@@ -2,16 +2,18 @@
  * useTerminal Hook
  *
  * Composable hook for managing a single XTerm.js instance
- * Handles initialization, resize, cleanup, and theme application
+ * Handles initialization, resize, cleanup, theme, search, filter, and clear
  *
  * IMPORTANT: This hook is designed to work WITHOUT React StrictMode
- * for the terminal window, because XTerm.js doesn't handle double-mounting well.
+ * for the terminal window, because XTerm.js doesn't handle double-mount well.
  */
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { SearchAddon } from '@xterm/addon-search';
+import { SerializeAddon } from '@xterm/addon-serialize';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import type { ITheme } from '@xterm/xterm';
@@ -38,20 +40,24 @@ export interface UseTerminalReturn {
   resize: () => void;
   /** Write data to terminal */
   write: (data: string) => void;
+  /** Clear terminal scrollback and screen */
+  clear: () => void;
+  /** Search addon for find operations */
+  searchAddon: SearchAddon | null;
+  /** Whether filter mode is active */
+  isFiltering: boolean;
+  /** Activate filter mode with a search term */
+  startFilter: (term: string) => void;
+  /** Update filter term while filtering */
+  updateFilter: (term: string) => void;
+  /** Deactivate filter mode and restore content */
+  stopFilter: () => void;
+  /** Number of lines matching the current filter */
+  filterMatchCount: number;
 }
 
 /**
  * Hook to manage a single XTerm instance
- *
- * Usage:
- * ```tsx
- * const { containerRef, terminal, resize } = useTerminal({
- *   terminalId: 'term-123',
- *   theme: TERMINAL_THEMES.dracula.colors,
- * });
- *
- * return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
- * ```
  */
 export function useTerminal(options: UseTerminalOptions): UseTerminalReturn {
   const { terminalId, theme, cursorColor, onData, onExit } = options;
@@ -60,6 +66,8 @@ export function useTerminal(options: UseTerminalOptions): UseTerminalReturn {
   const containerRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
+  const serializeAddonRef = useRef<SerializeAddon | null>(null);
 
   // Refs for cleanup functions
   const unlistenDataRef = useRef<UnlistenFn | null>(null);
@@ -77,14 +85,34 @@ export function useTerminal(options: UseTerminalOptions): UseTerminalReturn {
   const writeBufferRef = useRef<string[]>([]);
   const rafScheduledRef = useRef(false);
 
+  // Filter state
+  const [isFiltering, setIsFiltering] = useState(false);
+  const [filterMatchCount, setFilterMatchCount] = useState(0);
+  const filterTermRef = useRef<string>('');
+  const savedBufferRef = useRef<string | null>(null);
+  const incomingDuringFilterRef = useRef<string[]>([]);
+
   /**
    * Flush buffered writes to terminal (called via requestAnimationFrame)
    */
   const flushWrites = useCallback(() => {
     if (writeBufferRef.current.length > 0 && xtermRef.current && isMountedRef.current) {
       const chunk = writeBufferRef.current.join('');
-      xtermRef.current.write(chunk);
       writeBufferRef.current = [];
+
+      // If filtering, capture raw data and only show matching lines
+      if (filterTermRef.current) {
+        incomingDuringFilterRef.current.push(chunk);
+        const lines = chunk.split(/\r?\n/);
+        const term = filterTermRef.current.toLowerCase();
+        const matching = lines.filter(l => l.toLowerCase().includes(term));
+        if (matching.length > 0) {
+          xtermRef.current.write(matching.join('\r\n') + '\r\n');
+          setFilterMatchCount(prev => prev + matching.length);
+        }
+      } else {
+        xtermRef.current.write(chunk);
+      }
     }
     rafScheduledRef.current = false;
   }, []);
@@ -143,10 +171,14 @@ export function useTerminal(options: UseTerminalOptions): UseTerminalReturn {
     // Create addons
     const fitAddon = new FitAddon();
     const webLinksAddon = new WebLinksAddon();
+    const searchAddon = new SearchAddon();
+    const serializeAddon = new SerializeAddon();
 
     // Load addons BEFORE opening terminal
     xterm.loadAddon(fitAddon);
     xterm.loadAddon(webLinksAddon);
+    xterm.loadAddon(searchAddon);
+    xterm.loadAddon(serializeAddon);
 
     // Open terminal in container
     xterm.open(container);
@@ -154,6 +186,8 @@ export function useTerminal(options: UseTerminalOptions): UseTerminalReturn {
     // Store refs
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
+    searchAddonRef.current = searchAddon;
+    serializeAddonRef.current = serializeAddon;
 
     // Handle user input - send to backend
     const dataDisposable = xterm.onData((data) => {
@@ -274,6 +308,8 @@ export function useTerminal(options: UseTerminalOptions): UseTerminalReturn {
 
       // Clear refs
       fitAddonRef.current = null;
+      searchAddonRef.current = null;
+      serializeAddonRef.current = null;
       isInitializedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -314,11 +350,120 @@ export function useTerminal(options: UseTerminalOptions): UseTerminalReturn {
     }
   }, []);
 
+  /**
+   * Clear terminal scrollback and visible content
+   */
+  const clear = useCallback(() => {
+    if (xtermRef.current && isMountedRef.current) {
+      xtermRef.current.clear();
+    }
+  }, []);
+
+  /**
+   * Start filter mode - shows only lines matching the term
+   */
+  const startFilter = useCallback((term: string) => {
+    const xterm = xtermRef.current;
+    const serializeAddon = serializeAddonRef.current;
+    if (!xterm || !serializeAddon || !isMountedRef.current) return;
+
+    // Save current buffer content (serialized with ANSI sequences for full restoration)
+    const savedBuffer = serializeAddon.serialize();
+    savedBufferRef.current = savedBuffer;
+    incomingDuringFilterRef.current = [];
+    filterTermRef.current = term;
+    setIsFiltering(true);
+
+    // Filter lines from serialized buffer (preserves ANSI colors, consistent with updateFilter)
+    const allLines = savedBuffer.split(/\r?\n/);
+    const lowerTerm = term.toLowerCase();
+    const matching = allLines.filter(l => l.toLowerCase().includes(lowerTerm));
+
+    setFilterMatchCount(matching.length);
+
+    // Clear terminal and write only matching lines
+    xterm.reset();
+    if (matching.length > 0) {
+      xterm.write(matching.join('\r\n') + '\r\n');
+    }
+  }, []);
+
+  /**
+   * Update filter term while already filtering
+   */
+  const updateFilter = useCallback((term: string) => {
+    const xterm = xtermRef.current;
+    const savedBuffer = savedBufferRef.current;
+    if (!xterm || savedBuffer === null || !isMountedRef.current) return;
+
+    filterTermRef.current = term;
+
+    if (!term) {
+      // Empty term - restore everything
+      xterm.reset();
+      xterm.write(savedBuffer);
+      for (const chunk of incomingDuringFilterRef.current) {
+        xterm.write(chunk);
+      }
+      setFilterMatchCount(0);
+      return;
+    }
+
+    // Re-parse original buffer lines from the serialized content
+    // The serialized content is plain text with ANSI sequences
+    const originalLines = savedBuffer.split(/\r?\n/);
+    // Also include lines from incoming data during filter
+    const incomingLines = incomingDuringFilterRef.current.flatMap(c => c.split(/\r?\n/));
+    const allLines = [...originalLines, ...incomingLines];
+
+    const lowerTerm = term.toLowerCase();
+    const matching = allLines.filter(l => l.toLowerCase().includes(lowerTerm));
+
+    setFilterMatchCount(matching.length);
+
+    xterm.reset();
+    if (matching.length > 0) {
+      xterm.write(matching.join('\r\n') + '\r\n');
+    }
+  }, []);
+
+  /**
+   * Stop filter mode and restore full content
+   */
+  const stopFilter = useCallback(() => {
+    const xterm = xtermRef.current;
+    const savedBuffer = savedBufferRef.current;
+    if (!xterm || !isMountedRef.current) return;
+
+    filterTermRef.current = '';
+    setIsFiltering(false);
+    setFilterMatchCount(0);
+
+    if (savedBuffer !== null) {
+      // Restore original content + anything that came in during filtering
+      xterm.reset();
+      xterm.write(savedBuffer);
+      for (const chunk of incomingDuringFilterRef.current) {
+        xterm.write(chunk);
+      }
+    }
+
+    savedBufferRef.current = null;
+    incomingDuringFilterRef.current = [];
+  }, []);
+
   return {
     containerRef,
     terminal: xtermRef.current,
     resize,
     write,
+    clear,
+    searchAddon: searchAddonRef.current,
+    isFiltering,
+    startFilter,
+    updateFilter,
+    stopFilter,
+    filterMatchCount,
   };
 }
 
