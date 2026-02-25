@@ -605,6 +605,7 @@ export interface ClaudeSystemEvent extends ClaudeEventBase {
   model?: string;
   cwd?: string;
   tools?: string[];
+  isResumed?: boolean;
 }
 
 export interface ClaudeContentBlock {

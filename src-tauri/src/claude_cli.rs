@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::{Path, PathBuf}, process::Stdio};
+use std::{collections::HashMap, fs, path::{Path, PathBuf}, process::Stdio, sync::Arc};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdin, Command};
@@ -115,6 +115,8 @@ struct DaemonQueryState {
     app: AppHandle,
     /// Used to signal the awaiting send_message_via_sdk_streaming call
     completion_tx: tokio::sync::oneshot::Sender<Result<ClaudeCliResponse, String>>,
+    /// Pauses the query timeout while the user is reviewing a plan or answering a question
+    waiting_for_user: Arc<std::sync::atomic::AtomicBool>,
 }
 
 /// Send a message to an active SDK process via stdin
@@ -507,6 +509,8 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                     if let Some(state) = queries.get(qid.as_str()) {
                         let request_id = msg.get("requestId").and_then(|r| r.as_str()).unwrap_or("");
                         log::info!("[DAEMON:INTERACT] AskUserQuestion query={} requestId={} -> emitting to frontend", qid, request_id);
+                        // Pause timeout while user is answering
+                        state.waiting_for_user.store(true, std::sync::atomic::Ordering::Relaxed);
                         let questions = msg.get("questions").cloned().unwrap_or(serde_json::Value::Array(vec![]));
 
                         let payload = serde_json::json!({
@@ -530,6 +534,8 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                     if let Some(state) = queries.get(qid.as_str()) {
                         let request_id = msg.get("requestId").and_then(|r| r.as_str()).unwrap_or("");
                         log::info!("[DAEMON:INTERACT] PlanApprovalRequest query={} requestId={} -> emitting to frontend", qid, request_id);
+                        // Pause timeout while user reviews the plan
+                        state.waiting_for_user.store(true, std::sync::atomic::Ordering::Relaxed);
                         let plan = msg.get("plan").cloned().unwrap_or(serde_json::Value::Null);
 
                         let payload = serde_json::json!({
@@ -1874,6 +1880,9 @@ async fn send_message_via_daemon(
     // Create completion channel
     let (tx, rx) = tokio::sync::oneshot::channel();
 
+    // Shared flag: set to true when query is waiting for user (plan approval / ask-user-question)
+    let waiting_for_user = Arc::new(std::sync::atomic::AtomicBool::new(false));
+
     // Register query
     {
         let mut queries = DAEMON_QUERIES.lock().await;
@@ -1882,6 +1891,7 @@ async fn send_message_via_daemon(
             session_key: event_session_key.clone(),
             app: app.clone(),
             completion_tx: tx,
+            waiting_for_user: waiting_for_user.clone(),
         });
     }
 
@@ -1947,27 +1957,49 @@ async fn send_message_via_daemon(
         e
     })?;
 
-    // Wait for completion with timeout (10 minutes max per query)
-    match tokio::time::timeout(std::time::Duration::from_secs(600), rx).await {
-        Ok(Ok(result)) => {
-            log::info!("[DAEMON:QUERY] query={} finished successfully", query_id);
-            result
-        }
-        Ok(Err(_)) => {
-            log::error!("[DAEMON:QUERY] query={} completion channel dropped", query_id);
-            // Clean up orphaned query state
-            let mut queries = DAEMON_QUERIES.lock().await;
-            queries.remove(&query_id);
-            Err("Query completion channel was dropped unexpectedly".to_string())
-        }
-        Err(_) => {
-            log::error!("[DAEMON:QUERY] query={} timed out after 600s", query_id);
-            // Send abort to daemon and clean up
-            let abort_cmd = serde_json::json!({"type": "abort", "queryId": query_id});
-            let _ = send_to_daemon(&abort_cmd.to_string()).await;
-            let mut queries = DAEMON_QUERIES.lock().await;
-            queries.remove(&query_id);
-            Err("Query timed out after 10 minutes".to_string())
+    // Wait for completion with a smart timeout:
+    // - Hard limit of 10 minutes for AI processing
+    // - Timeout pauses automatically while waiting for user input (plan approval / ask-user-question)
+    const PROCESSING_TIMEOUT_SECS: u64 = 3600;
+    const CHECK_INTERVAL_SECS: u64 = 15;
+
+    tokio::pin!(rx);
+    let mut deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(PROCESSING_TIMEOUT_SECS);
+
+    loop {
+        let time_remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        // Poll every CHECK_INTERVAL_SECS so we can re-evaluate waiting_for_user
+        let wait_dur = std::cmp::min(
+            std::time::Duration::from_secs(CHECK_INTERVAL_SECS),
+            time_remaining + std::time::Duration::from_millis(1),
+        );
+
+        match tokio::time::timeout(wait_dur, &mut rx).await {
+            Ok(Ok(result)) => {
+                log::info!("[DAEMON:QUERY] query={} finished successfully", query_id);
+                break result;
+            }
+            Ok(Err(_)) => {
+                log::error!("[DAEMON:QUERY] query={} completion channel dropped", query_id);
+                let mut queries = DAEMON_QUERIES.lock().await;
+                queries.remove(&query_id);
+                break Err("Query completion channel was dropped unexpectedly".to_string());
+            }
+            Err(_) => {
+                // Interval elapsed — check whether we're waiting for the user
+                if waiting_for_user.load(std::sync::atomic::Ordering::Relaxed) {
+                    // User is reviewing a plan or answering a question: extend deadline
+                    deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(PROCESSING_TIMEOUT_SECS);
+                    log::debug!("[DAEMON:QUERY] query={} waiting for user input — timeout extended", query_id);
+                } else if tokio::time::Instant::now() >= deadline {
+                    log::error!("[DAEMON:QUERY] query={} timed out after {}s", query_id, PROCESSING_TIMEOUT_SECS);
+                    let abort_cmd = serde_json::json!({"type": "abort", "queryId": query_id});
+                    let _ = send_to_daemon(&abort_cmd.to_string()).await;
+                    let mut queries = DAEMON_QUERIES.lock().await;
+                    queries.remove(&query_id);
+                    break Err("Query timed out after 60 minutes".to_string());
+                }
+            }
         }
     }
 }
@@ -2774,6 +2806,17 @@ pub async fn answer_user_question(
         if daemon_guard.is_some() {
             drop(daemon_guard);
             log::info!("[DAEMON:INTERACT] Routing answer via daemon for requestId={}", request_id);
+
+            // Resume the query timeout now that user has responded
+            {
+                let queries = DAEMON_QUERIES.lock().await;
+                for state in queries.values() {
+                    if state.session_key == agent_id || state.agent_id == agent_id {
+                        state.waiting_for_user.store(false, std::sync::atomic::Ordering::Relaxed);
+                        break;
+                    }
+                }
+            }
 
             let cmd = serde_json::json!({
                 "type": "response",
