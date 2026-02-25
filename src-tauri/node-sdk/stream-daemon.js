@@ -190,6 +190,7 @@ async function handleQuery(cmd) {
     queryId, prompt, model = 'opus', permissionMode, thinkingMode,
     cwd, sessionId, agents, attachments, outputFormat, effort,
     mcpServers: passedMcpServers, allowedTools, teamContext, ideContext,
+    provider, providerBaseUrl, providerApiKey,
   } = cmd;
 
   const abortController = new AbortController();
@@ -199,6 +200,27 @@ async function handleQuery(cmd) {
 
   activeQueries.set(queryId, { abortController });
   log('QUERY', `Starting query=${queryId} model=${model} cwd=${cwd || 'default'} resume=${sessionId || '(new)'} activeQueries=${activeQueries.size}`);
+
+  // 🦆 LLM Provider: set env vars per-query for custom/ollama providers
+  // Save originals so we can restore after the query (daemon is persistent)
+  const savedBaseUrl = process.env.ANTHROPIC_BASE_URL;
+  const savedApiKey = process.env.ANTHROPIC_API_KEY;
+  const savedAuthToken = process.env.ANTHROPIC_AUTH_TOKEN;
+
+  if (provider === 'ollama') {
+    process.env.ANTHROPIC_BASE_URL = providerBaseUrl || 'http://localhost:11434';
+    process.env.ANTHROPIC_API_KEY = 'ollama';
+    process.env.ANTHROPIC_AUTH_TOKEN = 'ollama';
+    log('QUERY', `🦙 Provider: Ollama at ${process.env.ANTHROPIC_BASE_URL}`);
+  } else if (provider === 'custom') {
+    if (providerBaseUrl) {
+      process.env.ANTHROPIC_BASE_URL = providerBaseUrl;
+      log('QUERY', `🔧 Provider: Custom at ${providerBaseUrl}`);
+    }
+    if (providerApiKey) {
+      process.env.ANTHROPIC_API_KEY = providerApiKey;
+    }
+  }
 
   try {
     // --- Build SDK options (same logic as stream-claude.js) ---
@@ -413,6 +435,16 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
       }
     }
   } finally {
+    // 🦆 Restore original env vars after query (daemon is persistent)
+    if (provider === 'ollama' || provider === 'custom') {
+      if (savedBaseUrl !== undefined) process.env.ANTHROPIC_BASE_URL = savedBaseUrl;
+      else delete process.env.ANTHROPIC_BASE_URL;
+      if (savedApiKey !== undefined) process.env.ANTHROPIC_API_KEY = savedApiKey;
+      else delete process.env.ANTHROPIC_API_KEY;
+      if (savedAuthToken !== undefined) process.env.ANTHROPIC_AUTH_TOKEN = savedAuthToken;
+      else delete process.env.ANTHROPIC_AUTH_TOKEN;
+    }
+
     // Clean up pending requests for this query
     let cleanedRequests = 0;
     for (const [reqId, req] of pendingRequests.entries()) {

@@ -21,6 +21,8 @@ const state = {
   chatSending: false,
   chatPollTimer: null, // polling timer for live updates
   drawer: null,        // { agentId, agentName } when execute drawer is open
+  refreshing: false,   // pull-to-refresh in progress
+  autoRefreshTimer: null, // stealth auto-refresh timer
 };
 
 // ── API Client ─────────────────────────────────────────────────
@@ -120,6 +122,86 @@ async function loadData() {
     }
   }
   render();
+}
+
+// ── Pull-to-Refresh ───────────────────────────────────────────
+let pullStartY = 0;
+let pulling = false;
+
+function initPullToRefresh() {
+  const app = $('#app');
+  if (!app) return;
+
+  app.addEventListener('touchstart', (e) => {
+    // Only activate at top of scroll
+    if (app.scrollTop <= 0 && !state.chatSession && !state.drawer) {
+      pullStartY = e.touches[0].clientY;
+      pulling = true;
+    }
+  }, { passive: true });
+
+  app.addEventListener('touchmove', (e) => {
+    if (!pulling) return;
+    const pullDistance = e.touches[0].clientY - pullStartY;
+    const indicator = $('#pull-indicator');
+    if (indicator && pullDistance > 0) {
+      const progress = Math.min(pullDistance / 100, 1);
+      indicator.style.height = `${Math.min(pullDistance * 0.5, 50)}px`;
+      indicator.style.opacity = progress;
+      indicator.querySelector('.pull-spinner').style.transform = `rotate(${pullDistance * 3}deg)`;
+    }
+  }, { passive: true });
+
+  app.addEventListener('touchend', () => {
+    if (!pulling) return;
+    pulling = false;
+    const indicator = $('#pull-indicator');
+    if (indicator && parseInt(indicator.style.height) >= 45) {
+      refreshData();
+    }
+    if (indicator) {
+      indicator.style.height = '0px';
+      indicator.style.opacity = '0';
+    }
+  });
+}
+
+async function refreshData() {
+  if (state.refreshing) return;
+  state.refreshing = true;
+  render();
+  await loadData();
+  state.refreshing = false;
+  render();
+}
+
+// ── Stealth Auto-Refresh ──────────────────────────────────────
+function startAutoRefresh() {
+  stopAutoRefresh();
+  // Refresh data every 30s silently (no spinner, no toast)
+  state.autoRefreshTimer = setInterval(async () => {
+    if (state.chatSession || state.drawer || state.loading) return;
+    try {
+      const [statusData, agents, sessions, jobs] = await Promise.all([
+        api.get('/status'),
+        api.get('/agents'),
+        api.get('/sessions'),
+        api.get('/jobs'),
+      ]);
+      state.status = statusData;
+      state.agents = agents;
+      state.sessions = sessions.sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
+      state.jobs = jobs;
+      render();
+    } catch {}
+  }, 30000);
+}
+
+function stopAutoRefresh() {
+  if (state.autoRefreshTimer) {
+    clearInterval(state.autoRefreshTimer);
+    state.autoRefreshTimer = null;
+  }
 }
 
 // ── Chat ───────────────────────────────────────────────────────
@@ -279,15 +361,22 @@ function renderLogin() {
 
 function renderHeader() {
   return `
+    <div id="pull-indicator" class="pull-indicator" style="height:0px;opacity:0">
+      <div class="pull-spinner">↻</div>
+    </div>
+    ${state.refreshing ? '<div class="refresh-bar"><div class="refresh-bar-fill"></div></div>' : ''}
     <div class="header">
       <div style="display:flex;align-items:center;gap:8px">
         <span class="header-duck">🦆</span>
         <span class="header-title">Quack</span>
       </div>
-      <span class="header-status ${state.wsConnected ? '' : 'offline'}">
-        <span class="ws-dot ${state.wsConnected ? 'connected' : 'disconnected'}"></span>
-        ${state.wsConnected ? 'Live' : 'Offline'}
-      </span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn-refresh ${state.refreshing ? 'spinning' : ''}" id="refresh-btn" title="Refresh">↻</button>
+        <span class="header-status ${state.wsConnected ? '' : 'offline'}">
+          <span class="ws-dot ${state.wsConnected ? 'connected' : 'disconnected'}"></span>
+          ${state.wsConnected ? 'Live' : 'Offline'}
+        </span>
+      </div>
     </div>
   `;
 }
@@ -612,6 +701,12 @@ function bindEvents() {
     }
   }
 
+  // Refresh button
+  const refreshBtn = $('#refresh-btn');
+  if (refreshBtn) {
+    refreshBtn.onclick = () => refreshData();
+  }
+
   // Tabs
   $$('.tab-btn').forEach(btn => {
     btn.onclick = () => { state.tab = btn.dataset.tab; render(); };
@@ -656,4 +751,6 @@ render();
 if (state.token) {
   loadData();
   connectWs();
+  initPullToRefresh();
+  startAutoRefresh();
 }

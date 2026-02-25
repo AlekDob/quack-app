@@ -63,6 +63,7 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Session creation: `documentation/gotchas/gotcha-programmatic-session-creation.md`
 - axum nest + state: `documentation/gotchas/gotcha-axum-nest-state-types.md`
 - Remote execute: `documentation/gotchas/gotcha-remote-execute-needs-react-listener.md`
+- Daemon providers: `documentation/bugs/bug-daemon-missing-provider-env-vars.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

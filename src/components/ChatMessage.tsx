@@ -135,8 +135,8 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
       collapseTimeoutRef.current = null;
     }
 
-    // If expanded and not hovering, start collapse timer
-    if (isExpanded && !isHovering) {
+    // If expanded and not hovering, start collapse timer (only for sticky messages)
+    if (isExpanded && !isHovering && isLastUserMessage) {
       collapseTimeoutRef.current = setTimeout(() => {
         setIsExpanded(false);
       }, 300); // 300ms delay after hover out
@@ -248,10 +248,14 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
     return content;
   };
 
-  // Check if current message is truncated (only for sticky user messages)
+  // Check if current message is truncated (for ALL user messages)
   // Use extractOriginalCommand to get clean content for truncation check
-  const isMessageTruncated = isLastUserMessage && isUser
-    ? isTruncated(extractOriginalCommand(message.content), 30, 250)
+  const isMessageTruncated = isUser
+    ? isTruncated(
+        extractOriginalCommand(message.content),
+        isLastUserMessage ? 30 : 20,
+        isLastUserMessage ? 250 : 150
+      )
     : false;
 
   // 🦆 FIX: Stable event key generator - ALWAYS uses index for guaranteed uniqueness
@@ -586,9 +590,18 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
               <>
                 <span className="user-message-text">
                   {!isExpanded
-                    ? renderTextWithMentions(truncateText(extractOriginalCommand(message.content), 20, 150))
+                    ? renderTextWithMentions(truncateText(extractOriginalCommand(message.content), isLastUserMessage ? 30 : 20, isLastUserMessage ? 250 : 150))
                     : renderTextWithMentions(message.content)
                   }
+                  {/* Inline See more / Show less button for truncated messages */}
+                  {isMessageTruncated && (
+                    <button
+                      className="see-more-btn"
+                      onClick={handleToggleExpand}
+                    >
+                      {isExpanded ? 'Show less' : 'See more'}
+                    </button>
+                  )}
                 </span>
                 <img
                   src={humanoidAvatar}

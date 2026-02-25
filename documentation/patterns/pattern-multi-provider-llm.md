@@ -2,7 +2,7 @@
 type: pattern
 project: quack-app
 created: 2026-02-23
-last_verified: 2026-02-23
+last_verified: 2026-02-24
 tags: [llm, provider, ollama, multi-model, architecture]
 ---
 # Multi-Provider LLM Architecture
@@ -13,15 +13,23 @@ Quack supports three LLM providers: **Anthropic** (default), **Ollama** (local/c
 
 ## Architecture Flow
 
+### Legacy Path (spawn-per-message)
 ```
-Settings UI (provider select)
-  -> settingsStore.claude (Zustand persisted)
-    -> App.tsx / usePopoutKanbanChat.ts (reads provider settings)
-      -> Tauri invoke('stream_claude_message', { provider, provider_base_url, ... })
-        -> claude_cli.rs (match provider -> set env vars on Command)
-          -> Node.js stream-claude.js (uses ANTHROPIC_BASE_URL)
-            -> Claude Agent SDK query() (talks to configured endpoint)
+Settings UI -> Tauri invoke -> claude_cli.rs (set env vars on Command)
+  -> spawn stream-claude.js (fresh process, inherits env vars)
+    -> Claude Agent SDK query()
 ```
+
+### Daemon Path (persistent process)
+```
+Settings UI -> Tauri invoke -> claude_cli.rs (add provider fields to JSON query)
+  -> send JSON to stream-daemon.js (persistent process)
+    -> set env vars per-query (save originals first)
+      -> Claude Agent SDK query()
+    -> restore env vars in finally block
+```
+
+**Critical**: The daemon is persistent — env vars must be set/restored **per-query**, not per-process. See `documentation/bugs/bug-daemon-missing-provider-env-vars.md`.
 
 ## Key Mechanism
 
@@ -45,6 +53,7 @@ The Claude Agent SDK always uses the Anthropic Messages API format. Ollama v0.14
 | `src/services/claudeSDK.ts` | `getProviderRequestFields()`, `getActiveModelName()` |
 | `src-tauri/src/claude_cli.rs` | Env var injection per provider |
 | `src-tauri/node-sdk/stream-claude.js` | Auth bypass when `ANTHROPIC_BASE_URL` is set |
+| `src-tauri/node-sdk/stream-daemon.js` | Per-query env var set/restore for provider |
 | `src/components/settings/categories/ClaudeCodeSettings.tsx` | Provider selection UI |
 | `src/components/ChatSettingsMenu.tsx` | Provider-aware model display in chat footer |
 | `src/components/MessageSettingsBadges.tsx` | Model name badge on messages |

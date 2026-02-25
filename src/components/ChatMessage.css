@@ -270,11 +270,32 @@
   overflow-wrap: anywhere; /* Break even within long words/URLs */
 }
 
-/* Remove height constraint when expanded */
+/* Remove height constraint when expanded - works for ALL user messages */
+.chat-message.user .chat-message-body.expanded .user-message-text,
 .chat-message.sticky-user-message .chat-message-body.expanded .user-message-text {
   -webkit-line-clamp: unset;
   max-height: none;
   overflow: visible;
+}
+
+/* See more / Show less button inside user bubble */
+.see-more-btn {
+  display: inline;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.15s ease;
+  white-space: nowrap;
+}
+
+.see-more-btn:hover {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .chat-message-attachments {

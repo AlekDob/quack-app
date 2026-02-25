@@ -1928,6 +1928,16 @@ async fn send_message_via_daemon(
     if let Some(ref ide_ctx) = request.ide_context {
         query_cmd["ideContext"] = serde_json::Value::String(ide_ctx.clone());
     }
+    // 🦆 LLM Provider support for daemon path (custom/ollama providers)
+    if let Some(ref prov) = request.provider {
+        query_cmd["provider"] = serde_json::Value::String(prov.clone());
+    }
+    if let Some(ref url) = request.provider_base_url {
+        query_cmd["providerBaseUrl"] = serde_json::Value::String(url.clone());
+    }
+    if let Some(ref key) = request.provider_api_key {
+        query_cmd["providerApiKey"] = serde_json::Value::String(key.clone());
+    }
 
     // Send query to daemon
     let cmd_str = query_cmd.to_string();

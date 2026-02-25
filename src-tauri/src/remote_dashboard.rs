@@ -25,6 +25,8 @@ pub fn create_dashboard_router() -> Router {
         .route("/app.js", get(handle_js))
         .route("/style.css", get(handle_css))
         .route("/manifest.json", get(handle_manifest))
+        .route("/icon-192.png", get(handle_icon_192))
+        .route("/icon-512.png", get(handle_icon_512))
 }
 
 async fn handle_dashboard(Query(q): Query<DashboardQuery>) -> Html<String> {
@@ -61,6 +63,30 @@ async fn handle_manifest() -> Response {
         StatusCode::OK,
         [(header::CONTENT_TYPE, "application/manifest+json")],
         include_str!("../static/manifest.json"),
+    )
+        .into_response()
+}
+
+async fn handle_icon_192() -> Response {
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "image/png"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        include_bytes!("../icons/128x128@2x.png").as_slice(),
+    )
+        .into_response()
+}
+
+async fn handle_icon_512() -> Response {
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "image/png"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        include_bytes!("../icons/icon.png").as_slice(),
     )
         .into_response()
 }
