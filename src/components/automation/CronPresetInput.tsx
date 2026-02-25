@@ -29,7 +29,16 @@ export default function CronPresetInput({
     }
   }, []);
 
+  // Check if a cron expression has special patterns (e.g. every-N, ranges) in hour or minute
+  const hasSpecialTimeFields = (expression: string): boolean => {
+    const parts = expression.split(' ');
+    return parts[0].includes('*') || parts[0].includes('/') || parts[0].includes('-') || parts[0].includes(',')
+        || parts[1].includes('*') || parts[1].includes('/') || parts[1].includes('-') || parts[1].includes(',');
+  };
+
   const applyTime = (expression: string, time: string): string => {
+    // Don't override special time patterns like */6
+    if (hasSpecialTimeFields(expression)) return expression;
     const [hours, minutes] = time.split(':');
     const parts = expression.split(' ');
     parts[0] = String(parseInt(minutes, 10));

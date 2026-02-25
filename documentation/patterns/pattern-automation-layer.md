@@ -15,12 +15,12 @@ Quack's automation system allows users to schedule recurring agent sessions via 
 ```
 Rust Scheduler (tokio 30s tick + cron crate)
   --> emits `automation-scheduler-tick` Tauri event
-  --> React listener checks all enabled jobs' `nextRunAt`
-  --> If a job is due: `handleAutomationFireJob`
-    --> creates AgentSession via `createSession()`
-    --> sends prompt via `sendMessageForTargetAgent(sessionId, prompt, { workingDirectory })`
-    --> session appears under the agent in the sidebar
+  --> App.tsx GLOBAL listener (always mounted) checks all enabled jobs' `nextRunAt`
+  --> If a job is due: fires inline (markJobRunning → advance nextRunAt → createSession → sendMessage)
+  --> session appears under the agent in the sidebar
 ```
+
+**IMPORTANT**: The tick listener MUST live in App.tsx (always mounted), NOT in AutomationView (tab-scoped). See `documentation/bugs/fix-automation-job-fires-repeatedly.md`.
 
 ## Storage
 

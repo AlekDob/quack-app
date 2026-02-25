@@ -64,10 +64,12 @@ export const useAutomationStore = create<AutomationState>()(
           loadAutomationJobs(),
           loadAutomationHistory(),
         ]);
-        // Recalculate nextRunAt for all enabled jobs
+        // Recalculate nextRunAt only if missing or in the past (preserve future timestamps)
+        const now = Date.now();
         const updatedJobs = jobs.map(job => {
           if (!job.enabled) return job;
-          const nextRunAt = getNextFireTime(job.cronExpression) ?? undefined;
+          if (job.nextRunAt && job.nextRunAt > now) return job; // Already scheduled in the future
+          const nextRunAt = getNextFireTime(job.cronExpression, undefined, true) ?? undefined;
           return { ...job, nextRunAt };
         });
         set({ jobs: updatedJobs, history, isLoading: false });
@@ -82,7 +84,7 @@ export const useAutomationStore = create<AutomationState>()(
           createdAt: now,
           updatedAt: now,
           nextRunAt: jobData.enabled
-            ? getNextFireTime(jobData.cronExpression) ?? undefined
+            ? getNextFireTime(jobData.cronExpression, undefined, true) ?? undefined
             : undefined,
         };
         const jobs = [...get().jobs, newJob];
@@ -95,10 +97,10 @@ export const useAutomationStore = create<AutomationState>()(
         const jobs = get().jobs.map(job => {
           if (job.id !== id) return job;
           const updated = { ...job, ...updates, updatedAt: Date.now() };
-          // Recalculate nextRunAt if cron or enabled changed
+          // Recalculate nextRunAt if cron or enabled changed (inclusive: may fire this minute)
           if (updates.cronExpression !== undefined || updates.enabled !== undefined) {
             updated.nextRunAt = updated.enabled
-              ? getNextFireTime(updated.cronExpression) ?? undefined
+              ? getNextFireTime(updated.cronExpression, undefined, true) ?? undefined
               : undefined;
           }
           return updated;

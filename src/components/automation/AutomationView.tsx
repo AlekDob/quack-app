@@ -1,6 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { useAutomationStore } from '../../stores/automationStore';
 import AutomationJobCard from './AutomationJobCard';
 import AutomationJobForm from './AutomationJobForm';
@@ -30,74 +28,16 @@ export default function AutomationView({
     deleteJob,
     toggleJob,
     setActiveView,
-    markJobRunning,
-    markRunComplete,
     getRunningJobCount,
   } = useAutomationStore();
 
   const [showForm, setShowForm] = useState(false);
   const [editingJob, setEditingJob] = useState<AutomationJob | null>(null);
 
-  // Initialize store on mount
+  // Initialize store on mount (refresh UI data; scheduler tick lives in App.tsx)
   useEffect(() => {
     initialize();
   }, [initialize]);
-
-  // Start scheduler and listen for tick events
-  useEffect(() => {
-    invoke('start_automation_scheduler').catch(err =>
-      console.error('[Automation] Failed to start scheduler:', err)
-    );
-
-    const unlistenTick = listen('automation-scheduler-tick', () => {
-      handleSchedulerTick();
-    });
-
-    return () => {
-      unlistenTick.then(fn => fn());
-    };
-  }, []);
-
-  // Check jobs on tick
-  const handleSchedulerTick = useCallback(() => {
-    const { jobs } = useAutomationStore.getState();
-    const now = Date.now();
-
-    for (const job of jobs) {
-      if (!job.enabled || !job.nextRunAt) continue;
-      if (now < job.nextRunAt) continue;
-      if (job.skipIfRunning && job.lastRunStatus === 'running') continue;
-
-      fireJob(job);
-    }
-  }, []);
-
-  // Fire a job — delegates to parent (App.tsx) for session creation
-  const fireJob = useCallback(async (job: AutomationJob) => {
-    try {
-      const run = await markJobRunning(job.id);
-      await invoke('mark_automation_job_running', { jobId: job.id });
-
-      // Delegate to parent for actual session creation
-      if (onFireJob) {
-        onFireJob(job);
-      } else {
-        // Fallback: just fire via Rust event
-        await invoke('fire_automation_job', { job });
-      }
-
-      // Mark as success after 5s (parent may update sooner)
-      setTimeout(async () => {
-        const currentRun = useAutomationStore.getState().history.find(r => r.id === run.id);
-        if (currentRun?.status === 'running') {
-          await markRunComplete(run.id, 'success');
-          await invoke('mark_automation_job_completed', { jobId: job.id });
-        }
-      }, 5000);
-    } catch (err) {
-      console.error('[Automation] Failed to fire job:', err);
-    }
-  }, [markJobRunning, markRunComplete, onFireJob]);
 
   const handleEdit = useCallback((job: AutomationJob) => {
     setEditingJob(job);
@@ -109,9 +49,10 @@ export default function AutomationView({
     setEditingJob(null);
   }, []);
 
+  // "Fire Now" button delegates to parent (App.tsx) via onFireJob prop
   const handleFireNow = useCallback((job: AutomationJob) => {
-    fireJob(job);
-  }, [fireJob]);
+    onFireJob?.(job);
+  }, [onFireJob]);
 
   const runningCount = getRunningJobCount();
 

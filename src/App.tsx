@@ -90,6 +90,7 @@ import { useMarketplace } from "./hooks/useMarketplace";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useKanbanStore } from "./stores/kanbanStore";
+import { useAutomationStore } from "./stores/automationStore";
 import { useSessionStore } from "./stores/sessionStore";
 import { useTeamStore } from "./stores/teamStore";
 import { useChatStore } from "./stores/chatStore";
@@ -134,6 +135,7 @@ import {
   NATIVE_TERMINALS_STORAGE_KEY,
 } from "./services/terminalStorage";
 import { extractProjectId } from "./utils/projectUtils";
+import { getNextFireTime } from "./services/cronUtils";
 import {
   loadAgents as loadUnifiedAgents,
   saveAgents as saveUnifiedAgents,
@@ -9165,6 +9167,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
 
     try {
+      // 0. Inject agent personality into CLAUDE.md before firing
+      if (agent.personality) {
+        const projectPath = job.projectPath || agent.cwd;
+        await invoke('inject_personality_to_claude_md', {
+          projectPath,
+          personality: agent.personality,
+        });
+      }
+
       // 1. Create a new AgentSession for this automation run
       const newSession = await createSession({
         title: `[Auto] ${job.name}`,
@@ -9189,6 +9200,101 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       toast.error(`Failed to fire job "${job.name}": ${err instanceof Error ? err.message : String(err)}`);
     }
   }, [terminals, createSession, sendMessageForTargetAgent]);
+
+  // Brain: fix-automation-job-fires-repeatedly
+  // Global automation scheduler — always mounted, fires jobs even when Automation tab is closed
+  useEffect(() => {
+    if (!tauriAvailable) return;
+
+    // Initialize the automation store (loads jobs from disk)
+    useAutomationStore.getState().initialize();
+
+    // Start the Rust scheduler (idempotent — safe to call multiple times)
+    invoke('start_automation_scheduler').catch(err =>
+      console.error('[Automation] Failed to start scheduler:', err)
+    );
+
+    // Listen for 30s tick from Rust scheduler
+    const unlistenTickPromise = listen('automation-scheduler-tick', () => {
+      const { jobs, markJobRunning, markRunComplete, updateJob } = useAutomationStore.getState();
+      const now = Date.now();
+
+      for (const job of jobs) {
+        if (!job.enabled || !job.nextRunAt) continue;
+        if (now < job.nextRunAt) continue;
+        if (job.skipIfRunning && job.lastRunStatus === 'running') continue;
+
+        // Fire the job
+        (async () => {
+          try {
+            const run = await markJobRunning(job.id);
+            await invoke('mark_automation_job_running', { jobId: job.id });
+
+            // Advance nextRunAt IMMEDIATELY so next tick won't re-fire
+            const nextRunAt = getNextFireTime(job.cronExpression);
+            await updateJob(job.id, { nextRunAt: nextRunAt ?? undefined });
+
+            // Create session and send prompt via App.tsx handler
+            // Use terminalsRef for always-current terminal list
+            const agent = terminalsRef.current.find(t => t.id === job.agentId);
+            if (!agent) {
+              console.error('[Automation] Agent not found:', job.agentId);
+              await markRunComplete(run.id, 'failed', undefined, `Agent "${job.agentName}" not found`);
+              await invoke('mark_automation_job_completed', { jobId: job.id });
+              return;
+            }
+
+            // Inject agent personality into CLAUDE.md before firing
+            // This ensures the job runs with the correct agent identity, not the last manually-selected one
+            if (agent.personality) {
+              const projectPath = job.projectPath || agent.cwd;
+              try {
+                await invoke('inject_personality_to_claude_md', {
+                  projectPath,
+                  personality: agent.personality,
+                });
+                console.log(`[Automation] Injected personality for "${agent.label}" into ${projectPath}/CLAUDE.md`);
+              } catch (err) {
+                console.warn('[Automation] Failed to inject personality:', err);
+                // Continue anyway — job can still run with stale personality
+              }
+            }
+
+            const newSession = await createSession({
+              title: `[Auto] ${job.name}`,
+              agentId: job.agentId,
+              projectPath: job.projectPath || agent.cwd,
+              projectName: job.projectName || extractProjectId(agent.cwd) || 'project',
+              status: 'in_progress',
+              messageCount: 0,
+              initialPrompt: job.promptTemplate,
+            });
+
+            await sendMessageForTargetAgent(newSession.id, job.promptTemplate, {
+              workingDirectory: job.projectPath || agent.cwd,
+            });
+
+            console.log(`[Automation] Job "${job.name}" fired — session ${newSession.id}`);
+
+            // Mark as success after 5s (session lifecycle may update sooner)
+            setTimeout(async () => {
+              const currentRun = useAutomationStore.getState().history.find(r => r.id === run.id);
+              if (currentRun?.status === 'running') {
+                await markRunComplete(run.id, 'success');
+                await invoke('mark_automation_job_completed', { jobId: job.id });
+              }
+            }, 5000);
+          } catch (err) {
+            console.error('[Automation] Failed to fire job:', err);
+          }
+        })();
+      }
+    });
+
+    return () => {
+      unlistenTickPromise.then(fn => fn()).catch(() => undefined);
+    };
+  }, [tauriAvailable, createSession, sendMessageForTargetAgent]);
 
   // Handler for opening Git Drawer with fullscreen loader
   const handleOpenGitDrawer = useCallback(() => {

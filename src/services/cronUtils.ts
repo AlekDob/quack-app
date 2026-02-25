@@ -108,14 +108,20 @@ function fieldMatches(field: string, value: number): boolean {
  * Calculate next fire time from a cron expression.
  * Uses LOCAL timezone (new Date() uses system clock).
  * Scans minute-by-minute up to 366 days ahead.
+ *
+ * @param inclusive - If true, includes the current minute in the search.
+ *   Use `true` when creating a new job (so it can fire this minute).
+ *   Use `false` (default) after firing, to advance to the NEXT occurrence.
  */
-export function getNextFireTime(expression: string, fromDate?: Date): number | null {
+export function getNextFireTime(expression: string, fromDate?: Date, inclusive = false): number | null {
   const parts = parseCron(expression);
   if (!parts) return null;
 
   const start = fromDate ? new Date(fromDate) : new Date();
   start.setSeconds(0, 0);
-  start.setMinutes(start.getMinutes() + 1);
+  if (!inclusive) {
+    start.setMinutes(start.getMinutes() + 1);
+  }
 
   const maxIterations = 366 * 24 * 60;
   const candidate = new Date(start);
