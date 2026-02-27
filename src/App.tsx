@@ -4922,7 +4922,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       autoSend: boolean;
     }>("remote-execute", async (event) => {
       console.log("📱 [Remote Execute] Request:", event.payload);
-      const { agentId, prompt, projectPath, projectName } = event.payload;
+      const { sessionId: remoteSessionId, agentId, prompt, projectPath, projectName } = event.payload;
 
       // Find the terminal for this agent
       const agent = terminalsRef.current.find(t => t.id === agentId);
@@ -4933,7 +4933,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       try {
         // Create a new session
+        // Use the session ID from Rust so mobile can poll with the correct ID
         const newSession = await useSessionStore.getState().createSession({
+          id: remoteSessionId,
           title: `[Remote] ${prompt.slice(0, 50)}...`,
           agentId,
           projectPath: projectPath || agent.cwd,
@@ -9214,49 +9216,63 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       console.error('[Automation] Failed to start scheduler:', err)
     );
 
+    // Brain: fix-automation-job-fires-repeatedly
     // Listen for 30s tick from Rust scheduler
+    // Defense-in-depth: 3 layers prevent re-fires:
+    //   1. claimJobForFiring() — synchronous lock, prevents concurrent fires
+    //   2. nextRunAt advanced synchronously in-memory before any async work
+    //   3. lastRunStatus set to 'running' synchronously
     const unlistenTickPromise = listen('automation-scheduler-tick', () => {
-      const { jobs, markJobRunning, markRunComplete, updateJob } = useAutomationStore.getState();
+      const store = useAutomationStore.getState();
       const now = Date.now();
 
-      for (const job of jobs) {
+      for (const job of store.jobs) {
         if (!job.enabled || !job.nextRunAt) continue;
         if (now < job.nextRunAt) continue;
         if (job.skipIfRunning && job.lastRunStatus === 'running') continue;
 
-        // Fire the job
+        // LAYER 1: Synchronous firing lock — if another tick already claimed this job, skip
+        if (!store.claimJobForFiring(job.id)) continue;
+
+        // LAYER 2+3: Advance nextRunAt and set status SYNCHRONOUSLY in the store
+        // This ensures the NEXT tick (30s later) sees updated state immediately
+        const nextRunAt = getNextFireTime(job.cronExpression);
+        const updatedJobs = useAutomationStore.getState().jobs.map(j =>
+          j.id === job.id
+            ? { ...j, nextRunAt: nextRunAt ?? undefined, lastRunStatus: 'running' as const }
+            : j
+        );
+        useAutomationStore.setState({ jobs: updatedJobs });
+
+        // Async fire — runs in background, lock released when done
         (async () => {
           try {
+            const { markJobRunning, markRunComplete, updateJob, releaseJobFiring } =
+              useAutomationStore.getState();
             const run = await markJobRunning(job.id);
             await invoke('mark_automation_job_running', { jobId: job.id });
 
-            // Advance nextRunAt IMMEDIATELY so next tick won't re-fire
-            const nextRunAt = getNextFireTime(job.cronExpression);
+            // Persist nextRunAt to disk (already updated in-memory above)
             await updateJob(job.id, { nextRunAt: nextRunAt ?? undefined });
 
-            // Create session and send prompt via App.tsx handler
-            // Use terminalsRef for always-current terminal list
             const agent = terminalsRef.current.find(t => t.id === job.agentId);
             if (!agent) {
               console.error('[Automation] Agent not found:', job.agentId);
               await markRunComplete(run.id, 'failed', undefined, `Agent "${job.agentName}" not found`);
               await invoke('mark_automation_job_completed', { jobId: job.id });
+              releaseJobFiring(job.id);
               return;
             }
 
             // Inject agent personality into CLAUDE.md before firing
-            // This ensures the job runs with the correct agent identity, not the last manually-selected one
             if (agent.personality) {
-              const projectPath = job.projectPath || agent.cwd;
               try {
                 await invoke('inject_personality_to_claude_md', {
-                  projectPath,
+                  projectPath: job.projectPath || agent.cwd,
                   personality: agent.personality,
                 });
-                console.log(`[Automation] Injected personality for "${agent.label}" into ${projectPath}/CLAUDE.md`);
               } catch (err) {
                 console.warn('[Automation] Failed to inject personality:', err);
-                // Continue anyway — job can still run with stale personality
               }
             }
 
@@ -9276,23 +9292,41 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
             console.log(`[Automation] Job "${job.name}" fired — session ${newSession.id}`);
 
-            // Mark as success after 5s (session lifecycle may update sooner)
+            // Release lock and mark success after 5s
             setTimeout(async () => {
-              const currentRun = useAutomationStore.getState().history.find(r => r.id === run.id);
+              const s = useAutomationStore.getState();
+              const currentRun = s.history.find(r => r.id === run.id);
               if (currentRun?.status === 'running') {
-                await markRunComplete(run.id, 'success');
+                await s.markRunComplete(run.id, 'success');
                 await invoke('mark_automation_job_completed', { jobId: job.id });
               }
+              s.releaseJobFiring(job.id);
             }, 5000);
           } catch (err) {
             console.error('[Automation] Failed to fire job:', err);
+            useAutomationStore.getState().releaseJobFiring(job.id);
           }
         })();
       }
     });
 
+    // Listen for remote API changes to automation jobs
+    const unlistenJobsUpdated = listen('automation-jobs-updated', async () => {
+      console.log('[Automation] Jobs updated externally, reloading from disk...');
+      useAutomationStore.setState({ initialized: false });
+      await useAutomationStore.getState().initialize();
+    });
+
+    // Listen for remote API changes to sessions
+    const unlistenSessionsUpdated = listen('sessions-updated', () => {
+      console.log('[Sessions] Sessions updated externally, reloading...');
+      useSessionStore.getState().loadSessions();
+    });
+
     return () => {
       unlistenTickPromise.then(fn => fn()).catch(() => undefined);
+      unlistenJobsUpdated.then(fn => fn()).catch(() => undefined);
+      unlistenSessionsUpdated.then(fn => fn()).catch(() => undefined);
     };
   }, [tauriAvailable, createSession, sendMessageForTargetAgent]);
 
@@ -12334,6 +12368,8 @@ You have access to all Bash tools to execute git commands like:
           }}
           // MCP props
           onOpenMcpConfig={handleOpenMcpConfig}
+          // Sessions props
+          onSelectSession={handleSelectSession}
           // Force expand section
           forceExpandSection={forceExpandSection}
           onForceExpandHandled={() => setForceExpandSection(null)}

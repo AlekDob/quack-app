@@ -212,8 +212,16 @@ async function openChat(session) {
   state.drawer = null; // close drawer if open
   render();
   try {
-    const messages = await api.get(`/sessions/${session.id}/messages`);
+    // Fetch messages and latest session status in parallel
+    const [messages, sessionInfo] = await Promise.all([
+      api.get(`/sessions/${session.id}/messages`),
+      api.get(`/sessions/${session.id}`).catch(() => null),
+    ]);
     state.chatMessages = messages;
+    // Update status so typing indicator is accurate on first render
+    if (sessionInfo && sessionInfo.status) {
+      state.chatSession.status = sessionInfo.status;
+    }
     state.chatLoading = false;
   } catch (err) {
     state.chatLoading = false;
@@ -227,14 +235,29 @@ async function openChat(session) {
 async function pollChatMessages() {
   if (!state.chatSession) return;
   try {
-    const messages = await api.get(`/sessions/${state.chatSession.id}/messages`);
-    const hadMessages = state.chatMessages.length;
+    const [messages, sessionInfo] = await Promise.all([
+      api.get(`/sessions/${state.chatSession.id}/messages`),
+      api.get(`/sessions/${state.chatSession.id}`).catch(() => null),
+    ]);
+    const hadCount = state.chatMessages.length;
+    const lastContent = state.chatMessages[hadCount - 1]?.content || '';
+    const wasActive = isSessionActive(state.chatSession);
+
     state.chatMessages = messages;
-    if (messages.length > hadMessages) {
+    if (sessionInfo && sessionInfo.status) {
+      state.chatSession.status = sessionInfo.status;
+    }
+    const nowActive = isSessionActive(state.chatSession);
+    const newLastContent = messages[messages.length - 1]?.content || '';
+
+    // Re-render if: new messages, content changed, or status changed
+    if (messages.length !== hadCount || newLastContent !== lastContent || wasActive !== nowActive) {
       render();
       scrollChatToBottom();
     }
-  } catch {}
+  } catch (e) {
+    // Silently retry — session may not exist in storage yet
+  }
 }
 
 function startChatPolling() {
@@ -251,9 +274,9 @@ function stopChatPolling() {
 
 async function sendMessage() {
   const input = $('#chat-input');
-  if (!input || !input.value.trim() || state.chatSending) return;
-  const message = input.value.trim();
-  input.value = '';
+  if (!input || !input.textContent.trim() || state.chatSending) return;
+  const message = input.textContent.trim();
+  input.textContent = '';
   state.chatSending = true;
 
   // Optimistic: add to UI immediately
@@ -282,21 +305,30 @@ async function executeFromDrawer() {
   const prompt = $('#drawer-prompt')?.value?.trim();
   if (!prompt || !state.drawer) return;
 
-  const { agentId } = state.drawer;
+  const { agentId, agentName } = state.drawer;
   const sendBtn = $('#drawer-send');
   if (sendBtn) sendBtn.disabled = true;
 
   try {
     const res = await api.post('/execute', { agentId, prompt });
     if (res.success && res.sessionId) {
+      // Open chat immediately with a virtual session (don't wait for loadData)
+      const virtualSession = {
+        id: res.sessionId,
+        title: prompt.slice(0, 60) + (prompt.length > 60 ? '...' : ''),
+        agentId,
+        status: 'in_progress',
+        createdAt: Date.now(),
+      };
       state.drawer = null;
-      toast('Agent started!', 'success');
-      // Reload sessions then open the chat for the new session
-      await loadData();
-      const newSession = state.sessions.find(s => s.id === res.sessionId);
-      if (newSession) {
-        openChat(newSession);
-      }
+      state.chatSession = virtualSession;
+      state.chatMessages = [{ role: 'user', content: prompt }];
+      state.chatLoading = false;
+      render();
+      scrollChatToBottom();
+      startChatPolling();
+      // Background: reload sessions so list stays in sync
+      loadData();
     } else {
       toast(res.error || 'Execute failed', 'error');
     }
@@ -441,7 +473,16 @@ function renderAgents() {
     groups[project].push(a);
   });
 
-  const sorted = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+  // Sort agents within each group by displayOrder (preserves storage order = Mac order)
+  Object.values(groups).forEach(agents =>
+    agents.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
+  );
+  // Sort project groups by most recently active agent (same as Mac default)
+  const sorted = Object.entries(groups).sort(([, aAgents], [, bAgents]) => {
+    const aMax = Math.max(...aAgents.map(a => a.lastActiveAt || a.createdAt || 0));
+    const bMax = Math.max(...bAgents.map(a => a.lastActiveAt || a.createdAt || 0));
+    return bMax - aMax; // most recent first
+  });
 
   return sorted.map(([project, agents]) => `
     <div class="project-group">
@@ -540,17 +581,21 @@ function renderChat() {
         ${state.chatLoading
           ? '<div class="loading-center"><div class="spinner"></div></div>'
           : state.chatMessages.length
-            ? state.chatMessages.map(m => `
-                <div class="chat-bubble ${m.role}">
-                  <div class="chat-bubble-content">${formatMessage(m.content)}</div>
-                </div>
-              `).join('')
+            ? (() => {
+                const lastMsg = state.chatMessages[state.chatMessages.length - 1];
+                const showTyping = isSessionActive(s) && (!lastMsg || lastMsg.role === 'user');
+                return state.chatMessages.map(m => `
+                  <div class="chat-bubble ${m.role}">
+                    <div class="chat-bubble-content">${formatMessage(m.content)}</div>
+                  </div>
+                `).join('') + (showTyping ? renderTypingIndicator() : '');
+              })()
             : '<div class="empty-inline">Waiting for agent response...</div>'
         }
       </div>
       <div class="chat-input-bar">
-        <input id="chat-input" type="text" class="chat-input" placeholder="Type a message..."
-          ${state.chatSending ? 'disabled' : ''}>
+        <div id="chat-input" class="chat-input" contenteditable="${state.chatSending ? 'false' : 'true'}"
+          role="textbox" data-placeholder="Type a message..."></div>
         <button id="chat-send" class="btn btn-primary btn-send"
           ${state.chatSending ? 'disabled' : ''}>
           ${state.chatSending ? '...' : '→'}
@@ -565,6 +610,22 @@ function formatMessage(content) {
   return esc(content)
     .replace(/\n/g, '<br>')
     .replace(/`([^`]+)`/g, '<code>$1</code>');
+}
+
+function isSessionActive(session) {
+  if (!session) return false;
+  const status = session.status || '';
+  return status === 'in_progress' || status === 'running' || status === '';
+}
+
+function renderTypingIndicator() {
+  return `
+    <div class="chat-bubble assistant typing-indicator">
+      <div class="typing-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  `;
 }
 
 // ── Sessions Tab ───────────────────────────────────────────────
@@ -652,8 +713,12 @@ function bindEvents() {
     chatSend.onclick = sendMessage;
     const chatInput = $('#chat-input');
     if (chatInput) {
-      chatInput.onkeydown = (e) => { if (e.key === 'Enter') sendMessage(); };
-      chatInput.focus();
+      chatInput.onkeydown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      };
     }
   }
 

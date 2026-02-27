@@ -63,7 +63,7 @@ interface SessionState {
 
   // Actions
   loadSessions: (options?: { silent?: boolean }) => Promise<void>;
-  createSession: (session: Omit<AgentSession, 'id' | 'createdAt' | 'updatedAt'>) => Promise<AgentSession>;
+  createSession: (session: Omit<AgentSession, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) => Promise<AgentSession>;
   updateSession: (id: string, updates: Partial<AgentSession>) => Promise<void>;
   deleteSession: (id: string) => Promise<void>;
   markDone: (id: string, completionNote?: string) => Promise<void>;
@@ -116,9 +116,18 @@ export const useSessionStore = create<SessionState>()(
 
         // Create a new session
         createSession: async (sessionData) => {
+          // Dedup: if an ID was provided and already exists, return existing session
+          if (sessionData.id) {
+            const existing = get().sessions.find(s => s.id === sessionData.id);
+            if (existing) {
+              console.log('[sessionStore] Session already exists, skipping duplicate:', sessionData.id);
+              return existing;
+            }
+          }
+
           const newSession: AgentSession = {
             ...sessionData,
-            id: generateSessionId(),
+            id: sessionData.id || generateSessionId(),
             createdAt: Date.now(),
             updatedAt: Date.now(),
           };

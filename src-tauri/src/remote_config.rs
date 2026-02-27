@@ -88,7 +88,12 @@ fn save_config_to_store(
 
 #[tauri::command]
 pub async fn get_remote_config(app: AppHandle) -> Result<RemoteConfig, String> {
-    Ok(load_config(&app))
+    let mut config = load_config(&app);
+    // Return the actual runtime port (dev mode uses port+1 to avoid conflict)
+    if cfg!(debug_assertions) {
+        config.port += 1;
+    }
+    Ok(config)
 }
 
 #[tauri::command]
@@ -127,6 +132,24 @@ pub async fn regenerate_remote_token(app: AppHandle) -> Result<RemoteConfig, Str
 #[tauri::command]
 pub async fn get_local_ip() -> Result<String, String> {
     get_local_ip_address().ok_or_else(|| "Could not determine local IP".to_string())
+}
+
+#[tauri::command]
+pub async fn get_local_hostname() -> Result<String, String> {
+    hostname::get()
+        .map_err(|e| format!("Could not get hostname: {}", e))
+        .and_then(|h| {
+            h.into_string()
+                .map_err(|_| "Hostname contains invalid UTF-8".to_string())
+        })
+        .map(|name| {
+            // Append .local for mDNS if not already present
+            if name.ends_with(".local") {
+                name
+            } else {
+                format!("{}.local", name)
+            }
+        })
 }
 
 /// Get the local LAN IP address
