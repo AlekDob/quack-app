@@ -13,6 +13,8 @@ const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 
 export default function ClaudeCodeSettings() {
   const [agentTeamsEnabled, setAgentTeamsEnabled] = useState(false);
+  const [autoMemoryEnabled, setAutoMemoryEnabled] = useState(true);
+  const [memoryEnvOverride, setMemoryEnvOverride] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // LLM Provider state
@@ -21,7 +23,7 @@ export default function ClaudeCodeSettings() {
   const [ollamaOnline, setOllamaOnline] = useState<boolean | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
 
-  useEffect(() => { loadEnvVars(); }, []);
+  useEffect(() => { loadSettings(); }, []);
 
   // Check Ollama status when provider is 'ollama'
   useEffect(() => {
@@ -33,12 +35,17 @@ export default function ClaudeCodeSettings() {
     }
   }, [provider, providerBaseUrl]);
 
-  const loadEnvVars = async () => {
+  const loadSettings = async () => {
     try {
-      const envVars = await invoke<Record<string, string>>('get_claude_env_vars');
+      const [envVars, memoryFlag] = await Promise.all([
+        invoke<Record<string, string>>('get_claude_env_vars'),
+        invoke<boolean | null>('get_claude_settings_flag', { key: 'autoMemoryEnabled' }),
+      ]);
       setAgentTeamsEnabled(envVars['CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'] === '1');
+      setAutoMemoryEnabled(memoryFlag ?? true);
+      setMemoryEnvOverride(envVars['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] === '1');
     } catch (err) {
-      console.error('Failed to load Claude env vars:', err);
+      console.error('Failed to load Claude settings:', err);
     } finally {
       setLoading(false);
     }
@@ -65,6 +72,21 @@ export default function ClaudeCodeSettings() {
     } catch (err) {
       console.error('Failed to save Agent Teams setting:', err);
       setAgentTeamsEnabled(!enabled);
+    }
+  };
+
+  const handleToggleAutoMemory = async (enabled: boolean) => {
+    setAutoMemoryEnabled(enabled);
+    try {
+      // When enabling, remove the key (Claude Code default is enabled)
+      // When disabling, set to false explicitly
+      await invoke('set_claude_settings_flag', {
+        key: 'autoMemoryEnabled',
+        value: enabled ? null : false,
+      });
+    } catch (err) {
+      console.error('Failed to save Auto Memory setting:', err);
+      setAutoMemoryEnabled(!enabled);
     }
   };
 
@@ -255,6 +277,29 @@ export default function ClaudeCodeSettings() {
           </div>
         </>
       )}
+
+      {/* Memory */}
+      <SectionHeader
+        title="Memory"
+        description="Claude automatically saves patterns, preferences, and insights across sessions"
+      />
+      <div className="settings-group">
+        <SettingsRow
+          label="Auto Memory"
+          description={
+            memoryEnvOverride
+              ? <span>Overridden by <code style={{ fontSize: 10 }}>CLAUDE_CODE_DISABLE_AUTO_MEMORY</code> env var</span>
+              : 'Claude saves useful context to a persistent memory directory'
+          }
+          control={
+            <IOSSwitch
+              checked={autoMemoryEnabled && !memoryEnvOverride}
+              onChange={handleToggleAutoMemory}
+              disabled={loading || memoryEnvOverride}
+            />
+          }
+        />
+      </div>
 
       {/* Experimental Features */}
       <SectionHeader

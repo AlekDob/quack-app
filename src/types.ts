@@ -474,6 +474,7 @@ export interface AutomationJob {
   projectName: string;                     // Display name snapshot
   promptTemplate: string;                  // Prompt sent when job fires
   model?: string;                          // Model override (default: agent's default)
+  provider?: LLMProviderType;              // Provider for model (anthropic/ollama/custom)
   enabled: boolean;
   createdAt: number;
   updatedAt: number;

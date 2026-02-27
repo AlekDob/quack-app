@@ -8,8 +8,9 @@ import type { RemoteApiConfig } from '../../../types';
 export default function RemoteApiSettings() {
   const [config, setConfig] = useState<RemoteApiConfig | null>(null);
   const [localIp, setLocalIp] = useState<string | null>(null);
+  const [hostname, setHostname] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState<'token' | 'url' | null>(null);
+  const [copied, setCopied] = useState<'token' | 'url' | 'dashboard' | null>(null);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const loadConfig = useCallback(async () => {
@@ -18,6 +19,12 @@ export default function RemoteApiSettings() {
       setConfig(cfg);
       const ip = await invoke<string | null>('get_local_ip');
       setLocalIp(ip);
+      try {
+        const host = await invoke<string>('get_local_hostname');
+        setHostname(host);
+      } catch {
+        // hostname not available — fallback to IP
+      }
     } catch (err) {
       console.error('Failed to load remote config:', err);
     }
@@ -62,7 +69,7 @@ export default function RemoteApiSettings() {
     }
   };
 
-  const handleCopy = async (text: string, label: 'token' | 'url') => {
+  const handleCopy = async (text: string, label: 'token' | 'url' | 'dashboard') => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(label);
@@ -200,6 +207,75 @@ export default function RemoteApiSettings() {
           }
         />
       </div>
+
+      {config.enabled && config.token && (
+        <>
+          <SectionHeader
+            title="Mobile Dashboard"
+            description="Open this URL on your phone to control Quack remotely"
+          />
+
+          <div className="settings-group">
+            {hostname && (
+              <SettingsRow
+                label="Dashboard URL"
+                description={
+                  <code className="remote-api-url-display">
+                    {`http://${hostname}:${config.port}/dashboard?token=${config.token}`}
+                  </code>
+                }
+                control={
+                  <button
+                    onClick={() => handleCopy(
+                      `http://${hostname}:${config.port}/dashboard?token=${config.token}`,
+                      'dashboard'
+                    )}
+                    className="ios-button ios-button-secondary"
+                    disabled={loading}
+                  >
+                    {copied === 'dashboard' ? 'Copied!' : 'Copy URL'}
+                  </button>
+                }
+              />
+            )}
+            {!hostname && localIp && (
+              <SettingsRow
+                label="Dashboard URL"
+                description={
+                  <code className="remote-api-url-display">
+                    {`http://${localIp}:${config.port}/dashboard?token=${config.token}`}
+                  </code>
+                }
+                control={
+                  <button
+                    onClick={() => handleCopy(
+                      `http://${localIp}:${config.port}/dashboard?token=${config.token}`,
+                      'dashboard'
+                    )}
+                    className="ios-button ios-button-secondary"
+                    disabled={loading}
+                  >
+                    {copied === 'dashboard' ? 'Copied!' : 'Copy URL'}
+                  </button>
+                }
+              />
+            )}
+            <div className="settings-info-box">
+              <svg className="info-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 16v-4"/>
+                <path d="M12 8h.01"/>
+              </svg>
+              <span>
+                {hostname
+                  ? 'This URL uses mDNS (.local) and works on any WiFi network — no need to update when you change location. Save it as a PWA on your phone for quick access.'
+                  : 'This URL uses your current IP address and may change when switching networks. Copy again if you change WiFi.'
+                }
+              </span>
+            </div>
+          </div>
+        </>
+      )}
 
       <SectionHeader
         title="Available Endpoints"

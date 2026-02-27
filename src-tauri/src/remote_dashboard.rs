@@ -25,8 +25,10 @@ pub fn create_dashboard_router() -> Router {
         .route("/app.js", get(handle_js))
         .route("/style.css", get(handle_css))
         .route("/manifest.json", get(handle_manifest))
+        .route("/icon-180.png", get(handle_icon_180))
         .route("/icon-192.png", get(handle_icon_192))
         .route("/icon-512.png", get(handle_icon_512))
+        .route("/sw.js", get(handle_sw))
 }
 
 async fn handle_dashboard(Query(q): Query<DashboardQuery>) -> Html<String> {
@@ -67,6 +69,18 @@ async fn handle_manifest() -> Response {
         .into_response()
 }
 
+async fn handle_icon_180() -> Response {
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "image/png"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        include_bytes!("../static/icon-180.png").as_slice(),
+    )
+        .into_response()
+}
+
 async fn handle_icon_192() -> Response {
     (
         StatusCode::OK,
@@ -74,7 +88,7 @@ async fn handle_icon_192() -> Response {
             (header::CONTENT_TYPE, "image/png"),
             (header::CACHE_CONTROL, "public, max-age=86400"),
         ],
-        include_bytes!("../icons/128x128@2x.png").as_slice(),
+        include_bytes!("../static/icon-192.png").as_slice(),
     )
         .into_response()
 }
@@ -86,7 +100,19 @@ async fn handle_icon_512() -> Response {
             (header::CONTENT_TYPE, "image/png"),
             (header::CACHE_CONTROL, "public, max-age=86400"),
         ],
-        include_bytes!("../icons/icon.png").as_slice(),
+        include_bytes!("../static/icon-512.png").as_slice(),
+    )
+        .into_response()
+}
+
+async fn handle_sw() -> Response {
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "application/javascript; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-cache"),
+        ],
+        include_str!("../static/sw.js"),
     )
         .into_response()
 }

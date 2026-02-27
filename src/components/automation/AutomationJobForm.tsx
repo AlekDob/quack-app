@@ -30,9 +30,11 @@ export default function AutomationJobForm({
 
   // Per-job provider toggle (independent from global setting)
   const [jobProvider, setJobProvider] = useState<LLMProviderType>(
-    editingJob?.model && !['sonnet', 'opus', 'haiku'].some(m => editingJob.model?.includes(m))
-      ? 'ollama'
-      : 'anthropic'
+    editingJob?.provider || (
+      editingJob?.model && !['sonnet', 'opus', 'haiku'].some(m => editingJob.model?.includes(m))
+        ? 'ollama'
+        : 'anthropic'
+    )
   );
 
   // Fetch Ollama models when switching to ollama
@@ -94,6 +96,7 @@ export default function AutomationJobForm({
       projectName,
       promptTemplate: promptTemplate.trim(),
       model: model || undefined,
+      provider: model ? jobProvider : undefined,
       enabled: editingJob?.enabled ?? true,
       timeoutMinutes,
       skipIfRunning,

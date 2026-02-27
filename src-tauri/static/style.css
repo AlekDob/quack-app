@@ -373,10 +373,17 @@ body {
 .chat-input {
   flex: 1; padding: 10px 14px;
   background: rgba(255,255,255,0.04); border: 1px solid var(--border);
-  border-radius: 20px; color: var(--text); font-size: 14px;
+  border-radius: 20px; color: var(--text); font-size: 16px;
   font-family: inherit; outline: none;
+  -webkit-user-select: text; user-select: text;
+  min-height: 20px; max-height: 120px; overflow-y: auto;
+  word-break: break-word; line-height: 1.4;
 }
 .chat-input:focus { border-color: var(--accent); }
+.chat-input:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted); pointer-events: none;
+}
 .btn-send {
   width: 40px; height: 40px; border-radius: 50%;
   padding: 0; font-size: 18px;
@@ -385,6 +392,23 @@ body {
 
 .empty-inline {
   font-size: 13px; color: var(--text-muted); text-align: center; padding: 20px;
+}
+
+/* ── Typing Indicator ── */
+.typing-indicator { padding: 12px 16px; }
+.typing-dots {
+  display: flex; gap: 4px; align-items: center;
+}
+.typing-dots span {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-muted);
+  animation: typingBounce 1.4s ease-in-out infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-6px); opacity: 1; }
 }
 
 /* ── Pull to Refresh ── */
@@ -423,6 +447,55 @@ body {
   50% { width: 40%; margin-left: 30%; }
   100% { width: 0; margin-left: 100%; }
 }
+
+/* ── Tool Use Pills ── */
+.tool-uses {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 4px 0; align-self: flex-start; max-width: 90%;
+}
+.tool-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 500; color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 6px; padding: 3px 8px;
+  font-family: monospace; white-space: nowrap;
+  max-width: 260px; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Markdown in Chat Bubbles ── */
+.chat-bubble-content pre {
+  background: rgba(0, 0, 0, 0.3); border-radius: 8px;
+  padding: 10px 12px; margin: 6px 0; overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.chat-bubble-content pre code {
+  background: none; padding: 0; font-size: 12px;
+  line-height: 1.5; white-space: pre;
+}
+.chat-bubble-content .md-bullet {
+  display: block; padding-left: 12px; position: relative;
+}
+.chat-bubble-content .md-bullet::before {
+  content: '•'; position: absolute; left: 0; color: var(--accent);
+}
+
+/* ── Load More ── */
+.load-more {
+  text-align: center; padding: 8px; margin-bottom: 4px;
+  font-size: 12px; color: var(--accent); cursor: pointer;
+  border-radius: 8px; transition: background 0.15s;
+}
+.load-more:active { background: var(--card); }
+
+/* ── Notification Banner ── */
+.notif-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; margin-bottom: 12px;
+  background: rgba(242, 140, 82, 0.1); border: 1px solid rgba(242, 140, 82, 0.25);
+  border-radius: var(--radius); font-size: 13px; color: var(--text);
+}
+.notif-banner-actions { display: flex; gap: 6px; flex-shrink: 0; }
 
 /* ── Safe area (iPhone notch) ── */
 @supports (padding: env(safe-area-inset-top)) {

@@ -63,6 +63,9 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Session creation: `documentation/gotchas/gotcha-programmatic-session-creation.md`
 - axum nest + state: `documentation/gotchas/gotcha-axum-nest-state-types.md`
 - Remote execute: `documentation/gotchas/gotcha-remote-execute-needs-react-listener.md`
+- PWA icons iOS: `documentation/gotchas/gotcha-pwa-icon-fullbleed-ios.md`
+- Dashboard IP changes: `documentation/gotchas/gotcha-remote-dashboard-ip-changes.md`
+- Scheduler log spam: `documentation/gotchas/gotcha-automation-scheduler-log-spam.md`
 - Daemon providers: `documentation/bugs/bug-daemon-missing-provider-env-vars.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
@@ -74,6 +77,7 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Tab system: `documentation/patterns/pattern-tab-system-singleton.md`
 - Dark theme CSS: `documentation/patterns/pattern-dark-theme-css-values.md`
 - Remote API architecture: `documentation/patterns/pattern-remote-api-architecture.md`
+- Claude Code Memory Settings: `documentation/patterns/pattern-claude-code-memory-settings.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)

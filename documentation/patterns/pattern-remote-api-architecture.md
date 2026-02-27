@@ -2,7 +2,7 @@
 type: pattern
 project: quack-app
 created: 2026-02-24
-last_verified: 2026-02-24
+last_verified: 2026-02-27
 tags: [remote-api, axum, rest, authentication, tauri-store]
 ---
 
@@ -109,7 +109,11 @@ All under `/api/`, all require `Authorization: Bearer <token>`:
 | GET | `/api/agents/:id` | Single agent detail |
 | GET | `/api/sessions` | List all sessions |
 | GET | `/api/sessions/:id` | Single session detail |
+| DELETE | `/api/sessions/:id` | Delete a session |
 | GET | `/api/jobs` | List automation jobs |
+| POST | `/api/jobs` | Create a new automation job |
+| PUT | `/api/jobs/:id` | Update an automation job |
+| DELETE | `/api/jobs/:id` | Delete an automation job |
 | POST | `/api/jobs/:id/fire` | Manually fire an automation job |
 | POST | `/api/jobs/:id/toggle` | Toggle job enabled/disabled |
 | POST | `/api/execute` | Start a new agent session |
@@ -147,7 +151,33 @@ Served at `/dashboard?token=xxx` via `remote_dashboard.rs` using `include_str!()
 **Architecture**: 3-tab vanilla JS SPA (Agents, Sessions, Jobs) with:
 - Bottom drawer for execute (replaces the old Execute tab)
 - Full-screen chat view with 3s polling for live updates
+- Typing indicator (3 bouncing dots) while session is `in_progress`
+- Execute opens chat immediately with virtual session (no `loadData()` wait)
+- Pull-to-refresh gesture + refresh button + stealth auto-refresh (30s)
+- PWA icons served via `include_bytes!()` — full-bleed squares (no rounded corners, iOS applies its own mask)
+- `apple-touch-icon` at 180x180 (iOS standard), manifest icons at 192/512
 - WebSocket for status events (agent status, session created/completed)
+
+## mDNS Hostname Discovery
+
+The dashboard URL uses mDNS (`.local`) instead of raw IP addresses, so it survives WiFi/network changes:
+
+```rust
+#[tauri::command]
+pub async fn get_local_hostname() -> Result<String, String> {
+    hostname::get()  // crate: hostname = "0.4"
+        .map_err(|e| format!("Could not get hostname: {}", e))
+        .and_then(|h| h.into_string().map_err(|_| "Invalid UTF-8".to_string()))
+        .map(|name| if name.ends_with(".local") { name } else { format!("{}.local", name) })
+}
+```
+
+- **macOS**: Uses Bonjour (built-in), hostname resolves on any local network
+- **Windows 10+**: Native mDNS support since build 1703
+- **Fallback**: If hostname unavailable, Settings UI falls back to IP-based URL with a warning
+
+The Settings UI ("Mobile Dashboard" section) shows the full copyable URL:
+`http://{hostname}.local:{port}/dashboard?token={token}`
 
 ## WebSocket
 

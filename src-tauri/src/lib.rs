@@ -955,15 +955,23 @@ pub fn run() {
                 } else {
                     [127, 0, 0, 1]
                 };
-                let addr: SocketAddr = (bind_addr, remote_cfg.port).into();
+                // In dev mode, use port+1 to avoid conflict with installed build
+                let port = if cfg!(debug_assertions) {
+                    let dev_port = remote_cfg.port + 1;
+                    log::info!("🔧 Dev mode: using port {} (build uses {})", dev_port, remote_cfg.port);
+                    dev_port
+                } else {
+                    remote_cfg.port
+                };
+                let addr: SocketAddr = (bind_addr, port).into();
 
                 match tokio::net::TcpListener::bind(addr).await {
                     Ok(listener) => {
                         log::info!("🦆 HTTP server started on http://{}", addr);
                         if remote_cfg.enabled {
                             if let Some(ip) = remote_config::get_local_ip_address() {
-                                log::info!("🌐 Remote API available at: http://{}:{}/api/status", ip, remote_cfg.port);
-                                log::info!("📡 WebSocket available at: ws://{}:{}/ws?token=...", ip, remote_cfg.port);
+                                log::info!("🌐 Remote API available at: http://{}:{}/api/status", ip, port);
+                                log::info!("📡 WebSocket available at: ws://{}:{}/ws?token=...", ip, port);
                             }
                         }
                         log::info!("🦆 Telegram webhook available at: http://{}/telegram/webhook", addr);
@@ -1202,6 +1210,9 @@ pub fn run() {
             hooks::toggle_hook,
             hooks::get_claude_env_vars,
             hooks::set_claude_env_var,
+            hooks::get_claude_settings_flag,
+            hooks::set_claude_settings_flag,
+            hooks::open_claude_memory_folder,
             plugins::list_available_plugins,
             plugins::list_installed_plugins,
             plugins::install_plugin,
@@ -1310,6 +1321,7 @@ pub fn run() {
             remote_config::set_remote_enabled,
             remote_config::regenerate_remote_token,
             remote_config::get_local_ip,
+            remote_config::get_local_hostname,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

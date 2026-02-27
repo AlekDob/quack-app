@@ -94,7 +94,7 @@ pub async fn start_automation_scheduler(app: AppHandle) -> Result<(), String> {
     {
         let active = scheduler.active.lock().map_err(|e| e.to_string())?;
         if *active {
-            log::info!("[Automation] Scheduler already running");
+            log::debug!("[Automation] Scheduler already running");
             return Ok(());
         }
     }

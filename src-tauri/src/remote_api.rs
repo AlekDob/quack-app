@@ -4,10 +4,10 @@
 //! All /api/* routes require Bearer token auth (checked via ApiState).
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, post, put},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -85,6 +85,11 @@ struct AgentSummary {
     working_on: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     branch: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_active_at: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    created_at: Option<i64>,
+    display_order: i64,
 }
 
 #[derive(Serialize)]
@@ -101,7 +106,7 @@ struct SessionSummary {
     claude_session_id: Option<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct ChatMessage {
     role: String,
@@ -126,11 +131,62 @@ struct JobSummary {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct CreateJobRequest {
+    name: String,
+    cron_expression: String,
+    agent_id: String,
+    agent_name: String,
+    project_path: String,
+    project_name: String,
+    prompt_template: String,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default = "default_true")]
+    enabled: bool,
+    #[serde(default)]
+    timeout_minutes: Option<i64>,
+    #[serde(default)]
+    skip_if_running: Option<bool>,
+}
+
+fn default_true() -> bool { true }
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateJobRequest {
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    cron_expression: Option<String>,
+    #[serde(default)]
+    agent_id: Option<String>,
+    #[serde(default)]
+    agent_name: Option<String>,
+    #[serde(default)]
+    project_path: Option<String>,
+    #[serde(default)]
+    project_name: Option<String>,
+    #[serde(default)]
+    prompt_template: Option<String>,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    enabled: Option<bool>,
+    #[serde(default)]
+    timeout_minutes: Option<i64>,
+    #[serde(default)]
+    skip_if_running: Option<bool>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ExecuteRequest {
     agent_id: String,
     prompt: String,
     #[serde(default)]
     project_path: Option<String>,
+    #[serde(default)]
+    model: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -161,8 +217,9 @@ pub fn create_api_router(app: AppHandle, auth: RemoteAuthState) -> Router {
         .route("/agents", get(handle_list_agents))
         .route("/agents/:id", get(handle_get_agent))
         .route("/sessions", get(handle_list_sessions))
-        .route("/sessions/:id", get(handle_get_session))
-        .route("/jobs", get(handle_list_jobs))
+        .route("/sessions/:id", get(handle_get_session).delete(handle_delete_session))
+        .route("/jobs", get(handle_list_jobs).post(handle_create_job))
+        .route("/jobs/:id", put(handle_update_job).delete(handle_delete_job))
         .route("/jobs/:id/fire", post(handle_fire_job))
         .route("/jobs/:id/toggle", post(handle_toggle_job))
         .route("/execute", post(handle_execute))
@@ -279,7 +336,8 @@ async fn handle_list_agents(
         .and_then(|a| a.as_array())
         .map(|arr| {
             arr.iter()
-                .map(|a| {
+                .enumerate()
+                .map(|(idx, a)| {
                     let role = a.get("personality")
                         .and_then(|p| p.get("role"))
                         .and_then(|v| v.as_str())
@@ -297,6 +355,9 @@ async fn handle_list_agents(
                         project_path: a.get("projectPath").and_then(|v| v.as_str()).map(|s| s.to_string()),
                         working_on: a.get("workingOn").and_then(|v| v.as_str()).map(|s| s.to_string()),
                         branch: a.get("branch").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        last_active_at: a.get("lastActiveAt").and_then(|v| v.as_i64()),
+                        created_at: a.get("createdAt").and_then(|v| v.as_i64()),
+                        display_order: idx as i64,
                     }
                 })
                 .collect()
@@ -391,32 +452,55 @@ async fn handle_get_session(
 
 // ─── Session Messages ─────────────────────────────────────────────
 
+/// Query params for message pagination.
+/// If `limit` is set, returns the last N messages (with optional offset from the end).
+/// If not set, returns all messages (backward compatible for polling).
+#[derive(Deserialize)]
+struct MessagesQuery {
+    #[serde(default)]
+    limit: Option<usize>,
+    #[serde(default)]
+    offset: Option<usize>,
+}
+
 async fn handle_session_messages(
     headers: HeaderMap,
     State(state): State<ApiState>,
     Path(session_id): Path<String>,
-) -> ApiResult<Vec<ChatMessage>> {
+    Query(query): Query<MessagesQuery>,
+) -> Result<Response, (StatusCode, Json<ApiError>)> {
     state.check_auth(&headers).await?;
 
     // Find the claudeSessionId from the Quack session
     let storage = read_agents_storage().map_err(err)?;
-    let claude_id = storage
+    let session_entry = storage
         .get("sessions")
         .and_then(|s| s.as_array())
         .and_then(|arr| {
             arr.iter().find(|s| {
                 s.get("id").and_then(|v| v.as_str()) == Some(&session_id)
             })
-        })
+        });
+
+    // Session not found at all
+    if session_entry.is_none() {
+        return Ok(Json(serde_json::json!([])).into_response());
+    }
+
+    // Session exists but claudeSessionId not set yet (agent still initializing)
+    let claude_id = match session_entry
         .and_then(|s| s.get("claudeSessionId").and_then(|v| v.as_str()))
         .map(|s| s.to_string())
-        .ok_or_else(|| err("Session not found or has no Claude session ID".to_string()))?;
+    {
+        Some(id) if !id.is_empty() => id,
+        _ => return Ok(Json(serde_json::json!([])).into_response()),
+    };
 
     // Use the existing get_session_details function
     let details = crate::sessions::get_session_details(claude_id)
         .map_err(|e| err(format!("Failed to read messages: {}", e)))?;
 
-    let messages: Vec<ChatMessage> = details
+    let all_messages: Vec<ChatMessage> = details
         .messages
         .into_iter()
         .map(|m| ChatMessage {
@@ -425,7 +509,23 @@ async fn handle_session_messages(
         })
         .collect();
 
-    Ok(Json(messages))
+    let total = all_messages.len();
+
+    // If limit is set, return paginated slice (from the end)
+    let messages = if let Some(limit) = query.limit {
+        let offset = query.offset.unwrap_or(0);
+        let start = total.saturating_sub(offset + limit);
+        let end = total.saturating_sub(offset);
+        all_messages[start..end].to_vec()
+    } else {
+        all_messages
+    };
+
+    Ok((
+        StatusCode::OK,
+        [("x-total-count", total.to_string())],
+        Json(messages),
+    ).into_response())
 }
 
 #[derive(Deserialize)]
@@ -564,6 +664,191 @@ async fn handle_toggle_job(
     Ok(Json(serde_json::json!({ "success": true, "jobId": job_id, "enabled": new_enabled })))
 }
 
+// ─── Job CRUD ─────────────────────────────────────────────────────
+
+async fn handle_create_job(
+    headers: HeaderMap,
+    State(state): State<ApiState>,
+    Json(payload): Json<CreateJobRequest>,
+) -> ApiResult<serde_json::Value> {
+    state.check_auth(&headers).await?;
+
+    let store = state.app.store("quack-automations.json").map_err(|e| err(e.to_string()))?;
+
+    let mut jobs: Vec<serde_json::Value> = store
+        .get("jobs")
+        .and_then(|v| v.as_array().cloned())
+        .unwrap_or_default();
+
+    let now = chrono::Utc::now().timestamp_millis();
+    let id = format!("auto-{}-{}", now, &uuid::Uuid::new_v4().to_string()[..6]);
+
+    let new_job = serde_json::json!({
+        "id": id,
+        "name": payload.name,
+        "cronExpression": payload.cron_expression,
+        "agentId": payload.agent_id,
+        "agentName": payload.agent_name,
+        "projectPath": payload.project_path,
+        "projectName": payload.project_name,
+        "promptTemplate": payload.prompt_template,
+        "model": payload.model,
+        "enabled": payload.enabled,
+        "createdAt": now,
+        "updatedAt": now,
+        "timeoutMinutes": payload.timeout_minutes.unwrap_or(10),
+        "skipIfRunning": payload.skip_if_running.unwrap_or(true),
+    });
+
+    jobs.push(new_job.clone());
+    store.set("jobs", serde_json::json!(jobs));
+    let _ = state.app.emit("automation-jobs-updated", ());
+
+    log::info!("✅ [Remote API] Created job: {} ({})", id, payload.name);
+
+    Ok(Json(new_job))
+}
+
+async fn handle_update_job(
+    headers: HeaderMap,
+    State(state): State<ApiState>,
+    Path(job_id): Path<String>,
+    Json(payload): Json<UpdateJobRequest>,
+) -> ApiResult<serde_json::Value> {
+    state.check_auth(&headers).await?;
+
+    let store = state.app.store("quack-automations.json").map_err(|e| err(e.to_string()))?;
+
+    let mut jobs: Vec<serde_json::Value> = store
+        .get("jobs")
+        .and_then(|v| v.as_array().cloned())
+        .unwrap_or_default();
+
+    let mut found = false;
+    let mut updated_job = serde_json::Value::Null;
+    let now = chrono::Utc::now().timestamp_millis();
+
+    for job in jobs.iter_mut() {
+        if job.get("id").and_then(|v| v.as_str()) == Some(&job_id) {
+            found = true;
+            if let Some(name) = &payload.name { job["name"] = serde_json::json!(name); }
+            if let Some(cron) = &payload.cron_expression { job["cronExpression"] = serde_json::json!(cron); }
+            if let Some(agent_id) = &payload.agent_id { job["agentId"] = serde_json::json!(agent_id); }
+            if let Some(agent_name) = &payload.agent_name { job["agentName"] = serde_json::json!(agent_name); }
+            if let Some(project_path) = &payload.project_path { job["projectPath"] = serde_json::json!(project_path); }
+            if let Some(project_name) = &payload.project_name { job["projectName"] = serde_json::json!(project_name); }
+            if let Some(prompt) = &payload.prompt_template { job["promptTemplate"] = serde_json::json!(prompt); }
+            if let Some(model) = &payload.model { job["model"] = serde_json::json!(model); }
+            if let Some(enabled) = payload.enabled { job["enabled"] = serde_json::json!(enabled); }
+            if let Some(timeout) = payload.timeout_minutes { job["timeoutMinutes"] = serde_json::json!(timeout); }
+            if let Some(skip) = payload.skip_if_running { job["skipIfRunning"] = serde_json::json!(skip); }
+            job["updatedAt"] = serde_json::json!(now);
+            updated_job = job.clone();
+            break;
+        }
+    }
+
+    if !found {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(ApiError { error: format!("Job not found: {}", job_id) }),
+        ));
+    }
+
+    store.set("jobs", serde_json::json!(jobs));
+    let _ = state.app.emit("automation-jobs-updated", ());
+
+    log::info!("📝 [Remote API] Updated job: {}", job_id);
+
+    Ok(Json(updated_job))
+}
+
+async fn handle_delete_job(
+    headers: HeaderMap,
+    State(state): State<ApiState>,
+    Path(job_id): Path<String>,
+) -> ApiResult<serde_json::Value> {
+    state.check_auth(&headers).await?;
+
+    let store = state.app.store("quack-automations.json").map_err(|e| err(e.to_string()))?;
+
+    let jobs: Vec<serde_json::Value> = store
+        .get("jobs")
+        .and_then(|v| v.as_array().cloned())
+        .unwrap_or_default();
+
+    let original_len = jobs.len();
+    let filtered: Vec<serde_json::Value> = jobs
+        .into_iter()
+        .filter(|j| j.get("id").and_then(|v| v.as_str()) != Some(&job_id))
+        .collect();
+
+    if filtered.len() == original_len {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(ApiError { error: format!("Job not found: {}", job_id) }),
+        ));
+    }
+
+    store.set("jobs", serde_json::json!(filtered));
+    let _ = state.app.emit("automation-jobs-updated", ());
+
+    log::info!("🗑️ [Remote API] Deleted job: {}", job_id);
+
+    Ok(Json(serde_json::json!({ "success": true, "jobId": job_id })))
+}
+
+// ─── Session Delete ───────────────────────────────────────────────
+
+async fn handle_delete_session(
+    headers: HeaderMap,
+    State(state): State<ApiState>,
+    Path(session_id): Path<String>,
+) -> ApiResult<serde_json::Value> {
+    state.check_auth(&headers).await?;
+
+    // 1. Remove from agents storage (quack-agents.json)
+    let path = get_agents_storage_path()
+        .ok_or_else(|| err("Cannot determine storage path"))?;
+    let content = std::fs::read_to_string(&path)
+        .map_err(|e| err(format!("Failed to read storage: {}", e)))?;
+    let mut storage: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| err(format!("Failed to parse storage: {}", e)))?;
+
+    let removed = if let Some(sessions) = storage.get_mut("sessions").and_then(|s| s.as_array_mut()) {
+        let before = sessions.len();
+        sessions.retain(|s| s.get("id").and_then(|v| v.as_str()) != Some(&session_id));
+        before != sessions.len()
+    } else {
+        false
+    };
+
+    if !removed {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(ApiError { error: format!("Session not found: {}", session_id) }),
+        ));
+    }
+
+    // Write back
+    let updated = serde_json::to_string_pretty(&storage)
+        .map_err(|e| err(format!("Failed to serialize: {}", e)))?;
+    std::fs::write(&path, updated)
+        .map_err(|e| err(format!("Failed to write storage: {}", e)))?;
+
+    // 2. Try to delete Claude SDK session file (best-effort)
+    let _ = crate::sessions::delete_session(session_id.clone());
+
+    // 3. Notify frontend to reload sessions
+    let _ = state.app.emit("sessions-updated", ());
+
+    log::info!("🗑️ [Remote API] Deleted session: {}", session_id);
+
+    Ok(Json(serde_json::json!({ "success": true, "sessionId": session_id })))
+}
+
+// ─── Execute ──────────────────────────────────────────────────────
+
 async fn handle_execute(
     headers: HeaderMap,
     State(state): State<ApiState>,
@@ -612,6 +897,7 @@ async fn handle_execute(
         "projectPath": project_path,
         "projectName": project_name,
         "prompt": payload.prompt,
+        "model": payload.model.as_deref().unwrap_or("sonnet"),
         "source": "remote-api",
         "autoSend": true,
     });

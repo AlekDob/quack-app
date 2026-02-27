@@ -4,6 +4,10 @@
  * Zustand store for managing automation jobs and execution history.
  * Handles CRUD, scheduling state, and history tracking.
  *
+ * Brain: fix-automation-job-fires-repeatedly
+ * CRITICAL: The firing lock (firingJobIds) prevents race conditions where
+ * multiple ticks fire the same job before async updateJob completes.
+ *
  * @module automationStore
  */
 
@@ -28,7 +32,11 @@ interface AutomationState {
   jobs: AutomationJob[];
   history: AutomationRunHistory[];
   isLoading: boolean;
+  initialized: boolean;
   activeView: 'jobs' | 'history';
+
+  /** Job IDs currently being fired — synchronous guard against re-fires */
+  firingJobIds: Set<string>;
 
   // Lifecycle
   initialize: () => Promise<void>;
@@ -40,6 +48,10 @@ interface AutomationState {
   toggleJob: (id: string) => Promise<void>;
 
   // Execution
+  /** Synchronously claim a job for firing. Returns false if already claimed. */
+  claimJobForFiring: (jobId: string) => boolean;
+  /** Release the firing lock after job fire completes (success or error). */
+  releaseJobFiring: (jobId: string) => void;
   markJobRunning: (jobId: string) => Promise<AutomationRunHistory>;
   markRunComplete: (runId: string, status: AutomationRunStatus, sessionId?: string, error?: string) => Promise<void>;
 
@@ -56,10 +68,18 @@ export const useAutomationStore = create<AutomationState>()(
       jobs: [],
       history: [],
       isLoading: false,
+      initialized: false,
       activeView: 'jobs',
+      firingJobIds: new Set(),
 
       initialize: async () => {
-        set({ isLoading: true });
+        // Skip if already initialized (prevent race conditions from multiple callers)
+        if (get().initialized) return;
+
+        // Only show loading spinner on first load (no data yet) to avoid UI flicker
+        if (get().jobs.length === 0 && get().history.length === 0) {
+          set({ isLoading: true });
+        }
         const [jobs, history] = await Promise.all([
           loadAutomationJobs(),
           loadAutomationHistory(),
@@ -68,11 +88,11 @@ export const useAutomationStore = create<AutomationState>()(
         const now = Date.now();
         const updatedJobs = jobs.map(job => {
           if (!job.enabled) return job;
-          if (job.nextRunAt && job.nextRunAt > now) return job; // Already scheduled in the future
+          if (job.nextRunAt && job.nextRunAt > now) return job;
           const nextRunAt = getNextFireTime(job.cronExpression, undefined, true) ?? undefined;
           return { ...job, nextRunAt };
         });
-        set({ jobs: updatedJobs, history, isLoading: false });
+        set({ jobs: updatedJobs, history, isLoading: false, initialized: true });
         await saveAutomationJobs(updatedJobs);
       },
 
@@ -119,6 +139,21 @@ export const useAutomationStore = create<AutomationState>()(
         const job = get().jobs.find(j => j.id === id);
         if (!job) return;
         await get().updateJob(id, { enabled: !job.enabled });
+      },
+
+      claimJobForFiring: (jobId) => {
+        const { firingJobIds } = get();
+        if (firingJobIds.has(jobId)) return false;
+        const next = new Set(firingJobIds);
+        next.add(jobId);
+        set({ firingJobIds: next });
+        return true;
+      },
+
+      releaseJobFiring: (jobId) => {
+        const next = new Set(get().firingJobIds);
+        next.delete(jobId);
+        set({ firingJobIds: next });
       },
 
       markJobRunning: async (jobId) => {

@@ -20,6 +20,8 @@ const state = {
   chatLoading: false,
   chatSending: false,
   chatPollTimer: null, // polling timer for live updates
+  chatTotalMessages: 0,  // total messages on server
+  chatLoadingMore: false, // loading older messages
   drawer: null,        // { agentId, agentName } when execute drawer is open
   refreshing: false,   // pull-to-refresh in progress
   autoRefreshTimer: null, // stealth auto-refresh timer
@@ -205,20 +207,28 @@ function stopAutoRefresh() {
 }
 
 // ── Chat ───────────────────────────────────────────────────────
+const INITIAL_MSG_LIMIT = 3;
+const LOAD_MORE_LIMIT = 10;
+
 async function openChat(session) {
   state.chatSession = session;
   state.chatMessages = [];
   state.chatLoading = true;
+  state.chatTotalMessages = 0;
+  state.chatLoadingMore = false;
   state.drawer = null; // close drawer if open
   render();
   try {
-    // Fetch messages and latest session status in parallel
-    const [messages, sessionInfo] = await Promise.all([
-      api.get(`/sessions/${session.id}/messages`),
-      api.get(`/sessions/${session.id}`).catch(() => null),
-    ]);
+    // Fetch last N messages and latest session status in parallel
+    const res = await fetch(`${api.base()}/sessions/${session.id}/messages?limit=${INITIAL_MSG_LIMIT}`, {
+      headers: api.headers(),
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const messages = await res.json();
+    state.chatTotalMessages = parseInt(res.headers.get('x-total-count') || '0', 10);
+
+    const sessionInfo = await api.get(`/sessions/${session.id}`).catch(() => null);
     state.chatMessages = messages;
-    // Update status so typing indicator is accurate on first render
     if (sessionInfo && sessionInfo.status) {
       state.chatSession.status = sessionInfo.status;
     }
@@ -232,28 +242,114 @@ async function openChat(session) {
   startChatPolling();
 }
 
+async function loadMoreMessages() {
+  if (state.chatLoadingMore || !state.chatSession) return;
+  // Already have all messages
+  if (state.chatMessages.length >= state.chatTotalMessages) return;
+
+  state.chatLoadingMore = true;
+  render();
+
+  const container = $('#chat-messages');
+  const prevHeight = container ? container.scrollHeight : 0;
+
+  try {
+    const offset = state.chatMessages.filter(m => !m._optimistic).length;
+    const res = await fetch(
+      `${api.base()}/sessions/${state.chatSession.id}/messages?limit=${LOAD_MORE_LIMIT}&offset=${offset}`,
+      { headers: api.headers() }
+    );
+    if (!res.ok) throw new Error(`${res.status}`);
+    const olderMessages = await res.json();
+    state.chatTotalMessages = parseInt(res.headers.get('x-total-count') || '0', 10);
+
+    // Prepend older messages
+    state.chatMessages = [...olderMessages, ...state.chatMessages];
+  } catch (e) {
+    toast('Failed to load older messages', 'error');
+  }
+
+  state.chatLoadingMore = false;
+  render();
+
+  // Maintain scroll position after prepending
+  if (container) {
+    requestAnimationFrame(() => {
+      const newContainer = $('#chat-messages');
+      if (newContainer) {
+        newContainer.scrollTop = newContainer.scrollHeight - prevHeight;
+      }
+    });
+  }
+}
+
 async function pollChatMessages() {
   if (!state.chatSession) return;
   try {
-    const [messages, sessionInfo] = await Promise.all([
-      api.get(`/sessions/${state.chatSession.id}/messages`),
+    // Only fetch the tail — enough to detect new messages
+    const pollLimit = Math.max(INITIAL_MSG_LIMIT, 5);
+    const [res, sessionInfo] = await Promise.all([
+      fetch(`${api.base()}/sessions/${state.chatSession.id}/messages?limit=${pollLimit}`, {
+        headers: api.headers(),
+      }),
       api.get(`/sessions/${state.chatSession.id}`).catch(() => null),
     ]);
+    if (!res.ok) return;
+    const tailMessages = await res.json();
+    const serverTotal = parseInt(res.headers.get('x-total-count') || '0', 10);
+
     const hadCount = state.chatMessages.length;
     const lastContent = state.chatMessages[hadCount - 1]?.content || '';
     const wasActive = isSessionActive(state.chatSession);
+    const prevTotal = state.chatTotalMessages;
 
-    state.chatMessages = messages;
+    // How many new messages appeared on server since our last fetch
+    const newCount = serverTotal - prevTotal;
+    state.chatTotalMessages = serverTotal;
+
+    if (newCount > 0 && tailMessages.length > 0) {
+      // Append only the genuinely new messages at the end
+      const newMessages = tailMessages.slice(-newCount);
+      // Remove optimistic messages that are now on server
+      const nonOptimistic = state.chatMessages.filter(m => {
+        if (!m._optimistic) return true;
+        return !newMessages.some(n => n.role === 'user' && n.content === m.content);
+      });
+      state.chatMessages = [...nonOptimistic, ...newMessages];
+    } else {
+      // No new messages — update last message content if streaming changed it
+      const serverLast = tailMessages[tailMessages.length - 1];
+      const localLast = state.chatMessages[state.chatMessages.length - 1];
+      if (serverLast && localLast && !localLast._optimistic &&
+          serverLast.content !== localLast.content) {
+        localLast.content = serverLast.content;
+      }
+    }
+
+    // Preserve optimistic messages if server hasn't caught up
+    const optimistic = state.chatMessages.filter(m => m._optimistic);
+    if (optimistic.length && serverTotal <= prevTotal) {
+      // Server hasn't processed our message yet — keep optimistic
+    }
+
     if (sessionInfo && sessionInfo.status) {
       state.chatSession.status = sessionInfo.status;
     }
-    const nowActive = isSessionActive(state.chatSession);
-    const newLastContent = messages[messages.length - 1]?.content || '';
 
-    // Re-render if: new messages, content changed, or status changed
-    if (messages.length !== hadCount || newLastContent !== lastContent || wasActive !== nowActive) {
+    const nowActive = isSessionActive(state.chatSession);
+    const currentCount = state.chatMessages.length;
+    const newLastContent = state.chatMessages[currentCount - 1]?.content || '';
+
+    if (currentCount !== hadCount || newLastContent !== lastContent || wasActive !== nowActive) {
       render();
       scrollChatToBottom();
+      // Notify when a new assistant message arrives
+      if (newCount > 0) {
+        const lastNew = state.chatMessages[state.chatMessages.length - 1];
+        if (lastNew && lastNew.role === 'assistant') {
+          notifyNewMessage(lastNew.content || 'Agent replied');
+        }
+      }
     }
   } catch (e) {
     // Silently retry — session may not exist in storage yet
@@ -279,8 +375,8 @@ async function sendMessage() {
   input.textContent = '';
   state.chatSending = true;
 
-  // Optimistic: add to UI immediately
-  state.chatMessages.push({ role: 'user', content: message });
+  // Optimistic: add to UI immediately (flagged so polling preserves it)
+  state.chatMessages.push({ role: 'user', content: message, _optimistic: true });
   render();
   scrollChatToBottom();
 
@@ -306,11 +402,12 @@ async function executeFromDrawer() {
   if (!prompt || !state.drawer) return;
 
   const { agentId, agentName } = state.drawer;
+  const model = $('#drawer-model')?.value || 'sonnet';
   const sendBtn = $('#drawer-send');
   if (sendBtn) sendBtn.disabled = true;
 
   try {
-    const res = await api.post('/execute', { agentId, prompt });
+    const res = await api.post('/execute', { agentId, prompt, model });
     if (res.success && res.sessionId) {
       // Open chat immediately with a virtual session (don't wait for loadData)
       const virtualSession = {
@@ -368,6 +465,7 @@ function render() {
 
   app.innerHTML = `
     ${renderHeader()}
+    ${notifBannerType() ? renderNotifBanner(notifBannerType()) : ''}
     ${renderStats()}
     ${renderTabs()}
     ${renderContent()}
@@ -408,6 +506,28 @@ function renderHeader() {
           <span class="ws-dot ${state.wsConnected ? 'connected' : 'disconnected'}"></span>
           ${state.wsConnected ? 'Live' : 'Offline'}
         </span>
+      </div>
+    </div>
+  `;
+}
+
+function renderNotifBanner(type) {
+  if (type === 'install') {
+    return `
+      <div class="notif-banner" id="notif-banner">
+        <span>Add to Home Screen to receive push notifications when agents reply</span>
+        <div class="notif-banner-actions">
+          <button id="notif-dismiss" class="btn btn-secondary btn-sm">OK</button>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="notif-banner" id="notif-banner">
+      <span>Enable notifications to get alerts when agents reply</span>
+      <div class="notif-banner-actions">
+        <button id="notif-enable" class="btn btn-primary btn-sm">Enable</button>
+        <button id="notif-dismiss" class="btn btn-secondary btn-sm">Later</button>
       </div>
     </div>
   `;
@@ -550,6 +670,11 @@ function renderDrawer() {
         <span class="drawer-agent">${esc(agentName)}</span>
       </div>
       <div class="drawer-body">
+        <select id="drawer-model" class="select">
+          <option value="opus">Opus</option>
+          <option value="sonnet" selected>Sonnet</option>
+          <option value="haiku">Haiku</option>
+        </select>
         <textarea id="drawer-prompt" class="textarea" placeholder="What should the agent do?" rows="3" autofocus></textarea>
         <button id="drawer-send" class="btn btn-primary btn-block">
           Send
@@ -568,7 +693,7 @@ function renderChat() {
   return `
     <div class="chat-view">
       <div class="chat-header">
-        <button class="chat-back" id="back-btn">←</button>
+        <div class="chat-back" id="back-btn">←</div>
         <div class="chat-header-info">
           <div class="chat-header-title">${esc(s.title || 'Untitled')}</div>
           <div class="chat-header-agent">${esc(agentName)}</div>
@@ -582,24 +707,35 @@ function renderChat() {
           ? '<div class="loading-center"><div class="spinner"></div></div>'
           : state.chatMessages.length
             ? (() => {
+                const hasMore = state.chatMessages.filter(m => !m._optimistic).length < state.chatTotalMessages;
+                const loadMoreHtml = hasMore
+                  ? `<div class="load-more" id="load-more">${state.chatLoadingMore
+                      ? '<div class="spinner" style="margin:0 auto"></div>'
+                      : '<span>Load older messages</span>'}</div>`
+                  : '';
                 const lastMsg = state.chatMessages[state.chatMessages.length - 1];
                 const showTyping = isSessionActive(s) && (!lastMsg || lastMsg.role === 'user');
-                return state.chatMessages.map(m => `
-                  <div class="chat-bubble ${m.role}">
+                return loadMoreHtml + state.chatMessages.map(m => {
+                  if (m.role === 'tool') {
+                    return `<div class="tool-uses">${m.content.split('\n').map(t =>
+                      `<span class="tool-pill">${esc(t)}</span>`
+                    ).join('')}</div>`;
+                  }
+                  return `<div class="chat-bubble ${m.role}">
                     <div class="chat-bubble-content">${formatMessage(m.content)}</div>
-                  </div>
-                `).join('') + (showTyping ? renderTypingIndicator() : '');
+                  </div>`;
+                }).join('') + (showTyping ? renderTypingIndicator() : '');
               })()
             : '<div class="empty-inline">Waiting for agent response...</div>'
         }
       </div>
       <div class="chat-input-bar">
         <div id="chat-input" class="chat-input" contenteditable="${state.chatSending ? 'false' : 'true'}"
-          role="textbox" data-placeholder="Type a message..."></div>
-        <button id="chat-send" class="btn btn-primary btn-send"
-          ${state.chatSending ? 'disabled' : ''}>
+          enterkeyhint="send" data-placeholder="Type a message..."></div>
+        <div id="chat-send" class="btn btn-primary btn-send"
+          style="${state.chatSending ? 'opacity:0.4;pointer-events:none' : 'cursor:pointer'}">
           ${state.chatSending ? '...' : '→'}
-        </button>
+        </div>
       </div>
     </div>
   `;
@@ -607,9 +743,28 @@ function renderChat() {
 
 function formatMessage(content) {
   if (!content) return '';
-  return esc(content)
-    .replace(/\n/g, '<br>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>');
+  let html = esc(content);
+  // Code blocks (``` ... ```)
+  html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+  // Bold
+  html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  // Italic (single * not preceded/followed by *)
+  html = html.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+  // Headers (## → h3, # → h2)
+  html = html.replace(/^### (.+)$/gm, '<strong style="font-size:14px">$1</strong>');
+  html = html.replace(/^## (.+)$/gm, '<strong style="font-size:15px">$1</strong>');
+  html = html.replace(/^# (.+)$/gm, '<strong style="font-size:16px">$1</strong>');
+  // Bullet lists
+  html = html.replace(/^[-*] (.+)$/gm, '<span class="md-bullet">$1</span>');
+  // Newlines (but not inside <pre>)
+  html = html.replace(/\n/g, '<br>');
+  // Clean up <br> inside <pre>
+  html = html.replace(/<pre><code>([\s\S]*?)<\/code><\/pre>/g, (_, code) =>
+    `<pre><code>${code.replace(/<br>/g, '\n')}</code></pre>`
+  );
+  return html;
 }
 
 function isSessionActive(session) {
@@ -696,6 +851,12 @@ function bindEvents() {
     return;
   }
 
+  // Notification banner
+  const notifEnable = $('#notif-enable');
+  if (notifEnable) notifEnable.onclick = handleEnableNotifications;
+  const notifDismiss = $('#notif-dismiss');
+  if (notifDismiss) notifDismiss.onclick = dismissNotifBanner;
+
   // Back button (chat view → main)
   const backBtn = $('#back-btn');
   if (backBtn) {
@@ -704,6 +865,18 @@ function bindEvents() {
       state.chatSession = null;
       state.chatMessages = [];
       render();
+    };
+  }
+
+  // Load more messages (tap or scroll to top)
+  const loadMore = $('#load-more');
+  if (loadMore) loadMore.onclick = loadMoreMessages;
+  const chatContainer = $('#chat-messages');
+  if (chatContainer) {
+    chatContainer.onscroll = () => {
+      if (chatContainer.scrollTop < 40 && !state.chatLoadingMore) {
+        loadMoreMessages();
+      }
     };
   }
 
@@ -759,7 +932,6 @@ function bindEvents() {
     drawerSend.onclick = executeFromDrawer;
     const drawerPrompt = $('#drawer-prompt');
     if (drawerPrompt) {
-      // Cmd+Enter or Ctrl+Enter to send
       drawerPrompt.onkeydown = (e) => {
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) executeFromDrawer();
       };
@@ -811,6 +983,59 @@ function timeAgo(ts) {
   return `${days}d`;
 }
 
+// ── Service Worker & Notifications ────────────────────────────
+let swRegistration = null;
+
+async function initServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  try {
+    swRegistration = await navigator.serviceWorker.register('/dashboard/sw.js');
+    console.log('[SW] Registered');
+  } catch (e) {
+    console.warn('[SW] Registration failed:', e);
+  }
+}
+
+function isStandalone() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+// Returns: 'install' | 'enable' | false
+function notifBannerType() {
+  if (localStorage.getItem('quack_notif_dismissed')) return false;
+  // Not installed as PWA → show install prompt
+  if (!isStandalone()) return 'install';
+  // Installed but Notification API not available (old iOS)
+  if (!('Notification' in window)) return false;
+  // Already granted or denied
+  if (Notification.permission !== 'default') return false;
+  return 'enable';
+}
+
+async function handleEnableNotifications() {
+  const result = await Notification.requestPermission();
+  console.log('[Notifications] Permission:', result);
+  localStorage.setItem('quack_notif_dismissed', '1');
+  render();
+}
+
+function dismissNotifBanner() {
+  localStorage.setItem('quack_notif_dismissed', '1');
+  render();
+}
+
+function notifyNewMessage(text) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (document.visibilityState === 'visible') return;
+  const body = text.length > 120 ? text.slice(0, 117) + '...' : text;
+  // Use SW for iOS PWA support, fallback to Notification API
+  if (navigator.serviceWorker?.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'NOTIFY', title: 'Quack Agent', body });
+  } else {
+    new Notification('Quack Agent', { body, icon: '/dashboard/icon-192.png', tag: 'quack-reply' });
+  }
+}
+
 // ── Init ───────────────────────────────────────────────────────
 render();
 if (state.token) {
@@ -818,4 +1043,5 @@ if (state.token) {
   connectWs();
   initPullToRefresh();
   startAutoRefresh();
+  initServiceWorker();
 }

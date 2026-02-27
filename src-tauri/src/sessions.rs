@@ -719,6 +719,66 @@ fn parse_session_metadata_with_path(
     ))
 }
 
+/// Create a compact summary of a tool use for mobile display
+fn summarize_tool_use(name: &str, input: &Value) -> String {
+    let detail = match name {
+        "Read" | "read" => input["file_path"].as_str()
+            .map(|p| short_path(p))
+            .unwrap_or_default(),
+        "Write" | "write" => input["file_path"].as_str()
+            .map(|p| short_path(p))
+            .unwrap_or_default(),
+        "Edit" | "edit" => input["file_path"].as_str()
+            .map(|p| short_path(p))
+            .unwrap_or_default(),
+        "Bash" | "bash" => input["command"].as_str()
+            .map(|c| {
+                let trimmed = c.trim();
+                if trimmed.len() > 60 {
+                    format!("{}...", &trimmed[..57])
+                } else {
+                    trimmed.to_string()
+                }
+            })
+            .unwrap_or_default(),
+        "Glob" | "glob" => input["pattern"].as_str()
+            .unwrap_or("")
+            .to_string(),
+        "Grep" | "grep" => input["pattern"].as_str()
+            .unwrap_or("")
+            .to_string(),
+        "TodoWrite" | "TodoRead" => String::new(),
+        "Task" => input["description"].as_str()
+            .unwrap_or("")
+            .to_string(),
+        _ => {
+            // MCP tools: mcp__server__tool → "server tool"
+            if name.starts_with("mcp__") {
+                let parts: Vec<&str> = name.split("__").skip(1).collect();
+                parts.join(" ")
+            } else {
+                String::new()
+            }
+        }
+    };
+
+    if detail.is_empty() {
+        name.to_string()
+    } else {
+        format!("{} → {}", name, detail)
+    }
+}
+
+/// Shorten a file path to just filename or last 2 segments
+fn short_path(path: &str) -> String {
+    let parts: Vec<&str> = path.split('/').filter(|s| !s.is_empty()).collect();
+    if parts.len() <= 2 {
+        parts.join("/")
+    } else {
+        format!("{}/{}", parts[parts.len() - 2], parts[parts.len() - 1])
+    }
+}
+
 /// Parse messages and usage from jsonl content
 fn parse_session_messages(
     content: &str,
@@ -792,18 +852,35 @@ fn parse_session_messages(
             }
         }
 
-        // Extract assistant messages
+        // Extract assistant messages and tool uses
         if event["type"] == "assistant" {
             if let Some(message) = event["message"].as_object() {
                 if let Some(content_array) = message["content"].as_array() {
                     let mut assistant_text = String::new();
+                    let mut tool_uses: Vec<String> = Vec::new();
+
                     for block in content_array {
                         if block["type"] == "text" {
                             if let Some(text) = block["text"].as_str() {
                                 assistant_text.push_str(text);
                             }
+                        } else if block["type"] == "tool_use" {
+                            if let Some(name) = block["name"].as_str() {
+                                let summary = summarize_tool_use(name, &block["input"]);
+                                tool_uses.push(summary);
+                            }
                         }
                     }
+
+                    // Insert tool use pills before the text response
+                    if !tool_uses.is_empty() {
+                        messages.push(SessionHistoryMessage {
+                            role: "tool".to_string(),
+                            content: tool_uses.join("\n"),
+                            timestamp: None,
+                        });
+                    }
+
                     if !assistant_text.is_empty() {
                         messages.push(SessionHistoryMessage {
                             role: "assistant".to_string(),

@@ -6,12 +6,13 @@ import MCPPanel from "./MCPPanel";
 import HooksPanel from "./HooksPanel";
 import { CommandsPanel } from "./CommandsPanel";
 import { RulesPanel } from "./RulesPanel";
+import { SessionsPanel } from "./SessionsPanel";
 import { useRules } from "../hooks/useRules";
 import { useSlashCommands } from "../hooks/useSlashCommands";
 import { useMCPServers } from "../hooks/useMCPServers";
 import AgentContextPanel from "./AgentContextPanel";
 import ProjectContextPanel from "./ProjectContextPanel";
-import type { DirectoryEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, AgentPersonality, HookConfig, ChatMessage } from "../types";
+import type { DirectoryEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionInfo, AgentPersonality, HookConfig, ChatMessage } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 import "./SidePanelAccordion.css";
 
@@ -27,6 +28,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   droids: '#4ecdc4',      // Teal - automation
   rules: '#60a5fa',       // Blue - governance
   hooks: '#a78bfa',       // Purple - events
+  sessions: '#00d9ff',    // Cyan - sessions
   mcp: '#34d399',         // Green - servers
   commands: '#f472b6',    // Pink - commands
   context: '#f28c52',     // Orange - file explorer
@@ -172,6 +174,12 @@ const icons = {
       <path d="M7 7h6M7 10h6M7 13h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   ),
+  sessions: (
+    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+      <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10 6v4l3 2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
 };
 
 interface SidePanelAccordionProps {
@@ -258,6 +266,9 @@ interface SidePanelAccordionProps {
   // MCP props
   onOpenMcpConfig?: (filePath: string) => void;
 
+  // Sessions props
+  onSelectSession?: (session: SessionInfo) => void;
+
   // Force expand a specific section (controlled from parent)
   forceExpandSection?: string | null;
   onForceExpandHandled?: () => void;
@@ -340,6 +351,9 @@ export default function SidePanelAccordion({
   // MCP
   onOpenMcpConfig,
 
+  // Sessions
+  onSelectSession,
+
   // Force expand
   forceExpandSection,
   onForceExpandHandled,
@@ -387,7 +401,7 @@ export default function SidePanelAccordion({
   }, [focusedSection]);
 
   // Section IDs for reference (order is determined by DOM position, not dynamically)
-  const sectionIds = ['context', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks'];
+  const sectionIds = ['context', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions'];
 
   // Handle forceExpandSection from parent
   useEffect(() => {
@@ -640,6 +654,22 @@ export default function SidePanelAccordion({
             onSaveHook={onSaveHook}
             onDeleteHook={onDeleteHook}
             onToggleHook={onToggleHook}
+          />
+        </AccordionSection>
+
+        {/* Sessions */}
+        <AccordionSection
+          id="sessions"
+          title="Sessions"
+          icon={icons.sessions}
+          isExpanded={focusedSection === "sessions"}
+          isFocused={focusedSection === "sessions"}
+          order={getOrder("sessions")}
+          category="sessions"
+          onToggle={() => toggleSection("sessions")}
+        >
+          <SessionsPanel
+            onSelectSession={(session) => onSelectSession?.(session)}
           />
         </AccordionSection>
       </div>

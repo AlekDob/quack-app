@@ -70,6 +70,7 @@ Feature-oriented guides written for humans (Italian). Each feature has its own f
 | Guide | Path | Pages |
 |-------|------|-------|
 | Brain | guide/brain/ | [Overview](guide/brain/overview.md), [Access Chain](guide/brain/access-chain.md), [Entry Types](guide/brain/entry-types.md), [Brain UI](guide/brain/brain-ui.md), [Writing Entries](guide/brain/writing-entries.md) |
+| Memory | guide/memory/ | [Overview](guide/memory/overview.md) |
 
 ## Knowledge Store (documentation/)
 

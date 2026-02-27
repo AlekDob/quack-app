@@ -1792,7 +1792,7 @@ function AppContent() {
 
   // 📱 Pending auto-start: When WhatsApp triggers a session, store the prompt here
   // A useEffect will pick it up when activeId/activeSessionId are updated by React
-  const pendingAutoStartRef = useRef<{ prompt: string; sessionId: string } | null>(null);
+  const pendingAutoStartRef = useRef<{ prompt: string; sessionId: string; model?: string } | null>(null);
 
   // 🦆 Telegram Bot integration hook (DEPRECATED - using Telegram Central Bot now)
   // TODO: Remove this old webhook-based telegram system
@@ -2738,8 +2738,8 @@ function AppContent() {
       // Small delay for Claude SDK listener and chat UI to be fully ready
       const timer = setTimeout(async () => {
         if (sendMessageForAgentRef.current) {
-          console.log(`📱 Auto-sending prompt:`, pending.prompt.substring(0, 100));
-          await sendMessageForAgentRef.current(pending.prompt);
+          console.log(`📱 Auto-sending prompt:`, pending.prompt.substring(0, 100), `model:`, pending.model);
+          await sendMessageForAgentRef.current(pending.prompt, pending.model ? { model: pending.model } : undefined);
         } else {
           console.error(`📱 sendMessageForAgentRef still null after delay`);
         }
@@ -3151,11 +3151,15 @@ function AppContent() {
         }>('send_message_via_sdk_streaming', {
           agentId: targetAgentId,
           request: (() => {
-            const prf = getProviderRequestFields(remoteModels);
+            const prf = getProviderRequestFields(remoteModels, options?.model);
+            // 🦆 AUTOMATION FIX: If a non-anthropic provider is specified in options,
+            // override provider fields so Ollama/custom models resolve correctly
+            const isJobProvider = options?.provider && options.provider !== 'anthropic';
+            const { providerBaseUrl: globalBaseUrl, providerApiKey: globalApiKey } = useSettingsStore.getState().claude;
             return {
             prompt,
-            // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
-            model: prf.resolveModel(options?.model || 'opus46'),
+            // 🦆 MODEL FIX: For non-anthropic providers, use model ID directly; for Anthropic, resolve friendly name
+            model: isJobProvider ? (options?.model || 'opus46') : prf.resolveModel(options?.model || 'opus46'),
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
             // Extract only file paths from ChatAttachment objects - Rust expects Vec<String>
@@ -3171,9 +3175,9 @@ function AppContent() {
             ],
             sessionKey: targetAgentId,
             // 🦆 LLM Provider fields (Ollama/custom support)
-            provider: prf.provider,
-            providerBaseUrl: prf.providerBaseUrl,
-            providerApiKey: prf.providerApiKey,
+            provider: isJobProvider ? options.provider : prf.provider,
+            providerBaseUrl: isJobProvider ? (globalBaseUrl || 'http://localhost:11434') : prf.providerBaseUrl,
+            providerApiKey: isJobProvider && options.provider === 'custom' ? globalApiKey : prf.providerApiKey,
             // IDE context: injected into system prompt by Node.js, not into user message
             ideContext: ideContext || undefined,
           };
@@ -3222,6 +3226,20 @@ function AppContent() {
       });
 
       console.log(`[sendMessageForTargetAgent] Completed for ${targetAgentId}, session_id: ${response.session_id}`);
+
+      // 🦆 SESSIONS-FIRST: Save claudeSessionId in session store for resume support
+      if (response.session_id) {
+        const { updateSession: updateSess } = useSessionStore.getState();
+        await updateSess(targetAgentId, {
+          claudeSessionId: response.session_id,
+          messageCount: (updatedSession?.messageCount || 0) + 2, // user + assistant
+          inputTokens: (updatedSession?.inputTokens || 0) + (response.usage?.input_tokens || 0),
+          outputTokens: (updatedSession?.outputTokens || 0) + (response.usage?.output_tokens || 0),
+          cacheCreationTokens: (updatedSession?.cacheCreationTokens || 0) + (response.usage?.cache_creation_input_tokens || 0),
+          cacheReadTokens: (updatedSession?.cacheReadTokens || 0) + (response.usage?.cache_read_input_tokens || 0),
+          totalCost: (updatedSession?.totalCost || 0) + response.total_cost_usd,
+        });
+      }
 
       // 🦆 CRITICAL: Save sessionId in Kanban task for persistence across app restarts
       if (response.session_id) {
@@ -4918,11 +4936,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       projectPath: string;
       projectName: string;
       prompt: string;
+      model?: string;
       source: string;
       autoSend: boolean;
     }>("remote-execute", async (event) => {
       console.log("📱 [Remote Execute] Request:", event.payload);
-      const { sessionId: remoteSessionId, agentId, prompt, projectPath, projectName } = event.payload;
+      const { sessionId: remoteSessionId, agentId, prompt, projectPath, projectName, model: remoteModel } = event.payload;
 
       // Find the terminal for this agent
       const agent = terminalsRef.current.find(t => t.id === agentId);
@@ -4952,15 +4971,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         setActiveSessionIdExclusive(newSession.id);
 
         // Use pendingAutoStart to send the prompt once the session is active
-        pendingAutoStartRef.current = { prompt, sessionId: newSession.id };
+        pendingAutoStartRef.current = { prompt, sessionId: newSession.id, model: remoteModel };
 
         // Fallback: if activeSessionId was already set, send directly
         setTimeout(() => {
           if (pendingAutoStartRef.current?.sessionId === newSession.id) {
             console.log(`📱 [Remote Execute] Fallback: sending directly`);
+            const pendingModel = pendingAutoStartRef.current.model;
             pendingAutoStartRef.current = null;
             if (sendMessageForAgentRef.current) {
-              sendMessageForAgentRef.current(prompt);
+              sendMessageForAgentRef.current(prompt, pendingModel ? { model: pendingModel } : undefined);
             }
           }
         }, 2000);
@@ -9179,8 +9199,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
 
       // 1. Create a new AgentSession for this automation run
+      const sessionTitle = `[Auto] ${job.name || 'Unnamed Job'}`;
       const newSession = await createSession({
-        title: `[Auto] ${job.name}`,
+        title: sessionTitle,
         agentId: job.agentId,
         projectPath: job.projectPath || agent.cwd,
         projectName: job.projectName || extractProjectId(agent.cwd) || 'project',
@@ -9189,11 +9210,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         initialPrompt: job.promptTemplate,
       });
 
-      console.log('[Automation] Session created:', newSession.id);
+      console.log('[Automation] Session created:', newSession.id, 'title:', sessionTitle, 'model:', job.model);
 
       // 2. Send the prompt to the agent via the session
       await sendMessageForTargetAgent(newSession.id, job.promptTemplate, {
         workingDirectory: job.projectPath || agent.cwd,
+        model: job.model,
+        provider: job.provider,
       });
 
       toast.success(`Job "${job.name}" fired — session created under ${job.agentName}`);
@@ -9276,8 +9299,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               }
             }
 
+            const autoTitle = `[Auto] ${job.name || 'Unnamed Job'}`;
             const newSession = await createSession({
-              title: `[Auto] ${job.name}`,
+              title: autoTitle,
               agentId: job.agentId,
               projectPath: job.projectPath || agent.cwd,
               projectName: job.projectName || extractProjectId(agent.cwd) || 'project',
@@ -9288,9 +9312,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
             await sendMessageForTargetAgent(newSession.id, job.promptTemplate, {
               workingDirectory: job.projectPath || agent.cwd,
+              model: job.model,
+              provider: job.provider,
             });
 
-            console.log(`[Automation] Job "${job.name}" fired — session ${newSession.id}`);
+            console.log(`[Automation] Job "${job.name}" fired — session ${newSession.id}, title: ${autoTitle}, model: ${job.model}`);
 
             // Release lock and mark success after 5s
             setTimeout(async () => {

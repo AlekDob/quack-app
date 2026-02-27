@@ -537,6 +537,94 @@ fn set_claude_env_var_impl(key: &str, value: Option<&str>) -> Result<()> {
     Ok(())
 }
 
+/// Read a boolean flag from ~/.claude/settings.json top-level.
+#[tauri::command]
+pub fn get_claude_settings_flag(key: String) -> Result<Option<bool>, String> {
+    get_claude_settings_flag_impl(&key).map_err(|e| e.to_string())
+}
+
+fn get_claude_settings_flag_impl(key: &str) -> Result<Option<bool>> {
+    let path = get_global_settings_path();
+    let settings = read_settings(&path)?;
+    Ok(settings.other.get(key).and_then(|v| v.as_bool()))
+}
+
+/// Write a boolean flag to ~/.claude/settings.json top-level.
+/// Pass value=None to remove the key (revert to Claude Code default).
+#[tauri::command]
+pub fn set_claude_settings_flag(key: String, value: Option<bool>) -> Result<(), String> {
+    set_claude_settings_flag_impl(&key, value).map_err(|e| e.to_string())
+}
+
+fn set_claude_settings_flag_impl(key: &str, value: Option<bool>) -> Result<()> {
+    let path = get_global_settings_path();
+    let mut settings = read_settings(&path).unwrap_or_default();
+
+    match value {
+        Some(v) => {
+            settings.other.insert(
+                key.to_string(),
+                serde_json::Value::Bool(v),
+            );
+        }
+        None => {
+            settings.other.remove(key);
+        }
+    }
+
+    write_settings(&path, &settings)?;
+    Ok(())
+}
+
+/// Open the Claude Code auto-memory folder for the current project.
+#[tauri::command]
+pub fn open_claude_memory_folder(working_dir: Option<String>) -> Result<String, String> {
+    open_claude_memory_folder_impl(working_dir.as_deref()).map_err(|e| e.to_string())
+}
+
+fn open_claude_memory_folder_impl(working_dir: Option<&str>) -> Result<String> {
+    let home = dirs::home_dir().ok_or_else(|| anyhow!("Cannot find home directory"))?;
+    let projects_dir = home.join(".claude").join("projects");
+
+    // Try to find the memory directory for the current project
+    let cwd = working_dir
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+
+    // Claude Code uses the path with slashes replaced by dashes, prefixed with dash
+    // e.g., /Users/alekdob/Desktop/Dev/Personal/quack-app
+    //     → -Users-alekdob-Desktop-Dev-Personal-quack-app
+    let path_str = cwd.to_string_lossy().replace('/', "-");
+    let memory_dir = projects_dir.join(&path_str).join("memory");
+
+    if memory_dir.exists() {
+        #[cfg(target_os = "macos")]
+        std::process::Command::new("open")
+            .arg(&memory_dir)
+            .spawn()
+            .map_err(|e| anyhow!("Failed to open Finder: {}", e))?;
+
+        #[cfg(target_os = "windows")]
+        std::process::Command::new("explorer")
+            .arg(&memory_dir)
+            .spawn()
+            .map_err(|e| anyhow!("Failed to open Explorer: {}", e))?;
+
+        #[cfg(target_os = "linux")]
+        std::process::Command::new("xdg-open")
+            .arg(&memory_dir)
+            .spawn()
+            .map_err(|e| anyhow!("Failed to open file manager: {}", e))?;
+
+        Ok(memory_dir.to_string_lossy().to_string())
+    } else {
+        Err(anyhow!(
+            "Memory folder not found at {}. Start a Claude Code session first to initialize it.",
+            memory_dir.display()
+        ))
+    }
+}
+
 fn toggle_hook_impl(working_dir: Option<&str>, hook_id: &str, enabled: bool) -> Result<()> {
     // Try both project and global metadata
     for scope in [HookScope::Project, HookScope::Global] {

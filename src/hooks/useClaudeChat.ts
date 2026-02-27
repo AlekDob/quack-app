@@ -92,6 +92,8 @@ export interface ChatSendOptions {
   bypassTokenCheck?: boolean; // Skip token check (use with caution)
   // Model configuration from Supabase
   remoteModels?: import('../services/modelService').ModelConfig[]; // Remote models for ID mapping
+  // Provider override (for automation jobs that specify a non-global provider)
+  provider?: import('../types').LLMProviderType;
 }
 
 export interface UseClaudeChatOptions {
