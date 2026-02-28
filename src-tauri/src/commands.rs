@@ -14,6 +14,8 @@ pub struct SavedCommand {
     pub cwd: Option<String>,
     pub color: String,
     pub category: String, // "dev", "build", "test", "custom"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project_path: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -33,6 +35,14 @@ pub struct ProcessInfo {
 }
 
 const STORE_FILENAME: &str = "commands.json";
+
+/// Normalize empty-string optionals to None so filter logic works correctly.
+fn sanitize_optional_string(value: &Option<String>) -> Option<String> {
+    match value {
+        Some(s) if s.trim().is_empty() => None,
+        other => other.clone(),
+    }
+}
 const COMMANDS_KEY: &str = "saved_commands";
 
 #[tauri::command]
@@ -77,6 +87,7 @@ fn save_command_impl(app: &AppHandle, mut command: SavedCommand) -> Result<Saved
     if command.id.is_empty() {
         command.id = Uuid::new_v4().to_string();
     }
+    command.project_path = sanitize_optional_string(&command.project_path);
 
     let store = app
         .store(STORE_FILENAME)
@@ -120,6 +131,7 @@ fn update_command_impl(
             command.cwd = updated_command.cwd.clone();
             command.color = updated_command.color.clone();
             command.category = updated_command.category.clone();
+            command.project_path = sanitize_optional_string(&updated_command.project_path);
             updated = Some(command.clone());
             break;
         }

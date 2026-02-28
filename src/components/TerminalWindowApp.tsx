@@ -8,8 +8,10 @@ import { TerminalMain } from './terminal/TerminalMain';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useSystemWakeHandler } from '../hooks/useSystemWakeHandler';
 import { extractProjectId } from '../utils/projectUtils';
-import type { ProjectTerminal } from '../types';
+import type { ProjectTerminal, SavedCommand } from '../types';
 import type { ProjectInfo, InitialCommand } from '../hooks/useTerminalWindowManager';
+import SavedCommandsDrawer from './SavedCommandsDrawer';
+import SavedCommandModal from './SavedCommandModal';
 import './TerminalWindowApp.css';
 
 const MAX_NAME_LENGTH = 50;
@@ -75,6 +77,13 @@ export function TerminalWindowApp() {
   const [editingTerminalId, setEditingTerminalId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
+
+  // Saved Commands state
+  const [savedCommands, setSavedCommands] = useState<SavedCommand[]>([]);
+  const [savedCommandsDrawerOpen, setSavedCommandsDrawerOpen] = useState(false);
+  const [savedCommandsFilterProject, setSavedCommandsFilterProject] = useState<string | null>(null);
+  const [savedCommandModalOpen, setSavedCommandModalOpen] = useState(false);
+  const [editingCommand, setEditingCommand] = useState<SavedCommand | null>(null);
 
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -339,6 +348,54 @@ export function TerminalWindowApp() {
       editInputRef.current.select();
     }
   }, [editingTerminalId]);
+
+  // Load saved commands on mount
+  useEffect(() => {
+    invoke<SavedCommand[]>('load_saved_commands')
+      .then(setSavedCommands)
+      .catch((err) => console.warn('Unable to load saved commands', err));
+  }, []);
+
+  const handleLaunchSavedCommand = useCallback(async (command: SavedCommand, immediate: boolean) => {
+    // Determine which project to use
+    const projectPath = command.cwd || command.projectPath || selectedProject;
+    if (!projectPath) return;
+
+    if (immediate) {
+      // Launch in a new terminal
+      try {
+        const existingCount = getProjectTerminalsByPath(projectPath).length;
+        const result = await invoke<{ id: string; label: string; color: string; cwd: string; alive: boolean }>('create_terminal', {
+          label: command.name || `Terminal ${existingCount + 1}`,
+          color: command.color || '#4dd4b3',
+          cwd: projectPath,
+        });
+        const newTerminal: ProjectTerminal = {
+          id: result.id,
+          name: result.label,
+          projectPath,
+          color: result.color,
+          cwd: result.cwd,
+          alive: result.alive,
+          status: 'idle',
+          createdAt: Date.now(),
+        };
+        addProjectTerminal(newTerminal);
+        setActiveTerminalId(result.id);
+        // Send the command to the new terminal after a short delay for initialization
+        setTimeout(() => {
+          invoke('write_to_terminal', { id: result.id, data: command.command + '\n' }).catch(console.error);
+        }, 300);
+      } catch (err) {
+        console.error('Failed to launch saved command', err);
+      }
+    } else {
+      // Send to active terminal
+      if (activeTerminalId) {
+        invoke('write_to_terminal', { id: activeTerminalId, data: command.command + '\n' }).catch(console.error);
+      }
+    }
+  }, [selectedProject, activeTerminalId, getProjectTerminalsByPath, addProjectTerminal, setActiveTerminalId]);
 
   // Click outside to close context menu
   useEffect(() => {
@@ -607,17 +664,33 @@ export function TerminalWindowApp() {
         <div className="terminal-sidebar">
           <div className="terminal-sidebar-header" data-tauri-drag-region>
             <span className="terminal-sidebar-title" data-tauri-drag-region>TERMINALS</span>
-            <button
-              type="button"
-              className="terminal-add-project-btn"
-              onClick={handleAddProjectFolder}
-              title="Add project folder"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 5v14" />
-                <path d="M5 12h14" />
-              </svg>
-            </button>
+            <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="terminal-add-project-btn"
+                onClick={() => {
+                  setSavedCommandsFilterProject(null);
+                  setSavedCommandsDrawerOpen(true);
+                }}
+                title="Saved Commands"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="4 17 10 11 4 5"/>
+                  <line x1="12" y1="19" x2="20" y2="19"/>
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="terminal-add-project-btn"
+                onClick={handleAddProjectFolder}
+                title="Add project folder"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div className="terminal-sidebar-content">
@@ -641,6 +714,22 @@ export function TerminalWindowApp() {
                       &rsaquo;
                     </span>
                     <span className="project-name">{project.name}</span>
+                    <button
+                      type="button"
+                      className="project-add-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSavedCommandsFilterProject(project.path);
+                        setSavedCommandsDrawerOpen(true);
+                      }}
+                      title="Saved Commands"
+                      style={{ fontSize: '11px', opacity: 0.6 }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="4 17 10 11 4 5"/>
+                        <line x1="12" y1="19" x2="20" y2="19"/>
+                      </svg>
+                    </button>
                     <button
                       type="button"
                       className="project-add-btn"
@@ -737,6 +826,53 @@ export function TerminalWindowApp() {
           themeName="tokyo-night"
         />
       </div>
+
+      {/* Saved Commands Drawer + Modal */}
+      <SavedCommandsDrawer
+        open={savedCommandsDrawerOpen}
+        commands={savedCommandsFilterProject
+          ? savedCommands.filter(c => c.projectPath === savedCommandsFilterProject || !c.projectPath)
+          : savedCommands}
+        filterProject={savedCommandsFilterProject}
+        onClearFilter={() => setSavedCommandsFilterProject(null)}
+        onLaunch={(command, immediate) => handleLaunchSavedCommand(command, immediate)}
+        onEdit={(command) => {
+          setEditingCommand(command);
+          setSavedCommandModalOpen(true);
+        }}
+        onCreate={() => {
+          setEditingCommand(null);
+          setSavedCommandModalOpen(true);
+        }}
+        onDelete={async (command) => {
+          await invoke('delete_command', { id: command.id });
+          setSavedCommands((prev) => prev.filter((item) => item.id !== command.id));
+        }}
+        onClose={() => setSavedCommandsDrawerOpen(false)}
+      />
+
+      <SavedCommandModal
+        open={savedCommandModalOpen}
+        command={editingCommand}
+        defaultProjectPath={savedCommandsFilterProject}
+        onClose={() => {
+          setSavedCommandModalOpen(false);
+          setEditingCommand(null);
+        }}
+        onSaved={(command) => {
+          setSavedCommands((prev) => {
+            const index = prev.findIndex((c) => c.id === command.id);
+            if (index >= 0) {
+              const updated = [...prev];
+              updated[index] = command;
+              return updated;
+            }
+            return [...prev, command];
+          });
+          setSavedCommandModalOpen(false);
+          setEditingCommand(null);
+        }}
+      />
 
       {/* Context Menu - rendered via portal */}
       {createPortal(
