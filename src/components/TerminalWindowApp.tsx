@@ -4,7 +4,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open as openDialog, confirm } from '@tauri-apps/plugin-dialog';
 import { createPortal } from 'react-dom';
-import { TerminalMain } from './terminal/TerminalMain';
+import { TerminalMain, type TerminalMainHandle } from './terminal/TerminalMain';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useSystemWakeHandler } from '../hooks/useSystemWakeHandler';
 import { extractProjectId } from '../utils/projectUtils';
@@ -84,6 +84,11 @@ export function TerminalWindowApp() {
   const [savedCommandsFilterProject, setSavedCommandsFilterProject] = useState<string | null>(null);
   const [savedCommandModalOpen, setSavedCommandModalOpen] = useState(false);
   const [editingCommand, setEditingCommand] = useState<SavedCommand | null>(null);
+
+  // Action menu state
+  const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  const terminalMainRef = useRef<TerminalMainHandle>(null);
+  const actionMenuRef = useRef<HTMLDivElement>(null);
 
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -445,6 +450,30 @@ export function TerminalWindowApp() {
     }
   }, [editingTerminalId, saveEditedName]);
 
+  // Close action menu on outside click or Escape
+  useEffect(() => {
+    if (!actionMenuOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(e.target as Node)) {
+        setActionMenuOpen(false);
+      }
+    };
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActionMenuOpen(false);
+        e.stopPropagation();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside, true);
+    document.addEventListener('keydown', handleEscape, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('keydown', handleEscape, true);
+    };
+  }, [actionMenuOpen]);
+
   // Group terminals by project
   const terminalsByProject = useMemo(() => {
     const groups = new Map<string, ProjectTerminal[]>();
@@ -664,33 +693,17 @@ export function TerminalWindowApp() {
         <div className="terminal-sidebar">
           <div className="terminal-sidebar-header" data-tauri-drag-region>
             <span className="terminal-sidebar-title" data-tauri-drag-region>TERMINALS</span>
-            <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
-              <button
-                type="button"
-                className="terminal-add-project-btn"
-                onClick={() => {
-                  setSavedCommandsFilterProject(null);
-                  setSavedCommandsDrawerOpen(true);
-                }}
-                title="Saved Commands"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="4 17 10 11 4 5"/>
-                  <line x1="12" y1="19" x2="20" y2="19"/>
-                </svg>
-              </button>
-              <button
-                type="button"
-                className="terminal-add-project-btn"
-                onClick={handleAddProjectFolder}
-                title="Add project folder"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 5v14" />
-                  <path d="M5 12h14" />
-                </svg>
-              </button>
-            </div>
+            <button
+              type="button"
+              className="terminal-add-project-btn"
+              onClick={handleAddProjectFolder}
+              title="Add project folder"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+            </button>
           </div>
 
           <div className="terminal-sidebar-content">
@@ -714,22 +727,6 @@ export function TerminalWindowApp() {
                       &rsaquo;
                     </span>
                     <span className="project-name">{project.name}</span>
-                    <button
-                      type="button"
-                      className="project-add-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSavedCommandsFilterProject(project.path);
-                        setSavedCommandsDrawerOpen(true);
-                      }}
-                      title="Saved Commands"
-                      style={{ fontSize: '11px', opacity: 0.6 }}
-                    >
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="4 17 10 11 4 5"/>
-                        <line x1="12" y1="19" x2="20" y2="19"/>
-                      </svg>
-                    </button>
                     <button
                       type="button"
                       className="project-add-btn"
@@ -819,12 +816,90 @@ export function TerminalWindowApp() {
           </div>
         </div>
 
-        {/* Main terminal area */}
-        <TerminalMain
-          terminals={terminals}
-          activeTerminalId={activeTerminalId}
-          themeName="tokyo-night"
-        />
+        {/* Main terminal area with floating action menu */}
+        <div className="terminal-main-wrapper">
+          <TerminalMain
+            ref={terminalMainRef}
+            terminals={terminals}
+            activeTerminalId={activeTerminalId}
+            themeName="tokyo-night"
+          />
+
+          {/* Floating action menu — only when a terminal is active */}
+          {activeTerminalId && (
+            <div className="terminal-action-menu" ref={actionMenuRef}>
+              <button
+                type="button"
+                className="terminal-action-btn"
+                onClick={() => setActionMenuOpen(prev => !prev)}
+                title="Actions"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="5" r="1" />
+                  <circle cx="12" cy="12" r="1" />
+                  <circle cx="12" cy="19" r="1" />
+                </svg>
+              </button>
+
+              {actionMenuOpen && (
+                <div className="terminal-action-dropdown">
+                  <button
+                    type="button"
+                    className="terminal-action-item"
+                    onClick={() => { terminalMainRef.current?.find(); setActionMenuOpen(false); }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" />
+                      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                    </svg>
+                    <span>Find</span>
+                    <kbd>⌘F</kbd>
+                  </button>
+                  <button
+                    type="button"
+                    className="terminal-action-item"
+                    onClick={() => { terminalMainRef.current?.filter(); setActionMenuOpen(false); }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+                    </svg>
+                    <span>Filter</span>
+                    <kbd>⌘⇧F</kbd>
+                  </button>
+                  <button
+                    type="button"
+                    className="terminal-action-item"
+                    onClick={() => { terminalMainRef.current?.clear(); setActionMenuOpen(false); }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 6L6 18" />
+                      <path d="M6 6l12 12" />
+                    </svg>
+                    <span>Clear</span>
+                    <kbd>⌘K</kbd>
+                  </button>
+                  <div className="terminal-action-divider" />
+                  <button
+                    type="button"
+                    className="terminal-action-item"
+                    onClick={() => {
+                      const activeTerminal = terminals.find(t => t.id === activeTerminalId);
+                      setSavedCommandsFilterProject(activeTerminal?.projectPath ?? null);
+                      setSavedCommandsDrawerOpen(true);
+                      setActionMenuOpen(false);
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="4 17 10 11 4 5" />
+                      <line x1="12" y1="19" x2="20" y2="19" />
+                    </svg>
+                    <span>Commands</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Saved Commands Drawer + Modal */}

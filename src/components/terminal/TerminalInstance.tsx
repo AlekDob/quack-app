@@ -5,12 +5,19 @@
  * Handles visibility, theme, keyboard shortcuts (search, filter, clear), and lifecycle
  */
 
-import { memo, useState, useCallback, useEffect, useRef } from 'react';
+import { memo, useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { useTerminal } from './useTerminal';
 import { TERMINAL_THEMES, type TerminalThemeName } from './TerminalThemes';
 import { TerminalSearchBar } from './TerminalSearchBar';
 import { TerminalFilterBar } from './TerminalFilterBar';
 import '@xterm/xterm/css/xterm.css';
+
+/** Imperative API exposed by TerminalInstance via ref */
+export interface TerminalInstanceHandle {
+  find: () => void;
+  filter: () => void;
+  clear: () => void;
+}
 
 export interface TerminalInstanceProps {
   /** Terminal ID from backend */
@@ -36,15 +43,16 @@ export interface TerminalInstanceProps {
  * - Cmd+Shift+F: line filter mode
  * - Cmd+K: clear terminal
  * - Memoized to prevent unnecessary re-renders
+ * - Exposes { find, filter, clear } via ref (useImperativeHandle)
  */
-function TerminalInstanceComponent({
+const TerminalInstanceComponent = forwardRef<TerminalInstanceHandle, TerminalInstanceProps>(function TerminalInstanceComponent({
   terminalId,
   isActive,
   themeName = 'tokyo-night',
   cursorColor,
   onData,
   onExit,
-}: TerminalInstanceProps) {
+}, ref) {
     const theme = TERMINAL_THEMES[themeName]?.colors || TERMINAL_THEMES['tokyo-night'].colors;
 
     const {
@@ -101,6 +109,13 @@ function TerminalInstanceComponent({
       },
       [isFiltering, startFilter, updateFilter]
     );
+
+    // Expose actions via imperative handle for parent components (e.g. action menu)
+    useImperativeHandle(ref, () => ({
+      find: () => { showSearch ? closeSearch() : openSearch(); },
+      filter: () => { showFilter ? closeFilter() : openFilter(); },
+      clear,
+    }), [showSearch, showFilter, openSearch, openFilter, closeSearch, closeFilter, clear]);
 
     // Intercept keyboard shortcuts before xterm captures them
     useEffect(() => {
@@ -192,22 +207,12 @@ function TerminalInstanceComponent({
         />
       </div>
     );
-}
+});
 
 /**
  * Memoized export
  * Only re-render when props actually change
  */
-export const TerminalInstance = memo(
-  TerminalInstanceComponent,
-  (prev, next) => {
-    return (
-      prev.terminalId === next.terminalId &&
-      prev.isActive === next.isActive &&
-      prev.themeName === next.themeName &&
-      prev.cursorColor === next.cursorColor
-    );
-  }
-);
+export const TerminalInstance = memo(TerminalInstanceComponent);
 
 TerminalInstance.displayName = 'TerminalInstance';
