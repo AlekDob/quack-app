@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { SavedCommand, SavedCommandCategory } from "../types";
+import "./SavedCommandModal.css";
 
 interface SavedCommandModalProps {
   open: boolean;
   command: SavedCommand | null;
   onClose: () => void;
   onSaved: (command: SavedCommand) => void;
+  defaultProjectPath?: string | null;
 }
 
 const CATEGORY_OPTIONS: SavedCommandCategory[] = [
@@ -16,13 +18,14 @@ const CATEGORY_OPTIONS: SavedCommandCategory[] = [
   "custom",
 ];
 
-const createDefaultCommand = (): SavedCommand => ({
+const createDefaultCommand = (projectPath?: string | null): SavedCommand => ({
   id: "",
   name: "",
   command: "",
   cwd: "",
   color: "#4ecdc4",
   category: "dev",
+  projectPath: projectPath || undefined,
 });
 
 export default function SavedCommandModal({
@@ -30,6 +33,7 @@ export default function SavedCommandModal({
   command,
   onClose,
   onSaved,
+  defaultProjectPath,
 }: SavedCommandModalProps) {
   const [draft, setDraft] = useState<SavedCommand>(createDefaultCommand());
   const [saving, setSaving] = useState(false);
@@ -37,10 +41,10 @@ export default function SavedCommandModal({
 
   useEffect(() => {
     if (open) {
-      setDraft(command ?? createDefaultCommand());
+      setDraft(command ?? createDefaultCommand(defaultProjectPath));
       setError(null);
     }
-  }, [command, open]);
+  }, [command, open, defaultProjectPath]);
 
   if (!open) {
     return null;
@@ -62,7 +66,7 @@ export default function SavedCommandModal({
     }
 
     if (!draft.name.trim() || !draft.command.trim()) {
-      setError("Completa nome e comando per continuare.");
+      setError("Please fill in name and command to continue.");
       return;
     }
 
@@ -72,6 +76,7 @@ export default function SavedCommandModal({
     const payload: SavedCommand = {
       ...draft,
       cwd: draft.cwd?.trim() ? draft.cwd : undefined,
+      projectPath: draft.projectPath?.trim() ? draft.projectPath : undefined,
     };
 
     try {
@@ -90,7 +95,7 @@ export default function SavedCommandModal({
       onClose();
       setDraft(createDefaultCommand());
     } catch (err) {
-      console.error("Impossibile salvare il comando", err);
+      console.error("Failed to save command", err);
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
@@ -106,15 +111,19 @@ export default function SavedCommandModal({
     onClose();
   };
 
+  const projectLabel = draft.projectPath
+    ? draft.projectPath.split("/").pop() || draft.projectPath
+    : "Global (all projects)";
+
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal-panel saved-command-modal">
         <h2>
-          {draft.id ? "Modifica comando salvato" : "Nuovo comando salvato"}
+          {draft.id ? "Edit Saved Command" : "New Saved Command"}
         </h2>
 
         <label className="modal-field">
-          <span>Nome comando</span>
+          <span>Command name</span>
           <input
             type="text"
             value={draft.name}
@@ -124,7 +133,7 @@ export default function SavedCommandModal({
         </label>
 
         <label className="modal-field">
-          <span>Comando da eseguire</span>
+          <span>Command to run</span>
           <textarea
             value={draft.command}
             onChange={(event) => handleChange("command", event.target.value)}
@@ -134,44 +143,62 @@ export default function SavedCommandModal({
         </label>
 
         <label className="modal-field">
-          <span>Cartella (opzionale)</span>
+          <span>Working directory (optional)</span>
           <input
             type="text"
             value={draft.cwd ?? ""}
             onChange={(event) => handleChange("cwd", event.target.value)}
-            placeholder="/Users/alekdob/Desktop/Dev/Personal/quack-app"
+            placeholder="/path/to/project"
           />
         </label>
 
         <div className="modal-field">
-          <span>Colore</span>
-          <input
-            type="color"
-            value={draft.color}
-            onChange={(event) => handleChange("color", event.target.value)}
-            className="saved-command-color-picker"
-            aria-label="Seleziona colore"
-          />
+          <span>Project</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <input
+              type="text"
+              value={draft.projectPath ?? ""}
+              onChange={(event) => handleChange("projectPath", event.target.value)}
+              placeholder="Leave empty for global"
+              style={{ flex: 1 }}
+            />
+            <span style={{ fontSize: "11px", opacity: 0.6, whiteSpace: "nowrap" }}>
+              {projectLabel}
+            </span>
+          </div>
         </div>
 
-        <label className="modal-field">
-          <span>Categoria</span>
-          <select
-            value={draft.category}
-            onChange={(event) =>
-              handleChange(
-                "category",
-                event.target.value as SavedCommandCategory
-              )
-            }
-          >
-            {CATEGORY_OPTIONS.map((category) => (
-              <option key={category} value={category}>
-                {category.toUpperCase()}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div style={{ display: "flex", gap: "12px" }}>
+          <div className="modal-field" style={{ flex: 0 }}>
+            <span>Color</span>
+            <input
+              type="color"
+              value={draft.color}
+              onChange={(event) => handleChange("color", event.target.value)}
+              className="saved-command-color-picker"
+              aria-label="Select color"
+            />
+          </div>
+
+          <label className="modal-field" style={{ flex: 1 }}>
+            <span>Category</span>
+            <select
+              value={draft.category}
+              onChange={(event) =>
+                handleChange(
+                  "category",
+                  event.target.value as SavedCommandCategory
+                )
+              }
+            >
+              {CATEGORY_OPTIONS.map((category) => (
+                <option key={category} value={category}>
+                  {category.toUpperCase()}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         {error && <p className="modal-error">{error}</p>}
 
@@ -182,7 +209,7 @@ export default function SavedCommandModal({
             onClick={handleCancel}
             disabled={saving}
           >
-            Annulla
+            Cancel
           </button>
           <button
             type="button"
@@ -190,7 +217,7 @@ export default function SavedCommandModal({
             onClick={handleSubmit}
             disabled={saving}
           >
-            {saving ? "Salvataggio…" : draft.id ? "Salva" : "Crea comando"}
+            {saving ? "Saving..." : draft.id ? "Save" : "Create Command"}
           </button>
         </div>
       </div>

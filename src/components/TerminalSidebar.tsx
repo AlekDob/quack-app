@@ -88,6 +88,8 @@ interface SortableRepositoryGroupProps {
   onActiveSessionDone?: () => void;
   // Open Agent Personality accordion
   onOpenPersonality?: () => void;
+  // Saved Commands (per-project)
+  onOpenSavedCommands?: (projectPath: string) => void;
 }
 
 function SortableRepositoryGroup({
@@ -266,6 +268,9 @@ interface TerminalSidebarProps {
   onActiveSessionDone?: () => void;
   // Open Agent Personality accordion
   onOpenPersonality?: () => void;
+  // Saved Commands
+  onOpenSavedCommands?: () => void; // Global (footer button)
+  onOpenProjectSavedCommands?: (projectPath: string) => void; // Per-project (repo action row)
 }
 
 export default function TerminalSidebar({
@@ -318,6 +323,8 @@ export default function TerminalSidebar({
   activeSessionId,
   onActiveSessionDone,
   onOpenPersonality,
+  onOpenSavedCommands,
+  onOpenProjectSavedCommands,
 }: TerminalSidebarProps) {
   void _onColorChange;
   void _onDeleteAgentChat; // Will be used in context menu (Phase 4)
@@ -1044,6 +1051,7 @@ export default function TerminalSidebar({
                       activeSessionId={activeSessionId}
                       onActiveSessionDone={onActiveSessionDone}
                       onOpenPersonality={onOpenPersonality}
+                      onOpenSavedCommands={onOpenProjectSavedCommands}
                     />
                   );
                 }
@@ -1224,6 +1232,7 @@ export default function TerminalSidebar({
                           activeSessionId={activeSessionId}
                           onActiveSessionDone={onActiveSessionDone}
                           onOpenPersonality={onOpenPersonality}
+                          onOpenSavedCommands={onOpenProjectSavedCommands}
                         />
                       );
                     })}
@@ -1515,6 +1524,22 @@ export default function TerminalSidebar({
                 <circle cx="12" cy="12" r="3"/>
               </svg>
               <span>Settings</span>
+            </button>
+          )}
+
+          {/* Saved Commands */}
+          {onOpenSavedCommands && (
+            <button
+              type="button"
+              className="sidebar-footer-link"
+              onClick={onOpenSavedCommands}
+              title="Saved Commands"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="4 17 10 11 4 5"/>
+                <line x1="12" y1="19" x2="20" y2="19"/>
+              </svg>
+              <span>Commands</span>
             </button>
           )}
 
