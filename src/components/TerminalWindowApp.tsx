@@ -87,6 +87,7 @@ export function TerminalWindowApp() {
 
   // Action menu state
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  const [terminalBarVisible, setTerminalBarVisible] = useState(false);
   const terminalMainRef = useRef<TerminalMainHandle>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
 
@@ -474,6 +475,11 @@ export function TerminalWindowApp() {
     };
   }, [actionMenuOpen]);
 
+  // Reset bar visibility when switching terminals
+  useEffect(() => {
+    setTerminalBarVisible(false);
+  }, [activeTerminalId]);
+
   // Group terminals by project
   const terminalsByProject = useMemo(() => {
     const groups = new Map<string, ProjectTerminal[]>();
@@ -823,10 +829,11 @@ export function TerminalWindowApp() {
             terminals={terminals}
             activeTerminalId={activeTerminalId}
             themeName="tokyo-night"
+            onBarVisibilityChange={setTerminalBarVisible}
           />
 
-          {/* Floating action menu — only when a terminal is active */}
-          {activeTerminalId && (
+          {/* Floating action menu — hidden when search/filter bar is open */}
+          {activeTerminalId && !terminalBarVisible && (
             <div className="terminal-action-menu" ref={actionMenuRef}>
               <button
                 type="button"

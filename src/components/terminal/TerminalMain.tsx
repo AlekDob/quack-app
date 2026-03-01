@@ -29,6 +29,8 @@ export interface TerminalMainProps {
   onTerminalData?: (terminalId: string, data: string) => void;
   /** Callback when terminal exits */
   onTerminalExit?: (terminalId: string) => void;
+  /** Called when the active terminal's search/filter bar visibility changes */
+  onBarVisibilityChange?: (hasVisibleBar: boolean) => void;
 }
 
 /**
@@ -47,6 +49,7 @@ export const TerminalMain = forwardRef<TerminalMainHandle, TerminalMainProps>(fu
   themeName = 'tokyo-night',
   onTerminalData,
   onTerminalExit,
+  onBarVisibilityChange,
 }, ref) {
   // Track refs to each TerminalInstance by terminal ID
   const instanceRefs = useRef<Map<string, TerminalInstanceHandle>>(new Map());
@@ -101,6 +104,7 @@ export const TerminalMain = forwardRef<TerminalMainHandle, TerminalMainProps>(fu
           cursorColor={terminal.color}
           onData={(data) => onTerminalData?.(terminal.id, data)}
           onExit={() => onTerminalExit?.(terminal.id)}
+          onBarVisibilityChange={terminal.id === activeTerminalId ? onBarVisibilityChange : undefined}
         />
       ))}
     </div>

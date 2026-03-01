@@ -32,6 +32,8 @@ export interface TerminalInstanceProps {
   onData?: (data: string) => void;
   /** Callback when terminal exits */
   onExit?: () => void;
+  /** Called when search/filter bar visibility changes (true = a bar is open) */
+  onBarVisibilityChange?: (hasVisibleBar: boolean) => void;
 }
 
 /**
@@ -52,6 +54,7 @@ const TerminalInstanceComponent = forwardRef<TerminalInstanceHandle, TerminalIns
   cursorColor,
   onData,
   onExit,
+  onBarVisibilityChange,
 }, ref) {
     const theme = TERMINAL_THEMES[themeName]?.colors || TERMINAL_THEMES['tokyo-night'].colors;
 
@@ -77,27 +80,31 @@ const TerminalInstanceComponent = forwardRef<TerminalInstanceHandle, TerminalIns
         setShowFilter(false);
       }
       setShowSearch(true);
-    }, [showFilter, stopFilter]);
+      onBarVisibilityChange?.(true);
+    }, [showFilter, stopFilter, onBarVisibilityChange]);
 
     const openFilter = useCallback(() => {
       if (showSearch) {
         setShowSearch(false);
       }
       setShowFilter(true);
-    }, [showSearch]);
+      onBarVisibilityChange?.(true);
+    }, [showSearch, onBarVisibilityChange]);
 
     const closeSearch = useCallback(() => {
       setShowSearch(false);
+      onBarVisibilityChange?.(false);
       // Refocus terminal
       containerRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
-    }, [containerRef]);
+    }, [containerRef, onBarVisibilityChange]);
 
     const closeFilter = useCallback(() => {
       stopFilter();
       setShowFilter(false);
+      onBarVisibilityChange?.(false);
       // Refocus terminal
       containerRef.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
-    }, [stopFilter, containerRef]);
+    }, [stopFilter, containerRef, onBarVisibilityChange]);
 
     const handleFilterChange = useCallback(
       (term: string) => {
