@@ -262,6 +262,8 @@ body {
   background: var(--text-muted); flex-shrink: 0;
 }
 .session-dot.active { background: var(--success); animation: pulse 2s infinite; }
+.session-dot.working { background: #f59e0b; animation: pulse 1.5s ease-in-out infinite; }
+.session-dot.ready { background: #22c55e; }
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }

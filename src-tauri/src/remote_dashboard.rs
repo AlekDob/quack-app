@@ -45,7 +45,10 @@ async fn handle_dashboard(Query(q): Query<DashboardQuery>) -> Html<String> {
 async fn handle_js() -> Response {
     (
         StatusCode::OK,
-        [(header::CONTENT_TYPE, "application/javascript; charset=utf-8")],
+        [
+            (header::CONTENT_TYPE, "application/javascript; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store"),
+        ],
         include_str!("../static/app.js"),
     )
         .into_response()
@@ -54,7 +57,10 @@ async fn handle_js() -> Response {
 async fn handle_css() -> Response {
     (
         StatusCode::OK,
-        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store"),
+        ],
         include_str!("../static/style.css"),
     )
         .into_response()

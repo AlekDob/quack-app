@@ -25,6 +25,8 @@ const state = {
   drawer: null,        // { agentId, agentName } when execute drawer is open
   refreshing: false,   // pull-to-refresh in progress
   autoRefreshTimer: null, // stealth auto-refresh timer
+  ordering: null,      // { repoOrder: { order, colors }, agentOrders }
+  namedGroups: [],     // ProjectGroup[] from /api/groups
 };
 
 // ── API Client ─────────────────────────────────────────────────
@@ -105,16 +107,20 @@ function handleWsEvent(event) {
 // ── Data Loading ───────────────────────────────────────────────
 async function loadData() {
   try {
-    const [statusData, agents, sessions, jobs] = await Promise.all([
+    const [statusData, agents, sessions, jobs, ordering, namedGroups] = await Promise.all([
       api.get('/status'),
       api.get('/agents'),
       api.get('/sessions'),
       api.get('/jobs'),
+      api.get('/ordering').catch(() => null),
+      api.get('/groups').catch(() => []),
     ]);
     state.status = statusData;
     state.agents = agents;
     state.sessions = sessions.sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
     state.jobs = jobs;
+    state.ordering = ordering;
+    state.namedGroups = namedGroups || [];
     state.loading = false;
   } catch (err) {
     state.loading = false;
@@ -184,16 +190,20 @@ function startAutoRefresh() {
   state.autoRefreshTimer = setInterval(async () => {
     if (state.chatSession || state.drawer || state.loading) return;
     try {
-      const [statusData, agents, sessions, jobs] = await Promise.all([
+      const [statusData, agents, sessions, jobs, ordering, namedGroups] = await Promise.all([
         api.get('/status'),
         api.get('/agents'),
         api.get('/sessions'),
         api.get('/jobs'),
+        api.get('/ordering').catch(() => null),
+        api.get('/groups').catch(() => []),
       ]);
       state.status = statusData;
       state.agents = agents;
       state.sessions = sessions.sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
       state.jobs = jobs;
+      state.ordering = ordering;
+      state.namedGroups = namedGroups || [];
       render();
     } catch {}
   }, 30000);
@@ -402,12 +412,14 @@ async function executeFromDrawer() {
   if (!prompt || !state.drawer) return;
 
   const { agentId, agentName } = state.drawer;
-  const model = $('#drawer-model')?.value || 'sonnet';
+  const model = $('#drawer-model')?.value || '';
   const sendBtn = $('#drawer-send');
   if (sendBtn) sendBtn.disabled = true;
 
   try {
-    const res = await api.post('/execute', { agentId, prompt, model });
+    const body = { agentId, prompt };
+    if (model) body.model = model;
+    const res = await api.post('/execute', body);
     if (res.success && res.sessionId) {
       // Open chat immediately with a virtual session (don't wait for loadData)
       const virtualSession = {
@@ -419,7 +431,7 @@ async function executeFromDrawer() {
       };
       state.drawer = null;
       state.chatSession = virtualSession;
-      state.chatMessages = [{ role: 'user', content: prompt }];
+      state.chatMessages = [{ role: 'user', content: prompt, _optimistic: true }];
       state.chatLoading = false;
       render();
       scrollChatToBottom();
@@ -580,12 +592,64 @@ function renderContent() {
   }
 }
 
+// ── Ordering Helpers ───────────────────────────────────────────
+function getRepoKey(agent) {
+  if (!agent.projectPath) return null;
+  const parts = agent.projectPath.split('/').filter(Boolean);
+  return `repo-${parts[parts.length - 1] || ''}`;
+}
+
+function sortRepositoryGroups(entries) {
+  if (!state.ordering?.repoOrder?.order?.length) return entries;
+  const order = state.ordering.repoOrder.order;
+  const orderMap = new Map(order.map((key, i) => [key, i]));
+  return [...entries].sort(([, aAgents], [, bAgents]) => {
+    const aKey = getRepoKey(aAgents[0]);
+    const bKey = getRepoKey(bAgents[0]);
+    const aIdx = aKey != null ? (orderMap.get(aKey) ?? 9999) : 9999;
+    const bIdx = bKey != null ? (orderMap.get(bKey) ?? 9999) : 9999;
+    return aIdx - bIdx;
+  });
+}
+
+function sortAgentsInRepo(agents) {
+  if (!agents.length) return agents;
+  const repoPath = agents[0]?.projectPath;
+  if (!repoPath || !state.ordering?.agentOrders) {
+    return [...agents].sort((a, b) => (b.lastActiveAt || 0) - (a.lastActiveAt || 0));
+  }
+  const orderData = state.ordering.agentOrders[repoPath];
+  if (!orderData) {
+    return [...agents].sort((a, b) => (b.lastActiveAt || 0) - (a.lastActiveAt || 0));
+  }
+  // Find the first matching branch key, fallback to any key
+  const branchKey = agents[0]?.branch ? `${agents[0].branch}-main` : 'main-main';
+  const savedOrder = orderData[branchKey] || Object.values(orderData)[0];
+  if (!savedOrder?.length) {
+    return [...agents].sort((a, b) => (b.lastActiveAt || 0) - (a.lastActiveAt || 0));
+  }
+  const orderMap = new Map(savedOrder.map((id, i) => [id, i]));
+  return [...agents].sort((a, b) => {
+    const aIdx = orderMap.has(a.id) ? orderMap.get(a.id) : 9999;
+    const bIdx = orderMap.has(b.id) ? orderMap.get(b.id) : 9999;
+    return aIdx - bIdx;
+  });
+}
+
+// Mirror Mac dot colors: yellow=agent busy, green=agent idle/ready
+function getSessionDotClass(agentStatus, isNewest) {
+  const agentBusy = agentStatus === 'running' || agentStatus === 'busy';
+  if (agentBusy && isNewest) return 'working';
+  return 'ready';
+}
+
 // ── Agents Tab — Grouped by Project with Active Sessions ──────
 function renderAgents() {
   if (!state.agents.length) {
     return '<div class="empty"><div class="empty-icon">🦆</div><div class="empty-text">No agents configured</div></div>';
   }
 
+  // 1. Group agents by projectName
   const groups = {};
   state.agents.forEach(a => {
     const project = a.projectName || 'Unassigned';
@@ -593,26 +657,88 @@ function renderAgents() {
     groups[project].push(a);
   });
 
-  // Sort agents within each group by displayOrder (preserves storage order = Mac order)
-  Object.values(groups).forEach(agents =>
-    agents.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-  );
-  // Sort project groups by most recently active agent (same as Mac default)
-  const sorted = Object.entries(groups).sort(([, aAgents], [, bAgents]) => {
-    const aMax = Math.max(...aAgents.map(a => a.lastActiveAt || a.createdAt || 0));
-    const bMax = Math.max(...bAgents.map(a => a.lastActiveAt || a.createdAt || 0));
-    return bMax - aMax; // most recent first
-  });
+  // 2. Sort repo groups by saved order (or fallback to lastActiveAt)
+  let sortedEntries = sortRepositoryGroups(Object.entries(groups));
 
-  return sorted.map(([project, agents]) => `
-    <div class="project-group">
-      <div class="project-header">
-        <span class="project-name">${esc(project)}</span>
-        <span class="project-count">${agents.length}</span>
-      </div>
-      ${agents.map(a => renderAgentWithSessions(a)).join('')}
-    </div>
-  `).join('');
+  // 3. Sort agents within each repo
+  sortedEntries = sortedEntries.map(([key, agents]) => [key, sortAgentsInRepo(agents)]);
+
+  // 4. Build sections: named groups + standalone repos
+  const sections = [];
+  const usedKeys = new Set();
+
+  if (state.namedGroups.length > 0) {
+    // Map repoKey → entry for quick lookup
+    const entryByKey = new Map();
+    sortedEntries.forEach(([key, agents]) => {
+      const rk = getRepoKey(agents[0]);
+      if (rk) entryByKey.set(rk, [key, agents]);
+    });
+
+    // For each named group, find the position of its first member in the sorted order
+    const groupPositions = state.namedGroups.map(ng => {
+      const memberPaths = ng.projects.map(p => p.path);
+      const matchedEntries = [];
+      let minIdx = 9999;
+      sortedEntries.forEach(([key, agents], idx) => {
+        if (agents.some(a => memberPaths.includes(a.projectPath))) {
+          matchedEntries.push([key, agents]);
+          if (idx < minIdx) minIdx = idx;
+        }
+      });
+      return { group: ng, entries: matchedEntries, position: minIdx };
+    }).filter(g => g.entries.length > 0).sort((a, b) => a.position - b.position);
+
+    // Insert named groups at their positions, mark repos as used
+    let sIdx = 0;
+    const gpQueue = [...groupPositions];
+    sortedEntries.forEach(([key, agents], idx) => {
+      // Emit any named groups whose position matches this index
+      while (gpQueue.length > 0 && gpQueue[0].position <= idx) {
+        const gp = gpQueue.shift();
+        gp.entries.forEach(([k]) => usedKeys.add(k));
+        sections.push({ type: 'named', group: gp.group, entries: gp.entries });
+      }
+      if (!usedKeys.has(key)) {
+        sections.push({ type: 'repo', key, agents });
+      }
+    });
+    // Emit any remaining named groups
+    while (gpQueue.length > 0) {
+      const gp = gpQueue.shift();
+      gp.entries.forEach(([k]) => usedKeys.add(k));
+      sections.push({ type: 'named', group: gp.group, entries: gp.entries });
+    }
+  } else {
+    sortedEntries.forEach(([key, agents]) => {
+      sections.push({ type: 'repo', key, agents });
+    });
+  }
+
+  // 5. Render
+  return sections.map(section => {
+    if (section.type === 'named') {
+      const totalAgents = section.entries.reduce((sum, [, a]) => sum + a.length, 0);
+      return `
+        <div class="project-group">
+          <div class="project-header">
+            <span class="project-name">${esc(section.group.name)}</span>
+            <span class="project-count">${totalAgents}</span>
+          </div>
+          ${section.entries.map(([, agents]) =>
+            agents.map(a => renderAgentWithSessions(a)).join('')
+          ).join('')}
+        </div>`;
+    }
+    return `
+      <div class="project-group">
+        <div class="project-header">
+          <span class="project-name">${esc(section.agents[0]?.projectName || section.key)}</span>
+          <span class="project-count">${section.agents.length}</span>
+        </div>
+        ${section.agents.map(a => renderAgentWithSessions(a)).join('')}
+      </div>`;
+  }).join('');
 }
 
 function renderAgentWithSessions(a) {
@@ -625,7 +751,7 @@ function renderAgentWithSessions(a) {
       + `<div class="agent-avatar agent-avatar-fallback" style="display:none;background:${a.color || 'var(--accent)'}">🦆</div>`
     : `<div class="agent-avatar agent-avatar-fallback" style="background:${a.color || 'var(--accent)'}">🦆</div>`;
 
-  const statusClass = a.status === 'running' ? 'running' : a.status === 'error' ? 'error' : 'idle';
+  const statusClass = (a.status === 'running' || a.status === 'busy') ? 'busy' : a.status === 'error' ? 'error' : 'idle';
 
   return `
     <div class="agent-block">
@@ -644,9 +770,9 @@ function renderAgentWithSessions(a) {
       </div>
       ${activeSessions.length ? `
         <div class="agent-sessions">
-          ${activeSessions.map(s => `
+          ${activeSessions.map((s, i) => `
             <div class="agent-session-item" data-open-chat="${s.id}">
-              <span class="session-dot ${s.status === 'in_progress' ? 'active' : ''}"></span>
+              <span class="session-dot ${getSessionDotClass(a.status, i === 0)}"></span>
               <span class="session-title-inline">${esc(s.title || 'Untitled')}</span>
               <span class="session-time-inline">${timeAgo(s.createdAt)}</span>
             </div>
@@ -671,8 +797,9 @@ function renderDrawer() {
       </div>
       <div class="drawer-body">
         <select id="drawer-model" class="select">
+          <option value="" selected>Default (agent preset)</option>
           <option value="opus">Opus</option>
-          <option value="sonnet" selected>Sonnet</option>
+          <option value="sonnet">Sonnet</option>
           <option value="haiku">Haiku</option>
         </select>
         <textarea id="drawer-prompt" class="textarea" placeholder="What should the agent do?" rows="3" autofocus></textarea>

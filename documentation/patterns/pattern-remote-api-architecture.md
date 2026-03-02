@@ -118,6 +118,8 @@ All under `/api/`, all require `Authorization: Bearer <token>`:
 | POST | `/api/jobs/:id/toggle` | Toggle job enabled/disabled |
 | POST | `/api/execute` | Start a new agent session |
 
+| GET | `/api/ordering` | Repo + agent ordering (mirrors Mac sidebar) |
+| GET | `/api/groups` | Named project groups (e.g. "Quack", "MEOW") |
 | GET | `/api/sessions/:id/messages` | Chat messages for a session |
 | POST | `/api/sessions/:id/send` | Send message to active session |
 | GET | `/api/avatars/:filename` | Serve agent duck avatar images |
@@ -157,6 +159,9 @@ Served at `/dashboard?token=xxx` via `remote_dashboard.rs` using `include_str!()
 - PWA icons served via `include_bytes!()` — full-bleed squares (no rounded corners, iOS applies its own mask)
 - `apple-touch-icon` at 180x180 (iOS standard), manifest icons at 192/512
 - WebSocket for status events (agent status, session created/completed)
+- Group/agent ordering mirrors Mac sidebar via `/api/ordering` (reads `.dat` Tauri Store files)
+- Named project groups via `/api/groups` (reuses `groups::list_groups()`)
+- Session dot colors: agent `busy` + newest session → amber, agent `idle` → green, no messages → gray
 
 ## mDNS Hostname Discovery
 

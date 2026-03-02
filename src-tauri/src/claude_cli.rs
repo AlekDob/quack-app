@@ -483,19 +483,34 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                         });
                         let _ = app_handle.emit(&event_name, &wrapped);
 
-                        // Capture Result events for usage data
+                        // Update global agent status map for REST API
+                        // Brain: gotcha-mobile-session-dot-status
                         if let Some(event_type) = event.get("type").and_then(|t| t.as_str()) {
-                            if event_type == "result" {
-                                log::info!("[DAEMON:QUERY] query={} received Result event — capturing usage data", qid);
-                                if let Ok(result_event) = serde_json::from_value::<ClaudeEvent>(event.clone()) {
-                                    if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } = result_event {
-                                        let response = ClaudeCliResponse {
-                                            result, session_id, total_cost_usd, usage,
-                                        };
-                                        let mut results = DAEMON_QUERY_RESULTS.lock().await;
-                                        results.insert(qid.clone(), response);
+                            match event_type {
+                                "assistant" => {
+                                    // Agent is actively streaming — mark as busy
+                                    if let Ok(mut map) = crate::AGENT_STATUS.write() {
+                                        map.insert(agent_id.clone(), "busy".to_string());
                                     }
                                 }
+                                "result" => {
+                                    // Agent finished — mark as idle
+                                    if let Ok(mut map) = crate::AGENT_STATUS.write() {
+                                        map.insert(agent_id.clone(), "idle".to_string());
+                                    }
+                                    // Capture Result events for usage data
+                                    log::info!("[DAEMON:QUERY] query={} received Result event — capturing usage data", qid);
+                                    if let Ok(result_event) = serde_json::from_value::<ClaudeEvent>(event.clone()) {
+                                        if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } = result_event {
+                                            let response = ClaudeCliResponse {
+                                                result, session_id, total_cost_usd, usage,
+                                            };
+                                            let mut results = DAEMON_QUERY_RESULTS.lock().await;
+                                            results.insert(qid.clone(), response);
+                                        }
+                                    }
+                                }
+                                _ => {}
                             }
                         }
                     }
@@ -1850,6 +1865,14 @@ pub async fn send_message_via_sdk_streaming(
     log::info!("[DAEMON:QUERY] send_message_via_sdk_streaming at {} (daemon_enabled={})", debug_timestamp,
         DAEMON_MODE_ENABLED.load(Ordering::Relaxed));
 
+    // Brain: gotcha-mobile-session-dot-status
+    // Mark agent as busy immediately — before daemon/legacy even starts.
+    // This ensures the REST API returns "busy" right away, covering the gap
+    // between message sent and first "assistant" SDK event.
+    if let Ok(mut map) = crate::AGENT_STATUS.write() {
+        map.insert(agent_id.clone(), "busy".to_string());
+    }
+
     // Try daemon mode first
     if DAEMON_MODE_ENABLED.load(Ordering::Relaxed) {
         match send_message_via_daemon(&app, &agent_id, &request).await {
@@ -1899,6 +1922,7 @@ async fn send_message_via_daemon(
     let permission_value = request.permission_mode.as_ref().and_then(|mode| match mode.as_str() {
         "bypass" => Some("bypassPermissions".to_string()),
         "plan" => Some("plan".to_string()),
+        "debug" => Some("bypassPermissions".to_string()),
         "act" => None,
         _ => None,
     });
@@ -1916,6 +1940,9 @@ async fn send_message_via_daemon(
 
     if let Some(perm) = permission_value {
         query_cmd["permissionMode"] = serde_json::Value::String(perm);
+    }
+    if request.permission_mode.as_deref() == Some("debug") {
+        query_cmd["debugMode"] = serde_json::Value::Bool(true);
     }
     if let Some(ref agents) = request.agents {
         query_cmd["agents"] = serde_json::json!(agents);
@@ -2089,6 +2116,10 @@ async fn send_message_via_sdk_streaming_legacy(
             log::info!("[SDK DEBUG] Mapping 'plan' -> 'plan'");
             Some(serde_json::Value::String("plan".to_string()))
         }
+        "debug" => {
+            log::info!("[SDK DEBUG] Mapping 'debug' -> 'bypassPermissions' (with debug system prompt)");
+            Some(serde_json::Value::String("bypassPermissions".to_string()))
+        }
         "act" => {
             log::info!("[SDK DEBUG] Mapping 'act' -> undefined (omitting permissionMode)");
             None // undefined = auto-approve in SDK
@@ -2113,6 +2144,13 @@ async fn send_message_via_sdk_streaming_legacy(
         config["permissionMode"] = perm;
     } else {
         log::info!("[SDK DEBUG] Omitting permissionMode from config (will use SDK default: auto-approve)");
+    }
+
+    // Add debugMode flag when permission_mode is "debug"
+    // This tells stream-claude.js to append debug system prompt instructions
+    if permission_mode.as_deref() == Some("debug") {
+        config["debugMode"] = serde_json::Value::Bool(true);
+        log::info!("[SDK DEBUG] Debug mode enabled - adding debugMode flag to config");
     }
 
     // DEBUG: Log final config
@@ -2518,6 +2556,11 @@ async fn send_message_via_sdk_streaming_legacy(
                         // DEPRECATED: session_state.set_session(agent_id.clone(), session_id.clone());
                     }
                     ClaudeEvent::Assistant { message, .. } => {
+                        // Brain: gotcha-mobile-session-dot-status
+                        // Mark agent as busy on first assistant event
+                        if let Ok(mut map) = crate::AGENT_STATUS.write() {
+                            map.insert(agent_id.clone(), "busy".to_string());
+                        }
                         // Log content blocks for debugging Task tool detection
                         log::info!("[SDK] 📝 Assistant event with {} content blocks", message.content.len());
                         for (idx, block) in message.content.iter().enumerate() {
@@ -2636,6 +2679,11 @@ async fn send_message_via_sdk_streaming_legacy(
 
                 // Check if this is the final result
                 if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, model_usage, .. } = &event {
+                    // Brain: gotcha-mobile-session-dot-status
+                    // Mark agent as idle when streaming is done
+                    if let Ok(mut map) = crate::AGENT_STATUS.write() {
+                        map.insert(agent_id.clone(), "idle".to_string());
+                    }
                     log::info!("[SDK] 🦆 RESULT EVENT - input_tokens: {}, output_tokens: {}, cache_read: {}, cache_creation: {}, total_cost: {}, modelUsage: {:?}",
                         usage.input_tokens, usage.output_tokens, usage.cache_read_input_tokens, usage.cache_creation_input_tokens, total_cost_usd, model_usage);
 

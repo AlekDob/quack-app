@@ -3,7 +3,17 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, RwLock};
+
+/// In-memory agent status map: agent_id → "busy"/"idle".
+/// Updated by handle_status_update AND claude_cli daemon/legacy streaming.
+/// Read by remote API (`/api/agents`).
+// Brain: gotcha-mobile-session-dot-status
+pub type AgentStatusMap = Arc<RwLock<HashMap<String, String>>>;
+
+/// Global singleton — shared between hook handler, SDK streaming, and REST API.
+pub static AGENT_STATUS: once_cell::sync::Lazy<AgentStatusMap> =
+    once_cell::sync::Lazy::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 use axum::{extract::State, http::StatusCode, routing::{get, post}, Json, Router};
 use serde::{Deserialize, Serialize};
@@ -94,6 +104,7 @@ impl SessionState {
 #[derive(Clone)]
 struct HookState {
     app: AppHandle,
+    agent_status: AgentStatusMap,
 }
 
 #[derive(Deserialize, Clone)]
@@ -558,6 +569,18 @@ async fn handle_status_update(
         return StatusCode::BAD_REQUEST;
     }
 
+    // Update in-memory agent status map for REST API
+    // Store by both id AND label — the hook may send either, and the API
+    // looks up by the internal agent id or name from quack-agents.json.
+    if let Ok(mut map) = state.agent_status.write() {
+        if let Some(ref id) = sanitized_id {
+            map.insert(id.clone(), status.to_string());
+        }
+        if let Some(ref label) = sanitized_label {
+            map.insert(label.clone(), status.to_string());
+        }
+    }
+
     let event_payload = HookEventPayload {
         id: sanitized_id,
         label: sanitized_label,
@@ -909,7 +932,10 @@ pub fn run() {
             }
 
             tauri::async_runtime::spawn(async move {
-                let state = HookState { app: app_handle.clone() };
+                // Use global singleton for agent status — shared with claude_cli streaming
+                let agent_status = AGENT_STATUS.clone();
+
+                let state = HookState { app: app_handle.clone(), agent_status: agent_status.clone() };
 
                 // Initialize uptime tracker
                 remote_api::init_uptime();
@@ -929,6 +955,7 @@ pub fn run() {
                 let api_router = remote_api::create_api_router(
                     app_handle.clone(),
                     auth_for_server.clone(),
+                    agent_status.clone(),
                 );
 
                 // 📡 WebSocket route (auth via query param)

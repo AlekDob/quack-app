@@ -22,6 +22,7 @@ use crate::remote_auth::RemoteAuthState;
 pub struct ApiState {
     pub app: AppHandle,
     pub auth: RemoteAuthState,
+    pub agent_status: crate::AgentStatusMap,
 }
 
 impl ApiState {
@@ -199,6 +200,20 @@ struct ExecuteResponse {
     error: Option<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RepoOrderData {
+    order: Vec<String>,
+    colors: std::collections::HashMap<String, String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct OrderingResponse {
+    repo_order: RepoOrderData,
+    agent_orders: std::collections::HashMap<String, serde_json::Value>,
+}
+
 #[derive(Serialize, Clone)]
 struct ApiError {
     error: String,
@@ -209,8 +224,8 @@ type ApiResult<T> = Result<Json<T>, (StatusCode, Json<ApiError>)>;
 // ─── Router ────────────────────────────────────────────────────────
 
 /// Create the /api sub-router. Mount via `nest("/api", ...)` in lib.rs.
-pub fn create_api_router(app: AppHandle, auth: RemoteAuthState) -> Router {
-    let state = ApiState { app, auth };
+pub fn create_api_router(app: AppHandle, auth: RemoteAuthState, agent_status: crate::AgentStatusMap) -> Router {
+    let state = ApiState { app, auth, agent_status };
 
     Router::new()
         .route("/status", get(handle_status))
@@ -223,6 +238,8 @@ pub fn create_api_router(app: AppHandle, auth: RemoteAuthState) -> Router {
         .route("/jobs/:id/fire", post(handle_fire_job))
         .route("/jobs/:id/toggle", post(handle_toggle_job))
         .route("/execute", post(handle_execute))
+        .route("/ordering", get(handle_ordering))
+        .route("/groups", get(handle_list_groups))
         .route("/sessions/:id/messages", get(handle_session_messages))
         .route("/sessions/:id/send", post(handle_send_message))
         .route("/avatars/:filename", get(handle_avatar))
@@ -231,18 +248,31 @@ pub fn create_api_router(app: AppHandle, auth: RemoteAuthState) -> Router {
 
 // ─── Storage Helpers ───────────────────────────────────────────────
 
-fn get_agents_storage_path() -> Option<std::path::PathBuf> {
+fn get_app_data_dir() -> Option<std::path::PathBuf> {
     if cfg!(target_os = "macos") {
         dirs::home_dir()
-            .map(|h| h.join("Library/Application Support/com.quack.terminal/quack-agents.json"))
+            .map(|h| h.join("Library/Application Support/com.quack.terminal"))
     } else if cfg!(target_os = "windows") {
         std::env::var("APPDATA")
             .ok()
-            .map(|p| std::path::PathBuf::from(p).join("com.quack.terminal/quack-agents.json"))
+            .map(|p| std::path::PathBuf::from(p).join("com.quack.terminal"))
     } else {
         dirs::home_dir()
-            .map(|h| h.join(".local/share/com.quack.terminal/quack-agents.json"))
+            .map(|h| h.join(".local/share/com.quack.terminal"))
     }
+}
+
+fn get_agents_storage_path() -> Option<std::path::PathBuf> {
+    get_app_data_dir().map(|d| d.join("quack-agents.json"))
+}
+
+/// Read a Tauri Store `.dat` file (plain JSON on disk).
+fn read_dat_store(filename: &str) -> serde_json::Value {
+    get_app_data_dir()
+        .map(|dir| dir.join(filename))
+        .and_then(|path| std::fs::read_to_string(&path).ok())
+        .and_then(|content| serde_json::from_str(&content).ok())
+        .unwrap_or(serde_json::json!({}))
 }
 
 fn read_agents_storage() -> Result<serde_json::Value, String> {
@@ -331,6 +361,11 @@ async fn handle_list_agents(
 
     let storage = read_agents_storage().map_err(err)?;
 
+    // Read real-time agent status from global AGENT_STATUS map
+    // Brain: gotcha-mobile-session-dot-status
+    // Updated by: (1) handle_status_update hook, (2) daemon_stdout_reader, (3) legacy streaming
+    let live_status = state.agent_status.read().ok();
+
     let agents = storage
         .get("agents")
         .and_then(|a| a.as_array())
@@ -338,16 +373,30 @@ async fn handle_list_agents(
             arr.iter()
                 .enumerate()
                 .map(|(idx, a)| {
+                    let agent_id = a.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let agent_name = a.get("name").and_then(|v| v.as_str())
+                        .or_else(|| a.get("label").and_then(|v| v.as_str()))
+                        .unwrap_or("").to_string();
                     let role = a.get("personality")
                         .and_then(|p| p.get("role"))
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
+                    // Prefer live in-memory status over stale disk value.
+                    // Look up by agent ID first, then by agent name (hook may use either).
+                    let status = live_status.as_ref()
+                        .and_then(|map| {
+                            map.get(&agent_id).cloned()
+                                .or_else(|| map.get(&agent_name).cloned())
+                        })
+                        .unwrap_or_else(|| {
+                            a.get("status").and_then(|v| v.as_str()).unwrap_or("idle").to_string()
+                        });
                     AgentSummary {
-                        id: a.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        id: agent_id,
                         name: a.get("name").and_then(|v| v.as_str())
                             .or_else(|| a.get("label").and_then(|v| v.as_str()))
                             .unwrap_or("Agent").to_string(),
-                        status: a.get("status").and_then(|v| v.as_str()).unwrap_or("idle").to_string(),
+                        status,
                         avatar: a.get("avatar").and_then(|v| v.as_str()).map(|s| s.to_string()),
                         color: a.get("color").and_then(|v| v.as_str()).map(|s| s.to_string()),
                         role,
@@ -540,6 +589,24 @@ async fn handle_send_message(
     Json(payload): Json<SendMessageRequest>,
 ) -> ApiResult<serde_json::Value> {
     state.check_auth(&headers).await?;
+
+    // Brain: gotcha-mobile-session-dot-status
+    // Look up agent_id from session and mark as busy immediately
+    if let Ok(storage) = read_agents_storage() {
+        if let Some(agent_id) = storage
+            .get("sessions")
+            .and_then(|s| s.as_array())
+            .and_then(|arr| {
+                arr.iter()
+                    .find(|s| s.get("id").and_then(|v| v.as_str()) == Some(&session_id))
+                    .and_then(|s| s.get("agentId").and_then(|v| v.as_str()))
+            })
+        {
+            if let Ok(mut map) = crate::AGENT_STATUS.write() {
+                map.insert(agent_id.to_string(), "busy".to_string());
+            }
+        }
+    }
 
     // Emit event for the frontend to pick up and send to the session
     let event_data = serde_json::json!({
@@ -897,10 +964,17 @@ async fn handle_execute(
         "projectPath": project_path,
         "projectName": project_name,
         "prompt": payload.prompt,
-        "model": payload.model.as_deref().unwrap_or("sonnet"),
+        "model": payload.model.as_deref().filter(|m| !m.is_empty()),
         "source": "remote-api",
         "autoSend": true,
     });
+
+    // Brain: gotcha-mobile-session-dot-status
+    // Mark agent as busy IMMEDIATELY so the REST API returns "busy"
+    // before the daemon even starts streaming (covers the "waiting" gap)
+    if let Ok(mut map) = crate::AGENT_STATUS.write() {
+        map.insert(payload.agent_id.clone(), "busy".to_string());
+    }
 
     state.app.emit("remote-execute", &execute_event).map_err(|e| {
         (StatusCode::INTERNAL_SERVER_ERROR, Json(ApiError { error: format!("Failed to emit: {}", e) }))
@@ -917,6 +991,67 @@ async fn handle_execute(
         session_id: Some(session_id),
         error: None,
     }))
+}
+
+// ─── Ordering Endpoint ────────────────────────────────────────────
+
+async fn handle_ordering(
+    headers: HeaderMap,
+    State(state): State<ApiState>,
+) -> ApiResult<OrderingResponse> {
+    state.check_auth(&headers).await?;
+
+    // Read .quack-repo-order.dat (Tauri Store = plain JSON)
+    let repo_store = read_dat_store(".quack-repo-order.dat");
+    let repo_order = if let Some(raw) = repo_store.get("repository-order") {
+        if let Some(obj) = raw.as_object() {
+            // New format: { order: [...], colors: {...} }
+            let order = obj.get("order")
+                .and_then(|v| v.as_array())
+                .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                .unwrap_or_default();
+            let colors = obj.get("colors")
+                .and_then(|v| v.as_object())
+                .map(|m| m.iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string())).collect())
+                .unwrap_or_default();
+            RepoOrderData { order, colors }
+        } else if let Some(arr) = raw.as_array() {
+            // Legacy format: plain array
+            let order = arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect();
+            RepoOrderData { order, colors: Default::default() }
+        } else {
+            RepoOrderData { order: vec![], colors: Default::default() }
+        }
+    } else {
+        RepoOrderData { order: vec![], colors: Default::default() }
+    };
+
+    // Read .quack-agent-order.dat — keys are agent-order-${repoPath}
+    let agent_store = read_dat_store(".quack-agent-order.dat");
+    let agent_orders = if let Some(obj) = agent_store.as_object() {
+        obj.iter()
+            .filter(|(k, _)| k.starts_with("agent-order-"))
+            .map(|(k, v)| {
+                let repo_path = k.strip_prefix("agent-order-").unwrap_or(k).to_string();
+                (repo_path, v.clone())
+            })
+            .collect()
+    } else {
+        Default::default()
+    };
+
+    Ok(Json(OrderingResponse { repo_order, agent_orders }))
+}
+
+// ─── Groups Endpoint ──────────────────────────────────────────────
+
+async fn handle_list_groups(
+    headers: HeaderMap,
+    State(state): State<ApiState>,
+) -> ApiResult<Vec<crate::groups::ProjectGroup>> {
+    state.check_auth(&headers).await?;
+    let groups = crate::groups::list_groups().map_err(err)?;
+    Ok(Json(groups))
 }
 
 // ─── Avatar Endpoint ──────────────────────────────────────────────
