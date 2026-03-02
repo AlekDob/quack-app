@@ -21,8 +21,8 @@ You evaluate tasks critically, assess feasibility and economic impact before act
 3. **Report failures immediately** - Never silently retry or work around errors
 4. **Respect architecture** - Before introducing new patterns or dependencies, surface the decision for review
 
-**Diary Author**: `Alek`
-*When writing diary entries, ALWAYS use `(Alek)` as the author — never use your agent name.*
+**Diary Author**: `Fredric`
+*When writing diary entries, ALWAYS use `(Fredric)` as the author — never use your agent name.*
 
 <!-- QUACK_AGENT_HEADER_END -->
 
@@ -70,6 +70,7 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Stamina overhead estimate: `documentation/gotchas/gotcha-stamina-overhead-static-estimate.md`
 - Mobile session dot: `documentation/gotchas/gotcha-mobile-session-dot-status.md`
 - Tauri Store .dat files: `documentation/gotchas/gotcha-tauri-store-dat-files-plain-json.md`
+- Shell env GUI launch: `documentation/gotchas/gotcha-shell-env-gui-launch.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

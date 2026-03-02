@@ -8,6 +8,7 @@ import AIAssistantSettings from './categories/AIAssistantSettings';
 import AgentModesSettings from './categories/AgentModesSettings';
 import SecondBrainSettings from './categories/SecondBrainSettings';
 import IDESettings from './categories/IDESettings';
+import TerminalSettings from './categories/TerminalSettings';
 import LicenseSettings from './categories/LicenseSettings';
 import NotificationSettings from './categories/NotificationSettings';
 import RemoteApiSettings from './categories/RemoteApiSettings';
@@ -56,6 +57,8 @@ export default function UnifiedSettings({
         return <SecondBrainSettings />;
       case 'ide':
         return <IDESettings />;
+      case 'terminal':
+        return <TerminalSettings />;
       case 'license':
         return <LicenseSettings />;
       case 'notifications':

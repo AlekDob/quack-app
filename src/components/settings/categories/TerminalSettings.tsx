@@ -1,8 +1,40 @@
+import { useState, useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import SectionHeader from '../controls/SectionHeader';
 import SettingsRow from '../controls/SettingsRow';
 import IOSSwitch from '../controls/IOSSwitch';
 
+interface ShellInfo {
+  path: string;
+  name: string;
+}
+
 export default function TerminalSettings() {
+  const [shells, setShells] = useState<ShellInfo[]>([]);
+  const [selectedShell, setSelectedShell] = useState<string>('');
+
+  useEffect(() => {
+    // Load available shells and current preference
+    Promise.all([
+      invoke<ShellInfo[]>('list_available_shells'),
+      invoke<string | null>('get_default_shell'),
+    ]).then(([availableShells, currentShell]) => {
+      setShells(availableShells);
+      setSelectedShell(currentShell || '');
+    }).catch(console.error);
+  }, []);
+
+  const handleShellChange = async (path: string) => {
+    const previous = selectedShell;
+    setSelectedShell(path);
+    try {
+      await invoke('set_default_shell', { shell: path });
+    } catch (err) {
+      console.error('Failed to set default shell:', err);
+      setSelectedShell(previous);
+    }
+  };
+
   return (
     <div className="settings-category">
       <SectionHeader
@@ -14,8 +46,17 @@ export default function TerminalSettings() {
           label="Shell"
           description="The shell to use when creating new terminals"
           control={
-            <select className="ios-select" disabled>
-              <option>System Default (zsh)</option>
+            <select
+              className="ios-select"
+              value={selectedShell}
+              onChange={(e) => handleShellChange(e.target.value)}
+            >
+              <option value="">System Default</option>
+              {shells.map((shell) => (
+                <option key={shell.path} value={shell.path}>
+                  {shell.name} ({shell.path})
+                </option>
+              ))}
             </select>
           }
         />
@@ -69,8 +110,8 @@ export default function TerminalSettings() {
       </div>
 
       <div className="settings-info-box">
-        <span className="info-icon">ℹ️</span>
-        <span>Additional terminal settings coming in future updates</span>
+        <span className="info-icon">i</span>
+        <span>Font and behavior settings coming in future updates</span>
       </div>
     </div>
   );

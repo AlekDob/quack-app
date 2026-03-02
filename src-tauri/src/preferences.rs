@@ -29,6 +29,10 @@ pub struct AppPreferences {
     pub telegram_unique_id: Option<String>,
     #[serde(default)]
     pub telegram_linked_chat_id: Option<i64>,
+    // Terminal shell preference (None = auto-detect from $SHELL)
+    // Brain: fix-shell-env-gui-launch
+    #[serde(default)]
+    pub default_shell: Option<String>,
 }
 
 fn default_ai_model() -> String {
@@ -58,6 +62,7 @@ impl Default for AppPreferences {
             enable_mobile_notifications: false,
             telegram_unique_id: None,
             telegram_linked_chat_id: None,
+            default_shell: None,
         }
     }
 }
@@ -519,6 +524,121 @@ pub async fn initialize_central_bot_token(app: AppHandle) -> Result<(), String> 
     store.save().map_err(|e| e.to_string())?;
 
     log::info!("🦆 Initialized Quack Central Bot token (@JackTheDuck_bot)");
+
+    Ok(())
+}
+
+// Shell preference commands
+// Brain: fix-shell-env-gui-launch
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ShellInfo {
+    pub path: String,
+    pub name: String,
+}
+
+/// List shells available on the system by reading /etc/shells (macOS/Linux).
+#[tauri::command]
+pub fn list_available_shells() -> Result<Vec<ShellInfo>, String> {
+    let mut shells = Vec::new();
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Read /etc/shells for the system's list of valid login shells
+        if let Ok(content) = std::fs::read_to_string("/etc/shells") {
+            for line in content.lines() {
+                let line = line.trim();
+                if line.starts_with('/') {
+                    let path = std::path::Path::new(line);
+                    if path.exists() {
+                        let name = path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_else(|| line.to_string());
+                        shells.push(ShellInfo {
+                            path: line.to_string(),
+                            name,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Ensure at least the detected system shell is in the list
+        if shells.is_empty() {
+            let system_shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+            let name = std::path::Path::new(&system_shell)
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| system_shell.clone());
+            shells.push(ShellInfo {
+                path: system_shell,
+                name,
+            });
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        shells.push(ShellInfo {
+            path: "pwsh".to_string(),
+            name: "PowerShell Core".to_string(),
+        });
+        shells.push(ShellInfo {
+            path: "powershell.exe".to_string(),
+            name: "Windows PowerShell".to_string(),
+        });
+        shells.push(ShellInfo {
+            path: "cmd.exe".to_string(),
+            name: "Command Prompt".to_string(),
+        });
+    }
+
+    // Deduplicate by path (retain only first occurrence)
+    let mut seen = std::collections::HashSet::new();
+    shells.retain(|s| seen.insert(s.path.clone()));
+
+    Ok(shells)
+}
+
+/// Get the user's preferred default shell (None = auto-detect).
+#[tauri::command]
+pub async fn get_default_shell(app: AppHandle) -> Result<Option<String>, String> {
+    let prefs = get_preferences(app).await?;
+    Ok(prefs.default_shell)
+}
+
+/// Set the user's preferred default shell. Pass empty string to reset to auto-detect.
+#[tauri::command]
+pub async fn set_default_shell(app: AppHandle, shell: String) -> Result<(), String> {
+    let store = app
+        .store(PREFERENCES_STORE)
+        .map_err(|e| format!("Failed to load preferences store: {}", e))?;
+
+    let mut prefs = store
+        .get(PREFERENCES_KEY)
+        .and_then(|v| serde_json::from_value::<AppPreferences>(v.clone()).ok())
+        .unwrap_or_default();
+
+    prefs.default_shell = if shell.is_empty() {
+        None
+    } else {
+        // Validate the shell path exists before saving
+        if !std::path::Path::new(&shell).exists() {
+            return Err(format!("Shell not found: {}", shell));
+        }
+        Some(shell)
+    };
+
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
+
+    store.save().map_err(|e| e.to_string())?;
+
+    app.emit("preferences-changed", &prefs)
+        .map_err(|e| e.to_string())?;
 
     Ok(())
 }

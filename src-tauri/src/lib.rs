@@ -51,6 +51,7 @@ mod proxy;
 mod reveal;
 mod rules; // 📜 Claude Code rules management (.claude/rules/)
 mod sessions;
+pub mod shell_env; // 🐚 Login-shell environment capture for GUI-launched app
 mod skills;
 mod slash_commands;
 mod snippets; // Prompt snippets for quick text expansion
@@ -1186,6 +1187,9 @@ pub fn run() {
             preferences::get_background_image,
             preferences::set_background_image,
             preferences::list_available_backgrounds,
+            preferences::list_available_shells,
+            preferences::get_default_shell,
+            preferences::set_default_shell,
             preferences::set_telegram_config,
             preferences::get_telegram_config,
             preferences::set_ntfy_topic,

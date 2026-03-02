@@ -7,6 +7,7 @@ export type SettingsCategory =
   | 'agent-modes'
   | 'second-brain'
   | 'ide'
+  | 'terminal'
   | 'license'
   | 'notifications'
   | 'remote-api'
@@ -32,6 +33,7 @@ const categories: CategoryItem[] = [
   { id: 'agent-modes', label: 'Agent Modes' },
   { id: 'second-brain', label: 'Second Brain' },
   { id: 'ide', label: 'External IDE' },
+  { id: 'terminal', label: 'Terminal' },
   { id: 'license', label: 'License' },
   { id: 'notifications', label: 'Notifications' },
   { id: 'remote-api', label: 'Remote API' },

@@ -1,6 +1,5 @@
 use std::process::Command;
 use std::path::PathBuf;
-use std::env;
 use anyhow::{Result, Context};
 use serde::Serialize;
 
@@ -33,38 +32,9 @@ pub fn check_prerequisites() -> Result<PrerequisitesCheck, String> {
 }
 
 /// Build extended PATH for macOS app bundles.
-/// When launched as .app, Tauri processes don't inherit the user's shell PATH,
-/// so tools installed via Homebrew, nvm, volta, fnm, etc. are invisible.
+/// Delegates to the centralized `shell_env` module.
 fn get_extended_path() -> String {
-    let current = env::var("PATH").unwrap_or_default();
-    let home = dirs::home_dir().unwrap_or_default();
-
-    let extra_dirs: Vec<String> = vec![
-        // Homebrew (Apple Silicon + Intel)
-        "/opt/homebrew/bin".to_string(),
-        "/usr/local/bin".to_string(),
-        // nvm
-        home.join(".nvm/versions/node").to_string_lossy().to_string(),
-        // volta
-        home.join(".volta/bin").to_string_lossy().to_string(),
-        // fnm
-        home.join(".local/share/fnm/aliases/default/bin").to_string_lossy().to_string(),
-        home.join("Library/Application Support/fnm/aliases/default/bin").to_string_lossy().to_string(),
-        // n (tj/n)
-        "/usr/local/n/versions/node".to_string(),
-        // asdf
-        home.join(".asdf/shims").to_string_lossy().to_string(),
-        // mise/rtx
-        home.join(".local/share/mise/shims").to_string_lossy().to_string(),
-        // pnpm global
-        home.join(".local/share/pnpm").to_string_lossy().to_string(),
-        // User local bin
-        home.join(".local/bin").to_string_lossy().to_string(),
-    ];
-
-    let mut parts: Vec<String> = extra_dirs;
-    parts.push(current);
-    parts.join(":")
+    crate::shell_env::get_extended_path()
 }
 
 /// Hide the console window on Windows to prevent command prompts from flashing
