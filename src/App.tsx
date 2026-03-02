@@ -902,6 +902,7 @@ function AppContent() {
   const VISUAL_IDLE_DELAY_MS = 400; // Delay before showing idle status (prevents flickering)
   const [savedCommands, setSavedCommands] = useState<SavedCommand[]>([]);
   const [savedCommandsDrawerOpen, setSavedCommandsDrawerOpen] = useState(false);
+  const [savedCommandsFilterProject, setSavedCommandsFilterProject] = useState<string | null>(null);
   const [savedCommandModalOpen, setSavedCommandModalOpen] = useState(false);
   const [editingCommand, setEditingCommand] = useState<SavedCommand | null>(
     null
@@ -11325,6 +11326,15 @@ You have access to all Bash tools to execute git commands like:
           }}
           // Kanban button is now built into TerminalSidebar
           gitRefreshTrigger={gitRefreshTrigger}
+          // Saved Commands
+          onOpenSavedCommands={() => {
+            setSavedCommandsFilterProject(null);
+            setSavedCommandsDrawerOpen(true);
+          }}
+          onOpenProjectSavedCommands={(projectPath) => {
+            setSavedCommandsFilterProject(projectPath);
+            setSavedCommandsDrawerOpen(true);
+          }}
         />}
 
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
@@ -12507,7 +12517,11 @@ You have access to all Bash tools to execute git commands like:
 
         <SavedCommandsDrawer
           open={savedCommandsDrawerOpen}
-          commands={savedCommands}
+          commands={savedCommandsFilterProject
+            ? savedCommands.filter(c => c.projectPath === savedCommandsFilterProject || !c.projectPath)
+            : savedCommands}
+          filterProject={savedCommandsFilterProject}
+          onClearFilter={() => setSavedCommandsFilterProject(null)}
           onLaunch={(command, immediate) =>
             handleLaunchSavedCommand(
               command,
@@ -12643,6 +12657,7 @@ You have access to all Bash tools to execute git commands like:
         <SavedCommandModal
           open={savedCommandModalOpen}
           command={editingCommand}
+          defaultProjectPath={savedCommandsFilterProject}
           onClose={() => {
             setSavedCommandModalOpen(false);
             setEditingCommand(null);

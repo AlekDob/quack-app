@@ -84,6 +84,7 @@ export interface SavedCommand {
   cwd?: string;
   color: string;
   category: SavedCommandCategory;
+  projectPath?: string;
 }
 
 export interface ProcessInfo {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, type ReactNode } from "react";
 import type { SavedCommand, SavedCommandCategory } from "../types";
+import "./SavedCommandsDrawer.css";
 
 interface SavedCommandsDrawerProps {
   open: boolean;
@@ -9,6 +10,8 @@ interface SavedCommandsDrawerProps {
   onCreate: () => void;
   onDelete: (command: SavedCommand) => Promise<void>;
   onClose: () => void;
+  filterProject?: string | null;
+  onClearFilter?: () => void;
 }
 
 const CATEGORY_LABELS: Record<SavedCommandCategory, string> = {
@@ -73,6 +76,8 @@ export default function SavedCommandsDrawer({
   onCreate,
   onDelete,
   onClose,
+  filterProject,
+  onClearFilter,
 }: SavedCommandsDrawerProps) {
   const grouped = useMemo(() => {
     return commands.reduce<Record<SavedCommandCategory, SavedCommand[]>>(
@@ -103,14 +108,35 @@ export default function SavedCommandsDrawer({
     return () => window.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
 
+  const projectName = filterProject
+    ? filterProject.split("/").pop() || filterProject
+    : null;
+
   return (
     <div className={`saved-commands-drawer ${open ? "open" : ""}`}>
       <div className="saved-commands-drawer-backdrop" onClick={onClose} />
       <div className="saved-commands-drawer-panel">
         <header className="saved-commands-drawer-header">
           <div>
-            <h2>Saved Commands</h2>
-            <p>Organize frequent commands and launch them instantly.</p>
+            <h2>{projectName ? `Commands — ${projectName}` : "Saved Commands"}</h2>
+            <p>
+              {projectName
+                ? "Project and global commands."
+                : "Organize frequent commands and launch them instantly."}
+              {projectName && onClearFilter && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={onClearFilter}
+                    style={{ fontSize: "inherit", textDecoration: "underline", padding: 0 }}
+                  >
+                    Show all
+                  </button>
+                </>
+              )}
+            </p>
           </div>
           <button
             type="button"
@@ -144,6 +170,17 @@ export default function SavedCommandsDrawer({
                               style={{ backgroundColor: command.color }}
                             />
                             <strong>{command.name}</strong>
+                            {!command.projectPath && filterProject && (
+                              <span
+                                style={{
+                                  fontSize: "10px",
+                                  opacity: 0.5,
+                                  marginLeft: "6px",
+                                }}
+                              >
+                                global
+                              </span>
+                            )}
                           </div>
                           <div className="saved-command-icon-actions">
                             <button
@@ -198,7 +235,7 @@ export default function SavedCommandsDrawer({
           )}
           {commands.length === 0 && (
             <div className="saved-commands-empty">
-              <div>🦆 No saved commands yet.</div>
+              <div>No saved commands yet.</div>
               <button type="button" className="ghost" onClick={onCreate}>
                 Create your first command
               </button>
