@@ -97,7 +97,7 @@ interface SettingsState {
   importSettings: (json: string) => boolean;
 
   // Actions - Agent Mode Presets
-  updateModePreset: (mode: 'bypass' | 'plan', preset: Partial<ModePreset>) => void;
+  updateModePreset: (mode: 'bypass' | 'plan' | 'debug', preset: Partial<ModePreset>) => void;
   resetModePresets: () => void;
 }
 
@@ -160,6 +160,11 @@ const defaultAgentModePresets: AgentModePresets = {
     model: 'opus46',
     thinkingMode: 'auto',
     effort: 'medium',
+  },
+  debug: {
+    model: 'opus46',
+    thinkingMode: 'auto',
+    effort: 'high',
   },
 };
 
@@ -278,7 +283,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
-        version: 1,
+        version: 2,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
@@ -296,12 +301,16 @@ export const useSettingsStore = create<SettingsState>()(
             }
             // Normalize legacy model IDs in mode presets
             if (persisted.agentModePresets) {
-              for (const mode of ['bypass', 'plan'] as const) {
+              for (const mode of ['bypass', 'plan', 'debug'] as const) {
                 if (persisted.agentModePresets[mode]?.model) {
                   persisted.agentModePresets[mode].model = normalizeModelId(persisted.agentModePresets[mode].model);
                 }
               }
             }
+          }
+          // Ensure debug preset exists (added in v1, users with v0 persisted state won't have it)
+          if (persisted.agentModePresets && !persisted.agentModePresets.debug) {
+            persisted.agentModePresets.debug = defaultAgentModePresets.debug;
           }
           return persisted;
         },

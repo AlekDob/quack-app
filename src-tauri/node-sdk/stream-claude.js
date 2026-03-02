@@ -16,6 +16,7 @@ Symbol.asyncDispose ??= Symbol('Symbol.asyncDispose');
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
+import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync, existsSync } from 'fs';
 import { extname, join, dirname } from 'path';
 import { homedir } from 'os';
@@ -25,6 +26,25 @@ import { fileURLToPath } from 'url';
 // Get the directory of this script for MCP server paths
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// =============================================================================
+// SKILL LOADER — reads bundled skill files for system prompt injection
+// Brain: debug-mode-auto-skill-injection
+// =============================================================================
+
+/**
+ * Load a bundled skill markdown file from src-tauri/node-sdk/skills/
+ * Returns the file content or null if not found.
+ */
+function loadBundledSkill(skillName) {
+  const skillPath = join(__dirname, 'skills', `${skillName}.md`);
+  try {
+    if (existsSync(skillPath)) {
+      return readFileSync(skillPath, 'utf-8');
+    }
+  } catch { /* ignore read errors */ }
+  return null;
+}
 
 // =============================================================================
 // BIDIRECTIONAL COMMUNICATION SYSTEM
@@ -143,11 +163,13 @@ const {
   allowedTools, // Tools allowed for this session (passed from frontend via Rust backend)
   teamContext, // Agent Teams context (team name + members for prompt augmentation)
   ideContext, // IDE context (open file, selection, diagnostics, git status)
+  debugMode, // Debug mode flag - appends systematic debugging instructions to system prompt
 } = config;
 
 // DEBUG: Log what we received from Rust
 console.error(`[DEBUG] Raw config received:`, JSON.stringify(config, null, 2).substring(0, 500));
 console.error(`[DEBUG] allowedTools from config:`, allowedTools);
+console.error(`[DEBUG] debugMode from config:`, debugMode ?? 'not set');
 
 /**
  * Load global MCP servers from ~/.quack/mcp/.mcp.json
@@ -264,6 +286,23 @@ function loadMCPServersFromFile(workingDir) {
 // Emit event via stdout
 function emitEvent(event) {
   console.log(JSON.stringify(event));
+}
+
+// Brain: gotcha-stamina-overhead-static-estimate
+// Count tokens for prompt using the Anthropic countTokens API (FREE, precise)
+async function countPromptTokens(modelId, promptContent) {
+  try {
+    const client = new Anthropic();
+    const result = await client.messages.countTokens({
+      model: modelId,
+      messages: [{ role: 'user', content: promptContent }],
+    });
+    console.error(`[TOKENS] countTokens result: ${result.input_tokens} tokens for prompt`);
+    return result.input_tokens;
+  } catch (err) {
+    console.error(`[TOKENS] countTokens failed (non-blocking): ${err.message}`);
+    return null;
+  }
 }
 
 // Emit error via stderr
@@ -546,6 +585,25 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 - SQLite (lightweight, embedded)
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`
+        + (debugMode ? (() => {
+          // Brain: debug-mode-auto-skill-injection
+          const skillContent = loadBundledSkill('systematic-debugging');
+          const brainPreamble = `
+
+## Debug Mode - Systematic Debugging Active
+
+You are in **DEBUG MODE**. The full systematic debugging methodology is loaded below.
+
+**CRITICAL RULES:**
+1. **ALWAYS consult the Quack Brain first** - Before taking any action, search \`documentation/\`, \`~/.quack/brain/\`, and \`CLAUDE.md\` for related issues, known bugs, and existing patterns. Use the \`quack-brain\` skill for read/write operations.
+2. **Never guess** - Always trace the data flow and verify assumptions with evidence. Read the actual code, don't assume behavior.
+3. **Document findings** - After fixing, save discoveries to the Quack Brain for future reference. Add Brain breadcrumbs (\`// Brain: {slug}\`) in code above relevant fixes.
+
+`;
+          return skillContent
+            ? brainPreamble + skillContent
+            : brainPreamble + `Follow the 4-phase approach: Root Cause Investigation > Pattern Analysis > Hypothesis & Testing > Implementation. See systematic-debugging skill for details.`;
+        })() : '')
         + (teamContext ? buildTeamPromptAugmentation(teamContext) : '')
         + (ideContext ? `\n\n## IDE Context\n\n${ideContext}` : ''),
       },
@@ -831,6 +889,15 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
 
     console.error(`[DEBUG] Using streaming input mode: ${useStreamingInput} (MCP servers: ${hasMcpServers}, attachments: ${attachments?.length || 0})`);
 
+    // Brain: gotcha-stamina-overhead-static-estimate
+    // Count prompt tokens in parallel for precise overhead measurement (new sessions only)
+    const isNewSession = !sessionId;
+    let countTokensPromise = null;
+    if (isNewSession) {
+      const promptContent = createMessageContent(prompt, attachments);
+      countTokensPromise = countPromptTokens(modelId, promptContent);
+    }
+
     const stream = query({
       prompt: useStreamingInput ? generateMessages() : prompt,
       options,
@@ -838,6 +905,7 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
 
     // Stream events - no retry (retries re-send the full prompt, wasting tokens)
     try {
+      let promptTokensEmitted = false;
       for await (const event of stream) {
         // Log slash command info from system events
         if (event.type === 'system' && event.subtype === 'init') {
@@ -889,7 +957,25 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
           }, null, 2));
         }
 
+        // Brain: gotcha-stamina-overhead-static-estimate
+        // Emit prompt_token_count on first assistant event for precise overhead calculation
+        if (!promptTokensEmitted && countTokensPromise && event.type === 'assistant') {
+          const promptTokens = await countTokensPromise;
+          if (promptTokens !== null) {
+            emitEvent({ type: 'prompt_token_count', promptTokens });
+          }
+          promptTokensEmitted = true;
+        }
+
         emitEvent(event);
+      }
+
+      // If no assistant event came, still emit prompt tokens
+      if (!promptTokensEmitted && countTokensPromise) {
+        const promptTokens = await countTokensPromise;
+        if (promptTokens !== null) {
+          emitEvent({ type: 'prompt_token_count', promptTokens });
+        }
       }
 
       // Success - emit final complete event

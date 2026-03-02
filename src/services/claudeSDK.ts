@@ -32,7 +32,7 @@ export function getProviderRequestFields(remoteModels?: ModelConfig[], modelOver
 export interface ClaudeSDKOptions {
   model?: string;
   thinkingMode?: string;
-  permissionMode?: 'plan' | 'act' | 'bypass';
+  permissionMode?: 'plan' | 'act' | 'bypass' | 'debug';
   sessionId?: string;
   workingDirectory?: string;
   mcpServers?: Record<string, {
@@ -256,8 +256,9 @@ export async function* streamClaudeMessage(
 
     // Map permission mode to SDK permission mode
     // SDK accepts: undefined (auto-approve), 'plan' (planning only), 'bypassPermissions' (no confirmations)
+    // Brain: pattern-permission-modes
     const sdkPermissionMode =
-      permissionMode === 'bypass'
+      permissionMode === 'bypass' || permissionMode === 'debug'
         ? 'bypassPermissions'
         : permissionMode === 'plan'
           ? 'plan'

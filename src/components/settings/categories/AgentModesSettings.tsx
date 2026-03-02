@@ -20,7 +20,7 @@ const effortOptions = [
 ];
 
 interface ModePresetCardProps {
-  mode: 'bypass' | 'plan';
+  mode: 'bypass' | 'plan' | 'debug';
   title: string;
   description: string;
   color: string;
@@ -31,7 +31,7 @@ function ModePresetCard({ mode, title, description, color, icon }: ModePresetCar
   const { agentModePresets, updateModePreset } = useSettingsStore();
   const { models: remoteModels } = useModelsConfig();
   const modelOptions = getModelOptions(remoteModels);
-  const preset = agentModePresets[mode];
+  const preset = agentModePresets[mode] ?? { model: 'opus46', thinkingMode: 'auto' as const, effort: 'medium' as const };
 
   return (
     <div className="mode-preset-card" style={{ borderLeftColor: color }}>
@@ -95,7 +95,7 @@ export default function AgentModesSettings() {
   const { resetModePresets } = useSettingsStore();
 
   const handleReset = () => {
-    if (window.confirm('Reset to Anthropic recommended defaults?\n\nBypass: Sonnet 4.5\nPlan: Opus 4.6')) {
+    if (window.confirm('Reset to Anthropic recommended defaults?\n\nBuild: Opus 4.6\nPlan: Opus 4.6\nDebug: Opus 4.6 (high effort)')) {
       resetModePresets();
     }
   };
@@ -110,7 +110,7 @@ export default function AgentModesSettings() {
       <div className="mode-presets-grid">
         <ModePresetCard
           mode="bypass"
-          title="Bypass Mode"
+          title="Build Mode"
           description="No confirmations needed - agent executes autonomously"
           color="#f87171"
           icon="&#x2B22;"
@@ -122,6 +122,13 @@ export default function AgentModesSettings() {
           color="#60a5fa"
           icon="&#x25C7;"
         />
+        <ModePresetCard
+          mode="debug"
+          title="Debug Mode"
+          description="Systematic debugging - consults Brain and follows 4-phase debug approach"
+          color="#22c55e"
+          icon="&#x2B21;"
+        />
       </div>
 
       <div className="mode-presets-actions">
@@ -129,7 +136,7 @@ export default function AgentModesSettings() {
           Reset to Anthropic Defaults
         </button>
         <div className="mode-presets-hint">
-          Anthropic recommends: Bypass = Sonnet, Plan = Opus
+          Defaults: Build = Opus, Plan = Opus, Debug = Opus (high effort)
         </div>
       </div>
 

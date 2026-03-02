@@ -592,6 +592,7 @@ export interface OllamaModel {
 export interface AgentModePresets {
   bypass: ModePreset;
   plan: ModePreset;
+  debug: ModePreset;
 }
 
 // Claude CLI Event types (matching Rust backend + Claude Agent SDK)

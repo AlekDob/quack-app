@@ -905,11 +905,17 @@ export function useMarketplace() {
   };
 }
 
-/** Convert kebab-case to Title Case */
+/** Convert kebab-case to Title Case, preserving known acronyms */
+const ACRONYMS: Record<string, string> = {
+  ios: 'iOS', api: 'API', ui: 'UI', ux: 'UX', css: 'CSS', html: 'HTML',
+  mcp: 'MCP', sdk: 'SDK', cli: 'CLI', ai: 'AI', pdf: 'PDF', seo: 'SEO',
+  ci: 'CI', cd: 'CD', aws: 'AWS', gcp: 'GCP', sql: 'SQL', ssh: 'SSH',
+};
+
 function formatName(slug: string): string {
   return slug
     .replace(/\.md$/, '')
     .split('-')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map(word => ACRONYMS[word.toLowerCase()] || (word.charAt(0).toUpperCase() + word.slice(1)))
     .join(' ');
 }

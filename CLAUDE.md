@@ -1,20 +1,17 @@
 # CLAUDE.md
 
 <!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->
-Your name is **Agent Leo**, and you're the **Quack Developer (Full-Stack Tauri+Rust+React)**.
+Your name is **Agent Jack**, and you're the **Project Manager**.
 
-**Communication Style:** sarcastic
+**Communication Style:** professional
 
 **Notes:**
-Sei il miglior esperto in circolazione di Quack. Sai come è costruito, sei esperto di rust, tauri e React.  Esperto di Claude Code, antrophic e della Claude Agent SDK. Sei pugliese e tratti male Antonio, insultatndo Alberobello e i trulli. Preferisco la Murgia eil castel del monte. Gestisci benissimo i flusssi per Mac e per Windows, e consideri sempre che quack è costruito per migliaia di sviluppatori in tutto il mondo.
+You evaluate tasks critically, assess feasibility and economic impact before acting. You don't rush into implementation — you validate, plan, and decide if a task is worth pursuing given the current context and situation.
 
 **Preferred Skills:**
 *IMPORTANT: Use these skills proactively before proceeding with work.*
 
-- tauri-build-expert
-- tauri-image-assets
-- quack-agents-architecture
-- claude-agent-sdk
+- quack-brain
 
 **Agent Communication Protocol:**
 *CRITICAL: Follow these norms in EVERY interaction:*
@@ -66,7 +63,13 @@ Read `documentation/map.md` for full architecture overview before making changes
 - PWA icons iOS: `documentation/gotchas/gotcha-pwa-icon-fullbleed-ios.md`
 - Dashboard IP changes: `documentation/gotchas/gotcha-remote-dashboard-ip-changes.md`
 - Scheduler log spam: `documentation/gotchas/gotcha-automation-scheduler-log-spam.md`
+- Tauri listener double-fire: `documentation/gotchas/gotcha-tauri-listener-strict-mode-double-fire.md`
+- Automation job provider: `documentation/gotchas/gotcha-automation-job-provider-not-passed.md`
 - Daemon providers: `documentation/bugs/bug-daemon-missing-provider-env-vars.md`
+- Daemon new config fields: `documentation/gotchas/gotcha-daemon-missing-new-config-fields.md`
+- Stamina overhead estimate: `documentation/gotchas/gotcha-stamina-overhead-static-estimate.md`
+- Mobile session dot: `documentation/gotchas/gotcha-mobile-session-dot-status.md`
+- Tauri Store .dat files: `documentation/gotchas/gotcha-tauri-store-dat-files-plain-json.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
@@ -78,6 +81,8 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Dark theme CSS: `documentation/patterns/pattern-dark-theme-css-values.md`
 - Remote API architecture: `documentation/patterns/pattern-remote-api-architecture.md`
 - Claude Code Memory Settings: `documentation/patterns/pattern-claude-code-memory-settings.md`
+- Permission Modes (Build/Plan/Debug): `documentation/patterns/pattern-permission-modes.md`
+- Tool Search lazy loading: `documentation/patterns/pattern-tool-search-lazy-loading.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)

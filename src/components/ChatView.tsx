@@ -227,6 +227,9 @@ export default function ChatView({
   // State to show/hide existing ThinkingBlocks (toggle via footer icon)
   const [showThinkingBlocks, setShowThinkingBlocks] = useState(true);
 
+  // Debug mode banner accordion state
+  const [debugBannerExpanded, setDebugBannerExpanded] = useState(false);
+
   // Load active rules using the hook (automatic, zero config)
   const { activeRules, hasRules } = useAgentRules(selectedRules, basePath || '');
 
@@ -634,7 +637,7 @@ export default function ChatView({
         e.preventDefault();
 
         // Cycle through permission modes
-        const modes: PermissionMode[] = ['plan', 'bypass'];
+        const modes: PermissionMode[] = ['plan', 'bypass', 'debug'];
         const currentIndex = modes.indexOf(permissionMode);
         const nextIndex = (currentIndex + 1) % modes.length;
         onPermissionModeChange(modes[nextIndex]);
@@ -655,6 +658,67 @@ export default function ChatView({
           rules={activeRules}
           onEditRules={onEditRules}
         />
+      )}
+      {/* Debug Mode Banner - accordion, shown when debug mode is active */}
+      {permissionMode === 'debug' && (
+        <div className={`debug-mode-banner ${debugBannerExpanded ? 'expanded' : ''}`}>
+          <button
+            type="button"
+            className="debug-mode-banner-header"
+            onClick={() => setDebugBannerExpanded(!debugBannerExpanded)}
+          >
+            <div className="debug-mode-banner-left">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 16v-4" />
+                <path d="M12 8h.01" />
+              </svg>
+              <span className="debug-mode-banner-title">Debug Mode</span>
+              {!debugBannerExpanded && (
+                <span className="debug-mode-banner-desc">Brain lookup → Root cause → Hypothesis → Fix → Document</span>
+              )}
+            </div>
+            <svg
+              className={`debug-mode-chevron ${debugBannerExpanded ? 'rotated' : ''}`}
+              width="12" height="12" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="2"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          {debugBannerExpanded && (
+            <div className="debug-mode-banner-body">
+              <div className="debug-mode-phase">
+                <span className="debug-mode-phase-num">1</span>
+                <div>
+                  <strong>Brain Lookup</strong>
+                  <p>Searches Quack Brain, documentation, and known gotchas before touching any code.</p>
+                </div>
+              </div>
+              <div className="debug-mode-phase">
+                <span className="debug-mode-phase-num">2</span>
+                <div>
+                  <strong>Root Cause Investigation</strong>
+                  <p>Reads errors carefully, reproduces the issue, traces data flow backward from the failure point.</p>
+                </div>
+              </div>
+              <div className="debug-mode-phase">
+                <span className="debug-mode-phase-num">3</span>
+                <div>
+                  <strong>Hypothesis & Testing</strong>
+                  <p>Forms a single hypothesis, tests it minimally, and verifies before making changes.</p>
+                </div>
+              </div>
+              <div className="debug-mode-phase">
+                <span className="debug-mode-phase-num">4</span>
+                <div>
+                  <strong>Fix & Document</strong>
+                  <p>Fixes the root cause (not symptoms), adds Brain breadcrumbs in code, and saves findings for the future.</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
       <MessageList
         messages={messages}

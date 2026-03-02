@@ -392,6 +392,10 @@ export interface ProjectOverhead {
   globalClaudeMd: number;
   /** Tokens from project CLAUDE.md ({cwd}/CLAUDE.md) */
   projectClaudeMd: number;
+  /** Tokens from .claude/rules/*.md files */
+  rules: number;
+  /** Tokens from skill definitions */
+  skills: number;
   /** Tokens from MCP server definitions */
   mcpServers: number;
   /** Base memory overhead */
@@ -404,12 +408,14 @@ export interface ProjectOverhead {
   source: 'calculated' | 'fallback';
 }
 
-// Base overhead constants (from Claude CLI /context analysis)
+// Brain: gotcha-stamina-overhead-static-estimate
+// Base overhead constants (from Claude CLI /context analysis, updated 2026-03-01)
 const BASE_OVERHEAD = {
-  systemPrompt: 4200,    // System prompt and instructions
-  systemTools: 17500,    // Built-in tool definitions
-  memoryBase: 8300,      // Memory MCP baseline
-  mcpPerServer: 1500,    // ~1.5k tokens per MCP server
+  systemPrompt: 4000,    // System prompt and instructions (~2% of 200k)
+  systemTools: 16500,    // Built-in tool definitions (~8.2% of 200k)
+  memoryBase: 5000,      // Memory files baseline (~2.5% of 200k)
+  skills: 6700,          // Skill definitions loaded into context (~3.4% of 200k)
+  mcpPerServer: 3500,    // ~3.5k tokens per MCP server (tools + descriptions)
 };
 
 /**
@@ -455,14 +461,16 @@ export async function calculateProjectOverhead(
     // Calculate MCP overhead
     const mcpTokens = mcpServerCount * BASE_OVERHEAD.mcpPerServer;
 
-    // Calculate total
+    // Calculate total (includes skills estimate)
     const baseSystem = BASE_OVERHEAD.systemPrompt + BASE_OVERHEAD.systemTools;
-    const total = baseSystem + globalClaudeMdTokens + projectClaudeMdTokens + mcpTokens + BASE_OVERHEAD.memoryBase;
+    const total = baseSystem + globalClaudeMdTokens + projectClaudeMdTokens + mcpTokens + BASE_OVERHEAD.memoryBase + BASE_OVERHEAD.skills;
 
     return {
       baseSystem,
       globalClaudeMd: globalClaudeMdTokens,
       projectClaudeMd: projectClaudeMdTokens,
+      rules: 0, // Static estimate doesn't read rules files — countTokens API provides precision
+      skills: BASE_OVERHEAD.skills,
       mcpServers: mcpTokens,
       memoryBase: BASE_OVERHEAD.memoryBase,
       total,
@@ -476,6 +484,8 @@ export async function calculateProjectOverhead(
       baseSystem: BASE_OVERHEAD.systemPrompt + BASE_OVERHEAD.systemTools,
       globalClaudeMd: 2200,  // Default estimate
       projectClaudeMd: 0,
+      rules: 0,
+      skills: BASE_OVERHEAD.skills,
       mcpServers: BASE_OVERHEAD.mcpPerServer * 2, // Assume 2 servers
       memoryBase: BASE_OVERHEAD.memoryBase,
       total: ESTIMATED_OVERHEAD.total,

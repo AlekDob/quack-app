@@ -20,6 +20,7 @@ Symbol.asyncDispose ??= Symbol('Symbol.asyncDispose');
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
+import Anthropic from '@anthropic-ai/sdk';
 import { readFileSync, existsSync } from 'fs';
 import { extname, join, dirname } from 'path';
 import { homedir } from 'os';
@@ -31,6 +32,25 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // =============================================================================
+// SKILL LOADER — reads bundled skill files for system prompt injection
+// Brain: debug-mode-auto-skill-injection
+// =============================================================================
+
+/**
+ * Load a bundled skill markdown file from src-tauri/node-sdk/skills/
+ * Returns the file content or null if not found.
+ */
+function loadBundledSkill(skillName) {
+  const skillPath = join(__dirname, 'skills', `${skillName}.md`);
+  try {
+    if (existsSync(skillPath)) {
+      return readFileSync(skillPath, 'utf-8');
+    }
+  } catch { /* ignore read errors */ }
+  return null;
+}
+
+// =============================================================================
 // EMIT HELPERS
 // =============================================================================
 
@@ -40,6 +60,41 @@ function emit(obj) {
 
 function log(tag, ...args) {
   console.error(`[DAEMON:${tag}]`, ...args);
+}
+
+// =============================================================================
+// ANTHROPIC SDK CLIENT — for countTokens API (precise overhead measurement)
+// Brain: gotcha-stamina-overhead-static-estimate
+// =============================================================================
+
+let anthropicClient = null;
+
+function getAnthropicClient() {
+  if (!anthropicClient) {
+    anthropicClient = new Anthropic();
+  }
+  return anthropicClient;
+}
+
+/**
+ * Count tokens for a user prompt using the Anthropic countTokens API.
+ * Returns the input_tokens count, or null if the API call fails.
+ * This is a FREE API call — no billing.
+ */
+async function countPromptTokens(modelId, promptContent) {
+  try {
+    const client = getAnthropicClient();
+    const messages = [{ role: 'user', content: promptContent }];
+    const result = await client.messages.countTokens({
+      model: modelId,
+      messages,
+    });
+    log('TOKENS', `countTokens result: ${result.input_tokens} tokens for prompt`);
+    return result.input_tokens;
+  } catch (err) {
+    log('TOKENS', `countTokens failed (non-blocking): ${err.message}`);
+    return null;
+  }
 }
 
 // =============================================================================
@@ -190,7 +245,7 @@ async function handleQuery(cmd) {
     queryId, prompt, model = 'opus', permissionMode, thinkingMode,
     cwd, sessionId, agents, attachments, outputFormat, effort,
     mcpServers: passedMcpServers, allowedTools, teamContext, ideContext,
-    provider, providerBaseUrl, providerApiKey,
+    provider, providerBaseUrl, providerApiKey, debugMode,
   } = cmd;
 
   const abortController = new AbortController();
@@ -267,6 +322,25 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 - SQLite (lightweight, embedded)
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`
+        + (debugMode ? (() => {
+          // Brain: debug-mode-auto-skill-injection
+          const skillContent = loadBundledSkill('systematic-debugging');
+          const brainPreamble = `
+
+## Debug Mode - Systematic Debugging Active
+
+You are in **DEBUG MODE**. The full systematic debugging methodology is loaded below.
+
+**CRITICAL RULES:**
+1. **ALWAYS consult the Quack Brain first** - Before taking any action, search \`documentation/\`, \`~/.quack/brain/\`, and \`CLAUDE.md\` for related issues, known bugs, and existing patterns. Use the \`quack-brain\` skill for read/write operations.
+2. **Never guess** - Always trace the data flow and verify assumptions with evidence. Read the actual code, don't assume behavior.
+3. **Document findings** - After fixing, save discoveries to the Quack Brain for future reference. Add Brain breadcrumbs (\`// Brain: {slug}\`) in code above relevant fixes.
+
+`;
+          return skillContent
+            ? brainPreamble + skillContent
+            : brainPreamble + `Follow the 4-phase approach: Root Cause Investigation > Pattern Analysis > Hypothesis & Testing > Implementation. See systematic-debugging skill for details.`;
+        })() : '')
           + (teamContext ? buildTeamPromptAugmentation(teamContext) : '')
           + (ideContext ? `\n\n## IDE Context\n\n${ideContext}` : ''),
       },
@@ -383,16 +457,47 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
     const queryStartTime = Date.now();
     log('QUERY', `query=${queryId} calling SDK query() (streamingInput=${useStreamingInput})`);
 
+    // Brain: gotcha-stamina-overhead-static-estimate
+    // Count prompt tokens in parallel (non-blocking) for precise overhead measurement.
+    // Only for Anthropic provider (countTokens API not available on Ollama/custom).
+    // Only for new sessions (resumed sessions already have cached overhead in frontend).
+    const isAnthropicProvider = !provider || provider === 'anthropic';
+    const isNewSession = !sessionId;
+    let countTokensPromise = null;
+    if (isAnthropicProvider && isNewSession) {
+      const promptContent = createMessageContent(prompt, attachments);
+      countTokensPromise = countPromptTokens(modelId, promptContent);
+    }
+
     const stream = query({
       prompt: useStreamingInput ? generateMessages() : prompt,
       options,
     });
 
     let eventCount = 0;
+    let promptTokensEmitted = false;
     for await (const event of stream) {
       eventCount++;
+
+      // Emit prompt_token_count on first assistant event (so frontend has it before usage data)
+      if (!promptTokensEmitted && countTokensPromise && event.type === 'assistant') {
+        const promptTokens = await countTokensPromise;
+        if (promptTokens !== null) {
+          emit({ type: 'event', queryId, event: { type: 'prompt_token_count', promptTokens } });
+        }
+        promptTokensEmitted = true;
+      }
+
       // Emit each SDK event tagged with queryId
       emit({ type: 'event', queryId, event });
+    }
+
+    // If no assistant event came (unusual), still emit prompt tokens
+    if (!promptTokensEmitted && countTokensPromise) {
+      const promptTokens = await countTokensPromise;
+      if (promptTokens !== null) {
+        emit({ type: 'event', queryId, event: { type: 'prompt_token_count', promptTokens } });
+      }
     }
 
     const elapsedMs = Date.now() - queryStartTime;

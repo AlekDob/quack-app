@@ -614,7 +614,7 @@
 /* ============================================ */
 
 .context-receipt {
-  max-width: 520px;
+  max-width: 420px;
 }
 
 .context-receipt-main {
@@ -626,29 +626,29 @@
   border-radius: 8px;
 }
 
-/* Left Column: Duck + Model + Progress */
-.context-receipt-left {
+/* Center Column: Duck + Model + Progress (full-width) */
+.context-receipt-center {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-width: 180px;
+  width: 100%;
 }
 
-.context-receipt-left .fallout-duck-container {
+.context-receipt-center .fallout-duck-container {
   display: flex;
   align-items: center;
   justify-content: flex-start;
   padding: 0;
 }
 
-.context-receipt-left .fallout-duck-image {
+.context-receipt-center .fallout-duck-image {
   width: 64px;
   height: 64px;
   display: block;
 }
 
-.context-receipt-left .fallout-duck-status-badge {
+.context-receipt-center .fallout-duck-status-badge {
   position: relative;
   top: auto;
   right: auto;
@@ -696,7 +696,7 @@
 
 .context-usage-percentage {
   font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
-  font-size: 20px;
+  font-size: 28px;
   font-weight: 700;
   color: #4dd4b3;
   text-shadow: 0 0 10px rgba(77, 212, 179, 0.7);

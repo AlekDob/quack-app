@@ -48,66 +48,17 @@ const formatCostUsd = (cost: number): string => {
   return `$${cost.toFixed(2)}`;
 };
 
-// Breakdown calculation
-// IMPORTANT: The SDK's cache_creation_input_tokens and cache_read_input_tokens
-// include ALL tokens being cached (system + tools + memory + previous messages),
-// NOT just the overhead. So we CANNOT use them as a proxy for overhead.
-//
-// The overhead is now calculated dynamically per-project based on:
-// - CLAUDE.md files (global + project)
-// - MCP servers installed (.mcp.json)
-// - Base system overhead (system prompt + tools + memory)
-interface ContextBreakdown {
-  messages: number;        // Actual message tokens (input + output)
-  overhead: number;        // Overhead (dynamic or default ~38k)
-  autoCompact: number;     // Auto-compact cost reserve (45k)
-}
-
-// Default overhead estimate based on Claude CLI /context output (~38k tokens)
-const DEFAULT_OVERHEAD = 38000;
-
 // Auto-compact cost: estimated tokens used when auto-compact triggers at 45k free
 const AUTO_COMPACT_COST = 45000;
 
 /**
- * Calculate context breakdown
- *
- * With the new tracking model, inputTokens from the SDK already represents the
- * FULL context window input for the last turn (system + tools + all messages).
- * So overhead is INCLUDED in inputTokens, not added on top.
- *
- * Messages = inputTokens - overhead (the actual conversation content)
- * Overhead = dynamic (from project files) or default ~38k (system + tools + CLAUDE.md)
- * Auto-Compact = reserve for auto-compact operation (45k)
- */
-const calculateBreakdown = (
-  inputTokens: number,
-  outputTokens: number,
-  overhead: number = DEFAULT_OVERHEAD
-): ContextBreakdown => {
-  // inputTokens already includes overhead (system + tools + messages)
-  // Messages = what's left after subtracting overhead
-  const messagesTokens = Math.max(0, inputTokens - overhead);
-
-  return {
-    messages: messagesTokens,
-    overhead,
-    autoCompact: AUTO_COMPACT_COST,
-  };
-};
-
-/**
  * Calculate total context usage (matches Claude CLI `/context` output)
- * inputTokens already includes overhead, so total = inputTokens (no auto-compact added)
- * Auto-compact is shown separately in the breakdown as reserved space info
+ * inputTokens already includes overhead, so total = inputTokens
  */
 const calculateTotalContextUsage = (
   inputTokens: number,
   _outputTokens: number,
-  _overhead: number = DEFAULT_OVERHEAD
 ): number => {
-  // inputTokens = full context window fill (system + tools + messages)
-  // Matches what CLI `/context` shows (e.g., 36k/200k)
   return inputTokens;
 };
 
@@ -119,7 +70,7 @@ export default function TokenUsageModal({
   totalCost = 0,
   maxTokens,
   percentage,
-  overhead = DEFAULT_OVERHEAD,
+  overhead,
   status,
   onClose,
   onCompact,
@@ -131,11 +82,8 @@ export default function TokenUsageModal({
   onLocalReset,
   compactFailed = false,
 }: TokenUsageModalProps) {
-  // Calculate context breakdown using dynamic overhead
-  const breakdown = calculateBreakdown(inputTokens, outputTokens, overhead);
-
   // Total context usage = context fill only (matches CLI `/context`)
-  const totalContextUsage = calculateTotalContextUsage(inputTokens, outputTokens, overhead);
+  const totalContextUsage = calculateTotalContextUsage(inputTokens, outputTokens);
 
   // Free = max - context fill - auto-compact reserve (reserve is effectively unavailable)
   const remainingTokens = Math.max(0, maxTokens - totalContextUsage - AUTO_COMPACT_COST);
@@ -206,11 +154,10 @@ export default function TokenUsageModal({
         </div>
 
         <div className="token-modal-content fallout-content">
-          {/* Two-column layout: Duck + Breakdown */}
+          {/* Single column: Duck + Model + Percentage + Progress */}
           <div className="context-receipt-main">
-            {/* Left Column: Duck + Model + Progress */}
-            <div className="context-receipt-left">
-              {/* Duck Image */}
+            <div className="context-receipt-center">
+              {/* Duck + Status Badge */}
               <div className="fallout-duck-container">
                 <img
                   src="/images/stamina.png"
@@ -260,36 +207,6 @@ export default function TokenUsageModal({
                   <span className="context-usage-percentage">{Math.round(percentage)}%</span>
                   <span className="context-usage-tokens">{formatTokensK(totalContextUsage)} / {formatTokensK(maxTokens)}</span>
                 </div>
-              </div>
-            </div>
-
-            {/* Right Column: Breakdown */}
-            <div className="context-receipt-right">
-              <div className="context-breakdown-title">BREAKDOWN</div>
-              <div className="context-breakdown-list">
-                <div className="context-breakdown-row">
-                  <span className="context-breakdown-label">Messages</span>
-                  <span className="context-breakdown-value">{formatTokensK(breakdown.messages)}</span>
-                </div>
-                <div className="context-breakdown-row">
-                  <span className="context-breakdown-label">
-                    Overhead
-                    <span className="context-breakdown-source" title="System + tools + CLAUDE.md + MCP servers">*</span>
-                  </span>
-                  <span className="context-breakdown-value">{formatTokensK(breakdown.overhead)}</span>
-                </div>
-                <div className="context-breakdown-row">
-                  <span className="context-breakdown-label">
-                    Auto-Compact
-                    <span className="context-breakdown-source" title="Reserved tokens for auto-compact operation">**</span>
-                  </span>
-                  <span className="context-breakdown-value">{formatTokensK(breakdown.autoCompact)}</span>
-                </div>
-              </div>
-              <div className="context-breakdown-note">
-                * Overhead: system + tools + CLAUDE.md + MCP servers
-                <br />
-                ** Auto-Compact: reserved for conversation compaction
               </div>
             </div>
           </div>

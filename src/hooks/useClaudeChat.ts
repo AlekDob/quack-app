@@ -22,7 +22,7 @@ const taskToolToKanbanMap = new Map<string, string>();
 const MAX_EVENTS_PER_STREAM = 500;
 
 export type ThinkingMode = 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
-export type PermissionMode = 'plan' | 'bypass';
+export type PermissionMode = 'plan' | 'bypass' | 'debug';
 
 // 🧠 THINKING MODE CONTROL: Patterns to detect user intent to change thinking mode
 // Supports Italian and English commands
@@ -322,7 +322,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
       const stream = streamClaudeMessage(content, {
         model: options?.model || 'opus',
         thinkingMode: effectiveThinkingMode,
-        permissionMode: options?.permissionMode || 'bypass',
+        permissionMode: (options?.permissionMode === 'debug' ? 'bypass' : options?.permissionMode) || 'bypass',
         sessionId: claudeSessionId.current, // Resume previous session if exists
         workingDirectory: options?.workingDirectory,
         signal: abortControllerRef.current?.signal, // Pass abort signal

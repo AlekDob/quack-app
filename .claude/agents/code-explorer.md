@@ -1,6 +1,7 @@
 ---
 name: code-explorer
 description: Navigate and analyze existing codebase with deep understanding
+tools: Read, Grep, Glob, Bash
 model: opus
 ---
 

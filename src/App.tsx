@@ -1029,6 +1029,9 @@ function AppContent() {
     cacheReadTokens: number;
     totalCost: number; // total_cost_usd from Claude SDK result message
     overhead?: number; // Dynamic overhead calculated from project files
+    // Brain: gotcha-stamina-overhead-static-estimate
+    promptTokens?: number; // Precise prompt token count from countTokens API
+    measuredOverhead?: number; // Precise overhead = contextWindowFill - promptTokens (first turn only)
   }>>(new Map());
 
   // Project overhead cache - maps cwd to calculated overhead
@@ -1167,6 +1170,16 @@ function AppContent() {
       const cacheCreation = usage.cache_creation_input_tokens || 0;
       const contextWindowFill = usage.input_tokens + cacheRead + cacheCreation;
 
+      // Brain: gotcha-stamina-overhead-static-estimate
+      // Calculate measuredOverhead from countTokens API data (precise, not estimated).
+      // On the first turn of a new session: overhead = contextWindowFill - promptTokens
+      // Once measured, cache it for all subsequent turns in this session.
+      let measuredOverhead = currentTokens.measuredOverhead;
+      if (!measuredOverhead && currentTokens.promptTokens && contextWindowFill > 0) {
+        measuredOverhead = Math.max(0, contextWindowFill - currentTokens.promptTokens);
+        console.log(`[Token Tracking] 🎯 PRECISE overhead measured: ${measuredOverhead} (contextFill=${contextWindowFill} - promptTokens=${currentTokens.promptTokens})`);
+      }
+
       const updatedTokens = {
         inputTokens: contextWindowFill,
         outputTokens: usage.output_tokens,
@@ -1174,6 +1187,9 @@ function AppContent() {
         cacheReadTokens: cacheRead,
         // total_cost_usd is cumulative from SDK, so we just set it (not add)
         totalCost: totalCostUsd ?? currentTokens.totalCost,
+        // Preserve countTokens data
+        promptTokens: currentTokens.promptTokens,
+        measuredOverhead,
       };
 
       newMap.set(agentId, updatedTokens);
@@ -1325,6 +1341,29 @@ function AppContent() {
           cache_read_input_tokens: msgUsage.cache_read_input_tokens || 0,
         });
       }
+    }
+
+    // Brain: gotcha-stamina-overhead-static-estimate
+    // Handle prompt_token_count events: store precise prompt token count from countTokens API.
+    // On the first assistant event with usage, we calculate:
+    //   measuredOverhead = contextWindowFill - promptTokens
+    // This gives a PRECISE overhead measurement, replacing the static estimate.
+    if (claudeEvent.type === 'prompt_token_count') {
+      const promptEvt = claudeEvent as any;
+      const promptTokens = promptEvt.promptTokens;
+      if (promptTokens && promptTokens > 0) {
+        console.log(`[${source}] 🎯 Precise prompt token count for messageKey=${messageKey}: ${promptTokens}`);
+        setChatTokensMap((prev) => {
+          const newMap = new Map(prev);
+          const current = newMap.get(messageKey) || {
+            inputTokens: 0, outputTokens: 0,
+            cacheCreationTokens: 0, cacheReadTokens: 0, totalCost: 0,
+          };
+          newMap.set(messageKey, { ...current, promptTokens });
+          return newMap;
+        });
+      }
+      return; // Don't process further — this is a custom Quack event, not an SDK event
     }
 
     // Handle result events: update total_cost_usd and PERSIST tokens to disk
@@ -1793,6 +1832,7 @@ function AppContent() {
   // 📱 Pending auto-start: When WhatsApp triggers a session, store the prompt here
   // A useEffect will pick it up when activeId/activeSessionId are updated by React
   const pendingAutoStartRef = useRef<{ prompt: string; sessionId: string; model?: string } | null>(null);
+  const handledRemoteSessionIds = useRef(new Set<string>());
 
   // 🦆 Telegram Bot integration hook (DEPRECATED - using Telegram Central Bot now)
   // TODO: Remove this old webhook-based telegram system
@@ -3975,7 +4015,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Auto-switch settings based on permission mode using presets from settings
       let finalUpdates = { ...updates };
       if (updates.permissionMode !== undefined && updates.permissionMode !== current.permissionMode) {
-        const preset = presets[updates.permissionMode as 'bypass' | 'plan'];
+        const preset = presets[updates.permissionMode as 'bypass' | 'plan' | 'debug'];
         if (preset) {
           finalUpdates.model = normalizeModelName(preset.model);
           finalUpdates.thinkingMode = preset.thinkingMode;
@@ -4265,9 +4305,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       cacheReadTokens: 0,
       totalCost: 0,
     };
-    // Get project overhead from cache based on current cwd
+    // Brain: gotcha-stamina-overhead-static-estimate
+    // Priority: measuredOverhead (from countTokens API, precise) > projectOverheadCache (static estimate)
     const cwd = activeTerminal?.cwd || explorerPath || '';
-    const overhead = cwd ? projectOverheadCache.get(cwd) : undefined;
+    const staticOverhead = cwd ? projectOverheadCache.get(cwd) : undefined;
+    const overhead = tokens.measuredOverhead ?? staticOverhead;
     return { ...tokens, overhead };
   }, [chatKey, chatTokensMap, activeTerminal?.cwd, explorerPath, projectOverheadCache]);
 
@@ -4942,6 +4984,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }>("remote-execute", async (event) => {
       console.log("📱 [Remote Execute] Request:", event.payload);
       const { sessionId: remoteSessionId, agentId, prompt, projectPath, projectName, model: remoteModel } = event.payload;
+
+      // Dedup guard: synchronous check BEFORE any async work
+      // pendingAutoStartRef check fails because it's set after createSession (async race)
+      if (handledRemoteSessionIds.current.has(remoteSessionId)) {
+        console.log(`📱 [Remote Execute] Already handling session ${remoteSessionId}, skipping duplicate`);
+        return;
+      }
+      handledRemoteSessionIds.current.add(remoteSessionId);
 
       // Find the terminal for this agent
       const agent = terminalsRef.current.find(t => t.id === agentId);

@@ -11,7 +11,8 @@ interface PermissionOption {
 
 const permissionOptions: PermissionOption[] = [
   { value: 'plan', label: 'Plan · Planning only', icon: '◇', color: '#60a5fa' },
-  { value: 'bypass', label: 'Bypass · No confirmations', icon: '⬢', color: '#f87171' },
+  { value: 'bypass', label: 'Build · No confirmations', icon: '⬢', color: '#f87171' },
+  { value: 'debug', label: 'Debug · Systematic debugging', icon: '⬡', color: '#22c55e' },
 ];
 
 interface CustomPermissionSelectProps {
