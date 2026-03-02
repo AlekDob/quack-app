@@ -483,21 +483,27 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                         });
                         let _ = app_handle.emit(&event_name, &wrapped);
 
-                        // Update global agent status map for REST API
+                        // Update global agent status map + emit WS broadcast on CHANGE only
                         // Brain: gotcha-mobile-session-dot-status
                         if let Some(event_type) = event.get("type").and_then(|t| t.as_str()) {
                             match event_type {
                                 "assistant" => {
-                                    // Agent is actively streaming — mark as busy
-                                    if let Ok(mut map) = crate::AGENT_STATUS.write() {
-                                        map.insert(agent_id.clone(), "busy".to_string());
+                                    let changed = if let Ok(mut map) = crate::AGENT_STATUS.write() {
+                                        map.insert(agent_id.clone(), "busy".to_string()).as_deref() != Some("busy")
+                                    } else { false };
+                                    if changed {
+                                        let _ = app_handle.emit("external-terminal-status", serde_json::json!({
+                                            "id": agent_id, "status": "busy"
+                                        }));
                                     }
                                 }
                                 "result" => {
-                                    // Agent finished — mark as idle
                                     if let Ok(mut map) = crate::AGENT_STATUS.write() {
                                         map.insert(agent_id.clone(), "idle".to_string());
                                     }
+                                    let _ = app_handle.emit("external-terminal-status", serde_json::json!({
+                                        "id": agent_id, "status": "idle"
+                                    }));
                                     // Capture Result events for usage data
                                     log::info!("[DAEMON:QUERY] query={} received Result event — capturing usage data", qid);
                                     if let Ok(result_event) = serde_json::from_value::<ClaudeEvent>(event.clone()) {
@@ -1872,6 +1878,10 @@ pub async fn send_message_via_sdk_streaming(
     if let Ok(mut map) = crate::AGENT_STATUS.write() {
         map.insert(agent_id.clone(), "busy".to_string());
     }
+    // Emit WS broadcast for instant mobile update
+    let _ = app.emit("external-terminal-status", serde_json::json!({
+        "id": agent_id, "status": "busy"
+    }));
 
     // Try daemon mode first
     if DAEMON_MODE_ENABLED.load(Ordering::Relaxed) {
@@ -2557,10 +2567,12 @@ async fn send_message_via_sdk_streaming_legacy(
                     }
                     ClaudeEvent::Assistant { message, .. } => {
                         // Brain: gotcha-mobile-session-dot-status
-                        // Mark agent as busy on first assistant event
                         if let Ok(mut map) = crate::AGENT_STATUS.write() {
                             map.insert(agent_id.clone(), "busy".to_string());
                         }
+                        let _ = app.emit("external-terminal-status", serde_json::json!({
+                            "id": agent_id, "status": "busy"
+                        }));
                         // Log content blocks for debugging Task tool detection
                         log::info!("[SDK] 📝 Assistant event with {} content blocks", message.content.len());
                         for (idx, block) in message.content.iter().enumerate() {
@@ -2680,10 +2692,12 @@ async fn send_message_via_sdk_streaming_legacy(
                 // Check if this is the final result
                 if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, model_usage, .. } = &event {
                     // Brain: gotcha-mobile-session-dot-status
-                    // Mark agent as idle when streaming is done
                     if let Ok(mut map) = crate::AGENT_STATUS.write() {
                         map.insert(agent_id.clone(), "idle".to_string());
                     }
+                    let _ = app.emit("external-terminal-status", serde_json::json!({
+                        "id": agent_id, "status": "idle"
+                    }));
                     log::info!("[SDK] 🦆 RESULT EVENT - input_tokens: {}, output_tokens: {}, cache_read: {}, cache_creation: {}, total_cost: {}, modelUsage: {:?}",
                         usage.input_tokens, usage.output_tokens, usage.cache_read_input_tokens, usage.cache_creation_input_tokens, total_cost_usd, model_usage);
 
