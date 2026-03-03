@@ -70,6 +70,8 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Stamina overhead estimate: `documentation/gotchas/gotcha-stamina-overhead-static-estimate.md`
 - Mobile session dot: `documentation/gotchas/gotcha-mobile-session-dot-status.md`
 - Tauri Store .dat files: `documentation/gotchas/gotcha-tauri-store-dat-files-plain-json.md`
+- Automation session title lost: `documentation/bugs/fix-automation-session-title-missing.md`
+- Session reset after Stop: `documentation/bugs/fix-session-reset-after-stop.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

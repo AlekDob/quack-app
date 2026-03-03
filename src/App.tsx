@@ -1245,6 +1245,19 @@ function AppContent() {
       resumingSessionsRef.current.delete(messageKey);
     }
 
+    // Brain: fix-session-reset-after-stop
+    // Save claudeSessionId to session store IMMEDIATELY on system/init event.
+    // Without this, if the user clicks Stop before the response completes,
+    // the session store never gets the claudeSessionId (only saved on completion)
+    // and the next message creates a brand new session instead of resuming.
+    if (evt.type === 'system' && evt.subtype === 'init' && evt.session_id) {
+      const { updateSession: updateSessionNow } = useSessionStore.getState();
+      updateSessionNow(messageKey, { claudeSessionId: evt.session_id }).catch((err: Error) => {
+        console.warn(`[handleClaudeEvent] Failed to save early claudeSessionId:`, err);
+      });
+      console.log(`[handleClaudeEvent] 🦆 Early save claudeSessionId ${evt.session_id.slice(0, 8)}... to session ${messageKey}`);
+    }
+
     console.log(`🎯 [${source}] Event received for agentId=${agentId}, writing to messageKey=${messageKey}:`, {
       type: claudeEvent.type,
       hasMessage: !!evt.message,
