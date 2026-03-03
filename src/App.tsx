@@ -827,6 +827,10 @@ function AppContent() {
   // This replaces the old isKanbanTabActive overlay approach
   const isKanbanTabActive = activeTabId === 'kanban-board';
   const isOfficeTabActive = activeTabId === 'office-view';
+  // Brain: fix-office-webgl-shader-remount
+  // Track if office was ever opened so we keep OfficeView mounted (hidden)
+  // even after tab close, preventing WebGL context loss → stale shader errors
+  const officeEverOpened = useRef(false);
 
   // 🦆 Display tabs: Task tabs are now real tabs in the tabs array (type: 'task')
   // No need to transform 'chat' tab anymore - tasks have their own dedicated tabs
@@ -2858,18 +2862,19 @@ function AppContent() {
     const tasksWithSessions = tasks.filter((t: KanbanTask) => t.sessionId);
 
     if (tasksWithSessions.length === 0) {
-      console.log('[loadKanbanChatSessions] No Kanban tasks with sessionIds to load');
       return;
     }
 
-    console.log(`[loadKanbanChatSessions] Loading ${tasksWithSessions.length} Kanban chat sessions...`);
+    let loadedFromStore = 0;
+    let loadedFromRust = 0;
+    let skipped = 0;
 
     // Load Quack storage first (contains full ChatMessage[] with events for tool widgets)
     let store: Awaited<ReturnType<typeof Store.load>> | null = null;
     try {
       store = await Store.load('quack-chats.json');
     } catch (error) {
-      console.warn('[loadKanbanChatSessions] Could not load quack-chats.json store:', error);
+      console.warn('[loadKanbanChatSessions] Could not load store:', error);
     }
 
     for (const task of tasksWithSessions) {
@@ -2909,9 +2914,6 @@ function AppContent() {
 
               if (shouldOverwrite) {
                 newSessions.set(task.id, savedChat.messages);
-                console.log(`[loadKanbanChatSessions] ✅ Updated messages for task ${task.id} (had: ${existingMessages?.length || 0}, now: ${savedChat.messages.length}, hasEvents: ${savedHasEvents})`);
-              } else {
-                console.log(`[loadKanbanChatSessions] 🛡️ PROTECTED: Keeping in-memory messages for task ${task.id} (${existingMessages?.length} msgs with events: ${existingHasEvents})`);
               }
 
               return newSessions;
@@ -2933,13 +2935,12 @@ function AppContent() {
               });
             }
 
-            console.log(`[loadKanbanChatSessions] Restored ${savedChat.messages.length} messages with events for task ${task.id} from Quack storage`);
+            loadedFromStore++;
             continue; // Successfully loaded, skip Rust backend fallback
           }
         }
 
         // Fallback: Load from Rust backend (loses events, shows raw text only)
-        console.log(`[loadKanbanChatSessions] Falling back to Rust backend for task ${task.id}`);
         const details = await invoke<{
           id: string;
           messages: Array<{ role: string; content: string; timestamp?: number }>;
@@ -2972,9 +2973,7 @@ function AppContent() {
             // 3. Neither has events (both poor quality, so refresh)
             if (!existingMessages || existingMessages.length === 0 || (!existingHasEvents && newHasEvents) || (!existingHasEvents && !newHasEvents)) {
               newSessions.set(task.id, chatMessages);
-              console.log(`[loadKanbanChatSessions] Loaded ${chatMessages.length} messages from Rust for task ${task.id} ${newHasEvents ? 'WITH EVENTS' : 'without events'}`);
             } else {
-              console.log(`[loadKanbanChatSessions] 🛡️ PROTECTED: Skipping Rust fallback for task ${task.id} - keeping in-memory messages with events. Session integrity preserved.`);
               return prev; // Don't modify - session is SACRED
             }
             return newSessions;
@@ -3007,19 +3006,19 @@ function AppContent() {
                 timestamp: Date.now(),
               });
               await store.save();
-              console.log(`[loadKanbanChatSessions] Saved ${chatMessages.length} messages ${hasEvents ? 'WITH EVENTS' : 'without events (no better data exists)'} to store for task ${task.id}`);
-            } else {
-              console.log(`[loadKanbanChatSessions] 🛡️ PROTECTED: Skipping save for task ${task.id} - would overwrite event-rich messages with event-less fallback data. Session integrity preserved.`);
             }
           }
 
-          console.log(`[loadKanbanChatSessions] Restored ${chatMessages.length} messages (raw text) for task ${task.id} from Rust backend`);
+          loadedFromRust++;
+        } else {
+          skipped++;
         }
       } catch (error) {
-        console.warn(`[loadKanbanChatSessions] Failed to load session ${task.sessionId} for task ${task.id}:`, error);
-        // Continue loading other sessions even if one fails
+        console.warn(`[loadKanbanChatSessions] Failed to load task ${task.id}:`, error);
       }
     }
+
+    console.log(`[loadKanbanChatSessions] Done: ${loadedFromStore} from store, ${loadedFromRust} from Rust, ${skipped} skipped (total: ${tasksWithSessions.length})`);
   }, []);
 
   // 🦆 Save Kanban chat session to persistent storage
@@ -11770,31 +11769,31 @@ You have access to all Bash tools to execute git commands like:
                 return null;
               })()}
 
-              {/* Office Tab View - isometric office with duck agents */}
-              {activeTabId === 'office-view' && (() => {
-                const activeTab = tabs.find(t => t.id === activeTabId);
-                if (activeTab?.type === 'office') {
-                  return (
-                    <OfficeTabView
-                      tab={activeTab}
-                      isActive={true}
-                      terminals={terminals}
-                      onRoomClick={(projectPath) => {
-                        const agent = terminals.find(t => t.cwd === projectPath);
-                        if (agent) {
-                          setActiveId(agent.id);
-                          setActiveTabId('chat');
-                        }
-                      }}
-                      onDuckClick={(agentId) => {
-                        setActiveId(agentId);
+              {/* Office Tab View - stays mounted forever once opened to preserve WebGL context */}
+              {/* Brain: fix-office-webgl-shader-remount */}
+              {(() => {
+                const officeTab = tabs.find(t => t.type === 'office');
+                if (officeTab) officeEverOpened.current = true;
+                if (!officeEverOpened.current) return null;
+                return (
+                  <OfficeTabView
+                    tab={officeTab ?? { id: 'office-view', label: 'Office', type: 'office' as const, closable: true }}
+                    isActive={isOfficeTabActive && !!officeTab}
+                    terminals={terminals}
+                    onRoomClick={(projectPath) => {
+                      const agent = terminals.find(t => t.cwd === projectPath);
+                      if (agent) {
+                        setActiveId(agent.id);
                         setActiveTabId('chat');
-                      }}
-                      onExitOffice={() => setActiveTabId('chat')}
-                    />
-                  );
-                }
-                return null;
+                      }
+                    }}
+                    onDuckClick={(agentId) => {
+                      setActiveId(agentId);
+                      setActiveTabId('chat');
+                    }}
+                    onExitOffice={() => setActiveTabId('chat')}
+                  />
+                );
               })()}
 
               {/* NOTE: Task tabs removed - tasks now open in agent's main Chat tab via activeTaskPerAgent state */}
