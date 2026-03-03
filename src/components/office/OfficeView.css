@@ -1,0 +1,177 @@
+/* Office View Container */
+.office-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0f0f1a;
+  cursor: grab;
+  user-select: none;
+}
+
+.office-container:active {
+  cursor: grabbing;
+}
+
+/* Header bar */
+.office-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(15, 15, 26, 0.95);
+  border-bottom: 1px solid rgba(58, 58, 92, 0.5);
+  height: 48px;
+  z-index: 10;
+  position: relative;
+}
+
+.office-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e0e0ee;
+  margin: 0;
+}
+
+.office-stats {
+  font-size: 12px;
+  color: #8888aa;
+  flex: 1;
+}
+
+.office-exit-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(58, 58, 92, 0.5);
+  background: rgba(30, 30, 58, 0.8);
+  color: #aaaacc;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.office-exit-btn:hover {
+  background: rgba(50, 50, 80, 0.9);
+  color: #ffffff;
+  border-color: #4a4a6e;
+}
+
+/* Tooltip */
+.office-tooltip {
+  background: rgba(20, 20, 40, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(58, 58, 92, 0.6);
+  border-radius: 8px;
+  padding: 8px 12px;
+  z-index: 100;
+  min-width: 120px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.office-tooltip-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e0e0ee;
+  margin-bottom: 4px;
+}
+
+.office-tooltip-status {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.office-tooltip-status.status-busy {
+  background: rgba(0, 255, 136, 0.15);
+  color: #00ff88;
+}
+
+.office-tooltip-status.status-idle {
+  background: rgba(255, 170, 0, 0.15);
+  color: #ffaa00;
+}
+
+.office-tooltip-task {
+  font-size: 11px;
+  color: #8888aa;
+  margin: 4px 0 0;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Action Menu */
+.office-action-menu {
+  background: rgba(20, 20, 40, 0.98);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(58, 58, 92, 0.6);
+  border-radius: 10px;
+  padding: 0;
+  z-index: 200;
+  min-width: 180px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.office-action-menu-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(58, 58, 92, 0.4);
+}
+
+.office-action-menu-header strong {
+  font-size: 13px;
+  color: #e0e0ee;
+}
+
+.office-action-menu-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.office-action-menu-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: #8888aa;
+  border-bottom: 1px solid rgba(58, 58, 92, 0.4);
+}
+
+.office-action-menu-branch {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #6366f1;
+}
+
+.office-action-menu-actions {
+  padding: 4px;
+}
+
+.office-action-menu-actions button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: #ccccee;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.1s ease;
+}
+
+.office-action-menu-actions button:hover {
+  background: rgba(99, 102, 241, 0.15);
+  color: #ffffff;
+}

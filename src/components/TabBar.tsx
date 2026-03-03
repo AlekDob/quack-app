@@ -7,7 +7,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'rule' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'project-dashboard' | 'image' | 'teammate-stream' | 'automation';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'rule' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'project-dashboard' | 'image' | 'teammate-stream' | 'automation' | 'office';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -381,6 +381,11 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                 <circle cx="12" cy="12" r="3" />
               </svg>
+            </span>
+          )}
+          {tab.type === 'office' && (
+            <span className="tab-icon" aria-hidden="true" style={{ fontSize: '14px' }}>
+              🏢
             </span>
           )}
           {tab.type === 'image' && (
