@@ -77,6 +77,7 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Automation session title lost: `documentation/bugs/fix-automation-session-title-missing.md`
 - Session reset after Stop: `documentation/bugs/fix-session-reset-after-stop.md`
 - Memory leak 14GB RAM: `documentation/bugs/fix-memory-leak-14gb-ram.md`
+- Shell env GUI launch: `documentation/gotchas/gotcha-shell-env-gui-launch.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

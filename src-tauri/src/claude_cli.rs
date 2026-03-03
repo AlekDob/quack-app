@@ -287,6 +287,10 @@ async fn ensure_daemon(app: &AppHandle) -> Result<(), String> {
     // Individual query auth is handled per-query via env vars set before daemon spawn
     // For now, inherit process env (ANTHROPIC_API_KEY, OAuth, etc.)
 
+    // Use the user's full login-shell PATH as base (captures NVM, Homebrew, etc.
+    // even when Quack is launched from Finder with minimal env).
+    // Brain: fix-shell-env-gui-launch
+    let base_path = crate::shell_env::get_login_path();
     let using_sidecar = node_path.to_string_lossy().contains("node-sidecar");
     if using_sidecar {
         command.env_remove("NVM_DIR");
@@ -294,17 +298,14 @@ async fn ensure_daemon(app: &AppHandle) -> Result<(), String> {
         command.env_remove("NVM_INC");
         command.env_remove("VOLTA_HOME");
         command.env_remove("NODE_PATH");
-        if let Ok(current_path) = std::env::var("PATH") {
-            let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
-            let clean: Vec<&str> = current_path.split(sep)
-                .filter(|p| !p.contains(".nvm/") && !p.contains(".volta/"))
-                .collect();
-            command.env("PATH", clean.join(sep));
-        }
-    } else if let Some(node_dir) = node_path.parent() {
-        let current_path = std::env::var("PATH").unwrap_or_default();
         let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
-        command.env("PATH", format!("{}{}{}", node_dir.to_string_lossy(), sep, current_path));
+        let clean: Vec<&str> = base_path.split(sep)
+            .filter(|p| !p.contains(".nvm/") && !p.contains(".volta/"))
+            .collect();
+        command.env("PATH", clean.join(sep));
+    } else if let Some(node_dir) = node_path.parent() {
+        let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
+        command.env("PATH", format!("{}{}{}", node_dir.to_string_lossy(), sep, base_path));
     }
 
     // Set Anthropic credentials from environment or credential files

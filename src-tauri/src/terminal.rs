@@ -12,6 +12,7 @@ use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize}
 use regex::Regex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
+use tauri_plugin_store::StoreExt;
 use uuid::Uuid;
 
 #[derive(Default)]
@@ -454,8 +455,27 @@ fn spawn_process(app: &AppHandle, id: &str, cwd: &Path) -> Result<TerminalProces
     })
     .context("Impossibile aprire il PTY")?;
 
-  let shell = detect_shell();
-  let mut cmd = CommandBuilder::new(shell);
+  // Read shell preference from store (if available)
+  let preferred_shell = app.store("app-preferences.json").ok()
+    .and_then(|store| store.get("preferences"))
+    .and_then(|v| serde_json::from_value::<serde_json::Value>(v.clone()).ok())
+    .and_then(|v| v.get("default_shell")?.as_str().map(|s| s.to_string()));
+
+  let shell = detect_shell_with_preference(preferred_shell.as_deref());
+  let mut cmd = CommandBuilder::new(&shell);
+
+  // Spawn as login shell so user profiles (.zshrc, .bash_profile) are sourced.
+  // This ensures PATH from NVM, Volta, Homebrew, etc. is available.
+  // We also inject the login-shell PATH as a baseline so the shell starts with
+  // the user's PATH even before the profile finishes loading.
+  // Brain: fix-shell-env-gui-launch
+  #[cfg(not(target_os = "windows"))]
+  cmd.arg("-l");
+
+  // Set the login-shell PATH so tools are discoverable immediately.
+  // The -l flag will re-source profiles which may override this, but having
+  // it set upfront ensures the shell startup scripts themselves can find tools.
+  cmd.env("PATH", crate::shell_env::get_login_path());
   cmd.env("TERM", "xterm-256color");
   cmd.cwd(cwd);
 
@@ -645,8 +665,17 @@ fn compile_info(id: &str, session: &TerminalSession) -> TerminalInfo {
   }
 }
 
-fn detect_shell() -> String {
-  // Try SHELL env var first (Unix)
+/// Detect the shell to use. If `preferred` is Some and the path exists, use it.
+/// Otherwise fall back to $SHELL env var, then platform defaults.
+fn detect_shell_with_preference(preferred: Option<&str>) -> String {
+  // Check user preference first
+  if let Some(pref) = preferred {
+    if !pref.is_empty() && std::path::Path::new(pref).exists() {
+      return pref.to_string();
+    }
+  }
+
+  // Try SHELL env var (Unix)
   if let Ok(shell) = std::env::var("SHELL") {
     return shell;
   }
@@ -747,9 +776,13 @@ fn execute_command_impl(command: String, cwd: String) -> Result<CommandResult> {
   let program = parts[0];
   let args = &parts[1..];
 
-  // Execute the command
+  // Execute the command with the user's login-shell PATH so tools like
+  // 'idea', 'ng', etc. installed via NVM/Homebrew are discoverable.
+  // Brain: fix-shell-env-gui-launch
   let mut cmd = Command::new(program);
-  cmd.args(args).current_dir(cwd_path);
+  cmd.args(args)
+    .current_dir(cwd_path)
+    .env("PATH", crate::shell_env::get_login_path());
 
   // Windows: Hide console window
   #[cfg(target_os = "windows")]

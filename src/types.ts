@@ -735,7 +735,6 @@ export interface ClaudeContentBlockStopEvent extends ClaudeEventBase {
   session_id?: string;
 }
 
-// Brain: gotcha-stamina-overhead-static-estimate
 export interface ClaudePromptTokenCountEvent extends ClaudeEventBase {
   type: 'prompt_token_count';
   promptTokens: number;

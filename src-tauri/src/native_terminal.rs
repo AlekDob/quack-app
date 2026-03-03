@@ -310,7 +310,7 @@ fn open_native_terminal_impl(request: NativeTerminalRequest) -> Result<NativeTer
             tell application "Terminal"
                 activate
                 -- Do everything in a single do script to avoid opening multiple windows
-                set newTab to do script "cd '{}' && clear; export PS1='\\[\\033]0;Terminal: {}\\007\\]$PS1'; exec $SHELL"
+                set newTab to do script "cd '{}' && clear; export PS1='\\[\\033]0;Terminal: {}\\007\\]$PS1'; exec $SHELL -l"
                 -- Also set custom title property for reliable searching later
                 set custom title of newTab to "Terminal: {}"
             end tell
