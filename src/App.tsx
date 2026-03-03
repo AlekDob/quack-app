@@ -1350,8 +1350,7 @@ function AppContent() {
     //   measuredOverhead = contextWindowFill - promptTokens
     // This gives a PRECISE overhead measurement, replacing the static estimate.
     if (claudeEvent.type === 'prompt_token_count') {
-      const promptEvt = claudeEvent as any;
-      const promptTokens = promptEvt.promptTokens;
+      const promptTokens = claudeEvent.promptTokens;
       if (promptTokens && promptTokens > 0) {
         console.log(`[${source}] 🎯 Precise prompt token count for messageKey=${messageKey}: ${promptTokens}`);
         setChatTokensMap((prev) => {

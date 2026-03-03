@@ -598,7 +598,7 @@ export interface AgentModePresets {
 
 // Claude CLI Event types (matching Rust backend + Claude Agent SDK)
 export interface ClaudeEventBase {
-  type: 'system' | 'assistant' | 'user' | 'result' | 'agent' | 'error' | 'message_start' | 'message_delta' | 'message_stop' | 'content_block_start' | 'content_block_delta' | 'content_block_stop';
+  type: 'system' | 'assistant' | 'user' | 'result' | 'agent' | 'error' | 'message_start' | 'message_delta' | 'message_stop' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'prompt_token_count';
 }
 
 export interface ClaudeSystemEvent extends ClaudeEventBase {
@@ -735,6 +735,11 @@ export interface ClaudeContentBlockStopEvent extends ClaudeEventBase {
   session_id?: string;
 }
 
+export interface ClaudePromptTokenCountEvent extends ClaudeEventBase {
+  type: 'prompt_token_count';
+  promptTokens: number;
+}
+
 export type ClaudeEvent =
   | ClaudeSystemEvent
   | ClaudeAssistantEvent
@@ -747,7 +752,8 @@ export type ClaudeEvent =
   | ClaudeMessageStopEvent
   | ClaudeContentBlockStartEvent
   | ClaudeContentBlockDeltaEvent
-  | ClaudeContentBlockStopEvent;
+  | ClaudeContentBlockStopEvent
+  | ClaudePromptTokenCountEvent;
 
 // ============================================
 // AskUserQuestion Types (SDK v0.1.71+)
