@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useCallback } from 'react';
-import type { TerminalInfo } from '../../types';
+import type { TerminalInfo, ChatMessage } from '../../types';
 import type { ActionMenuData } from './officeTypes';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
@@ -12,17 +12,32 @@ interface OfficeActionMenuProps {
   onClose: () => void;
 }
 
-/** Same logic as AgentSessionItem.getActivityDotColor */
+/**
+ * DRY: Exact same logic as AgentSessionItem.getActivityDotColor (CSS string).
+ * Priority: Awaiting (purple) > Working (yellow) > Ready (green) > Empty (gray)
+ */
 function getSessionDotColor(
   sessionId: string,
   chatLoadingMap: Map<string, boolean>,
   pendingQuestionsMap: Map<string, Set<string>>,
+  chatSessions: Map<string, ChatMessage[]>,
 ): string {
   const hasPending = (pendingQuestionsMap.get(sessionId)?.size ?? 0) > 0;
-  if (hasPending) return '#a855f7'; // Purple - awaiting user
+  if (hasPending) return '#a855f7';
+
   const isLoading = chatLoadingMap.get(sessionId) ?? false;
-  if (isLoading) return '#f59e0b'; // Yellow - working
-  return '#22c55e'; // Green - active (default for in_progress sessions)
+  const messages = chatSessions.get(sessionId) ?? [];
+  const lastMessage = messages[messages.length - 1];
+  const isStreaming = lastMessage?.role === 'assistant' && lastMessage.status === 'streaming';
+  if (isLoading || isStreaming) return '#f59e0b';
+
+  const isDormant = messages.length === 0 || !messages.some(m => m.role === 'user');
+  if (!isDormant && lastMessage?.role === 'assistant'
+    && (lastMessage.status === 'complete' || lastMessage.status === undefined)) {
+    return '#22c55e';
+  }
+
+  return '#6b7280';
 }
 
 export default function OfficeActionMenu({
@@ -37,6 +52,7 @@ export default function OfficeActionMenu({
   const sessions = useSessionStore(state => state.sessions);
   const chatLoadingMap = useChatStore(state => state.chatLoadingMap);
   const pendingQuestionsMap = useChatStore(state => state.pendingQuestionsMap);
+  const chatSessions = useChatStore(state => state.chatSessions);
 
   // Only active sessions (in_progress)
   const agentSessions = useMemo(() => {
@@ -103,7 +119,7 @@ export default function OfficeActionMenu({
             >
               <span
                 className="office-session-dot"
-                style={{ backgroundColor: getSessionDotColor(s.id, chatLoadingMap, pendingQuestionsMap) }}
+                style={{ backgroundColor: getSessionDotColor(s.id, chatLoadingMap, pendingQuestionsMap, chatSessions) }}
               />
               <span className="office-session-title">
                 {s.title || 'Untitled'}

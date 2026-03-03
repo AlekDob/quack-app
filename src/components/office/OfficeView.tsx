@@ -5,22 +5,42 @@ import OfficeScene from './OfficeScene';
 import OfficeTooltip from './OfficeTooltip';
 import OfficeActionMenu from './OfficeActionMenu';
 import { computeRoomPositions, computeBreakRoomPosition } from './officeLayout';
-import type { TerminalInfo } from '../../types';
+import type { TerminalInfo, ChatMessage } from '../../types';
 import type { TooltipData, ActionMenuData } from './officeTypes';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
 import './OfficeView.css';
 
-/** Same color logic as AgentSessionItem.getActivityDotColor (hex int for PixiJS) */
+/**
+ * DRY: Exact same logic as AgentSessionItem.getActivityDotColor, but returns hex int for PixiJS.
+ * Priority: Awaiting (purple) > Working (yellow) > Ready (green) > Empty (gray)
+ */
 function getSessionDotHex(
   sessionId: string,
   chatLoadingMap: Map<string, boolean>,
   pendingQuestionsMap: Map<string, Set<string>>,
+  chatSessions: Map<string, ChatMessage[]>,
 ): number {
+  // 1. Purple: pending user question (highest priority)
   const hasPending = (pendingQuestionsMap.get(sessionId)?.size ?? 0) > 0;
-  if (hasPending) return 0xa855f7; // Purple
-  if (chatLoadingMap.get(sessionId)) return 0xf59e0b; // Yellow
-  return 0x22c55e; // Green
+  if (hasPending) return 0xa855f7;
+
+  // 2. Yellow: isActuallyLoading (chatLoadingMap OR last message streaming)
+  const isLoading = chatLoadingMap.get(sessionId) ?? false;
+  const messages = chatSessions.get(sessionId) ?? [];
+  const lastMessage = messages[messages.length - 1];
+  const isStreaming = lastMessage?.role === 'assistant' && lastMessage.status === 'streaming';
+  if (isLoading || isStreaming) return 0xf59e0b;
+
+  // 3. Green: agent ready (last assistant message is complete)
+  const isDormant = messages.length === 0 || !messages.some(m => m.role === 'user');
+  if (!isDormant && lastMessage?.role === 'assistant'
+    && (lastMessage.status === 'complete' || lastMessage.status === undefined)) {
+    return 0x22c55e;
+  }
+
+  // 4. Gray: empty or dormant
+  return 0x6b7280;
 }
 
 // Register PixiJS components once at module level
@@ -86,19 +106,21 @@ export default function OfficeView({
   // DRY: compute session dot colors in DOM tree (Zustand works here)
   // then pass down as props to PixiJS tree where Zustand subscriptions don't trigger re-renders
   // Brain: fix-office-status-dot-chatloadingmap-key-mismatch
+  // DRY: read ALL the same stores that AgentSessionList reads
   const chatLoadingMap = useChatStore(state => state.chatLoadingMap);
   const pendingQuestionsMap = useChatStore(state => state.pendingQuestionsMap);
+  const chatSessions = useChatStore(state => state.chatSessions);
   const agentDotColors = useMemo(() => {
     const map = new Map<string, number[]>();
     for (const t of activeTerminals) {
       const agentSessions = sessions
         .filter(s => s.agentId === t.id && s.status === 'in_progress');
       map.set(t.id, agentSessions.map(s =>
-        getSessionDotHex(s.id, chatLoadingMap, pendingQuestionsMap),
+        getSessionDotHex(s.id, chatLoadingMap, pendingQuestionsMap, chatSessions),
       ));
     }
     return map;
-  }, [activeTerminals, sessions, chatLoadingMap, pendingQuestionsMap]);
+  }, [activeTerminals, sessions, chatLoadingMap, pendingQuestionsMap, chatSessions]);
 
   // Track container size for Application
   const hasCentered = useRef(false);
