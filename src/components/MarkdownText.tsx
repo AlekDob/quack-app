@@ -142,6 +142,12 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
     };
 
     const processInlineMarkdown = (line: string): string => {
+      // Links: [text](url) - must be processed BEFORE bold/italic to avoid conflicts
+      line = line.replace(
+        /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener noreferrer" class="md-link">$1</a>'
+      );
+
       // Bold: **text** or __text__ (must be processed BEFORE italic)
       line = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
       line = line.replace(/__(.+?)__/g, '<strong>$1</strong>');

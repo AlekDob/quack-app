@@ -27,32 +27,9 @@ export function shouldArchiveSession(session: AgentSession): boolean {
   return session.messageCount > MAX_MESSAGES_PER_SESSION;
 }
 
-/**
- * Write lock to prevent race conditions between local writes and file watcher reloads.
- * When a write operation is in progress, the polling hook should skip reloads.
- */
-export const sessionWriteLock = {
-  /** Timestamp of last write operation */
-  lastWriteAt: 0,
-  /** Debounce period in ms - ignore file watcher events for this duration after a write */
-  DEBOUNCE_MS: 500,
-
-  /** Mark that a write operation just happened */
-  markWrite() {
-    this.lastWriteAt = Date.now();
-    console.log('[sessionWriteLock] Write marked at', this.lastWriteAt);
-  },
-
-  /** Check if we should skip a reload (within debounce period of last write) */
-  shouldSkipReload(): boolean {
-    const elapsed = Date.now() - this.lastWriteAt;
-    const skip = elapsed < this.DEBOUNCE_MS;
-    if (skip) {
-      console.log(`[sessionWriteLock] Skipping reload (${elapsed}ms since last write, debounce: ${this.DEBOUNCE_MS}ms)`);
-    }
-    return skip;
-  }
-};
+// Brain: fix-automation-session-title-missing
+// Re-export from extracted module to avoid circular dependency with unifiedAgentStorage
+export { sessionWriteLock } from './sessionWriteLock';
 
 interface SessionState {
   // State
@@ -148,6 +125,19 @@ export const useSessionStore = create<SessionState>()(
           const sessions = get().sessions.map((session) => {
             if (session.id === id) {
               const updatedSession = { ...session, ...updates, updatedAt: Date.now() };
+
+              // Brain: fix-automation-session-title-missing
+              // Defense-in-depth: ensure required fields are never lost during updates.
+              // Race conditions between store.reload() and store.save() can cause
+              // the base session object to lose title/status, resulting in "Untitled" sessions.
+              if (!updatedSession.title) {
+                console.warn(`[sessionStore] ⚠️ Session ${id} lost title during update — restoring from original`);
+                updatedSession.title = session.title || `Session ${id.slice(-6)}`;
+              }
+              if (!updatedSession.status) {
+                console.warn(`[sessionStore] ⚠️ Session ${id} lost status during update — restoring from original`);
+                updatedSession.status = session.status || 'in_progress';
+              }
 
               // Check if session has exceeded message limit (soft warning)
               if (shouldArchiveSession(updatedSession)) {

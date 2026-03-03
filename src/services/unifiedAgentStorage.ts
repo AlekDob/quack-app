@@ -17,6 +17,8 @@ import { Store } from "@tauri-apps/plugin-store";
 import { toast } from "sonner";
 import { getTestModeStoreName } from "../utils/testModeStorage";
 import type { AgentPersonality, AgentSession } from "../types";
+// Brain: fix-automation-session-title-missing
+import { sessionWriteLock } from "../stores/sessionWriteLock";
 
 // ============================================
 // Types
@@ -335,12 +337,17 @@ export async function loadAgentSessions(): Promise<AgentSession[]> {
   try {
     const store = await getStore();
 
-    // Force reload from disk to catch external changes
-    try {
-      await store.reload();
-      console.log("[unifiedAgentStorage] Store reloaded from disk");
-    } catch (reloadError) {
-      console.warn("[unifiedAgentStorage] Failed to reload sessions from disk:", reloadError);
+    // Brain: fix-automation-session-title-missing
+    // Skip reload if a write was recently done — prevents race condition where
+    // store.reload() overwrites in-memory data before store.save() completes,
+    // causing fields like title/status to be lost from newly created sessions.
+    if (!sessionWriteLock.shouldSkipReload()) {
+      try {
+        await store.reload();
+        console.log("[unifiedAgentStorage] Store reloaded from disk");
+      } catch (reloadError) {
+        console.warn("[unifiedAgentStorage] Failed to reload sessions from disk:", reloadError);
+      }
     }
 
     const stored = await store.get<AgentSession[]>(SESSIONS_KEY);
@@ -401,6 +408,15 @@ export async function loadAgentSessions(): Promise<AgentSession[]> {
  */
 export async function saveAgentSessions(sessions: AgentSession[]): Promise<void> {
   try {
+    // Brain: fix-automation-session-title-missing
+    // Defense-in-depth: detect and warn about sessions with missing required fields
+    // This should never happen, but catches race conditions before they corrupt disk data
+    for (const s of sessions) {
+      if (!s.title || !s.status) {
+        console.warn(`[unifiedAgentStorage] ⚠️ Saving session ${s.id} with missing fields: title="${s.title}", status="${s.status}"`);
+      }
+    }
+
     const store = await getStore();
     await store.set(SESSIONS_KEY, sessions);
     await store.save();

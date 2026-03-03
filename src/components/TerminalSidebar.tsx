@@ -1527,22 +1527,6 @@ export default function TerminalSidebar({
             </button>
           )}
 
-          {/* Saved Commands */}
-          {onOpenSavedCommands && (
-            <button
-              type="button"
-              className="sidebar-footer-link"
-              onClick={onOpenSavedCommands}
-              title="Saved Commands"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="4 17 10 11 4 5"/>
-                <line x1="12" y1="19" x2="20" y2="19"/>
-              </svg>
-              <span>Commands</span>
-            </button>
-          )}
-
           {/* Docs */}
           <button
             type="button"
@@ -1557,44 +1541,15 @@ export default function TerminalSidebar({
             <span>Docs</span>
           </button>
 
-          {/* Setup — Gumroad */}
-          <button
-            type="button"
-            className="sidebar-footer-link sidebar-footer-setup"
-            onClick={() => open('https://alekdob.gumroad.com/l/tsvgt')}
-            title="Setup & onboarding — €79"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9"/>
-              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
-            <span>Setup</span>
-          </button>
-
-          {/* Experts */}
-          <button
-            type="button"
-            className="sidebar-footer-link sidebar-footer-experts"
-            onClick={() => open('https://quack.build/experts')}
-            title="Meet our Quack Experts"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            <span>Experts</span>
-          </button>
-
-          {/* Buy us a pizza (icon only) */}
+          {/* Support Quack — pizza */}
           <button
             type="button"
             className="sidebar-footer-link sidebar-footer-pizza"
             onClick={() => open('https://alekdob.gumroad.com/l/obgae')}
-            title="Buy us a pizza!"
+            title="Support Quack!"
           >
             <span style={{ fontSize: '12px' }}>🍕</span>
+            <span>Fund a Pizza</span>
           </button>
         </div>
 

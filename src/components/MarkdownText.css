@@ -199,6 +199,19 @@
   margin: 3px 0;
 }
 
+/* Links */
+.md-link {
+  color: #00D9FF;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(0, 217, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.md-link:hover {
+  color: #33e2ff;
+  border-bottom-color: rgba(0, 217, 255, 0.6);
+}
+
 /* Bold */
 strong {
   font-weight: 600;

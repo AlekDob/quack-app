@@ -427,25 +427,28 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
           {!isUser && currentSessionId && (
             <SessionIdDisplay sessionId={currentSessionId} />
           )}
-          {isLastUserMessage && isUser && (
+          {isUser && (isLastUserMessage || isMessageTruncated) && (
             <div className="sticky-message-actions">
-              <button
-                className={`sticky-action-btn ${isCopied ? 'copied' : ''}`}
-                onClick={handleCopyMessage}
-                title={isCopied ? "Copied!" : "Copy full message"}
-              >
-                {isCopied ? (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="20 6 9 17 4 12"></polyline>
-                  </svg>
-                ) : (
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                  </svg>
-                )}
-              </button>
-              {/* Only show expand button if message is actually truncated */}
+              {/* Copy button only on last (sticky) user message */}
+              {isLastUserMessage && (
+                <button
+                  className={`sticky-action-btn ${isCopied ? 'copied' : ''}`}
+                  onClick={handleCopyMessage}
+                  title={isCopied ? "Copied!" : "Copy full message"}
+                >
+                  {isCopied ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  )}
+                </button>
+              )}
+              {/* Expand button on ALL truncated user messages */}
               {isMessageTruncated && (
                 <button
                   className="sticky-action-btn"
