@@ -1643,6 +1643,7 @@ export interface KanbanTask {
 export type ShortcutActionId =
   | 'toggleKanban'
   | 'toggleAutomation'
+  | 'toggleOffice'
   | 'openTerminalWindow'
   | 'toggleSidePanel'
   | 'newAgent'

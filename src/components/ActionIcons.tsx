@@ -377,7 +377,7 @@ function ActionIcons({
 
       {/* Office Icon */}
       {onOfficeClick && (
-        <KeyboardShortcutTooltip label="Office" shortcut="">
+        <KeyboardShortcutTooltip label="Office" shortcut="⌘O">
           <button
             type="button"
             className={`action-icon ${isOfficeActive ? 'active' : ''}`}

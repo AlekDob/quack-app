@@ -52,6 +52,13 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = (() =
       defaultKeys: buildShortcut("J"),
       currentKeys: buildShortcut("J"),
     },
+    toggleOffice: {
+      id: "toggleOffice" as const,
+      label: "Toggle Office",
+      description: "Open or close the Office view",
+      defaultKeys: buildShortcut("O"),
+      currentKeys: buildShortcut("O"),
+    },
     openTerminalWindow: {
       id: "openTerminalWindow" as const,
       label: "Terminal Window",

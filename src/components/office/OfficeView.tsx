@@ -1,21 +1,57 @@
 import { useRef, useState, useCallback, useMemo, useEffect } from 'react';
 import { Application, extend } from '@pixi/react';
-import { Container, Graphics, Text } from 'pixi.js';
+import { Container, Graphics, Text, Sprite, Application as PixiApplication } from 'pixi.js';
 import OfficeScene from './OfficeScene';
 import OfficeTooltip from './OfficeTooltip';
 import OfficeActionMenu from './OfficeActionMenu';
-import { computeRoomPositions } from './officeLayout';
+import { computeRoomPositions, computeBreakRoomPosition } from './officeLayout';
 import type { TerminalInfo } from '../../types';
 import type { TooltipData, ActionMenuData } from './officeTypes';
+import { useSessionStore } from '../../stores/sessionStore';
+import { useChatStore } from '../../stores/chatStore';
 import './OfficeView.css';
 
+/** Same color logic as AgentSessionItem.getActivityDotColor (hex int for PixiJS) */
+function getSessionDotHex(
+  sessionId: string,
+  chatLoadingMap: Map<string, boolean>,
+  pendingQuestionsMap: Map<string, Set<string>>,
+): number {
+  const hasPending = (pendingQuestionsMap.get(sessionId)?.size ?? 0) > 0;
+  if (hasPending) return 0xa855f7; // Purple
+  if (chatLoadingMap.get(sessionId)) return 0xf59e0b; // Yellow
+  return 0x22c55e; // Green
+}
+
 // Register PixiJS components once at module level
-extend({ Container, Graphics, Text });
+extend({ Container, Graphics, Text, Sprite });
+
+// Brain: fix-office-pixi-cancelresize-remount
+// Patch Application.prototype.destroy to catch _cancelResize TypeError.
+// Root cause: @pixi/react v8 calls app.destroy() inside its internal reconciler's
+// commitCallbacks phase. If ResizePlugin.init() never completed (async race),
+// _cancelResize is undefined → TypeError → reconciler marks root as
+// RootFatalErrored → ALL future rendering stops → blank canvas.
+// Wrapping destroy in try-catch prevents the error from reaching the reconciler.
+const origAppDestroy = PixiApplication.prototype.destroy;
+PixiApplication.prototype.destroy = function (
+  ...args: Parameters<typeof origAppDestroy>
+) {
+  try {
+    origAppDestroy.apply(this, args);
+  } catch (err) {
+    if (err instanceof TypeError && String(err).includes('_cancelResize')) {
+      return;
+    }
+    throw err;
+  }
+};
 
 interface OfficeViewProps {
   terminals: TerminalInfo[];
   onRoomClick?: (projectPath: string) => void;
   onDuckClick?: (agentId: string) => void;
+  onSessionClick?: (sessionId: string) => void;
   onExitOffice?: () => void;
 }
 
@@ -23,26 +59,64 @@ export default function OfficeView({
   terminals,
   onRoomClick,
   onDuckClick,
+  onSessionClick,
   onExitOffice,
 }: OfficeViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [viewport, setViewport] = useState({ zoom: 0.8, panX: 400, panY: 80 });
+  // Center viewport on the relax room at grid (0,0).
+  // gridToIso(0,0) = (0,0), so we just need half container size as offset.
+  const [viewport, setViewport] = useState({ zoom: 0.8, panX: 0, panY: 0 });
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const [actionMenu, setActionMenu] = useState<ActionMenuData | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const [containerSize, setContainerSize] = useState({ w: 0, h: 0 });
 
-  const rooms = useMemo(
-    () => computeRoomPositions(terminals),
-    [terminals]
-  );
+  // Filter: only agents with non-completed sessions
+  const sessions = useSessionStore(state => state.sessions);
+  const activeTerminals = useMemo(() => {
+    return terminals.filter(t =>
+      sessions.some(s => s.agentId === t.id && (s.status === 'todo' || s.status === 'in_progress'))
+    );
+  }, [terminals, sessions]);
+
+  const rooms = useMemo(() => computeRoomPositions(activeTerminals), [activeTerminals]);
+  const breakRoom = useMemo(() => computeBreakRoomPosition(rooms.length), [rooms.length]);
+
+  // DRY: compute session dot colors in DOM tree (Zustand works here)
+  // then pass down as props to PixiJS tree where Zustand subscriptions don't trigger re-renders
+  // Brain: fix-office-status-dot-chatloadingmap-key-mismatch
+  const chatLoadingMap = useChatStore(state => state.chatLoadingMap);
+  const pendingQuestionsMap = useChatStore(state => state.pendingQuestionsMap);
+  const agentDotColors = useMemo(() => {
+    const map = new Map<string, number[]>();
+    for (const t of activeTerminals) {
+      const agentSessions = sessions
+        .filter(s => s.agentId === t.id && s.status === 'in_progress');
+      map.set(t.id, agentSessions.map(s =>
+        getSessionDotHex(s.id, chatLoadingMap, pendingQuestionsMap),
+      ));
+    }
+    return map;
+  }, [activeTerminals, sessions, chatLoadingMap, pendingQuestionsMap]);
 
   // Track container size for Application
+  const hasCentered = useRef(false);
   useEffect(() => {
     if (!containerRef.current) return;
     const obs = new ResizeObserver(([entry]) => {
-      setContainerSize({ w: entry.contentRect.width, h: entry.contentRect.height });
+      const { width, height } = entry.contentRect;
+      setContainerSize({ w: width, h: height });
+      // Center viewport on grid origin (0,0) on first measurement
+      if (!hasCentered.current && width > 0) {
+        hasCentered.current = true;
+        const canvasH = height - 48; // subtract header
+        setViewport(prev => ({
+          ...prev,
+          panX: width / 2,
+          panY: canvasH / 2,
+        }));
+      }
     });
     obs.observe(containerRef.current);
     return () => obs.disconnect();
@@ -99,7 +173,7 @@ export default function OfficeView({
       <div className="office-header">
         <h2 className="office-title">Office</h2>
         <div className="office-stats">
-          {rooms.length} progetti &middot; {terminals.length} agenti
+          {rooms.length} progetti &middot; {activeTerminals.length} agenti attivi
         </div>
         <button className="office-exit-btn" onClick={onExitOffice}>
           Torna alla Chat
@@ -116,10 +190,13 @@ export default function OfficeView({
         >
           <OfficeScene
             rooms={rooms}
+            breakRoom={breakRoom}
             viewport={viewport}
+            agentDotColors={agentDotColors}
             onRoomClick={onRoomClick}
             onDuckHover={setTooltip}
             onDuckClick={(agentId, screenX, screenY) => {
+              console.log('[OfficeView] onDuckClick received:', agentId, screenX, screenY);
               setActionMenu({ agentId, screenX, screenY });
             }}
           />
@@ -133,6 +210,10 @@ export default function OfficeView({
           data={actionMenu}
           terminals={terminals}
           onGoToChat={handleDuckAction}
+          onSessionClick={(sessionId) => {
+            setActionMenu(null);
+            onSessionClick?.(sessionId);
+          }}
           onClose={() => setActionMenu(null)}
         />
       )}

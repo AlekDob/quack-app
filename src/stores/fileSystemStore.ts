@@ -2,10 +2,13 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { DirectoryEntry } from '../types';
 
+const MAX_CACHED_DIRS = 100;
+
 interface FileSystemState {
   // Explorer state
   explorerPath: string;
   explorerTree: Record<string, DirectoryEntry[]>;
+  explorerTreeOrder: string[];
   explorerRoot: string | null;
   loadingExplorer: boolean;
   explorerError: string | null;
@@ -84,6 +87,7 @@ export const useFileSystemStore = create<FileSystemState>()(
     // Initial state
     explorerPath: '',
     explorerTree: {},
+    explorerTreeOrder: [],
     explorerRoot: null,
     loadingExplorer: false,
     explorerError: null,
@@ -101,15 +105,23 @@ export const useFileSystemStore = create<FileSystemState>()(
 
     setExplorerTree: (tree) => set({ explorerTree: tree }),
 
-    addToExplorerTree: (path, entries) => set((state) => ({
-      explorerTree: {
-        ...state.explorerTree,
-        [path]: entries,
-      },
-    })),
+    addToExplorerTree: (path, entries) => set((state) => {
+      const newOrder = state.explorerTreeOrder.filter((p) => p !== path);
+      newOrder.push(path);
+
+      const newTree = { ...state.explorerTree, [path]: entries };
+
+      if (newOrder.length > MAX_CACHED_DIRS) {
+        const evicted = newOrder.shift()!;
+        delete newTree[evicted];
+      }
+
+      return { explorerTree: newTree, explorerTreeOrder: newOrder };
+    }),
 
     setExplorerRoot: (root) => set({
       explorerRoot: root,
+      explorerTreeOrder: [],
       expandedDirs: new Set(),
       selectedFile: null,
     }),

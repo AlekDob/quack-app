@@ -175,3 +175,45 @@
   background: rgba(99, 102, 241, 0.15);
   color: #ffffff;
 }
+
+/* Session list in action menu */
+.office-action-menu-sessions {
+  padding: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.office-session-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: #c0c0d0;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.1s ease;
+}
+
+.office-session-item:hover {
+  background: rgba(99, 102, 241, 0.15);
+  color: #ffffff;
+}
+
+.office-session-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+
+.office-session-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -217,6 +217,11 @@ export function canPopoutTab(tab: Tab): boolean {
     return false;
   }
 
+  // Office tab is a singleton view, no popout needed
+  if (tab.type === 'office') {
+    return false;
+  }
+
   // All other tab types can be popped out
   return true;
 }

@@ -298,12 +298,15 @@ async function pollChatMessages() {
   try {
     // Only fetch the tail — enough to detect new messages
     const pollLimit = Math.max(INITIAL_MSG_LIMIT, 5);
-    const [res, sessionInfo] = await Promise.all([
+    const [res, sessionInfo, agents] = await Promise.all([
       fetch(`${api.base()}/sessions/${state.chatSession.id}/messages?limit=${pollLimit}`, {
         headers: api.headers(),
       }),
       api.get(`/sessions/${state.chatSession.id}`).catch(() => null),
+      api.get('/agents').catch(() => null),
     ]);
+    // Keep agent status fresh while in chat view (auto-refresh skips chat)
+    if (agents) state.agents = agents;
     if (!res.ok) return;
     const tailMessages = await res.json();
     const serverTotal = parseInt(res.headers.get('x-total-count') || '0', 10);
@@ -311,6 +314,7 @@ async function pollChatMessages() {
     const hadCount = state.chatMessages.length;
     const lastContent = state.chatMessages[hadCount - 1]?.content || '';
     const wasActive = isSessionActive(state.chatSession);
+    const wasAgentBusy = isAgentBusy(state.chatSession.agentId);
     const prevTotal = state.chatTotalMessages;
 
     // How many new messages appeared on server since our last fetch
@@ -347,10 +351,11 @@ async function pollChatMessages() {
     }
 
     const nowActive = isSessionActive(state.chatSession);
+    const nowAgentBusy = isAgentBusy(state.chatSession.agentId);
     const currentCount = state.chatMessages.length;
     const newLastContent = state.chatMessages[currentCount - 1]?.content || '';
 
-    if (currentCount !== hadCount || newLastContent !== lastContent || wasActive !== nowActive) {
+    if (currentCount !== hadCount || newLastContent !== lastContent || wasActive !== nowActive || wasAgentBusy !== nowAgentBusy) {
       render();
       scrollChatToBottom();
       // Notify when a new assistant message arrives
@@ -636,6 +641,13 @@ function sortAgentsInRepo(agents) {
   });
 }
 
+// Brain: gotcha-mobile-session-dot-status
+// Single source of truth for agent busy state — used by list AND chat view
+function isAgentBusy(agentId) {
+  const agent = state.agents.find(a => a.id === agentId);
+  return agent && (agent.status === 'busy' || agent.status === 'running');
+}
+
 // Mirror Mac dot colors: yellow=agent busy, green=agent idle/ready
 function getSessionDotClass(agentStatus, isNewest) {
   const agentBusy = agentStatus === 'running' || agentStatus === 'busy';
@@ -826,7 +838,7 @@ function renderChat() {
           <div class="chat-header-agent">${esc(agentName)}</div>
         </div>
         <div class="chat-header-live">
-          <span class="ws-dot ${state.wsConnected ? 'connected' : 'disconnected'}"></span>
+          <span class="session-dot ${getSessionDotClass(agent?.status, true)}"></span>
         </div>
       </div>
       <div class="chat-messages" id="chat-messages">
@@ -841,7 +853,7 @@ function renderChat() {
                       : '<span>Load older messages</span>'}</div>`
                   : '';
                 const lastMsg = state.chatMessages[state.chatMessages.length - 1];
-                const showTyping = isSessionActive(s) && (!lastMsg || lastMsg.role === 'user');
+                const showTyping = isAgentBusy(s.agentId) && (!lastMsg || lastMsg.role === 'user');
                 return loadMoreHtml + state.chatMessages.map(m => {
                   if (m.role === 'tool') {
                     return `<div class="tool-uses">${m.content.split('\n').map(t =>

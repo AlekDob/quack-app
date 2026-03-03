@@ -2,7 +2,7 @@
 type: gotcha
 project: quack-app
 created: 2026-03-01
-last_verified: 2026-03-02
+last_verified: 2026-03-03
 tags: [remote-api, mobile-dashboard, session-status, dot-color]
 ---
 # Gotcha: Mobile Session Dot Color Depends on Agent Status, Not Session Status
@@ -92,6 +92,20 @@ There's a gap between "message sent to SDK" and "first `assistant` event receive
 2. `handle_send_message` in `remote_api.rs` (mobile send message)
 3. `send_message_via_sdk_streaming` in `claude_cli.rs` (function entry)
 
+## Chat View Must Use Agent Status Too (2026-03-03)
+
+The chat view (opened when tapping a session) had a separate problem: it used `session.status` via `isSessionActive()` for the typing indicator, and showed a `ws-dot` (WebSocket connected = always green) instead of the agent status dot. This caused:
+
+1. **Green dot in chat** when agent was busy (ws-dot shows connection, not activity)
+2. **No typing indicator** because `isSessionActive()` + last-message check is unreliable
+3. **Stale status** because `startAutoRefresh()` skips when `state.chatSession` is set
+
+**Fix** (DRY approach):
+- `isAgentBusy(agentId)` — single source of truth helper, used by both list and chat
+- Chat header: replaced `ws-dot` with `session-dot` using `getSessionDotClass(agent.status, true)`
+- Typing indicator: `isAgentBusy(s.agentId)` instead of `isSessionActive(s)`
+- `pollChatMessages()` now also fetches `/api/agents` to keep agent status fresh during chat view
+
 ## Key Insight
 
 `session.status` ≠ real-time activity. Use `agent.status` to determine if work is happening NOW — but only if the status comes from the in-memory `AGENT_STATUS` global, not from disk.
@@ -101,7 +115,7 @@ There's a gap between "message sent to SDK" and "first `assistant` event receive
 - `src-tauri/src/lib.rs` — `AGENT_STATUS` global static definition
 - `src-tauri/src/claude_cli.rs` — `daemon_stdout_reader` and legacy streaming (write to map)
 - `src-tauri/src/remote_api.rs` — `handle_list_agents` (read from map)
-- `src-tauri/static/app.js` — `getSessionDotClass()` function
+- `src-tauri/static/app.js` — `isAgentBusy()`, `getSessionDotClass()`, `renderChat()`, `pollChatMessages()`
 - `src-tauri/static/style.css` — `.session-dot.working`, `.session-dot.ready` classes
 - `src-tauri/src/remote_dashboard.rs` — Cache-Control headers on JS/CSS
 - `src/components/AgentSessionItem.tsx` — Mac reference implementation (`getActivityDotColor`)

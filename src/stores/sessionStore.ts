@@ -12,6 +12,7 @@ import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { AgentSession, AgentSessionStatus } from '../types';
 import { loadAgentSessions, saveAgentSessions } from '../services/unifiedAgentStorage';
+import { sessionWriteLock } from './sessionWriteLock';
 
 /**
  * Maximum messages allowed per session before archiving is recommended

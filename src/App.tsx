@@ -1056,6 +1056,66 @@ function AppContent() {
   const [pendingQuestionIdsMap, setPendingQuestionIdsMap] = useState<Map<string, Set<string>>>(new Map());
   const [answeredQuestionsMap, setAnsweredQuestionsMap] = useState<Map<string, Map<string, AskUserQuestionAnswers>>>(new Map());
 
+  // Brain: fix-memory-leak-14gb-ram — cap messages per session to prevent unbounded growth
+  const MAX_MESSAGES_PER_SESSION = 500;
+  // Auto-trim: cap messages per session to prevent unbounded memory growth
+  // Runs after any setChatSessions update — catches ALL code paths with zero refactoring risk
+  useEffect(() => {
+    let needsTrim = false;
+    for (const [, messages] of chatSessions) {
+      if (messages.length > MAX_MESSAGES_PER_SESSION) { needsTrim = true; break; }
+    }
+    if (!needsTrim) return;
+    setChatSessions(prev => {
+      const trimmed = new Map(prev);
+      for (const [key, messages] of trimmed) {
+        if (messages.length > MAX_MESSAGES_PER_SESSION) {
+          trimmed.set(key, messages.slice(-MAX_MESSAGES_PER_SESSION));
+        }
+      }
+      return trimmed;
+    });
+  }, [chatSessions]);
+
+  // Brain: fix-memory-leak-14gb-ram
+  // Centralized cleanup: remove ALL data associated with an agent from every Map/Ref
+  const cleanupAgentData = useCallback((agentId: string) => {
+    // Abort active streams first
+    abortControllersRef.current.forEach((ctrl, key) => {
+      if (key.startsWith(agentId)) { ctrl.abort(); abortControllersRef.current.delete(key); }
+    });
+    // Unlisten Tauri events
+    const unlisten = activeListenersRef.current.get(agentId);
+    if (unlisten) { try { unlisten(); } catch { /* ignore */ } activeListenersRef.current.delete(agentId); }
+    // Clear timers
+    for (const timerMap of [idleTimersRef.current, notificationTimersRef.current, visualIdleTimersRef.current]) {
+      const timer = timerMap.get(agentId);
+      if (timer) { clearTimeout(timer); timerMap.delete(agentId); }
+    }
+    // Clear refs
+    pendingListenersRef.current.delete(agentId);
+    eventBufferRef.current.delete(agentId);
+    activeMessageKeyRef.current.delete(agentId);
+    lastPromptsRef.current.delete(agentId);
+    agentMetadataRef.current.delete(agentId);
+    lastAgentResponseRef.current.delete(agentId);
+    activeStreamsRef.current.delete(agentId);
+    outputBuffersRef.current.delete(agentId);
+    resumingSessionsRef.current.delete(agentId);
+    // Clear state Maps
+    setChatSessions(prev => { const m = new Map(prev); m.delete(agentId); return m; });
+    setChatLoadingMap(prev => { const m = new Map(prev); m.delete(agentId); return m; });
+    setChatTokensMap(prev => { const m = new Map(prev); m.delete(agentId); return m; });
+    setChatSessionIds(prev => { const m = new Map(prev); m.delete(agentId); return m; });
+    setPendingQuestionIdsMap(prev => { const m = new Map(prev); m.delete(agentId); return m; });
+    setAnsweredQuestionsMap(prev => { const m = new Map(prev); m.delete(agentId); return m; });
+    setAgentChatSettings(prev => { const m = new Map(prev); m.delete(agentId); return m; });
+    setTaskInputDrafts(prev => { const m = new Map(prev); m.delete(agentId); return m; });
+    setProjectOverheadCache(prev => { const m = new Map(prev); m.delete(agentId); return m; });
+    setModifiedFiles(prev => { const m = new Map(prev); m.delete(agentId); return m; });
+    setFileEditsMap(prev => { const m = new Map(prev); m.delete(agentId); return m; });
+  }, []);
+
   // 🦆 Session message sync - sync messageCount from chatSessions to sessionStore
   useSessionMessageSync({
     chatSessions,
@@ -1417,6 +1477,13 @@ function AppContent() {
           return newMap;
         });
       }
+
+      // Brain: fix-memory-leak-14gb-ram
+      // Session-end cleanup: free temporary buffers that are no longer needed
+      const agentId = activeMessageKeyRef.current.get(messageKey) || messageKey;
+      outputBuffersRef.current.delete(agentId);
+      outputBuffersRef.current.delete(messageKey);
+      activeMessageKeyRef.current.delete(agentId);
     }
   }, [handleTokenUpdate]);
 
@@ -1482,7 +1549,9 @@ function AppContent() {
             cache_read_input_tokens: 0,
           },
         };
-        return [...prev, newSession];
+        // Brain: fix-memory-leak-14gb-ram — cap usage sessions to prevent unbounded growth
+        const updated = [...prev, newSession];
+        return updated.length > 100 ? updated.slice(-100) : updated;
       }
     });
 
@@ -1706,15 +1775,38 @@ function AppContent() {
     }
   }, [activeId]);
 
-  // Sync terminal status with chatLoadingMap and check if waiting for response
+  // Brain: fix-office-status-dot-chatloadingmap-key-mismatch
+  // Sync terminal status with chatLoadingMap and check if waiting for response.
+  // chatLoadingMap is keyed by sessionId (not agentId), so we must look up
+  // this agent's sessions to find the correct loading state.
   useEffect(() => {
+    const allSessions = useSessionStore.getState().sessions;
+
     setTerminals((prev) => {
       return prev.map((terminal) => {
-        const isLoading = chatLoadingMap.get(terminal.id) ?? false;
+        // Find all session IDs belonging to this agent
+        const agentSessionIds = allSessions
+          .filter(s => s.agentId === terminal.id)
+          .map(s => s.id);
+
+        // Check loading by agentId (legacy) OR any of the agent's sessionIds
+        const isLoading = chatLoadingMap.get(terminal.id) === true ||
+          agentSessionIds.some(sid => chatLoadingMap.get(sid) === true);
         const newStatus = isLoading ? 'busy' : 'idle';
 
         // Check if chat is waiting for user response
-        const chatMessages = chatSessions.get(terminal.id) ?? [];
+        // Collect messages from all sessions for this agent
+        let chatMessages: ChatMessage[] = [];
+        for (const sid of agentSessionIds) {
+          const msgs = chatSessions.get(sid);
+          if (msgs && msgs.length > 0) {
+            chatMessages = msgs; // Use the session with messages (prefer last)
+          }
+        }
+        // Fallback: try by agentId (legacy keys)
+        if (chatMessages.length === 0) {
+          chatMessages = chatSessions.get(terminal.id) ?? [];
+        }
         const lastMessage = chatMessages[chatMessages.length - 1];
 
         // Check if agent is dormant (no user interaction yet)
@@ -1727,19 +1819,6 @@ function AppContent() {
           !isDormant && // 🚨 NOT dormant (don't show 💬 for agents without user interaction)
           lastMessage?.role === 'assistant' && // Last message is from assistant
           lastMessage?.status === 'complete'; // Message is complete
-
-        // Debug logging
-        if (terminal.label === 'Agent Carlos') {
-          console.log(`[App.tsx] 🔔 ${terminal.label} waitingForResponse calculation:`, {
-            isLoading,
-            messagesCount: chatMessages.length,
-            hasUserMessage,
-            isDormant,
-            lastMessageRole: lastMessage?.role,
-            lastMessageStatus: lastMessage?.status,
-            result: isWaitingForResponse
-          });
-        }
 
         // Only update if something actually changed to avoid unnecessary re-renders
         if (
@@ -9841,6 +9920,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   useGlobalKeyboardShortcuts({
     toggleKanban: handleOpenKanbanTab,
     toggleAutomation: handleOpenAutomationTab,
+    toggleOffice: handleOpenOfficeTab,
     openTerminalWindow: handleCreateAgentTerminal,  // Cmd+T opens Terminal Window App
     newAgent: handleOpenNewTerminalModal,           // Cmd+N opens New Agent modal
     toggleSidePanel: useCallback(() => {
@@ -11279,25 +11359,14 @@ You have access to all Bash tools to execute git commands like:
             setActiveAgentChatId(chatId);
           }}
           onDeleteAgentChat={async (chatId) => {
-            // 🦆 Clean up listener for this agent
-            const unlisten = activeListenersRef.current.get(chatId);
-            if (unlisten) {
-              unlisten();
-              activeListenersRef.current.delete(chatId);
-            }
-            // Remove from chatSessions map
-            setChatSessions(prev => {
-              const newSessions = new Map(prev);
-              newSessions.delete(chatId);
-              return newSessions;
-            });
+            // Brain: fix-memory-leak-14gb-ram
+            // Centralized cleanup: removes ALL data from every Map/Ref for this agent
+            cleanupAgentData(chatId);
             setAgentChats(prev => prev.filter(chat => chat.id !== chatId));
             if (activeAgentChatId === chatId) {
               setActiveAgentChatId(null);
             }
-
-            // Note: SDK session cleanup happens automatically
-            console.log(`[onDeleteAgentChat] Removed agent chat: ${chatId}`);
+            console.log(`[onDeleteAgentChat] Cleaned up all data for agent: ${chatId}`);
           }}
           onUpdateAgentChat={(chatId, updates) => {
             setAgentChats(prev => prev.map(chat =>
@@ -11791,6 +11860,7 @@ You have access to all Bash tools to execute git commands like:
                       setActiveId(agentId);
                       setActiveTabId('chat');
                     }}
+                    onSessionClick={handleSessionClick}
                     onExitOffice={() => setActiveTabId('chat')}
                   />
                 );
