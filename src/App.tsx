@@ -83,6 +83,8 @@ import DocsTabView from "./views/DocsTabView";
 import ClaudeAssetsTabView from "./views/ClaudeAssetsTabView";
 import KanbanTabView from "./views/KanbanTabView";
 import AutomationTabView from "./views/AutomationTabView";
+import OfficeTabView from "./views/OfficeTabView";
+import { useOfficeTab } from "./hooks/useOfficeTab";
 import ProjectDashboardTabView from "./views/ProjectDashboardTabView";
 import ImageTabView from "./views/ImageTabView";
 import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
@@ -429,6 +431,9 @@ function AppContent() {
   // Automation tab management
   const { openAutomationTab } = useAutomationTab();
 
+  // Office tab management
+  const { openOfficeTab } = useOfficeTab();
+
   // Project Dashboard tab management
   const { openProjectDashboardTab } = useProjectDashboardTab();
 
@@ -770,7 +775,7 @@ function AppContent() {
         if (Array.isArray(savedTabs) && savedTabs.length > 0) {
           // Only restore simple tab types that survive reload (chat, kanban)
           // Filter out tabs that need runtime context (file editors, terminals, etc.)
-          const safeTypes = new Set(['chat', 'kanban-board', 'docs']);
+          const safeTypes = new Set(['chat', 'kanban-board', 'docs', 'office']);
           const restored = savedTabs.filter(
             (t: Tab) => safeTypes.has(t.type) || t.id === 'chat'
           );
@@ -821,6 +826,7 @@ function AppContent() {
   // Derived state: is Kanban tab currently active?
   // This replaces the old isKanbanTabActive overlay approach
   const isKanbanTabActive = activeTabId === 'kanban-board';
+  const isOfficeTabActive = activeTabId === 'office-view';
 
   // 🦆 Display tabs: Task tabs are now real tabs in the tabs array (type: 'task')
   // No need to transform 'chat' tab anymore - tasks have their own dedicated tabs
@@ -9241,6 +9247,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [openAutomationTab, activeTabId, tabs]);
 
+  // Handler for opening/focusing Office tab
+  const handleOpenOfficeTab = useCallback(() => {
+    if (activeTabId === 'office-view') {
+      setActiveTabId('chat');
+      return;
+    }
+    const existingTab = tabs.find(t => t.type === 'office');
+    if (existingTab) {
+      setActiveTabId('office-view');
+    } else {
+      const newTab = openOfficeTab();
+      setTabs(prevTabs => [...prevTabs, newTab]);
+      setActiveTabId('office-view');
+    }
+  }, [openOfficeTab, activeTabId, tabs]);
+
   // Handler for firing an automation job — creates a session and sends the prompt
   const handleAutomationFireJob = useCallback(async (job: AutomationJob) => {
     console.log('[Automation] Firing job:', job.name, 'agent:', job.agentId);
@@ -11240,7 +11262,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) ? 'side-panel-collapsed' : ''} ${terminals.length === 0 && persistedProjects.size === 0 ? 'no-agents sidebar-hidden' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''} ${isChatFullscreen ? 'chat-fullscreen' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive && !isOfficeTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) || isOfficeTabActive ? 'side-panel-collapsed' : ''} ${terminals.length === 0 && persistedProjects.size === 0 ? 'no-agents sidebar-hidden' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''} ${isOfficeTabActive ? 'office-mode' : ''} ${isChatFullscreen ? 'chat-fullscreen' : ''}`}
         style={{ gridTemplateColumns }}
       >
         {/* Hide sidebar when no projects/agents */}
@@ -11351,7 +11373,7 @@ You have access to all Bash tools to execute git commands like:
         />}
 
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
-        <section className={`terminal-pane ${activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') ? 'full-width-tab' : ''}`}>
+        <section className={`terminal-pane ${activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || isOfficeTabActive ? 'full-width-tab' : ''}`}>
           {terminals.length === 0 && persistedProjects.size === 0 ? (
             /* Empty state when no projects at all - show image or guide */
             <div
@@ -11641,6 +11663,8 @@ You have access to all Bash tools to execute git commands like:
               inProgressTaskCount={inProgressTaskCount}
               onAutomationClick={handleOpenAutomationTab}
               isAutomationActive={tabs.some(t => t.type === 'automation' && t.id === activeTabId)}
+              onOfficeClick={handleOpenOfficeTab}
+              isOfficeActive={isOfficeTabActive}
               onStoreClick={() => setShowStoreDrawer(!showStoreDrawer)}
               isStoreOpen={showStoreDrawer}
             />
@@ -11740,6 +11764,33 @@ You have access to all Bash tools to execute git commands like:
                       onSessionClick={handleSessionClick}
                       onExitAutomation={() => setActiveTabId('chat')}
                       onFireJob={handleAutomationFireJob}
+                    />
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Office Tab View - isometric office with duck agents */}
+              {activeTabId === 'office-view' && (() => {
+                const activeTab = tabs.find(t => t.id === activeTabId);
+                if (activeTab?.type === 'office') {
+                  return (
+                    <OfficeTabView
+                      tab={activeTab}
+                      isActive={true}
+                      terminals={terminals}
+                      onRoomClick={(projectPath) => {
+                        const agent = terminals.find(t => t.cwd === projectPath);
+                        if (agent) {
+                          setActiveId(agent.id);
+                          setActiveTabId('chat');
+                        }
+                      }}
+                      onDuckClick={(agentId) => {
+                        setActiveId(agentId);
+                        setActiveTabId('chat');
+                      }}
+                      onExitOffice={() => setActiveTabId('chat')}
                     />
                   );
                 }
@@ -12457,7 +12508,7 @@ You have access to all Bash tools to execute git commands like:
           onSessionClick={handleSessionClick}
           activeSessionId={activeSessionId ?? undefined}
           // Collapse props
-          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded)}
+          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) || isOfficeTabActive}
           onToggleCollapse={() => {
             if (isKanbanTabActive) {
               setKanbanSidePanelExpanded(!kanbanSidePanelExpanded);

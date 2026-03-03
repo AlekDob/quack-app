@@ -44,6 +44,9 @@ interface ActionIconsProps {
   onAutomationClick?: () => void;
   isAutomationActive?: boolean;
   runningAutomationCount?: number;
+  // Office
+  onOfficeClick?: () => void;
+  isOfficeActive?: boolean;
   // Quack Store
   onStoreClick?: () => void;
   isStoreOpen?: boolean;
@@ -63,6 +66,8 @@ function ActionIcons({
   onAutomationClick,
   isAutomationActive = false,
   runningAutomationCount = 0,
+  onOfficeClick,
+  isOfficeActive = false,
   onStoreClick,
   isStoreOpen = false,
 }: ActionIconsProps) {
@@ -366,6 +371,26 @@ function ActionIcons({
                 {runningAutomationCount}
               </span>
             )}
+          </button>
+        </KeyboardShortcutTooltip>
+      )}
+
+      {/* Office Icon */}
+      {onOfficeClick && (
+        <KeyboardShortcutTooltip label="Office" shortcut="">
+          <button
+            type="button"
+            className={`action-icon ${isOfficeActive ? 'active' : ''}`}
+            onClick={onOfficeClick}
+            aria-label="Open Office View"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+              <line x1="9" y1="6" x2="15" y2="6" />
+              <line x1="9" y1="10" x2="15" y2="10" />
+              <line x1="9" y1="14" x2="15" y2="14" />
+              <line x1="9" y1="18" x2="12" y2="18" />
+            </svg>
           </button>
         </KeyboardShortcutTooltip>
       )}
