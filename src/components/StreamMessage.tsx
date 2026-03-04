@@ -14,6 +14,7 @@ import { TaskWidget } from './TaskWidget';
 import { TaskOutputWidget } from './TaskOutputWidget';
 import AskUserQuestionWidget from './AskUserQuestionWidget';
 import DiffViewer from './DiffViewer';
+import CompactingIndicator from './CompactingIndicator';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import type { ClaudeEvent, AskUserQuestionAnswers, DiffLine, ToolDiff } from '../types';
@@ -450,6 +451,16 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
         defaultExpanded={false}
       />
     );
+  }
+
+  // Context compaction status indicator
+  if (message.type === 'system' && message.subtype === 'status' && message.status === 'compacting') {
+    return <CompactingIndicator isCompacting={true} />;
+  }
+
+  // Context compaction boundary (compaction completed)
+  if (message.type === 'system' && message.subtype === 'compact_boundary') {
+    return <CompactingIndicator isCompacting={false} />;
   }
 
   // Assistant message - contains text and tool uses

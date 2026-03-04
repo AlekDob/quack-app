@@ -1,0 +1,59 @@
+/* CompactingIndicator - inline system status for context compaction */
+
+.compacting-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  margin: 4px 0;
+  margin-left: 48px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+}
+
+.compacting-icon {
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.compacting-text {
+  opacity: 0.7;
+}
+
+.compacting-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 2px;
+}
+
+.compacting-dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  animation: compacting-bounce 1.4s ease-in-out infinite;
+}
+
+.compacting-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.compacting-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.compacting-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes compacting-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}

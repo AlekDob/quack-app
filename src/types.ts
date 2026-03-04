@@ -609,6 +609,8 @@ export interface ClaudeSystemEvent extends ClaudeEventBase {
   cwd?: string;
   tools?: string[];
   isResumed?: boolean;
+  status?: 'compacting' | null;
+  compact_metadata?: { trigger: 'manual' | 'auto'; pre_tokens: number };
 }
 
 export interface ClaudeContentBlock {
