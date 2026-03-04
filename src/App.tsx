@@ -146,7 +146,7 @@ import {
   type UnifiedAgent,
 } from "./services/unifiedAgentStorage";
 import { calculateProjectOverhead } from "./services/conversationRecovery";
-import { getDuckdroidUrl, getAgentAvatar } from "./utils/agentAvatars";
+import { getDuckdroidUrl, getAgentAvatar, getAvatarUrl } from "./utils/agentAvatars";
 import { showProjectToast } from "./components/ProjectToast";
 import { loadAvailableDroids } from "./utils/skillsAndDroidsLoader";
 import { loadProjectColors, getProjectColor, DEFAULT_PROJECT_COLORS } from "./utils/projectColors";
@@ -6019,7 +6019,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         agentScope: agentInfo.scope as 'global' | 'project',
         icon: (
           <img
-            src={agentInfo.avatar ? `/images/ducks/new-avatars/${agentInfo.avatar}` : getDuckdroidUrl()}
+            src={agentInfo.avatar ? getAvatarUrl(agentInfo.avatar) : getDuckdroidUrl()}
             alt="Agent"
             style={{ width: '16px', height: '16px', borderRadius: '3px' }}
           />

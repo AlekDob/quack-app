@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { getDuckdroidUrl } from '../utils/agentAvatars';
+import { getDuckdroidUrl, getAgentAvatar } from '../utils/agentAvatars';
 
 interface AgentInfo {
   name: string;
@@ -32,6 +32,15 @@ const DEFAULT_COLOR = '#8b5cf6'; // Purple default for droids
 const agentCache = new Map<string, AgentInfo>();
 
 /**
+ * Resolve avatar URL from an avatar filename (handles sync and async custom avatars)
+ */
+async function resolveAvatarUrl(avatar: string | undefined): Promise<string> {
+  if (!avatar) return getDuckdroidUrl();
+  const result = getAgentAvatar('', avatar);
+  return result instanceof Promise ? result : result;
+}
+
+/**
  * Hook to load agent info (avatar + color) asynchronously
  * @param agentId - The agent ID/name (e.g., "strategic-project-advisor")
  * @param workingDir - Optional working directory for project agents
@@ -47,18 +56,23 @@ export function useAgentInfo(agentId: string, workingDir?: string): AgentInfoRes
 
   useEffect(() => {
     if (!agentId) return;
+    let isMounted = true;
 
     // Check cache first
     const cacheKey = `${agentId}-${workingDir || 'default'}`;
     const cached = agentCache.get(cacheKey);
     if (cached) {
-      setInfo({
-        avatarUrl: cached.avatar ? `/avatars/${cached.avatar}` : getDuckdroidUrl(),
-        color: cached.color || DEFAULT_COLOR,
-        description: cached.description || '',
-        model: cached.model || 'opus',
+      resolveAvatarUrl(cached.avatar).then(avatarUrl => {
+        if (isMounted) {
+          setInfo({
+            avatarUrl,
+            color: cached.color || DEFAULT_COLOR,
+            description: cached.description || '',
+            model: cached.model || 'opus',
+          });
+        }
       });
-      return;
+      return () => { isMounted = false; };
     }
 
     // Fetch agents list and find matching agent
@@ -75,16 +89,19 @@ export function useAgentInfo(agentId: string, workingDir?: string): AgentInfoRes
           return normalizedName === normalizedId || a.name.toLowerCase() === agentId.toLowerCase();
         });
 
-        if (agent) {
+        if (agent && isMounted) {
           // Cache the result
           agentCache.set(cacheKey, agent);
 
-          setInfo({
-            avatarUrl: agent.avatar ? `/avatars/${agent.avatar}` : getDuckdroidUrl(),
-            color: agent.color || DEFAULT_COLOR,
-            description: agent.description || '',
-            model: agent.model || 'opus',
-          });
+          const avatarUrl = await resolveAvatarUrl(agent.avatar);
+          if (isMounted) {
+            setInfo({
+              avatarUrl,
+              color: agent.color || DEFAULT_COLOR,
+              description: agent.description || '',
+              model: agent.model || 'opus',
+            });
+          }
         }
       } catch (error) {
         console.warn('[useAgentInfo] Failed to fetch agent info:', error);
@@ -93,6 +110,7 @@ export function useAgentInfo(agentId: string, workingDir?: string): AgentInfoRes
     };
 
     fetchAgentInfo();
+    return () => { isMounted = false; };
   }, [agentId, workingDir]);
 
   return info;
