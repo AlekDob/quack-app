@@ -163,7 +163,7 @@ const defaultAgentModePresets: AgentModePresets = {
   },
   debug: {
     model: 'opus46',
-    thinkingMode: 'auto',
+    thinkingMode: 'hard', // Forces extended thinking for root cause analysis
     effort: 'high',
   },
 };
@@ -283,7 +283,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
-        version: 2,
+        version: 3,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
@@ -311,6 +311,10 @@ export const useSettingsStore = create<SettingsState>()(
           // Ensure debug preset exists (added in v1, users with v0 persisted state won't have it)
           if (persisted.agentModePresets && !persisted.agentModePresets.debug) {
             persisted.agentModePresets.debug = defaultAgentModePresets.debug;
+          }
+          // v3: Force extended thinking for debug mode (was 'auto', now 'hard')
+          if (version < 3 && persisted.agentModePresets?.debug) {
+            persisted.agentModePresets.debug.thinkingMode = 'hard';
           }
           return persisted;
         },

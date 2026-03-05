@@ -789,7 +789,9 @@ function AppContent() {
     } catch { /* ignore parse errors */ }
     return [{ id: 'chat', label: 'Chat', type: 'chat', closable: false }];
   });
-  const [activeTabId, setActiveTabId] = useState(() => {
+  // DEBUG: track who changes activeTabId
+  const _debugActiveTabRef = useRef<string>('chat');
+  const [activeTabId, _rawSetActiveTabId] = useState(() => {
     try {
       const stored = localStorage.getItem('ui-storage');
       if (stored) {
@@ -805,6 +807,15 @@ function AppContent() {
     } catch { /* ignore parse errors */ }
     return 'chat';
   });
+  const setActiveTabId = useCallback((value: string) => {
+    const prev = _debugActiveTabRef.current;
+    if (value !== prev) {
+      const stack = new Error().stack?.split('\n').slice(1, 4).map(l => l.trim()).join(' | ') || '';
+      console.log(`[DEBUG-TAB] ${prev} → ${value}`, stack);
+    }
+    _debugActiveTabRef.current = value;
+    _rawSetActiveTabId(value);
+  }, []);
 
   // Clear editor selection when navigating away from file tab
   useEffect(() => {
@@ -1847,9 +1858,11 @@ function AppContent() {
         const updated = new Map(prev);
         // Filter out chat tab (always present) and special tabs - save only file tabs
         // Special tabs persist across agents and shouldn't be stored per-agent
+        // Brain: fix-office-view-snaps-back-to-chat
         const specialTabTypes = [
           'kanban', 'docs', 'second-brain', 'memory-graph', 'claude-assets',
-          'agent', 'skill', 'command', 'browser-manager', 'agent-terminal', 'chat'
+          'agent', 'skill', 'command', 'browser-manager', 'agent-terminal', 'chat',
+          'office', 'automation'
         ];
         const agentTabs = tabs.filter(t => !specialTabTypes.includes(t.type));
         updated.set(previousId, agentTabs);
@@ -1864,19 +1877,32 @@ function AppContent() {
 
       // 🦆 FIX: Preserve special tabs (kanban, docs, second-brain, memory-graph, etc.)
       // These tabs should persist across agent switches - they are not agent-specific
+      // Brain: fix-office-view-snaps-back-to-chat
       const specialTabTypes = [
         'kanban', 'docs', 'second-brain', 'memory-graph', 'claude-assets',
-        'agent', 'skill', 'command', 'browser-manager', 'agent-terminal'
+        'agent', 'skill', 'command', 'browser-manager', 'agent-terminal',
+        'office', 'automation'
       ];
 
       // Always include chat tab + restored agent tabs + preserve special tabs
       setTabs(prevTabs => {
         const specialTabs = prevTabs.filter(t => specialTabTypes.includes(t.type));
-        return [
-          { id: 'chat', label: 'Chat', type: 'chat', closable: false },
+        const merged = [
+          { id: 'chat', label: 'Chat', type: 'chat' as const, closable: false },
           ...restoredTabs,
           ...specialTabs
         ];
+        // Deduplicate by id (keep first occurrence)
+        const seen = new Set<string>();
+        const deduped = merged.filter(t => {
+          if (seen.has(t.id)) return false;
+          seen.add(t.id);
+          return true;
+        });
+        if (deduped.length !== merged.length) {
+          console.warn('[DEBUG-TAB] Effect1: deduped tabs', merged.length, '→', deduped.length);
+        }
+        return deduped;
       });
 
       // 🦆 FIX: Don't change activeTabId if user is viewing a special tab
@@ -10216,15 +10242,28 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     // 🦆 FIX: Preserve special tabs (kanban, docs, second-brain, memory-graph, etc.)
     // These tabs should persist across agent switches - they are not agent-specific
+    // Brain: fix-office-view-snaps-back-to-chat
     const specialTabTypes = [
       'kanban', 'docs', 'second-brain', 'memory-graph', 'claude-assets',
-      'agent', 'skill', 'command', 'browser-manager', 'agent-terminal'
+      'agent', 'skill', 'command', 'browser-manager', 'agent-terminal',
+      'office', 'automation'
     ];
 
     setTabs(prevTabs => {
       // Keep any special tabs that were open
       const specialTabs = prevTabs.filter(t => specialTabTypes.includes(t.type));
-      return [chatTab, ...terminalTabs, ...specialTabs];
+      const merged = [chatTab, ...terminalTabs, ...specialTabs];
+      // Deduplicate by id (keep first occurrence)
+      const seen = new Set<string>();
+      const deduped = merged.filter(t => {
+        if (seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      });
+      if (deduped.length !== merged.length) {
+        console.warn('[DEBUG-TAB] Effect2: deduped tabs', merged.length, '→', deduped.length);
+      }
+      return deduped;
     });
 
     // 🦆 FIX: Don't change activeTabId if user is viewing a special tab

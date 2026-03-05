@@ -21,12 +21,13 @@ Symbol.asyncDispose ??= Symbol('Symbol.asyncDispose');
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import Anthropic from '@anthropic-ai/sdk';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { extname, join, dirname } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -48,6 +49,51 @@ function loadBundledSkill(skillName) {
     }
   } catch { /* ignore read errors */ }
   return null;
+}
+
+// =============================================================================
+// DEBUG MODE HELPERS — Brain hints + Git context for system prompt injection
+// Brain: debug-mode-v2-brain-git-context
+// =============================================================================
+
+/**
+ * Load Brain entry slugs from documentation/bugs/ and documentation/gotchas/.
+ * Returns an array of relative paths (e.g. "documentation/bugs/fix-memory-leak.md").
+ * Lightweight: only reads directory listings, never file contents.
+ */
+function loadBrainHints(projectCwd) {
+  if (!projectCwd) return [];
+  const dirs = ['documentation/bugs', 'documentation/gotchas'];
+  const slugs = [];
+  for (const dir of dirs) {
+    const fullDir = join(projectCwd, dir);
+    if (!existsSync(fullDir)) continue;
+    try {
+      for (const f of readdirSync(fullDir)) {
+        if (f.endsWith('.md')) slugs.push(`${dir}/${f}`);
+      }
+    } catch { /* ignore read errors */ }
+  }
+  return slugs.slice(0, 50);
+}
+
+/**
+ * Load recent git context (last 5 commits + uncommitted changes).
+ * Returns a markdown block or empty string if not a git repo.
+ * Timeout: 3s to avoid blocking on slow repos.
+ */
+function loadGitContext(projectCwd) {
+  if (!projectCwd) return '';
+  try {
+    const opts = { cwd: projectCwd, encoding: 'utf-8', timeout: 3000 };
+    const log = execSync('git log --oneline -5 2>/dev/null', opts).trim();
+    const stat = execSync('git diff --stat 2>/dev/null', opts).trim();
+    if (!log && !stat) return '';
+    let ctx = '\n## Recent Git Context (auto-loaded for debugging)\n\n';
+    if (log) ctx += `### Last 5 commits\n\`\`\`\n${log}\n\`\`\`\n\n`;
+    if (stat) ctx += `### Uncommitted changes\n\`\`\`\n${stat}\n\`\`\`\n\n`;
+    return ctx;
+  } catch { return ''; }
 }
 
 // =============================================================================
@@ -323,26 +369,59 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`
         + (debugMode ? (() => {
-          // Brain: debug-mode-auto-skill-injection
+          // Brain: debug-mode-v2-brain-git-context
           const skillContent = loadBundledSkill('systematic-debugging');
-          const brainPreamble = `
+          const gitContext = loadGitContext(cwd);
+          const brainHints = loadBrainHints(cwd);
+          const hintsBlock = brainHints.length > 0
+            ? brainHints.map(s => `- ${s}`).join('\n')
+            : '(no Brain entries found in this project)';
 
-## Debug Mode - Systematic Debugging Active
+          // Structure: skill (reference) → git context → Brain protocol (LAST = recency bias)
+          let debugPrompt = '';
 
-You are in **DEBUG MODE**. The full systematic debugging methodology is loaded below.
+          // 1. Skill content (methodology reference)
+          if (skillContent) {
+            debugPrompt += `\n\n## Systematic Debugging Methodology\n\n${skillContent}`;
+          }
 
-**CRITICAL RULES:**
-1. **ALWAYS consult the Quack Brain first** - Before taking any action, search \`documentation/\`, \`~/.quack/brain/\`, and \`CLAUDE.md\` for related issues, known bugs, and existing patterns. Use the \`quack-brain\` skill for read/write operations.
-2. **Never guess** - Always trace the data flow and verify assumptions with evidence. Read the actual code, don't assume behavior.
-3. **Document findings** - After fixing, save discoveries to the Quack Brain for future reference. Add Brain breadcrumbs (\`// Brain: {slug}\`) in code above relevant fixes.
+          // 2. Git context (what changed recently)
+          if (gitContext) {
+            debugPrompt += gitContext;
+          }
 
+          // 3. Brain-First Protocol (LAST for maximum recency bias)
+          debugPrompt += `
+
+## DEBUG MODE — MANDATORY BRAIN-FIRST PROTOCOL
+
+You are in **DEBUG MODE**. Before writing ANY code or investigating ANY file, you MUST complete Step 0.
+
+### STEP 0: Brain Check (REQUIRED — skip = invalid session)
+
+1. Read CLAUDE.md's "Knowledge Base" section — it lists critical gotchas, bugs, and patterns with file paths
+2. Identify which entries relate to the user's problem (match by keyword/area)
+3. Use the Read tool to read those .md files
+4. If nothing in Knowledge Base matches, search \`documentation/bugs/\` and \`documentation/gotchas/\` with Grep
+5. State what you found (or "No relevant Brain entries found") BEFORE proceeding
+
+### Available Brain entries in this project:
+${hintsBlock}
+
+### Example — what WRONG vs RIGHT looks like:
+**User:** "The stamina bar shows 100% even after many messages"
+**WRONG:** "Let me look at StaminaBarBorder..." ← skipped Brain, will waste 20 min rediscovering a known fix
+**RIGHT:** "Checking Brain... found fix-stamina-messages-zero-modelusage-fallback.md. Reading it now..." ← 2 min fix
+
+### CRITICAL RULES:
+1. **Brain first** — ALWAYS complete Step 0 before any investigation
+2. **Never guess** — Trace data flow, verify with evidence. Read the actual code.
+3. **Document findings** — Save to Brain + add \`// Brain: {slug}\` breadcrumbs in code
 `;
-          return skillContent
-            ? brainPreamble + skillContent
-            : brainPreamble + `Follow the 4-phase approach: Root Cause Investigation > Pattern Analysis > Hypothesis & Testing > Implementation. See systematic-debugging skill for details.`;
+          return debugPrompt;
         })() : '')
-          + (teamContext ? buildTeamPromptAugmentation(teamContext) : '')
-          + (ideContext ? `\n\n## IDE Context\n\n${ideContext}` : ''),
+        + (teamContext ? buildTeamPromptAugmentation(teamContext) : '')
+        + (ideContext ? `\n\n## IDE Context\n\n${ideContext}` : ''),
       },
       canUseTool: async (toolName, input, toolOptions) => {
         // AskUserQuestion — forward to frontend

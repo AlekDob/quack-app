@@ -2,7 +2,7 @@
 type: pattern
 project: quack-app
 created: 2026-02-28
-last_verified: 2026-03-01
+last_verified: 2026-03-05
 tags: [permission-mode, build, plan, debug, agent-mode, sdk]
 ---
 # Permission Modes System (Build / Plan / Debug)
@@ -50,23 +50,29 @@ User selects mode in UI (footer dropdown or Shift+Tab)
 | Node (daemon) | `src-tauri/node-sdk/stream-daemon.js` | System prompt injection |
 | Skill (bundled) | `src-tauri/node-sdk/skills/systematic-debugging.md` | Full debugging methodology |
 
-### Debug Mode System Prompt
+### Debug Mode System Prompt (v2)
 
-When `debugMode === true`, the Node.js layer:
+When `debugMode === true`, the Node.js layer injects 3 blocks into `systemPrompt.append`:
 
-1. Reads the bundled skill from `src-tauri/node-sdk/skills/systematic-debugging.md` via `loadBundledSkill()`
-2. Prepends the Quack Brain preamble (Brain-first, never guess, document findings)
-3. Appends the full skill content to `systemPrompt.append`
-4. Falls back to a brief summary if the skill file is not found
+**Order matters** — structured for maximum recency bias (most important = last):
 
-The bundled `systematic-debugging` skill includes:
-- **The Iron Law** — No fixes without root cause investigation
-- **4-phase process** — Root Cause → Pattern Analysis → Hypothesis → Implementation
-- **Defense-in-depth** — Validate at every layer
-- **Red flags** — Stop signals when debugging goes off track
-- **Common rationalizations** — Anti-patterns to avoid
+1. **Systematic Debugging Skill** — loaded from `src-tauri/node-sdk/skills/systematic-debugging.md` via `loadBundledSkill()`. Contains Iron Law, 4-phase process, defense-in-depth, red flags. Step 1.5 "Check Quack Brain" is embedded in Phase 1.
 
-This way users get the full methodology automatically without installing the skill manually.
+2. **Git Context** — loaded via `loadGitContext(cwd)`. Auto-injects `git log --oneline -5` + `git diff --stat`. Timeout: 3s. Only present in git repos with history.
+
+3. **Brain-First Protocol (LAST = highest priority)** — mandatory Step 0 with:
+   - Brain slug hints from `loadBrainHints(cwd)` (reads `documentation/bugs/` and `gotchas/` directory listings only — no file contents)
+   - Concrete wrong/right example showing why Brain check matters
+   - Explicit rules: Brain first, never guess, document findings
+
+**Helper functions** (defined in both `stream-claude.js` and `stream-daemon.js`):
+- `loadBrainHints(projectCwd)` — returns array of `.md` file paths from `documentation/bugs/` and `gotchas/` (max 50, lightweight)
+- `loadGitContext(projectCwd)` — returns markdown block with recent git log + diff stat (3s timeout)
+
+**Default preset** (settingsStore.ts v3):
+- Model: Opus 4.6
+- Thinking: `hard` (forces extended thinking for root cause analysis)
+- Effort: `high`
 
 ### Adding a New Mode
 
