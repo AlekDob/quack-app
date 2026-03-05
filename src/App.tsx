@@ -9916,6 +9916,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [terminals, chatSessions, loadDirectory, setActiveTaskIdExclusive]);
 
   // Global keyboard shortcuts
+  const sidebarView = useUIStore((s) => s.sidebarView);
+  const setSidebarView = useUIStore((s) => s.setSidebarView);
+
   useGlobalKeyboardShortcuts({
     toggleKanban: handleOpenKanbanTab,
     toggleAutomation: handleOpenAutomationTab,
@@ -9940,6 +9943,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         requestNewTaskModal();
       }
     }, [activeTabId, requestNewTaskModal]),
+    toggleSidebarView: useCallback(() => {
+      setSidebarView(sidebarView === 'projects' ? 'taskhub' : 'projects');
+    }, [sidebarView, setSidebarView]),
   });
 
   // Tab management handlers

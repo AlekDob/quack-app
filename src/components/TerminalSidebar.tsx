@@ -31,7 +31,10 @@ import { extractProjectId } from "../utils/projectUtils";
 import { formatShortcut } from "../utils/platform";
 import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo, ProjectGroup } from "../types";
 import { useGroupStore } from "../stores/groupStore";
+import { useUIStore } from "../stores/uiStore";
 import GroupCreationModal from "./GroupCreationModal";
+import SidebarViewToggle from "./SidebarViewToggle";
+import TaskHubView from "./TaskHubView";
 
 // Storage format for project order and colors
 interface ProjectStorageData {
@@ -333,6 +336,10 @@ export default function TerminalSidebar({
   void onAdd; // Used by "+" button in toolbar (kept for future use)
   const [query, setQuery] = useState("");
   const [appVersion, setAppVersion] = useState('v0.0.0');
+
+  // Sidebar view toggle (projects vs task hub)
+  const sidebarView = useUIStore((s) => s.sidebarView);
+  const setSidebarView = useUIStore((s) => s.setSidebarView);
 
   // Fetch app version on mount
   useEffect(() => {
@@ -987,6 +994,8 @@ export default function TerminalSidebar({
             <span>Group</span>
           </button>
         )}
+
+        <SidebarViewToggle activeView={sidebarView} onChange={setSidebarView} />
       </div>
 
       <div className="sidebar-header sidebar-header-codex" data-tauri-drag-region>
@@ -995,15 +1004,26 @@ export default function TerminalSidebar({
           type="text"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search projects"
+          placeholder={sidebarView === 'taskhub' ? "Search tasks" : "Search projects"}
         />
       </div>
 
       {/* Agent List - no label, directly the list */}
       <div className="sidebar-list" style={{ marginTop: '4px' }}>
-        {/* Metro Style View is now the only option */}
+        {/* Task Hub: flat priority-sorted session list */}
+        {sidebarView === 'taskhub' && (
+          <TaskHubView
+            terminals={terminals}
+            onSessionClick={onSessionClick}
+            activeSessionId={activeSessionId}
+            chatSessions={chatSessions}
+            lastReadTimestamps={lastReadTimestamps}
+            searchQuery={query}
+          />
+        )}
 
-            {/* Metro-style repository groups with drag-and-drop */}
+        {/* Projects view: metro-style repository groups */}
+        {sidebarView === 'projects' && (
             <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -1299,6 +1319,7 @@ export default function TerminalSidebar({
               })() : null}
             </DragOverlay>
           </DndContext>
+        )}
 
         {/* Empty state - Onboarding CTA (only when no projects at all) */}
         {terminals.length === 0 && (!persistedProjects || persistedProjects.size === 0) && (

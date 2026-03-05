@@ -1660,7 +1660,8 @@ export type ShortcutActionId =
   | 'chatOpenDroids'
   | 'chatOpenCommands'
   | 'chatInsertXml'
-  | 'chatNewLine';
+  | 'chatNewLine'
+  | 'toggleSidebarView';
 
 /**
  * Configuration for a single keyboard shortcut
