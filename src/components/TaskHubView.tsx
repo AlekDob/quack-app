@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import type { TerminalInfo, ChatMessage } from '../types';
 import { useSessionStore } from '../stores/sessionStore';
 import { useChatStore } from '../stores/chatStore';
@@ -9,6 +9,7 @@ interface TaskHubViewProps {
   terminals: TerminalInfo[];
   onSessionClick?: (sessionId: string) => void;
   activeSessionId?: string;
+  onActiveSessionDone?: () => void;
   chatSessions?: Map<string, ChatMessage[]>;
   lastReadTimestamps?: Map<string, number>;
   searchQuery?: string;
@@ -43,12 +44,61 @@ export default function TaskHubView({
   terminals,
   onSessionClick,
   activeSessionId,
+  onActiveSessionDone,
   chatSessions,
   searchQuery = '',
 }: TaskHubViewProps) {
   const sessions = useSessionStore((s) => s.sessions);
+  const updateSession = useSessionStore((s) => s.updateSession);
+  const deleteSession = useSessionStore((s) => s.deleteSession);
   const chatLoadingMap = useChatStore((s) => s.chatLoadingMap);
   const pendingQuestionsMap = useChatStore((s) => s.pendingQuestionsMap);
+
+  // Confirmation dialog state
+  const [deleteDialog, setDeleteDialog] = useState<{ id: string; title: string } | null>(null);
+  const [renameDialog, setRenameDialog] = useState<{ id: string; title: string } | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+
+  // Session actions
+  const handleMarkDone = useCallback((sessionId: string) => {
+    updateSession(sessionId, { status: 'done', completedAt: Date.now() });
+    if (sessionId === activeSessionId && onActiveSessionDone) {
+      onActiveSessionDone();
+    }
+  }, [updateSession, activeSessionId, onActiveSessionDone]);
+
+  const handleDeleteRequest = useCallback((sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (session) {
+      setDeleteDialog({ id: session.id, title: session.title });
+    }
+  }, [sessions]);
+
+  const handleConfirmDelete = useCallback(() => {
+    if (deleteDialog) {
+      deleteSession(deleteDialog.id);
+      if (deleteDialog.id === activeSessionId && onActiveSessionDone) {
+        onActiveSessionDone();
+      }
+      setDeleteDialog(null);
+    }
+  }, [deleteDialog, deleteSession, activeSessionId, onActiveSessionDone]);
+
+  const handleRenameRequest = useCallback((sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId);
+    if (session) {
+      setRenameDialog({ id: session.id, title: session.title });
+      setRenameValue(session.title);
+    }
+  }, [sessions]);
+
+  const handleConfirmRename = useCallback(() => {
+    if (renameDialog && renameValue.trim()) {
+      updateSession(renameDialog.id, { title: renameValue.trim() });
+      setRenameDialog(null);
+      setRenameValue('');
+    }
+  }, [renameDialog, renameValue, updateSession]);
 
   // Build terminal lookup map
   const terminalMap = useMemo(() => {
@@ -176,11 +226,119 @@ export default function TaskHubView({
                 chatMessages={messages}
                 isLoading={item.isLoading}
                 hasPendingQuestion={item.hasPending}
+                onMarkDone={handleMarkDone}
+                onDelete={handleDeleteRequest}
+                onRename={handleRenameRequest}
               />
             );
           })}
         </div>
       ))}
+
+      {/* Delete confirmation dialog */}
+      {deleteDialog && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 99999,
+            background: 'rgba(0,0,0,0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={() => setDeleteDialog(null)}
+        >
+          <div
+            style={{
+              background: 'rgba(30, 30, 35, 0.98)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '10px', padding: '20px', maxWidth: '320px', width: '90%',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '13px', margin: '0 0 16px' }}>
+              Delete "{deleteDialog.title}"? This cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setDeleteDialog(null)}
+                style={{
+                  padding: '6px 14px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)',
+                  background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '12px',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                style={{
+                  padding: '6px 14px', borderRadius: '6px', border: 'none',
+                  background: '#ef4444', color: '#fff', cursor: 'pointer', fontSize: '12px',
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rename dialog */}
+      {renameDialog && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 99999,
+            background: 'rgba(0,0,0,0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
+          }}
+          onClick={() => { setRenameDialog(null); setRenameValue(''); }}
+        >
+          <div
+            style={{
+              background: 'rgba(30, 30, 35, 0.98)', border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: '10px', padding: '20px', maxWidth: '320px', width: '90%',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '13px', margin: '0 0 12px' }}>
+              Rename session
+            </p>
+            <input
+              autoFocus
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleConfirmRename();
+                if (e.key === 'Escape') { setRenameDialog(null); setRenameValue(''); }
+              }}
+              style={{
+                width: '100%', padding: '8px 10px', borderRadius: '6px',
+                border: '1px solid rgba(255,255,255,0.2)', background: 'rgba(0,0,0,0.3)',
+                color: 'rgba(255,255,255,0.9)', fontSize: '12px', outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
+              <button
+                onClick={() => { setRenameDialog(null); setRenameValue(''); }}
+                style={{
+                  padding: '6px 14px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)',
+                  background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', fontSize: '12px',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRename}
+                style={{
+                  padding: '6px 14px', borderRadius: '6px', border: 'none',
+                  background: '#3b82f6', color: '#fff', cursor: 'pointer', fontSize: '12px',
+                }}
+              >
+                Rename
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

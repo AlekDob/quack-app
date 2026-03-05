@@ -1016,6 +1016,7 @@ export default function TerminalSidebar({
             terminals={terminals}
             onSessionClick={onSessionClick}
             activeSessionId={activeSessionId}
+            onActiveSessionDone={onActiveSessionDone}
             chatSessions={chatSessions}
             lastReadTimestamps={lastReadTimestamps}
             searchQuery={query}
