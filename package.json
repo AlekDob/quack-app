@@ -56,8 +56,8 @@
     "setup:linux": "./scripts/setup-linux.sh"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.62",
-    "@anthropic-ai/sdk": "^0.72.1",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.69",
+    "@anthropic-ai/sdk": "^0.78.0",
     "@codemirror/commands": "^6.10.0",
     "@codemirror/lang-css": "^6.3.1",
     "@codemirror/lang-html": "^6.4.11",
