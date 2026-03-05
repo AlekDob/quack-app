@@ -52,11 +52,11 @@ export const AppProviders = ({ children }: { children: React.ReactNode }) => {
 };
 
 // Re-export hooks for convenience
-export { useTerminals } from './TerminalContext';
-export { useChat } from './ChatContext';
-export { useFileSystem } from './FileSystemContext';
-export { useGit } from './GitContext';
-export { useUI } from './UIContext';
-export { useTestMode, useClaudeCliAvailability } from './TestModeContext';
-export { useAnalytics } from './PostHogContext';
-export type { AnalyticsEvents, UserProperties } from './PostHogContext';
+;
+;
+;
+;
+;
+;
+;
+;

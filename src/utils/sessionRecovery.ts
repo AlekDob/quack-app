@@ -11,7 +11,7 @@ import { toast } from 'sonner';
  * Validate prompt before sending to SDK
  * Prevents common issues that cause SDK crashes
  */
-export function validatePrompt(prompt: string): { valid: boolean; reason?: string } {
+function validatePrompt(prompt: string): { valid: boolean; reason?: string } {
   const trimmed = prompt.trim();
 
   // Too short
@@ -66,7 +66,7 @@ export function saveSessionBackup(sessionId: string, messages: any[]): void {
  * Load session backup from localStorage
  * Returns null if no backup exists or backup is corrupted
  */
-export function loadSessionBackup(sessionId: string): { messages: any[]; timestamp: number } | null {
+function loadSessionBackup(sessionId: string): { messages: any[]; timestamp: number } | null {
   try {
     const backupJson = localStorage.getItem(`session_backup_${sessionId}`);
     if (!backupJson) return null;
@@ -99,7 +99,7 @@ export function loadSessionBackup(sessionId: string): { messages: any[]; timesta
 /**
  * Clear session backup after successful recovery
  */
-export function clearSessionBackup(sessionId: string): void {
+function clearSessionBackup(sessionId: string): void {
   try {
     localStorage.removeItem(`session_backup_${sessionId}`);
     console.log(`[SessionRecovery] Backup cleared for session ${sessionId}`);
@@ -112,7 +112,7 @@ export function clearSessionBackup(sessionId: string): void {
  * Show recovery dialog to user
  * Returns user's choice: 'recover' | 'restart' | 'cancel'
  */
-export async function showRecoveryDialog(
+async function showRecoveryDialog(
   sessionId: string,
   messageCount: number
 ): Promise<'recover' | 'restart' | 'cancel'> {
@@ -137,7 +137,7 @@ export async function showRecoveryDialog(
  * Clean up old backups (older than 7 days)
  * Should be called periodically (e.g., on app startup)
  */
-export function cleanupOldBackups(): void {
+function cleanupOldBackups(): void {
   try {
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const keys = Object.keys(localStorage);

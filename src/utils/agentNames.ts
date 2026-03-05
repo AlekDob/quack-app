@@ -8,7 +8,7 @@
 import type { AgentInfo } from '../types';
 
 // International agent names collection
-export const AGENT_NAMES = [
+const AGENT_NAMES = [
   // Original Quack Team
   'Agent Jack',
   'Agent Mike',
@@ -243,7 +243,7 @@ export function getRandomGenderedName(
  * Get all available agent names
  * @returns Array of all agent names
  */
-export function getAllAgentNames(): string[] {
+function getAllAgentNames(): string[] {
   return [...AGENT_NAMES];
 }
 
@@ -252,7 +252,7 @@ export function getAllAgentNames(): string[] {
  * @param query - Search query string
  * @returns Array of matching agent names
  */
-export function searchAgentNames(query: string): string[] {
+function searchAgentNames(query: string): string[] {
   const lowerQuery = query.toLowerCase();
   return AGENT_NAMES.filter(name =>
     name.toLowerCase().includes(lowerQuery)

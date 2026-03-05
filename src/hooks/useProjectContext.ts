@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 
-export interface Bookmark {
+interface Bookmark {
   id: string;
   title: string;
   url: string;

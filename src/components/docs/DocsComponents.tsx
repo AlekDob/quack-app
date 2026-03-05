@@ -237,4 +237,4 @@ const DocsComponents: Components = {
 export default DocsComponents;
 
 // Export custom components for direct use
-export { Callout, Steps, Tabs, Card };
+;

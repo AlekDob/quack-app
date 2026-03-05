@@ -1,3 +1,21 @@
 {
-  "hooks": {}
+  "hooks": {},
+  "permissions": {
+    "deny": [
+      "Read(./dist/**)",
+      "Read(./images/**)",
+      "Read(./video/**)",
+      "Read(./public/images/**)",
+      "Read(./.worktrees/**)",
+      "Read(./releases/**)",
+      "Read(./plan/**)",
+      "Read(./planning/**)",
+      "Read(./diagrams/**)",
+      "Read(./node-sidecar/**)",
+      "Read(./quack-inspector/**)",
+      "Read(./.smart-connections/**)",
+      "Read(./.obsidian/**)",
+      "Read(./src-tauri/target/**)"
+    ]
+  }
 }

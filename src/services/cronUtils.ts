@@ -10,7 +10,7 @@
 
 // ─── Cron Presets ───────────────────────────────────────────────────
 
-export interface CronPreset {
+interface CronPreset {
   label: string;
   description: string;
   expression: string;

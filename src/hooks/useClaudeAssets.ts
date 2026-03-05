@@ -393,4 +393,3 @@ export function useClaudeAssets(initialProjectPaths?: string[]): UseClaudeAssets
   };
 }
 
-export default useClaudeAssets;

@@ -183,4 +183,3 @@ export const TaskOutputWidget: React.FC<TaskOutputWidgetProps> = ({
   );
 };
 
-export default TaskOutputWidget;

@@ -73,7 +73,7 @@ interface ChatContextValue {
   loadChatHistory: (agentId: string) => Promise<void>;
 }
 
-export type { FileEdit };
+;
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 
@@ -434,7 +434,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export const useChat = () => {
+const useChat = () => {
   const context = useContext(ChatContext);
   if (!context) {
     throw new Error('useChat must be used within ChatProvider');

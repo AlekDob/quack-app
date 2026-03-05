@@ -171,7 +171,7 @@ async function fetchAppConfig(): Promise<AppConfig> {
   }
 }
 
-export function useAppConfig() {
+function useAppConfig() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
   const [loading, setLoading] = useState(true);
 
@@ -184,17 +184,17 @@ export function useAppConfig() {
   return { config, loading };
 }
 
-export function usePricingConfig() {
+function usePricingConfig() {
   const { config, loading } = useAppConfig();
   return { pricing: config.pricing, loading };
 }
 
-export function useCheckoutConfig() {
+function useCheckoutConfig() {
   const { config, loading } = useAppConfig();
   return { checkout: config.checkout, loading };
 }
 
-export function useFeaturesConfig() {
+function useFeaturesConfig() {
   const { config, loading } = useAppConfig();
   return { features: config.features, loading };
 }

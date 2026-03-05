@@ -7,7 +7,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 // Types
 // =============================================================================
 
-export interface IDEInfo {
+interface IDEInfo {
   id: string;
   name: string;
   appPath: string;
@@ -26,14 +26,14 @@ export interface InstalledApp {
   icon_base64: string | null;
 }
 
-export interface CustomIDE {
+interface CustomIDE {
   id: string;
   name: string;
   app_path: string;
   icon_base64: string | null;
 }
 
-export interface IDEConfig {
+interface IDEConfig {
   preferredIDE: string | null;
   autoLaunch: boolean;
   syncFocus: boolean;
@@ -77,7 +77,7 @@ interface IDEState extends IDEConfig {
 // IDE Registry (mirror of MCP server for UI icons/names)
 // =============================================================================
 
-export const IDE_REGISTRY: Record<string, { name: string; icon: string }> = {
+const IDE_REGISTRY: Record<string, { name: string; icon: string }> = {
   vscode: { name: 'Visual Studio Code', icon: 'vscode' },
   cursor: { name: 'Cursor', icon: 'cursor' },
   windsurf: { name: 'Windsurf', icon: 'windsurf' },
@@ -398,6 +398,6 @@ export const selectShouldShowOnboarding = (state: IDEState): boolean => {
   return !state.hasCompletedOnboarding && state.preferredIDE === null;
 };
 
-export const selectInstalledIDEApps = (state: IDEState): InstalledApp[] => {
+const selectInstalledIDEApps = (state: IDEState): InstalledApp[] => {
   return state.installedApps.filter(a => a.category === 'ide');
 };

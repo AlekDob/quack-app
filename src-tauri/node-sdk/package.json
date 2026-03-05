@@ -17,7 +17,10 @@
     "@anthropic-ai/claude-agent-sdk": "^0.2.47",
     "@anthropic-ai/sdk": "^0.72.1",
     "@modelcontextprotocol/sdk": "^1.12.1",
-    "discord.js": "^14.14.1"
+    "discord.js": "^14.14.1",
+    "tree-sitter": "^0.22.4",
+    "tree-sitter-javascript": "^0.23.1",
+    "tree-sitter-typescript": "^0.23.2"
   },
   "devDependencies": {
     "@vitest/ui": "^2.1.8",

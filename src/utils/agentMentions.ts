@@ -7,7 +7,7 @@
 
 import type { AgentInfo } from '../types';
 
-export interface AgentMention {
+interface AgentMention {
   agentName: string;
   startIndex: number;
   endIndex: number;
@@ -40,7 +40,7 @@ export function parseAgentMentions(text: string): AgentMention[] {
  * Extract agent names from @mentions in text
  * Example: "@mike @julie hello" → ["mike", "julie"]
  */
-export function extractAgentNames(text: string): string[] {
+function extractAgentNames(text: string): string[] {
   const mentions = parseAgentMentions(text);
   return mentions.map(m => m.agentName);
 }
@@ -74,13 +74,13 @@ export function matchMentionsToAgents(
  * Remove @mentions from text
  * Example: "@mike @julie hello" → "hello"
  */
-export function stripMentions(text: string): string {
+function stripMentions(text: string): string {
   return text.replace(/@[\w-]+/g, '').trim().replace(/\s+/g, ' ');
 }
 
 /**
  * Check if text contains any @mentions
  */
-export function hasMentions(text: string): boolean {
+function hasMentions(text: string): boolean {
   return /@[\w-]+/.test(text);
 }

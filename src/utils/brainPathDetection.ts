@@ -11,7 +11,7 @@ const BRAIN_PATH_PATTERNS = [
 
 export const BRAIN_COLOR = '#E84A7F';
 
-export function isBrainPath(path: string): boolean {
+function isBrainPath(path: string): boolean {
   if (!path) return false;
   return BRAIN_PATH_PATTERNS.some(p => p.test(path));
 }

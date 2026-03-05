@@ -10,6 +10,13 @@
       "env": {
         "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
       }
+    },
+    "code-intel": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "./src-tauri/node-sdk/code-intel-mcp-server.js"
+      ]
     }
   }
 }

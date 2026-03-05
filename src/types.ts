@@ -14,7 +14,7 @@ export interface NativeTerminal {
 export type NativeTerminalApp = "Terminal" | "iTerm" | "iTerm2" | "Warp" | "WezTerm" | "Hyper" | "Alacritty" | "Kitty" | "Tabby" | "Termius";
 
 // Info about an installed terminal application
-export interface TerminalAppInfo {
+interface TerminalAppInfo {
   name: string;           // Internal name (e.g., "iTerm", "Warp")
   displayName: string;    // Display name (e.g., "iTerm.app", "Warp.app")
   path: string;           // Full path to the application bundle
@@ -87,7 +87,7 @@ export interface SavedCommand {
   projectPath?: string;
 }
 
-export interface ProcessInfo {
+interface ProcessInfo {
   terminalId: string;
   terminalLabel: string;
   command?: string;
@@ -154,7 +154,7 @@ export interface GitBranch {
   behind?: number;
 }
 
-export interface GitMergeResult {
+interface GitMergeResult {
   success: boolean;
   hasConflicts: boolean;
   conflictedFiles: string[];
@@ -169,7 +169,7 @@ export interface GitPullResult {
   isFastForward: boolean;
 }
 
-export interface GitConflictFile {
+interface GitConflictFile {
   path: string;
   status: string;
 }
@@ -202,14 +202,14 @@ export interface AISuggestion {
   alternative?: string;
 }
 
-export interface AISettings {
+interface AISettings {
   apiKey: string;
   model: 'gpt-4o-mini' | 'gpt-4o' | 'gpt-3.5-turbo';
   enableCommandAssistant: boolean;
   enableErrorAnalyzer: boolean;
 }
 
-export interface TokenStats {
+interface TokenStats {
   totalTokensUsed: number;
   estimatedCost: number;
   requestCount: number;
@@ -248,7 +248,7 @@ export interface AIPromptImprovement {
   confidence: number;
 }
 
-export interface AIPromptEngineerResponse {
+interface AIPromptEngineerResponse {
   type: 'questions' | 'improvement';
   questions?: AIQuestion[];
   improvement?: AIPromptImprovement;
@@ -413,7 +413,7 @@ export interface ChatMessage {
   thinkingContent?: string; // Extracted thinking block content for display
 }
 
-export interface ChatSession {
+interface ChatSession {
   id: string;
   title: string;
   messages: ChatMessage[];
@@ -521,13 +521,13 @@ export interface ProjectGroup {
 }
 
 // Simplified ClaudeSession for Telegram integration
-export interface ClaudeSession {
+interface ClaudeSession {
   id: string;
   name: string;
   isStreaming: boolean;
 }
 
-export interface ClaudeSettings {
+interface ClaudeSettings {
   apiKey: string;
   model: string;
   temperature: number;
@@ -536,7 +536,7 @@ export interface ClaudeSettings {
   enableStreaming: boolean;
 }
 
-export interface StreamChunk {
+interface StreamChunk {
   type: "text" | "tool_use" | "tool_result";
   content: string;
   toolCall?: ChatToolCall;
@@ -597,7 +597,7 @@ export interface AgentModePresets {
 }
 
 // Claude CLI Event types (matching Rust backend + Claude Agent SDK)
-export interface ClaudeEventBase {
+interface ClaudeEventBase {
   type: 'system' | 'assistant' | 'user' | 'result' | 'agent' | 'error' | 'message_start' | 'message_delta' | 'message_stop' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'prompt_token_count';
 }
 
@@ -613,7 +613,7 @@ export interface ClaudeSystemEvent extends ClaudeEventBase {
   compact_metadata?: { trigger: 'manual' | 'auto'; pre_tokens: number };
 }
 
-export interface ClaudeContentBlock {
+interface ClaudeContentBlock {
   type: 'text' | 'tool_use' | 'thinking';
   text?: string;
   thinking?: string; // Content of thinking block when type is 'thinking'
@@ -622,7 +622,7 @@ export interface ClaudeContentBlock {
   input?: Record<string, unknown>;
 }
 
-export interface ClaudeAssistantMessage {
+interface ClaudeAssistantMessage {
   id: string;
   content: ClaudeContentBlock[];
   uuid?: string; // SDK message UUID (for file checkpointing)
@@ -649,7 +649,7 @@ export interface ClaudeUserEvent extends ClaudeEventBase {
   uuid?: string; // SDK User message UUID (for file checkpointing rewind)
 }
 
-export interface ModelUsageEntry {
+interface ModelUsageEntry {
   inputTokens: number;
   outputTokens: number;
   cacheReadInputTokens: number;
@@ -812,9 +812,9 @@ export interface PendingUserQuestion {
 }
 
 // Slash Commands types
-export type SlashCommandScope = 'built-in' | 'project' | 'user' | 'plugin' | 'mcp';
+type SlashCommandScope = 'built-in' | 'project' | 'user' | 'plugin' | 'mcp';
 
-export interface SlashCommandFrontmatter {
+interface SlashCommandFrontmatter {
   'allowed-tools'?: string;
   'argument-hint'?: string;
   description?: string;
@@ -822,7 +822,7 @@ export interface SlashCommandFrontmatter {
   'disable-model-invocation'?: boolean;
 }
 
-export interface SlashCommand {
+interface SlashCommand {
   name: string; // Command name without the leading "/"
   description: string;
   scope: SlashCommandScope;
@@ -834,12 +834,12 @@ export interface SlashCommand {
   serverName?: string; // MCP server name (for MCP commands)
 }
 
-export interface SlashCommandsResponse {
+interface SlashCommandsResponse {
   builtIn: SlashCommand[];
   custom: SlashCommand[];
 }
 
-export interface CreateSlashCommandParams {
+interface CreateSlashCommandParams {
   name: string;
   description: string;
   content: string;
@@ -926,7 +926,7 @@ export type MCPServerConfig =
       env?: Record<string, string>;
     };
 
-export interface MCPConfigFile {
+interface MCPConfigFile {
   mcpServers: Record<string, MCPServerConfig>;
 }
 
@@ -940,17 +940,17 @@ export interface MCPTemplate {
 }
 
 // Plugin Marketplace types
-export type PluginCategory = 'agent' | 'command' | 'hook' | 'setting' | 'mcp' | 'stack' | 'skill';
-export type PluginSource = 'davila7' | 'aitmpl' | 'custom';
-export type PluginScope = 'global' | 'project';
+type PluginCategory = 'agent' | 'command' | 'hook' | 'setting' | 'mcp' | 'stack' | 'skill';
+type PluginSource = 'davila7' | 'aitmpl' | 'custom';
+type PluginScope = 'global' | 'project';
 
-export interface PluginMetadata {
+interface PluginMetadata {
   icon?: string;
   tags: string[];
   dependencies?: string[];
 }
 
-export interface Plugin {
+interface Plugin {
   id: string;
   name: string;
   description: string;
@@ -1202,7 +1202,7 @@ export interface HookTemplateVariable {
 /**
  * Event emitted when a hook is triggered during execution
  */
-export interface HookExecutionEvent {
+interface HookExecutionEvent {
   hookId: string;
   hookName: string;
   hookType: HookType;
@@ -1233,7 +1233,7 @@ export interface Snippet {
 /**
  * Dynamic variable that can be used in snippets
  */
-export type SnippetVariable =
+type SnippetVariable =
   | '{date}'        // Current date (YYYY-MM-DD)
   | '{time}'        // Current time (HH:MM)
   | '{datetime}'    // Current date and time
@@ -1413,7 +1413,7 @@ export interface BackgroundTaskQueueStats {
 /**
  * State of the background agent system
  */
-export interface BackgroundAgentState {
+interface BackgroundAgentState {
   tasks: BackgroundTask[];
   queueStats: BackgroundTaskQueueStats;
   maxConcurrent: number;      // Max concurrent running tasks
@@ -1517,7 +1517,7 @@ export interface RulesResponse {
 /**
  * Parameters for creating a new rule
  */
-export interface CreateRuleParams {
+interface CreateRuleParams {
   name: string;
   content: string;
   scope: RuleScope;
@@ -1700,7 +1700,7 @@ export interface KanbanTaskInitialValues {
 /**
  * Context passed to task completion hooks
  */
-export interface TaskCompletionContext {
+interface TaskCompletionContext {
   task: KanbanTask;
   chatMessages: ChatMessage[];
   options: TaskCompletionOptions;
@@ -1709,7 +1709,7 @@ export interface TaskCompletionContext {
 /**
  * Options for task completion processing
  */
-export interface TaskCompletionOptions {
+interface TaskCompletionOptions {
   /** Skip documentation generation */
   skipDocumentation?: boolean;
   /** Source of the completion trigger */
@@ -1737,7 +1737,7 @@ export interface TaskCompletionResult {
 /**
  * Summary extracted from task conversation
  */
-export interface TaskSummary {
+interface TaskSummary {
   /** Original objective from task prompt */
   objective: string;
   /** AI-generated summary of work done */
@@ -1759,7 +1759,7 @@ export interface TaskSummary {
 /**
  * Equipment item reference in a bundle
  */
-export interface BundleEquipment {
+interface BundleEquipment {
   id: string;
   required: boolean;
 }
@@ -1886,12 +1886,12 @@ export interface TeamConfig {
   taskDescription?: string;
 }
 
-export interface TeamContext {
+interface TeamContext {
   teamName: string;
   members: TeamContextMember[];
 }
 
-export interface TeamContextMember {
+interface TeamContextMember {
   name: string;
   role: string;
   communicationStyle: string;

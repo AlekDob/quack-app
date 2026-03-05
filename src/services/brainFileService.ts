@@ -16,7 +16,7 @@ const PROJECT_DOC_DIR = 'documentation';
 const BRAIN_PATH_KEY = 'quack-brain-path';
 const BRAIN_PATH_MARKER = '.quack/brain-path';
 
-export interface BrainEntry {
+interface BrainEntry {
   type: string;
   project?: string;
   created: string;
@@ -49,7 +49,7 @@ async function getGlobalBrainPath(): Promise<string> {
 /**
  * Get the project documentation path
  */
-export function getProjectDocPath(projectRoot: string): string {
+function getProjectDocPath(projectRoot: string): string {
   return normalizePath(`${projectRoot}/${PROJECT_DOC_DIR}`);
 }
 
@@ -115,7 +115,7 @@ export async function initBrainStructure(projectRoot?: string): Promise<void> {
 /**
  * Save a knowledge entry to the brain
  */
-export async function saveBrainEntry(entry: {
+async function saveBrainEntry(entry: {
   type: string;
   project?: string;
   projectRoot?: string;
@@ -150,7 +150,7 @@ export async function saveBrainEntry(entry: {
 /**
  * Append a diary entry for today
  */
-export async function appendDiaryEntry(
+async function appendDiaryEntry(
   projectRoot: string,
   content: string
 ): Promise<string> {
@@ -181,7 +181,7 @@ export async function appendDiaryEntry(
 /**
  * List brain entries (project docs or global)
  */
-export async function listBrainEntries(
+async function listBrainEntries(
   options: {
     projectRoot?: string;
     type?: string;
@@ -234,7 +234,7 @@ async function listMdFilesRecursive(dirPath: string): Promise<string[]> {
 /**
  * Read a brain entry file and parse its frontmatter
  */
-export async function readBrainEntry(filePath: string): Promise<BrainEntry | null> {
+async function readBrainEntry(filePath: string): Promise<BrainEntry | null> {
   try {
     const content = await invoke<string>('read_file_content', { path: filePath });
     return parseBrainFile(content, filePath);

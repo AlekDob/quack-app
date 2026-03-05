@@ -6,12 +6,12 @@ import { invoke } from '@tauri-apps/api/core';
 // Types
 // =============================================================================
 
-export interface GitUserConfig {
+interface GitUserConfig {
   name: string | null;
   email: string | null;
 }
 
-export interface GitConfigState {
+interface GitConfigState {
   hasCompletedOnboarding: boolean;
   userConfig: GitUserConfig | null;
   isChecking: boolean;
@@ -107,6 +107,6 @@ export const selectShouldShowGitOnboarding = (state: GitConfigState): boolean =>
   return !state.hasCompletedOnboarding;
 };
 
-export const selectIsGitConfigured = (state: GitConfigState): boolean => {
+const selectIsGitConfigured = (state: GitConfigState): boolean => {
   return !!(state.userConfig?.name && state.userConfig?.email);
 };

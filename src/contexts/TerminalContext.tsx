@@ -401,7 +401,7 @@ export const TerminalProvider = ({ children }: { children: React.ReactNode }) =>
   );
 };
 
-export const useTerminals = () => {
+const useTerminals = () => {
   const context = useContext(TerminalContext);
   if (!context) {
     throw new Error('useTerminals must be used within TerminalProvider');

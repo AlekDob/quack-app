@@ -474,7 +474,7 @@ export const UIProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-export const useUI = () => {
+const useUI = () => {
   const context = useContext(UIContext);
   if (!context) {
     throw new Error('useUI must be used within UIProvider');

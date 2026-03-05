@@ -96,7 +96,7 @@ export interface ChatSendOptions {
   provider?: import('../types').LLMProviderType;
 }
 
-export interface UseClaudeChatOptions {
+interface UseClaudeChatOptions {
   initialSessionId?: string;
   initialTokens?: {
     inputTokens: number;
@@ -108,7 +108,7 @@ export interface UseClaudeChatOptions {
   internalSessionId?: string; // 🦆 SESSIONS-FIRST: Internal session ID for loading state sync
 }
 
-export function useClaudeChat(options?: UseClaudeChatOptions) {
+function useClaudeChat(options?: UseClaudeChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isConfigured, setIsConfigured] = useState(true); // SDK always available

@@ -5,7 +5,7 @@ import type { TerminalInfo } from '../../types';
 export const TILE_W = 450;
 export const TILE_H = 225;
 
-export interface WorkstationPos {
+interface WorkstationPos {
   deskX: number;
   deskY: number;
   duckX: number;
@@ -23,7 +23,7 @@ export interface RoomPosition {
 }
 
 /** Convert grid (col, row) to isometric screen coordinates */
-export function gridToIso(col: number, row: number): { x: number; y: number } {
+function gridToIso(col: number, row: number): { x: number; y: number } {
   return {
     x: (col - row) * (TILE_W / 2),
     y: (col + row) * (TILE_H / 2),

@@ -20,7 +20,7 @@ const DPX = Math.round(DEPTH_LEN * Math.cos(DEPTH_ANGLE));
 const DPY = Math.round(DEPTH_LEN * Math.sin(DEPTH_ANGLE));
 
 
-export type RenderLayer = "base" | "ducks" | "desks";
+type RenderLayer = "base" | "ducks" | "desks";
 
 interface OfficeRoomProps {
   room: RoomPosition;

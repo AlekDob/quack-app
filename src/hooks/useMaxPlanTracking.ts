@@ -5,7 +5,7 @@ import type { MaxPlanType, MaxPlanConfig, MaxPlanSession, MaxPlanStats } from '.
  * Claude Max Plan Configuration
  * Based on official limits (5-hour rolling window)
  */
-export type { MaxPlanType, MaxPlanConfig, MaxPlanSession, MaxPlanStats };
+export type { MaxPlanType,    };
 
 const PLAN_CONFIGS: Record<MaxPlanType, MaxPlanConfig> = {
   pro: {

@@ -8,7 +8,7 @@
 import type { AgentPersonality } from '../types';
 import { migrateRulePaths } from './rulePathUtils';
 
-export interface SavedAgent {
+interface SavedAgent {
   id: string;
   name: string;
   avatar: string;
@@ -147,7 +147,7 @@ export function saveAgent(
 /**
  * Update an existing agent's properties
  */
-export function updateAgent(id: string, updates: Partial<Omit<SavedAgent, 'id' | 'createdAt'>>): SavedAgent | null {
+function updateAgent(id: string, updates: Partial<Omit<SavedAgent, 'id' | 'createdAt'>>): SavedAgent | null {
   const agents = getSavedAgents();
   const index = agents.findIndex(a => a.id === id);
 
@@ -273,7 +273,7 @@ export function markAgentAsUsed(id: string): SavedAgent | null {
 /**
  * Clear all saved agents (for debugging/reset)
  */
-export function clearAllAgents(): void {
+function clearAllAgents(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch (error) {
@@ -284,7 +284,7 @@ export function clearAllAgents(): void {
 /**
  * Export agents as JSON (for backup)
  */
-export function exportAgents(): string {
+function exportAgents(): string {
   const agents = getSavedAgents();
   return JSON.stringify(agents, null, 2);
 }
@@ -292,7 +292,7 @@ export function exportAgents(): string {
 /**
  * Import agents from JSON (for restore)
  */
-export function importAgents(json: string): number {
+function importAgents(json: string): number {
   try {
     const importedAgents = JSON.parse(json) as SavedAgent[];
 

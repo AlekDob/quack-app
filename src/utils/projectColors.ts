@@ -6,7 +6,7 @@
 import { Store } from '@tauri-apps/plugin-store';
 
 // Storage format for project order and colors
-export interface ProjectStorageData {
+interface ProjectStorageData {
   order: string[];
   colors: Record<string, string>;
 }

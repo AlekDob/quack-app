@@ -34,7 +34,7 @@ export const getTestModeStoreName = (baseName: string): string => {
 /**
  * Check if currently running in test mode
  */
-export const isTestMode = (): boolean => {
+const isTestMode = (): boolean => {
   return IS_TEST_MODE;
 };
 
@@ -42,7 +42,7 @@ export const isTestMode = (): boolean => {
  * Get all test mode storage file patterns
  * Useful for cleanup operations
  */
-export const getTestModeStoragePatterns = (): string[] => {
+const getTestModeStoragePatterns = (): string[] => {
   return [
     'quack-terminals-TEST.json',
     'quack-agent-chats-TEST.json',
@@ -54,7 +54,7 @@ export const getTestModeStoragePatterns = (): string[] => {
 /**
  * Log storage operation in test mode
  */
-export const logTestModeStorage = (operation: string, storeName: string): void => {
+const logTestModeStorage = (operation: string, storeName: string): void => {
   if (IS_TEST_MODE) {
     console.log(`🧪 TEST MODE Storage: ${operation} - ${storeName}`);
   }

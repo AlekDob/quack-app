@@ -308,4 +308,3 @@ export function useSystemWakeHandler(options: WakeHandlerOptions = {}) {
   // Return nothing - this hook just sets up side effects
 }
 
-export default useSystemWakeHandler;

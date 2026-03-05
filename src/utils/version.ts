@@ -20,7 +20,7 @@ export async function getCurrentVersion(): Promise<string> {
  * @param version - Version string to parse
  * @returns {major, minor, patch, suffix} or null if invalid
  */
-export function parseVersion(version: string): {
+function parseVersion(version: string): {
   major: number;
   minor: number;
   patch: number;
@@ -51,7 +51,7 @@ export function parseVersion(version: string): {
  * @param version2 - Second version to compare
  * @returns -1 if version1 < version2, 0 if equal, 1 if version1 > version2, null if invalid
  */
-export function compareVersions(version1: string, version2: string): number | null {
+function compareVersions(version1: string, version2: string): number | null {
   const v1 = parseVersion(version1);
   const v2 = parseVersion(version2);
 
@@ -95,7 +95,7 @@ export function isNewerVersion(currentVersion: string, newVersion: string): bool
  * @param withPrefix - Whether to include 'v' prefix (default: true)
  * @returns Formatted version string (e.g., "v0.1.0" or "0.1.0")
  */
-export function formatVersion(version: string, withPrefix: boolean = true): string {
+function formatVersion(version: string, withPrefix: boolean = true): string {
   // Remove existing 'v' prefix
   const cleanVersion = version.replace(/^v/, '');
 

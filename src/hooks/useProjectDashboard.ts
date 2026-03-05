@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useKanbanStore } from '../stores/kanbanStore';
 import type { KanbanTask } from '../types';
 
-export interface GitStatusData {
+interface GitStatusData {
   branch: string;
   ahead: number;
   behind: number;
@@ -13,20 +13,20 @@ export interface GitStatusData {
   unstagedCount: number;
 }
 
-export interface GitCommit {
+interface GitCommit {
   hash: string;
   message: string;
   author: string;
   timestamp: number;
 }
 
-export interface GitWorktree {
+interface GitWorktree {
   path: string;
   branch: string;
   isCurrent: boolean;
 }
 
-export interface ProjectDashboardData {
+interface ProjectDashboardData {
   gitStatus: GitStatusData | null;
   commits: GitCommit[];
   worktrees: GitWorktree[];

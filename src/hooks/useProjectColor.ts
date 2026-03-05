@@ -66,7 +66,7 @@ export function useProjectColor(projectPath: string, projectIndex: number = 0): 
 /**
  * Invalidate the color cache (call this when colors are changed)
  */
-export function invalidateProjectColorCache(): void {
+function invalidateProjectColorCache(): void {
   cachedColors = null;
   isLoading = false;
   loadPromise = null;
@@ -76,7 +76,7 @@ export function invalidateProjectColorCache(): void {
  * Get project color synchronously (use cached value or fallback)
  * Useful for immediate rendering without hook
  */
-export function getProjectColorSync(projectPath: string, projectIndex: number = 0): string {
+function getProjectColorSync(projectPath: string, projectIndex: number = 0): string {
   const repoKey = pathToRepoKey(projectPath);
   return getProjectColor(repoKey, cachedColors || {}, projectIndex);
 }

@@ -372,4 +372,4 @@ export function useTabPopoutWindow(onTabReturn?: (tab: Tab) => void) {
   };
 }
 
-export type { Tab, PopoutPosition };
+;

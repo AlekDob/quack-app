@@ -5,13 +5,13 @@ const HISTORY_STORAGE_KEY = 'maxplan-history';
 const MAX_HISTORY_DAYS = 30; // Keep 30 days of history
 
 // Re-export types for backward compatibility
-export type { DailyUsage, WeeklyUsage, MaxPlanHistoryData };
+export type { DailyUsage,  MaxPlanHistoryData };
 
 /**
  * Hook to track and manage historical Max Plan usage data.
  * Stores daily/weekly consumption in localStorage.
  */
-export function useMaxPlanHistory() {
+function useMaxPlanHistory() {
   const [history, setHistory] = useState<MaxPlanHistoryData>(() => loadHistory());
 
   // Save history to localStorage whenever it changes

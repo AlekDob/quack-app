@@ -14,7 +14,7 @@
 import type { ChatMessage } from '../types';
 
 // Token limits for different models (default 200k for all Claude models)
-export const TOKEN_LIMITS: Record<string, number> = {
+const TOKEN_LIMITS: Record<string, number> = {
   opus: 200000,
   sonnet: 200000,
   haiku: 200000,
@@ -22,7 +22,7 @@ export const TOKEN_LIMITS: Record<string, number> = {
 
 // Estimated overhead costs (fallback when no cache data available)
 // These are used only before the first message establishes the cache
-export const ESTIMATED_OVERHEAD = {
+const ESTIMATED_OVERHEAD = {
   system: 17900,   // System prompt, CLAUDE.md, instructions
   memory: 5900,    // Memory MCP context
   mcpTools: 2700,  // MCP tool definitions
@@ -30,8 +30,8 @@ export const ESTIMATED_OVERHEAD = {
 };
 
 // Alias for backward compatibility
-export const FIXED_OVERHEAD = ESTIMATED_OVERHEAD;
-export const TOTAL_OVERHEAD = ESTIMATED_OVERHEAD.total;
+const FIXED_OVERHEAD = ESTIMATED_OVERHEAD;
+const TOTAL_OVERHEAD = ESTIMATED_OVERHEAD.total;
 
 /**
  * Calculate dynamic overhead using real cache data from SDK
@@ -39,7 +39,7 @@ export const TOTAL_OVERHEAD = ESTIMATED_OVERHEAD.total;
  * @param cacheReadTokens - tokens read from cache (subsequent messages)
  * @returns The real overhead if available, otherwise estimated
  */
-export function calculateDynamicOverhead(
+function calculateDynamicOverhead(
   cacheCreationTokens: number = 0,
   cacheReadTokens: number = 0
 ): { overhead: number; source: 'cache' | 'estimated' } {
@@ -53,7 +53,7 @@ export function calculateDynamicOverhead(
 }
 
 // Warning thresholds (percentage of max tokens)
-export const TOKEN_THRESHOLDS = {
+const TOKEN_THRESHOLDS = {
   INFO: 50,      // 50% - Informational
   WARNING: 70,   // 70% - Consider compact
   DANGER: 85,    // 85% - Auto-compact recommended
@@ -134,7 +134,7 @@ export function calculateTokenBudget(
  * Create a local summary of messages (when SDK compact fails)
  * This is a simple summarization - just extracts key info
  */
-export function createLocalSummary(messages: ChatMessage[]): string {
+function createLocalSummary(messages: ChatMessage[]): string {
   if (messages.length === 0) return '';
 
   const summaryParts: string[] = [];
@@ -210,7 +210,7 @@ export function performSoftReset(
 /**
  * Export conversation to markdown format
  */
-export function exportConversationToMarkdown(
+function exportConversationToMarkdown(
   messages: ChatMessage[],
   metadata?: {
     sessionId?: string;
@@ -357,7 +357,7 @@ export function getRecommendedAction(
  * ~4 characters per token is a common estimate
  * @param textOrLength - The text content or its character length
  */
-export function estimateTokens(textOrLength: string | number): number {
+function estimateTokens(textOrLength: string | number): number {
   const length = typeof textOrLength === 'string' ? textOrLength.length : textOrLength;
   return Math.ceil(length / 4);
 }
@@ -365,7 +365,7 @@ export function estimateTokens(textOrLength: string | number): number {
 /**
  * Check if adding a new message would exceed the limit
  */
-export function wouldExceedLimit(
+function wouldExceedLimit(
   currentInputTokens: number,
   currentOutputTokens: number,
   newMessageLength: number,
@@ -385,7 +385,7 @@ export function wouldExceedLimit(
 /**
  * Project-specific overhead calculation result
  */
-export interface ProjectOverhead {
+interface ProjectOverhead {
   /** Base system overhead (system prompt, tools) - fixed */
   baseSystem: number;
   /** Tokens from global CLAUDE.md (~/.claude/CLAUDE.md) */

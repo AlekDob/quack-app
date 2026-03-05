@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { Tab } from '../components/TabBar';
 
-export interface UseProjectDashboardTabReturn {
+interface UseProjectDashboardTabReturn {
   openProjectDashboardTab: (projectPath: string, projectName: string) => Tab;
   isProjectDashboardTab: (tab: Tab) => boolean;
 }

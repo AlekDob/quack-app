@@ -51,7 +51,7 @@ export function useDeepLinkHandler(onOpenFile: (payload: OpenFilePayload) => voi
 }
 
 // Helper to test deep link
-export async function testDeepLink(url: string): Promise<OpenFilePayload | null> {
+async function testDeepLink(url: string): Promise<OpenFilePayload | null> {
   try {
     const result = await invoke<OpenFilePayload>('test_deep_link', { url });
     console.log('🦆 Deep link test result:', result);

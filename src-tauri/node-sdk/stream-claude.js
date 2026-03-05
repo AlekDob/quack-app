@@ -939,22 +939,31 @@ ${hintsBlock}
     // See: https://github.com/anthropics/claude-code/issues/6710
     // Using stdio transport instead for stability
     const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
+    const codeIntelMcpServerPath = join(__dirname, 'code-intel-mcp-server.js');
     console.error(`[MCP] IDE MCP server path: ${ideMcpServerPath}`);
+    console.error(`[MCP] IDE MCP exists: ${existsSync(ideMcpServerPath)}`);
+    console.error(`[MCP] Code Intel MCP server path: ${codeIntelMcpServerPath}`);
+    console.error(`[MCP] Code Intel MCP exists: ${existsSync(codeIntelMcpServerPath)}`);
 
-    // Merge MCP servers: file-based servers + built-in Quack servers (ide)
+    // Merge MCP servers: file-based servers + built-in Quack servers (ide + code-intel)
     options.mcpServers = {
       ...(resolvedMcpServers || {}),
       'ide-tools': {
         command: 'node',
         args: [ideMcpServerPath],
       },
+      'code-intel': {
+        type: 'stdio',
+        command: 'node',
+        args: [codeIntelMcpServerPath],
+      },
     };
 
-    const builtInServerCount = 1; // ide-tools
+    const builtInServerCount = 2; // ide-tools + code-intel
     if (resolvedMcpServers && Object.keys(resolvedMcpServers).length > 0) {
       console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length + builtInServerCount} MCP servers:`, Object.keys(options.mcpServers).join(', '));
     } else {
-      console.error(`[MCP] Using built-in MCP servers only (ide-tools)`);
+      console.error(`[MCP] Using built-in MCP servers only (ide-tools, code-intel)`);
     }
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));

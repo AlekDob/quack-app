@@ -19,7 +19,7 @@ import type { GitStatusSummary } from '../types';
 
 const MAX_GIT_CHANGED_FILES = 20;
 
-export interface IdeContext {
+interface IdeContext {
   openedFile: string | null;
   selection: {
     filePath: string;
@@ -56,7 +56,7 @@ export interface ExternalIdeContext {
 /**
  * Gather IDE context from Quack's internal state.
  */
-export function gatherInternalContext(
+function gatherInternalContext(
   gitSummary: GitStatusSummary | null
 ): IdeContext {
   const { previewFile, editorSelection } = useFileSystemStore.getState();
@@ -100,7 +100,7 @@ function formatGitStatus(gs: GitStatusSummary): string {
  * Format IDE context as XML tags to prepend to the user prompt.
  * Uses the same tag format as Claude Code CLI.
  */
-export function formatContextPrefix(ctx: IdeContext): string {
+function formatContextPrefix(ctx: IdeContext): string {
   const parts: string[] = [];
 
   if (ctx.openedFile) {
@@ -172,7 +172,7 @@ function formatExternalContextPrefix(
  * Build the context prefix string from Quack's internal state.
  * This is the synchronous version (fallback when no external IDE is connected).
  */
-export function buildInternalContextPrefix(
+function buildInternalContextPrefix(
   gitSummary: GitStatusSummary | null
 ): string {
   const ctx = gatherInternalContext(gitSummary);

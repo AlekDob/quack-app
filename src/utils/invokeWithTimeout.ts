@@ -7,7 +7,7 @@
 
 import { invoke } from '@tauri-apps/api/core';
 
-export class TimeoutError extends Error {
+class TimeoutError extends Error {
   constructor(command: string, timeout: number) {
     super(`Command "${command}" timed out after ${timeout}ms`);
     this.name = 'TimeoutError';

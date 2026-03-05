@@ -43,7 +43,7 @@ const LEGACY_ID_MAP: Record<string, string> = {
  * Prioritizes remote config from Supabase.
  * Emergency fallback only used when Supabase is unreachable.
  */
-export function getModels(remoteModels?: ModelConfig[]): ModelConfig[] {
+function getModels(remoteModels?: ModelConfig[]): ModelConfig[] {
   const models = remoteModels?.filter(m => m.isActive);
   if (models && models.length > 0) {
     return [...models].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -86,7 +86,7 @@ export function getModelId(
 /**
  * Get the default model config.
  */
-export function getDefaultModel(
+function getDefaultModel(
   remoteModels?: ModelConfig[]
 ): ModelConfig {
   const models = getModels(remoteModels);

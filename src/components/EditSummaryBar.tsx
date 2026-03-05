@@ -4,12 +4,12 @@ import FileDiffButton from './FileDiffButton';
 import { useIDEStore, selectHasPreferredIDE } from '../stores/ideStore';
 import './EditSummaryBar.css';
 
-export interface LineChange {
+interface LineChange {
   line: number;
   type: 'added' | 'modified' | 'removed';
 }
 
-export interface FileEdit {
+interface FileEdit {
   filePath: string;
   editCount: number;
   lineNumbers: number[];
@@ -17,7 +17,7 @@ export interface FileEdit {
   status?: 'created' | 'modified'; // NEW: Track if file was created or modified
 }
 
-export interface FileDeleted {
+interface FileDeleted {
   filePath: string;
 }
 

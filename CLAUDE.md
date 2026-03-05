@@ -76,9 +76,11 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Memory leak 14GB RAM: `documentation/bugs/fix-memory-leak-14gb-ram.md`
 - Shell env GUI launch: `documentation/gotchas/gotcha-shell-env-gui-launch.md`
 - PixiJS CSP black screen: `documentation/gotchas/gotcha-pixi-csp-unsafe-eval.md`
+- MCP registration: `documentation/gotchas/gotcha-mcp-registration-settings-sources.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
+- Codebase Health Workflow: `documentation/decisions/decision-codebase-health-workflow.md`
 
 **Key patterns**: `documentation/patterns/` — search by name before implementing similar features.
 - Multi-provider LLM: `documentation/patterns/pattern-multi-provider-llm.md`

@@ -57,7 +57,7 @@ export async function deleteCustomAvatar(avatarId: string): Promise<void> {
  * @param avatarId - Avatar ID
  * @returns Full file path
  */
-export async function getCustomAvatarPath(avatarId: string): Promise<string> {
+async function getCustomAvatarPath(avatarId: string): Promise<string> {
   return await invoke<string>('get_custom_avatar_path', { avatarId });
 }
 

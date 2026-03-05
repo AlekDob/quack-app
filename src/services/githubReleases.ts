@@ -241,7 +241,7 @@ export async function fetchAllReleases(limit: number = 10): Promise<GitHubReleas
 /**
  * Clear all release caches (useful for testing)
  */
-export function clearReleaseCache(): void {
+function clearReleaseCache(): void {
   try {
     localStorage.removeItem(CACHE_KEY_LATEST);
     localStorage.removeItem(CACHE_KEY_ALL);

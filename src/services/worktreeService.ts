@@ -8,7 +8,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { KanbanTask } from '../types';
 
-export interface GitWorktree {
+interface GitWorktree {
   path: string;
   branch: string;
   commitHash: string;
@@ -16,7 +16,7 @@ export interface GitWorktree {
   isDetached: boolean;
 }
 
-export interface MergeResult {
+interface MergeResult {
   success: boolean;
   strategy?: 'fast-forward' | 'merge-commit';
   hasConflicts?: boolean;
@@ -24,7 +24,7 @@ export interface MergeResult {
   error?: string;
 }
 
-export interface WorktreeConfig {
+interface WorktreeConfig {
   /** Maximum worktrees allowed per project */
   maxWorktrees: number;
   /** Target branch for merge (default: main) */
@@ -70,7 +70,7 @@ export function generateBranchName(task: KanbanTask): string {
  * Generate worktree path for a task
  * Format: {projectPath}/.worktrees/task-{taskId}
  */
-export function generateWorktreePath(task: KanbanTask): string {
+function generateWorktreePath(task: KanbanTask): string {
   const shortId = task.id.slice(-8);
   return `${task.projectPath}/.worktrees/task-${shortId}`;
 }
@@ -78,7 +78,7 @@ export function generateWorktreePath(task: KanbanTask): string {
 /**
  * List all worktrees for a project
  */
-export async function listWorktrees(projectPath: string): Promise<GitWorktree[]> {
+async function listWorktrees(projectPath: string): Promise<GitWorktree[]> {
   try {
     const worktrees = await invoke<GitWorktree[]>('git_list_worktrees', {
       rootPath: projectPath,
@@ -93,7 +93,7 @@ export async function listWorktrees(projectPath: string): Promise<GitWorktree[]>
 /**
  * Check if a worktree exists for a task
  */
-export async function worktreeExists(task: KanbanTask): Promise<boolean> {
+async function worktreeExists(task: KanbanTask): Promise<boolean> {
   const worktreePath = generateWorktreePath(task);
   const worktrees = await listWorktrees(task.projectPath);
   return worktrees.some(wt => wt.path === worktreePath);
@@ -154,7 +154,7 @@ export async function ensureWorktree(
  * Clean up worktree and optionally delete branch.
  * Called after successful merge or task cancellation.
  */
-export async function cleanupWorktree(
+async function cleanupWorktree(
   task: KanbanTask,
   deleteBranch: boolean = true,
   force: boolean = false
@@ -205,7 +205,7 @@ export async function cleanupWorktree(
 /**
  * Check for uncommitted changes in worktree
  */
-export async function hasUncommittedChanges(worktreePath: string): Promise<boolean> {
+async function hasUncommittedChanges(worktreePath: string): Promise<boolean> {
   try {
     const status = await invoke<{ clean: boolean }>('git_status_summary', {
       rootPath: worktreePath,
@@ -222,7 +222,7 @@ export async function hasUncommittedChanges(worktreePath: string): Promise<boole
  * Auto-commit all changes in a worktree before merge.
  * This ensures no work is lost when the worktree is cleaned up.
  */
-export async function autoCommitWorktreeChanges(
+async function autoCommitWorktreeChanges(
   worktreePath: string,
   taskTitle: string
 ): Promise<boolean> {
@@ -252,7 +252,7 @@ export async function autoCommitWorktreeChanges(
 /**
  * Check for uncommitted changes in main repo (not worktree)
  */
-export async function hasUncommittedChangesInMain(projectPath: string): Promise<boolean> {
+async function hasUncommittedChangesInMain(projectPath: string): Promise<boolean> {
   try {
     const status = await invoke<{ dirty: boolean }>('git_status_summary', {
       rootPath: projectPath,
@@ -433,7 +433,7 @@ async function getConflictedFiles(projectPath: string): Promise<string[]> {
 /**
  * Abort an in-progress merge
  */
-export async function abortMerge(projectPath: string): Promise<void> {
+async function abortMerge(projectPath: string): Promise<void> {
   try {
     await invoke('git_merge_abort', {
       rootPath: projectPath,
@@ -448,7 +448,7 @@ export async function abortMerge(projectPath: string): Promise<void> {
 /**
  * Resolve conflicts by keeping one side
  */
-export async function resolveConflicts(
+async function resolveConflicts(
   projectPath: string,
   strategy: 'ours' | 'theirs'
 ): Promise<void> {
@@ -465,7 +465,7 @@ export async function resolveConflicts(
 }
 
 // Export service object for convenience
-export const worktreeService = {
+const worktreeService = {
   generateBranchName,
   generateWorktreePath,
   listWorktrees,
@@ -478,4 +478,3 @@ export const worktreeService = {
   resolveConflicts,
 };
 
-export default worktreeService;

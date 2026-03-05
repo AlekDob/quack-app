@@ -8,7 +8,7 @@ export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 export const MAX_IMAGE_DIMENSION = 8000; // 8000x8000 pixels
 export const RECOMMENDED_IMAGE_DIMENSION = 1568; // Claude recommended for performance
 
-export interface CompressionResult {
+interface CompressionResult {
   blob: Blob;
   wasCompressed: boolean;
   originalSize?: number;

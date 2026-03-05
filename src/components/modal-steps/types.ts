@@ -20,7 +20,7 @@ export interface ActiveProject {
 }
 
 // Props for StepProjectContext
-export interface StepProjectContextProps {
+interface StepProjectContextProps {
   path: string;
   branch: string;
   useWorktree: boolean;

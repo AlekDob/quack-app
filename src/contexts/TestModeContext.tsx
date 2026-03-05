@@ -109,7 +109,7 @@ export const TestModeProvider = ({ children }: { children: React.ReactNode }) =>
 };
 
 // Hook to use test mode context
-export const useTestMode = () => {
+const useTestMode = () => {
   const context = useContext(TestModeContext);
   if (!context) {
     throw new Error('useTestMode must be used within TestModeProvider');

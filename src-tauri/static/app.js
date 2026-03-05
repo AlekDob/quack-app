@@ -868,14 +868,14 @@ function renderChat() {
             : '<div class="empty-inline">Waiting for agent response...</div>'
         }
       </div>
-      <div class="chat-input-bar">
+      ${isAgentBusy(s.agentId) ? '' : `<div class="chat-input-bar">
         <div id="chat-input" class="chat-input" contenteditable="${state.chatSending ? 'false' : 'true'}"
           enterkeyhint="send" data-placeholder="Type a message..."></div>
         <div id="chat-send" class="btn btn-primary btn-send"
           style="${state.chatSending ? 'opacity:0.4;pointer-events:none' : 'cursor:pointer'}">
           ${state.chatSending ? '...' : '→'}
         </div>
-      </div>
+      </div>`}
     </div>
   `;
 }
