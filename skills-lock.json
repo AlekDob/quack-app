@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "lsp-code-analysis": {
+      "source": "lsp-client/lsp-skill",
+      "sourceType": "github",
+      "computedHash": "b9e9b7fe4129e71fc2403ae86113b6292533e54ffe8484aeff46e94603d22b78"
+    }
+  }
+}

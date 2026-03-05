@@ -1,0 +1,30 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "src/brain-main.tsx",
+    "src/browser-main.tsx",
+    "src/pip.tsx",
+    "src/preview.tsx",
+    "src/tab-popout-entry.tsx",
+    "src/terminal-entry.tsx",
+    "src/terminal-window-entry.tsx"
+  ],
+  "project": ["src/**/*.{ts,tsx,css}"],
+  "ignore": [
+    ".worktrees/**",
+    ".agents/**",
+    ".claude/**",
+    "scripts/**",
+    "docs/**",
+    "quack-inspector/**",
+    "node-sidecar/**",
+    "src-tauri/node-sdk/**",
+    "src-tauri/static/**",
+    "documentation/**"
+  ],
+  "ignoreDependencies": [
+    "@anthropic-ai/claude-agent-sdk",
+    "@anthropic-ai/sdk"
+  ]
+}
