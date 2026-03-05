@@ -1,12 +1,16 @@
 import { useRef, useState, useCallback, useMemo, useEffect } from 'react';
+// Brain: gotcha-pixi-csp-unsafe-eval
+// MUST import before any PixiJS usage — replaces new Function() calls with
+// CSP-safe polyfills. Without this, production builds enforce script-src 'self'
+// which blocks shader compilation → black screen.
+import 'pixi.js/unsafe-eval';
 import { Application, extend } from '@pixi/react';
 import { Container, Graphics, Text, Sprite, Application as PixiApplication } from 'pixi.js';
 import OfficeScene from './OfficeScene';
-import OfficeTooltip from './OfficeTooltip';
 import OfficeActionMenu from './OfficeActionMenu';
 import { computeRoomPositions, computeBreakRoomPosition } from './officeLayout';
 import type { TerminalInfo, ChatMessage } from '../../types';
-import type { TooltipData, ActionMenuData } from './officeTypes';
+import type { ActionMenuData } from './officeTypes';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useChatStore } from '../../stores/chatStore';
 import './OfficeView.css';
@@ -86,7 +90,6 @@ export default function OfficeView({
   // Center viewport on the relax room at grid (0,0).
   // gridToIso(0,0) = (0,0), so we just need half container size as offset.
   const [viewport, setViewport] = useState({ zoom: 0.8, panX: 0, panY: 0 });
-  const [tooltip, setTooltip] = useState<TooltipData | null>(null);
   const [actionMenu, setActionMenu] = useState<ActionMenuData | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
@@ -216,7 +219,6 @@ export default function OfficeView({
             viewport={viewport}
             agentDotColors={agentDotColors}
             onRoomClick={onRoomClick}
-            onDuckHover={setTooltip}
             onDuckClick={(agentId, screenX, screenY) => {
               console.log('[OfficeView] onDuckClick received:', agentId, screenX, screenY);
               setActionMenu({ agentId, screenX, screenY });
@@ -226,7 +228,6 @@ export default function OfficeView({
       )}
 
       {/* HTML overlays */}
-      {tooltip && <OfficeTooltip data={tooltip} />}
       {actionMenu && (
         <OfficeActionMenu
           data={actionMenu}

@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, memo } from 'react';
 import { useTick } from '@pixi/react';
 import type { TerminalInfo } from '../../types';
-import type { TooltipData } from './officeTypes';
 import { useAvatarTexture } from './useAvatarTexture';
 
 const AVATAR_RADIUS = 18;
@@ -15,11 +14,10 @@ interface OfficeDuckProps {
   localY: number;
   /** Session dot colors (hex ints), computed in DOM tree via chatLoadingMap */
   dotColors: number[];
-  onHover?: (data: TooltipData | null) => void;
   onClick?: (agentId: string, screenX: number, screenY: number) => void;
 }
 
-function OfficeDuck({ agent, localX, localY, dotColors, onHover, onClick }: OfficeDuckProps) {
+function OfficeDuck({ agent, localX, localY, dotColors, onClick }: OfficeDuckProps) {
   // frameRef: high-frequency counter, never causes React re-renders
   const frameRef = useRef(0);
   // Throttled tick: triggers React re-render only every 5 frames (~12fps)
@@ -101,17 +99,6 @@ function OfficeDuck({ agent, localX, localY, dotColors, onHover, onClick }: Offi
     }
   };
 
-  const handlePointerEnter = useCallback(() => {
-    onHover?.({
-      agentId: agent.id,
-      name: agent.label || 'Agent',
-      status: agent.status || 'idle',
-      workingOn: agent.workingOn,
-      screenX: localX,
-      screenY: localY,
-    });
-  }, [agent, localX, localY, onHover]);
-
   const handleClick = useCallback(() => {
     onClick?.(agent.id, localX, localY);
   }, [agent.id, localX, localY, onClick]);
@@ -124,8 +111,6 @@ function OfficeDuck({ agent, localX, localY, dotColors, onHover, onClick }: Offi
       y={localY + bobOffset}
       eventMode="static"
       cursor="pointer"
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={() => onHover?.(null)}
       onClick={handleClick}
     >
       {/* Border ring */}

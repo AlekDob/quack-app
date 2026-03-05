@@ -78,6 +78,7 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Session reset after Stop: `documentation/bugs/fix-session-reset-after-stop.md`
 - Memory leak 14GB RAM: `documentation/bugs/fix-memory-leak-14gb-ram.md`
 - Shell env GUI launch: `documentation/gotchas/gotcha-shell-env-gui-launch.md`
+- PixiJS CSP black screen: `documentation/gotchas/gotcha-pixi-csp-unsafe-eval.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

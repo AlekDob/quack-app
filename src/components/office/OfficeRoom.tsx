@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, memo, useMemo } from "react";
 import OfficeDuck from "./OfficeDuck";
 import { TILE_W, TILE_H, getWorkstationPositions } from "./officeLayout";
 import type { RoomPosition } from "./officeLayout";
-import type { TooltipData } from "./officeTypes";
-
 const WALL_H = 50;
 const FLOOR_COLOR = 0x1e1e3a;
 const FLOOR_STROKE = 0x3a3a5c;
@@ -30,7 +28,6 @@ interface OfficeRoomProps {
   /** Pre-computed session dot colors per agent (from DOM tree) */
   agentDotColors?: Map<string, number[]>;
   onRoomClick?: (projectPath: string) => void;
-  onDuckHover?: (data: TooltipData | null) => void;
   onDuckClick?: (agentId: string, screenX: number, screenY: number) => void;
 }
 
@@ -116,7 +113,6 @@ function OfficeRoom({
   layer,
   agentDotColors,
   onRoomClick,
-  onDuckHover,
   onDuckClick,
 }: OfficeRoomProps) {
   const workstations = useMemo(
@@ -226,7 +222,6 @@ function OfficeRoom({
               localX={ws.duckX}
               localY={ws.duckY}
               dotColors={agentDotColors?.get(agent.id) ?? []}
-              onHover={onDuckHover}
               onClick={onDuckClick}
             />
           );

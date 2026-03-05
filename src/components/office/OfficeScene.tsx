@@ -4,8 +4,6 @@ import OfficeRoomLabel from './OfficeRoomLabel';
 import OfficeBreakRoom from './OfficeBreakRoom';
 import OfficeBreakRoomLabel from './OfficeBreakRoomLabel';
 import type { RoomPosition, BreakRoomPosition } from './officeLayout';
-import type { TooltipData } from './officeTypes';
-
 interface OfficeSceneProps {
   rooms: RoomPosition[];
   breakRoom: BreakRoomPosition;
@@ -13,7 +11,6 @@ interface OfficeSceneProps {
   /** Pre-computed session dot colors per agent (from DOM tree where Zustand works) */
   agentDotColors?: Map<string, number[]>;
   onRoomClick?: (projectPath: string) => void;
-  onDuckHover?: (data: TooltipData | null) => void;
   onDuckClick?: (agentId: string, screenX: number, screenY: number) => void;
 }
 
@@ -33,7 +30,6 @@ function OfficeScene({
   viewport,
   agentDotColors,
   onRoomClick,
-  onDuckHover,
   onDuckClick,
 }: OfficeSceneProps) {
   return (
@@ -86,7 +82,6 @@ function OfficeScene({
             room={room}
             layer="ducks"
             agentDotColors={agentDotColors}
-            onDuckHover={onDuckHover}
             onDuckClick={onDuckClick}
           />
         ))}
