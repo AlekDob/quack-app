@@ -1,0 +1,40 @@
+/* Task Hub View - flat session list with priority sections */
+
+.task-hub-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 4px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.task-hub-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+}
+
+.task-hub-group {
+  margin-bottom: 8px;
+}
+
+.task-hub-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 2px;
+  font-size: 8px;
+  font-family: monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.3);
+  user-select: none;
+}
+
+.task-hub-section-count {
+  font-size: 8px;
+  color: rgba(255, 255, 255, 0.2);
+  font-family: monospace;
+}

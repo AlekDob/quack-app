@@ -171,6 +171,13 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = (() =
       defaultKeys: buildShortcut("L", true),
       currentKeys: buildShortcut("L", true),
     },
+    toggleSidebarView: {
+      id: "toggleSidebarView" as const,
+      label: "Toggle Sidebar View",
+      description: "Switch between Projects and Task Hub view",
+      defaultKeys: buildShortcut("E"),
+      currentKeys: buildShortcut("E"),
+    },
   };
   return shortcuts;
 })();
