@@ -141,7 +141,14 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
       }
     };
 
+    const escapeHtml = (str: string): string => {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    };
+
     const processInlineMarkdown = (line: string): string => {
+      // Inline code: `code` - process FIRST to protect content from other transformations
+      line = line.replace(/`([^`]+)`/g, (_match, code) => `<code class="md-inline-code">${escapeHtml(code)}</code>`);
+
       // Links: [text](url) - must be processed BEFORE bold/italic to avoid conflicts
       line = line.replace(
         /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
@@ -155,9 +162,6 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
       // Italic: *text* or _text_ (after bold to avoid conflicts)
       line = line.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
       line = line.replace(/(?<!_)_([^_]+)_(?!_)/g, '<em>$1</em>');
-
-      // Inline code: `code`
-      line = line.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
 
       return line;
     };
