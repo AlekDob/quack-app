@@ -27,7 +27,7 @@ import {
  * Write lock to prevent race conditions between local writes and file watcher reloads.
  * When a write operation is in progress, the polling hook should skip reloads.
  */
-const kanbanWriteLock = {
+export const kanbanWriteLock = {
   /** Timestamp of last write operation */
   lastWriteAt: 0,
   /** Debounce period in ms - ignore file watcher events for this duration after a write */

@@ -242,7 +242,7 @@ export const FileSystemProvider = ({ children }: { children: React.ReactNode }) 
   );
 };
 
-const useFileSystem = () => {
+export const useFileSystem = () => {
   const context = useContext(FileSystemContext);
   if (!context) {
     throw new Error('useFileSystem must be used within FileSystemProvider');

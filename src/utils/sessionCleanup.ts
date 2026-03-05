@@ -12,7 +12,7 @@ import type { AgentSession } from '../types';
 /**
  * Storage statistics for session data
  */
-interface SessionStorageStats {
+export interface SessionStorageStats {
   totalSessions: number;
   oldSessions: number;
   estimatedSize: number;

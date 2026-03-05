@@ -30,7 +30,7 @@ export function shouldArchiveSession(session: AgentSession): boolean {
 
 // Brain: fix-automation-session-title-missing
 // Re-export from extracted module to avoid circular dependency with unifiedAgentStorage
-;
+export { sessionWriteLock } from './sessionWriteLock';
 
 interface SessionState {
   // State

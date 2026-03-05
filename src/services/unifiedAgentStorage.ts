@@ -43,7 +43,7 @@ export interface UnifiedAgent {
 /**
  * Root storage structure
  */
-interface UnifiedAgentStore {
+export interface UnifiedAgentStore {
   agents: UnifiedAgent[];
   sessions: AgentSession[];
   version: number;
@@ -187,7 +187,7 @@ export async function saveAgents(agents: UnifiedAgent[]): Promise<void> {
  * @param id - Agent identifier
  * @returns Agent or null if not found
  */
-async function getAgent(id: string): Promise<UnifiedAgent | null> {
+export async function getAgent(id: string): Promise<UnifiedAgent | null> {
   try {
     const agents = await loadAgents();
     return agents.find((a) => a.id === id) ?? null;
@@ -233,7 +233,7 @@ export async function createAgent(
  * @param id - Agent identifier
  * @param updates - Partial agent object with fields to update
  */
-async function updateAgent(
+export async function updateAgent(
   id: string,
   updates: Partial<Omit<UnifiedAgent, "id" | "createdAt">>
 ): Promise<void> {
@@ -294,7 +294,7 @@ export async function deleteAgent(id: string): Promise<void> {
  * @param projectPath - Path of the project to filter by
  * @returns Array of agents belonging to the specified project
  */
-async function getAgentsByProject(projectPath: string): Promise<UnifiedAgent[]> {
+export async function getAgentsByProject(projectPath: string): Promise<UnifiedAgent[]> {
   const agents = await loadAgents();
   return agents.filter((a) => a.projectPath === projectPath);
 }
@@ -305,7 +305,7 @@ async function getAgentsByProject(projectPath: string): Promise<UnifiedAgent[]> 
  * @param limit - Optional limit on number of agents returned
  * @returns Array of agents sorted by lastActiveAt descending
  */
-async function getRecentAgents(limit?: number): Promise<UnifiedAgent[]> {
+export async function getRecentAgents(limit?: number): Promise<UnifiedAgent[]> {
   const agents = await loadAgents();
   const sorted = agents.sort((a, b) => b.lastActiveAt - a.lastActiveAt);
   return limit ? sorted.slice(0, limit) : sorted;
@@ -317,7 +317,7 @@ async function getRecentAgents(limit?: number): Promise<UnifiedAgent[]> {
  * @param agentId - Agent identifier
  * @param sdkSessionId - Claude SDK session ID
  */
-async function updateAgentSdkSession(
+export async function updateAgentSdkSession(
   agentId: string,
   sdkSessionId: string
 ): Promise<void> {
@@ -608,7 +608,7 @@ export async function migrateFromLegacy(): Promise<number> {
 /**
  * Clear all agent data (for testing or reset)
  */
-async function clearAllAgents(): Promise<void> {
+export async function clearAllAgents(): Promise<void> {
   try {
     const store = await getStore();
     await store.clear();
@@ -624,7 +624,7 @@ async function clearAllAgents(): Promise<void> {
 /**
  * Get storage statistics for debugging
  */
-async function getStorageStats(): Promise<{
+export async function getStorageStats(): Promise<{
   agentCount: number;
   version: number;
   projectPaths: string[];
@@ -652,7 +652,7 @@ async function getStorageStats(): Promise<{
 /**
  * Export agents to JSON (for backup)
  */
-async function exportAgents(): Promise<string> {
+export async function exportAgents(): Promise<string> {
   const agents = await loadAgents();
   const sessions = await loadAgentSessions();
   const store: UnifiedAgentStore = {
@@ -669,7 +669,7 @@ async function exportAgents(): Promise<string> {
  * @param jsonString - JSON string with UnifiedAgentStore structure
  * @param mergeWithExisting - If true, merge with existing agents; if false, replace all
  */
-async function importAgents(
+export async function importAgents(
   jsonString: string,
   mergeWithExisting = true
 ): Promise<number> {

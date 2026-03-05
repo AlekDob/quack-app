@@ -647,9 +647,14 @@ function AppContent() {
     expressions: [],
   });
 
+  // Debug wrapper for setNewTerminalPersonality
   const handlePersonalityChange = useCallback((newPersonality: Partial<AgentPersonality>) => {
     setNewTerminalPersonality((prev) => {
+      console.log('🔍 handlePersonalityChange called');
+      console.log('🔍 Previous state:', JSON.stringify(prev, null, 2));
+      console.log('🔍 New personality:', JSON.stringify(newPersonality, null, 2));
       const merged = { ...prev, ...newPersonality };
+      console.log('🔍 Merged state:', JSON.stringify(merged, null, 2));
       return merged;
     });
   }, []);
@@ -2095,18 +2100,31 @@ function AppContent() {
                 hasMetadata: !!agentMetadata,
               });
 
+              console.log('[Memory Observer DEBUG] Processing messages for agent:', agentId,
+                lastMsg ? { eventsCount: lastMsg.events?.length, role: lastMsg.role } : 'no lastMsg');
+
               if (lastMsg && lastMsg.events) {
                 let hasFileModifications = false;
                 const toolExecutions: Array<{ name: string; input: unknown }> = [];
 
+                console.log('[Memory Observer DEBUG] Events to process:', lastMsg.events.length);
+
                 // Check assistant events for Write/Edit tool uses
                 // Also check for MCP Memory read_graph results
-                lastMsg.events.forEach((evt) => {
+                lastMsg.events.forEach((evt, idx) => {
+                  console.log(`[Memory Observer DEBUG] Event ${idx}:`, evt.type,
+                    evt.type === 'assistant' ? `content blocks: ${(evt as any).message?.content?.length}` : '');
+
                   if (evt.type === 'assistant' && (evt as any).message?.content) {
                     ((evt as any).message.content as any[]).forEach((content) => {
+                      console.log('[Memory Observer DEBUG] Content block:', content.type,
+                        content.type === 'tool_use' ? `name: ${content.name}` : '');
+
                       if (content.type === 'tool_use') {
                         const toolName = content.name?.toLowerCase();
                         const input = content.input;
+
+                        console.log('[Memory Observer] Found tool_use:', toolName);
 
                         // Check if Write or Edit tools were used
                         if ((toolName === 'write' && input?.file_path) ||
@@ -2116,6 +2134,7 @@ function AppContent() {
 
                         // Collect tool executions for memory observer
                         if (toolName && ['write', 'edit', 'bash'].includes(toolName)) {
+                          console.log('[Memory Observer] Adding to toolExecutions:', toolName);
                           toolExecutions.push({ name: toolName, input });
                         }
                       }
@@ -2137,10 +2156,19 @@ function AppContent() {
                   // Then check for tool_result responses
                   if (evt.type === 'user' && (evt as any).message?.content) {
                     const contentArray = (evt as any).message.content as any[];
+                    console.log('[MCP Memory DEBUG] User event content types:', contentArray.map((c: any) => c.type));
 
                     contentArray.forEach((content) => {
                       if (content.type === 'tool_result') {
-                        // tool_result processed for MCP Memory panel
+                        console.log('[MCP Memory DEBUG] tool_result found:', {
+                          tool_use_id: content.tool_use_id,
+                          contentType: typeof content.content,
+                          contentPreview: typeof content.content === 'string'
+                            ? content.content.substring(0, 200)
+                            : JSON.stringify(content.content).substring(0, 200)
+                        });
+
+
                       }
                     });
                   }

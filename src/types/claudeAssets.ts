@@ -81,13 +81,13 @@ export interface AssetOperationResult {
 }
 
 // Drag and drop payload
-interface AssetDragPayload {
+export interface AssetDragPayload {
   asset: ClaudeAsset;
   sourceProject: string;
 }
 
 // Drop target info
-interface AssetDropTarget {
+export interface AssetDropTarget {
   projectPath: string;
   projectName: string;
   assetType: ClaudeAssetType;
@@ -102,7 +102,7 @@ export interface AssetFilters {
 }
 
 // State for the Claude Assets Manager
-interface ClaudeAssetsState {
+export interface ClaudeAssetsState {
   projects: ClaudeProject[];
   selectedProject: string | null;
   selectedAsset: ClaudeAsset | null;
@@ -113,7 +113,7 @@ interface ClaudeAssetsState {
 }
 
 // Props for asset-related components
-interface AssetCardProps {
+export interface AssetCardProps {
   asset: ClaudeAsset;
   isSelected: boolean;
   isDragging: boolean;
@@ -124,7 +124,7 @@ interface AssetCardProps {
   onEdit: (asset: ClaudeAsset) => void;
 }
 
-interface ProjectItemProps {
+export interface ProjectItemProps {
   project: ClaudeProject;
   isSelected: boolean;
   isDropTarget: boolean;
@@ -133,7 +133,7 @@ interface ProjectItemProps {
 }
 
 // Tab configuration
-interface ClaudeAssetsTab {
+export interface ClaudeAssetsTab {
   id: string;
   type: 'claude-assets';
   label: string;

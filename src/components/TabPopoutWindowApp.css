@@ -1,0 +1,333 @@
+/* Tab Popout Window - Glassmorphism styling matching PipWindow */
+
+.tab-popout-window {
+  width: 100%;
+  height: 100%;
+  background: rgba(10, 12, 16, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Loading state */
+.tab-popout-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-popout-loading-text {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+/* Titlebar - Draggable with macOS traffic lights support */
+.tab-popout-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* Add padding for macOS traffic lights (semaforo) */
+  padding: 12px 16px 12px 80px;
+  background: rgba(20, 24, 32, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: move;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-app-region: drag;
+  transition: background 0.2s ease;
+}
+
+.tab-popout-titlebar.dragging {
+  background: rgba(242, 140, 82, 0.15);
+}
+
+.tab-popout-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tab-popout-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.tab-popout-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #f28c52;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+/* File path - shown after filename */
+.tab-popout-filepath {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Content Area */
+.tab-popout-content {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+  background: rgba(15, 18, 24, 0.5);
+  position: relative;
+}
+
+/* Custom Scrollbar */
+.tab-popout-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.tab-popout-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tab-popout-content::-webkit-scrollbar-thumb {
+  background: rgba(242, 140, 82, 0.3);
+  border-radius: 4px;
+}
+
+.tab-popout-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(242, 140, 82, 0.5);
+}
+
+/* Placeholder Content */
+.tab-popout-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.tab-popout-placeholder-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+  opacity: 0.8;
+  animation: tab-popout-float 3s ease-in-out infinite;
+}
+
+.tab-popout-placeholder-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 8px;
+}
+
+.tab-popout-placeholder-subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  max-width: 400px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+/* Animations */
+@keyframes tab-popout-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .tab-popout-titlebar {
+    padding: 10px 12px;
+  }
+
+  .tab-popout-icon {
+    font-size: 14px;
+  }
+
+  .tab-popout-label {
+    font-size: 12px;
+  }
+
+  .tab-popout-control-btn {
+    width: 20px;
+    height: 20px;
+  }
+
+  .tab-popout-control-icon {
+    font-size: 14px;
+  }
+
+  .tab-popout-placeholder-icon {
+    font-size: 48px;
+  }
+
+  .tab-popout-placeholder-title {
+    font-size: 16px;
+  }
+
+  .tab-popout-placeholder-subtitle {
+    font-size: 13px;
+  }
+}
+
+/* Focus styles for accessibility */
+.tab-popout-control-btn:focus-visible {
+  outline: 2px solid #f28c52;
+  outline-offset: 2px;
+}
+
+/* Prevent text selection during drag */
+.tab-popout-titlebar * {
+  pointer-events: none;
+}
+
+.tab-popout-controls * {
+  pointer-events: auto;
+}
+
+/* Return to tab button */
+.tab-popout-return-btn {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.tab-popout-return-btn:hover {
+  background: rgba(242, 140, 82, 0.2);
+  color: #f28c52;
+}
+
+.tab-popout-return-btn:active {
+  background: rgba(242, 140, 82, 0.3);
+  transform: scale(0.95);
+}
+
+.tab-popout-return-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Unsaved changes indicator */
+.tab-popout-unsaved {
+  color: #fbbf24;
+  margin-left: 4px;
+  font-weight: 700;
+}
+
+/* Loading spinner for content */
+.tab-popout-loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+}
+
+.tab-popout-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #f28c52;
+  border-radius: 50%;
+  animation: tab-popout-spin 1s linear infinite;
+}
+
+@keyframes tab-popout-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tab-popout-loading-message {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Error display */
+.tab-popout-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 40px 20px;
+  text-align: center;
+  gap: 16px;
+}
+
+.tab-popout-error-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.tab-popout-error-message {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  max-width: 400px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.tab-popout-retry-btn {
+  padding: 8px 16px;
+  background: rgba(242, 140, 82, 0.2);
+  border: 1px solid rgba(242, 140, 82, 0.4);
+  border-radius: 6px;
+  color: #f28c52;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab-popout-retry-btn:hover {
+  background: rgba(242, 140, 82, 0.3);
+  border-color: rgba(242, 140, 82, 0.6);
+}
+
+/* Code editor container - ensure full height */
+.tab-popout-content > div {
+  height: 100%;
+}

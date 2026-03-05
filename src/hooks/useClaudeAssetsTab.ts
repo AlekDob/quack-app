@@ -66,3 +66,4 @@ export function useClaudeAssetsTab({
   };
 }
 
+export default useClaudeAssetsTab;

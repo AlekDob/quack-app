@@ -42,3 +42,11 @@ codebase-cleaner      → execute fixes from health report
 - Knip needs `knip.json` config for non-standard entry points (Tauri multi-entry: `brain-main.tsx`, `browser-main.tsx`, etc.)
 - Doctor's dead code count is less precise than Knip — use Knip for authoritative dead code, doctor for everything else
 - Cleaner currently available as `general-purpose` subagent type (global agents not yet registered as subagent types)
+
+## Incident: 2026-03-05 — Aggressive deletion broke Brain + Terminal
+
+A Haiku agent ran a cleanup that deleted 259 files including components reachable from secondary entry points (`brain-main.tsx`, `terminal-entry.tsx`, etc.). The doctor report correctly excluded entry points, but the agent also deleted their **transitive dependencies** (e.g., `BrainApp.tsx`, `TerminalMain.tsx`, `StandaloneTerminal.tsx`). These files had 0 importers in `App.tsx` but were imported by secondary HTML entry points.
+
+**Root cause**: No step in the workflow traced the import chain from ALL entry points — only the main `App.tsx` was checked. A file with 0 importers in the main app can still be critical if a secondary entry point depends on it.
+
+**Fix**: Updated `codebase-cleaner` agent with mandatory Phase 0C (Map All Entry Points) and stronger safety rules that require tracing import chains back to ALL entry points before deletion.

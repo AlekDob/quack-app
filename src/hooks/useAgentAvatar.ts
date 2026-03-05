@@ -97,7 +97,7 @@ export function useAgentAvatar(_agentName: string, avatarFilename?: string): str
  * Call this early in app startup to warm the cache
  * @param avatarFilenames - Array of avatar filenames to preload
  */
-async function preloadAvatars(avatarFilenames: (string | undefined)[]): Promise<void> {
+export async function preloadAvatars(avatarFilenames: (string | undefined)[]): Promise<void> {
   const uniqueFilenames = [...new Set(avatarFilenames)];
   await Promise.all(uniqueFilenames.map(getCachedAvatar));
 }
@@ -105,6 +105,6 @@ async function preloadAvatars(avatarFilenames: (string | undefined)[]): Promise<
 /**
  * Clear avatar cache (useful for testing or when avatars change)
  */
-function clearAvatarCache(): void {
+export function clearAvatarCache(): void {
   avatarCache.clear();
 }

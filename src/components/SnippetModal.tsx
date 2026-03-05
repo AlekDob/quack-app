@@ -461,3 +461,4 @@ export function SnippetModal({
   return createPortal(modalContent, document.body);
 }
 
+export default SnippetModal;

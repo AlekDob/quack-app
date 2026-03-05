@@ -24,7 +24,7 @@ const getTestModeAuthState = (): boolean => {
 /**
  * Wrapped invoke that intercepts commands in test mode
  */
-const invoke = async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
+export const invoke = async <T>(command: string, args?: Record<string, unknown>): Promise<T> => {
   // In test mode, intercept specific commands
   if (IS_TEST_MODE) {
     // Intercept Claude CLI availability check

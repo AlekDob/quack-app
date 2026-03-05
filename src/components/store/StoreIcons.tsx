@@ -2,7 +2,7 @@ import type { ReactElement } from 'react';
 import { getAvatarUrl } from '../../utils/agentAvatars';
 
 // Category-specific gradients - each type has its own color
-const CATEGORY_GRADIENTS: Record<string, string> = {
+export const CATEGORY_GRADIENTS: Record<string, string> = {
   skills: 'linear-gradient(135deg, #f28c52, #e67339)',
   agents: 'linear-gradient(135deg, #f28c52, #fbbf24)',
   'agent-bundles': 'linear-gradient(135deg, #f28c52, #fbbf24)',

@@ -145,7 +145,7 @@ export function useAgentRules(
  * Get a summary string of active rules
  * Useful for displaying in compact UI elements
  */
-function getRulesSummary(rules: AgentRuleInfo[]): string {
+export function getRulesSummary(rules: AgentRuleInfo[]): string {
   if (rules.length === 0) return 'No rules active';
   if (rules.length === 1) return rules[0].name;
   if (rules.length <= 3) return rules.map(r => r.name).join(', ');

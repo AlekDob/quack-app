@@ -24,7 +24,7 @@ import type { Tab } from "../components/TabBar";
 /**
  * Terminal metadata stored in persistent storage
  */
-interface TerminalMetadata {
+export interface TerminalMetadata {
   id: string;
   label: string;
   color: string;
@@ -51,7 +51,7 @@ export const NATIVE_TERMINALS_STORAGE_KEY = "nativeTerminals";
  * Save terminals to persistent storage
  * @param terminals Array of terminal information to save
  */
-const saveTerminalsToStorage = async (terminals: TerminalInfo[]): Promise<void> => {
+export const saveTerminalsToStorage = async (terminals: TerminalInfo[]): Promise<void> => {
   try {
     const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
     // Save terminal metadata including personality AND ID for persistence
@@ -77,7 +77,7 @@ const saveTerminalsToStorage = async (terminals: TerminalInfo[]): Promise<void> 
  * Load terminals from persistent storage
  * @returns Array of terminal metadata, empty array if none found or error occurs
  */
-const loadTerminalsFromStorage = async (): Promise<TerminalMetadata[]> => {
+export const loadTerminalsFromStorage = async (): Promise<TerminalMetadata[]> => {
   try {
     const store = await Store.load(getTestModeStoreName("quack-terminals.json"));
     const stored = await store.get<TerminalMetadata[]>(STORAGE_KEY);
@@ -275,7 +275,7 @@ export const loadNativeTerminalsFromStorage = async (): Promise<NativeTerminal[]
  * This is the new source of truth for which agents are "open"
  * @param projectPath The project path to load active agents for
  */
-const loadActiveAgentIds = async (projectPath: string): Promise<string[]> => {
+export const loadActiveAgentIds = async (projectPath: string): Promise<string[]> => {
   try {
     const ids = await invoke<string[]>('load_active_agents', { projectPath });
     console.log(`[terminalStorage] Loaded ${ids.length} active agents from ${projectPath}`);
@@ -291,7 +291,7 @@ const loadActiveAgentIds = async (projectPath: string): Promise<string[]> => {
  * @param projectPath The project path
  * @param agentIds Array of agent IDs that are currently active
  */
-const saveActiveAgentIds = async (projectPath: string, agentIds: string[]): Promise<void> => {
+export const saveActiveAgentIds = async (projectPath: string, agentIds: string[]): Promise<void> => {
   try {
     await invoke('save_active_agents', { projectPath, agentIds });
     console.log(`[terminalStorage] Saved ${agentIds.length} active agents to ${projectPath}`);

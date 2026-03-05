@@ -96,7 +96,7 @@ export function getFallbackDuckUrl(): string {
  * Get a random duck avatar for a new agent
  * @returns Random avatar filename
  */
-function getRandomAvatar(): string {
+export function getRandomAvatar(): string {
   return AVAILABLE_AVATARS[Math.floor(Math.random() * AVAILABLE_AVATARS.length)];
 }
 
@@ -131,7 +131,7 @@ export function getAgentAvatar(_agentName: string, avatarFilename?: string): str
  * @param avatarFilename - Avatar filename to check
  * @returns true if avatar is valid (default or custom)
  */
-function hasAgentAvatar(avatarFilename?: string): boolean {
+export function hasAgentAvatar(avatarFilename?: string): boolean {
   if (!avatarFilename) return false;
 
   // Check if it's a custom avatar (UUID format)
@@ -147,7 +147,7 @@ function hasAgentAvatar(avatarFilename?: string): boolean {
  * Get all available duck avatars with their URLs
  * @returns Record of avatar filename to URL
  */
-function getAvailableAvatars(): Record<string, string> {
+export function getAvailableAvatars(): Record<string, string> {
   const avatars: Record<string, string> = {};
   AVAILABLE_AVATARS.forEach(avatar => {
     avatars[avatar] = getAvatarUrl(avatar);

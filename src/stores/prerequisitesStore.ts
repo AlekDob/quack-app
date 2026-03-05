@@ -6,7 +6,7 @@ import { invoke } from '@tauri-apps/api/core';
 // Types
 // =============================================================================
 
-interface PrerequisiteStatus {
+export interface PrerequisiteStatus {
   name: string;
   installed: boolean;
   version: string | null;
@@ -15,14 +15,14 @@ interface PrerequisiteStatus {
   version_satisfied: boolean;
 }
 
-interface PrerequisitesCheck {
+export interface PrerequisitesCheck {
   git: PrerequisiteStatus;
   nodejs: PrerequisiteStatus;
   claude_cli: PrerequisiteStatus;
   all_installed: boolean;
 }
 
-interface PrerequisitesState {
+export interface PrerequisitesState {
   hasCompletedOnboarding: boolean;
   prerequisites: PrerequisitesCheck | null;
   isChecking: boolean;
@@ -239,6 +239,6 @@ export const selectShouldShowPrerequisites = (state: PrerequisitesState): boolea
   return !state.hasCompletedOnboarding;
 };
 
-const selectAllPrerequisitesInstalled = (state: PrerequisitesState): boolean => {
+export const selectAllPrerequisitesInstalled = (state: PrerequisitesState): boolean => {
   return state.prerequisites?.all_installed ?? false;
 };

@@ -42,4 +42,5 @@ function TerminalIcon({ className = '', size = 16 }: TerminalIconProps) {
   );
 }
 
+export default memo(TerminalIcon);
 export { TerminalIcon };

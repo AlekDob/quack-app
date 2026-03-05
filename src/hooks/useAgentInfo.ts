@@ -119,6 +119,6 @@ export function useAgentInfo(agentId: string, workingDir?: string): AgentInfoRes
 /**
  * Clear the agent info cache
  */
-function clearAgentInfoCache(): void {
+export function clearAgentInfoCache(): void {
   agentCache.clear();
 }

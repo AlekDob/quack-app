@@ -243,7 +243,7 @@ class DebugLogger {
 }
 
 // Singleton instance
-const debugLogger = new DebugLogger();
+export const debugLogger = new DebugLogger();
 
 // Export for use in hooks and components
 export default debugLogger;

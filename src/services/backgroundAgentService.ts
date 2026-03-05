@@ -275,7 +275,7 @@ function startQueueProcessor(): void {
 /**
  * Stop the queue processor
  */
-function stopQueueProcessor(): void {
+export function stopQueueProcessor(): void {
   if (queueProcessorInterval) {
     clearInterval(queueProcessorInterval);
     queueProcessorInterval = null;
@@ -627,7 +627,7 @@ export function runCommandInBackground(
 /**
  * Get all active (running + queued) tasks
  */
-function getActiveTasks(): BackgroundTask[] {
+export function getActiveTasks(): BackgroundTask[] {
   const store = useBackgroundAgentStore.getState();
   return store.tasks.filter(t => ['running', 'queued', 'paused'].includes(t.status));
 }
@@ -635,7 +635,7 @@ function getActiveTasks(): BackgroundTask[] {
 /**
  * Get queue statistics
  */
-function getQueueStats() {
+export function getQueueStats() {
   const store = useBackgroundAgentStore.getState();
   return store.getQueueStats();
 }

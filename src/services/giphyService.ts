@@ -12,7 +12,7 @@ const GIPHY_API_URL = 'https://api.giphy.com/v1/gifs';
 /**
  * Set the Giphy API key at runtime (from Settings store)
  */
-function setGiphyApiKey(key: string): void {
+export function setGiphyApiKey(key: string): void {
   giphyApiKey = key;
 }
 
@@ -28,7 +28,7 @@ const MAX_RECENT_KEYWORDS = 10;
 let lastRequestTime = 0;
 const MIN_REQUEST_INTERVAL_MS = 500; // Minimum 500ms between requests
 
-interface GiphyGif {
+export interface GiphyGif {
   id: string;
   url: string; // Full size URL
   previewUrl: string; // Smaller preview for faster loading
@@ -37,7 +37,7 @@ interface GiphyGif {
   height: number;
 }
 
-interface GiphySearchResponse {
+export interface GiphySearchResponse {
   data: Array<{
     id: string;
     title: string;
@@ -141,7 +141,7 @@ const MIN_LANDSCAPE_RATIO = 1.2;
  * Search for a LANDSCAPE GIF on Giphy with variety
  * Fetches multiple results and selects randomly from landscape options
  */
-async function searchGif(keyword: string, cacheKey?: string): Promise<GiphyGif | null> {
+export async function searchGif(keyword: string, cacheKey?: string): Promise<GiphyGif | null> {
   if (!giphyApiKey) {
     console.warn('[GiphyService] API key not available');
     return null;
@@ -248,7 +248,7 @@ async function searchGif(keyword: string, cacheKey?: string): Promise<GiphyGif |
  * @param toolName - The tool name
  * @param toolId - Unique ID for this tool invocation (used for caching)
  */
-async function getGifForTool(toolName: string, toolId?: string): Promise<GiphyGif | null> {
+export async function getGifForTool(toolName: string, toolId?: string): Promise<GiphyGif | null> {
   const keywords = getKeywordsForTool(toolName);
 
   // Try to pick a keyword we haven't used recently
@@ -278,7 +278,7 @@ async function getGifForTool(toolName: string, toolId?: string): Promise<GiphyGi
  * Check if Giphy service is configured and available
  * Returns true only if user has provided their own API key
  */
-function isGiphyConfigured(): boolean {
+export function isGiphyConfigured(): boolean {
   return !!giphyApiKey;
 }
 

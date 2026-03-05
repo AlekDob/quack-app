@@ -15,9 +15,9 @@ export const QUALITY_WEIGHTS = {
 } as const;
 
 // Quality levels
-type QualityLevel = 'weak' | 'moderate' | 'strong';
+export type QualityLevel = 'weak' | 'moderate' | 'strong';
 
-interface TriggerQuality {
+export interface TriggerQuality {
   level: QualityLevel;
   score: number;
   message: string;

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import type { MCPServer, MCPTemplate } from '../types';
 
-interface UseMCPServersReturn {
+export interface UseMCPServersReturn {
   servers: MCPServer[];
   templates: MCPTemplate[];
   loading: boolean;

@@ -10,7 +10,7 @@ export interface SlashCommand {
   scope: string; // "global" | "project" | "builtin"
 }
 
-interface SlashCommandsResponse {
+export interface SlashCommandsResponse {
   builtin: SlashCommand[];
   custom: SlashCommand[];
 }

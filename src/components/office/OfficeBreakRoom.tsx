@@ -106,7 +106,7 @@ function isoBox(
   g.fill({ color: topColor });
 }
 
-type BreakRoomLayer = "base" | "furniture";
+export type BreakRoomLayer = "base" | "furniture";
 
 interface OfficeBreakRoomProps {
   position: BreakRoomPosition;

@@ -1,0 +1,557 @@
+.terminal-window-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #1a1a1a;
+  color: #fff;
+  overflow: hidden;
+  position: relative;
+}
+
+/* White line fix handled globally in index.css body::before */
+
+.terminal-window-header {
+  display: none; /* Hidden - not needed */
+}
+
+.terminal-window-header:active {
+  cursor: grabbing;
+}
+
+.terminal-window-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.3px;
+}
+
+.terminal-window-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0; /* Critical for nested flexbox to calculate heights properly */
+}
+
+/* Sidebar */
+.terminal-sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: #0B0C0E;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal-sidebar-header {
+  height: 35px;
+  padding: 0px 8px 0 80px; /* Left padding for macOS traffic lights */
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: grab;
+  -webkit-app-region: drag;
+}
+
+.terminal-sidebar-header:active {
+  cursor: grabbing;
+}
+
+.terminal-sidebar-title {
+  flex: 1;
+  cursor: grab;
+  -webkit-app-region: drag;
+}
+
+.terminal-sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.terminal-sidebar-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+}
+
+.terminal-sidebar-empty p {
+  margin: 0 0 8px 0;
+}
+
+.terminal-sidebar-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.3);
+  line-height: 1.4;
+}
+
+/* Add Project Button */
+.terminal-add-project-btn {
+  width: 24px;
+  height: 24px;
+  background: rgba(242, 140, 82, 0.1);
+  border: 1px solid rgba(242, 140, 82, 0.3);
+  color: #f28c52;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  margin-left: auto; /* Push to the end */
+  -webkit-app-region: no-drag; /* Exclude from drag region */
+}
+
+.terminal-add-project-btn:hover {
+  background: rgba(242, 140, 82, 0.2);
+  border-color: rgba(242, 140, 82, 0.5);
+  transform: scale(1.05);
+}
+
+.terminal-add-project-btn:active {
+  transform: scale(0.95);
+}
+
+/* Project Group */
+.project-group {
+  margin-bottom: 4px;
+}
+
+.project-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px 6px 12px;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.project-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.project-header.selected {
+  background: rgba(77, 212, 179, 0.1);
+}
+
+.project-chevron {
+  width: 16px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.4);
+  transition: transform 0.15s ease;
+}
+
+.project-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.project-name {
+  flex: 1;
+  min-width: 0; /* Allow text to shrink for ellipsis */
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-add-btn {
+  width: 20px;
+  height: 20px;
+  background: rgba(77, 212, 179, 0.15);
+  border: 1px solid rgba(77, 212, 179, 0.3);
+  color: #4dd4b3;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  padding: 0;
+  padding-bottom: 1px; /* Optical adjustment for + character */
+}
+
+.project-add-btn:hover {
+  background: rgba(77, 212, 179, 0.3);
+  border-color: rgba(77, 212, 179, 0.5);
+  color: #6ee7c2;
+  transform: scale(1.05);
+}
+
+/* Terminal Items */
+.project-terminals {
+  padding-left: 28px;
+}
+
+.project-no-terminals {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+  font-style: italic;
+}
+
+.terminal-item {
+  display: flex;
+  align-items: center;
+  padding: 5px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin: 2px 8px 2px 0;
+  transition: background 0.15s ease;
+}
+
+.terminal-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.terminal-item.active {
+  background: rgba(77, 212, 179, 0.15);
+}
+
+.terminal-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.terminal-name {
+  flex: 1;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+
+/* Main Terminal Area */
+.terminal-main {
+  flex: 1;
+  background: #1e1e1e;
+  min-height: 0; /* Critical for flexbox to allow shrinking */
+  min-width: 0; /* Also needed for flexbox */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Terminal surface fills flex container */
+.terminal-main .terminal-surface {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Terminal instance fills available space */
+.terminal-main .terminal-instance {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* XTerm fills its container */
+.terminal-main .xterm {
+  height: 100% !important;
+  width: 100% !important;
+  padding: 8px !important;
+}
+
+.terminal-main .xterm-viewport {
+  overflow-y: auto !important;
+}
+
+.terminal-main .xterm-screen {
+  height: 100% !important;
+}
+
+/* Fix for line-height issues with Claude Code and other TUI apps */
+.terminal-main .xterm-rows {
+  line-height: normal !important;
+}
+
+.terminal-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.terminal-empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  font-family: monospace;
+  opacity: 0.5;
+}
+
+.terminal-empty p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.terminal-empty-hint {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* Terminal Name Input */
+.terminal-name-input {
+  flex: 1;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(77, 212, 179, 0.4);
+  border-radius: 4px;
+  padding: 2px 6px;
+  outline: none;
+  font-family: inherit;
+  min-width: 0;
+  transition: all 0.15s ease;
+}
+
+.terminal-name-input:focus {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(77, 212, 179, 0.6);
+  box-shadow: 0 0 0 2px rgba(77, 212, 179, 0.15);
+}
+
+/* Terminal Edit Button */
+.terminal-edit-btn {
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  opacity: 0;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.terminal-item:hover .terminal-edit-btn {
+  opacity: 1;
+}
+
+.terminal-edit-btn:hover {
+  background: rgba(77, 212, 179, 0.2);
+  color: #4dd4b3;
+}
+
+/* Improved Close Button */
+.terminal-close-btn {
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  opacity: 0;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.terminal-item:hover .terminal-close-btn {
+  opacity: 1;
+}
+
+.terminal-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* Context Menu */
+.terminal-context-menu {
+  background: rgba(30, 30, 30, 0.98);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  min-width: 140px;
+  animation: contextMenuFadeIn 0.12s ease-out;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.terminal-context-menu-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.12s ease;
+  user-select: none;
+}
+
+.terminal-context-menu-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+.terminal-context-menu-item.danger {
+  color: #ef4444;
+}
+
+.terminal-context-menu-item.danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.terminal-context-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 4px 8px;
+}
+
+/* Color Picker */
+.terminal-color-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  margin: 4px;
+}
+
+.terminal-color-option {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.terminal-color-option:hover {
+  transform: scale(1.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.terminal-color-option.active {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.terminal-main-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+/* ===== Floating Action Menu ===== */
+
+.terminal-action-menu {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  z-index: 10;
+}
+
+.terminal-action-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(20, 22, 28, 0.75);
+  color: rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.terminal-action-btn:hover {
+  background: rgba(30, 34, 44, 0.9);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.terminal-action-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 170px;
+  background: #1a1d24;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.terminal-action-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.terminal-action-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.terminal-action-item span {
+  flex: 1;
+  text-align: left;
+}
+
+.terminal-action-item kbd {
+  font-family: inherit;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.terminal-action-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 6px;
+}

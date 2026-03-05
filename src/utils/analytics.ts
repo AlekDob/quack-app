@@ -13,7 +13,7 @@ const APP_VERSION = import.meta.env.PACKAGE_VERSION || '0.0.0';
 /**
  * Get common properties to include with all events
  */
-function getCommonProperties(): Record<string, unknown> {
+export function getCommonProperties(): Record<string, unknown> {
   return {
     app_version: APP_VERSION,
     platform: 'desktop',
@@ -124,7 +124,7 @@ export const FeatureCategories = {
   PIP: 'pip',
 } as const;
 
-type FeatureCategory = (typeof FeatureCategories)[keyof typeof FeatureCategories];
+export type FeatureCategory = (typeof FeatureCategories)[keyof typeof FeatureCategories];
 
 /**
  * Create a feature usage event payload
@@ -172,7 +172,7 @@ export class SessionTracker {
 }
 
 // Global session tracker instance
-const sessionTracker = new SessionTracker();
+export const sessionTracker = new SessionTracker();
 
 /**
  * Debounced event tracker to avoid spamming similar events
@@ -202,7 +202,7 @@ export function createDebouncedTracker<K extends keyof AnalyticsEvents>(
 /**
  * Batch event tracker for high-frequency events
  */
-class BatchedEventTracker {
+export class BatchedEventTracker {
   private batch: Array<{ event: string; properties: Record<string, unknown> }> = [];
   private flushInterval: NodeJS.Timeout | null = null;
   private batchSize: number;

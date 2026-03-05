@@ -112,7 +112,7 @@ export function useSessions() {
 /**
  * Parse history.jsonl content into structured events and messages
  */
-function parseSessionHistory(historyContent: string): {
+export function parseSessionHistory(historyContent: string): {
   events: ClaudeEvent[];
   messages: SessionHistoryMessage[];
   usage: UsageStats;

@@ -73,7 +73,7 @@ export function sessionToKanbanTask(
  * @param agentInfoMap - Optional map of agentId → agent info for card display
  * @returns Array of KanbanTask representations
  */
-function sessionsToKanbanTasks(
+export function sessionsToKanbanTasks(
   sessions: AgentSession[],
   agentInfoMap?: Map<string, { name?: string; avatar?: string; color?: string }>
 ): KanbanTask[] {
@@ -89,6 +89,6 @@ function sessionsToKanbanTasks(
  * @param task - The task to check
  * @returns true if task is a session-based agent task
  */
-function isSessionTask(task: KanbanTask): boolean {
+export function isSessionTask(task: KanbanTask): boolean {
   return task.type === 'agent';
 }

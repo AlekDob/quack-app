@@ -18,7 +18,7 @@ export function formatRelativeTime(timestamp: number): string {
 /**
  * Format timestamp to absolute date/time (e.g., "Jan 13, 2:30 PM")
  */
-function formatAbsoluteTime(timestamp: number): string {
+export function formatAbsoluteTime(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',

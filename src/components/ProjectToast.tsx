@@ -9,7 +9,7 @@
 import { toast } from 'sonner';
 import './ProjectToast.css';
 
-interface ProjectToastProps {
+export interface ProjectToastProps {
   projectName: string;
   projectColor: string;
   agentName?: string;
@@ -18,7 +18,7 @@ interface ProjectToastProps {
   type?: 'success' | 'info' | 'warning' | 'error';
 }
 
-function ProjectToast({
+export function ProjectToast({
   projectName,
   projectColor,
   agentName,
@@ -87,7 +87,7 @@ export function showProjectToast(props: ProjectToastProps, duration = 4000) {
 /**
  * Convenience methods for different toast types
  */
-const projectToast = {
+export const projectToast = {
   success: (props: Omit<ProjectToastProps, 'type'>, duration?: number) =>
     showProjectToast({ ...props, type: 'success' }, duration),
 
@@ -101,3 +101,4 @@ const projectToast = {
     showProjectToast({ ...props, type: 'error' }, duration),
 };
 
+export default ProjectToast;

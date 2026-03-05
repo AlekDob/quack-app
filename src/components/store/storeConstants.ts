@@ -2,7 +2,7 @@ import type { MarketplaceCategory } from '../../types';
 
 export type StoreTab = 'all' | 'skills' | 'commands' | 'agents' | 'droids' | 'rules' | 'mcp' | 'hooks';
 
-interface TabConfig {
+export interface TabConfig {
   value: StoreTab;
   label: string;
   sidebarLabel: string;

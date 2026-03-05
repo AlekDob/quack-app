@@ -138,4 +138,4 @@ export const useShortcutsStore = create<ShortcutsState>()(
 );
 
 // Export utility function for use outside of React
-;
+export { formatShortcutKeys };

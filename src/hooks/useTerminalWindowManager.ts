@@ -2,12 +2,12 @@ import { useCallback, useState } from 'react';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { emitTo } from '@tauri-apps/api/event';
 
-interface ProjectInfo {
+export interface ProjectInfo {
   path: string;
   name: string;
 }
 
-interface InitialCommand {
+export interface InitialCommand {
   projectPath: string;
   command: string;
   terminalLabel?: string;

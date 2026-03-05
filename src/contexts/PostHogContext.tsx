@@ -65,7 +65,7 @@ export interface AnalyticsEvents {
 }
 
 // User properties for identification
-interface UserProperties {
+export interface UserProperties {
   plan?: 'free' | 'pro';
   deviceId?: string;
   appVersion?: string;
@@ -276,7 +276,7 @@ export const PostHogProvider: React.FC<{ children: React.ReactNode }> = ({ child
 };
 
 // Custom hook for using analytics
-const useAnalytics = (): PostHogContextValue => {
+export const useAnalytics = (): PostHogContextValue => {
   const context = useContext(PostHogContext);
 
   if (!context) {
@@ -301,4 +301,4 @@ const useAnalytics = (): PostHogContextValue => {
 };
 
 // Export the raw posthog instance for advanced usage
-;
+export { posthog };

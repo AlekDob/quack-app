@@ -9,7 +9,7 @@ const LICENSE_DATA_STORAGE = 'quack_license_data';
 
 // Free tier limits — Quack is now FREE FOREVER with no limits
 // Kept for backwards compatibility but everything is unlocked
-const FREE_LIMITS = {
+export const FREE_LIMITS = {
   maxTerminals: Infinity,
   maxGroups: Infinity,
   cloudSync: true,
@@ -20,7 +20,7 @@ const FREE_LIMITS = {
 } as const;
 
 // Pro features list
-const PRO_FEATURES = {
+export const PRO_FEATURES = {
   unlimitedTerminals: true,
   unlimitedGroups: true,
   cloudSync: true,
@@ -111,7 +111,7 @@ export const clearLicenseData = (): void => {
 /**
  * Check if a specific feature is available
  */
-const hasFeature = (feature: keyof typeof PRO_FEATURES): boolean => {
+export const hasFeature = (feature: keyof typeof PRO_FEATURES): boolean => {
   if (isPro()) {
     return PRO_FEATURES[feature];
   }
@@ -121,7 +121,7 @@ const hasFeature = (feature: keyof typeof PRO_FEATURES): boolean => {
 /**
  * Get the limit for a specific resource
  */
-const getLimit = (resource: keyof typeof FREE_LIMITS): number | boolean => {
+export const getLimit = (resource: keyof typeof FREE_LIMITS): number | boolean => {
   if (isPro()) {
     // Pro users have unlimited/all features
     if (resource === 'maxTerminals' || resource === 'maxGroups') {
@@ -135,7 +135,7 @@ const getLimit = (resource: keyof typeof FREE_LIMITS): number | boolean => {
 /**
  * Check if user can create another terminal
  */
-const canCreateTerminal = (currentCount: number): boolean => {
+export const canCreateTerminal = (currentCount: number): boolean => {
   if (isPro()) return true;
   return currentCount < FREE_LIMITS.maxTerminals;
 };
@@ -143,7 +143,7 @@ const canCreateTerminal = (currentCount: number): boolean => {
 /**
  * Check if user can create another group
  */
-const canCreateGroup = (currentCount: number): boolean => {
+export const canCreateGroup = (currentCount: number): boolean => {
   if (isPro()) return true;
   return currentCount < FREE_LIMITS.maxGroups;
 };
@@ -151,7 +151,7 @@ const canCreateGroup = (currentCount: number): boolean => {
 /**
  * Get upgrade message based on limit reached
  */
-const getUpgradeMessage = (limitType: string): string => {
+export const getUpgradeMessage = (limitType: string): string => {
   const messages: Record<string, string> = {
     terminals: 'Quack is free with unlimited agents! Need help setting up? Check out our Setup & Expert plans.',
     groups: 'Quack is free with unlimited groups! Need help setting up? Check out our Setup & Expert plans.',
@@ -165,14 +165,14 @@ const getUpgradeMessage = (limitType: string): string => {
 /**
  * Format license type for display
  */
-const formatLicenseType = (type: 'lifetime' | 'subscription'): string => {
+export const formatLicenseType = (type: 'lifetime' | 'subscription'): string => {
   return type === 'lifetime' ? 'Lifetime License' : 'Subscription';
 };
 
 /**
  * Calculate days until license expires (for subscriptions)
  */
-const getDaysUntilExpiry = (expiresAt?: number): number | null => {
+export const getDaysUntilExpiry = (expiresAt?: number): number | null => {
   if (!expiresAt) return null;
   const now = Date.now();
   const diff = expiresAt - now;
@@ -182,7 +182,7 @@ const getDaysUntilExpiry = (expiresAt?: number): number | null => {
 /**
  * Check if license is expiring soon (within 7 days)
  */
-const isExpiringSoon = (expiresAt?: number): boolean => {
+export const isExpiringSoon = (expiresAt?: number): boolean => {
   const days = getDaysUntilExpiry(expiresAt);
   return days !== null && days <= 7 && days > 0;
 };
@@ -190,7 +190,7 @@ const isExpiringSoon = (expiresAt?: number): boolean => {
 /**
  * Check if license needs revalidation (7 days since last check)
  */
-const needsRevalidation = (lastValidatedAt?: number): boolean => {
+export const needsRevalidation = (lastValidatedAt?: number): boolean => {
   if (!lastValidatedAt) return true; // Never validated, need to validate
 
   const now = Date.now();

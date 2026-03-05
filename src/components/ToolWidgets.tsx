@@ -23,15 +23,13 @@ function createDiffFromStrings(oldString: string, newString: string, fileName?: 
 }
 
 // Get tool color based on tool type
-const getToolColor = (toolName: string): string => {
+export const getToolColor = (toolName: string): string => {
   const name = toolName.toLowerCase();
   if (name === 'webfetch' || name === 'websearch') return '#10b981'; // green
   // Brain tools get vibrant rose color (inherited from old memory style)
   if (name.startsWith('mcp__quack-brain') || name.startsWith('mcp__brain') || name.startsWith('mcp_brain')) return '#E84A7F'; // vibrant rose
   // IDE tools get purple color
   if (name.startsWith('mcp__ide') || name.startsWith('mcp_ide')) return '#a855f7'; // purple
-  // Code Intel tools get cyan color
-  if (name.startsWith('mcp__code-intel') || name.startsWith('mcp_code-intel')) return '#06b6d4'; // cyan
   // Skill tool gets gold/amber color
   if (name === 'skill') return '#fbbf24'; // gold/amber
   // Plan Mode tools get emerald color
@@ -54,11 +52,10 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
   const isWebTool = toolName === 'webfetch' || toolName === 'websearch';
   const isMcpBrainTool = toolName.startsWith('mcp__quack-brain') || toolName.startsWith('mcp__brain') || toolName.startsWith('mcp_brain');
   const isMcpIdeTool = toolName.startsWith('mcp__ide') || toolName.startsWith('mcp_ide');
-  const isMcpCodeIntelTool = toolName.startsWith('mcp__code-intel') || toolName.startsWith('mcp_code-intel');
   const isSkillTool = toolName === 'skill';
   const isPlanModeTool = toolName === 'enterplanmode' || toolName === 'exitplanmode';
   const isMcpTool = toolName.startsWith('mcp__') || toolName.startsWith('mcp_');
-  const iconColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpIdeTool ? '#a855f7' : isMcpCodeIntelTool ? '#06b6d4' : isSkillTool ? '#fbbf24' : isPlanModeTool ? '#34d399' : isMcpTool ? '#f97316' : 'currentColor';
+  const iconColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpIdeTool ? '#a855f7' : isSkillTool ? '#fbbf24' : isPlanModeTool ? '#34d399' : isMcpTool ? '#f97316' : 'currentColor';
 
   if (toolName === 'read') {
     return (
@@ -240,17 +237,6 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
     );
   }
 
-  // MCP Code Intel tools - code structure/AST icon (cyan)
-  if (isMcpCodeIntelTool) {
-    return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="16 18 22 12 16 6"/>
-        <polyline points="8 6 2 12 8 18"/>
-        <line x1="12" y1="2" x2="12" y2="22" opacity="0.4"/>
-      </svg>
-    );
-  }
-
   // MCP tools - generic icon for MCP operations
   if (isMcpTool) {
     return (
@@ -340,11 +326,10 @@ export const SystemInitializedWidget: React.FC<{
               const isWebTool = toolNameLower === 'webfetch' || toolNameLower === 'websearch';
               const isMcpBrainTool = toolNameLower.startsWith('mcp__quack-brain') || toolNameLower.startsWith('mcp__brain') || toolNameLower.startsWith('mcp_brain');
               const isMcpIdeTool = toolNameLower.startsWith('mcp__ide') || toolNameLower.startsWith('mcp_ide');
-              const isMcpCodeIntelTool = toolNameLower.startsWith('mcp__code-intel') || toolNameLower.startsWith('mcp_code-intel');
               const isSkillTool = toolNameLower === 'skill';
               const isPlanModeTool = toolNameLower === 'enterplanmode' || toolNameLower === 'exitplanmode';
               const isMcpTool = toolNameLower.startsWith('mcp__') || toolNameLower.startsWith('mcp_');
-              const textColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpIdeTool ? '#a855f7' : isMcpCodeIntelTool ? '#06b6d4' : isSkillTool ? '#fbbf24' : isPlanModeTool ? '#34d399' : isMcpTool ? '#f97316' : undefined;
+              const textColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpIdeTool ? '#a855f7' : isSkillTool ? '#fbbf24' : isPlanModeTool ? '#34d399' : isMcpTool ? '#f97316' : undefined;
 
               return (
                 <span key={i} className="system-init-tool-badge" style={{ color: textColor }}>
@@ -362,7 +347,7 @@ export const SystemInitializedWidget: React.FC<{
 };
 
 // Edit widget
-const EditWidget: React.FC<{
+export const EditWidget: React.FC<{
   file_path: string;
   old_string: string;
   new_string: string;
@@ -435,7 +420,7 @@ const EditWidget: React.FC<{
 };
 
 // Write widget
-const WriteWidget: React.FC<{
+export const WriteWidget: React.FC<{
   filePath: string;
   content: string;
   result?: any;
@@ -511,7 +496,7 @@ const WriteWidget: React.FC<{
 };
 
 // Bash widget
-const BashWidget: React.FC<{
+export const BashWidget: React.FC<{
   command: string;
   description?: string;
   result?: any;
@@ -572,7 +557,7 @@ const BashWidget: React.FC<{
 };
 
 // Read widget
-const ReadWidget: React.FC<{
+export const ReadWidget: React.FC<{
   filePath: string;
   result?: any;
   onFilePathClick?: (path: string) => void;
@@ -639,7 +624,7 @@ const ReadWidget: React.FC<{
 };
 
 // Grep widget
-const GrepWidget: React.FC<{
+export const GrepWidget: React.FC<{
   pattern: string;
   path?: string;
   result?: any;

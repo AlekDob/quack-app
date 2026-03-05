@@ -1,0 +1,225 @@
+/**
+ * ToolGifWidget Styles
+ *
+ * Follows Quack Design System:
+ * - Orange accent color (#f28c52)
+ * - Dark theme with glassmorphism
+ * - Smooth animations with cubic-bezier
+ */
+
+.tool-gif-widget {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 8px 0;
+  opacity: 0;
+  transform: translateY(8px) scale(0.95);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tool-gif-widget.loaded {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.tool-gif-widget.exiting {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+}
+
+.tool-gif-widget.loading {
+  opacity: 0.7;
+}
+
+/* GIF Container */
+.tool-gif-container {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(18, 20, 27, 0.9);
+  border: 1px solid rgba(242, 140, 82, 0.2);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.3),
+    0 0 20px rgba(242, 140, 82, 0.1);
+  max-width: 200px;
+  min-width: 120px;
+}
+
+/* Loading Skeleton */
+.tool-gif-skeleton {
+  width: 160px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-gif-skeleton-pulse {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(242, 140, 82, 0.2) 0%, rgba(242, 140, 82, 0.4) 100%);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* GIF Image */
+.tool-gif-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 150px;
+  object-fit: cover;
+  transition: opacity 0.3s ease;
+}
+
+.tool-gif-image.hidden {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tool-gif-image.visible {
+  position: relative;
+  opacity: 1;
+}
+
+/* Tool Name Badge */
+.tool-gif-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tool-gif-badge-text {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Spinner Animation */
+.tool-gif-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #f28c52;
+}
+
+.tool-gif-spinner svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Success checkmark */
+.tool-gif-badge svg:not(.tool-gif-spinner svg) {
+  color: #4dd4b3;
+  flex-shrink: 0;
+}
+
+/* Giphy Attribution */
+.tool-gif-attribution {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 2px 6px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 9px;
+  transition: color 0.2s ease;
+}
+
+.tool-gif-attribution:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.tool-gif-attribution svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.6;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .tool-gif-container {
+    max-width: 160px;
+    min-width: 100px;
+  }
+
+  .tool-gif-skeleton {
+    width: 140px;
+    height: 100px;
+  }
+
+  .tool-gif-badge {
+    padding: 4px 8px;
+  }
+
+  .tool-gif-badge-text {
+    font-size: 10px;
+  }
+}
+
+/* Dark mode optimizations */
+@media (prefers-color-scheme: dark) {
+  .tool-gif-container {
+    background: rgba(15, 17, 21, 0.95);
+  }
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .tool-gif-widget {
+    transition: opacity 0.15s ease;
+    transform: none !important;
+  }
+
+  .tool-gif-widget.loaded {
+    transform: none;
+  }
+
+  .tool-gif-widget.exiting {
+    transform: none;
+  }
+
+  .tool-gif-skeleton-pulse {
+    animation: none;
+    opacity: 0.5;
+  }
+
+  .tool-gif-spinner svg {
+    animation: none;
+  }
+}

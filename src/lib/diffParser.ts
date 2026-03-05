@@ -90,7 +90,7 @@ export function parseDiff(diffContent: string): DiffInfo {
 /**
  * Crea un DiffInfo vuoto
  */
-function emptyDiffInfo(): DiffInfo {
+export function emptyDiffInfo(): DiffInfo {
   return {
     additions: [],
     deletions: [],

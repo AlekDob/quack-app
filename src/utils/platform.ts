@@ -9,7 +9,7 @@ let cachedPlatform: 'macos' | 'windows' | 'linux' | null = null;
  * Detects the current operating system
  * Uses navigator.userAgent as primary detection method
  */
-function getPlatform(): 'macos' | 'windows' | 'linux' {
+export function getPlatform(): 'macos' | 'windows' | 'linux' {
   if (cachedPlatform) {
     return cachedPlatform;
   }
@@ -37,14 +37,14 @@ export function isMacOS(): boolean {
 /**
  * Check if running on Windows
  */
-function isWindows(): boolean {
+export function isWindows(): boolean {
   return getPlatform() === 'windows';
 }
 
 /**
  * Check if running on Linux
  */
-function isLinux(): boolean {
+export function isLinux(): boolean {
   return getPlatform() === 'linux';
 }
 
@@ -88,7 +88,7 @@ export function normalizePath(path: string): string {
  * Get the modifier key symbol for the current platform
  * @returns '⌘' for macOS, 'Ctrl' for Windows/Linux
  */
-function getModifierKey(): string {
+export function getModifierKey(): string {
   return isMacOS() ? '⌘' : 'Ctrl';
 }
 

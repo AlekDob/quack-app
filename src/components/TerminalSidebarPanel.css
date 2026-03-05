@@ -1,0 +1,104 @@
+.terminal-sidebar-panel {
+  width: 240px;
+  background: rgba(20, 20, 20, 0.95);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(10px);
+}
+
+.terminal-sidebar-header {
+  height: 36px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.terminal-sidebar-header span {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.5px;
+}
+
+.terminal-sidebar-projects {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.terminal-sidebar-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
+}
+
+.project-group {
+  margin-bottom: 2px;
+}
+
+.project-group-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.project-group-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.project-group-chevron {
+  width: 16px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.project-group-chevron.expanded {
+  transform: rotate(90deg);
+}
+
+.project-group-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #ffffff;
+  margin-left: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-add-terminal {
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  transition: all 0.15s ease;
+  opacity: 0;
+}
+
+.project-group-header:hover .project-add-terminal {
+  opacity: 1;
+}
+
+.project-add-terminal:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+}
+
+.project-terminals {
+  padding-left: 8px;
+}

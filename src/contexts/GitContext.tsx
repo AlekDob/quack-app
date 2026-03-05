@@ -306,7 +306,7 @@ export const GitProvider = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-const useGit = () => {
+export const useGit = () => {
   const context = useContext(GitContext);
   if (!context) {
     throw new Error('useGit must be used within GitProvider');

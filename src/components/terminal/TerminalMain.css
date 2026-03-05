@@ -1,0 +1,106 @@
+/**
+ * TerminalMain Styles
+ *
+ * Clean, simple styles for terminal container
+ * No !important hacks, just clean flexbox
+ */
+
+/* Main container - fills available space */
+.terminal-main {
+  flex: 1;
+  min-height: 0; /* Critical for flexbox to allow shrinking */
+  min-width: 0;  /* Critical for flexbox to allow shrinking */
+  position: relative;
+  overflow: hidden;
+  background: #1e1e1e;
+}
+
+/* Terminal instance container */
+.terminal-instance {
+  /* Positioned absolutely within terminal-main */
+  /* All positioning done via inline styles in component */
+}
+
+/* XTerm container */
+.terminal-container {
+  /* Sizing done via inline styles in component */
+  /* Container for XTerm.js to attach to */
+}
+
+/* Override XTerm.js default styles for better fit */
+.terminal-main .xterm {
+  /* XTerm calculates its own height/width */
+  /* We just ensure it doesn't overflow */
+}
+
+.terminal-main .xterm-viewport {
+  /* Allow scrolling within terminal */
+  overflow-y: auto;
+}
+
+.terminal-main .xterm-screen {
+  /* Screen canvas */
+}
+
+/* Empty state */
+.terminal-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  color: rgba(255, 255, 255, 0.5);
+  user-select: none;
+}
+
+.terminal-empty-icon {
+  font-size: 64px;
+  font-family: 'Menlo', 'Monaco', monospace;
+  margin-bottom: 24px;
+  opacity: 0.6;
+  font-weight: 300;
+}
+
+.terminal-empty-title {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0 0 8px 0;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.terminal-empty-hint {
+  font-size: 13px;
+  margin: 0;
+  opacity: 0.6;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Smooth fade transition when switching terminals */
+.terminal-instance {
+  will-change: opacity;
+}
+
+/* Ensure XTerm renders crisp text */
+.terminal-main .xterm-rows {
+  line-height: normal;
+  font-feature-settings: 'liga' 0; /* Disable ligatures for terminal */
+}
+
+/* Scrollbar styling for XTerm viewport */
+.terminal-main .xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+}
+
+.terminal-main .xterm-viewport::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.terminal-main .xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 5px;
+}
+
+.terminal-main .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}

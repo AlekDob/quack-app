@@ -112,7 +112,7 @@ interface UseBackgroundAgentsReturn {
 /**
  * Hook for managing background agents
  */
-function useBackgroundAgents(): UseBackgroundAgentsReturn {
+export function useBackgroundAgents(): UseBackgroundAgentsReturn {
   // Get store state and actions
   const {
     tasks,
@@ -305,7 +305,7 @@ export function useBackgroundAgentInit(): void {
  * Hook for listening to background task completion events
  * Useful for components that need to react to task completion
  */
-function useBackgroundTaskCompletion(
+export function useBackgroundTaskCompletion(
   onComplete: (taskId: string, result: BackgroundTaskResult) => void
 ): void {
   useEffect(() => {
@@ -330,7 +330,7 @@ function useBackgroundTaskCompletion(
  * Hook for listening to background task result messages for chat
  * Used by chat components to display background task results
  */
-function useBackgroundTaskChatResults(
+export function useBackgroundTaskChatResults(
   chatId: string,
   onResult: (result: {
     taskId: string;
@@ -373,7 +373,7 @@ function useBackgroundTaskChatResults(
 /**
  * Hook for getting task count badge (for sidebar)
  */
-function useBackgroundTaskBadge(): {
+export function useBackgroundTaskBadge(): {
   count: number;
   hasRunning: boolean;
   hasFailed: boolean;
@@ -393,3 +393,4 @@ function useBackgroundTaskBadge(): {
   }, [tasks]);
 }
 
+export default useBackgroundAgents;

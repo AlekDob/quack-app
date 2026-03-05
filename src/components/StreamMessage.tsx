@@ -88,7 +88,6 @@ const getToolColorMinimal = (name: string): string => {
   if (toolName === 'glob' || toolName === 'grep') return '#6b7280'; // gray
   if (toolName === 'task') return '#fbbf24'; // yellow
   if (toolName === 'webfetch' || toolName === 'websearch') return '#10b981'; // emerald
-  if (toolName.startsWith('mcp__code-intel') || toolName.startsWith('mcp_code-intel')) return '#06b6d4'; // cyan
   if (toolName.startsWith('mcp__') || toolName.startsWith('mcp_')) return '#f97316'; // orange
   return '#6b7280'; // default gray
 };

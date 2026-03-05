@@ -1,6 +1,6 @@
 import type { DroidSpec } from '../components/droid-factory/types';
 
-interface ValidationResult {
+export interface ValidationResult {
   valid: boolean;
   errors: string[];
 }

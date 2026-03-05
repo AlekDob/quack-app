@@ -4,7 +4,7 @@ import DocsSidebar from './DocsSidebar';
 import DocsContent from './DocsContent';
 import './DocsViewer.css';
 
-interface DocsMeta {
+export interface DocsMeta {
   title: string;
   description?: string;
   icon?: string;

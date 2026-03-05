@@ -6,7 +6,7 @@
  */
 
 // JSON Schema base types
-interface JSONSchema {
+export interface JSONSchema {
   type: string;
   properties?: Record<string, JSONSchema>;
   items?: JSONSchema;
@@ -22,7 +22,7 @@ interface JSONSchema {
 }
 
 // Output format configuration
-interface OutputFormat {
+export interface OutputFormat {
   type: 'json_schema';
   json_schema: JSONSchema;
 }
@@ -44,7 +44,7 @@ export interface WebAnalysisOutput {
   };
 }
 
-const webAnalysisSchema: JSONSchema = {
+export const webAnalysisSchema: JSONSchema = {
   type: 'object',
   properties: {
     title: { type: 'string' },
@@ -101,7 +101,7 @@ export interface BugReportOutput {
   risk_score?: number;
 }
 
-const bugReportSchema: JSONSchema = {
+export const bugReportSchema: JSONSchema = {
   type: 'object',
   properties: {
     bugs_found: {
@@ -154,7 +154,7 @@ export interface FileAnalysisOutput {
   suggestions?: string[];
 }
 
-const fileAnalysisSchema: JSONSchema = {
+export const fileAnalysisSchema: JSONSchema = {
   type: 'object',
   properties: {
     language: { type: 'string' },
@@ -197,7 +197,7 @@ const fileAnalysisSchema: JSONSchema = {
 };
 
 // ===== Structured Output Result =====
-interface StructuredOutputResult<T = unknown> {
+export interface StructuredOutputResult<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;

@@ -144,7 +144,7 @@ export async function loadAvailableDroids(projectPath: string): Promise<DroidMet
 /**
  * Format skills list for CLAUDE.md
  */
-function formatSkillsForClaudeMd(skills: SkillMetadata[], selectedIds: string[]): string {
+export function formatSkillsForClaudeMd(skills: SkillMetadata[], selectedIds: string[]): string {
   const selectedSkills = skills.filter(s => selectedIds.includes(s.id));
 
   if (selectedSkills.length === 0) {
@@ -157,7 +157,7 @@ function formatSkillsForClaudeMd(skills: SkillMetadata[], selectedIds: string[])
 /**
  * Format droids list for CLAUDE.md
  */
-function formatDroidsForClaudeMd(droids: DroidMetadata[], selectedIds: string[]): string {
+export function formatDroidsForClaudeMd(droids: DroidMetadata[], selectedIds: string[]): string {
   const selectedDroids = droids.filter(d => selectedIds.includes(d.id));
 
   if (selectedDroids.length === 0) {
