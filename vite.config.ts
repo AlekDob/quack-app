@@ -132,48 +132,30 @@ export default defineConfig(({ mode }) => {
         output: {
           // Manual chunking strategy for optimal code splitting
           manualChunks: (id) => {
-            // XTerm - Terminal library (~150KB)
+            // XTerm - Terminal library, self-contained (~150KB)
             if (id.includes('@xterm/xterm') || id.includes('xterm')) {
               return 'xterm';
             }
 
-            // Claude SDK - AI library (~100KB)
+            // Claude SDK - AI library, self-contained (~100KB)
             if (id.includes('@anthropic-ai/claude-agent-sdk') || id.includes('@anthropic-ai/sdk')) {
               return 'claude-sdk';
             }
 
-            // Mermaid - Diagrams library (if used)
+            // Mermaid - Diagrams library, self-contained
             if (id.includes('mermaid')) {
               return 'mermaid';
             }
 
-            // React core libraries
-            if (id.includes('node_modules') && (
-              id.includes('react/') ||
-              id.includes('react-dom/') ||
-              id.includes('scheduler/')
-            )) {
-              return 'react-vendor';
-            }
-
-            // UI libraries
-            if (id.includes('lucide-react') ||
-                id.includes('sonner') ||
-                id.includes('react-colorful')) {
-              return 'ui-vendor';
-            }
-
-            // Tauri plugins
+            // Tauri plugins - self-contained
             if (id.includes('@tauri-apps/')) {
               return 'tauri-vendor';
             }
 
-            // DND Kit - needs to be in same chunk as React
-            if (id.includes('@dnd-kit')) {
-              return 'react-vendor';
-            }
-
-            // Everything else from node_modules
+            // All other node_modules in a single vendor chunk
+            // IMPORTANT: Do NOT split React from other deps — causes circular
+            // chunk dependencies that make React undefined at runtime
+            // Brain: gotcha-vendor-circular-chunk-dependency
             if (id.includes('node_modules')) {
               return 'vendor';
             }
