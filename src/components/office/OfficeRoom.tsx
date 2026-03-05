@@ -174,6 +174,14 @@ function OfficeRoom({
     g.fill({ color: 0xffffff });
   }, []);
 
+  // Brain: fix-office-view-snaps-back-to-chat
+  // Guard against stale PixiJS click events. PixiJS v8 EventBoundary.mapPointerUp
+  // does NOT clear pressTargetsByButton after a normal click (only for pointerupoutside).
+  // Since pointerup is listened on globalThis, ANY pointerup anywhere on the page
+  // can trigger a stale click on the room. This flag ensures onRoomClick only fires
+  // when a genuine pointerdown was received on THIS canvas container first.
+  const pointerDownOnRoom = useRef(false);
+
   // Mask ref for desks layer (hooks must be unconditional)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const deskContainerRef = useRef<any>(null);
@@ -200,7 +208,13 @@ function OfficeRoom({
         y={room.screenY}
         eventMode="static"
         cursor="pointer"
-        onClick={() => onRoomClick?.(room.projectPath)}
+        onPointerDown={() => { pointerDownOnRoom.current = true; }}
+        onClick={() => {
+          if (pointerDownOnRoom.current) {
+            onRoomClick?.(room.projectPath);
+          }
+          pointerDownOnRoom.current = false;
+        }}
       >
         <pixiGraphics draw={drawWalls} />
         <pixiGraphics draw={drawFloor} />

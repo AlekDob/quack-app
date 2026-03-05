@@ -789,9 +789,7 @@ function AppContent() {
     } catch { /* ignore parse errors */ }
     return [{ id: 'chat', label: 'Chat', type: 'chat', closable: false }];
   });
-  // DEBUG: track who changes activeTabId
-  const _debugActiveTabRef = useRef<string>('chat');
-  const [activeTabId, _rawSetActiveTabId] = useState(() => {
+  const [activeTabId, setActiveTabId] = useState(() => {
     try {
       const stored = localStorage.getItem('ui-storage');
       if (stored) {
@@ -807,16 +805,6 @@ function AppContent() {
     } catch { /* ignore parse errors */ }
     return 'chat';
   });
-  const setActiveTabId = useCallback((value: string) => {
-    const prev = _debugActiveTabRef.current;
-    if (value !== prev) {
-      const stack = new Error().stack?.split('\n').slice(1, 4).map(l => l.trim()).join(' | ') || '';
-      console.log(`[DEBUG-TAB] ${prev} → ${value}`, stack);
-    }
-    _debugActiveTabRef.current = value;
-    _rawSetActiveTabId(value);
-  }, []);
-
   // Clear editor selection when navigating away from file tab
   useEffect(() => {
     if (!activeTabId.startsWith('file-')) {
@@ -1899,9 +1887,6 @@ function AppContent() {
           seen.add(t.id);
           return true;
         });
-        if (deduped.length !== merged.length) {
-          console.warn('[DEBUG-TAB] Effect1: deduped tabs', merged.length, '→', deduped.length);
-        }
         return deduped;
       });
 
@@ -10260,9 +10245,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         seen.add(t.id);
         return true;
       });
-      if (deduped.length !== merged.length) {
-        console.warn('[DEBUG-TAB] Effect2: deduped tabs', merged.length, '→', deduped.length);
-      }
       return deduped;
     });
 

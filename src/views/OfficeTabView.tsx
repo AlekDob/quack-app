@@ -18,6 +18,13 @@ interface OfficeTabViewProps {
  * Brain: fix-office-pixi-cancelresize-remount
  * Delays first render until tab is active (correct dimensions).
  * Once mounted, stays mounted with off-screen positioning to preserve WebGL.
+ *
+ * Brain: fix-office-view-snaps-back-to-chat
+ * The spurious click fix is in OfficeRoom.tsx (pointerdown guard), not here.
+ * PixiJS v8 EventBoundary.mapPointerUp doesn't clean pressTargetsByButton
+ * after normal clicks, and listens for pointerup on globalThis. The guard
+ * ensures onRoomClick only fires for genuine pointerdown→pointerup sequences
+ * on the canvas container.
  */
 function OfficeTabView({
   tab,
@@ -42,13 +49,13 @@ function OfficeTabView({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        ...(isActive ? {} : {
+        ...(!isActive ? {
           position: 'absolute',
           inset: 0,
           opacity: 0,
-          pointerEvents: 'none' as const,
           zIndex: -1,
-        }),
+          pointerEvents: 'none' as const,
+        } : {}),
       }}
     >
       <OfficeView

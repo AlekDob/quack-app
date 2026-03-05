@@ -1,42 +1,74 @@
 ---
-type: gotcha
+type: bug
 project: quack-app
 created: 2026-03-05
 last_verified: 2026-03-05
-tags: [office, tabs, specialTabTypes, navigation, race-condition]
+tags: [office, pixijs, event-propagation, tabs, navigation]
 ---
-# Office/Automation view snaps back to Chat after 1-2 seconds
+# Office view snaps back to Chat after opening
 
 ## Symptom
-Opening the Office (or Automation) tab works momentarily, but after 1-2 seconds the view resets to the Chat tab automatically.
+Opening the Office tab works momentarily, but within 1-2 seconds the view resets to the Chat tab automatically. Debug logging revealed the exact caller: `onRoomClick` in the PixiJS scene.
 
-## Root Cause
-Three separate `specialTabTypes` arrays in `App.tsx` control which tabs are preserved across agent/terminal switches. These arrays were missing `'office'` and `'automation'`.
+## Root Cause (confirmed via `[DEBUG-TAB]` wrapper)
 
-When an agent switch or terminal update effect fires (triggered by `activeId` or `activeTerminal` change), the code checks:
-```ts
-const isSpecialTabActive = specialTabTypes.some(type =>
-  activeTabId.includes(type) || activeTabId === 'kanban-board'
-);
-if (!isSpecialTabActive) {
-  setActiveTabId('chat'); // <-- This resets the Office view!
-}
+PixiJS v8 `EventBoundary.mapPointerUp` has a critical behavior: it does NOT clean up `pressTargetsByButton` after a **normal click** (only cleans it for `pointerupoutside`). Combined with PixiJS listening for `pointerup` on `globalThis` (window level), this creates stale click events.
+
+The full sequence:
+1. User was in Office before, clicked on a room → PixiJS tracks `pressTarget = roomContainer` in `trackingData.pressTargetsByButton[0]`
+2. User exited Office → `pointerup` fires → PixiJS dispatches `click` → `onRoomClick` navigates to chat
+3. **BUG**: `pressTargetsByButton[0]` is NOT deleted after the normal click (only deleted for `pointerupoutside` path)
+4. User opens Office again by clicking a DOM button → `pointerdown` fires on the button (NOT on the canvas — PixiJS only listens for `pointerdown` on `domElement`)
+5. `pointerup` from releasing the button → PixiJS captures it from `globalThis` → `mapPointerUp` finds the **stale** `pressTarget = roomContainer` → hit test at pointer position → if mouse overlaps a room → `click` dispatched → `onRoomClick` → snap back to chat!
+
+Key PixiJS v8 event listener setup (`EventSystem.mjs`):
+```
+this.domElement.addEventListener("pointerdown", ...) // canvas only
+globalThis.addEventListener("pointerup", ...)         // window level!
 ```
 
-Since `'office'` was not in `specialTabTypes`, `isSpecialTabActive` was `false`, and the effect would call `setActiveTabId('chat')`.
-
-## The Three Arrays
-1. **~line 1850** — Filters agent-specific tabs when saving per-agent tab state
-2. **~line 1870** — Preserves special tabs when restoring tabs for new active agent
-3. **~line 10220** — Preserves special tabs during terminal switch tab reconstruction
-
-All three must stay in sync. Any new global tab type (not agent-specific) must be added to all three.
+Previous failed attempts:
+- DOM `pointer-events: none` delay on parent div → doesn't work because PixiJS captures `pointerup` from `globalThis`, bypassing DOM pointer-events
+- Temporal guard ref in `handleOpenOfficeTab` → stale closure issue in `useCallback`
+- `interactionsReady` state with 400ms delay → same underlying problem
 
 ## Fix
-Added `'office'` and `'automation'` to all three `specialTabTypes` arrays.
 
-## Trigger
-Any event that changes `activeId` or `activeTerminal` (e.g., agent selection in sidebar, new session creation, terminal status update) while Office/Automation tab is active.
+Added a `pointerdown` guard in `OfficeRoom.tsx` on the room base container. The `onRoomClick` callback only fires if a genuine `pointerdown` was received on THIS canvas container first:
+
+```tsx
+const pointerDownOnRoom = useRef(false);
+
+<pixiContainer
+  eventMode="static"
+  cursor="pointer"
+  onPointerDown={() => { pointerDownOnRoom.current = true; }}
+  onClick={() => {
+    if (pointerDownOnRoom.current) {
+      onRoomClick?.(room.projectPath);
+    }
+    pointerDownOnRoom.current = false;
+  }}
+>
+```
+
+This works because:
+- `onPointerDown` only fires when `pointerdown` reaches the CANVAS (PixiJS listens on `domElement`)
+- If `pointerdown` was on a DOM button (not canvas), `pointerDownOnRoom` stays false
+- Stale `pressTarget` from previous interactions can't trigger `onRoomClick` without a fresh `pointerdown`
+
+Also kept defense-in-depth from prior iterations:
+- `specialTabTypes` arrays include `'office'` and `'automation'` (prevents tab removal on agent switch)
+- Tab deduplication by `tab.id` in both `setTabs` effects
+
+## Files Changed
+- `src/components/office/OfficeRoom.tsx`: `pointerDownOnRoom` ref guard on base layer
+- `src/views/OfficeTabView.tsx`: removed unnecessary `interactionsReady` pointer-events delay
+- `src/App.tsx`: `specialTabTypes` arrays, tab dedup (kept from prior iteration)
+
+## Related
+- `gotcha-pixi-csp-unsafe-eval.md` — another PixiJS production gotcha
+- `fix-office-webgl-shader-remount.md` — OfficeView must stay mounted (officeEverOpened ref)
 
 ## Prevention
-When adding a new singleton tab type (like Kanban, Office, Automation), always add its `type` string to ALL `specialTabTypes` arrays in App.tsx. Search for `specialTabTypes` to find them all.
+**Any PixiJS component with `onClick` must guard against stale `pressTargetsByButton` data.** Use a `pointerdown` flag ref to verify the click sequence started on the canvas. This is especially critical for PixiJS containers that toggle visibility, because stale tracking data persists across visibility changes.
