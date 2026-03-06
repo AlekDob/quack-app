@@ -170,13 +170,13 @@ export default defineConfig(({ mode }) => {
           compact: isProduction,
         },
 
-        // Tree-shaking options - be careful not to remove React internals
+        // Tree-shaking: use safe defaults only
+        // IMPORTANT: Do NOT set propertyReadSideEffects: false — it can cause
+        // Rollup to reorder module initialization, making React undefined when
+        // libraries call React.createContext() at module scope.
+        // Brain: gotcha-vendor-circular-chunk-dependency
         treeshake: isProduction ? {
-          // IMPORTANT: Keep moduleSideEffects true for React to work properly
-          // Setting to false was removing useLayoutEffect and other React internals
           moduleSideEffects: true,
-          propertyReadSideEffects: false,
-          tryCatchDeoptimization: false,
         } : false,
       },
     },

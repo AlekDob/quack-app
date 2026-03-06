@@ -228,16 +228,8 @@ async fn ensure_daemon(app: &AppHandle) -> Result<(), String> {
 
     log::info!("[DAEMON:LIFECYCLE] Spawning persistent Node.js daemon...");
 
-    let script_path = app
-        .path()
-        .resolve("node-sdk/stream-daemon.js", tauri::path::BaseDirectory::Resource)
-        .map_err(|e| format!("Failed to resolve daemon script path: {}", e))?;
-
-    if !script_path.exists() {
-        return Err(format!("Daemon script not found at: {:?}", script_path));
-    }
-
-    let script_path = sanitize_path_for_node(&script_path);
+    let script_path = get_node_sdk_script(app, "stream-daemon.js")?;
+    log::info!("[DAEMON:LIFECYCLE] Resolved daemon script: {:?}", script_path);
     let node_sdk_dir = script_path.parent()
         .ok_or("Failed to get node-sdk directory")?
         .to_path_buf();
@@ -2226,23 +2218,9 @@ async fn send_message_via_sdk_streaming_legacy(
 
     let config_str = config.to_string();
 
-    // Get path to Node.js script using Tauri's resource resolver for production builds
-    let script_path = app
-        .path()
-        .resolve("node-sdk/stream-claude.js", tauri::path::BaseDirectory::Resource)
-        .map_err(|e| format!("Failed to resolve node-sdk path: {}", e))?;
-
+    // Get path to Node.js script (production resource dir + dev fallback)
+    let script_path = get_sdk_script_path(&app)?;
     log::info!("[SDK DEBUG] Resolved script path: {:?}", script_path);
-
-    if !script_path.exists() {
-        log::error!("[SDK DEBUG] Script not found at path: {:?}", script_path);
-        return Err(format!("Node.js SDK script not found at: {:?}", script_path));
-    }
-
-    log::info!("[SDK DEBUG] Script found successfully");
-
-    // Sanitize paths for Node.js (strip \\?\ prefix on Windows that causes EISDIR crash)
-    let script_path = sanitize_path_for_node(&script_path);
 
     // Get the node-sdk directory (parent of the script) for node_modules resolution
     let node_sdk_dir = script_path.parent()
@@ -2911,50 +2889,36 @@ pub async fn answer_user_question(
     send_to_process(&agent_id, &message).await
 }
 
-/// Helper to get the SDK script path
-fn get_sdk_script_path(app: &AppHandle) -> Result<PathBuf, String> {
-    // Try to find the bundled script first
-    let resource_path = app.path().resource_dir()
-        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
-
-    let script_path = resource_path.join("node-sdk").join("stream-claude.js");
-    if script_path.exists() {
-        return Ok(sanitize_path_for_node(&script_path));
+/// Helper to resolve a node-sdk script path (resource dir → dev fallback)
+fn get_node_sdk_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, String> {
+    // 1. Production: bundled resource directory
+    if let Ok(resource_path) = app.path().resource_dir() {
+        let script_path = resource_path.join("node-sdk").join(script_name);
+        if script_path.exists() {
+            return Ok(sanitize_path_for_node(&script_path));
+        }
     }
 
-    // Fallback to development path
+    // 2. Development: CARGO_MANIFEST_DIR (src-tauri/)
     let dev_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("node-sdk")
-        .join("stream-claude.js");
+        .join(script_name);
 
     if dev_path.exists() {
         return Ok(sanitize_path_for_node(&dev_path));
     }
 
-    Err("Could not find stream-claude.js script".to_string())
+    Err(format!("Could not find {} in resource dir or dev path", script_name))
+}
+
+/// Helper to get the SDK script path
+fn get_sdk_script_path(app: &AppHandle) -> Result<PathBuf, String> {
+    get_node_sdk_script(app, "stream-claude.js")
 }
 
 /// Helper to get the rewind-files script path
 fn get_rewind_script_path(app: &AppHandle) -> Result<PathBuf, String> {
-    // Try to find the bundled script first
-    let resource_path = app.path().resource_dir()
-        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
-
-    let script_path = resource_path.join("node-sdk").join("rewind-files.js");
-    if script_path.exists() {
-        return Ok(sanitize_path_for_node(&script_path));
-    }
-
-    // Fallback to development path
-    let dev_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("node-sdk")
-        .join("rewind-files.js");
-
-    if dev_path.exists() {
-        return Ok(sanitize_path_for_node(&dev_path));
-    }
-
-    Err("Could not find rewind-files.js script".to_string())
+    get_node_sdk_script(app, "rewind-files.js")
 }
 
 /// Helper to get the Node.js executable path (bundled sidecar or system Node.js)
