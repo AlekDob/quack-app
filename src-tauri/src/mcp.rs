@@ -530,7 +530,14 @@ async fn start_mcp_server(
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
 
-    // Add environment variables if present
+    // Brain: gotcha-shell-env-gui-launch
+    // Inject login shell environment so MCP servers can find node, npx, etc.
+    // when Quack is launched from Finder (GUI) instead of terminal.
+    for (key, value) in crate::shell_env::get_login_env() {
+        cmd.env(key, value);
+    }
+
+    // Add server-specific environment variables (overrides login env)
     if let Some(env) = &server.env {
         for (key, value) in env {
             cmd.env(key, value);
@@ -1131,6 +1138,12 @@ async fn test_stdio_connection(
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
 
+    // Brain: gotcha-shell-env-gui-launch
+    // Inject login shell environment for test spawns too
+    for (key, value) in crate::shell_env::get_login_env() {
+        cmd.env(key, value);
+    }
+
     // Windows: Hide console window
     #[cfg(target_os = "windows")]
     {
@@ -1148,25 +1161,55 @@ async fn test_stdio_connection(
             }
         })?;
 
-    // Wait up to 2 seconds to see if process starts successfully
-    match tokio::time::timeout(Duration::from_secs(2), child.wait()).await {
-        Ok(Ok(status)) => {
-            // Process exited within 2 seconds
-            if status.success() {
-                Ok(true) // Process ran and exited successfully
-            } else {
-                Err(format!("Process exited with error code: {}", status.code().unwrap_or(-1)))
+    // Poll with try_wait() instead of wait().
+    // IMPORTANT: Tokio's child.wait() closes stdin before waiting (deadlock prevention),
+    // which causes MCP stdio servers to see EOF on stdin and exit with code 1.
+    // try_wait() is non-blocking and does NOT close stdin.
+    let poll_interval = Duration::from_millis(200);
+    let max_polls = 10; // 10 × 200ms = 2s
+
+    for _ in 0..max_polls {
+        tokio::time::sleep(poll_interval).await;
+
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                // Process exited prematurely — read stderr for diagnosis
+                let stderr_text = if let Some(stderr) = child.stderr.take() {
+                    let reader = BufReader::new(stderr);
+                    let mut lines = reader.lines();
+                    let mut output = String::new();
+                    while let Ok(Some(line)) = lines.next_line().await {
+                        if output.len() < 2000 {
+                            output.push_str(&line);
+                            output.push('\n');
+                        }
+                    }
+                    output
+                } else {
+                    String::new()
+                };
+
+                log::error!("[MCP TEST] Process exited early: code={:?} stderr={}", status.code(), stderr_text.trim());
+
+                return if status.success() {
+                    Ok(true)
+                } else {
+                    let msg = if stderr_text.is_empty() {
+                        format!("Process exited with error code: {}", status.code().unwrap_or(-1))
+                    } else {
+                        format!("Process exited with error code {}: {}", status.code().unwrap_or(-1), stderr_text.trim())
+                    };
+                    Err(msg)
+                };
             }
-        }
-        Ok(Err(e)) => {
-            Err(format!("Process error: {}", e))
-        }
-        Err(_) => {
-            // Timeout - process is still running (good sign for MCP servers!)
-            child.kill().await.ok(); // Clean up
-            Ok(true) // Process started and stayed alive
+            Ok(None) => continue, // Still running — good
+            Err(e) => return Err(format!("Process error: {}", e)),
         }
     }
+
+    // Process survived 2 seconds — test passed, clean up
+    child.kill().await.ok();
+    Ok(true)
 }
 
 /// Test MCP server connection (performs actual connectivity test)
@@ -1175,8 +1218,11 @@ pub async fn test_mcp_connection(
     _app: AppHandle,
     server: MCPServer,
 ) -> Result<bool, String> {
+    log::info!("[MCP TEST] Testing connection for '{}' (transport: {}, command: {:?}, args: {:?})",
+        server.id, server.transport, server.command, server.args);
+
     // Perform actual connection test based on transport type
-    match server.transport.as_str() {
+    let result = match server.transport.as_str() {
         "stdio" => {
             // Validate fields first
             let command = server.command.as_ref()
@@ -1211,7 +1257,10 @@ pub async fn test_mcp_connection(
         _ => {
             Err(format!("Unknown transport type: {}", server.transport))
         }
-    }
+    };
+
+    log::info!("[MCP TEST] Result for '{}': {:?}", server.id, result);
+    result
 }
 
 /// Stop a running MCP server (stdio only)
