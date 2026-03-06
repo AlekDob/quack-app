@@ -5,6 +5,7 @@ import { extname } from 'path';
 import Parser from 'tree-sitter';
 import TypeScript from 'tree-sitter-typescript';
 import JavaScript from 'tree-sitter-javascript';
+import Swift from 'tree-sitter-swift';
 
 /**
  * Map of file extensions to language names.
@@ -14,6 +15,7 @@ const LANGUAGE_MAP = {
   '.tsx': 'tsx',
   '.js': 'javascript',
   '.jsx': 'javascript',
+  '.swift': 'swift',
 };
 
 export const SUPPORTED_EXTENSIONS = Object.keys(LANGUAGE_MAP);
@@ -32,6 +34,7 @@ function getLanguageGrammar(languageName) {
     case 'typescript': return TypeScript.typescript;
     case 'tsx': return TypeScript.tsx;
     case 'javascript': return JavaScript;
+    case 'swift': return Swift;
     default: return null;
   }
 }

@@ -6,12 +6,25 @@ import { walkFiles } from './walker.js';
 import { getParser, SUPPORTED_EXTENSIONS } from './parser.js';
 
 const DEFINITION_NODE_TYPES = new Set([
+  // TS/JS
   'function_declaration',
   'class_declaration',
   'interface_declaration',
   'type_alias_declaration',
   'enum_declaration',
   'variable_declarator',
+  // Swift
+  'protocol_declaration',
+  'property_declaration',
+  'typealias_declaration',
+  'init_declaration',
+]);
+
+/** Identifier node types across TS/JS and Swift. */
+const IDENTIFIER_TYPES = new Set([
+  'identifier',
+  'type_identifier',
+  'simple_identifier',
 ]);
 
 /**
@@ -73,10 +86,7 @@ function collectReferences(
 ) {
   if (results.length >= maxResults) return;
 
-  if (
-    (node.type === 'identifier' || node.type === 'type_identifier') &&
-    node.text === symbol
-  ) {
+  if (IDENTIFIER_TYPES.has(node.type) && node.text === symbol) {
     const context = classifyContext(node);
 
     // Skip definitions if not requested
@@ -110,10 +120,7 @@ function collectReferences(
  */
 function countIdentifiers(node, symbol) {
   let count = 0;
-  if (
-    (node.type === 'identifier' || node.type === 'type_identifier') &&
-    node.text === symbol
-  ) {
+  if (IDENTIFIER_TYPES.has(node.type) && node.text === symbol) {
     return 1;
   }
   for (const child of node.children) {
@@ -129,20 +136,44 @@ function classifyContext(identifierNode) {
   const parent = identifierNode.parent;
   if (!parent) return 'other';
 
+  // TS/JS imports
   if (parent.type === 'import_specifier') return 'import';
   if (parent.type === 'import_clause') return 'import';
+
+  // Swift imports
+  if (parent.type === 'import_declaration') return 'import';
+
+  // Function/method calls
   if (parent.type === 'call_expression') return 'call';
   if (parent.type === 'new_expression') return 'call';
+
+  // TS/JS type references
   if (parent.type === 'type_annotation') return 'type_reference';
   if (parent.type === 'type_reference') return 'type_reference';
   if (parent.type === 'generic_type') return 'type_reference';
+
+  // Swift type references
+  if (parent.type === 'user_type') return 'type_reference';
+  if (parent.type === 'inheritance_specifier') return 'type_reference';
+  if (parent.type === 'as_expression') return 'type_reference';
+
+  // Assignments
   if (parent.type === 'assignment_expression') return 'assignment';
+  if (parent.type === 'assignment') return 'assignment';
+
+  // Swift navigation (method call chain)
+  if (parent.type === 'navigation_suffix') return 'call';
 
   if (DEFINITION_NODE_TYPES.has(parent.type)) return 'definition';
 
   // Check grandparent for export > definition
   const grandparent = parent.parent;
   if (grandparent && DEFINITION_NODE_TYPES.has(grandparent.type)) {
+    return 'definition';
+  }
+
+  // Swift pattern in property_declaration = definition
+  if (parent.type === 'pattern' && grandparent?.type === 'property_declaration') {
     return 'definition';
   }
 

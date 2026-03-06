@@ -3,7 +3,7 @@
 
 import { readFileSync, existsSync } from 'fs';
 import { dirname, join, extname } from 'path';
-import { getParser } from './parser.js';
+import { getParser, getLanguageName } from './parser.js';
 
 const RESOLVE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx'];
 const INDEX_FILES = ['index.ts', 'index.tsx', 'index.js', 'index.jsx'];
@@ -28,19 +28,57 @@ export function getImports(filePath, resolveRelative = true) {
   const tree = parser.parse(source);
   const imports = [];
   const fileDir = dirname(filePath);
+  const isSwift = getLanguageName(filePath) === 'swift';
 
   for (const node of tree.rootNode.children) {
-    if (node.type !== 'import_statement') continue;
+    if (isSwift && node.type === 'import_declaration') {
+      const importInfo = extractSwiftImport(node);
+      if (importInfo) imports.push(importInfo);
+      continue;
+    }
 
-    const importInfo = extractImportInfo(node, fileDir, resolveRelative);
-    if (importInfo) imports.push(importInfo);
+    if (!isSwift && node.type === 'import_statement') {
+      const importInfo = extractImportInfo(node, fileDir, resolveRelative);
+      if (importInfo) imports.push(importInfo);
+    }
   }
 
   return { file: filePath, imports };
 }
 
+// --- Swift imports ---
+
 /**
- * Extract import details from an import_statement AST node.
+ * Extract import details from a Swift import_declaration.
+ * Swift: `import Foundation`, `import UIKit`, `import struct SwiftUI.View`
+ */
+function extractSwiftImport(node) {
+  const line = node.startPosition.row + 1;
+  const identifiers = [];
+
+  for (const child of node.children) {
+    if (child.type === 'identifier' || child.type === 'simple_identifier') {
+      identifiers.push(child.text);
+    }
+  }
+
+  if (identifiers.length === 0) return null;
+
+  const source = identifiers.join('.');
+  return {
+    source,
+    resolvedPath: null,
+    symbols: [{ name: source, alias: null, isDefault: true }],
+    isDefault: true,
+    isNamespace: true,
+    line,
+  };
+}
+
+// --- TS/JS imports ---
+
+/**
+ * Extract import details from a TS/JS import_statement AST node.
  */
 function extractImportInfo(node, fileDir, resolveRelative) {
   const sourceNode = findStringContent(node);
@@ -98,7 +136,6 @@ function extractNamedImports(namedImportsNode, symbols) {
         (c) => c.type === 'identifier'
       );
       const name = identifiers[0]?.text;
-      // If there are two identifiers, second is the alias (import { X as Y })
       const alias = identifiers.length > 1 ? identifiers[1].text : null;
       if (name) {
         symbols.push({ name, alias, isDefault: false });
@@ -113,7 +150,6 @@ function extractNamedImports(namedImportsNode, symbols) {
 function findStringContent(importNode) {
   for (const child of importNode.children) {
     if (child.type === 'string') {
-      // String node contains string_fragment child with actual text
       const fragment = child.children.find(
         (c) => c.type === 'string_fragment'
       );
@@ -136,18 +172,15 @@ function isRelativePath(importSource) {
 function resolveImportPath(fromDir, importSource) {
   const basePath = join(fromDir, importSource);
 
-  // Try exact path first (already has extension)
   if (extname(basePath) && existsSync(basePath)) {
     return basePath;
   }
 
-  // Try adding extensions
   for (const ext of RESOLVE_EXTENSIONS) {
     const withExt = basePath + ext;
     if (existsSync(withExt)) return withExt;
   }
 
-  // Try as directory with index file
   for (const indexFile of INDEX_FILES) {
     const indexPath = join(basePath, indexFile);
     if (existsSync(indexPath)) return indexPath;

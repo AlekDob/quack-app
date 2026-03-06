@@ -8,6 +8,8 @@ const EXCLUDED_DIRS = new Set([
   'node_modules', '.git', 'dist', 'build', 'target',
   '.next', '.nuxt', '__pycache__', '.venv', 'coverage',
   '.turbo', '.cache', '.worktrees',
+  // Swift/Xcode
+  '.build', 'DerivedData', '.swiftpm', 'Pods',
 ]);
 
 const MAX_FILE_SIZE = 1_000_000; // 1MB

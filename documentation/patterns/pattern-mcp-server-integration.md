@@ -2,7 +2,7 @@
 type: pattern
 project: quack-app
 created: 2026-01-08
-last_verified: 2026-03-05
+last_verified: 2026-03-06
 tags: [mcp, architecture, tools, code-intel]
 ---
 
@@ -38,7 +38,7 @@ All servers expose tools accessible by Claude Agent SDK
 ### 6. code-intel-mcp-server.js (NEW - 2026-03-05)
 **Tools**: code_outline, code_find_definition, code_find_references, code_get_imports
 **Engine**: tree-sitter (AST parsing) + walkdir file discovery
-**Languages**: TypeScript, JavaScript (MVP), extensible to Swift/Rust/Python/Go
+**Languages**: TypeScript, JavaScript, Swift (added 2026-03-06). Extensible to Rust/Python/Go
 **Purpose**: Semantic code navigation for agents — replaces repetitive Grep/Read that waste ~15K tokens
 **Modules**: `lib/code-intel/` — walker.js, parser.js, outline.js, definitions.js, references.js, imports.js
 **Registration**: `.mcp.json` (project root) — loaded by SDK via settingSources

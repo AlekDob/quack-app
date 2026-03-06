@@ -2,15 +2,21 @@
 // AST outline extraction using tree-sitter
 
 import { readFileSync } from 'fs';
-import { getParser } from './parser.js';
+import { getParser, getLanguageName } from './parser.js';
 
 const DEFINITION_TYPES = new Set([
+  // TS/JS
   'function_declaration',
   'class_declaration',
   'interface_declaration',
   'type_alias_declaration',
   'enum_declaration',
   'lexical_declaration',
+  // Swift
+  'protocol_declaration',
+  'property_declaration',
+  'typealias_declaration',
+  'init_declaration',
 ]);
 
 /**
@@ -31,9 +37,10 @@ export function getOutline(filePath) {
 
   const tree = parser.parse(source);
   const symbols = [];
+  const isSwift = getLanguageName(filePath) === 'swift';
 
   for (const node of tree.rootNode.children) {
-    const symbol = extractSymbol(node);
+    const symbol = extractSymbol(node, isSwift);
     if (symbol) symbols.push(symbol);
   }
 
@@ -43,18 +50,18 @@ export function getOutline(filePath) {
 /**
  * Extract a symbol from a top-level AST node.
  */
-function extractSymbol(node) {
-  // Handle export statements by unwrapping
+function extractSymbol(node, isSwift) {
+  // Handle export statements by unwrapping (TS/JS only)
   if (node.type === 'export_statement') {
     const child = findDefinitionChild(node);
     if (!child) return null;
-    const symbol = extractDefinition(child);
+    const symbol = extractDefinition(child, isSwift);
     if (symbol) symbol.exported = true;
     return symbol;
   }
 
   if (DEFINITION_TYPES.has(node.type)) {
-    return extractDefinition(node);
+    return extractDefinition(node, isSwift);
   }
 
   return null;
@@ -73,9 +80,11 @@ function findDefinitionChild(exportNode) {
 /**
  * Extract definition details from a definition AST node.
  */
-function extractDefinition(node) {
-  const kind = nodeTypeToKind(node.type);
-  const name = extractName(node);
+function extractDefinition(node, isSwift) {
+  const kind = isSwift
+    ? swiftNodeTypeToKind(node)
+    : nodeTypeToKind(node.type);
+  const name = extractName(node, isSwift);
   if (!name) return null;
 
   const result = {
@@ -83,16 +92,23 @@ function extractDefinition(node) {
     kind,
     line: node.startPosition.row + 1,
     endLine: node.endPosition.row + 1,
-    exported: false,
+    exported: isSwift ? isSwiftPublic(node) : false,
     children: [],
   };
 
-  // Extract class members
+  // Extract class/struct/enum members
   if (node.type === 'class_declaration') {
-    result.children = extractClassMembers(node);
+    result.children = isSwift
+      ? extractSwiftMembers(node)
+      : extractClassMembers(node);
   }
 
-  // Handle lexical_declaration with arrow functions
+  // Extract protocol members
+  if (node.type === 'protocol_declaration') {
+    result.children = extractProtocolMembers(node);
+  }
+
+  // Handle lexical_declaration with arrow functions (TS/JS)
   if (node.type === 'lexical_declaration') {
     const declarator = node.children.find(
       (c) => c.type === 'variable_declarator'
@@ -111,7 +127,8 @@ function extractDefinition(node) {
 /**
  * Extract the name identifier from a node.
  */
-function extractName(node) {
+function extractName(node, isSwift) {
+  // TS/JS lexical_declaration
   if (node.type === 'lexical_declaration') {
     const declarator = node.children.find(
       (c) => c.type === 'variable_declarator'
@@ -125,16 +142,44 @@ function extractName(node) {
     return null;
   }
 
+  // Swift property_declaration: name is inside pattern child
+  if (node.type === 'property_declaration') {
+    const pattern = node.children.find((c) => c.type === 'pattern');
+    if (pattern) {
+      const nameNode = pattern.children.find(
+        (c) => c.type === 'simple_identifier'
+      );
+      return nameNode?.text || pattern.text || null;
+    }
+    return null;
+  }
+
+  // Swift init_declaration
+  if (node.type === 'init_declaration') {
+    return 'init';
+  }
+
   for (const child of node.children) {
-    if (child.type === 'identifier' || child.type === 'type_identifier') {
+    if (
+      child.type === 'identifier' ||
+      child.type === 'type_identifier' ||
+      child.type === 'simple_identifier'
+    ) {
       return child.text;
+    }
+    // Swift extension: name is inside user_type > type_identifier
+    if (child.type === 'user_type') {
+      const typeId = child.children.find(
+        (c) => c.type === 'type_identifier'
+      );
+      if (typeId) return typeId.text;
     }
   }
   return null;
 }
 
 /**
- * Extract method definitions from a class body.
+ * Extract method definitions from a class body (TS/JS).
  */
 function extractClassMembers(classNode) {
   const members = [];
@@ -162,7 +207,140 @@ function extractClassMembers(classNode) {
 }
 
 /**
- * Map AST node type to a human-readable kind.
+ * Extract members from a Swift class/struct/enum body.
+ */
+function extractSwiftMembers(classNode) {
+  const members = [];
+  const body = classNode.children.find(
+    (c) => c.type === 'class_body' || c.type === 'enum_class_body'
+  );
+  if (!body) return members;
+
+  for (const member of body.children) {
+    if (member.type === 'function_declaration') {
+      const name = member.children.find(
+        (c) => c.type === 'simple_identifier'
+      );
+      if (name) {
+        members.push({
+          name: name.text,
+          kind: 'method',
+          line: member.startPosition.row + 1,
+          endLine: member.endPosition.row + 1,
+          exported: isSwiftPublic(member),
+          children: [],
+        });
+      }
+    }
+
+    if (member.type === 'property_declaration') {
+      const pattern = member.children.find((c) => c.type === 'pattern');
+      const name = pattern?.children.find(
+        (c) => c.type === 'simple_identifier'
+      );
+      if (name || pattern) {
+        members.push({
+          name: name?.text || pattern?.text || 'unknown',
+          kind: 'property',
+          line: member.startPosition.row + 1,
+          endLine: member.endPosition.row + 1,
+          exported: isSwiftPublic(member),
+          children: [],
+        });
+      }
+    }
+
+    if (member.type === 'init_declaration') {
+      members.push({
+        name: 'init',
+        kind: 'initializer',
+        line: member.startPosition.row + 1,
+        endLine: member.endPosition.row + 1,
+        exported: isSwiftPublic(member),
+        children: [],
+      });
+    }
+  }
+  return members;
+}
+
+/**
+ * Extract members from a Swift protocol body.
+ */
+function extractProtocolMembers(protocolNode) {
+  const members = [];
+  const body = protocolNode.children.find(
+    (c) => c.type === 'protocol_body'
+  );
+  if (!body) return members;
+
+  for (const member of body.children) {
+    if (member.type === 'protocol_function_declaration') {
+      const name = member.children.find(
+        (c) => c.type === 'simple_identifier'
+      );
+      if (name) {
+        members.push({
+          name: name.text,
+          kind: 'method',
+          line: member.startPosition.row + 1,
+          endLine: member.endPosition.row + 1,
+          exported: false,
+          children: [],
+        });
+      }
+    }
+
+    if (member.type === 'protocol_property_declaration') {
+      const name = member.children.find(
+        (c) => c.type === 'simple_identifier'
+      );
+      if (name) {
+        members.push({
+          name: name.text,
+          kind: 'property',
+          line: member.startPosition.row + 1,
+          endLine: member.endPosition.row + 1,
+          exported: false,
+          children: [],
+        });
+      }
+    }
+
+    if (member.type === 'associatedtype_declaration') {
+      const name = member.children.find(
+        (c) => c.type === 'type_identifier'
+      );
+      if (name) {
+        members.push({
+          name: name.text,
+          kind: 'associatedtype',
+          line: member.startPosition.row + 1,
+          endLine: member.endPosition.row + 1,
+          exported: false,
+          children: [],
+        });
+      }
+    }
+  }
+  return members;
+}
+
+/**
+ * Check if a Swift declaration has public/open access modifier.
+ */
+function isSwiftPublic(node) {
+  for (const child of node.children) {
+    if (child.type === 'modifiers' || child.type === 'modifier') {
+      const text = child.text;
+      if (text === 'public' || text === 'open') return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Map AST node type to a human-readable kind (TS/JS).
  */
 function nodeTypeToKind(nodeType) {
   const kindMap = {
@@ -174,4 +352,34 @@ function nodeTypeToKind(nodeType) {
     lexical_declaration: 'variable',
   };
   return kindMap[nodeType] || 'unknown';
+}
+
+/**
+ * Map Swift AST node to kind, detecting keyword for class_declaration.
+ * In Swift tree-sitter, class/struct/enum/extension/actor all use class_declaration.
+ */
+function swiftNodeTypeToKind(node) {
+  if (node.type === 'class_declaration') {
+    // Keyword may not be first child (modifiers like public/private come first)
+    const keywordMap = {
+      class: 'class',
+      struct: 'struct',
+      enum: 'enum',
+      extension: 'extension',
+      actor: 'actor',
+    };
+    for (const child of node.children) {
+      if (keywordMap[child.type]) return keywordMap[child.type];
+    }
+    return 'class';
+  }
+
+  const kindMap = {
+    function_declaration: 'function',
+    protocol_declaration: 'protocol',
+    property_declaration: 'variable',
+    typealias_declaration: 'type',
+    init_declaration: 'initializer',
+  };
+  return kindMap[node.type] || 'unknown';
 }
