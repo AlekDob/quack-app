@@ -80,6 +80,7 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Shell env GUI launch: `documentation/gotchas/gotcha-shell-env-gui-launch.md`
 - PixiJS CSP black screen: `documentation/gotchas/gotcha-pixi-csp-unsafe-eval.md`
 - MCP registration: `documentation/gotchas/gotcha-mcp-registration-settings-sources.md`
+- Tokio wait() closes stdin: `documentation/gotchas/gotcha-tokio-child-wait-closes-stdin.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

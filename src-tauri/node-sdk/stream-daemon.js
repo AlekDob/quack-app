@@ -512,9 +512,11 @@ ${hintsBlock}
     }
 
     const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
+    const codeIntelMcpServerPath = join(__dirname, 'code-intel-mcp-server.js');
     options.mcpServers = {
       ...(resolvedMcpServers || {}),
       'ide-tools': { command: 'node', args: [ideMcpServerPath] },
+      'code-intel': { type: 'stdio', command: 'node', args: [codeIntelMcpServerPath] },
     };
 
     const mcpCount = options.mcpServers ? Object.keys(options.mcpServers).length : 0;
