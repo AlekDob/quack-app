@@ -30,6 +30,7 @@ export default function QuackStoreDrawer({ onClose, onRefresh, activeProjects = 
   const {
     allResources, loading, error, loadResources,
     installResource, uninstallResource, installBundleSkills, isInstalled,
+    hasUpdate, updateResource, installedVersions, updateCount,
   } = useMarketplace();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -127,6 +128,22 @@ export default function QuackStoreDrawer({ onClose, onRefresh, activeProjects = 
     }
   };
 
+  const handleUpdate = async (resource: MarketplaceResource, scope: 'global' | 'project' = 'global') => {
+    const toastId = toast.loading(`Updating ${resource.name}...`);
+    try {
+      const success = await updateResource(resource, scope);
+      if (success) {
+        toast.success(`${resource.name} updated to v${resource.version}!`, { id: toastId, duration: 5000 });
+        onRefresh?.();
+        return true;
+      }
+      return false;
+    } catch {
+      toast.error(`Failed to update ${resource.name}`, { id: toastId });
+      return false;
+    }
+  };
+
   const handleUninstall = async (resourceId: string) => {
     const resource = allResources.find(r => r.id === resourceId);
     const name = resource?.name || 'Resource';
@@ -167,7 +184,9 @@ export default function QuackStoreDrawer({ onClose, onRefresh, activeProjects = 
         activeTab={activeTab}
         searchQuery={searchQuery}
         isInstalled={isInstalled}
+        hasUpdate={hasUpdate}
         onInstall={handleInstall}
+        onUpdate={handleUpdate}
         onUninstall={handleUninstall}
         onViewDetails={setSelectedResource}
         onRefresh={handleRefresh}
@@ -176,8 +195,11 @@ export default function QuackStoreDrawer({ onClose, onRefresh, activeProjects = 
         <MarketplaceInstallModal
           resource={selectedResource}
           installed={isInstalled(selectedResource.id)}
+          hasUpdate={hasUpdate(selectedResource.id)}
+          installedVersion={installedVersions[selectedResource.id]}
           onClose={() => setSelectedResource(null)}
           onInstall={handleInstall}
+          onUpdate={handleUpdate}
           onUninstall={handleUninstall}
           activeProjects={activeProjects}
         />

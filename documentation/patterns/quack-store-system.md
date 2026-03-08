@@ -67,6 +67,15 @@ When the "Discover" tab is active with no search query, items are grouped by cat
 - **StoreItemCard**: click on card opens detail (existing behavior), "More info" is an additional visual cue
 - **AgentSelector**: `detailResource` state + inline `<MarketplaceInstallModal>` render — works standalone without the store drawer
 
+## Versioning & Updates (2026-03-08)
+
+Centralized version tracking via `~/.claude/plugins/quack-installed.json`. See `pattern-marketplace-versioning.md` for full details.
+
+- Registry service: `marketplaceRegistryService.ts`
+- Update detection: `hasUpdate()` in `useMarketplace.ts`
+- UI: three-state buttons (Get / Remove / Update) + orange badge
+- Full skill download: GitHub Contents API recursive, fallback to SKILL.md-only
+
 ## CSS Naming Convention
 
 `.quack-store-*` (drawer-level), `.store-sidebar-*`, `.store-hero-*`, `.store-featured-*`, `.store-item-*`, `.store-detail-*`

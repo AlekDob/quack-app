@@ -45,6 +45,10 @@ export default function MarketplaceDrawer({
     toggleFavorite,
     isInstalled,
     isFavorite,
+    installedVersions,
+    hasUpdate,
+    updateResource,
+    updateCount,
   } = useMarketplace();
 
   const selectedSession = useSessionStore((s) => s.getSelectedSession());
@@ -130,6 +134,30 @@ export default function MarketplaceDrawer({
     }
   };
 
+  const handleUpdate = async (resource: MarketplaceResource, scope: 'global' | 'project' = 'global') => {
+    const projectPath = selectedSession?.projectPath;
+    const toastId = toast.loading(`Updating ${resource.name}...`);
+    try {
+      const success = await updateResource(resource, scope, projectPath);
+      if (success) {
+        toast.success(`${resource.name} updated to v${resource.version}!`, {
+          id: toastId,
+          duration: 5000,
+        });
+        onRefresh?.();
+        return true;
+      }
+      return false;
+    } catch (err) {
+      toast.error(`Failed to update ${resource.name}`, {
+        id: toastId,
+        description: err instanceof Error ? err.message : 'Unknown error',
+        duration: 6000,
+      });
+      return false;
+    }
+  };
+
   const handleRefresh = async () => {
     await loadResources();
     onRefresh?.();
@@ -160,6 +188,11 @@ export default function MarketplaceDrawer({
                 }}
               >
                 {installedCount} installed
+                {updateCount > 0 && (
+                  <span style={{ color: '#f28c52', marginLeft: '4px' }}>
+                    · {updateCount} update{updateCount > 1 ? 's' : ''}
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -297,7 +330,9 @@ export default function MarketplaceDrawer({
                 resource={resource}
                 installed={isInstalled(resource.id)}
                 favorited={isFavorite(resource.id)}
+                hasUpdate={hasUpdate(resource.id)}
                 onInstall={handleInstall}
+                onUpdate={handleUpdate}
                 onViewDetails={setSelectedResource}
                 onToggleFavorite={toggleFavorite}
               />
@@ -311,8 +346,11 @@ export default function MarketplaceDrawer({
         <MarketplaceInstallModal
           resource={selectedResource}
           installed={isInstalled(selectedResource.id)}
+          hasUpdate={hasUpdate(selectedResource.id)}
+          installedVersion={installedVersions[selectedResource.id]}
           onClose={() => setSelectedResource(null)}
           onInstall={handleInstall}
+          onUpdate={handleUpdate}
           onUninstall={handleUninstall}
         />
       )}

@@ -8,14 +8,17 @@ import MarkdownText from './MarkdownText';
 interface MarketplaceInstallModalProps {
   resource: MarketplaceResource | null;
   installed: boolean;
+  hasUpdate?: boolean;
+  installedVersion?: string;
   onClose: () => void;
   onInstall: (resource: MarketplaceResource, scope: 'global' | 'project') => Promise<boolean>;
+  onUpdate?: (resource: MarketplaceResource, scope: 'global' | 'project') => Promise<boolean>;
   onUninstall?: (resourceId: string) => Promise<boolean>;
   activeProjects?: ActiveProject[];
 }
 
 export default function MarketplaceInstallModal({
-  resource, installed, onClose, onInstall, onUninstall,
+  resource, installed, hasUpdate, installedVersion, onClose, onInstall, onUpdate, onUninstall,
 }: MarketplaceInstallModalProps) {
   const [installing, setInstalling] = useState(false);
   const [scope, setScope] = useState<'global' | 'project'>('global');
@@ -28,6 +31,17 @@ export default function MarketplaceInstallModal({
     setInstalling(true);
     try {
       const success = await onInstall(resource, scope);
+      if (success) setTimeout(() => onClose(), 300);
+    } finally {
+      setInstalling(false);
+    }
+  };
+
+  const handleUpdate = async () => {
+    if (!onUpdate || !resource) return;
+    setInstalling(true);
+    try {
+      const success = await onUpdate(resource, scope);
       if (success) setTimeout(() => onClose(), 300);
     } finally {
       setInstalling(false);
@@ -132,7 +146,19 @@ export default function MarketplaceInstallModal({
         <div className="store-detail-actions">
           {installed ? (
             <>
-              <span className="store-detail-installed-badge">Installed</span>
+              <span className="store-detail-installed-badge">
+                Installed{installedVersion && installedVersion !== 'unknown' ? ` v${installedVersion}` : ''}
+              </span>
+              {hasUpdate && onUpdate && (
+                <button
+                  type="button"
+                  className="store-detail-btn store-detail-btn-install"
+                  onClick={handleUpdate}
+                  disabled={installing}
+                >
+                  {installing ? 'Updating...' : `Update to v${resource.version}`}
+                </button>
+              )}
               {onUninstall && (
                 <button
                   type="button"

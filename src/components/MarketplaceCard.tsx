@@ -9,7 +9,9 @@ interface MarketplaceCardProps {
   resource: MarketplaceResource;
   installed: boolean;
   favorited: boolean;
+  hasUpdate?: boolean;
   onInstall: (resource: MarketplaceResource) => void;
+  onUpdate?: (resource: MarketplaceResource) => void;
   onViewDetails: (resource: MarketplaceResource) => void;
   onToggleFavorite: (resourceId: string) => void;
 }
@@ -18,7 +20,9 @@ export default function MarketplaceCard({
   resource,
   installed,
   favorited,
+  hasUpdate,
   onInstall,
+  onUpdate,
   onViewDetails,
   onToggleFavorite,
 }: MarketplaceCardProps) {
@@ -206,8 +210,8 @@ export default function MarketplaceCard({
         <span style={{ color: 'rgba(255, 255, 255, 0.35)' }}>
           {resource.author}
         </span>
-        <span style={{ color: 'rgba(255, 255, 255, 0.25)' }}>
-          v{resource.version}
+        <span style={{ color: hasUpdate ? '#f28c52' : 'rgba(255, 255, 255, 0.25)' }}>
+          v{resource.version}{hasUpdate ? ' ↑' : ''}
         </span>
         {resource.featured && (
           <span style={{ color: '#fbbf24', fontWeight: 500 }}>
@@ -218,7 +222,35 @@ export default function MarketplaceCard({
 
       {/* Action Buttons */}
       <div className="flex items-center gap-2">
-        {installed ? (
+        {installed && hasUpdate ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdate?.(resource);
+            }}
+            className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200"
+            style={{
+              background: '#f28c52',
+              border: '1px solid #f28c52',
+              color: '#0c1018',
+              letterSpacing: '0.02em',
+              boxShadow: '0 2px 8px rgba(242, 140, 82, 0.3)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#f9a06e';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(242, 140, 82, 0.45)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#f28c52';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(242, 140, 82, 0.3)';
+              e.currentTarget.style.transform = 'translateY(0)';
+            }}
+          >
+            Update v{resource.version}
+          </button>
+        ) : installed ? (
           <button
             type="button"
             className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold"
