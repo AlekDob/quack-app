@@ -4,13 +4,15 @@ import { getCategoryGradient, getCategoryIcon, VerifiedIcon, formatInstallCount,
 interface StoreItemCardProps {
   resource: MarketplaceResource;
   installed: boolean;
+  hasUpdate?: boolean;
   onInstall: (resource: MarketplaceResource) => void;
+  onUpdate?: (resource: MarketplaceResource) => void;
   onUninstall: (resourceId: string) => Promise<boolean>;
   onViewDetails: (resource: MarketplaceResource) => void;
 }
 
 export default function StoreItemCard({
-  resource, installed, onInstall, onUninstall, onViewDetails,
+  resource, installed, hasUpdate, onInstall, onUpdate, onUninstall, onViewDetails,
 }: StoreItemCardProps) {
   return (
     <div
@@ -51,13 +53,25 @@ export default function StoreItemCard({
               {formatInstallCount(resource.installCount)} installs
             </span>
           )}
-          {installed && <span className="store-installed-badge">Installed</span>}
+          {installed && !hasUpdate && <span className="store-installed-badge">Installed</span>}
+          {installed && hasUpdate && <span className="store-update-badge">Update v{resource.version}</span>}
           <span className="store-item-more-info">More info</span>
         </div>
       </div>
 
       <div className="store-item-action">
-        {installed ? (
+        {installed && hasUpdate ? (
+          <button
+            type="button"
+            className="store-get-btn store-get-btn-update"
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdate?.(resource);
+            }}
+          >
+            Update
+          </button>
+        ) : installed ? (
           <button
             type="button"
             className="store-get-btn store-get-btn-remove"

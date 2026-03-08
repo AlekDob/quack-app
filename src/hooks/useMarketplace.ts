@@ -4,6 +4,10 @@ import { homeDir, join } from '@tauri-apps/api/path';
 import type { MarketplaceResource, MarketplaceCategory, MarketplaceFilters, MarketplaceLibrary, AgentTemplate } from '../types';
 import { createAgent, type UnifiedAgent } from '../services/unifiedAgentStorage';
 import { getRandomGenderedName, getRandomName } from '../utils/agentNames';
+import {
+  loadRegistry, markInstalled, markUninstalled,
+  compareVersions, type InstalledEntry,
+} from '../services/marketplaceRegistryService';
 
 const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/AlekDob/quack-marketplace/main';
 const cacheBust = () => `?t=${Date.now()}`;
@@ -46,6 +50,80 @@ interface PluginJson {
   agentTemplate?: AgentTemplate;
 }
 
+// GitHub Contents API types for full directory download
+interface GitHubContentEntry {
+  name: string;
+  type: 'file' | 'dir';
+  download_url: string | null;
+  url: string;
+  path: string;
+}
+
+const GITHUB_API_BASE = 'https://api.github.com/repos/AlekDob/quack-marketplace/contents';
+
+/** Download an entire skill directory (SKILL.md + scripts/ + references/ + assets/ etc.) */
+async function downloadSkillDirectory(
+  pluginSource: string,
+  skillPath: string,
+  targetDir: string
+): Promise<void> {
+  const apiUrl = `${GITHUB_API_BASE}/${pluginSource}/${skillPath}`;
+  try {
+    const res = await fetch(apiUrl, {
+      headers: { 'Accept': 'application/vnd.github.v3+json' },
+    });
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    const entries: GitHubContentEntry[] = await res.json();
+    await downloadDirectoryEntries(entries, targetDir);
+  } catch {
+    // Fallback: download only SKILL.md (rate limit or API error)
+    const skillMdUrl = `${GITHUB_RAW_BASE}/${pluginSource}/${skillPath}/SKILL.md`;
+    const res = await fetch(skillMdUrl);
+    if (!res.ok) throw new Error(`Failed to download skill: ${res.status}`);
+    const content = await res.text();
+    try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
+    await invoke('write_file_content', {
+      path: `${targetDir}/SKILL.md`,
+      content,
+    });
+  }
+}
+
+async function downloadDirectoryEntries(
+  entries: GitHubContentEntry[],
+  targetDir: string
+): Promise<void> {
+  try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
+  for (const entry of entries) {
+    if (entry.type === 'file' && entry.download_url) {
+      try {
+        const fileRes = await fetch(entry.download_url);
+        if (!fileRes.ok) continue;
+        const content = await fileRes.text();
+        await invoke('write_file_content', {
+          path: `${targetDir}/${entry.name}`,
+          content,
+        });
+      } catch {
+        // Skip individual file failures
+      }
+    } else if (entry.type === 'dir') {
+      try {
+        const subRes = await fetch(entry.url, {
+          headers: { 'Accept': 'application/vnd.github.v3+json' },
+        });
+        if (!subRes.ok) continue;
+        const subEntries: GitHubContentEntry[] = await subRes.json();
+        await downloadDirectoryEntries(subEntries, `${targetDir}/${entry.name}`);
+      } catch {
+        // Skip subdirectory failures
+      }
+    }
+  }
+}
+
+type InstalledVersionMap = Record<string, string>;
+
 /**
  * Fetches marketplace data from the quack-marketplace GitHub repo.
  * Dynamically discovers plugins and their contents without hardcoded data.
@@ -64,6 +142,7 @@ export function useMarketplace() {
     sortBy: 'name',
   });
   const [categories, setCategories] = useState<MarketplaceCategory[]>([]);
+  const [installedVersions, setInstalledVersions] = useState<InstalledVersionMap>({});
 
   // Fetch marketplace.json and build resource list from GitHub
   const loadResources = useCallback(async () => {
@@ -316,11 +395,13 @@ export function useMarketplace() {
     await Promise.allSettled(fetchPromises);
   };
 
-  // Check which resources are installed locally
+  // Check which resources are installed locally (registry first, then filesystem fallback)
   const checkInstalledResources = async (allResources: MarketplaceResource[]) => {
     try {
       const home = await homeDir();
+      const registry = await loadRegistry();
       const installed: MarketplaceResource[] = [];
+      const versions: InstalledVersionMap = {};
 
       for (const resource of allResources) {
         const ext = resource as MarketplaceResource & {
@@ -331,6 +412,15 @@ export function useMarketplace() {
           _commandPath?: string;
         };
 
+        // Check registry first (fast, single file already loaded)
+        const registryEntry = registry.resources[resource.id];
+        if (registryEntry) {
+          installed.push(resource);
+          versions[resource.id] = registryEntry.version;
+          continue;
+        }
+
+        // Fallback: check filesystem for pre-registry installations
         let checkPath = '';
         if (ext._skillPath) {
           const skillName = ext._skillPath.split('/').pop() || '';
@@ -350,6 +440,7 @@ export function useMarketplace() {
           try {
             await invoke<string>('read_file_content', { path: checkPath });
             installed.push(resource);
+            versions[resource.id] = 'unknown'; // Pre-registry install, version unknown
           } catch {
             // Not installed
           }
@@ -361,6 +452,7 @@ export function useMarketplace() {
         installedResources: installed,
         lastSync: Date.now(),
       }));
+      setInstalledVersions(versions);
     } catch {
       // Can't check installed status
     }
@@ -426,24 +518,10 @@ export function useMarketplace() {
       }
 
       if (ext._skillPath && ext._pluginSource) {
-        // Download the skill SKILL.md file
+        // Download full skill directory (SKILL.md + scripts/ + references/ + assets/ etc.)
         const skillName = ext._skillPath.split('/').pop() || '';
-        const skillMdUrl = `${GITHUB_RAW_BASE}/${ext._pluginSource}/${ext._skillPath}/SKILL.md`;
-
-        const res = await fetch(skillMdUrl);
-        if (!res.ok) throw new Error(`Failed to download skill: ${res.status}`);
-        const content = await res.text();
-
-        // Write to {basePath}/skills/{skillName}/SKILL.md
         const targetDir = await join(basePath, 'skills', skillName);
-        const targetPath = await join(targetDir, 'SKILL.md');
-
-        try {
-          await invoke('create_directory', { path: targetDir });
-        } catch {
-          // Directory may already exist, continue
-        }
-        await invoke('write_file_content', { path: targetPath, content });
+        await downloadSkillDirectory(ext._pluginSource, ext._skillPath, targetDir);
       } else if (ext._commandPath && ext._pluginSource) {
         // Download the command .md file
         const cmdFile = ext._commandPath.split('/').pop() || '';
@@ -551,11 +629,13 @@ export function useMarketplace() {
         throw new Error('Unknown resource type');
       }
 
-      // Add to installed
+      // Track in registry and update state
+      await markInstalled(resource.id, resource.version, scope, projectPath);
       setLibrary(prev => ({
         ...prev,
-        installedResources: [...prev.installedResources, resource],
+        installedResources: [...prev.installedResources.filter(r => r.id !== resource.id), resource],
       }));
+      setInstalledVersions(prev => ({ ...prev, [resource.id]: resource.version }));
 
       return true;
     } catch (err) {
@@ -614,10 +694,16 @@ export function useMarketplace() {
         }
       }
 
+      await markUninstalled(resourceId);
       setLibrary(prev => ({
         ...prev,
         installedResources: prev.installedResources.filter(r => r.id !== resourceId),
       }));
+      setInstalledVersions(prev => {
+        const next = { ...prev };
+        delete next[resourceId];
+        return next;
+      });
 
       return true;
     } catch (err) {
@@ -879,6 +965,31 @@ export function useMarketplace() {
     return library.favorites.includes(resourceId);
   }, [library]);
 
+  // Check if a resource has an update available
+  const hasUpdate = useCallback((resourceId: string): boolean => {
+    const installedVersion = installedVersions[resourceId];
+    if (!installedVersion || installedVersion === 'unknown') return false;
+    const resource = resources.find(r => r.id === resourceId);
+    if (!resource) return false;
+    return compareVersions(resource.version, installedVersion) > 0;
+  }, [installedVersions, resources]);
+
+  // Update = reinstall with new version (overwrites all files)
+  const updateResource = useCallback(async (
+    resource: MarketplaceResource,
+    scope: 'global' | 'project' = 'global',
+    projectPath?: string
+  ): Promise<boolean> => {
+    return installResource(resource, scope, projectPath);
+  }, [installResource]);
+
+  // Count resources with available updates
+  const updateCount = Object.keys(installedVersions).filter(id => {
+    const r = resources.find(x => x.id === id);
+    return r && installedVersions[id] !== 'unknown' &&
+      compareVersions(r.version, installedVersions[id]) > 0;
+  }).length;
+
   // Load on mount
   useEffect(() => {
     loadResources();
@@ -902,6 +1013,10 @@ export function useMarketplace() {
     toggleFavorite,
     isInstalled,
     isFavorite,
+    installedVersions,
+    hasUpdate,
+    updateResource,
+    updateCount,
   };
 }
 

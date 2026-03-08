@@ -22,7 +22,7 @@ Quack ships with six MCP servers that are automatically available to all agents.
 | **semantic-search** | Searches your codebase by meaning, not just text — useful for finding related code across files |
 | **ide-tools** | IDE integration: open files in tabs, show diffs, arrange windows, reveal files in Finder |
 | **memory-prompt-hook** | Automatically injects project memory into the agent's context at session start |
-| **code-intel** | Code intelligence powered by tree-sitter: outline a file, find definitions, find references, list imports (TypeScript and JavaScript) |
+| **code-intel** | Code intelligence powered by tree-sitter: outline a file, find definitions, find references, list imports (TypeScript, JavaScript, Swift) |
 
 :::callout[info]
 `code-intel` is the newest addition. It gives agents semantic code navigation — finding where a symbol is defined or used — without needing an external LSP.

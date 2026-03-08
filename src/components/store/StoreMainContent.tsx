@@ -27,7 +27,9 @@ interface StoreMainContentProps {
   activeTab: StoreTab;
   searchQuery: string;
   isInstalled: (id: string) => boolean;
+  hasUpdate?: (id: string) => boolean;
   onInstall: (resource: MarketplaceResource, scope?: 'global' | 'project') => Promise<boolean>;
+  onUpdate?: (resource: MarketplaceResource, scope?: 'global' | 'project') => Promise<boolean>;
   onUninstall: (resourceId: string) => Promise<boolean>;
   onViewDetails: (resource: MarketplaceResource) => void;
   onRefresh: () => void;
@@ -41,12 +43,14 @@ function getPageTitle(tab: StoreTab): string {
 interface GroupedItemsProps {
   resources: MarketplaceResource[];
   isInstalled: (id: string) => boolean;
+  hasUpdate?: (id: string) => boolean;
   onInstall: (resource: MarketplaceResource, scope?: 'global' | 'project') => Promise<boolean>;
+  onUpdate?: (resource: MarketplaceResource, scope?: 'global' | 'project') => Promise<boolean>;
   onUninstall: (resourceId: string) => Promise<boolean>;
   onViewDetails: (resource: MarketplaceResource) => void;
 }
 
-function GroupedItems({ resources, isInstalled, onInstall, onUninstall, onViewDetails }: GroupedItemsProps) {
+function GroupedItems({ resources, isInstalled, hasUpdate, onInstall, onUpdate, onUninstall, onViewDetails }: GroupedItemsProps) {
   const groups = useMemo(() => {
     return CATEGORY_GROUP_ORDER
       .map((group) => ({
@@ -73,7 +77,9 @@ function GroupedItems({ resources, isInstalled, onInstall, onUninstall, onViewDe
                 key={r.id}
                 resource={r}
                 installed={isInstalled(r.id)}
+                hasUpdate={hasUpdate?.(r.id)}
                 onInstall={onInstall}
+                onUpdate={onUpdate}
                 onUninstall={onUninstall}
                 onViewDetails={onViewDetails}
               />
@@ -88,8 +94,8 @@ function GroupedItems({ resources, isInstalled, onInstall, onUninstall, onViewDe
 
 export default function StoreMainContent({
   loading, error, featuredResources, sortedResources,
-  activeTab, searchQuery, isInstalled,
-  onInstall, onUninstall, onViewDetails, onRefresh,
+  activeTab, searchQuery, isInstalled, hasUpdate,
+  onInstall, onUpdate, onUninstall, onViewDetails, onRefresh,
 }: StoreMainContentProps) {
   if (loading) {
     return (
@@ -148,7 +154,9 @@ export default function StoreMainContent({
           <GroupedItems
             resources={sortedResources}
             isInstalled={isInstalled}
+            hasUpdate={hasUpdate}
             onInstall={onInstall}
+            onUpdate={onUpdate}
             onUninstall={onUninstall}
             onViewDetails={onViewDetails}
           />
@@ -159,7 +167,9 @@ export default function StoreMainContent({
                 key={r.id}
                 resource={r}
                 installed={isInstalled(r.id)}
+                hasUpdate={hasUpdate?.(r.id)}
                 onInstall={onInstall}
+                onUpdate={onUpdate}
                 onUninstall={onUninstall}
                 onViewDetails={onViewDetails}
               />

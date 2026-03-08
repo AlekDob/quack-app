@@ -535,6 +535,25 @@
   color: #ef4444;
 }
 
+.store-get-btn-update {
+  background: rgba(242, 140, 82, 0.15);
+  color: #f28c52;
+}
+
+.store-get-btn-update:hover {
+  background: rgba(242, 140, 82, 0.25);
+  color: #f9a06e;
+}
+
+.store-update-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(242, 140, 82, 0.15);
+  color: #f28c52;
+}
+
 /* === Empty & Error States === */
 .store-empty {
   display: flex;
