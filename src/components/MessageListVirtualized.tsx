@@ -301,7 +301,7 @@ function MessageListVirtualized({
   return (
     <div className="message-list">
       <AutoSizer>
-        {({ height, width }) => (
+        {({ height, width }: { height: number; width: number }) => (
           <VariableSizeList
             ref={listRef}
             outerRef={outerRef}

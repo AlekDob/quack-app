@@ -30,6 +30,8 @@ export function getImports(filePath, resolveRelative = true) {
   const fileDir = dirname(filePath);
   const isSwift = getLanguageName(filePath) === 'swift';
 
+  const isPhp = getLanguageName(filePath) === 'php';
+
   for (const node of tree.rootNode.children) {
     if (isSwift && node.type === 'import_declaration') {
       const importInfo = extractSwiftImport(node);
@@ -37,7 +39,13 @@ export function getImports(filePath, resolveRelative = true) {
       continue;
     }
 
-    if (!isSwift && node.type === 'import_statement') {
+    if (isPhp && node.type === 'namespace_use_declaration') {
+      const phpImports = extractPhpUseStatement(node);
+      imports.push(...phpImports);
+      continue;
+    }
+
+    if (!isSwift && !isPhp && node.type === 'import_statement') {
       const importInfo = extractImportInfo(node, fileDir, resolveRelative);
       if (importInfo) imports.push(importInfo);
     }
@@ -73,6 +81,78 @@ function extractSwiftImport(node) {
     isNamespace: true,
     line,
   };
+}
+
+// --- PHP imports ---
+
+/**
+ * Extract import details from a PHP namespace_use_declaration.
+ * Handles: `use App\Models\User;`, `use App\Services\{A, B};`, `use App\Enums\Status as StatusEnum;`
+ */
+function extractPhpUseStatement(node) {
+  const line = node.startPosition.row + 1;
+  const results = [];
+
+  // Check for grouped use: use App\Services\{A, B};
+  const group = node.children.find((c) => c.type === 'namespace_use_group');
+  if (group) {
+    // Prefix is a namespace_name before the group
+    const prefixNode = node.children.find((c) => c.type === 'namespace_name');
+    const prefix = prefixNode ? prefixNode.text + '\\' : '';
+
+    for (const child of group.children) {
+      if (child.type === 'namespace_use_clause') {
+        const name = child.children.find((c) => c.type === 'name');
+        if (name) {
+          const source = prefix + name.text;
+          results.push({
+            source,
+            resolvedPath: null,
+            symbols: [{ name: name.text, alias: null, isDefault: true }],
+            isDefault: true,
+            isNamespace: false,
+            line,
+          });
+        }
+      }
+    }
+    return results;
+  }
+
+  // Single use: use App\Models\User; or use App\Enums\Status as StatusEnum;
+  const clause = node.children.find((c) => c.type === 'namespace_use_clause');
+  if (clause) {
+    const qualifiedName = clause.children.find((c) => c.type === 'qualified_name');
+    const source = qualifiedName ? qualifiedName.text : clause.text;
+
+    // Extract the short name (last segment)
+    const nameNodes = [];
+    const walkNames = (n) => {
+      for (const c of n.children) {
+        if (c.type === 'name') nameNodes.push(c.text);
+        walkNames(c);
+      }
+    };
+    walkNames(qualifiedName || clause);
+    const shortName = nameNodes[nameNodes.length - 1] || source;
+
+    // Check for alias: `as AliasName`
+    const aliasNode = clause.children.find(
+      (c, i, arr) => c.type === 'name' && i > 0 && arr[i - 1]?.type === 'as'
+    );
+    const alias = aliasNode ? aliasNode.text : null;
+
+    results.push({
+      source,
+      resolvedPath: null,
+      symbols: [{ name: shortName, alias, isDefault: true }],
+      isDefault: true,
+      isNamespace: false,
+      line,
+    });
+  }
+
+  return results;
 }
 
 // --- TS/JS imports ---

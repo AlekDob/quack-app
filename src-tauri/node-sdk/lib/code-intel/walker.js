@@ -10,6 +10,8 @@ const EXCLUDED_DIRS = new Set([
   '.turbo', '.cache', '.worktrees',
   // Swift/Xcode
   '.build', 'DerivedData', '.swiftpm', 'Pods',
+  // PHP/Composer
+  'vendor',
 ]);
 
 const MAX_FILE_SIZE = 1_000_000; // 1MB

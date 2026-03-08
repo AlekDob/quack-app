@@ -18,13 +18,19 @@ const DEFINITION_NODE_TYPES = new Set([
   'property_declaration',
   'typealias_declaration',
   'init_declaration',
+  // PHP
+  'function_definition',
+  'trait_declaration',
+  'const_element',
+  'method_declaration',
 ]);
 
-/** Identifier node types across TS/JS and Swift. */
+/** Identifier node types across TS/JS, Swift, and PHP. */
 const IDENTIFIER_TYPES = new Set([
   'identifier',
   'type_identifier',
   'simple_identifier',
+  'name', // PHP
 ]);
 
 /**
@@ -160,6 +166,24 @@ function classifyContext(identifierNode) {
   // Assignments
   if (parent.type === 'assignment_expression') return 'assignment';
   if (parent.type === 'assignment') return 'assignment';
+
+  // PHP imports (use statements)
+  if (parent.type === 'namespace_use_clause') return 'import';
+  if (parent.type === 'qualified_name') return 'import';
+
+  // PHP type references
+  if (parent.type === 'base_clause') return 'type_reference';
+  if (parent.type === 'class_interface_clause') return 'type_reference';
+  if (parent.type === 'named_type') return 'type_reference';
+  if (parent.type === 'use_declaration') return 'type_reference';
+
+  // PHP object creation
+  if (parent.type === 'object_creation_expression') return 'call';
+
+  // PHP function calls
+  if (parent.type === 'function_call_expression') return 'call';
+  if (parent.type === 'scoped_call_expression') return 'call';
+  if (parent.type === 'member_call_expression') return 'call';
 
   // Swift navigation (method call chain)
   if (parent.type === 'navigation_suffix') return 'call';

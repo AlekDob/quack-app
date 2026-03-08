@@ -18,6 +18,11 @@ const DEFINITION_NODE_TYPES = new Set([
   'property_declaration',
   'typealias_declaration',
   'init_declaration',
+  // PHP
+  'function_definition',
+  'trait_declaration',
+  'const_element',
+  'method_declaration',
 ]);
 
 /**
@@ -51,9 +56,11 @@ export function findDefinition(
 
     const tree = parser.parse(source);
     const lines = source.split('\n');
-    const isSwift = getLanguageName(filePath) === 'swift';
+    const lang = getLanguageName(filePath);
+    const isSwift = lang === 'swift';
+    const isPhp = lang === 'php';
 
-    findDefinitionNodes(tree.rootNode, symbol, filePath, lines, definitions, isSwift);
+    findDefinitionNodes(tree.rootNode, symbol, filePath, lines, definitions, isSwift, isPhp);
   }
 
   return { symbol, definitions };
@@ -62,14 +69,20 @@ export function findDefinition(
 /**
  * Recursively search AST for definition nodes matching the symbol.
  */
-function findDefinitionNodes(node, symbol, filePath, lines, results, isSwift) {
+function findDefinitionNodes(node, symbol, filePath, lines, results, isSwift, isPhp) {
   if (DEFINITION_NODE_TYPES.has(node.type)) {
-    const match = findMatchingIdentifier(node, symbol, isSwift);
+    const match = findMatchingIdentifier(node, symbol, isSwift, isPhp);
     if (match) {
-      const exported = isSwift ? isSwiftPublic(node) : isExported(node);
+      const exported = isSwift
+        ? isSwiftPublic(node)
+        : isPhp
+          ? isPhpPublic(node)
+          : isExported(node);
       const kind = isSwift
         ? getSwiftDefinitionKind(node)
-        : getDefinitionKind(node);
+        : isPhp
+          ? getPhpDefinitionKind(node)
+          : getDefinitionKind(node);
       const line = match.startPosition.row + 1;
       const preview = lines[match.startPosition.row]?.trim() || '';
 
@@ -85,14 +98,23 @@ function findDefinitionNodes(node, symbol, filePath, lines, results, isSwift) {
   }
 
   for (const child of node.children) {
-    findDefinitionNodes(child, symbol, filePath, lines, results, isSwift);
+    findDefinitionNodes(child, symbol, filePath, lines, results, isSwift, isPhp);
   }
 }
 
 /**
  * Find an identifier child that matches the symbol name.
  */
-function findMatchingIdentifier(node, symbol, isSwift) {
+function findMatchingIdentifier(node, symbol, isSwift, isPhp) {
+  // PHP: name child is used for classes, functions, traits, enums, interfaces, methods, const_element
+  if (isPhp) {
+    const nameNode = node.children.find(
+      (c) => c.type === 'name' && c.text === symbol
+    );
+    if (nameNode) return nameNode;
+    return null;
+  }
+
   // Swift property_declaration: name is inside pattern child
   if (isSwift && node.type === 'property_declaration') {
     const pattern = node.children.find((c) => c.type === 'pattern');
@@ -160,6 +182,36 @@ function getDefinitionKind(node) {
     type_alias_declaration: 'type',
     enum_declaration: 'enum',
     variable_declarator: 'variable',
+  };
+  return kindMap[node.type] || 'unknown';
+}
+
+/**
+ * Check if a PHP declaration has public visibility.
+ */
+function isPhpPublic(node) {
+  // Walk up to the declaration parent for const_element
+  const target = node.type === 'const_element' ? node.parent : node;
+  for (const child of target.children) {
+    if (child.type === 'visibility_modifier') {
+      return child.text === 'public';
+    }
+  }
+  return true; // no modifier = public in PHP
+}
+
+/**
+ * Get the kind of definition from a PHP AST node.
+ */
+function getPhpDefinitionKind(node) {
+  const kindMap = {
+    function_definition: 'function',
+    class_declaration: 'class',
+    interface_declaration: 'interface',
+    trait_declaration: 'trait',
+    enum_declaration: 'enum',
+    method_declaration: 'method',
+    const_element: 'constant',
   };
   return kindMap[node.type] || 'unknown';
 }

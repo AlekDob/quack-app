@@ -17,6 +17,10 @@ const DEFINITION_TYPES = new Set([
   'property_declaration',
   'typealias_declaration',
   'init_declaration',
+  // PHP
+  'function_definition',
+  'trait_declaration',
+  'const_declaration',
 ]);
 
 /**
@@ -37,10 +41,12 @@ export function getOutline(filePath) {
 
   const tree = parser.parse(source);
   const symbols = [];
-  const isSwift = getLanguageName(filePath) === 'swift';
+  const lang = getLanguageName(filePath);
+  const isSwift = lang === 'swift';
+  const isPhp = lang === 'php';
 
   for (const node of tree.rootNode.children) {
-    const symbol = extractSymbol(node, isSwift);
+    const symbol = extractSymbol(node, isSwift, isPhp);
     if (symbol) symbols.push(symbol);
   }
 
@@ -50,18 +56,18 @@ export function getOutline(filePath) {
 /**
  * Extract a symbol from a top-level AST node.
  */
-function extractSymbol(node, isSwift) {
+function extractSymbol(node, isSwift, isPhp) {
   // Handle export statements by unwrapping (TS/JS only)
   if (node.type === 'export_statement') {
     const child = findDefinitionChild(node);
     if (!child) return null;
-    const symbol = extractDefinition(child, isSwift);
+    const symbol = extractDefinition(child, isSwift, isPhp);
     if (symbol) symbol.exported = true;
     return symbol;
   }
 
   if (DEFINITION_TYPES.has(node.type)) {
-    return extractDefinition(node, isSwift);
+    return extractDefinition(node, isSwift, isPhp);
   }
 
   return null;
@@ -80,19 +86,27 @@ function findDefinitionChild(exportNode) {
 /**
  * Extract definition details from a definition AST node.
  */
-function extractDefinition(node, isSwift) {
+function extractDefinition(node, isSwift, isPhp) {
   const kind = isSwift
     ? swiftNodeTypeToKind(node)
-    : nodeTypeToKind(node.type);
-  const name = extractName(node, isSwift);
+    : isPhp
+      ? phpNodeTypeToKind(node.type)
+      : nodeTypeToKind(node.type);
+  const name = extractName(node, isSwift, isPhp);
   if (!name) return null;
+
+  const exported = isSwift
+    ? isSwiftPublic(node)
+    : isPhp
+      ? isPhpPublic(node)
+      : false;
 
   const result = {
     name,
     kind,
     line: node.startPosition.row + 1,
     endLine: node.endPosition.row + 1,
-    exported: isSwift ? isSwiftPublic(node) : false,
+    exported,
     children: [],
   };
 
@@ -100,7 +114,14 @@ function extractDefinition(node, isSwift) {
   if (node.type === 'class_declaration') {
     result.children = isSwift
       ? extractSwiftMembers(node)
-      : extractClassMembers(node);
+      : isPhp
+        ? extractPhpMembers(node)
+        : extractClassMembers(node);
+  }
+
+  // Extract PHP interface/trait members
+  if (isPhp && (node.type === 'interface_declaration' || node.type === 'trait_declaration')) {
+    result.children = extractPhpMembers(node);
   }
 
   // Extract protocol members
@@ -127,7 +148,17 @@ function extractDefinition(node, isSwift) {
 /**
  * Extract the name identifier from a node.
  */
-function extractName(node, isSwift) {
+function extractName(node, isSwift, isPhp) {
+  // PHP const_declaration: name is inside const_element child
+  if (isPhp && node.type === 'const_declaration') {
+    const constEl = node.children.find((c) => c.type === 'const_element');
+    if (constEl) {
+      const nameNode = constEl.children.find((c) => c.type === 'name');
+      return nameNode?.text || null;
+    }
+    return null;
+  }
+
   // TS/JS lexical_declaration
   if (node.type === 'lexical_declaration') {
     const declarator = node.children.find(
@@ -163,7 +194,8 @@ function extractName(node, isSwift) {
     if (
       child.type === 'identifier' ||
       child.type === 'type_identifier' ||
-      child.type === 'simple_identifier'
+      child.type === 'simple_identifier' ||
+      (isPhp && child.type === 'name')
     ) {
       return child.text;
     }
@@ -337,6 +369,95 @@ function isSwiftPublic(node) {
     }
   }
   return false;
+}
+
+/**
+ * Extract members from a PHP class/interface/trait body.
+ */
+function extractPhpMembers(classNode) {
+  const members = [];
+  const body = classNode.children.find((c) => c.type === 'declaration_list');
+  if (!body) return members;
+
+  for (const member of body.children) {
+    if (member.type === 'method_declaration') {
+      const nameNode = member.children.find((c) => c.type === 'name');
+      if (nameNode) {
+        members.push({
+          name: nameNode.text,
+          kind: 'method',
+          line: member.startPosition.row + 1,
+          endLine: member.endPosition.row + 1,
+          exported: isPhpPublic(member),
+          children: [],
+        });
+      }
+    }
+
+    if (member.type === 'property_declaration') {
+      const propEl = member.children.find((c) => c.type === 'property_element');
+      if (propEl) {
+        const varName = propEl.children.find((c) => c.type === 'variable_name');
+        const nameNode = varName?.children.find((c) => c.type === 'name');
+        if (nameNode) {
+          members.push({
+            name: '$' + nameNode.text,
+            kind: 'property',
+            line: member.startPosition.row + 1,
+            endLine: member.endPosition.row + 1,
+            exported: isPhpPublic(member),
+            children: [],
+          });
+        }
+      }
+    }
+
+    if (member.type === 'const_declaration') {
+      const constEl = member.children.find((c) => c.type === 'const_element');
+      if (constEl) {
+        const nameNode = constEl.children.find((c) => c.type === 'name');
+        if (nameNode) {
+          members.push({
+            name: nameNode.text,
+            kind: 'constant',
+            line: member.startPosition.row + 1,
+            endLine: member.endPosition.row + 1,
+            exported: isPhpPublic(member),
+            children: [],
+          });
+        }
+      }
+    }
+  }
+  return members;
+}
+
+/**
+ * Check if a PHP declaration has public visibility (or no visibility = public by default for interfaces).
+ */
+function isPhpPublic(node) {
+  for (const child of node.children) {
+    if (child.type === 'visibility_modifier') {
+      return child.text === 'public';
+    }
+  }
+  // PHP: no visibility modifier on class/interface/trait/function = public at top level
+  return true;
+}
+
+/**
+ * Map PHP AST node type to a human-readable kind.
+ */
+function phpNodeTypeToKind(nodeType) {
+  const kindMap = {
+    function_definition: 'function',
+    class_declaration: 'class',
+    interface_declaration: 'interface',
+    trait_declaration: 'trait',
+    enum_declaration: 'enum',
+    const_declaration: 'constant',
+  };
+  return kindMap[nodeType] || 'unknown';
 }
 
 /**
