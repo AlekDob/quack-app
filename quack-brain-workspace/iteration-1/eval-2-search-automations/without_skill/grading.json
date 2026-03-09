@@ -1,0 +1,38 @@
+{
+  "eval_id": 2,
+  "eval_name": "search-automations-knowledge",
+  "configuration": "without_skill",
+  "expectations": [
+    {
+      "text": "checks_claude_md_first",
+      "passed": false,
+      "evidence": "Sources list does NOT mention CLAUDE.md. Starts directly with documentation/ files. The agent went straight to searching documentation and code without checking CLAUDE.md Knowledge Base first."
+    },
+    {
+      "text": "finds_automation_entries",
+      "passed": true,
+      "evidence": "Found all 6 key entries: pattern-automation-layer, overview guide, 2 gotchas, 2 bugs. Also explored actual source code files (stores, services, App.tsx, types.ts)."
+    },
+    {
+      "text": "follows_access_chain",
+      "passed": false,
+      "evidence": "Did NOT follow the access chain order. Mixed documentation/ and source code exploration. No evidence of starting from CLAUDE.md. Global brain searched at the end but without structured ordering."
+    },
+    {
+      "text": "presents_summary",
+      "passed": true,
+      "evidence": "Very detailed summary with architecture, types, file lists, gotchas, preset cron table, anti-refire mechanism, tab integration. Actually MORE detailed than with_skill in some areas (includes actual TypeScript interfaces from code)."
+    }
+  ],
+  "issues": [
+    "Skipped CLAUDE.md as starting point",
+    "Used non-standard frontmatter type: eval-output (instead of search-summary or similar Brain type)",
+    "Mixed code exploration with brain search (not strictly following brain methodology)"
+  ],
+  "bonuses": [
+    "Explored actual source code for deeper context",
+    "Included anti-refire mechanism details not in brain entries",
+    "More detailed TypeScript interface documentation"
+  ],
+  "pass_rate": 0.5
+}

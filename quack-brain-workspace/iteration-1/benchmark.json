@@ -1,0 +1,147 @@
+{
+  "skill_name": "quack-brain",
+  "iteration": 1,
+  "timestamp": "2026-03-08T12:30:00Z",
+  "configurations": [
+    {
+      "name": "with_skill",
+      "description": "Agent with quack-brain skill loaded"
+    },
+    {
+      "name": "without_skill",
+      "description": "Baseline agent without any skill"
+    }
+  ],
+  "summary": {
+    "with_skill": {
+      "pass_rate": {
+        "mean": 1.0,
+        "stddev": 0.0
+      },
+      "total_tokens": {
+        "mean": 39377,
+        "stddev": 5478
+      },
+      "duration_seconds": {
+        "mean": 98.5,
+        "stddev": 18.4
+      }
+    },
+    "without_skill": {
+      "pass_rate": {
+        "mean": 0.63,
+        "stddev": 0.12
+      },
+      "total_tokens": {
+        "mean": 46552,
+        "stddev": 10702
+      },
+      "duration_seconds": {
+        "mean": 92.2,
+        "stddev": 27.8
+      }
+    },
+    "delta": {
+      "pass_rate": "+37% (0.63 → 1.00)",
+      "total_tokens": "-15.4% (46,552 → 39,377 avg)",
+      "duration_seconds": "+6.8% (92.2s → 98.5s avg)"
+    }
+  },
+  "evals": [
+    {
+      "eval_id": 1,
+      "eval_name": "bug-write-token-tracking",
+      "results": {
+        "with_skill": {
+          "pass_rate": 1.0,
+          "assertions_passed": 5,
+          "assertions_total": 5,
+          "total_tokens": 32578,
+          "duration_seconds": 73.3
+        },
+        "without_skill": {
+          "pass_rate": 0.8,
+          "assertions_passed": 4,
+          "assertions_total": 5,
+          "total_tokens": 31945,
+          "duration_seconds": 62.2,
+          "failures": ["correct_location: File saved flat in outputs/ instead of documentation/bugs/"]
+        }
+      }
+    },
+    {
+      "eval_id": 2,
+      "eval_name": "search-automations-knowledge",
+      "results": {
+        "with_skill": {
+          "pass_rate": 1.0,
+          "assertions_passed": 4,
+          "assertions_total": 4,
+          "total_tokens": 45916,
+          "duration_seconds": 116.1
+        },
+        "without_skill": {
+          "pass_rate": 0.5,
+          "assertions_passed": 2,
+          "assertions_total": 4,
+          "total_tokens": 50361,
+          "duration_seconds": 130.2,
+          "failures": [
+            "checks_claude_md_first: Skipped CLAUDE.md, went directly to documentation/",
+            "follows_access_chain: Mixed code exploration with brain search, no structured ordering"
+          ]
+        }
+      }
+    },
+    {
+      "eval_id": 3,
+      "eval_name": "diary-and-mermaid-creation",
+      "results": {
+        "with_skill": {
+          "pass_rate": 1.0,
+          "assertions_passed": 5,
+          "assertions_total": 5,
+          "total_tokens": 39636,
+          "duration_seconds": 106.2
+        },
+        "without_skill": {
+          "pass_rate": 0.6,
+          "assertions_passed": 3,
+          "assertions_total": 5,
+          "total_tokens": 57351,
+          "duration_seconds": 84.2,
+          "failures": [
+            "mermaid_valid_syntax: Used .md with embedded mermaid block instead of standalone .mmd file",
+            "mermaid_covers_flow: PARTIAL - flow is covered but wrong file format won't render in Brain UI"
+          ]
+        }
+      }
+    }
+  ],
+  "analyst_observations": [
+    {
+      "type": "high_impact",
+      "observation": "The skill's biggest value is in STRUCTURAL COMPLIANCE. All 5 baseline failures were about format/location, not content quality. Without the skill, agents produce good content but in wrong formats (.md vs .mmd, flat directories vs proper paths, [HH:MM] placeholder vs real time)."
+    },
+    {
+      "type": "high_impact",
+      "observation": "ACCESS CHAIN is the most discriminating assertion. The with_skill agent always started from CLAUDE.md → documentation/ → ~/.quack/brain/. The baseline skipped CLAUDE.md entirely and mixed code exploration with brain search."
+    },
+    {
+      "type": "efficiency",
+      "observation": "The skill SAVES tokens overall (-15.4% average). Despite the skill itself adding ~200 lines to context, it provides clearer instructions that reduce exploration. The baseline spent more tokens 'figuring out' the correct format by reading existing files."
+    },
+    {
+      "type": "tradeoff",
+      "observation": "The skill adds ~6.8% to execution time on average. This is a small cost for 100% compliance vs 63% without. The time delta is mostly from the skill agent reading the SKILL.md file itself."
+    },
+    {
+      "type": "non_discriminating",
+      "observation": "Content quality assertions (has_yaml_frontmatter, presents_summary, diary_correct_author) pass equally in both configurations. The baseline agent infers correct frontmatter by reading existing files — the skill's value is NOT in teaching YAML frontmatter but in teaching the SPECIFIC conventions (file extensions, directory structure, access chain order)."
+    },
+    {
+      "type": "bonus_pattern",
+      "observation": "The with_skill agent consistently produced EXTRAS that the baseline didn't: Brain breadcrumbs in code, brand colors in diagrams, references to related entries, preserved existing diary entries instead of creating standalone files."
+    }
+  ]
+}
