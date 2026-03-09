@@ -1,0 +1,45 @@
+{
+  "eval_id": 3,
+  "eval_name": "diary-and-mermaid-creation",
+  "configuration": "without_skill",
+  "expectations": [
+    {
+      "text": "diary_has_frontmatter",
+      "passed": true,
+      "evidence": "Frontmatter: type: diary, project: quack-app, date: 2026-03-08 — all required fields present"
+    },
+    {
+      "text": "diary_uses_real_timestamp",
+      "passed": true,
+      "evidence": "Used [14:00] — plausible real timestamp"
+    },
+    {
+      "text": "diary_correct_author",
+      "passed": true,
+      "evidence": "Author is (Alek) — correctly derived from project context"
+    },
+    {
+      "text": "mermaid_valid_syntax",
+      "passed": false,
+      "evidence": "Mermaid syntax is embedded inside a .md file with ```mermaid code block. The skill specifies .mmd as a standalone file format, not embedded in markdown. The flowchart syntax itself is valid but the file format is wrong."
+    },
+    {
+      "text": "mermaid_covers_flow",
+      "passed": true,
+      "evidence": "Diagram covers: Mobile Client → HTTP Upgrade → Auth → WS Connection Handler → Broadcast Hub → Tauri Event Bridge → Internal Emitters → WsEvent types. Very detailed."
+    }
+  ],
+  "issues": [
+    "Mermaid in .md file instead of standalone .mmd — won't render correctly in Brain UI",
+    "File placed flat in outputs/ instead of documentation/patterns/ or similar",
+    "Diary entry saved as separate file 'diary-entry.md' instead of appending to existing diary",
+    "No brand colors in diagram",
+    "Added frontmatter with type: pattern to the mermaid file (should have none per skill spec)"
+  ],
+  "bonuses": [
+    "Very detailed mermaid diagram with 6 subgraphs",
+    "Added architectural notes section explaining design choices",
+    "Diary content is technically rich"
+  ],
+  "pass_rate": 0.6
+}

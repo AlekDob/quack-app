@@ -1,0 +1,68 @@
+graph TD
+    subgraph Clients["External Clients"]
+        MOB[Mobile Dashboard]
+        EXT[External Tool]
+    end
+
+    subgraph Rust["Rust Backend (src-tauri)"]
+        WS_UPGRADE["handle_ws_upgrade()\nGET /ws?token=xxx"]
+        AUTH_CHECK["RemoteAuthState\ntoken validation"]
+        WS_CONN["handle_ws_connection()"]
+        SEND_TASK["tokio::spawn\nSend Task\n(broadcast → client)"]
+        RECV_TASK["tokio::spawn\nRecv Task\n(ping/close handling)"]
+        SELECT["tokio::select!\nfirst task done → disconnect"]
+        BROADCAST["WsBroadcast\ntokio::sync::broadcast\nSender<WsEvent>"]
+        LIB_LISTENERS["lib.rs\nTauri event listeners\n(agent_status, session_*, job_*)"]
+    end
+
+    subgraph Events["WsEvent Types"]
+        E1[agent_status]
+        E2[session_created]
+        E3[session_completed]
+        E4[job_fired]
+        E5[job_completed]
+    end
+
+    subgraph React["React Frontend"]
+        TAURI_EMIT["Tauri emit()\n(agent-status-changed\nsession-created, etc.)"]
+        APP_TSX["App.tsx\nTauri event listeners"]
+        SESSION_STORE["sessionStore\n(Zustand)"]
+        AGENT_STORE["agentStore\n(Zustand)"]
+        UI["Chat / Session UI\nComponent re-render"]
+    end
+
+    MOB -->|"WebSocket\nws://host/ws?token=xxx"| WS_UPGRADE
+    EXT -->|"WebSocket\nws://host/ws?token=xxx"| WS_UPGRADE
+
+    WS_UPGRADE --> AUTH_CHECK
+    AUTH_CHECK -->|"401 Unauthorized"| MOB
+    AUTH_CHECK -->|"valid token → upgrade"| WS_CONN
+
+    WS_CONN --> SEND_TASK
+    WS_CONN --> RECV_TASK
+    SEND_TASK --> SELECT
+    RECV_TASK --> SELECT
+
+    BROADCAST -->|"broadcast::Receiver\nsubscribe()"| SEND_TASK
+    SEND_TASK -->|"JSON Message\nserde_json::to_string"| MOB
+
+    LIB_LISTENERS -->|"WsBroadcast.send(WsEvent)"| BROADCAST
+
+    E1 --> LIB_LISTENERS
+    E2 --> LIB_LISTENERS
+    E3 --> LIB_LISTENERS
+    E4 --> LIB_LISTENERS
+    E5 --> LIB_LISTENERS
+
+    LIB_LISTENERS --> TAURI_EMIT
+    TAURI_EMIT --> APP_TSX
+    APP_TSX --> SESSION_STORE
+    APP_TSX --> AGENT_STORE
+    SESSION_STORE --> UI
+    AGENT_STORE --> UI
+
+    style BROADCAST fill:#FF6B35,color:#fff
+    style WS_CONN fill:#004E89,color:#fff
+    style SELECT fill:#004E89,color:#fff
+    style APP_TSX fill:#00D9FF,color:#000
+    style UI fill:#F7931E,color:#fff

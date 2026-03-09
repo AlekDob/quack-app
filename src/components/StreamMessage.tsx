@@ -18,7 +18,7 @@ import CompactingIndicator from './CompactingIndicator';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import type { ClaudeEvent, AskUserQuestionAnswers, DiffLine, ToolDiff } from '../types';
-import { BugReportWidget, WebAnalysisCard } from './structured-outputs';
+import { BugReportWidget, WebAnalysisCard, structuredOutputRegistry } from './structured-outputs';
 import { isBugReportOutput, isWebAnalysisOutput } from '../types/structuredOutputs';
 import { TeammateWidget } from './TeammateWidget';
 import { useTeamStore } from '../stores/teamStore';
@@ -1046,6 +1046,12 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
               onLinkClick={(url) => window.open(url, '_blank')}
             />
           )}
+          {/* Registry fallback for new structured output types */}
+          {structuredOutput && !isBugReportOutput(structuredOutput) && !isWebAnalysisOutput(structuredOutput) && (() => {
+            const RendererComponent = structuredOutputRegistry.find(structuredOutput);
+            if (!RendererComponent) return null;
+            return <RendererComponent data={structuredOutput as never} />;
+          })()}
 
           {/* Regular text result */}
           {message.result && !structuredOutput && (

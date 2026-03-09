@@ -1,0 +1,27 @@
+{
+  "eval_id": 3,
+  "eval_name": "diary-and-mermaid-creation",
+  "prompt": "Ho implementato un nuovo pattern per la gestione dei WebSocket nel modulo remote. Scrivi il diary entry e crea un diagramma mermaid del flusso dati WebSocket -> Rust handler -> React state.",
+  "assertions": [
+    {
+      "name": "diary_has_frontmatter",
+      "description": "Diary file has YAML frontmatter with type: diary, project, and date fields"
+    },
+    {
+      "name": "diary_uses_real_timestamp",
+      "description": "Diary bullet uses actual time from date command, not invented time"
+    },
+    {
+      "name": "diary_correct_author",
+      "description": "Author in diary bullet is 'Alek' (from CLAUDE.md), not the agent name"
+    },
+    {
+      "name": "mermaid_valid_syntax",
+      "description": "The .mmd file contains valid Mermaid diagram syntax (graph/flowchart/sequence)"
+    },
+    {
+      "name": "mermaid_covers_flow",
+      "description": "Diagram shows WebSocket -> Rust handler -> React state flow"
+    }
+  ]
+}

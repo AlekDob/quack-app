@@ -1,0 +1,99 @@
+{
+  "skill_name": "quack-brain",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Ho appena fixato un bug nel token tracking. L'input_tokens includeva i cached tokens causando la stamina bar a mostrare 100%. Salva questa scoperta nel brain.",
+      "expected_output": "A markdown file in documentation/bugs/ with proper YAML frontmatter (type: bug_fix, project, created, last_verified, tags), descriptive kebab-case filename, structured sections (Problem, Solution, Key Insight), and all 4 save criteria met.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "has_yaml_frontmatter",
+          "description": "Output file has valid YAML frontmatter with type, project, created, last_verified, tags fields",
+          "type": "contains"
+        },
+        {
+          "name": "correct_type_field",
+          "description": "Frontmatter type is bug_fix or bug",
+          "type": "contains"
+        },
+        {
+          "name": "kebab_case_filename",
+          "description": "Filename uses descriptive kebab-case (not generic like bug-fix-1.md)",
+          "type": "structural"
+        },
+        {
+          "name": "has_structured_sections",
+          "description": "Contains Problem, Solution, and Key Insight sections",
+          "type": "structural"
+        },
+        {
+          "name": "correct_location",
+          "description": "File is saved in documentation/bugs/ directory",
+          "type": "structural"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Devo modificare il sistema di automazioni. Prima di iniziare, cerca nel brain cosa sappiamo gia sulle automazioni.",
+      "expected_output": "Agent searches CLAUDE.md Knowledge Base for automation references, reads relevant entries from documentation/ (gotchas, patterns, decisions), and presents a summary of existing knowledge about automations.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "checks_claude_md_first",
+          "description": "Agent reads CLAUDE.md or references its Knowledge Base section as the first step",
+          "type": "behavioral"
+        },
+        {
+          "name": "finds_automation_entries",
+          "description": "Agent finds and reads at least 2 automation-related entries (gotchas, patterns, etc.)",
+          "type": "behavioral"
+        },
+        {
+          "name": "follows_access_chain",
+          "description": "Agent follows the access chain order: CLAUDE.md -> documentation/ -> ~/.quack/brain/",
+          "type": "behavioral"
+        },
+        {
+          "name": "presents_summary",
+          "description": "Agent presents a structured summary of automation knowledge found",
+          "type": "output_quality"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Ho implementato un nuovo pattern per la gestione dei WebSocket nel modulo remote. Scrivi il diary entry e crea un diagramma mermaid del flusso dati WebSocket -> Rust handler -> React state.",
+      "expected_output": "Two files: 1) A diary entry in documentation/diary/ with correct format (YAML frontmatter with type:diary, date, bullet with real timestamp and user name from CLAUDE.md), 2) A .mmd file with valid Mermaid syntax showing the WebSocket data flow.",
+      "files": [],
+      "assertions": [
+        {
+          "name": "diary_has_frontmatter",
+          "description": "Diary file has YAML frontmatter with type: diary, project, and date fields",
+          "type": "contains"
+        },
+        {
+          "name": "diary_uses_real_timestamp",
+          "description": "Diary bullet uses actual time from date command, not invented time",
+          "type": "behavioral"
+        },
+        {
+          "name": "diary_correct_author",
+          "description": "Author in diary bullet is 'Alek' (from CLAUDE.md), not the agent name",
+          "type": "contains"
+        },
+        {
+          "name": "mermaid_valid_syntax",
+          "description": "The .mmd file contains valid Mermaid diagram syntax (graph/flowchart/sequence)",
+          "type": "structural"
+        },
+        {
+          "name": "mermaid_covers_flow",
+          "description": "Diagram shows WebSocket -> Rust handler -> React state flow",
+          "type": "output_quality"
+        }
+      ]
+    }
+  ]
+}

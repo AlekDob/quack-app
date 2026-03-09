@@ -1,0 +1,27 @@
+{
+  "eval_id": 1,
+  "eval_name": "bug-write-token-tracking",
+  "prompt": "Ho appena fixato un bug nel token tracking. L'input_tokens includeva i cached tokens causando la stamina bar a mostrare 100%. Salva questa scoperta nel brain.",
+  "assertions": [
+    {
+      "name": "has_yaml_frontmatter",
+      "description": "Output file has valid YAML frontmatter with type, project, created, last_verified, tags fields"
+    },
+    {
+      "name": "correct_type_field",
+      "description": "Frontmatter type is bug_fix or bug"
+    },
+    {
+      "name": "kebab_case_filename",
+      "description": "Filename uses descriptive kebab-case (not generic like bug-fix-1.md)"
+    },
+    {
+      "name": "has_structured_sections",
+      "description": "Contains Problem, Solution, and Key Insight sections"
+    },
+    {
+      "name": "correct_location",
+      "description": "File is saved in documentation/bugs/ directory structure"
+    }
+  ]
+}
