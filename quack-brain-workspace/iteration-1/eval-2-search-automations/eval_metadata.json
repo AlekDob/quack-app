@@ -1,0 +1,23 @@
+{
+  "eval_id": 2,
+  "eval_name": "search-automations-knowledge",
+  "prompt": "Devo modificare il sistema di automazioni. Prima di iniziare, cerca nel brain cosa sappiamo già sulle automazioni.",
+  "assertions": [
+    {
+      "name": "checks_claude_md_first",
+      "description": "Agent reads CLAUDE.md or references its Knowledge Base section as the first step"
+    },
+    {
+      "name": "finds_automation_entries",
+      "description": "Agent finds and reads at least 2 automation-related entries (gotchas, patterns, etc.)"
+    },
+    {
+      "name": "follows_access_chain",
+      "description": "Agent follows the access chain order: CLAUDE.md -> documentation/ -> ~/.quack/brain/"
+    },
+    {
+      "name": "presents_summary",
+      "description": "Agent presents a structured summary of automation knowledge found"
+    }
+  ]
+}

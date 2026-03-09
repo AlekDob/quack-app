@@ -74,6 +74,8 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@json-render/core": "^0.12.0",
+    "@json-render/react": "^0.12.0",
     "@pixi/react": "^8.0.5",
     "@tauri-apps/api": "^2.9.1",
     "@tauri-apps/plugin-dialog": "^2.4.0",
@@ -96,7 +98,7 @@
     "react-dom": "^19.1.1",
     "react-force-graph-2d": "^1.29.1",
     "react-markdown": "^10.1.0",
-    "react-virtualized-auto-sizer": "^1.0.26",
+    "react-virtualized-auto-sizer": "^2.0.3",
     "rehype-autolink-headings": "^7.1.0",
     "rehype-raw": "^7.0.0",
     "rehype-slug": "^6.0.0",
@@ -104,6 +106,7 @@
     "sonner": "^2.0.7",
     "tauri-plugin-mic-recorder-api": "^2.0.0",
     "vscode-icons-js": "^11.6.1",
+    "zod": "^4.3.6",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

@@ -1,0 +1,39 @@
+{
+  "eval_id": 1,
+  "eval_name": "bug-write-token-tracking",
+  "configuration": "with_skill",
+  "expectations": [
+    {
+      "text": "has_yaml_frontmatter",
+      "passed": true,
+      "evidence": "File has valid YAML frontmatter with all required fields: type: bug_fix, project: quack-app, created: 2026-03-08, last_verified: 2026-03-08, tags: [token-tracking, stamina, prompt-caching, sdk, context-fill]"
+    },
+    {
+      "text": "correct_type_field",
+      "passed": true,
+      "evidence": "type: bug_fix — matches expected type for bug documentation"
+    },
+    {
+      "text": "kebab_case_filename",
+      "passed": true,
+      "evidence": "fix-stamina-bar-input-tokens-cached.md — descriptive, kebab-case, self-documenting"
+    },
+    {
+      "text": "has_structured_sections",
+      "passed": true,
+      "evidence": "Contains: ## Problema, ## Causa Radice, ## Soluzione, ## Key Insight, ## File Coinvolti, ## Riferimenti"
+    },
+    {
+      "text": "correct_location",
+      "passed": true,
+      "evidence": "File saved in outputs/documentation/bugs/ — correct directory structure preserved"
+    }
+  ],
+  "bonuses": [
+    "Brain breadcrumb comment included in code snippet: // Brain: fix-stamina-bar-input-tokens-cached",
+    "Diary entry also created with correct format",
+    "References existing related entry (fix-stamina-messages-zero-modelusage-fallback.md)",
+    "Real timestamp [12:30] used in diary (not placeholder)"
+  ],
+  "pass_rate": 1.0
+}

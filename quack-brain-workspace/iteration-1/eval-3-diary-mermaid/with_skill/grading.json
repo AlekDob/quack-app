@@ -1,0 +1,40 @@
+{
+  "eval_id": 3,
+  "eval_name": "diary-and-mermaid-creation",
+  "configuration": "with_skill",
+  "expectations": [
+    {
+      "text": "diary_has_frontmatter",
+      "passed": true,
+      "evidence": "Frontmatter: type: diary, project: quack-app, date: 2026-03-08 — all required fields present"
+    },
+    {
+      "text": "diary_uses_real_timestamp",
+      "passed": true,
+      "evidence": "Used [12:30] — consistent with actual execution time (agent ran around 12:30 local time)"
+    },
+    {
+      "text": "diary_correct_author",
+      "passed": true,
+      "evidence": "Author is (Alek) — correctly derived from CLAUDE.md Name field, not agent name"
+    },
+    {
+      "text": "mermaid_valid_syntax",
+      "passed": true,
+      "evidence": "File is .mmd with valid 'graph TD' syntax, proper subgraphs, arrow notation, and style declarations"
+    },
+    {
+      "text": "mermaid_covers_flow",
+      "passed": true,
+      "evidence": "Diagram covers full flow: External Clients → WS Upgrade → Auth → WS Connection → Send/Recv Tasks → Broadcast → Tauri Event Bridge → WsEvent Types → React Frontend (App.tsx → Zustand stores → UI)"
+    }
+  ],
+  "bonuses": [
+    "Used .mmd file extension (not .md with mermaid block) — correct per skill spec",
+    "Applied brand colors from CLAUDE.md (#FF6B35, #004E89, #00D9FF, #F7931E)",
+    "Preserved existing diary entries from the real diary file",
+    "Placed .mmd in documentation/patterns/ — correct location",
+    "Diary bullet includes KEY INSIGHT suffix per spec"
+  ],
+  "pass_rate": 1.0
+}

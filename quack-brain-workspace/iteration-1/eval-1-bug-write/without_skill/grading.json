@@ -1,0 +1,38 @@
+{
+  "eval_id": 1,
+  "eval_name": "bug-write-token-tracking",
+  "configuration": "without_skill",
+  "expectations": [
+    {
+      "text": "has_yaml_frontmatter",
+      "passed": true,
+      "evidence": "File has valid YAML frontmatter: type: bug_fix, project: quack-app, created: 2026-03-08, last_verified: 2026-03-08, tags: [token-tracking, stamina, prompt-caching, input-tokens, context-fill]"
+    },
+    {
+      "text": "correct_type_field",
+      "passed": true,
+      "evidence": "type: bug_fix — correct"
+    },
+    {
+      "text": "kebab_case_filename",
+      "passed": true,
+      "evidence": "bug-token-input-includes-cached-stamina-100.md — descriptive kebab-case"
+    },
+    {
+      "text": "has_structured_sections",
+      "passed": true,
+      "evidence": "Contains: ## Problema, ## Root Cause, ## Soluzione, ## Key Insights, ## Testing"
+    },
+    {
+      "text": "correct_location",
+      "passed": false,
+      "evidence": "File saved flat in outputs/ root, NOT in outputs/documentation/bugs/ — missing the correct directory structure"
+    }
+  ],
+  "issues": [
+    "No Brain breadcrumb in code snippets",
+    "Diary entry uses placeholder [HH:MM] instead of real timestamp",
+    "Directory structure not preserved (flat in outputs/ instead of documentation/bugs/)"
+  ],
+  "pass_rate": 0.8
+}

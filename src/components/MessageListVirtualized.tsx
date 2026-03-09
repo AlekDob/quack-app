@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import type { CSSProperties } from 'react';
 // @ts-ignore - react-window types issue
 import { VariableSizeList } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
+import { AutoSizer } from 'react-virtualized-auto-sizer';
 import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
 import DuckAnimation from './DuckAnimation';
@@ -300,6 +300,7 @@ function MessageListVirtualized({
 
   return (
     <div className="message-list">
+      {/* @ts-expect-error - react-virtualized-auto-sizer render prop types */}
       <AutoSizer>
         {({ height, width }: { height: number; width: number }) => (
           <VariableSizeList

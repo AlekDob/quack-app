@@ -1,0 +1,33 @@
+{
+  "eval_id": 2,
+  "eval_name": "search-automations-knowledge",
+  "configuration": "with_skill",
+  "expectations": [
+    {
+      "text": "checks_claude_md_first",
+      "passed": true,
+      "evidence": "Sources list starts with 'CLAUDE.md - Knowledge Base section (riferimenti a gotchas e patterns)' as item #1"
+    },
+    {
+      "text": "finds_automation_entries",
+      "passed": true,
+      "evidence": "Found 8 relevant entries: pattern-automation-layer, overview guide, 2 gotchas (scheduler-log-spam, job-provider-not-passed), 2 bugs (fires-repeatedly, session-title-missing), plus map.md and global brain search"
+    },
+    {
+      "text": "follows_access_chain",
+      "passed": true,
+      "evidence": "Clear access chain: 1. CLAUDE.md → 2. documentation/map.md → 3-8. documentation/ entries → 9. ~/.quack/brain/ (no results)"
+    },
+    {
+      "text": "presents_summary",
+      "passed": true,
+      "evidence": "Comprehensive structured summary with: architecture overview, storage details, type interfaces, component table, gotchas, bugs, file reference table, improvement areas"
+    }
+  ],
+  "bonuses": [
+    "Identified 3 areas of technical debt",
+    "Proper frontmatter with type: search-summary",
+    "Clean access chain numbering"
+  ],
+  "pass_rate": 1.0
+}
