@@ -16,6 +16,50 @@ fn hide_console_window(cmd: &mut std::process::Command) {
 }
 
 // =============================================================================
+// CLOUD PROVIDER ENV PROPAGATION
+// Brain: fix-bedrock-env-vars-gui-launch
+// When Quack is launched from Finder (GUI), critical env vars like
+// CLAUDE_CODE_USE_BEDROCK, AWS_PROFILE, etc. are missing from the process env.
+// This helper propagates them from the cached login-shell environment.
+// =============================================================================
+
+/// Cloud provider env vars that must be propagated to SDK child processes.
+const CLOUD_PROVIDER_ENV_VARS: &[&str] = &[
+    // Bedrock / Vertex toggle
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    // AWS credentials & config
+    "AWS_PROFILE",
+    "AWS_REGION",
+    "AWS_DEFAULT_REGION",
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_SESSION_TOKEN",
+    "ANTHROPIC_BEDROCK_BASE_URL",
+    // GCP / Vertex credentials
+    "CLOUD_ML_REGION",
+    "ANTHROPIC_VERTEX_PROJECT_ID",
+    "GOOGLE_APPLICATION_CREDENTIALS",
+];
+
+/// Propagate cloud provider env vars from the login shell to a child Command.
+/// Skips vars already set in the current process env (explicit overrides win).
+fn propagate_cloud_env(command: &mut Command) {
+    let login_env = crate::shell_env::get_login_env();
+    for &var in CLOUD_PROVIDER_ENV_VARS {
+        // If already in process env, it's inherited automatically — skip
+        if std::env::var(var).is_ok() {
+            continue;
+        }
+        // If present in login shell but not in process env, inject it
+        if let Some(value) = login_env.get(var) {
+            log::info!("[ENV] Propagating {} from login shell", var);
+            command.env(var, value);
+        }
+    }
+}
+
+// =============================================================================
 // WINDOWS PATH SANITIZATION
 // =============================================================================
 
@@ -299,6 +343,10 @@ async fn ensure_daemon(app: &AppHandle) -> Result<(), String> {
         let sep = if cfg!(target_os = "windows") { ";" } else { ":" };
         command.env("PATH", format!("{}{}{}", node_dir.to_string_lossy(), sep, base_path));
     }
+
+    // Propagate cloud provider env vars (Bedrock, Vertex, AWS) from login shell
+    // Brain: fix-bedrock-env-vars-gui-launch
+    propagate_cloud_env(&mut command);
 
     // Set Anthropic credentials from environment or credential files
     let has_env_key = std::env::var("ANTHROPIC_API_KEY").is_ok();
@@ -2431,6 +2479,10 @@ async fn send_message_via_sdk_streaming_legacy(
             }
         }
     }
+
+    // Propagate cloud provider env vars (Bedrock, Vertex, AWS) from login shell
+    // Brain: fix-bedrock-env-vars-gui-launch
+    propagate_cloud_env(&mut command);
 
     // Add node directory to PATH for SDK child processes (if using system Node.js)
     if !node_path.to_string_lossy().contains("node-sidecar") {

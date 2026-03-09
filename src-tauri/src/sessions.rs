@@ -735,7 +735,12 @@ fn summarize_tool_use(name: &str, input: &Value) -> String {
             .map(|c| {
                 let trimmed = c.trim();
                 if trimmed.len() > 60 {
-                    format!("{}...", &trimmed[..57])
+                    let end = trimmed.char_indices()
+                        .map(|(i, _)| i)
+                        .take_while(|&i| i <= 57)
+                        .last()
+                        .unwrap_or(0);
+                    format!("{}...", &trimmed[..end])
                 } else {
                     trimmed.to_string()
                 }
