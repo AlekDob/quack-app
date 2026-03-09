@@ -79,6 +79,7 @@ Read `documentation/map.md` for full architecture overview before making changes
 - Session reset after Stop: `documentation/bugs/fix-session-reset-after-stop.md`
 - Memory leak 14GB RAM: `documentation/bugs/fix-memory-leak-14gb-ram.md`
 - Shell env GUI launch: `documentation/gotchas/gotcha-shell-env-gui-launch.md`
+- Bedrock env vars GUI: `documentation/bugs/fix-bedrock-env-vars-gui-launch.md`
 - PixiJS CSP black screen: `documentation/gotchas/gotcha-pixi-csp-unsafe-eval.md`
 - MCP registration: `documentation/gotchas/gotcha-mcp-registration-settings-sources.md`
 - Tokio wait() closes stdin: `documentation/gotchas/gotcha-tokio-child-wait-closes-stdin.md`
