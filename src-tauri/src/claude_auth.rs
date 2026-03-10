@@ -272,10 +272,15 @@ pub fn get_auth_debug_info() -> Result<AuthDebugInfo, String> {
     // Check environment variables — also check login shell env for GUI-launched Quack
     // Brain: fix-bedrock-env-vars-gui-launch
     let login_env = crate::shell_env::get_login_env();
+    let process_bedrock = std::env::var("CLAUDE_CODE_USE_BEDROCK").ok();
+    let login_bedrock = login_env.get("CLAUDE_CODE_USE_BEDROCK").cloned();
+    log::info!("[AuthDebug] CLAUDE_CODE_USE_BEDROCK — process: {:?}, login_shell: {:?}, login_env_size: {}",
+        process_bedrock, login_bedrock, login_env.len());
+
     let anthropic_api_key = std::env::var("ANTHROPIC_API_KEY").is_ok()
         || login_env.contains_key("ANTHROPIC_API_KEY");
-    let claude_code_use_bedrock = std::env::var("CLAUDE_CODE_USE_BEDROCK")
-        .or_else(|_| login_env.get("CLAUDE_CODE_USE_BEDROCK").cloned().ok_or(()))
+    let claude_code_use_bedrock = process_bedrock.as_deref()
+        .or(login_bedrock.as_deref())
         .map(|v| v == "1")
         .unwrap_or(false);
     let claude_code_use_vertex = std::env::var("CLAUDE_CODE_USE_VERTEX")
