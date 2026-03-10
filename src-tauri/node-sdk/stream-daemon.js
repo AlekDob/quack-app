@@ -221,10 +221,20 @@ function loadMCPServersFromFile(workingDir) {
 // =============================================================================
 
 function getModelId(model) {
+  // Last line of defense: map both legacy short names AND Supabase IDs
+  // to valid API model IDs. The frontend should resolve via Supabase config,
+  // but if it fails (offline, slow load), these prevent "invalid model" errors.
   const fallbackMap = {
+    // Legacy short names
     'haiku': 'claude-haiku-4-5',
     'sonnet': 'claude-sonnet-4-5-20250929',
     'opus': 'claude-opus-4-5-20251101',
+    // Supabase IDs (must be kept in sync with Supabase app_config)
+    'haiku45': 'claude-haiku-4-5',
+    'sonnet45': 'claude-sonnet-4-5-20250929',
+    'opus45': 'claude-opus-4-5-20251101',
+    'opus46': 'claude-opus-4-6',
+    'sonnet46': 'claude-sonnet-4-6',
   };
   return fallbackMap[model] || model;
 }
