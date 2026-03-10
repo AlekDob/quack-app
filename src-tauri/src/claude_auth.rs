@@ -269,22 +269,22 @@ pub struct AuthDebugInfo {
 pub fn get_auth_debug_info() -> Result<AuthDebugInfo, String> {
     use crate::claude_cli::check_claude_cli_available;
 
-    // Check environment variables — also check login shell env for GUI-launched Quack
+    // Check environment variables — process env > settings.json > login shell
     // Brain: fix-bedrock-env-vars-gui-launch
     let login_env = crate::shell_env::get_login_env();
-    let process_bedrock = std::env::var("CLAUDE_CODE_USE_BEDROCK").ok();
-    let login_bedrock = login_env.get("CLAUDE_CODE_USE_BEDROCK").cloned();
-    log::info!("[AuthDebug] CLAUDE_CODE_USE_BEDROCK — process: {:?}, login_shell: {:?}, login_env_size: {}",
-        process_bedrock, login_bedrock, login_env.len());
+    let settings_env = crate::hooks::get_claude_env_vars_impl().unwrap_or_default();
 
     let anthropic_api_key = std::env::var("ANTHROPIC_API_KEY").is_ok()
+        || settings_env.contains_key("ANTHROPIC_API_KEY")
         || login_env.contains_key("ANTHROPIC_API_KEY");
-    let claude_code_use_bedrock = process_bedrock.as_deref()
-        .or(login_bedrock.as_deref())
+    let claude_code_use_bedrock = std::env::var("CLAUDE_CODE_USE_BEDROCK").ok()
+        .or_else(|| settings_env.get("CLAUDE_CODE_USE_BEDROCK").cloned())
+        .or_else(|| login_env.get("CLAUDE_CODE_USE_BEDROCK").cloned())
         .map(|v| v == "1")
         .unwrap_or(false);
-    let claude_code_use_vertex = std::env::var("CLAUDE_CODE_USE_VERTEX")
-        .or_else(|_| login_env.get("CLAUDE_CODE_USE_VERTEX").cloned().ok_or(()))
+    let claude_code_use_vertex = std::env::var("CLAUDE_CODE_USE_VERTEX").ok()
+        .or_else(|| settings_env.get("CLAUDE_CODE_USE_VERTEX").cloned())
+        .or_else(|| login_env.get("CLAUDE_CODE_USE_VERTEX").cloned())
         .map(|v| v == "1")
         .unwrap_or(false);
 

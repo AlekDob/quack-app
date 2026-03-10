@@ -42,16 +42,25 @@ const CLOUD_PROVIDER_ENV_VARS: &[&str] = &[
     "GOOGLE_APPLICATION_CREDENTIALS",
 ];
 
-/// Propagate cloud provider env vars from the login shell to a child Command.
-/// Skips vars already set in the current process env (explicit overrides win).
+/// Propagate cloud provider env vars to a child Command.
+/// Priority: process env (inherited) > settings.json env > login shell env.
 fn propagate_cloud_env(command: &mut Command) {
     let login_env = crate::shell_env::get_login_env();
+    // Read env vars from ~/.claude/settings.json (set via Quack Settings toggle)
+    let settings_env = crate::hooks::get_claude_env_vars_impl().unwrap_or_default();
+
     for &var in CLOUD_PROVIDER_ENV_VARS {
         // If already in process env, it's inherited automatically — skip
         if std::env::var(var).is_ok() {
             continue;
         }
-        // If present in login shell but not in process env, inject it
+        // Settings.json env vars take priority (user explicitly set via UI)
+        if let Some(value) = settings_env.get(var) {
+            log::info!("[ENV] Propagating {} from settings.json", var);
+            command.env(var, value);
+            continue;
+        }
+        // Fallback: login shell env
         if let Some(value) = login_env.get(var) {
             log::info!("[ENV] Propagating {} from login shell", var);
             command.env(var, value);

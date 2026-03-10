@@ -13,6 +13,7 @@ const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 
 export default function ClaudeCodeSettings() {
   const [agentTeamsEnabled, setAgentTeamsEnabled] = useState(false);
+  const [bedrockEnabled, setBedrockEnabled] = useState(false);
   const [autoMemoryEnabled, setAutoMemoryEnabled] = useState(true);
   const [memoryEnvOverride, setMemoryEnvOverride] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -42,6 +43,7 @@ export default function ClaudeCodeSettings() {
         invoke<boolean | null>('get_claude_settings_flag', { key: 'autoMemoryEnabled' }),
       ]);
       setAgentTeamsEnabled(envVars['CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS'] === '1');
+      setBedrockEnabled(envVars['CLAUDE_CODE_USE_BEDROCK'] === '1');
       setAutoMemoryEnabled(memoryFlag ?? true);
       setMemoryEnvOverride(envVars['CLAUDE_CODE_DISABLE_AUTO_MEMORY'] === '1');
     } catch (err) {
@@ -72,6 +74,19 @@ export default function ClaudeCodeSettings() {
     } catch (err) {
       console.error('Failed to save Agent Teams setting:', err);
       setAgentTeamsEnabled(!enabled);
+    }
+  };
+
+  const handleToggleBedrock = async (enabled: boolean) => {
+    setBedrockEnabled(enabled);
+    try {
+      await invoke('set_claude_env_var', {
+        key: 'CLAUDE_CODE_USE_BEDROCK',
+        value: enabled ? '1' : null,
+      });
+    } catch (err) {
+      console.error('Failed to save Bedrock setting:', err);
+      setBedrockEnabled(!enabled);
     }
   };
 
@@ -277,6 +292,39 @@ export default function ClaudeCodeSettings() {
           </div>
         </>
       )}
+
+      {/* Cloud Provider — always visible, applies to Claude Code SDK agents */}
+      <SectionHeader
+        title="Cloud Provider"
+        description="Route Claude Code agent calls through your own AWS Bedrock account"
+      />
+      <div className="settings-group">
+        <SettingsRow
+          label="Use AWS Bedrock"
+          description="Sets CLAUDE_CODE_USE_BEDROCK=1 so agents route through your AWS account"
+          control={
+            <IOSSwitch
+              checked={bedrockEnabled}
+              onChange={handleToggleBedrock}
+              disabled={loading}
+            />
+          }
+        />
+        {bedrockEnabled && (
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+            padding: '8px 12px', margin: '4px 12px 12px', borderRadius: 8,
+            backgroundColor: 'rgba(0, 217, 255, 0.06)',
+            border: '1px solid rgba(0, 217, 255, 0.12)',
+          }}>
+            <span style={{ fontSize: 13, lineHeight: '18px', flexShrink: 0, opacity: 0.7 }}>&#x2139;</span>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, opacity: 0.8 }}>
+              Requires valid AWS credentials (AWS_PROFILE, AWS_REGION, etc.) configured in your shell.
+              Restart active sessions for changes to take effect.
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* Memory */}
       <SectionHeader

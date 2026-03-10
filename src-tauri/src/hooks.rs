@@ -490,7 +490,7 @@ pub fn get_claude_env_vars() -> Result<HashMap<String, String>, String> {
     get_claude_env_vars_impl().map_err(|e| e.to_string())
 }
 
-fn get_claude_env_vars_impl() -> Result<HashMap<String, String>> {
+pub(crate) fn get_claude_env_vars_impl() -> Result<HashMap<String, String>> {
     let path = get_global_settings_path();
     let settings = read_settings(&path)?;
     let mut result = HashMap::new();
