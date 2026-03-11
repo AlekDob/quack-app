@@ -16,9 +16,6 @@ import { useBTW } from '../hooks/useBTW';
 import { useQuickLoop } from '../hooks/useQuickLoop';
 import { QuickLoopPopover } from './loop/QuickLoopPopover';
 import { QuickLoopIndicator } from './loop/QuickLoopIndicator';
-import { useFileCheckpoints } from '../hooks/useFileCheckpoints';
-import RewindTimeline from './rewind/RewindTimeline';
-import RewindPreviewModal from './rewind/RewindPreviewModal';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
 import { createBackgroundTask } from '../services/backgroundAgentService';
 import { useChatStore } from '../stores/chatStore';
@@ -249,13 +246,6 @@ export default function ChatView({
   const quickLoop = useQuickLoop((prompt) => {
     onSendMessage(prompt);
   });
-
-  // Rewind Timeline - file checkpoints
-  const sessionKeyForCheckpoints = currentSessionId || '';
-  const fileCheckpoints = useFileCheckpoints(sessionKeyForCheckpoints);
-  const [showRewindTimeline, setShowRewindTimeline] = useState(false);
-  const [rewindPreviewCheckpoint, setRewindPreviewCheckpoint] = useState<import('../hooks/useFileCheckpoints').FileCheckpoint | null>(null);
-  const [rewindLoading, setRewindLoading] = useState(false);
 
   // Persistent attachments via chat store
   const setStoreAttachments = useChatStore((state) => state.setAttachments);
@@ -837,9 +827,9 @@ export default function ChatView({
           {messages.length > 0 && (
             <div style={{ position: 'relative' }}>
               <button
-                className="chat-btw-btn"
+                className="chat-loop-btn"
                 onClick={() => setShowLoopPopover(!showLoopPopover)}
-                title="Quick Loop - Prompt ricorrente"
+                title="Quick Loop - Recurring prompt"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 1l4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
@@ -863,18 +853,6 @@ export default function ChatView({
             currentRun={quickLoop.currentRun}
             onClick={() => setShowLoopPopover(true)}
           />
-          {/* Rewind Timeline - file checkpoint history */}
-          {fileCheckpoints.hasCheckpoints && (
-            <button
-              className="chat-btw-btn"
-              onClick={() => setShowRewindTimeline(!showRewindTimeline)}
-              title="Rewind Timeline - Cronologia checkpoint"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-              </svg>
-            </button>
-          )}
           {isLoading && onAbortStream && (
             <button
               className="chat-stop-btn"
@@ -980,31 +958,6 @@ export default function ChatView({
         model={btw.model}
         onSendQuery={btw.sendQuery}
         onClose={btw.closeBTW}
-      />
-      {/* Rewind Timeline */}
-      <RewindTimeline
-        checkpoints={fileCheckpoints.checkpoints}
-        onSelectCheckpoint={(cp) => setRewindPreviewCheckpoint(cp)}
-        isAgentRunning={isLoading}
-        isOpen={showRewindTimeline}
-        onClose={() => setShowRewindTimeline(false)}
-      />
-      {/* Rewind Preview Modal */}
-      <RewindPreviewModal
-        checkpoint={rewindPreviewCheckpoint}
-        isOpen={rewindPreviewCheckpoint !== null}
-        onClose={() => setRewindPreviewCheckpoint(null)}
-        onConfirmRewind={async (cp) => {
-          setRewindLoading(true);
-          try {
-            onRewindFiles?.(cp.messageId);
-            fileCheckpoints.markRewound(cp.id);
-            setRewindPreviewCheckpoint(null);
-          } finally {
-            setRewindLoading(false);
-          }
-        }}
-        isLoading={rewindLoading}
       />
     </div>
   );

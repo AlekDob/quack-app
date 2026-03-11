@@ -24,6 +24,7 @@ mod agency_setup;
 mod ai;
 mod brain_window;
 mod browser;
+mod btw; // BTW side-chain: one-shot Anthropic Messages API queries
 mod claude_auth;
 mod claude_cli;
 mod claude_oauth;
@@ -1353,6 +1354,8 @@ pub fn run() {
             remote_config::regenerate_remote_token,
             remote_config::get_local_ip,
             remote_config::get_local_hostname,
+            // BTW side-chain query
+            btw::btw_query,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

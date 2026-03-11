@@ -19,7 +19,7 @@ export default function ClaudeCodeSettings() {
   const [loading, setLoading] = useState(true);
 
   // LLM Provider state
-  const { provider, providerBaseUrl, providerApiKey, ollamaModel } = useSettingsStore(s => s.claude);
+  const { provider, providerBaseUrl, providerApiKey, ollamaModel, btwModel } = useSettingsStore(s => s.claude);
   const updateClaude = useSettingsStore(s => s.updateClaudeSettings);
   const [ollamaOnline, setOllamaOnline] = useState<boolean | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
@@ -292,6 +292,29 @@ export default function ClaudeCodeSettings() {
           </div>
         </>
       )}
+
+      {/* BTW Side-Chain */}
+      <SectionHeader
+        title="BTW Side-Chain"
+        description="Quick questions drawer — ask without interrupting the main session"
+      />
+      <div className="settings-group">
+        <SettingsRow
+          label="Model"
+          description="AI model for BTW quick responses (lighter = faster)"
+          control={
+            <select
+              className="settings-select"
+              value={btwModel}
+              onChange={(e) => updateClaude({ btwModel: e.target.value })}
+            >
+              <option value="haiku45">Haiku 4.5</option>
+              <option value="sonnet46">Sonnet 4.6</option>
+              <option value="opus46">Opus 4.6</option>
+            </select>
+          }
+        />
+      </div>
 
       {/* Cloud Provider — always visible, applies to Claude Code SDK agents */}
       <SectionHeader

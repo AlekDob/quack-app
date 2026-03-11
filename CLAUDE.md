@@ -83,6 +83,8 @@ Read `documentation/map.md` for full architecture overview before making changes
 - PixiJS CSP black screen: `documentation/gotchas/gotcha-pixi-csp-unsafe-eval.md`
 - MCP registration: `documentation/gotchas/gotcha-mcp-registration-settings-sources.md`
 - Tokio wait() closes stdin: `documentation/gotchas/gotcha-tokio-child-wait-closes-stdin.md`
+- BTW must use SDK streaming: `documentation/gotchas/gotcha-btw-must-use-sdk-streaming.md`
+- Rewind already in StreamMessage: `documentation/gotchas/gotcha-rewind-already-exists-in-stream-message.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

@@ -234,6 +234,42 @@
   cursor: not-allowed;
 }
 
+/* BTW, Loop toolbar buttons — neutral white, same pattern as other toolbar icons */
+.chat-btw-btn,
+.chat-loop-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  flex-shrink: 0;
+}
+
+.chat-btw-btn svg,
+.chat-loop-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.chat-btw-btn:hover,
+.chat-loop-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.chat-btw-btn:active,
+.chat-loop-btn:active {
+  opacity: 0.8;
+}
+
 .chat-stop-btn {
   display: flex;
   align-items: center;
