@@ -178,6 +178,13 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = (() =
       defaultKeys: buildShortcut("E"),
       currentKeys: buildShortcut("E"),
     },
+    toggleBTW: {
+      id: "toggleBTW" as const,
+      label: "Toggle BTW",
+      description: "Open BTW side-chain quick question drawer",
+      defaultKeys: "Ctrl+B",
+      currentKeys: "Ctrl+B",
+    },
   };
   return shortcuts;
 })();

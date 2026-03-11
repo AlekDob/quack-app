@@ -1661,7 +1661,8 @@ export type ShortcutActionId =
   | 'chatOpenCommands'
   | 'chatInsertXml'
   | 'chatNewLine'
-  | 'toggleSidebarView';
+  | 'toggleSidebarView'
+  | 'toggleBTW';
 
 /**
  * Configuration for a single keyboard shortcut
@@ -1906,4 +1907,64 @@ export interface RemoteApiConfig {
   enabled: boolean;
   token: string | null;
   port: number;
+}
+
+// ==========================================
+// BTW Side-Chain Chat Types (SDK Updates 2026)
+// ==========================================
+
+/** Ephemeral BTW conversation — not persisted after drawer close */
+export interface BTWConversation {
+  query: string;
+  response: string;
+  timestamp: number;
+  sessionId: string;
+  model: string;
+  isLoading: boolean;
+  error?: string;
+}
+
+// ==========================================
+// Quick Loop Types (SDK Updates 2026)
+// ==========================================
+
+export type QuickLoopStatus = 'idle' | 'running' | 'paused' | 'stopped';
+
+/** Session-scoped recurring prompt — dies with the session */
+export interface QuickLoop {
+  prompt: string;
+  intervalMs: number;
+  maxRuns?: number;
+  currentRun: number;
+  status: QuickLoopStatus;
+  sessionId: string;
+  startedAt: number;
+  lastRunAt?: number;
+  nextRunAt?: number;
+}
+
+// ==========================================
+// File Checkpoint Types (SDK Updates 2026)
+// ==========================================
+
+/** A single file checkpoint emitted by the SDK during file modifications */
+export interface FileCheckpoint {
+  id: string;
+  timestamp: number;
+  files: string[];
+  messageId: string;
+  sessionKey: string;
+  rewound?: boolean;
+}
+
+// ==========================================
+// Structured Output Schema Registry (SDK Updates 2026)
+// ==========================================
+
+/** Named, versioned JSON Schema for structured output validation */
+export interface StructuredSchemaEntry {
+  name: string;
+  version: string;
+  jsonSchema: StructuredOutputSchema;
+  validate: (data: unknown) => boolean;
 }

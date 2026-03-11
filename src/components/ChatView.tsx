@@ -11,6 +11,14 @@ import EditSummaryBar from './EditSummaryBar';
 import TodoProgressBar from './TodoProgressBar';
 import type { TodoItem } from './TodoProgressBar';
 import AgentRulesBanner from './AgentRulesBanner';
+import BTWDrawer from './btw/BTWDrawer';
+import { useBTW } from '../hooks/useBTW';
+import { useQuickLoop } from '../hooks/useQuickLoop';
+import { QuickLoopPopover } from './loop/QuickLoopPopover';
+import { QuickLoopIndicator } from './loop/QuickLoopIndicator';
+import { useFileCheckpoints } from '../hooks/useFileCheckpoints';
+import RewindTimeline from './rewind/RewindTimeline';
+import RewindPreviewModal from './rewind/RewindPreviewModal';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
 import { createBackgroundTask } from '../services/backgroundAgentService';
 import { useChatStore } from '../stores/chatStore';
@@ -233,6 +241,21 @@ export default function ChatView({
   // Load active rules using the hook (automatic, zero config)
   const { activeRules, hasRules } = useAgentRules(selectedRules, basePath || '');
 
+  // BTW Side-Chain Chat
+  const btw = useBTW();
+
+  // Quick Loop - recurring prompts
+  const [showLoopPopover, setShowLoopPopover] = useState(false);
+  const quickLoop = useQuickLoop((prompt) => {
+    onSendMessage(prompt);
+  });
+
+  // Rewind Timeline - file checkpoints
+  const sessionKeyForCheckpoints = currentSessionId || '';
+  const fileCheckpoints = useFileCheckpoints(sessionKeyForCheckpoints);
+  const [showRewindTimeline, setShowRewindTimeline] = useState(false);
+  const [rewindPreviewCheckpoint, setRewindPreviewCheckpoint] = useState<import('../hooks/useFileCheckpoints').FileCheckpoint | null>(null);
+  const [rewindLoading, setRewindLoading] = useState(false);
 
   // Persistent attachments via chat store
   const setStoreAttachments = useChatStore((state) => state.setAttachments);
@@ -798,6 +821,60 @@ export default function ChatView({
                 <Brain size={16} />
             </button>
           )}
+          {/* BTW Side-Chain - quick questions without interrupting the agent */}
+          {messages.length > 0 && (
+            <button
+              className="chat-btw-btn"
+              onClick={btw.isOpen ? btw.closeBTW : btw.openBTW}
+              title="BTW - Quick question (Ctrl+B)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </button>
+          )}
+          {/* Quick Loop - recurring prompts */}
+          {messages.length > 0 && (
+            <div style={{ position: 'relative' }}>
+              <button
+                className="chat-btw-btn"
+                onClick={() => setShowLoopPopover(!showLoopPopover)}
+                title="Quick Loop - Prompt ricorrente"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 1l4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                  <path d="M7 23l-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                </svg>
+              </button>
+              <QuickLoopPopover
+                isOpen={showLoopPopover}
+                onClose={() => setShowLoopPopover(false)}
+                onStartLoop={quickLoop.startLoop}
+                status={quickLoop.status}
+                activePrompt={quickLoop.prompt}
+                onStopLoop={quickLoop.stopLoop}
+                currentRun={quickLoop.currentRun}
+              />
+            </div>
+          )}
+          {/* Quick Loop Indicator */}
+          <QuickLoopIndicator
+            status={quickLoop.status}
+            currentRun={quickLoop.currentRun}
+            onClick={() => setShowLoopPopover(true)}
+          />
+          {/* Rewind Timeline - file checkpoint history */}
+          {fileCheckpoints.hasCheckpoints && (
+            <button
+              className="chat-btw-btn"
+              onClick={() => setShowRewindTimeline(!showRewindTimeline)}
+              title="Rewind Timeline - Cronologia checkpoint"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+              </svg>
+            </button>
+          )}
           {isLoading && onAbortStream && (
             <button
               className="chat-stop-btn"
@@ -893,6 +970,42 @@ export default function ChatView({
           onToggleFullscreen={onToggleFullscreen}
         />
       </div>
+      {/* BTW Side-Chain Drawer */}
+      <BTWDrawer
+        isOpen={btw.isOpen}
+        query={btw.query}
+        response={btw.response}
+        isLoading={btw.isLoading}
+        error={btw.error}
+        model={btw.model}
+        onSendQuery={btw.sendQuery}
+        onClose={btw.closeBTW}
+      />
+      {/* Rewind Timeline */}
+      <RewindTimeline
+        checkpoints={fileCheckpoints.checkpoints}
+        onSelectCheckpoint={(cp) => setRewindPreviewCheckpoint(cp)}
+        isAgentRunning={isLoading}
+        isOpen={showRewindTimeline}
+        onClose={() => setShowRewindTimeline(false)}
+      />
+      {/* Rewind Preview Modal */}
+      <RewindPreviewModal
+        checkpoint={rewindPreviewCheckpoint}
+        isOpen={rewindPreviewCheckpoint !== null}
+        onClose={() => setRewindPreviewCheckpoint(null)}
+        onConfirmRewind={async (cp) => {
+          setRewindLoading(true);
+          try {
+            onRewindFiles?.(cp.messageId);
+            fileCheckpoints.markRewound(cp.id);
+            setRewindPreviewCheckpoint(null);
+          } finally {
+            setRewindLoading(false);
+          }
+        }}
+        isLoading={rewindLoading}
+      />
     </div>
   );
 }

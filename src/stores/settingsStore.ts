@@ -29,6 +29,8 @@ interface ClaudeSettings {
   providerBaseUrl: string;  // Custom endpoint (e.g., http://localhost:11434 for Ollama)
   providerApiKey: string;   // API key for custom providers
   ollamaModel: string;      // Model name for Ollama/custom (e.g., 'qwen3-coder')
+  // BTW Side-Chain Chat settings
+  btwModel: string;         // Model for BTW quick queries (default: haiku45)
 }
 
 interface TerminalSettings {
@@ -63,6 +65,7 @@ interface GeneralSettings {
   enableToolGifs: boolean; // Show GIF reactions when tools execute
   toolGifCategories: ToolGifCategories; // Per-category toggle
   giphyApiKey: string; // User's own Giphy API key
+  btwShortcut: string; // Keyboard shortcut for BTW drawer (default: Ctrl+B)
 }
 
 interface SettingsState {
@@ -132,6 +135,7 @@ const defaultGeneralSettings: GeneralSettings = {
   enableToolGifs: false, // GIF reactions disabled by default (requires Giphy API key)
   toolGifCategories: defaultToolGifCategories,
   giphyApiKey: '', // User provides their own key
+  btwShortcut: 'Ctrl+B', // BTW drawer shortcut
 };
 
 const defaultClaudeSettings: ClaudeSettings = {
@@ -145,6 +149,7 @@ const defaultClaudeSettings: ClaudeSettings = {
   providerBaseUrl: '',
   providerApiKey: '',
   ollamaModel: '',
+  btwModel: 'haiku45', // BTW Side-Chain: fast & cheap by default
 };
 
 // Anthropic recommended defaults for agent modes
@@ -283,7 +288,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
-        version: 3,
+        version: 4,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
@@ -315,6 +320,15 @@ export const useSettingsStore = create<SettingsState>()(
           // v3: Force extended thinking for debug mode (was 'auto', now 'hard')
           if (version < 3 && persisted.agentModePresets?.debug) {
             persisted.agentModePresets.debug.thinkingMode = 'hard';
+          }
+          // v4: Add BTW Side-Chain fields (btwModel in claude, btwShortcut in general)
+          if (version < 4) {
+            if (persisted.claude && !persisted.claude.btwModel) {
+              persisted.claude.btwModel = 'haiku45';
+            }
+            if (persisted.general && !persisted.general.btwShortcut) {
+              persisted.general.btwShortcut = 'Ctrl+B';
+            }
           }
           return persisted;
         },
