@@ -88,6 +88,10 @@ const getToolColorMinimal = (name: string): string => {
   if (toolName === 'glob' || toolName === 'grep') return '#6b7280'; // gray
   if (toolName === 'task') return '#fbbf24'; // yellow
   if (toolName === 'webfetch' || toolName === 'websearch') return '#10b981'; // emerald
+  // Agent Teams native primitives
+  if (toolName === 'teamcreate' || toolName === 'teamdelete') return '#C084FC'; // bright lilac
+  if (toolName === 'sendmessage') return '#06B6D4'; // cyan (communication)
+  if (toolName === 'taskcreate' || toolName === 'taskupdate' || toolName === 'tasklist') return '#F59E0B'; // amber
   if (toolName.startsWith('mcp__') || toolName.startsWith('mcp_')) return '#f97316'; // orange
   return '#6b7280'; // default gray
 };

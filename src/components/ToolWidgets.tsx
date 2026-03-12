@@ -23,42 +23,46 @@ function createDiffFromStrings(oldString: string, newString: string, fileName?: 
 }
 
 // Get tool color based on tool type
+// Core SDK tools share one neutral color; special categories get distinctive colors
 export const getToolColor = (toolName: string): string => {
   const name = toolName.toLowerCase();
-  if (name === 'webfetch' || name === 'websearch') return '#10b981'; // green
-  // Brain tools get vibrant rose color (inherited from old memory style)
-  if (name.startsWith('mcp__quack-brain') || name.startsWith('mcp__brain') || name.startsWith('mcp_brain')) return '#E84A7F'; // vibrant rose
-  // IDE tools get purple color
-  if (name.startsWith('mcp__ide') || name.startsWith('mcp_ide')) return '#a855f7'; // purple
-  // Code-intel tools get cyan color
-  if (name.startsWith('mcp__code-intel') || name.startsWith('mcp__code_intel') || name.startsWith('mcp_code-intel') || name.startsWith('mcp_code_intel')) return '#06b6d4'; // cyan
-  // Skill tool gets gold/amber color
-  if (name === 'skill') return '#fbbf24'; // gold/amber
-  // Plan Mode tools get emerald color
-  if (name === 'enterplanmode' || name === 'exitplanmode') return '#34d399'; // emerald
-  // MCP Memory and other MCP tools get orange (generic MCP)
-  if (name.startsWith('mcp__') || name.startsWith('mcp_')) return '#f97316'; // orange (other MCP tools)
-  if (name === 'task') return '#8b5cf6'; // purple
-  if (name === 'bash' || name === 'bashoutput' || name === 'killshell') return '#f59e0b'; // amber
-  if (name === 'read' || name === 'glob' || name === 'grep') return '#3b82f6'; // blue
-  if (name === 'edit' || name === 'write' || name === 'multiedit' || name === 'notebookedit') return '#ec4899'; // pink
-  if (name === 'todowrite') return '#14b8a6'; // teal
-  return '#6b7280'; // gray default
+  // --- Special categories (distinctive colors) ---
+  // MCP Brain tools - vibrant rose
+  if (name.startsWith('mcp__quack-brain') || name.startsWith('mcp__brain') || name.startsWith('mcp_brain')) return '#E84A7F';
+  // MCP IDE tools - purple
+  if (name.startsWith('mcp__ide') || name.startsWith('mcp_ide')) return '#a855f7';
+  // MCP Code-intel tools - cyan
+  if (name.startsWith('mcp__code-intel') || name.startsWith('mcp__code_intel') || name.startsWith('mcp_code-intel') || name.startsWith('mcp_code_intel')) return '#06b6d4';
+  // MCP PostHog tools - pink/magenta
+  if (name.startsWith('mcp__posthog')) return '#ec4899';
+  // Other MCP tools - orange
+  if (name.startsWith('mcp__') || name.startsWith('mcp_')) return '#f97316';
+  // Skill tool - gold/amber
+  if (name === 'skill') return '#fbbf24';
+  // Agent Teams native primitives - bright lilac
+  if (name === 'teamcreate' || name === 'teamdelete') return '#C084FC';
+  // Agent Teams communication - cyan
+  if (name === 'sendmessage') return '#06B6D4';
+  // Agent Teams task coordination - amber
+  if (name === 'taskcreate' || name === 'taskupdate' || name === 'tasklist') return '#F59E0B';
+  // Cron/automation - teal
+  if (name === 'croncreate' || name === 'crondelete' || name === 'cronlist') return '#14b8a6';
+  // Worktree - green
+  if (name === 'enterworktree' || name === 'exitworktree') return '#22c55e';
+  // --- Core SDK tools (unified green) ---
+  return '#22c55e';
 };
 
 // Icons for different tools
 export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
   const toolName = name.toLowerCase();
 
-  // Determine color based on tool type
-  const isWebTool = toolName === 'webfetch' || toolName === 'websearch';
+  // Single source of truth for icon color
+  const iconColor = getToolColor(toolName);
   const isMcpBrainTool = toolName.startsWith('mcp__quack-brain') || toolName.startsWith('mcp__brain') || toolName.startsWith('mcp_brain');
   const isMcpIdeTool = toolName.startsWith('mcp__ide') || toolName.startsWith('mcp_ide');
   const isMcpCodeIntelTool = toolName.startsWith('mcp__code-intel') || toolName.startsWith('mcp__code_intel') || toolName.startsWith('mcp_code-intel') || toolName.startsWith('mcp_code_intel');
-  const isSkillTool = toolName === 'skill';
-  const isPlanModeTool = toolName === 'enterplanmode' || toolName === 'exitplanmode';
   const isMcpTool = toolName.startsWith('mcp__') || toolName.startsWith('mcp_');
-  const iconColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpIdeTool ? '#a855f7' : isMcpCodeIntelTool ? '#06b6d4' : isSkillTool ? '#fbbf24' : isPlanModeTool ? '#34d399' : isMcpTool ? '#f97316' : 'currentColor';
 
   if (toolName === 'read') {
     return (
@@ -200,6 +204,78 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
     );
   }
 
+  // Agent Teams - TeamCreate/TeamDelete (violet - people group)
+  if (toolName === 'teamcreate' || toolName === 'teamdelete') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+    );
+  }
+
+  // Agent Teams - SendMessage (cyan - chat bubble)
+  if (toolName === 'sendmessage') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    );
+  }
+
+  // Agent Teams - TaskCreate/TaskUpdate/TaskList (amber - checklist)
+  if (toolName === 'taskcreate' || toolName === 'taskupdate' || toolName === 'tasklist') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 11l3 3L22 4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+    );
+  }
+
+  // TaskStop (stop/square icon)
+  if (toolName === 'taskstop') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+      </svg>
+    );
+  }
+
+  // ToolSearch (magnifying glass)
+  if (toolName === 'toolsearch') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+    );
+  }
+
+  // Cron tools (teal - clock icon)
+  if (toolName === 'croncreate' || toolName === 'crondelete' || toolName === 'cronlist') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+    );
+  }
+
+  // Worktree tools (green - git branch icon)
+  if (toolName === 'enterworktree' || toolName === 'exitworktree') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="6" y1="3" x2="6" y2="15"/>
+        <circle cx="18" cy="6" r="3"/>
+        <circle cx="6" cy="18" r="3"/>
+        <path d="M18 9a9 9 0 0 1-9 9"/>
+      </svg>
+    );
+  }
+
   if (toolName.includes('listmcpresourcestool') || toolName.includes('readmcpresourcetool')) {
     return (
       <svg width="16" height="16" viewBox="0 0 16 16" fill={iconColor}>
@@ -337,14 +413,7 @@ export const SystemInitializedWidget: React.FC<{
           <div className="system-init-tools">
             {tools.map((tool, i) => {
               const toolNameLower = tool.toLowerCase();
-              const isWebTool = toolNameLower === 'webfetch' || toolNameLower === 'websearch';
-              const isMcpBrainTool = toolNameLower.startsWith('mcp__quack-brain') || toolNameLower.startsWith('mcp__brain') || toolNameLower.startsWith('mcp_brain');
-              const isMcpIdeTool = toolNameLower.startsWith('mcp__ide') || toolNameLower.startsWith('mcp_ide');
-              const isMcpCodeIntelTool = toolNameLower.startsWith('mcp__code-intel') || toolNameLower.startsWith('mcp__code_intel') || toolNameLower.startsWith('mcp_code-intel') || toolNameLower.startsWith('mcp_code_intel');
-              const isSkillTool = toolNameLower === 'skill';
-              const isPlanModeTool = toolNameLower === 'enterplanmode' || toolNameLower === 'exitplanmode';
-              const isMcpTool = toolNameLower.startsWith('mcp__') || toolNameLower.startsWith('mcp_');
-              const textColor = isWebTool ? '#10b981' : isMcpBrainTool ? '#E84A7F' : isMcpIdeTool ? '#a855f7' : isMcpCodeIntelTool ? '#06b6d4' : isSkillTool ? '#fbbf24' : isPlanModeTool ? '#34d399' : isMcpTool ? '#f97316' : undefined;
+              const textColor = getToolColor(toolNameLower) !== '#22c55e' ? getToolColor(toolNameLower) : undefined;
 
               return (
                 <span key={i} className="system-init-tool-badge" style={{ color: textColor }}>
