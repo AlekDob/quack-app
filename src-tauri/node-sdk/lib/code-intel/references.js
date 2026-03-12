@@ -23,6 +23,11 @@ const DEFINITION_NODE_TYPES = new Set([
   'trait_declaration',
   'const_element',
   'method_declaration',
+  // Java
+  'record_declaration',
+  'annotation_type_declaration',
+  'constructor_declaration',
+  'field_declaration',
 ]);
 
 /** Identifier node types across TS/JS, Swift, and PHP. */
@@ -188,6 +193,22 @@ function classifyContext(identifierNode) {
   // Swift navigation (method call chain)
   if (parent.type === 'navigation_suffix') return 'call';
 
+  // Java imports
+  if (parent.type === 'scoped_identifier' && hasAncestor(identifierNode, 'import_declaration')) return 'import';
+
+  // Java method calls
+  if (parent.type === 'method_invocation') return 'call';
+  if (parent.type === 'object_creation_expression') return 'call';
+
+  // Java type references
+  if (parent.type === 'type_list') return 'type_reference'; // implements/extends list
+  if (parent.type === 'superclass') return 'type_reference';
+  if (parent.type === 'super_interfaces') return 'type_reference';
+  if (parent.type === 'type_arguments') return 'type_reference'; // generics
+  if (parent.type === 'annotation') return 'type_reference';
+  if (parent.type === 'catches') return 'type_reference';
+  if (parent.type === 'throws') return 'type_reference';
+
   if (DEFINITION_NODE_TYPES.has(parent.type)) return 'definition';
 
   // Check grandparent for export > definition
@@ -202,4 +223,16 @@ function classifyContext(identifierNode) {
   }
 
   return 'other';
+}
+
+/**
+ * Check if a node has an ancestor of the given type.
+ */
+function hasAncestor(node, ancestorType) {
+  let current = node.parent;
+  while (current) {
+    if (current.type === ancestorType) return true;
+    current = current.parent;
+  }
+  return false;
 }

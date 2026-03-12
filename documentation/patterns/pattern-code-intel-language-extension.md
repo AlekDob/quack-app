@@ -10,7 +10,7 @@ tags: [code-intel, tree-sitter, language-support, mcp]
 
 ## Overview
 
-code-intel uses tree-sitter for AST-based code navigation. Adding a new language requires updating 6 modules in `src-tauri/node-sdk/lib/code-intel/`.
+code-intel uses tree-sitter for AST-based code navigation. Currently supports **TypeScript, JavaScript, Swift, PHP, and Java**. Adding a new language requires updating 6 modules in `src-tauri/node-sdk/lib/code-intel/`.
 
 ## Steps
 
@@ -72,6 +72,20 @@ For each new language:
 | Extension names | Inside `user_type > type_identifier`, not direct `type_identifier` |
 | Modifier ordering | `public struct Foo` → children order: `modifiers`, `struct`, `type_identifier`. Don't assume keyword is `children[0]` |
 | Protocol members | Use `protocol_function_declaration`, `protocol_property_declaration` (not same as class members) |
+
+### Java (tree-sitter-java)
+
+| Gotcha | Detail |
+|--------|--------|
+| Separate node types | Unlike Swift, Java has distinct `class_declaration`, `interface_declaration`, `enum_declaration`, `record_declaration`, `annotation_type_declaration` |
+| `modifiers` node | Access modifiers wrapped in `modifiers` parent; iterate children to find `public`/`private` keywords |
+| `field_declaration` naming | Field name is inside `variable_declarator > identifier`, not a direct `identifier` child |
+| Import structure | `import_declaration` → `scoped_identifier` chain; wildcards use `asterisk` sibling; static imports have `static` keyword child |
+| `enum_body_declarations` | Methods inside enums are nested under `enum_body_declarations` (after the `;`), not directly in `enum_body` |
+| `class_body` vs `interface_body` | Different body node types per container: `class_body`, `interface_body`, `enum_body`, `annotation_type_body` |
+| Constructor vs method | Constructors use `constructor_declaration` (no return type), methods use `method_declaration` |
+| `type_identifier` | Type names (e.g., `String`, `Logger`) use `type_identifier` node, variable names use `identifier` |
+| Import context detection | Java import identifiers are nested in `scoped_identifier` — use `hasAncestor('import_declaration')` to detect import context |
 
 ## Testing Checklist
 

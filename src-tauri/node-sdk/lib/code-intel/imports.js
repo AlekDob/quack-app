@@ -31,8 +31,15 @@ export function getImports(filePath, resolveRelative = true) {
   const isSwift = getLanguageName(filePath) === 'swift';
 
   const isPhp = getLanguageName(filePath) === 'php';
+  const isJava = getLanguageName(filePath) === 'java';
 
   for (const node of tree.rootNode.children) {
+    if (isJava && node.type === 'import_declaration') {
+      const importInfo = extractJavaImport(node);
+      if (importInfo) imports.push(importInfo);
+      continue;
+    }
+
     if (isSwift && node.type === 'import_declaration') {
       const importInfo = extractSwiftImport(node);
       if (importInfo) imports.push(importInfo);
@@ -266,5 +273,48 @@ function resolveImportPath(fromDir, importSource) {
     if (existsSync(indexPath)) return indexPath;
   }
 
+  return null;
+}
+
+// --- Java imports ---
+
+/**
+ * Extract import details from a Java import_declaration.
+ * Handles: `import java.util.List;`, `import java.util.*;`, `import static java.lang.Math.PI;`
+ */
+function extractJavaImport(node) {
+  const line = node.startPosition.row + 1;
+  const isStatic = node.children.some((c) => c.type === 'static');
+  const isWildcard = node.children.some((c) => c.type === 'asterisk');
+
+  // Find the scoped_identifier (full package path)
+  const scopedId = node.children.find((c) => c.type === 'scoped_identifier');
+  if (!scopedId) return null;
+
+  const source = scopedId.text + (isWildcard ? '.*' : '');
+
+  // Extract the short name (last identifier in the chain)
+  const lastId = getLastIdentifier(scopedId);
+  const shortName = isWildcard ? '*' : (lastId || source);
+
+  return {
+    source,
+    resolvedPath: null,
+    symbols: [{ name: shortName, alias: null, isDefault: !isWildcard }],
+    isDefault: !isWildcard,
+    isNamespace: isWildcard,
+    isStatic,
+    line,
+  };
+}
+
+/**
+ * Get the last identifier text from a scoped_identifier chain.
+ */
+function getLastIdentifier(scopedId) {
+  const children = scopedId.children;
+  for (let i = children.length - 1; i >= 0; i--) {
+    if (children[i].type === 'identifier') return children[i].text;
+  }
   return null;
 }

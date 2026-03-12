@@ -81,6 +81,9 @@ interface RepositoryGroupProps {
   onOpenPersonality?: () => void;
   // Saved Commands (per-project)
   onOpenSavedCommands?: (projectPath: string) => void;
+  // Favorite/star
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
 // Helper function to get avatar image URL (works in both dev and production)
@@ -1130,6 +1133,8 @@ export default function RepositoryGroup({
   onActiveSessionDone,
   onOpenPersonality,
   onOpenSavedCommands,
+  isFavorite,
+  onToggleFavorite,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [showGitMenu, setShowGitMenu] = useState<string | null>(null);
@@ -1940,6 +1945,32 @@ export default function RepositoryGroup({
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Star/Favorite button */}
+            {onToggleFavorite && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleFavorite();
+                }}
+                title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                className={`repo-action-btn${isFavorite ? ' repo-action-btn--favorite' : ''}`}
+                style={isFavorite ? { color: 'rgba(251, 191, 36, 0.9)' } : undefined}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill={isFavorite ? 'rgba(251, 191, 36, 0.9)' : 'none'}
+                  stroke={isFavorite ? 'rgba(251, 191, 36, 0.9)' : 'currentColor'}
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              </button>
+            )}
             {/* Copy Path button */}
             <button
               type="button"

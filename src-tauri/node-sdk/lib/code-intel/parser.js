@@ -7,6 +7,7 @@ import TypeScript from 'tree-sitter-typescript';
 import JavaScript from 'tree-sitter-javascript';
 import Swift from 'tree-sitter-swift';
 import PHP from 'tree-sitter-php';
+import Java from 'tree-sitter-java';
 
 /**
  * Map of file extensions to language names.
@@ -18,6 +19,7 @@ const LANGUAGE_MAP = {
   '.jsx': 'javascript',
   '.swift': 'swift',
   '.php': 'php',
+  '.java': 'java',
 };
 
 export const SUPPORTED_EXTENSIONS = Object.keys(LANGUAGE_MAP);
@@ -38,6 +40,7 @@ function getLanguageGrammar(languageName) {
     case 'javascript': return JavaScript;
     case 'swift': return Swift;
     case 'php': return PHP.php;
+    case 'java': return Java;
     default: return null;
   }
 }

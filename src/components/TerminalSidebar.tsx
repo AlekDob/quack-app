@@ -36,10 +36,11 @@ import GroupCreationModal from "./GroupCreationModal";
 import SidebarViewToggle from "./SidebarViewToggle";
 import TaskHubView from "./TaskHubView";
 
-// Storage format for project order and colors
+// Storage format for project order, colors, and favorites
 interface ProjectStorageData {
   order: string[];
   colors: Record<string, string>;
+  favorites?: string[]; // Array of favorited repoKeys (e.g. "repo-quack-app")
 }
 
 // Default color palette for auto-assignment
@@ -93,6 +94,9 @@ interface SortableRepositoryGroupProps {
   onOpenPersonality?: () => void;
   // Saved Commands (per-project)
   onOpenSavedCommands?: (projectPath: string) => void;
+  // Favorite/star
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
 function SortableRepositoryGroup({
@@ -436,6 +440,9 @@ export default function TerminalSidebar({
   // Metro style is now the only option (removed useMetroStyle state)
   const [repositoryOrder, setRepositoryOrder] = useState<string[]>([]);
   const [projectColors, setProjectColors] = useState<Record<string, string>>({});
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const favoritesRef = useRef<Set<string>>(new Set());
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [activeRepoId, setActiveRepoId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     position: { x: number; y: number };
@@ -499,6 +506,11 @@ export default function TerminalSidebar({
             // New format - use directly
             setRepositoryOrder(savedData.order);
             setProjectColors(savedData.colors);
+            if (savedData.favorites) {
+              const loadedFavs = new Set(savedData.favorites);
+              favoritesRef.current = loadedFavs;
+              setFavorites(loadedFavs);
+            }
           }
         }
       } catch (error) {
@@ -508,17 +520,30 @@ export default function TerminalSidebar({
     loadOrderAndColors();
   }, []);
 
-  // Save repository order and colors
-  const saveRepositoryOrder = useCallback(async (order: string[], colors: Record<string, string>) => {
+  // Save repository order, colors, and favorites
+  const saveRepositoryOrder = useCallback(async (order: string[], colors: Record<string, string>, favs: Set<string>) => {
     try {
       const store = await Store.load('.quack-repo-order.dat');
-      const data: ProjectStorageData = { order, colors };
+      const data: ProjectStorageData = { order, colors, favorites: Array.from(favs) };
       await store.set('repository-order', data);
       await store.save();
     } catch (error) {
       console.error('Failed to save repository order:', error);
     }
   }, []);
+
+  // Toggle a project's favorite status (uses ref to avoid stale closure on rapid clicks)
+  const toggleFavorite = useCallback((repoKey: string) => {
+    const next = new Set(favoritesRef.current);
+    if (next.has(repoKey)) {
+      next.delete(repoKey);
+    } else {
+      next.add(repoKey);
+    }
+    favoritesRef.current = next;
+    setFavorites(next);
+    saveRepositoryOrder(repositoryOrder, projectColors, next);
+  }, [repositoryOrder, projectColors, saveRepositoryOrder]);
 
   // Handle repository drag start
   const handleRepoDragStart = (event: DragStartEvent) => {
@@ -574,7 +599,7 @@ export default function TerminalSidebar({
       });
       setProjectColors(updatedColors);
 
-      saveRepositoryOrder(newRepoOrder, updatedColors);
+      saveRepositoryOrder(newRepoOrder, updatedColors, favorites);
     }
 
     setActiveRepoId(null);
@@ -678,52 +703,54 @@ export default function TerminalSidebar({
       ? repositoryGroups.filter(([name]) => fuzzyMatch(query, name))
       : repositoryGroups;
 
+    let ordered: typeof filteredGroups;
+
     if (repositoryOrder.length === 0) {
-      return filteredGroups;
-    }
+      ordered = filteredGroups;
+    } else {
+      // Create a map for quick lookup
+      const groupMap = new Map(filteredGroups.map(([name, group]) => [`repo-${name}`, [name, group] as [string, typeof group]]));
 
-    // Create a map for quick lookup
-    const groupMap = new Map(filteredGroups.map(([name, group]) => [`repo-${name}`, [name, group] as [string, typeof group]]));
+      // Sort based on saved order
+      ordered = [];
+      const added = new Set<string>();
 
-    // Sort based on saved order
-    const ordered: typeof filteredGroups = [];
-    const added = new Set<string>();
-
-    // First add repositories in the saved order
-    for (const repoKey of repositoryOrder) {
-      const group = groupMap.get(repoKey);
-      if (group && !added.has(repoKey)) {
-        ordered.push(group);
-        added.add(repoKey);
-      }
-    }
-
-    // Then add any new repositories not in the saved order
-    const newRepos: string[] = [];
-    for (const [name, group] of filteredGroups) {
-      const repoKey = `repo-${name}`;
-      if (!added.has(repoKey)) {
-        ordered.push([name, group]);
-        newRepos.push(repoKey);
-      }
-    }
-
-    // Auto-assign colors to new projects
-    if (newRepos.length > 0) {
-      const updatedColors = { ...projectColors };
-      const updatedOrder = [...repositoryOrder, ...newRepos];
-
-      newRepos.forEach((repoKey, index) => {
-        if (!updatedColors[repoKey]) {
-          const colorIndex = (repositoryOrder.length + index) % DEFAULT_PROJECT_COLORS.length;
-          updatedColors[repoKey] = DEFAULT_PROJECT_COLORS[colorIndex];
+      // First add repositories in the saved order
+      for (const repoKey of repositoryOrder) {
+        const group = groupMap.get(repoKey);
+        if (group && !added.has(repoKey)) {
+          ordered.push(group);
+          added.add(repoKey);
         }
-      });
+      }
 
-      // Update state and persist
-      setProjectColors(updatedColors);
-      setRepositoryOrder(updatedOrder);
-      saveRepositoryOrder(updatedOrder, updatedColors);
+      // Then add any new repositories not in the saved order
+      const newRepos: string[] = [];
+      for (const [name, group] of filteredGroups) {
+        const repoKey = `repo-${name}`;
+        if (!added.has(repoKey)) {
+          ordered.push([name, group]);
+          newRepos.push(repoKey);
+        }
+      }
+
+      // Auto-assign colors to new projects
+      if (newRepos.length > 0) {
+        const updatedColors = { ...projectColors };
+        const updatedOrder = [...repositoryOrder, ...newRepos];
+
+        newRepos.forEach((repoKey, index) => {
+          if (!updatedColors[repoKey]) {
+            const colorIndex = (repositoryOrder.length + index) % DEFAULT_PROJECT_COLORS.length;
+            updatedColors[repoKey] = DEFAULT_PROJECT_COLORS[colorIndex];
+          }
+        });
+
+        // Update state and persist
+        setProjectColors(updatedColors);
+        setRepositoryOrder(updatedOrder);
+        saveRepositoryOrder(updatedOrder, updatedColors, favorites);
+      }
     }
 
     return ordered;
@@ -776,12 +803,31 @@ export default function TerminalSidebar({
     return sections;
   }, [orderedRepositoryGroups, groups]);
 
+  // Apply favorites filter when toggled on
+  const filteredSidebarSections = useMemo((): SidebarSection[] => {
+    if (!showFavoritesOnly || favorites.size === 0) return sidebarSections;
+    return sidebarSections.reduce<SidebarSection[]>((acc, section) => {
+      if (section.type === 'standalone') {
+        if (favorites.has(`repo-${section.project[0]}`)) {
+          acc.push(section);
+        }
+      } else {
+        // Group: filter to only favorited projects within
+        const favProjects = section.projects.filter(([name]) => favorites.has(`repo-${name}`));
+        if (favProjects.length > 0) {
+          acc.push({ ...section, projects: favProjects });
+        }
+      }
+      return acc;
+    }, []);
+  }, [sidebarSections, showFavoritesOnly, favorites]);
+
   // Compute section-level IDs for the top-level SortableContext
   const sectionIds = useMemo(() => {
-    return sidebarSections.map((s) =>
+    return filteredSidebarSections.map((s) =>
       s.type === 'group' ? `group-${s.group.id}` : `repo-${s.project[0]}`
     );
-  }, [sidebarSections]);
+  }, [filteredSidebarSections]);
 
   // Legacy cwd groups for fallback (when not using metro style)
   const cwdGroups = useMemo(() => {
@@ -985,17 +1031,52 @@ export default function TerminalSidebar({
             className="new-project-btn-sidebar"
             onClick={() => setShowGroupModal(true)}
             aria-label="Create Group"
-            style={{ marginLeft: '4px' }}
+            style={{ marginLeft: '4px', padding: '4px 6px', minWidth: 'unset' }}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="3" width="20" height="18" rx="2" />
               <line x1="12" y1="3" x2="12" y2="21" />
             </svg>
-            <span>Group</span>
           </button>
         )}
 
         <SidebarViewToggle activeView={sidebarView} onChange={setSidebarView} />
+
+        {/* Favorites filter toggle */}
+        {favorites.size > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowFavoritesOnly((prev) => !prev)}
+            title={showFavoritesOnly ? "Show all projects" : "Show favorites only"}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '24px',
+              height: '22px',
+              marginLeft: '4px',
+              background: showFavoritesOnly ? 'rgba(251, 191, 36, 0.15)' : 'rgba(255, 255, 255, 0.06)',
+              border: 'none',
+              borderRadius: '4px',
+              color: showFavoritesOnly ? 'rgba(251, 191, 36, 0.9)' : 'rgba(255, 255, 255, 0.4)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill={showFavoritesOnly ? 'rgba(251, 191, 36, 0.9)' : 'none'}
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+          </button>
+        )}
       </div>
 
       <div className="sidebar-header sidebar-header-codex" data-tauri-drag-region>
@@ -1035,7 +1116,7 @@ export default function TerminalSidebar({
               items={sectionIds}
               strategy={verticalListSortingStrategy}
             >
-              {sidebarSections.map((section) => {
+              {filteredSidebarSections.map((section) => {
                 if (section.type === 'standalone') {
                   const [repoName, repoData] = section.project;
                   const repoKey = `repo-${repoName}`;
@@ -1073,6 +1154,8 @@ export default function TerminalSidebar({
                       onActiveSessionDone={onActiveSessionDone}
                       onOpenPersonality={onOpenPersonality}
                       onOpenSavedCommands={onOpenProjectSavedCommands}
+                      isFavorite={favorites.has(repoKey)}
+                      onToggleFavorite={() => toggleFavorite(repoKey)}
                     />
                   );
                 }
@@ -1254,6 +1337,8 @@ export default function TerminalSidebar({
                           onActiveSessionDone={onActiveSessionDone}
                           onOpenPersonality={onOpenPersonality}
                           onOpenSavedCommands={onOpenProjectSavedCommands}
+                          isFavorite={favorites.has(repoKey)}
+                          onToggleFavorite={() => toggleFavorite(repoKey)}
                         />
                       );
                     })}

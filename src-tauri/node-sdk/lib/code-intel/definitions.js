@@ -23,6 +23,11 @@ const DEFINITION_NODE_TYPES = new Set([
   'trait_declaration',
   'const_element',
   'method_declaration',
+  // Java
+  'record_declaration',
+  'annotation_type_declaration',
+  'constructor_declaration',
+  'field_declaration',
 ]);
 
 /**
@@ -59,8 +64,9 @@ export function findDefinition(
     const lang = getLanguageName(filePath);
     const isSwift = lang === 'swift';
     const isPhp = lang === 'php';
+    const isJava = lang === 'java';
 
-    findDefinitionNodes(tree.rootNode, symbol, filePath, lines, definitions, isSwift, isPhp);
+    findDefinitionNodes(tree.rootNode, symbol, filePath, lines, definitions, isSwift, isPhp, isJava);
   }
 
   return { symbol, definitions };
@@ -69,20 +75,24 @@ export function findDefinition(
 /**
  * Recursively search AST for definition nodes matching the symbol.
  */
-function findDefinitionNodes(node, symbol, filePath, lines, results, isSwift, isPhp) {
+function findDefinitionNodes(node, symbol, filePath, lines, results, isSwift, isPhp, isJava) {
   if (DEFINITION_NODE_TYPES.has(node.type)) {
-    const match = findMatchingIdentifier(node, symbol, isSwift, isPhp);
+    const match = findMatchingIdentifier(node, symbol, isSwift, isPhp, isJava);
     if (match) {
-      const exported = isSwift
-        ? isSwiftPublic(node)
-        : isPhp
-          ? isPhpPublic(node)
-          : isExported(node);
-      const kind = isSwift
-        ? getSwiftDefinitionKind(node)
-        : isPhp
-          ? getPhpDefinitionKind(node)
-          : getDefinitionKind(node);
+      const exported = isJava
+        ? isJavaPublic(node)
+        : isSwift
+          ? isSwiftPublic(node)
+          : isPhp
+            ? isPhpPublic(node)
+            : isExported(node);
+      const kind = isJava
+        ? getJavaDefinitionKind(node)
+        : isSwift
+          ? getSwiftDefinitionKind(node)
+          : isPhp
+            ? getPhpDefinitionKind(node)
+            : getDefinitionKind(node);
       const line = match.startPosition.row + 1;
       const preview = lines[match.startPosition.row]?.trim() || '';
 
@@ -98,14 +108,14 @@ function findDefinitionNodes(node, symbol, filePath, lines, results, isSwift, is
   }
 
   for (const child of node.children) {
-    findDefinitionNodes(child, symbol, filePath, lines, results, isSwift, isPhp);
+    findDefinitionNodes(child, symbol, filePath, lines, results, isSwift, isPhp, isJava);
   }
 }
 
 /**
  * Find an identifier child that matches the symbol name.
  */
-function findMatchingIdentifier(node, symbol, isSwift, isPhp) {
+function findMatchingIdentifier(node, symbol, isSwift, isPhp, isJava) {
   // PHP: name child is used for classes, functions, traits, enums, interfaces, methods, const_element
   if (isPhp) {
     const nameNode = node.children.find(
@@ -125,6 +135,18 @@ function findMatchingIdentifier(node, symbol, isSwift, isPhp) {
       if (nameNode) return nameNode;
       // Fallback: pattern itself might be the name
       if (pattern.text === symbol) return pattern;
+    }
+    return null;
+  }
+
+  // Java field_declaration: name is inside variable_declarator child
+  if (isJava && node.type === 'field_declaration') {
+    const varDecl = node.children.find((c) => c.type === 'variable_declarator');
+    if (varDecl) {
+      const nameNode = varDecl.children.find(
+        (c) => c.type === 'identifier' && c.text === symbol
+      );
+      if (nameNode) return nameNode;
     }
     return null;
   }
@@ -240,6 +262,37 @@ function getSwiftDefinitionKind(node) {
     property_declaration: 'variable',
     typealias_declaration: 'type',
     init_declaration: 'initializer',
+  };
+  return kindMap[node.type] || 'unknown';
+}
+
+/**
+ * Check if a Java declaration has public access modifier.
+ */
+function isJavaPublic(node) {
+  for (const child of node.children) {
+    if (child.type === 'modifiers') {
+      for (const mod of child.children) {
+        if (mod.type === 'public') return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Get the kind of definition from a Java AST node.
+ */
+function getJavaDefinitionKind(node) {
+  const kindMap = {
+    class_declaration: 'class',
+    interface_declaration: 'interface',
+    enum_declaration: 'enum',
+    record_declaration: 'record',
+    annotation_type_declaration: 'annotation',
+    method_declaration: 'method',
+    constructor_declaration: 'constructor',
+    field_declaration: 'field',
   };
   return kindMap[node.type] || 'unknown';
 }

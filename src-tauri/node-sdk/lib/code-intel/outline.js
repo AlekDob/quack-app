@@ -21,6 +21,9 @@ const DEFINITION_TYPES = new Set([
   'function_definition',
   'trait_declaration',
   'const_declaration',
+  // Java
+  'record_declaration',
+  'annotation_type_declaration',
 ]);
 
 /**
@@ -44,9 +47,10 @@ export function getOutline(filePath) {
   const lang = getLanguageName(filePath);
   const isSwift = lang === 'swift';
   const isPhp = lang === 'php';
+  const isJava = lang === 'java';
 
   for (const node of tree.rootNode.children) {
-    const symbol = extractSymbol(node, isSwift, isPhp);
+    const symbol = extractSymbol(node, isSwift, isPhp, isJava);
     if (symbol) symbols.push(symbol);
   }
 
@@ -56,18 +60,18 @@ export function getOutline(filePath) {
 /**
  * Extract a symbol from a top-level AST node.
  */
-function extractSymbol(node, isSwift, isPhp) {
+function extractSymbol(node, isSwift, isPhp, isJava) {
   // Handle export statements by unwrapping (TS/JS only)
   if (node.type === 'export_statement') {
     const child = findDefinitionChild(node);
     if (!child) return null;
-    const symbol = extractDefinition(child, isSwift, isPhp);
+    const symbol = extractDefinition(child, isSwift, isPhp, isJava);
     if (symbol) symbol.exported = true;
     return symbol;
   }
 
   if (DEFINITION_TYPES.has(node.type)) {
-    return extractDefinition(node, isSwift, isPhp);
+    return extractDefinition(node, isSwift, isPhp, isJava);
   }
 
   return null;
@@ -86,20 +90,24 @@ function findDefinitionChild(exportNode) {
 /**
  * Extract definition details from a definition AST node.
  */
-function extractDefinition(node, isSwift, isPhp) {
-  const kind = isSwift
-    ? swiftNodeTypeToKind(node)
-    : isPhp
-      ? phpNodeTypeToKind(node.type)
-      : nodeTypeToKind(node.type);
+function extractDefinition(node, isSwift, isPhp, isJava) {
+  const kind = isJava
+    ? javaNodeTypeToKind(node.type)
+    : isSwift
+      ? swiftNodeTypeToKind(node)
+      : isPhp
+        ? phpNodeTypeToKind(node.type)
+        : nodeTypeToKind(node.type);
   const name = extractName(node, isSwift, isPhp);
   if (!name) return null;
 
-  const exported = isSwift
-    ? isSwiftPublic(node)
-    : isPhp
-      ? isPhpPublic(node)
-      : false;
+  const exported = isJava
+    ? isJavaPublic(node)
+    : isSwift
+      ? isSwiftPublic(node)
+      : isPhp
+        ? isPhpPublic(node)
+        : false;
 
   const result = {
     name,
@@ -110,8 +118,19 @@ function extractDefinition(node, isSwift, isPhp) {
     children: [],
   };
 
-  // Extract class/struct/enum members
-  if (node.type === 'class_declaration') {
+  // Extract Java members from class, interface, enum, record, annotation
+  if (isJava && (
+    node.type === 'class_declaration' ||
+    node.type === 'interface_declaration' ||
+    node.type === 'enum_declaration' ||
+    node.type === 'record_declaration' ||
+    node.type === 'annotation_type_declaration'
+  )) {
+    result.children = extractJavaMembers(node);
+  }
+
+  // Extract class/struct/enum members (TS/JS/Swift/PHP)
+  if (!isJava && node.type === 'class_declaration') {
     result.children = isSwift
       ? extractSwiftMembers(node)
       : isPhp
@@ -503,4 +522,156 @@ function swiftNodeTypeToKind(node) {
     init_declaration: 'initializer',
   };
   return kindMap[node.type] || 'unknown';
+}
+
+/**
+ * Map Java AST node type to a human-readable kind.
+ */
+function javaNodeTypeToKind(nodeType) {
+  const kindMap = {
+    class_declaration: 'class',
+    interface_declaration: 'interface',
+    enum_declaration: 'enum',
+    record_declaration: 'record',
+    annotation_type_declaration: 'annotation',
+  };
+  return kindMap[nodeType] || 'unknown';
+}
+
+/**
+ * Check if a Java declaration has public access modifier.
+ */
+function isJavaPublic(node) {
+  for (const child of node.children) {
+    if (child.type === 'modifiers') {
+      for (const mod of child.children) {
+        if (mod.type === 'public') return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Extract members from a Java class/interface/enum/record/annotation body.
+ */
+function extractJavaMembers(parentNode) {
+  const members = [];
+  const bodyTypes = ['class_body', 'interface_body', 'enum_body', 'annotation_type_body'];
+  let body = null;
+  for (const child of parentNode.children) {
+    if (bodyTypes.includes(child.type)) {
+      body = child;
+      break;
+    }
+  }
+  if (!body) return members;
+
+  for (const member of body.children) {
+    if (member.type === 'method_declaration') {
+      const nameNode = member.children.find((c) => c.type === 'identifier');
+      if (nameNode) {
+        members.push({
+          name: nameNode.text,
+          kind: 'method',
+          line: member.startPosition.row + 1,
+          endLine: member.endPosition.row + 1,
+          exported: isJavaPublic(member),
+          children: [],
+        });
+      }
+    }
+
+    if (member.type === 'constructor_declaration') {
+      const nameNode = member.children.find((c) => c.type === 'identifier');
+      members.push({
+        name: nameNode?.text || 'constructor',
+        kind: 'constructor',
+        line: member.startPosition.row + 1,
+        endLine: member.endPosition.row + 1,
+        exported: isJavaPublic(member),
+        children: [],
+      });
+    }
+
+    if (member.type === 'field_declaration') {
+      const varDecl = member.children.find((c) => c.type === 'variable_declarator');
+      const nameNode = varDecl?.children.find((c) => c.type === 'identifier');
+      if (nameNode) {
+        members.push({
+          name: nameNode.text,
+          kind: 'field',
+          line: member.startPosition.row + 1,
+          endLine: member.endPosition.row + 1,
+          exported: isJavaPublic(member),
+          children: [],
+        });
+      }
+    }
+
+    // Inner classes, interfaces, enums
+    if (member.type === 'class_declaration' || member.type === 'interface_declaration' || member.type === 'enum_declaration') {
+      const nameNode = member.children.find((c) => c.type === 'identifier');
+      if (nameNode) {
+        members.push({
+          name: nameNode.text,
+          kind: javaNodeTypeToKind(member.type),
+          line: member.startPosition.row + 1,
+          endLine: member.endPosition.row + 1,
+          exported: isJavaPublic(member),
+          children: extractJavaMembers(member),
+        });
+      }
+    }
+
+    // Enum constants
+    if (member.type === 'enum_constant') {
+      const nameNode = member.children.find((c) => c.type === 'identifier');
+      if (nameNode) {
+        members.push({
+          name: nameNode.text,
+          kind: 'enum_constant',
+          line: member.startPosition.row + 1,
+          endLine: member.endPosition.row + 1,
+          exported: true,
+          children: [],
+        });
+      }
+    }
+
+    // Enum body declarations (methods inside enums after the semicolon)
+    if (member.type === 'enum_body_declarations') {
+      for (const decl of member.children) {
+        if (decl.type === 'method_declaration') {
+          const nameNode = decl.children.find((c) => c.type === 'identifier');
+          if (nameNode) {
+            members.push({
+              name: nameNode.text,
+              kind: 'method',
+              line: decl.startPosition.row + 1,
+              endLine: decl.endPosition.row + 1,
+              exported: isJavaPublic(decl),
+              children: [],
+            });
+          }
+        }
+      }
+    }
+
+    // Annotation type element declarations
+    if (member.type === 'annotation_type_element_declaration') {
+      const nameNode = member.children.find((c) => c.type === 'identifier');
+      if (nameNode) {
+        members.push({
+          name: nameNode.text,
+          kind: 'method',
+          line: member.startPosition.row + 1,
+          endLine: member.endPosition.row + 1,
+          exported: true,
+          children: [],
+        });
+      }
+    }
+  }
+  return members;
 }

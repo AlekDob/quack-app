@@ -12,6 +12,8 @@ const EXCLUDED_DIRS = new Set([
   '.build', 'DerivedData', '.swiftpm', 'Pods',
   // PHP/Composer
   'vendor',
+  // Java/Gradle/IntelliJ
+  '.gradle', 'out',
 ]);
 
 const MAX_FILE_SIZE = 1_000_000; // 1MB

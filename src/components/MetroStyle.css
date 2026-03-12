@@ -195,6 +195,11 @@
   transform: scale(0.95);
 }
 
+/* Favorite star button - always visible when favorited */
+.repo-action-btn--favorite {
+  opacity: 1 !important;
+}
+
 /* Always-visible "New Agent" button next to project name */
 .repo-new-agent-btn {
   display: inline-flex;
