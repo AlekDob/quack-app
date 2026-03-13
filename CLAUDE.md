@@ -48,6 +48,7 @@ When working cross-project, read the sibling project's CLAUDE.md for context.
 ## Knowledge Base
 
 Read `documentation/map.md` for full architecture overview before making changes.
+Read `documentation/AST.md` for a complete index of all exported symbols per file — use it to quickly locate functions, components, stores, and types without exploratory searches.
 
 **Critical gotchas** (read before modifying these areas):
 - Token tracking: `documentation/gotchas/gotcha-branch-display-race-condition.md`
