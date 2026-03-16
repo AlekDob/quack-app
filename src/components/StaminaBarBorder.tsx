@@ -42,7 +42,7 @@ function StaminaBarBorder({
 
   // Calculate stamina
   // inputTokens from SDK = full context window fill (system + tools + CLAUDE.md + messages)
-  // This matches what Claude CLI `/context` reports (e.g., 36k/200k)
+  // This matches what Claude CLI `/context` reports (e.g., 36k/200k or 36k/1M)
   const messageTokens = Math.max(0, inputTokens - overhead);
   // Total = context fill only (no auto-compact reserve in percentage, to match CLI)
   const totalContextUsage = inputTokens;
@@ -135,6 +135,7 @@ export default memo(StaminaBarBorder, (prevProps, nextProps) => {
     prevProps.cacheCreationTokens === nextProps.cacheCreationTokens &&
     prevProps.cacheReadTokens === nextProps.cacheReadTokens &&
     prevProps.totalCost === nextProps.totalCost &&
-    prevProps.overhead === nextProps.overhead
+    prevProps.overhead === nextProps.overhead &&
+    prevProps.maxTokens === nextProps.maxTokens
   );
 });

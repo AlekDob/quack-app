@@ -1042,6 +1042,7 @@ function AppContent() {
     // Brain: gotcha-stamina-overhead-static-estimate
     promptTokens?: number; // Precise prompt token count from countTokens API
     measuredOverhead?: number; // Precise overhead = contextWindowFill - promptTokens (first turn only)
+    contextWindow?: number; // Context window size from SDK modelUsage (200k or 1M)
   }>>(new Map());
 
   // Project overhead cache - maps cwd to calculated overhead
@@ -1453,13 +1454,29 @@ function AppContent() {
     // agentic steps, while assistant message usage (above) is per-step and accurate for context fill.
     if (claudeEvent.type === 'result') {
       const resultEvt = claudeEvent as any;
-      if (resultEvt.total_cost_usd != null) {
-        console.log(`[${source}] 🦆 Result event cost update for messageKey=${messageKey}: $${resultEvt.total_cost_usd}`);
+      // Extract contextWindow from modelUsage (SDK sends as modelUsage via serde rename)
+      // modelUsage is a Record<modelId, { contextWindow, costUSD, ... }>
+      let contextWindow: number | undefined;
+      if (resultEvt.modelUsage || resultEvt.model_usage) {
+        const modelUsage = resultEvt.modelUsage || resultEvt.model_usage;
+        const firstModel = Object.values(modelUsage)[0] as { contextWindow?: number } | undefined;
+        if (firstModel?.contextWindow && firstModel.contextWindow > 0) {
+          contextWindow = firstModel.contextWindow;
+          console.log(`[${source}] 🦆 Context window from SDK modelUsage: ${contextWindow}`);
+        }
+      }
+
+      if (resultEvt.total_cost_usd != null || contextWindow) {
+        console.log(`[${source}] 🦆 Result event update for messageKey=${messageKey}: cost=$${resultEvt.total_cost_usd}, contextWindow=${contextWindow}`);
         setChatTokensMap((prev) => {
           const newMap = new Map(prev);
           const current = newMap.get(messageKey);
           if (current) {
-            const updated = { ...current, totalCost: resultEvt.total_cost_usd };
+            const updated = {
+              ...current,
+              totalCost: resultEvt.total_cost_usd ?? current.totalCost,
+              ...(contextWindow ? { contextWindow } : {}),
+            };
             newMap.set(messageKey, updated);
 
             // 🦆 STAMINA PERSISTENCE: Save tokens to sessionStore for survival across app restarts
@@ -1470,6 +1487,7 @@ function AppContent() {
               cacheCreationTokens: updated.cacheCreationTokens,
               cacheReadTokens: updated.cacheReadTokens,
               totalCost: updated.totalCost,
+              ...(updated.contextWindow ? { contextWindow: updated.contextWindow } : {}),
             });
           }
           return newMap;
@@ -4418,7 +4436,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     const cwd = activeTerminal?.cwd || explorerPath || '';
     const staticOverhead = cwd ? projectOverheadCache.get(cwd) : undefined;
     const overhead = tokens.measuredOverhead ?? staticOverhead;
-    return { ...tokens, overhead };
+    return { ...tokens, overhead, contextWindow: tokens.contextWindow };
   }, [chatKey, chatTokensMap, activeTerminal?.cwd, explorerPath, projectOverheadCache]);
 
   const selectedGitEntry = useMemo(() => {
@@ -12072,7 +12090,12 @@ You have access to all Bash tools to execute git commands like:
                     onUserQuestionAnswer={answerUserQuestionForAgent}
                     pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
                     answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
-                    currentSessionId={isTaskChat ? activeTaskId ?? undefined : activeSessionId ?? undefined}
+                    currentSessionId={isTaskChat
+                      ? activeTaskId ?? undefined
+                      : (activeSessionId
+                        ? agentSessions.find(s => s.id === activeSessionId)?.claudeSessionId ?? activeSessionId
+                        : undefined)
+                    }
                     // 🦆 SESSION-FIRST: Internal session ID for state management (attachments, settings)
                     internalSessionId={isTaskChat ? activeTaskId ?? undefined : activeSessionId ?? undefined}
                     // Fullscreen mode
@@ -12218,9 +12241,8 @@ You have access to all Bash tools to execute git commands like:
                     onUserQuestionAnswer={answerUserQuestionForAgent}
                     pendingQuestionIds={pendingQuestionIdsMap.get(taskSessionId) || new Set()}
                     answeredQuestions={answeredQuestionsMap.get(taskSessionId) || new Map()}
-                    // 🦆 FIX: Use Quack session ID (taskSessionId) for AskUserQuestion matching
-                    // The backend stores questions keyed by sessionKey (Quack session ID), not claudeSessionId
-                    currentSessionId={taskSessionId}
+                    // 🦆 FIX: Display claudeSessionId (real Claude Code ID) in header badge
+                    currentSessionId={agentSessions.find(s => s.id === taskSessionId)?.claudeSessionId ?? taskSessionId}
                     // 🦆 Internal session ID for state management (attachments, settings)
                     internalSessionId={taskSessionId}
                     // Fullscreen mode

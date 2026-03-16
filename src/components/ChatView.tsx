@@ -94,6 +94,7 @@ interface ChatViewProps {
     cacheReadTokens: number;
     totalCost: number; // total_cost_usd from Claude SDK (authoritative)
     overhead?: number; // Dynamic overhead calculated from project files
+    contextWindow?: number; // Context window size from SDK (200k or 1M)
   };
   // OpenAI API key for Whisper
   openaiApiKey?: string;
@@ -801,6 +802,7 @@ export default function ChatView({
           cacheCreationTokens={sessionTokens.cacheCreationTokens}
           cacheReadTokens={sessionTokens.cacheReadTokens}
           totalCost={sessionTokens.totalCost}
+          maxTokens={sessionTokens.contextWindow}
           overhead={sessionTokens.overhead}
           onCompact={onCompactConversation}
           onClear={onClearConversation}

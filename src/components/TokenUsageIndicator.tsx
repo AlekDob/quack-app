@@ -149,12 +149,12 @@ function TokenUsageIndicator({
     }
   };
 
-  // Format token count (45.2k, 120k, etc.) - unused but kept for potential future use
-  // const formatTokens = (tokens: number) => {
-  //   if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
-  //   if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
-  //   return tokens.toString();
-  // };
+  // Format token count (45.2k, 120k, 1.0M)
+  const formatTokens = (tokens: number) => {
+    if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+    if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
+    return tokens.toString();
+  };
 
   return (
     <>
@@ -229,13 +229,14 @@ function TokenUsageIndicator({
 
 // Export with memo to prevent unnecessary re-renders
 export default memo(TokenUsageIndicator, (prevProps, nextProps) => {
-  // Only re-render if token counts, cost, or overhead actually changed
+  // Only re-render if token counts, cost, overhead, or maxTokens actually changed
   return (
     prevProps.inputTokens === nextProps.inputTokens &&
     prevProps.outputTokens === nextProps.outputTokens &&
     prevProps.cacheCreationTokens === nextProps.cacheCreationTokens &&
     prevProps.cacheReadTokens === nextProps.cacheReadTokens &&
     prevProps.totalCost === nextProps.totalCost &&
-    prevProps.overhead === nextProps.overhead
+    prevProps.overhead === nextProps.overhead &&
+    prevProps.maxTokens === nextProps.maxTokens
   );
 });

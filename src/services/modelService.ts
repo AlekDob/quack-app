@@ -65,25 +65,31 @@ export function getModelId(
   friendlyName: string,
   remoteModels?: ModelConfig[]
 ): string {
+  // Handle [1m] suffix for 1M context window
+  const has1MSuffix = friendlyName.endsWith('[1m]');
+  const baseName = has1MSuffix ? friendlyName.replace('[1m]', '') : friendlyName;
+
   const models = getModels(remoteModels);
 
   // Try direct match first
-  let found = models.find(m => m.id === friendlyName);
+  let found = models.find(m => m.id === baseName);
 
   // If not found, try legacy mapping
-  if (!found && LEGACY_ID_MAP[friendlyName]) {
-    const mappedId = LEGACY_ID_MAP[friendlyName];
+  if (!found && LEGACY_ID_MAP[baseName]) {
+    const mappedId = LEGACY_ID_MAP[baseName];
     found = models.find(m => m.id === mappedId);
     if (found) {
-      console.debug(`[ModelService] Mapped legacy ID '${friendlyName}' → '${mappedId}'`);
+      console.debug(`[ModelService] Mapped legacy ID '${baseName}' → '${mappedId}'`);
     }
   }
 
   if (!found) {
-    console.warn(`[ModelService] Model '${friendlyName}' not found in config, using as-is`);
+    console.warn(`[ModelService] Model '${baseName}' not found in config, using as-is`);
   }
 
-  return found?.modelId ?? friendlyName;
+  const modelId = found?.modelId ?? baseName;
+  // Re-append [1m] suffix — SDK strips it before sending to API
+  return has1MSuffix ? `${modelId}[1m]` : modelId;
 }
 
 /**
@@ -116,15 +122,20 @@ export function getModelLabel(
   friendlyName: string,
   remoteModels?: ModelConfig[]
 ): string {
+  // Handle [1m] suffix for 1M context window
+  const has1MSuffix = friendlyName.endsWith('[1m]');
+  const baseName = has1MSuffix ? friendlyName.replace('[1m]', '') : friendlyName;
+
   const models = getModels(remoteModels);
 
   // Try direct match first
-  let found = models.find(m => m.id === friendlyName);
+  let found = models.find(m => m.id === baseName);
 
   // If not found, try legacy mapping
-  if (!found && LEGACY_ID_MAP[friendlyName]) {
-    found = models.find(m => m.id === LEGACY_ID_MAP[friendlyName]);
+  if (!found && LEGACY_ID_MAP[baseName]) {
+    found = models.find(m => m.id === LEGACY_ID_MAP[baseName]);
   }
 
-  return found?.label ?? friendlyName;
+  const label = found?.label ?? baseName;
+  return has1MSuffix ? `${label} (1M)` : label;
 }

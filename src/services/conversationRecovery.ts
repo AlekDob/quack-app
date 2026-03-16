@@ -13,7 +13,9 @@
 
 import type { ChatMessage } from '../types';
 
-// Token limits for different models (default 200k for all Claude models)
+// Token limits for different models
+// Default 200k for all Claude models; Opus 4.6 and Sonnet 4.6 support up to 1M (GA March 2026)
+// The actual context window is provided by SDK modelUsage.contextWindow at runtime
 export const TOKEN_LIMITS: Record<string, number> = {
   opus: 200000,
   sonnet: 200000,
@@ -79,9 +81,10 @@ export interface TokenBudgetStatus {
 export function calculateTokenBudget(
   inputTokens: number,
   outputTokens: number,
-  model: string = 'opus'
+  model: string = 'opus',
+  contextWindow?: number // SDK-provided context window (200k or 1M)
 ): TokenBudgetStatus {
-  const maxTokens = TOKEN_LIMITS[model] ?? 200000;
+  const maxTokens = contextWindow ?? TOKEN_LIMITS[model] ?? 200000;
   const messageTokens = inputTokens + outputTokens;
   const totalUsed = messageTokens + TOTAL_OVERHEAD;
   const percentage = (totalUsed / maxTokens) * 100;
@@ -285,9 +288,10 @@ export function downloadConversationExport(
 export function shouldBlockMessage(
   inputTokens: number,
   outputTokens: number,
-  model: string = 'opus'
+  model: string = 'opus',
+  contextWindow?: number
 ): { blocked: boolean; reason?: string } {
-  const status = calculateTokenBudget(inputTokens, outputTokens, model);
+  const status = calculateTokenBudget(inputTokens, outputTokens, model, contextWindow);
 
   if (!status.canSendMessage) {
     return {
@@ -305,13 +309,14 @@ export function shouldBlockMessage(
 export function getRecommendedAction(
   inputTokens: number,
   outputTokens: number,
-  model: string = 'opus'
+  model: string = 'opus',
+  contextWindow?: number
 ): {
   action: 'none' | 'suggest_compact' | 'recommend_compact' | 'force_clear';
   message: string;
   urgency: 'low' | 'medium' | 'high' | 'critical';
 } {
-  const status = calculateTokenBudget(inputTokens, outputTokens, model);
+  const status = calculateTokenBudget(inputTokens, outputTokens, model, contextWindow);
 
   if (status.level === 'blocked') {
     return {
@@ -369,7 +374,8 @@ export function wouldExceedLimit(
   currentInputTokens: number,
   currentOutputTokens: number,
   newMessageLength: number,
-  model: string = 'opus'
+  model: string = 'opus',
+  contextWindow?: number
 ): boolean {
   const estimatedNewTokens = estimateTokens(newMessageLength);
   const futureInputTokens = currentInputTokens + estimatedNewTokens;
@@ -378,7 +384,7 @@ export function wouldExceedLimit(
   const estimatedResponseTokens = estimatedNewTokens * 2;
   const futureOutputTokens = currentOutputTokens + estimatedResponseTokens;
 
-  const status = calculateTokenBudget(futureInputTokens, futureOutputTokens, model);
+  const status = calculateTokenBudget(futureInputTokens, futureOutputTokens, model, contextWindow);
   return !status.canSendMessage;
 }
 
@@ -410,11 +416,12 @@ export interface ProjectOverhead {
 
 // Brain: gotcha-stamina-overhead-static-estimate
 // Base overhead constants (from Claude CLI /context analysis, updated 2026-03-01)
+// These are absolute token counts, independent of context window size (200k or 1M)
 const BASE_OVERHEAD = {
-  systemPrompt: 4000,    // System prompt and instructions (~2% of 200k)
-  systemTools: 16500,    // Built-in tool definitions (~8.2% of 200k)
-  memoryBase: 5000,      // Memory files baseline (~2.5% of 200k)
-  skills: 6700,          // Skill definitions loaded into context (~3.4% of 200k)
+  systemPrompt: 4000,    // System prompt and instructions
+  systemTools: 16500,    // Built-in tool definitions
+  memoryBase: 5000,      // Memory files baseline
+  skills: 6700,          // Skill definitions loaded into context
   mcpPerServer: 3500,    // ~3.5k tokens per MCP server (tools + descriptions)
 };
 
