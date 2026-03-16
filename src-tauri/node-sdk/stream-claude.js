@@ -583,7 +583,9 @@ async function main() {
     ];
 
     // Use allowedTools from config if provided, otherwise use defaults
-    const resolvedAllowedTools = allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0
+    // Brain: btw-context-aware
+    // An explicit empty array [] means "no tools" (read-only mode, e.g. BTW side-chain)
+    const resolvedAllowedTools = allowedTools && Array.isArray(allowedTools)
       ? allowedTools
       : defaultAllowedTools;
 

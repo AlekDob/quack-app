@@ -241,8 +241,9 @@ export default function ChatView({
   // Load active rules using the hook (automatic, zero config)
   const { activeRules, hasRules } = useAgentRules(selectedRules, basePath || '');
 
-  // BTW Side-Chain Chat
-  const btw = useBTW();
+  // BTW Side-Chain Chat — context-aware (reads current session messages)
+  // Brain: btw-context-aware
+  const btw = useBTW({ messages });
 
   // Remote Team Widget
   const remoteTeam = useTeamStore(s => s.remoteTeam);
