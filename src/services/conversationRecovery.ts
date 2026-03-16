@@ -13,11 +13,12 @@
 
 import type { ChatMessage } from '../types';
 
-// Token limits for different models (default 200k for all Claude models)
+// Token limits for different models (fallback when SDK hasn't reported contextWindow yet)
+// Opus 4.6 and Sonnet 4.6 have 1M context windows; Haiku remains at 200k
 export const TOKEN_LIMITS: Record<string, number> = {
-  opus: 200000,
-  sonnet: 200000,
-  haiku: 200000,
+  opus: 1_000_000,
+  sonnet: 1_000_000,
+  haiku: 200_000,
 };
 
 // Estimated overhead costs (fallback when no cache data available)
@@ -79,9 +80,10 @@ export interface TokenBudgetStatus {
 export function calculateTokenBudget(
   inputTokens: number,
   outputTokens: number,
-  model: string = 'opus'
+  model: string = 'opus',
+  contextWindow?: number, // Prefer SDK-reported context window size
 ): TokenBudgetStatus {
-  const maxTokens = TOKEN_LIMITS[model] ?? 200000;
+  const maxTokens = contextWindow ?? TOKEN_LIMITS[model] ?? 200000;
   const messageTokens = inputTokens + outputTokens;
   const totalUsed = messageTokens + TOTAL_OVERHEAD;
   const percentage = (totalUsed / maxTokens) * 100;

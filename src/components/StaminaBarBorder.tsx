@@ -7,7 +7,7 @@ interface StaminaBarBorderProps {
   cacheCreationTokens?: number;
   cacheReadTokens?: number;
   totalCost?: number;
-  maxTokens?: number;
+  maxTokens?: number; // Context window size from SDK (undefined until first result event)
   overhead?: number;
   onCompact?: () => void;
   onClear?: () => void;
@@ -33,16 +33,21 @@ function StaminaBarBorder({
   cacheCreationTokens = 0,
   cacheReadTokens = 0,
   totalCost = 0,
-  maxTokens = 200000,
+  maxTokens,
   overhead = DEFAULT_OVERHEAD,
   onCompact,
   onClear,
 }: StaminaBarBorderProps) {
   const [showModal, setShowModal] = useState(false);
 
+  // Don't render until SDK reports the actual context window size
+  if (!maxTokens) {
+    return null;
+  }
+
   // Calculate stamina
   // inputTokens from SDK = full context window fill (system + tools + CLAUDE.md + messages)
-  // This matches what Claude CLI `/context` reports (e.g., 36k/200k)
+  // This matches what Claude CLI `/context` reports
   const messageTokens = Math.max(0, inputTokens - overhead);
   // Total = context fill only (no auto-compact reserve in percentage, to match CLI)
   const totalContextUsage = inputTokens;

@@ -1042,6 +1042,7 @@ function AppContent() {
     // Brain: gotcha-stamina-overhead-static-estimate
     promptTokens?: number; // Precise prompt token count from countTokens API
     measuredOverhead?: number; // Precise overhead = contextWindowFill - promptTokens (first turn only)
+    maxTokens?: number; // Context window size from SDK model_usage (e.g., 1M for Opus)
   }>>(new Map());
 
   // Project overhead cache - maps cwd to calculated overhead
@@ -1453,13 +1454,42 @@ function AppContent() {
     // agentic steps, while assistant message usage (above) is per-step and accurate for context fill.
     if (claudeEvent.type === 'result') {
       const resultEvt = claudeEvent as any;
-      if (resultEvt.total_cost_usd != null) {
-        console.log(`[${source}] 🦆 Result event cost update for messageKey=${messageKey}: $${resultEvt.total_cost_usd}`);
+
+      // Extract context window size from modelUsage in result event.
+      // Note: Rust serde serializes as "modelUsage" (camelCase) due to #[serde(rename = "modelUsage")]
+      //
+      // Brain: sdk-context-window-native-cli
+      // The context window value comes from the CLI binary the SDK spawns.
+      // When using the native CLI (~/.local/bin/claude), it correctly reports 1M for Opus 4.6 / Sonnet 4.6.
+      // When using the SDK's bundled cli.js, it reports 200k. We trust the SDK's reported value
+      // because it reflects the actual compaction threshold — showing a higher value would be misleading.
+      let contextWindow: number | undefined;
+      const modelUsage = resultEvt.modelUsage || resultEvt.model_usage;
+      if (modelUsage) {
+        for (const entry of Object.values(modelUsage) as any[]) {
+          if (entry.contextWindow > 0) {
+            contextWindow = Math.max(contextWindow ?? 0, entry.contextWindow);
+          }
+        }
+      }
+
+      if (resultEvt.total_cost_usd != null || contextWindow) {
+        if (resultEvt.total_cost_usd != null) {
+          console.log(`[${source}] 🦆 Result event cost update for messageKey=${messageKey}: $${resultEvt.total_cost_usd}`);
+        }
+        if (contextWindow) {
+          const modelNames = modelUsage ? Object.keys(modelUsage).join(', ') : 'unknown';
+          console.log(`[${source}] 🦆 Context window from SDK: ${contextWindow} tokens (models: ${modelNames})`, modelUsage);
+        }
         setChatTokensMap((prev) => {
           const newMap = new Map(prev);
           const current = newMap.get(messageKey);
           if (current) {
-            const updated = { ...current, totalCost: resultEvt.total_cost_usd };
+            const updated = {
+              ...current,
+              ...(resultEvt.total_cost_usd != null && { totalCost: resultEvt.total_cost_usd }),
+              ...(contextWindow && { maxTokens: contextWindow }),
+            };
             newMap.set(messageKey, updated);
 
             // 🦆 STAMINA PERSISTENCE: Save tokens to sessionStore for survival across app restarts

@@ -32,8 +32,12 @@ interface TokenUsageModalProps {
   compactFailed?: boolean;
 }
 
-// Format tokens as K (e.g., 55500 -> "55.5k")
+// Format tokens as K/M (e.g., 55500 -> "55.5k", 1000000 -> "1M")
 const formatTokensK = (tokens: number): string => {
+  if (tokens >= 1_000_000) {
+    const m = tokens / 1_000_000;
+    return m % 1 === 0 ? `${m}M` : `${m.toFixed(1)}M`;
+  }
   if (tokens >= 1000) {
     return `${(tokens / 1000).toFixed(1)}k`;
   }
@@ -375,7 +379,7 @@ export default function TokenUsageModal({
               <line x1="12" y1="16" x2="12" y2="12" />
               <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
-            <span>Claude sessions have a 200k token context window. Use /compact to preserve context while reducing tokens.</span>
+            <span>Claude sessions have a {formatTokensK(maxTokens)} token context window. Use /compact to preserve context while reducing tokens.</span>
           </div>
         </div>
       </div>

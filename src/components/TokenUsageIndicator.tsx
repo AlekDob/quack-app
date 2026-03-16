@@ -12,7 +12,7 @@ interface TokenUsageIndicatorProps {
   cacheCreationTokens?: number;
   cacheReadTokens?: number;
   totalCost?: number; // total_cost_usd from Claude SDK (authoritative)
-  maxTokens?: number; // Default: 200000
+  maxTokens?: number; // Context window size from SDK (undefined until first result event)
   overhead?: number; // Dynamic overhead calculated from project files (default: 38000)
   onCompact?: () => void;
   onClear?: () => void;
@@ -39,13 +39,18 @@ function TokenUsageIndicator({
   cacheCreationTokens = 0,
   cacheReadTokens = 0,
   totalCost = 0,
-  maxTokens = 200000,
+  maxTokens,
   overhead = DEFAULT_OVERHEAD,
   onCompact,
   onClear,
 }: TokenUsageIndicatorProps) {
   const [showModal, setShowModal] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+
+  // Don't render until SDK reports the actual context window size
+  if (!maxTokens) {
+    return null;
+  }
 
   // TEMPORARILY DISABLED: Max Plan tracking
   // const { stats: maxPlanStats, history, clearHistory, exportHistory } = useMaxPlan();

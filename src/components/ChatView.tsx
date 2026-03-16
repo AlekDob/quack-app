@@ -94,6 +94,7 @@ interface ChatViewProps {
     cacheReadTokens: number;
     totalCost: number; // total_cost_usd from Claude SDK (authoritative)
     overhead?: number; // Dynamic overhead calculated from project files
+    maxTokens?: number; // Context window size from SDK model_usage
   };
   // OpenAI API key for Whisper
   openaiApiKey?: string;
@@ -244,7 +245,7 @@ export default function ChatView({
   const btw = useBTW();
 
   // Remote Team Widget
-  const remoteTeam = useTeamStore(s => s.remoteTeam);
+  const remoteTeam = useTeamStore(s => s.activeTeam);
 
   // Quick Loop - recurring prompts
   const [showLoopPopover, setShowLoopPopover] = useState(false);
@@ -739,16 +740,16 @@ export default function ChatView({
         </div>
       )}
       {/* Remote Team Widget — shown to lead agent when a team is active */}
-      {remoteTeam && remoteTeam.status !== 'disbanded' && activeAgent?.name === remoteTeam.leadAgentId && (
+      {remoteTeam && activeAgent?.name === remoteTeam.leadAgentId && (
         <RemoteTeamWidget
           teamName={remoteTeam.name}
-          members={remoteTeam.members}
-          teamStatus={remoteTeam.status}
+          members={remoteTeam.members.map(m => ({ agentId: m.agentId, agentName: m.name }))}
+          teamStatus="active"
           onMemberClick={(agentId, sessionId) => {
             // Navigate to the teammate's session stream tab
             const member = remoteTeam.members.find(m => m.agentId === agentId);
             if (onTeammateDrillDown && sessionId) {
-              onTeammateDrillDown(sessionId, member?.agentName || 'Teammate');
+              onTeammateDrillDown(sessionId, member?.name || 'Teammate');
             }
           }}
         />
@@ -802,6 +803,7 @@ export default function ChatView({
           cacheReadTokens={sessionTokens.cacheReadTokens}
           totalCost={sessionTokens.totalCost}
           overhead={sessionTokens.overhead}
+          maxTokens={sessionTokens.maxTokens}
           onCompact={onCompactConversation}
           onClear={onClearConversation}
         />

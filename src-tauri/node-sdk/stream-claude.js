@@ -847,6 +847,26 @@ ${hintsBlock}
       console.error(`[DEBUG] Thinking mode: default (adaptive)`);
     }
 
+    // Enable 1M context window for supported models (Opus 4.6, Sonnet 4.6)
+    // This beta flag is checked by the SDK's internal uM() function which controls:
+    // - modelUsage.contextWindow reporting (200k vs 1M)
+    // - Auto-compaction threshold (~155k vs ~967k)
+    // - Blocking limit calculation
+    // Without it, the SDK operates in 200k mode even for 1M-capable models.
+    options.betas = ['context-1m-2025-08-07'];
+
+    // Use the installed Claude Code CLI binary instead of the SDK's bundled cli.js.
+    // The native binary (v2.x) correctly resolves the 1M context window for Opus 4.6 / Sonnet 4.6
+    // via the tengu_hawthorn_window feature flag, while the bundled cli.js (v0.2.x) falls back to 200k.
+    // This ensures compaction triggers at ~950k instead of ~155k.
+    const nativeClaudePath = join(homedir(), '.local', 'bin', 'claude');
+    if (existsSync(nativeClaudePath)) {
+      options.pathToClaudeCodeExecutable = nativeClaudePath;
+      console.error(`[DEBUG] Using native Claude CLI: ${nativeClaudePath}`);
+    } else {
+      console.error(`[DEBUG] Native Claude CLI not found at ${nativeClaudePath}, using bundled CLI`);
+    }
+
     if (cwd) {
       options.cwd = cwd;
       console.error(`[DEBUG] Working directory: ${cwd}`);
