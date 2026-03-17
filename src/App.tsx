@@ -1042,7 +1042,7 @@ function AppContent() {
     // Brain: gotcha-stamina-overhead-static-estimate
     promptTokens?: number; // Precise prompt token count from countTokens API
     measuredOverhead?: number; // Precise overhead = contextWindowFill - promptTokens (first turn only)
-    contextWindow?: number; // Context window size from SDK modelUsage (200k or 1M)
+    contextWindow?: number; // Context window size from SDK modelUsage (200k or 1M, e.g., 1M for Opus)
   }>>(new Map());
 
   // Project overhead cache - maps cwd to calculated overhead
@@ -1454,27 +1454,44 @@ function AppContent() {
     // agentic steps, while assistant message usage (above) is per-step and accurate for context fill.
     if (claudeEvent.type === 'result') {
       const resultEvt = claudeEvent as any;
-      // Extract contextWindow from modelUsage (SDK sends as modelUsage via serde rename)
+
+      // Extract context window size from modelUsage in result event.
+      // Note: Rust serde serializes as "modelUsage" (camelCase) due to #[serde(rename = "modelUsage")]
       // modelUsage is a Record<modelId, { contextWindow, costUSD, ... }>
+      //
+      // Brain: sdk-context-window-native-cli
+      // The context window value comes from the CLI binary the SDK spawns.
+      // When using the native CLI (~/.local/bin/claude), it correctly reports 1M for Opus 4.6 / Sonnet 4.6.
+      // When using the SDK's bundled cli.js, it reports 200k. We trust the SDK's reported value
+      // because it reflects the actual compaction threshold — showing a higher value would be misleading.
       let contextWindow: number | undefined;
-      if (resultEvt.modelUsage || resultEvt.model_usage) {
-        const modelUsage = resultEvt.modelUsage || resultEvt.model_usage;
-        const firstModel = Object.values(modelUsage)[0] as { contextWindow?: number } | undefined;
-        if (firstModel?.contextWindow && firstModel.contextWindow > 0) {
-          contextWindow = firstModel.contextWindow;
+      const modelUsage = resultEvt.modelUsage || resultEvt.model_usage;
+      if (modelUsage) {
+        for (const entry of Object.values(modelUsage) as any[]) {
+          if (entry.contextWindow > 0) {
+            contextWindow = Math.max(contextWindow ?? 0, entry.contextWindow);
+          }
+        }
+        if (contextWindow) {
           console.log(`[${source}] 🦆 Context window from SDK modelUsage: ${contextWindow}`);
         }
       }
 
       if (resultEvt.total_cost_usd != null || contextWindow) {
-        console.log(`[${source}] 🦆 Result event update for messageKey=${messageKey}: cost=$${resultEvt.total_cost_usd}, contextWindow=${contextWindow}`);
+        if (resultEvt.total_cost_usd != null) {
+          console.log(`[${source}] 🦆 Result event cost update for messageKey=${messageKey}: $${resultEvt.total_cost_usd}`);
+        }
+        if (contextWindow) {
+          const modelNames = modelUsage ? Object.keys(modelUsage).join(', ') : 'unknown';
+          console.log(`[${source}] 🦆 Context window from SDK: ${contextWindow} tokens (models: ${modelNames})`, modelUsage);
+        }
         setChatTokensMap((prev) => {
           const newMap = new Map(prev);
           const current = newMap.get(messageKey);
           if (current) {
             const updated = {
               ...current,
-              totalCost: resultEvt.total_cost_usd ?? current.totalCost,
+              ...(resultEvt.total_cost_usd != null && { totalCost: resultEvt.total_cost_usd }),
               ...(contextWindow ? { contextWindow } : {}),
             };
             newMap.set(messageKey, updated);
@@ -4214,7 +4231,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       console.log('[App] 📋 Plan approval response sent successfully');
 
-      // Auto-switch to Bypass mode after plan approval so the agent can execute
+      // Auto-switch to Bypass (Build) mode after plan approval so the next
+      // user message lets the agent execute. The UI permission toggle updates
+      // immediately so the user sees "Build" mode for their next prompt.
       if (approved) {
         updateAgentSettings({ permissionMode: 'bypass' });
       }

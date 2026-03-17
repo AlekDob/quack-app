@@ -861,6 +861,14 @@ ${hintsBlock}
       console.error(`[DEBUG] Thinking mode: default (adaptive)`);
     }
 
+    // Enable 1M context window for supported models (Opus 4.6, Sonnet 4.6)
+    // This beta flag is checked by the SDK's internal uM() function which controls:
+    // - modelUsage.contextWindow reporting (200k vs 1M)
+    // - Auto-compaction threshold (~155k vs ~967k)
+    // - Blocking limit calculation
+    // Without it, the SDK operates in 200k mode even for 1M-capable models.
+    options.betas = ['context-1m-2025-08-07'];
+
     if (cwd) {
       options.cwd = cwd;
       console.error(`[DEBUG] Working directory: ${cwd}`);

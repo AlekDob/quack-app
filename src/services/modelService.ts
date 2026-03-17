@@ -24,10 +24,11 @@ export interface ModelConfig {
  * Uses Sonnet as a safe, cost-effective default.
  */
 const EMERGENCY_FALLBACK: ModelConfig[] = [
-  { id: 'opus46', modelId: 'claude-opus-4-6', label: 'Opus 4.6', isDefault: true, isActive: true, sortOrder: 0 },
-  { id: 'sonnet46', modelId: 'claude-sonnet-4-6', label: 'Sonnet 4.6', isDefault: false, isActive: true, sortOrder: 1 },
-  { id: 'sonnet45', modelId: 'claude-sonnet-4-5-20250929', label: 'Sonnet 4.5', isDefault: false, isActive: true, sortOrder: 2 },
-  { id: 'haiku45', modelId: 'claude-haiku-4-5', label: 'Haiku 4.5', isDefault: false, isActive: true, sortOrder: 3 },
+  { id: 'opus46-1m', modelId: 'claude-opus-4-6[1m]', label: 'Opus 4.6 (1M)', isDefault: true, isActive: true, sortOrder: 0 },
+  { id: 'opus46', modelId: 'claude-opus-4-6', label: 'Opus 4.6', isDefault: false, isActive: true, sortOrder: 1 },
+  { id: 'sonnet46', modelId: 'claude-sonnet-4-6', label: 'Sonnet 4.6', isDefault: false, isActive: true, sortOrder: 2 },
+  { id: 'sonnet45', modelId: 'claude-sonnet-4-5-20250929', label: 'Sonnet 4.5', isDefault: false, isActive: true, sortOrder: 3 },
+  { id: 'haiku45', modelId: 'claude-haiku-4-5', label: 'Haiku 4.5', isDefault: false, isActive: true, sortOrder: 4 },
 ];
 
 /**
@@ -49,7 +50,12 @@ const LEGACY_ID_MAP: Record<string, string> = {
 export function getModels(remoteModels?: ModelConfig[]): ModelConfig[] {
   const models = remoteModels?.filter(m => m.isActive);
   if (models && models.length > 0) {
-    return [...models].sort((a, b) => a.sortOrder - b.sortOrder);
+    const sorted = [...models].sort((a, b) => a.sortOrder - b.sortOrder);
+    // Ensure Opus 4.6 (1M) is always available even if not yet in Supabase
+    if (!sorted.find(m => m.id === 'opus46-1m')) {
+      sorted.unshift({ id: 'opus46-1m', modelId: 'claude-opus-4-6[1m]', label: 'Opus 4.6 (1M)', isDefault: false, isActive: true, sortOrder: -1 });
+    }
+    return sorted;
   }
   // Emergency fallback - Supabase unreachable
   console.warn('[ModelService] Using emergency fallback - Supabase models not available');
