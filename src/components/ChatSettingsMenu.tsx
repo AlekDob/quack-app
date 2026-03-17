@@ -102,9 +102,17 @@ export default function ChatSettingsMenu({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen]);
 
+  // 1M context window support: model IDs ending with [1m] suffix
+  // Opus 4.6 has 1M natively (automatic on Max/Team/Enterprise/API) — no toggle needed.
+  // Sonnet 4.6 requires explicit [1m] suffix (extra usage billing on Max/Team).
+  const baseModel = model.replace('[1m]', '');
+  const is1MEnabled = model.endsWith('[1m]');
+  const supports1M = baseModel === 'sonnet46';
+
   const getModelLabelText = () => {
     if (provider !== 'anthropic') return ollamaModel || provider;
-    return getModelLabel(model, remoteModels);
+    const label = getModelLabel(baseModel, remoteModels);
+    return is1MEnabled ? `${label} (1M)` : label;
   };
 
   // getThinkingLabel removed - thinking mode now shown via brain icon in footer
@@ -214,17 +222,45 @@ export default function ChatSettingsMenu({
             <label className="chat-settings-label">
               <span className="chat-settings-label-text">Model</span>
               {provider === 'anthropic' ? (
-                <select
-                  value={model}
-                  onChange={(e) => onModelChange(e.target.value)}
-                  className="chat-settings-select"
-                >
-                  {modelOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <select
+                    value={baseModel}
+                    onChange={(e) => {
+                      const newBase = e.target.value;
+                      const new1MSupported = newBase === 'sonnet46';
+                      onModelChange(is1MEnabled && new1MSupported ? `${newBase}[1m]` : newBase);
+                    }}
+                    className="chat-settings-select"
+                    style={{ flex: 1 }}
+                  >
+                    {modelOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {supports1M && (
+                    <button
+                      type="button"
+                      onClick={() => onModelChange(is1MEnabled ? baseModel : `${baseModel}[1m]`)}
+                      title={is1MEnabled ? 'Disabilita context window 1M (torna a 200k)' : 'Abilita context window 1M'}
+                      style={{
+                        padding: '3px 8px',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        border: 'none',
+                        borderRadius: 4,
+                        cursor: 'pointer',
+                        backgroundColor: is1MEnabled ? 'rgba(0, 217, 255, 0.2)' : 'rgba(128, 132, 150, 0.15)',
+                        color: is1MEnabled ? '#00D9FF' : 'var(--text-secondary)',
+                        transition: 'all 0.2s ease',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      1M
+                    </button>
+                  )}
+                </div>
               ) : (
                 ollamaModelOptions.length > 0 ? (
                   <select

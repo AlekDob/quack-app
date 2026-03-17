@@ -13,7 +13,7 @@ import { listen } from '@tauri-apps/api/event';
 import { useSettingsStore } from '../stores/settingsStore';
 import { getProviderRequestFields } from '../services/claudeSDK';
 import { getModelId } from '../services/modelService';
-import type { ClaudeEvent } from '../types';
+import type { ChatMessage, ClaudeEvent } from '../types';
 
 interface BTWState {
   isOpen: boolean;
@@ -21,6 +21,11 @@ interface BTWState {
   response: string;
   isLoading: boolean;
   error: string | undefined;
+}
+
+interface UseBTWOptions {
+  /** Current session messages — injected as read-only context (like Claude Code /btw) */
+  messages?: ChatMessage[];
 }
 
 interface UseBTWReturn extends BTWState {
@@ -39,6 +44,44 @@ const INITIAL_STATE: BTWState = {
   isLoading: false,
   error: undefined,
 };
+
+// Brain: btw-context-aware
+// Max chars for conversation context injected into BTW prompt.
+// ~50k chars ≈ ~12k tokens — safe for Haiku's 200k window.
+const MAX_CONTEXT_CHARS = 50_000;
+
+/** Build a compact text representation of recent conversation messages */
+function buildConversationContext(messages: ChatMessage[]): string {
+  if (!messages.length) return '';
+
+  // Walk backwards, collecting messages until we hit the char budget
+  let totalChars = 0;
+  const selected: string[] = [];
+
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    const role = msg.role === 'user' ? 'User' : 'Assistant';
+    // Truncate very long messages (e.g. tool results) to keep context balanced
+    const content = msg.content.length > 4000
+      ? msg.content.slice(0, 4000) + '...[truncated]'
+      : msg.content;
+    const line = `[${role}]: ${content}`;
+
+    if (totalChars + line.length > MAX_CONTEXT_CHARS) break;
+    totalChars += line.length;
+    selected.unshift(line);
+  }
+
+  if (!selected.length) return '';
+
+  return `<conversation_context>
+The following is the conversation from the current session. You can reference it to answer the user's question. This context is READ-ONLY — do not attempt to execute tools or make changes.
+
+${selected.join('\n\n')}
+</conversation_context>
+
+`;
+}
 
 const matchesShortcut = (e: KeyboardEvent, shortcut: string): boolean => {
   const parts = shortcut.split('+');
@@ -66,9 +109,12 @@ function extractTextFromEvent(evt: ClaudeEvent): string {
     .join('');
 }
 
-export function useBTW(): UseBTWReturn {
+export function useBTW(options?: UseBTWOptions): UseBTWReturn {
   const [state, setState] = useState<BTWState>(INITIAL_STATE);
   const unlistenRef = useRef<(() => void) | null>(null);
+  // Keep a ref to messages so sendQuery closure always sees the latest
+  const messagesRef = useRef<ChatMessage[]>(options?.messages ?? []);
+  messagesRef.current = options?.messages ?? [];
 
   const btwModel = useSettingsStore((s) => s.claude.btwModel) || 'haiku45';
   const btwShortcut = useSettingsStore((s) => s.general.btwShortcut) || 'Ctrl+B';
@@ -116,6 +162,11 @@ export function useBTW(): UseBTWReturn {
           }
         );
 
+        // Brain: btw-context-aware
+        // Inject conversation context as prefix (read-only, like Claude Code /btw)
+        const context = buildConversationContext(messagesRef.current);
+        const enrichedPrompt = context + question;
+
         // Use same SDK pipeline as main chat
         const prf = getProviderRequestFields();
         const resolvedModel = prf.provider
@@ -125,11 +176,13 @@ export function useBTW(): UseBTWReturn {
         await invoke('send_message_via_sdk_streaming', {
           agentId: BTW_AGENT_ID,
           request: {
-            prompt: question,
+            prompt: enrichedPrompt,
             model: resolvedModel,
             permissionMode: 'bypass',
             cwd: undefined,
             sessionKey,
+            // Read-only: no tools allowed (like Claude Code /btw)
+            allowedTools: [],
             provider: prf.provider,
             providerBaseUrl: prf.providerBaseUrl,
             providerApiKey: prf.providerApiKey,

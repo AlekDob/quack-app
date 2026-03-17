@@ -1042,7 +1042,7 @@ function AppContent() {
     // Brain: gotcha-stamina-overhead-static-estimate
     promptTokens?: number; // Precise prompt token count from countTokens API
     measuredOverhead?: number; // Precise overhead = contextWindowFill - promptTokens (first turn only)
-    maxTokens?: number; // Context window size from SDK model_usage (e.g., 1M for Opus)
+    contextWindow?: number; // Context window size from SDK modelUsage (200k or 1M, e.g., 1M for Opus)
   }>>(new Map());
 
   // Project overhead cache - maps cwd to calculated overhead
@@ -1457,6 +1457,7 @@ function AppContent() {
 
       // Extract context window size from modelUsage in result event.
       // Note: Rust serde serializes as "modelUsage" (camelCase) due to #[serde(rename = "modelUsage")]
+      // modelUsage is a Record<modelId, { contextWindow, costUSD, ... }>
       //
       // Brain: sdk-context-window-native-cli
       // The context window value comes from the CLI binary the SDK spawns.
@@ -1470,6 +1471,9 @@ function AppContent() {
           if (entry.contextWindow > 0) {
             contextWindow = Math.max(contextWindow ?? 0, entry.contextWindow);
           }
+        }
+        if (contextWindow) {
+          console.log(`[${source}] 🦆 Context window from SDK modelUsage: ${contextWindow}`);
         }
       }
 
@@ -1488,7 +1492,7 @@ function AppContent() {
             const updated = {
               ...current,
               ...(resultEvt.total_cost_usd != null && { totalCost: resultEvt.total_cost_usd }),
-              ...(contextWindow && { maxTokens: contextWindow }),
+              ...(contextWindow ? { contextWindow } : {}),
             };
             newMap.set(messageKey, updated);
 
@@ -1500,6 +1504,7 @@ function AppContent() {
               cacheCreationTokens: updated.cacheCreationTokens,
               cacheReadTokens: updated.cacheReadTokens,
               totalCost: updated.totalCost,
+              ...(updated.contextWindow ? { contextWindow: updated.contextWindow } : {}),
             });
           }
           return newMap;
@@ -4448,7 +4453,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     const cwd = activeTerminal?.cwd || explorerPath || '';
     const staticOverhead = cwd ? projectOverheadCache.get(cwd) : undefined;
     const overhead = tokens.measuredOverhead ?? staticOverhead;
-    return { ...tokens, overhead };
+    return { ...tokens, overhead, contextWindow: tokens.contextWindow };
   }, [chatKey, chatTokensMap, activeTerminal?.cwd, explorerPath, projectOverheadCache]);
 
   const selectedGitEntry = useMemo(() => {
@@ -12102,7 +12107,12 @@ You have access to all Bash tools to execute git commands like:
                     onUserQuestionAnswer={answerUserQuestionForAgent}
                     pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
                     answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
-                    currentSessionId={isTaskChat ? activeTaskId ?? undefined : activeSessionId ?? undefined}
+                    currentSessionId={isTaskChat
+                      ? activeTaskId ?? undefined
+                      : (activeSessionId
+                        ? agentSessions.find(s => s.id === activeSessionId)?.claudeSessionId ?? activeSessionId
+                        : undefined)
+                    }
                     // 🦆 SESSION-FIRST: Internal session ID for state management (attachments, settings)
                     internalSessionId={isTaskChat ? activeTaskId ?? undefined : activeSessionId ?? undefined}
                     // Fullscreen mode
@@ -12248,9 +12258,8 @@ You have access to all Bash tools to execute git commands like:
                     onUserQuestionAnswer={answerUserQuestionForAgent}
                     pendingQuestionIds={pendingQuestionIdsMap.get(taskSessionId) || new Set()}
                     answeredQuestions={answeredQuestionsMap.get(taskSessionId) || new Map()}
-                    // 🦆 FIX: Use Quack session ID (taskSessionId) for AskUserQuestion matching
-                    // The backend stores questions keyed by sessionKey (Quack session ID), not claudeSessionId
-                    currentSessionId={taskSessionId}
+                    // 🦆 FIX: Display claudeSessionId (real Claude Code ID) in header badge
+                    currentSessionId={agentSessions.find(s => s.id === taskSessionId)?.claudeSessionId ?? taskSessionId}
                     // 🦆 Internal session ID for state management (attachments, settings)
                     internalSessionId={taskSessionId}
                     // Fullscreen mode

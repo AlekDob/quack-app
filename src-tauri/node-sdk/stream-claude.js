@@ -181,6 +181,11 @@ async function requestFromFrontend(type, data, timeoutMs = 0) {
  * This fallback ensures backward compatibility.
  */
 function getModelId(model) {
+  // Handle [1m] suffix for 1M context window (e.g., 'opus46[1m]' -> 'claude-opus-4-6[1m]')
+  // The SDK natively supports the [1m] suffix appended to model IDs.
+  const has1MSuffix = model.endsWith('[1m]');
+  const baseModel = has1MSuffix ? model.replace('[1m]', '') : model;
+
   // Last line of defense: map both legacy short names AND Supabase IDs
   // to valid API model IDs. The frontend should resolve via Supabase config,
   // but if it fails (offline, slow load), these prevent "invalid model" errors.
@@ -197,7 +202,9 @@ function getModelId(model) {
     'sonnet46': 'claude-sonnet-4-6',
   };
 
-  return fallbackMap[model] || model;
+  const resolved = fallbackMap[baseModel] || baseModel;
+  // Re-append [1m] suffix if present — SDK strips it before sending to API
+  return has1MSuffix ? `${resolved}[1m]` : resolved;
 }
 
 // Parse command line arguments
@@ -551,7 +558,8 @@ async function main() {
 
     // Build SDK options
     const modelId = getModelId(model);
-    console.error(`[DEBUG] Model mapping: "${model}" → "${modelId}"`);
+    const is1MContext = modelId.endsWith('[1m]');
+    console.error(`[DEBUG] Model mapping: "${model}" → "${modelId}" (1M context: ${is1MContext})`);
 
     // Default tools if not provided by frontend
     const defaultAllowedTools = [
@@ -575,7 +583,9 @@ async function main() {
     ];
 
     // Use allowedTools from config if provided, otherwise use defaults
-    const resolvedAllowedTools = allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0
+    // Brain: btw-context-aware
+    // An explicit empty array [] means "no tools" (read-only mode, e.g. BTW side-chain)
+    const resolvedAllowedTools = allowedTools && Array.isArray(allowedTools)
       ? allowedTools
       : defaultAllowedTools;
 
@@ -588,6 +598,10 @@ async function main() {
 
     const options = {
       model: modelId,
+      // Brain: 1m-context-window-support
+      // The [1m] suffix in modelId is enough — the CLI handles it natively.
+      // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
+      // No betas needed (GA since March 2026, beta header is ignored).
       // Enable automatic reading of CLAUDE.md and project settings
       settingSources: ['project', 'user', 'local'],
 
@@ -1073,6 +1087,16 @@ ${hintsBlock}
             modelUsage: event.modelUsage,
             total_cost_usd: event.total_cost_usd,
           }, null, 2));
+          // Brain: 1m-context-window-support
+          // Log contextWindow specifically to verify 1M activation
+          if (event.modelUsage || event.model_usage) {
+            const mu = event.modelUsage || event.model_usage;
+            for (const [modelName, usage] of Object.entries(mu)) {
+              if (usage?.contextWindow) {
+                console.error(`[DEBUG] 🦆 contextWindow for ${modelName}: ${usage.contextWindow} (${usage.contextWindow >= 1_000_000 ? '1M' : '200k'})`);
+              }
+            }
+          }
         }
 
         // Brain: gotcha-stamina-overhead-static-estimate

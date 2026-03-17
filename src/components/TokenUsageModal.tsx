@@ -32,7 +32,7 @@ interface TokenUsageModalProps {
   compactFailed?: boolean;
 }
 
-// Format tokens as K/M (e.g., 55500 -> "55.5k", 1000000 -> "1M")
+// Format tokens as K or M (e.g., 55500 -> "55.5k", 1000000 -> "1M")
 const formatTokensK = (tokens: number): string => {
   if (tokens >= 1_000_000) {
     const m = tokens / 1_000_000;

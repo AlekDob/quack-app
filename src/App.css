@@ -1113,7 +1113,9 @@ button.directory-chooser:disabled {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 8px;
+  height: 22px;
+  padding: 0 8px;
+  box-sizing: border-box;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 4px;
@@ -9475,6 +9477,19 @@ button.directory-chooser:disabled {
   border-bottom-color: rgba(18, 20, 27, 0.95);
 }
 
+/* Sidebar header tooltips - align right to avoid overflow clip */
+.sidebar-header-top .action-icon-tooltip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.sidebar-header-top .action-icon-tooltip::before {
+  left: auto;
+  right: 8px;
+  transform: none;
+}
+
 /* ========================================= */
 /* Agent Modal - Compact Codex Style */
 /* ========================================= */
@@ -11455,7 +11470,8 @@ button.directory-chooser:disabled {
 /* New project button - more visible */
 .new-project-btn-sidebar {
   font-size: 12px !important;
-  padding: 5px 12px !important;
+  padding: 0 12px !important;
+  height: 22px !important;
 }
 
 .new-project-btn-sidebar svg {

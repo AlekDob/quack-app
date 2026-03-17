@@ -1028,15 +1028,16 @@ export default function TerminalSidebar({
         {orderedRepositoryGroups.length >= 2 && (
           <button
             type="button"
-            className="new-project-btn-sidebar"
+            className="new-project-btn-sidebar action-icon"
             onClick={() => setShowGroupModal(true)}
             aria-label="Create Group"
-            style={{ marginLeft: '4px', padding: '4px 6px', minWidth: 'unset' }}
+            style={{ marginLeft: '4px', padding: '0 6px', height: '22px', minWidth: 'unset', boxSizing: 'border-box' }}
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="3" width="20" height="18" rx="2" />
               <line x1="12" y1="3" x2="12" y2="21" />
             </svg>
+            <span className="action-icon-tooltip">Create Group</span>
           </button>
         )}
 
@@ -1046,8 +1047,9 @@ export default function TerminalSidebar({
         {favorites.size > 0 && (
           <button
             type="button"
+            className="action-icon"
             onClick={() => setShowFavoritesOnly((prev) => !prev)}
-            title={showFavoritesOnly ? "Show all projects" : "Show favorites only"}
+            aria-label={showFavoritesOnly ? "Show all projects" : "Show favorites only"}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -1075,6 +1077,7 @@ export default function TerminalSidebar({
             >
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
             </svg>
+            <span className="action-icon-tooltip">{showFavoritesOnly ? "Show all" : "Favorites"}</span>
           </button>
         )}
       </div>

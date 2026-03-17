@@ -221,6 +221,11 @@ function loadMCPServersFromFile(workingDir) {
 // =============================================================================
 
 function getModelId(model) {
+  // Handle [1m] suffix for 1M context window (e.g., 'opus46[1m]' -> 'claude-opus-4-6[1m]')
+  // The SDK natively supports the [1m] suffix appended to model IDs.
+  const has1MSuffix = model.endsWith('[1m]');
+  const baseModel = has1MSuffix ? model.replace('[1m]', '') : model;
+
   // Last line of defense: map both legacy short names AND Supabase IDs
   // to valid API model IDs. The frontend should resolve via Supabase config,
   // but if it fails (offline, slow load), these prevent "invalid model" errors.
@@ -236,7 +241,10 @@ function getModelId(model) {
     'opus46': 'claude-opus-4-6',
     'sonnet46': 'claude-sonnet-4-6',
   };
-  return fallbackMap[model] || model;
+
+  const resolved = fallbackMap[baseModel] || baseModel;
+  // Re-append [1m] suffix if present — SDK strips it before sending to API
+  return has1MSuffix ? `${resolved}[1m]` : resolved;
 }
 
 // =============================================================================
@@ -336,6 +344,8 @@ async function handleQuery(cmd) {
   try {
     // --- Build SDK options (same logic as stream-claude.js) ---
     const modelId = getModelId(model);
+    const is1MContext = modelId.endsWith('[1m]');
+    log('QUERY', `Model mapping: "${model}" → "${modelId}" (1M context: ${is1MContext})`);
 
     const defaultAllowedTools = [
       'Skill', 'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
@@ -347,6 +357,9 @@ async function handleQuery(cmd) {
 
     const options = {
       model: modelId,
+      // Brain: 1m-context-window-support
+      // The [1m] suffix in modelId is enough — the CLI handles it natively.
+      // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
       settingSources: ['project', 'user', 'local'],
       tools: { type: 'preset', preset: 'claude_code' },
       allowedTools: resolvedAllowedTools,

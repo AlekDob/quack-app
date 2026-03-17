@@ -8,9 +8,24 @@ interface TeammateState {
   sessionId?: string;
 }
 
+interface RemoteTeam {
+  name: string;
+  leadAgentId: string;
+  status: string;
+  members: Array<{
+    agentId: string;
+    agentName: string;
+    role?: string;
+    task: string;
+    sessionId?: string;
+    status: string;
+  }>;
+}
+
 interface TeamStore {
   // State
   activeTeam: TeamConfig | null;
+  remoteTeam: RemoteTeam | null;
   teammateStatus: Map<string, TeammateState>;
   loading: boolean;
 
@@ -31,6 +46,7 @@ interface TeamStore {
 
 export const useTeamStore = create<TeamStore>()((set) => ({
   activeTeam: null,
+  remoteTeam: null,
   teammateStatus: new Map(),
   loading: false,
 

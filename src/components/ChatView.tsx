@@ -94,7 +94,7 @@ interface ChatViewProps {
     cacheReadTokens: number;
     totalCost: number; // total_cost_usd from Claude SDK (authoritative)
     overhead?: number; // Dynamic overhead calculated from project files
-    maxTokens?: number; // Context window size from SDK model_usage
+    contextWindow?: number; // Context window size from SDK (200k or 1M)
   };
   // OpenAI API key for Whisper
   openaiApiKey?: string;
@@ -241,8 +241,9 @@ export default function ChatView({
   // Load active rules using the hook (automatic, zero config)
   const { activeRules, hasRules } = useAgentRules(selectedRules, basePath || '');
 
-  // BTW Side-Chain Chat
-  const btw = useBTW();
+  // BTW Side-Chain Chat — context-aware (reads current session messages)
+  // Brain: btw-context-aware
+  const btw = useBTW({ messages });
 
   // Remote Team Widget
   const remoteTeam = useTeamStore(s => s.activeTeam);
@@ -802,6 +803,7 @@ export default function ChatView({
           cacheCreationTokens={sessionTokens.cacheCreationTokens}
           cacheReadTokens={sessionTokens.cacheReadTokens}
           totalCost={sessionTokens.totalCost}
+          maxTokens={sessionTokens.contextWindow}
           overhead={sessionTokens.overhead}
           maxTokens={sessionTokens.maxTokens}
           onCompact={onCompactConversation}
