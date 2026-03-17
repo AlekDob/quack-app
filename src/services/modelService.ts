@@ -24,10 +24,11 @@ export interface ModelConfig {
  * Uses Sonnet as a safe, cost-effective default.
  */
 const EMERGENCY_FALLBACK: ModelConfig[] = [
-  { id: 'opus46', modelId: 'claude-opus-4-6', label: 'Opus 4.6', isDefault: true, isActive: true, sortOrder: 0 },
-  { id: 'sonnet46', modelId: 'claude-sonnet-4-6', label: 'Sonnet 4.6', isDefault: false, isActive: true, sortOrder: 1 },
-  { id: 'sonnet45', modelId: 'claude-sonnet-4-5-20250929', label: 'Sonnet 4.5', isDefault: false, isActive: true, sortOrder: 2 },
-  { id: 'haiku45', modelId: 'claude-haiku-4-5', label: 'Haiku 4.5', isDefault: false, isActive: true, sortOrder: 3 },
+  { id: 'opus46-1m', modelId: 'claude-opus-4-6[1m]', label: 'Opus 4.6 (1M)', isDefault: true, isActive: true, sortOrder: 0 },
+  { id: 'opus46', modelId: 'claude-opus-4-6', label: 'Opus 4.6', isDefault: false, isActive: true, sortOrder: 1 },
+  { id: 'sonnet46', modelId: 'claude-sonnet-4-6', label: 'Sonnet 4.6', isDefault: false, isActive: true, sortOrder: 2 },
+  { id: 'sonnet45', modelId: 'claude-sonnet-4-5-20250929', label: 'Sonnet 4.5', isDefault: false, isActive: true, sortOrder: 3 },
+  { id: 'haiku45', modelId: 'claude-haiku-4-5', label: 'Haiku 4.5', isDefault: false, isActive: true, sortOrder: 4 },
 ];
 
 /**
