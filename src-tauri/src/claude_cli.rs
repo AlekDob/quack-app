@@ -2813,8 +2813,38 @@ async fn send_message_via_sdk_streaming_legacy(
     }
 
     if !status.success() {
-        let stderr_text = if !stderr_output.is_empty() {
-            format!("\n\nStderr output:\n{}", stderr_output.join("\n"))
+        // Try to extract a clean error message from stderr JSON objects
+        // The SDK often outputs {"type":"error","error":"..."} with the actual user-facing message
+        let clean_error = stderr_output.iter()
+            .filter_map(|line| {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
+                    // Only extract from objects with "type": "error" to avoid false matches
+                    if val.get("type").and_then(|t| t.as_str()) == Some("error") {
+                        val.get("error").and_then(|e| e.as_str()).map(|s| s.to_string())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .last();
+
+        if let Some(error_msg) = clean_error {
+            return Err(error_msg);
+        }
+
+        // Fallback: only include [ERROR]/[WARN] lines (filter out [DEBUG], env vars, MCP configs)
+        // This prevents leaking sensitive env vars and connection strings to the UI
+        let filtered: Vec<&str> = stderr_output.iter()
+            .map(|s| s.as_str())
+            .filter(|line| line.contains("[ERROR]") || line.contains("[WARN]"))
+            .collect();
+
+        let stderr_text = if !filtered.is_empty() {
+            let joined = filtered.join("\n");
+            let truncated: String = if joined.len() > 500 { joined.chars().take(500).collect() } else { joined };
+            format!("\n\n{}", truncated)
         } else {
             String::new()
         };

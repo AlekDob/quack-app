@@ -647,7 +647,8 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
         )}
         {hasError && message.error && (
           <div className="chat-message-error">
-            {message.error === 'Aborted' ? 'Aborted' : `Error: ${message.error}`}
+            {message.error === 'Aborted' ? 'Aborted' :
+              `Error: ${message.error.length > 200 ? message.error.substring(0, 200) + '...' : message.error}`}
           </div>
         )}
         {message.toolCalls && message.toolCalls.length > 0 && (

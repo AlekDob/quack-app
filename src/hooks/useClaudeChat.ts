@@ -674,7 +674,12 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
           errorMessage = err.message;
 
           // Extract specific error types for better user feedback
-          if (errorMessage.includes('API key')) {
+          if (errorMessage.includes('hit your limit') || errorMessage.includes("You've hit your limit")) {
+            // Extract the clean rate limit message (e.g. "You've hit your limit · resets 7pm (Europe/Stockholm)")
+            const match = errorMessage.match(/You've hit your limit[^"}\n]*/);
+            errorMessage = match?.[0] || "You've hit your rate limit";
+            errorDetails = 'Your usage limit will reset automatically at the time shown above. You can continue using the app after the reset.';
+          } else if (errorMessage.includes('API key')) {
             errorDetails = 'Please check your Anthropic API key in settings.';
           } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
             errorDetails = 'Rate limit reached. Please wait a few minutes and try again.';
@@ -699,8 +704,13 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
               '• Reduce the size of your CLAUDE.md file\n' +
               '• Send shorter messages';
           }
+
+          // Sanitize: truncate very long error messages to prevent UI dump
+          if (errorMessage.length > 300) {
+            errorMessage = errorMessage.substring(0, 300) + '...';
+          }
         } else if (typeof err === 'string') {
-          errorMessage = err;
+          errorMessage = err.length > 300 ? err.substring(0, 300) + '...' : err;
         }
 
         // Update message with error
