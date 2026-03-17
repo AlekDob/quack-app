@@ -805,7 +805,6 @@ export default function ChatView({
           totalCost={sessionTokens.totalCost}
           maxTokens={sessionTokens.contextWindow}
           overhead={sessionTokens.overhead}
-          maxTokens={sessionTokens.maxTokens}
           onCompact={onCompactConversation}
           onClear={onClearConversation}
         />
