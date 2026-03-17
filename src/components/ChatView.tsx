@@ -744,7 +744,7 @@ export default function ChatView({
       {remoteTeam && activeAgent?.name === remoteTeam.leadAgentId && (
         <RemoteTeamWidget
           teamName={remoteTeam.name}
-          members={remoteTeam.members.map(m => ({ agentId: m.agentId, agentName: m.name }))}
+          members={remoteTeam.members.map(m => ({ agentId: m.agentId, agentName: m.name, task: m.role || '', status: 'active' }))}
           teamStatus="active"
           onMemberClick={(agentId, sessionId) => {
             // Navigate to the teammate's session stream tab
@@ -766,7 +766,9 @@ export default function ChatView({
         projectName={projectName}
         gitBranch={gitBranch}
         thinkingModeResetKey={thinkingModeResetCounter}
-        onUserQuestionAnswer={onUserQuestionAnswer}
+        onUserQuestionAnswer={onUserQuestionAnswer
+          ? (toolUseId, answers, _sessionKey) => onUserQuestionAnswer(toolUseId, answers, internalSessionId || _sessionKey)
+          : undefined}
         pendingQuestionIds={pendingQuestionIds}
         answeredQuestions={answeredQuestions}
         currentSessionId={currentSessionId}

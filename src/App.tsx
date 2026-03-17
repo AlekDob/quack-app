@@ -4231,7 +4231,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       console.log('[App] 📋 Plan approval response sent successfully');
 
-      // Auto-switch to Bypass mode after plan approval so the agent can execute
+      // Auto-switch to Bypass (Build) mode after plan approval so the next
+      // user message lets the agent execute. The UI permission toggle updates
+      // immediately so the user sees "Build" mode for their next prompt.
       if (approved) {
         updateAgentSettings({ permissionMode: 'bypass' });
       }
