@@ -184,6 +184,19 @@
   color: var(--category-color, #f28c52);
 }
 
+/* Changes badge always glows (even when collapsed) */
+.accordion-section[data-category="changes"] .accordion-badge {
+  background: color-mix(in srgb, var(--category-color, #34d399) 25%, transparent);
+  color: var(--category-color, #34d399);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--category-color, #34d399) 40%, transparent);
+  animation: changes-badge-pulse 2s ease-in-out infinite;
+}
+
+@keyframes changes-badge-pulse {
+  0%, 100% { box-shadow: 0 0 6px color-mix(in srgb, var(--category-color, #34d399) 30%, transparent); }
+  50% { box-shadow: 0 0 12px color-mix(in srgb, var(--category-color, #34d399) 50%, transparent); }
+}
+
 .accordion-badge-label {
   flex-shrink: 0;
   padding: 2px 6px;
