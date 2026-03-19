@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
 import InlineDiffView from './InlineDiffView'
+import OpenInIDEButton from './OpenInIDEButton'
 import { ConfirmModal } from './ConfirmModal'
 import './ChangesPanel.css'
 
@@ -248,7 +249,10 @@ export default function ChangesPanel({
     return 'D'
   }
 
-  const getStatusClass = (s: 'created' | 'modified' | 'deleted'): string => {
+  const isMarkdown = (filePath: string): boolean => filePath.endsWith('.md')
+
+  const getStatusClass = (s: 'created' | 'modified' | 'deleted', filePath: string): string => {
+    if (isMarkdown(filePath)) return 'changes-status-markdown'
     if (s === 'created') return 'changes-status-new'
     if (s === 'modified') return 'changes-status-modified'
     return 'changes-status-deleted'
@@ -313,10 +317,10 @@ export default function ChangesPanel({
                 >
                   <path d="M9 18l6-6-6-6" />
                 </svg>
-                <span className={`changes-file-status ${getStatusClass(status)}`}>
+                <span className={`changes-file-status ${getStatusClass(status, filePath)}`}>
                   {getStatusLabel(status)}
                 </span>
-                <span className="changes-file-name" title={filePath}>
+                <span className={`changes-file-name ${isMarkdown(filePath) ? 'changes-file-name-markdown' : ''}`} title={filePath}>
                   {fileName}
                 </span>
                 {isStaged && <span className="changes-staged-badge">staged</span>}
@@ -324,6 +328,7 @@ export default function ChangesPanel({
                   {dirPath}
                 </span>
                 <div className="changes-file-actions" onClick={(e) => e.stopPropagation()}>
+                  <OpenInIDEButton path={filePath} iconOnly className="changes-btn changes-btn-ide" />
                   <button
                     type="button"
                     className="changes-btn changes-btn-reject"

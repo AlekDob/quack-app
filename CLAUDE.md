@@ -89,6 +89,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Rewind already in StreamMessage: `documentation/gotchas/gotcha-rewind-already-exists-in-stream-message.md`
 - SDK bundled CLI 200k context: `documentation/gotchas/gotcha-sdk-bundled-cli-200k-context-window.md`
 - Empty state no drag region: `documentation/bugs/fix-empty-state-no-drag-region.md`
+- Git.rs English errors: `documentation/gotchas/gotcha-git-rs-error-messages-english.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
@@ -105,6 +106,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Tool Search lazy loading: `documentation/patterns/pattern-tool-search-lazy-loading.md`
 - Code-intel language extension: `documentation/patterns/pattern-code-intel-language-extension.md`
 - Marketplace versioning: `documentation/patterns/pattern-marketplace-versioning.md`
+- Changes Panel (Codex diffs): `documentation/patterns/pattern-changes-panel.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)
