@@ -2711,18 +2711,23 @@ function AppContent() {
       // Each session has its own claudeSessionId for independent conversations
       // The messageKey is the session ID, which is what we need to use
       // Brain: fix-remote-team-session-tracking
-      // Also save messageCount and mark session as done so Remote API polling
-      // can detect completion (e.g., team manager polling for delegated tasks)
+      // Save messageCount so Remote API polling can detect progress.
+      // Auto-done ONLY for remote-execute sessions (title starts with "[Remote]")
+      // to avoid closing interactive sessions after the first response.
       try {
         const finalMessages = chatSessions.get(messageKey) ?? [];
-        await updateSession(messageKey, {
+        const isRemoteSession = capturedSession?.title?.startsWith('[Remote]');
+        const completionUpdate: Record<string, unknown> = {
           claudeSessionId: response.session_id,
           messageCount: finalMessages.length,
-          status: 'done' as const,
-          completedAt: Date.now(),
           updatedAt: Date.now(),
-        });
-        console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}, messageCount=${finalMessages.length}, status=done`);
+        };
+        if (isRemoteSession) {
+          completionUpdate.status = 'done';
+          completionUpdate.completedAt = Date.now();
+        }
+        await updateSession(messageKey, completionUpdate);
+        console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}, messageCount=${finalMessages.length}${isRemoteSession ? ', status=done' : ''}`);
       } catch (err) {
         console.warn(`[SESSION-FIX] Failed to save claudeSessionId:`, err);
       }
