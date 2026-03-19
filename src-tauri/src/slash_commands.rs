@@ -25,11 +25,42 @@ pub struct SlashCommandsResponse {
     pub custom: Vec<SlashCommand>,
 }
 
-/// Built-in commands (empty - all functionality moved to chat UI buttons)
-/// Previously included: /help, /clear, /reset, /model, /session
-/// Now handled by: Compact, Clear, Terminal Resume buttons in chat footer
+/// SDK built-in slash commands — handled natively by the Claude Code CLI.
+/// These are passed through to the SDK as raw "/command" text (no expansion).
+const SDK_BUILTIN_COMMANDS: &[(&str, &str)] = &[
+    ("compact", "Compress conversation history to save context"),
+    ("context", "Show context window usage and token counts"),
+    ("cost", "Show session cost and token usage breakdown"),
+    ("diff", "Show file changes made in this session"),
+    ("doctor", "Run diagnostics and check configuration"),
+    ("init", "Initialize CLAUDE.md and project configuration"),
+    ("memory", "Show active memory files"),
+    ("mcp", "Show MCP server connection status"),
+    ("model", "Show or change the active model"),
+    ("permissions", "Show current tool permissions"),
+    ("review", "Review code changes made in this session"),
+    ("status", "Show session status and configuration"),
+    ("undo", "Undo the last file change"),
+];
+
+/// Check if a command name is an SDK built-in slash command
+fn is_sdk_builtin(command_name: &str) -> bool {
+    SDK_BUILTIN_COMMANDS.iter().any(|(name, _)| *name == command_name)
+}
+
+/// Built-in commands: SDK commands that the CLI handles natively
 fn get_builtin_commands() -> Vec<SlashCommand> {
-    vec![]
+    SDK_BUILTIN_COMMANDS
+        .iter()
+        .map(|(name, desc)| SlashCommand {
+            name: name.to_string(),
+            description: desc.to_string(),
+            content: String::new(),
+            is_builtin: true,
+            parameters: None,
+            scope: "sdk".to_string(),
+        })
+        .collect()
 }
 
 /// Parse frontmatter from markdown file
@@ -293,6 +324,17 @@ pub fn expand_slash_command(
     args: String,
 ) -> Result<String, String> {
     log::info!("🦆 Expanding slash command: {} with args: {}", command_name, args);
+
+    // SDK built-in commands are passed through as raw text — the CLI handles them natively
+    if is_sdk_builtin(&command_name) {
+        let raw = if args.is_empty() {
+            format!("/{}", command_name)
+        } else {
+            format!("/{} {}", command_name, args)
+        };
+        log::info!("🦆 SDK built-in command: {}", raw);
+        return Ok(raw);
+    }
 
     // Try to find command in project commands first
     let project_commands_dir = PathBuf::from(&base_path).join(".claude/commands");

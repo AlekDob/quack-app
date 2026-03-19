@@ -974,32 +974,20 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
     // Check for structured output in the message
     const structuredOutput = (message as any).structured_output;
 
-    // Check if the result text is already shown in the last assistant message
-    // to avoid duplication
-    const lastAssistantMessage = useMemo(() => {
-      for (let i = streamMessages.length - 1; i >= 0; i--) {
-        const msg = streamMessages[i];
-        if (msg === message) continue; // Skip current message
-        if (msg.type === 'assistant' && msg.message?.content) {
-          return msg;
-        }
-      }
-      return null;
-    }, [streamMessages, message]);
+    // Check if ANY assistant event already has text content.
+    // The result event's text is always an aggregation of streamed assistant text,
+    // so showing it would duplicate what the user already sees.
+    const anyAssistantHasText = useMemo(() => {
+      return streamMessages.some((msg) => {
+        if (msg.type !== 'assistant' || !msg.message?.content) return false;
+        const content = msg.message.content;
+        if (!Array.isArray(content)) return false;
+        return content.some((c: any) => c.type === 'text' && c.text?.trim());
+      });
+    }, [streamMessages]);
 
-    // Get the text from last assistant message
-    const lastAssistantText = useMemo(() => {
-      if (!lastAssistantMessage?.message?.content) return null;
-      const content = lastAssistantMessage.message.content;
-      if (Array.isArray(content)) {
-        const textBlock = content.find((c: any) => c.type === 'text');
-        return textBlock?.text || null;
-      }
-      return null;
-    }, [lastAssistantMessage]);
-
-    // Only show result text if it's different from assistant text or if there's an error
-    const shouldShowResultText = message.error || (message.result && message.result !== lastAssistantText);
+    // Only show result text if no assistant event showed text, or if there's an error
+    const shouldShowResultText = message.error || (message.result && !anyAssistantHasText);
 
     // If we don't need to show the text, render only stats without avatar/name
     if (!shouldShowResultText) {

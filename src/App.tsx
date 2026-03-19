@@ -1017,6 +1017,7 @@ function AppContent() {
   // the event arrives before React's setState has created the streaming message
   const eventBufferRef = useRef<Map<string, ClaudeEvent[]>>(new Map());
 
+
   // 🦆 SESSION-FIRST: Map agentId → active sessionId/messageKey
   // When streaming, events come with agentId but we need to write to the correct sessionId
   // This ref tracks which messageKey (sessionId or agentId) is currently active for each agent
@@ -2253,46 +2254,11 @@ function AppContent() {
     };
   }, [tauriAvailable, activeAgentIdsKey]); // 🦆 RACE FIX: Only re-setup when agent IDs change, not on every message update!
 
-  // 🦆 PRE-WARM LISTENER: Setup listener when agent is selected (before first message)
-  // This reuses the same listener setup logic as multi-listener but triggers on activeId change
-  // instead of waiting for chatSessions to update
-  useEffect(() => {
-    if (!tauriAvailable || !activeId) return;
-
-    // Skip if listener already exists or is being registered by another effect
-    if (activeListenersRef.current.has(activeId) || pendingListenersRef.current.has(activeId)) {
-      return;
-    }
-
-    let cancelled = false;
-    const capturedId = activeId;
-    pendingListenersRef.current.add(capturedId);
-
-    const eventName = `claude-event:${capturedId}`;
-
-    // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
-    // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey
-    listen<{ sessionKey: string; event: ClaudeEvent }>(eventName, (event) => {
-      const { sessionKey, event: claudeEvent } = event.payload;
-      handleClaudeEvent(capturedId, claudeEvent, 'Pre-warm', sessionKey);
-    }).then((unlisten) => {
-      pendingListenersRef.current.delete(capturedId);
-      if (cancelled) {
-        unlisten();
-        return;
-      }
-      activeListenersRef.current.set(capturedId, unlisten);
-    }).catch((error) => {
-      pendingListenersRef.current.delete(capturedId);
-      if (!cancelled) {
-        console.error(`[Pre-warm] Failed for ${capturedId}:`, error);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [tauriAvailable, activeId]);
+  // 🦆 PRE-WARM LISTENER: REMOVED — was a third listener registration point
+  // alongside Multi-Listener and ensureListenerReady, causing duplicate event
+  // delivery. The Multi-Listener effect covers all active terminals, and
+  // ensureListenerReady (called from sendMessageForAgent) covers the gap
+  // before the first message. Two registration points are sufficient.
 
   // 🦆 SESSION PERSISTENCE: REMOVED - Agents always start fresh
   // Users can resume sessions via Sessions panel -> "Resume Session" button
@@ -2591,6 +2557,7 @@ function AppContent() {
     // 🦆 EVENT BUFFER FIX: Clear any stale buffered events from previous conversations for this session
     // 🦆 SESSION-FIRST: Use messageKey for buffer (parallel sessions need separate buffers)
     eventBufferRef.current.delete(messageKey);
+
 
     // 🦆 SESSION-FIRST: Add assistant message placeholder using messageKey
     setChatSessions((prev) => {

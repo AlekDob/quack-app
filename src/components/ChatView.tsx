@@ -384,7 +384,11 @@ export default function ChatView({
         return;
       } catch (error) {
         console.error('[ChatView] Failed to expand slash command:', error);
-        // Fall through to send raw content if expansion fails
+        // Don't fall through — sending raw "/command" to the SDK causes it
+        // to be processed as a built-in CLI command AND a Claude prompt,
+        // producing a duplicate response.
+        toast.error(`Unknown command: /${commandName}`);
+        return;
       }
     }
 

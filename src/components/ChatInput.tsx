@@ -140,6 +140,9 @@ export default function ChatInput({
   }, [initialAttachments, controlledAttachments]);
   const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // Guard against double-send from overlapping keyboard handlers
+  // (global shortcut handler + local onKeyDown both fire on same keypress)
+  const sendingRef = useRef(false);
 
   // Determine if controlled or uncontrolled for input
   const isControlled = controlledInputValue !== undefined && controlledOnInputChange !== undefined;
@@ -1123,13 +1126,25 @@ export default function ChatInput({
     const trimmed = (input || '').trim();
     if ((!trimmed && attachments.length === 0) || isStreaming) return;
 
+    // Prevent double-send: global shortcut handler + local onKeyDown
+    // both fire on the same keypress (e.g. Cmd+Enter matches both the
+    // configurable chatSendMessage shortcut AND the hardcoded handler).
+    // React state updates (setInput) are batched, so the second call
+    // still sees non-empty input. This ref guard blocks the second call.
+    if (sendingRef.current) return;
+    sendingRef.current = true;
+
     // Clear input before awaiting send (which blocks until stream ends)
     const currentAttachments = [...attachments];
     setInput('');
     setAttachments([]);
     setError(null);
 
-    await onSend(trimmed, { attachments: currentAttachments });
+    try {
+      await onSend(trimmed, { attachments: currentAttachments });
+    } finally {
+      sendingRef.current = false;
+    }
   };
 
   const handleStop = () => {
