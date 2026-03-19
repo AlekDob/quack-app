@@ -19,7 +19,8 @@ interface UseSessionMessageSyncProps {
 /**
  * Hook that syncs messageCount of sessions with chat messages.
  *
- * @param chatSessions - Map of agentId -> ChatMessage[]
+ * Brain: fix-remote-team-session-tracking
+ * @param chatSessions - Map of sessionId -> ChatMessage[] (SESSION-FIRST architecture)
  * @param activeSessionId - Currently active session ID
  */
 export function useSessionMessageSync({
@@ -33,9 +34,11 @@ export function useSessionMessageSync({
     const session = useSessionStore.getState().sessions.find(s => s.id === activeSessionId);
     if (!session) return;
 
-    // Get messages for this session's agent
-    const agentMessages = chatSessions.get(session.agentId) || [];
-    const messageCount = agentMessages.length;
+    // Brain: fix-remote-team-session-tracking
+    // SESSION-FIRST: chatSessions is keyed by session.id (not agentId)
+    // Each session has its own message list, enabling parallel sessions per agent
+    const sessionMessages = chatSessions.get(activeSessionId) || [];
+    const messageCount = sessionMessages.length;
 
     // Only update if count has changed
     if (session.messageCount !== messageCount) {

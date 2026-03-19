@@ -2710,12 +2710,19 @@ function AppContent() {
       // 🦆 SESSION-FIRST FIX: Save Claude session ID to the SPECIFIC session (not agent!)
       // Each session has its own claudeSessionId for independent conversations
       // The messageKey is the session ID, which is what we need to use
+      // Brain: fix-remote-team-session-tracking
+      // Also save messageCount and mark session as done so Remote API polling
+      // can detect completion (e.g., team manager polling for delegated tasks)
       try {
+        const finalMessages = chatSessions.get(messageKey) ?? [];
         await updateSession(messageKey, {
           claudeSessionId: response.session_id,
+          messageCount: finalMessages.length,
+          status: 'done' as const,
+          completedAt: Date.now(),
           updatedAt: Date.now(),
         });
-        console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}`);
+        console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}, messageCount=${finalMessages.length}, status=done`);
       } catch (err) {
         console.warn(`[SESSION-FIX] Failed to save claudeSessionId:`, err);
       }
@@ -11482,6 +11489,19 @@ You have access to all Bash tools to execute git commands like:
                 overflow: 'hidden',
               }}
             >
+              {/* Drag region for empty state - sidebar is hidden so we need a draggable area */}
+              <div
+                data-tauri-drag-region
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '40px',
+                  zIndex: 10,
+                  // Brain: gotcha-window-confirm-tauri-webview
+                }}
+              />
               {/* Guide Viewer - shown when emptyStateShowGuide is true */}
               {emptyStateShowGuide ? (
                 <div style={{
