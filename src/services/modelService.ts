@@ -51,10 +51,6 @@ export function getModels(remoteModels?: ModelConfig[]): ModelConfig[] {
   const models = remoteModels?.filter(m => m.isActive);
   if (models && models.length > 0) {
     const sorted = [...models].sort((a, b) => a.sortOrder - b.sortOrder);
-    // Ensure Opus 4.6 (1M) is always available even if not yet in Supabase
-    if (!sorted.find(m => m.id === 'opus46-1m')) {
-      sorted.unshift({ id: 'opus46-1m', modelId: 'claude-opus-4-6[1m]', label: 'Opus 4.6 (1M)', isDefault: false, isActive: true, sortOrder: -1 });
-    }
     return sorted;
   }
   // Emergency fallback - Supabase unreachable
