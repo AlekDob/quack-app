@@ -1,4 +1,5 @@
 import type { GitStatusEntry } from '../types'
+import InlineDiffView from './InlineDiffView'
 import './DiffDrawer.css'
 
 type DiffView = 'worktree' | 'staged'
@@ -107,108 +108,11 @@ function DiffDrawer({
 
         {/* Content */}
         <div className="diff-drawer-content">
-          {diffLoading ? (
-            <div className="diff-drawer-empty">Computing diff…</div>
-          ) : diffError ? (
-            <div className="diff-drawer-error">{diffError}</div>
-          ) : (
-            <div className="diff-drawer-diff">
-              {(() => {
-                // Parse diff to extract real line numbers
-                // Safety check for undefined/null/empty diffContent
-                if (!diffContent || diffContent.trim() === '') {
-                  return <div className="diff-drawer-empty">No changes to display. The file may have been committed already.</div>;
-                }
-                const lines = diffContent.split('\n');
-                let oldLineNum = 0;
-                let newLineNum = 0;
-
-                return lines.map((line, index) => {
-                  const isAddition = line.startsWith('+') && !line.startsWith('+++')
-                  const isDeletion = line.startsWith('-') && !line.startsWith('---')
-                  const isHunkHeader = line.startsWith('@@')
-                  const isMeta =
-                    isHunkHeader ||
-                    line.startsWith('diff ') ||
-                    line.startsWith('index ') ||
-                    line.startsWith('---') ||
-                    line.startsWith('+++')
-
-                  // Parse hunk header to get starting line numbers
-                  // Format: @@ -oldStart,oldCount +newStart,newCount @@
-                  if (isHunkHeader) {
-                    const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
-                    if (match) {
-                      oldLineNum = parseInt(match[1], 10)
-                      newLineNum = parseInt(match[2], 10)
-                    }
-                  }
-
-                  // Calculate line numbers for this line
-                  let displayOldLine: string | number = ''
-                  let displayNewLine: string | number = ''
-
-                  if (!isMeta) {
-                    if (isAddition) {
-                      // Addition: only new file line number
-                      displayNewLine = newLineNum
-                      newLineNum++
-                    } else if (isDeletion) {
-                      // Deletion: only old file line number
-                      displayOldLine = oldLineNum
-                      oldLineNum++
-                    } else {
-                      // Context: both line numbers
-                      displayOldLine = oldLineNum
-                      displayNewLine = newLineNum
-                      oldLineNum++
-                      newLineNum++
-                    }
-                  }
-
-                  const content = isAddition || isDeletion ? line.slice(1) : line
-                  const displayText = content.length > 0 ? content : '\u00a0'
-
-                  let background = 'transparent'
-                  let borderLeft = '3px solid transparent'
-                  let textColor = '#e5ecff'
-                  let fontWeight: number | undefined
-
-                  if (isAddition) {
-                    background = 'rgba(34, 197, 94, 0.18)'
-                    borderLeft = '3px solid rgba(34, 197, 94, 0.55)'
-                    textColor = '#bbf7d0'
-                  } else if (isDeletion) {
-                    background = 'rgba(239, 68, 68, 0.22)'
-                    borderLeft = '3px solid rgba(239, 68, 68, 0.55)'
-                    textColor = '#fecaca'
-                  } else if (isMeta) {
-                    background = 'rgba(59, 130, 246, 0.15)'
-                    borderLeft = '3px solid rgba(59, 130, 246, 0.6)'
-                    textColor = '#cbd5f5'
-                    fontWeight = 600
-                  }
-
-                  return (
-                    <div
-                      key={`${index}-${line}`}
-                      className="diff-line"
-                      style={{
-                        background,
-                        borderLeft,
-                        color: textColor,
-                        fontWeight,
-                      }}
-                    >
-                      <span className="diff-line-number diff-line-old">{displayOldLine}</span>
-                      <span className="diff-line-number diff-line-new">{displayNewLine}</span>
-                      <span className="diff-line-content">{displayText}</span>
-                    </div>
-                  )
-                })
-              })()}
-            </div>
-          )}
+          <InlineDiffView
+            diffContent={diffContent}
+            loading={diffLoading}
+            error={diffError}
+          />
         </div>
       </div>
     </>

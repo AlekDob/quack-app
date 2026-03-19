@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
+import ChangesPanel from "./ChangesPanel";
 import FileExplorer from "./FileExplorer";
 import AgentsPanel from "./AgentsPanel";
 import SkillsPanel from "./SkillsPanel";
@@ -23,6 +24,7 @@ import "./SidePanelAccordion.css";
 
 // Category-specific colors matching Quack Store
 const CATEGORY_COLORS: Record<string, string> = {
+  changes: '#34d399',     // Green - git changes
   skills: '#f28c52',      // Orange - main accent
   agents: '#f28c52',      // Orange - personas
   droids: '#4ecdc4',      // Teal - automation
@@ -43,6 +45,7 @@ interface AccordionSectionProps {
   title: string;
   icon: ReactNode;
   badge?: number;
+  badgeLabel?: ReactNode;
   isExpanded: boolean;
   isFocused?: boolean;
   order?: number;
@@ -51,7 +54,7 @@ interface AccordionSectionProps {
   children: ReactNode;
 }
 
-function AccordionSection({ id, title, icon, badge, isExpanded, isFocused = false, order = 0, category, onToggle, children }: AccordionSectionProps) {
+function AccordionSection({ id, title, icon, badge, badgeLabel, isExpanded, isFocused = false, order = 0, category, onToggle, children }: AccordionSectionProps) {
   const color = CATEGORY_COLORS[category || id] || CATEGORY_COLORS.default;
 
   return (
@@ -83,9 +86,11 @@ function AccordionSection({ id, title, icon, badge, isExpanded, isFocused = fals
         </svg>
         <span className="accordion-icon">{icon}</span>
         <span className="accordion-title">{title}</span>
-        {typeof badge === "number" && badge > 0 && (
+        {badgeLabel ? (
+          <span className="accordion-badge-label">{badgeLabel}</span>
+        ) : typeof badge === "number" && badge > 0 ? (
           <span className="accordion-badge">{badge}</span>
-        )}
+        ) : null}
       </button>
       {isExpanded && (
         <div className="accordion-content" id={`accordion-content-${id}`}>
@@ -98,6 +103,13 @@ function AccordionSection({ id, title, icon, badge, isExpanded, isFocused = fals
 
 // Icons
 const icons = {
+  changes: (
+    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+      <path d="M4 5h12M4 10h12M4 15h12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M15 3l2 2-2 2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 13l-2 2 2 2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
   workspace: (
     <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
       <path
@@ -269,6 +281,10 @@ interface SidePanelAccordionProps {
   // Sessions props
   onSelectSession?: (session: SessionInfo) => void;
 
+  // Changes panel props
+  onRefreshGitStatus?: () => void;
+  onClearModifiedFiles?: () => void;
+
   // Force expand a specific section (controlled from parent)
   forceExpandSection?: string | null;
   onForceExpandHandled?: () => void;
@@ -354,6 +370,10 @@ export default function SidePanelAccordion({
   // Sessions
   onSelectSession,
 
+  // Changes panel
+  onRefreshGitStatus,
+  onClearModifiedFiles,
+
   // Force expand
   forceExpandSection,
   onForceExpandHandled,
@@ -401,7 +421,7 @@ export default function SidePanelAccordion({
   }, [focusedSection]);
 
   // Section IDs for reference (order is determined by DOM position, not dynamically)
-  const sectionIds = ['context', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions'];
+  const sectionIds = ['changes', 'context', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions'];
 
   // Handle forceExpandSection from parent
   useEffect(() => {
@@ -464,7 +484,29 @@ export default function SidePanelAccordion({
       )}
 
       <div className={`accordion-container ${focusedSection ? 'has-focus' : ''}`} ref={containerRef}>
-        {/* File Explorer - First accordion */}
+        {/* Changes - Codex-style diff panel */}
+        {modifiedFiles && modifiedFiles.size > 0 && (
+          <AccordionSection
+            id="changes"
+            title="Changes"
+            icon={icons.changes}
+            badge={modifiedFiles.size}
+            isExpanded={focusedSection === "changes"}
+            isFocused={focusedSection === "changes"}
+            order={getOrder("changes")}
+            category="changes"
+            onToggle={() => toggleSection("changes")}
+          >
+            <ChangesPanel
+              rootPath={rootPath}
+              modifiedFiles={modifiedFiles}
+              onRefreshGitStatus={onRefreshGitStatus || (() => {})}
+              onClearModifiedFiles={onClearModifiedFiles}
+            />
+          </AccordionSection>
+        )}
+
+        {/* File Explorer */}
         <AccordionSection
           id="context"
           title="File Explorer"

@@ -12643,6 +12643,9 @@ You have access to all Bash tools to execute git commands like:
           onOpenMcpConfig={handleOpenMcpConfig}
           // Sessions props
           onSelectSession={handleSelectSession}
+          // Changes panel props
+          onRefreshGitStatus={refreshGitSummary}
+          onClearModifiedFiles={() => setModifiedFiles(new Map())}
           // Force expand section
           forceExpandSection={forceExpandSection}
           onForceExpandHandled={() => setForceExpandSection(null)}

@@ -55,6 +55,15 @@ pub fn git_diff(
 }
 
 #[tauri::command]
+pub fn git_discard_file(
+    path: String,
+    is_untracked: bool,
+    root_path: Option<String>,
+) -> Result<(), String> {
+    git_discard_file_impl(path, is_untracked, root_path).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
 pub fn git_stage(path: String, root_path: Option<String>) -> Result<(), String> {
     git_stage_impl(path, root_path).map_err(|err| err.to_string())
 }
@@ -95,7 +104,7 @@ fn git_status_summary_impl(root_path: Option<String>) -> Result<GitStatusSummary
     let starting_path = root_path.map(PathBuf::from);
     let root = git_root(starting_path)?;
     let output = run_git(&root, &["status", "--porcelain=1", "--branch"], false)?;
-    let mut branch = String::from("sconosciuto");
+    let mut branch = String::from("unknown");
     let mut upstream = None;
     let mut ahead = None;
     let mut behind = None;
@@ -231,6 +240,30 @@ fn git_diff_impl(
     }
 }
 
+fn git_discard_file_impl(
+    path: String,
+    is_untracked: bool,
+    root_path: Option<String>,
+) -> Result<()> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    if is_untracked {
+        // New file: delete from filesystem
+        let file_path = root.join(&path);
+        if file_path.exists() {
+            std::fs::remove_file(&file_path)
+                .context(format!("Failed to delete untracked file: {}", path))?;
+        }
+    } else {
+        // Tracked file: unstage first (if staged), then checkout
+        // Ignore errors from reset (file might not be staged)
+        let _ = run_git(&root, &["reset", "HEAD", "--", &path], true);
+        run_git(&root, &["checkout", "--", &path], false)?;
+    }
+    Ok(())
+}
+
 fn git_stage_impl(path: String, root_path: Option<String>) -> Result<()> {
     let starting_path = root_path.map(PathBuf::from);
     let root = git_root(starting_path)?;
@@ -254,7 +287,7 @@ fn git_stage_all_impl(root_path: Option<String>) -> Result<()> {
 
 fn git_commit_impl(message: String, root_path: Option<String>) -> Result<()> {
     if message.trim().is_empty() {
-        return Err(anyhow!("Il messaggio di commit non può essere vuoto."));
+        return Err(anyhow!("Commit message cannot be empty"));
     }
 
     let starting_path = root_path.map(PathBuf::from);
@@ -431,7 +464,7 @@ pub(crate) fn git_root(starting_path: Option<PathBuf>) -> Result<PathBuf> {
     let mut dir = if let Some(path) = starting_path {
         path
     } else {
-        env::current_dir().context("Impossibile determinare la directory corrente")?
+        env::current_dir().context("Failed to determine current directory")?
     };
 
     loop {
@@ -442,7 +475,7 @@ pub(crate) fn git_root(starting_path: Option<PathBuf>) -> Result<PathBuf> {
             break;
         }
     }
-    Err(anyhow!("Impossibile trovare la directory .git"))
+    Err(anyhow!("Could not find .git directory"))
 }
 
 #[tauri::command]
@@ -541,7 +574,7 @@ fn run_git(root: &PathBuf, args: &[&str], allow_non_zero: bool) -> Result<String
     }
 
     let output = cmd.output()
-        .with_context(|| format!("Impossibile eseguire git {:?}", args))?;
+        .with_context(|| format!("Failed to run git {:?}", args))?;
 
     if !output.status.success()
         && !(allow_non_zero && output.status.code().unwrap_or_default() == 1)
@@ -549,7 +582,7 @@ fn run_git(root: &PathBuf, args: &[&str], allow_non_zero: bool) -> Result<String
         let stderr = String::from_utf8_lossy(&output.stderr);
         let message = stderr.trim();
         if message.is_empty() {
-            return Err(anyhow!("Comando git fallito"));
+            return Err(anyhow!("Git command failed with no output (exit code: {})", output.status.code().unwrap_or(-1)));
         }
         return Err(anyhow!(message.to_string()));
     }
