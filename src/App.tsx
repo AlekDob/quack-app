@@ -9152,23 +9152,29 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [activeTerminal?.cwd, explorerRoot, explorerPath]);
 
   // Handler to update modified files map (for FileExplorer indicators)
+  // Merges new edits into existing map so changes accumulate across the session
   const handleEditsChange = useCallback((edits: FileEdit[], deletes: FileDeleted[]) => {
-    const newModifiedFiles = new Map<string, 'created' | 'modified' | 'deleted'>();
-    const newFileEditsMap = new Map<string, FileEdit>();
+    // Skip empty updates to avoid clearing accumulated state
+    if (edits.length === 0 && deletes.length === 0) return;
 
-    // Add all edited files with their status and complete info
-    edits.forEach(edit => {
-      newModifiedFiles.set(edit.filePath, edit.status || 'modified');
-      newFileEditsMap.set(edit.filePath, edit);
+    setModifiedFiles(prev => {
+      const merged = new Map(prev);
+      edits.forEach(edit => {
+        merged.set(edit.filePath, edit.status || 'modified');
+      });
+      deletes.forEach(deleted => {
+        merged.set(deleted.filePath, 'deleted');
+      });
+      return merged;
     });
 
-    // Add all deleted files
-    deletes.forEach(deleted => {
-      newModifiedFiles.set(deleted.filePath, 'deleted');
+    setFileEditsMap(prev => {
+      const merged = new Map(prev);
+      edits.forEach(edit => {
+        merged.set(edit.filePath, edit);
+      });
+      return merged;
     });
-
-    setModifiedFiles(newModifiedFiles);
-    setFileEditsMap(newFileEditsMap);
   }, []);
 
   // Handler to open Browser Manager tab
