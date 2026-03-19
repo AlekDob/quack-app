@@ -2743,12 +2743,19 @@ function AppContent() {
       // 🦆 SESSION-FIRST FIX: Save Claude session ID to the SPECIFIC session (not agent!)
       // Each session has its own claudeSessionId for independent conversations
       // The messageKey is the session ID, which is what we need to use
+      // Brain: fix-remote-team-session-tracking
+      // Also save messageCount and mark session as done so Remote API polling
+      // can detect completion (e.g., team manager polling for delegated tasks)
       try {
+        const finalMessages = chatSessions.get(messageKey) ?? [];
         await updateSession(messageKey, {
           claudeSessionId: response.session_id,
+          messageCount: finalMessages.length,
+          status: 'done' as const,
+          completedAt: Date.now(),
           updatedAt: Date.now(),
         });
-        console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}`);
+        console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}, messageCount=${finalMessages.length}, status=done`);
       } catch (err) {
         console.warn(`[SESSION-FIX] Failed to save claudeSessionId:`, err);
       }
