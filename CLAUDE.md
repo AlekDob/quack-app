@@ -92,6 +92,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - BTW must use SDK streaming: `documentation/gotchas/gotcha-btw-must-use-sdk-streaming.md`
 - Rewind already in StreamMessage: `documentation/gotchas/gotcha-rewind-already-exists-in-stream-message.md`
 - SDK bundled CLI 200k context: `documentation/gotchas/gotcha-sdk-bundled-cli-200k-context-window.md`
+- Empty state no drag region: `documentation/bugs/fix-empty-state-no-drag-region.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

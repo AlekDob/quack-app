@@ -11515,6 +11515,19 @@ You have access to all Bash tools to execute git commands like:
                 overflow: 'hidden',
               }}
             >
+              {/* Drag region for empty state - sidebar is hidden so we need a draggable area */}
+              <div
+                data-tauri-drag-region
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: '40px',
+                  zIndex: 10,
+                  // Brain: gotcha-window-confirm-tauri-webview
+                }}
+              />
               {/* Guide Viewer - shown when emptyStateShowGuide is true */}
               {emptyStateShowGuide ? (
                 <div style={{
