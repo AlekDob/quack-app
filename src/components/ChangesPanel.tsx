@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
 import InlineDiffView from './InlineDiffView'
 import OpenInIDEButton from './OpenInIDEButton'
+import CommitModal from './CommitModal'
 import { ConfirmModal } from './ConfirmModal'
 import './ChangesPanel.css'
 
@@ -35,6 +36,10 @@ export default function ChangesPanel({
   const [stagedFiles, setStagedFiles] = useState<Set<string>>(new Set())
 
   const entries = Array.from(modifiedFiles.entries())
+
+  // Ref for race condition guard in loadDiff
+  const expandedFilesRef = useRef(expandedFiles)
+  useEffect(() => { expandedFilesRef.current = expandedFiles }, [expandedFiles])
 
   const shortenPath = (fullPath: string): string => {
     const parts = fullPath.split('/').filter(Boolean)
@@ -87,6 +92,8 @@ export default function ChangesPanel({
         }
 
         setDiffCache((prev) => {
+          // Guard: skip if user collapsed the file while loading
+          if (!expandedFilesRef.current.has(filePath)) return prev
           const next = new Map(prev)
           next.set(filePath, { content, loading: false, error: null })
           return next
@@ -103,28 +110,29 @@ export default function ChangesPanel({
     [rootPath, getRelativePath],
   )
 
+  // Brain: gotcha-console-log-inside-state-updater
   const toggleFile = useCallback(
     (filePath: string, status: 'created' | 'modified' | 'deleted') => {
+      const shouldLoad = !diffCache.has(filePath) && !expandedFiles.has(filePath)
       setExpandedFiles((prev) => {
         const next = new Set(prev)
         if (next.has(filePath)) {
           next.delete(filePath)
         } else {
           next.add(filePath)
-          if (!diffCache.has(filePath)) {
-            loadDiff(filePath, status)
-          }
         }
         return next
       })
+      if (shouldLoad) {
+        loadDiff(filePath, status)
+      }
     },
-    [diffCache, loadDiff],
+    [diffCache, expandedFiles, loadDiff],
   )
 
   const handleAccept = useCallback(
     async (filePath: string) => {
       const relativePath = getRelativePath(filePath)
-      console.log('[ChangesPanel] Accept:', { filePath, relativePath, rootPath })
       try {
         await invoke('git_stage', { path: relativePath, rootPath })
         setStagedFiles((prev) => new Set(prev).add(filePath))
@@ -146,7 +154,6 @@ export default function ChangesPanel({
         return
       }
       const relativePath = getRelativePath(filePath)
-      console.log('[ChangesPanel] Reject:', { filePath, relativePath, rootPath })
       try {
         await invoke('git_discard_file', {
           path: relativePath,
@@ -241,7 +248,7 @@ export default function ChangesPanel({
     } finally {
       setCommitting(false)
     }
-  }, [commitTitle, commitDesc, rootPath, onRefreshGitStatus])
+  }, [commitTitle, commitDesc, rootPath, onRefreshGitStatus, onClearModifiedFiles])
 
   const getStatusLabel = (s: 'created' | 'modified' | 'deleted'): string => {
     if (s === 'created') return 'N'
@@ -368,64 +375,17 @@ export default function ChangesPanel({
         })}
       </div>
 
-      {/* Commit modal */}
       {showCommitModal && (
-        <>
-          <div className="changes-modal-backdrop" onClick={() => setShowCommitModal(false)} />
-          <div className="changes-commit-modal">
-            <div className="changes-commit-modal-header">
-              <span>Commit Changes</span>
-              <button
-                type="button"
-                className="changes-modal-close"
-                onClick={() => setShowCommitModal(false)}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-            <div className="changes-commit-modal-body">
-              <input
-                type="text"
-                className="changes-commit-input"
-                placeholder="Commit title..."
-                value={commitTitle}
-                onChange={(e) => setCommitTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    handleCommit()
-                  }
-                }}
-                disabled={committing}
-                autoFocus
-              />
-              <textarea
-                className="changes-commit-textarea"
-                placeholder="Description (optional)..."
-                value={commitDesc}
-                onChange={(e) => setCommitDesc(e.target.value)}
-                disabled={committing}
-                rows={3}
-              />
-            </div>
-            <div className="changes-commit-modal-footer">
-              <span className="changes-commit-file-count">
-                {entries.length} file{entries.length !== 1 ? 's' : ''}
-              </span>
-              <button
-                type="button"
-                className="changes-commit-btn"
-                onClick={handleCommit}
-                disabled={committing || !commitTitle.trim()}
-              >
-                {committing ? 'Committing...' : 'Commit'}
-              </button>
-            </div>
-          </div>
-        </>
+        <CommitModal
+          fileCount={entries.length}
+          commitTitle={commitTitle}
+          commitDesc={commitDesc}
+          committing={committing}
+          onTitleChange={setCommitTitle}
+          onDescChange={setCommitDesc}
+          onCommit={handleCommit}
+          onClose={() => setShowCommitModal(false)}
+        />
       )}
 
       {/* Confirm modal for deleting new files */}

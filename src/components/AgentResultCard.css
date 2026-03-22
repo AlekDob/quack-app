@@ -1,0 +1,124 @@
+/* AgentResultCard — Droid report card */
+
+.agent-result-card {
+  border-radius: 8px;
+  margin-bottom: 6px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.agent-result-card:hover {
+  filter: brightness(1.05);
+}
+
+/* Header — always visible */
+.agent-result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+
+.agent-result-header:hover {
+  filter: brightness(1.1);
+}
+
+.agent-result-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.agent-result-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.agent-result-name strong {
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 600;
+}
+
+.agent-result-badge {
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+/* Metadata pills */
+.agent-result-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.agent-result-pill {
+  font-size: 9px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1px 7px;
+  border-radius: 10px;
+  white-space: nowrap;
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+}
+
+.agent-result-chevron {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.35);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.agent-result-chevron.rotated {
+  transform: rotate(90deg);
+}
+
+/* Body — collapsible */
+.agent-result-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+  padding: 0 14px;
+}
+
+.agent-result-body.expanded {
+  max-height: 4000px;
+  padding: 0 14px 14px;
+  overflow-y: auto;
+}
+
+.agent-result-body .md-container {
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+/* Divider between header and body */
+.agent-result-body.expanded::before {
+  content: '';
+  display: block;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin-bottom: 12px;
+}

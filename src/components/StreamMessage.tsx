@@ -12,6 +12,7 @@ import MarkdownText from './MarkdownText';
 import ThinkingBlock from './ThinkingBlock';
 import { TaskWidget } from './TaskWidget';
 import { TaskOutputWidget } from './TaskOutputWidget';
+import { AgentResultCard } from './AgentResultCard';
 import AskUserQuestionWidget from './AskUserQuestionWidget';
 import DiffViewer from './DiffViewer';
 import CompactingIndicator from './CompactingIndicator';
@@ -305,6 +306,7 @@ const MemoizedTodoWriteWidget = memo(TodoWriteWidget);
 const MemoizedExitPlanModeWidget = memo(ExitPlanModeWidget);
 const MemoizedEnterPlanModeWidget = memo(EnterPlanModeWidget);
 const MemoizedAskUserQuestionWidget = memo(AskUserQuestionWidget);
+const MemoizedAgentResultCard = memo(AgentResultCard);
 const MemoizedImagePreviewWidget = memo(ImagePreviewWidget);
 const MemoizedToolMinimalStream = memo(ToolMinimalStream);
 
@@ -603,12 +605,49 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
           }
         }
 
+        // Risultato completato → mostra report card
+        if (toolResult) {
+          return (
+            <MemoizedAgentResultCard
+              key={idx}
+              subagentType={input.subagent_type}
+              description={input.description || 'Task completato'}
+              rawResult={toolResult}
+              workingDirectory={workingDirectory}
+            />
+          );
+        }
+
         return (
           <MemoizedTaskWidget
             key={idx}
             subagentType={input.subagent_type}
             description={input.description || 'Running task'}
-            isLoading={!toolResult}
+            isLoading={true}
+            workingDirectory={workingDirectory}
+          />
+        );
+      }
+
+      // Agent tool - report card when completed
+      if (toolName === 'agent') {
+        if (toolResult) {
+          return (
+            <MemoizedAgentResultCard
+              key={idx}
+              subagentType={input?.subagent_type}
+              description={input?.description || 'Agent task'}
+              rawResult={toolResult}
+              workingDirectory={workingDirectory}
+            />
+          );
+        }
+        return (
+          <MemoizedTaskWidget
+            key={idx}
+            subagentType={input?.subagent_type || 'agent'}
+            description={input?.description || 'Running agent'}
+            isLoading={true}
             workingDirectory={workingDirectory}
           />
         );

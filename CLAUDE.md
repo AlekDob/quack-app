@@ -107,6 +107,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Code-intel language extension: `documentation/patterns/pattern-code-intel-language-extension.md`
 - Marketplace versioning: `documentation/patterns/pattern-marketplace-versioning.md`
 - Changes Panel (Codex diffs): `documentation/patterns/pattern-changes-panel.md`
+- Agent Result Card (droid reports): `documentation/patterns/pattern-agent-result-card.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)

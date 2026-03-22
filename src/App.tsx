@@ -1809,6 +1809,13 @@ function AppContent() {
     }
   }, [activeId]);
 
+  // Reset Changes Panel when switching session/agent
+  // Brain: pattern-changes-panel
+  useEffect(() => {
+    setModifiedFiles(new Map());
+    setFileEditsMap(new Map());
+  }, [activeId]);
+
   // Brain: fix-office-status-dot-chatloadingmap-key-mismatch
   // Sync terminal status with chatLoadingMap and check if waiting for response.
   // chatLoadingMap is keyed by sessionId (not agentId), so we must look up

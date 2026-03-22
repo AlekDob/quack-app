@@ -25,7 +25,8 @@ SDK write events → App.tsx modifiedFiles Map<string, 'created'|'modified'|'del
 ### Key Components
 | Component | File | Role |
 |-----------|------|------|
-| ChangesPanel | `src/components/ChangesPanel.tsx` | Main panel: file list, actions, commit modal |
+| ChangesPanel | `src/components/ChangesPanel.tsx` | Main panel: file list, actions |
+| CommitModal | `src/components/CommitModal.tsx` | Commit dialog (title + description) |
 | InlineDiffView | `src/components/InlineDiffView.tsx` | Shared diff renderer (also used by DiffDrawer) |
 
 ### Rust Commands
@@ -39,6 +40,18 @@ SDK write events → App.tsx modifiedFiles Map<string, 'created'|'modified'|'del
 - **Reject on new files**: Deletes with ConfirmModal (Brain: gotcha-window-confirm-tauri-webview)
 - **Auto-expand**: No — panel shows badge count only, user opens manually
 - **Post-commit cleanup**: `onClearModifiedFiles` callback resets parent state to empty Map
+
+## Session Persistence
+- `handleEditsChange` in App.tsx **merges** new edits into existing `modifiedFiles` Map (not replace)
+- Empty updates (`edits.length === 0 && deletes.length === 0`) are skipped to avoid clearing state between turns
+- On session switch (`activeId` changes), a `useEffect` resets both `modifiedFiles` and `fileEditsMap`
+- Badge glows green even when section is collapsed (CSS `data-category="changes"` selector + pulse animation)
+
+## Race Condition Guard
+`loadDiff` uses an `expandedFilesRef` to check if the file is still expanded before writing to `diffCache`. This prevents stale diff data from rendering when the user collapses a file while the invoke is in flight.
+
+## Markdown File Highlighting
+Files ending in `.md` get purple color (`#8b5cf6`) on both the status badge and file name, matching `EditSummaryBar`'s markdown section styling.
 
 ## InlineDiffView Compact Mode
 The `compact` prop reduces font size and replaces line numbers with colored indicators (green/red dots). Used in ChangesPanel sidebar context where space is limited.
