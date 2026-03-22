@@ -1,0 +1,36 @@
+%%{init: {'theme': 'dark', 'themeVariables': {'primaryColor': '#FF6B35', 'primaryTextColor': '#fff', 'primaryBorderColor': '#FF6B35', 'lineColor': '#00D9FF', 'secondaryColor': '#004E89', 'tertiaryColor': '#1a1a2e'}}}%%
+
+flowchart TD
+    A["User sends message"] --> B{"Agent decides to delegate?"}
+    B -->|No| C["Agent handles directly"]
+    B -->|Yes| D["Agent calls Agent/Task tool"]
+
+    D --> E["TaskWidget renders<br/>(spinner shown)"]
+    D --> F["Subagent starts<br/>(separate process)"]
+
+    E --> G{"Agent runs parallel tools?"}
+    G -->|Yes| H["Read, Grep, etc.<br/>(nested with purple bar)"]
+    G -->|No| I["Waits for subagent"]
+
+    F --> J["Subagent uses its own tools<br/>(invisible to parent stream)"]
+    J --> K["Subagent completes"]
+
+    H --> I
+    K --> L["tool_result returned<br/>Array of {text, type} blocks"]
+
+    L --> M["parseAgentResult()"]
+    M --> N["Block 1: Markdown content"]
+    M --> O["Block 2: Metadata<br/>(agentId, tokens, duration, tools)"]
+
+    N --> P["AgentResultCard renders"]
+    O --> P
+
+    P --> Q["Header: avatar + name +<br/>badge + metadata pills"]
+    P --> R["Body: MarkdownText<br/>(tables, code, headings)"]
+
+    style A fill:#FF6B35,stroke:#FF6B35
+    style F fill:#8b5cf6,stroke:#8b5cf6
+    style J fill:#8b5cf6,stroke:#8b5cf6
+    style H fill:#004E89,stroke:#8b5cf6,stroke-width:3px
+    style P fill:#004E89,stroke:#00D9FF
+    style K fill:#22c55e,stroke:#22c55e
