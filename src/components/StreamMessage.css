@@ -21,6 +21,23 @@
   margin-left: 44px; /* 32px avatar + 12px gap */
 }
 
+/* Nested tools: orchestrator tools running while a subagent is active */
+.stream-message.nested-under-agent {
+  margin-left: 24px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(139, 92, 246, 0.3);
+}
+
+.stream-message.nested-under-agent.no-header .assistant-text {
+  margin-left: 20px; /* reduced since already indented */
+}
+
+.tool-event-group-row.nested-under-agent {
+  margin-left: 24px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(139, 92, 246, 0.3);
+}
+
 .assistant-avatar {
   width: 32px;
   height: 32px;

@@ -518,6 +518,42 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
               });
               flushGroup();
 
+              // Detect nested context: orchestrator tools running while a subagent is active
+              const nestedEventIndices = new Set<number>();
+              {
+                const pendingAgentToolIds = new Set<string>();
+                message.events!.forEach((evt: any, idx: number) => {
+                  if (evt.type === 'assistant' && evt.message?.content) {
+                    for (const block of evt.message.content) {
+                      if (block.type === 'tool_use') {
+                        const n = (block.name || '').toLowerCase();
+                        if (n === 'agent' || (n === 'task' && block.input?.subagent_type)) {
+                          pendingAgentToolIds.add(block.id);
+                        }
+                      }
+                    }
+                  }
+                  if (evt.type === 'user' && evt.message?.content) {
+                    for (const block of evt.message.content) {
+                      if (block.type === 'tool_result' && pendingAgentToolIds.has(block.tool_use_id)) {
+                        pendingAgentToolIds.delete(block.tool_use_id);
+                      }
+                    }
+                  }
+                  // Mark assistant events that don't contain the agent tool itself
+                  if (pendingAgentToolIds.size > 0 && evt.type === 'assistant') {
+                    const hasAgentTool = evt.message?.content?.some((b: any) => {
+                      if (b.type !== 'tool_use') return false;
+                      const n = (b.name || '').toLowerCase();
+                      return n === 'agent' || (n === 'task' && b.input?.subagent_type);
+                    });
+                    if (!hasAgentTool) {
+                      nestedEventIndices.add(idx);
+                    }
+                  }
+                });
+              }
+
               // Helper to compute showHeader for an event
               const computeShowHeader = (eventIndex: number, event: any): boolean => {
                 let prevVisibleType: string | null = null;
@@ -531,7 +567,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 return event.type !== 'assistant' || prevVisibleType !== 'assistant';
               };
 
-              const renderStreamMessage = (event: any, eventIndex: number, showHeader: boolean) => (
+              const renderStreamMessage = (event: any, eventIndex: number, showHeader: boolean, isNested?: boolean) => (
                 <StreamMessage
                   key={getStableEventKey(event, eventIndex)}
                   message={event}
@@ -552,15 +588,18 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                   onPlanApprovalResponse={onPlanApprovalResponse}
                   onTeammateDrillDown={onTeammateDrillDown}
                   showHeader={showHeader}
+                  isNestedUnderAgent={isNested}
                 />
               );
 
               return groups.map((group) => {
                 if (group.kind === 'single') {
+                  const isNested = nestedEventIndices.has(group.eventIndex);
                   return renderStreamMessage(
                     group.event,
                     group.eventIndex,
-                    computeShowHeader(group.eventIndex, group.event)
+                    computeShowHeader(group.eventIndex, group.event),
+                    isNested
                   );
                 }
                 // If the first item needs a header (avatar/name), render it
@@ -568,18 +607,19 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 const firstNeedsHeader = computeShowHeader(group.items[0].eventIndex, group.items[0].event);
                 const headerItem = firstNeedsHeader ? group.items[0] : null;
                 const groupItems = firstNeedsHeader ? group.items.slice(1) : group.items;
+                const isGroupNested = group.items.some(item => nestedEventIndices.has(item.eventIndex));
 
                 return (
                   <Fragment key={`event-group-${group.items[0].eventIndex}`}>
-                    {headerItem && renderStreamMessage(headerItem.event, headerItem.eventIndex, true)}
+                    {headerItem && renderStreamMessage(headerItem.event, headerItem.eventIndex, true, isGroupNested)}
                     {groupItems.length > 1 ? (
-                      <div className="tool-event-group-row">
+                      <div className={`tool-event-group-row${isGroupNested ? ' nested-under-agent' : ''}`}>
                         {groupItems.map(({ event, eventIndex }) =>
-                          renderStreamMessage(event, eventIndex, false)
+                          renderStreamMessage(event, eventIndex, false, isGroupNested)
                         )}
                       </div>
                     ) : groupItems.length === 1 ? (
-                      renderStreamMessage(groupItems[0].event, groupItems[0].eventIndex, false)
+                      renderStreamMessage(groupItems[0].event, groupItems[0].eventIndex, false, isGroupNested)
                     ) : null}
                   </Fragment>
                 );

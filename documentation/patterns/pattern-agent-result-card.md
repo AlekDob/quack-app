@@ -67,8 +67,33 @@ TeammateWidget takes priority over both when the task matches a team member name
 | `src/components/TaskWidget.tsx` | Loading state (spinner) |
 | `src/hooks/useAgentInfo.ts` | Avatar + color resolution |
 
+## Nested Tool Indentation
+
+When the orchestrator runs tools (Read, Grep, etc.) while a subagent is active, those tools appear indented with a purple sidebar to distinguish them from the subagent's work.
+
+**Critical**: the SDK does NOT stream subagent tool calls to the parent. Any Read/Grep visible in the UI during an Agent tool execution belong to the **orchestrator**, never the subagent.
+
+### Implementation
+
+In `ChatMessage.tsx`, `nestedEventIndices` is computed by scanning events:
+1. Track `pendingAgentToolIds` — tool_use IDs for Agent/Task tools
+2. Clear when matching `tool_result` arrives in a user event
+3. Assistant events between tool_use and tool_result (that don't contain the Agent tool itself) are marked nested
+
+`StreamMessage` receives `isNestedUnderAgent` prop → applies `.nested-under-agent` CSS class (margin-left + border-left purple bar).
+
+### Key Files (nesting)
+
+| File | Role |
+|------|------|
+| `src/components/ChatMessage.tsx` | nestedEventIndices computation + prop passing |
+| `src/components/StreamMessage.tsx` | isNestedUnderAgent prop + CSS class |
+| `src/components/StreamMessage.css` | .nested-under-agent styles |
+
 ## Gotchas
 
 - The `task` tool handler checks for team members FIRST — `TeammateWidget` takes priority
 - `toolName` is lowercased at line 496 of StreamMessage.tsx — always compare with lowercase
 - Metadata block detection uses `text.includes('<usage>')` — if SDK changes the format, parsing silently falls back to no metadata (safe degradation)
+- `agent` must be in `SPECIAL_WIDGET_TOOLS` — without it, the Agent tool gets grouped with other tools instead of having its own row
+- Subagent tools are invisible to the parent stream — only start/stop events and final result are visible

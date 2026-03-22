@@ -100,7 +100,7 @@ const getToolColorMinimal = (name: string): string => {
 // Tools rendered as special widgets (never grouped into rows)
 export const SPECIAL_WIDGET_TOOLS = new Set([
   'todowrite', 'exitplanmode', 'enterplanmode',
-  'askuserquestion', 'task', 'taskoutput',
+  'askuserquestion', 'task', 'taskoutput', 'agent',
 ]);
 
 // Tools that always get their own row (expandable diffs/undo)
@@ -336,6 +336,8 @@ interface StreamMessageProps {
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
   // Whether to show the agent header (avatar, name) — used for grouping consecutive messages
   showHeader?: boolean;
+  // Whether this message's tools are running while a subagent is active
+  isNestedUnderAgent?: boolean;
 }
 
 const StreamMessage: React.FC<StreamMessageProps> = ({
@@ -358,6 +360,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   onPlanApprovalResponse,
   onTeammateDrillDown,
   showHeader = true,
+  isNestedUnderAgent = false,
 }) => {
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -737,7 +740,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
     });
 
     return (
-      <div className={`stream-message assistant-message${!showHeader ? ' no-header' : ''}`}>
+      <div className={`stream-message assistant-message${!showHeader ? ' no-header' : ''}${isNestedUnderAgent ? ' nested-under-agent' : ''}`}>
         {/* Thinking blocks - rendered before the main content */}
         {msg.content.map((content: any, idx: number) => {
           if (content.type === 'thinking' && content.thinking && showThinkingBlocks) {
