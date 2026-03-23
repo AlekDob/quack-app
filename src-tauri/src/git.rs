@@ -264,6 +264,40 @@ fn git_discard_file_impl(
     Ok(())
 }
 
+/// Check which files from a list are still dirty (modified/untracked) in git.
+/// Returns only the paths that are still dirty — clean files are omitted.
+#[tauri::command]
+pub fn git_check_files_dirty(
+    paths: Vec<String>,
+    root_path: Option<String>,
+) -> Result<Vec<String>, String> {
+    git_check_files_dirty_impl(paths, root_path).map_err(|err| err.to_string())
+}
+
+fn git_check_files_dirty_impl(
+    paths: Vec<String>,
+    root_path: Option<String>,
+) -> Result<Vec<String>> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+    let output = run_git(&root, &["status", "--porcelain=1"], false)?;
+
+    // Collect all dirty paths from git status
+    let dirty: std::collections::HashSet<String> = output
+        .lines()
+        .filter_map(|line| {
+            if line.len() > 3 {
+                Some(line[3..].trim().to_string())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    // Return only paths that are still dirty
+    Ok(paths.into_iter().filter(|p| dirty.contains(p)).collect())
+}
+
 fn git_stage_impl(path: String, root_path: Option<String>) -> Result<()> {
     let starting_path = root_path.map(PathBuf::from);
     let root = git_root(starting_path)?;

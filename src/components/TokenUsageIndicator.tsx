@@ -68,18 +68,16 @@ function TokenUsageIndicator({
   const clearHistory = () => {};
   const exportHistory = () => '';
 
-  // With the new tracking model, inputTokens from SDK = full context window input
-  // (already includes system + tools + all messages). Overhead is included in inputTokens.
-  // Total context usage = inputTokens + auto-compact reserve
-  const totalContextUsage = inputTokens + AUTO_COMPACT_COST;
-
-  // Calculate usage percentage based on total context
+  // Brain: fix-daemon-missing-1m-context-betas
+  // inputTokens from SDK = full context window fill (system + tools + CLAUDE.md + messages)
+  // Must match StaminaBarBorder calculation for consistency
+  const messageTokens = Math.max(0, inputTokens - overhead);
+  const totalContextUsage = inputTokens;
   const usagePercentage = (totalContextUsage / maxTokens) * 100;
 
   // STAMINA LOGIC: Based on FREE tokens (usable space)
-  // maxUsableTokens = total context minus auto-compact reserve
-  const maxUsableTokens = maxTokens - AUTO_COMPACT_COST;
-  const remainingUsableTokens = Math.max(0, maxUsableTokens - inputTokens);
+  const maxUsableTokens = maxTokens - overhead - AUTO_COMPACT_COST;
+  const remainingUsableTokens = Math.max(0, maxUsableTokens - messageTokens);
 
   // Stamina = percentage of usable space remaining
   // Fresh agent (0 input tokens): 100%

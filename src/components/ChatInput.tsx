@@ -1864,11 +1864,12 @@ export default function ChatInput({
     else if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (isStreaming) {
-        // Empty input + Enter = stop streaming
-        if (!input.trim()) {
-          handleStop();
+        // Enter does nothing during streaming — stop is UI-button-only
+        // Show hint if user has typed a message
+        if (input.trim()) {
+          setInfoMessage('Will send after current response.');
+          setTimeout(() => setInfoMessage(null), 3000);
         }
-        // If input has content, do nothing (user is composing next message)
       } else {
         void handleSend();
       }
@@ -2356,7 +2357,11 @@ export default function ChatInput({
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            onFocus={() => setIsFocused(true)}
+            onFocus={() => {
+              setIsFocused(true);
+              // Notify sidebar to scroll active session into view
+              window.dispatchEvent(new CustomEvent('quack:scroll-to-active-session'));
+            }}
             onBlur={(e) => {
               // Keep focus state if clicking inside chat-view-footer (parent component)
               const relatedTarget = e.relatedTarget as HTMLElement | null;

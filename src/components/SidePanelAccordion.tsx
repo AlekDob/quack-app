@@ -284,6 +284,7 @@ interface SidePanelAccordionProps {
   // Changes panel props
   onRefreshGitStatus?: () => void;
   onClearModifiedFiles?: () => void;
+  onRemoveModifiedFiles?: (paths: string[]) => void;
 
   // Force expand a specific section (controlled from parent)
   forceExpandSection?: string | null;
@@ -373,6 +374,7 @@ export default function SidePanelAccordion({
   // Changes panel
   onRefreshGitStatus,
   onClearModifiedFiles,
+  onRemoveModifiedFiles,
 
   // Force expand
   forceExpandSection,
@@ -502,6 +504,7 @@ export default function SidePanelAccordion({
               modifiedFiles={modifiedFiles}
               onRefreshGitStatus={onRefreshGitStatus || (() => {})}
               onClearModifiedFiles={onClearModifiedFiles}
+              onRemoveModifiedFiles={onRemoveModifiedFiles}
             />
           </AccordionSection>
         )}

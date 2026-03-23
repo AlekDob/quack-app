@@ -71,6 +71,8 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Tauri listener double-fire: `documentation/gotchas/gotcha-tauri-listener-strict-mode-double-fire.md`
 - Automation job provider: `documentation/gotchas/gotcha-automation-job-provider-not-passed.md`
 - Daemon providers: `documentation/bugs/bug-daemon-missing-provider-env-vars.md`
+- Daemon 1M context betas: `documentation/bugs/fix-daemon-missing-1m-context-betas.md`
+- Session limit prompt cache: `documentation/bugs/fix-session-limit-prompt-cache.md`
 - Daemon new config fields: `documentation/gotchas/gotcha-daemon-missing-new-config-fields.md`
 - Stamina overhead estimate: `documentation/gotchas/gotcha-stamina-overhead-static-estimate.md`
 - Mobile session dot: `documentation/gotchas/gotcha-mobile-session-dot-status.md`

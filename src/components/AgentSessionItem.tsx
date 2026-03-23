@@ -77,6 +77,20 @@ function AgentSessionItem({
     }
   }, [isActive]);
 
+  // 🦆 Scroll into view when chat input is focused (keeps sidebar aligned)
+  useEffect(() => {
+    const handleScrollToActive = () => {
+      if (isActive && itemRef.current) {
+        itemRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+      }
+    };
+    window.addEventListener('quack:scroll-to-active-session', handleScrollToActive);
+    return () => window.removeEventListener('quack:scroll-to-active-session', handleScrollToActive);
+  }, [isActive]);
+
   // Handle right-click context menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

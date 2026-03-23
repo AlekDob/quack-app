@@ -1116,6 +1116,7 @@ pub fn run() {
             git::git_status_summary,
             git::git_diff,
             git::git_discard_file,
+            git::git_check_files_dirty,
             git::git_stage,
             git::git_unstage,
             git::git_stage_all,

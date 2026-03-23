@@ -78,15 +78,17 @@ export interface TokenBudgetStatus {
 /**
  * Calculate current token budget status
  */
+// Brain: fix-calculate-token-budget-double-counting
 export function calculateTokenBudget(
   inputTokens: number,
-  outputTokens: number,
+  _outputTokens: number, // kept for API compat — output tokens do NOT consume context window
   model: string = 'opus',
   contextWindow?: number, // SDK-provided context window size (200k or 1M)
 ): TokenBudgetStatus {
   const maxTokens = contextWindow ?? TOKEN_LIMITS[model] ?? 200000;
-  const messageTokens = inputTokens + outputTokens;
-  const totalUsed = messageTokens + TOTAL_OVERHEAD;
+  // inputTokens from SDK = total context window fill (system + tools + CLAUDE.md + messages)
+  // It already includes overhead. Output tokens are generated, they don't fill context.
+  const totalUsed = inputTokens;
   const percentage = (totalUsed / maxTokens) * 100;
   const remaining = Math.max(0, maxTokens - totalUsed);
 

@@ -2851,6 +2851,19 @@ function AppContent() {
               ? err
               : 'Unknown error';
 
+        // Brain: fix-session-limit-prompt-cache
+        // Detect rate limit / session limit errors and show user-friendly message
+        const isRateLimit = errorMessage.includes('rate_limit') ||
+          errorMessage.includes('rate limit') ||
+          errorMessage.includes('usage cap') ||
+          errorMessage.includes('overloaded') ||
+          errorMessage.includes('Too many requests') ||
+          errorMessage.includes('429');
+
+        const displayMessage = isRateLimit
+          ? `Il session limit di Claude è stato raggiunto. Il limite si ripristina automaticamente — controlla le impostazioni di Claude per vedere il countdown. Nel frattempo puoi:\n\n- Attendere il ripristino del limite\n- Usare un modello diverso (es. Haiku consuma meno)\n- Attivare "Utilizzo aggiuntivo" nelle impostazioni di Claude`
+          : `Quack! 🦆 I encountered an error: ${errorMessage}`;
+
         // 🦆 SESSION-FIRST: Update message with error using messageKey
         setChatSessions((prev) => {
           const newSessions = new Map(prev);
@@ -2861,7 +2874,7 @@ function AppContent() {
               msg.id === assistantMessageId
                 ? {
                     ...msg,
-                    content: `Quack! 🦆 I encountered an error: ${errorMessage}`,
+                    content: displayMessage,
                     status: 'error' as const,
                     error: errorMessage,
                   }
@@ -2870,6 +2883,10 @@ function AppContent() {
           );
           return newSessions;
         });
+
+        if (isRateLimit) {
+          toast.error('Session limit raggiunto — controlla le impostazioni di Claude');
+        }
       }
     } finally {
       // 🦆 SESSION-FIRST: Clear loading using messageKey

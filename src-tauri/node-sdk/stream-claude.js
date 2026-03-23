@@ -656,28 +656,20 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`
         + (debugMode ? (() => {
-          // Brain: debug-mode-v2-brain-git-context
+          // Brain: fix-session-limit-prompt-cache
+          // STATIC parts only in systemPrompt — dynamic parts (gitContext) moved to contextPrefix
           const skillContent = loadBundledSkill('systematic-debugging');
-          const gitContext = loadGitContext(cwd);
           const brainHints = loadBrainHints(cwd);
           const hintsBlock = brainHints.length > 0
             ? brainHints.map(s => `- ${s}`).join('\n')
             : '(no Brain entries found in this project)';
 
-          // Structure: skill (reference) → git context → Brain protocol (LAST = recency bias)
           let debugPrompt = '';
 
-          // 1. Skill content (methodology reference)
           if (skillContent) {
             debugPrompt += `\n\n## Systematic Debugging Methodology\n\n${skillContent}`;
           }
 
-          // 2. Git context (what changed recently)
-          if (gitContext) {
-            debugPrompt += gitContext;
-          }
-
-          // 3. Brain-First Protocol (LAST for maximum recency bias)
           debugPrompt += `
 
 ## DEBUG MODE — MANDATORY BRAIN-FIRST PROTOCOL
@@ -707,8 +699,9 @@ ${hintsBlock}
 `;
           return debugPrompt;
         })() : '')
-        + (teamContext ? buildTeamPromptAugmentation(teamContext) : '')
-        + (ideContext ? `\n\n## IDE Context\n\n${ideContext}` : ''),
+        + (teamContext ? buildTeamPromptAugmentation(teamContext) : ''),
+        // Brain: fix-session-limit-prompt-cache
+        // ideContext removed from systemPrompt — injected as contextPrefix in user prompt below
       },
 
       // =============================================================================
@@ -1009,17 +1002,34 @@ ${hintsBlock}
 
     console.error(`[DEBUG] Using streaming input mode: ${useStreamingInput} (MCP servers: ${hasMcpServers}, attachments: ${attachments?.length || 0})`);
 
+    // Brain: fix-session-limit-prompt-cache
+    // Dynamic context (ideContext, gitContext) prepended to user prompt to preserve system prompt cache.
+    let contextPrefix = '';
+    if (ideContext) {
+      contextPrefix += `\n\n## IDE Context\n\n${ideContext}`;
+    }
+    if (debugMode) {
+      const gitCtx = loadGitContext(cwd);
+      if (gitCtx) contextPrefix += gitCtx;
+    }
+    const finalPrompt = contextPrefix
+      ? `${prompt}\n\n<system-reminder>\n${contextPrefix}\n</system-reminder>`
+      : prompt;
+
     // Brain: gotcha-stamina-overhead-static-estimate
     // Count prompt tokens in parallel for precise overhead measurement (new sessions only)
     const isNewSession = !sessionId;
     let countTokensPromise = null;
     if (isNewSession) {
-      const promptContent = createMessageContent(prompt, attachments);
+      const promptContent = createMessageContent(finalPrompt, attachments);
       countTokensPromise = countPromptTokens(modelId, promptContent);
     }
 
+    // Override the module-level prompt for generateMessages()
+    prompt = finalPrompt;
+
     const stream = query({
-      prompt: useStreamingInput ? generateMessages() : prompt,
+      prompt: useStreamingInput ? generateMessages() : finalPrompt,
       options,
     });
 

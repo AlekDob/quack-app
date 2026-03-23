@@ -392,28 +392,26 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`
         + (debugMode ? (() => {
-          // Brain: debug-mode-v2-brain-git-context
+          // Brain: fix-session-limit-prompt-cache
+          // STATIC parts only in systemPrompt (skill + brain hints — don't change between turns)
+          // DYNAMIC parts (gitContext) moved to contextPrefix below
           const skillContent = loadBundledSkill('systematic-debugging');
-          const gitContext = loadGitContext(cwd);
           const brainHints = loadBrainHints(cwd);
           const hintsBlock = brainHints.length > 0
             ? brainHints.map(s => `- ${s}`).join('\n')
             : '(no Brain entries found in this project)';
 
-          // Structure: skill (reference) → git context → Brain protocol (LAST = recency bias)
           let debugPrompt = '';
 
-          // 1. Skill content (methodology reference)
+          // 1. Skill content (methodology reference — static)
           if (skillContent) {
             debugPrompt += `\n\n## Systematic Debugging Methodology\n\n${skillContent}`;
           }
 
-          // 2. Git context (what changed recently)
-          if (gitContext) {
-            debugPrompt += gitContext;
-          }
+          // 2. Git context REMOVED from here — it's dynamic and breaks prompt cache
+          // Now injected as contextPrefix in the user prompt
 
-          // 3. Brain-First Protocol (LAST for maximum recency bias)
+          // 3. Brain-First Protocol (static per project)
           debugPrompt += `
 
 ## DEBUG MODE — MANDATORY BRAIN-FIRST PROTOCOL
@@ -443,8 +441,11 @@ ${hintsBlock}
 `;
           return debugPrompt;
         })() : '')
-        + (teamContext ? buildTeamPromptAugmentation(teamContext) : '')
-        + (ideContext ? `\n\n## IDE Context\n\n${ideContext}` : ''),
+        + (teamContext ? buildTeamPromptAugmentation(teamContext) : ''),
+        // Brain: fix-session-limit-prompt-cache
+        // ideContext is NO LONGER appended here — it changes every turn (file open, git status)
+        // which would invalidate the entire system prompt cache (~50k+ tokens).
+        // Instead, ideContext is prepended to the user prompt. See contextPrefix below.
       },
       canUseTool: async (toolName, input, toolOptions) => {
         // AskUserQuestion — forward to frontend
@@ -505,6 +506,11 @@ ${hintsBlock}
       }
     }
 
+    // Brain: fix-daemon-missing-1m-context-betas
+    // Enable 1M context window for supported models (Opus 4.6, Sonnet 4.6)
+    // Without this, the SDK operates at 200k and auto-compacts at ~155k tokens.
+    options.betas = ['context-1m-2025-08-07'];
+
     if (cwd) options.cwd = cwd;
     if (sessionId) options.resume = sessionId;
     if (effort) options.effort = effort;
@@ -545,9 +551,31 @@ ${hintsBlock}
     const mcpCount = options.mcpServers ? Object.keys(options.mcpServers).length : 0;
     log('MCP', `query=${queryId} resolved ${mcpCount} MCP servers: [${Object.keys(options.mcpServers || {}).join(', ')}]`);
 
+    // Brain: fix-session-limit-prompt-cache
+    // Dynamic context (ideContext, gitContext) is prepended to the user prompt as a
+    // <system-reminder> block instead of being part of systemPrompt. This preserves
+    // the prompt cache for the static system prompt (~50k+ tokens) across turns.
+    // Without this, every time the user switches files or makes a commit, the entire
+    // system prompt cache is invalidated, costing ~10x more rate limit budget.
+    let contextPrefix = '';
+    if (ideContext) {
+      contextPrefix += `\n\n## IDE Context\n\n${ideContext}`;
+    }
+    if (debugMode) {
+      const gitContext = loadGitContext(cwd);
+      if (gitContext) {
+        contextPrefix += gitContext;
+      }
+    }
+
+    // Build the final prompt with context prefix
+    const finalPrompt = contextPrefix
+      ? `${prompt}\n\n<system-reminder>\n${contextPrefix}\n</system-reminder>`
+      : prompt;
+
     // --- Build message generator ---
     async function* generateMessages() {
-      const content = createMessageContent(prompt, attachments);
+      const content = createMessageContent(finalPrompt, attachments);
       yield {
         type: 'user',
         message: { role: 'user', content },
@@ -569,12 +597,12 @@ ${hintsBlock}
     const isNewSession = !sessionId;
     let countTokensPromise = null;
     if (isAnthropicProvider && isNewSession) {
-      const promptContent = createMessageContent(prompt, attachments);
+      const promptContent = createMessageContent(finalPrompt, attachments);
       countTokensPromise = countPromptTokens(modelId, promptContent);
     }
 
     const stream = query({
-      prompt: useStreamingInput ? generateMessages() : prompt,
+      prompt: useStreamingInput ? generateMessages() : finalPrompt,
       options,
     });
 
@@ -590,6 +618,19 @@ ${hintsBlock}
           emit({ type: 'event', queryId, event: { type: 'prompt_token_count', promptTokens } });
         }
         promptTokensEmitted = true;
+      }
+
+      // Brain: fix-daemon-missing-1m-context-betas
+      // Log contextWindow from result events to verify 1M activation
+      if (event.type === 'result') {
+        const mu = event.modelUsage || event.model_usage;
+        if (mu) {
+          for (const [modelName, usage] of Object.entries(mu)) {
+            if (usage?.contextWindow) {
+              log('QUERY', `contextWindow for ${modelName}: ${usage.contextWindow} (${usage.contextWindow >= 1_000_000 ? '1M' : '200k'})`);
+            }
+          }
+        }
       }
 
       // Emit each SDK event tagged with queryId
