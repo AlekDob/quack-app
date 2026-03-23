@@ -93,6 +93,8 @@ interface KanbanState {
 
   // Agent filter for Kanban view
   filterAgentId: string | null;
+  // Free text filter for Kanban view (matches project name and task title)
+  filterText: string;
 
   // Actions
   loadTasks: (options?: { silent?: boolean }) => Promise<void>; // Now loads from sessionStore
@@ -126,6 +128,7 @@ interface KanbanState {
   isManualHumanReview: (taskId: string) => boolean;
   // Agent filter actions
   setAgentFilter: (agentId: string | null) => void;
+  setFilterText: (text: string) => void;
   // Agent info management
   updateAgentInfo: (agentId: string, info: { name?: string; avatar?: string; color?: string }) => void;
 
@@ -176,6 +179,7 @@ export const useKanbanStore = create<KanbanState>()(
 
         // Agent filter
         filterAgentId: null,
+        filterText: '',
 
         // 🦆 SESSIONS-FIRST: Load tasks from sessionStore (no-op for compatibility)
         // Sessions are loaded by sessionStore.loadSessions()
@@ -432,6 +436,11 @@ export const useKanbanStore = create<KanbanState>()(
           console.log('[kanbanStore] Agent filter set to:', agentId);
         },
 
+        // Set free text filter for Kanban view
+        setFilterText: (text) => {
+          set({ filterText: text });
+        },
+
         // Mark task as being documented
         markDocumentationProcessing: (taskId) => {
           const processingDocumentation = new Set(get().processingDocumentation);
@@ -463,9 +472,9 @@ export const useKanbanStore = create<KanbanState>()(
 
         // 🦆 SESSIONS-FIRST: Selector: Get tasks by status (reads from sessionStore)
         getTasksByStatus: (status) => {
-          const { filterAgentId, agentInfoMap } = get();
+          const { filterAgentId, filterText, agentInfoMap } = get();
           const sessionStore = useSessionStore.getState();
-          
+
           let filteredSessions = sessionStore.sessions.filter((s) => s.status === status);
 
           // Apply agent filter if set
@@ -473,8 +482,17 @@ export const useKanbanStore = create<KanbanState>()(
             filteredSessions = filteredSessions.filter((s) => s.agentId === filterAgentId);
           }
 
+          // Apply text filter (matches project name or session title)
+          if (filterText) {
+            const needle = filterText.toLowerCase();
+            filteredSessions = filteredSessions.filter((s) =>
+              (s.title && s.title.toLowerCase().includes(needle)) ||
+              (s.projectName && s.projectName.toLowerCase().includes(needle))
+            );
+          }
+
           // Convert sessions to tasks
-          return filteredSessions.map((session) => 
+          return filteredSessions.map((session) =>
             sessionToKanbanTask(session, agentInfoMap.get(session.agentId))
           );
         },
@@ -541,20 +559,33 @@ export const useKanbanStore = create<KanbanState>()(
 
         // 🦆 SESSIONS-FIRST: Selector: Get visible done tasks (paginated)
         getVisibleDoneTasks: () => {
-          const { doneVisibleCount, agentInfoMap } = get();
+          const { doneVisibleCount, filterAgentId, filterText, agentInfoMap } = get();
           const sessionStore = useSessionStore.getState();
-          
-          const doneSessions = sessionStore.sessions
-            .filter((s) => s.status === 'done')
-            .sort((a, b) => {
-              // Sort by completedAt descending (most recent first)
-              const aTime = a.completedAt || a.createdAt || 0;
-              const bTime = b.completedAt || b.createdAt || 0;
-              return bTime - aTime;
-            });
-          
+
+          let doneSessions = sessionStore.sessions.filter((s) => s.status === 'done');
+
+          // Apply agent filter if set
+          if (filterAgentId) {
+            doneSessions = doneSessions.filter((s) => s.agentId === filterAgentId);
+          }
+
+          // Apply text filter (matches project name or session title)
+          if (filterText) {
+            const needle = filterText.toLowerCase();
+            doneSessions = doneSessions.filter((s) =>
+              (s.title && s.title.toLowerCase().includes(needle)) ||
+              (s.projectName && s.projectName.toLowerCase().includes(needle))
+            );
+          }
+
+          doneSessions.sort((a, b) => {
+            const aTime = a.completedAt || a.createdAt || 0;
+            const bTime = b.completedAt || b.createdAt || 0;
+            return bTime - aTime;
+          });
+
           const visibleSessions = doneSessions.slice(0, doneVisibleCount);
-          
+
           return visibleSessions.map((session) =>
             sessionToKanbanTask(session, agentInfoMap.get(session.agentId))
           );
@@ -562,10 +593,20 @@ export const useKanbanStore = create<KanbanState>()(
 
         // 🦆 SESSIONS-FIRST: Selector: Check if there are more done tasks to load
         hasMoreDoneTasks: () => {
-          const { doneVisibleCount } = get();
+          const { doneVisibleCount, filterAgentId, filterText } = get();
           const sessionStore = useSessionStore.getState();
-          const totalDone = sessionStore.sessions.filter((s) => s.status === 'done').length;
-          return totalDone > doneVisibleCount;
+          let doneSessions = sessionStore.sessions.filter((s) => s.status === 'done');
+          if (filterAgentId) {
+            doneSessions = doneSessions.filter((s) => s.agentId === filterAgentId);
+          }
+          if (filterText) {
+            const needle = filterText.toLowerCase();
+            doneSessions = doneSessions.filter((s) =>
+              (s.title && s.title.toLowerCase().includes(needle)) ||
+              (s.projectName && s.projectName.toLowerCase().includes(needle))
+            );
+          }
+          return doneSessions.length > doneVisibleCount;
         },
       }),
       {

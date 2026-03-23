@@ -126,6 +126,9 @@ export default function KanbanView({
     addToHumanReview,
     removeFromHumanReview,
     isManualHumanReview,
+    // Text filter
+    filterText,
+    setFilterText,
   } = useKanbanStore();
 
   // 🦆 SESSIONS-FIRST: Sync agentInfoMap with terminals for proper avatar/color display
@@ -525,6 +528,31 @@ export default function KanbanView({
       <div className="kanban-header" data-tauri-drag-region>
         <h1 className="kanban-title" data-tauri-drag-region>Kanban Board</h1>
         <div style={{ flex: 1 }} data-tauri-drag-region />
+        <div className="kanban-filter-input-wrapper">
+          <svg className="kanban-filter-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            className="kanban-filter-input"
+            type="text"
+            placeholder="Filter by project or task..."
+            value={filterText}
+            onChange={(e) => setFilterText(e.target.value)}
+          />
+          {filterText && (
+            <button
+              className="kanban-filter-clear"
+              onClick={() => setFilterText('')}
+              aria-label="Clear filter"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Kanban columns */}

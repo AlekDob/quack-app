@@ -77,6 +77,62 @@
   margin: 0;
 }
 
+/* Filter input */
+.kanban-filter-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.kanban-filter-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--kanban-text-secondary, #888);
+  pointer-events: none;
+}
+
+.kanban-filter-input {
+  width: 220px;
+  padding: 6px 30px 6px 32px;
+  font-size: 13px;
+  border: 1px solid var(--kanban-border, #333);
+  border-radius: 6px;
+  background: var(--kanban-card-bg, #1e1e1e);
+  color: var(--kanban-text-primary, #e0e0e0);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.kanban-filter-input::placeholder {
+  color: var(--kanban-text-secondary, #888);
+}
+
+.kanban-filter-input:focus {
+  border-color: var(--kanban-accent, #6366f1);
+}
+
+.kanban-filter-clear {
+  position: absolute;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: var(--kanban-text-secondary, #888);
+  color: var(--kanban-card-bg, #1e1e1e);
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.kanban-filter-clear:hover {
+  opacity: 1;
+}
+
 .kanban-add-button {
   display: flex;
   align-items: center;
