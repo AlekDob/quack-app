@@ -12663,13 +12663,6 @@ You have access to all Bash tools to execute git commands like:
           // Changes panel props
           onRefreshGitStatus={refreshGitSummary}
           onClearModifiedFiles={() => setModifiedFiles(new Map())}
-          onRemoveModifiedFiles={(paths: string[]) => {
-            setModifiedFiles(prev => {
-              const next = new Map(prev)
-              paths.forEach(p => next.delete(p))
-              return next
-            })
-          }}
           // Force expand section
           forceExpandSection={forceExpandSection}
           onForceExpandHandled={() => setForceExpandSection(null)}
