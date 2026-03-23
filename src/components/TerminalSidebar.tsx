@@ -1650,17 +1650,6 @@ export default function TerminalSidebar({
             </svg>
             <span>Docs</span>
           </button>
-
-          {/* Support Quack — pizza */}
-          <button
-            type="button"
-            className="sidebar-footer-link sidebar-footer-pizza"
-            onClick={() => open('https://alekdob.gumroad.com/l/obgae')}
-            title="Support Quack!"
-          >
-            <span style={{ fontSize: '12px' }}>🍕</span>
-            <span>Fund a Pizza</span>
-          </button>
         </div>
 
         {/* Right side: Version Tag */}

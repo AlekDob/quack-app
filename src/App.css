@@ -8502,14 +8502,6 @@ button.directory-chooser:disabled {
   color: #fb923c;
 }
 
-.sidebar-footer-pizza {
-  opacity: 0.5;
-  transition: opacity 0.2s ease;
-}
-
-.sidebar-footer-pizza:hover {
-  opacity: 1;
-}
 
 .sidebar-footer-link svg {
   flex-shrink: 0;

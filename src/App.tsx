@@ -52,7 +52,6 @@ import ContextDrawer from "./components/ContextDrawer";
 import SkillDrawer from "./components/SkillDrawer";
 import BackgroundsModal from "./components/BackgroundsModal";
 import TelegramSetup from "./components/TelegramSetup";
-import SupportChatWidget from "./components/SupportChatWidget";
 // Old Background Tasks system - replaced by Kanban shell tasks
 // import BackgroundTasksDrawer from "./components/BackgroundTasksDrawer";
 // import { runDroidInBackground } from "./services/backgroundAgentService";
@@ -12664,6 +12663,13 @@ You have access to all Bash tools to execute git commands like:
           // Changes panel props
           onRefreshGitStatus={refreshGitSummary}
           onClearModifiedFiles={() => setModifiedFiles(new Map())}
+          onRemoveModifiedFiles={(paths: string[]) => {
+            setModifiedFiles(prev => {
+              const next = new Map(prev)
+              paths.forEach(p => next.delete(p))
+              return next
+            })
+          }}
           // Force expand section
           forceExpandSection={forceExpandSection}
           onForceExpandHandled={() => setForceExpandSection(null)}
@@ -13015,9 +13021,6 @@ You have access to all Bash tools to execute git commands like:
 
       {/* Update notification toast — checks GitHub releases on mount */}
       <UpdateToast />
-
-      {/* Live support chat widget */}
-      <SupportChatWidget />
 
       <Toaster position="bottom-right" richColors closeButton />
     </>
