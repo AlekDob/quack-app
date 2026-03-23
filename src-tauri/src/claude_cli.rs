@@ -402,6 +402,8 @@ async fn ensure_daemon(app: &AppHandle) -> Result<(), String> {
                     log::error!("[Daemon stderr] {}", line);
                 } else if upper.contains("[WARN]") {
                     log::warn!("[Daemon stderr] {}", line);
+                } else if upper.contains("[CONTEXT]") || upper.contains("[DAEMON:CONTEXT]") || upper.contains("[USAGE]") || upper.contains("[DAEMON:USAGE]") {
+                    log::info!("[Daemon stderr] {}", line);
                 } else {
                     log::debug!("[Daemon stderr] {}", line);
                 }

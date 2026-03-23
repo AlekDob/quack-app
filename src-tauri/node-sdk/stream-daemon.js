@@ -26,7 +26,7 @@ import { extname, join, dirname } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -106,6 +106,171 @@ function emit(obj) {
 
 function log(tag, ...args) {
   console.error(`[DAEMON:${tag}]`, ...args);
+}
+
+function estimateTokens(text = '') {
+  return Math.ceil(text.length / 4);
+}
+
+function hashText(text = '') {
+  return createHash('sha256').update(text).digest('hex').slice(0, 16);
+}
+
+function previewText(text = '', maxChars = 240) {
+  if (!text) return '';
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, maxChars)}...`;
+}
+
+function summarizeText(text = '') {
+  return {
+    chars: text.length,
+    lines: text ? text.split('\n').length : 0,
+    estimatedTokens: estimateTokens(text),
+    hash: hashText(text),
+    preview: previewText(text),
+  };
+}
+
+function getContextInstructionFiles(projectCwd) {
+  const files = [];
+  const candidates = [
+    { scope: 'user', path: join(homedir(), '.claude', 'CLAUDE.md') },
+  ];
+
+  if (projectCwd) {
+    candidates.push(
+      { scope: 'project-dotclaude', path: join(projectCwd, '.claude', 'CLAUDE.md') },
+      { scope: 'project-root', path: join(projectCwd, 'CLAUDE.md') },
+    );
+  }
+
+  for (const candidate of candidates) {
+    if (!existsSync(candidate.path)) continue;
+    try {
+      const content = readFileSync(candidate.path, 'utf8');
+      files.push({
+        scope: candidate.scope,
+        path: candidate.path,
+        chars: content.length,
+        lines: content ? content.split('\n').length : 0,
+        estimatedTokens: estimateTokens(content),
+        hash: hashText(content),
+      });
+    } catch (error) {
+      files.push({
+        scope: candidate.scope,
+        path: candidate.path,
+        error: error.message,
+      });
+    }
+  }
+
+  return files;
+}
+
+function logContextPayload({
+  queryId,
+  model,
+  modelId,
+  sessionId,
+  prompt,
+  attachments,
+  ideContext,
+  systemPromptAppend,
+  settingSources,
+  allowedTools,
+  mcpServers,
+  teamContext,
+  debugMode,
+  cwd,
+}) {
+  const instructionFiles = getContextInstructionFiles(cwd);
+  const payloadSummary = {
+    queryId,
+    resume: Boolean(sessionId),
+    model,
+    modelId,
+    cwd: cwd || null,
+    debugMode: Boolean(debugMode),
+    prompt: summarizeText(prompt),
+    ideContext: summarizeText(ideContext || ''),
+    systemPromptAppend: summarizeText(systemPromptAppend || ''),
+    attachments: {
+      count: attachments?.length || 0,
+      paths: attachments || [],
+    },
+    teamContext: teamContext ? {
+      teamName: teamContext.teamName,
+      memberCount: teamContext.members?.length || 0,
+    } : null,
+    settingSources,
+    allowedTools: {
+      count: allowedTools.length,
+      names: allowedTools,
+    },
+    mcpServers: {
+      count: Object.keys(mcpServers || {}).length,
+      names: Object.keys(mcpServers || {}),
+    },
+    instructionFiles,
+    estimatedInjectedTokens: {
+      ideContext: estimateTokens(ideContext || ''),
+      systemPromptAppend: estimateTokens(systemPromptAppend || ''),
+      instructionFiles: instructionFiles.reduce((sum, file) => sum + (file.estimatedTokens || 0), 0),
+    },
+    payloadHashes: {
+      prompt: hashText(prompt || ''),
+      ideContext: hashText(ideContext || ''),
+      systemPromptAppend: hashText(systemPromptAppend || ''),
+      instructionFilesComposite: hashText(
+        instructionFiles
+          .map(file => `${file.scope}:${file.path}:${file.hash || file.error || 'missing'}`)
+          .join('|')
+      ),
+      settingSources: hashText(JSON.stringify(settingSources || [])),
+      allowedTools: hashText(JSON.stringify(allowedTools || [])),
+      mcpServers: hashText(JSON.stringify(Object.keys(mcpServers || {}).sort())),
+      teamContext: hashText(JSON.stringify(teamContext || null)),
+    },
+  };
+
+  log('CONTEXT', JSON.stringify(payloadSummary));
+}
+
+function extractMaxContextWindow(modelUsage) {
+  if (!modelUsage || typeof modelUsage !== 'object') return null;
+  let maxContextWindow = null;
+  for (const entry of Object.values(modelUsage)) {
+    if (entry && typeof entry === 'object' && Number.isFinite(entry.contextWindow) && entry.contextWindow > 0) {
+      maxContextWindow = Math.max(maxContextWindow ?? 0, entry.contextWindow);
+    }
+  }
+  return maxContextWindow;
+}
+
+function logUsagePayload({ queryId, eventType, usage, modelUsage }) {
+  if (!usage && !modelUsage) return;
+
+  const inputTokens = usage?.input_tokens || 0;
+  const outputTokens = usage?.output_tokens || 0;
+  const cacheReadTokens = usage?.cache_read_input_tokens || usage?.cacheReadInputTokens || 0;
+  const cacheCreationTokens = usage?.cache_creation_input_tokens || usage?.cacheCreationInputTokens || 0;
+  const effectiveContextFill = inputTokens + cacheReadTokens + cacheCreationTokens;
+  const contextWindow = extractMaxContextWindow(modelUsage);
+
+  log('USAGE', JSON.stringify({
+    queryId,
+    eventType,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheCreationTokens,
+    effectiveContextFill,
+    contextWindow,
+    contextUtilizationPct: contextWindow ? Number(((effectiveContextFill / contextWindow) * 100).toFixed(2)) : null,
+  }));
 }
 
 // =============================================================================
@@ -355,19 +520,7 @@ async function handleQuery(cmd) {
     const resolvedAllowedTools = allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0
       ? allowedTools : defaultAllowedTools;
 
-    const options = {
-      model: modelId,
-      // Brain: 1m-context-window-support
-      // The [1m] suffix in modelId is enough — the CLI handles it natively.
-      // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
-      settingSources: ['project', 'user', 'local'],
-      tools: { type: 'preset', preset: 'claude_code' },
-      allowedTools: resolvedAllowedTools,
-      abortController,
-      systemPrompt: {
-        type: 'preset',
-        preset: 'claude_code',
-        append: `
+    const systemPromptAppend = `
 
 ## Interactive Questions (AskUserQuestion Tool)
 
@@ -391,30 +544,26 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 - SQLite (lightweight, embedded)
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`
-        + (debugMode ? (() => {
-          // Brain: debug-mode-v2-brain-git-context
-          const skillContent = loadBundledSkill('systematic-debugging');
-          const gitContext = loadGitContext(cwd);
-          const brainHints = loadBrainHints(cwd);
-          const hintsBlock = brainHints.length > 0
-            ? brainHints.map(s => `- ${s}`).join('\n')
-            : '(no Brain entries found in this project)';
+      + (debugMode ? (() => {
+        // Brain: debug-mode-v2-brain-git-context
+        const skillContent = loadBundledSkill('systematic-debugging');
+        const gitContext = loadGitContext(cwd);
+        const brainHints = loadBrainHints(cwd);
+        const hintsBlock = brainHints.length > 0
+          ? brainHints.map(s => `- ${s}`).join('\n')
+          : '(no Brain entries found in this project)';
 
-          // Structure: skill (reference) → git context → Brain protocol (LAST = recency bias)
-          let debugPrompt = '';
+        let debugPrompt = '';
 
-          // 1. Skill content (methodology reference)
-          if (skillContent) {
-            debugPrompt += `\n\n## Systematic Debugging Methodology\n\n${skillContent}`;
-          }
+        if (skillContent) {
+          debugPrompt += `\n\n## Systematic Debugging Methodology\n\n${skillContent}`;
+        }
 
-          // 2. Git context (what changed recently)
-          if (gitContext) {
-            debugPrompt += gitContext;
-          }
+        if (gitContext) {
+          debugPrompt += gitContext;
+        }
 
-          // 3. Brain-First Protocol (LAST for maximum recency bias)
-          debugPrompt += `
+        debugPrompt += `
 
 ## DEBUG MODE — MANDATORY BRAIN-FIRST PROTOCOL
 
@@ -441,10 +590,24 @@ ${hintsBlock}
 2. **Never guess** — Trace data flow, verify with evidence. Read the actual code.
 3. **Document findings** — Save to Brain + add \`// Brain: {slug}\` breadcrumbs in code
 `;
-          return debugPrompt;
-        })() : '')
-        + (teamContext ? buildTeamPromptAugmentation(teamContext) : '')
-        + (ideContext ? `\n\n## IDE Context\n\n${ideContext}` : ''),
+        return debugPrompt;
+      })() : '')
+      + (teamContext ? buildTeamPromptAugmentation(teamContext) : '')
+      + (ideContext ? `\n\n## IDE Context\n\n${ideContext}` : '');
+
+    const options = {
+      model: modelId,
+      // Brain: 1m-context-window-support
+      // The [1m] suffix in modelId is enough — the CLI handles it natively.
+      // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
+      settingSources: ['project'],
+      tools: { type: 'preset', preset: 'claude_code' },
+      allowedTools: resolvedAllowedTools,
+      abortController,
+      systemPrompt: {
+        type: 'preset',
+        preset: 'claude_code',
+        append: systemPromptAppend,
       },
       canUseTool: async (toolName, input, toolOptions) => {
         // AskUserQuestion — forward to frontend
@@ -544,6 +707,22 @@ ${hintsBlock}
 
     const mcpCount = options.mcpServers ? Object.keys(options.mcpServers).length : 0;
     log('MCP', `query=${queryId} resolved ${mcpCount} MCP servers: [${Object.keys(options.mcpServers || {}).join(', ')}]`);
+    logContextPayload({
+      queryId,
+      model,
+      modelId,
+      sessionId,
+      prompt,
+      attachments,
+      ideContext,
+      systemPromptAppend,
+      settingSources: options.settingSources,
+      allowedTools: resolvedAllowedTools,
+      mcpServers: options.mcpServers,
+      teamContext,
+      debugMode,
+      cwd,
+    });
 
     // --- Build message generator ---
     async function* generateMessages() {
@@ -582,6 +761,23 @@ ${hintsBlock}
     let promptTokensEmitted = false;
     for await (const event of stream) {
       eventCount++;
+
+      if (event.type === 'assistant' && event.message?.usage) {
+        logUsagePayload({
+          queryId,
+          eventType: 'assistant',
+          usage: event.message.usage,
+        });
+      }
+
+      if (event.type === 'result') {
+        logUsagePayload({
+          queryId,
+          eventType: 'result',
+          usage: event.usage,
+          modelUsage: event.modelUsage || event.model_usage,
+        });
+      }
 
       // Emit prompt_token_count on first assistant event (so frontend has it before usage data)
       if (!promptTokensEmitted && countTokensPromise && event.type === 'assistant') {

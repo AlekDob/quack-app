@@ -23,6 +23,7 @@ import { homedir } from 'os';
 import { execSync } from 'child_process';
 import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
 
 // Get the directory of this script for MCP server paths
 const __filename = fileURLToPath(import.meta.url);
@@ -351,6 +352,169 @@ function emitEvent(event) {
   console.log(JSON.stringify(event));
 }
 
+function estimateTokens(text = '') {
+  return Math.ceil(text.length / 4);
+}
+
+function hashText(text = '') {
+  return createHash('sha256').update(text).digest('hex').slice(0, 16);
+}
+
+function previewText(text = '', maxChars = 240) {
+  if (!text) return '';
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, maxChars)}...`;
+}
+
+function summarizeText(text = '') {
+  return {
+    chars: text.length,
+    lines: text ? text.split('\n').length : 0,
+    estimatedTokens: estimateTokens(text),
+    hash: hashText(text),
+    preview: previewText(text),
+  };
+}
+
+function getContextInstructionFiles(projectCwd) {
+  const files = [];
+  const candidates = [
+    { scope: 'user', path: join(homedir(), '.claude', 'CLAUDE.md') },
+  ];
+
+  if (projectCwd) {
+    candidates.push(
+      { scope: 'project-dotclaude', path: join(projectCwd, '.claude', 'CLAUDE.md') },
+      { scope: 'project-root', path: join(projectCwd, 'CLAUDE.md') },
+    );
+  }
+
+  for (const candidate of candidates) {
+    if (!existsSync(candidate.path)) continue;
+    try {
+      const content = readFileSync(candidate.path, 'utf8');
+      files.push({
+        scope: candidate.scope,
+        path: candidate.path,
+        chars: content.length,
+        lines: content ? content.split('\n').length : 0,
+        estimatedTokens: estimateTokens(content),
+        hash: hashText(content),
+      });
+    } catch (error) {
+      files.push({
+        scope: candidate.scope,
+        path: candidate.path,
+        error: error.message,
+      });
+    }
+  }
+
+  return files;
+}
+
+function logContextPayload({
+  model,
+  modelId,
+  sessionId,
+  prompt,
+  attachments,
+  ideContext,
+  systemPromptAppend,
+  settingSources,
+  allowedTools,
+  mcpServers,
+  teamContext,
+  debugMode,
+  cwd,
+}) {
+  const instructionFiles = getContextInstructionFiles(cwd);
+  const payloadSummary = {
+    resume: Boolean(sessionId),
+    model,
+    modelId,
+    cwd: cwd || null,
+    debugMode: Boolean(debugMode),
+    prompt: summarizeText(prompt),
+    ideContext: summarizeText(ideContext || ''),
+    systemPromptAppend: summarizeText(systemPromptAppend || ''),
+    attachments: {
+      count: attachments?.length || 0,
+      paths: attachments || [],
+    },
+    teamContext: teamContext ? {
+      teamName: teamContext.teamName,
+      memberCount: teamContext.members?.length || 0,
+    } : null,
+    settingSources,
+    allowedTools: {
+      count: allowedTools.length,
+      names: allowedTools,
+    },
+    mcpServers: {
+      count: Object.keys(mcpServers || {}).length,
+      names: Object.keys(mcpServers || {}),
+    },
+    instructionFiles,
+    estimatedInjectedTokens: {
+      ideContext: estimateTokens(ideContext || ''),
+      systemPromptAppend: estimateTokens(systemPromptAppend || ''),
+      instructionFiles: instructionFiles.reduce((sum, file) => sum + (file.estimatedTokens || 0), 0),
+    },
+    payloadHashes: {
+      prompt: hashText(prompt || ''),
+      ideContext: hashText(ideContext || ''),
+      systemPromptAppend: hashText(systemPromptAppend || ''),
+      instructionFilesComposite: hashText(
+        instructionFiles
+          .map(file => `${file.scope}:${file.path}:${file.hash || file.error || 'missing'}`)
+          .join('|')
+      ),
+      settingSources: hashText(JSON.stringify(settingSources || [])),
+      allowedTools: hashText(JSON.stringify(allowedTools || [])),
+      mcpServers: hashText(JSON.stringify(Object.keys(mcpServers || {}).sort())),
+      teamContext: hashText(JSON.stringify(teamContext || null)),
+    },
+  };
+
+  console.error(`[CONTEXT] ${JSON.stringify(payloadSummary)}`);
+}
+
+function extractMaxContextWindow(modelUsage) {
+  if (!modelUsage || typeof modelUsage !== 'object') return null;
+  let maxContextWindow = null;
+  for (const entry of Object.values(modelUsage)) {
+    if (entry && typeof entry === 'object' && Number.isFinite(entry.contextWindow) && entry.contextWindow > 0) {
+      maxContextWindow = Math.max(maxContextWindow ?? 0, entry.contextWindow);
+    }
+  }
+  return maxContextWindow;
+}
+
+function logUsagePayload({ streamId, eventType, usage, modelUsage }) {
+  if (!usage && !modelUsage) return;
+
+  const inputTokens = usage?.input_tokens || 0;
+  const outputTokens = usage?.output_tokens || 0;
+  const cacheReadTokens = usage?.cache_read_input_tokens || usage?.cacheReadInputTokens || 0;
+  const cacheCreationTokens = usage?.cache_creation_input_tokens || usage?.cacheCreationInputTokens || 0;
+  const effectiveContextFill = inputTokens + cacheReadTokens + cacheCreationTokens;
+  const contextWindow = extractMaxContextWindow(modelUsage);
+
+  console.error(`[USAGE] ${JSON.stringify({
+    streamId,
+    eventType,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheCreationTokens,
+    effectiveContextFill,
+    contextWindow,
+    contextUtilizationPct: contextWindow ? Number(((effectiveContextFill / contextWindow) * 100).toFixed(2)) : null,
+  })}`);
+}
+
 // Brain: gotcha-stamina-overhead-static-estimate
 // Count tokens for prompt using the Anthropic countTokens API (FREE, precise)
 async function countPromptTokens(modelId, promptContent) {
@@ -596,42 +760,7 @@ async function main() {
     // Brain: fix-duplicate-plan-approval
     let planAlreadyApproved = false;
 
-    const options = {
-      model: modelId,
-      // Brain: 1m-context-window-support
-      // The [1m] suffix in modelId is enough — the CLI handles it natively.
-      // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
-      // No betas needed (GA since March 2026, beta header is ignored).
-      // Enable automatic reading of CLAUDE.md and project settings
-      settingSources: ['project', 'user', 'local'],
-
-      // =============================================================================
-      // TOOLS CONFIGURATION (SDK v0.1.76)
-      //
-      // Using the claude_code preset for ALL default tools (55+)
-      // PLUS AskUserQuestion as a custom tool for interactive user choices
-      //
-      // From SDK docs:
-      // - `tools`: can be array combining preset + custom tools
-      // - `allowedTools`: filters which tools Claude can actually use
-      // - `canUseTool`: permission callback fires when tools need approval
-      // =============================================================================
-
-      // Use claude_code preset for all standard tools
-      tools: {
-        type: 'preset',
-        preset: 'claude_code'
-      },
-
-      // allowedTools filters from the preset - includes AskUserQuestion
-      allowedTools: resolvedAllowedTools,
-
-      // 🧠 System Prompt with Memory Context (already populated above)
-      // Memory search was performed BEFORE building options (now async with AI extraction)
-      systemPrompt: {
-        type: 'preset',
-        preset: 'claude_code',
-        append: `
+    const systemPromptAppend = `
 
 ## Interactive Questions (AskUserQuestion Tool)
 
@@ -664,20 +793,16 @@ IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to pr
             ? brainHints.map(s => `- ${s}`).join('\n')
             : '(no Brain entries found in this project)';
 
-          // Structure: skill (reference) → git context → Brain protocol (LAST = recency bias)
           let debugPrompt = '';
 
-          // 1. Skill content (methodology reference)
           if (skillContent) {
             debugPrompt += `\n\n## Systematic Debugging Methodology\n\n${skillContent}`;
           }
 
-          // 2. Git context (what changed recently)
           if (gitContext) {
             debugPrompt += gitContext;
           }
 
-          // 3. Brain-First Protocol (LAST for maximum recency bias)
           debugPrompt += `
 
 ## DEBUG MODE — MANDATORY BRAIN-FIRST PROTOCOL
@@ -708,7 +833,44 @@ ${hintsBlock}
           return debugPrompt;
         })() : '')
         + (teamContext ? buildTeamPromptAugmentation(teamContext) : '')
-        + (ideContext ? `\n\n## IDE Context\n\n${ideContext}` : ''),
+        + (ideContext ? `\n\n## IDE Context\n\n${ideContext}` : '');
+
+    const options = {
+      model: modelId,
+      // Brain: 1m-context-window-support
+      // The [1m] suffix in modelId is enough — the CLI handles it natively.
+      // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
+      // No betas needed (GA since March 2026, beta header is ignored).
+      // Enable automatic reading of CLAUDE.md and project settings
+      settingSources: ['project'],
+
+      // =============================================================================
+      // TOOLS CONFIGURATION (SDK v0.1.76)
+      //
+      // Using the claude_code preset for ALL default tools (55+)
+      // PLUS AskUserQuestion as a custom tool for interactive user choices
+      //
+      // From SDK docs:
+      // - `tools`: can be array combining preset + custom tools
+      // - `allowedTools`: filters which tools Claude can actually use
+      // - `canUseTool`: permission callback fires when tools need approval
+      // =============================================================================
+
+      // Use claude_code preset for all standard tools
+      tools: {
+        type: 'preset',
+        preset: 'claude_code'
+      },
+
+      // allowedTools filters from the preset - includes AskUserQuestion
+      allowedTools: resolvedAllowedTools,
+
+      // 🧠 System Prompt with Memory Context (already populated above)
+      // Memory search was performed BEFORE building options (now async with AI extraction)
+      systemPrompt: {
+        type: 'preset',
+        preset: 'claude_code',
+        append: systemPromptAppend,
       },
 
       // =============================================================================
@@ -999,6 +1161,21 @@ ${hintsBlock}
     }
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));
+    logContextPayload({
+      model,
+      modelId,
+      sessionId,
+      prompt,
+      attachments,
+      ideContext,
+      systemPromptAppend,
+      settingSources: options.settingSources,
+      allowedTools: resolvedAllowedTools,
+      mcpServers: options.mcpServers,
+      teamContext,
+      debugMode,
+      cwd,
+    });
 
     // Query Claude with streaming input mode
     // IMPORTANT: SDK MCP servers REQUIRE streaming input mode (async generator)
@@ -1027,6 +1204,23 @@ ${hintsBlock}
     try {
       let promptTokensEmitted = false;
       for await (const event of stream) {
+        if (event.type === 'assistant' && event.message?.usage) {
+          logUsagePayload({
+            streamId,
+            eventType: 'assistant',
+            usage: event.message.usage,
+          });
+        }
+
+        if (event.type === 'result') {
+          logUsagePayload({
+            streamId,
+            eventType: 'result',
+            usage: event.usage,
+            modelUsage: event.modelUsage || event.model_usage,
+          });
+        }
+
         // Log slash command info from system events
         if (event.type === 'system' && event.subtype === 'init') {
           console.error(`[DEBUG] System initialized - Session: ${event.session_id}`);

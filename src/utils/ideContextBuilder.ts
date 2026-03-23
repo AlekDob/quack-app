@@ -190,6 +190,12 @@ export async function buildContextPrefix(
   gitSummary: GitStatusSummary | null,
   workspacePath: string | null
 ): Promise<string> {
+  // Temporary cache-debug switch: disable IDE context injection entirely
+  // so we can isolate cache behavior without IDE/open-file/git prompt noise.
+  void gitSummary;
+  void workspacePath;
+  return '';
+
   // Check if IDE context injection is enabled
   const { ideContextEnabled } = useFileSystemStore.getState();
   if (!ideContextEnabled) return '';
