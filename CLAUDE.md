@@ -94,6 +94,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Empty state no drag region: `documentation/bugs/fix-empty-state-no-drag-region.md`
 - Git.rs English errors: `documentation/gotchas/gotcha-git-rs-error-messages-english.md`
 - Subagent tools invisible: `documentation/gotchas/gotcha-subagent-tools-invisible-to-parent.md`
+- stream-claude.js const prompt: `documentation/bugs/fix-stream-claude-const-prompt-reassignment.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

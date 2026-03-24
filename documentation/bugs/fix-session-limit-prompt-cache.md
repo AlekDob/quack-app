@@ -2,7 +2,7 @@
 type: bug
 project: quack-app
 created: 2026-03-23
-last_verified: 2026-03-23
+last_verified: 2026-03-24
 tags: [session-limit, rate-limit, prompt-cache, performance, tokens]
 ---
 
@@ -96,7 +96,13 @@ The only confirmed working version is **v2.1.68** (pinned at `~/.claude-code-pin
 ### Actions taken
 1. Added `pathToClaudeCodeExecutable` in stream-daemon.js and stream-claude.js pointing to native CLI (commit `8fe115c`)
 2. Installed v2.1.68 at `~/.claude-code-pinned/bin/claude` for testing
-3. **Pending**: pin to v2.1.68 if Fred's testing confirms the fix with standard vs premium plan
+3. Fred was on **standard plan** (not premium) — tests may not reflect real premium behavior
+4. Fred confirmed that his original `<system-reminder>` issue was likely due to missing wrapper, not the technique itself. He is building and testing our version.
+
+### `<system-reminder>` wrapper — why it works
+Fred originally had ideContext in user message without the wrapper → "looked crazy on resume". CC CLI itself uses `systemPromptAppend`. Our approach uses `<system-reminder>` tags to signal system-level context. This is cleaner on resume because the model treats it as metadata, not conversation content.
+
+**If Issue #34629 gets fixed upstream**, `systemPromptAppend` becomes the cleaner long-term approach (no context accumulation in history). Our fix is a workaround for the broken cache, not a permanent architecture choice.
 
 ### SDK Issue #89 — cache breakpoint overflow
 The SDK's bundled `cli.js` applies `cache_control: { type: 'ephemeral' }` to ALL system prompt blocks, exceeding the API limit of 4 breakpoints. A community user patched the `cli.js` and cache efficiency jumped from 49.7% to 91-98%.
