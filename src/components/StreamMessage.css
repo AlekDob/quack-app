@@ -25,7 +25,6 @@
 .stream-message.nested-under-agent {
   margin-left: 24px;
   padding-left: 12px;
-  border-left: 2px solid rgba(139, 92, 246, 0.3);
 }
 
 .stream-message.nested-under-agent.no-header .assistant-text {
@@ -35,7 +34,6 @@
 .tool-event-group-row.nested-under-agent {
   margin-left: 24px;
   padding-left: 12px;
-  border-left: 2px solid rgba(139, 92, 246, 0.3);
 }
 
 .assistant-avatar {

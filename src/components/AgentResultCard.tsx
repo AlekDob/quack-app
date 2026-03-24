@@ -173,7 +173,7 @@ export function AgentResultCard({
             border: `1px solid ${hexToRgba(color, 0.3)}`,
           }}
         >
-          Rapporto
+          Report
         </span>
 
         {hasPills && (
@@ -190,7 +190,7 @@ export function AgentResultCard({
             )}
             {metadata.toolUses && (
               <span className="agent-result-pill">
-                {metadata.toolUses} strumenti
+                {metadata.toolUses} tools
               </span>
             )}
           </div>

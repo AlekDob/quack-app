@@ -78,6 +78,32 @@ Added detection of 429/rate_limit errors in `App.tsx` with a user-friendly Itali
 2. Check backend logs: `cache_read_input_tokens` should be high (>30k) on the 2nd+ message
 3. Monitor the session limit bar — it should drain ~10x slower than before
 
+## Ongoing investigation (2026-03-24)
+
+### Native CLI cache regression (CC Issue #34629)
+
+Fredric Nilgran (Anthropic) tested Quack's prompt caching behavior and found:
+- **Quack**: ~6,200 tokens uncached per message
+- **CC CLI native**: ~300 tokens uncached per message
+- cache_read stuck at ~35k (system prompt only), cache_creation ~47k per turn
+
+Root cause: cache breakpoint placement regression since CC v2.1.69 ([github.com/anthropics/claude-code/issues/34629](https://github.com/anthropics/claude-code/issues/34629)). Only the system prompt is cached; conversation history is `cache_create`d from scratch every turn.
+
+v2.1.72 release notes claim "Fixed prompt cache invalidation in SDK query() calls, reducing input token costs up to 12x" but Fred confirmed the problem persists even with native CLI v2.1.81.
+
+The only confirmed working version is **v2.1.68** (pinned at `~/.claude-code-pinned/bin/claude`).
+
+### Actions taken
+1. Added `pathToClaudeCodeExecutable` in stream-daemon.js and stream-claude.js pointing to native CLI (commit `8fe115c`)
+2. Installed v2.1.68 at `~/.claude-code-pinned/bin/claude` for testing
+3. **Pending**: pin to v2.1.68 if Fred's testing confirms the fix with standard vs premium plan
+
+### SDK Issue #89 — cache breakpoint overflow
+The SDK's bundled `cli.js` applies `cache_control: { type: 'ephemeral' }` to ALL system prompt blocks, exceeding the API limit of 4 breakpoints. A community user patched the `cli.js` and cache efficiency jumped from 49.7% to 91-98%.
+
+### SDK Issue #188 — forced 1h cache TTL
+SDK forces 1-hour cache TTL with no configuration option. Cache writes cost 2x base price instead of 1.25x with 5-min TTL.
+
 ## Related
 
 - `gotcha-stamina-overhead-static-estimate.md` — overhead calculation

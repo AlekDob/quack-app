@@ -2,7 +2,7 @@
 type: pattern
 project: quack-app
 created: 2026-03-22
-last_verified: 2026-03-22
+last_verified: 2026-03-24
 tags: [frontend, agent, droid, subagent, tool-result, rendering, markdown]
 ---
 # Pattern: Agent Result Card
@@ -75,20 +75,23 @@ When the orchestrator runs tools (Read, Grep, etc.) while a subagent is active, 
 
 ### Implementation
 
-In `ChatMessage.tsx`, `nestedEventIndices` is computed by scanning events:
-1. Track `pendingAgentToolIds` — tool_use IDs for Agent/Task tools
+In `ChatMessage.tsx`, `nestedEventIndices` is a `Map<number, string>` (event index → subagentType) computed by scanning events:
+1. Track `pendingAgentTools` (`Map<string, string>`) — toolUseId → subagentType for Agent/Task tools
 2. Clear when matching `tool_result` arrives in a user event
-3. Assistant events between tool_use and tool_result (that don't contain the Agent tool itself) are marked nested
+3. Assistant events between tool_use and tool_result (that don't contain the Agent tool itself) are marked nested with the active droid's subagentType
 
-`StreamMessage` receives `isNestedUnderAgent` prop → applies `.nested-under-agent` CSS class (margin-left + border-left purple bar).
+`StreamMessage` receives `isNestedUnderAgent` + `nestedDroidType` props:
+- `.nested-under-agent` CSS class applies indentation + purple bar
+- When `nestedDroidType` is set, `useAgentInfo(nestedDroidType)` loads the droid's avatar and color; the name is formatted from kebab-case (e.g. `git-commit-manager` → "Git Commit Manager")
 
 ### Key Files (nesting)
 
 | File | Role |
 |------|------|
-| `src/components/ChatMessage.tsx` | nestedEventIndices computation + prop passing |
-| `src/components/StreamMessage.tsx` | isNestedUnderAgent prop + CSS class |
+| `src/components/ChatMessage.tsx` | nestedEventIndices Map computation + droidType prop passing |
+| `src/components/StreamMessage.tsx` | isNestedUnderAgent + nestedDroidType props, useAgentInfo for droid avatar/name |
 | `src/components/StreamMessage.css` | .nested-under-agent styles |
+| `src/hooks/useAgentInfo.ts` | Fetches droid avatar/color from Tauri agent registry |
 
 ## Gotchas
 

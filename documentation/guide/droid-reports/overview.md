@@ -71,15 +71,18 @@ Il droid esegue i suoi tool internamente — non sono visibili nella tua chat. S
 
 ### Come distinguerli
 
-I tool dell'agente principale che girano durante l'esecuzione di un droid sono **indentati con una barra laterale viola**:
+I tool dell'agente principale che girano durante l'esecuzione di un droid sono **indentati con una barra laterale viola** e mostrano **avatar e nome del droid** attivo (non dell'orchestratore):
 
 ```
 Agent Leo
   "Lancio il code reviewer..."
   +-- using Agent on Code review ●●●
   |
-  |  using Read on App.tsx        ✓ >    <-- Orchestratore
-  |  using Grep on handleEvent    ✓ >    <-- Orchestratore
+  |  [Avatar Droid] Code Reviewer
+  |  using Read on App.tsx        ✓ >    <-- Eseguito durante il droid
+  |
+  |  [Avatar Droid] Code Reviewer
+  |  using Grep on handleEvent    ✓ >    <-- Eseguito durante il droid
   |
   +-- [Rapporto Droid]                   <-- Risultato del droid
 
@@ -87,7 +90,7 @@ Agent Leo
   "Ecco cosa ho trovato..."
 ```
 
-La barra viola indica: "questi strumenti li sta usando l'agente principale, in parallelo al lavoro del droid".
+La barra viola + avatar del droid indica: "questi strumenti girano nel contesto del droid attivo". L'avatar e il nome vengono caricati tramite `useAgentInfo` hook dalla configurazione del droid in `.claude/agents/`.
 
 ## Personalizzazione dei droid
 

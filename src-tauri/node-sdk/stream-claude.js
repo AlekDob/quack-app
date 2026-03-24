@@ -211,7 +211,7 @@ function getModelId(model) {
 const args = process.argv.slice(2);
 const config = JSON.parse(args[0] || '{}');
 
-const {
+let {
   prompt,
   model = 'opus',
   permissionMode, // No default - let SDK use its default (auto-approve) when undefined

@@ -85,6 +85,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Shell env GUI launch: `documentation/gotchas/gotcha-shell-env-gui-launch.md`
 - Bedrock env vars GUI: `documentation/bugs/fix-bedrock-env-vars-gui-launch.md`
 - PixiJS CSP black screen: `documentation/gotchas/gotcha-pixi-csp-unsafe-eval.md`
+- CSP cleanup on integration removal: `documentation/gotchas/gotcha-csp-cleanup-removed-integrations.md`
 - MCP registration: `documentation/gotchas/gotcha-mcp-registration-settings-sources.md`
 - Tokio wait() closes stdin: `documentation/gotchas/gotcha-tokio-child-wait-closes-stdin.md`
 - BTW must use SDK streaming: `documentation/gotchas/gotcha-btw-must-use-sdk-streaming.md`

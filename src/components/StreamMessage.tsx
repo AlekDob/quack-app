@@ -18,6 +18,7 @@ import DiffViewer from './DiffViewer';
 import CompactingIndicator from './CompactingIndicator';
 import { getAvatarUrl } from '../utils/agentAvatars';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
+import { useAgentInfo } from '../hooks/useAgentInfo';
 import type { ClaudeEvent, AskUserQuestionAnswers, DiffLine, ToolDiff } from '../types';
 import { BugReportWidget, WebAnalysisCard, structuredOutputRegistry } from './structured-outputs';
 import { isBugReportOutput, isWebAnalysisOutput } from '../types/structuredOutputs';
@@ -338,6 +339,8 @@ interface StreamMessageProps {
   showHeader?: boolean;
   // Whether this message's tools are running while a subagent is active
   isNestedUnderAgent?: boolean;
+  // The subagent_type of the droid this message is nested under (e.g. "git-commit-manager")
+  nestedDroidType?: string;
 }
 
 const StreamMessage: React.FC<StreamMessageProps> = ({
@@ -361,9 +364,13 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   onTeammateDrillDown,
   showHeader = true,
   isNestedUnderAgent = false,
+  nestedDroidType,
 }) => {
   // State for avatar URL (handles both default and custom avatars)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // When nested under a droid, use the droid's avatar and name instead of parent agent's
+  const droidInfo = useAgentInfo(nestedDroidType || '', workingDirectory);
 
   // Load avatar URL (custom or default)
   useEffect(() => {
@@ -759,7 +766,9 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
         <div className="assistant-text">
           {showHeader && (
             <div className="assistant-avatar">
-              {avatarUrl ? (
+              {nestedDroidType ? (
+                <img src={droidInfo.avatarUrl} alt={nestedDroidType} style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover' }} />
+              ) : avatarUrl ? (
                 <img src={avatarUrl} alt={agentName} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
               ) : (
                 <img src={duckAvatar} alt="Quack Agency" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
@@ -769,8 +778,10 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
           <div className="assistant-content">
             {showHeader && (
               <div className="assistant-name">
-                {agentName}
-                {activeTeam && (() => {
+                {nestedDroidType
+                  ? nestedDroidType.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+                  : agentName}
+                {!nestedDroidType && activeTeam && (() => {
                   const normalizedAgent = agentName.toLowerCase().replace('agent ', '');
                   const isMember = activeTeam.members.some(m =>
                     m.name.toLowerCase().replace('agent ', '') === normalizedAgent

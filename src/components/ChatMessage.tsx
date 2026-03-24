@@ -519,36 +519,39 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
               flushGroup();
 
               // Detect nested context: orchestrator tools running while a subagent is active
-              const nestedEventIndices = new Set<number>();
+              // Maps event index → subagentType of the active droid
+              const nestedEventIndices = new Map<number, string>();
               {
-                const pendingAgentToolIds = new Set<string>();
+                const pendingAgentTools = new Map<string, string>(); // toolUseId → subagentType
                 message.events!.forEach((evt: any, idx: number) => {
                   if (evt.type === 'assistant' && evt.message?.content) {
                     for (const block of evt.message.content) {
                       if (block.type === 'tool_use') {
                         const n = (block.name || '').toLowerCase();
                         if (n === 'agent' || (n === 'task' && block.input?.subagent_type)) {
-                          pendingAgentToolIds.add(block.id);
+                          pendingAgentTools.set(block.id, block.input?.subagent_type || 'agent');
                         }
                       }
                     }
                   }
                   if (evt.type === 'user' && evt.message?.content) {
                     for (const block of evt.message.content) {
-                      if (block.type === 'tool_result' && pendingAgentToolIds.has(block.tool_use_id)) {
-                        pendingAgentToolIds.delete(block.tool_use_id);
+                      if (block.type === 'tool_result' && pendingAgentTools.has(block.tool_use_id)) {
+                        pendingAgentTools.delete(block.tool_use_id);
                       }
                     }
                   }
                   // Mark assistant events that don't contain the agent tool itself
-                  if (pendingAgentToolIds.size > 0 && evt.type === 'assistant') {
+                  if (pendingAgentTools.size > 0 && evt.type === 'assistant') {
                     const hasAgentTool = evt.message?.content?.some((b: any) => {
                       if (b.type !== 'tool_use') return false;
                       const n = (b.name || '').toLowerCase();
                       return n === 'agent' || (n === 'task' && b.input?.subagent_type);
                     });
                     if (!hasAgentTool) {
-                      nestedEventIndices.add(idx);
+                      // Use the most recently started droid's type
+                      const droidType = [...pendingAgentTools.values()].pop() || 'agent';
+                      nestedEventIndices.set(idx, droidType);
                     }
                   }
                 });
@@ -567,7 +570,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 return event.type !== 'assistant' || prevVisibleType !== 'assistant';
               };
 
-              const renderStreamMessage = (event: any, eventIndex: number, showHeader: boolean, isNested?: boolean) => (
+              const renderStreamMessage = (event: any, eventIndex: number, showHeader: boolean, isNested?: boolean, droidType?: string) => (
                 <StreamMessage
                   key={getStableEventKey(event, eventIndex)}
                   message={event}
@@ -589,17 +592,64 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                   onTeammateDrillDown={onTeammateDrillDown}
                   showHeader={showHeader}
                   isNestedUnderAgent={isNested}
+                  nestedDroidType={droidType}
                 />
               );
 
-              return groups.map((group) => {
+              // Reorder: move agent/task result groups to AFTER their nested groups
+              // so the droid report appears at the bottom, after all tool calls
+              const groupHasAgentTool = (g: typeof groups[0]): boolean => {
+                const evts = g.kind === 'single' ? [g.event] : g.items.map((i: any) => i.event);
+                return evts.some((evt: any) =>
+                  evt.message?.content?.some((b: any) => {
+                    if (b.type !== 'tool_use') return false;
+                    const n = (b.name || '').toLowerCase();
+                    return n === 'agent' || (n === 'task' && b.input?.subagent_type);
+                  })
+                );
+              };
+              const groupIsNested = (g: typeof groups[0]): boolean =>
+                g.kind === 'single'
+                  ? nestedEventIndices.has(g.eventIndex)
+                  : g.items.some((item: any) => nestedEventIndices.has(item.eventIndex));
+
+              const renderGroups = (() => {
+                const result: typeof groups = [];
+                let i = 0;
+                while (i < groups.length) {
+                  const group = groups[i];
+                  if (groupHasAgentTool(group)) {
+                    const nested: typeof groups = [];
+                    let j = i + 1;
+                    while (j < groups.length && groupIsNested(groups[j])) {
+                      nested.push(groups[j]);
+                      j++;
+                    }
+                    if (nested.length > 0) {
+                      result.push(...nested);
+                      result.push(group);
+                      i = j;
+                    } else {
+                      result.push(group);
+                      i++;
+                    }
+                  } else {
+                    result.push(group);
+                    i++;
+                  }
+                }
+                return result;
+              })();
+
+              return renderGroups.map((group) => {
                 if (group.kind === 'single') {
-                  const isNested = nestedEventIndices.has(group.eventIndex);
+                  const droidType = nestedEventIndices.get(group.eventIndex);
                   return renderStreamMessage(
                     group.event,
                     group.eventIndex,
                     computeShowHeader(group.eventIndex, group.event),
-                    isNested
+                    !!droidType,
+                    droidType
                   );
                 }
                 // If the first item needs a header (avatar/name), render it
@@ -607,19 +657,21 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 const firstNeedsHeader = computeShowHeader(group.items[0].eventIndex, group.items[0].event);
                 const headerItem = firstNeedsHeader ? group.items[0] : null;
                 const groupItems = firstNeedsHeader ? group.items.slice(1) : group.items;
-                const isGroupNested = group.items.some(item => nestedEventIndices.has(item.eventIndex));
+                // Find the droid type for this group (first nested item's type)
+                const groupDroidType = group.items.reduce<string | undefined>((found, item) => found || nestedEventIndices.get(item.eventIndex), undefined);
+                const isGroupNested = !!groupDroidType;
 
                 return (
                   <Fragment key={`event-group-${group.items[0].eventIndex}`}>
-                    {headerItem && renderStreamMessage(headerItem.event, headerItem.eventIndex, true, isGroupNested)}
+                    {headerItem && renderStreamMessage(headerItem.event, headerItem.eventIndex, true, isGroupNested, groupDroidType)}
                     {groupItems.length > 1 ? (
                       <div className={`tool-event-group-row${isGroupNested ? ' nested-under-agent' : ''}`}>
                         {groupItems.map(({ event, eventIndex }) =>
-                          renderStreamMessage(event, eventIndex, false, isGroupNested)
+                          renderStreamMessage(event, eventIndex, false, isGroupNested, groupDroidType)
                         )}
                       </div>
                     ) : groupItems.length === 1 ? (
-                      renderStreamMessage(groupItems[0].event, groupItems[0].eventIndex, false, isGroupNested)
+                      renderStreamMessage(groupItems[0].event, groupItems[0].eventIndex, false, isGroupNested, groupDroidType)
                     ) : null}
                   </Fragment>
                 );
