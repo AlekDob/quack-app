@@ -36,6 +36,42 @@
   padding-left: 12px;
 }
 
+/* DroidActivityBlock: single avatar+name header, all tool calls inside content */
+.droid-activity-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-left: 54px;
+  margin-bottom: 4px;
+}
+
+.droid-activity-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.droid-activity-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.droid-activity-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 4px;
+}
+
+/* Remove default no-header indent inside droid block — avatar is external */
+.droid-activity-content .stream-message.no-header .assistant-text {
+  margin-left: 0;
+}
+
 .assistant-avatar {
   width: 32px;
   height: 32px;

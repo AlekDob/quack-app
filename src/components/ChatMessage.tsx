@@ -2,6 +2,7 @@ import { memo, useState, useEffect, useRef, Fragment } from 'react';
 import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
 import ToolCallMinimal from './ToolCallMinimal';
 import StreamMessage, { SPECIAL_WIDGET_TOOLS, SOLO_ROW_TOOLS, isImageRead } from './StreamMessage';
+import { DroidActivityBlock } from './DroidActivityBlock';
 import ThinkingBlock from './ThinkingBlock';
 import MessageSettingsBadges from './MessageSettingsBadges';
 import SessionIdDisplay from './SessionIdDisplay';
@@ -641,41 +642,79 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 return result;
               })();
 
-              return renderGroups.map((group) => {
-                if (group.kind === 'single') {
-                  const droidType = nestedEventIndices.get(group.eventIndex);
-                  return renderStreamMessage(
-                    group.event,
-                    group.eventIndex,
-                    computeShowHeader(group.eventIndex, group.event),
-                    !!droidType,
-                    droidType
-                  );
-                }
-                // If the first item needs a header (avatar/name), render it
-                // standalone so the header stays on its own line above the group.
-                const firstNeedsHeader = computeShowHeader(group.items[0].eventIndex, group.items[0].event);
-                const headerItem = firstNeedsHeader ? group.items[0] : null;
-                const groupItems = firstNeedsHeader ? group.items.slice(1) : group.items;
-                // Find the droid type for this group (first nested item's type)
-                const groupDroidType = group.items.reduce<string | undefined>((found, item) => found || nestedEventIndices.get(item.eventIndex), undefined);
-                const isGroupNested = !!groupDroidType;
+              // Render: consecutive nested groups from same droid → DroidActivityBlock
+              const getGroupDroidType = (g: typeof groups[0]): string | undefined =>
+                g.kind === 'single'
+                  ? nestedEventIndices.get(g.eventIndex)
+                  : g.items.reduce<string | undefined>((f, item) => f || nestedEventIndices.get(item.eventIndex), undefined);
 
-                return (
-                  <Fragment key={`event-group-${group.items[0].eventIndex}`}>
-                    {headerItem && renderStreamMessage(headerItem.event, headerItem.eventIndex, true, isGroupNested, groupDroidType)}
-                    {groupItems.length > 1 ? (
-                      <div className={`tool-event-group-row${isGroupNested ? ' nested-under-agent' : ''}`}>
-                        {groupItems.map(({ event, eventIndex }) =>
-                          renderStreamMessage(event, eventIndex, false, isGroupNested, groupDroidType)
-                        )}
-                      </div>
-                    ) : groupItems.length === 1 ? (
-                      renderStreamMessage(groupItems[0].event, groupItems[0].eventIndex, false, isGroupNested, groupDroidType)
-                    ) : null}
-                  </Fragment>
-                );
-              });
+              const renderResult: React.ReactNode[] = [];
+              let ri = 0;
+              while (ri < renderGroups.length) {
+                const group = renderGroups[ri];
+                const droidType = getGroupDroidType(group);
+
+                if (droidType) {
+                  // Collect all consecutive groups from the same droid
+                  const droidRun: typeof groups = [];
+                  let rj = ri;
+                  while (rj < renderGroups.length && getGroupDroidType(renderGroups[rj]) === droidType) {
+                    droidRun.push(renderGroups[rj]);
+                    rj++;
+                  }
+                  const firstEventIndex = droidRun[0].kind === 'single'
+                    ? droidRun[0].eventIndex
+                    : droidRun[0].items[0].eventIndex;
+
+                  renderResult.push(
+                    <DroidActivityBlock
+                      key={`droid-block-${firstEventIndex}`}
+                      droidType={droidType}
+                      workingDirectory={workingDirectory}
+                    >
+                      {droidRun.flatMap(g =>
+                        g.kind === 'single'
+                          ? [renderStreamMessage(g.event, g.eventIndex, false)]
+                          : g.items.map(({ event, eventIndex }) =>
+                              renderStreamMessage(event, eventIndex, false)
+                            )
+                      )}
+                    </DroidActivityBlock>
+                  );
+                  ri = rj;
+                } else {
+                  // Non-nested group: render normally
+                  if (group.kind === 'single') {
+                    renderResult.push(
+                      renderStreamMessage(
+                        group.event,
+                        group.eventIndex,
+                        computeShowHeader(group.eventIndex, group.event)
+                      )
+                    );
+                  } else {
+                    const firstNeedsHeader = computeShowHeader(group.items[0].eventIndex, group.items[0].event);
+                    const headerItem = firstNeedsHeader ? group.items[0] : null;
+                    const groupItems = firstNeedsHeader ? group.items.slice(1) : group.items;
+                    renderResult.push(
+                      <Fragment key={`event-group-${group.items[0].eventIndex}`}>
+                        {headerItem && renderStreamMessage(headerItem.event, headerItem.eventIndex, true)}
+                        {groupItems.length > 1 ? (
+                          <div className="tool-event-group-row">
+                            {groupItems.map(({ event, eventIndex }) =>
+                              renderStreamMessage(event, eventIndex, false)
+                            )}
+                          </div>
+                        ) : groupItems.length === 1 ? (
+                          renderStreamMessage(groupItems[0].event, groupItems[0].eventIndex, false)
+                        ) : null}
+                      </Fragment>
+                    );
+                  }
+                  ri++;
+                }
+              }
+              return renderResult;
             })()}
           </div>
         ) : (
