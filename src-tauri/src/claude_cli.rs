@@ -402,6 +402,8 @@ async fn ensure_daemon(app: &AppHandle) -> Result<(), String> {
                     log::error!("[Daemon stderr] {}", line);
                 } else if upper.contains("[WARN]") {
                     log::warn!("[Daemon stderr] {}", line);
+                } else if upper.contains("[INFO]") {
+                    log::info!("[Daemon stderr] {}", line);
                 } else {
                     log::debug!("[Daemon stderr] {}", line);
                 }
@@ -566,6 +568,63 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                                         }
                                     }
                                 }
+                                // Brain: fix-ask-user-question-stream-event-not-emitted
+                                // SDK emits ask_user_question as a stream event regardless of
+                                // whether canUseTool is called. In bypassPermissions mode (Build),
+                                // canUseTool is NOT called, so the top-level "ask_user_question"
+                                // message (handled below at the outer match) never fires.
+                                // We must also emit ask-user-question from here so the frontend
+                                // can render the UI and collect user answers.
+                                "ask_user_question" => {
+                                    let request_id = event.get("requestId").and_then(|r| r.as_str()).unwrap_or("");
+                                    let questions = event.get("questions").cloned().unwrap_or(serde_json::Value::Array(vec![]));
+                                    log::info!("[DAEMON:ROUTE] ask_user_question stream event query={} requestId={} -> emitting ask-user-question to frontend", qid, request_id);
+
+                                    // Pause timeout while user is answering
+                                    {
+                                        let queries_lock = DAEMON_QUERIES.lock().await;
+                                        if let Some(state) = queries_lock.get(qid.as_str()) {
+                                            state.waiting_for_user.store(true, std::sync::atomic::Ordering::Relaxed);
+                                        }
+                                    }
+
+                                    let payload = serde_json::json!({
+                                        "requestId": request_id,
+                                        "questions": questions,
+                                        "agentId": agent_id,
+                                        "sessionKey": session_key,
+                                        "queryId": qid
+                                    });
+
+                                    let ask_event = format!("ask-user-question:{}", agent_id);
+                                    let _ = app_handle.emit(&ask_event, payload.clone());
+                                    let _ = app_handle.emit("ask-user-question", payload);
+                                }
+                                // Same for plan_approval_request stream events
+                                "plan_approval_request" => {
+                                    let request_id = event.get("requestId").and_then(|r| r.as_str()).unwrap_or("");
+                                    let plan = event.get("plan").cloned().unwrap_or(serde_json::Value::Null);
+                                    log::info!("[DAEMON:ROUTE] plan_approval_request stream event query={} requestId={} -> emitting plan-approval-request to frontend", qid, request_id);
+
+                                    {
+                                        let queries_lock = DAEMON_QUERIES.lock().await;
+                                        if let Some(state) = queries_lock.get(qid.as_str()) {
+                                            state.waiting_for_user.store(true, std::sync::atomic::Ordering::Relaxed);
+                                        }
+                                    }
+
+                                    let payload = serde_json::json!({
+                                        "requestId": request_id,
+                                        "plan": plan,
+                                        "agentId": agent_id,
+                                        "sessionKey": session_key,
+                                        "queryId": qid
+                                    });
+
+                                    let plan_event = format!("plan-approval-request:{}", agent_id);
+                                    let _ = app_handle.emit(&plan_event, payload.clone());
+                                    let _ = app_handle.emit("plan-approval-request", payload);
+                                }
                                 _ => {}
                             }
                         }
@@ -706,7 +765,7 @@ async fn send_to_daemon(message: &str) -> Result<(), String> {
         .ok()
         .and_then(|v| v.get("type").and_then(|t| t.as_str()).map(String::from))
         .unwrap_or_else(|| "unknown".to_string());
-    log::debug!("[DAEMON:IPC] Sending to daemon stdin: type={} ({}B)", msg_type, message.len());
+    log::info!("[DAEMON:IPC] Sending to daemon stdin: type={} ({}B)", msg_type, message.len());
 
     let mut daemon_guard = DAEMON_PROCESS.lock().await;
     if let Some(ref mut daemon) = *daemon_guard {
@@ -2957,30 +3016,49 @@ pub async fn answer_user_question(
 ) -> Result<(), String> {
     log::info!("[DAEMON:INTERACT] answer_user_question process={} requestId={}", agent_id, request_id);
 
-    // Try daemon mode first
+    // Brain: fix-ask-user-question-stream-event-not-emitted
+    // Try daemon mode first, BUT only if daemon has a matching active query.
+    // When daemon query fails and falls back to legacy per-process mode,
+    // the query runs in the legacy process but the daemon process still exists.
+    // Without this check, answers would go to the daemon (which has no matching
+    // pendingRequest) and get silently lost.
     if DAEMON_MODE_ENABLED.load(Ordering::Relaxed) {
         let daemon_guard = DAEMON_PROCESS.lock().await;
-        if daemon_guard.is_some() {
-            drop(daemon_guard);
-            log::info!("[DAEMON:INTERACT] Routing answer via daemon for requestId={}", request_id);
+        let daemon_running = daemon_guard.is_some();
+        drop(daemon_guard);
 
-            // Resume the query timeout now that user has responded
-            {
+        if daemon_running {
+            // Check if daemon actually has an active query for this agent/session
+            let has_matching_query = {
                 let queries = DAEMON_QUERIES.lock().await;
-                for state in queries.values() {
-                    if state.session_key == agent_id || state.agent_id == agent_id {
-                        state.waiting_for_user.store(false, std::sync::atomic::Ordering::Relaxed);
-                        break;
+                queries.values().any(|state| {
+                    state.session_key == agent_id || state.agent_id == agent_id
+                })
+            };
+
+            if has_matching_query {
+                log::info!("[DAEMON:INTERACT] Routing answer via daemon for requestId={} (matching query found)", request_id);
+
+                // Resume the query timeout now that user has responded
+                {
+                    let queries = DAEMON_QUERIES.lock().await;
+                    for state in queries.values() {
+                        if state.session_key == agent_id || state.agent_id == agent_id {
+                            state.waiting_for_user.store(false, std::sync::atomic::Ordering::Relaxed);
+                            break;
+                        }
                     }
                 }
-            }
 
-            let cmd = serde_json::json!({
-                "type": "response",
-                "requestId": request_id,
-                "answers": answers,
-            });
-            return send_to_daemon(&cmd.to_string()).await;
+                let cmd = serde_json::json!({
+                    "type": "response",
+                    "requestId": request_id,
+                    "answers": answers,
+                });
+                return send_to_daemon(&cmd.to_string()).await;
+            } else {
+                log::warn!("[DAEMON:INTERACT] Daemon running but NO matching query for process={} — falling back to legacy", agent_id);
+            }
         }
     }
 

@@ -28,6 +28,15 @@ import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { execSync } from 'child_process';
+import { appendFileSync } from 'fs';
+
+// 🐛 DIAG: Write diagnostics to a file that's easy to check
+const DIAG_FILE = join(homedir(), '.quack', 'daemon-diag.log');
+function diag(msg) {
+  try {
+    appendFileSync(DIAG_FILE, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch (e) { /* ignore */ }
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -319,6 +328,7 @@ async function handleQuery(cmd) {
 
   activeQueries.set(queryId, { abortController });
   log('QUERY', `Starting query=${queryId} model=${model} cwd=${cwd || 'default'} resume=${sessionId || '(new)'} activeQueries=${activeQueries.size}`);
+  diag(`QUERY_START: queryId=${queryId}, permissionMode=${permissionMode || '(none/act)'}, model=${model}, activeQueries=${activeQueries.size}`);
 
   // 🦆 LLM Provider: set env vars per-query for custom/ollama providers
   // Save originals so we can restore after the query (daemon is persistent)
@@ -371,7 +381,8 @@ async function handleQuery(cmd) {
       // Brain: 1m-context-window-support
       // The [1m] suffix in modelId is enough — the CLI handles it natively.
       // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
-      ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
+      // 🐛 DEBUG: Disabled native CLI to test AskUserQuestion hang regression
+      // ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
       settingSources: ['project', 'user', 'local'],
       tools: { type: 'preset', preset: 'claude_code' },
       allowedTools: resolvedAllowedTools,
@@ -469,16 +480,20 @@ ${hintsBlock}
       canUseTool: async (toolName, input, toolOptions) => {
         // AskUserQuestion — forward to frontend
         if (toolName === 'AskUserQuestion') {
-          log('INTERACT', `AskUserQuestion canUseTool triggered for query=${queryId}`);
+          diag(`canUseTool AskUserQuestion triggered for query=${queryId}`);
           try {
             const response = await requestFromFrontend(queryId, 'ask_user_question', {
               questions: input.questions,
             });
-            return {
+            diag(`canUseTool AskUserQuestion RESOLVED for query=${queryId}: ${JSON.stringify(response.answers).slice(0, 200)}`);
+            const result = {
               behavior: 'allow',
               updatedInput: { questions: input.questions, answers: response.answers },
             };
+            log('INTERACT', `[INFO] AskUserQuestion returning to SDK: ${JSON.stringify(result).slice(0, 300)}`);
+            return result;
           } catch (error) {
+            log('INTERACT', `[WARN] AskUserQuestion FAILED for query=${queryId}: ${error.message}`);
             return { behavior: 'deny', message: `Failed to get user answers: ${error.message}` };
           }
         }
@@ -486,20 +501,25 @@ ${hintsBlock}
         // ExitPlanMode — forward to frontend (Brain: fix-duplicate-plan-approval)
         if (toolName === 'ExitPlanMode') {
           if (planAlreadyApproved) {
+            log('INTERACT', `[INFO] ExitPlanMode already approved, skipping for query=${queryId}`);
             return { behavior: 'allow', updatedInput: input };
           }
-          log('INTERACT', `ExitPlanMode canUseTool triggered for query=${queryId}`);
+          diag(`canUseTool ExitPlanMode triggered for query=${queryId}`);
           try {
             const response = await requestFromFrontend(queryId, 'plan_approval_request', { plan: input });
             const answers = response.answers || response;
+            diag(`canUseTool ExitPlanMode RESOLVED for query=${queryId}: ${JSON.stringify(answers).slice(0, 200)}`);
             const isApproved = answers.approved === 'true' || answers.approved === true;
             if (isApproved) {
               planAlreadyApproved = true;
+              log('INTERACT', `[INFO] ExitPlanMode APPROVED for query=${queryId} — returning allow to SDK`);
               return { behavior: 'allow', updatedInput: input };
             } else {
+              log('INTERACT', `[INFO] ExitPlanMode REJECTED for query=${queryId} — returning deny to SDK`);
               return { behavior: 'deny', message: answers.feedback || 'User rejected the plan' };
             }
           } catch (error) {
+            log('INTERACT', `[WARN] ExitPlanMode FAILED for query=${queryId}: ${error.message}`);
             return { behavior: 'deny', message: `Failed to get plan approval: ${error.message}` };
           }
         }
@@ -561,10 +581,13 @@ ${hintsBlock}
 
     const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
     const codeIntelMcpServerPath = join(__dirname, 'code-intel-mcp-server.js');
+    const visualizerMcpServerPath = join(__dirname, 'visualizer-mcp-server.js');
+    // Brain: quack-visualizer-inline-html
     options.mcpServers = {
       ...(resolvedMcpServers || {}),
       'ide-tools': { command: 'node', args: [ideMcpServerPath] },
       'code-intel': { type: 'stdio', command: 'node', args: [codeIntelMcpServerPath] },
+      'visualizer': { command: 'node', args: [visualizerMcpServerPath] },
     };
 
     const mcpCount = options.mcpServers ? Object.keys(options.mcpServers).length : 0;
@@ -650,6 +673,17 @@ ${hintsBlock}
             }
           }
         }
+      }
+
+      // Brain: fix-ask-user-question-stream-event-not-emitted
+      // Log when SDK emits ask_user_question/plan_approval_request as stream events.
+      // In bypassPermissions mode, canUseTool is NOT called for these — the SDK
+      // auto-approves and only emits the stream event. The Rust event handler
+      // must re-emit these as ask-user-question/plan-approval-request Tauri events.
+      if (event.type === 'ask_user_question') {
+        diag(`STREAM_EVENT ask_user_question: queryId=${queryId}, requestId=${event.requestId}, canUseTool was ${pendingRequests.size > 0 ? 'CALLED' : 'NOT called (bypass mode?)'}`);
+      } else if (event.type === 'plan_approval_request') {
+        diag(`STREAM_EVENT plan_approval_request: queryId=${queryId}, requestId=${event.requestId}`);
       }
 
       // Emit each SDK event tagged with queryId
@@ -753,10 +787,12 @@ async function requestFromFrontend(queryId, type, data, timeoutMs = 0) {
     }
 
     pendingRequests.set(requestId, { resolve, reject, timeout, queryId });
+    diag(`STORED pending: requestId=${requestId}, queryId=${queryId}, type=${type}, total=${pendingRequests.size}`);
+    log('INTERACT', `[INFO] Stored pending request: requestId=${requestId}, queryId=${queryId}, type=${type}, total pending=${pendingRequests.size}`);
 
     // Emit the request tagged with queryId so Rust can route the event
     emit({ type, queryId, requestId, ...data });
-    log('IPC', `Sent ${type} requestId=${requestId} query=${queryId}`);
+    log('IPC', `[INFO] Sent ${type} requestId=${requestId} query=${queryId}`);
   });
 }
 
@@ -785,14 +821,15 @@ function handleAbort(cmd) {
 
 function handleResponse(cmd) {
   const { requestId, answers } = cmd;
+  diag(`handleResponse: requestId=${requestId}, found=${pendingRequests.has(requestId)}, pendingKeys=[${Array.from(pendingRequests.keys()).join(',')}]`);
   if (pendingRequests.has(requestId)) {
     const { resolve, timeout } = pendingRequests.get(requestId);
     clearTimeout(timeout);
     pendingRequests.delete(requestId);
     resolve({ requestId, answers });
-    log('INTERACT', `Resolved response for requestId=${requestId}`);
+    diag(`✅ RESOLVED requestId=${requestId}`);
   } else {
-    log('INTERACT', `No pending request found for requestId=${requestId}`);
+    diag(`❌ NOT FOUND requestId=${requestId}, pendingKeys=[${Array.from(pendingRequests.keys()).join(',')}], activeQueries=[${Array.from(activeQueries.keys()).join(',')}]`);
   }
 }
 
@@ -833,7 +870,10 @@ async function main() {
   stdinReader.on('line', async (line) => {
     try {
       const cmd = JSON.parse(line);
-      log('IPC', `Received command type=${cmd.type}${cmd.queryId ? ` query=${cmd.queryId}` : ''}${cmd.requestId ? ` requestId=${cmd.requestId}` : ''}`);
+      if (cmd.type === 'response') {
+        diag(`RESPONSE on stdin: requestId=${cmd.requestId}, pendingKeys=[${Array.from(pendingRequests.keys()).join(',')}]`);
+      }
+      log('IPC', `[INFO] Received stdin command type=${cmd.type}${cmd.queryId ? ` query=${cmd.queryId}` : ''}${cmd.requestId ? ` requestId=${cmd.requestId}` : ''}`);
 
       switch (cmd.type) {
         case 'query':

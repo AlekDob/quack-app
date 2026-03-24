@@ -95,10 +95,12 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Git.rs English errors: `documentation/gotchas/gotcha-git-rs-error-messages-english.md`
 - Subagent tools invisible: `documentation/gotchas/gotcha-subagent-tools-invisible-to-parent.md`
 - stream-claude.js const prompt: `documentation/bugs/fix-stream-claude-const-prompt-reassignment.md`
+- AskUserQuestion/Plan hang: `documentation/bugs/fix-ask-user-question-stream-event-not-emitted.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
 - Codebase Health Workflow: `documentation/decisions/decision-codebase-health-workflow.md`
+- /code Skill Workflow: `documentation/decisions/decision-code-skill-workflow.md`
 
 **Key patterns**: `documentation/patterns/` — search by name before implementing similar features.
 - Multi-provider LLM: `documentation/patterns/pattern-multi-provider-llm.md`
@@ -112,7 +114,9 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Code-intel language extension: `documentation/patterns/pattern-code-intel-language-extension.md`
 - Marketplace versioning: `documentation/patterns/pattern-marketplace-versioning.md`
 - Changes Panel (Codex diffs): `documentation/patterns/pattern-changes-panel.md`
+- Changes Panel all-messages fix: `documentation/bugs/fix-changes-panel-all-messages.md`
 - Agent Result Card (droid reports): `documentation/patterns/pattern-agent-result-card.md`
+- HTML Visualizer (inline iframe): `documentation/patterns/pattern-html-visualizer-inline.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)
