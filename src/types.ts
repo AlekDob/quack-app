@@ -594,6 +594,7 @@ export interface AgentModePresets {
   bypass: ModePreset;
   plan: ModePreset;
   debug: ModePreset;
+  chat: ModePreset;
 }
 
 // Claude CLI Event types (matching Rust backend + Claude Agent SDK)
@@ -1626,7 +1627,7 @@ export interface KanbanTask {
   // Chat settings (persisted per task)
   chatModel?: string;
   chatThinkingMode?: 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
-  chatPermissionMode?: 'plan' | 'bypass';
+  chatPermissionMode?: 'plan' | 'bypass' | 'debug' | 'chat';
   chatEffort?: 'low' | 'medium' | 'high';
 
   // Task completion tracking

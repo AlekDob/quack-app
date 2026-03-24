@@ -20,7 +20,7 @@ const effortOptions = [
 ];
 
 interface ModePresetCardProps {
-  mode: 'bypass' | 'plan' | 'debug';
+  mode: 'bypass' | 'plan' | 'debug' | 'chat';
   title: string;
   description: string;
   color: string;
@@ -95,7 +95,7 @@ export default function AgentModesSettings() {
   const { resetModePresets } = useSettingsStore();
 
   const handleReset = () => {
-    if (window.confirm('Reset to Anthropic recommended defaults?\n\nBuild: Opus 4.6\nPlan: Opus 4.6\nDebug: Opus 4.6 (high effort)')) {
+    if (window.confirm('Reset to Anthropic recommended defaults?\n\nBuild: Opus 4.6\nPlan: Opus 4.6\nDebug: Opus 4.6 (high effort)\nChat: Sonnet 4.5 (low effort)')) {
       resetModePresets();
     }
   };
@@ -129,6 +129,13 @@ export default function AgentModesSettings() {
           color="#22c55e"
           icon="&#x2B21;"
         />
+        <ModePresetCard
+          mode="chat"
+          title="Chat Mode"
+          description="Conversational - asks before writing or editing, minimizes token usage"
+          color="#00D9FF"
+          icon="&#x25CB;"
+        />
       </div>
 
       <div className="mode-presets-actions">
@@ -136,7 +143,7 @@ export default function AgentModesSettings() {
           Reset to Anthropic Defaults
         </button>
         <div className="mode-presets-hint">
-          Defaults: Build = Opus, Plan = Opus, Debug = Opus (high effort)
+          Defaults: Build = Opus, Plan = Opus, Debug = Opus (high effort), Chat = Sonnet (low effort)
         </div>
       </div>
 

@@ -309,7 +309,7 @@ async function handleQuery(cmd) {
     queryId, prompt, model = 'opus', permissionMode, thinkingMode,
     cwd, sessionId, agents, attachments, outputFormat, effort,
     mcpServers: passedMcpServers, allowedTools, teamContext, ideContext,
-    provider, providerBaseUrl, providerApiKey, debugMode,
+    provider, providerBaseUrl, providerApiKey, debugMode, chatMode,
   } = cmd;
 
   const abortController = new AbortController();
@@ -452,6 +452,13 @@ ${hintsBlock}
 3. **Document findings** — Save to Brain + add \`// Brain: {slug}\` breadcrumbs in code
 `;
           return debugPrompt;
+        })() : '')
+        + (chatMode ? (() => {
+          const skillContent = loadBundledSkill('chat-interaction');
+          if (skillContent) {
+            return `\n\n## Chat Interaction Mode\n\n${skillContent}`;
+          }
+          return '';
         })() : '')
         + (teamContext ? buildTeamPromptAugmentation(teamContext) : ''),
         // Brain: fix-session-limit-prompt-cache

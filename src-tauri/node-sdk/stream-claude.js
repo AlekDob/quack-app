@@ -227,12 +227,14 @@ let {
   teamContext, // Agent Teams context (team name + members for prompt augmentation)
   ideContext, // IDE context (open file, selection, diagnostics, git status)
   debugMode, // Debug mode flag - appends systematic debugging instructions to system prompt
+  chatMode, // Chat mode flag - appends conversational interaction instructions to system prompt
 } = config;
 
 // DEBUG: Log what we received from Rust
 console.error(`[DEBUG] Raw config received:`, JSON.stringify(config, null, 2).substring(0, 500));
 console.error(`[DEBUG] allowedTools from config:`, allowedTools);
 console.error(`[DEBUG] debugMode from config:`, debugMode ?? 'not set');
+console.error(`[DEBUG] chatMode from config:`, chatMode ?? 'not set');
 
 /**
  * Load global MCP servers from ~/.quack/mcp/.mcp.json
@@ -709,6 +711,13 @@ ${hintsBlock}
 3. **Document findings** — Save to Brain + add \`// Brain: {slug}\` breadcrumbs in code
 `;
           return debugPrompt;
+        })() : '')
+        + (chatMode ? (() => {
+          const skillContent = loadBundledSkill('chat-interaction');
+          if (skillContent) {
+            return `\n\n## Chat Interaction Mode\n\n${skillContent}`;
+          }
+          return '';
         })() : '')
         + (teamContext ? buildTeamPromptAugmentation(teamContext) : ''),
         // Brain: fix-session-limit-prompt-cache

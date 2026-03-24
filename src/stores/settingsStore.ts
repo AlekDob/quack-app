@@ -100,7 +100,7 @@ interface SettingsState {
   importSettings: (json: string) => boolean;
 
   // Actions - Agent Mode Presets
-  updateModePreset: (mode: 'bypass' | 'plan' | 'debug', preset: Partial<ModePreset>) => void;
+  updateModePreset: (mode: 'bypass' | 'plan' | 'debug' | 'chat', preset: Partial<ModePreset>) => void;
   resetModePresets: () => void;
 }
 
@@ -170,6 +170,11 @@ const defaultAgentModePresets: AgentModePresets = {
     model: 'opus46',
     thinkingMode: 'hard', // Forces extended thinking for root cause analysis
     effort: 'high',
+  },
+  chat: {
+    model: 'sonnet45',
+    thinkingMode: 'auto',
+    effort: 'low', // Minimize token consumption for conversational use
   },
 };
 
@@ -288,7 +293,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
-        version: 4,
+        version: 5,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
@@ -306,7 +311,7 @@ export const useSettingsStore = create<SettingsState>()(
             }
             // Normalize legacy model IDs in mode presets
             if (persisted.agentModePresets) {
-              for (const mode of ['bypass', 'plan', 'debug'] as const) {
+              for (const mode of ['bypass', 'plan', 'debug', 'chat'] as const) {
                 if (persisted.agentModePresets[mode]?.model) {
                   persisted.agentModePresets[mode].model = normalizeModelId(persisted.agentModePresets[mode].model);
                 }
@@ -328,6 +333,12 @@ export const useSettingsStore = create<SettingsState>()(
             }
             if (persisted.general && !persisted.general.btwShortcut) {
               persisted.general.btwShortcut = 'Ctrl+B';
+            }
+          }
+          // v5: Add Chat mode preset (Sonnet, low effort, conversational)
+          if (version < 5) {
+            if (persisted.agentModePresets && !persisted.agentModePresets.chat) {
+              persisted.agentModePresets.chat = defaultAgentModePresets.chat;
             }
           }
           return persisted;

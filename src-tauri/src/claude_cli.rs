@@ -1983,6 +1983,7 @@ async fn send_message_via_daemon(
         "bypass" => Some("bypassPermissions".to_string()),
         "plan" => Some("plan".to_string()),
         "debug" => Some("bypassPermissions".to_string()),
+        "chat" => Some("default".to_string()),
         "act" => None,
         _ => None,
     });
@@ -2003,6 +2004,9 @@ async fn send_message_via_daemon(
     }
     if request.permission_mode.as_deref() == Some("debug") {
         query_cmd["debugMode"] = serde_json::Value::Bool(true);
+    }
+    if request.permission_mode.as_deref() == Some("chat") {
+        query_cmd["chatMode"] = serde_json::Value::Bool(true);
     }
     if let Some(ref agents) = request.agents {
         query_cmd["agents"] = serde_json::json!(agents);
@@ -2180,6 +2184,10 @@ async fn send_message_via_sdk_streaming_legacy(
             log::info!("[SDK DEBUG] Mapping 'debug' -> 'bypassPermissions' (with debug system prompt)");
             Some(serde_json::Value::String("bypassPermissions".to_string()))
         }
+        "chat" => {
+            log::info!("[SDK DEBUG] Mapping 'chat' -> 'default' (ask before acting)");
+            Some(serde_json::Value::String("default".to_string()))
+        }
         "act" => {
             log::info!("[SDK DEBUG] Mapping 'act' -> undefined (omitting permissionMode)");
             None // undefined = auto-approve in SDK
@@ -2211,6 +2219,13 @@ async fn send_message_via_sdk_streaming_legacy(
     if permission_mode.as_deref() == Some("debug") {
         config["debugMode"] = serde_json::Value::Bool(true);
         log::info!("[SDK DEBUG] Debug mode enabled - adding debugMode flag to config");
+    }
+
+    // Add chatMode flag when permission_mode is "chat"
+    // This tells stream-claude.js to append chat interaction instructions
+    if permission_mode.as_deref() == Some("chat") {
+        config["chatMode"] = serde_json::Value::Bool(true);
+        log::info!("[SDK DEBUG] Chat mode enabled - adding chatMode flag to config");
     }
 
     // DEBUG: Log final config

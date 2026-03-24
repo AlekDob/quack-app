@@ -26,6 +26,7 @@ const permissionModeOptions = [
   { value: 'plan' as PermissionMode, label: '◇ Plan · Planning only' },
   { value: 'bypass' as PermissionMode, label: '⬢ Build · No confirmations' },
   { value: 'debug' as PermissionMode, label: '⬡ Debug · Systematic debugging' },
+  { value: 'chat' as PermissionMode, label: '○ Chat · Ask before acting' },
 ];
 
 const effortOptions = [
@@ -127,6 +128,7 @@ export default function ChatSettingsMenu({
       plan: '#60a5fa',
       bypass: '#f87171',
       debug: '#22c55e',
+      chat: '#00D9FF',
     };
     return colors[permissionMode] || '#ffffff';
   };

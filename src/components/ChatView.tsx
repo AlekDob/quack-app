@@ -661,7 +661,7 @@ export default function ChatView({
         e.preventDefault();
 
         // Cycle through permission modes
-        const modes: PermissionMode[] = ['plan', 'bypass', 'debug'];
+        const modes: PermissionMode[] = ['plan', 'bypass', 'debug', 'chat'];
         const currentIndex = modes.indexOf(permissionMode);
         const nextIndex = (currentIndex + 1) % modes.length;
         onPermissionModeChange(modes[nextIndex]);

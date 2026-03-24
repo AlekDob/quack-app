@@ -112,7 +112,7 @@ import type { DiffInfo } from "./components/CodeEditorCodeMirror";
 import { parseDiff } from "./lib/diffParser";
 import { buildContextPrefix } from "./utils/ideContextBuilder";
 import { useExternalIdeContext } from "./hooks/useExternalIdeContext";
-import type { ChatSendOptions } from "./hooks/useClaudeChat";
+import type { ChatSendOptions, PermissionMode } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useModelsConfig } from "./hooks/useAppConfig";
 import { getModelId } from "./services/modelService";
@@ -4160,7 +4160,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Auto-switch settings based on permission mode using presets from settings
       let finalUpdates = { ...updates };
       if (updates.permissionMode !== undefined && updates.permissionMode !== current.permissionMode) {
-        const preset = presets[updates.permissionMode as 'bypass' | 'plan' | 'debug'];
+        const preset = presets[updates.permissionMode as 'bypass' | 'plan' | 'debug' | 'chat'];
         if (preset) {
           finalUpdates.model = normalizeModelName(preset.model);
           finalUpdates.thinkingMode = preset.thinkingMode;
@@ -11854,7 +11854,7 @@ You have access to all Bash tools to execute git commands like:
                       onCreateNewAgent={handleOpenNewAgentForKanban}
                       defaultModel={currentSettings.model}
                       defaultThinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
-                      defaultPermissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
+                      defaultPermissionMode={currentSettings.permissionMode as PermissionMode}
                       defaultEffort={currentSettings.effort || 'medium'}
                       onLoadChatSessions={loadKanbanChatSessions}
                       onDiffClick={handleDiffClick}
@@ -12069,7 +12069,7 @@ You have access to all Bash tools to execute git commands like:
                     onModelChange={(model) => updateAgentSettings({ model })}
                     thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
                     onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
-                    permissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
+                    permissionMode={currentSettings.permissionMode as PermissionMode}
                     onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
                     effort={currentSettings.effort || 'medium'}
                     onEffortChange={(effort) => updateAgentSettings({ effort })}
@@ -12231,7 +12231,7 @@ You have access to all Bash tools to execute git commands like:
                     onModelChange={(model) => updateAgentSettings({ model })}
                     thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
                     onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
-                    permissionMode={currentSettings.permissionMode as 'plan' | 'bypass'}
+                    permissionMode={currentSettings.permissionMode as PermissionMode}
                     onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
                     effort={currentSettings.effort || 'medium'}
                     onEffortChange={(effort) => updateAgentSettings({ effort })}
