@@ -596,12 +596,23 @@ async function main() {
     // Brain: fix-duplicate-plan-approval
     let planAlreadyApproved = false;
 
+    // Brain: gotcha-sdk-bundled-cli-200k-context-window
+    // The native Claude CLI binary handles prompt caching ~20x more efficiently
+    // than the SDK's bundled cli.js (300 vs 6200 uncached tokens/message).
+    // It also correctly resolves the 1M context window feature flag.
+    const isWindows = process.platform === 'win32';
+    const nativeClaudePath = isWindows
+      ? join(homedir(), '.claude', 'local', 'claude.exe')
+      : join(homedir(), '.local', 'bin', 'claude');
+    const hasNativeCli = existsSync(nativeClaudePath);
+
     const options = {
       model: modelId,
       // Brain: 1m-context-window-support
       // The [1m] suffix in modelId is enough — the CLI handles it natively.
       // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
       // No betas needed (GA since March 2026, beta header is ignored).
+      ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
       // Enable automatic reading of CLAUDE.md and project settings
       settingSources: ['project', 'user', 'local'],
 
