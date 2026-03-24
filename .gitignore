@@ -41,3 +41,4 @@ src-tauri/binaries/
 .quack/teams/
 /CLAUDE.md
 dist-linux
+.worktrees/
