@@ -29,6 +29,32 @@ import { createHash } from 'crypto';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+function resolveClaudeCodeExecutable() {
+  const envPath = process.env.CLAUDE_CODE_EXECUTABLE?.trim();
+  const candidates = [
+    envPath || null,
+    join(homedir(), '.local', 'bin', 'claude'),
+    '/opt/homebrew/bin/claude',
+    '/usr/local/bin/claude',
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      if (existsSync(candidate)) return candidate;
+    } catch { /* ignore fs errors */ }
+  }
+
+  try {
+    const resolved = execSync('command -v claude', {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (resolved && existsSync(resolved)) return resolved;
+  } catch { /* ignore PATH lookup failures */ }
+
+  return null;
+}
+
 // =============================================================================
 // SKILL LOADER — reads bundled skill files for system prompt injection
 // Brain: debug-mode-auto-skill-injection
@@ -1031,6 +1057,21 @@ ${hintsBlock}
     // Without it, the SDK operates in 200k mode even for 1M-capable models.
     options.betas = ['context-1m-2025-08-07'];
 
+    // Brain: gotcha-sdk-bundled-cli-200k-context-window
+    // Prefer the installed native Claude Code binary over the SDK bundled cli.js.
+    // This keeps behavior closer to the user's Claude Code CLI and avoids bundled-CLI regressions.
+    const nativeClaudeExecutable = resolveClaudeCodeExecutable();
+    if (nativeClaudeExecutable) {
+      options.pathToClaudeCodeExecutable = nativeClaudeExecutable;
+      console.error(`[DEBUG] Using native Claude executable: ${nativeClaudeExecutable}`);
+    } else {
+      console.error('[DEBUG] Using SDK bundled Claude CLI (no native executable found)');
+    }
+    console.error(`[EXEC] ${JSON.stringify({
+      pathToClaudeCodeExecutable: options.pathToClaudeCodeExecutable ?? null,
+      executionMode: options.pathToClaudeCodeExecutable ? 'native-claude' : 'sdk-bundled-cli',
+    })}`);
+
     if (cwd) {
       options.cwd = cwd;
       console.error(`[DEBUG] Working directory: ${cwd}`);
@@ -1132,32 +1173,14 @@ ${hintsBlock}
     // Note: SDK MCP servers (createSdkMcpServer) have a known bug with "Stream closed" errors
     // See: https://github.com/anthropics/claude-code/issues/6710
     // Using stdio transport instead for stability
-    const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
-    const codeIntelMcpServerPath = join(__dirname, 'code-intel-mcp-server.js');
-    console.error(`[MCP] IDE MCP server path: ${ideMcpServerPath}`);
-    console.error(`[MCP] IDE MCP exists: ${existsSync(ideMcpServerPath)}`);
-    console.error(`[MCP] Code Intel MCP server path: ${codeIntelMcpServerPath}`);
-    console.error(`[MCP] Code Intel MCP exists: ${existsSync(codeIntelMcpServerPath)}`);
-
-    // Merge MCP servers: file-based servers + built-in Quack servers (ide + code-intel)
     options.mcpServers = {
       ...(resolvedMcpServers || {}),
-      'ide-tools': {
-        command: 'node',
-        args: [ideMcpServerPath],
-      },
-      'code-intel': {
-        type: 'stdio',
-        command: 'node',
-        args: [codeIntelMcpServerPath],
-      },
     };
 
-    const builtInServerCount = 2; // ide-tools + code-intel
     if (resolvedMcpServers && Object.keys(resolvedMcpServers).length > 0) {
-      console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length + builtInServerCount} MCP servers:`, Object.keys(options.mcpServers).join(', '));
+      console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length} MCP servers:`, Object.keys(options.mcpServers).join(', '));
     } else {
-      console.error(`[MCP] Using built-in MCP servers only (ide-tools, code-intel)`);
+      console.error(`[MCP] No MCP servers enabled for this query`);
     }
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));

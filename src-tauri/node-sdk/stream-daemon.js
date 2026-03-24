@@ -32,6 +32,32 @@ import { execSync } from 'child_process';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+function resolveClaudeCodeExecutable() {
+  const envPath = process.env.CLAUDE_CODE_EXECUTABLE?.trim();
+  const candidates = [
+    envPath || null,
+    join(homedir(), '.local', 'bin', 'claude'),
+    '/opt/homebrew/bin/claude',
+    '/usr/local/bin/claude',
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      if (existsSync(candidate)) return candidate;
+    } catch { /* ignore fs errors */ }
+  }
+
+  try {
+    const resolved = execSync('command -v claude', {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    if (resolved && existsSync(resolved)) return resolved;
+  } catch { /* ignore PATH lookup failures */ }
+
+  return null;
+}
+
 // =============================================================================
 // SKILL LOADER — reads bundled skill files for system prompt injection
 // Brain: debug-mode-auto-skill-injection
@@ -687,6 +713,22 @@ ${hintsBlock}
       options.env.CLAUDE_CODE_TASK_LIST_ID = `quack-${sessionId}`;
     }
 
+    // Brain: gotcha-sdk-bundled-cli-200k-context-window
+    // Prefer the installed native Claude Code binary over the SDK bundled cli.js.
+    // This avoids bundled-CLI regressions and keeps behavior aligned with the user's CLI.
+    const nativeClaudeExecutable = resolveClaudeCodeExecutable();
+    if (nativeClaudeExecutable) {
+      options.pathToClaudeCodeExecutable = nativeClaudeExecutable;
+      log('QUERY', `query=${queryId} using native Claude executable: ${nativeClaudeExecutable}`);
+    } else {
+      log('QUERY', `query=${queryId} using SDK bundled Claude CLI (no native executable found)`);
+    }
+    log('EXEC', JSON.stringify({
+      queryId,
+      pathToClaudeCodeExecutable: options.pathToClaudeCodeExecutable ?? null,
+      executionMode: options.pathToClaudeCodeExecutable ? 'native-claude' : 'sdk-bundled-cli',
+    }));
+
     options.enableFileCheckpointing = true;
 
     // --- MCP servers ---
@@ -697,12 +739,8 @@ ${hintsBlock}
       resolvedMcpServers = loadGlobalMCPServers();
     }
 
-    const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
-    const codeIntelMcpServerPath = join(__dirname, 'code-intel-mcp-server.js');
     options.mcpServers = {
       ...(resolvedMcpServers || {}),
-      'ide-tools': { command: 'node', args: [ideMcpServerPath] },
-      'code-intel': { type: 'stdio', command: 'node', args: [codeIntelMcpServerPath] },
     };
 
     const mcpCount = options.mcpServers ? Object.keys(options.mcpServers).length : 0;
