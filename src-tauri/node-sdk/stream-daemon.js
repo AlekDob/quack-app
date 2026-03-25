@@ -21,120 +21,20 @@ Symbol.asyncDispose ??= Symbol('Symbol.asyncDispose');
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import Anthropic from '@anthropic-ai/sdk';
-import { readFileSync, existsSync, readdirSync, appendFileSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { extname, join, dirname } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
 import { randomUUID, createHash } from 'crypto';
 import { execSync, spawn } from 'child_process';
+import { appendFileSync } from 'fs';
 
 // 🐛 DIAG: Write diagnostics to a file that's easy to check
 const DIAG_FILE = join(homedir(), '.quack', 'daemon-diag.log');
-const CACHE_INVESTIGATION_LOG = join(homedir(), '.quack', 'cache-investigation.log');
-const CACHE_DEBUG_DIR = join(homedir(), '.quack', 'cache-debug');
-const fetchCaptureState = {
-  queryId: null,
-  enabled: false,
-  requestCount: 0,
-};
 function diag(msg) {
   try {
     appendFileSync(DIAG_FILE, `[${new Date().toISOString()}] ${msg}\n`);
-  } catch (e) { /* ignore */ }
-}
-
-function normalizeBodyForCapture(body) {
-  if (body == null) return null;
-  if (typeof body === 'string') return body;
-  if (Buffer.isBuffer(body)) return body.toString('utf8');
-  if (body instanceof Uint8Array) return Buffer.from(body).toString('utf8');
-  return null;
-}
-
-function writeSdkApiRequestCapture({ queryId, url, method, bodyText }) {
-  try {
-    mkdirSync(CACHE_DEBUG_DIR, { recursive: true });
-    const parsedBody = (() => {
-      try {
-        return bodyText ? JSON.parse(bodyText) : null;
-      } catch {
-        return null;
-      }
-    })();
-    const requestIndex = ++fetchCaptureState.requestCount;
-    const filePath = join(CACHE_DEBUG_DIR, `${queryId}.api-request.${requestIndex}.json`);
-    const payload = {
-      ts: new Date().toISOString(),
-      queryId,
-      requestIndex,
-      url,
-      method,
-      bodyHash: hashText(bodyText || ''),
-      bodyChars: bodyText?.length || 0,
-      parsedBody,
-      rawBody: parsedBody ? undefined : bodyText,
-    };
-    appendFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`);
-    writeCacheInvestigationLog('stream-daemon', 'API_REQUEST', {
-      queryId,
-      requestIndex,
-      url,
-      method,
-      bodyHash: payload.bodyHash,
-      bodyChars: payload.bodyChars,
-      filePath,
-      model: parsedBody?.model || null,
-      messageCount: Array.isArray(parsedBody?.messages) ? parsedBody.messages.length : null,
-      toolCount: Array.isArray(parsedBody?.tools) ? parsedBody.tools.length : null,
-      systemChars: typeof parsedBody?.system === 'string'
-        ? parsedBody.system.length
-        : Array.isArray(parsedBody?.system)
-          ? JSON.stringify(parsedBody.system).length
-          : 0,
-    });
-  } catch (error) {
-    log('WARN', `Failed to write API request capture: ${error.message}`);
-  }
-}
-
-if (typeof globalThis.fetch === 'function' && !globalThis.__quackFetchCaptureInstalled) {
-  const originalFetch = globalThis.fetch.bind(globalThis);
-  globalThis.fetch = async function quackFetchCapture(input, init) {
-    if (fetchCaptureState.enabled) {
-      try {
-        const url = typeof input === 'string' || input instanceof URL
-          ? String(input)
-          : input?.url;
-        const method = init?.method || input?.method || 'GET';
-        if (url && method.toUpperCase() === 'POST' && url.includes('/v1/messages')) {
-          let bodyText = normalizeBodyForCapture(init?.body);
-          if (bodyText == null && typeof Request !== 'undefined' && input instanceof Request) {
-            bodyText = await input.clone().text();
-          }
-          writeSdkApiRequestCapture({
-            queryId: fetchCaptureState.queryId,
-            url,
-            method,
-            bodyText,
-          });
-        }
-      } catch (error) {
-        log('WARN', `Fetch capture failed: ${error.message}`);
-      }
-    }
-    return originalFetch(input, init);
-  };
-  globalThis.__quackFetchCaptureInstalled = true;
-}
-
-function writeCacheInvestigationLog(source, tag, payload) {
-  try {
-    mkdirSync(dirname(CACHE_INVESTIGATION_LOG), { recursive: true });
-    appendFileSync(
-      CACHE_INVESTIGATION_LOG,
-      `${JSON.stringify({ ts: new Date().toISOString(), source, tag, ...payload })}\n`
-    );
   } catch (e) { /* ignore */ }
 }
 
@@ -216,16 +116,6 @@ function emit(obj) {
 
 function log(tag, ...args) {
   console.error(`[DAEMON:${tag}]`, ...args);
-}
-
-function logSessionPayload(payload) {
-  log('SESSION', JSON.stringify(payload));
-  writeCacheInvestigationLog('stream-daemon', 'SESSION', payload);
-}
-
-function logHookPayload(payload) {
-  log('HOOK', JSON.stringify(payload));
-  writeCacheInvestigationLog('stream-daemon', 'HOOK', payload);
 }
 
 // =============================================================================
@@ -399,281 +289,6 @@ function createMessageContent(text, imagePaths = []) {
   return content;
 }
 
-function estimateTokens(text = '') {
-  return Math.ceil(text.length / 4);
-}
-
-function hashText(text = '') {
-  return createHash('sha256').update(text).digest('hex').slice(0, 16);
-}
-
-function previewText(text = '', maxChars = 240) {
-  if (!text) return '';
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  if (normalized.length <= maxChars) return normalized;
-  return `${normalized.slice(0, maxChars)}...`;
-}
-
-function summarizeText(text = '') {
-  return {
-    chars: text.length,
-    lines: text ? text.split('\n').length : 0,
-    estimatedTokens: estimateTokens(text),
-    hash: hashText(text),
-    preview: previewText(text),
-  };
-}
-
-function getContextInstructionFiles(projectCwd) {
-  const files = [];
-  const candidates = [
-    { scope: 'user', path: join(homedir(), '.claude', 'CLAUDE.md') },
-  ];
-
-  if (projectCwd) {
-    candidates.push(
-      { scope: 'project-dotclaude', path: join(projectCwd, '.claude', 'CLAUDE.md') },
-      { scope: 'project-root', path: join(projectCwd, 'CLAUDE.md') },
-    );
-  }
-
-  for (const candidate of candidates) {
-    if (!existsSync(candidate.path)) continue;
-    try {
-      const content = readFileSync(candidate.path, 'utf8');
-      files.push({
-        scope: candidate.scope,
-        path: candidate.path,
-        chars: content.length,
-        lines: content ? content.split('\n').length : 0,
-        estimatedTokens: estimateTokens(content),
-        hash: hashText(content),
-      });
-    } catch (error) {
-      files.push({
-        scope: candidate.scope,
-        path: candidate.path,
-        error: error.message,
-      });
-    }
-  }
-
-  return files;
-}
-
-function logContextPayload({
-  queryId,
-  model,
-  modelId,
-  sessionId,
-  prompt,
-  attachments,
-  ideContext,
-  systemPromptAppend,
-  settingSources,
-  allowedTools,
-  mcpServers,
-  teamContext,
-  debugMode,
-  cwd,
-  investigation,
-}) {
-  const instructionFiles = getContextInstructionFiles(cwd);
-  const payloadSummary = {
-    queryId,
-    resume: Boolean(sessionId),
-    model,
-    modelId,
-    cwd: cwd || null,
-    debugMode: Boolean(debugMode),
-    prompt: summarizeText(prompt),
-    ideContext: summarizeText(ideContext || ''),
-    systemPromptAppend: summarizeText(systemPromptAppend || ''),
-    attachments: {
-      count: attachments?.length || 0,
-      paths: attachments || [],
-    },
-    teamContext: teamContext ? {
-      teamName: teamContext.teamName,
-      memberCount: teamContext.members?.length || 0,
-    } : null,
-    investigation: investigation || null,
-    settingSources,
-    allowedTools: {
-      count: allowedTools.length,
-      names: allowedTools,
-    },
-    mcpServers: {
-      count: Object.keys(mcpServers || {}).length,
-      names: Object.keys(mcpServers || {}),
-    },
-    instructionFiles,
-    estimatedInjectedTokens: {
-      ideContext: estimateTokens(ideContext || ''),
-      systemPromptAppend: estimateTokens(systemPromptAppend || ''),
-      instructionFiles: instructionFiles.reduce((sum, file) => sum + (file.estimatedTokens || 0), 0),
-    },
-    payloadHashes: {
-      prompt: hashText(prompt || ''),
-      ideContext: hashText(ideContext || ''),
-      systemPromptAppend: hashText(systemPromptAppend || ''),
-      instructionFilesComposite: hashText(
-        instructionFiles
-          .map(file => `${file.scope}:${file.path}:${file.hash || file.error || 'missing'}`)
-          .join('|')
-      ),
-      settingSources: hashText(JSON.stringify(settingSources || [])),
-      allowedTools: hashText(JSON.stringify(allowedTools || [])),
-      mcpServers: hashText(JSON.stringify(Object.keys(mcpServers || {}).sort())),
-      teamContext: hashText(JSON.stringify(teamContext || null)),
-      investigation: hashText(JSON.stringify(investigation || null)),
-    },
-  };
-
-  log('CONTEXT', JSON.stringify(payloadSummary));
-  writeCacheInvestigationLog('stream-daemon', 'CONTEXT', payloadSummary);
-}
-
-function extractMaxContextWindow(modelUsage) {
-  if (!modelUsage || typeof modelUsage !== 'object') return null;
-  let maxContextWindow = null;
-  for (const entry of Object.values(modelUsage)) {
-    if (entry && typeof entry === 'object' && Number.isFinite(entry.contextWindow) && entry.contextWindow > 0) {
-      maxContextWindow = Math.max(maxContextWindow ?? 0, entry.contextWindow);
-    }
-  }
-  return maxContextWindow;
-}
-
-function getCacheInvestigationConfig() {
-  const requestedMode = process.env.QUACK_CACHE_INVESTIGATION_MODE || 'baseline';
-  switch (requestedMode) {
-    case 'baseline':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
-    case 'baseline-scaffold-debug':
-      return {
-        mode: requestedMode,
-        toolConfigMode: 'preset_claude_code',
-        systemPromptMode: 'claude_code_preset',
-        includeBuiltInMcp: true,
-        includeAllMcp: true,
-        settingSources: ['project', 'user', 'local'],
-        enableSdkDebugHooks: true,
-      };
-    case 'baseline-preserve-skill-attachments':
-      return {
-        mode: requestedMode,
-        toolConfigMode: 'preset_claude_code',
-        systemPromptMode: 'claude_code_preset',
-        includeBuiltInMcp: true,
-        includeAllMcp: true,
-        settingSources: ['project', 'user', 'local'],
-        enableSdkDebugHooks: true,
-        preserveSkillAttachments: true,
-      };
-    case 'baseline-no-allowed-tools':
-      return {
-        mode: requestedMode,
-        toolConfigMode: 'preset_claude_code',
-        systemPromptMode: 'claude_code_preset',
-        includeBuiltInMcp: true,
-        includeAllMcp: true,
-        settingSources: ['project', 'user', 'local'],
-        enableSdkDebugHooks: true,
-        omitAllowedTools: true,
-      };
-    case 'baseline-preserve-skill-attachments-no-settings':
-      return {
-        mode: requestedMode,
-        toolConfigMode: 'preset_claude_code',
-        systemPromptMode: 'claude_code_preset',
-        includeBuiltInMcp: true,
-        includeAllMcp: true,
-        settingSources: [],
-        enableSdkDebugHooks: true,
-        preserveSkillAttachments: true,
-      };
-    case 'baseline-preserve-skill-attachments-no-settings-no-file-checkpointing':
-      return {
-        mode: requestedMode,
-        toolConfigMode: 'preset_claude_code',
-        systemPromptMode: 'claude_code_preset',
-        includeBuiltInMcp: true,
-        includeAllMcp: true,
-        settingSources: [],
-        enableSdkDebugHooks: true,
-        preserveSkillAttachments: true,
-        disableFileCheckpointing: true,
-      };
-    case 'baseline-preserve-skill-attachments-no-settings-no-file-checkpointing-capture-request':
-      return {
-        mode: requestedMode,
-        toolConfigMode: 'preset_claude_code',
-        systemPromptMode: 'claude_code_preset',
-        includeBuiltInMcp: true,
-        includeAllMcp: true,
-        settingSources: [],
-        enableSdkDebugHooks: true,
-        preserveSkillAttachments: true,
-        disableFileCheckpointing: true,
-        captureApiRequestPayload: true,
-      };
-    case 'explicit-tools':
-      return { mode: requestedMode, toolConfigMode: 'explicit_allowed_tools', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
-    case 'preset-no-builtin-mcp':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: false, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
-    case 'explicit-tools-no-builtin-mcp':
-      return { mode: requestedMode, toolConfigMode: 'explicit_allowed_tools', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: false, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
-    case 'all-mcp-disabled':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: false, includeAllMcp: false, settingSources: ['project', 'user', 'local'] };
-    case 'project-only-settings':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project'] };
-    case 'all-mcp-disabled-project-only-settings':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: false, includeAllMcp: false, settingSources: ['project'] };
-    case 'all-mcp-disabled-no-settings':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: false, includeAllMcp: false, settingSources: [] };
-    case 'minimal-no-preset-no-settings':
-      return { mode: requestedMode, toolConfigMode: 'no_tools', systemPromptMode: 'minimal_plain', includeBuiltInMcp: false, includeAllMcp: false, settingSources: [] };
-    default:
-      log('WARN', `Unknown QUACK_CACHE_INVESTIGATION_MODE="${requestedMode}", falling back to baseline`);
-      return { mode: 'baseline', toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
-  }
-}
-
-function logUsagePayload({ queryId, eventType, usage, modelUsage }) {
-  if (!usage && !modelUsage) return;
-
-  const inputTokens = usage?.input_tokens || 0;
-  const outputTokens = usage?.output_tokens || 0;
-  const cacheReadTokens = usage?.cache_read_input_tokens || usage?.cacheReadInputTokens || 0;
-  const cacheCreationTokens = usage?.cache_creation_input_tokens || usage?.cacheCreationInputTokens || 0;
-  const effectiveContextFill = inputTokens + cacheReadTokens + cacheCreationTokens;
-  const contextWindow = extractMaxContextWindow(modelUsage);
-
-  log('USAGE', JSON.stringify({
-    queryId,
-    eventType,
-    inputTokens,
-    outputTokens,
-    cacheReadTokens,
-    cacheCreationTokens,
-    effectiveContextFill,
-    contextWindow,
-    contextUtilizationPct: contextWindow ? Number(((effectiveContextFill / contextWindow) * 100).toFixed(2)) : null,
-  }));
-  writeCacheInvestigationLog('stream-daemon', 'USAGE', {
-    queryId,
-    eventType,
-    inputTokens,
-    outputTokens,
-    cacheReadTokens,
-    cacheCreationTokens,
-    effectiveContextFill,
-    contextWindow,
-    contextUtilizationPct: contextWindow ? Number(((effectiveContextFill / contextWindow) * 100).toFixed(2)) : null,
-  });
-}
-
 // =============================================================================
 // TEAM PROMPT AUGMENTATION (reused from stream-claude.js)
 // =============================================================================
@@ -702,12 +317,10 @@ function buildTeamPromptAugmentation(tc) {
 // Each query() call spawns a fresh CLI subprocess, destroying in-memory state
 // (skills, cache markers, message decorations) and causing ~28-33k tokens of
 // cache re-creation per turn. Keeping the subprocess alive across turns reduces
-// this to ~56 tokens — a 500x improvement.
+// this to ~230 tokens — a 120x improvement.
 // =============================================================================
 
 const sessionProcesses = new Map(); // claudeSessionId → SessionProcess
-
-// Resolved below after __dirname is computed (see assignment after __dirname definition).
 
 /**
  * Build CLI args for spawning the Claude Code subprocess.
@@ -723,14 +336,12 @@ function buildCliArgs(opts) {
   if (opts.model) args.push('--model', opts.model);
   if (opts.resume) args.push('--resume', opts.resume);
   if (opts.permissionMode) args.push('--permission-mode', opts.permissionMode);
-  // Enable bidirectional permission requests so canUseTool works
   if (opts.canUseTool) args.push('--permission-prompt-tool', 'stdio');
   if (opts.settingSources !== undefined) args.push('--setting-sources', opts.settingSources.join(','));
   if (opts.betas?.length) args.push('--betas', opts.betas.join(','));
   if (opts.allowedTools?.length) args.push('--allowedTools', opts.allowedTools.join(','));
   if (opts.disallowedTools?.length) args.push('--disallowedTools', opts.disallowedTools.join(','));
 
-  // Tools config
   if (opts.tools !== undefined) {
     if (Array.isArray(opts.tools)) {
       args.push('--tools', opts.tools.length === 0 ? '' : opts.tools.join(','));
@@ -739,7 +350,6 @@ function buildCliArgs(opts) {
     }
   }
 
-  // Thinking/effort
   if (opts.thinking) {
     switch (opts.thinking.type) {
       case 'enabled': args.push('--max-thinking-tokens', (opts.thinking.budgetTokens ?? 0).toString()); break;
@@ -749,15 +359,12 @@ function buildCliArgs(opts) {
   }
   if (opts.effort) args.push('--effort', opts.effort);
 
-  // MCP servers
   if (opts.mcpServers && Object.keys(opts.mcpServers).length > 0) {
     args.push('--mcp-config', JSON.stringify({ mcpServers: opts.mcpServers }));
   }
 
-  // Debug
   if (opts.debugFile) args.push('--debug-file', opts.debugFile);
 
-  // Agents
   if (opts.agents?.length) {
     for (const agent of opts.agents) {
       args.push('--agent', agent.path || agent.name);
@@ -799,14 +406,12 @@ class SessionProcess {
     this.alive = false;
     this.initialized = false;
 
-    // Per-query state (updated for each new turn)
     this.currentQueryId = null;
     this.canUseToolFn = null;
 
-    // Event routing
     this.eventQueue = [];
     this.eventResolve = null;
-    this.pendingControlRequests = new Map(); // requestId → { resolve, reject }
+    this.pendingControlRequests = new Map();
   }
 
   spawn(args, cwd, env) {
@@ -818,11 +423,9 @@ class SessionProcess {
 
     this.alive = true;
 
-    // Read stdout as JSON lines
     this.rl = createInterface({ input: this.child.stdout });
     this.rl.on('line', (line) => this._handleStdoutLine(line));
 
-    // Log stderr for debugging
     this.child.stderr.on('data', (data) => {
       const text = data.toString().trim();
       if (text) diag(`[SessionProcess ${this.sessionId}] stderr: ${text}`);
@@ -832,12 +435,10 @@ class SessionProcess {
       this.alive = false;
       if (this.rl) { try { this.rl.close(); } catch { /* ignore */ } }
       diag(`[SessionProcess ${this.sessionId}] exited code=${code} signal=${signal}`);
-      // Reject any pending control requests
       for (const [, pending] of this.pendingControlRequests) {
         pending.reject(new Error('Process exited'));
       }
       this.pendingControlRequests.clear();
-      // Ensure the event consumer unblocks — push sentinel to queue AND resolve
       const exitEvent = { type: 'result', subtype: 'error_process_exit', is_error: true, errors: ['Process exited unexpectedly'] };
       if (this.eventResolve) {
         const r = this.eventResolve;
@@ -851,10 +452,6 @@ class SessionProcess {
     log('SESSION_PROCESS', `Spawned subprocess for session=${this.sessionId} pid=${this.child.pid}`);
   }
 
-  /**
-   * Send the initialize control_request (systemPrompt append, agents, etc.)
-   * Must be called once after spawn, before sending user messages.
-   */
   async initialize(initConfig) {
     if (this.initialized) return;
     const response = await this._sendControlRequest({
@@ -872,17 +469,11 @@ class SessionProcess {
     return response;
   }
 
-  /**
-   * Set per-query context before sending a message.
-   */
   startQuery(queryId, canUseToolFn) {
     this.currentQueryId = queryId;
     this.canUseToolFn = canUseToolFn;
   }
 
-  /**
-   * Send a user message to the subprocess stdin.
-   */
   sendMessage(text, attachments) {
     const content = createMessageContent(text, attachments);
     this._writeStdin({
@@ -893,9 +484,6 @@ class SessionProcess {
     });
   }
 
-  /**
-   * Async generator yielding SDK events until a 'result' event.
-   */
   async *events() {
     while (this.alive) {
       const event = await this._nextEvent();
@@ -904,9 +492,6 @@ class SessionProcess {
     }
   }
 
-  /**
-   * Update mutable options between turns via control_requests.
-   */
   async setModel(model) {
     return this._sendControlRequest({ subtype: 'set_model', model });
   }
@@ -915,9 +500,6 @@ class SessionProcess {
     return this._sendControlRequest({ subtype: 'set_permission_mode', mode });
   }
 
-  /**
-   * Kill the subprocess.
-   */
   kill() {
     if (!this.child || this.child.killed) return;
     this.alive = false;
@@ -933,14 +515,11 @@ class SessionProcess {
     log('SESSION_PROCESS', `Killing subprocess for session=${this.sessionId}`);
   }
 
-  // --- Private methods ---
-
   _handleStdoutLine(line) {
     if (!line.trim()) return;
     let event;
     try { event = JSON.parse(line); } catch { return; }
 
-    // Route control_response → pending control requests from us
     if (event.type === 'control_response') {
       const pending = this.pendingControlRequests.get(event.response?.request_id);
       if (pending) {
@@ -951,7 +530,6 @@ class SessionProcess {
       return;
     }
 
-    // Route control_request from subprocess → handle permission checks
     if (event.type === 'control_request') {
       this._handleSubprocessControlRequest(event).catch(err => {
         diag(`[SessionProcess] control_request error: ${err.message}`);
@@ -959,13 +537,11 @@ class SessionProcess {
       return;
     }
 
-    // Skip internal protocol messages
     if (event.type === 'control_cancel_request' || event.type === 'keep_alive' ||
         event.type === 'streamlined_text' || event.type === 'streamlined_tool_use_summary') {
       return;
     }
 
-    // Queue the event for the consumer
     if (this.eventResolve) {
       const r = this.eventResolve;
       this.eventResolve = null;
@@ -975,9 +551,6 @@ class SessionProcess {
     }
   }
 
-  /**
-   * Handle a control_request from the subprocess (permission check, etc.)
-   */
   async _handleSubprocessControlRequest(event) {
     const request = event.request;
     const requestId = event.request_id;
@@ -1010,7 +583,6 @@ class SessionProcess {
         });
       }
     } else {
-      // Default: deny unknown control requests
       this._writeStdin({
         type: 'control_response',
         response: {
@@ -1022,9 +594,6 @@ class SessionProcess {
     }
   }
 
-  /**
-   * Send a control_request to the subprocess and wait for response.
-   */
   _sendControlRequest(request) {
     const requestId = randomUUID();
     return new Promise((resolve, reject) => {
@@ -1065,7 +634,7 @@ async function handleQuery(cmd) {
     queryId, prompt, model = 'opus', permissionMode, thinkingMode,
     cwd, sessionId, agents, attachments, outputFormat, effort,
     mcpServers: passedMcpServers, allowedTools, teamContext, ideContext,
-    provider, providerBaseUrl, providerApiKey, debugMode, chatMode, sessionKey,
+    provider, providerBaseUrl, providerApiKey, debugMode, chatMode,
   } = cmd;
 
   const abortController = new AbortController();
@@ -1111,36 +680,33 @@ async function handleQuery(cmd) {
     ];
     const resolvedAllowedTools = allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0
       ? allowedTools : defaultAllowedTools;
-    const investigation = getCacheInvestigationConfig();
-    fetchCaptureState.enabled = Boolean(investigation.captureApiRequestPayload);
-    fetchCaptureState.queryId = queryId;
-    fetchCaptureState.requestCount = 0;
-    if (investigation.captureApiRequestPayload) {
-      process.env.QUACK_CAPTURE_REQUEST_BODY = '1';
-      process.env.QUACK_CAPTURE_REQUEST_QUERY_ID = queryId;
-      process.env.QUACK_CAPTURE_REQUEST_INDEX = '0';
-    } else {
-      delete process.env.QUACK_CAPTURE_REQUEST_BODY;
-      delete process.env.QUACK_CAPTURE_REQUEST_QUERY_ID;
-      delete process.env.QUACK_CAPTURE_REQUEST_INDEX;
-    }
-    const effectiveAllowedTools = investigation.toolConfigMode === 'no_tools'
-      ? []
-      : investigation.omitAllowedTools
-        ? undefined
-        : resolvedAllowedTools;
-    const toolsConfig =
-      investigation.toolConfigMode === 'explicit_allowed_tools'
-        ? effectiveAllowedTools
-        : investigation.toolConfigMode === 'no_tools'
-          ? []
-          : { type: 'preset', preset: 'claude_code' };
-    const systemPromptConfig = investigation.systemPromptMode === 'minimal_plain'
-      ? 'Answer the user directly and concisely.'
-      : {
-          type: 'preset',
-          preset: 'claude_code',
-          append: `
+
+    // Brain: gotcha-sdk-bundled-cli-200k-context-window
+    // The native Claude CLI binary handles prompt caching ~20x more efficiently
+    // than the SDK's bundled cli.js (300 vs 6200 uncached tokens/message).
+    // It also correctly resolves the 1M context window feature flag.
+    const isWindows = process.platform === 'win32';
+    const nativeClaudePath = isWindows
+      ? join(homedir(), '.claude', 'local', 'claude.exe')
+      : join(homedir(), '.local', 'bin', 'claude');
+    const hasNativeCli = existsSync(nativeClaudePath);
+    debugLog(`CLI: ${hasNativeCli ? 'native (' + nativeClaudePath + ')' : 'bundled cli.js'}`);
+
+    const options = {
+      model: modelId,
+      // Brain: 1m-context-window-support
+      // The [1m] suffix in modelId is enough — the CLI handles it natively.
+      // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
+      // 🐛 DEBUG: Disabled native CLI to test AskUserQuestion hang regression
+      // ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
+      settingSources: ['project', 'user', 'local'],
+      tools: { type: 'preset', preset: 'claude_code' },
+      allowedTools: resolvedAllowedTools,
+      abortController,
+      systemPrompt: {
+        type: 'preset',
+        preset: 'claude_code',
+        append: `
 
 ## Interactive Questions (AskUserQuestion Tool)
 
@@ -1164,24 +730,28 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 - SQLite (lightweight, embedded)
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`
-        };
-    const debugPromptAppend = debugMode ? (() => {
-      // Brain: fix-session-limit-prompt-cache
-      // STATIC parts only in systemPrompt (skill + brain hints — don't change between turns)
-      // DYNAMIC parts (gitContext) moved to contextPrefix below
-      const skillContent = loadBundledSkill('systematic-debugging');
-      const brainHints = loadBrainHints(cwd);
-      const hintsBlock = brainHints.length > 0
-        ? brainHints.map(s => `- ${s}`).join('\n')
-        : '(no Brain entries found in this project)';
+        + (debugMode ? (() => {
+          // Brain: fix-session-limit-prompt-cache
+          // STATIC parts only in systemPrompt (skill + brain hints — don't change between turns)
+          // DYNAMIC parts (gitContext) moved to contextPrefix below
+          const skillContent = loadBundledSkill('systematic-debugging');
+          const brainHints = loadBrainHints(cwd);
+          const hintsBlock = brainHints.length > 0
+            ? brainHints.map(s => `- ${s}`).join('\n')
+            : '(no Brain entries found in this project)';
 
-      let debugPrompt = '';
+          let debugPrompt = '';
 
-      if (skillContent) {
-        debugPrompt += `\n\n## Systematic Debugging Methodology\n\n${skillContent}`;
-      }
+          // 1. Skill content (methodology reference — static)
+          if (skillContent) {
+            debugPrompt += `\n\n## Systematic Debugging Methodology\n\n${skillContent}`;
+          }
 
-      debugPrompt += `
+          // 2. Git context REMOVED from here — it's dynamic and breaks prompt cache
+          // Now injected as contextPrefix in the user prompt
+
+          // 3. Brain-First Protocol (static per project)
+          debugPrompt += `
 
 ## DEBUG MODE — MANDATORY BRAIN-FIRST PROTOCOL
 
@@ -1208,106 +778,21 @@ ${hintsBlock}
 2. **Never guess** — Trace data flow, verify with evidence. Read the actual code.
 3. **Document findings** — Save to Brain + add \`// Brain: {slug}\` breadcrumbs in code
 `;
-      return debugPrompt;
-    })() : '';
-    const chatPromptAppend = chatMode ? (() => {
-      const skillContent = loadBundledSkill('chat-interaction');
-      if (skillContent) {
-        return `\n\n## Chat Interaction Mode\n\n${skillContent}`;
-      }
-      return '';
-    })() : '';
-    const teamPromptAppend = teamContext ? buildTeamPromptAugmentation(teamContext) : '';
-    const finalSystemPrompt =
-      typeof systemPromptConfig === 'string'
-        ? `${systemPromptConfig}${debugPromptAppend}${chatPromptAppend}${teamPromptAppend}`
-        : {
-            ...systemPromptConfig,
-            append: `${systemPromptConfig.append}${debugPromptAppend}${chatPromptAppend}${teamPromptAppend}`,
-            // Brain: fix-session-limit-prompt-cache
-            // ideContext is NO LONGER appended here — it changes every turn (file open, git status)
-            // which would invalidate the entire system prompt cache (~50k+ tokens).
-            // Instead, ideContext is prepended to the user prompt. See contextPrefix below.
-          };
-
-    // Brain: gotcha-sdk-bundled-cli-200k-context-window
-    // The native Claude CLI binary handles prompt caching ~20x more efficiently
-    // than the SDK's bundled cli.js (300 vs 6200 uncached tokens/message).
-    // It also correctly resolves the 1M context window feature flag.
-    const isWindows = process.platform === 'win32';
-    const nativeClaudePath = isWindows
-      ? join(homedir(), '.claude', 'local', 'claude.exe')
-      : join(homedir(), '.local', 'bin', 'claude');
-    const hasNativeCli = existsSync(nativeClaudePath);
-    log('QUERY', `CLI path mode: ${hasNativeCli ? `native (${nativeClaudePath})` : 'bundled cli.js'}`);
-    const debugFilePath = investigation.enableSdkDebugHooks
-      ? join(CACHE_DEBUG_DIR, `${queryId}.sdk-debug.log`)
-      : undefined;
-    if (debugFilePath) {
-      mkdirSync(dirname(debugFilePath), { recursive: true });
-    }
-    const investigationHooks = investigation.enableSdkDebugHooks ? {
-      SessionStart: async (input) => {
-        logHookPayload({
-          queryId,
-          hookEventName: 'SessionStart',
-          source: input.source,
-          model: input.model,
-          agentType: input.agent_type,
-        });
+          return debugPrompt;
+        })() : '')
+        + (chatMode ? (() => {
+          const skillContent = loadBundledSkill('chat-interaction');
+          if (skillContent) {
+            return `\n\n## Chat Interaction Mode\n\n${skillContent}`;
+          }
+          return '';
+        })() : '')
+        + (teamContext ? buildTeamPromptAugmentation(teamContext) : ''),
+        // Brain: fix-session-limit-prompt-cache
+        // ideContext is NO LONGER appended here — it changes every turn (file open, git status)
+        // which would invalidate the entire system prompt cache (~50k+ tokens).
+        // Instead, ideContext is prepended to the user prompt. See contextPrefix below.
       },
-      InstructionsLoaded: async (input) => {
-        logHookPayload({
-          queryId,
-          hookEventName: 'InstructionsLoaded',
-          filePath: input.file_path,
-          memoryType: input.memory_type,
-          loadReason: input.load_reason,
-          triggerFilePath: input.trigger_file_path,
-          parentFilePath: input.parent_file_path,
-          globs: input.globs,
-        });
-      },
-      ConfigChange: async (input) => {
-        logHookPayload({
-          queryId,
-          hookEventName: 'ConfigChange',
-          source: input.source,
-          filePath: input.file_path,
-        });
-      },
-      PreCompact: async (input) => {
-        logHookPayload({
-          queryId,
-          hookEventName: 'PreCompact',
-          trigger: input.trigger,
-          customInstructionsHash: input.custom_instructions ? hashText(input.custom_instructions) : null,
-          customInstructionsChars: input.custom_instructions ? input.custom_instructions.length : 0,
-        });
-      },
-      Setup: async (input) => {
-        logHookPayload({
-          queryId,
-          hookEventName: 'Setup',
-          trigger: input.trigger,
-        });
-      },
-    } : undefined;
-
-    const options = {
-      model: modelId,
-      // Brain: 1m-context-window-support
-      // The [1m] suffix in modelId is enough — the CLI handles it natively.
-      // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
-      // 🐛 DEBUG: Disabled native CLI to test AskUserQuestion hang regression
-      // ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
-      settingSources: investigation.settingSources,
-      tools: toolsConfig,
-      ...(effectiveAllowedTools ? { allowedTools: effectiveAllowedTools } : {}),
-      abortController,
-      systemPrompt: finalSystemPrompt,
-      ...(debugFilePath ? { debugFile: debugFilePath } : {}),
-      ...(investigationHooks ? { hooks: investigationHooks } : {}),
       canUseTool: async (toolName, input, toolOptions) => {
         // AskUserQuestion — forward to frontend
         if (toolName === 'AskUserQuestion') {
@@ -1399,89 +884,30 @@ ${hintsBlock}
     if (sessionId) {
       options.env.CLAUDE_CODE_TASK_LIST_ID = `quack-${sessionId}`;
     }
-    if (investigation.preserveSkillAttachments) {
-      options.env.QUACK_PRESERVE_SKILL_ATTACHMENTS = '1';
-    }
-    if (investigation.disableFileCheckpointing) {
-      options.env.CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING = '1';
-    }
 
-    options.enableFileCheckpointing = !investigation.disableFileCheckpointing;
+    options.enableFileCheckpointing = true;
 
     // --- MCP servers ---
-    let resolvedMcpServers = {};
-    if (investigation.includeAllMcp) {
-      resolvedMcpServers = passedMcpServers;
-      if (!resolvedMcpServers && cwd) {
-        resolvedMcpServers = loadMCPServersFromFile(cwd);
-      } else if (!resolvedMcpServers) {
-        resolvedMcpServers = loadGlobalMCPServers();
-      }
+    let resolvedMcpServers = passedMcpServers;
+    if (!resolvedMcpServers && cwd) {
+      resolvedMcpServers = loadMCPServersFromFile(cwd);
+    } else if (!resolvedMcpServers) {
+      resolvedMcpServers = loadGlobalMCPServers();
     }
 
     const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
     const codeIntelMcpServerPath = join(__dirname, 'code-intel-mcp-server.js');
     const visualizerMcpServerPath = join(__dirname, 'visualizer-mcp-server.js');
     // Brain: quack-visualizer-inline-html
-    const builtInMcpServers = investigation.includeBuiltInMcp ? {
+    options.mcpServers = {
+      ...(resolvedMcpServers || {}),
       'ide-tools': { command: 'node', args: [ideMcpServerPath] },
       'code-intel': { type: 'stdio', command: 'node', args: [codeIntelMcpServerPath] },
       'visualizer': { command: 'node', args: [visualizerMcpServerPath] },
-    } : {};
-    options.mcpServers = {
-      ...(resolvedMcpServers || {}),
-      ...builtInMcpServers,
     };
 
     const mcpCount = options.mcpServers ? Object.keys(options.mcpServers).length : 0;
     log('MCP', `query=${queryId} resolved ${mcpCount} MCP servers: [${Object.keys(options.mcpServers || {}).join(', ')}]`);
-    log('QUERY', `query=${queryId} investigation mode=${investigation.mode} tools=${investigation.toolConfigMode} builtInMcp=${investigation.includeBuiltInMcp}`);
-    logSessionPayload({
-      phase: 'effective_config',
-      queryId,
-      sessionKey: sessionKey || null,
-      incomingSessionId: sessionId || null,
-      model,
-      modelId,
-      effectiveResume: options.resume || null,
-      effectiveCwd: options.cwd || null,
-      permissionMode: options.permissionMode || null,
-      betas: options.betas || [],
-      provider: provider || 'anthropic',
-      toolConfigMode: investigation.toolConfigMode,
-      systemPromptMode: investigation.systemPromptMode || 'claude_code_preset',
-      includeBuiltInMcp: investigation.includeBuiltInMcp,
-      includeAllMcp: investigation.includeAllMcp,
-      settingSources: investigation.settingSources,
-      mcpCount,
-      sdkDebugHooks: Boolean(investigation.enableSdkDebugHooks),
-      preserveSkillAttachments: Boolean(investigation.preserveSkillAttachments),
-      omitAllowedTools: Boolean(investigation.omitAllowedTools),
-      disableFileCheckpointing: Boolean(investigation.disableFileCheckpointing),
-      captureApiRequestPayload: Boolean(investigation.captureApiRequestPayload),
-      debugFilePath: debugFilePath || null,
-      cliPathMode: hasNativeCli ? 'native' : 'bundled',
-      nativeClaudePath: hasNativeCli ? nativeClaudePath : null,
-      fileCheckpointingEnabled: options.enableFileCheckpointing,
-    });
-    const systemPromptAppend = options.systemPrompt?.append || '';
-    logContextPayload({
-      queryId,
-      model,
-      modelId,
-      sessionId,
-      prompt,
-      attachments,
-      ideContext,
-      systemPromptAppend,
-      settingSources: options.settingSources,
-      allowedTools: resolvedAllowedTools,
-      mcpServers: options.mcpServers,
-      teamContext,
-      debugMode,
-      cwd,
-      investigation,
-    });
 
     // Brain: fix-session-limit-prompt-cache
     // Dynamic context (ideContext, gitContext) is prepended to the user prompt as a
@@ -1526,103 +952,80 @@ ${hintsBlock}
       countTokensPromise = countPromptTokens(modelId, promptContent);
     }
 
-    // Build the canUseTool callback for this query
-    const canUseToolForQuery = options.canUseTool ? async (toolName, input, toolOptions) => {
-      // AskUserQuestion — forward to frontend
+    // Build the canUseTool callback for this query (used by persistent subprocess path)
+    const canUseToolForQuery = async (toolName, input, toolOptions) => {
       if (toolName === 'AskUserQuestion') {
         diag(`canUseTool AskUserQuestion triggered for query=${queryId}`);
         try {
           const response = await requestFromFrontend(queryId, 'ask_user_question', {
             questions: input.questions,
           });
-          diag(`canUseTool AskUserQuestion RESOLVED for query=${queryId}: ${JSON.stringify(response.answers).slice(0, 200)}`);
-          const result = {
+          return {
             behavior: 'allow',
             updatedInput: { questions: input.questions, answers: response.answers },
           };
-          log('INTERACT', `[INFO] AskUserQuestion returning: ${JSON.stringify(result).slice(0, 300)}`);
-          return result;
         } catch (error) {
-          log('INTERACT', `[WARN] AskUserQuestion FAILED for query=${queryId}: ${error.message}`);
           return { behavior: 'deny', message: `Failed to get user answers: ${error.message}` };
         }
       }
-
-      // ExitPlanMode — forward to frontend (Brain: fix-duplicate-plan-approval)
       if (toolName === 'ExitPlanMode') {
         if (planAlreadyApproved) {
-          log('INTERACT', `[INFO] ExitPlanMode already approved, skipping for query=${queryId}`);
           return { behavior: 'allow', updatedInput: input };
         }
         diag(`canUseTool ExitPlanMode triggered for query=${queryId}`);
         try {
           const response = await requestFromFrontend(queryId, 'plan_approval_request', { plan: input });
           const answers = response.answers || response;
-          diag(`canUseTool ExitPlanMode RESOLVED for query=${queryId}: ${JSON.stringify(answers).slice(0, 200)}`);
           const isApproved = answers.approved === 'true' || answers.approved === true;
           if (isApproved) {
             planAlreadyApproved = true;
-            log('INTERACT', `[INFO] ExitPlanMode APPROVED for query=${queryId} — returning allow to SDK`);
             return { behavior: 'allow', updatedInput: input };
           } else {
-            log('INTERACT', `[INFO] ExitPlanMode REJECTED for query=${queryId} — returning deny to SDK`);
             return { behavior: 'deny', message: answers.feedback || 'User rejected the plan' };
           }
         } catch (error) {
-          log('INTERACT', `[WARN] ExitPlanMode FAILED for query=${queryId}: ${error.message}`);
           return { behavior: 'deny', message: `Failed to get plan approval: ${error.message}` };
         }
       }
-
-      // Default: allow
       return { behavior: 'allow', updatedInput: input };
-    } : null;
+    };
 
-    // --- Persistent subprocess path (for resumed sessions) ---
+    // --- Persistent subprocess for resumed sessions ---
     // Brain: bug-post-fix-cache-breakage-investigation
-    // New sessions still use query() since there's no session to keep alive.
+    // New sessions use query() since there's no session to keep alive.
     // Resumed sessions use a persistent subprocess to preserve cache state.
     const usePersistentProcess = sessionId && isAnthropicProvider;
-
-    let eventSource; // async iterable of events
+    let eventSource;
 
     if (usePersistentProcess) {
       const spawnOpts = {
         model: modelId,
         resume: sessionId,
         permissionMode: options.permissionMode,
-        canUseTool: !!canUseToolForQuery,
-        settingSources: investigation.settingSources,
+        canUseTool: true,
+        settingSources: options.settingSources || ['project', 'user', 'local'],
         betas: options.betas,
-        allowedTools: effectiveAllowedTools,
+        allowedTools: resolvedAllowedTools,
         tools: toolsConfig,
         thinking: options.thinking,
         effort: options.effort,
         mcpServers: options.mcpServers,
-        debugFile: debugFilePath,
         agents: options.agents,
         cwd,
       };
       const fingerprint = getSessionFingerprint(spawnOpts);
 
       let proc = sessionProcesses.get(sessionId);
-
-      // Restart if subprocess died or options changed
       if (proc && (!proc.alive || proc.fingerprint !== fingerprint)) {
-        log('SESSION_PROCESS', `Restarting subprocess for session=${sessionId} (alive=${proc.alive}, fingerprint_changed=${proc.fingerprint !== fingerprint})`);
+        log('SESSION_PROCESS', `Restarting subprocess for session=${sessionId} (alive=${proc.alive}, fp_changed=${proc.fingerprint !== fingerprint})`);
         proc.kill();
         proc = null;
       }
 
       if (!proc) {
         proc = new SessionProcess(sessionId, fingerprint);
-        const cliArgs = buildCliArgs(spawnOpts);
-        const spawnEnv = { ...process.env };
-        if (investigation.preserveSkillAttachments) spawnEnv.QUACK_PRESERVE_SKILL_ATTACHMENTS = '1';
-        if (investigation.disableFileCheckpointing) spawnEnv.CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING = '1';
-        proc.spawn(cliArgs, cwd, spawnEnv);
+        proc.spawn(buildCliArgs(spawnOpts), cwd, { ...process.env });
 
-        // Send the init config (systemPrompt append, agents, etc.)
         const appendPart = options.systemPrompt?.append || '';
         try {
           await proc.initialize({
@@ -1663,18 +1066,6 @@ ${hintsBlock}
     for await (const event of eventSource) {
       eventCount++;
 
-      if (event.type === 'system' && event.subtype === 'init') {
-        logSessionPayload({
-          phase: 'system_init',
-          queryId,
-          sessionKey: sessionKey || null,
-          incomingSessionId: sessionId || null,
-          eventSessionId: event.session_id || null,
-          toolsAvailable: Array.isArray(event.tools) ? event.tools.length : null,
-          mcpServerCount: Array.isArray(event.mcp_servers) ? event.mcp_servers.length : null,
-        });
-      }
-
       // Emit prompt_token_count on first assistant event (so frontend has it before usage data)
       if (!promptTokensEmitted && countTokensPromise && event.type === 'assistant') {
         const promptTokens = await countTokensPromise;
@@ -1682,30 +1073,6 @@ ${hintsBlock}
           emit({ type: 'event', queryId, event: { type: 'prompt_token_count', promptTokens } });
         }
         promptTokensEmitted = true;
-      }
-
-      if (event.type === 'assistant' && event.message?.usage) {
-        logUsagePayload({
-          queryId,
-          eventType: 'assistant',
-          usage: event.message.usage,
-          modelUsage: event.modelUsage || event.model_usage,
-        });
-      } else if (event.type === 'result') {
-        logSessionPayload({
-          phase: 'result',
-          queryId,
-          sessionKey: sessionKey || null,
-          incomingSessionId: sessionId || null,
-          resultSessionId: event.session_id || null,
-          subtype: event.subtype || null,
-        });
-        logUsagePayload({
-          queryId,
-          eventType: 'result',
-          usage: event.usage,
-          modelUsage: event.modelUsage || event.model_usage,
-        });
       }
 
       // Brain: fix-daemon-missing-1m-context-betas
@@ -1804,16 +1171,6 @@ ${hintsBlock}
       }
     }
     activeQueries.delete(queryId);
-    if (fetchCaptureState.queryId === queryId) {
-      fetchCaptureState.enabled = false;
-      fetchCaptureState.queryId = null;
-      fetchCaptureState.requestCount = 0;
-    }
-    if (process.env.QUACK_CAPTURE_REQUEST_QUERY_ID === queryId) {
-      delete process.env.QUACK_CAPTURE_REQUEST_BODY;
-      delete process.env.QUACK_CAPTURE_REQUEST_QUERY_ID;
-      delete process.env.QUACK_CAPTURE_REQUEST_INDEX;
-    }
     log('QUERY', `query=${queryId} cleanup done (cleaned ${cleanedRequests} pending requests, remaining active=${activeQueries.size})`);
   }
 }
@@ -1872,8 +1229,6 @@ function handleAbort(cmd) {
 
     // Clear query context on persistent subprocesses but keep them alive for cache reuse.
     // Brain: bug-post-fix-cache-breakage-investigation
-    // Killing the subprocess on abort would destroy the cache benefit.
-    // The subprocess will naturally stop processing when the current turn completes or errors.
     for (const [sid, proc] of sessionProcesses.entries()) {
       if (proc.currentQueryId === queryId) {
         proc.currentQueryId = null;
@@ -1914,13 +1269,11 @@ async function handleShutdown() {
     state.abortController.abort();
     log('LIFECYCLE', `Aborted query=${queryId} during shutdown`);
   }
-  // Kill all persistent subprocesses
   for (const [sid, proc] of sessionProcesses.entries()) {
     proc.kill();
     log('LIFECYCLE', `Killed session process=${sid} during shutdown`);
   }
   sessionProcesses.clear();
-  // Give queries a moment to clean up
   await new Promise(resolve => setTimeout(resolve, 1000));
   log('LIFECYCLE', 'Daemon shutting down');
   process.exit(0);

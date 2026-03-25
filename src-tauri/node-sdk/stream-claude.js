@@ -17,28 +17,16 @@ Symbol.asyncDispose ??= Symbol('Symbol.asyncDispose');
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import Anthropic from '@anthropic-ai/sdk';
-import { readFileSync, existsSync, readdirSync, appendFileSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, readdirSync } from 'fs';
 import { extname, join, dirname } from 'path';
 import { homedir } from 'os';
 import { execSync } from 'child_process';
 import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
-import { createHash } from 'crypto';
 
 // Get the directory of this script for MCP server paths
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const CACHE_INVESTIGATION_LOG = join(homedir(), '.quack', 'cache-investigation.log');
-
-function writeCacheInvestigationLog(source, tag, payload) {
-  try {
-    mkdirSync(dirname(CACHE_INVESTIGATION_LOG), { recursive: true });
-    appendFileSync(
-      CACHE_INVESTIGATION_LOG,
-      `${JSON.stringify({ ts: new Date().toISOString(), source, tag, ...payload })}\n`
-    );
-  } catch (e) { /* ignore */ }
-}
 
 // =============================================================================
 // SKILL LOADER — reads bundled skill files for system prompt injection
@@ -440,223 +428,6 @@ function createMessageContent(text, imagePaths = []) {
   return content;
 }
 
-function estimateTokens(text = '') {
-  return Math.ceil(text.length / 4);
-}
-
-function hashText(text = '') {
-  return createHash('sha256').update(text).digest('hex').slice(0, 16);
-}
-
-function previewText(text = '', maxChars = 240) {
-  if (!text) return '';
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  if (normalized.length <= maxChars) return normalized;
-  return `${normalized.slice(0, maxChars)}...`;
-}
-
-function summarizeText(text = '') {
-  return {
-    chars: text.length,
-    lines: text ? text.split('\n').length : 0,
-    estimatedTokens: estimateTokens(text),
-    hash: hashText(text),
-    preview: previewText(text),
-  };
-}
-
-function getContextInstructionFiles(projectCwd) {
-  const files = [];
-  const candidates = [
-    { scope: 'user', path: join(homedir(), '.claude', 'CLAUDE.md') },
-  ];
-
-  if (projectCwd) {
-    candidates.push(
-      { scope: 'project-dotclaude', path: join(projectCwd, '.claude', 'CLAUDE.md') },
-      { scope: 'project-root', path: join(projectCwd, 'CLAUDE.md') },
-    );
-  }
-
-  for (const candidate of candidates) {
-    if (!existsSync(candidate.path)) continue;
-    try {
-      const content = readFileSync(candidate.path, 'utf8');
-      files.push({
-        scope: candidate.scope,
-        path: candidate.path,
-        chars: content.length,
-        lines: content ? content.split('\n').length : 0,
-        estimatedTokens: estimateTokens(content),
-        hash: hashText(content),
-      });
-    } catch (error) {
-      files.push({
-        scope: candidate.scope,
-        path: candidate.path,
-        error: error.message,
-      });
-    }
-  }
-
-  return files;
-}
-
-function logContextPayload({
-  queryId,
-  model,
-  modelId,
-  sessionId,
-  prompt,
-  attachments,
-  ideContext,
-  systemPromptAppend,
-  settingSources,
-  allowedTools,
-  mcpServers,
-  teamContext,
-  debugMode,
-  cwd,
-  investigation,
-}) {
-  const instructionFiles = getContextInstructionFiles(cwd);
-  const payloadSummary = {
-    queryId,
-    resume: Boolean(sessionId),
-    model,
-    modelId,
-    cwd: cwd || null,
-    debugMode: Boolean(debugMode),
-    prompt: summarizeText(prompt),
-    ideContext: summarizeText(ideContext || ''),
-    systemPromptAppend: summarizeText(systemPromptAppend || ''),
-    attachments: {
-      count: attachments?.length || 0,
-      paths: attachments || [],
-    },
-    teamContext: teamContext ? {
-      teamName: teamContext.teamName,
-      memberCount: teamContext.members?.length || 0,
-    } : null,
-    investigation: investigation || null,
-    settingSources,
-    allowedTools: {
-      count: allowedTools.length,
-      names: allowedTools,
-    },
-    mcpServers: {
-      count: Object.keys(mcpServers || {}).length,
-      names: Object.keys(mcpServers || {}),
-    },
-    instructionFiles,
-    estimatedInjectedTokens: {
-      ideContext: estimateTokens(ideContext || ''),
-      systemPromptAppend: estimateTokens(systemPromptAppend || ''),
-      instructionFiles: instructionFiles.reduce((sum, file) => sum + (file.estimatedTokens || 0), 0),
-    },
-    payloadHashes: {
-      prompt: hashText(prompt || ''),
-      ideContext: hashText(ideContext || ''),
-      systemPromptAppend: hashText(systemPromptAppend || ''),
-      instructionFilesComposite: hashText(
-        instructionFiles
-          .map(file => `${file.scope}:${file.path}:${file.hash || file.error || 'missing'}`)
-          .join('|')
-      ),
-      settingSources: hashText(JSON.stringify(settingSources || [])),
-      allowedTools: hashText(JSON.stringify(allowedTools || [])),
-      mcpServers: hashText(JSON.stringify(Object.keys(mcpServers || {}).sort())),
-      teamContext: hashText(JSON.stringify(teamContext || null)),
-      investigation: hashText(JSON.stringify(investigation || null)),
-    },
-  };
-
-  console.error(`[CONTEXT] ${JSON.stringify(payloadSummary)}`);
-  writeCacheInvestigationLog('stream-claude', 'CONTEXT', payloadSummary);
-}
-
-function extractMaxContextWindow(modelUsage) {
-  if (!modelUsage || typeof modelUsage !== 'object') return null;
-  let maxContextWindow = null;
-  for (const entry of Object.values(modelUsage)) {
-    if (entry && typeof entry === 'object' && Number.isFinite(entry.contextWindow) && entry.contextWindow > 0) {
-      maxContextWindow = Math.max(maxContextWindow ?? 0, entry.contextWindow);
-    }
-  }
-  return maxContextWindow;
-}
-
-function getCacheInvestigationConfig() {
-  const requestedMode = process.env.QUACK_CACHE_INVESTIGATION_MODE || 'baseline';
-  switch (requestedMode) {
-    case 'baseline':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
-    case 'baseline-preserve-skill-attachments':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'], preserveSkillAttachments: true };
-    case 'explicit-tools':
-      return { mode: requestedMode, toolConfigMode: 'explicit_allowed_tools', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
-    case 'preset-no-builtin-mcp':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: false, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
-    case 'explicit-tools-no-builtin-mcp':
-      return { mode: requestedMode, toolConfigMode: 'explicit_allowed_tools', includeBuiltInMcp: false, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
-    case 'all-mcp-disabled':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: false, includeAllMcp: false, settingSources: ['project', 'user', 'local'] };
-    case 'project-only-settings':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project'] };
-    case 'all-mcp-disabled-project-only-settings':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: false, includeAllMcp: false, settingSources: ['project'] };
-    case 'all-mcp-disabled-no-settings':
-      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: false, includeAllMcp: false, settingSources: [] };
-    case 'baseline-preserve-skill-attachments-no-settings-no-file-checkpointing':
-      return {
-        mode: requestedMode,
-        toolConfigMode: 'preset_claude_code',
-        includeBuiltInMcp: true,
-        includeAllMcp: true,
-        settingSources: [],
-        preserveSkillAttachments: true,
-        disableFileCheckpointing: true,
-      };
-    default:
-      console.error(`[WARN] Unknown QUACK_CACHE_INVESTIGATION_MODE="${requestedMode}", falling back to baseline`);
-      return { mode: 'baseline', toolConfigMode: 'preset_claude_code', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
-  }
-}
-
-function logUsagePayload({ queryId, eventType, usage, modelUsage }) {
-  if (!usage && !modelUsage) return;
-
-  const inputTokens = usage?.input_tokens || 0;
-  const outputTokens = usage?.output_tokens || 0;
-  const cacheReadTokens = usage?.cache_read_input_tokens || usage?.cacheReadInputTokens || 0;
-  const cacheCreationTokens = usage?.cache_creation_input_tokens || usage?.cacheCreationInputTokens || 0;
-  const effectiveContextFill = inputTokens + cacheReadTokens + cacheCreationTokens;
-  const contextWindow = extractMaxContextWindow(modelUsage);
-
-  console.error(`[USAGE] ${JSON.stringify({
-    queryId,
-    eventType,
-    inputTokens,
-    outputTokens,
-    cacheReadTokens,
-    cacheCreationTokens,
-    effectiveContextFill,
-    contextWindow,
-    contextUtilizationPct: contextWindow ? Number(((effectiveContextFill / contextWindow) * 100).toFixed(2)) : null,
-  })}`);
-  writeCacheInvestigationLog('stream-claude', 'USAGE', {
-    queryId,
-    eventType,
-    inputTokens,
-    outputTokens,
-    cacheReadTokens,
-    cacheCreationTokens,
-    effectiveContextFill,
-    contextWindow,
-    contextUtilizationPct: contextWindow ? Number(((effectiveContextFill / contextWindow) * 100).toFixed(2)) : null,
-  });
-}
-
 // Streaming input generator for messages
 // IMPORTANT: SDK MCP servers REQUIRE streaming input mode (async generator)
 // See: https://platform.claude.com/docs/en/agent-sdk/custom-tools
@@ -819,16 +590,8 @@ async function main() {
     const resolvedAllowedTools = allowedTools && Array.isArray(allowedTools)
       ? allowedTools
       : defaultAllowedTools;
-    const investigation = getCacheInvestigationConfig();
-    const toolsConfig = investigation.toolConfigMode === 'explicit_allowed_tools'
-      ? resolvedAllowedTools
-      : {
-          type: 'preset',
-          preset: 'claude_code'
-        };
 
     console.error(`[DEBUG] Using ${resolvedAllowedTools.length} allowed tools:`, resolvedAllowedTools.slice(0, 5).join(', ') + '...');
-    console.error(`[DEBUG] Investigation mode: ${investigation.mode} (tools=${investigation.toolConfigMode}, builtInMcp=${investigation.includeBuiltInMcp})`);
 
     // Track whether the plan has been approved in this session to prevent
     // duplicate approval requests when SDK re-enters plan mode
@@ -853,7 +616,7 @@ async function main() {
       // No betas needed (GA since March 2026, beta header is ignored).
       ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
       // Enable automatic reading of CLAUDE.md and project settings
-      settingSources: investigation.settingSources,
+      settingSources: ['project', 'user', 'local'],
 
       // =============================================================================
       // TOOLS CONFIGURATION (SDK v0.1.76)
@@ -867,8 +630,11 @@ async function main() {
       // - `canUseTool`: permission callback fires when tools need approval
       // =============================================================================
 
-      // Investigation mode can swap the preset scaffold for an explicit tool list.
-      tools: toolsConfig,
+      // Use claude_code preset for all standard tools
+      tools: {
+        type: 'preset',
+        preset: 'claude_code'
+      },
 
       // allowedTools filters from the preset - includes AskUserQuestion
       allowedTools: resolvedAllowedTools,
@@ -1167,9 +933,6 @@ ${hintsBlock}
       ...process.env,
       ENABLE_TOOL_SEARCH: 'auto', // Activate when MCP tools exceed 10% of context
     };
-    if (investigation.preserveSkillAttachments) {
-      options.env.QUACK_PRESERVE_SKILL_ATTACHMENTS = '1';
-    }
     console.error(`[DEBUG] MCP Tool Search ENABLED (auto mode - activates at >10% context usage)`);
 
     if (sessionId) {
@@ -1189,11 +952,8 @@ ${hintsBlock}
     // input tokens on long sessions. File rewind still works but may not have
     // UUIDs for older messages (rewind to recent messages should still work).
     // =============================================================================
-    if (investigation.disableFileCheckpointing) {
-      options.env.CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING = '1';
-    }
-    options.enableFileCheckpointing = !investigation.disableFileCheckpointing;
-    console.error(`[DEBUG] File checkpointing ${options.enableFileCheckpointing ? 'ENABLED' : 'DISABLED'} (replay-user-messages disabled to save tokens)`);
+    options.enableFileCheckpointing = true;
+    console.error(`[DEBUG] File checkpointing ENABLED (replay-user-messages disabled to save tokens)`);
 
     // Add effort parameter if provided explicitly (takes precedence over thinkingMode mapping)
     // Controls quality vs speed/cost tradeoff: 'low', 'medium', 'high', 'max'
@@ -1203,23 +963,21 @@ ${hintsBlock}
     }
 
     // Load MCP servers: priority is passed config > .mcp.json file
-    let resolvedMcpServers = investigation.includeAllMcp ? mcpServers : {};
+    let resolvedMcpServers = mcpServers;
     console.error(`[MCP] === MCP SERVER LOADING ===`);
     console.error(`[MCP] mcpServers from config: ${mcpServers ? JSON.stringify(Object.keys(mcpServers)) : 'null'}`);
     console.error(`[MCP] cwd: ${cwd || 'null'}`);
 
-    if (investigation.includeAllMcp && !resolvedMcpServers && cwd) {
+    if (!resolvedMcpServers && cwd) {
       console.error(`[MCP] No mcpServers in config, loading from .mcp.json...`);
       resolvedMcpServers = loadMCPServersFromFile(cwd);
-    } else if (investigation.includeAllMcp && !resolvedMcpServers && !cwd) {
+    } else if (!resolvedMcpServers && !cwd) {
       console.error(`[MCP] No cwd provided, loading global MCP servers only...`);
       resolvedMcpServers = loadGlobalMCPServers();
     }
 
     console.error(`[MCP] resolvedMcpServers: ${resolvedMcpServers ? JSON.stringify(Object.keys(resolvedMcpServers)) : 'null'}`);
     console.error(`[MCP] === END MCP SERVER LOADING ===`);
-
-    const queryId = `legacy_${sessionId || 'new'}_${Date.now()}`;
 
     // Add IDE Tools MCP server (stdio-based for reliability)
     // Note: SDK MCP servers (createSdkMcpServer) have a known bug with "Stream closed" errors
@@ -1232,8 +990,9 @@ ${hintsBlock}
     console.error(`[MCP] Code Intel MCP server path: ${codeIntelMcpServerPath}`);
     console.error(`[MCP] Code Intel MCP exists: ${existsSync(codeIntelMcpServerPath)}`);
 
-    // Merge MCP servers: file-based servers + optional built-in Quack servers (ide + code-intel)
-    const builtInMcpServers = investigation.includeBuiltInMcp ? {
+    // Merge MCP servers: file-based servers + built-in Quack servers (ide + code-intel)
+    options.mcpServers = {
+      ...(resolvedMcpServers || {}),
       'ide-tools': {
         command: 'node',
         args: [ideMcpServerPath],
@@ -1243,39 +1002,14 @@ ${hintsBlock}
         command: 'node',
         args: [codeIntelMcpServerPath],
       },
-    } : {};
-    options.mcpServers = {
-      ...(resolvedMcpServers || {}),
-      ...builtInMcpServers,
     };
 
-    const builtInServerCount = Object.keys(builtInMcpServers).length;
+    const builtInServerCount = 2; // ide-tools + code-intel
     if (resolvedMcpServers && Object.keys(resolvedMcpServers).length > 0) {
       console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length + builtInServerCount} MCP servers:`, Object.keys(options.mcpServers).join(', '));
     } else {
-      console.error(builtInServerCount > 0
-        ? `[MCP] Using built-in MCP servers only (${Object.keys(builtInMcpServers).join(', ')})`
-        : `[MCP] No MCP servers enabled`);
+      console.error(`[MCP] Using built-in MCP servers only (ide-tools, code-intel)`);
     }
-
-    const systemPromptAppend = options.systemPrompt?.append || '';
-    logContextPayload({
-      queryId,
-      model,
-      modelId,
-      sessionId,
-      prompt,
-      attachments,
-      ideContext,
-      systemPromptAppend,
-      settingSources: options.settingSources,
-      allowedTools: resolvedAllowedTools,
-      mcpServers: options.mcpServers,
-      teamContext,
-      debugMode,
-      cwd,
-      investigation,
-    });
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));
 
@@ -1391,22 +1125,6 @@ ${hintsBlock}
             emitEvent({ type: 'prompt_token_count', promptTokens });
           }
           promptTokensEmitted = true;
-        }
-
-        if (event.type === 'assistant' && event.message?.usage) {
-          logUsagePayload({
-            queryId,
-            eventType: 'assistant',
-            usage: event.message.usage,
-            modelUsage: event.modelUsage || event.model_usage,
-          });
-        } else if (event.type === 'result') {
-          logUsagePayload({
-            queryId,
-            eventType: 'result',
-            usage: event.usage,
-            modelUsage: event.modelUsage || event.model_usage,
-          });
         }
 
         emitEvent(event);
