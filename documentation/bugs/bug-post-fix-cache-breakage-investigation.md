@@ -1070,7 +1070,46 @@ As of 2026-03-25, the best-supported working hypothesis is:
   - the fundamental cause is re-serialization from disk: native CLI keeps messages in-memory with their original decorations, while Quack's daemon resume path re-serializes all messages, stripping `cache_control` and TodoWrite from historical messages
   - a secondary instability is MCP tool reordering between turns (observed in Turn 2→3), which breaks the prefix at the tools section
 
-## Root-cause conclusion
+### Persistent subprocess prototype: theory confirmed
+
+Script: `scripts/cache-persistent-subprocess-test.mjs`
+
+This prototype bypassed the SDK's `query()` function and spawned the CLI subprocess directly, keeping it alive across 4 turns instead of spawning a new process per turn.
+
+Configuration:
+- Session: `ae0a6c1a-0790-4492-a4a8-ed7dcf7f0c61` (large resumed session)
+- Model: `claude-haiku-4-5-20251001`
+- Prompt: `Test message - Answer with ok`
+- `settingSources: []`, `tools: default`, no explicit MCP
+- CWD: `/Users/fredric/Dev/flow`
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` | `effectiveContextFill` | `contextWindow` |
+|---:|---:|---:|---:|---:|
+| 1 | `20,836` | `39,947` | `60,793` | `200,000` |
+| 2 | `60,783` | `56` | `60,849` | `200,000` |
+| 3 | `60,839` | `56` | `60,905` | `200,000` |
+| 4 | `60,895` | `56` | `60,961` | `200,000` |
+
+Steady-state `cacheCreationTokens`: **56** (turns 2-4)
+
+Comparison:
+
+| Path | Steady-state `cacheCreationTokens` |
+|---|---:|
+| **Persistent subprocess** | **56** |
+| Native Claude Code CLI | ~300 |
+| Quack daemon (`query()` per turn) | ~28,000-33,000 |
+
+The persistent subprocess achieves **even better** cache behavior than native CLI. The 56 tokens of cache creation per turn represents only the new user+assistant message pair being appended.
+
+What this proves:
+
+- The cache break was caused by spawning a fresh CLI subprocess per `query()` call
+- Each new subprocess re-loads the session from disk, re-serializes all messages, and destroys in-memory state (skills, cache markers, message decorations)
+- Keeping a single subprocess alive across turns preserves all internal state and achieves near-perfect prefix cache reuse
+- The fix is architectural: Quack's daemon must maintain a persistent CLI subprocess per session instead of using `query()` per turn
+
+## Root-cause conclusion (revised after persistent subprocess prototype)
 
 ### 1. What portion of the original cache breakage was fixed?
 
@@ -1092,15 +1131,16 @@ The remaining issue is in the **Claude Code SDK / bundled runtime's message seri
 
 ### 4. Is the residual issue actionable in Quack or blocked upstream?
 
-**Classification: Mixed (option 4)**
+**Classification: Quack fix available now (option 1)**
 
-- **One remaining local optimization**: Quack could potentially stabilize MCP tool ordering to prevent the secondary prefix break. This is a minor improvement.
-- **One upstream blocker**: The primary cause — `ejY()` stripping `cache_control` and TodoWrite from re-serialized historical messages — is inside the bundled Claude Code runtime. Quack cannot fix this without either:
-  - An SDK option to preserve `cache_control` on historical messages during resume
-  - An SDK option to add `cache_control` breakpoints on the tools section
-  - A change to the SDK resume path that retains the original message serialization
+The persistent subprocess prototype proved the fix is entirely local. The SDK's V1 `query()` API spawns a fresh CLI subprocess per call, destroying all in-memory state. When the subprocess is kept alive across turns, `cacheCreationTokens` drops from ~28,000-33,000 to **56** — better than native CLI.
 
-**Implementation direction**: Quack is now at or near the local optimum for the daemon path. The largest remaining gain requires upstream SDK changes. Quack should:
-1. Stabilize MCP tool ordering (local fix, minor gain)
-2. Report the re-serialization cache regression to the Claude Code SDK team with the payload evidence in this document
-3. Monitor SDK updates for resume-path caching improvements
+**Implementation direction**: Quack must migrate from per-turn `query()` calls to a persistent subprocess architecture:
+
+1. **Build a `SessionProcess` manager** in `stream-daemon.js` that spawns the CLI subprocess once per session and keeps it alive between turns
+2. New user messages are piped to the subprocess's stdin using the existing `--input-format stream-json` protocol
+3. Responses are read from stdout as JSON lines, forwarded to the frontend as before
+4. The subprocess is killed only when the session ends (user closes it, timeout, or error)
+5. The V2 SDK API (`unstable_v2_createSession` / `unstable_v2_resumeSession`) is an alternative path once it matures — it provides the same persistent subprocess semantics with a cleaner API surface
+
+**Expected impact**: ~500x reduction in per-turn cache creation tokens. This translates to lower API costs, faster response times, and reduced latency for resumed sessions.
