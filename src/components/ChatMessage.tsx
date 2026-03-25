@@ -97,6 +97,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const hasError = message.status === 'error';
+
   const attachments = message.attachments ?? [];
 
   // Check if this is a resume session message
@@ -510,8 +511,11 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
               };
 
               message.events!.forEach((event: any, eventIndex: number) => {
-                // User events are invisible — skip them for grouping purposes
-                if (event.type === 'user') return;
+                // Only assistant events render visible tool/text content.
+                // All other event types (user, agent, system, rate_limit_event, etc.)
+                // must be skipped — they create non-nested groups that break consecutive
+                // droid grouping, causing each tool call to get its own DroidActivityBlock.
+                if (event.type !== 'assistant') return;
 
                 if (isGroupableToolEvent(event)) {
                   if (currentGroup) {
@@ -562,6 +566,12 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                       nestedEventIndices.set(idx, droidType);
                     }
                   }
+                  // Also mark agent (start/stop) events as nested so they don't break
+                  // the consecutive droid chain when referenced by groupIsNested/getGroupDroidType
+                  if (pendingAgentTools.size > 0 && evt.type === 'agent') {
+                    const droidType = [...pendingAgentTools.values()].pop() || 'agent';
+                    nestedEventIndices.set(idx, droidType);
+                  }
                 });
               }
 
@@ -604,15 +614,22 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 />
               );
 
-              // Reorder: move agent/task result groups to AFTER their nested groups
-              // so the droid report appears at the bottom, after all tool calls
-              const groupHasAgentTool = (g: typeof groups[0]): boolean => {
+              // Reorder: move COMPLETED agent/task result groups to AFTER their nested groups
+              // so the droid report appears at the bottom. Pending (loading) groups stay at top.
+              const groupHasCompletedAgentTool = (g: typeof groups[0]): boolean => {
                 const evts = g.kind === 'single' ? [g.event] : g.items.map((i: any) => i.event);
                 return evts.some((evt: any) =>
                   evt.message?.content?.some((b: any) => {
                     if (b.type !== 'tool_use') return false;
                     const n = (b.name || '').toLowerCase();
-                    return n === 'agent' || (n === 'task' && b.input?.subagent_type);
+                    if (!(n === 'agent' || (n === 'task' && b.input?.subagent_type))) return false;
+                    // Only reorder if the tool has a completed result
+                    const toolId = b.id;
+                    return message.events!.some((e: any) =>
+                      e.type === 'user' && e.message?.content?.some((c: any) =>
+                        c.type === 'tool_result' && c.tool_use_id === toolId
+                      )
+                    );
                   })
                 );
               };
@@ -626,7 +643,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 let i = 0;
                 while (i < groups.length) {
                   const group = groups[i];
-                  if (groupHasAgentTool(group)) {
+                  if (groupHasCompletedAgentTool(group)) {
                     const nested: typeof groups = [];
                     let j = i + 1;
                     while (j < groups.length && groupIsNested(groups[j])) {
@@ -679,11 +696,15 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                       droidType={droidType}
                       workingDirectory={workingDirectory}
                     >
-                      {droidRun.flatMap(g =>
+                      {droidRun.map(g =>
                         g.kind === 'single'
-                          ? [renderStreamMessage(g.event, g.eventIndex, false)]
-                          : g.items.map(({ event, eventIndex }) =>
-                              renderStreamMessage(event, eventIndex, false)
+                          ? renderStreamMessage(g.event, g.eventIndex, false)
+                          : (
+                              <div className="tool-event-group-row" key={`droid-row-${g.items[0].eventIndex}`}>
+                                {g.items.map(({ event, eventIndex }) =>
+                                  renderStreamMessage(event, eventIndex, false)
+                                )}
+                              </div>
                             )
                       )}
                     </DroidActivityBlock>
