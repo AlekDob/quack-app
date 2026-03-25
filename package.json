@@ -32,6 +32,7 @@
     "health": "knip --reporter compact",
     "health:baseline": "knip --reporter json 2>/dev/null > .knip-baseline.json && echo '✅ Baseline saved to .knip-baseline.json'",
     "health:compare": "knip --reporter json 2>/dev/null | node scripts/knip-compare.cjs",
+    "cache:investigation": "node scripts/cache-investigation-summary.mjs",
     "analyze:deps": "npm ls --depth=0 --prod | head -20",
     "clean": "rm -rf dist node_modules/.vite",
     "clean:all": "rm -rf dist node_modules src-tauri/target",

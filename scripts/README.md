@@ -95,6 +95,38 @@ npm run tauri:dev
 
 ## 🔧 Build Scripts
 
+### `cache-investigation-summary.mjs`
+
+**Purpose**: Summarize `~/.quack/cache-investigation.log` into per-session cache tables for prompt-cache debugging
+
+**Usage**:
+```bash
+# Latest captured session
+npm run cache:investigation
+
+# List recent sessions
+npm run cache:investigation -- --list-sessions
+
+# Inspect one specific session
+npm run cache:investigation -- --session session-...
+
+# Archive raw events used for one summary
+npm run cache:investigation -- --archive /tmp/cache-session.jsonl
+```
+
+**What it shows**:
+- prompt / IDE / system prompt hashes per turn
+- allowed tools + MCP hash stability
+- `cacheReadTokens`
+- `cacheCreationTokens`
+- `effectiveContextFill`
+- `contextWindow`
+
+**Why it exists**:
+- avoids manual filtering of verbose Quack logs
+- makes it easy to compare repeated resumed turns
+- provides a stable workflow for the cache investigation documented in `documentation/bugs/bug-post-fix-cache-breakage-investigation.md`
+
 ### `optimize-bundle.sh`
 
 **Purpose**: Optimize the Tauri bundle after building

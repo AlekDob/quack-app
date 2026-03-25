@@ -21,20 +21,30 @@ Symbol.asyncDispose ??= Symbol('Symbol.asyncDispose');
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import Anthropic from '@anthropic-ai/sdk';
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, appendFileSync, mkdirSync } from 'fs';
 import { extname, join, dirname } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { execSync } from 'child_process';
-import { appendFileSync } from 'fs';
 
 // 🐛 DIAG: Write diagnostics to a file that's easy to check
 const DIAG_FILE = join(homedir(), '.quack', 'daemon-diag.log');
+const CACHE_INVESTIGATION_LOG = join(homedir(), '.quack', 'cache-investigation.log');
 function diag(msg) {
   try {
     appendFileSync(DIAG_FILE, `[${new Date().toISOString()}] ${msg}\n`);
+  } catch (e) { /* ignore */ }
+}
+
+function writeCacheInvestigationLog(source, tag, payload) {
+  try {
+    mkdirSync(dirname(CACHE_INVESTIGATION_LOG), { recursive: true });
+    appendFileSync(
+      CACHE_INVESTIGATION_LOG,
+      `${JSON.stringify({ ts: new Date().toISOString(), source, tag, ...payload })}\n`
+    );
   } catch (e) { /* ignore */ }
 }
 
@@ -286,6 +296,183 @@ function createMessageContent(text, imagePaths = []) {
     }
   }
   return content;
+}
+
+function estimateTokens(text = '') {
+  return Math.ceil(text.length / 4);
+}
+
+function hashText(text = '') {
+  return createHash('sha256').update(text).digest('hex').slice(0, 16);
+}
+
+function previewText(text = '', maxChars = 240) {
+  if (!text) return '';
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, maxChars)}...`;
+}
+
+function summarizeText(text = '') {
+  return {
+    chars: text.length,
+    lines: text ? text.split('\n').length : 0,
+    estimatedTokens: estimateTokens(text),
+    hash: hashText(text),
+    preview: previewText(text),
+  };
+}
+
+function getContextInstructionFiles(projectCwd) {
+  const files = [];
+  const candidates = [
+    { scope: 'user', path: join(homedir(), '.claude', 'CLAUDE.md') },
+  ];
+
+  if (projectCwd) {
+    candidates.push(
+      { scope: 'project-dotclaude', path: join(projectCwd, '.claude', 'CLAUDE.md') },
+      { scope: 'project-root', path: join(projectCwd, 'CLAUDE.md') },
+    );
+  }
+
+  for (const candidate of candidates) {
+    if (!existsSync(candidate.path)) continue;
+    try {
+      const content = readFileSync(candidate.path, 'utf8');
+      files.push({
+        scope: candidate.scope,
+        path: candidate.path,
+        chars: content.length,
+        lines: content ? content.split('\n').length : 0,
+        estimatedTokens: estimateTokens(content),
+        hash: hashText(content),
+      });
+    } catch (error) {
+      files.push({
+        scope: candidate.scope,
+        path: candidate.path,
+        error: error.message,
+      });
+    }
+  }
+
+  return files;
+}
+
+function logContextPayload({
+  queryId,
+  model,
+  modelId,
+  sessionId,
+  prompt,
+  attachments,
+  ideContext,
+  systemPromptAppend,
+  settingSources,
+  allowedTools,
+  mcpServers,
+  teamContext,
+  debugMode,
+  cwd,
+}) {
+  const instructionFiles = getContextInstructionFiles(cwd);
+  const payloadSummary = {
+    queryId,
+    resume: Boolean(sessionId),
+    model,
+    modelId,
+    cwd: cwd || null,
+    debugMode: Boolean(debugMode),
+    prompt: summarizeText(prompt),
+    ideContext: summarizeText(ideContext || ''),
+    systemPromptAppend: summarizeText(systemPromptAppend || ''),
+    attachments: {
+      count: attachments?.length || 0,
+      paths: attachments || [],
+    },
+    teamContext: teamContext ? {
+      teamName: teamContext.teamName,
+      memberCount: teamContext.members?.length || 0,
+    } : null,
+    settingSources,
+    allowedTools: {
+      count: allowedTools.length,
+      names: allowedTools,
+    },
+    mcpServers: {
+      count: Object.keys(mcpServers || {}).length,
+      names: Object.keys(mcpServers || {}),
+    },
+    instructionFiles,
+    estimatedInjectedTokens: {
+      ideContext: estimateTokens(ideContext || ''),
+      systemPromptAppend: estimateTokens(systemPromptAppend || ''),
+      instructionFiles: instructionFiles.reduce((sum, file) => sum + (file.estimatedTokens || 0), 0),
+    },
+    payloadHashes: {
+      prompt: hashText(prompt || ''),
+      ideContext: hashText(ideContext || ''),
+      systemPromptAppend: hashText(systemPromptAppend || ''),
+      instructionFilesComposite: hashText(
+        instructionFiles
+          .map(file => `${file.scope}:${file.path}:${file.hash || file.error || 'missing'}`)
+          .join('|')
+      ),
+      settingSources: hashText(JSON.stringify(settingSources || [])),
+      allowedTools: hashText(JSON.stringify(allowedTools || [])),
+      mcpServers: hashText(JSON.stringify(Object.keys(mcpServers || {}).sort())),
+      teamContext: hashText(JSON.stringify(teamContext || null)),
+    },
+  };
+
+  log('CONTEXT', JSON.stringify(payloadSummary));
+  writeCacheInvestigationLog('stream-daemon', 'CONTEXT', payloadSummary);
+}
+
+function extractMaxContextWindow(modelUsage) {
+  if (!modelUsage || typeof modelUsage !== 'object') return null;
+  let maxContextWindow = null;
+  for (const entry of Object.values(modelUsage)) {
+    if (entry && typeof entry === 'object' && Number.isFinite(entry.contextWindow) && entry.contextWindow > 0) {
+      maxContextWindow = Math.max(maxContextWindow ?? 0, entry.contextWindow);
+    }
+  }
+  return maxContextWindow;
+}
+
+function logUsagePayload({ queryId, eventType, usage, modelUsage }) {
+  if (!usage && !modelUsage) return;
+
+  const inputTokens = usage?.input_tokens || 0;
+  const outputTokens = usage?.output_tokens || 0;
+  const cacheReadTokens = usage?.cache_read_input_tokens || usage?.cacheReadInputTokens || 0;
+  const cacheCreationTokens = usage?.cache_creation_input_tokens || usage?.cacheCreationInputTokens || 0;
+  const effectiveContextFill = inputTokens + cacheReadTokens + cacheCreationTokens;
+  const contextWindow = extractMaxContextWindow(modelUsage);
+
+  log('USAGE', JSON.stringify({
+    queryId,
+    eventType,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheCreationTokens,
+    effectiveContextFill,
+    contextWindow,
+    contextUtilizationPct: contextWindow ? Number(((effectiveContextFill / contextWindow) * 100).toFixed(2)) : null,
+  }));
+  writeCacheInvestigationLog('stream-daemon', 'USAGE', {
+    queryId,
+    eventType,
+    inputTokens,
+    outputTokens,
+    cacheReadTokens,
+    cacheCreationTokens,
+    effectiveContextFill,
+    contextWindow,
+    contextUtilizationPct: contextWindow ? Number(((effectiveContextFill / contextWindow) * 100).toFixed(2)) : null,
+  });
 }
 
 // =============================================================================
@@ -592,6 +779,22 @@ ${hintsBlock}
 
     const mcpCount = options.mcpServers ? Object.keys(options.mcpServers).length : 0;
     log('MCP', `query=${queryId} resolved ${mcpCount} MCP servers: [${Object.keys(options.mcpServers || {}).join(', ')}]`);
+    logContextPayload({
+      queryId,
+      model,
+      modelId,
+      sessionId,
+      prompt,
+      attachments,
+      ideContext,
+      systemPromptAppend,
+      settingSources: options.settingSources,
+      allowedTools: resolvedAllowedTools,
+      mcpServers: options.mcpServers,
+      teamContext,
+      debugMode,
+      cwd,
+    });
 
     // Brain: fix-session-limit-prompt-cache
     // Dynamic context (ideContext, gitContext) is prepended to the user prompt as a
@@ -660,6 +863,22 @@ ${hintsBlock}
           emit({ type: 'event', queryId, event: { type: 'prompt_token_count', promptTokens } });
         }
         promptTokensEmitted = true;
+      }
+
+      if (event.type === 'assistant' && event.message?.usage) {
+        logUsagePayload({
+          queryId,
+          eventType: 'assistant',
+          usage: event.message.usage,
+          modelUsage: event.modelUsage || event.model_usage,
+        });
+      } else if (event.type === 'result') {
+        logUsagePayload({
+          queryId,
+          eventType: 'result',
+          usage: event.usage,
+          modelUsage: event.modelUsage || event.model_usage,
+        });
       }
 
       // Brain: fix-daemon-missing-1m-context-betas
