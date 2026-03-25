@@ -30,7 +30,7 @@ import AddKanbanTaskModal, { type KanbanTaskInitialValues, type KanbanTaskDraft 
 import { useKanbanStore } from '../../stores/kanbanStore';
 import { useChatStore } from '../../stores/chatStore';
 import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage, ChatAttachment, EffortLevel } from '../../types';
-import type { ChatSendOptions } from '../../hooks/useClaudeChat';
+import type { ChatSendOptions, PermissionMode } from '../../hooks/useClaudeChat';
 import { toast } from 'sonner';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import './KanbanView.css';
@@ -52,7 +52,7 @@ interface KanbanViewProps {
   // Default settings from global settings
   defaultModel?: string;
   defaultThinkingMode?: 'auto' | 'think' | 'hard' | 'harder' | 'ultra';
-  defaultPermissionMode?: 'plan' | 'bypass';
+  defaultPermissionMode?: PermissionMode;
   defaultEffort?: EffortLevel;
   // 🦆 Load saved chat sessions from sessionIds
   onLoadChatSessions?: () => Promise<void>;

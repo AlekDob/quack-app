@@ -322,7 +322,7 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
       const stream = streamClaudeMessage(content, {
         model: options?.model || 'opus',
         thinkingMode: effectiveThinkingMode,
-        permissionMode: (options?.permissionMode === 'debug' ? 'bypass' : options?.permissionMode === 'chat' ? 'default' : options?.permissionMode) || 'bypass',
+        permissionMode: (options?.permissionMode === 'debug' ? 'bypass' : options?.permissionMode === 'chat' ? 'act' : options?.permissionMode) || 'bypass',
         sessionId: claudeSessionId.current, // Resume previous session if exists
         workingDirectory: options?.workingDirectory,
         signal: abortControllerRef.current?.signal, // Pass abort signal
