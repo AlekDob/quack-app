@@ -33,10 +33,99 @@ import { execSync } from 'child_process';
 const DIAG_FILE = join(homedir(), '.quack', 'daemon-diag.log');
 const CACHE_INVESTIGATION_LOG = join(homedir(), '.quack', 'cache-investigation.log');
 const CACHE_DEBUG_DIR = join(homedir(), '.quack', 'cache-debug');
+const fetchCaptureState = {
+  queryId: null,
+  enabled: false,
+  requestCount: 0,
+};
 function diag(msg) {
   try {
     appendFileSync(DIAG_FILE, `[${new Date().toISOString()}] ${msg}\n`);
   } catch (e) { /* ignore */ }
+}
+
+function normalizeBodyForCapture(body) {
+  if (body == null) return null;
+  if (typeof body === 'string') return body;
+  if (Buffer.isBuffer(body)) return body.toString('utf8');
+  if (body instanceof Uint8Array) return Buffer.from(body).toString('utf8');
+  return null;
+}
+
+function writeSdkApiRequestCapture({ queryId, url, method, bodyText }) {
+  try {
+    mkdirSync(CACHE_DEBUG_DIR, { recursive: true });
+    const parsedBody = (() => {
+      try {
+        return bodyText ? JSON.parse(bodyText) : null;
+      } catch {
+        return null;
+      }
+    })();
+    const requestIndex = ++fetchCaptureState.requestCount;
+    const filePath = join(CACHE_DEBUG_DIR, `${queryId}.api-request.${requestIndex}.json`);
+    const payload = {
+      ts: new Date().toISOString(),
+      queryId,
+      requestIndex,
+      url,
+      method,
+      bodyHash: hashText(bodyText || ''),
+      bodyChars: bodyText?.length || 0,
+      parsedBody,
+      rawBody: parsedBody ? undefined : bodyText,
+    };
+    appendFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`);
+    writeCacheInvestigationLog('stream-daemon', 'API_REQUEST', {
+      queryId,
+      requestIndex,
+      url,
+      method,
+      bodyHash: payload.bodyHash,
+      bodyChars: payload.bodyChars,
+      filePath,
+      model: parsedBody?.model || null,
+      messageCount: Array.isArray(parsedBody?.messages) ? parsedBody.messages.length : null,
+      toolCount: Array.isArray(parsedBody?.tools) ? parsedBody.tools.length : null,
+      systemChars: typeof parsedBody?.system === 'string'
+        ? parsedBody.system.length
+        : Array.isArray(parsedBody?.system)
+          ? JSON.stringify(parsedBody.system).length
+          : 0,
+    });
+  } catch (error) {
+    log('WARN', `Failed to write API request capture: ${error.message}`);
+  }
+}
+
+if (typeof globalThis.fetch === 'function' && !globalThis.__quackFetchCaptureInstalled) {
+  const originalFetch = globalThis.fetch.bind(globalThis);
+  globalThis.fetch = async function quackFetchCapture(input, init) {
+    if (fetchCaptureState.enabled) {
+      try {
+        const url = typeof input === 'string' || input instanceof URL
+          ? String(input)
+          : input?.url;
+        const method = init?.method || input?.method || 'GET';
+        if (url && method.toUpperCase() === 'POST' && url.includes('/v1/messages')) {
+          let bodyText = normalizeBodyForCapture(init?.body);
+          if (bodyText == null && typeof Request !== 'undefined' && input instanceof Request) {
+            bodyText = await input.clone().text();
+          }
+          writeSdkApiRequestCapture({
+            queryId: fetchCaptureState.queryId,
+            url,
+            method,
+            bodyText,
+          });
+        }
+      } catch (error) {
+        log('WARN', `Fetch capture failed: ${error.message}`);
+      }
+    }
+    return originalFetch(input, init);
+  };
+  globalThis.__quackFetchCaptureInstalled = true;
 }
 
 function writeCacheInvestigationLog(source, tag, payload) {
@@ -470,6 +559,64 @@ function getCacheInvestigationConfig() {
         settingSources: ['project', 'user', 'local'],
         enableSdkDebugHooks: true,
       };
+    case 'baseline-preserve-skill-attachments':
+      return {
+        mode: requestedMode,
+        toolConfigMode: 'preset_claude_code',
+        systemPromptMode: 'claude_code_preset',
+        includeBuiltInMcp: true,
+        includeAllMcp: true,
+        settingSources: ['project', 'user', 'local'],
+        enableSdkDebugHooks: true,
+        preserveSkillAttachments: true,
+      };
+    case 'baseline-no-allowed-tools':
+      return {
+        mode: requestedMode,
+        toolConfigMode: 'preset_claude_code',
+        systemPromptMode: 'claude_code_preset',
+        includeBuiltInMcp: true,
+        includeAllMcp: true,
+        settingSources: ['project', 'user', 'local'],
+        enableSdkDebugHooks: true,
+        omitAllowedTools: true,
+      };
+    case 'baseline-preserve-skill-attachments-no-settings':
+      return {
+        mode: requestedMode,
+        toolConfigMode: 'preset_claude_code',
+        systemPromptMode: 'claude_code_preset',
+        includeBuiltInMcp: true,
+        includeAllMcp: true,
+        settingSources: [],
+        enableSdkDebugHooks: true,
+        preserveSkillAttachments: true,
+      };
+    case 'baseline-preserve-skill-attachments-no-settings-no-file-checkpointing':
+      return {
+        mode: requestedMode,
+        toolConfigMode: 'preset_claude_code',
+        systemPromptMode: 'claude_code_preset',
+        includeBuiltInMcp: true,
+        includeAllMcp: true,
+        settingSources: [],
+        enableSdkDebugHooks: true,
+        preserveSkillAttachments: true,
+        disableFileCheckpointing: true,
+      };
+    case 'baseline-preserve-skill-attachments-no-settings-no-file-checkpointing-capture-request':
+      return {
+        mode: requestedMode,
+        toolConfigMode: 'preset_claude_code',
+        systemPromptMode: 'claude_code_preset',
+        includeBuiltInMcp: true,
+        includeAllMcp: true,
+        settingSources: [],
+        enableSdkDebugHooks: true,
+        preserveSkillAttachments: true,
+        disableFileCheckpointing: true,
+        captureApiRequestPayload: true,
+      };
     case 'explicit-tools':
       return { mode: requestedMode, toolConfigMode: 'explicit_allowed_tools', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
     case 'preset-no-builtin-mcp':
@@ -603,9 +750,23 @@ async function handleQuery(cmd) {
     const resolvedAllowedTools = allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0
       ? allowedTools : defaultAllowedTools;
     const investigation = getCacheInvestigationConfig();
+    fetchCaptureState.enabled = Boolean(investigation.captureApiRequestPayload);
+    fetchCaptureState.queryId = queryId;
+    fetchCaptureState.requestCount = 0;
+    if (investigation.captureApiRequestPayload) {
+      process.env.QUACK_CAPTURE_REQUEST_BODY = '1';
+      process.env.QUACK_CAPTURE_REQUEST_QUERY_ID = queryId;
+      process.env.QUACK_CAPTURE_REQUEST_INDEX = '0';
+    } else {
+      delete process.env.QUACK_CAPTURE_REQUEST_BODY;
+      delete process.env.QUACK_CAPTURE_REQUEST_QUERY_ID;
+      delete process.env.QUACK_CAPTURE_REQUEST_INDEX;
+    }
     const effectiveAllowedTools = investigation.toolConfigMode === 'no_tools'
       ? []
-      : resolvedAllowedTools;
+      : investigation.omitAllowedTools
+        ? undefined
+        : resolvedAllowedTools;
     const toolsConfig =
       investigation.toolConfigMode === 'explicit_allowed_tools'
         ? effectiveAllowedTools
@@ -780,7 +941,7 @@ ${hintsBlock}
       // ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
       settingSources: investigation.settingSources,
       tools: toolsConfig,
-      allowedTools: effectiveAllowedTools,
+      ...(effectiveAllowedTools ? { allowedTools: effectiveAllowedTools } : {}),
       abortController,
       systemPrompt: finalSystemPrompt,
       ...(debugFilePath ? { debugFile: debugFilePath } : {}),
@@ -876,8 +1037,14 @@ ${hintsBlock}
     if (sessionId) {
       options.env.CLAUDE_CODE_TASK_LIST_ID = `quack-${sessionId}`;
     }
+    if (investigation.preserveSkillAttachments) {
+      options.env.QUACK_PRESERVE_SKILL_ATTACHMENTS = '1';
+    }
+    if (investigation.disableFileCheckpointing) {
+      options.env.CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING = '1';
+    }
 
-    options.enableFileCheckpointing = true;
+    options.enableFileCheckpointing = !investigation.disableFileCheckpointing;
 
     // --- MCP servers ---
     let resolvedMcpServers = {};
@@ -926,9 +1093,14 @@ ${hintsBlock}
       settingSources: investigation.settingSources,
       mcpCount,
       sdkDebugHooks: Boolean(investigation.enableSdkDebugHooks),
+      preserveSkillAttachments: Boolean(investigation.preserveSkillAttachments),
+      omitAllowedTools: Boolean(investigation.omitAllowedTools),
+      disableFileCheckpointing: Boolean(investigation.disableFileCheckpointing),
+      captureApiRequestPayload: Boolean(investigation.captureApiRequestPayload),
       debugFilePath: debugFilePath || null,
       cliPathMode: hasNativeCli ? 'native' : 'bundled',
       nativeClaudePath: hasNativeCli ? nativeClaudePath : null,
+      fileCheckpointingEnabled: options.enableFileCheckpointing,
     });
     const systemPromptAppend = options.systemPrompt?.append || '';
     logContextPayload({
@@ -1150,6 +1322,16 @@ ${hintsBlock}
       }
     }
     activeQueries.delete(queryId);
+    if (fetchCaptureState.queryId === queryId) {
+      fetchCaptureState.enabled = false;
+      fetchCaptureState.queryId = null;
+      fetchCaptureState.requestCount = 0;
+    }
+    if (process.env.QUACK_CAPTURE_REQUEST_QUERY_ID === queryId) {
+      delete process.env.QUACK_CAPTURE_REQUEST_BODY;
+      delete process.env.QUACK_CAPTURE_REQUEST_QUERY_ID;
+      delete process.env.QUACK_CAPTURE_REQUEST_INDEX;
+    }
     log('QUERY', `query=${queryId} cleanup done (cleaned ${cleanedRequests} pending requests, remaining active=${activeQueries.size})`);
   }
 }

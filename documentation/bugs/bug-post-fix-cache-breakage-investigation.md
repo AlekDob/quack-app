@@ -702,6 +702,113 @@ The remaining investigation question is now narrower:
 - is this attachment-loss behavior caused by Quack's SDK invocation pattern
 - or is it an SDK / Claude Code runtime limitation of the `sdk-ts` resume path itself
 
+### Follow-up control: preserve skill attachments in the persisted transcript
+
+To test that hypothesis directly, Quack was run in a patched mode that preserves:
+
+- `skill_listing`
+- `invoked_skills`
+- `dynamic_skill`
+
+in the persisted session JSONL instead of dropping all attachments.
+
+Mode:
+
+- `baseline-preserve-skill-attachments`
+
+Result:
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` |
+|---|---:|---:|
+| 1 | `15282` | `63363` |
+| 2 | `15282` | `63500` |
+| 3 | `38852` | `40126` |
+| 4 | `38852` | `40261` |
+
+Transcript result:
+
+- the resumed session transcript now contains `attachment: 1`
+- specifically:
+  - `type: "skill_listing"`
+  - `isInitial: true`
+  - `skillCount: 18`
+
+Interpretation:
+
+- this proves the transcript persistence drop was real
+- and it proves Quack can preserve the attachment state the runtime expects
+- but fixing that bug did **not** collapse steady-state `cacheCreationTokens` toward native Claude Code CLI levels
+- therefore the missing `skill_listing` attachment was a real cache-break bug, but not the primary remaining one
+
+### Follow-up control: remove Quack's explicit `allowedTools` injection
+
+Next, Quack was run with the full Claude Code preset/runtime still enabled, but without sending the explicit `allowedTools` list from Quack.
+
+Mode:
+
+- `baseline-no-allowed-tools`
+
+Result:
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` |
+|---|---:|---:|
+| 1 | `38852` | `40457` |
+| 2 | `38852` | `40592` |
+| 3 | `38852` | `40727` |
+| 4 | `38852` | `40923` |
+
+Runtime result:
+
+- `toolsAvailable` remained `83`
+- `mcpServerCount` remained `8`
+- the same large permission updates still applied on every turn
+- the same skill reloads still occurred on every turn
+
+Interpretation:
+
+- Quack's explicit `allowedTools` parameter is not the primary source of the repeated permission scaffold
+- the repeated permission/settings/tool scaffold is being rebuilt by the preset/runtime/settings path itself
+
+### Combined control: preserve skill attachments and remove settings loading
+
+The next control combined the two proven real fixes:
+
+- preserve the skill attachment state used for resume
+- disable SDK filesystem settings loading with `settingSources: []`
+
+Mode:
+
+- `baseline-preserve-skill-attachments-no-settings`
+
+Result:
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` |
+|---|---:|---:|
+| 1 | `13792` | `54646` |
+| 2 | `13792` | `54781` |
+| 3 | `35511` | `33197` |
+| 4 | `13792` | `55051` |
+
+Runtime result:
+
+- `settingSources: []`
+- `toolsAvailable` dropped from `83` to `75`
+- `mcpServerCount` dropped from `8` to `7`
+- debug logs showed:
+  - `Loaded 0 unique skills`
+  - repeated `FileHistory: Copied backup ...` on every resumed turn
+
+Interpretation:
+
+- the combination still did not produce healthy cache behavior
+- so the primary remaining cache break is not explained by:
+  - dynamic system prompt content
+  - missing `skill_listing` persistence alone
+  - SDK filesystem settings alone
+  - Quack's explicit `allowedTools` injection
+
+At this point, the strongest remaining suspect is the file checkpointing / file-history restore machinery that still replays backup state into a fresh internal UUID on every resumed query.
+
 ### D. Upstream regression layer
 
 Goal: determine whether the residual behavior matches Claude Code issue `#34629`.
@@ -746,55 +853,121 @@ The final diagnosis must end with one implementation direction:
 
 ## Next investigation phase
 
-The next phase should focus only on the daemon path.
+The next phase should stay on the daemon path, but file checkpointing / file-history restore is no longer the leading suspect.
 
-What has already been ruled out:
+What is now ruled out or reduced to secondary causes:
 
 - dynamic `systemPrompt.append` mutation
-- tool preset choice
-- built-in MCP scaffold as the primary cause
+- Quack-owned `ideContext` / `gitContext` placement
+- Quack's explicit `allowedTools` injection
+- built-in MCP removal as a sufficient fix
+- SDK filesystem settings as a sufficient fix
+- missing `skill_listing` persistence as a sufficient fix
 - native vs bundled Claude executable as the primary cause
-- Haiku model behavior itself
 - the legacy `stream-claude.js` path as the main optimization target
+- SDK file checkpointing / file-history restore as the primary remaining cause
+
+### Latest result: file checkpointing disabled
+
+Investigation mode:
+
+- `baseline-preserve-skill-attachments-no-settings-no-file-checkpointing`
+
+Per-turn result on the same Haiku resumed session:
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` |
+|---|---:|---:|
+| 1 | `13792` | `55268` |
+| 2 | `35511` | `33705` |
+| 3 | `35511` | `33861` |
+| 4 | `13792` | `55797` |
+
+Runtime evidence:
+
+- `SESSION.effective_config.fileCheckpointingEnabled = false`
+- `SESSION.effective_config.disableFileCheckpointing = true`
+- the SDK debug logs no longer contain `FileHistory: Copied backup ...`
+
+Conclusion from this step:
+
+- file checkpointing really was disabled
+- the file-history restore path disappeared from the debug logs
+- `cacheCreationTokens` did **not** materially improve
+
+So file checkpointing / file-history restore was a real runtime behavior, but it is **not** the main driver of the remaining steady-state cache break.
 
 ### Immediate next step
 
-Restore daemon mode and instrument daemon session lifecycle behavior before changing any more prompt structure.
+Inspect the remaining hidden preset/runtime scaffold that still exists even after:
 
-Add daemon-only telemetry for:
+- `settingSources: []`
+- persisted `skill_listing` preservation
+- file checkpointing disabled
 
-- incoming `session_id`
-- incoming `session_key`
-- effective SDK `options.resume`
-- effective SDK `options.cwd`
-- effective SDK `permissionMode`
-- effective SDK `betas`
-- Claude system/init `session_id`
-- Claude result/session identifiers, if exposed by the SDK event stream
+The most useful next isolation is now:
 
-### Goal of the next step
+- compare the remaining full preset/runtime path against a no-skills / no-agents / no-custom-instructions variant while keeping tool support on
+- trace which hidden runtime block still accounts for `toolsAvailable: 75` and the `~33k-55k` repeated cache creation
 
-Prove whether resumed daemon turns are truly staying on one Claude session or whether Quack is partially rebuilding, forking, or otherwise perturbing the session state between turns.
+### Latest result: actual `/v1/messages` payload diff
 
-### Follow-up after daemon session verification
+Investigation mode:
 
-If daemon session reuse looks correct, the next strongest isolation test is:
+- `baseline-preserve-skill-attachments-no-settings-no-file-checkpointing-capture-request`
 
-- daemon baseline with all MCP disabled, not just Quack's built-in MCP servers
+Captured artifacts:
 
-That will separate:
+- `~/.quack/cache-debug/q_session-1773999614211-782jy1t_09117272-861d-435d-93b1-03cd6bffa099.cli-api-request.01.json`
+- `~/.quack/cache-debug/q_session-1773999614211-782jy1t_1336fcc2-6654-4c1a-97e5-18667166c1a7.cli-api-request.01.json`
+- `~/.quack/cache-debug/q_session-1773999614211-782jy1t_74ca9a1c-624c-4796-94f1-caba7bcbba68.cli-api-request.01.json`
+- `~/.quack/cache-debug/q_session-1773999614211-782jy1t_d83c6c9f-f4c9-4347-97b7-edfaee0356ce.cli-api-request.01.json`
 
-- daemon/session integration issues
-- hidden MCP/runtime scaffold costs
+Key serializer/runtime functions in the bundled SDK path:
 
-That test is now complete. The next step after it should be:
+- `wJY(...)`: builds the outgoing `body.messages` array
+- `ejY(...)`: serializes user messages
+- `AJY(...)`: serializes assistant messages
 
-- isolate `settingSources` as the likely remaining source of hidden MCP/tool/runtime scaffold
-- specifically compare current `['project', 'user', 'local']` against a reduced configuration that still preserves `CLAUDE.md` loading expectations as much as possible
+Relevant bundled runtime behavior:
 
-### Working expectation
+- `ejY(A, q = false, K, _)` adds `cache_control: { type: 'ephemeral' }` only when `q === true`, meaning only the current latest user message gets the cache marker
+- the TodoWrite reminder block is injected as a hidden meta/user block before the current latest user text
 
-The most likely remaining root cause is now in Quack's daemon/session integration layer, not in prompt text placement or the tool-preset/MCP configuration that has already been tested.
+What the actual payload diff showed:
+
+- top-level `body.system` was stable across repeated turns
+- top-level `body.mcp_servers` was stable across repeated turns
+- top-level `body.metadata` was stable across repeated turns
+- message count grew by exactly `+2` each turn as expected
+- but the request body was **not** append-only
+
+Concrete mutation found between turn 2 and turn 3:
+
+- first differing historical message index: `230`
+- turn 2 request posted message `230` as:
+  - hidden TodoWrite reminder block
+  - then the real user text block
+  - and that real user text block had `cache_control: { type: 'ephemeral' }`
+- turn 3 request posted that **same historical user message** as:
+  - only the plain user text block
+  - no TodoWrite reminder block
+  - no `cache_control`
+
+The same pattern repeated between turn 3 and turn 4 at message index `232`.
+
+Conclusion from this step:
+
+- Quack's actual posted `/v1/messages` history is being rewritten between repeated resumed turns
+- the rewrite happens exactly at the boundary of the previously-latest user message
+- the current turn's user message is serialized with hidden TodoWrite reminder + `cache_control`
+- on the next turn, that same message is rehydrated as plain text history without the reminder and without `cache_control`
+- this is now the first directly observed pre-history mutation in the real API payload, not just an inference from token counts
+
+Immediate implication:
+
+- the remaining cache break is not only "large hidden scaffold exists"
+- the runtime is also mutating previously-posted history at a cache-sensitive boundary
+- that mutation is a strong candidate for why Quack still fails to approach native Claude Code CLI cache reuse even after other fixes
 
 ## Current best hypothesis
 
@@ -810,7 +983,12 @@ As of 2026-03-25, the best-supported working hypothesis is:
 - the `all-mcp-disabled-no-settings` control confirms that SDK filesystem settings loading via `settingSources` was one real hidden pre-history source
 - even with `settingSources: []`, the daemon still initializes with `toolsAvailable: 27` and much worse cache behavior than native Claude Code CLI
 - scaffold-debug inspection of the bundled runtime shows that skill state is only restored from prior `skill_listing` attachments during resume
-- the resumed Quack session transcript contains zero `attachment` / `skill_listing` entries, so the runtime re-sends the skill scaffold as `initial` on repeated resumed turns
-- after removing settings-based scaffold, the strongest remaining suspect is now attachment-state loss or non-restoration inside the Claude Code preset / SDK runtime layer, with any remaining gap treated as a possible upstream Claude Code / Agent SDK resume limitation
+- the resumed Quack session transcript originally contained zero `attachment` / `skill_listing` entries, and preserving that state proved one real persistence bug
+- fixing that persistence bug did not collapse steady-state cache creation, so it is a secondary cause rather than the primary remaining one
+- removing Quack's explicit `allowedTools` injection did not help, so the repeated permission scaffold is coming from deeper preset/runtime behavior
+- combining preserved skill attachments with `settingSources: []` still did not produce healthy cache behavior
+- disabling file checkpointing removed the `FileHistory` restore logs but did not materially reduce `cacheCreationTokens`, so file checkpointing is not the primary remaining cause
+- direct `/v1/messages` capture now proves that the bundled runtime rewrites the previous latest user message between turns by dropping the hidden TodoWrite reminder block and the `cache_control` marker when that message becomes historical
+- the strongest remaining suspect is now the bundled runtime's user-message serialization / rehydration path around `wJY(...)` / `ejY(...)`, especially the latest-message-only reminder and `cache_control` transform
 
 That hypothesis is not yet final. The fixed matrix above is required before locking the root cause.

@@ -591,6 +591,8 @@ function getCacheInvestigationConfig() {
   switch (requestedMode) {
     case 'baseline':
       return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
+    case 'baseline-preserve-skill-attachments':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'], preserveSkillAttachments: true };
     case 'explicit-tools':
       return { mode: requestedMode, toolConfigMode: 'explicit_allowed_tools', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
     case 'preset-no-builtin-mcp':
@@ -605,6 +607,16 @@ function getCacheInvestigationConfig() {
       return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: false, includeAllMcp: false, settingSources: ['project'] };
     case 'all-mcp-disabled-no-settings':
       return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: false, includeAllMcp: false, settingSources: [] };
+    case 'baseline-preserve-skill-attachments-no-settings-no-file-checkpointing':
+      return {
+        mode: requestedMode,
+        toolConfigMode: 'preset_claude_code',
+        includeBuiltInMcp: true,
+        includeAllMcp: true,
+        settingSources: [],
+        preserveSkillAttachments: true,
+        disableFileCheckpointing: true,
+      };
     default:
       console.error(`[WARN] Unknown QUACK_CACHE_INVESTIGATION_MODE="${requestedMode}", falling back to baseline`);
       return { mode: 'baseline', toolConfigMode: 'preset_claude_code', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
@@ -1155,6 +1167,9 @@ ${hintsBlock}
       ...process.env,
       ENABLE_TOOL_SEARCH: 'auto', // Activate when MCP tools exceed 10% of context
     };
+    if (investigation.preserveSkillAttachments) {
+      options.env.QUACK_PRESERVE_SKILL_ATTACHMENTS = '1';
+    }
     console.error(`[DEBUG] MCP Tool Search ENABLED (auto mode - activates at >10% context usage)`);
 
     if (sessionId) {
@@ -1174,8 +1189,11 @@ ${hintsBlock}
     // input tokens on long sessions. File rewind still works but may not have
     // UUIDs for older messages (rewind to recent messages should still work).
     // =============================================================================
-    options.enableFileCheckpointing = true;
-    console.error(`[DEBUG] File checkpointing ENABLED (replay-user-messages disabled to save tokens)`);
+    if (investigation.disableFileCheckpointing) {
+      options.env.CLAUDE_CODE_DISABLE_FILE_CHECKPOINTING = '1';
+    }
+    options.enableFileCheckpointing = !investigation.disableFileCheckpointing;
+    console.error(`[DEBUG] File checkpointing ${options.enableFileCheckpointing ? 'ENABLED' : 'DISABLED'} (replay-user-messages disabled to save tokens)`);
 
     // Add effort parameter if provided explicitly (takes precedence over thinkingMode mapping)
     // Controls quality vs speed/cost tradeoff: 'low', 'medium', 'high', 'max'
