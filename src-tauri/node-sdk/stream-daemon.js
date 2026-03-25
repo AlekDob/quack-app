@@ -690,7 +690,7 @@ async function handleQuery(cmd) {
       ? join(homedir(), '.claude', 'local', 'claude.exe')
       : join(homedir(), '.local', 'bin', 'claude');
     const hasNativeCli = existsSync(nativeClaudePath);
-    debugLog(`CLI: ${hasNativeCli ? 'native (' + nativeClaudePath + ')' : 'bundled cli.js'}`);
+    log('QUERY', `CLI: ${hasNativeCli ? 'native (' + nativeClaudePath + ')' : 'bundled cli.js'}`);
 
     const options = {
       model: modelId,
@@ -1006,7 +1006,7 @@ ${hintsBlock}
         settingSources: options.settingSources || ['project', 'user', 'local'],
         betas: options.betas,
         allowedTools: resolvedAllowedTools,
-        tools: toolsConfig,
+        tools: options.tools,
         thinking: options.thinking,
         effort: options.effort,
         mcpServers: options.mcpServers,
@@ -1075,9 +1075,16 @@ ${hintsBlock}
         promptTokensEmitted = true;
       }
 
-      // Brain: fix-daemon-missing-1m-context-betas
-      // Log contextWindow from result events to verify 1M activation
+      // Log cache and context stats from result events
       if (event.type === 'result') {
+        diag(`RESULT_EVENT: keys=${Object.keys(event).join(',')}, usage=${!!event.usage}, subtype=${event.subtype}`);
+        const u = event.usage;
+        if (u) {
+          const cRead = u.cache_read_input_tokens || 0;
+          const cCreate = u.cache_creation_input_tokens || 0;
+          log('CACHE', `query=${queryId} cacheRead=${cRead} cacheCreation=${cCreate} input=${u.input_tokens || 0} effective=${cRead + cCreate + (u.input_tokens || 0)}`);
+          diag(`CACHE: cacheRead=${cRead} cacheCreation=${cCreate} effective=${cRead + cCreate + (u.input_tokens || 0)}`);
+        }
         const mu = event.modelUsage || event.model_usage;
         if (mu) {
           for (const [modelName, usage] of Object.entries(mu)) {
