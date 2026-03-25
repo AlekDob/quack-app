@@ -969,6 +969,78 @@ Immediate implication:
 - the runtime is also mutating previously-posted history at a cache-sensitive boundary
 - that mutation is a strong candidate for why Quack still fails to approach native Claude Code CLI cache reuse even after other fixes
 
+### Quantitative payload diff: prefix break analysis
+
+Script: `scripts/cache-payload-diff.mjs`
+
+This analysis compared the 4 captured `/v1/messages` payloads byte-for-byte to determine exactly where and how much the prefix breaks between consecutive turns.
+
+#### Mutation summary
+
+| Transition | Mutated msgs | Nature | Mutation size |
+|---|---:|---|---:|
+| Turn 0 → 1 | 1 | TodoWrite removed + `cache_control` removed from msg[228] | 549 bytes |
+| Turn 1 → 2 | 1 | TodoWrite removed + `cache_control` removed from msg[230] | 549 bytes |
+| Turn 2 → 3 | 1 | TodoWrite removed + `cache_control` removed from msg[232] | 549 bytes |
+
+Additionally, Turn 2 → 3 showed `body.tools` **reordered** (MCP tool positions shifted, same tools present). This is a secondary instability.
+
+#### Prefix divergence point
+
+| Transition | First divergence | Section | Stable prefix chars | Unstable tail chars |
+|---|---:|---|---:|---:|
+| Turn 0 → 1 | char 383,152 | msg[228] (user) | ~95,788 est tokens | ~485 est tokens |
+| Turn 1 → 2 | char 384,199 | msg[230] (user) | ~96,050 est tokens | ~485 est tokens |
+| Turn 2 → 3 | char 121,905 | tools (offset 94242) | ~30,476 est tokens | ~66,320 est tokens |
+
+#### `cache_control` breakpoint positions across turns
+
+| Turn | system breakpoints | tool breakpoints | message breakpoints |
+|---|---|---|---|
+| Turn 0 | system[1], system[2] | none | msg[228] |
+| Turn 1 | system[1], system[2] | none | msg[230] |
+| Turn 2 | system[1], system[2] | none | msg[232] |
+| Turn 3 | system[1], system[2] | none | msg[234] |
+
+#### Request body composition
+
+| Section | Chars | Est. tokens |
+|---|---:|---:|
+| `body.system` | 27,664 | ~6,916 |
+| `body.tools` | 107,516 | ~26,879 |
+| `body.messages` (228-235 msgs) | 248,000-252,000 | ~62,000-63,000 |
+| **Total** | ~384,000-387,000 | ~96,000-97,000 |
+
+#### Why the small mutation causes a large cache miss
+
+The mutation itself is tiny (549 bytes per turn). But the cache miss is large because of **cache breakpoint placement**:
+
+1. The API creates cache entries only at positions marked with `cache_control: { type: 'ephemeral' }`
+2. The only breakpoints are at system[1], system[2], and the **latest user message**
+3. There are **no breakpoints on `body.tools`** — tools are only cached as part of the message-level cache entry
+4. When the latest user message moves from msg[N] to msg[N+2], the old breakpoint at msg[N] no longer matches (because msg[N] was mutated)
+5. The API falls back to the last matching breakpoint: system[2] (~6,916 tokens)
+6. Everything from system[2] onward (tools + all messages = ~89,000 tokens) must be re-cached as a new entry at the new msg[N+2] breakpoint
+
+This explains the observed cache behavior:
+
+| Turn | Observed `cacheReadTokens` | Explanation |
+|---|---:|---|
+| 1 | 0 | First query, no prior cache |
+| 2 | 15,282 | Falls back to system[2] breakpoint from turn 1 |
+| 3 | 39,081 | Partial prefix match against turn 2's msg[230] cache entry (msg[228] unchanged since turn 2) |
+| 4 | 39,081 | Same partial match depth stabilizes |
+
+The steady-state `cacheCreationTokens` of ~28,000-33,000 represents the portion of the request from the cache-break boundary through the new latest message — everything the API cannot match against any prior cache entry.
+
+#### Why native Claude Code CLI does not have this problem
+
+In native CLI, the session lives in a single long-running process. Messages are appended in-memory. The `ejY()` serializer decorates only the current latest message, but historical messages retain their original serialization (including TodoWrite and `cache_control`) because they are never re-serialized from disk.
+
+In Quack's daemon path, each `query()` call resumes from the persisted session JSONL. The SDK re-loads and re-serializes all messages from scratch. The `ejY()` serializer then treats previously-latest messages as plain historical messages — stripping the TodoWrite reminder and `cache_control` that were present when they were originally sent.
+
+This re-serialization-from-disk behavior is the fundamental difference.
+
 ## Current best hypothesis
 
 As of 2026-03-25, the best-supported working hypothesis is:
@@ -990,5 +1062,45 @@ As of 2026-03-25, the best-supported working hypothesis is:
 - disabling file checkpointing removed the `FileHistory` restore logs but did not materially reduce `cacheCreationTokens`, so file checkpointing is not the primary remaining cause
 - direct `/v1/messages` capture now proves that the bundled runtime rewrites the previous latest user message between turns by dropping the hidden TodoWrite reminder block and the `cache_control` marker when that message becomes historical
 - the strongest remaining suspect is now the bundled runtime's user-message serialization / rehydration path around `wJY(...)` / `ejY(...)`, especially the latest-message-only reminder and `cache_control` transform
+- quantitative payload diff analysis (`scripts/cache-payload-diff.mjs`) now confirms:
+  - the prefix diverges at the previously-latest user message (~549 bytes mutation per turn)
+  - but the cascade is large because `cache_control` breakpoints exist only on system[1], system[2], and the latest user message — with **no breakpoints on tools**
+  - the API falls back to the system[2] breakpoint (~15k tokens), forcing re-cache of tools + all messages (~80k+ tokens)
+  - after 2-3 turns the cache partially warms (prefix match against prior entries stabilizes at ~39k read), but steady-state creation remains ~28-33k
+  - the fundamental cause is re-serialization from disk: native CLI keeps messages in-memory with their original decorations, while Quack's daemon resume path re-serializes all messages, stripping `cache_control` and TodoWrite from historical messages
+  - a secondary instability is MCP tool reordering between turns (observed in Turn 2→3), which breaks the prefix at the tools section
 
-That hypothesis is not yet final. The fixed matrix above is required before locking the root cause.
+## Root-cause conclusion
+
+### 1. What portion of the original cache breakage was fixed?
+
+Moving `ideContext` and `gitContext` out of `systemPrompt.append` into the user-message `<system-reminder>` block fixed the Quack-owned dynamic system prompt mutation. This eliminated the failure mode where every IDE file change or git status change invalidated the entire system prompt cache.
+
+### 2. What portion remains?
+
+Steady-state resumed sessions still show ~28,000-33,000 `cacheCreationTokens` per turn. This is roughly 30-35% of the effective context being re-cached on every turn, compared to ~0.3k (near-zero) in native Claude Code CLI.
+
+### 3. Which exact layer owns the remaining steady-state resumed recache?
+
+The remaining issue is in the **Claude Code SDK / bundled runtime's message serialization path**, specifically:
+
+- **Primary cause**: `ejY()` re-serializes historical messages without the TodoWrite reminder and `cache_control: { type: 'ephemeral' }` that they had when originally sent. This breaks the cache prefix at the most recent historical user message boundary. Combined with the absence of intermediate `cache_control` breakpoints on the tools section, this forces re-caching of a large portion of the request.
+
+- **Secondary cause**: MCP tool ordering instability between turns (observed sporadically) breaks the prefix earlier in the serialized stream.
+
+- **Root mechanism**: Quack's daemon resume path re-loads sessions from the persisted JSONL and passes them to the SDK's `query()`. The SDK re-serializes all messages from scratch, applying latest-message-only decorations that differ from the original serialization. Native CLI avoids this because sessions stay in-memory within a single process.
+
+### 4. Is the residual issue actionable in Quack or blocked upstream?
+
+**Classification: Mixed (option 4)**
+
+- **One remaining local optimization**: Quack could potentially stabilize MCP tool ordering to prevent the secondary prefix break. This is a minor improvement.
+- **One upstream blocker**: The primary cause — `ejY()` stripping `cache_control` and TodoWrite from re-serialized historical messages — is inside the bundled Claude Code runtime. Quack cannot fix this without either:
+  - An SDK option to preserve `cache_control` on historical messages during resume
+  - An SDK option to add `cache_control` breakpoints on the tools section
+  - A change to the SDK resume path that retains the original message serialization
+
+**Implementation direction**: Quack is now at or near the local optimum for the daemon path. The largest remaining gain requires upstream SDK changes. Quack should:
+1. Stabilize MCP tool ordering (local fix, minor gain)
+2. Report the re-serialization cache regression to the Claude Code SDK team with the payload evidence in this document
+3. Monitor SDK updates for resume-path caching improvements
