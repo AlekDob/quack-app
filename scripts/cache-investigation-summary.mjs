@@ -131,6 +131,8 @@ function buildSessionSummary(sessionId, events) {
       instructionHash: shortHash(payloadHashes.instructionFilesComposite),
       allowedToolsHash: shortHash(payloadHashes.allowedTools),
       mcpHash: shortHash(payloadHashes.mcpServers),
+      investigationHash: shortHash(payloadHashes.investigation),
+      investigationMode: context.investigation?.mode || 'baseline',
       mcpCount: context.mcpServers?.count ?? 0,
       cacheReadTokens: usage?.cacheReadTokens ?? null,
       cacheCreationTokens: usage?.cacheCreationTokens ?? null,
@@ -147,6 +149,7 @@ function buildSessionSummary(sessionId, events) {
     instructionHash: new Set(rows.map(r => r.instructionHash)).size === 1,
     allowedToolsHash: new Set(rows.map(r => r.allowedToolsHash)).size === 1,
     mcpHash: new Set(rows.map(r => r.mcpHash)).size === 1,
+    investigationHash: new Set(rows.map(r => r.investigationHash)).size === 1,
   };
 
   return {
@@ -186,13 +189,15 @@ function printSessionSummary(summary) {
     `system=${summary.stability.systemHash} ` +
     `instr=${summary.stability.instructionHash} ` +
     `tools=${summary.stability.allowedToolsHash} ` +
-    `mcp=${summary.stability.mcpHash}`
+    `mcp=${summary.stability.mcpHash} ` +
+    `investigation=${summary.stability.investigationHash}`
   );
   console.log('');
   console.log([
     'Turn'.padEnd(4),
     'Src'.padEnd(13),
     'Resume'.padEnd(6),
+    'Mode'.padEnd(18),
     'Prompt'.padEnd(8),
     'IDE'.padEnd(8),
     'System'.padEnd(8),
@@ -209,6 +214,7 @@ function printSessionSummary(summary) {
       String(row.turn).padEnd(4),
       String(row.source || '-').padEnd(13),
       String(row.resume).padEnd(6),
+      String(row.investigationMode).padEnd(18),
       row.promptHash.padEnd(8),
       row.ideHash.padEnd(8),
       row.systemHash.padEnd(8),

@@ -32,6 +32,7 @@ import { execSync } from 'child_process';
 // 🐛 DIAG: Write diagnostics to a file that's easy to check
 const DIAG_FILE = join(homedir(), '.quack', 'daemon-diag.log');
 const CACHE_INVESTIGATION_LOG = join(homedir(), '.quack', 'cache-investigation.log');
+const CACHE_DEBUG_DIR = join(homedir(), '.quack', 'cache-debug');
 function diag(msg) {
   try {
     appendFileSync(DIAG_FILE, `[${new Date().toISOString()}] ${msg}\n`);
@@ -125,6 +126,16 @@ function emit(obj) {
 
 function log(tag, ...args) {
   console.error(`[DAEMON:${tag}]`, ...args);
+}
+
+function logSessionPayload(payload) {
+  log('SESSION', JSON.stringify(payload));
+  writeCacheInvestigationLog('stream-daemon', 'SESSION', payload);
+}
+
+function logHookPayload(payload) {
+  log('HOOK', JSON.stringify(payload));
+  writeCacheInvestigationLog('stream-daemon', 'HOOK', payload);
 }
 
 // =============================================================================
@@ -375,6 +386,7 @@ function logContextPayload({
   teamContext,
   debugMode,
   cwd,
+  investigation,
 }) {
   const instructionFiles = getContextInstructionFiles(cwd);
   const payloadSummary = {
@@ -395,6 +407,7 @@ function logContextPayload({
       teamName: teamContext.teamName,
       memberCount: teamContext.members?.length || 0,
     } : null,
+    investigation: investigation || null,
     settingSources,
     allowedTools: {
       count: allowedTools.length,
@@ -423,6 +436,7 @@ function logContextPayload({
       allowedTools: hashText(JSON.stringify(allowedTools || [])),
       mcpServers: hashText(JSON.stringify(Object.keys(mcpServers || {}).sort())),
       teamContext: hashText(JSON.stringify(teamContext || null)),
+      investigation: hashText(JSON.stringify(investigation || null)),
     },
   };
 
@@ -439,6 +453,43 @@ function extractMaxContextWindow(modelUsage) {
     }
   }
   return maxContextWindow;
+}
+
+function getCacheInvestigationConfig() {
+  const requestedMode = process.env.QUACK_CACHE_INVESTIGATION_MODE || 'baseline';
+  switch (requestedMode) {
+    case 'baseline':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
+    case 'baseline-scaffold-debug':
+      return {
+        mode: requestedMode,
+        toolConfigMode: 'preset_claude_code',
+        systemPromptMode: 'claude_code_preset',
+        includeBuiltInMcp: true,
+        includeAllMcp: true,
+        settingSources: ['project', 'user', 'local'],
+        enableSdkDebugHooks: true,
+      };
+    case 'explicit-tools':
+      return { mode: requestedMode, toolConfigMode: 'explicit_allowed_tools', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
+    case 'preset-no-builtin-mcp':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: false, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
+    case 'explicit-tools-no-builtin-mcp':
+      return { mode: requestedMode, toolConfigMode: 'explicit_allowed_tools', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: false, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
+    case 'all-mcp-disabled':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: false, includeAllMcp: false, settingSources: ['project', 'user', 'local'] };
+    case 'project-only-settings':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project'] };
+    case 'all-mcp-disabled-project-only-settings':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: false, includeAllMcp: false, settingSources: ['project'] };
+    case 'all-mcp-disabled-no-settings':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: false, includeAllMcp: false, settingSources: [] };
+    case 'minimal-no-preset-no-settings':
+      return { mode: requestedMode, toolConfigMode: 'no_tools', systemPromptMode: 'minimal_plain', includeBuiltInMcp: false, includeAllMcp: false, settingSources: [] };
+    default:
+      log('WARN', `Unknown QUACK_CACHE_INVESTIGATION_MODE="${requestedMode}", falling back to baseline`);
+      return { mode: 'baseline', toolConfigMode: 'preset_claude_code', systemPromptMode: 'claude_code_preset', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
+  }
 }
 
 function logUsagePayload({ queryId, eventType, usage, modelUsage }) {
@@ -505,7 +556,7 @@ async function handleQuery(cmd) {
     queryId, prompt, model = 'opus', permissionMode, thinkingMode,
     cwd, sessionId, agents, attachments, outputFormat, effort,
     mcpServers: passedMcpServers, allowedTools, teamContext, ideContext,
-    provider, providerBaseUrl, providerApiKey, debugMode, chatMode,
+    provider, providerBaseUrl, providerApiKey, debugMode, chatMode, sessionKey,
   } = cmd;
 
   const abortController = new AbortController();
@@ -551,33 +602,22 @@ async function handleQuery(cmd) {
     ];
     const resolvedAllowedTools = allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0
       ? allowedTools : defaultAllowedTools;
-
-    // Brain: gotcha-sdk-bundled-cli-200k-context-window
-    // The native Claude CLI binary handles prompt caching ~20x more efficiently
-    // than the SDK's bundled cli.js (300 vs 6200 uncached tokens/message).
-    // It also correctly resolves the 1M context window feature flag.
-    const isWindows = process.platform === 'win32';
-    const nativeClaudePath = isWindows
-      ? join(homedir(), '.claude', 'local', 'claude.exe')
-      : join(homedir(), '.local', 'bin', 'claude');
-    const hasNativeCli = existsSync(nativeClaudePath);
-    debugLog(`CLI: ${hasNativeCli ? 'native (' + nativeClaudePath + ')' : 'bundled cli.js'}`);
-
-    const options = {
-      model: modelId,
-      // Brain: 1m-context-window-support
-      // The [1m] suffix in modelId is enough — the CLI handles it natively.
-      // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
-      // 🐛 DEBUG: Disabled native CLI to test AskUserQuestion hang regression
-      // ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
-      settingSources: ['project', 'user', 'local'],
-      tools: { type: 'preset', preset: 'claude_code' },
-      allowedTools: resolvedAllowedTools,
-      abortController,
-      systemPrompt: {
-        type: 'preset',
-        preset: 'claude_code',
-        append: `
+    const investigation = getCacheInvestigationConfig();
+    const effectiveAllowedTools = investigation.toolConfigMode === 'no_tools'
+      ? []
+      : resolvedAllowedTools;
+    const toolsConfig =
+      investigation.toolConfigMode === 'explicit_allowed_tools'
+        ? effectiveAllowedTools
+        : investigation.toolConfigMode === 'no_tools'
+          ? []
+          : { type: 'preset', preset: 'claude_code' };
+    const systemPromptConfig = investigation.systemPromptMode === 'minimal_plain'
+      ? 'Answer the user directly and concisely.'
+      : {
+          type: 'preset',
+          preset: 'claude_code',
+          append: `
 
 ## Interactive Questions (AskUserQuestion Tool)
 
@@ -601,28 +641,24 @@ You have access to the AskUserQuestion tool. USE IT when you need user input to 
 - SQLite (lightweight, embedded)
 
 IMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`
-        + (debugMode ? (() => {
-          // Brain: fix-session-limit-prompt-cache
-          // STATIC parts only in systemPrompt (skill + brain hints — don't change between turns)
-          // DYNAMIC parts (gitContext) moved to contextPrefix below
-          const skillContent = loadBundledSkill('systematic-debugging');
-          const brainHints = loadBrainHints(cwd);
-          const hintsBlock = brainHints.length > 0
-            ? brainHints.map(s => `- ${s}`).join('\n')
-            : '(no Brain entries found in this project)';
+        };
+    const debugPromptAppend = debugMode ? (() => {
+      // Brain: fix-session-limit-prompt-cache
+      // STATIC parts only in systemPrompt (skill + brain hints — don't change between turns)
+      // DYNAMIC parts (gitContext) moved to contextPrefix below
+      const skillContent = loadBundledSkill('systematic-debugging');
+      const brainHints = loadBrainHints(cwd);
+      const hintsBlock = brainHints.length > 0
+        ? brainHints.map(s => `- ${s}`).join('\n')
+        : '(no Brain entries found in this project)';
 
-          let debugPrompt = '';
+      let debugPrompt = '';
 
-          // 1. Skill content (methodology reference — static)
-          if (skillContent) {
-            debugPrompt += `\n\n## Systematic Debugging Methodology\n\n${skillContent}`;
-          }
+      if (skillContent) {
+        debugPrompt += `\n\n## Systematic Debugging Methodology\n\n${skillContent}`;
+      }
 
-          // 2. Git context REMOVED from here — it's dynamic and breaks prompt cache
-          // Now injected as contextPrefix in the user prompt
-
-          // 3. Brain-First Protocol (static per project)
-          debugPrompt += `
+      debugPrompt += `
 
 ## DEBUG MODE — MANDATORY BRAIN-FIRST PROTOCOL
 
@@ -649,21 +685,106 @@ ${hintsBlock}
 2. **Never guess** — Trace data flow, verify with evidence. Read the actual code.
 3. **Document findings** — Save to Brain + add \`// Brain: {slug}\` breadcrumbs in code
 `;
-          return debugPrompt;
-        })() : '')
-        + (chatMode ? (() => {
-          const skillContent = loadBundledSkill('chat-interaction');
-          if (skillContent) {
-            return `\n\n## Chat Interaction Mode\n\n${skillContent}`;
-          }
-          return '';
-        })() : '')
-        + (teamContext ? buildTeamPromptAugmentation(teamContext) : ''),
-        // Brain: fix-session-limit-prompt-cache
-        // ideContext is NO LONGER appended here — it changes every turn (file open, git status)
-        // which would invalidate the entire system prompt cache (~50k+ tokens).
-        // Instead, ideContext is prepended to the user prompt. See contextPrefix below.
+      return debugPrompt;
+    })() : '';
+    const chatPromptAppend = chatMode ? (() => {
+      const skillContent = loadBundledSkill('chat-interaction');
+      if (skillContent) {
+        return `\n\n## Chat Interaction Mode\n\n${skillContent}`;
+      }
+      return '';
+    })() : '';
+    const teamPromptAppend = teamContext ? buildTeamPromptAugmentation(teamContext) : '';
+    const finalSystemPrompt =
+      typeof systemPromptConfig === 'string'
+        ? `${systemPromptConfig}${debugPromptAppend}${chatPromptAppend}${teamPromptAppend}`
+        : {
+            ...systemPromptConfig,
+            append: `${systemPromptConfig.append}${debugPromptAppend}${chatPromptAppend}${teamPromptAppend}`,
+            // Brain: fix-session-limit-prompt-cache
+            // ideContext is NO LONGER appended here — it changes every turn (file open, git status)
+            // which would invalidate the entire system prompt cache (~50k+ tokens).
+            // Instead, ideContext is prepended to the user prompt. See contextPrefix below.
+          };
+
+    // Brain: gotcha-sdk-bundled-cli-200k-context-window
+    // The native Claude CLI binary handles prompt caching ~20x more efficiently
+    // than the SDK's bundled cli.js (300 vs 6200 uncached tokens/message).
+    // It also correctly resolves the 1M context window feature flag.
+    const isWindows = process.platform === 'win32';
+    const nativeClaudePath = isWindows
+      ? join(homedir(), '.claude', 'local', 'claude.exe')
+      : join(homedir(), '.local', 'bin', 'claude');
+    const hasNativeCli = existsSync(nativeClaudePath);
+    log('QUERY', `CLI path mode: ${hasNativeCli ? `native (${nativeClaudePath})` : 'bundled cli.js'}`);
+    const debugFilePath = investigation.enableSdkDebugHooks
+      ? join(CACHE_DEBUG_DIR, `${queryId}.sdk-debug.log`)
+      : undefined;
+    if (debugFilePath) {
+      mkdirSync(dirname(debugFilePath), { recursive: true });
+    }
+    const investigationHooks = investigation.enableSdkDebugHooks ? {
+      SessionStart: async (input) => {
+        logHookPayload({
+          queryId,
+          hookEventName: 'SessionStart',
+          source: input.source,
+          model: input.model,
+          agentType: input.agent_type,
+        });
       },
+      InstructionsLoaded: async (input) => {
+        logHookPayload({
+          queryId,
+          hookEventName: 'InstructionsLoaded',
+          filePath: input.file_path,
+          memoryType: input.memory_type,
+          loadReason: input.load_reason,
+          triggerFilePath: input.trigger_file_path,
+          parentFilePath: input.parent_file_path,
+          globs: input.globs,
+        });
+      },
+      ConfigChange: async (input) => {
+        logHookPayload({
+          queryId,
+          hookEventName: 'ConfigChange',
+          source: input.source,
+          filePath: input.file_path,
+        });
+      },
+      PreCompact: async (input) => {
+        logHookPayload({
+          queryId,
+          hookEventName: 'PreCompact',
+          trigger: input.trigger,
+          customInstructionsHash: input.custom_instructions ? hashText(input.custom_instructions) : null,
+          customInstructionsChars: input.custom_instructions ? input.custom_instructions.length : 0,
+        });
+      },
+      Setup: async (input) => {
+        logHookPayload({
+          queryId,
+          hookEventName: 'Setup',
+          trigger: input.trigger,
+        });
+      },
+    } : undefined;
+
+    const options = {
+      model: modelId,
+      // Brain: 1m-context-window-support
+      // The [1m] suffix in modelId is enough — the CLI handles it natively.
+      // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
+      // 🐛 DEBUG: Disabled native CLI to test AskUserQuestion hang regression
+      // ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
+      settingSources: investigation.settingSources,
+      tools: toolsConfig,
+      allowedTools: effectiveAllowedTools,
+      abortController,
+      systemPrompt: finalSystemPrompt,
+      ...(debugFilePath ? { debugFile: debugFilePath } : {}),
+      ...(investigationHooks ? { hooks: investigationHooks } : {}),
       canUseTool: async (toolName, input, toolOptions) => {
         // AskUserQuestion — forward to frontend
         if (toolName === 'AskUserQuestion') {
@@ -759,26 +880,57 @@ ${hintsBlock}
     options.enableFileCheckpointing = true;
 
     // --- MCP servers ---
-    let resolvedMcpServers = passedMcpServers;
-    if (!resolvedMcpServers && cwd) {
-      resolvedMcpServers = loadMCPServersFromFile(cwd);
-    } else if (!resolvedMcpServers) {
-      resolvedMcpServers = loadGlobalMCPServers();
+    let resolvedMcpServers = {};
+    if (investigation.includeAllMcp) {
+      resolvedMcpServers = passedMcpServers;
+      if (!resolvedMcpServers && cwd) {
+        resolvedMcpServers = loadMCPServersFromFile(cwd);
+      } else if (!resolvedMcpServers) {
+        resolvedMcpServers = loadGlobalMCPServers();
+      }
     }
 
     const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
     const codeIntelMcpServerPath = join(__dirname, 'code-intel-mcp-server.js');
     const visualizerMcpServerPath = join(__dirname, 'visualizer-mcp-server.js');
     // Brain: quack-visualizer-inline-html
-    options.mcpServers = {
-      ...(resolvedMcpServers || {}),
+    const builtInMcpServers = investigation.includeBuiltInMcp ? {
       'ide-tools': { command: 'node', args: [ideMcpServerPath] },
       'code-intel': { type: 'stdio', command: 'node', args: [codeIntelMcpServerPath] },
       'visualizer': { command: 'node', args: [visualizerMcpServerPath] },
+    } : {};
+    options.mcpServers = {
+      ...(resolvedMcpServers || {}),
+      ...builtInMcpServers,
     };
 
     const mcpCount = options.mcpServers ? Object.keys(options.mcpServers).length : 0;
     log('MCP', `query=${queryId} resolved ${mcpCount} MCP servers: [${Object.keys(options.mcpServers || {}).join(', ')}]`);
+    log('QUERY', `query=${queryId} investigation mode=${investigation.mode} tools=${investigation.toolConfigMode} builtInMcp=${investigation.includeBuiltInMcp}`);
+    logSessionPayload({
+      phase: 'effective_config',
+      queryId,
+      sessionKey: sessionKey || null,
+      incomingSessionId: sessionId || null,
+      model,
+      modelId,
+      effectiveResume: options.resume || null,
+      effectiveCwd: options.cwd || null,
+      permissionMode: options.permissionMode || null,
+      betas: options.betas || [],
+      provider: provider || 'anthropic',
+      toolConfigMode: investigation.toolConfigMode,
+      systemPromptMode: investigation.systemPromptMode || 'claude_code_preset',
+      includeBuiltInMcp: investigation.includeBuiltInMcp,
+      includeAllMcp: investigation.includeAllMcp,
+      settingSources: investigation.settingSources,
+      mcpCount,
+      sdkDebugHooks: Boolean(investigation.enableSdkDebugHooks),
+      debugFilePath: debugFilePath || null,
+      cliPathMode: hasNativeCli ? 'native' : 'bundled',
+      nativeClaudePath: hasNativeCli ? nativeClaudePath : null,
+    });
+    const systemPromptAppend = options.systemPrompt?.append || '';
     logContextPayload({
       queryId,
       model,
@@ -794,6 +946,7 @@ ${hintsBlock}
       teamContext,
       debugMode,
       cwd,
+      investigation,
     });
 
     // Brain: fix-session-limit-prompt-cache
@@ -856,6 +1009,18 @@ ${hintsBlock}
     for await (const event of stream) {
       eventCount++;
 
+      if (event.type === 'system' && event.subtype === 'init') {
+        logSessionPayload({
+          phase: 'system_init',
+          queryId,
+          sessionKey: sessionKey || null,
+          incomingSessionId: sessionId || null,
+          eventSessionId: event.session_id || null,
+          toolsAvailable: Array.isArray(event.tools) ? event.tools.length : null,
+          mcpServerCount: Array.isArray(event.mcp_servers) ? event.mcp_servers.length : null,
+        });
+      }
+
       // Emit prompt_token_count on first assistant event (so frontend has it before usage data)
       if (!promptTokensEmitted && countTokensPromise && event.type === 'assistant') {
         const promptTokens = await countTokensPromise;
@@ -873,6 +1038,14 @@ ${hintsBlock}
           modelUsage: event.modelUsage || event.model_usage,
         });
       } else if (event.type === 'result') {
+        logSessionPayload({
+          phase: 'result',
+          queryId,
+          sessionKey: sessionKey || null,
+          incomingSessionId: sessionId || null,
+          resultSessionId: event.session_id || null,
+          subtype: event.subtype || null,
+        });
         logUsagePayload({
           queryId,
           eventType: 'result',

@@ -503,6 +503,7 @@ function getContextInstructionFiles(projectCwd) {
 }
 
 function logContextPayload({
+  queryId,
   model,
   modelId,
   sessionId,
@@ -516,9 +517,11 @@ function logContextPayload({
   teamContext,
   debugMode,
   cwd,
+  investigation,
 }) {
   const instructionFiles = getContextInstructionFiles(cwd);
   const payloadSummary = {
+    queryId,
     resume: Boolean(sessionId),
     model,
     modelId,
@@ -535,6 +538,7 @@ function logContextPayload({
       teamName: teamContext.teamName,
       memberCount: teamContext.members?.length || 0,
     } : null,
+    investigation: investigation || null,
     settingSources,
     allowedTools: {
       count: allowedTools.length,
@@ -563,6 +567,7 @@ function logContextPayload({
       allowedTools: hashText(JSON.stringify(allowedTools || [])),
       mcpServers: hashText(JSON.stringify(Object.keys(mcpServers || {}).sort())),
       teamContext: hashText(JSON.stringify(teamContext || null)),
+      investigation: hashText(JSON.stringify(investigation || null)),
     },
   };
 
@@ -581,7 +586,32 @@ function extractMaxContextWindow(modelUsage) {
   return maxContextWindow;
 }
 
-function logUsagePayload({ eventType, usage, modelUsage }) {
+function getCacheInvestigationConfig() {
+  const requestedMode = process.env.QUACK_CACHE_INVESTIGATION_MODE || 'baseline';
+  switch (requestedMode) {
+    case 'baseline':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
+    case 'explicit-tools':
+      return { mode: requestedMode, toolConfigMode: 'explicit_allowed_tools', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
+    case 'preset-no-builtin-mcp':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: false, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
+    case 'explicit-tools-no-builtin-mcp':
+      return { mode: requestedMode, toolConfigMode: 'explicit_allowed_tools', includeBuiltInMcp: false, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
+    case 'all-mcp-disabled':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: false, includeAllMcp: false, settingSources: ['project', 'user', 'local'] };
+    case 'project-only-settings':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project'] };
+    case 'all-mcp-disabled-project-only-settings':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: false, includeAllMcp: false, settingSources: ['project'] };
+    case 'all-mcp-disabled-no-settings':
+      return { mode: requestedMode, toolConfigMode: 'preset_claude_code', includeBuiltInMcp: false, includeAllMcp: false, settingSources: [] };
+    default:
+      console.error(`[WARN] Unknown QUACK_CACHE_INVESTIGATION_MODE="${requestedMode}", falling back to baseline`);
+      return { mode: 'baseline', toolConfigMode: 'preset_claude_code', includeBuiltInMcp: true, includeAllMcp: true, settingSources: ['project', 'user', 'local'] };
+  }
+}
+
+function logUsagePayload({ queryId, eventType, usage, modelUsage }) {
   if (!usage && !modelUsage) return;
 
   const inputTokens = usage?.input_tokens || 0;
@@ -592,6 +622,7 @@ function logUsagePayload({ eventType, usage, modelUsage }) {
   const contextWindow = extractMaxContextWindow(modelUsage);
 
   console.error(`[USAGE] ${JSON.stringify({
+    queryId,
     eventType,
     inputTokens,
     outputTokens,
@@ -602,6 +633,7 @@ function logUsagePayload({ eventType, usage, modelUsage }) {
     contextUtilizationPct: contextWindow ? Number(((effectiveContextFill / contextWindow) * 100).toFixed(2)) : null,
   })}`);
   writeCacheInvestigationLog('stream-claude', 'USAGE', {
+    queryId,
     eventType,
     inputTokens,
     outputTokens,
@@ -775,8 +807,16 @@ async function main() {
     const resolvedAllowedTools = allowedTools && Array.isArray(allowedTools)
       ? allowedTools
       : defaultAllowedTools;
+    const investigation = getCacheInvestigationConfig();
+    const toolsConfig = investigation.toolConfigMode === 'explicit_allowed_tools'
+      ? resolvedAllowedTools
+      : {
+          type: 'preset',
+          preset: 'claude_code'
+        };
 
     console.error(`[DEBUG] Using ${resolvedAllowedTools.length} allowed tools:`, resolvedAllowedTools.slice(0, 5).join(', ') + '...');
+    console.error(`[DEBUG] Investigation mode: ${investigation.mode} (tools=${investigation.toolConfigMode}, builtInMcp=${investigation.includeBuiltInMcp})`);
 
     // Track whether the plan has been approved in this session to prevent
     // duplicate approval requests when SDK re-enters plan mode
@@ -801,7 +841,7 @@ async function main() {
       // No betas needed (GA since March 2026, beta header is ignored).
       ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
       // Enable automatic reading of CLAUDE.md and project settings
-      settingSources: ['project', 'user', 'local'],
+      settingSources: investigation.settingSources,
 
       // =============================================================================
       // TOOLS CONFIGURATION (SDK v0.1.76)
@@ -815,11 +855,8 @@ async function main() {
       // - `canUseTool`: permission callback fires when tools need approval
       // =============================================================================
 
-      // Use claude_code preset for all standard tools
-      tools: {
-        type: 'preset',
-        preset: 'claude_code'
-      },
+      // Investigation mode can swap the preset scaffold for an explicit tool list.
+      tools: toolsConfig,
 
       // allowedTools filters from the preset - includes AskUserQuestion
       allowedTools: resolvedAllowedTools,
@@ -1148,21 +1185,23 @@ ${hintsBlock}
     }
 
     // Load MCP servers: priority is passed config > .mcp.json file
-    let resolvedMcpServers = mcpServers;
+    let resolvedMcpServers = investigation.includeAllMcp ? mcpServers : {};
     console.error(`[MCP] === MCP SERVER LOADING ===`);
     console.error(`[MCP] mcpServers from config: ${mcpServers ? JSON.stringify(Object.keys(mcpServers)) : 'null'}`);
     console.error(`[MCP] cwd: ${cwd || 'null'}`);
 
-    if (!resolvedMcpServers && cwd) {
+    if (investigation.includeAllMcp && !resolvedMcpServers && cwd) {
       console.error(`[MCP] No mcpServers in config, loading from .mcp.json...`);
       resolvedMcpServers = loadMCPServersFromFile(cwd);
-    } else if (!resolvedMcpServers && !cwd) {
+    } else if (investigation.includeAllMcp && !resolvedMcpServers && !cwd) {
       console.error(`[MCP] No cwd provided, loading global MCP servers only...`);
       resolvedMcpServers = loadGlobalMCPServers();
     }
 
     console.error(`[MCP] resolvedMcpServers: ${resolvedMcpServers ? JSON.stringify(Object.keys(resolvedMcpServers)) : 'null'}`);
     console.error(`[MCP] === END MCP SERVER LOADING ===`);
+
+    const queryId = `legacy_${sessionId || 'new'}_${Date.now()}`;
 
     // Add IDE Tools MCP server (stdio-based for reliability)
     // Note: SDK MCP servers (createSdkMcpServer) have a known bug with "Stream closed" errors
@@ -1175,9 +1214,8 @@ ${hintsBlock}
     console.error(`[MCP] Code Intel MCP server path: ${codeIntelMcpServerPath}`);
     console.error(`[MCP] Code Intel MCP exists: ${existsSync(codeIntelMcpServerPath)}`);
 
-    // Merge MCP servers: file-based servers + built-in Quack servers (ide + code-intel)
-    options.mcpServers = {
-      ...(resolvedMcpServers || {}),
+    // Merge MCP servers: file-based servers + optional built-in Quack servers (ide + code-intel)
+    const builtInMcpServers = investigation.includeBuiltInMcp ? {
       'ide-tools': {
         command: 'node',
         args: [ideMcpServerPath],
@@ -1187,16 +1225,24 @@ ${hintsBlock}
         command: 'node',
         args: [codeIntelMcpServerPath],
       },
+    } : {};
+    options.mcpServers = {
+      ...(resolvedMcpServers || {}),
+      ...builtInMcpServers,
     };
 
-    const builtInServerCount = 2; // ide-tools + code-intel
+    const builtInServerCount = Object.keys(builtInMcpServers).length;
     if (resolvedMcpServers && Object.keys(resolvedMcpServers).length > 0) {
       console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length + builtInServerCount} MCP servers:`, Object.keys(options.mcpServers).join(', '));
     } else {
-      console.error(`[MCP] Using built-in MCP servers only (ide-tools, code-intel)`);
+      console.error(builtInServerCount > 0
+        ? `[MCP] Using built-in MCP servers only (${Object.keys(builtInMcpServers).join(', ')})`
+        : `[MCP] No MCP servers enabled`);
     }
 
+    const systemPromptAppend = options.systemPrompt?.append || '';
     logContextPayload({
+      queryId,
       model,
       modelId,
       sessionId,
@@ -1210,6 +1256,7 @@ ${hintsBlock}
       teamContext,
       debugMode,
       cwd,
+      investigation,
     });
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));
@@ -1330,12 +1377,14 @@ ${hintsBlock}
 
         if (event.type === 'assistant' && event.message?.usage) {
           logUsagePayload({
+            queryId,
             eventType: 'assistant',
             usage: event.message.usage,
             modelUsage: event.modelUsage || event.model_usage,
           });
         } else if (event.type === 'result') {
           logUsagePayload({
+            queryId,
             eventType: 'result',
             usage: event.usage,
             modelUsage: event.modelUsage || event.model_usage,

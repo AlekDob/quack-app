@@ -2051,6 +2051,7 @@ async fn send_message_via_daemon(
     let mut query_cmd = serde_json::json!({
         "type": "query",
         "queryId": query_id,
+        "sessionKey": event_session_key,
         "prompt": request.prompt,
         "model": request.model.as_deref().unwrap_or(DEFAULT_MODEL),
         "thinkingMode": request.thinking_mode,

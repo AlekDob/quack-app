@@ -151,6 +151,43 @@ This baseline was measured after the `<system-reminder>` move became the working
 - it did **not** remove the large steady-state resumed `cacheCreationTokens`
 - the remaining issue is therefore not explained by `ideContext` or `gitContext` placement alone
 
+### Canonical captured baseline on the current branch
+
+This is the first checked-in post-fix baseline captured from `~/.quack/cache-investigation.log`.
+
+- Artifact: `documentation/bugs/artifacts/cache-investigation-session-1773999614211-782jy1t.jsonl`
+- Session id: `session-1773999614211-782jy1t`
+- Prompt: `Test message - Answer with ”ok"`
+- Session shape: large resumed session
+- Model: `claude-haiku-4-5-20251001`
+- Provider/auth: Anthropic with Claude Code auth
+- Open IDE file: `/Users/fredric/Dev/flow/components/Projects/ProjectsReportDashboard.vue`
+- MCP server count: `7`
+- Dynamic context changed between turns: `no`
+- Investigation mode: `baseline`
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` | `effectiveContextFill` | `contextWindow` |
+|---|---:|---:|---:|---:|
+| 1 | `0` | `66786` | `66796` | `200000` |
+| 2 | `15282` | `51702` | `66994` | `200000` |
+| 3 | `39081` | `28100` | `67191` | `200000` |
+| 4 | `39081` | `28292` | `67383` | `200000` |
+
+Stable hashes across all 4 turns:
+
+- `prompt.hash`: `2a98b75f87e46395`
+- `ideContext.hash`: `5104dec2d6758318`
+- `systemPromptAppend.hash`: `340081fd6e9b103f`
+- `instructionFilesComposite`: `6c09c2ffcf69ea4d`
+- `allowedTools`: `b2608f9ec3c986fd`
+- `mcpServers`: `580c38ebc9dd6d93`
+
+Current conclusion from this canonical capture:
+
+- the visible cache-relevant prompt shape is byte-stable across resumed turns
+- the remaining resumed recache is still substantial even after the `<system-reminder>` migration
+- the next isolation step should target SDK preset/tool scaffold and MCP scaffold size rather than dynamic context placement
+
 ## 3. Large / resumed session with only IDE file change
 
 ### Historical baseline from the 2026-03-24 investigation
@@ -213,9 +250,70 @@ Controlled comparisons:
 - reduced MCP server set
 - no MCP servers, if safe on the path under test
 
+Current implementation for this stage:
+
+- `QUACK_CACHE_INVESTIGATION_MODE=baseline`
+  - keep `tools: { type: 'preset', preset: 'claude_code' }`
+  - keep built-in MCP servers enabled
+- `QUACK_CACHE_INVESTIGATION_MODE=explicit-tools`
+  - replace the preset tool scaffold with an explicit tool list derived from `allowedTools`
+  - keep built-in MCP servers enabled
+- `QUACK_CACHE_INVESTIGATION_MODE=preset-no-builtin-mcp`
+  - keep the preset tool scaffold
+  - disable Quack's built-in MCP servers
+- `QUACK_CACHE_INVESTIGATION_MODE=explicit-tools-no-builtin-mcp`
+  - use the explicit tool list
+  - disable Quack's built-in MCP servers
+
+These modes are for investigation only. `baseline` remains the default if the env var is unset.
+
 Success criterion:
 
 - attribute a measurable share of `cacheCreationTokens` to preset/tool scaffold rather than dynamic user-message context
+
+### Completed 2x2 result on Haiku (`claude-haiku-4-5-20251001`, `200000` context window)
+
+The preset/MCP scaffold matrix is now complete for the same large resumed session shape.
+
+Steady-state comparison:
+
+| Mode | Built-in MCP | Tool mode | `cacheReadTokens` | `cacheCreationTokens` | Outcome |
+|---|---|---|---:|---:|---|
+| `baseline` | enabled | `claude_code` preset | `39081` | `28100-28292` | Best result |
+| `explicit-tools` | enabled | explicit tool list | `29962` | `30268-30750` | Worse than baseline |
+| `preset-no-builtin-mcp` | disabled | `claude_code` preset | `37426` | `31706` | Worse than baseline |
+| `explicit-tools-no-builtin-mcp` | disabled | explicit tool list | `28307` | `32184-32662` | Worst result |
+
+Representative turns from the final `explicit-tools-no-builtin-mcp` run:
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` | `effectiveContextFill` | `contextWindow` |
+|---|---:|---:|---:|---:|
+| 1 | `7895` | `52357` | `60262` | `200000` |
+| 2 | `28307` | `32184` | `60501` | `200000` |
+| 3 | `28307` | `32423` | `60740` | `200000` |
+| 4 | `28307` | `32662` | `60979` | `200000` |
+
+What this rules out:
+
+- replacing the `claude_code` preset with an explicit tool list is **not** the fix
+- removing Quack's built-in MCP scaffold is **not** the fix
+- combining both changes is worse than the original baseline
+
+What remained stable within each mode:
+
+- `prompt.hash`
+- `ideContext.hash`
+- `systemPromptAppend.hash`
+- `payloadHashes.instructionFilesComposite`
+- `payloadHashes.allowedTools`
+- `payloadHashes.mcpServers` within the mode under test
+
+Current conclusion for the preset/MCP layer:
+
+- the best local configuration tested so far is still the original `baseline`
+- the persistent resumed recache is not primarily caused by Quack's current tool-preset selection
+- the persistent resumed recache is not primarily caused by Quack's built-in MCP scaffold
+- the next investigation stage should move to execution/runtime path comparisons rather than further preset/MCP tuning
 
 ### C. Execution / runtime layer
 
@@ -230,6 +328,379 @@ Compare:
 Success criterion:
 
 - know whether the behavior is path-specific or shared across SDK-backed paths
+
+### Native Claude Code CLI control (`claude-haiku-4-5`)
+
+This control was run in the terminal against the same project/session shape using Claude Code CLI directly. The `/cost` values below are cumulative totals, so the per-turn comparison uses deltas between successive `/cost` snapshots.
+
+Prompt:
+
+- `Test message - Answer with ok`
+
+Observed cumulative `/cost` totals:
+
+| Turn | Cache read total | Cache write total |
+|---|---:|---:|
+| 1 | `0` | `76.3k` |
+| 2 | `76.3k` | `76.6k` |
+| 3 | `152.9k` | `76.9k` |
+| 4 | `229.7k` | `77.2k` |
+
+Converted per-turn deltas:
+
+| Turn | Cache read delta | Cache write delta |
+|---|---:|---:|
+| 1 | `0` | `76.3k` |
+| 2 | `76.3k` | `0.3k` |
+| 3 | `76.6k` | `0.3k` |
+| 4 | `76.8k` | `0.3k` |
+
+Comparison against Quack's best Haiku baseline:
+
+| Path | Turn | `cacheReadTokens` | `cacheCreationTokens` |
+|---|---|---:|---:|
+| Claude Code CLI | 2 | `76.3k` | `0.3k` |
+| Claude Code CLI | 3 | `76.6k` | `0.3k` |
+| Claude Code CLI | 4 | `76.8k` | `0.3k` |
+| Quack `baseline` | 2 | `15.3k` | `51.7k` |
+| Quack `baseline` | 3 | `39.1k` | `28.1k` |
+| Quack `baseline` | 4 | `39.1k` | `28.3k` |
+
+Current conclusion from this control:
+
+- native Claude Code CLI shows healthy cache reuse after the first turn
+- the same model (`claude-haiku-4-5`) is capable of near-full prefix reuse in the same general workload shape
+- Quack's remaining recache is therefore not explained by model behavior alone
+- the strongest remaining suspect is Quack's SDK / runtime execution path rather than the model itself
+
+### Quack daemon vs Quack legacy path (`claude-haiku-4-5`, `baseline` mode)
+
+The next runtime control compared Quack's two SDK-backed paths directly:
+
+- daemon path: `stream-daemon.js`
+- legacy per-process path: `stream-claude.js`
+
+Both runs used:
+
+- the same model: `claude-haiku-4-5-20251001`
+- the same large resumed session shape
+- the same prompt: `Test message - Answer with ok`
+- the same baseline investigation mode
+
+#### Daemon baseline
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` |
+|---|---:|---:|
+| 2 | `15282` | `51702` |
+| 3 | `39081` | `28100` |
+| 4 | `39081` | `28292` |
+
+#### Legacy baseline
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` | Notes |
+|---|---:|---:|---|
+| 1 | `15282` | `57697` | Stable visible hashes |
+| 2 | `15282` | `57890` | Stable visible hashes |
+| 3 | `0` | `73365` | Same prompt/system/tools, reuse collapsed |
+| 4 | `0` | `73619` | `ideContext.hash` drifted on this turn |
+
+Interpretation:
+
+- the legacy `stream-claude.js` path is materially worse than the daemon path
+- the daemon path is the better Quack runtime path currently available
+- neither Quack path comes close to native Claude Code CLI cache behavior
+
+What this proves:
+
+- the remaining cache problem is not just "the SDK in general behaves this way"
+- Quack's internal runtime path changes the caching outcome materially
+- at least part of the residual issue is Quack-runtime-path specific
+
+Current conclusion for the runtime layer:
+
+- native Claude Code CLI: healthy caching
+- Quack daemon path: degraded, but substantially better than legacy
+- Quack legacy path: severely degraded, with cache reuse collapsing to zero in the tested run
+- further local investigation should focus on the daemon/session integration path, not the legacy path
+
+### Daemon baseline with all MCP disabled
+
+The next daemon-only control disabled all explicit MCP configuration:
+
+- no passed MCP servers
+- no `.mcp.json` / global MCP loading from Quack
+- no built-in Quack MCP servers
+
+Investigation mode:
+
+- `QUACK_CACHE_INVESTIGATION_MODE=all-mcp-disabled`
+
+#### Daemon `all-mcp-disabled`
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` |
+|---|---:|---:|
+| 1 | `15282` | `54228` |
+| 2 | `33946` | `35818` |
+| 3 | `33946` | `36011` |
+| 4 | `33946` | `36265` |
+
+Comparison against the best daemon baseline:
+
+| Mode | `cacheReadTokens` | `cacheCreationTokens` |
+|---|---:|---:|
+| `baseline` | `39081` | `28100-28292` |
+| `all-mcp-disabled` | `33946` | `35818-36265` |
+
+So:
+
+- removing all explicit MCP changes the numbers
+- but it still does **not** outperform the normal daemon baseline
+- the remaining cache loss is not solved by simply zeroing out Quack-managed MCP configuration
+
+#### Key hidden-runtime finding
+
+The daemon `SESSION` telemetry showed:
+
+- effective config: `mcpCount: 0`
+- Claude `system_init`: `mcpServerCount: 5`
+- Claude `system_init`: `toolsAvailable: 46`
+
+That means the runtime still initializes with a nontrivial server/tool scaffold even when Quack passes zero MCP servers in the daemon config.
+
+#### Strong lead from SDK docs
+
+The installed SDK type definitions document that:
+
+- `settingSources` controls filesystem settings loading
+- when `settingSources` is present, the SDK loads `user`, `project`, and `local` settings files
+- the SDK settings model includes MCP-related fields such as:
+  - `enableAllProjectMcpServers`
+  - `enabledMcpjsonServers`
+  - `disabledMcpjsonServers`
+  - `allowedMcpServers`
+
+This strongly suggests the hidden `mcpServerCount: 5` is not coming from Quack's explicit `options.mcpServers`, but from SDK-loaded filesystem settings triggered by:
+
+- `settingSources: ['project', 'user', 'local']`
+
+Current conclusion from this control:
+
+- Quack's daemon path is correctly resuming the same Claude session
+- Quack's explicit MCP config can be reduced to zero without eliminating the hidden server/tool scaffold
+- the strongest remaining local suspect is now SDK filesystem settings loading via `settingSources`, not Quack's explicit MCP map
+
+#### Daemon `all-mcp-disabled-project-only-settings`
+
+This variant kept:
+
+- no explicit MCP
+- no built-in Quack MCP
+- `settingSources: ['project']`
+
+Results:
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` |
+|---|---:|---:|
+| 1 | `0` | `71287` |
+| 2 | `15031` | `56449` |
+| 3 | `35324` | `36410` |
+| 4 | `35324` | `36603` |
+
+Key `SESSION` findings:
+
+- effective config: `mcpCount: 0`
+- effective config: `settingSources: ['project']`
+- Claude `system_init`: `mcpServerCount: 4`
+- Claude `system_init`: `toolsAvailable: 60`
+
+This did **not** support the narrower theory that only `user` / `local` settings were responsible. Project-only settings were still enough to produce a large hidden scaffold before history.
+
+#### Daemon `all-mcp-disabled-no-settings`
+
+This is the sharpest isolation run so far:
+
+- no explicit MCP
+- no built-in Quack MCP
+- `settingSources: []`
+
+Results:
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` |
+|---|---:|---:|
+| 1 | `0` | `57067` |
+| 2 | `24778` | `32543` |
+| 3 | `24778` | `32736` |
+| 4 | `24778` | `32929` |
+
+Key `SESSION` findings:
+
+- effective config: `mcpCount: 0`
+- effective config: `settingSources: []`
+- Claude `system_init`: `mcpServerCount: 0`
+- Claude `system_init`: `toolsAvailable: 27`
+
+This is the first run where hidden MCP servers actually disappeared. That means filesystem-loaded SDK settings really were contributing hidden pre-history scaffold before message history.
+
+What improved relative to earlier daemon runs:
+
+- hidden `mcpServerCount` dropped from `5` / `4` to `0`
+- hidden `toolsAvailable` dropped from `46-60` to `27`
+- `effectiveContextFill` dropped from roughly `69k-72k` to roughly `57k`
+- subjective latency also improved noticeably during manual testing
+
+What did **not** happen:
+
+- cache behavior still did not approach native Claude Code CLI
+- steady-state cache creation remained about `32.5k-32.9k`
+
+So the `settingSources` hypothesis is now partially confirmed:
+
+- SDK filesystem settings loading was a real hidden injection source before history
+- but removing it entirely still leaves a substantial residual scaffold and recache problem
+- the remaining gap is now more likely inside the Claude Code preset / SDK runtime itself than in Quack's explicit settings or MCP plumbing
+
+#### Daemon `minimal-no-preset-no-settings`
+
+This control stripped the daemon path down as far as possible while still using the SDK query flow:
+
+- no explicit MCP
+- no built-in Quack MCP
+- `settingSources: []`
+- no Claude Code preset
+- no tools
+- minimal plain system prompt
+
+Results:
+
+| Turn | `cacheReadTokens` | `cacheCreationTokens` | `effectiveContextFill` |
+|---|---:|---:|---:|
+| 1 | `0` | `28455` | `28465` |
+| 2 | `28455` | `193` | `28658` |
+| 3 | `28648` | `254` | `28912` |
+| 4 | `28902` | `193` | `29105` |
+
+Key `SESSION` findings:
+
+- effective config: `toolConfigMode: 'no_tools'`
+- effective config: `settingSources: []`
+- effective config: `mcpCount: 0`
+- Claude `system_init`: `toolsAvailable: 0`
+- Claude `system_init`: `mcpServerCount: 0`
+
+This is the first Quack daemon run whose steady-state cache behavior lands in the same ballpark as native Claude Code CLI. After turn 1, cache creation collapsed from tens of thousands of tokens down to roughly `193-254` tokens per turn.
+
+That means the remaining cache break was **not** coming from:
+
+- visible user-message context (`ideContext`, `gitContext`)
+- Quack's explicit MCP map
+- SDK filesystem settings alone
+
+It was primarily coming from the hidden scaffold introduced by continuing to force:
+
+- `tools: { type: 'preset', preset: 'claude_code' }`
+- `systemPrompt: { type: 'preset', preset: 'claude_code', ... }`
+
+through the daemon path.
+
+### Revised diagnosis after minimal control
+
+At this point, the evidence supports a much more specific root cause:
+
+- moving dynamic context out of `systemPrompt.append` fixed one real cache breaker
+- SDK filesystem settings loading via `settingSources` added a second hidden source of pre-history scaffold
+- but the **largest remaining local cause** was the Claude Code preset/runtime scaffold itself
+- once the daemon path used:
+  - no settings
+  - no MCP
+  - no tools
+  - no Claude Code preset
+  cache creation dropped to near-ideal repeated-turn levels
+
+So the primary residual issue is no longer best described as "upstream SDK behavior in general". It is more precisely:
+
+- Quack's daemon integration is restoring a heavy Claude Code preset/runtime path whose hidden scaffold is not being reused the way native Claude Code CLI reuses it
+
+### Code-level finding: skill scaffold is re-sent as "initial" on resumed turns
+
+The daemon scaffold-debug run produced the first concrete code-level explanation for the repeated large cache writes.
+
+Relevant SDK runtime code from the bundled `cli.js`:
+
+- `Kn_()` sends the hidden `skill_listing` attachment and logs:
+  - `Sending ${_.length} skills via attachment (${Y ? "initial" : "dynamic"}, ...)`
+- `Pe4()` sets an internal flag so the next `Kn_()` call will treat skills as already known
+- `OR_()` only calls `Pe4()` when resumed messages contain an attachment with:
+  - `attachment.type === "skill_listing"`
+- `w16()` is the resume loader used for resumed sessions
+
+What the code means in plain terms:
+
+- the runtime only avoids re-sending the full initial skill scaffold if it can reconstruct prior `skill_listing` attachments during resume
+- if those attachments are missing from the resumed transcript, the internal skill state stays empty
+- once that state is empty, `Kn_()` sends the full skills block again and marks it as `initial`
+
+### Transcript evidence from the actual resumed Quack session
+
+The resumed session transcript on disk for the tested Quack daemon run:
+
+- `/Users/fredric/.claude/projects/-Users-fredric-Dev-flow/ae0a6c1a-0790-4492-a4a8-ed7dcf7f0c61.jsonl`
+
+contains:
+
+- `attachment: 0`
+- `skill_listing: 0`
+- `invoked_skills: 0`
+- `dynamic_skill: 0`
+
+and `rg` confirms there are no `skill_listing` records in that transcript at all.
+
+This matters because the same daemon scaffold-debug run logged:
+
+- `Sending 18 skills via attachment (initial, 18 total sent)`
+
+on every repeated resumed turn.
+
+Current interpretation:
+
+- the SDK runtime is not recovering prior skill-attachment state during Quack resume
+- as a result, the coding-agent skill scaffold is treated as fresh on every message
+- this provides a concrete mechanism for why large hidden pre-history content is repeatedly recreated before the actual message history
+
+### Code-level finding: file history is copied into a fresh internal session id each turn
+
+The bundled runtime also explains the `FileHistory: Copied backup ...` lines.
+
+Relevant SDK runtime code:
+
+- `Ey8()` copies file-history backups from the previous persisted session id into the current internal runtime session id
+- it compares:
+  - previous session id from resumed messages
+  - current internal `E8()` session id
+- when they differ, it hard-links or copies all tracked file-history backups into the new internal session folder
+
+This matches the debug logs:
+
+- Quack keeps the same external Claude session id
+- but the runtime still creates a fresh internal file-history destination UUID on resumed queries
+
+Current interpretation:
+
+- this file-history copy behavior is real and repeatable
+- but it does not yet look like the primary cache-break mechanism by itself
+- the stronger lead remains the missing attachment-backed skill restore, because that directly controls whether the hidden skill scaffold is emitted as `initial` every turn
+
+### Refined local root-cause hypothesis
+
+The strongest local explanation now is:
+
+- Quack's resumed SDK path restores user/assistant conversation state, but does not restore enough hidden attachment state for the Claude Code runtime to consider the coding-agent scaffold already established
+- because the prior `skill_listing` attachment state is missing during resume, the runtime re-sends the skill scaffold as `initial` on every resumed turn
+- that repeated hidden scaffold emission is a concrete, code-backed explanation for the persistent high `cacheCreationTokens`
+
+The remaining investigation question is now narrower:
+
+- is this attachment-loss behavior caused by Quack's SDK invocation pattern
+- or is it an SDK / Claude Code runtime limitation of the `sdk-ts` resume path itself
 
 ### D. Upstream regression layer
 
@@ -273,12 +744,73 @@ The final diagnosis must end with one implementation direction:
 - compare Quack resumed turns directly from `USAGE` events, not from cumulative totals
 - never mix fresh-session and resumed-session numbers in the same conclusion table
 
+## Next investigation phase
+
+The next phase should focus only on the daemon path.
+
+What has already been ruled out:
+
+- dynamic `systemPrompt.append` mutation
+- tool preset choice
+- built-in MCP scaffold as the primary cause
+- native vs bundled Claude executable as the primary cause
+- Haiku model behavior itself
+- the legacy `stream-claude.js` path as the main optimization target
+
+### Immediate next step
+
+Restore daemon mode and instrument daemon session lifecycle behavior before changing any more prompt structure.
+
+Add daemon-only telemetry for:
+
+- incoming `session_id`
+- incoming `session_key`
+- effective SDK `options.resume`
+- effective SDK `options.cwd`
+- effective SDK `permissionMode`
+- effective SDK `betas`
+- Claude system/init `session_id`
+- Claude result/session identifiers, if exposed by the SDK event stream
+
+### Goal of the next step
+
+Prove whether resumed daemon turns are truly staying on one Claude session or whether Quack is partially rebuilding, forking, or otherwise perturbing the session state between turns.
+
+### Follow-up after daemon session verification
+
+If daemon session reuse looks correct, the next strongest isolation test is:
+
+- daemon baseline with all MCP disabled, not just Quack's built-in MCP servers
+
+That will separate:
+
+- daemon/session integration issues
+- hidden MCP/runtime scaffold costs
+
+That test is now complete. The next step after it should be:
+
+- isolate `settingSources` as the likely remaining source of hidden MCP/tool/runtime scaffold
+- specifically compare current `['project', 'user', 'local']` against a reduced configuration that still preserves `CLAUDE.md` loading expectations as much as possible
+
+### Working expectation
+
+The most likely remaining root cause is now in Quack's daemon/session integration layer, not in prompt text placement or the tool-preset/MCP configuration that has already been tested.
+
 ## Current best hypothesis
 
 As of 2026-03-25, the best-supported working hypothesis is:
 
 - the old Quack-local cache breaker caused by dynamic `systemPrompt.append` content has been fixed
-- a second, larger residual issue remains in the SDK / preset / runtime path
-- the residual issue is probably mixed: partially attributable to Quack’s chosen SDK path and partially attributable to upstream Claude Code / Agent SDK cache behavior
+- a second, larger residual issue remains in the SDK / runtime path
+- the completed preset/MCP 2x2 indicates the residual issue is **not** primarily explained by Quack's current `claude_code` preset choice or by built-in MCP injection
+- the native Claude Code CLI control indicates the residual issue is **not** primarily explained by Haiku model behavior alone
+- the daemon-vs-legacy comparison indicates the issue is at least partly runtime-path specific inside Quack
+- daemon session lifecycle logging indicates session resume IDs are stable and correct
+- the `all-mcp-disabled` control indicates hidden server/tool scaffold still appears even with `mcpCount: 0`
+- the `all-mcp-disabled-no-settings` control confirms that SDK filesystem settings loading via `settingSources` was one real hidden pre-history source
+- even with `settingSources: []`, the daemon still initializes with `toolsAvailable: 27` and much worse cache behavior than native Claude Code CLI
+- scaffold-debug inspection of the bundled runtime shows that skill state is only restored from prior `skill_listing` attachments during resume
+- the resumed Quack session transcript contains zero `attachment` / `skill_listing` entries, so the runtime re-sends the skill scaffold as `initial` on repeated resumed turns
+- after removing settings-based scaffold, the strongest remaining suspect is now attachment-state loss or non-restoration inside the Claude Code preset / SDK runtime layer, with any remaining gap treated as a possible upstream Claude Code / Agent SDK resume limitation
 
 That hypothesis is not yet final. The fixed matrix above is required before locking the root cause.
