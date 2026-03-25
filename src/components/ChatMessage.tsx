@@ -512,10 +512,11 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
 
               message.events!.forEach((event: any, eventIndex: number) => {
                 // Only assistant events render visible tool/text content.
-                // All other event types (user, agent, system, rate_limit_event, etc.)
+                // system/init is also allowed through (renders the "System Initialized" block).
+                // All other event types (user, agent, other system events, rate_limit_event, etc.)
                 // must be skipped — they create non-nested groups that break consecutive
                 // droid grouping, causing each tool call to get its own DroidActivityBlock.
-                if (event.type !== 'assistant') return;
+                if (event.type !== 'assistant' && !(event.type === 'system' && event.subtype === 'init')) return;
 
                 if (isGroupableToolEvent(event)) {
                   if (currentGroup) {

@@ -542,6 +542,12 @@ class SessionProcess {
       return;
     }
 
+    // Cache the system/init event so it can be re-emitted on subsequent queries
+    if (event.type === 'system' && event.subtype === 'init') {
+      this.cachedInitEvent = event;
+      diag(`[SessionProcess ${this.sessionId}] captured system/init: tools=${event.tools?.length || 0}, mcp=${event.mcp_servers?.length || 0}`);
+    }
+
     if (this.eventResolve) {
       const r = this.eventResolve;
       this.eventResolve = null;
@@ -1065,6 +1071,7 @@ ${hintsBlock}
     let promptTokensEmitted = false;
     for await (const event of eventSource) {
       eventCount++;
+      if (eventCount <= 5) diag(`EVENT[${eventCount}]: type=${event.type}, subtype=${event.subtype || '-'}`);
 
       // Emit prompt_token_count on first assistant event (so frontend has it before usage data)
       if (!promptTokensEmitted && countTokensPromise && event.type === 'assistant') {
