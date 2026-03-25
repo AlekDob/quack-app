@@ -1033,7 +1033,7 @@ ${hintsBlock}
       if (gitCtx) contextPrefix += gitCtx;
     }
     const finalPrompt = contextPrefix
-      ? `${prompt}\n\n<system-reminder>\n${contextPrefix}\n</system-reminder>`
+      ? `<system-reminder>\n${contextPrefix}\n</system-reminder>\n\n${prompt}`
       : prompt;
 
     // Brain: gotcha-stamina-overhead-static-estimate

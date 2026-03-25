@@ -249,11 +249,18 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
     return content;
   };
 
+  // Strip <system-reminder> tags from user messages (IDE/git context injected by stream-claude.js)
+  // These are metadata for the model, not relevant for display
+  const stripSystemReminder = (content: string): string => {
+    if (!content.includes('<system-reminder')) return content;
+    return content.replace(/<system-reminder>[\s\S]*?<\/system-reminder>\s*/g, '').trim();
+  };
+
   // Check if current message is truncated (for ALL user messages)
   // Use extractOriginalCommand to get clean content for truncation check
   const isMessageTruncated = isUser
     ? isTruncated(
-        extractOriginalCommand(message.content),
+        extractOriginalCommand(stripSystemReminder(message.content)),
         isLastUserMessage ? 30 : 20,
         isLastUserMessage ? 250 : 150
       )
@@ -724,8 +731,8 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
               <>
                 <span className="user-message-text">
                   {!isExpanded
-                    ? renderTextWithMentions(truncateText(extractOriginalCommand(message.content), isLastUserMessage ? 30 : 20, isLastUserMessage ? 250 : 150))
-                    : renderTextWithMentions(message.content)
+                    ? renderTextWithMentions(truncateText(extractOriginalCommand(stripSystemReminder(message.content)), isLastUserMessage ? 30 : 20, isLastUserMessage ? 250 : 150))
+                    : renderTextWithMentions(stripSystemReminder(message.content))
                   }
                   {/* Inline See more / Show less button for truncated messages */}
                   {isMessageTruncated && (
