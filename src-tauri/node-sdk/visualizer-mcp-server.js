@@ -27,16 +27,23 @@ import {
 const TOOLS = [
   {
     name: 'visualize_html',
-    description: `Render interactive HTML/CSS/JS visualization inline in the chat. Use this tool when you want to display:
-- Charts and graphs (use Chart.js, D3.js, or pure SVG from CDN)
+    description: `Render interactive HTML/CSS visualization inline in the chat. Use this tool when you want to display:
+- Charts and graphs (use pure SVG — NO JavaScript libraries)
 - Data tables with sorting/filtering
 - Diagrams, flowcharts, timelines
-- Interactive widgets (calculators, color pickers, etc.)
-- Code review scorecards or dashboards
+- Scorecards, dashboards, KPI cards
 - Any visual representation that helps the user understand data
 
-The HTML will be rendered in a secure sandboxed iframe. You can load external libraries from CDN (Chart.js, D3, etc.).
-Always use a dark background (#1a1a2e) and light text (rgba(255,255,255,0.85)) to match the Quack theme.
+CRITICAL RULES:
+1. NO JavaScript — the sandbox blocks script execution. Use only HTML + CSS + inline SVG.
+2. Background: always use #000 (pure black). Text: rgba(255,255,255,0.85).
+3. Font sizes: use 12-14px for body text, 10-11px for labels/captions, 16-20px for headings, 22-28px for KPI numbers. Never go below 10px.
+4. Layout: use CSS flexbox/grid. Design for ~600px width. Use vertical stacking (single column) for complex dashboards to avoid horizontal overflow.
+5. Colors: prefer the Quack palette — #FF6B35 (primary), #004E89 (secondary), #00D9FF (accent), #2ecc71 (success), #F7931E (warning).
+6. Charts: build bar charts with CSS divs + percentage heights. Build donuts/pies with SVG circles + stroke-dasharray. Build gauges with CSS gradients.
+7. Spacing: use compact but readable padding (8-16px). Cards with rgba(255,255,255,0.04) backgrounds and rgba(255,255,255,0.08) borders.
+8. The iframe auto-resizes to content height (up to 2000px). No need to constrain height manually.
+
 Include all CSS inline. The iframe has no access to the parent page.`,
     inputSchema: {
       type: 'object',

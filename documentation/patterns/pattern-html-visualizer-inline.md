@@ -39,11 +39,11 @@ This works with any LLM provider (not just Anthropic) and as a fallback when the
 
 ## Sandbox Strategy
 
-The iframe uses `sandbox="allow-scripts"` **without** `allow-same-origin`. This is the maximum isolation level that still permits JavaScript execution inside the iframe:
+The iframe uses `sandbox="allow-scripts"` **without** `allow-same-origin`. In practice, **JavaScript execution is blocked** by the sandboxed environment. All visualizations must use **pure HTML + CSS + inline SVG** — no Chart.js, D3, or any JS library.
 
 - The iframe cannot access the parent document's DOM, cookies, or storage.
 - The iframe cannot make same-origin requests to the host application.
-- Scripts inside the iframe can run (needed for interactive visualizations like charts, animations).
+- Scripts do NOT execute reliably — the MCP tool description explicitly instructs agents to avoid JS.
 
 ## Auto-Resize via postMessage
 
@@ -61,7 +61,9 @@ The wrapped HTML is computed with `useMemo` keyed on the raw `html` prop. This p
 
 - **isLoaded state resets on html change**: when the `html` prop changes, `isLoaded` is reset to `false` to show a loading state while the new content renders.
 - **React key collision fix**: each `HtmlVisualizer` instance uses a stable key derived from content to avoid React reconciliation issues when multiple visualizers appear in the same message.
-- **Dark base styles**: `wrapHtmlForSandbox()` injects minimal dark-theme CSS (dark background, light text) so visualizations blend with Quack's UI by default.
+- **Black base styles**: `wrapHtmlForSandbox()` injects minimal black-theme CSS (`#000` background, light text) so visualizations blend with Quack's UI by default. Font sizes default to 13px body text.
+- **Max height 2000px**: the iframe auto-resizes up to 2000px, allowing full-height dashboards without clipping.
+- **No JS rule**: the MCP tool description explicitly tells agents to use only HTML+CSS+SVG, no JavaScript.
 - **CopyButton extracted**: the copy-to-clipboard button was extracted as a reusable `CopyButton` component for use in other contexts beyond the visualizer.
 
 ## Files

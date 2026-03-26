@@ -39,11 +39,12 @@ const AUTO_RESIZE_SCRIPT = `
 const BASE_STYLES = `
 <style>
   html, body {
-    margin: 0; padding: 12px;
-    background: #1a1a2e;
+    margin: 0; padding: 16px;
+    background: #000;
     color: rgba(255, 255, 255, 0.85);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-size: 14px;
+    font-size: 13px;
+    line-height: 1.5;
     overflow-x: hidden;
   }
   * { box-sizing: border-box; }
