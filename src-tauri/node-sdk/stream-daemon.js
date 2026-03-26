@@ -1356,7 +1356,17 @@ async function main() {
 
   stdinReader.on('close', () => {
     log('LIFECYCLE', 'stdin closed — Rust process likely exited, shutting down');
-    process.exit(0);
+    handleShutdown();
+  });
+
+  // Clean up child processes on signals (prevents orphaned MCP servers)
+  process.on('SIGTERM', () => {
+    log('LIFECYCLE', 'SIGTERM received — shutting down');
+    handleShutdown();
+  });
+  process.on('SIGINT', () => {
+    log('LIFECYCLE', 'SIGINT received — shutting down');
+    handleShutdown();
   });
 
   // Keep the event loop alive (stdin is already keeping it alive via readline,

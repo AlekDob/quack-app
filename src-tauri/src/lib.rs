@@ -1358,6 +1358,13 @@ pub fn run() {
             // BTW side-chain query
             btw::btw_query,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Kill all orphaned MCP server processes on app exit
+                let mcp_manager: tauri::State<mcp::MCPProcessManager> = app_handle.state();
+                mcp_manager.kill_all();
+            }
+        });
 }
