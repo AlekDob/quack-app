@@ -2518,9 +2518,14 @@ function AppContent() {
     }
 
     // 🦆 SESSION-FIRST: Add messages to session using messageKey
+    // IMPORTANT: Read from prev (latest state), NOT from currentMessages (stale closure).
+    // handleClaudeEvent accumulates streaming events into chatSessions via setChatSessions.
+    // If we use the closure's currentMessages here, we overwrite those events, causing
+    // the previous turn's response to appear one turn late.
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
-      newSessions.set(messageKey, [...currentMessages, ...messagesToAdd]);
+      const latestMessages = newSessions.get(messageKey) ?? [];
+      newSessions.set(messageKey, [...latestMessages, ...messagesToAdd]);
       return newSessions;
     });
 
@@ -3255,10 +3260,11 @@ function AppContent() {
       status: 'sending',
     };
 
-    // Add user message
+    // Add user message — use prev (latest state) to avoid stale closure overwrite
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
-      newSessions.set(targetAgentId, [...currentMessages, userMessage]);
+      const latestMessages = newSessions.get(targetAgentId) ?? [];
+      newSessions.set(targetAgentId, [...latestMessages, userMessage]);
       return newSessions;
     });
 
