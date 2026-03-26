@@ -155,7 +155,7 @@ Exported symbols per file. Generated 2026-03-13.
 ### services/claudeSDK.ts
 - `getActiveModelName()`, `getProviderRequestFields()`, `ClaudeSDKOptions`, `ClaudeSDKStreamEvent`
 - `abortSessionStream()`, `abortAllStreams()`, `getActiveStreamCount()`
-- `sendToolResult()`, `answerUserQuestionViaStdin()`, `rewindFiles()`, `RewindFilesResult`
+- `answerUserQuestionViaStdin()`, `rewindFiles()`, `RewindFilesResult`
 
 ### services/conversationRecovery.ts
 - `TOKEN_LIMITS`, `ESTIMATED_OVERHEAD`, `TOKEN_THRESHOLDS`, `TokenWarningLevel`, `TokenBudgetStatus`

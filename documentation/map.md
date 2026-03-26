@@ -15,7 +15,7 @@ updated: 2026-02-24
 |---------|------|---------|
 | Brain File Service | src/services/brainFileService.ts | Two-level knowledge store CRUD |
 | Activity Log Service | src/services/activityLogService.ts | JSONL activity event log |
-| Claude SDK | src-tauri/node-sdk/stream-claude.js | AI streaming via Agent SDK |
+| Claude SDK | src-tauri/node-sdk/stream-daemon.js | AI streaming via persistent daemon |
 | Unified Agent Storage | src/services/unifiedAgentStorage.ts | Agent + session persistence |
 | Automation Storage | src/services/automationStorage.ts | Cron job persistence |
 | Cron Utils | src/services/cronUtils.ts | Cron expression parsing + next-run calc |

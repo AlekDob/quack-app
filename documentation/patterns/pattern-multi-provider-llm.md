@@ -13,13 +13,6 @@ Quack supports three LLM providers: **Anthropic** (default), **Ollama** (local/c
 
 ## Architecture Flow
 
-### Legacy Path (spawn-per-message)
-```
-Settings UI -> Tauri invoke -> claude_cli.rs (set env vars on Command)
-  -> spawn stream-claude.js (fresh process, inherits env vars)
-    -> Claude Agent SDK query()
-```
-
 ### Daemon Path (persistent process)
 ```
 Settings UI -> Tauri invoke -> claude_cli.rs (add provider fields to JSON query)
@@ -52,7 +45,6 @@ The Claude Agent SDK always uses the Anthropic Messages API format. Ollama v0.14
 | `src/services/ollamaService.ts` | Health check + model discovery via `/api/tags` |
 | `src/services/claudeSDK.ts` | `getProviderRequestFields()`, `getActiveModelName()` |
 | `src-tauri/src/claude_cli.rs` | Env var injection per provider |
-| `src-tauri/node-sdk/stream-claude.js` | Auth bypass when `ANTHROPIC_BASE_URL` is set |
 | `src-tauri/node-sdk/stream-daemon.js` | Per-query env var set/restore for provider |
 | `src/components/settings/categories/ClaudeCodeSettings.tsx` | Provider selection UI |
 | `src/components/ChatSettingsMenu.tsx` | Provider-aware model display in chat footer |

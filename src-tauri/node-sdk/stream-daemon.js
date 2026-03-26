@@ -170,7 +170,7 @@ const activeQueries = new Map();
 const pendingRequests = new Map();
 
 // =============================================================================
-// MCP SERVER LOADING (reused from stream-claude.js)
+// MCP SERVER LOADING
 // =============================================================================
 
 function loadGlobalMCPServers() {
@@ -227,7 +227,7 @@ function loadMCPServersFromFile(workingDir) {
 }
 
 // =============================================================================
-// MODEL MAPPING (reused from stream-claude.js)
+// MODEL MAPPING
 // =============================================================================
 
 function getModelId(model) {
@@ -258,7 +258,7 @@ function getModelId(model) {
 }
 
 // =============================================================================
-// IMAGE ATTACHMENT SUPPORT (reused from stream-claude.js)
+// IMAGE ATTACHMENT SUPPORT
 // =============================================================================
 
 function fileToImageBlock(filePath) {
@@ -290,7 +290,7 @@ function createMessageContent(text, imagePaths = []) {
 }
 
 // =============================================================================
-// TEAM PROMPT AUGMENTATION (reused from stream-claude.js)
+// TEAM PROMPT AUGMENTATION
 // =============================================================================
 
 function buildTeamPromptAugmentation(tc) {
@@ -674,7 +674,7 @@ async function handleQuery(cmd) {
   }
 
   try {
-    // --- Build SDK options (same logic as stream-claude.js) ---
+    // --- Build SDK options ---
     const modelId = getModelId(model);
     const is1MContext = modelId.endsWith('[1m]');
     log('QUERY', `Model mapping: "${model}" → "${modelId}" (1M context: ${is1MContext})`);
@@ -1137,7 +1137,7 @@ ${hintsBlock}
       const errorMsg = err instanceof Error ? err.message : String(err);
       const errorStack = err instanceof Error ? err.stack : '';
 
-      // Check for subagent crash (same logic as stream-claude.js)
+      // Check for subagent crash
       const isSubagentCrash = errorStack?.includes('ProcessTransport') ||
         errorStack?.includes('exitHandler') ||
         errorMsg.includes('process exited') ||

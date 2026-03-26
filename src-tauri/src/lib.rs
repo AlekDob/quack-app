@@ -1208,8 +1208,7 @@ pub fn run() {
             claude_cli::send_message_via_cli_streaming,
             claude_cli::send_message_via_sdk_streaming,
             claude_cli::abort_sdk_stream,         // 🛑 Stop button: kill Node.js process / abort daemon query
-            claude_cli::send_tool_result_to_sdk, // 🗣️ AskUserQuestion support (legacy)
-            claude_cli::answer_user_question,    // 🗣️ AskUserQuestion via stdin (daemon or legacy)
+            claude_cli::answer_user_question,    // 🗣️ AskUserQuestion via daemon stdin
             claude_cli::rewind_files,            // ⏪ File Checkpointing rewind (SDK 0.2.7+)
             claude_cli::restart_daemon,          // 🔄 Restart persistent daemon (dev/debug)
             claude_cli::reload_mcp_servers,      // 🔌 Hot-reload MCP server configuration

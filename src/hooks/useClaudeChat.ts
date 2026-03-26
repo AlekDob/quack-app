@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { ChatAttachment, ChatMessage, ClaudeEvent, StructuredOutputFormat, EffortLevel, AskUserQuestionAnswers, PendingUserQuestion } from '../types';
-import { streamClaudeMessage, abortSessionStream, sendToolResult } from '../services/claudeSDK';
+import { streamClaudeMessage, abortSessionStream, answerUserQuestionViaStdin } from '../services/claudeSDK';
 import { invoke } from '@tauri-apps/api/core';
 import debugLogger from '../services/debugLogger';
 import posthog from 'posthog-js';
@@ -913,7 +913,6 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
   const answerUserQuestion = useCallback(async (
     toolUseId: string,
     answers: AskUserQuestionAnswers,
-    workingDirectory?: string
   ) => {
     if (!claudeSessionId.current) {
       console.error('[useClaudeChat] Cannot answer question: no active session');
@@ -931,20 +930,12 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
     });
 
     try {
-      // Format the answer as a tool result
-      const formattedAnswer = Object.entries(answers)
-        .map(([header, value]) => {
-          const valueStr = Array.isArray(value) ? value.join(', ') : value;
-          return `${header}: ${valueStr}`;
-        })
-        .join('\n');
-
-      // Send the tool result to continue the conversation
-      await sendToolResult(
-        claudeSessionId.current,
+      // Send the answer via daemon stdin
+      const processKey = claudeSessionId.current;
+      await answerUserQuestionViaStdin(
+        processKey,
         toolUseId,
-        formattedAnswer,
-        workingDirectory
+        answers as Record<string, string>
       );
 
       console.log('[useClaudeChat] 🗣️ Question answered successfully');

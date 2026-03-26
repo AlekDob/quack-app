@@ -4224,7 +4224,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
       // Send response via stdin - reuse the same mechanism as AskUserQuestion
       // The backend expects { requestId, answers } format
-      // We encode approved/feedback as answers that stream-claude.js will parse
+      // We encode approved/feedback as answers that stream-daemon.js will parse
       await answerUserQuestionViaStdin(
         processKey,
         requestId,
