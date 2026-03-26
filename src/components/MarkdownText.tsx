@@ -129,12 +129,14 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
       );
 
       // Bold: **text** or __text__ (must be processed BEFORE italic)
+      // Brain: fix-markdown-underscore-intra-word
       line = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-      line = line.replace(/__(.+?)__/g, '<strong>$1</strong>');
+      line = line.replace(/(?<![a-zA-Z0-9])__(.+?)__(?![a-zA-Z0-9])/g, '<strong>$1</strong>');
 
       // Italic: *text* or _text_ (after bold to avoid conflicts)
+      // Per CommonMark/GFM: underscore intra-word NON è emphasis (retry_request_status resta intatto)
       line = line.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
-      line = line.replace(/(?<!_)_([^_]+)_(?!_)/g, '<em>$1</em>');
+      line = line.replace(/(?<![a-zA-Z0-9_])_([^_]+)_(?![a-zA-Z0-9_])/g, '<em>$1</em>');
 
       return line;
     };

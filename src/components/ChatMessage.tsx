@@ -686,6 +686,10 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 return undefined;
               };
 
+              // Check if group contains an Agent/Task tool call
+              const groupHasAgentTool = (g: typeof groups[0]): boolean =>
+                getAgentToolDroidType(g) !== undefined;
+
               // Debug: log merge loop inputs (temporary — remove after fix verified)
               if (process.env.NODE_ENV === 'development') {
                 console.debug('[DroidMerge] nestedEventIndices:', [...nestedEventIndices.entries()]);
