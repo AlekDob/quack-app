@@ -1,5 +1,6 @@
 import { useState, memo } from 'react';
 import TokenUsageModal from './TokenUsageModal';
+import { getModelLabel } from '../services/modelService';
 
 interface StaminaBarBorderProps {
   inputTokens: number;
@@ -9,6 +10,7 @@ interface StaminaBarBorderProps {
   totalCost?: number;
   maxTokens?: number; // Context window size from SDK (undefined until first result event)
   overhead?: number;
+  model?: string;
   onCompact?: () => void;
   onClear?: () => void;
 }
@@ -35,6 +37,7 @@ function StaminaBarBorder({
   totalCost = 0,
   maxTokens,
   overhead = DEFAULT_OVERHEAD,
+  model,
   onCompact,
   onClear,
 }: StaminaBarBorderProps) {
@@ -125,6 +128,7 @@ function StaminaBarBorder({
           overhead={overhead}
           status={status}
           onClose={() => setShowModal(false)}
+          model={model ? getModelLabel(model) : undefined}
           onCompact={onCompact}
           onClear={onClear}
         />
@@ -141,6 +145,7 @@ export default memo(StaminaBarBorder, (prevProps, nextProps) => {
     prevProps.cacheReadTokens === nextProps.cacheReadTokens &&
     prevProps.totalCost === nextProps.totalCost &&
     prevProps.overhead === nextProps.overhead &&
-    prevProps.maxTokens === nextProps.maxTokens
+    prevProps.maxTokens === nextProps.maxTokens &&
+    prevProps.model === nextProps.model
   );
 });
