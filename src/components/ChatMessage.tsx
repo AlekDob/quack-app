@@ -758,11 +758,15 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                     : droidTools[0].items[0].eventIndex;
 
                   const flattenGroups = (gs: typeof groups) =>
-                    gs.flatMap(g =>
+                    gs.map(g =>
                       g.kind === 'single'
-                        ? [renderStreamMessage(g.event, g.eventIndex, false)]
-                        : g.items.map(({ event, eventIndex }) =>
-                            renderStreamMessage(event, eventIndex, false)
+                        ? renderStreamMessage(g.event, g.eventIndex, false)
+                        : (
+                            <div className="tool-event-group-row" key={`droid-row-${g.items[0].eventIndex}`}>
+                              {g.items.map(({ event, eventIndex }) =>
+                                renderStreamMessage(event, eventIndex, false)
+                              )}
+                            </div>
                           )
                     );
 
