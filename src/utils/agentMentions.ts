@@ -20,8 +20,9 @@ export interface AgentMention {
  */
 export function parseAgentMentions(text: string): AgentMention[] {
   const mentions: AgentMention[] = [];
-  // Match @ followed by word characters and hyphens
-  const mentionRegex = /@([\w-]+)/g;
+  // Match @ followed by word characters and hyphens, but NOT inside emails
+  // Brain: fix-mention-regex-email-false-positive
+  const mentionRegex = /(?<!\w)@([\w-]+)/g;
   let match;
 
   while ((match = mentionRegex.exec(text)) !== null) {
@@ -75,12 +76,12 @@ export function matchMentionsToAgents(
  * Example: "@mike @julie hello" → "hello"
  */
 export function stripMentions(text: string): string {
-  return text.replace(/@[\w-]+/g, '').trim().replace(/\s+/g, ' ');
+  return text.replace(/(?<!\w)@[\w-]+/g, '').trim().replace(/\s+/g, ' ');
 }
 
 /**
  * Check if text contains any @mentions
  */
 export function hasMentions(text: string): boolean {
-  return /@[\w-]+/.test(text);
+  return /(?<!\w)@[\w-]+/.test(text);
 }
