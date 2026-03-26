@@ -286,6 +286,40 @@ export default function ChatView({
       const [, commandName, commandArgs] = slashCommandMatch;
       console.log('[ChatView] Detected slash command:', commandName, 'with args:', commandArgs);
 
+      // INTERCEPT commands that have native handlers — sending these as raw text
+      // to the SDK causes Claude to treat them as regular prompts instead of CLI commands.
+      if (commandName === 'compact' && onCompactConversation) {
+        onCompactConversation();
+        return;
+      }
+      if (commandName === 'clear' && onClearConversation) {
+        onClearConversation();
+        return;
+      }
+
+      // INTERCEPT /context — show token usage from session data
+      if (commandName === 'context') {
+        const total = sessionTokens.inputTokens + sessionTokens.outputTokens;
+        const ctxWindow = sessionTokens.contextWindow || 200_000;
+        const pct = ctxWindow > 0 ? ((total / ctxWindow) * 100).toFixed(1) : '0';
+        const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+        toast.info(
+          `Context: ${fmt(total)} / ${fmt(ctxWindow)} tokens (${pct}%)\n` +
+          `Input: ${fmt(sessionTokens.inputTokens)} · Output: ${fmt(sessionTokens.outputTokens)}\n` +
+          `Cache read: ${fmt(sessionTokens.cacheReadTokens)} · Cache write: ${fmt(sessionTokens.cacheCreationTokens)}`,
+          { duration: 6000 }
+        );
+        return;
+      }
+
+      // SDK built-in commands without native handlers — show a helpful toast
+      // instead of sending them as regular prompts (which confuses Claude).
+      const cliOnlyCommands = ['cost', 'diff', 'doctor', 'init', 'memory', 'mcp', 'model', 'permissions', 'review', 'status', 'undo'];
+      if (cliOnlyCommands.includes(commandName)) {
+        toast.info(`/${commandName} is a CLI-only command — use it in the Claude Code terminal.`);
+        return;
+      }
+
       // INTERCEPT /background command - create background task instead of sending message
       if (commandName === 'background') {
         if (!commandArgs || !commandArgs.trim()) {
