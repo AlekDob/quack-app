@@ -93,6 +93,57 @@ In `ChatMessage.tsx`, `nestedEventIndices` is a `Map<number, string>` (event ind
 | `src/components/StreamMessage.css` | .nested-under-agent styles |
 | `src/hooks/useAgentInfo.ts` | Fetches droid avatar/color from Tauri agent registry |
 
+## DroidActivityBlock Merging
+
+When the orchestrator calls the same subagent type multiple times consecutively (e.g. `Agent(Explore)` x5), each invocation produces its own `[nested tools] + [agent result]` pair. Without merging, each gets its own `DroidActivityBlock` with a repeated avatar.
+
+### Problem
+
+After the reorder step, the sequence looks like:
+```
+nested tools (Explore)   → droidType = "Explore"
+agent result #1          → droidType = undefined (has agent tool)
+nested tools (Explore)   → droidType = "Explore"
+agent result #2          → droidType = undefined
+```
+
+The agent-result groups (which have no `droidType`) break the consecutive chain, creating separate blocks.
+
+### Solution
+
+`getAgentToolDroidType()` helper extracts `subagent_type` from agent-result groups. The render loop absorbs agent-result groups of the same droid into the merged block:
+
+```typescript
+// In the collect loop, absorb agent results + intermediate non-droid groups:
+if (gDroid === droidType) {
+  droidTools.push(g);          // nested tool group
+} else if (groupHasAgentTool(g) && getAgentToolDroidType(g) === droidType) {
+  droidAgentResults.push(g);   // agent result for same droid
+} else if (!gDroid && !groupHasAgentTool(g)) {
+  // Lookahead: check if same droid reappears within next 3 groups
+  // If yes, absorb intermediate group into the block
+  // Brain: fix-droid-avatar-repeated
+  if (hasMoreSameDroid) { droidIntermediate.push(g); }
+  else { break; }
+} else {
+  break;                       // different droid or non-nested → stop
+}
+```
+
+Tools render first, then intermediate groups, then agent results (AgentResultCards) at the end of the block.
+
+### Collapsible Behavior
+
+`DroidActivityBlock` is collapsible: expanded by default, with a chevron toggle. When collapsed, shows a "N tools" count badge. Uses `Children.count()` for the count.
+
+### Key Files (merging)
+
+| File | Role |
+|------|------|
+| `src/components/ChatMessage.tsx` | `getAgentToolDroidType()` + merge loop |
+| `src/components/DroidActivityBlock.tsx` | Collapsible wrapper with chevron |
+| `src/components/StreamMessage.css` | `.droid-activity-header`, `.droid-activity-chevron`, `.droid-activity-count` |
+
 ## Gotchas
 
 - The `task` tool handler checks for team members FIRST — `TeammateWidget` takes priority
@@ -100,3 +151,5 @@ In `ChatMessage.tsx`, `nestedEventIndices` is a `Map<number, string>` (event ind
 - Metadata block detection uses `text.includes('<usage>')` — if SDK changes the format, parsing silently falls back to no metadata (safe degradation)
 - `agent` must be in `SPECIAL_WIDGET_TOOLS` — without it, the Agent tool gets grouped with other tools instead of having its own row
 - Subagent tools are invisible to the parent stream — only start/stop events and final result are visible
+- Merging now uses **lookahead** (max 3 groups ahead) to absorb intermediate non-droid events between runs of the same droid. Breaks only on a DIFFERENT droid type.
+- CSS `.droid-activity-content > .stream-message` has compact 2px margin for tighter tool list inside droid blocks

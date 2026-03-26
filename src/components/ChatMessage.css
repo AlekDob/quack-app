@@ -30,7 +30,15 @@
 }
 
 .chat-message.user .chat-message-header {
-  display: none; /* Hide "You 11:39" header - not needed for iMessage style */
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+/* Hide role/timestamp text for user messages - only show action icons */
+.chat-message.user .chat-message-role,
+.chat-message.user .chat-message-timestamp {
+  display: none;
 }
 
 .chat-message.user .chat-message-body {
@@ -178,16 +186,17 @@
   flex-shrink: 0;
 }
 
-.sticky-message-actions {
+/* Actions always visible on every user message header */
+.user-message-actions {
   display: flex;
   align-items: center;
   gap: 4px;
   margin-left: auto;
-  opacity: 0;
+  opacity: 0.5;
   transition: opacity 0.2s;
 }
 
-.chat-message.sticky-user-message:hover .sticky-message-actions {
+.chat-message:hover .user-message-actions {
   opacity: 1;
 }
 

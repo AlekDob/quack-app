@@ -1,45 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { CopyButton } from './chat/CopyButton';
+import HtmlVisualizer from './chat/HtmlVisualizer';
 import './MarkdownText.css';
 
 interface MarkdownTextProps {
   children: string;
-}
-
-/**
- * Copy button component for code blocks
- */
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy text:', err);
-    }
-  };
-
-  return (
-    <button
-      className="md-copy-button"
-      onClick={handleCopy}
-      title={copied ? 'Copied!' : 'Copy to clipboard'}
-    >
-      {copied ? (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M13.5 3.5L6 11L2.5 7.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ) : (
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <rect x="5" y="5" width="9" height="9" rx="1" />
-          <path d="M3 11V3a2 2 0 0 1 2-2h8" />
-        </svg>
-      )}
-      <span className="md-copy-label">{copied ? 'Copied!' : 'Copy'}</span>
-    </button>
-  );
 }
 
 /**
@@ -56,6 +21,7 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
     let currentList: string[] | null = null;
     let listKey = 0;
     let codeBlock: string[] | null = null;
+    let codeBlockLang = '';
     let codeBlockKey = 0;
     let tableRows: string[][] | null = null;
     let tableKey = 0;
@@ -78,15 +44,22 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
     const flushCodeBlock = () => {
       if (codeBlock && codeBlock.length > 0) {
         const codeContent = codeBlock.join('\n');
-        elements.push(
-          <div key={`code-wrapper-${codeBlockKey}`} className="md-code-block-wrapper">
-            <CopyButton text={codeContent} />
-            <pre key={`code-${codeBlockKey++}`} className="md-code-block">
-              <code>{codeContent}</code>
-            </pre>
-          </div>
-        );
+        const key = codeBlockKey++;
+        // Brain: quack-visualizer-inline-html
+        if (codeBlockLang === 'quack-viz') {
+          elements.push(<HtmlVisualizer key={`viz-${key}`} html={codeContent} />);
+        } else {
+          elements.push(
+            <div key={`code-wrapper-${key}`} className="md-code-block-wrapper">
+              <CopyButton text={codeContent} />
+              <pre key={`code-${key}`} className="md-code-block">
+                <code>{codeContent}</code>
+              </pre>
+            </div>
+          );
+        }
         codeBlock = null;
+        codeBlockLang = '';
       }
     };
 
@@ -167,10 +140,12 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
     };
 
     lines.forEach((line, idx) => {
-      // Code block delimiters
-      if (line.trim().startsWith('```')) {
+      // Code block delimiters — capture language tag (e.g. ```quack-viz, ```typescript)
+      const fenceMatch = line.trim().match(/^```(\S*)/);
+      if (fenceMatch) {
         if (codeBlock === null) {
           flushList();
+          codeBlockLang = fenceMatch[1] || '';
           codeBlock = [];
         } else {
           flushCodeBlock();

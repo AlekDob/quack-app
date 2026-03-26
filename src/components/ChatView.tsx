@@ -432,36 +432,33 @@ export default function ChatView({
   };
 
   // Track file edits and deletions from the LAST assistant message only
+  // Brain: fix-changes-panel-all-messages
+  // Scan ALL assistant messages to collect cumulative file edits across the entire session.
+  // Previously only scanned lastAssistantMessage, losing edits from earlier turns
+  // on session restore, tab switch, or component remount.
   const { currentFileEdits, currentFileDeletes } = useMemo(() => {
-    // Find the last assistant message (most recent AI response)
-    const lastAssistantMessage = [...messages]
-      .reverse()
-      .find(msg => msg.role === 'assistant');
+    const assistantMessages = messages.filter(msg => msg.role === 'assistant');
 
-    if (!lastAssistantMessage) return { currentFileEdits: [], currentFileDeletes: [] };
+    if (assistantMessages.length === 0) return { currentFileEdits: [], currentFileDeletes: [] };
 
-    // Collect file edits and deletions from tool calls in the last message
     const fileEdits: Map<string, FileEdit> = new Map();
     const fileDeletes: Set<string> = new Set();
 
-    // Check if message has events (ClaudeEvent[] format)
-    if (lastAssistantMessage.events && Array.isArray(lastAssistantMessage.events)) {
-      lastAssistantMessage.events.forEach((event: any) => {
+    for (const assistantMessage of assistantMessages) {
+      if (!assistantMessage.events || !Array.isArray(assistantMessage.events)) continue;
+
+      assistantMessage.events.forEach((event: any) => {
         // Track Brain MCP tool results (mdFilePath is in the result, not input)
         if (event.type === 'user' && event.message?.content && Array.isArray(event.message.content)) {
           event.message.content.forEach((item: any) => {
             if (item.type === 'tool_result' && item.content) {
               try {
-                // Parse tool result content (could be string or already parsed)
                 const resultContent = typeof item.content === 'string'
                   ? JSON.parse(item.content)
                   : item.content;
 
-                // Check for mdFilePath from brain_create_entity or brain_add_observation
                 if (resultContent.mdFilePath && resultContent.mdFilePath.endsWith('.md')) {
                   const mdPath = resultContent.mdFilePath;
-                  console.log('[ChatView] Detected brain MCP created file:', mdPath);
-
                   if (!fileEdits.has(mdPath)) {
                     fileEdits.set(mdPath, {
                       filePath: mdPath,
@@ -490,8 +487,6 @@ export default function ChatView({
                 // Track Edit and Write tool calls
                 if ((toolName === 'edit' || toolName === 'write') && input?.file_path) {
                   const filePath = input.file_path;
-
-                  // Determine status: Edit tool = modified, Write tool = likely created
                   const status: 'created' | 'modified' = toolName === 'write' ? 'created' : 'modified';
 
                   if (!fileEdits.has(filePath)) {
@@ -499,11 +494,10 @@ export default function ChatView({
                       filePath,
                       editCount: 0,
                       lineNumbers: [],
-                      lineChanges: [], // Initialize empty array for line-by-line changes
-                      status, // NEW: Track file creation vs modification
+                      lineChanges: [],
+                      status,
                     });
                   } else {
-                    // If file already tracked and we see an Edit tool, mark as modified
                     if (toolName === 'edit') {
                       fileEdits.get(filePath)!.status = 'modified';
                     }
@@ -512,28 +506,19 @@ export default function ChatView({
                   const edit = fileEdits.get(filePath)!;
                   edit.editCount++;
 
-                  // Compute line changes for Edit tool (has old_string and new_string)
                   if (toolName === 'edit' && input.old_string && input.new_string) {
                     const changes = computeLineChanges(input.old_string, input.new_string);
-
-                    // Debug: log the changes
-                    console.log('[ChatView] Computed line changes for', filePath, ':', changes);
-
                     edit.lineChanges!.push(...changes);
                   }
-                  // For Write tool, we don't have old_string, so we can't compute precise diffs
-                  // The Write tool creates or overwrites entire files
                 }
 
                 // Track Bash commands with rm
                 if (toolName === 'bash' && input?.command) {
                   const command = input.command as string;
-                  // Match rm commands: rm file.txt, rm -rf dir/, rm *.txt, etc.
                   const rmMatch = command.match(/\brm\s+(?:-[^\s]*\s+)?(.+)/);
                   if (rmMatch) {
                     const filePaths = rmMatch[1].split(/\s+/).filter(p => p && !p.startsWith('-'));
                     filePaths.forEach(path => {
-                      // Clean up the path (remove quotes, wildcards for display)
                       const cleanPath = path.replace(/['"]/g, '').trim();
                       if (cleanPath) {
                         fileDeletes.add(cleanPath);

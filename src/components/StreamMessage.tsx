@@ -27,6 +27,7 @@ import { useTeamStore } from '../stores/teamStore';
 import { useAgentAvatar } from '../hooks/useAgentAvatar';
 import type { TeamConfig } from '../types';
 import { isBrainRead, BRAIN_COLOR } from '../utils/brainPathDetection';
+import HtmlVisualizer from './chat/HtmlVisualizer';
 
 // Import duck avatar
 import duckAvatar from '../../images/duck.png';
@@ -102,6 +103,7 @@ const getToolColorMinimal = (name: string): string => {
 export const SPECIAL_WIDGET_TOOLS = new Set([
   'todowrite', 'exitplanmode', 'enterplanmode',
   'askuserquestion', 'task', 'taskoutput', 'agent',
+  'mcp__visualizer__visualize_html',
 ]);
 
 // Tools that always get their own row (expandable diffs/undo)
@@ -587,6 +589,14 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             />
           );
         }
+      }
+
+      // Brain: quack-visualizer-inline-html
+      // Visualize HTML tool — renders interactive iframe inline in chat
+      if (toolName === 'mcp__visualizer__visualize_html' && input?.html) {
+        return (
+          <HtmlVisualizer key={idx} html={input.html as string} title={input.title as string | undefined} />
+        );
       }
 
       // Task tool (subagent) - special widget

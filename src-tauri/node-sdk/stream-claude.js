@@ -985,12 +985,16 @@ ${hintsBlock}
     // Using stdio transport instead for stability
     const ideMcpServerPath = join(__dirname, 'ide-mcp-server.js');
     const codeIntelMcpServerPath = join(__dirname, 'code-intel-mcp-server.js');
+    const visualizerMcpServerPath = join(__dirname, 'visualizer-mcp-server.js');
     console.error(`[MCP] IDE MCP server path: ${ideMcpServerPath}`);
     console.error(`[MCP] IDE MCP exists: ${existsSync(ideMcpServerPath)}`);
     console.error(`[MCP] Code Intel MCP server path: ${codeIntelMcpServerPath}`);
     console.error(`[MCP] Code Intel MCP exists: ${existsSync(codeIntelMcpServerPath)}`);
+    console.error(`[MCP] Visualizer MCP server path: ${visualizerMcpServerPath}`);
+    console.error(`[MCP] Visualizer MCP exists: ${existsSync(visualizerMcpServerPath)}`);
 
-    // Merge MCP servers: file-based servers + built-in Quack servers (ide + code-intel)
+    // Brain: quack-visualizer-inline-html
+    // Merge MCP servers: file-based servers + built-in Quack servers
     options.mcpServers = {
       ...(resolvedMcpServers || {}),
       'ide-tools': {
@@ -1002,13 +1006,17 @@ ${hintsBlock}
         command: 'node',
         args: [codeIntelMcpServerPath],
       },
+      'visualizer': {
+        command: 'node',
+        args: [visualizerMcpServerPath],
+      },
     };
 
-    const builtInServerCount = 2; // ide-tools + code-intel
+    const builtInServerCount = 3; // ide-tools + code-intel + visualizer
     if (resolvedMcpServers && Object.keys(resolvedMcpServers).length > 0) {
       console.error(`[MCP] Loaded ${Object.keys(resolvedMcpServers).length + builtInServerCount} MCP servers:`, Object.keys(options.mcpServers).join(', '));
     } else {
-      console.error(`[MCP] Using built-in MCP servers only (ide-tools, code-intel)`);
+      console.error(`[MCP] Using built-in MCP servers only (ide-tools, code-intel, visualizer)`);
     }
 
     console.error(`[DEBUG] Final Options:`, JSON.stringify(options, null, 2));

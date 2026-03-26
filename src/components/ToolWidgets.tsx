@@ -33,6 +33,8 @@ export const getToolColor = (toolName: string): string => {
   if (name.startsWith('mcp__ide') || name.startsWith('mcp_ide')) return '#a855f7';
   // MCP Code-intel tools - cyan
   if (name.startsWith('mcp__code-intel') || name.startsWith('mcp__code_intel') || name.startsWith('mcp_code-intel') || name.startsWith('mcp_code_intel')) return '#06b6d4';
+  // MCP Visualizer tools - hot pink/fuchsia
+  if (name.startsWith('mcp__visualizer') || name.startsWith('mcp_visualizer')) return '#d946ef';
   // MCP PostHog tools - pink/magenta
   if (name.startsWith('mcp__posthog')) return '#ec4899';
   // Other MCP tools - orange
@@ -62,6 +64,7 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
   const isMcpBrainTool = toolName.startsWith('mcp__quack-brain') || toolName.startsWith('mcp__brain') || toolName.startsWith('mcp_brain');
   const isMcpIdeTool = toolName.startsWith('mcp__ide') || toolName.startsWith('mcp_ide');
   const isMcpCodeIntelTool = toolName.startsWith('mcp__code-intel') || toolName.startsWith('mcp__code_intel') || toolName.startsWith('mcp_code-intel') || toolName.startsWith('mcp_code_intel');
+  const isMcpVisualizerTool = toolName.startsWith('mcp__visualizer') || toolName.startsWith('mcp_visualizer');
   const isMcpTool = toolName.startsWith('mcp__') || toolName.startsWith('mcp_');
 
   if (toolName === 'read') {
@@ -312,6 +315,16 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
         <circle cx="11" cy="5" r="1" fill={iconColor}/>
         <polyline points="8 13 11 16 8 19"/>
         <line x1="14" y1="19" x2="18" y2="19"/>
+      </svg>
+    );
+  }
+
+  // MCP Visualizer tools - eye/preview icon (fuchsia)
+  if (isMcpVisualizerTool) {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+        <circle cx="12" cy="12" r="3"/>
       </svg>
     );
   }

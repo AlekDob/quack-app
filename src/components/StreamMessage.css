@@ -59,17 +59,66 @@
   min-width: 0;
 }
 
+/* Clickable header row: name + count + chevron */
+.droid-activity-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 4px;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.droid-activity-header:hover .droid-activity-name {
+  color: rgba(255, 255, 255, 1);
+}
+
 .droid-activity-name {
-  display: block;
   font-size: 13px;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
-  margin-bottom: 4px;
+  transition: color 0.15s;
+}
+
+.droid-activity-count {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 1px 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.droid-activity-chevron {
+  color: rgba(255, 255, 255, 0.35);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.droid-activity-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.droid-activity-header:hover .droid-activity-chevron {
+  color: rgba(255, 255, 255, 0.6);
 }
 
 /* Remove default no-header indent inside droid block — avatar is external */
 .droid-activity-content .stream-message.no-header .assistant-text {
   margin-left: 0;
+}
+
+/* Compact tool spacing inside droid block — like main agent tool rows */
+.droid-activity-content > .stream-message {
+  margin-bottom: 2px;
+}
+
+.droid-activity-content > .stream-message:last-child {
+  margin-bottom: 0;
 }
 
 .assistant-avatar {

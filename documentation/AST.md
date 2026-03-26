@@ -302,8 +302,18 @@ Exported symbols per file. Generated 2026-03-13.
 ### components/btw/ (1 file)
 - `BTWDrawer` (`BTWDrawerProps`)
 
-### components/chat/ (2 files)
+### components/chat/ (5 files)
 - `EquipBar`, `EquipBarExample`
+
+### src/components/chat/HtmlVisualizer.tsx
+- `HtmlVisualizer` -- Sandboxed inline HTML renderer for interactive visualizations
+
+### src/components/chat/htmlVisualizerUtils.ts
+- `wrapHtmlForSandbox()` -- Wrap HTML with auto-resize script and dark base styles
+- `isCompleteHtmlDocument()` -- Detect if HTML string is a complete document
+
+### src/components/chat/CopyButton.tsx
+- `CopyButton` -- Reusable copy-to-clipboard button with visual feedback
 
 ### components/claude-assets/ (5 files)
 - `AssetCard`, `AssetPreviewModal`, `AssetsBrowser`, `ClaudeAssetsPanel`, `ProjectsList`

@@ -27,12 +27,25 @@ All tool widgets in Quack follow a consistent pattern for styling chat tool resu
 
 ## Tool-Specific Colors (getToolColor)
 
-- WebFetch/Search: #10b981 (green)
-- Brain tools: #E84A7F (rose)
-- Kanban: #06b6d4 (cyan)
-- Bash: #f59e0b (amber)
-- File ops: #3b82f6 (blue)
-- Edit/Write: #ec4899 (pink)
+MCP tools have distinctive colors; core SDK tools share unified green (#22c55e).
+
+| Category | Color | Hex |
+|----------|-------|-----|
+| MCP Brain | vibrant rose | #E84A7F |
+| MCP IDE | purple | #a855f7 |
+| MCP Code-intel | cyan | #06b6d4 |
+| MCP Visualizer | fuchsia | #d946ef |
+| MCP PostHog | pink/magenta | #ec4899 |
+| Other MCP | orange | #f97316 |
+| Skill | gold/amber | #fbbf24 |
+| Agent Teams (primitives) | lilac | #C084FC |
+| Agent Teams (messages) | cyan | #06B6D4 |
+| Agent Teams (tasks) | amber | #F59E0B |
+| Cron/automation | teal | #14b8a6 |
+| Worktree | green | #22c55e |
+| Core SDK tools | green | #22c55e |
+
+Each MCP category also has a distinctive SVG icon in `ToolIcon` (same file).
 
 ## Steps to Add New Widget
 

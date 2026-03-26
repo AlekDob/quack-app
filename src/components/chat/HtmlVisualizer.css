@@ -1,0 +1,116 @@
+/* === HTML VISUALIZER — Inline sandbox for AI-generated HTML === */
+
+.html-visualizer {
+  position: relative;
+  margin: 8px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(242, 140, 82, 0.3);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Toolbar */
+.html-viz-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.html-viz-label {
+  font-size: 11px;
+  color: #f28c52;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.html-viz-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.html-viz-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.html-viz-btn.active {
+  background: rgba(242, 140, 82, 0.15);
+  color: #f28c52;
+}
+
+/* Iframe container */
+.html-viz-iframe-container {
+  position: relative;
+  overflow: hidden;
+  transition: height 0.2s ease;
+}
+
+.html-viz-iframe {
+  width: 100%;
+  border: none;
+  display: block;
+  background: #1a1a2e;
+}
+
+/* Collapsed state */
+.html-viz-iframe-container.collapsed {
+  height: 0 !important;
+}
+
+/* Code fallback view */
+.html-viz-code-view {
+  max-height: 400px;
+  overflow: auto;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.html-viz-code-view pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* Loading skeleton */
+.html-viz-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  gap: 8px;
+}
+
+.html-viz-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(242, 140, 82, 0.2);
+  border-top-color: #f28c52;
+  border-radius: 50%;
+  animation: html-viz-spin 0.6s linear infinite;
+}
+
+@keyframes html-viz-spin {
+  to { transform: rotate(360deg); }
+}

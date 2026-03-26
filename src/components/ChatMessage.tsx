@@ -436,8 +436,24 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
           {!isUser && currentSessionId && (
             <SessionIdDisplay sessionId={currentSessionId} />
           )}
-          {isUser && (isLastUserMessage || isMessageTruncated) && (
-            <div className="sticky-message-actions">
+          {isUser && (
+            <div className="user-message-actions">
+              {/* Expand/collapse button — always visible on every user message */}
+              <button
+                className={`sticky-action-btn ${isExpanded ? 'active' : ''}`}
+                onClick={handleToggleExpand}
+                title={isExpanded ? "Collapse" : "Expand full message"}
+              >
+                {isExpanded ? (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="18 15 12 9 6 15"></polyline>
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                )}
+              </button>
               {/* Copy button only on last (sticky) user message */}
               {isLastUserMessage && (
                 <button
@@ -453,24 +469,6 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                  )}
-                </button>
-              )}
-              {/* Expand button on ALL truncated user messages */}
-              {isMessageTruncated && (
-                <button
-                  className="sticky-action-btn"
-                  onClick={handleToggleExpand}
-                  title={isExpanded ? "Collapse" : "Expand full message"}
-                >
-                  {isExpanded ? (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="18 15 12 9 6 15"></polyline>
-                    </svg>
-                  ) : (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                   )}
                 </button>
@@ -673,6 +671,33 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                   ? nestedEventIndices.get(g.eventIndex)
                   : g.items.reduce<string | undefined>((f, item) => f || nestedEventIndices.get(item.eventIndex), undefined);
 
+              // Extract subagent_type from agent-tool groups (for merging)
+              const getAgentToolDroidType = (g: typeof groups[0]): string | undefined => {
+                const evts = g.kind === 'single' ? [g.event] : g.items.map((i: any) => i.event);
+                for (const evt of evts) {
+                  for (const b of (evt.message?.content || [])) {
+                    if (b.type === 'tool_use') {
+                      const n = (b.name || '').toLowerCase();
+                      if (n === 'agent') return b.input?.subagent_type || 'agent';
+                      if (n === 'task' && b.input?.subagent_type) return b.input.subagent_type;
+                    }
+                  }
+                }
+                return undefined;
+              };
+
+              // Debug: log merge loop inputs (temporary — remove after fix verified)
+              if (process.env.NODE_ENV === 'development') {
+                console.debug('[DroidMerge] nestedEventIndices:', [...nestedEventIndices.entries()]);
+                console.debug('[DroidMerge] renderGroups droidTypes:', renderGroups.map((g, i) => ({
+                  i,
+                  droidType: getGroupDroidType(g),
+                  hasAgentTool: groupHasAgentTool(g),
+                  agentDroidType: getAgentToolDroidType(g),
+                  kind: g.kind,
+                })));
+              }
+
               const renderResult: React.ReactNode[] = [];
               let ri = 0;
               while (ri < renderGroups.length) {
@@ -680,16 +705,62 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 const droidType = getGroupDroidType(group);
 
                 if (droidType) {
-                  // Collect all consecutive groups from the same droid
-                  const droidRun: typeof groups = [];
+                  // Collect consecutive groups from same droid, absorbing agent results
+                  // and intermediate non-droid groups (lookahead up to 3) into one block
+                  // Brain: fix-droid-avatar-repeated
+                  const droidTools: typeof groups = [];
+                  const droidAgentResults: typeof groups = [];
+                  const droidIntermediate: typeof groups = []; // non-droid groups absorbed via lookahead
                   let rj = ri;
-                  while (rj < renderGroups.length && getGroupDroidType(renderGroups[rj]) === droidType) {
-                    droidRun.push(renderGroups[rj]);
-                    rj++;
+
+                  while (rj < renderGroups.length) {
+                    const g = renderGroups[rj];
+                    const gDroid = getGroupDroidType(g);
+
+                    if (gDroid === droidType) {
+                      droidTools.push(g);
+                      rj++;
+                    } else if (groupHasAgentTool(g) && getAgentToolDroidType(g) === droidType) {
+                      // Agent result for same droid — absorb into merged block
+                      droidAgentResults.push(g);
+                      rj++;
+                    } else if (!gDroid && !groupHasAgentTool(g)) {
+                      // Intermediate group (text, non-nested tool) — lookahead to check
+                      // if the same droid reappears within next 3 groups
+                      let hasMoreSameDroid = false;
+                      for (let rk = rj + 1; rk < renderGroups.length && rk <= rj + 3; rk++) {
+                        const gk = renderGroups[rk];
+                        const gkDroid = getGroupDroidType(gk);
+                        if (gkDroid === droidType ||
+                            (groupHasAgentTool(gk) && getAgentToolDroidType(gk) === droidType)) {
+                          hasMoreSameDroid = true;
+                          break;
+                        }
+                        if (gkDroid && gkDroid !== droidType) break;
+                      }
+                      if (hasMoreSameDroid) {
+                        droidIntermediate.push(g);
+                        rj++;
+                      } else {
+                        break;
+                      }
+                    } else {
+                      break;
+                    }
                   }
-                  const firstEventIndex = droidRun[0].kind === 'single'
-                    ? droidRun[0].eventIndex
-                    : droidRun[0].items[0].eventIndex;
+
+                  const firstEventIndex = droidTools[0].kind === 'single'
+                    ? droidTools[0].eventIndex
+                    : droidTools[0].items[0].eventIndex;
+
+                  const flattenGroups = (gs: typeof groups) =>
+                    gs.flatMap(g =>
+                      g.kind === 'single'
+                        ? [renderStreamMessage(g.event, g.eventIndex, false)]
+                        : g.items.map(({ event, eventIndex }) =>
+                            renderStreamMessage(event, eventIndex, false)
+                          )
+                    );
 
                   renderResult.push(
                     <DroidActivityBlock
@@ -697,17 +768,9 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                       droidType={droidType}
                       workingDirectory={workingDirectory}
                     >
-                      {droidRun.map(g =>
-                        g.kind === 'single'
-                          ? renderStreamMessage(g.event, g.eventIndex, false)
-                          : (
-                              <div className="tool-event-group-row" key={`droid-row-${g.items[0].eventIndex}`}>
-                                {g.items.map(({ event, eventIndex }) =>
-                                  renderStreamMessage(event, eventIndex, false)
-                                )}
-                              </div>
-                            )
-                      )}
+                      {flattenGroups(droidTools)}
+                      {flattenGroups(droidIntermediate)}
+                      {flattenGroups(droidAgentResults)}
                     </DroidActivityBlock>
                   );
                   ri = rj;
