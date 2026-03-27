@@ -1370,6 +1370,16 @@ function AppContent() {
       const sessionMessages = newSessions.get(messageKey) ?? [];
       const lastMsg = sessionMessages[sessionMessages.length - 1];
 
+      // 🦆 DIAGNOSTIC: Enrich the last ring buffer entry with actual state
+      {
+        const diag = eventDiagnosticsRef.current;
+        const last = diag[diag.length - 1];
+        if (last) {
+          last.evtCount = lastMsg?.events?.length ?? 0;
+          last.lastStatus = lastMsg?.status ?? 'none';
+        }
+      }
+
       // Check if we have a streaming message ready
       if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
         // 🦆 BUFFER FLUSH: First, check if there are buffered events to apply
@@ -2366,6 +2376,23 @@ function AppContent() {
       return;
     }
 
+    // 🦆 DIAGNOSTIC: Check if previous assistant message is incomplete (late-render bug)
+    {
+      const sessionMsgs = chatSessions.get(activeSessionId) ?? [];
+      const lastMsg = sessionMsgs[sessionMsgs.length - 1];
+      if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status !== 'complete') {
+        console.warn(
+          `[BUG:LATE_RENDER] Previous assistant message still "${lastMsg.status}" at send time!`,
+          `\n  session=${activeSessionId}`,
+          `\n  msgId=${lastMsg.id}`,
+          `\n  events=${lastMsg.events?.length ?? 0}`,
+          `\n  content=${lastMsg.content ? 'yes' : 'no'}`,
+          `\n  messageCount=${sessionMsgs.length}`,
+        );
+        console.warn('[BUG:LATE_RENDER] Event ring buffer:', JSON.parse(JSON.stringify(eventDiagnosticsRef.current)));
+      }
+    }
+
     // 🦆 RACE CONDITION FIX: Capture ALL state at the START of the function
     // User may switch sessions while this async function runs - we must use captured values
     const messageKey = activeSessionId;
@@ -2709,6 +2736,13 @@ function AppContent() {
         });
       sdkInvokePromise.catch(() => {}); // Suppress unhandled rejection when abort fires first
       const response = await Promise.race([sdkInvokePromise, abortPromise]);
+
+      // 🦆 DIAGNOSTIC: Log completion timing for late-render investigation
+      {
+        const diag = eventDiagnosticsRef.current;
+        diag.push({ t: Date.now(), key: messageKey, type: '_invoke_complete', evtCount: -1, lastStatus: response.result ? 'has_result' : 'no_result' });
+        if (diag.length > 50) diag.splice(0, diag.length - 50);
+      }
 
       // 🦆 SESSION-FIRST: Update message with final result using messageKey
       setChatSessions((prev) => {
