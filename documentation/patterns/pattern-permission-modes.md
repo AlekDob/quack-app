@@ -28,7 +28,7 @@ User selects mode in UI (footer dropdown or Shift+Tab)
   → auto-loads preset (model, thinking, effort) from settingsStore
   → on send: permissionMode passed to Rust backend
   → Rust maps to SDK value + adds flags (chatMode: true / debugMode: true)
-  → Node.js (stream-claude.js OR stream-daemon.js) reads flags
+  → Node.js (stream-daemon.js) reads flags
   → Appends mode-specific instructions to systemPrompt.append
   → SDK session receives enriched system prompt
 ```
@@ -58,7 +58,6 @@ Frontend  → Rust           → SDK/Daemon
 | Keyboard | `src/components/ChatView.tsx` | Shift+Tab cycle |
 | Auto-switch | `src/App.tsx` | Preset auto-apply on mode change |
 | Rust | `src-tauri/src/claude_cli.rs` | SDK mapping + mode flags |
-| Node (spawn) | `src-tauri/node-sdk/stream-claude.js` | System prompt injection |
 | Node (daemon) | `src-tauri/node-sdk/stream-daemon.js` | System prompt injection |
 | Skill (debug) | `src-tauri/node-sdk/skills/systematic-debugging.md` | Full debugging methodology |
 | Skill (chat) | `src-tauri/node-sdk/skills/chat-interaction.md` | Conversational interaction rules |
@@ -96,7 +95,7 @@ When `chatMode === true`, the Node.js layer injects the `chat-interaction` skill
 - Thinking: `auto`
 - Effort: `low`
 
-**Helper functions** (defined in both `stream-claude.js` and `stream-daemon.js`):
+**Helper functions** (defined in `stream-daemon.js`):
 - `loadBrainHints(projectCwd)` — returns array of `.md` file paths from `documentation/bugs/` and `gotchas/` (max 50, lightweight)
 - `loadGitContext(projectCwd)` — returns markdown block with recent git log + diff stat (3s timeout)
 
@@ -109,8 +108,8 @@ When `chatMode === true`, the Node.js layer injects the `chat-interaction` skill
 5. Add default preset in `settingsStore.ts` + bump persist version
 6. Add to Shift+Tab cycle in `ChatView.tsx`
 7. Add cast in `App.tsx` preset lookup
-8. Add SDK mapping in `claude_cli.rs` (BOTH daemon + SDK paths)
-9. Add system prompt in BOTH `stream-claude.js` AND `stream-daemon.js`
+8. Add SDK mapping in `claude_cli.rs`
+9. Add system prompt in `stream-daemon.js`
 10. Add mapping in `useClaudeChat.ts` direct SDK path (hook maps frontend value → SDK value)
 
 ### Migration

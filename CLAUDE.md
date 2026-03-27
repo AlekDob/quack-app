@@ -21,8 +21,8 @@ You evaluate tasks critically, assess feasibility and economic impact before act
 3. **Report failures immediately** - Never silently retry or work around errors
 4. **Respect architecture** - Before introducing new patterns or dependencies, surface the decision for review
 
-**Diary Author**: `Alek`
-*When writing diary entries, ALWAYS use `(Alek)` as the author — never use your agent name.*
+**Diary Author**: `Fredric`
+*When writing diary entries, ALWAYS use `(Fredric)` as the author — never use your agent name.*
 
 <!-- QUACK_AGENT_HEADER_END -->
 
@@ -70,7 +70,6 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Daemon providers: `documentation/bugs/bug-daemon-missing-provider-env-vars.md`
 - Daemon 1M context betas: `documentation/bugs/fix-daemon-missing-1m-context-betas.md`
 - Session limit prompt cache: `documentation/bugs/fix-session-limit-prompt-cache.md`
-- Daemon new config fields: `documentation/gotchas/gotcha-daemon-missing-new-config-fields.md`
 - Stamina overhead estimate: `documentation/gotchas/gotcha-stamina-overhead-static-estimate.md`
 - Mobile session dot: `documentation/gotchas/gotcha-mobile-session-dot-status.md`
 - Tauri Store .dat files: `documentation/gotchas/gotcha-tauri-store-dat-files-plain-json.md`
@@ -92,8 +91,8 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Empty state no drag region: `documentation/bugs/fix-empty-state-no-drag-region.md`
 - Git.rs English errors: `documentation/gotchas/gotcha-git-rs-error-messages-english.md`
 - Subagent tools invisible: `documentation/gotchas/gotcha-subagent-tools-invisible-to-parent.md`
-- stream-claude.js const prompt: `documentation/bugs/fix-stream-claude-const-prompt-reassignment.md`
 - AskUserQuestion/Plan hang: `documentation/bugs/fix-ask-user-question-stream-event-not-emitted.md`
+- Mention regex email false positive: `documentation/bugs/fix-mention-regex-email-false-positive.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

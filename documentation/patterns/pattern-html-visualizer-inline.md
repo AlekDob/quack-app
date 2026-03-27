@@ -78,7 +78,6 @@ The wrapped HTML is computed with `useMemo` keyed on the raw `html` prop. This p
 | `src/components/StreamMessage.tsx` | MCP tool_use detection + widget rendering |
 | `src-tauri/node-sdk/visualizer-mcp-server.js` | MCP server with `visualize_html` tool |
 | `src-tauri/node-sdk/stream-daemon.js` | Registers visualizer MCP server |
-| `src-tauri/node-sdk/stream-claude.js` | Registers visualizer MCP server (legacy) |
 
 ## Distinctive Tool Chip
 
@@ -90,4 +89,4 @@ The visualizer MCP tool has a distinctive appearance in the tool bar (System Ini
 
 ## Brain Breadcrumb
 
-`// Brain: quack-visualizer-inline-html` — placed in `MarkdownText.tsx`, `StreamMessage.tsx`, `stream-daemon.js`, `stream-claude.js`.
+`// Brain: quack-visualizer-inline-html` — placed in `MarkdownText.tsx`, `StreamMessage.tsx`, `stream-daemon.js`.

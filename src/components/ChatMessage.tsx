@@ -250,7 +250,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
     return content;
   };
 
-  // Strip <system-reminder> tags from user messages (IDE/git context injected by stream-claude.js)
+  // Strip <system-reminder> tags from user messages (IDE/git context injected by stream-daemon.js)
   // These are metadata for the model, not relevant for display
   const stripSystemReminder = (content: string): string => {
     if (!content.includes('<system-reminder')) return content;

@@ -48,6 +48,18 @@ impl MCPProcessManager {
             false
         }
     }
+
+    /// Kill all managed MCP server processes (called on app exit)
+    pub fn kill_all(&self) {
+        if let Ok(mut processes) = self.processes.lock() {
+            for (server_id, child) in processes.iter_mut() {
+                if let Err(e) = child.start_kill() {
+                    eprintln!("Failed to kill MCP process {}: {}", server_id, e);
+                }
+            }
+            processes.clear();
+        }
+    }
 }
 
 /// MCP Server configuration with support for multiple transport types

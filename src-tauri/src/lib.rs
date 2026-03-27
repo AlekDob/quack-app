@@ -1208,8 +1208,7 @@ pub fn run() {
             claude_cli::send_message_via_cli_streaming,
             claude_cli::send_message_via_sdk_streaming,
             claude_cli::abort_sdk_stream,         // 🛑 Stop button: kill Node.js process / abort daemon query
-            claude_cli::send_tool_result_to_sdk, // 🗣️ AskUserQuestion support (legacy)
-            claude_cli::answer_user_question,    // 🗣️ AskUserQuestion via stdin (daemon or legacy)
+            claude_cli::answer_user_question,    // 🗣️ AskUserQuestion via daemon stdin
             claude_cli::rewind_files,            // ⏪ File Checkpointing rewind (SDK 0.2.7+)
             claude_cli::restart_daemon,          // 🔄 Restart persistent daemon (dev/debug)
             claude_cli::reload_mcp_servers,      // 🔌 Hot-reload MCP server configuration
@@ -1359,6 +1358,13 @@ pub fn run() {
             // BTW side-chain query
             btw::btw_query,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Kill all orphaned MCP server processes on app exit
+                let mcp_manager: tauri::State<mcp::MCPProcessManager> = app_handle.state();
+                mcp_manager.kill_all();
+            }
+        });
 }

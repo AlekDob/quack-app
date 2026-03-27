@@ -81,7 +81,7 @@ export default function TokenUsageModal({
   onClear,
   onShowAnalytics,
   maxPlanStats,
-  model = 'Opus 4.5',
+  model = 'Opus 4.6',
   onExport,
   onLocalReset,
   compactFailed = false,

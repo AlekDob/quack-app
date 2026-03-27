@@ -5,7 +5,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{ChildStdin, Command};
 use tokio::sync::Mutex as TokioMutex;
 use once_cell::sync::Lazy;
-use std::sync::atomic::{AtomicBool, Ordering};
+// std::sync::atomic types used via full path (e.g., std::sync::atomic::AtomicBool)
 
 // Windows-specific helper to hide console windows
 #[cfg(target_os = "windows")]
@@ -113,13 +113,8 @@ fn sanitize_path_string_for_node(path: &str) -> String {
 }
 
 // =============================================================================
-// ACTIVE PROCESS MANAGEMENT (for bidirectional communication)
+// CHILD PROCESS MANAGEMENT (for abort/kill support)
 // =============================================================================
-
-/// Store active Node.js SDK processes with their stdin handles
-/// Key: agent_id, Value: ChildStdin handle
-static ACTIVE_PROCESSES: Lazy<TokioMutex<HashMap<String, ChildStdin>>> =
-    Lazy::new(|| TokioMutex::new(HashMap::new()));
 
 /// Store running child processes (stdin/stdout/stderr already taken) for abort/kill support
 /// Key: event_session_key, Value: Child handle
@@ -152,8 +147,6 @@ static DAEMON_QUERIES: Lazy<TokioMutex<HashMap<String, DaemonQueryState>>> =
 static DAEMON_QUERY_RESULTS: Lazy<TokioMutex<HashMap<String, ClaudeCliResponse>>> =
     Lazy::new(|| TokioMutex::new(HashMap::new()));
 
-/// Whether daemon mode is enabled (feature flag)
-static DAEMON_MODE_ENABLED: AtomicBool = AtomicBool::new(true);
 
 struct DaemonProcess {
     stdin: ChildStdin,
@@ -172,92 +165,22 @@ struct DaemonQueryState {
     waiting_for_user: Arc<std::sync::atomic::AtomicBool>,
 }
 
-/// Send a message to an active SDK process via stdin
-/// Send message to a running process via stdin
-/// 🦆 FIX: Now uses process_key (sessionKey) instead of agent_id to support concurrent sessions
-pub async fn send_to_process(process_key: &str, message: &str) -> Result<(), String> {
-    log::info!("[SDK] 📤 send_to_process called for process: {}", process_key);
-
-    let mut processes = ACTIVE_PROCESSES.lock().await;
-
-    // Log active process count for debugging
-    log::info!("[SDK] 📤 Active processes count: {}, looking for: {}", processes.len(), process_key);
-
-    if let Some(stdin) = processes.get_mut(process_key) {
-        let line = format!("{}\n", message);
-        log::info!("[SDK] 📤 Writing {} bytes to stdin...", line.len());
-
-        stdin.write_all(line.as_bytes()).await
-            .map_err(|e| {
-                log::error!("[SDK] ❌ Failed to write to process stdin: {}", e);
-                format!("Failed to write to process stdin: {}", e)
-            })?;
-
-        log::info!("[SDK] 📤 Flushing stdin...");
-        stdin.flush().await
-            .map_err(|e| {
-                log::error!("[SDK] ❌ Failed to flush process stdin: {}", e);
-                format!("Failed to flush process stdin: {}", e)
-            })?;
-
-        log::info!("[SDK] ✅ Sent message to process {}: {}...", process_key, &message[..std::cmp::min(100, message.len())]);
-        Ok(())
-    } else {
-        // Log all available process IDs for debugging
-        let available_ids: Vec<&String> = processes.keys().collect();
-        log::error!("[SDK] ❌ No active process found for process: {}. Available: {:?}", process_key, available_ids);
-        Err(format!("No active process found for process: {}. Available: {:?}", process_key, available_ids))
-    }
-}
-
-/// Register an active process stdin
-/// 🦆 FIX: Use process_key (sessionKey or agentId) to support multiple concurrent sessions per agent
-async fn register_process_stdin(process_key: String, stdin: ChildStdin) {
-    let mut processes = ACTIVE_PROCESSES.lock().await;
-    processes.insert(process_key.clone(), stdin);
-    log::info!("[SDK] 📝 Registered stdin for process: {}", process_key);
-}
-
-/// Unregister a process when it completes
-/// 🦆 FIX: Use process_key (sessionKey or agentId) to support multiple concurrent sessions per agent
-async fn unregister_process(process_key: &str) {
-    let mut processes = ACTIVE_PROCESSES.lock().await;
-    processes.remove(process_key);
-    log::info!("[SDK] 🗑️ Unregistered stdin for process: {}", process_key);
-}
-
-/// Abort a running SDK stream.
-/// In daemon mode: sends abort command (doesn't kill daemon).
-/// In legacy mode: kills the Node.js process.
+/// Abort a running SDK stream by sending an abort command to the daemon.
 #[tauri::command]
 pub async fn abort_sdk_stream(session_key: String) -> Result<(), String> {
-    // Try daemon mode first: find a query matching this session key
-    {
-        let queries = DAEMON_QUERIES.lock().await;
-        let matching_query = queries.iter()
-            .find(|(_, state)| state.session_key == session_key)
-            .map(|(qid, _)| qid.clone());
+    let queries = DAEMON_QUERIES.lock().await;
+    let matching_query = queries.iter()
+        .find(|(_, state)| state.session_key == session_key)
+        .map(|(qid, _)| qid.clone());
 
-        if let Some(query_id) = matching_query {
-            log::info!("[DAEMON:ABORT] Sending abort for daemon query={} session={}", query_id, session_key);
-            let cmd = serde_json::json!({"type": "abort", "queryId": query_id});
-            return send_to_daemon(&cmd.to_string()).await;
-        }
+    if let Some(query_id) = matching_query {
+        log::info!("[DAEMON:ABORT] Sending abort for daemon query={} session={}", query_id, session_key);
+        let cmd = serde_json::json!({"type": "abort", "queryId": query_id});
+        drop(queries);
+        return send_to_daemon(&cmd.to_string()).await;
     }
 
-    // Fall back to legacy kill
-    let child_opt = {
-        let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
-        procs.remove(&session_key)
-    };
-
-    if let Some(mut child) = child_opt {
-        child.kill().await
-            .map_err(|e| format!("Failed to kill Node.js process: {}", e))?;
-        log::info!("[SDK] 🛑 Killed Node.js process for session: {}", session_key);
-    } else {
-        log::warn!("[SDK] ⚠️ abort_sdk_stream: no running process or daemon query found for session: {}", session_key);
-    }
+    log::warn!("[SDK] ⚠️ abort_sdk_stream: no daemon query found for session: {}", session_key);
     Ok(())
 }
 
@@ -1964,8 +1887,7 @@ pub async fn send_message_via_cli_streaming(
 }
 
 /// Send a message to Claude via Node.js SDK with real-time streaming.
-/// Uses persistent daemon mode when enabled (default), falling back to
-/// per-process mode if daemon is unavailable.
+/// Uses the persistent daemon process for all queries.
 #[tauri::command]
 pub async fn send_message_via_sdk_streaming(
     app: AppHandle,
@@ -1977,11 +1899,10 @@ pub async fn send_message_via_sdk_streaming(
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis();
-    log::info!("[DAEMON:QUERY] send_message_via_sdk_streaming at {} (daemon_enabled={})", debug_timestamp,
-        DAEMON_MODE_ENABLED.load(Ordering::Relaxed));
+    log::info!("[DAEMON:QUERY] send_message_via_sdk_streaming at {}", debug_timestamp);
 
     // Brain: gotcha-mobile-session-dot-status
-    // Mark agent as busy immediately — before daemon/legacy even starts.
+    // Mark agent as busy immediately — before daemon even starts.
     // This ensures the REST API returns "busy" right away, covering the gap
     // between message sent and first "assistant" SDK event.
     if let Ok(mut map) = crate::AGENT_STATUS.write() {
@@ -1992,19 +1913,20 @@ pub async fn send_message_via_sdk_streaming(
         "id": agent_id, "status": "busy"
     }));
 
-    // Try daemon mode first
-    if DAEMON_MODE_ENABLED.load(Ordering::Relaxed) {
-        match send_message_via_daemon(&app, &agent_id, &request).await {
-            Ok(response) => return Ok(response),
-            Err(e) => {
-                log::warn!("[DAEMON:FALLBACK] Daemon mode failed: {} — falling back to legacy per-process mode", e);
-                // Fall through to legacy mode
+    // Send via daemon. On daemon lifecycle errors, restart once and retry.
+    match send_message_via_daemon(&app, &agent_id, &request).await {
+        Ok(response) => Ok(response),
+        Err(e) if e.contains("daemon") || e.contains("Daemon") || e.contains("stdin") || e.contains("crashed") || e.contains("dropped") => {
+            log::warn!("[DAEMON:RETRY] Daemon error, restarting daemon and retrying: {}", e);
+            // Clear stale daemon state so ensure_daemon() spawns fresh
+            {
+                let mut daemon = DAEMON_PROCESS.lock().await;
+                *daemon = None;
             }
+            send_message_via_daemon(&app, &agent_id, &request).await
         }
+        Err(e) => Err(e),
     }
-
-    // Legacy per-process mode (fallback)
-    send_message_via_sdk_streaming_legacy(app, agent_id, request).await
 }
 
 /// Send message via the persistent daemon process
@@ -2164,850 +2086,7 @@ async fn send_message_via_daemon(
     }
 }
 
-/// Legacy: Send a message to Claude via Node.js SDK with per-process spawning
-async fn send_message_via_sdk_streaming_legacy(
-    app: AppHandle,
-    agent_id: String,
-    request: ClaudeCliRequest,
-) -> Result<ClaudeCliResponse, String> {
-    log::info!("[SDK LEGACY] Using per-process mode for agent_id={}", agent_id);
-    
-    let ClaudeCliRequest {
-        prompt,
-        model,
-        thinking_mode,
-        permission_mode,
-        agents,
-        cwd,
-        attachments,
-        session_id, // ✅ Extract session_id for use in session management
-        output_format, // ✅ Extract output_format for structured outputs
-        effort, // ✅ Extract effort parameter (SDK 0.1.54+)
-        setting_sources, // ✅ Extract setting_sources to control prompt length
-        allowed_tools, // 🗣️ Extract allowed_tools for AskUserQuestion etc.
-        session_key, // 🦆 SESSION-FIRST: Frontend session key for event routing
-        team_context, // 🦆 Agent Teams context
-        provider, // 🦆 LLM Provider (anthropic/ollama/custom)
-        provider_base_url,
-        provider_api_key,
-        ide_context, // 🖥️ IDE context (injected into system prompt by Node.js)
-    } = request;
-
-    // 🦆 SESSION-FIRST: Use session_key - WARN if missing (potential bug)
-    let event_session_key = match &session_key {
-        Some(key) => key.clone(),
-        None => {
-            log::warn!("⚠️ [SDK] session_key missing in request! Using agent_id as fallback. This may cause session mixing.");
-            agent_id.clone()
-        }
-    };
-
-    // Use provided cwd or fallback to current directory
-    // Sanitize to strip \\?\ prefix that breaks Node.js on Windows (EISDIR lstat 'C:' bug)
-    let working_dir = cwd.or_else(|| {
-        std::env::current_dir()
-            .ok()
-            .and_then(|p| p.to_str().map(|s| s.to_string()))
-    }).map(|p| sanitize_path_string_for_node(&p));
-
-    // 🦆 SESSIONS-FIRST: Use ONLY the session_id from request
-    // DO NOT fallback to agent_id - each AgentSession must have its own Claude session
-    // If session_id is None, Claude SDK will create a NEW session
-    let current_session_id = session_id.clone();
-
-    if let Some(ref sid) = current_session_id {
-        log::info!("[SDK] 🦆 SESSIONS-FIRST: Resuming existing Claude session: {}", sid);
-    } else {
-        log::info!("[SDK] 🦆 SESSIONS-FIRST: Creating NEW Claude session (no session_id provided)");
-    }
-
-    // Build config JSON for Node.js script
-    // Note: permissionMode mapping for Agent SDK:
-    // - undefined (not set) = auto-approve (our "act" mode)
-    // - "plan" = planning only
-    // - "bypassPermissions" = no confirmations (our "bypass" mode)
-
-    // DEBUG: Log the received permission_mode
-    log::info!("[SDK DEBUG] Received permission_mode from frontend: {:?}", permission_mode);
-
-    let permission_value = permission_mode.as_ref().and_then(|mode| match mode.as_str() {
-        "bypass" => {
-            log::info!("[SDK DEBUG] Mapping 'bypass' -> 'bypassPermissions'");
-            Some(serde_json::Value::String("bypassPermissions".to_string()))
-        }
-        "plan" => {
-            log::info!("[SDK DEBUG] Mapping 'plan' -> 'plan'");
-            Some(serde_json::Value::String("plan".to_string()))
-        }
-        "debug" => {
-            log::info!("[SDK DEBUG] Mapping 'debug' -> 'bypassPermissions' (with debug system prompt)");
-            Some(serde_json::Value::String("bypassPermissions".to_string()))
-        }
-        "chat" => {
-            log::info!("[SDK DEBUG] Mapping 'chat' -> 'default' (ask before acting)");
-            Some(serde_json::Value::String("default".to_string()))
-        }
-        "act" => {
-            log::info!("[SDK DEBUG] Mapping 'act' -> undefined (omitting permissionMode)");
-            None // undefined = auto-approve in SDK
-        }
-        _ => {
-            log::warn!("[SDK DEBUG] Unknown permission mode '{}', defaulting to auto-approve (omitting permissionMode)", mode);
-            None // fallback to auto-approve
-        }
-    });
-
-    let mut config = serde_json::json!({
-        "prompt": prompt,
-        "model": model.unwrap_or_else(|| DEFAULT_MODEL.to_string()),
-        "thinkingMode": thinking_mode,
-        "cwd": working_dir,
-        "sessionId": current_session_id, // Pass session ID for resume
-    });
-
-    // Add permissionMode only if explicitly set (not "act")
-    if let Some(perm) = permission_value {
-        log::info!("[SDK DEBUG] Adding permissionMode to config: {:?}", perm);
-        config["permissionMode"] = perm;
-    } else {
-        log::info!("[SDK DEBUG] Omitting permissionMode from config (will use SDK default: auto-approve)");
-    }
-
-    // Add debugMode flag when permission_mode is "debug"
-    // This tells stream-claude.js to append debug system prompt instructions
-    if permission_mode.as_deref() == Some("debug") {
-        config["debugMode"] = serde_json::Value::Bool(true);
-        log::info!("[SDK DEBUG] Debug mode enabled - adding debugMode flag to config");
-    }
-
-    // Add chatMode flag when permission_mode is "chat"
-    // This tells stream-claude.js to append chat interaction instructions
-    if permission_mode.as_deref() == Some("chat") {
-        config["chatMode"] = serde_json::Value::Bool(true);
-        log::info!("[SDK DEBUG] Chat mode enabled - adding chatMode flag to config");
-    }
-
-    // DEBUG: Log final config
-    log::info!("[SDK DEBUG] Final config JSON: {}", config.to_string());
-
-    // Add agents if provided
-    if let Some(agent_list) = agents {
-        config["agents"] = serde_json::json!(agent_list);
-    }
-
-    // Add teamContext if provided (Agent Teams mode)
-    if let Some(tc) = &team_context {
-        config["teamContext"] = serde_json::json!(tc);
-        log::info!("[SDK] Adding teamContext: team={}, {} members", tc.team_name, tc.members.len());
-    }
-
-    // Add IDE context if provided (injected into system prompt by Node.js)
-    if let Some(ref ide_ctx) = ide_context {
-        config["ideContext"] = serde_json::Value::String(ide_ctx.clone());
-    }
-
-    // Add attachments if provided (for image support)
-    if let Some(attachment_list) = attachments {
-        config["attachments"] = serde_json::json!(attachment_list);
-        log::info!("[SDK DEBUG] Adding {} attachments to config", attachment_list.len());
-    }
-
-    // Add outputFormat if provided (for structured outputs)
-    if let Some(output_fmt) = output_format {
-        config["outputFormat"] = output_fmt;
-        log::info!("[SDK DEBUG] Adding outputFormat to config for structured outputs");
-    }
-
-    // Add effort parameter if provided (SDK 0.1.54+)
-    // Controls quality vs speed/cost tradeoff: 'low', 'medium', 'high'
-    if let Some(effort_level) = effort {
-        config["effort"] = serde_json::Value::String(effort_level.clone());
-        log::info!("[SDK DEBUG] Adding effort parameter to config: {}", effort_level);
-    }
-
-    // Add settingSources if provided (to control prompt length)
-    // Default (if not provided): ['project'] only
-    // To disable all automatic loading: pass empty array []
-    // Full context: ['project', 'user', 'local']
-    if let Some(sources) = setting_sources {
-        config["settingSources"] = serde_json::Value::Array(
-            sources.iter().map(|s| serde_json::Value::String(s.clone())).collect()
-        );
-        log::info!("[SDK DEBUG] Adding settingSources to config: {:?}", sources);
-    } else {
-        log::info!("[SDK DEBUG] Using default settingSources: ['project']");
-    }
-
-    // 🗣️ Add allowedTools if provided (SDK v0.1.57+)
-    // This enables specific tools like AskUserQuestion
-    if let Some(tools) = allowed_tools {
-        config["allowedTools"] = serde_json::Value::Array(
-            tools.iter().map(|t| serde_json::Value::String(t.clone())).collect()
-        );
-        log::info!("[SDK DEBUG] Adding allowedTools to config: {:?}", tools);
-    }
-
-    let config_str = config.to_string();
-
-    // Get path to Node.js script (production resource dir + dev fallback)
-    let script_path = get_sdk_script_path(&app)?;
-    log::info!("[SDK DEBUG] Resolved script path: {:?}", script_path);
-
-    // Get the node-sdk directory (parent of the script) for node_modules resolution
-    let node_sdk_dir = script_path.parent()
-        .ok_or("Failed to get node-sdk directory".to_string())?
-        .to_path_buf();
-
-    // Determine Node.js executable path
-    // Strategy:
-    // 1. In production mode: Try bundled sidecar first, then fallback to system Node.js
-    // 2. In development mode: Use system Node.js directly
-    log::info!("[SDK] Looking for Node.js executable...");
-
-    let is_production = !cfg!(debug_assertions);
-    let target_arch = if cfg!(target_arch = "aarch64") {
-        "aarch64"
-    } else if cfg!(target_arch = "x86_64") {
-        "x86_64"
-    } else {
-        "unknown"
-    };
-
-    log::info!("[SDK] Mode: {}, Architecture: {}",
-        if is_production { "production" } else { "development" },
-        target_arch
-    );
-
-    let node_path = if is_production {
-        // Production mode: Try bundled sidecar first
-        // Note: Tauri places sidecar binaries in Contents/MacOS/ with the base name only
-        let sidecar_name = "node-sidecar";
-
-        log::info!("[SDK] Looking for sidecar binary: {}", sidecar_name);
-
-        // Strategy 1: Try using app.path().resolve_resource
-        // Tauri should automatically find the sidecar in Contents/MacOS/
-        let sidecar_path = app.path().resolve(
-            sidecar_name,
-            tauri::path::BaseDirectory::Resource
-        ).ok().or_else(|| {
-            // Strategy 2: Manual path construction
-            // Try to locate the app bundle and construct the path manually
-            if let Ok(exe_path) = std::env::current_exe() {
-                // exe_path is: /path/to/Quack.app/Contents/MacOS/Quack
-                if let Some(macos_dir) = exe_path.parent() {
-                    let manual_path = macos_dir.join(sidecar_name);
-                    log::info!("[SDK] Trying manual sidecar path: {:?}", manual_path);
-                    if manual_path.exists() {
-                        return Some(manual_path);
-                    }
-                }
-            }
-            None
-        });
-
-        match sidecar_path {
-            Some(path) if path.exists() => {
-                log::info!("[SDK] ✅ Found bundled Node.js sidecar at: {:?}", path);
-                Some(path)
-            }
-            Some(path) => {
-                log::warn!("[SDK] ⚠️ Sidecar path resolved but file does not exist: {:?}", path);
-                log::warn!("[SDK] Falling back to system Node.js...");
-                find_system_node_executable()
-            }
-            None => {
-                log::warn!("[SDK] ⚠️ Failed to resolve sidecar path");
-                log::warn!("[SDK] Falling back to system Node.js...");
-                find_system_node_executable()
-            }
-        }
-    } else {
-        // Development mode: Use system Node.js directly (faster iteration)
-        log::info!("[SDK] Development mode - using system Node.js");
-        find_system_node_executable()
-    };
-
-    let node_path = node_path
-        .ok_or_else(|| {
-            log::error!("[SDK] ❌ Node.js executable not found!");
-            log::error!("[SDK] Production mode: {}", is_production);
-            log::error!("[SDK] Target architecture: {}", target_arch);
-            if is_production {
-                format!("Node.js {} or later is required but was not found. Please install it from https://nodejs.org (LTS recommended) and restart Quack.", MIN_NODE_VERSION)
-            } else {
-                format!("Node.js {} or later is required but was not found. Please install it or ensure it's in your PATH.", MIN_NODE_VERSION)
-            }
-        })?;
-
-    log::info!("[SDK] Using Node.js at: {:?}", node_path);
-
-    // Determine if we're using the bundled sidecar or system Node.js
-    let using_sidecar = node_path.to_string_lossy().contains("node-sidecar");
-
-    // Create the command with the resolved Node.js path
-    let mut command = Command::new(&node_path);
-
-    // Brain: sdk-requires-node22-disposable
-    // For Node < 22, inject CJS polyfill via --require BEFORE ESM loads.
-    // This ensures Symbol.dispose is defined before the SDK captures it at module level.
-    let node_major = get_node_major_version(&node_path).unwrap_or(0);
-    if node_major > 0 && node_major < 22 {
-        let polyfill_path = node_sdk_dir.join("disposable-polyfill.cjs");
-        if polyfill_path.exists() {
-            log::info!("[SDK] Node v{} < 22 — injecting --require {:?}", node_major, polyfill_path);
-            command.arg("--require").arg(&polyfill_path);
-        } else {
-            log::warn!("[SDK] ⚠️ Node v{} < 22 but polyfill not found at {:?}", node_major, polyfill_path);
-        }
-    } else {
-        log::info!("[SDK] Node v{} >= 22 — Symbol.dispose is native, no polyfill needed", node_major);
-    }
-
-    command
-        .arg(&script_path)
-        .arg(&config_str)
-        .current_dir(&node_sdk_dir)
-        .stdin(Stdio::piped())   // Enable stdin for bidirectional communication (AskUserQuestion)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    // ✅ ENVIRONMENT ISOLATION: When using bundled sidecar, remove NVM/Volta variables
-    // that could interfere with the bundled Node.js runtime
-    if using_sidecar {
-        log::info!("[SDK] 🔒 Using bundled sidecar - isolating NVM/Volta environment variables");
-
-        // Remove NVM-specific variables that could cause conflicts
-        command.env_remove("NVM_DIR");
-        command.env_remove("NVM_BIN");
-        command.env_remove("NVM_INC");
-        command.env_remove("NVM_CD_FLAGS");
-        command.env_remove("NVM_RC_VERSION");
-
-        // Remove Volta-specific variables
-        command.env_remove("VOLTA_HOME");
-
-        // Remove Node.js module resolution variables that could interfere
-        command.env_remove("NODE_PATH");
-
-        // Set a clean PATH that doesn't include NVM/Volta bin directories
-        if let Ok(current_path) = std::env::var("PATH") {
-            let path_separator = if cfg!(target_os = "windows") { ";" } else { ":" };
-            let clean_path: Vec<&str> = current_path
-                .split(path_separator)
-                .filter(|p| {
-                    !p.contains(".nvm/") && !p.contains(".nvm\\") &&
-                    !p.contains(".volta/") && !p.contains(".volta\\") &&
-                    !p.contains("nvm/versions/") && !p.contains("nvm\\versions\\")
-                })
-                .collect();
-            let new_path = clean_path.join(path_separator);
-            log::info!("[SDK] 🧹 Cleaned PATH (removed NVM/Volta): {} entries", clean_path.len());
-            command.env("PATH", new_path);
-        }
-    }
-
-    // 🦆 LLM Provider-based authentication
-    let active_provider = provider.as_deref().unwrap_or("anthropic");
-
-    match active_provider {
-        "ollama" => {
-            let base_url = provider_base_url.as_deref().unwrap_or("http://localhost:11434");
-            command.env("ANTHROPIC_BASE_URL", base_url);
-            command.env("ANTHROPIC_API_KEY", "ollama");
-            command.env("ANTHROPIC_AUTH_TOKEN", "ollama");
-            log::info!("[SDK] 🦙 Provider: Ollama at {}", base_url);
-        }
-        "custom" => {
-            if let Some(ref url) = provider_base_url {
-                command.env("ANTHROPIC_BASE_URL", url);
-                log::info!("[SDK] 🔧 Provider: Custom at {}", url);
-            }
-            if let Some(ref key) = provider_api_key {
-                command.env("ANTHROPIC_API_KEY", key);
-            }
-        }
-        _ => {
-            // Anthropic: original credential resolution logic
-            use crate::claude_auth;
-
-            let has_env_key = std::env::var("ANTHROPIC_API_KEY").is_ok();
-
-            if has_env_key {
-                log::info!("[SDK] ✅ ANTHROPIC_API_KEY found in environment, using it");
-                if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
-                    command.env("ANTHROPIC_API_KEY", key);
-                }
-            } else {
-                match claude_auth::get_claude_credentials() {
-                    Ok(Some(credentials)) => {
-                        log::info!("[SDK] ✅ Found Claude Code credentials (type: {:?})", credentials.auth_type);
-                        match credentials.auth_type {
-                            crate::claude_auth::AuthType::ApiKey => {
-                                log::info!("[SDK] Setting ANTHROPIC_API_KEY from credentials file");
-                                command.env("ANTHROPIC_API_KEY", &credentials.token);
-                            }
-                            crate::claude_auth::AuthType::OAuth => {
-                                log::info!("[SDK] OAuth detected - SDK will use ~/.claude.json automatically");
-                            }
-                        }
-                    }
-                    Ok(None) => {
-                        log::warn!("[SDK] ⚠️ No Claude Code credentials found");
-                    }
-                    Err(e) => {
-                        log::warn!("[SDK] ⚠️ Failed to read Claude Code credentials: {}", e);
-                    }
-                }
-            }
-        }
-    }
-
-    // Propagate cloud provider env vars (Bedrock, Vertex, AWS) from login shell
-    // Brain: fix-bedrock-env-vars-gui-launch
-    propagate_cloud_env(&mut command);
-
-    // Add node directory to PATH for SDK child processes (if using system Node.js)
-    if !node_path.to_string_lossy().contains("node-sidecar") {
-        if let Some(node_dir) = node_path.parent() {
-            let current_path = std::env::var("PATH").unwrap_or_default();
-            let node_dir_str = node_dir.to_string_lossy();
-            let path_separator = if cfg!(target_os = "windows") { ";" } else { ":" };
-            let new_path = if current_path.is_empty() {
-                node_dir_str.to_string()
-            } else {
-                format!("{}{}{}", node_dir_str, path_separator, current_path)
-            };
-            log::info!("[SDK DEBUG] Setting PATH with node directory: {}", new_path);
-            command.env("PATH", new_path);
-        }
-    }
-
-    // Set CLAUDE_CODE_TASK_LIST_ID for Tasks persistence across sessions
-    if let Some(ref sid) = session_id {
-        let task_list_id = format!("quack-{}", sid);
-        log::info!("[SDK] Setting CLAUDE_CODE_TASK_LIST_ID: {}", task_list_id);
-        command.env("CLAUDE_CODE_TASK_LIST_ID", &task_list_id);
-    }
-
-    // Always propagate Agent Teams env var so TeammateTool is available in SDK
-    // The user enables this via Settings toggle → stored in ~/.claude/settings.json
-    // Without this, F8() in the SDK returns false and TeammateTool is not registered
-    command.env("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", "1");
-    log::info!("[SDK] Agent Teams mode enabled via env var");
-
-    log::info!("[SDK DEBUG] Spawning Node.js process with script: {:?}", script_path);
-    log::info!("[SDK DEBUG] Working directory: {:?}", node_sdk_dir);
-
-    // Windows: Hide console window
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    let mut child = command
-        .spawn()
-        .map_err(|e| {
-            log::error!("[SDK DEBUG] Failed to spawn Node.js process: {}", e);
-            format!("Failed to spawn Node.js SDK script: {}", e)
-        })?;
-
-    log::info!("[SDK DEBUG] Node.js process spawned successfully");
-
-    // Take stdin for bidirectional communication (AskUserQuestion)
-    // 🦆 FIX: Use event_session_key instead of agent_id to support multiple concurrent sessions
-    if let Some(stdin) = child.stdin.take() {
-        register_process_stdin(event_session_key.clone(), stdin).await;
-    }
-
-    // Read stdout for events (in foreground to stream in real-time)
-    let stdout = child.stdout.take()
-        .ok_or("Failed to capture stdout".to_string())?;
-    let mut stdout_reader = BufReader::new(stdout).lines();
-
-    // Capture stderr for logging (Node.js SDK uses stderr for debug/info messages
-    // since stdout is reserved for JSON data in stdio MCP transport)
-    let stderr_handle = if let Some(stderr) = child.stderr.take() {
-        Some(tokio::spawn(async move {
-            let mut stderr_reader = BufReader::new(stderr).lines();
-            let mut stderr_lines: Vec<String> = Vec::with_capacity(200);
-            while let Ok(Some(line)) = stderr_reader.next_line().await {
-                // Classify log level based on content
-                let line_upper = line.to_uppercase();
-                if line_upper.contains("[DEBUG]") || line_upper.contains("[MCP]") || line_upper.contains("[AUTH]") || line_upper.contains("[IDE-MCP]") {
-                    log::debug!("[Node.js SDK] {}", line);
-                } else if line_upper.contains("[ERROR]") || line_upper.contains("ERROR:") || line_upper.contains("FATAL") {
-                    log::error!("[Node.js SDK] {}", line);
-                } else if line_upper.contains("⚠") || line_upper.contains("[WARN]") || line_upper.contains("WARNING") {
-                    log::warn!("[Node.js SDK] {}", line);
-                } else {
-                    log::info!("[Node.js SDK] {}", line);
-                }
-                stderr_lines.push(line);
-                if stderr_lines.len() > 200 {
-                    stderr_lines.remove(0);
-                }
-            }
-            stderr_lines
-        }))
-    } else {
-        None
-    };
-
-    // Store child in running processes map for abort support
-    // All I/O handles (stdin/stdout/stderr) are already taken above
-    {
-        let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
-        procs.insert(event_session_key.clone(), child);
-    }
-
-    // Track final response
-    let mut final_result: Option<ClaudeCliResponse> = None;
-
-    // Stream stdout events in real-time (foreground task)
-    while let Ok(Some(line)) = stdout_reader.next_line().await {
-        // Parse JSON event
-        match serde_json::from_str::<ClaudeEvent>(&line) {
-            Ok(event) => {
-                // Log event type for debugging
-                match &event {
-                    ClaudeEvent::System { session_id, .. } => {
-                        // 🦆 SESSIONS-FIRST: Log session ID, but DON'T store in global state
-                        // The frontend stores claudeSessionId in each AgentSession
-                        log::info!("[SDK] 🦆 Claude session ID: {} (frontend will store in AgentSession)", session_id);
-                        // DEPRECATED: session_state.set_session(agent_id.clone(), session_id.clone());
-                    }
-                    ClaudeEvent::Assistant { message, .. } => {
-                        // Brain: gotcha-mobile-session-dot-status
-                        if let Ok(mut map) = crate::AGENT_STATUS.write() {
-                            map.insert(agent_id.clone(), "busy".to_string());
-                        }
-                        let _ = app.emit("external-terminal-status", serde_json::json!({
-                            "id": agent_id, "status": "busy"
-                        }));
-                        // Log content blocks for debugging Task tool detection
-                        log::info!("[SDK] 📝 Assistant event with {} content blocks", message.content.len());
-                        for (idx, block) in message.content.iter().enumerate() {
-                            match block {
-                                ContentBlock::Text { text } => {
-                                    log::info!("[SDK]   Block {}: Text ({}...)", idx, &text[..std::cmp::min(50, text.len())]);
-                                }
-                                ContentBlock::ToolUse { name, input, .. } => {
-                                    // Check for Task tool specifically
-                                    if name.to_lowercase() == "task" {
-                                        log::info!("[SDK]   Block {}: 🎯 Task TOOL_USE - subagent: {:?}", idx, input.get("subagent_type"));
-                                    } else {
-                                        log::info!("[SDK]   Block {}: ToolUse({})", idx, name);
-                                    }
-                                }
-                                ContentBlock::Thinking { thinking } => {
-                                    log::info!("[SDK]   Block {}: Thinking ({}...)", idx, &thinking[..std::cmp::min(50, thinking.len())]);
-                                }
-                                ContentBlock::Other(val) => {
-                                    log::info!("[SDK]   Block {}: Other - type={:?}", idx, val.get("type"));
-                                }
-                            }
-                        }
-                    }
-                    ClaudeEvent::Agent { action, agent_name, agent_type, .. } => {
-                        log::info!("[SDK] 🤖 Agent event: action={:?}, name={:?}, type={:?}",
-                            action, agent_name, agent_type);
-                    }
-                    ClaudeEvent::Complete { .. } => {
-                        log::info!("[SDK] ✅ Stream complete event received");
-                    }
-                    ClaudeEvent::AskUserQuestion { request_id, questions, .. } => {
-                        log::info!("[SDK] 🗣️ AskUserQuestion event: requestId={}, {} questions, sessionKey={}", request_id, questions.len(), event_session_key);
-                        // Emit ask_user_question event to frontend using BOTH:
-                        // 1. Agent-specific event (for backwards compatibility)
-                        // 2. Global event (more reliable, frontend filters by agentId)
-                        // 🦆 FIX: Include sessionKey so frontend can track pending questions per session
-                        let ask_event_name = format!("ask-user-question:{}", agent_id);
-                        let payload = serde_json::json!({
-                            "requestId": request_id,
-                            "questions": questions,
-                            "agentId": agent_id,
-                            "sessionKey": event_session_key
-                        });
-
-                        // Emit to agent-specific listener
-                        match app.emit(&ask_event_name, payload.clone()) {
-                            Ok(_) => {
-                                log::info!("[SDK] 🗣️ Emitted ask-user-question event to frontend (agent-specific: {})", agent_id);
-                            }
-                            Err(e) => {
-                                log::error!("[SDK] ❌ Failed to emit ask-user-question event (agent-specific): {:?}", e);
-                            }
-                        }
-
-                        // Also emit to global listener (more reliable fallback)
-                        match app.emit("ask-user-question", payload) {
-                            Ok(_) => {
-                                log::info!("[SDK] 🗣️ Emitted ask-user-question event to frontend (global)");
-                            }
-                            Err(e) => {
-                                log::error!("[SDK] ❌ Failed to emit ask-user-question event (global): {:?}", e);
-                            }
-                        }
-                    }
-                    ClaudeEvent::PlanApprovalRequest { request_id, plan, .. } => {
-                        log::info!("[SDK] 📋 PlanApprovalRequest event: requestId={}, sessionKey={}", request_id, event_session_key);
-
-                        let payload = serde_json::json!({
-                            "requestId": request_id,
-                            "plan": plan,
-                            "agentId": agent_id,
-                            "sessionKey": event_session_key
-                        });
-
-                        // Emit to global listener
-                        match app.emit("plan-approval-request", payload) {
-                            Ok(_) => {
-                                log::info!("[SDK] 📋 Emitted plan-approval-request event to frontend");
-                            }
-                            Err(e) => {
-                                log::error!("[SDK] ❌ Failed to emit plan-approval-request event: {:?}", e);
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-
-                // Emit event to frontend immediately
-                let event_name = format!("claude-event:{}", agent_id);
-
-                // Debug: Log before emitting to verify Task events are sent
-                if let ClaudeEvent::Assistant { message, .. } = &event {
-                    for block in &message.content {
-                        if let ContentBlock::ToolUse { name, .. } = block {
-                            if name.to_lowercase() == "task" {
-                                log::info!("[SDK] 🚀 EMITTING Task tool event to frontend: {}", event_name);
-                            }
-                        }
-                    }
-                }
-
-
-                // 🦆 SESSION-FIRST: Wrap event with session_key for proper routing
-                let wrapped_event = serde_json::json!({
-                    "sessionKey": event_session_key,
-                    "event": &event
-                });
-
-                match app.emit(&event_name, &wrapped_event) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        log::error!("[SDK] ❌ EMIT FAILED: {:?}", e);
-                    }
-                }
-
-                // Check if this is the final result
-                if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, model_usage, .. } = &event {
-                    // Brain: gotcha-mobile-session-dot-status
-                    if let Ok(mut map) = crate::AGENT_STATUS.write() {
-                        map.insert(agent_id.clone(), "idle".to_string());
-                    }
-                    let _ = app.emit("external-terminal-status", serde_json::json!({
-                        "id": agent_id, "status": "idle"
-                    }));
-                    log::info!("[SDK] 🦆 RESULT EVENT - input_tokens: {}, output_tokens: {}, cache_read: {}, cache_creation: {}, total_cost: {}, modelUsage: {:?}",
-                        usage.input_tokens, usage.output_tokens, usage.cache_read_input_tokens, usage.cache_creation_input_tokens, total_cost_usd, model_usage);
-
-                    // Pass usage as-is to frontend. The frontend calculates context fill as:
-                    // contextWindowFill = input_tokens + cache_read + cache_creation
-                    // This accounts for prompt caching where input_tokens is only non-cached portion.
-                    final_result = Some(ClaudeCliResponse {
-                        result: result.clone(),
-                        session_id: session_id.clone(),
-                        total_cost_usd: *total_cost_usd,
-                        usage: usage.clone(),
-                    });
-                }
-            }
-            Err(e) => {
-                // Try to parse as raw JSON to forward unknown events
-                if let Ok(raw_value) = serde_json::from_str::<serde_json::Value>(&line) {
-                    log::warn!("[SDK] ⚠️ Unknown event type, forwarding raw: {:?}", raw_value.get("type"));
-                    // 🦆 SESSION-FIRST: Wrap raw event with session_key
-                    let wrapped_event = serde_json::json!({
-                        "sessionKey": event_session_key,
-                        "event": &raw_value
-                    });
-                    let event_name = format!("claude-event:{}", agent_id);
-                    let _ = app.emit(&event_name, &wrapped_event);
-                } else {
-                    log::error!("[SDK] ❌ Failed to parse event: {} - Line: {}", e, &line[..std::cmp::min(200, line.len())]);
-                }
-            }
-        }
-    }
-
-    // Take child back from running processes map (may be None if abort_sdk_stream already removed and killed it)
-    let child_for_wait = {
-        let mut procs = RUNNING_CHILD_PROCESSES.lock().await;
-        procs.remove(&event_session_key)
-    };
-
-    let status = match child_for_wait {
-        Some(mut c) => c.wait().await
-            .map_err(|e| format!("Failed to wait for Node.js process: {}", e))?,
-        None => {
-            // Child was already removed and killed by abort_sdk_stream
-            log::info!("[SDK] Process was aborted for session: {}", event_session_key);
-            unregister_process(&event_session_key).await;
-            return Err("Cancelled by user".to_string());
-        }
-    };
-
-    // Cleanup: unregister the process stdin
-    // 🦆 FIX: Use event_session_key instead of agent_id to match registration
-    unregister_process(&event_session_key).await;
-
-    // Collect stderr if available
-    let stderr_output = if let Some(handle) = stderr_handle {
-        handle.await.unwrap_or_default()
-    } else {
-        Vec::new()
-    };
-
-    // Check if process was terminated by signal (SIGTERM = 15, SIGINT = 2)
-    // These are intentional cancellations, not errors
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::ExitStatusExt;
-        if let Some(signal) = status.signal() {
-            if signal == 15 || signal == 2 {
-                // SIGTERM or SIGINT - user cancelled, not an error
-                log::info!("[SDK] Process was cancelled by user (signal {})", signal);
-                return final_result.ok_or_else(|| "Cancelled by user".to_string());
-            }
-        }
-    }
-
-    if !status.success() {
-        // Try to extract a clean error message from stderr JSON objects
-        // The SDK often outputs {"type":"error","error":"..."} with the actual user-facing message
-        let clean_error = stderr_output.iter()
-            .filter_map(|line| {
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(line) {
-                    // Only extract from objects with "type": "error" to avoid false matches
-                    if val.get("type").and_then(|t| t.as_str()) == Some("error") {
-                        val.get("error").and_then(|e| e.as_str()).map(|s| s.to_string())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .last();
-
-        if let Some(error_msg) = clean_error {
-            return Err(error_msg);
-        }
-
-        // Fallback: only include [ERROR]/[WARN] lines (filter out [DEBUG], env vars, MCP configs)
-        // This prevents leaking sensitive env vars and connection strings to the UI
-        let filtered: Vec<&str> = stderr_output.iter()
-            .map(|s| s.as_str())
-            .filter(|line| line.contains("[ERROR]") || line.contains("[WARN]"))
-            .collect();
-
-        let stderr_text = if !filtered.is_empty() {
-            let joined = filtered.join("\n");
-            let truncated: String = if joined.len() > 500 { joined.chars().take(500).collect() } else { joined };
-            format!("\n\n{}", truncated)
-        } else {
-            String::new()
-        };
-
-        return Err(format!(
-            "Node.js SDK script failed with status: {}{}",
-            status,
-            stderr_text
-        ));
-    }
-
-    // Return final response
-    final_result.ok_or_else(|| {
-        "No result event found in Node.js SDK output".to_string()
-    })
-}
-
-/// Send a tool result back to the Claude SDK for interactive tools like AskUserQuestion
-/// This creates a new SDK call with the tool result to continue the conversation
-#[tauri::command]
-pub async fn send_tool_result_to_sdk(
-    app: AppHandle,
-    session_id: String,
-    tool_use_id: String,
-    result: String,
-    working_directory: Option<String>,
-) -> Result<(), String> {
-    log::info!("[SDK] 🗣️ Sending tool result for tool_use_id: {}", tool_use_id);
-
-    // Get the Node.js script path
-    let script_path = get_sdk_script_path(&app)?;
-
-    // Sanitize working directory for Node.js (strip \\?\ prefix on Windows)
-    let working_directory = working_directory.map(|p| sanitize_path_string_for_node(&p));
-
-    // Build the tool result config
-    let config = serde_json::json!({
-        "toolResult": {
-            "type": "tool_result",
-            "tool_use_id": tool_use_id,
-            "content": result,
-        },
-        "sessionId": session_id,
-        "cwd": working_directory,
-    });
-
-    let config_json = serde_json::to_string(&config)
-        .map_err(|e| format!("Failed to serialize tool result config: {}", e))?;
-
-    log::info!("[SDK] 🗣️ Tool result config: {}", config_json);
-
-    // Spawn Node.js process to send the tool result (use same node resolution as main flow)
-    let node_path = get_bundled_node_path(&app)?;
-
-    let mut command = Command::new(&node_path);
-    command
-        .arg(&script_path)
-        .arg("--tool-result")
-        .arg(&config_json)
-        .current_dir(working_directory.as_deref().unwrap_or("."))
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    // Windows: Hide console window
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
-
-    let child = command.spawn()
-        .map_err(|e| format!("Failed to spawn Node.js for tool result: {}", e))?;
-
-    let output = child.wait_with_output().await
-        .map_err(|e| format!("Failed to wait for tool result process: {}", e))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        log::error!("[SDK] Tool result failed: {}", stderr);
-        return Err(format!("Tool result failed: {}", stderr));
-    }
-
-    log::info!("[SDK] 🗣️ Tool result sent successfully");
-    Ok(())
-}
-
-/// Send answers to an AskUserQuestion request via stdin.
-/// Routes through daemon if in daemon mode, otherwise uses legacy per-process stdin.
+/// Send answers to an AskUserQuestion request via daemon stdin.
 #[tauri::command]
 pub async fn answer_user_question(
     agent_id: String,  // Actually the processKey (sessionKey or agentId)
@@ -3016,61 +2095,40 @@ pub async fn answer_user_question(
 ) -> Result<(), String> {
     log::info!("[DAEMON:INTERACT] answer_user_question process={} requestId={}", agent_id, request_id);
 
-    // Brain: fix-ask-user-question-stream-event-not-emitted
-    // Try daemon mode first, BUT only if daemon has a matching active query.
-    // When daemon query fails and falls back to legacy per-process mode,
-    // the query runs in the legacy process but the daemon process still exists.
-    // Without this check, answers would go to the daemon (which has no matching
-    // pendingRequest) and get silently lost.
-    if DAEMON_MODE_ENABLED.load(Ordering::Relaxed) {
-        let daemon_guard = DAEMON_PROCESS.lock().await;
-        let daemon_running = daemon_guard.is_some();
-        drop(daemon_guard);
+    // Verify daemon has a matching active query for this agent/session
+    let has_matching_query = {
+        let queries = DAEMON_QUERIES.lock().await;
+        queries.values().any(|state| {
+            state.session_key == agent_id || state.agent_id == agent_id
+        })
+    };
 
-        if daemon_running {
-            // Check if daemon actually has an active query for this agent/session
-            let has_matching_query = {
-                let queries = DAEMON_QUERIES.lock().await;
-                queries.values().any(|state| {
-                    state.session_key == agent_id || state.agent_id == agent_id
-                })
-            };
+    if !has_matching_query {
+        return Err(format!(
+            "No active daemon query found for process={}. The query may have already completed.",
+            agent_id
+        ));
+    }
 
-            if has_matching_query {
-                log::info!("[DAEMON:INTERACT] Routing answer via daemon for requestId={} (matching query found)", request_id);
+    log::info!("[DAEMON:INTERACT] Routing answer via daemon for requestId={} (matching query found)", request_id);
 
-                // Resume the query timeout now that user has responded
-                {
-                    let queries = DAEMON_QUERIES.lock().await;
-                    for state in queries.values() {
-                        if state.session_key == agent_id || state.agent_id == agent_id {
-                            state.waiting_for_user.store(false, std::sync::atomic::Ordering::Relaxed);
-                            break;
-                        }
-                    }
-                }
-
-                let cmd = serde_json::json!({
-                    "type": "response",
-                    "requestId": request_id,
-                    "answers": answers,
-                });
-                return send_to_daemon(&cmd.to_string()).await;
-            } else {
-                log::warn!("[DAEMON:INTERACT] Daemon running but NO matching query for process={} — falling back to legacy", agent_id);
+    // Resume the query timeout now that user has responded
+    {
+        let queries = DAEMON_QUERIES.lock().await;
+        for state in queries.values() {
+            if state.session_key == agent_id || state.agent_id == agent_id {
+                state.waiting_for_user.store(false, std::sync::atomic::Ordering::Relaxed);
+                break;
             }
         }
     }
 
-    // Legacy mode: send to per-process stdin
-    log::info!("[DAEMON:FALLBACK] Routing answer via legacy process for requestId={}", request_id);
-    let response = serde_json::json!({
+    let cmd = serde_json::json!({
+        "type": "response",
         "requestId": request_id,
         "answers": answers,
     });
-    let message = serde_json::to_string(&response)
-        .map_err(|e| format!("Failed to serialize answer: {}", e))?;
-    send_to_process(&agent_id, &message).await
+    send_to_daemon(&cmd.to_string()).await
 }
 
 /// Helper to resolve a node-sdk script path (resource dir → dev fallback)
@@ -3093,11 +2151,6 @@ fn get_node_sdk_script(app: &AppHandle, script_name: &str) -> Result<PathBuf, St
     }
 
     Err(format!("Could not find {} in resource dir or dev path", script_name))
-}
-
-/// Helper to get the SDK script path
-fn get_sdk_script_path(app: &AppHandle) -> Result<PathBuf, String> {
-    get_node_sdk_script(app, "stream-claude.js")
 }
 
 /// Helper to get the rewind-files script path

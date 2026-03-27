@@ -346,7 +346,7 @@ export async function* streamClaudeMessage(
     }
 
     // TEMPORARY: Throw error instead of calling SDK directly
-    // TODO: Refactor to use Tauri backend (stream-claude.js) instead
+    // TODO: Refactor to use Tauri backend (stream-daemon.js) instead
     throw new Error('Claude SDK should be called via Tauri backend, not directly from frontend');
 
     /*
@@ -718,32 +718,6 @@ export function abortAllStreams(): void {
  */
 export function getActiveStreamCount(): number {
   return activeStreams.size;
-}
-
-/**
- * Send a tool result back to the Claude SDK for an active session
- * Used for interactive tools like AskUserQuestion (legacy approach)
- */
-export async function sendToolResult(
-  sessionId: string,
-  toolUseId: string,
-  result: string,
-  workingDirectory?: string
-): Promise<void> {
-  console.log('[claudeSDK] 🗣️ Sending tool result:', { sessionId, toolUseId, resultLength: result.length });
-
-  try {
-    await invoke('send_tool_result_to_sdk', {
-      sessionId,
-      toolUseId,
-      result,
-      workingDirectory: workingDirectory || process.cwd?.() || '.',
-    });
-    console.log('[claudeSDK] 🗣️ Tool result sent successfully');
-  } catch (err) {
-    console.error('[claudeSDK] Failed to send tool result:', err);
-    throw err;
-  }
 }
 
 /**
