@@ -13,17 +13,24 @@ export function getActiveModelName(fallback?: string): string {
 }
 
 /** Get provider fields for SDK invoke calls */
+// Brain: fix-bedrock-model-override
 export function getProviderRequestFields(remoteModels?: ModelConfig[], modelOverride?: string) {
-  const { provider, providerBaseUrl, providerApiKey, ollamaModel } = useSettingsStore.getState().claude;
+  const { provider, providerBaseUrl, providerApiKey, ollamaModel, bedrockModelOverride } = useSettingsStore.getState().claude;
   const isAnthropic = provider === 'anthropic';
 
   return {
     provider: isAnthropic ? undefined : provider,
     providerBaseUrl: !isAnthropic && providerBaseUrl ? providerBaseUrl : undefined,
     providerApiKey: provider === 'custom' && providerApiKey ? providerApiKey : undefined,
-    /** Resolve model: Anthropic uses Supabase mapping, others use ollamaModel */
+    /** Resolve model: Bedrock override > Anthropic Supabase mapping > Ollama/custom */
     resolveModel: (friendlyName: string) => {
       if (!isAnthropic) return modelOverride || ollamaModel || friendlyName;
+      // Bedrock model override: when set, bypass Supabase model ID resolution
+      // Users paste their Bedrock ARN or model ID (e.g. us.anthropic.claude-sonnet-4-5-20250929-v1:0)
+      if (bedrockModelOverride?.trim()) {
+        console.log(`[getProviderRequestFields] Bedrock model override active: "${bedrockModelOverride}"`);
+        return bedrockModelOverride.trim();
+      }
       return getModelId(friendlyName, remoteModels);
     },
   };

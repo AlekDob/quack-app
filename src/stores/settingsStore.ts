@@ -31,6 +31,9 @@ interface ClaudeSettings {
   ollamaModel: string;      // Model name for Ollama/custom (e.g., 'qwen3-coder')
   // BTW Side-Chain Chat settings
   btwModel: string;         // Model for BTW quick queries (default: haiku45)
+  // Bedrock/Vertex model override — when set, bypasses normal model resolution
+  // Brain: fix-bedrock-model-override
+  bedrockModelOverride: string;  // Full Bedrock ARN or model ID (e.g. us.anthropic.claude-sonnet-4-5-20250929-v1:0)
 }
 
 interface TerminalSettings {
@@ -150,6 +153,7 @@ const defaultClaudeSettings: ClaudeSettings = {
   providerApiKey: '',
   ollamaModel: '',
   btwModel: 'haiku45', // BTW Side-Chain: fast & cheap by default
+  bedrockModelOverride: '', // Empty = use normal model resolution
 };
 
 // Anthropic recommended defaults for agent modes

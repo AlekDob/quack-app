@@ -1115,13 +1115,21 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             </div>
           )}
 
-          {/* Error display */}
+          {/* Error display — Brain: fix-bedrock-model-override */}
           {message.error && (
             <div className="result-error-inline">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
                 <path d="M4.47.22A.75.75 0 015 0h6a.75.75 0 01.53.22l4.25 4.25c.141.14.22.331.22.53v6a.75.75 0 01-.22.53l-4.25 4.25A.75.75 0 0111 16H5a.75.75 0 01-.53-.22L.22 11.53A.75.75 0 010 11V5a.75.75 0 01.22-.53L4.47.22z"/>
               </svg>
-              {message.error}
+              <div>
+                {message.error}
+                {message.error.includes('model identifier is invalid') && (
+                  <div style={{ marginTop: 6, fontSize: 11, opacity: 0.85, lineHeight: 1.5 }}>
+                    <strong>Tip:</strong> This model may not be available on your cloud provider (Bedrock/Vertex).
+                    Go to Settings → Cloud Provider → Model Override and paste your provider-specific model ID or ARN.
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

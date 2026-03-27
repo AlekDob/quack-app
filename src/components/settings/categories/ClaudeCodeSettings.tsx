@@ -19,7 +19,7 @@ export default function ClaudeCodeSettings() {
   const [loading, setLoading] = useState(true);
 
   // LLM Provider state
-  const { provider, providerBaseUrl, providerApiKey, ollamaModel, btwModel } = useSettingsStore(s => s.claude);
+  const { provider, providerBaseUrl, providerApiKey, ollamaModel, btwModel, bedrockModelOverride } = useSettingsStore(s => s.claude);
   const updateClaude = useSettingsStore(s => s.updateClaudeSettings);
   const [ollamaOnline, setOllamaOnline] = useState<boolean | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
@@ -333,19 +333,63 @@ export default function ClaudeCodeSettings() {
             />
           }
         />
+        {/* Brain: fix-bedrock-model-override */}
         {bedrockEnabled && (
-          <div style={{
-            display: 'flex', alignItems: 'flex-start', gap: 8,
-            padding: '8px 12px', margin: '4px 12px 12px', borderRadius: 8,
-            backgroundColor: 'rgba(0, 217, 255, 0.06)',
-            border: '1px solid rgba(0, 217, 255, 0.12)',
-          }}>
-            <span style={{ fontSize: 13, lineHeight: '18px', flexShrink: 0, opacity: 0.7 }}>&#x2139;</span>
-            <span style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, opacity: 0.8 }}>
-              Requires valid AWS credentials (AWS_PROFILE, AWS_REGION, etc.) configured in your shell.
-              Restart active sessions for changes to take effect.
-            </span>
-          </div>
+          <>
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              padding: '8px 12px', margin: '4px 12px 0', borderRadius: 8,
+              backgroundColor: 'rgba(0, 217, 255, 0.06)',
+              border: '1px solid rgba(0, 217, 255, 0.12)',
+            }}>
+              <span style={{ fontSize: 13, lineHeight: '18px', flexShrink: 0, opacity: 0.7 }}>&#x2139;</span>
+              <span style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, opacity: 0.8 }}>
+                Requires valid AWS credentials (AWS_PROFILE, AWS_REGION, etc.) configured in your shell.
+                Restart active sessions for changes to take effect.
+              </span>
+            </div>
+            <SettingsRow
+              label="Model Override"
+              description="Override the model sent to Bedrock. Paste a Bedrock model ID or full ARN. Leave empty to use the default model selection."
+              control={
+                <input
+                  className="settings-input"
+                  type="text"
+                  value={bedrockModelOverride}
+                  onChange={(e) => updateClaude({ bedrockModelOverride: e.target.value })}
+                  placeholder="e.g. us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+                  style={{ fontSize: 11 }}
+                />
+              }
+            />
+            {bedrockModelOverride?.trim() && (
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 8,
+                padding: '8px 12px', margin: '0 12px 12px', borderRadius: 8,
+                backgroundColor: 'rgba(0, 217, 255, 0.06)',
+                border: '1px solid rgba(0, 217, 255, 0.12)',
+              }}>
+                <span style={{ fontSize: 13, lineHeight: '18px', flexShrink: 0, opacity: 0.7 }}>&#x2713;</span>
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, opacity: 0.8 }}>
+                  All agents will use <code style={{ fontSize: 10, backgroundColor: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: 3 }}>{bedrockModelOverride.trim()}</code> regardless of model selection.
+                </span>
+              </div>
+            )}
+            {!bedrockModelOverride?.trim() && (
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 8,
+                padding: '8px 12px', margin: '0 12px 12px', borderRadius: 8,
+                backgroundColor: 'rgba(242, 140, 82, 0.06)',
+                border: '1px solid rgba(242, 140, 82, 0.12)',
+              }}>
+                <span style={{ fontSize: 13, lineHeight: '18px', flexShrink: 0, opacity: 0.7 }}>&#x26A0;</span>
+                <span style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, opacity: 0.8 }}>
+                  Some models (e.g. Opus 4.6, Sonnet 4.6) may not be available on Bedrock yet.
+                  If you get "model identifier is invalid", paste the correct Bedrock model ID above.
+                </span>
+              </div>
+            )}
+          </>
         )}
       </div>
 

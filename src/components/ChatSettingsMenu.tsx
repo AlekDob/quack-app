@@ -48,7 +48,7 @@ export default function ChatSettingsMenu({
 }: ChatSettingsMenuProps) {
   const { models: remoteModels, loading: modelsLoading } = useModelsConfig();
   const modelOptions = getModelOptions(remoteModels);
-  const { provider, providerBaseUrl, ollamaModel } = useSettingsStore(s => s.claude);
+  const { provider, providerBaseUrl, ollamaModel, bedrockModelOverride } = useSettingsStore(s => s.claude);
   const updateClaude = useSettingsStore(s => s.updateClaudeSettings);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -110,8 +110,19 @@ export default function ChatSettingsMenu({
   const is1MEnabled = model.endsWith('[1m]');
   const supports1M = baseModel === 'sonnet46';
 
+  // Brain: fix-bedrock-model-override
+  const hasBedrockOverride = !!bedrockModelOverride?.trim();
+
   const getModelLabelText = () => {
     if (provider !== 'anthropic') return ollamaModel || provider;
+    // When Bedrock override is active, show the override model ID (truncated)
+    if (hasBedrockOverride) {
+      const override = bedrockModelOverride.trim();
+      // Extract model name from ARN if possible (last segment after /)
+      const arnParts = override.split('/');
+      const shortName = arnParts.length > 1 ? arnParts[arnParts.length - 1] : override;
+      return shortName.length > 30 ? `${shortName.substring(0, 27)}...` : shortName;
+    }
     const label = getModelLabel(baseModel, remoteModels);
     return is1MEnabled ? `${label} (1M)` : label;
   };
@@ -222,7 +233,19 @@ export default function ChatSettingsMenu({
           {/* Model dropdown - adapts to provider */}
           <div className="chat-settings-section">
             <label className="chat-settings-label">
-              <span className="chat-settings-label-text">Model</span>
+              <span className="chat-settings-label-text">
+                Model
+                {hasBedrockOverride && (
+                  <span style={{
+                    marginLeft: 6, fontSize: 9, fontWeight: 700,
+                    padding: '1px 5px', borderRadius: 3,
+                    backgroundColor: 'rgba(255, 153, 0, 0.15)',
+                    color: '#ff9900', letterSpacing: '0.04em',
+                  }}>
+                    BEDROCK
+                  </span>
+                )}
+              </span>
               {provider === 'anthropic' ? (
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <select
@@ -233,7 +256,8 @@ export default function ChatSettingsMenu({
                       onModelChange(is1MEnabled && new1MSupported ? `${newBase}[1m]` : newBase);
                     }}
                     className="chat-settings-select"
-                    style={{ flex: 1 }}
+                    style={{ flex: 1, opacity: hasBedrockOverride ? 0.5 : 1 }}
+                    title={hasBedrockOverride ? 'Model overridden by Bedrock settings' : undefined}
                   >
                     {modelOptions.map((option) => (
                       <option key={option.value} value={option.value}>
