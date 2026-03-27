@@ -29,6 +29,20 @@ const AUTO_RESIZE_SCRIPT = `
       if (now - lastSent > 500) { lastSent = now; sendHeight(); }
     }).observe(document.body);
   }
+  // Brain: fix-anchor-navigation-sandboxed-iframe
+  // WHY: In sandboxed srcdoc iframes, <a href="#id"> navigates away from
+  // the srcdoc content (shows Quack splash instead). Intercept all anchor
+  // clicks and use scrollIntoView for smooth in-page navigation.
+  document.addEventListener('click', function(e) {
+    var link = e.target.closest('a[href^="#"]');
+    if (!link) return;
+    e.preventDefault();
+    var targetId = link.getAttribute('href').slice(1);
+    var target = document.getElementById(targetId);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
   window.addEventListener('load', sendHeight);
   // Fallback for scripts that render after load
   setTimeout(sendHeight, 1000);

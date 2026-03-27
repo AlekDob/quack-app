@@ -93,6 +93,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Subagent tools invisible: `documentation/gotchas/gotcha-subagent-tools-invisible-to-parent.md`
 - AskUserQuestion/Plan hang: `documentation/bugs/fix-ask-user-question-stream-event-not-emitted.md`
 - Mention regex email false positive: `documentation/bugs/fix-mention-regex-email-false-positive.md`
+- Anchor nav sandboxed iframe: `documentation/gotchas/gotcha-anchor-navigation-sandboxed-iframe.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

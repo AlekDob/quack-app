@@ -2,7 +2,7 @@
 type: pattern
 project: quack-app
 created: 2026-03-24
-last_verified: 2026-03-24
+last_verified: 2026-03-27
 tags: [visualizer, iframe, sandbox, html, inline-rendering]
 ---
 
@@ -39,19 +39,26 @@ This works with any LLM provider (not just Anthropic) and as a fallback when the
 
 ## Sandbox Strategy
 
-The iframe uses `sandbox="allow-scripts"` **without** `allow-same-origin`. In practice, **JavaScript execution is blocked** by the sandboxed environment. All visualizations must use **pure HTML + CSS + inline SVG** — no Chart.js, D3, or any JS library.
+The iframe uses `sandbox="allow-scripts"` **without** `allow-same-origin`.
 
+- **JavaScript works**: `allow-scripts` enables JS execution. The auto-resize script, anchor interception, and inline JS all run correctly. Agents can use JS for interactive features (scroll, tabs, animations).
 - The iframe cannot access the parent document's DOM, cookies, or storage.
 - The iframe cannot make same-origin requests to the host application.
-- Scripts do NOT execute reliably — the MCP tool description explicitly instructs agents to avoid JS.
+- External library loading (CDN) is blocked — use inline JS only.
 
-## Auto-Resize via postMessage
+## Injected Scripts (AUTO_RESIZE_SCRIPT)
 
-The wrapped HTML (via `wrapHtmlForSandbox()`) injects a ResizeObserver script that posts height changes to the parent window:
+The `wrapHtmlForSandbox()` function injects a `<script>` block that handles two concerns:
 
-1. `wrapHtmlForSandbox()` appends a `<script>` before `</body>` (using `lastIndexOf` for correct injection point).
-2. The script observes `document.body` with a `ResizeObserver` and sends `{ type: 'resize', height }` via `postMessage`.
-3. `HtmlVisualizer.tsx` listens for `message` events and verifies `event.source === iframeRef.current.contentWindow` before accepting the height — this prevents spoofed messages from other iframes or windows.
+### 1. Auto-Resize via postMessage
+
+1. Appends script before `</body>` (using `lastIndexOf` for correct injection point).
+2. Observes `document.body` with `ResizeObserver` and sends `{ type: 'quack-viz-resize', height }` via `postMessage`.
+3. `HtmlVisualizer.tsx` verifies `event.source === iframeRef.current.contentWindow` before accepting — prevents spoofed messages.
+
+### 2. Anchor Click Interception
+
+`<a href="#id">` links in a sandboxed srcdoc iframe navigate away from the content (showing the Quack splash page). The injected script intercepts all anchor clicks and uses `scrollIntoView({ behavior: 'smooth' })` instead. See `gotcha-anchor-navigation-sandboxed-iframe.md`.
 
 ## useMemo for srcDoc Stability
 
@@ -62,8 +69,8 @@ The wrapped HTML is computed with `useMemo` keyed on the raw `html` prop. This p
 - **isLoaded state resets on html change**: when the `html` prop changes, `isLoaded` is reset to `false` to show a loading state while the new content renders.
 - **React key collision fix**: each `HtmlVisualizer` instance uses a stable key derived from content to avoid React reconciliation issues when multiple visualizers appear in the same message.
 - **Black base styles**: `wrapHtmlForSandbox()` injects minimal black-theme CSS (`#000` background, light text) so visualizations blend with Quack's UI by default. Font sizes default to 13px body text.
-- **Max height 2000px**: the iframe auto-resizes up to 2000px, allowing full-height dashboards without clipping.
-- **No JS rule**: the MCP tool description explicitly tells agents to use only HTML+CSS+SVG, no JavaScript.
+- **Default height 650px**: `DEFAULT_HEIGHT = 650` in `HtmlVisualizer.tsx`. The iframe starts at this height and auto-resizes up to `MAX_HEIGHT` (2000px).
+- **JS is supported**: `sandbox="allow-scripts"` enables inline JS. Agents can use JS for interactivity (tabs, scroll, animations). External CDN scripts are blocked.
 - **CopyButton extracted**: the copy-to-clipboard button was extracted as a reusable `CopyButton` component for use in other contexts beyond the visualizer.
 
 ## Files

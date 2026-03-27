@@ -9,7 +9,7 @@ import './HtmlVisualizer.css';
 
 // === CONSTANTS ===
 
-const DEFAULT_HEIGHT = 300;
+const DEFAULT_HEIGHT = 650;
 const MAX_HEIGHT = 2000;
 const MIN_HEIGHT = 60;
 
