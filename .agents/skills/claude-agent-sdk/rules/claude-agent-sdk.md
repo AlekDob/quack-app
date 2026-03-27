@@ -4,7 +4,7 @@ paths: "**/*agent*.ts", "**/*.ts"
 
 # Claude Agent SDK Corrections
 
-This uses **@anthropic-ai/claude-agent-sdk v0.1.50**.
+This uses **@anthropic-ai/claude-agent-sdk v0.2.85**.
 
 ## MCP Tool Naming Convention
 

@@ -1,7 +1,7 @@
 ---
 name: claude-agent-sdk
 description: |
-  Build autonomous AI agents with Claude Agent SDK v0.2.47. Structured outputs, 14 hook events (incl. TeammateIdle/TaskCompleted), MCP tool annotations, Task System, prompt suggestions. Prevents 14 documented errors.
+  Build autonomous AI agents with Claude Agent SDK v0.2.85. Structured outputs, 14 hook events (incl. TeammateIdle/TaskCompleted), MCP tool annotations, Task System, prompt suggestions, taskBudget, reloadPlugins, agentProgressSummaries. Prevents 14 documented errors.
 
   Use when: building coding agents, SRE systems, security auditors, or troubleshooting CLI not found, structured output validation, session forking errors, MCP config issues, subagent cleanup, task system setup.
 user-invocable: true
@@ -9,7 +9,7 @@ user-invocable: true
 
 # Claude Agent SDK - Complete Reference & Error Prevention Guide
 
-**Package**: @anthropic-ai/claude-agent-sdk@0.2.47
+**Package**: @anthropic-ai/claude-agent-sdk@0.2.85
 **Breaking Changes**: v0.1.45 - Structured outputs (Nov 2025), v0.1.0 - No default system prompt, settingSources required
 
 ---
