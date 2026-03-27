@@ -30,18 +30,30 @@ const AUTO_RESIZE_SCRIPT = `
     }).observe(document.body);
   }
   // Brain: fix-anchor-navigation-sandboxed-iframe
-  // WHY: In sandboxed srcdoc iframes, <a href="#id"> navigates away from
-  // the srcdoc content (shows Quack splash instead). Intercept all anchor
-  // clicks and use scrollIntoView for smooth in-page navigation.
+  // WHY: In Tauri WebView srcdoc iframes, <a href="#id"> resolves to
+  // tauri://localhost/#id instead of scrolling in-place. This crashes the
+  // iframe by loading the full app. Three-layer defense:
+  // 1. Capture-phase listener fires BEFORE browser default navigation
+  // 2. Both preventDefault AND stopImmediatePropagation to kill the event
+  // 3. Strip href from all anchor links as CSS-only fallback
   document.addEventListener('click', function(e) {
     var link = e.target.closest('a[href^="#"]');
     if (!link) return;
     e.preventDefault();
+    e.stopImmediatePropagation();
     var targetId = link.getAttribute('href').slice(1);
     var target = document.getElementById(targetId);
     if (target) {
       target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+    return false;
+  }, true);
+  // Layer 3: strip href from anchor-only links so browser can't navigate even without JS
+  document.querySelectorAll('a[href^="#"]').forEach(function(a) {
+    var id = a.getAttribute('href').slice(1);
+    a.removeAttribute('href');
+    a.style.cursor = 'pointer';
+    a.dataset.scrollTo = id;
   });
   window.addEventListener('load', sendHeight);
   // Fallback for scripts that render after load
