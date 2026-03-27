@@ -1016,6 +1016,13 @@ function AppContent() {
   // the event arrives before React's setState has created the streaming message
   const eventBufferRef = useRef<Map<string, ClaudeEvent[]>>(new Map());
 
+  // 🦆 DIAGNOSTIC: Ring buffer to capture event flow for intermittent late-render bug.
+  // Near-zero overhead: just pushes small objects to a capped array.
+  // Dumped to console only when anomaly is detected at send time.
+  const eventDiagnosticsRef = useRef<Array<{
+    t: number; key: string; type: string; evtCount: number; lastStatus: string;
+  }>>([]);
+
 
   // 🦆 SESSION-FIRST: Map agentId → active sessionId/messageKey
   // When streaming, events come with agentId but we need to write to the correct sessionId
@@ -1261,6 +1268,8 @@ function AppContent() {
         // Preserve countTokens data
         promptTokens: currentTokens.promptTokens,
         measuredOverhead,
+        // Preserve contextWindow from previous result event so stamina bar stays visible between turns
+        contextWindow: currentTokens.contextWindow,
       };
 
       newMap.set(agentId, updatedTokens);
@@ -1346,6 +1355,13 @@ function AppContent() {
           teamState.updateTeammateStatus(agentEvt.agent_name, 'stopped', agentEvt.session_id);
         }
       }
+    }
+
+    // 🦆 DIAGNOSTIC: Record event arrival for late-render bug investigation
+    {
+      const diag = eventDiagnosticsRef.current;
+      diag.push({ t: Date.now(), key: messageKey, type: claudeEvent.type, evtCount: -1, lastStatus: '' });
+      if (diag.length > 50) diag.splice(0, diag.length - 50);
     }
 
     // Update chat session with incoming events using messageKey
@@ -3406,6 +3422,8 @@ function AppContent() {
           cacheCreationTokens: current.cacheCreationTokens + (response.usage?.cache_creation_input_tokens || 0),
           cacheReadTokens: current.cacheReadTokens + (response.usage?.cache_read_input_tokens || 0),
           totalCost: current.totalCost + response.total_cost_usd,
+          // Preserve contextWindow so stamina bar stays visible between turns
+          contextWindow: current.contextWindow,
         });
         return newMap;
       });
@@ -3684,6 +3702,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           cacheCreationTokens: 0,
           cacheReadTokens: 0,
           totalCost: currentTokens?.totalCost || 0, // Preserve cumulative cost
+          contextWindow: currentTokens?.contextWindow, // Preserve so stamina bar stays visible
         });
         return newMap;
       });
@@ -3836,6 +3855,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           cacheCreationTokens: 0,
           cacheReadTokens: 0,
           totalCost: currentTokens?.totalCost || 0, // Preserve cumulative cost
+          contextWindow: currentTokens?.contextWindow, // Preserve so stamina bar stays visible
         });
         return newMap;
       });
