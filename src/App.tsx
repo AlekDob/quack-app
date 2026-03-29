@@ -2603,10 +2603,6 @@ function AppContent() {
     // 🦆 SESSION-FIRST: Clear previous response text for this session (new conversation turn)
     lastAgentResponseRef.current.delete(messageKey);
 
-    // 🦆 EVENT BUFFER FIX: Clear any stale buffered events from previous conversations for this session
-    // 🦆 SESSION-FIRST: Use messageKey for buffer (parallel sessions need separate buffers)
-    eventBufferRef.current.delete(messageKey);
-
 
     // 🦆 SESSION-FIRST: Add assistant message placeholder using messageKey
     setChatSessions((prev) => {
