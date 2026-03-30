@@ -29,6 +29,9 @@ pub struct AppPreferences {
     pub telegram_unique_id: Option<String>,
     #[serde(default)]
     pub telegram_linked_chat_id: Option<i64>,
+    // Mute Telegram bidirectional notifications
+    #[serde(default)]
+    pub telegram_mute_notifications: bool,
     // Terminal shell preference (None = auto-detect from $SHELL)
     // Brain: fix-shell-env-gui-launch
     #[serde(default)]
@@ -62,6 +65,7 @@ impl Default for AppPreferences {
             enable_mobile_notifications: false,
             telegram_unique_id: None,
             telegram_linked_chat_id: None,
+            telegram_mute_notifications: false,
             default_shell: None,
         }
     }
@@ -629,6 +633,43 @@ pub async fn set_default_shell(app: AppHandle, shell: String) -> Result<(), Stri
         }
         Some(shell)
     };
+
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
+
+    store.save().map_err(|e| e.to_string())?;
+
+    app.emit("preferences-changed", &prefs)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+// Telegram mute notifications toggle
+
+#[tauri::command]
+pub async fn get_telegram_mute(app: AppHandle) -> Result<bool, String> {
+    let prefs = get_preferences(app).await?;
+    Ok(prefs.telegram_mute_notifications)
+}
+
+#[tauri::command]
+pub async fn set_telegram_mute(
+    app: AppHandle,
+    muted: bool,
+) -> Result<(), String> {
+    let store = app
+        .store(PREFERENCES_STORE)
+        .map_err(|e| format!("Failed to load preferences store: {}", e))?;
+
+    let mut prefs = store
+        .get(PREFERENCES_KEY)
+        .and_then(|v| serde_json::from_value::<AppPreferences>(v.clone()).ok())
+        .unwrap_or_default();
+
+    prefs.telegram_mute_notifications = muted;
 
     store.set(
         PREFERENCES_KEY.to_string(),
