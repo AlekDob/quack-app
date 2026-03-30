@@ -690,17 +690,6 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
               const groupHasAgentTool = (g: typeof groups[0]): boolean =>
                 getAgentToolDroidType(g) !== undefined;
 
-              // Debug: log merge loop inputs (temporary — remove after fix verified)
-              if (process.env.NODE_ENV === 'development') {
-                console.debug('[DroidMerge] nestedEventIndices:', [...nestedEventIndices.entries()]);
-                console.debug('[DroidMerge] renderGroups droidTypes:', renderGroups.map((g, i) => ({
-                  i,
-                  droidType: getGroupDroidType(g),
-                  hasAgentTool: groupHasAgentTool(g),
-                  agentDroidType: getAgentToolDroidType(g),
-                  kind: g.kind,
-                })));
-              }
 
               const renderResult: React.ReactNode[] = [];
               let ri = 0;

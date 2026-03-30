@@ -474,6 +474,27 @@ class SessionProcess {
     this.canUseToolFn = canUseToolFn;
   }
 
+  async interruptCurrentQuery() {
+    if (!this.alive) {
+      throw new Error(`Session process ${this.sessionId} is not alive`);
+    }
+
+    if (!this.currentQueryId) {
+      log('SESSION_PROCESS', `Interrupt requested for session=${this.sessionId} with no active query`);
+      return;
+    }
+
+    log('SESSION_PROCESS', `Interrupting subprocess for session=${this.sessionId} query=${this.currentQueryId}`);
+    await this._sendControlRequest({ subtype: 'interrupt' });
+  }
+
+  clearQueryContext(queryId) {
+    if (!queryId || this.currentQueryId === queryId) {
+      this.currentQueryId = null;
+      this.canUseToolFn = null;
+    }
+  }
+
   sendMessage(text, attachments) {
     const content = createMessageContent(text, attachments);
     this._writeStdin({
@@ -644,11 +665,18 @@ async function handleQuery(cmd) {
   } = cmd;
 
   const abortController = new AbortController();
+  const queryState = {
+    abortController,
+    mode: 'starting',
+    status: 'active',
+    queryHandle: null,
+    sessionProcess: null,
+  };
 
   // Track plan approval state per query (Brain: fix-duplicate-plan-approval)
   let planAlreadyApproved = false;
 
-  activeQueries.set(queryId, { abortController });
+  activeQueries.set(queryId, queryState);
   log('QUERY', `Starting query=${queryId} model=${model} cwd=${cwd || 'default'} resume=${sessionId || '(new)'} activeQueries=${activeQueries.size}`);
   diag(`QUERY_START: queryId=${queryId}, permissionMode=${permissionMode || '(none/act)'}, model=${model}, activeQueries=${activeQueries.size}`);
 
@@ -1049,6 +1077,8 @@ ${hintsBlock}
       }
 
       if (proc) {
+        queryState.mode = 'persistent';
+        queryState.sessionProcess = proc;
         proc.startQuery(queryId, canUseToolForQuery);
         proc.sendMessage(finalPrompt, attachments);
         eventSource = proc.events();
@@ -1058,13 +1088,13 @@ ${hintsBlock}
 
     // Fallback: use SDK query() for new sessions or when persistent subprocess is unavailable
     if (!eventSource) {
-      const hasMcpServers = options.mcpServers && Object.keys(options.mcpServers).length > 0;
-      const useStreamingInput = hasMcpServers || (attachments && attachments.length > 0);
-      log('QUERY', `query=${queryId} calling SDK query() (streamingInput=${useStreamingInput})`);
-      eventSource = query({
-        prompt: useStreamingInput ? generateMessages() : finalPrompt,
+      queryState.mode = 'query';
+      log('QUERY', `query=${queryId} calling SDK query() (streamingInput=true)`);
+      queryState.queryHandle = query({
+        prompt: generateMessages(),
         options,
       });
+      eventSource = queryState.queryHandle;
     }
 
     let eventCount = 0;
@@ -1073,10 +1103,18 @@ ${hintsBlock}
       eventCount++;
       if (eventCount <= 5) diag(`EVENT[${eventCount}]: type=${event.type}, subtype=${event.subtype || '-'}`);
 
+      const latestQueryState = activeQueries.get(queryId);
+      const suppressEvent = latestQueryState && latestQueryState.status !== 'active';
+      if (suppressEvent) {
+        log('ABORT', `Suppressing post-stop event for query=${queryId}: type=${event.type}`);
+        continue;
+      }
+
       // Emit prompt_token_count on first assistant event (so frontend has it before usage data)
       if (!promptTokensEmitted && countTokensPromise && event.type === 'assistant') {
         const promptTokens = await countTokensPromise;
-        if (promptTokens !== null) {
+        const currentState = activeQueries.get(queryId);
+        if (promptTokens !== null && (!currentState || currentState.status === 'active')) {
           emit({ type: 'event', queryId, event: { type: 'prompt_token_count', promptTokens } });
         }
         promptTokensEmitted = true;
@@ -1120,14 +1158,19 @@ ${hintsBlock}
     // If no assistant event came (unusual), still emit prompt tokens
     if (!promptTokensEmitted && countTokensPromise) {
       const promptTokens = await countTokensPromise;
-      if (promptTokens !== null) {
+      const currentState = activeQueries.get(queryId);
+      if (promptTokens !== null && (!currentState || currentState.status === 'active')) {
         emit({ type: 'event', queryId, event: { type: 'prompt_token_count', promptTokens } });
       }
     }
 
     const elapsedMs = Date.now() - queryStartTime;
     emit({ type: 'query_complete', queryId });
-    log('QUERY', `query=${queryId} completed successfully (${eventCount} events, ${elapsedMs}ms)`);
+    if (queryState.status === 'active') {
+      log('QUERY', `query=${queryId} completed successfully (${eventCount} events, ${elapsedMs}ms)`);
+    } else {
+      log('ABORT', `query=${queryId} drained after stop (${eventCount} events observed, ${elapsedMs}ms)`);
+    }
 
   } catch (err) {
     if (abortController.signal.aborted) {
@@ -1173,6 +1216,10 @@ ${hintsBlock}
       else delete process.env.ANTHROPIC_API_KEY;
       if (savedAuthToken !== undefined) process.env.ANTHROPIC_AUTH_TOKEN = savedAuthToken;
       else delete process.env.ANTHROPIC_AUTH_TOKEN;
+    }
+
+    if (queryState.sessionProcess) {
+      queryState.sessionProcess.clearQueryContext(queryId);
     }
 
     // Clean up pending requests for this query
@@ -1227,34 +1274,72 @@ async function requestFromFrontend(queryId, type, data, timeoutMs = 0) {
 // COMMAND HANDLERS
 // =============================================================================
 
-function handleAbort(cmd) {
+async function handleAbort(cmd) {
   const { queryId } = cmd;
   const queryState = activeQueries.get(queryId);
-  if (queryState) {
-    // Reject pending requests for this query before aborting
-    for (const [reqId, req] of pendingRequests.entries()) {
-      if (req.queryId === queryId) {
-        clearTimeout(req.timeout);
-        req.reject(new Error('Query aborted'));
-        pendingRequests.delete(reqId);
-      }
-    }
-    queryState.abortController.abort();
-
-    // Clear query context on persistent subprocesses but keep them alive for cache reuse.
-    // Brain: bug-post-fix-cache-breakage-investigation
-    for (const [sid, proc] of sessionProcesses.entries()) {
-      if (proc.currentQueryId === queryId) {
-        proc.currentQueryId = null;
-        proc.canUseToolFn = null;
-        log('ABORT', `Cleared query context on persistent subprocess for session=${sid} (kept alive)`);
-      }
-    }
-
-    log('ABORT', `query=${queryId} aborted successfully`);
-  } else {
+  if (!queryState) {
     log('ABORT', `No active query found for abort: ${queryId}`);
+    return;
   }
+
+  if (queryState.status !== 'active') {
+    log('ABORT', `query=${queryId} already ${queryState.status}`);
+    return;
+  }
+
+  queryState.status = 'aborting';
+
+  // Reject pending requests for this query before interrupting
+  for (const [reqId, req] of pendingRequests.entries()) {
+    if (req.queryId === queryId) {
+      clearTimeout(req.timeout);
+      req.reject(new Error('Query aborted'));
+      pendingRequests.delete(reqId);
+    }
+  }
+
+  const interruptTimeoutMs = 3000;
+  const withTimeout = (promise, timeoutMs) => Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`Interrupt timed out after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]);
+
+  const finalizeAbort = () => {
+    queryState.abortController.abort();
+    queryState.status = 'aborted';
+  };
+
+  if (queryState.mode === 'persistent' && queryState.sessionProcess) {
+    try {
+      await withTimeout(queryState.sessionProcess.interruptCurrentQuery(), interruptTimeoutMs);
+      queryState.sessionProcess.clearQueryContext(queryId);
+      finalizeAbort();
+      log('ABORT', `query=${queryId} interrupted successfully via persistent subprocess`);
+    } catch (err) {
+      log('ABORT', `query=${queryId} interrupt failed (${err.message}) — killing subprocess`);
+      queryState.sessionProcess.clearQueryContext(queryId);
+      queryState.sessionProcess.kill();
+      finalizeAbort();
+    }
+    return;
+  }
+
+  if (queryState.mode === 'query' && queryState.queryHandle && typeof queryState.queryHandle.interrupt === 'function') {
+    try {
+      await withTimeout(queryState.queryHandle.interrupt(), interruptTimeoutMs);
+      finalizeAbort();
+      log('ABORT', `query=${queryId} interrupted successfully via SDK query handle`);
+    } catch (err) {
+      log('ABORT', `query=${queryId} query-handle interrupt failed (${err.message}) — aborting controller`);
+      finalizeAbort();
+    }
+    return;
+  }
+
+  finalizeAbort();
+  log('ABORT', `query=${queryId} aborted via controller fallback`);
 }
 
 function handleResponse(cmd) {
@@ -1327,7 +1412,7 @@ async function main() {
           break;
 
         case 'abort':
-          handleAbort(cmd);
+          await handleAbort(cmd);
           break;
 
         case 'response':
