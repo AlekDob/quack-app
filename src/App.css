@@ -3727,6 +3727,7 @@ button.directory-chooser:disabled {
 .explorer-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.45rem;
   padding: 0.25rem 0.5rem;
   margin-bottom: 0.65rem;
@@ -3785,42 +3786,51 @@ button.directory-chooser:disabled {
   background: rgba(var(--accent-rgb), 0.18);
 }
 
-/* File actions container (Reveal in Finder + Mention @ buttons) */
-.explorer-file-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  opacity: 0;
-  transition: opacity 0.15s ease;
+/* Row wrapper - holds button + action row below */
+.explorer-row-wrapper {
+  position: relative;
 }
 
-.explorer-row:hover .explorer-file-actions {
+/* File actions - row below, hidden by default (repo-action-row pattern) */
+.explorer-file-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 2.5rem;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.2s ease, opacity 0.15s ease;
+}
+
+.explorer-row-wrapper:hover .explorer-file-actions {
+  max-height: 28px;
   opacity: 1;
 }
 
-/* Mention @ button */
+/* Mention @ button - same size as Finder/IDE icons */
 .explorer-mention-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
   padding: 0;
   border: none;
-  border-radius: 4px;
-  background: rgba(242, 140, 82, 0.1);
-  color: rgba(242, 140, 82, 0.6);
-  font-size: 0.72rem;
+  border-radius: 3px;
+  background: transparent;
+  color: rgba(242, 140, 82, 0.5);
+  font-size: 0.65rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .explorer-mention-btn:hover {
-  background: rgba(242, 140, 82, 0.25);
+  background: rgba(255, 255, 255, 0.1);
   color: #f28c52;
-  transform: scale(1.1);
 }
 
 .explorer-mention-btn:active {

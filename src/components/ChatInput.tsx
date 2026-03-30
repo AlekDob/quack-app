@@ -65,7 +65,7 @@ interface ChatInputProps {
   onClearAgent?: () => void;
   pendingAgentMention?: AgentInfo | null;
   onMentionInserted?: () => void;
-  pendingFileMention?: { name: string; path: string; relativePath: string } | null;
+  pendingFileMention?: { name: string; path: string; relativePath: string; isDirectory: boolean } | null;
   onFileMentionInserted?: () => void;
   pendingSlashCommand?: { name: string; description: string } | null;
   onCommandInserted?: () => void;
@@ -674,7 +674,7 @@ export default function ChatInput({
   useEffect(() => {
     if (!pendingFileMention || !textareaRef.current) return;
 
-    // Insert @file:path at current cursor position
+    // Insert @file: or @folder: path at current cursor position
     const cursorPos = textareaRef.current.selectionStart;
     const beforeCursor = input.substring(0, cursorPos);
     const afterCursor = input.substring(cursorPos);
@@ -682,7 +682,8 @@ export default function ChatInput({
     // Add space before @ if needed
     const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n');
     const prefix = needsSpaceBefore ? ' ' : '';
-    const mention = `${prefix}@file:${pendingFileMention.relativePath} `;
+    const mentionType = pendingFileMention.isDirectory ? '@folder' : '@file';
+    const mention = `${prefix}${mentionType}:${pendingFileMention.relativePath} `;
     const newInput = beforeCursor + mention + afterCursor;
 
     setInput(newInput);

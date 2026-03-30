@@ -63,7 +63,7 @@ interface ChatViewProps {
   onEditsChange?: (edits: FileEdit[], deletes: FileDeleted[]) => void; // NEW: Notify parent when edits change
   pendingAgentMention?: AgentInfo | null;
   onMentionInserted?: () => void;
-  pendingFileMention?: { name: string; path: string; relativePath: string } | null;
+  pendingFileMention?: { name: string; path: string; relativePath: string; isDirectory: boolean } | null;
   onFileMentionInserted?: () => void;
   pendingSlashCommand?: { name: string; description: string } | null;
   onCommandInserted?: () => void;

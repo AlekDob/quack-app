@@ -297,7 +297,7 @@ function AppRefactored() {
   // Agent management
   const [agents, setAgents] = useState<AgentInfo[]>([]);
   const [pendingAgentMention, setPendingAgentMention] = useState<AgentInfo | null>(null);
-  const [pendingFileMention, setPendingFileMention] = useState<{ name: string; path: string; relativePath: string } | null>(null);
+  const [pendingFileMention, setPendingFileMention] = useState<{ name: string; path: string; relativePath: string; isDirectory: boolean } | null>(null);
   const [pendingSlashCommand, setPendingSlashCommand] = useState<{ name: string; description: string } | null>(null);
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [agentsError, setAgentsError] = useState<string | null>(null);
@@ -505,8 +505,8 @@ function AppRefactored() {
             await loadDirectory(path);
             return explorerTree.get(path) || [];
           }}
-          onMentionFile={(filePath, fileName) => {
-            setPendingFileMention({ path: filePath, name: fileName, relativePath: fileName });
+          onMentionFile={(filePath, fileName, isDirectory) => {
+            setPendingFileMention({ path: filePath, name: fileName, relativePath: fileName, isDirectory });
           }}
 
           // Agents props

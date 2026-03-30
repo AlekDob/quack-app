@@ -69,7 +69,7 @@ interface FileExplorerProps {
   activeFilePath: string | null;
   onOpenFile: (entry: DirectoryEntry) => void;
   onLoadChildren: (path: string) => Promise<DirectoryEntry[]>;
-  onMentionFile?: (filePath: string, fileName: string) => void;
+  onMentionFile?: (filePath: string, fileName: string, isDirectory: boolean) => void;
   modifiedFiles?: Map<string, 'created' | 'modified' | 'deleted'>; // NEW: Track modified files
 }
 
@@ -390,56 +390,58 @@ function FileExplorer({
 
           return (
             <Fragment key={entry.path}>
-              <button
-                type="button"
-                className={rowClass}
-                style={{ marginLeft: `${marginLeft}px`, paddingLeft: '6px' }}
-                title={entry.name}
-                onClick={() => {
-                  if (isDirectory) {
-                    void handleToggleDirectory(entry);
-                  } else {
-                    onOpenFile(entry);
-                  }
-                }}
-                onContextMenu={(event) => handleContextMenu(event, entry)}
-                draggable={!isDirectory}
-                onDragStart={(event) => handleDragStart(event, entry)}
-              >
-                <span
-                  className={`explorer-expander ${
-                    isDirectory ? (isExpanded ? "open" : "") : "placeholder"
-                  } ${isLoadingNode ? "loading" : ""}`}
-                  onClick={(event) => {
-                    if (!isDirectory) {
-                      return;
+              <div className="explorer-row-wrapper" style={{ marginLeft: `${marginLeft}px` }}>
+                <button
+                  type="button"
+                  className={rowClass}
+                  style={{ paddingLeft: '6px' }}
+                  title={entry.name}
+                  onClick={() => {
+                    if (isDirectory) {
+                      void handleToggleDirectory(entry);
+                    } else {
+                      onOpenFile(entry);
                     }
-                    event.stopPropagation();
-                    void handleToggleDirectory(entry);
                   }}
-                  aria-hidden="true"
-                />
-                <FileIcon
-                  name={entry.name}
-                  isDirectory={isDirectory}
-                  isOpen={isExpanded}
-                  size={16}
-                />
-                {/* Show modification indicator for files */}
-                {!isDirectory && modifiedFiles?.has(entry.path) && (
+                  onContextMenu={(event) => handleContextMenu(event, entry)}
+                  draggable={!isDirectory}
+                  onDragStart={(event) => handleDragStart(event, entry)}
+                >
                   <span
-                    className={`file-modified-indicator file-modified-indicator-${modifiedFiles.get(entry.path)}`}
-                    title={`File ${modifiedFiles.get(entry.path)}`}
+                    className={`explorer-expander ${
+                      isDirectory ? (isExpanded ? "open" : "") : "placeholder"
+                    } ${isLoadingNode ? "loading" : ""}`}
+                    onClick={(event) => {
+                      if (!isDirectory) {
+                        return;
+                      }
+                      event.stopPropagation();
+                      void handleToggleDirectory(entry);
+                    }}
+                    aria-hidden="true"
                   />
-                )}
-                <span className="explorer-name">{entry.name}</span>
-                {isDirectory && displayCount !== null && (
-                  <span className="explorer-count" aria-hidden="true">
-                    {displayCount}
-                  </span>
-                )}
-                {/* Show actions for both files AND directories */}
-                <div className="explorer-file-actions">
+                  <FileIcon
+                    name={entry.name}
+                    isDirectory={isDirectory}
+                    isOpen={isExpanded}
+                    size={16}
+                  />
+                  {/* Show modification indicator for files */}
+                  {!isDirectory && modifiedFiles?.has(entry.path) && (
+                    <span
+                      className={`file-modified-indicator file-modified-indicator-${modifiedFiles.get(entry.path)}`}
+                      title={`File ${modifiedFiles.get(entry.path)}`}
+                    />
+                  )}
+                  <span className="explorer-name">{entry.name}</span>
+                  {isDirectory && displayCount !== null && (
+                    <span className="explorer-count" aria-hidden="true">
+                      {displayCount}
+                    </span>
+                  )}
+                </button>
+                {/* Action buttons - row below, revealed on hover */}
+                <div className="explorer-file-actions" onClick={(e) => e.stopPropagation()}>
                   <OpenInIDEButton path={entry.path} iconOnly />
                   <RevealInFinderButton path={entry.path} iconOnly />
                   {onMentionFile && (
@@ -448,7 +450,7 @@ function FileExplorer({
                       className="explorer-mention-btn"
                       onClick={(e) => {
                         e.stopPropagation();
-                        onMentionFile(entry.path, entry.name);
+                        onMentionFile(entry.path, entry.name, isDirectory);
                       }}
                       title={isDirectory ? "Insert @folder mention in chat" : "Insert @file mention in chat"}
                       aria-label={isDirectory ? "Mention folder in chat" : "Mention file in chat"}
@@ -457,7 +459,7 @@ function FileExplorer({
                     </button>
                   )}
                 </div>
-              </button>
+              </div>
               {isDirectory &&
                 isExpanded &&
                 tree[entry.path] &&
@@ -646,26 +648,27 @@ function FileExplorer({
               const fileMarginLeft = 8 + (node.depth + 1) * 16;
 
               return (
-                <button
-                  key={result.path}
-                  type="button"
-                  className={rowClass}
-                  style={{ marginLeft: `${fileMarginLeft}px`, paddingLeft: '6px' }}
-                  title={result.relative_path}
-                  onClick={() => onOpenFile(entry)}
-                  onContextMenu={(event) => handleContextMenu(event, entry)}
-                  draggable={true}
-                  onDragStart={(event) => handleDragStart(event, entry)}
-                >
-                  <span className="explorer-expander placeholder" aria-hidden="true" />
-                  <FileIcon
-                    name={result.name}
-                    isDirectory={false}
-                    isOpen={false}
-                    size={16}
-                  />
-                  <span className="explorer-name">{result.name}</span>
-                  <div className="explorer-file-actions">
+                <div key={result.path} className="explorer-row-wrapper" style={{ marginLeft: `${fileMarginLeft}px` }}>
+                  <button
+                    type="button"
+                    className={rowClass}
+                    style={{ paddingLeft: '6px' }}
+                    title={result.relative_path}
+                    onClick={() => onOpenFile(entry)}
+                    onContextMenu={(event) => handleContextMenu(event, entry)}
+                    draggable={true}
+                    onDragStart={(event) => handleDragStart(event, entry)}
+                  >
+                    <span className="explorer-expander placeholder" aria-hidden="true" />
+                    <FileIcon
+                      name={result.name}
+                      isDirectory={false}
+                      isOpen={false}
+                      size={16}
+                    />
+                    <span className="explorer-name">{result.name}</span>
+                  </button>
+                  <div className="explorer-file-actions" onClick={(e) => e.stopPropagation()}>
                     <OpenInIDEButton path={result.path} iconOnly />
                     <RevealInFinderButton path={result.path} iconOnly />
                     {onMentionFile && (
@@ -674,7 +677,7 @@ function FileExplorer({
                         className="explorer-mention-btn"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onMentionFile(result.path, result.name);
+                          onMentionFile(result.path, result.name, false);
                         }}
                         title="Insert @file mention in chat"
                         aria-label="Mention file in chat"
@@ -683,7 +686,7 @@ function FileExplorer({
                       </button>
                     )}
                   </div>
-                </button>
+                </div>
               );
             })}
           </Fragment>
@@ -709,10 +712,17 @@ function FileExplorer({
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-white">File Explorer</h3>
           <div className="flex items-center gap-1">
-            {/* Refresh button */}
+            {/* Refresh button - reloads ALL expanded directories */}
             <button
               type="button"
-              onClick={() => activePath && onLoadChildren?.(activePath)}
+              onClick={() => {
+                // Reload root + all expanded subdirectories to pick up filesystem changes
+                const pathsToReload = [activePath, ...Array.from(expanded)].filter(Boolean);
+                const unique = [...new Set(pathsToReload)];
+                for (const p of unique) {
+                  void onLoadChildren(p).catch(() => {});
+                }
+              }}
               disabled={loading}
               className="p-1.5 text-white/50 hover:text-white hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
               title="Refresh"

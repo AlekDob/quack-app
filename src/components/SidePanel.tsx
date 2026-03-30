@@ -361,7 +361,7 @@ interface SidePanelProps {
   modifiedFiles?: Map<string, 'created' | 'modified' | 'deleted'>; // NEW: Track modified files
   onOpenFile: (entry: DirectoryEntry) => void;
   onLoadChildren: (path: string) => Promise<DirectoryEntry[]>;
-  onMentionFile?: (filePath: string, fileName: string) => void;
+  onMentionFile?: (filePath: string, fileName: string, isDirectory: boolean) => void;
 
   // Agents props
   agents: AgentInfo[];

@@ -4446,7 +4446,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const [selectedAgent, _setSelectedAgent] = useState<AgentDetails | null>(null);
   // activeAgent moved to top of component for TypeScript hoisting
   const [pendingAgentMention, setPendingAgentMention] = useState<AgentInfo | null>(null); // Agent to insert as @mention in input
-  const [pendingFileMention, setPendingFileMention] = useState<{ name: string; path: string; relativePath: string } | null>(null); // File to insert as @file mention
+  const [pendingFileMention, setPendingFileMention] = useState<{ name: string; path: string; relativePath: string; isDirectory: boolean } | null>(null); // File/folder to insert as @mention
   const [pendingSlashCommand, setPendingSlashCommand] = useState<{ name: string; description: string } | null>(null); // Slash command to insert in input
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [agentsInitialized, setAgentsInitialized] = useState(false); // True after first load completes
@@ -5780,6 +5780,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // Auto-refresh FileExplorer when files are modified by Claude
   useEffect(() => {
     if (refreshExplorerTrigger > 0 && explorerRoot) {
+      // Clear stale cache so subdirectories are re-fetched when expanded
+      setExplorerTree({});
       // Refresh the root directory to show new/modified files
       loadDirectory(explorerRoot);
     }
@@ -6520,7 +6522,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [tauriAvailable, clearTerminalAttention, addActiveAgent]);
 
-  const handleMentionFile = useCallback((filePath: string, fileName: string) => {
+  const handleMentionFile = useCallback((filePath: string, fileName: string, isDirectory: boolean) => {
     // Calculate relative path from explorerRoot
     const basePath = explorerRoot ?? explorerPath;
     let relativePath = filePath;
@@ -6529,11 +6531,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       relativePath = filePath.substring(basePath.length).replace(/^\//, '');
     }
 
-    // Set pending file mention for ChatInput to pick up
+    // Set pending file/folder mention for ChatInput to pick up
     setPendingFileMention({
       name: fileName,
       path: filePath,
       relativePath: relativePath,
+      isDirectory,
     });
 
     toast.success(`File mention added: @file:${relativePath}`, {

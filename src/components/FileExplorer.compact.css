@@ -39,6 +39,7 @@
   box-shadow: none; /* Remove shadows */
   transition: background 0.1s ease; /* Quick transition */
   cursor: pointer !important; /* Fix cursor on search results */
+  flex-wrap: wrap; /* Allow icons/count to wrap below when deeply indented */
 }
 
 /* Directory rows - slightly more spacing */
@@ -134,9 +135,11 @@
 }
 
 .file-explorer .explorer-mention-btn {
-  width: 18px;
-  height: 18px;
-  font-size: 0.65rem;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  font-size: 0.6rem;
   border-radius: 3px;
   padding: 0;
   display: inline-flex;
