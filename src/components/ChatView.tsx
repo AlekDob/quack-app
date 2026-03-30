@@ -254,6 +254,14 @@ export default function ChatView({
     onSendMessage(prompt);
   });
 
+  // Stable wrapper for onUserQuestionAnswer — avoids breaking memo() on MessageList/ChatMessage
+  const stableOnUserQuestionAnswer = useCallback(
+    (toolUseId: string, answers: AskUserQuestionAnswers, _sessionKey?: string) => {
+      onUserQuestionAnswer?.(toolUseId, answers, internalSessionId || _sessionKey);
+    },
+    [onUserQuestionAnswer, internalSessionId]
+  );
+
   // Persistent attachments via chat store
   const setStoreAttachments = useChatStore((state) => state.setAttachments);
   const clearStoreAttachments = useChatStore((state) => state.clearAttachments);
@@ -789,9 +797,7 @@ export default function ChatView({
         projectName={projectName}
         gitBranch={gitBranch}
         thinkingModeResetKey={thinkingModeResetCounter}
-        onUserQuestionAnswer={onUserQuestionAnswer
-          ? (toolUseId, answers, _sessionKey) => onUserQuestionAnswer(toolUseId, answers, internalSessionId || _sessionKey)
-          : undefined}
+        onUserQuestionAnswer={onUserQuestionAnswer ? stableOnUserQuestionAnswer : undefined}
         pendingQuestionIds={pendingQuestionIds}
         answeredQuestions={answeredQuestions}
         currentSessionId={currentSessionId}

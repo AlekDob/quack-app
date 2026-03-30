@@ -343,6 +343,10 @@ function unifiedAgentToTerminalMetadata(agent: UnifiedAgent) {
   };
 }
 
+// Stable empty collections — avoids creating new references on every render
+const EMPTY_SET = new Set<string>();
+const EMPTY_MAP = new Map<string, AskUserQuestionAnswers>();
+
 function AppContent() {
   // Load assets INSIDE the component, not at module level
   const introAudio = new URL("../sounds/quack-intro.mp3", import.meta.url).href;
@@ -12232,8 +12236,8 @@ You have access to all Bash tools to execute git commands like:
                     }}
                     onOpenKanban={handleOpenKanbanTab}
                     onUserQuestionAnswer={answerUserQuestionForAgent}
-                    pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
-                    answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
+                    pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || EMPTY_SET}
+                    answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || EMPTY_MAP}
                     currentSessionId={isTaskChat
                       ? activeTaskId ?? undefined
                       : (activeSessionId
@@ -12383,8 +12387,8 @@ You have access to all Bash tools to execute git commands like:
                     // Open Kanban view callback
                     onOpenKanban={handleOpenKanbanTab}
                     onUserQuestionAnswer={answerUserQuestionForAgent}
-                    pendingQuestionIds={pendingQuestionIdsMap.get(taskSessionId) || new Set()}
-                    answeredQuestions={answeredQuestionsMap.get(taskSessionId) || new Map()}
+                    pendingQuestionIds={pendingQuestionIdsMap.get(taskSessionId) || EMPTY_SET}
+                    answeredQuestions={answeredQuestionsMap.get(taskSessionId) || EMPTY_MAP}
                     // 🦆 FIX: Display claudeSessionId (real Claude Code ID) in header badge
                     currentSessionId={agentSessions.find(s => s.id === taskSessionId)?.claudeSessionId ?? taskSessionId}
                     // 🦆 Internal session ID for state management (attachments, settings)
