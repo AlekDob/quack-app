@@ -18,7 +18,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { Toaster, toast } from "sonner";
 import "sonner/dist/styles.css";
 import "./sonner-custom.css";
-import { saveSessionBackup } from "./utils/sessionRecovery";
+import { saveSessionBackup, cleanupOldBackups } from "./utils/sessionRecovery";
 
 import TerminalSidebar from "./components/TerminalSidebar";
 import SidePanel from "./components/SidePanel";
@@ -498,43 +498,52 @@ function AppContent() {
       setActiveTaskId(null);
       console.log(`[SESSION-FIX] Cleared activeTaskId because activeSessionId is now: ${newSessionId}`);
 
-      // 🚀 LAZY HYDRATION: Load chat messages only when session is selected
-      // This avoids loading ALL sessions at boot, improving startup time
-      setChatSessions(prev => {
-        // Skip if already hydrated
-        if (prev.has(newSessionId)) {
-          return prev;
+      // 🚀 LAZY HYDRATION: Load chat messages from .jsonl on first visit after restart.
+      // Boot-time code (loadKanbanChatSessions) may pre-populate chatSessions with stale
+      // data from quack-chats.json, so we use hydratedSessionsRef to track which sessions
+      // have been freshly loaded from .jsonl in this app session.
+      // After the first .jsonl load, subsequent switches preserve the in-memory cache
+      // (rich ChatMessage objects with tool events, subagent data, etc.).
+      if (hydratedSessionsRef.current.has(newSessionId)) {
+        // Already hydrated from .jsonl in this app session — keep in-memory data
+        return;
+      }
+
+      // Optimistic lock: claim the slot synchronously to prevent duplicate IIFEs
+      // if the user switches to the same session twice before the first resolves.
+      hydratedSessionsRef.current.add(newSessionId);
+
+      // First visit after restart — load from .jsonl via Tauri backend
+      (async () => {
+        const session = useSessionStore.getState().sessions.find(s => s.id === newSessionId);
+        if (!session?.claudeSessionId) {
+          console.warn(`[LAZY HYDRATE] No claudeSessionId for session ${newSessionId}`);
+          return;
         }
 
-        // Async hydration - doesn't block the selection
-        (async () => {
-          const session = useSessionStore.getState().sessions.find(s => s.id === newSessionId);
-          if (!session?.claudeSessionId) return;
+        try {
+          const details = await invoke<SessionDetails>('resume_session', {
+            sessionId: session.claudeSessionId
+          });
 
-          try {
-            const details = await invoke<SessionDetails>('resume_session', {
-              sessionId: session.claudeSessionId
-            });
+          if (details.messages && details.messages.length > 0) {
+            const chatMessages: ChatMessage[] = details.messages.map((m) => ({
+              id: crypto.randomUUID(),
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+              timestamp: m.timestamp || Date.now(),
+              status: 'complete' as const,
+            }));
 
-            if (details.messages && details.messages.length > 0) {
-              const chatMessages: ChatMessage[] = details.messages.map((m) => ({
-                id: crypto.randomUUID(),
-                role: m.role as 'user' | 'assistant',
-                content: m.content,
-                timestamp: m.timestamp || Date.now(),
-                status: 'complete' as const,
-              }));
-
-              setChatSessions(p => new Map(p).set(newSessionId, chatMessages));
-              console.log(`[LAZY HYDRATE] Loaded ${chatMessages.length} messages for session ${newSessionId}`);
-            }
-          } catch (e) {
-            console.debug(`[LAZY HYDRATE] Could not restore session ${newSessionId}:`, e);
+            setChatSessions(p => new Map(p).set(newSessionId, chatMessages));
+            console.log(`[LAZY HYDRATE] Loaded ${chatMessages.length} messages for session ${newSessionId}`);
           }
-        })();
-
-        return prev;
-      });
+        } catch (e) {
+          // Release the lock so a retry is possible on next switch
+          hydratedSessionsRef.current.delete(newSessionId);
+          console.debug(`[LAZY HYDRATE] Could not restore session ${newSessionId}:`, e);
+        }
+      })();
     }
   }, []);
 
@@ -1002,6 +1011,16 @@ function AppContent() {
   // 🦆 SESSION PERSISTENCE: REMOVED - No longer showing resume messages
   // Users can resume via Sessions panel instead
 
+  // Ref mirror of chatSessions for synchronous access in beforeunload and result-event handlers
+  const chatSessionsRef = useRef<Map<string, ChatMessage[]>>(new Map());
+  // Ref mirror of activeSessionId for synchronous access in beforeunload handler
+  const activeSessionIdRef = useRef<string | null>(null);
+  // Track which sessions have been freshly hydrated from .jsonl in THIS app session.
+  // Boot-time code (loadKanbanChatSessions) may pre-populate chatSessions with stale data
+  // from quack-chats.json. This ref ensures the first visit to each session after restart
+  // always refreshes from .jsonl, while subsequent switches preserve the in-memory cache.
+  const hydratedSessionsRef = useRef<Set<string>>(new Set());
+
   // 🦆 RACE CONDITION FIX: Track active event listeners to ensure they're ready before invoke()
   // This prevents the bug where events are emitted before the listener is set up
   const activeListenersRef = useRef<Map<string, () => void>>(new Map());
@@ -1087,6 +1106,39 @@ function AppContent() {
       return trimmed;
     });
   }, [chatSessions]);
+
+  // Keep chatSessionsRef in sync for synchronous access in beforeunload and result-event handlers
+  useEffect(() => {
+    chatSessionsRef.current = chatSessions;
+  }, [chatSessions]);
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
+
+  // 🦆 SESSION BACKUP: Flush active session messages to localStorage on app close.
+  // Only the active session is flushed here — other sessions are covered by the
+  // per-turn saveSessionBackup call in the result-event handler.
+  useEffect(() => {
+    const flush = () => {
+      const sid = activeSessionIdRef.current;
+      if (!sid) return;
+      const messages = chatSessionsRef.current.get(sid);
+      if (messages && messages.length > 0) {
+        saveSessionBackup(sid, messages);
+      }
+    };
+    window.addEventListener('beforeunload', flush);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, []);
+
+  // Clean up stale localStorage backups on startup (older than 7 days)
+  useEffect(() => {
+    cleanupOldBackups();
+  }, []);
 
   // Brain: fix-memory-leak-14gb-ram
   // Centralized cleanup: remove ALL data associated with an agent from every Map/Ref
@@ -1554,6 +1606,18 @@ function AppContent() {
           return newMap;
         });
       }
+
+      // 🦆 SESSION BACKUP: Persist messages to localStorage at end of turn
+      // Same frequency as token persistence above — once per turn, no excessive writes.
+      // Uses functional updater to read the latest flushed state (chatSessionsRef may
+      // be one render behind since its sync effect runs after paint).
+      setChatSessions(current => {
+        const msgs = current.get(messageKey);
+        if (msgs && msgs.length > 0) {
+          saveSessionBackup(messageKey, msgs);
+        }
+        return current; // no mutation — React bails out
+      });
 
       // Brain: fix-memory-leak-14gb-ram
       // Session-end cleanup: free temporary buffers that are no longer needed
