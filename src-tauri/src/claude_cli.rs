@@ -158,6 +158,9 @@ struct DaemonProcess {
 struct DaemonQueryState {
     agent_id: String,
     session_key: String,
+    /// Brain: fix-late-render-abort-stale-buffer
+    /// Frontend-generated turn ID echoed back in every emitted event.
+    turn_id: Option<String>,
     app: AppHandle,
     /// Used to signal the awaiting send_message_via_sdk_streaming call
     completion_tx: tokio::sync::oneshot::Sender<Result<ClaudeCliResponse, String>>,
@@ -443,17 +446,21 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                     let emit_info = {
                         let queries = DAEMON_QUERIES.lock().await;
                         queries.get(qid.as_str()).map(|state| {
-                            (state.agent_id.clone(), state.session_key.clone(), state.app.clone())
+                            (state.agent_id.clone(), state.session_key.clone(), state.turn_id.clone(), state.app.clone())
                         })
                     };
 
-                    if let Some((agent_id, session_key, app_handle)) = emit_info {
+                    if let Some((agent_id, session_key, turn_id, app_handle)) = emit_info {
                         let sdk_event_type = event.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
                         log::debug!("[DAEMON:ROUTE] query={} event_type={} -> agent={}", qid, sdk_event_type, agent_id);
 
                         let event_name = format!("claude-event:{}", agent_id);
+                        // Brain: fix-late-render-abort-stale-buffer
+                        // Include turnId (frontend-generated) so the frontend can reject
+                        // stale events from aborted/completed queries.
                         let wrapped = serde_json::json!({
                             "sessionKey": session_key,
+                            "turnId": turn_id,
                             "event": event
                         });
                         let _ = app_handle.emit(&event_name, &wrapped);
@@ -970,6 +977,10 @@ pub struct ClaudeCliRequest {
     // 🖥️ IDE context (open file, selection, diagnostics, git status)
     // Injected into system prompt by Node.js — kept separate from user message
     pub ide_context: Option<String>,
+    // Brain: fix-late-render-abort-stale-buffer
+    // Frontend-generated turn ID echoed back in every emitted event so the frontend
+    // can reject stale events from aborted/completed queries.
+    pub turn_id: Option<String>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -1953,6 +1964,7 @@ async fn send_message_via_daemon(
         queries.insert(query_id.clone(), DaemonQueryState {
             agent_id: agent_id.to_string(),
             session_key: event_session_key.clone(),
+            turn_id: request.turn_id.clone(),
             app: app.clone(),
             completion_tx: tx,
             waiting_for_user: waiting_for_user.clone(),

@@ -1015,6 +1015,10 @@ function AppContent() {
   // This fixes the intermittent bug where Task/droid widgets don't appear because
   // the event arrives before React's setState has created the streaming message
   const eventBufferRef = useRef<Map<string, ClaudeEvent[]>>(new Map());
+  // Brain: fix-late-render-abort-stale-buffer
+  // Track the active queryId per session so handleClaudeEvent can reject stale events
+  // from aborted/completed queries that arrive after a new turn starts.
+  const activeQueryIdRef = useRef<Map<string, string>>(new Map());
 
   // 🦆 DIAGNOSTIC: Ring buffer to capture event flow for intermittent late-render bug.
   // Near-zero overhead: just pushes small objects to a capped array.
@@ -1306,7 +1310,8 @@ function AppContent() {
     agentId: string,
     claudeEvent: ClaudeEvent,
     source: string, // For debugging: 'Multi-Listener', 'Pre-warm', 'ensureListenerReady'
-    sessionKey?: string // 🦆 SESSION-FIRST: sessionKey from Rust event wrapper
+    sessionKey?: string, // 🦆 SESSION-FIRST: sessionKey from Rust event wrapper
+    queryId?: string // Brain: fix-late-render-abort-stale-buffer — per-turn event isolation
   ) => {
     const evt = claudeEvent as any;
 
@@ -1317,6 +1322,19 @@ function AppContent() {
       return; // REJECT event - do not write to any session
     }
     const messageKey = sessionKey;
+
+    // Brain: fix-late-render-abort-stale-buffer
+    // Reject events from stale queries. When a new turn starts, sendMessageForAgent
+    // sets activeQueryIdRef to a new turnId and passes it to Rust. Rust echoes it back
+    // in every event. Events carrying a different turnId are from old/aborted queries
+    // and must be discarded — otherwise they get applied to the new streaming placeholder.
+    if (queryId) {
+      const activeTurnId = activeQueryIdRef.current.get(messageKey);
+      if (activeTurnId && queryId !== activeTurnId) {
+        console.log(`🦆 [${source}] REJECTED stale event for messageKey=${messageKey}: event turnId=${queryId.slice(0, 20)} !== active ${activeTurnId.slice(0, 20)}`);
+        return;
+      }
+    }
 
     // Tag system/init events as resumed to hide redundant header + init widget
     if (evt.type === 'system' && evt.subtype === 'init' && resumingSessionsRef.current.has(messageKey)) {
@@ -2126,14 +2144,15 @@ function AppContent() {
       const eventName = `claude-event:${agentId}`;
 
       try {
-        // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey
-        // Payload structure: { sessionKey: string, event: ClaudeEvent }
-        const unlisten = await listen<{ sessionKey: string; event: ClaudeEvent }>(eventName, (event) => {
-          const { sessionKey, event: claudeEvent } = event.payload;
+        // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey + queryId
+        // Payload structure: { sessionKey: string, queryId: string, event: ClaudeEvent }
+        const unlisten = await listen<{ sessionKey: string; turnId?: string; event: ClaudeEvent }>(eventName, (event) => {
+          const { sessionKey, turnId: queryId, event: claudeEvent } = event.payload;
 
           // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
           // 🦆 SESSION-FIRST: Pass sessionKey so events go to the correct chat session
-          handleClaudeEvent(agentId, claudeEvent, 'Multi-Listener', sessionKey);
+          // Brain: fix-late-render-abort-stale-buffer — pass queryId for turn isolation
+          handleClaudeEvent(agentId, claudeEvent, 'Multi-Listener', sessionKey, queryId);
 
           // Auto-refresh FileExplorer when files are created/modified
           if (claudeEvent.type === 'result') {
@@ -2308,13 +2327,14 @@ function AppContent() {
     const eventName = `claude-event:${agentId}`;
 
     try {
-      // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey
-      const unlisten = await listen<{ sessionKey: string; event: ClaudeEvent }>(eventName, (event) => {
-        const { sessionKey, event: claudeEvent } = event.payload;
+      // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey + queryId
+      const unlisten = await listen<{ sessionKey: string; queryId?: string; event: ClaudeEvent }>(eventName, (event) => {
+        const { sessionKey, queryId, event: claudeEvent } = event.payload;
 
         // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
         // 🦆 SESSION-FIRST: Pass sessionKey so events go to the correct chat session
-        handleClaudeEvent(agentId, claudeEvent, 'ensureListenerReady', sessionKey);
+        // Brain: fix-late-render-abort-stale-buffer — pass queryId for turn isolation
+        handleClaudeEvent(agentId, claudeEvent, 'ensureListenerReady', sessionKey, queryId);
 
         // Handle completion event - FileExplorer refresh
         if (claudeEvent.type === 'result') {
@@ -2603,29 +2623,27 @@ function AppContent() {
     // 🦆 SESSION-FIRST: Clear previous response text for this session (new conversation turn)
     lastAgentResponseRef.current.delete(messageKey);
 
+    // Brain: fix-late-render-abort-stale-buffer
+    // Clear active queryId so stale events from the old query are rejected,
+    // and the first event of the NEW query will set the active queryId.
+    activeQueryIdRef.current.delete(messageKey);
 
     // 🦆 SESSION-FIRST: Add assistant message placeholder using messageKey
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
       const sessionMessages = newSessions.get(messageKey) ?? [];
 
-      // 🦆 EVENT BUFFER FIX: Check if there are buffered events to apply immediately
-      // This handles the race condition where events arrive before this setState completes
-      // 🦆 SESSION-FIRST: Use messageKey for buffer
-      const bufferedEvents = eventBufferRef.current.get(messageKey) || [];
-      if (bufferedEvents.length > 0) {
-        console.log(`🦆 [sendMessageForAgent] Flushing ${bufferedEvents.length} buffered events for messageKey=${messageKey}`);
+      // Brain: fix-late-render-abort-stale-buffer
+      // Discard any buffered events — they are always stale (from a previous turn
+      // or aborted stream). The invoke hasn't been called yet at this point, so no
+      // events for the NEW turn can exist in the buffer. New-turn events will arrive
+      // via handleClaudeEvent after the placeholder is created and status is 'streaming'.
+      if (eventBufferRef.current.has(messageKey)) {
+        const staleCount = eventBufferRef.current.get(messageKey)!.length;
+        console.log(`🦆 [sendMessageForAgent] Discarding ${staleCount} stale buffered events for messageKey=${messageKey}`);
         eventBufferRef.current.delete(messageKey);
-
-        // Apply buffered events to the new assistant message
-        const messageWithBufferedEvents = {
-          ...assistantMessage,
-          events: bufferedEvents,
-        };
-        newSessions.set(messageKey, [...sessionMessages, messageWithBufferedEvents]);
-      } else {
-        newSessions.set(messageKey, [...sessionMessages, assistantMessage]);
       }
+      newSessions.set(messageKey, [...sessionMessages, assistantMessage]);
 
       return newSessions;
     });
@@ -2739,6 +2757,9 @@ function AppContent() {
         diag.push({ t: Date.now(), key: messageKey, type: '_invoke_complete', evtCount: -1, lastStatus: response.result ? 'has_result' : 'no_result' });
         if (diag.length > 50) diag.splice(0, diag.length - 50);
       }
+
+      // 🦆 DIAGNOSTIC: Log response.result to determine if SDK returns old or new content on resume
+      console.log(`[COMPLETION] messageKey=${messageKey}, msgId=${assistantMessageId}, response.result (first 200 chars):`, response.result?.substring(0, 200));
 
       // 🦆 SESSION-FIRST: Update message with final result using messageKey
       setChatSessions((prev) => {
@@ -2887,6 +2908,13 @@ function AppContent() {
                 : msg
             )
           );
+          // Brain: fix-late-render-abort-stale-buffer
+          // Clear event buffer on abort: the daemon may still emit trailing events
+          // after the frontend aborts. Without this, those events buffer and get
+          // incorrectly flushed into the NEXT turn's assistant placeholder.
+          eventBufferRef.current.delete(messageKey);
+          // Clear active queryId so trailing events from the aborted query are rejected
+          activeQueryIdRef.current.delete(messageKey);
           return newSessions;
         });
       } else {
@@ -3330,24 +3358,22 @@ function AppContent() {
       },
     };
 
+    // Brain: fix-late-render-abort-stale-buffer
+    // Clear active queryId so stale events from old queries are rejected
+    activeQueryIdRef.current.delete(targetAgentId);
+
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
       const agentMessages = newSessions.get(targetAgentId) ?? [];
 
-      // 🦆 EVENT BUFFER FIX: Flush buffered events to prevent race condition
-      // Same pattern as sendMessageForAgent (line ~1914-1940)
-      const bufferedEvents = eventBufferRef.current.get(targetAgentId) || [];
-      if (bufferedEvents.length > 0) {
-        console.log(`🦆 [sendMessageForTargetAgent] Flushing ${bufferedEvents.length} buffered events for ${targetAgentId}`);
+      // Brain: fix-late-render-abort-stale-buffer
+      // Discard any stale buffered events — same reasoning as sendMessageForAgent.
+      if (eventBufferRef.current.has(targetAgentId)) {
+        const staleCount = eventBufferRef.current.get(targetAgentId)!.length;
+        console.log(`🦆 [sendMessageForTargetAgent] Discarding ${staleCount} stale buffered events for ${targetAgentId}`);
         eventBufferRef.current.delete(targetAgentId);
-        const messageWithBufferedEvents = {
-          ...assistantMessage,
-          events: bufferedEvents,
-        };
-        newSessions.set(targetAgentId, [...agentMessages, messageWithBufferedEvents]);
-      } else {
-        newSessions.set(targetAgentId, [...agentMessages, assistantMessage]);
       }
+      newSessions.set(targetAgentId, [...agentMessages, assistantMessage]);
       return newSessions;
     });
 
