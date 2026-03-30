@@ -26,7 +26,15 @@ export function getChatMessageTurnId(message?: ChatMessage): string | undefined 
   return typeof turnId === 'string' && turnId.length > 0 ? turnId : undefined;
 }
 
-export function shouldRejectClaudeEvent(activeTurnId?: string, incomingTurnId?: string): boolean {
+export function shouldRejectClaudeEvent(
+  activeTurnId?: string,
+  incomingTurnId?: string,
+  abortedTurnIds?: ReadonlySet<string>,
+): boolean {
+  if (incomingTurnId && abortedTurnIds?.has(incomingTurnId)) {
+    return true;
+  }
+
   return Boolean(activeTurnId && incomingTurnId && activeTurnId !== incomingTurnId);
 }
 

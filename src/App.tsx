@@ -1049,6 +1049,7 @@ function AppContent() {
   // Track the active turnId per session so handleClaudeEvent can reject stale events
   // from aborted/completed queries that arrive after a new turn starts.
   const activeQueryIdRef = useRef<Map<string, string>>(new Map());
+  const abortedTurnIdsRef = useRef<Map<string, Set<string>>>(new Map());
 
   // 🦆 DIAGNOSTIC: Ring buffer to capture event flow for intermittent late-render bug.
   // Near-zero overhead: just pushes small objects to a capped array.
@@ -1169,6 +1170,8 @@ function AppContent() {
     // Clear refs
     pendingListenersRef.current.delete(agentId);
     eventBufferRef.current.delete(agentId);
+    activeQueryIdRef.current.delete(agentId);
+    abortedTurnIdsRef.current.delete(agentId);
     activeMessageKeyRef.current.delete(agentId);
     lastPromptsRef.current.delete(agentId);
     agentMetadataRef.current.delete(agentId);
@@ -1385,6 +1388,7 @@ function AppContent() {
       return; // REJECT event - do not write to any session
     }
     const messageKey = sessionKey;
+    const abortedTurnIds = abortedTurnIdsRef.current.get(messageKey);
 
     // Brain: fix-late-render-abort-stale-buffer
     // Reject events from stale queries. When a new turn starts, sendMessageForAgent
@@ -1392,8 +1396,12 @@ function AppContent() {
     // in every event. Events carrying a different turnId are from old/aborted queries
     // and must be discarded — otherwise they get applied to the new streaming placeholder.
     const activeTurnId = activeQueryIdRef.current.get(messageKey);
-    if (shouldRejectClaudeEvent(activeTurnId, turnId)) {
-      console.log(`🦆 [${source}] REJECTED stale event for messageKey=${messageKey}: event turnId=${turnId!.slice(0, 20)} !== active ${activeTurnId!.slice(0, 20)}`);
+    if (shouldRejectClaudeEvent(activeTurnId, turnId, abortedTurnIds)) {
+      if (turnId && abortedTurnIds?.has(turnId)) {
+        console.log(`🦆 [${source}] REJECTED aborted-turn event for messageKey=${messageKey}: turnId=${turnId.slice(0, 20)}`);
+      } else {
+        console.log(`🦆 [${source}] REJECTED stale event for messageKey=${messageKey}: event turnId=${turnId!.slice(0, 20)} !== active ${activeTurnId!.slice(0, 20)}`);
+      }
       return;
     }
 
@@ -2685,6 +2693,8 @@ function AppContent() {
 
     // 🦆 SESSION-FIRST: Clear previous response text for this session (new conversation turn)
     lastAgentResponseRef.current.delete(messageKey);
+    // Old aborted turns no longer need explicit same-turn filtering once a new turn starts.
+    abortedTurnIdsRef.current.delete(messageKey);
 
     // Set the active turn ID before the placeholder/invoke so late events from the
     // previous turn can be rejected immediately instead of buffering into the next turn.
@@ -2975,6 +2985,9 @@ function AppContent() {
           // Clear event buffer on abort: the daemon may still emit trailing events
           // after the frontend aborts. Without this, those events buffer and get
           // incorrectly flushed into the NEXT turn's assistant placeholder.
+          const abortedTurnIds = abortedTurnIdsRef.current.get(messageKey) ?? new Set<string>();
+          abortedTurnIds.add(turnId);
+          abortedTurnIdsRef.current.set(messageKey, abortedTurnIds);
           eventBufferRef.current.delete(messageKey);
           // Clear active turnId so trailing events from the aborted query are rejected
           activeQueryIdRef.current.delete(messageKey);
@@ -3422,6 +3435,7 @@ function AppContent() {
     };
 
     activeQueryIdRef.current.set(targetAgentId, turnId);
+    abortedTurnIdsRef.current.delete(targetAgentId);
 
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
@@ -3634,6 +3648,9 @@ function AppContent() {
           )
         );
         if (wasAborted) {
+          const abortedTurnIds = abortedTurnIdsRef.current.get(targetAgentId) ?? new Set<string>();
+          abortedTurnIds.add(turnId);
+          abortedTurnIdsRef.current.set(targetAgentId, abortedTurnIds);
           eventBufferRef.current.delete(targetAgentId);
           activeQueryIdRef.current.delete(targetAgentId);
         }

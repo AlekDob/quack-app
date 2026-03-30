@@ -37,6 +37,12 @@ describe('chatTurnIsolation', () => {
     expect(shouldRejectClaudeEvent('turn-2', undefined)).toBe(false);
   });
 
+  it('rejects events for locally aborted turns', () => {
+    expect(shouldRejectClaudeEvent('turn-1', 'turn-1', new Set(['turn-1']))).toBe(true);
+    expect(shouldRejectClaudeEvent('turn-2', 'turn-1', new Set(['turn-3']))).toBe(true);
+    expect(shouldRejectClaudeEvent('turn-1', 'turn-1', new Set(['turn-2']))).toBe(false);
+  });
+
   it('applies same-turn trailing events to a completed assistant message', () => {
     const completedMessage = createAssistantMessage('turn-1', 'complete');
     completedMessage.events = [createAssistantEvent('initial')];
