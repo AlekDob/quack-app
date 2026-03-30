@@ -15,6 +15,11 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { ChatMessage, KanbanTask, ClaudeEvent } from '../types';
 import { getProviderRequestFields } from '../services/claudeSDK';
 import type { ChatSendOptions } from './useClaudeChat';
+import {
+  appendMessagesToSession,
+  createChatTurnId,
+  shouldRejectClaudeEvent,
+} from '../utils/chatTurnIsolation';
 
 interface ChatTokens {
   inputTokens: number;
@@ -50,6 +55,7 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
   const lastPromptsRef = useRef<Map<string, string>>(new Map());
   // Listeners cleanup
   const listenersRef = useRef<Map<string, UnlistenFn>>(new Map());
+  const activeTurnIdRef = useRef<Map<string, string>>(new Map());
 
   // Load chat session from storage
   const loadChatSession = useCallback(async (taskId: string, sessionId?: string) => {
@@ -154,16 +160,12 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
       status: 'complete',
     };
 
-    const currentMessages = chatSessions.get(taskId) || [];
-    const messagesWithUser = [...currentMessages, userMessage];
-
     setChatSessions(prev => {
-      const newSessions = new Map(prev);
-      newSessions.set(taskId, messagesWithUser);
-      return newSessions;
+      return appendMessagesToSession(prev, taskId, [userMessage]);
     });
 
     // Create assistant message placeholder
+    const turnId = createChatTurnId();
     const assistantMessageId = `assistant-${Date.now()}`;
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
@@ -171,13 +173,12 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
       content: '',
       timestamp: Date.now(),
       status: 'streaming',
+      metadata: { turnId },
     };
 
-    const messagesWithAssistant = [...messagesWithUser, assistantMessage];
+    activeTurnIdRef.current.set(taskId, turnId);
     setChatSessions(prev => {
-      const newSessions = new Map(prev);
-      newSessions.set(taskId, messagesWithAssistant);
-      return newSessions;
+      return appendMessagesToSession(prev, taskId, [assistantMessage]);
     });
 
     // Mark stream as active
@@ -191,6 +192,12 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
       const task = tasks.find(t => t.id === taskId);
       const existingSessionId = task?.sessionId;
 
+      const existingUnlisten = listenersRef.current.get(taskId);
+      if (existingUnlisten) {
+        existingUnlisten();
+        listenersRef.current.delete(taskId);
+      }
+
       // Setup stream listener using correct event pattern (claude-event:{agentId})
       const eventName = `claude-event:${taskId}`;
       let accumulatedContent = '';
@@ -198,13 +205,20 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
 
       console.log(`[usePopoutKanbanChat] Setting up listener for: ${eventName}`);
 
-      const unlisten = await listen<ClaudeEvent>(eventName, (event) => {
+      const unlisten = await listen<{ sessionKey?: string; turnId?: string; event: ClaudeEvent }>(eventName, (event) => {
         if (!activeStreamsRef.current.get(taskId)) {
           // Stream was aborted
           return;
         }
 
-        const claudeEvent = event.payload;
+        const { sessionKey, turnId: eventTurnId, event: claudeEvent } = event.payload;
+        if (sessionKey && sessionKey !== taskId) {
+          return;
+        }
+
+        if (shouldRejectClaudeEvent(activeTurnIdRef.current.get(taskId), eventTurnId)) {
+          return;
+        }
 
         // Extract session_id from various event types
         if ('session_id' in claudeEvent && claudeEvent.session_id) {
@@ -220,7 +234,7 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
               setChatSessions(prev => {
                 const newSessions = new Map(prev);
                 const msgs = [...(newSessions.get(taskId) || [])];
-                const lastIndex = msgs.findIndex(m => m.id === assistantMessageId);
+                const lastIndex = msgs.findIndex(m => m.id === assistantMessageId || m.metadata?.turnId === turnId);
                 if (lastIndex >= 0) {
                   msgs[lastIndex] = { ...msgs[lastIndex], content: accumulatedContent };
                 }
@@ -242,7 +256,7 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
                 setChatSessions(prev => {
                   const newSessions = new Map(prev);
                   const msgs = [...(newSessions.get(taskId) || [])];
-                  const lastIndex = msgs.findIndex(m => m.id === assistantMessageId);
+                  const lastIndex = msgs.findIndex(m => m.id === assistantMessageId || m.metadata?.turnId === turnId);
                   if (lastIndex >= 0) {
                     msgs[lastIndex] = { ...msgs[lastIndex], content: accumulatedContent };
                   }
@@ -258,7 +272,7 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
             setChatSessions(prev => {
               const newSessions = new Map(prev);
               const msgs = [...(newSessions.get(taskId) || [])];
-              const lastIndex = msgs.findIndex(m => m.id === assistantMessageId);
+              const lastIndex = msgs.findIndex(m => m.id === assistantMessageId || m.metadata?.turnId === turnId);
               if (lastIndex >= 0) {
                 msgs[lastIndex] = { ...msgs[lastIndex], status: 'complete' };
               }
@@ -276,7 +290,8 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
               return newMap;
             });
 
-            activeStreamsRef.current.delete(taskId);
+            // Keep the listener active until the next send/abort so same-turn tail
+            // events that arrive after result still land on the completed message.
             break;
 
           case 'error':
@@ -287,7 +302,7 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
             setChatSessions(prev => {
               const newSessions = new Map(prev);
               const msgs = [...(newSessions.get(taskId) || [])];
-              const lastIndex = msgs.findIndex(m => m.id === assistantMessageId);
+              const lastIndex = msgs.findIndex(m => m.id === assistantMessageId || m.metadata?.turnId === turnId);
               if (lastIndex >= 0) {
                 msgs[lastIndex] = {
                   ...msgs[lastIndex],
@@ -321,6 +336,8 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
           prompt: content,
           cwd: options?.workingDirectory || task?.projectPath || '/',
           sessionId: existingSessionId,
+          sessionKey: taskId,
+          turnId,
           model: prf.resolveModel(options?.model || 'opus'),
           thinkingMode: options?.thinkingMode || 'auto',
           permissionMode: options?.permissionMode || 'bypass',
@@ -340,7 +357,7 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
       setChatSessions(prev => {
         const newSessions = new Map(prev);
         const msgs = [...(newSessions.get(taskId) || [])];
-        const lastIndex = msgs.findIndex(m => m.id === assistantMessageId);
+        const lastIndex = msgs.findIndex(m => m.id === assistantMessageId || m.metadata?.turnId === turnId);
         if (lastIndex >= 0) {
           msgs[lastIndex] = {
             ...msgs[lastIndex],
@@ -360,11 +377,12 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
 
       activeStreamsRef.current.delete(taskId);
     }
-  }, [chatSessions, saveChatSession]);
+  }, [saveChatSession]);
 
   // Abort active stream
   const abortStream = useCallback((taskId: string) => {
     activeStreamsRef.current.set(taskId, false);
+    activeTurnIdRef.current.delete(taskId);
 
     // Cleanup listener
     const unlisten = listenersRef.current.get(taskId);
@@ -396,6 +414,14 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
 
   // Clear conversation
   const clearConversation = useCallback(async (taskId: string) => {
+    activeTurnIdRef.current.delete(taskId);
+    activeStreamsRef.current.delete(taskId);
+    const unlisten = listenersRef.current.get(taskId);
+    if (unlisten) {
+      unlisten();
+      listenersRef.current.delete(taskId);
+    }
+
     setChatSessions(prev => {
       const newSessions = new Map(prev);
       newSessions.delete(taskId);
@@ -435,6 +461,7 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
     return () => {
       listenersRef.current.forEach(unlisten => unlisten());
       listenersRef.current.clear();
+      activeTurnIdRef.current.clear();
     };
   }, []);
 
