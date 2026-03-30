@@ -5662,49 +5662,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           body: `${agentName}: Response completed!`,
         });
 
-        // Send Telegram notification if user is linked
-        try {
-          const [, chatId] = await invoke<[string | null, number | null]>("get_telegram_link");
-          if (chatId) {
-            // Get the last response text (if available)
-            const lastResponse = lastAgentResponseRef.current.get(payload.id) || '';
-
-            let message = '';
-
-            if (!lastResponse) {
-              // No text response (only tool calls)
-              message = `🦆 *${projectName}*\n\n${agentName}: Response completed!\n\n_Open Quack to view details_`;
-            } else if (lastResponse.length <= 1000) {
-              // Short response: send FULL text
-              // Clean up markdown formatting for Telegram
-              const cleanText = lastResponse
-                .replace(/```[\s\S]*?```/g, '[code block]')
-                .replace(/`([^`]+)`/g, '$1');
-
-              message = `🦆 *${projectName}*\n\n${agentName}:\n\n${cleanText}\n\n---\n_View in Quack for full context_`;
-            } else {
-              // Long response: send summary (first 300 chars)
-              const summary = lastResponse.substring(0, 297) + '...';
-              const cleanSummary = summary
-                .replace(/```[\s\S]*?```/g, '[code]')
-                .replace(/`([^`]+)`/g, '$1');
-
-              message = `🦆 *${projectName}*\n\n${agentName}:\n\n${cleanSummary}\n\n_Open Quack to view full response (${lastResponse.length} chars)_`;
-            }
-
-            await invoke("send_telegram_message", {
-              payload: {
-                chat_id: chatId,
-                text: message,
-              },
-            });
-
-            // Clear the saved response after sending notification
-            lastAgentResponseRef.current.delete(payload.id);
-          }
-        } catch (error) {
-          console.warn("Unable to send Telegram notification", error);
-        }
+        // Telegram notifications are now handled by the Rust notification bridge
+        // (telegram_notifications.rs) which subscribes to WsBroadcast events
+        // and sends formatted summaries with inline keyboard buttons.
+        // Brain: 002-telegram-bidirectional-chat
+        lastAgentResponseRef.current.delete(payload.id);
       } catch (error) {
         console.warn("Unable to show notification", error);
       }

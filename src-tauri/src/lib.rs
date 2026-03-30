@@ -58,6 +58,10 @@ mod slash_commands;
 mod snippets; // Prompt snippets for quick text expansion
 mod telegram_bot;
 mod telegram_central;
+mod telegram_types;
+mod telegram_send;
+mod telegram_commands;
+mod telegram_notifications;
 mod telegram_obfuscation; // 🔐 Telegram token obfuscation (temporary security)
 mod terminal;
 mod automation; // 🤖 Cron-based automation scheduler for agent sessions
@@ -647,7 +651,7 @@ pub fn run() {
             }
 
             // Initialize Telegram Central Polling State
-            let telegram_state = telegram_central::TelegramPollingState::new(app.handle().clone());
+            let telegram_state = telegram_types::TelegramPollingState::new(app.handle().clone());
             app.manage(telegram_state);
 
             // 🌐 Initialize Remote API config and auth state
@@ -932,6 +936,14 @@ pub fn run() {
                     }
                 });
             }
+
+            // Share WsBroadcast globally so telegram_notifications can subscribe
+            app.manage(ws_broadcast.clone());
+
+            // Start Telegram notification bridge
+            let mappings = telegram_notifications::TelegramSessionMappings::new();
+            app.manage(mappings);
+            telegram_notifications::start_notification_bridge(app.handle().clone());
 
             tauri::async_runtime::spawn(async move {
                 // Use global singleton for agent status — shared with claude_cli streaming
@@ -1267,6 +1279,8 @@ pub fn run() {
             preferences::save_telegram_link,
             preferences::get_telegram_link,
             preferences::initialize_central_bot_token,
+            preferences::get_telegram_mute,
+            preferences::set_telegram_mute,
             personality::save_agent_personality,
             personality::load_agent_personality,
             personality::inject_personality_to_claude_md,

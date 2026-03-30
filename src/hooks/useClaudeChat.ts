@@ -618,14 +618,8 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
             model: options?.model || 'opus',
           });
 
-          // 🆕 Trigger mobile notification
-          try {
-            await invoke('send_ai_completion_notification', {
-              content: assistantContent.substring(0, 100) || 'Chat completed!'
-            });
-          } catch (err) {
-            console.warn('[Mobile Notification] Failed:', err);
-          }
+          // Telegram notifications handled by Rust notification bridge
+          // Brain: 002-telegram-bidirectional-chat
 
           // Trigger onComplete callback if provided
           if (options?.onComplete) {

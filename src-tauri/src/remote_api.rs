@@ -275,7 +275,7 @@ fn read_dat_store(filename: &str) -> serde_json::Value {
         .unwrap_or(serde_json::json!({}))
 }
 
-fn read_agents_storage() -> Result<serde_json::Value, String> {
+pub(crate) fn read_agents_storage() -> Result<serde_json::Value, String> {
     let path = get_agents_storage_path()
         .ok_or_else(|| "Cannot determine storage path".to_string())?;
     let content = std::fs::read_to_string(&path)

@@ -128,3 +128,12 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 **Brain breadcrumbs in code**: When writing code related to a Brain entry (bug fix, pattern, gotcha), add `// Brain: {slug}` above the relevant block. This links code back to its documentation. Example: `// Brain: fix-stamina-bar-prompt-caching`. See quack-brain skill for full rules.
 
 Full knowledge store: `documentation/` (project) + `~/.quack/brain/` (global). Use the `quack-brain` skill for read/write operations.
+
+## Active Technologies
+- Rust 1.75+ (Tauri backend), TypeScript strict (React frontend) + Tauri v2, walkdir, rayon, ignore (gitignore support), React 18, Zustand (001-fulltext-search)
+- Local filesystem (read-only search, no persistence needed) (001-fulltext-search)
+- Rust 1.75+ (Tauri backend), TypeScript strict (React frontend) + Tauri v2, tokio (async runtime + broadcast channel), reqwest (HTTP client), serde (serialization) (002-telegram-bidirectional-chat)
+- In-memory HashMap for session-message mappings; `app-preferences.json` for mute toggle (002-telegram-bidirectional-chat)
+
+## Recent Changes
+- 001-fulltext-search: Added Rust 1.75+ (Tauri backend), TypeScript strict (React frontend) + Tauri v2, walkdir, rayon, ignore (gitignore support), React 18, Zustand
