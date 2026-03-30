@@ -8517,6 +8517,14 @@ button.directory-chooser:disabled {
   flex-shrink: 0;
 }
 
+.sidebar-footer-discord {
+  color: #5865F2;
+}
+
+.sidebar-footer-discord:hover {
+  color: #7289DA;
+}
+
 .sidebar-footer-version {
   font-size: 9px;
   color: rgba(255, 255, 255, 0.85);
