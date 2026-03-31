@@ -1980,12 +1980,11 @@ function AppContent() {
     }
   }, [activeId]);
 
-  // Reset Changes Panel when switching session/agent
-  // Brain: pattern-changes-panel
-  useEffect(() => {
-    setModifiedFiles(new Map());
-    setFileEditsMap(new Map());
-  }, [activeId]);
+  // Brain: fix-changes-panel-race-condition
+  // Removed: useEffect reset on activeId was racing with ChatView's onEditsChange.
+  // Parent effects fire AFTER child effects in React, so the reset was overwriting
+  // the edits that ChatView had just populated. Now handleEditsChange does a full
+  // REPLACE (not merge), so stale data is cleared automatically on session switch.
 
   // Brain: fix-office-status-dot-chatloadingmap-key-mismatch
   // Sync terminal status with chatLoadingMap and check if waiting for response.
@@ -9353,29 +9352,29 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [activeTerminal?.cwd, explorerRoot, explorerPath]);
 
-  // Handler to update modified files map (for FileExplorer indicators)
-  // Merges new edits into existing map so changes accumulate across the session
+  // Brain: fix-changes-panel-race-condition
+  // Handler to update modified files map (for FileExplorer indicators).
+  // REPLACES (not merges) — ChatView's useMemo always sends the complete set
+  // from all assistant messages, so replace is correct and avoids stale data
+  // from previous sessions persisting after a session switch.
   const handleEditsChange = useCallback((edits: FileEdit[], deletes: FileDeleted[]) => {
-    // Skip empty updates to avoid clearing accumulated state
-    if (edits.length === 0 && deletes.length === 0) return;
-
-    setModifiedFiles(prev => {
-      const merged = new Map(prev);
+    setModifiedFiles(() => {
+      const fresh = new Map<string, 'created' | 'modified' | 'deleted'>();
       edits.forEach(edit => {
-        merged.set(edit.filePath, edit.status || 'modified');
+        fresh.set(edit.filePath, edit.status || 'modified');
       });
       deletes.forEach(deleted => {
-        merged.set(deleted.filePath, 'deleted');
+        fresh.set(deleted.filePath, 'deleted');
       });
-      return merged;
+      return fresh;
     });
 
-    setFileEditsMap(prev => {
-      const merged = new Map(prev);
+    setFileEditsMap(() => {
+      const fresh = new Map<string, FileEdit>();
       edits.forEach(edit => {
-        merged.set(edit.filePath, edit);
+        fresh.set(edit.filePath, edit);
       });
-      return merged;
+      return fresh;
     });
   }, []);
 
