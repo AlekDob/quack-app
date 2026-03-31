@@ -511,10 +511,17 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
               message.events!.forEach((event: any, eventIndex: number) => {
                 // Only assistant events render visible tool/text content.
                 // system/init is also allowed through (renders the "System Initialized" block).
+                // system/status (compacting) and system/compact_boundary are allowed for CompactingIndicator.
                 // All other event types (user, agent, other system events, rate_limit_event, etc.)
                 // must be skipped — they create non-nested groups that break consecutive
                 // droid grouping, causing each tool call to get its own DroidActivityBlock.
-                if (event.type !== 'assistant' && !(event.type === 'system' && event.subtype === 'init')) return;
+                // Brain: fix-compact-not-triggering-sdk-native
+                const isAllowedSystemEvent = event.type === 'system' && (
+                  event.subtype === 'init' ||
+                  event.subtype === 'compact_boundary' ||
+                  (event.subtype === 'status' && event.status === 'compacting')
+                );
+                if (event.type !== 'assistant' && !isAllowedSystemEvent) return;
 
                 if (isGroupableToolEvent(event)) {
                   if (currentGroup) {
@@ -690,17 +697,6 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
               const groupHasAgentTool = (g: typeof groups[0]): boolean =>
                 getAgentToolDroidType(g) !== undefined;
 
-              // Debug: log merge loop inputs (temporary — remove after fix verified)
-              if (process.env.NODE_ENV === 'development') {
-                console.debug('[DroidMerge] nestedEventIndices:', [...nestedEventIndices.entries()]);
-                console.debug('[DroidMerge] renderGroups droidTypes:', renderGroups.map((g, i) => ({
-                  i,
-                  droidType: getGroupDroidType(g),
-                  hasAgentTool: groupHasAgentTool(g),
-                  agentDroidType: getAgentToolDroidType(g),
-                  kind: g.kind,
-                })));
-              }
 
               const renderResult: React.ReactNode[] = [];
               let ri = 0;

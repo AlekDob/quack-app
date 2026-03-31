@@ -6,6 +6,7 @@
  */
 
 import { toast } from 'sonner';
+import type { ChatMessage } from '../types';
 
 /**
  * Validate prompt before sending to SDK
@@ -48,7 +49,7 @@ export function validatePrompt(prompt: string): { valid: boolean; reason?: strin
  * Save session backup to localStorage
  * Used as fallback when SDK session fails
  */
-export function saveSessionBackup(sessionId: string, messages: any[]): void {
+export function saveSessionBackup(sessionId: string, messages: ChatMessage[]): void {
   try {
     const backup = {
       sessionId,
@@ -66,7 +67,7 @@ export function saveSessionBackup(sessionId: string, messages: any[]): void {
  * Load session backup from localStorage
  * Returns null if no backup exists or backup is corrupted
  */
-export function loadSessionBackup(sessionId: string): { messages: any[]; timestamp: number } | null {
+export function loadSessionBackup(sessionId: string): { messages: ChatMessage[]; timestamp: number } | null {
   try {
     const backupJson = localStorage.getItem(`session_backup_${sessionId}`);
     if (!backupJson) return null;
@@ -79,9 +80,9 @@ export function loadSessionBackup(sessionId: string): { messages: any[]; timesta
       return null;
     }
 
-    // Check if backup is too old (> 24 hours)
+    // Check if backup is too old (> 7 days, matching cleanupOldBackups)
     const age = Date.now() - backup.timestamp;
-    if (age > 24 * 60 * 60 * 1000) {
+    if (age > 7 * 24 * 60 * 60 * 1000) {
       console.warn('[SessionRecovery] Backup is too old, ignoring');
       return null;
     }

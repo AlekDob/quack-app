@@ -18,7 +18,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { Toaster, toast } from "sonner";
 import "sonner/dist/styles.css";
 import "./sonner-custom.css";
-import { saveSessionBackup } from "./utils/sessionRecovery";
+import { saveSessionBackup, cleanupOldBackups } from "./utils/sessionRecovery";
 
 import TerminalSidebar from "./components/TerminalSidebar";
 import SidePanel from "./components/SidePanel";
@@ -197,6 +197,13 @@ import type {
   AutomationJob,
 } from "./types";
 import { getRandomName } from "./utils/agentNames";
+import {
+  appendMessagesToSession,
+  createChatTurnId,
+  routeClaudeEventToSession,
+  shouldRejectClaudeEvent,
+  type BufferedClaudeEvent,
+} from "./utils/chatTurnIsolation";
 
 import "./App.css";
 import "./components/MetroStyle.css";
@@ -335,6 +342,10 @@ function unifiedAgentToTerminalMetadata(agent: UnifiedAgent) {
     branch: undefined, // Runtime state - will be re-detected
   };
 }
+
+// Stable empty collections — avoids creating new references on every render
+const EMPTY_SET = new Set<string>();
+const EMPTY_MAP = new Map<string, AskUserQuestionAnswers>();
 
 function AppContent() {
   // Load assets INSIDE the component, not at module level
@@ -498,43 +509,52 @@ function AppContent() {
       setActiveTaskId(null);
       console.log(`[SESSION-FIX] Cleared activeTaskId because activeSessionId is now: ${newSessionId}`);
 
-      // 🚀 LAZY HYDRATION: Load chat messages only when session is selected
-      // This avoids loading ALL sessions at boot, improving startup time
-      setChatSessions(prev => {
-        // Skip if already hydrated
-        if (prev.has(newSessionId)) {
-          return prev;
+      // 🚀 LAZY HYDRATION: Load chat messages from .jsonl on first visit after restart.
+      // Boot-time code (loadKanbanChatSessions) may pre-populate chatSessions with stale
+      // data from quack-chats.json, so we use hydratedSessionsRef to track which sessions
+      // have been freshly loaded from .jsonl in this app session.
+      // After the first .jsonl load, subsequent switches preserve the in-memory cache
+      // (rich ChatMessage objects with tool events, subagent data, etc.).
+      if (hydratedSessionsRef.current.has(newSessionId)) {
+        // Already hydrated from .jsonl in this app session — keep in-memory data
+        return;
+      }
+
+      // Optimistic lock: claim the slot synchronously to prevent duplicate IIFEs
+      // if the user switches to the same session twice before the first resolves.
+      hydratedSessionsRef.current.add(newSessionId);
+
+      // First visit after restart — load from .jsonl via Tauri backend
+      (async () => {
+        const session = useSessionStore.getState().sessions.find(s => s.id === newSessionId);
+        if (!session?.claudeSessionId) {
+          console.warn(`[LAZY HYDRATE] No claudeSessionId for session ${newSessionId}`);
+          return;
         }
 
-        // Async hydration - doesn't block the selection
-        (async () => {
-          const session = useSessionStore.getState().sessions.find(s => s.id === newSessionId);
-          if (!session?.claudeSessionId) return;
+        try {
+          const details = await invoke<SessionDetails>('resume_session', {
+            sessionId: session.claudeSessionId
+          });
 
-          try {
-            const details = await invoke<SessionDetails>('resume_session', {
-              sessionId: session.claudeSessionId
-            });
+          if (details.messages && details.messages.length > 0) {
+            const chatMessages: ChatMessage[] = details.messages.map((m) => ({
+              id: crypto.randomUUID(),
+              role: m.role as 'user' | 'assistant',
+              content: m.content,
+              timestamp: m.timestamp || Date.now(),
+              status: 'complete' as const,
+            }));
 
-            if (details.messages && details.messages.length > 0) {
-              const chatMessages: ChatMessage[] = details.messages.map((m) => ({
-                id: crypto.randomUUID(),
-                role: m.role as 'user' | 'assistant',
-                content: m.content,
-                timestamp: m.timestamp || Date.now(),
-                status: 'complete' as const,
-              }));
-
-              setChatSessions(p => new Map(p).set(newSessionId, chatMessages));
-              console.log(`[LAZY HYDRATE] Loaded ${chatMessages.length} messages for session ${newSessionId}`);
-            }
-          } catch (e) {
-            console.debug(`[LAZY HYDRATE] Could not restore session ${newSessionId}:`, e);
+            setChatSessions(p => new Map(p).set(newSessionId, chatMessages));
+            console.log(`[LAZY HYDRATE] Loaded ${chatMessages.length} messages for session ${newSessionId}`);
           }
-        })();
-
-        return prev;
-      });
+        } catch (e) {
+          // Release the lock so a retry is possible on next switch
+          hydratedSessionsRef.current.delete(newSessionId);
+          console.debug(`[LAZY HYDRATE] Could not restore session ${newSessionId}:`, e);
+        }
+      })();
     }
   }, []);
 
@@ -1002,6 +1022,16 @@ function AppContent() {
   // 🦆 SESSION PERSISTENCE: REMOVED - No longer showing resume messages
   // Users can resume via Sessions panel instead
 
+  // Ref mirror of chatSessions for synchronous access in beforeunload and result-event handlers
+  const chatSessionsRef = useRef<Map<string, ChatMessage[]>>(new Map());
+  // Ref mirror of activeSessionId for synchronous access in beforeunload handler
+  const activeSessionIdRef = useRef<string | null>(null);
+  // Track which sessions have been freshly hydrated from .jsonl in THIS app session.
+  // Boot-time code (loadKanbanChatSessions) may pre-populate chatSessions with stale data
+  // from quack-chats.json. This ref ensures the first visit to each session after restart
+  // always refreshes from .jsonl, while subsequent switches preserve the in-memory cache.
+  const hydratedSessionsRef = useRef<Set<string>>(new Set());
+
   // 🦆 RACE CONDITION FIX: Track active event listeners to ensure they're ready before invoke()
   // This prevents the bug where events are emitted before the listener is set up
   const activeListenersRef = useRef<Map<string, () => void>>(new Map());
@@ -1014,11 +1044,12 @@ function AppContent() {
   // 🦆 EVENT BUFFER FIX: Buffer events that arrive before the streaming message is ready
   // This fixes the intermittent bug where Task/droid widgets don't appear because
   // the event arrives before React's setState has created the streaming message
-  const eventBufferRef = useRef<Map<string, ClaudeEvent[]>>(new Map());
+  const eventBufferRef = useRef<Map<string, BufferedClaudeEvent[]>>(new Map());
   // Brain: fix-late-render-abort-stale-buffer
-  // Track the active queryId per session so handleClaudeEvent can reject stale events
+  // Track the active turnId per session so handleClaudeEvent can reject stale events
   // from aborted/completed queries that arrive after a new turn starts.
   const activeQueryIdRef = useRef<Map<string, string>>(new Map());
+  const abortedTurnIdsRef = useRef<Map<string, Set<string>>>(new Map());
 
   // 🦆 DIAGNOSTIC: Ring buffer to capture event flow for intermittent late-render bug.
   // Near-zero overhead: just pushes small objects to a capped array.
@@ -1088,6 +1119,39 @@ function AppContent() {
     });
   }, [chatSessions]);
 
+  // Keep chatSessionsRef in sync for synchronous access in beforeunload and result-event handlers
+  useEffect(() => {
+    chatSessionsRef.current = chatSessions;
+  }, [chatSessions]);
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
+
+  // 🦆 SESSION BACKUP: Flush active session messages to localStorage on app close.
+  // Only the active session is flushed here — other sessions are covered by the
+  // per-turn saveSessionBackup call in the result-event handler.
+  useEffect(() => {
+    const flush = () => {
+      const sid = activeSessionIdRef.current;
+      if (!sid) return;
+      const messages = chatSessionsRef.current.get(sid);
+      if (messages && messages.length > 0) {
+        saveSessionBackup(sid, messages);
+      }
+    };
+    window.addEventListener('beforeunload', flush);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      window.removeEventListener('beforeunload', flush);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, []);
+
+  // Clean up stale localStorage backups on startup (older than 7 days)
+  useEffect(() => {
+    cleanupOldBackups();
+  }, []);
+
   // Brain: fix-memory-leak-14gb-ram
   // Centralized cleanup: remove ALL data associated with an agent from every Map/Ref
   const cleanupAgentData = useCallback((agentId: string) => {
@@ -1106,6 +1170,8 @@ function AppContent() {
     // Clear refs
     pendingListenersRef.current.delete(agentId);
     eventBufferRef.current.delete(agentId);
+    activeQueryIdRef.current.delete(agentId);
+    abortedTurnIdsRef.current.delete(agentId);
     activeMessageKeyRef.current.delete(agentId);
     lastPromptsRef.current.delete(agentId);
     agentMetadataRef.current.delete(agentId);
@@ -1311,7 +1377,7 @@ function AppContent() {
     claudeEvent: ClaudeEvent,
     source: string, // For debugging: 'Multi-Listener', 'Pre-warm', 'ensureListenerReady'
     sessionKey?: string, // 🦆 SESSION-FIRST: sessionKey from Rust event wrapper
-    queryId?: string // Brain: fix-late-render-abort-stale-buffer — per-turn event isolation
+    turnId?: string // Frontend-generated turn ID echoed back from Rust for per-turn isolation
   ) => {
     const evt = claudeEvent as any;
 
@@ -1322,18 +1388,21 @@ function AppContent() {
       return; // REJECT event - do not write to any session
     }
     const messageKey = sessionKey;
+    const abortedTurnIds = abortedTurnIdsRef.current.get(messageKey);
 
     // Brain: fix-late-render-abort-stale-buffer
     // Reject events from stale queries. When a new turn starts, sendMessageForAgent
     // sets activeQueryIdRef to a new turnId and passes it to Rust. Rust echoes it back
     // in every event. Events carrying a different turnId are from old/aborted queries
     // and must be discarded — otherwise they get applied to the new streaming placeholder.
-    if (queryId) {
-      const activeTurnId = activeQueryIdRef.current.get(messageKey);
-      if (activeTurnId && queryId !== activeTurnId) {
-        console.log(`🦆 [${source}] REJECTED stale event for messageKey=${messageKey}: event turnId=${queryId.slice(0, 20)} !== active ${activeTurnId.slice(0, 20)}`);
-        return;
+    const activeTurnId = activeQueryIdRef.current.get(messageKey);
+    if (shouldRejectClaudeEvent(activeTurnId, turnId, abortedTurnIds)) {
+      if (turnId && abortedTurnIds?.has(turnId)) {
+        console.log(`🦆 [${source}] REJECTED aborted-turn event for messageKey=${messageKey}: turnId=${turnId.slice(0, 20)}`);
+      } else {
+        console.log(`🦆 [${source}] REJECTED stale event for messageKey=${messageKey}: event turnId=${turnId!.slice(0, 20)} !== active ${activeTurnId!.slice(0, 20)}`);
       }
+      return;
     }
 
     // Tag system/init events as resumed to hide redundant header + init widget
@@ -1355,11 +1424,36 @@ function AppContent() {
       console.log(`[handleClaudeEvent] 🦆 Early save claudeSessionId ${evt.session_id.slice(0, 8)}... to session ${messageKey}`);
     }
 
+    // Brain: fix-compact-not-triggering-sdk-native
+    // When SDK compaction completes, reset token tracking so the stamina bar reflects
+    // the post-compact context. The next message's usage data will provide accurate numbers.
+    if (evt.type === 'system' && evt.subtype === 'compact_boundary') {
+      const preTokens = evt.compact_metadata?.pre_tokens;
+      console.log(`[handleClaudeEvent] 🗜️ Compact boundary for ${messageKey}: pre_tokens=${preTokens}`);
+      setChatTokensMap((prev) => {
+        const newMap = new Map(prev);
+        const currentTokens = newMap.get(messageKey);
+        if (currentTokens) {
+          newMap.set(messageKey, {
+            ...currentTokens,
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheCreationTokens: 0,
+            cacheReadTokens: 0,
+            // Preserve cumulative cost and context window
+            totalCost: currentTokens.totalCost,
+            contextWindow: currentTokens.contextWindow,
+          });
+        }
+        return newMap;
+      });
+    }
+
     console.log(`🎯 [${source}] Event received for agentId=${agentId}, writing to messageKey=${messageKey}:`, {
       type: claudeEvent.type,
       hasMessage: !!evt.message,
       sessionKeyFromEvent: sessionKey,
-      contentTypes: evt.message?.content?.map((c: any) => ({ type: c.type, name: c.name })),
+      contentTypes: Array.isArray(evt.message?.content) ? evt.message.content.map((c: any) => ({ type: c.type, name: c.name })) : undefined,
     });
 
     // Intercept Agent events for Team teammate tracking
@@ -1387,6 +1481,7 @@ function AppContent() {
       const newSessions = new Map(prev);
       const sessionMessages = newSessions.get(messageKey) ?? [];
       const lastMsg = sessionMessages[sessionMessages.length - 1];
+      const bufferedEvents = eventBufferRef.current.get(messageKey) || [];
 
       // 🦆 DIAGNOSTIC: Enrich the last ring buffer entry with actual state
       {
@@ -1398,33 +1493,28 @@ function AppContent() {
         }
       }
 
-      // Check if we have a streaming message ready
-      if (lastMsg && lastMsg.role === 'assistant' && lastMsg.status === 'streaming') {
-        // 🦆 BUFFER FLUSH: First, check if there are buffered events to apply
-        // 🦆 SESSION-FIRST: Use messageKey for buffer (parallel sessions need separate buffers)
-        const bufferedEvents = eventBufferRef.current.get(messageKey) || [];
-        if (bufferedEvents.length > 0) {
-          console.log(`🦆 [${source}] Flushing ${bufferedEvents.length} buffered events for messageKey=${messageKey}`);
-          eventBufferRef.current.delete(messageKey);
+      const routedEvent = routeClaudeEventToSession({
+        sessionMessages,
+        bufferedEvents,
+        claudeEvent,
+        turnId,
+      });
+
+      if (routedEvent.bufferedEvents.length > 0) {
+        eventBufferRef.current.set(messageKey, routedEvent.bufferedEvents);
+      } else {
+        eventBufferRef.current.delete(messageKey);
+      }
+
+      if (routedEvent.action === 'applied') {
+        if (routedEvent.flushedBufferedCount > 0) {
+          console.log(`🦆 [${source}] Flushing ${routedEvent.flushedBufferedCount} buffered events for messageKey=${messageKey}`);
+        }
+        if (routedEvent.discardedBufferedCount > 0) {
+          console.log(`🦆 [${source}] Discarded ${routedEvent.discardedBufferedCount} stale buffered events for messageKey=${messageKey}`);
         }
 
-        const updatedMessages = [...sessionMessages];
-
-        // Combine buffered events with current event
-        const allEvents = [...bufferedEvents, claudeEvent];
-
-        // Check if this is the first assistant response (for timestamp update)
-        const isFirstAssistantResponse = claudeEvent.type === 'assistant' &&
-                                         claudeEvent.message?.content &&
-                                         claudeEvent.message.content.length > 0 &&
-                                         lastMsg.timestamp === 0;
-
-        updatedMessages[updatedMessages.length - 1] = {
-          ...lastMsg,
-          events: [...(lastMsg.events || []), ...allEvents],
-          timestamp: isFirstAssistantResponse ? Date.now() : lastMsg.timestamp,
-        };
-        newSessions.set(messageKey, updatedMessages);
+        newSessions.set(messageKey, routedEvent.sessionMessages);
 
         // Extract text content for Telegram notifications
         if (claudeEvent.type === 'assistant' && claudeEvent.message?.content) {
@@ -1445,9 +1535,6 @@ function AppContent() {
         // 🦆 BUFFER: No streaming message yet - buffer the event for later
         // 🦆 SESSION-FIRST: Use messageKey for buffer (parallel sessions need separate buffers)
         console.log(`🦆 [${source}] Buffering event for messageKey=${messageKey} (no streaming message ready yet)`);
-        const buffer = eventBufferRef.current.get(messageKey) || [];
-        buffer.push(claudeEvent);
-        eventBufferRef.current.set(messageKey, buffer);
       }
 
       return newSessions;
@@ -1554,6 +1641,18 @@ function AppContent() {
           return newMap;
         });
       }
+
+      // 🦆 SESSION BACKUP: Persist messages to localStorage at end of turn
+      // Same frequency as token persistence above — once per turn, no excessive writes.
+      // Uses functional updater to read the latest flushed state (chatSessionsRef may
+      // be one render behind since its sync effect runs after paint).
+      setChatSessions(current => {
+        const msgs = current.get(messageKey);
+        if (msgs && msgs.length > 0) {
+          saveSessionBackup(messageKey, msgs);
+        }
+        return current; // no mutation — React bails out
+      });
 
       // Brain: fix-memory-leak-14gb-ram
       // Session-end cleanup: free temporary buffers that are no longer needed
@@ -2144,15 +2243,14 @@ function AppContent() {
       const eventName = `claude-event:${agentId}`;
 
       try {
-        // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey + queryId
-        // Payload structure: { sessionKey: string, queryId: string, event: ClaudeEvent }
+        // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey + turnId
+        // Payload structure: { sessionKey: string, turnId: string, event: ClaudeEvent }
         const unlisten = await listen<{ sessionKey: string; turnId?: string; event: ClaudeEvent }>(eventName, (event) => {
-          const { sessionKey, turnId: queryId, event: claudeEvent } = event.payload;
+          const { sessionKey, turnId, event: claudeEvent } = event.payload;
 
           // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
           // 🦆 SESSION-FIRST: Pass sessionKey so events go to the correct chat session
-          // Brain: fix-late-render-abort-stale-buffer — pass queryId for turn isolation
-          handleClaudeEvent(agentId, claudeEvent, 'Multi-Listener', sessionKey, queryId);
+          handleClaudeEvent(agentId, claudeEvent, 'Multi-Listener', sessionKey, turnId);
 
           // Auto-refresh FileExplorer when files are created/modified
           if (claudeEvent.type === 'result') {
@@ -2327,14 +2425,13 @@ function AppContent() {
     const eventName = `claude-event:${agentId}`;
 
     try {
-      // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey + queryId
-      const unlisten = await listen<{ sessionKey: string; queryId?: string; event: ClaudeEvent }>(eventName, (event) => {
-        const { sessionKey, queryId, event: claudeEvent } = event.payload;
+      // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey + turnId
+      const unlisten = await listen<{ sessionKey: string; turnId?: string; event: ClaudeEvent }>(eventName, (event) => {
+        const { sessionKey, turnId, event: claudeEvent } = event.payload;
 
         // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
         // 🦆 SESSION-FIRST: Pass sessionKey so events go to the correct chat session
-        // Brain: fix-late-render-abort-stale-buffer — pass queryId for turn isolation
-        handleClaudeEvent(agentId, claudeEvent, 'ensureListenerReady', sessionKey, queryId);
+        handleClaudeEvent(agentId, claudeEvent, 'ensureListenerReady', sessionKey, turnId);
 
         // Handle completion event - FileExplorer refresh
         if (claudeEvent.type === 'result') {
@@ -2515,9 +2612,6 @@ function AppContent() {
       return;
     }
 
-    // 🦆 SESSION-FIRST: Get current session's chat messages using messageKey
-    const currentMessages = chatSessions.get(messageKey) ?? [];
-
     // 🦆 Create AgentChat automatically if it doesn't exist (for UI-created agents)
     // 🦆 RACE CONDITION FIX: Use capturedAgentId
     if (!agentChats.find(a => a.id === capturedAgentId)) {
@@ -2582,9 +2676,7 @@ function AppContent() {
 
     // 🦆 SESSION-FIRST: Add messages to session using messageKey
     setChatSessions((prev) => {
-      const newSessions = new Map(prev);
-      newSessions.set(messageKey, [...currentMessages, ...messagesToAdd]);
-      return newSessions;
+      return appendMessagesToSession(prev, messageKey, messagesToAdd);
     });
 
     // Track chat message sent to PostHog
@@ -2601,6 +2693,7 @@ function AppContent() {
     });
 
     // Create assistant message placeholder with settings metadata (SDK 0.1.54+)
+    const turnId = createChatTurnId();
     const assistantMessageId = `msg-${Date.now()}-assistant-${Math.random().toString(36).substr(2, 9)}`;
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
@@ -2617,16 +2710,20 @@ function AppContent() {
         thinkingMode: options?.thinkingMode || 'auto',
       },
       // Hide header + init widget on resumed sessions (known at message creation time)
-      metadata: capturedClaudeSessionId ? { isResumed: true } : undefined,
+      metadata: {
+        ...(capturedClaudeSessionId ? { isResumed: true } : {}),
+        turnId,
+      },
     };
 
     // 🦆 SESSION-FIRST: Clear previous response text for this session (new conversation turn)
     lastAgentResponseRef.current.delete(messageKey);
+    // Old aborted turns no longer need explicit same-turn filtering once a new turn starts.
+    abortedTurnIdsRef.current.delete(messageKey);
 
-    // Brain: fix-late-render-abort-stale-buffer
-    // Clear active queryId so stale events from the old query are rejected,
-    // and the first event of the NEW query will set the active queryId.
-    activeQueryIdRef.current.delete(messageKey);
+    // Set the active turn ID before the placeholder/invoke so late events from the
+    // previous turn can be rejected immediately instead of buffering into the next turn.
+    activeQueryIdRef.current.set(messageKey, turnId);
 
     // 🦆 SESSION-FIRST: Add assistant message placeholder using messageKey
     setChatSessions((prev) => {
@@ -2688,7 +2785,7 @@ function AppContent() {
           agentId: capturedAgentId,
           request: (() => {
             const prf = getProviderRequestFields(remoteModels);
-            return {
+          return {
             prompt,
             // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
             model: (() => {
@@ -2715,6 +2812,7 @@ function AppContent() {
             // 🦆 SESSION-FIRST: Pass sessionKey so Rust can include it in emitted events
             // This enables parallel conversations - each stream knows where to route events
             sessionKey: messageKey,
+            turnId,
             // ✅ New SDK 0.1.54+ features
             outputFormat: options?.outputFormat, // Structured outputs (beta)
             effort: options?.effort, // Effort parameter for quality vs speed/cost tradeoff
@@ -2912,8 +3010,11 @@ function AppContent() {
           // Clear event buffer on abort: the daemon may still emit trailing events
           // after the frontend aborts. Without this, those events buffer and get
           // incorrectly flushed into the NEXT turn's assistant placeholder.
+          const abortedTurnIds = abortedTurnIdsRef.current.get(messageKey) ?? new Set<string>();
+          abortedTurnIds.add(turnId);
+          abortedTurnIdsRef.current.set(messageKey, abortedTurnIds);
           eventBufferRef.current.delete(messageKey);
-          // Clear active queryId so trailing events from the aborted query are rejected
+          // Clear active turnId so trailing events from the aborted query are rejected
           activeQueryIdRef.current.delete(messageKey);
           return newSessions;
         });
@@ -3318,7 +3419,7 @@ function AppContent() {
     activeStreamsRef.current.get(targetAgentId)!.add(streamKey);
 
     // Get current messages for this agent
-    const currentMessages = chatSessions.get(targetAgentId) ?? [];
+    const currentMessagesSnapshot = chatSessions.get(targetAgentId) ?? [];
 
     // Create user message
     const userMessage: ChatMessage = {
@@ -3331,9 +3432,7 @@ function AppContent() {
 
     // Add user message
     setChatSessions((prev) => {
-      const newSessions = new Map(prev);
-      newSessions.set(targetAgentId, [...currentMessages, userMessage]);
-      return newSessions;
+      return appendMessagesToSession(prev, targetAgentId, [userMessage]);
     });
 
     // Set loading for this agent
@@ -3344,6 +3443,7 @@ function AppContent() {
     });
 
     // Create assistant message placeholder
+    const turnId = createChatTurnId();
     const assistantMessageId = `msg-${Date.now()}-assistant-${Math.random().toString(36).substr(2, 9)}`;
     const assistantMessage: ChatMessage = {
       id: assistantMessageId,
@@ -3356,11 +3456,11 @@ function AppContent() {
         effort: options?.effort || 'medium',
         thinkingMode: options?.thinkingMode || 'auto',
       },
+      metadata: { turnId },
     };
 
-    // Brain: fix-late-render-abort-stale-buffer
-    // Clear active queryId so stale events from old queries are rejected
-    activeQueryIdRef.current.delete(targetAgentId);
+    activeQueryIdRef.current.set(targetAgentId, turnId);
+    abortedTurnIdsRef.current.delete(targetAgentId);
 
     setChatSessions((prev) => {
       const newSessions = new Map(prev);
@@ -3424,6 +3524,7 @@ function AppContent() {
             // 🦆 WORKTREE ISOLATION: Use effectiveWorkingDirectory which prioritizes worktreePath
             cwd: effectiveWorkingDirectory,
             sessionId: existingSessionId,
+            turnId,
             effort: options?.effort,
             allowedTools: [
               'Skill', 'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
@@ -3545,8 +3646,9 @@ function AppContent() {
           effort: options?.effort || 'medium',
           thinkingMode: options?.thinkingMode || 'auto',
         },
+        metadata: { turnId },
       };
-      const messagesToSave = [...currentMessages, finalUserMessage, finalAssistantMessage];
+      const messagesToSave = [...currentMessagesSnapshot, finalUserMessage, finalAssistantMessage];
       await saveKanbanChatSession(targetAgentId, messagesToSave, response.session_id);
 
     } catch (err) {
@@ -3570,6 +3672,13 @@ function AppContent() {
               : msg
           )
         );
+        if (wasAborted) {
+          const abortedTurnIds = abortedTurnIdsRef.current.get(targetAgentId) ?? new Set<string>();
+          abortedTurnIds.add(turnId);
+          abortedTurnIdsRef.current.set(targetAgentId, abortedTurnIds);
+          eventBufferRef.current.delete(targetAgentId);
+          activeQueryIdRef.current.delete(targetAgentId);
+        }
         return newSessions;
       });
     } finally {
@@ -12169,8 +12278,8 @@ You have access to all Bash tools to execute git commands like:
                     }}
                     onOpenKanban={handleOpenKanbanTab}
                     onUserQuestionAnswer={answerUserQuestionForAgent}
-                    pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Set()}
-                    answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || new Map()}
+                    pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || EMPTY_SET}
+                    answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || EMPTY_MAP}
                     currentSessionId={isTaskChat
                       ? activeTaskId ?? undefined
                       : (activeSessionId
@@ -12320,8 +12429,8 @@ You have access to all Bash tools to execute git commands like:
                     // Open Kanban view callback
                     onOpenKanban={handleOpenKanbanTab}
                     onUserQuestionAnswer={answerUserQuestionForAgent}
-                    pendingQuestionIds={pendingQuestionIdsMap.get(taskSessionId) || new Set()}
-                    answeredQuestions={answeredQuestionsMap.get(taskSessionId) || new Map()}
+                    pendingQuestionIds={pendingQuestionIdsMap.get(taskSessionId) || EMPTY_SET}
+                    answeredQuestions={answeredQuestionsMap.get(taskSessionId) || EMPTY_MAP}
                     // 🦆 FIX: Display claudeSessionId (real Claude Code ID) in header badge
                     currentSessionId={agentSessions.find(s => s.id === taskSessionId)?.claudeSessionId ?? taskSessionId}
                     // 🦆 Internal session ID for state management (attachments, settings)
@@ -13097,4 +13206,3 @@ function App() {
 }
 
 export default App;
-
