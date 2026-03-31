@@ -26,10 +26,10 @@ export const FONT_SIZE_PRESETS: Record<FontSizePreset, FontSizeScale> = {
 };
 
 export const PRESET_LABELS: Record<FontSizePreset, string> = {
-  S: 'Piccolo',
-  M: 'Medio',
-  L: 'Grande',
-  XL: 'Extra Grande',
+  S: 'Small',
+  M: 'Medium',
+  L: 'Large',
+  XL: 'Extra Large',
 };
 
 export interface FontOption {

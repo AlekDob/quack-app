@@ -48,7 +48,7 @@ function PreviewBlock({ preset, fontUI, fontMono }: {
   const sizes = FONT_SIZE_PRESETS[preset];
   return (
     <div className="typo-preview-wrapper">
-      <div className="typo-preview-label">Anteprima</div>
+      <div className="typo-preview-label">Preview</div>
       <div className="typo-preview-box">
         <p className="typo-preview-body" style={{ fontFamily: fontUI, fontSize: `${sizes.body}px` }}>
           The quick brown fox jumps over the lazy duck. 🦆
@@ -77,12 +77,12 @@ export default function TypographySettings() {
     <div className="settings-category">
       <SectionHeader
         title="Typography"
-        description="Personalizza font e dimensioni del testo"
+        description="Customize fonts and text size"
       />
 
       {/* Size Presets */}
       <div className="settings-group">
-        <div className="typo-section-label">Dimensione testo</div>
+        <div className="typo-section-label">Text Size</div>
         <div className="typo-preset-grid">
           {PRESETS.map((p) => (
             <PresetCard
@@ -100,8 +100,8 @@ export default function TypographySettings() {
         <div className="typo-font-rows">
           <div className="typo-font-row">
             <div className="typo-font-row-left">
-              <div className="typo-font-row-label">Font interfaccia</div>
-              <div className="typo-font-row-desc">Testo, titoli e UI dell&apos;app</div>
+              <div className="typo-font-row-label">UI Font</div>
+              <div className="typo-font-row-desc">Text, headings and app interface</div>
             </div>
             <select
               id="typo-font-ui"
@@ -116,8 +116,8 @@ export default function TypographySettings() {
           </div>
           <div className="typo-font-row">
             <div className="typo-font-row-left">
-              <div className="typo-font-row-label">Font codice</div>
-              <div className="typo-font-row-desc">Code block, terminale e monospace</div>
+              <div className="typo-font-row-label">Code Font</div>
+              <div className="typo-font-row-desc">Code blocks, terminal and monospace</div>
             </div>
             <select
               id="typo-font-mono"
@@ -146,7 +146,7 @@ export default function TypographySettings() {
       <div className="settings-group">
         <div className="typo-reset-row">
           <button type="button" className="typo-reset-btn" onClick={resetTypo}>
-            ⟲ Ripristina valori predefiniti
+            ⟲ Reset to defaults
           </button>
         </div>
       </div>
