@@ -1170,13 +1170,20 @@ ${hintsBlock}
         }
 
         // Brain: sdk-get-context-usage-breakdown
-        // After each result event, call getContextUsage() for precise per-category
-        // token breakdown (system prompt, tools, messages, MCP, skills, etc.)
-        // This replaces the static overhead estimate with SDK-provided data.
-        // Works in both modes: SDK query() handle and persistent subprocess.
-        const ctxSource = queryState.queryHandle || queryState.sessionProcess;
+        // Must await getContextUsage() before the for-await loop ends, because
+        // the result event is the last event — after iteration the query handle
+        // closes and control requests fail with "Query closed before response".
+        // In query mode, queryHandle.getContextUsage() fails because the generator
+        // closes after the result event. Prefer sessionProcess (persistent subprocess)
+        // which stays alive across queries. Fall back to queryHandle for non-persistent.
+        const ctxSource = queryState.sessionProcess || queryState.queryHandle;
         if (ctxSource && typeof ctxSource.getContextUsage === 'function') {
-          ctxSource.getContextUsage().then((ctxUsage) => {
+          try {
+            const rawResult = await ctxSource.getContextUsage();
+            // SessionProcess._sendControlRequest resolves with the control_response
+            // envelope: { subtype: 'success', request_id, response: { ...data } }.
+            // SDK Query handle resolves with the data directly.
+            const ctxUsage = rawResult?.response || rawResult;
             if (ctxUsage && (ctxUsage.totalTokens > 0 || ctxUsage.categories?.length > 0)) {
               log('CONTEXT', `query=${queryId} contextUsage: total=${ctxUsage.totalTokens}/${ctxUsage.maxTokens} (${ctxUsage.percentage?.toFixed(1) || 0}%) categories=${ctxUsage.categories?.length || 0}`);
               emit({
@@ -1193,9 +1200,9 @@ ${hintsBlock}
                 },
               });
             }
-          }).catch((err) => {
+          } catch (err) {
             log('CONTEXT', `query=${queryId} getContextUsage failed: ${err.message}`);
-          });
+          }
         }
       }
 
