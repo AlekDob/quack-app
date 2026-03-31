@@ -495,32 +495,30 @@ export default function SidePanelAccordion({
       )}
 
       <div className={`accordion-container ${focusedSection ? 'has-focus' : ''}`} ref={containerRef}>
-        {/* Changes - Codex-style diff panel */}
-        {modifiedFiles && modifiedFiles.size > 0 && (
-          <AccordionSection
-            id="changes"
-            title="Changes"
-            icon={icons.changes}
-            badge={modifiedFiles.size}
-            isExpanded={focusedSection === "changes"}
-            isFocused={focusedSection === "changes"}
-            order={getOrder("changes")}
-            category="changes"
-            onToggle={() => toggleSection("changes")}
-          >
-            <ChangesPanel
-              rootPath={rootPath}
-              modifiedFiles={modifiedFiles}
-              onRefreshGitStatus={onRefreshGitStatus || (() => {})}
-              onClearModifiedFiles={onClearModifiedFiles}
-              onRemoveModifiedFiles={onRemoveModifiedFiles}
-              branch={branch}
-              isWorktree={isWorktree}
-              history={gitHistory}
-              historyLoading={gitHistoryLoading}
-            />
-          </AccordionSection>
-        )}
+        {/* Changes - Codex-style diff panel (always visible, shows branch/history even without changes) */}
+        <AccordionSection
+          id="changes"
+          title="Changes"
+          icon={icons.changes}
+          badge={modifiedFiles?.size || undefined}
+          isExpanded={focusedSection === "changes"}
+          isFocused={focusedSection === "changes"}
+          order={getOrder("changes")}
+          category="changes"
+          onToggle={() => toggleSection("changes")}
+        >
+          <ChangesPanel
+            rootPath={rootPath}
+            modifiedFiles={modifiedFiles || new Map()}
+            onRefreshGitStatus={onRefreshGitStatus || (() => {})}
+            onClearModifiedFiles={onClearModifiedFiles}
+            onRemoveModifiedFiles={onRemoveModifiedFiles}
+            branch={branch}
+            isWorktree={isWorktree}
+            history={gitHistory}
+            historyLoading={gitHistoryLoading}
+          />
+        </AccordionSection>
 
         {/* File Explorer */}
         <AccordionSection

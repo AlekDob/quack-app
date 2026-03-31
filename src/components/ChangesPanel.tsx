@@ -341,14 +341,6 @@ export default function ChangesPanel({
     return 'changes-status-deleted'
   }
 
-  if (allEntries.length === 0) {
-    return (
-      <div className="changes-panel-empty">
-        No changes in this session
-      </div>
-    )
-  }
-
   const currentEntries = activeTab === 'pending' ? pendingEntries
     : activeTab === 'committed' ? committedEntries
     : [] // history tab renders its own content
