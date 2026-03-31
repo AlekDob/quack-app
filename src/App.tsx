@@ -1424,11 +1424,36 @@ function AppContent() {
       console.log(`[handleClaudeEvent] 🦆 Early save claudeSessionId ${evt.session_id.slice(0, 8)}... to session ${messageKey}`);
     }
 
+    // Brain: fix-compact-not-triggering-sdk-native
+    // When SDK compaction completes, reset token tracking so the stamina bar reflects
+    // the post-compact context. The next message's usage data will provide accurate numbers.
+    if (evt.type === 'system' && evt.subtype === 'compact_boundary') {
+      const preTokens = evt.compact_metadata?.pre_tokens;
+      console.log(`[handleClaudeEvent] 🗜️ Compact boundary for ${messageKey}: pre_tokens=${preTokens}`);
+      setChatTokensMap((prev) => {
+        const newMap = new Map(prev);
+        const currentTokens = newMap.get(messageKey);
+        if (currentTokens) {
+          newMap.set(messageKey, {
+            ...currentTokens,
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheCreationTokens: 0,
+            cacheReadTokens: 0,
+            // Preserve cumulative cost and context window
+            totalCost: currentTokens.totalCost,
+            contextWindow: currentTokens.contextWindow,
+          });
+        }
+        return newMap;
+      });
+    }
+
     console.log(`🎯 [${source}] Event received for agentId=${agentId}, writing to messageKey=${messageKey}:`, {
       type: claudeEvent.type,
       hasMessage: !!evt.message,
       sessionKeyFromEvent: sessionKey,
-      contentTypes: evt.message?.content?.map((c: any) => ({ type: c.type, name: c.name })),
+      contentTypes: Array.isArray(evt.message?.content) ? evt.message.content.map((c: any) => ({ type: c.type, name: c.name })) : undefined,
     });
 
     // Intercept Agent events for Team teammate tracking

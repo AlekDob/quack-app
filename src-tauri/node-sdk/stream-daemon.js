@@ -960,10 +960,16 @@ ${hintsBlock}
       }
     }
 
+    // Brain: fix-compact-not-triggering-sdk-native
+    // Detect /compact early — it needs special handling throughout the query pipeline.
+    const isCompactCommand = /^\s*\/compact\b/.test(prompt);
+
     // Build the final prompt with context prefix
-    const finalPrompt = contextPrefix
-      ? `${prompt}\n\n<system-reminder>\n${contextPrefix}\n</system-reminder>`
-      : prompt;
+    // /compact must be sent as-is — appending system-reminder context would prevent
+    // the SDK's slash command parser from recognizing it as a command.
+    const finalPrompt = isCompactCommand
+      ? prompt
+      : (contextPrefix ? `${prompt}\n\n<system-reminder>\n${contextPrefix}\n</system-reminder>` : prompt);
 
     // --- Build message generator ---
     async function* generateMessages() {
@@ -1028,7 +1034,21 @@ ${hintsBlock}
     // Brain: bug-post-fix-cache-breakage-investigation
     // New sessions use query() since there's no session to keep alive.
     // Resumed sessions use a persistent subprocess to preserve cache state.
-    const usePersistentProcess = sessionId && isAnthropicProvider;
+    //
+    // Brain: fix-compact-not-triggering-sdk-native
+    // /compact must bypass the persistent subprocess — slash commands are only parsed
+    // by the SDK's query() API, not by the streaming stdin protocol. When we detect
+    // /compact, we kill the persistent subprocess and force the query() path.
+    // After compaction, the next message creates a fresh subprocess with compacted state.
+    if (isCompactCommand && sessionId) {
+      const proc = sessionProcesses.get(sessionId);
+      if (proc) {
+        log('COMPACT', `Killing persistent subprocess for session=${sessionId} to allow SDK-native /compact`);
+        proc.kill();
+        sessionProcesses.delete(sessionId);
+      }
+    }
+    const usePersistentProcess = sessionId && isAnthropicProvider && !isCompactCommand;
     let eventSource;
 
     if (usePersistentProcess) {
@@ -1089,9 +1109,14 @@ ${hintsBlock}
     // Fallback: use SDK query() for new sessions or when persistent subprocess is unavailable
     if (!eventSource) {
       queryState.mode = 'query';
-      log('QUERY', `query=${queryId} calling SDK query() (streamingInput=true)`);
+      // Brain: fix-compact-not-triggering-sdk-native
+      // /compact must be sent as a string prompt (not AsyncIterable) so the SDK's
+      // slash command parser recognizes it. AsyncIterable prompts go through streamInput
+      // which bypasses slash command parsing.
+      const queryPrompt = isCompactCommand ? finalPrompt : generateMessages();
+      log('QUERY', `query=${queryId} calling SDK query() (${isCompactCommand ? 'compact string prompt' : 'streamingInput=true'})`);
       queryState.queryHandle = query({
-        prompt: generateMessages(),
+        prompt: queryPrompt,
         options,
       });
       eventSource = queryState.queryHandle;

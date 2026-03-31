@@ -183,7 +183,7 @@ export default function ChatView({
   lastPrompt,
   // Conversation management
   onClearConversation,
-  onCompactConversation,
+  // onCompactConversation — no longer used; /compact now flows through onSendMessage to the SDK
   onOpenSessionInTerminal,
   // Token usage tracking
   sessionTokens = { inputTokens: 0, outputTokens: 0, cacheCreationTokens: 0, cacheReadTokens: 0, totalCost: 0 },
@@ -294,10 +294,19 @@ export default function ChatView({
       const [, commandName, commandArgs] = slashCommandMatch;
       console.log('[ChatView] Detected slash command:', commandName, 'with args:', commandArgs);
 
-      // INTERCEPT commands that have native handlers — sending these as raw text
-      // to the SDK causes Claude to treat them as regular prompts instead of CLI commands.
-      if (commandName === 'compact' && onCompactConversation) {
-        onCompactConversation();
+      // /compact should flow through to the SDK as a regular message — the SDK's
+      // slash command parser intercepts it and triggers native context compaction.
+      // Previously this was intercepted here for a custom Haiku-based summarization,
+      // but that only affected UI state without compacting the SDK's internal context.
+      // Brain: fix-compact-not-triggering-sdk-native
+      if (commandName === 'compact') {
+        await onSendMessage(trimmedContent, {
+          ...options,
+          model,
+          thinkingMode,
+          permissionMode,
+          effort,
+        });
         return;
       }
       if (commandName === 'clear' && onClearConversation) {
@@ -837,7 +846,7 @@ export default function ChatView({
           maxTokens={sessionTokens.contextWindow}
           overhead={sessionTokens.overhead}
           model={model}
-          onCompact={onCompactConversation}
+          onCompact={() => onSendMessage('/compact')}
           onClear={onClearConversation}
         />
         <div className="chat-view-footer-controls">
@@ -921,12 +930,12 @@ export default function ChatView({
               <span>Stop</span>
             </button>
           )}
-          {messages.length > 0 && onCompactConversation && (
+          {messages.length > 0 && (
             <button
               className="chat-compact-btn"
-              onClick={onCompactConversation}
+              onClick={() => onSendMessage('/compact')}
               disabled={isLoading}
-              title="Compact Conversation (summarize older messages)"
+              title="Compact Conversation (SDK native context compaction)"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
