@@ -30,6 +30,8 @@ interface TokenUsageModalProps {
   onExport?: () => void;
   onLocalReset?: () => void;
   compactFailed?: boolean;
+  // Brain: sdk-get-context-usage-breakdown
+  contextUsageBreakdown?: { name: string; tokens: number; color: string; isDeferred?: boolean }[];
 }
 
 // Format tokens as K or M (e.g., 55500 -> "55.5k", 1000000 -> "1M")
@@ -85,6 +87,7 @@ export default function TokenUsageModal({
   onExport,
   onLocalReset,
   compactFailed = false,
+  contextUsageBreakdown,
 }: TokenUsageModalProps) {
   // Total context usage = context fill only (matches CLI `/context`)
   const totalContextUsage = calculateTotalContextUsage(inputTokens, outputTokens);
@@ -226,6 +229,43 @@ export default function TokenUsageModal({
               <span className="context-summary-value">{formatTokensK(remainingTokens)}</span>
             </div>
           </div>
+
+          {/* Brain: sdk-get-context-usage-breakdown */}
+          {/* Per-category token breakdown from SDK getContextUsage() */}
+          {contextUsageBreakdown && contextUsageBreakdown.length > 0 && (
+            <div className="context-breakdown">
+              <div className="context-breakdown-title">TOKEN BREAKDOWN</div>
+              <div className="context-breakdown-list">
+                {contextUsageBreakdown
+                  .filter(cat => cat.tokens > 0)
+                  .sort((a, b) => b.tokens - a.tokens)
+                  .map((cat) => {
+                    const catPercent = maxTokens > 0 ? (cat.tokens / maxTokens) * 100 : 0;
+                    return (
+                      <div key={cat.name} className="context-breakdown-item">
+                        <div className="context-breakdown-item-header">
+                          <span className="context-breakdown-dot" style={{ backgroundColor: cat.color }} />
+                          <span className="context-breakdown-name">
+                            {cat.name}
+                            {cat.isDeferred && <span className="context-breakdown-deferred"> (lazy)</span>}
+                          </span>
+                          <span className="context-breakdown-tokens">{formatTokensK(cat.tokens)}</span>
+                        </div>
+                        <div className="context-breakdown-bar-bg">
+                          <div
+                            className="context-breakdown-bar-fill"
+                            style={{
+                              width: `${Math.max(1, catPercent)}%`,
+                              backgroundColor: cat.color,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
 
           {/* Max Plan Status (if available) */}
           {maxPlanStats && (

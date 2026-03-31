@@ -861,3 +861,85 @@
   color: rgba(77, 212, 179, 0.8);
   background: rgba(77, 212, 179, 0.05);
 }
+
+/* ============================================ */
+/* CONTEXT USAGE BREAKDOWN (SDK getContextUsage) */
+/* Brain: sdk-get-context-usage-breakdown */
+/* ============================================ */
+
+.context-breakdown {
+  margin-top: 4px;
+  padding: 12px;
+  background: rgba(77, 212, 179, 0.03);
+  border: 1px solid rgba(77, 212, 179, 0.15);
+  border-radius: 8px;
+}
+
+.context-breakdown-title {
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.context-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.context-breakdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.context-breakdown-item-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.context-breakdown-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.context-breakdown-name {
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  flex: 1;
+  text-transform: capitalize;
+}
+
+.context-breakdown-deferred {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.35);
+  font-style: italic;
+}
+
+.context-breakdown-tokens {
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.context-breakdown-bar-bg {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.context-breakdown-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}

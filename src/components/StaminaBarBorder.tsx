@@ -2,6 +2,13 @@ import { useState, memo } from 'react';
 import TokenUsageModal from './TokenUsageModal';
 import { getModelLabel } from '../services/modelService';
 
+interface ContextCategory {
+  name: string;
+  tokens: number;
+  color: string;
+  isDeferred?: boolean;
+}
+
 interface StaminaBarBorderProps {
   inputTokens: number;
   outputTokens: number;
@@ -13,6 +20,7 @@ interface StaminaBarBorderProps {
   model?: string;
   onCompact?: () => void;
   onClear?: () => void;
+  contextUsageBreakdown?: ContextCategory[];
 }
 
 // Default overhead estimate based on Claude CLI /context output (~38k tokens)
@@ -40,6 +48,7 @@ function StaminaBarBorder({
   model,
   onCompact,
   onClear,
+  contextUsageBreakdown,
 }: StaminaBarBorderProps) {
   const [showModal, setShowModal] = useState(false);
 
@@ -131,6 +140,7 @@ function StaminaBarBorder({
           model={model ? getModelLabel(model) : undefined}
           onCompact={onCompact}
           onClear={onClear}
+          contextUsageBreakdown={contextUsageBreakdown}
         />
       )}
     </>
@@ -146,6 +156,7 @@ export default memo(StaminaBarBorder, (prevProps, nextProps) => {
     prevProps.totalCost === nextProps.totalCost &&
     prevProps.overhead === nextProps.overhead &&
     prevProps.maxTokens === nextProps.maxTokens &&
-    prevProps.model === nextProps.model
+    prevProps.model === nextProps.model &&
+    prevProps.contextUsageBreakdown === nextProps.contextUsageBreakdown
   );
 });

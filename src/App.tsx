@@ -195,6 +195,7 @@ import type {
   KanbanTaskInitialValues,
   AskUserQuestionAnswers,
   AutomationJob,
+  ContextUsageCategory,
 } from "./types";
 import { getRandomName } from "./utils/agentNames";
 import {
@@ -1085,6 +1086,8 @@ function AppContent() {
     promptTokens?: number; // Precise prompt token count from countTokens API
     measuredOverhead?: number; // Precise overhead = contextWindowFill - promptTokens (first turn only)
     contextWindow?: number; // Context window size from SDK modelUsage (200k or 1M, e.g., 1M for Opus)
+    // Brain: sdk-get-context-usage-breakdown
+    contextUsageBreakdown?: ContextUsageCategory[]; // Per-category breakdown from getContextUsage()
   }>>(new Map());
 
   // Project overhead cache - maps cwd to calculated overhead
@@ -1578,6 +1581,32 @@ function AppContent() {
         });
       }
       return; // Don't process further — this is a custom Quack event, not an SDK event
+    }
+
+    // Brain: sdk-get-context-usage-breakdown
+    // Handle context_usage_breakdown events: per-category token breakdown from getContextUsage()
+    // Provides precise overhead measurement replacing static estimate.
+    if (claudeEvent.type === 'context_usage_breakdown') {
+      const breakdownEvt = claudeEvent as any;
+      if (breakdownEvt.categories && breakdownEvt.categories.length > 0) {
+        console.log(`[${source}] 📊 Context usage breakdown for messageKey=${messageKey}: ${breakdownEvt.totalTokens}/${breakdownEvt.maxTokens} (${breakdownEvt.percentage?.toFixed(1)}%)`, breakdownEvt.categories);
+        setChatTokensMap((prev) => {
+          const newMap = new Map(prev);
+          const current = newMap.get(messageKey) || {
+            inputTokens: 0, outputTokens: 0,
+            cacheCreationTokens: 0, cacheReadTokens: 0, totalCost: 0,
+          };
+          // Store breakdown categories for display in TokenUsageModal
+          newMap.set(messageKey, {
+            ...current,
+            contextUsageBreakdown: breakdownEvt.categories,
+            // Use SDK-reported values as authoritative context window and total
+            ...(breakdownEvt.maxTokens > 0 ? { contextWindow: breakdownEvt.maxTokens } : {}),
+          });
+          return newMap;
+        });
+      }
+      return; // Custom Quack event, don't process further
     }
 
     // Handle result events: update total_cost_usd and PERSIST tokens to disk

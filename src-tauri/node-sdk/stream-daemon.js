@@ -521,6 +521,11 @@ class SessionProcess {
     return this._sendControlRequest({ subtype: 'set_permission_mode', mode });
   }
 
+  // Brain: sdk-get-context-usage-breakdown
+  async getContextUsage() {
+    return this._sendControlRequest({ subtype: 'get_context_usage' });
+  }
+
   kill() {
     if (!this.child || this.child.killed) return;
     this.alive = false;
@@ -1162,6 +1167,35 @@ ${hintsBlock}
               log('QUERY', `contextWindow for ${modelName}: ${usage.contextWindow} (${usage.contextWindow >= 1_000_000 ? '1M' : '200k'})`);
             }
           }
+        }
+
+        // Brain: sdk-get-context-usage-breakdown
+        // After each result event, call getContextUsage() for precise per-category
+        // token breakdown (system prompt, tools, messages, MCP, skills, etc.)
+        // This replaces the static overhead estimate with SDK-provided data.
+        // Works in both modes: SDK query() handle and persistent subprocess.
+        const ctxSource = queryState.queryHandle || queryState.sessionProcess;
+        if (ctxSource && typeof ctxSource.getContextUsage === 'function') {
+          ctxSource.getContextUsage().then((ctxUsage) => {
+            if (ctxUsage && (ctxUsage.totalTokens > 0 || ctxUsage.categories?.length > 0)) {
+              log('CONTEXT', `query=${queryId} contextUsage: total=${ctxUsage.totalTokens}/${ctxUsage.maxTokens} (${ctxUsage.percentage?.toFixed(1) || 0}%) categories=${ctxUsage.categories?.length || 0}`);
+              emit({
+                type: 'event', queryId,
+                event: {
+                  type: 'context_usage_breakdown',
+                  totalTokens: ctxUsage.totalTokens,
+                  maxTokens: ctxUsage.maxTokens,
+                  percentage: ctxUsage.percentage,
+                  model: ctxUsage.model,
+                  autoCompactThreshold: ctxUsage.autoCompactThreshold,
+                  isAutoCompactEnabled: ctxUsage.isAutoCompactEnabled,
+                  categories: ctxUsage.categories,
+                },
+              });
+            }
+          }).catch((err) => {
+            log('CONTEXT', `query=${queryId} getContextUsage failed: ${err.message}`);
+          });
         }
       }
 

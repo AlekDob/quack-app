@@ -599,7 +599,7 @@ export interface AgentModePresets {
 
 // Claude CLI Event types (matching Rust backend + Claude Agent SDK)
 export interface ClaudeEventBase {
-  type: 'system' | 'assistant' | 'user' | 'result' | 'agent' | 'error' | 'message_start' | 'message_delta' | 'message_stop' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'prompt_token_count';
+  type: 'system' | 'assistant' | 'user' | 'result' | 'agent' | 'error' | 'message_start' | 'message_delta' | 'message_stop' | 'content_block_start' | 'content_block_delta' | 'content_block_stop' | 'prompt_token_count' | 'context_usage_breakdown';
 }
 
 export interface ClaudeSystemEvent extends ClaudeEventBase {
@@ -743,6 +743,26 @@ export interface ClaudePromptTokenCountEvent extends ClaudeEventBase {
   promptTokens: number;
 }
 
+// Brain: sdk-get-context-usage-breakdown
+// Per-category token breakdown from SDK getContextUsage() (v0.2.86+)
+export interface ContextUsageCategory {
+  name: string;
+  tokens: number;
+  color: string;
+  isDeferred?: boolean;
+}
+
+export interface ClaudeContextUsageBreakdownEvent extends ClaudeEventBase {
+  type: 'context_usage_breakdown';
+  totalTokens: number;
+  maxTokens: number;
+  percentage: number;
+  model: string;
+  autoCompactThreshold?: number;
+  isAutoCompactEnabled: boolean;
+  categories: ContextUsageCategory[];
+}
+
 export type ClaudeEvent =
   | ClaudeSystemEvent
   | ClaudeAssistantEvent
@@ -756,7 +776,8 @@ export type ClaudeEvent =
   | ClaudeContentBlockStartEvent
   | ClaudeContentBlockDeltaEvent
   | ClaudeContentBlockStopEvent
-  | ClaudePromptTokenCountEvent;
+  | ClaudePromptTokenCountEvent
+  | ClaudeContextUsageBreakdownEvent;
 
 // ============================================
 // AskUserQuestion Types (SDK v0.1.71+)

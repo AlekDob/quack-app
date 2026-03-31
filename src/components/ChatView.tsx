@@ -95,6 +95,7 @@ interface ChatViewProps {
     totalCost: number; // total_cost_usd from Claude SDK (authoritative)
     overhead?: number; // Dynamic overhead calculated from project files
     contextWindow?: number; // Context window size from SDK (200k or 1M)
+    contextUsageBreakdown?: { name: string; tokens: number; color: string; isDeferred?: boolean }[];
   };
   // OpenAI API key for Whisper
   openaiApiKey?: string;
@@ -848,6 +849,7 @@ export default function ChatView({
           model={model}
           onCompact={() => onSendMessage('/compact')}
           onClear={onClearConversation}
+          contextUsageBreakdown={sessionTokens.contextUsageBreakdown}
         />
         <div className="chat-view-footer-controls">
           <ChatSettingsMenu
