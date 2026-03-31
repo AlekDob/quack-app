@@ -2785,9 +2785,9 @@ function AppContent() {
         ? sessionWorktreePath
         : getEffectiveWorkingDir(activeTerminal?.cwd, explorerPath);
 
-      // Build IDE context (open file, selection, git status) as a separate field
+      // Build IDE context (open file, selection) as a separate field
       // Injected into system prompt by Node.js — not concatenated into user message
-      const ideContext = await buildContextPrefix(gitSummary, workingDir ?? null);
+      const ideContext = await buildContextPrefix(workingDir ?? null);
 
       // Create abort promise that rejects when signal is aborted
       const abortPromise = new Promise<never>((_, reject) => {
@@ -3513,9 +3513,9 @@ function AppContent() {
 
       let prompt = content;
 
-      // Build IDE context (open file, selection, git status) as a separate field
+      // Build IDE context (open file, selection) as a separate field
       // Injected into system prompt by Node.js — not concatenated into user message
-      const ideContext = await buildContextPrefix(gitSummary, effectiveWorkingDirectory ?? null);
+      const ideContext = await buildContextPrefix(effectiveWorkingDirectory ?? null);
 
       // Create abort promise
       const abortPromise = new Promise<never>((_, reject) => {

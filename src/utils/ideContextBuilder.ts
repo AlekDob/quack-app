@@ -1,7 +1,7 @@
 /**
  * IDE Context Builder
  *
- * Gathers context from Quack's internal state (preview file, editor selection, git status)
+ * Gathers context from Quack's internal state (preview file, editor selection)
  * and/or from an external IDE via the Claude Code extension WebSocket connection,
  * then formats it as XML tags to prepend to agent chat prompts.
  *
@@ -9,15 +9,14 @@
  * - <ide_opened_file> for the currently active file
  * - <ide_selection> for selected code
  * - <ide_diagnostics> for LSP diagnostics
- * - gitStatus: for git state
+ *
+ * Note: Git status is NOT injected — the agent can run git commands itself,
+ * and cached git state goes stale (causing incorrect branch info).
  */
 
 import { invoke } from '@tauri-apps/api/core';
 import { useFileSystemStore } from '../stores/fileSystemStore';
 import { isMacOS } from './platform';
-import type { GitStatusSummary } from '../types';
-
-const MAX_GIT_CHANGED_FILES = 20;
 
 export interface IdeContext {
   openedFile: string | null;
@@ -28,7 +27,6 @@ export interface IdeContext {
     startLine: number;
     endLine: number;
   } | null;
-  gitStatus: GitStatusSummary | null;
 }
 
 /** Context from an external IDE (via Claude Code extension WebSocket) */
@@ -56,44 +54,12 @@ export interface ExternalIdeContext {
 /**
  * Gather IDE context from Quack's internal state.
  */
-export function gatherInternalContext(
-  gitSummary: GitStatusSummary | null
-): IdeContext {
+export function gatherInternalContext(): IdeContext {
   const { previewFile, editorSelection } = useFileSystemStore.getState();
   return {
     openedFile: previewFile,
     selection: editorSelection,
-    gitStatus: gitSummary,
   };
-}
-
-/**
- * Format git status as a string block.
- */
-function formatGitStatus(gs: GitStatusSummary): string {
-  const statusLines: string[] = [];
-  statusLines.push(`Current branch: ${gs.branch}`);
-  if (gs.upstream) statusLines.push(`Upstream: ${gs.upstream}`);
-  if (gs.ahead !== null && gs.ahead > 0) statusLines.push(`Ahead: ${gs.ahead}`);
-  if (gs.behind !== null && gs.behind > 0) statusLines.push(`Behind: ${gs.behind}`);
-
-  if (!gs.clean) {
-    const changed = gs.entries.filter(e => e.staged_status || e.unstaged_status || e.is_untracked);
-    if (changed.length > 0) {
-      statusLines.push('');
-      statusLines.push('Status:');
-      changed.slice(0, MAX_GIT_CHANGED_FILES).forEach(e => {
-        const staged = e.staged_status || ' ';
-        const unstaged = e.unstaged_status || ' ';
-        statusLines.push(`${staged}${unstaged} ${e.path}`);
-      });
-      if (changed.length > MAX_GIT_CHANGED_FILES) {
-        statusLines.push(`... and ${changed.length - MAX_GIT_CHANGED_FILES} more`);
-      }
-    }
-  }
-
-  return `gitStatus: ${statusLines.join('\n')}`;
 }
 
 /**
@@ -115,10 +81,6 @@ export function formatContextPrefix(ctx: IdeContext): string {
     );
   }
 
-  if (ctx.gitStatus) {
-    parts.push(formatGitStatus(ctx.gitStatus));
-  }
-
   if (parts.length === 0) return '';
 
   return parts.join('\n') + '\n';
@@ -127,11 +89,9 @@ export function formatContextPrefix(ctx: IdeContext): string {
 /**
  * Format external IDE context as XML tags.
  * Includes diagnostics from the IDE when available.
- * Git status always comes from Quack's own state.
  */
 function formatExternalContextPrefix(
-  ctx: ExternalIdeContext,
-  gitSummary: GitStatusSummary | null
+  ctx: ExternalIdeContext
 ): string {
   const parts: string[] = [];
 
@@ -158,11 +118,6 @@ function formatExternalContextPrefix(
     );
   }
 
-  // Git status always from Quack's own state
-  if (gitSummary) {
-    parts.push(formatGitStatus(gitSummary));
-  }
-
   if (parts.length === 0) return '';
 
   return parts.join('\n') + '\n';
@@ -172,10 +127,8 @@ function formatExternalContextPrefix(
  * Build the context prefix string from Quack's internal state.
  * This is the synchronous version (fallback when no external IDE is connected).
  */
-export function buildInternalContextPrefix(
-  gitSummary: GitStatusSummary | null
-): string {
-  const ctx = gatherInternalContext(gitSummary);
+export function buildInternalContextPrefix(): string {
+  const ctx = gatherInternalContext();
   return formatContextPrefix(ctx);
 }
 
@@ -184,10 +137,8 @@ export function buildInternalContextPrefix(
  * This is the async version used when a workspace path is available.
  *
  * Priority: External IDE (WebSocket) > Quack internal (file preview/selection)
- * Git status always comes from Quack's own state.
  */
 export async function buildContextPrefix(
-  gitSummary: GitStatusSummary | null,
   workspacePath: string | null
 ): Promise<string> {
   // Check if IDE context injection is enabled
@@ -196,7 +147,7 @@ export async function buildContextPrefix(
 
   // External IDE context is Mac-only
   if (!isMacOS()) {
-    return buildInternalContextPrefix(gitSummary);
+    return buildInternalContextPrefix();
   }
 
   // Try external IDE context first
@@ -207,7 +158,7 @@ export async function buildContextPrefix(
         { workspacePath }
       );
       if (externalCtx) {
-        return formatExternalContextPrefix(externalCtx, gitSummary);
+        return formatExternalContextPrefix(externalCtx);
       }
     } catch (e) {
       console.debug('[IDE Context] External IDE not available, using internal:', e);
@@ -215,5 +166,5 @@ export async function buildContextPrefix(
   }
 
   // Fall back to internal context
-  return buildInternalContextPrefix(gitSummary);
+  return buildInternalContextPrefix();
 }

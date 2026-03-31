@@ -3,14 +3,14 @@
 - Surfaces:
   - Chat input action bar — IDE chip icon (shows active file/selection; click toggles enabled/disabled)
   - Project Context Panel accordion — displays file, selection range, IDE name
-  - Agent system prompt — `<ide_opened_file>`, `<ide_selection>`, `<ide_diagnostics>`, `gitStatus:` blocks
+  - Agent system prompt — `<ide_opened_file>`, `<ide_selection>`, `<ide_diagnostics>` blocks
 
 # Entry Points
 - UI: `src/components/ChatInput.tsx` — IDE chip rendered when `previewFile || editorSelection || externalIdeContext`; click calls `toggleIdeContext()`
 - UI: `src/components/ProjectContextPanel.tsx` — reads same store state, displays context label
 - State: `src/stores/fileSystemStore.ts` — `ideContextEnabled`, `externalIdeContext`, `previewFile`, `editorSelection`, `toggleIdeContext()`
 - Poll hook: `src/hooks/useExternalIdeContext.ts` — 5 s interval, calls `invoke('get_ide_context', { workspacePath })`; mounted in `App.tsx:717`
-- Build: `src/utils/ideContextBuilder.ts :: buildContextPrefix(gitSummary, workspacePath)` — called at send time in App.tsx (lines ~2444, ~3130)
+- Build: `src/utils/ideContextBuilder.ts :: buildContextPrefix(workspacePath)` — called at send time in App.tsx (lines ~2790, ~3518)
 - Backend IPC: `src-tauri/src/ide_integration.rs :: get_ide_context(workspace_path)` — Tauri command; Mac-only guard in callers
 - Forwarded to sidecar: `src-tauri/src/claude_cli.rs` — attaches `ideContext` string field on `ClaudeRequest`; sidecar reads it in `stream-claude.js`
 
@@ -19,8 +19,8 @@
 2. `get_ide_context` (Rust) scans `~/.claude/ide/*.lock` files, finds lock whose `workspaceFolders` matches the path, verifies PID alive, connects via WebSocket `ws://127.0.0.1:{port}` with `authToken` header
 3. Rust sends MCP-style JSON-RPC requests to the IDE extension, parses active file, selection, open tabs, diagnostics → returns `ExternalIdeContext`
 4. ChatInput chip reflects state: shows filename / line range; greyed out when `ideContextEnabled = false`
-5. On message send, `buildContextPrefix(gitSummary, workingDir)` is called: checks `ideContextEnabled`; on Mac tries external IDE first, falls back to internal (`previewFile` / `editorSelection` from store)
-6. Returns XML-formatted string: `<ide_opened_file>…</ide_opened_file>`, `<ide_selection …/>`, `<ide_diagnostics>…</ide_diagnostics>`, `gitStatus: …`
+5. On message send, `buildContextPrefix(workingDir)` is called: checks `ideContextEnabled`; on Mac tries external IDE first, falls back to internal (`previewFile` / `editorSelection` from store)
+6. Returns XML-formatted string: `<ide_opened_file>…</ide_opened_file>`, `<ide_selection …/>`, `<ide_diagnostics>…</ide_diagnostics>` (git status removed — agent runs git commands directly)
 7. String is passed as `ide_context: Option<String>` on `ClaudeRequest` struct → Rust serialises it as `config.ideContext` → Node.js sidecar prepends it to the user message (`effectivePrompt = ideContext + "\n\n" + prompt`)
 8. Agent receives context at the top of the human turn; system prompt stays stable across messages → token cache is preserved
 
