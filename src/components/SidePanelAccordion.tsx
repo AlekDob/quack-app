@@ -515,6 +515,7 @@ export default function SidePanelAccordion({
             onRemoveModifiedFiles={onRemoveModifiedFiles}
             branch={branch}
             isWorktree={isWorktree}
+            projectName={projectName}
             history={gitHistory}
             historyLoading={gitHistoryLoading}
           />

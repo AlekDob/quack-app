@@ -16,6 +16,16 @@
   box-sizing: border-box;
 }
 
+.changes-project-name {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 .changes-branch-icon {
   flex-shrink: 0;
   color: rgba(255, 255, 255, 0.45);
@@ -49,6 +59,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+button.changes-tab,
 .changes-tab {
   flex: 1;
   display: flex;

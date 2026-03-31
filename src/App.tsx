@@ -10864,6 +10864,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tauriAvailable, hasBootstrapped]); // Intentionally NOT including refreshGitSummary to prevent re-load on every switch
 
+  // Refresh git history when active agent changes (Changes panel always visible)
+  // This ensures the History tab shows commits from the current project, not quack-app
+  useEffect(() => {
+    if (activeId && tauriAvailable && hasBootstrapped) {
+      void refreshGitSummary();
+    }
+  }, [activeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSelectGitEntry = useCallback((entry: GitStatusEntry) => {
     setSelectedGitPath(entry.path);
     setEditSummaryDiffEntry(null); // Clear synthetic entry when selecting from git panel
