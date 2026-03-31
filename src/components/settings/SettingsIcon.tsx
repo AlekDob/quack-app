@@ -122,6 +122,13 @@ export default function SettingsIcon({ category, className = '' }: SettingsIconP
         </svg>
       );
 
+    case 'typography':
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none">
+          <path d="M5 19h3.5l1.2-3.2h4.6L15.5 19H19L12.6 4h-1.2L5 19zm5.4-5.2L12 9.2l1.6 4.6h-3.2z" fill="currentColor" />
+        </svg>
+      );
+
     case 'keyboard-shortcuts':
       return (
         <svg {...iconProps}>

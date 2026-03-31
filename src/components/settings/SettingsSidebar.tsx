@@ -12,6 +12,7 @@ export type SettingsCategory =
   | 'notifications'
   | 'remote-api'
   | 'appearance'
+  | 'typography'
   | 'keyboard-shortcuts'
   | 'debug'
   | 'about';
@@ -38,6 +39,7 @@ const categories: CategoryItem[] = [
   { id: 'notifications', label: 'Notifications' },
   { id: 'remote-api', label: 'Remote API' },
   { id: 'appearance', label: 'Appearance' },
+  { id: 'typography', label: 'Typography' },
   { id: 'keyboard-shortcuts', label: 'Keyboard' },
   { id: 'debug', label: 'Debug' },
   { id: 'about', label: 'About' },

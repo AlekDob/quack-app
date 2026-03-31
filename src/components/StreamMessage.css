@@ -78,14 +78,14 @@
 }
 
 .droid-activity-name {
-  font-size: 13px;
+  font-size: var(--fs-user-msg);
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
   transition: color 0.15s;
 }
 
 .droid-activity-count {
-  font-size: 10px;
+  font-size: var(--fs-small);
   font-weight: 500;
   color: rgba(255, 255, 255, 0.4);
   padding: 1px 6px;
@@ -143,7 +143,7 @@
 }
 
 .assistant-name {
-  font-size: 12px; /* ← Ridotto da 13px */
+  font-size: var(--fs-body);
   font-weight: 600;
   color: rgba(147, 197, 253, 0.9);
   margin-bottom: 6px;
@@ -153,7 +153,7 @@
 }
 
 .team-mode-badge {
-  font-size: 9px;
+  font-size: var(--fs-small);
   font-weight: 500;
   color: rgba(0, 217, 255, 0.8);
   background: rgba(0, 217, 255, 0.1);
@@ -180,7 +180,7 @@
 }
 
 .assistant-message-text {
-  font-size: 12px; /* ← Ridotto da 14px */
+  font-size: var(--fs-body);
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.9);
   white-space: pre-wrap;
@@ -210,7 +210,7 @@
   background: rgba(139, 92, 246, 0.12);
   border: 1px solid rgba(139, 92, 246, 0.25);
   border-radius: 10px;
-  font-size: 10px;
+  font-size: var(--fs-small);
   font-weight: 500;
   color: #a78bfa;
   letter-spacing: 0.2px;
@@ -248,13 +248,13 @@
 
 .result-title {
   font-weight: 600;
-  font-size: 13px; /* ← Ridotto da 15px */
+  font-size: var(--fs-user-msg);
   color: rgba(255, 255, 255, 0.95);
 }
 
 .result-content {
   margin-bottom: 12px;
-  font-size: 12px; /* ← Ridotto da 14px */
+  font-size: var(--fs-body);
   line-height: 1.6;
   color: rgba(255, 255, 255, 0.8);
 }
@@ -268,7 +268,7 @@
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 6px;
-  font-size: 11px; /* ← Ridotto da 13px */
+  font-size: var(--fs-code);
   color: rgba(239, 68, 68, 1);
   line-height: 1.5;
 }
@@ -290,7 +290,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 10px; /* ← Ridotto da 12px */
+  font-size: var(--fs-small);
 }
 
 .result-stat-label {
@@ -298,7 +298,7 @@
 }
 
 .result-stat-value {
-  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
+  font-family: var(--font-mono);
   color: rgba(255, 255, 255, 0.9);
   font-weight: 500;
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import posthog from "posthog-js";
 import { invokeWithTimeout, fireAndForget } from "./utils/invokeWithTimeout";
@@ -90,6 +90,7 @@ import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
 import { useMarketplace } from "./hooks/useMarketplace";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
+import { applyTypography } from "./constants/typography";
 import { useKanbanStore } from "./stores/kanbanStore";
 import { useAutomationStore } from "./stores/automationStore";
 import { useSessionStore } from "./stores/sessionStore";
@@ -693,6 +694,12 @@ function AppContent() {
   const [hasSavedAgents, setHasSavedAgents] = useState(true); // Assume true until bootstrap confirms
   const [persistedProjects, setPersistedProjects] = useState<Map<string, string>>(new Map()); // path -> name
   const [introVersion, setIntroVersion] = useState('');
+
+  // Apply typography CSS variables before first paint + on every change
+  const typography = useSettingsStore((s) => s.typography);
+  useLayoutEffect(() => {
+    applyTypography(typography);
+  }, [typography]);
 
   // Fetch app version for intro screen
   useEffect(() => {

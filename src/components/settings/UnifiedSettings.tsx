@@ -13,6 +13,7 @@ import LicenseSettings from './categories/LicenseSettings';
 import NotificationSettings from './categories/NotificationSettings';
 import RemoteApiSettings from './categories/RemoteApiSettings';
 import AppearanceSettings from './categories/AppearanceSettings';
+import TypographySettings from './categories/TypographySettings';
 import KeyboardShortcutsSettings from './categories/KeyboardShortcutsSettings';
 import DebugSettings from './categories/DebugSettings';
 import AboutSettings from './categories/AboutSettings';
@@ -67,6 +68,8 @@ export default function UnifiedSettings({
         return <RemoteApiSettings />;
       case 'appearance':
         return <AppearanceSettings />;
+      case 'typography':
+        return <TypographySettings />;
       case 'keyboard-shortcuts':
         return <KeyboardShortcutsSettings />;
       case 'debug':

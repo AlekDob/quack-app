@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { EffortLevel, ModePreset, AgentModePresets, LLMProviderType } from '../types';
+import { applyTypography, DEFAULT_TYPOGRAPHY } from '../constants/typography';
+import type { TypographySettings, FontSizePreset } from '../constants/typography';
 
 /**
  * Normalize legacy model short names to Supabase IDs.
@@ -77,6 +79,7 @@ interface SettingsState {
   terminal: TerminalSettings;
   general: GeneralSettings;
   agentModePresets: AgentModePresets;
+  typography: TypographySettings;
 
   // Actions - Claude
   setClaudeApiKey: (key: string | null) => void;
@@ -96,6 +99,11 @@ interface SettingsState {
   toggleSounds: () => void;
   toggleToolGifs: () => void;
   setGiphyApiKey: (key: string) => void;
+
+  // Actions - Typography
+  setFontSizePreset: (preset: FontSizePreset) => void;
+  updateTypography: (settings: Partial<TypographySettings>) => void;
+  resetTypography: () => void;
 
   // Actions - Global
   resetAllSettings: () => void;
@@ -191,6 +199,7 @@ export const useSettingsStore = create<SettingsState>()(
         terminal: defaultTerminalSettings,
         general: defaultGeneralSettings,
         agentModePresets: defaultAgentModePresets,
+        typography: DEFAULT_TYPOGRAPHY,
 
         // Claude actions
         setClaudeApiKey: (key) => set((state) => ({
@@ -247,12 +256,38 @@ export const useSettingsStore = create<SettingsState>()(
           general: { ...state.general, giphyApiKey: key },
         })),
 
+        // Typography actions
+        setFontSizePreset: (preset) => {
+          set((state) => {
+            const newTypo = { ...state.typography, fontSizePreset: preset };
+            applyTypography(newTypo);
+            return { typography: newTypo };
+          });
+        },
+
+        updateTypography: (settings) => {
+          set((state) => {
+            const newTypo = { ...state.typography, ...settings };
+            applyTypography(newTypo);
+            return { typography: newTypo };
+          });
+        },
+
+        resetTypography: () => {
+          applyTypography(DEFAULT_TYPOGRAPHY);
+          set({ typography: DEFAULT_TYPOGRAPHY });
+        },
+
         // Global actions
-        resetAllSettings: () => set({
-          claude: defaultClaudeSettings,
-          terminal: defaultTerminalSettings,
-          general: defaultGeneralSettings,
-        }),
+        resetAllSettings: () => {
+          applyTypography(DEFAULT_TYPOGRAPHY);
+          set({
+            claude: defaultClaudeSettings,
+            terminal: defaultTerminalSettings,
+            general: defaultGeneralSettings,
+            typography: DEFAULT_TYPOGRAPHY,
+          });
+        },
 
         exportSettings: () => {
           const state = get();
@@ -260,6 +295,7 @@ export const useSettingsStore = create<SettingsState>()(
             claude: { ...state.claude, apiKey: null }, // Don't export API key
             terminal: state.terminal,
             general: state.general,
+            typography: state.typography,
             version: '1.0.0',
             exportedAt: new Date().toISOString(),
           };
@@ -270,9 +306,12 @@ export const useSettingsStore = create<SettingsState>()(
           try {
             const data = JSON.parse(json);
             if (data.version && data.terminal && data.general) {
+              const typo = { ...DEFAULT_TYPOGRAPHY, ...data.typography };
+              applyTypography(typo);
               set({
                 terminal: { ...defaultTerminalSettings, ...data.terminal },
                 general: { ...defaultGeneralSettings, ...data.general },
+                typography: typo,
                 // Don't import Claude settings for security
               });
               return true;
@@ -297,13 +336,14 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
-        version: 5,
+        version: 6,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
           terminal: state.terminal,
           general: state.general,
           agentModePresets: state.agentModePresets,
+          typography: state.typography,
         }),
         // Migrate persisted legacy model IDs (sonnet→sonnet45, opus→opus46, haiku→haiku45)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -343,6 +383,16 @@ export const useSettingsStore = create<SettingsState>()(
           if (version < 5) {
             if (persisted.agentModePresets && !persisted.agentModePresets.chat) {
               persisted.agentModePresets.chat = defaultAgentModePresets.chat;
+            }
+          }
+          // v6: Add Typography settings (font size presets + font family)
+          if (version < 6) {
+            if (!persisted.typography) {
+              persisted.typography = {
+                ...DEFAULT_TYPOGRAPHY,
+                // Preserve existing mono font from terminal settings if available
+                fontFamilyMono: persisted.terminal?.fontFamily || DEFAULT_TYPOGRAPHY.fontFamilyMono,
+              };
             }
           }
           return persisted;

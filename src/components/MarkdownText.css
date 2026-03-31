@@ -1,7 +1,7 @@
 .markdown-content {
   line-height: 1.4;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 
 /* Headings - Compact */
@@ -13,38 +13,38 @@
 }
 
 .md-h1 {
-  font-size: 14px;
+  font-size: var(--fs-h1);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   padding-bottom: 3px;
 }
 
 .md-h2 {
-  font-size: 13px;
+  font-size: var(--fs-h2);
   color: #f28c52;
 }
 
 .md-h3 {
-  font-size: 12px;
+  font-size: var(--fs-body);
   color: #f28c52;
 }
 
 .md-h4 {
-  font-size: 11px;
+  font-size: var(--fs-h4);
 }
 
 .md-h5 {
-  font-size: 11px;
+  font-size: var(--fs-h4);
 }
 
 .md-h6 {
-  font-size: 10px;
+  font-size: var(--fs-h6);
   color: rgba(255, 255, 255, 0.7);
 }
 
 /* Paragraphs */
 .md-paragraph {
   margin: 6px 0;
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 
 /* Lists */
@@ -56,7 +56,7 @@
 .md-list li {
   margin: 3px 0;
   color: rgba(255, 255, 255, 0.85);
-  font-size: 12px;
+  font-size: var(--fs-body);
 }
 
 .md-list li::marker {
@@ -76,8 +76,8 @@
   border: 1px solid rgba(242, 140, 82, 0.25);
   border-radius: 3px;
   padding: 1px 4px;
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-code);
   color: #f28c52;
 }
 
@@ -95,8 +95,8 @@
   padding: 10px;
   padding-top: 36px; /* Space for copy button */
   overflow-x: auto;
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-code);
   line-height: 1.4;
 }
 
@@ -154,7 +154,7 @@
 .md-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: var(--fs-code);
 }
 
 .md-table th,
@@ -168,7 +168,7 @@
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
   background: rgba(255, 255, 255, 0.05);
-  font-size: 10px;
+  font-size: var(--fs-small);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }

@@ -54,7 +54,7 @@
   color: white;
   padding: 10px 14px;
   border-radius: 18px 18px 4px 18px; /* iMessage tail on bottom-right */
-  font-size: 13px;
+  font-size: var(--fs-user-msg);
   line-height: 1.4;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   /* Size constraints */
@@ -128,7 +128,7 @@
   color: white;
   padding: 10px 14px;
   border-radius: 18px 18px 4px 18px;
-  font-size: 13px;
+  font-size: var(--fs-user-msg);
   line-height: 1.4;
   box-shadow:
     0 2px 8px rgba(242, 140, 82, 0.3),
@@ -252,17 +252,17 @@
 
 .chat-message-role {
   font-weight: 600;
-  font-size: 10px; /* ← Ridotto da 11px */
+  font-size: var(--fs-small);
   color: rgba(255, 255, 255, 0.7);
 }
 
 .chat-message-timestamp {
-  font-size: 9px; /* ← Ridotto da 10px */
+  font-size: var(--fs-small);
   color: rgba(255, 255, 255, 0.35);
 }
 
 .chat-message-body {
-  font-size: 12px; /* ← Ridotto da 13px */
+  font-size: var(--fs-body);
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.85);
   word-wrap: break-word;
@@ -382,7 +382,7 @@
 }
 
 .chat-message-attachment-name {
-  font-size: 12px; /* ← Ridotto da 13px */
+  font-size: var(--fs-body);
   font-weight: 500;
   color: rgba(255, 255, 255, 0.85);
   white-space: nowrap;
@@ -391,7 +391,7 @@
 }
 
 .chat-message-attachment-size {
-  font-size: 10px; /* ← Ridotto da 11px */
+  font-size: var(--fs-small);
   color: rgba(255, 255, 255, 0.5);
 }
 
@@ -401,7 +401,7 @@
   background: rgba(255, 59, 48, 0.1);
   border: 1px solid rgba(255, 59, 48, 0.2);
   border-radius: 4px;
-  font-size: 10px; /* ← Ridotto da 11px */
+  font-size: var(--fs-small);
   color: #ff3b30;
 }
 
@@ -437,7 +437,7 @@
   background: rgba(77, 212, 179, 0.1);
   border: 1px solid rgba(77, 212, 179, 0.2);
   border-radius: 12px;
-  font-size: 10px; /* ← Ridotto da 11px */
+  font-size: var(--fs-small);
   font-weight: 500;
   color: rgba(77, 212, 179, 0.9);
   white-space: nowrap;
@@ -464,7 +464,7 @@
   background: rgba(242, 140, 82, 0.15);
   border: 1px solid rgba(242, 140, 82, 0.3);
   border-radius: 10px;
-  font-size: 10px; /* ← Ridotto da 11px */
+  font-size: var(--fs-small);
   font-weight: 500;
   vertical-align: middle;
 }
@@ -481,6 +481,6 @@
 
 .agent-mention-name {
   color: rgba(255, 255, 255, 0.95);
-  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   line-height: 1;
 }

@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  font-family: 'General Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-ui, 'General Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif);
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
@@ -22,6 +22,19 @@
   --blur-light: 4px;
   --blur-medium: 8px;
   --blur-heavy: 12px;
+
+  /* Typography — CSS variables set by applyTypography(), M preset defaults */
+  --font-ui: 'General Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', monospace;
+  --fs-body: 12px;
+  --fs-user-msg: 13px;
+  --fs-h1: 14px;
+  --fs-h2: 13px;
+  --fs-h4: 11px;
+  --fs-h6: 10px;
+  --fs-code: 11px;
+  --fs-small: 10px;
+  --fs-terminal: 14px;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
