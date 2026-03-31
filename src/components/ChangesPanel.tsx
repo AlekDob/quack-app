@@ -5,10 +5,12 @@ import InlineDiffView from './InlineDiffView'
 import OpenInIDEButton from './OpenInIDEButton'
 import CommitModal from './CommitModal'
 import { ConfirmModal } from './ConfirmModal'
+import GitTimelineItem, { TIMELINE_LINE_LEFT } from './GitTimelineItem'
+import type { GitCommitEntry } from '../types'
 import './ChangesPanel.css'
 
 type FileStatus = 'created' | 'modified' | 'deleted'
-type ActiveTab = 'pending' | 'committed'
+type ActiveTab = 'pending' | 'committed' | 'history'
 
 interface ChangesPanelProps {
   rootPath: string | null
@@ -16,6 +18,12 @@ interface ChangesPanelProps {
   onRefreshGitStatus: () => void
   onClearModifiedFiles?: () => void
   onRemoveModifiedFiles?: (paths: string[]) => void
+  // Branch context (US1)
+  branch?: string | null
+  isWorktree?: boolean
+  // History tab (US2)
+  history?: GitCommitEntry[]
+  historyLoading?: boolean
 }
 
 interface DiffState {
@@ -30,6 +38,10 @@ export default function ChangesPanel({
   onRefreshGitStatus,
   onClearModifiedFiles,
   onRemoveModifiedFiles,
+  branch,
+  isWorktree,
+  history,
+  historyLoading,
 }: ChangesPanelProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('pending')
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
@@ -337,7 +349,9 @@ export default function ChangesPanel({
     )
   }
 
-  const currentEntries = activeTab === 'pending' ? pendingEntries : committedEntries
+  const currentEntries = activeTab === 'pending' ? pendingEntries
+    : activeTab === 'committed' ? committedEntries
+    : [] // history tab renders its own content
 
   const renderFileRow = ([filePath, status]: [string, FileStatus]) => {
     const fileName = filePath.split('/').pop() || filePath
@@ -417,6 +431,24 @@ export default function ChangesPanel({
 
   return (
     <div className="changes-panel">
+      {/* Context bar — branch/worktree info (US1) */}
+      {branch && (
+        <div className="changes-context-bar">
+          <svg className="changes-branch-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="6" y1="3" x2="6" y2="15" />
+            <circle cx="18" cy="6" r="3" />
+            <circle cx="6" cy="18" r="3" />
+            <path d="M18 9a9 9 0 0 1-9 9" />
+          </svg>
+          <span className="changes-branch-name" title={branch}>
+            {branch}
+          </span>
+          {isWorktree && (
+            <span className="changes-worktree-badge">worktree</span>
+          )}
+        </div>
+      )}
+
       {/* Tabs */}
       <div className="changes-tabs">
         <button
@@ -437,6 +469,16 @@ export default function ChangesPanel({
           Committed
           {committedEntries.length > 0 && (
             <span className="changes-tab-count changes-tab-count-committed">{committedEntries.length}</span>
+          )}
+        </button>
+        <button
+          type="button"
+          className={`changes-tab ${activeTab === 'history' ? 'active' : ''}`}
+          onClick={() => setActiveTab('history')}
+        >
+          History
+          {history && history.length > 0 && (
+            <span className="changes-tab-count changes-tab-count-history">{history.length}</span>
           )}
         </button>
       </div>
@@ -492,15 +534,37 @@ export default function ChangesPanel({
         </div>
       )}
 
-      {/* Empty state per tab */}
-      {currentEntries.length === 0 && (
+      {/* History tab content (US2) */}
+      {activeTab === 'history' && (
+        <div className="changes-history-list">
+          {historyLoading ? (
+            <div className="changes-panel-empty">Loading commits…</div>
+          ) : !history || history.length === 0 ? (
+            <div className="changes-panel-empty">Nessun commit trovato</div>
+          ) : (
+            <div style={{ position: 'relative', padding: '0.5rem 0.8rem 1rem 0' }}>
+              {history.map((entry, index) => (
+                <GitTimelineItem
+                  key={entry.hash}
+                  entry={entry}
+                  lineLeft={TIMELINE_LINE_LEFT}
+                  isLast={index === history.length - 1}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Empty state per tab (pending/committed only) */}
+      {activeTab !== 'history' && currentEntries.length === 0 && (
         <div className="changes-panel-empty">
           {activeTab === 'pending' ? 'No pending changes' : 'No committed files yet'}
         </div>
       )}
 
-      {/* File list */}
-      {currentEntries.length > 0 && (
+      {/* File list (pending/committed only) */}
+      {activeTab !== 'history' && currentEntries.length > 0 && (
         <div className="changes-panel-list">
           {currentEntries.map(renderFileRow)}
         </div>

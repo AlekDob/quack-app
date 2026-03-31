@@ -285,6 +285,11 @@ interface SidePanelAccordionProps {
   onRefreshGitStatus?: () => void;
   onClearModifiedFiles?: () => void;
   onRemoveModifiedFiles?: (paths: string[]) => void;
+  // Changes panel — branch context + history
+  branch?: string | null;
+  isWorktree?: boolean;
+  gitHistory?: import('../types').GitCommitEntry[];
+  gitHistoryLoading?: boolean;
 
   // Force expand a specific section (controlled from parent)
   forceExpandSection?: string | null;
@@ -375,6 +380,10 @@ export default function SidePanelAccordion({
   onRefreshGitStatus,
   onClearModifiedFiles,
   onRemoveModifiedFiles,
+  branch,
+  isWorktree,
+  gitHistory,
+  gitHistoryLoading,
 
   // Force expand
   forceExpandSection,
@@ -505,6 +514,10 @@ export default function SidePanelAccordion({
               onRefreshGitStatus={onRefreshGitStatus || (() => {})}
               onClearModifiedFiles={onClearModifiedFiles}
               onRemoveModifiedFiles={onRemoveModifiedFiles}
+              branch={branch}
+              isWorktree={isWorktree}
+              history={gitHistory}
+              historyLoading={gitHistoryLoading}
             />
           </AccordionSection>
         )}

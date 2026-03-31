@@ -12721,6 +12721,10 @@ You have access to all Bash tools to execute git commands like:
           // Changes panel props
           onRefreshGitStatus={refreshGitSummary}
           onClearModifiedFiles={() => setModifiedFiles(new Map())}
+          branch={gitBranch || null}
+          isWorktree={!!activeTerminal?.useWorktree}
+          gitHistory={commitHistory}
+          gitHistoryLoading={loadingGit}
           // Force expand section
           forceExpandSection={forceExpandSection}
           onForceExpandHandled={() => setForceExpandSection(null)}
