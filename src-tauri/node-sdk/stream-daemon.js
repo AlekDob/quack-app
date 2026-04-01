@@ -158,10 +158,16 @@ async function countPromptTokens(modelId, promptContent) {
 // =============================================================================
 
 /**
- * Active queries: queryId → { abortController, pendingRequests }
+ * Active queries: queryId → query state
  * Each query has its own AbortController for independent cancellation.
  */
 const activeQueries = new Map();
+
+/**
+ * Sessions whose persistent subprocess was tainted by Stop/overlap handling.
+ * The next query for that session must log diagnostics and spawn a fresh subprocess.
+ */
+const taintedSessions = new Map();
 
 /**
  * Global pending requests map (keyed by requestId).
@@ -408,6 +414,10 @@ class SessionProcess {
 
     this.currentQueryId = null;
     this.canUseToolFn = null;
+    this.tainted = false;
+    this.retireAfterQueryId = null;
+    this.taintReason = null;
+    this.taintedAt = null;
 
     this.eventQueue = [];
     this.eventResolve = null;
@@ -474,6 +484,15 @@ class SessionProcess {
     this.canUseToolFn = canUseToolFn;
   }
 
+  markTaintedAfterAbort(queryId, reason) {
+    this.tainted = true;
+    this.retireAfterQueryId = queryId;
+    this.taintReason = reason;
+    this.taintedAt = Date.now();
+    log('SESSION_PROCESS', `Marked subprocess tainted for session=${this.sessionId} query=${queryId} reason=${reason}`);
+    diag(`[SessionProcess ${this.sessionId}] tainted query=${queryId} reason=${reason}`);
+  }
+
   async interruptCurrentQuery() {
     if (!this.alive) {
       throw new Error(`Session process ${this.sessionId} is not alive`);
@@ -493,6 +512,24 @@ class SessionProcess {
       this.currentQueryId = null;
       this.canUseToolFn = null;
     }
+  }
+
+  finishQuery(queryId) {
+    this.clearQueryContext(queryId);
+
+    if (this.retireAfterQueryId && this.retireAfterQueryId === queryId) {
+      log(
+        'SESSION_PROCESS',
+        `Retiring tainted subprocess for session=${this.sessionId} query=${queryId} reason=${this.taintReason || 'unknown'}`
+      );
+      diag(
+        `[SessionProcess ${this.sessionId}] retiring tainted subprocess query=${queryId} reason=${this.taintReason || 'unknown'}`
+      );
+      this.kill();
+      return true;
+    }
+
+    return false;
   }
 
   sendMessage(text, attachments) {
@@ -529,6 +566,8 @@ class SessionProcess {
   kill() {
     if (!this.child || this.child.killed) return;
     this.alive = false;
+    this.currentQueryId = null;
+    this.canUseToolFn = null;
     try {
       this.child.stdin.end();
     } catch { /* ignore */ }
@@ -676,6 +715,7 @@ async function handleQuery(cmd) {
     status: 'active',
     queryHandle: null,
     sessionProcess: null,
+    sessionId: sessionId || null,
   };
 
   // Track plan approval state per query (Brain: fix-duplicate-plan-approval)
@@ -1057,6 +1097,36 @@ ${hintsBlock}
     let eventSource;
 
     if (usePersistentProcess) {
+      const overlappingQueries = Array.from(activeQueries.entries())
+        .filter(([otherQueryId, otherState]) => otherQueryId !== queryId && otherState.sessionId === sessionId);
+      if (overlappingQueries.length > 0) {
+        log(
+          'ABORT',
+          `query=${queryId} detected ${overlappingQueries.length} overlapping query(s) for session=${sessionId}; forcing fresh subprocess`
+        );
+        diag(
+          `OVERLAP_DETECTED: newQuery=${queryId}, session=${sessionId}, overlaps=[${overlappingQueries
+            .map(([otherQueryId, otherState]) => `${otherQueryId}:${otherState.status}`)
+            .join(',')}]`
+        );
+
+        for (const [otherQueryId, otherState] of overlappingQueries) {
+          otherState.status = 'aborted';
+          otherState.abortController.abort();
+          if (otherState.sessionProcess) {
+            otherState.sessionProcess.markTaintedAfterAbort(otherQueryId, 'overlap-prevention');
+            otherState.sessionProcess.kill();
+          }
+          taintedSessions.set(sessionId, {
+            queryId: otherQueryId,
+            reason: 'overlap-prevention',
+            taintedAt: Date.now(),
+            postStopEventCount: 0,
+            resultAfterInterrupt: false,
+          });
+        }
+      }
+
       const spawnOpts = {
         model: modelId,
         resume: sessionId,
@@ -1075,11 +1145,28 @@ ${hintsBlock}
       const fingerprint = getSessionFingerprint(spawnOpts);
 
       let proc = sessionProcesses.get(sessionId);
-      if (proc && (!proc.alive || proc.fingerprint !== fingerprint)) {
-        log('SESSION_PROCESS', `Restarting subprocess for session=${sessionId} (alive=${proc.alive}, fp_changed=${proc.fingerprint !== fingerprint})`);
+      const taintInfo = taintedSessions.get(sessionId);
+      if (taintInfo) {
+        const stillDraining = Boolean(proc?.currentQueryId || proc?.retireAfterQueryId);
+        log(
+          'ABORT',
+          `Starting query=${queryId} on tainted session=${sessionId}; previousQuery=${taintInfo.queryId} reason=${taintInfo.reason} postStopEvents=${taintInfo.postStopEventCount} resultAfterInterrupt=${taintInfo.resultAfterInterrupt} stillDraining=${stillDraining}`
+        );
+        diag(
+          `TAINTED_SESSION_RESTART: newQuery=${queryId}, session=${sessionId}, previousQuery=${taintInfo.queryId}, reason=${taintInfo.reason}, postStopEvents=${taintInfo.postStopEventCount}, resultAfterInterrupt=${taintInfo.resultAfterInterrupt}, stillDraining=${stillDraining}`
+        );
+      }
+
+      if (proc && (taintInfo || proc.tainted || !proc.alive || proc.fingerprint !== fingerprint)) {
+        log(
+          'SESSION_PROCESS',
+          `Restarting subprocess for session=${sessionId} (tainted=${Boolean(taintInfo || proc.tainted)}, alive=${proc.alive}, fp_changed=${proc.fingerprint !== fingerprint})`
+        );
         proc.kill();
+        sessionProcesses.delete(sessionId);
         proc = null;
       }
+      if (taintInfo) taintedSessions.delete(sessionId);
 
       if (!proc) {
         proc = new SessionProcess(sessionId, fingerprint);
@@ -1136,6 +1223,15 @@ ${hintsBlock}
       const latestQueryState = activeQueries.get(queryId);
       const suppressEvent = latestQueryState && latestQueryState.status !== 'active';
       if (suppressEvent) {
+        if (queryState.sessionId && taintedSessions.has(queryState.sessionId)) {
+          const taintInfo = taintedSessions.get(queryState.sessionId);
+          taintInfo.postStopEventCount += 1;
+          if (event.type === 'result') {
+            taintInfo.resultAfterInterrupt = true;
+            log('ABORT', `Result arrived after interrupt for query=${queryId} session=${queryState.sessionId}`);
+            diag(`RESULT_AFTER_INTERRUPT: query=${queryId}, session=${queryState.sessionId}`);
+          }
+        }
         log('ABORT', `Suppressing post-stop event for query=${queryId}: type=${event.type}`);
         continue;
       }
@@ -1285,7 +1381,10 @@ ${hintsBlock}
     }
 
     if (queryState.sessionProcess) {
-      queryState.sessionProcess.clearQueryContext(queryId);
+      const retiredProcess = queryState.sessionProcess.finishQuery(queryId);
+      if (retiredProcess && queryState.sessionId && sessionProcesses.get(queryState.sessionId) === queryState.sessionProcess) {
+        sessionProcesses.delete(queryState.sessionId);
+      }
     }
 
     // Clean up pending requests for this query
@@ -1378,15 +1477,27 @@ async function handleAbort(cmd) {
   };
 
   if (queryState.mode === 'persistent' && queryState.sessionProcess) {
+    const sessionId = queryState.sessionProcess.sessionId;
+    const taintInfo = {
+      queryId,
+      reason: 'user-stop',
+      taintedAt: Date.now(),
+      postStopEventCount: 0,
+      resultAfterInterrupt: false,
+    };
+    taintedSessions.set(sessionId, taintInfo);
+    queryState.sessionProcess.markTaintedAfterAbort(queryId, 'user-stop');
+
     try {
       await withTimeout(queryState.sessionProcess.interruptCurrentQuery(), interruptTimeoutMs);
-      queryState.sessionProcess.clearQueryContext(queryId);
       finalizeAbort();
       log('ABORT', `query=${queryId} interrupted successfully via persistent subprocess`);
     } catch (err) {
       log('ABORT', `query=${queryId} interrupt failed (${err.message}) — killing subprocess`);
-      queryState.sessionProcess.clearQueryContext(queryId);
       queryState.sessionProcess.kill();
+      if (sessionProcesses.get(sessionId) === queryState.sessionProcess) {
+        sessionProcesses.delete(sessionId);
+      }
       finalizeAbort();
     }
     return;
