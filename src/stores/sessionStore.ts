@@ -13,6 +13,7 @@ import { devtools, persist } from 'zustand/middleware';
 import type { AgentSession, AgentSessionStatus } from '../types';
 import { loadAgentSessions, saveAgentSessions } from '../services/unifiedAgentStorage';
 import { sessionWriteLock } from './sessionWriteLock';
+import { appendBrainDiaryOnDone } from '../services/brainSessionService';
 
 /**
  * Maximum messages allowed per session before archiving is recommended
@@ -196,6 +197,14 @@ export const useSessionStore = create<SessionState>()(
           sessionWriteLock.markWrite();
 
           console.log('[sessionStore] Marked session as done:', id, completionNote);
+
+          // Brain: pattern-brain-hooks — auto-diary on session done
+          const doneSession = sessions.find((s) => s.id === id);
+          if (doneSession?.projectPath) {
+            appendBrainDiaryOnDone(doneSession).catch((err) =>
+              console.warn('[sessionStore] Brain diary append failed:', err)
+            );
+          }
         },
 
         // Select a session

@@ -118,6 +118,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Changes Panel all-messages fix: `documentation/bugs/fix-changes-panel-all-messages.md`
 - Agent Result Card (droid reports): `documentation/patterns/pattern-agent-result-card.md`
 - HTML Visualizer (inline iframe): `documentation/patterns/pattern-html-visualizer-inline.md`
+- Brain Hooks (automated knowledge surfacing): `documentation/patterns/pattern-brain-hooks.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)

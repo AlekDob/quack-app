@@ -1,0 +1,61 @@
+graph TD
+    subgraph "Claude Code SDK"
+        SDK[Hook System]
+    end
+
+    subgraph "Brain Hooks (~/.quack/hooks/brain/)"
+        SS[session-start.js]
+        PR[pre-read.js]
+        PW[pre-write.js]
+        ST[stop.js]
+        SH[shared.js]
+    end
+
+    subgraph "Brain Knowledge (documentation/)"
+        AST[AST.md]
+        GOT[gotchas/]
+        BUG[bugs/]
+        DIA[diary/]
+    end
+
+    subgraph "Session State (.claude/)"
+        SES[_brain-session.json]
+    end
+
+    SDK -->|SessionStart| SS
+    SDK -->|PreToolUse Read| PR
+    SDK -->|PreToolUse Write/Edit| PW
+    SDK -->|Stop| ST
+
+    SS -->|creates| SES
+    SS -->|reads stats| GOT
+    SS -->|reads stats| BUG
+
+    PR -->|lookup| AST
+    PR -->|scan| GOT
+    PR -->|scan| BUG
+    PR -->|read/write| SES
+
+    PW -->|scan| GOT
+    PW -->|scan| BUG
+    PW -->|resolve breadcrumbs| GOT
+
+    ST -->|reads| SES
+    ST -->|appends summary| DIA
+    ST -->|deletes| SES
+
+    SS -.->|uses| SH
+    PR -.->|uses| SH
+    PW -.->|uses| SH
+    ST -.->|uses| SH
+
+    style SS fill:#FF6B35,color:#fff
+    style PR fill:#004E89,color:#fff
+    style PW fill:#F7931E,color:#fff
+    style ST fill:#00D9FF,color:#000
+    style SH fill:#333,color:#fff
+    style AST fill:#2ecc71,color:#fff
+    style GOT fill:#e74c3c,color:#fff
+    style BUG fill:#e74c3c,color:#fff
+    style DIA fill:#9b59b6,color:#fff
+    style SES fill:#555,color:#fff

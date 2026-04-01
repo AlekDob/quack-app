@@ -11,6 +11,7 @@ import EditSummaryBar from './EditSummaryBar';
 import TodoProgressBar from './TodoProgressBar';
 import type { TodoItem } from './TodoProgressBar';
 import AgentRulesBanner from './AgentRulesBanner';
+import BrainContextBanner from './BrainContextBanner';
 import BTWDrawer from './btw/BTWDrawer';
 import { useBTW } from '../hooks/useBTW';
 import { useQuickLoop } from '../hooks/useQuickLoop';
@@ -718,6 +719,13 @@ export default function ChatView({
         <AgentRulesBanner
           rules={activeRules}
           onEditRules={onEditRules}
+        />
+      )}
+      {/* Brain Context Banner - shown at session start when no messages yet */}
+      {messages.length === 0 && (
+        <BrainContextBanner
+          basePath={basePath}
+          sessionId={internalSessionId}
         />
       )}
       {/* Debug Mode Banner - accordion, shown when debug mode is active */}
