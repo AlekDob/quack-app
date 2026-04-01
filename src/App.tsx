@@ -1914,11 +1914,19 @@ function AppContent() {
   }, [activeTerminal, tauriAvailable, activeSessionId]);
 
   // 🦆 BRANCH-PER-SESSION: Override gitBranch when active session has explicit branch
+  // Brain: bug-stale-branch-indicator-after-checkout
+  // Also propagate session branch to the terminal so the sidebar groups agents correctly.
   useEffect(() => {
     if (!activeSessionId) return;
     const session = useSessionStore.getState().sessions.find(s => s.id === activeSessionId);
     if (session?.branch) {
       setGitBranch(session.branch);
+      // Update the terminal's branch so RepositoryGroup sidebar shows it correctly
+      setTerminals((prev) =>
+        prev.map((t) =>
+          t.id === session.agentId ? { ...t, branch: session.branch } : t
+        )
+      );
     }
   }, [activeSessionId]);
 

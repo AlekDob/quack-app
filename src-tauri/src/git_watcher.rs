@@ -73,6 +73,7 @@ impl GitBranchWatcherManager {
 
         let project_path_clone = project_path.clone();
         let head_path_clone = head_path.clone();
+        let app_for_init = app.clone(); // Clone for initial emit after watcher starts
 
         let mut debouncer = new_debouncer(
             Duration::from_millis(200),
@@ -120,6 +121,22 @@ impl GitBranchWatcherManager {
             "[GitBranchWatcher] Started for: {}",
             project_path
         );
+
+        // Brain: bug-stale-branch-indicator-after-checkout
+        // Emit the current branch immediately on watcher start.
+        // The checkout may have happened before the watcher was created,
+        // so the frontend needs the initial state to update terminal.branch.
+        drop(watchers); // release lock before emit
+        if let Ok(branch) = read_branch_from_head(&head_path) {
+            let event = GitBranchChangedEvent {
+                project_path,
+                branch,
+            };
+            if let Err(e) = app_for_init.emit("git:branch-changed", &event) {
+                log::error!("[GitBranchWatcher] Failed to emit initial event: {}", e);
+            }
+        }
+
         Ok(())
     }
 
