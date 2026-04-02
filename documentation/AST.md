@@ -128,6 +128,10 @@ Exported symbols per file. Generated 2026-03-13.
 - `useIDEStore` (store), `IDE_REGISTRY`, `IDEInfo`, `InstalledApp`, `CustomIDE`, `IDEConfig`
 - `selectPreferredIDEName()`, `selectHasPreferredIDE()`, `selectShouldShowOnboarding()`, `selectInstalledIDEApps()`
 
+### stores/editorStore.ts
+- `useEditorStore` (store): `openFile()`, `updateContent()`, `save()`, `openDiff()`, `resolveEdit()`, `setCursorPosition()`, `reset()`
+- State: `filePath`, `content`, `originalContent`, `mode`, `isDirty`, `isLoading`, `pendingEdit`, `cursorPosition`
+
 ### stores/shortcutsStore.ts
 - `useShortcutsStore` (store)
 
@@ -259,7 +263,7 @@ Exported symbols per file. Generated 2026-03-13.
 - `useProjectDashboard()` -- `GitStatusData`, `GitCommit`, `ProjectDashboardData`
 
 ### Tab & UI Hooks
-- `useAutomationTab()`, `useKanbanTab()`, `useOfficeTab()`, `useDocsTab()`, `useClaudeAssetsTab()`
+- `useAutomationTab()`, `useKanbanTab()`, `useOfficeTab()`, `useCodeEditorTab()`, `useDocsTab()`, `useClaudeAssetsTab()`
 - `useProjectDashboardTab()`, `useTabPopoutWindow()`, `useDrawerAnimation()`
 - `usePipWindow()`, `useWindowFocus()`, `useGlobalKeyboardShortcuts()`
 
@@ -325,6 +329,19 @@ Exported symbols per file. Generated 2026-03-13.
 - `AssemblyLine`, `DroidCollection`, `DroidFactoryDrawer`, `DroidTemplateGallery`, `DroidWizard`, `SkillTemplateGallery`, `SkillWizard`
 - `types.ts`: `FactoryMode`, `DroidSpec`, `SkillSpec`, `UserStats`, `Achievement`, `TOOL_LEVELS`, `DROID_TEMPLATES`, `SKILL_TEMPLATES`, `ACHIEVEMENTS_CONFIG`
 
+### components/editor/ (10 files)
+- `CodeEditorEngine` (component): refactored CM6 editor with imperative ref (search/replace)
+- `CodeEditorView` (component): main orchestrator (header + content + status bar)
+- `CodeMirrorMergeView` (component): side-by-side diff via @codemirror/merge
+- `EditorContent` (component): mode switch between edit (Engine) and diff (MergeView)
+- `EditorEmptyState` (component): "Nessun file aperto" placeholder
+- `EditorHeader` (component): breadcrumb, mode badge, Accept/Reject/Edit/Save buttons
+- `EditorStatusBar` (component): Ln/Col, language, encoding, save status
+- `editorTheme.ts`: `customTheme`, `customHighlightStyle`, `highlightExtension`
+- `editorSearch.ts`: `setSearchMatches`, `searchMatchesField`, `findAllMatches()`, `buildSearchDecorations()`
+- `editorDiff.ts`: `setDiffDecorations`, `diffDecorationsField`, `applyDiffDecorations()`
+- `editorTypes.ts`: `CodeEditorRef`, `CodeEditorProps`, `DiffInfo`, `LineChange`, `SearchOptions`, `EditorMode`, `PendingEdit`, `DiffRequest`, `EditFileRequest`, `EditFileResponse`, `CursorPosition`
+
 ### components/kanban/ (6 files)
 - `AddKanbanTaskModal` (`KanbanTaskInitialValues`, `KanbanTaskDraft`), `KanbanCard`, `KanbanCardOverlay`, `KanbanColumn`, `KanbanMiniPanel`, `KanbanPopoutView`, `KanbanView`
 
@@ -367,7 +384,7 @@ Exported symbols per file. Generated 2026-03-13.
 ## 7. Views (src/views/)
 
 - `ClaudeAssetsTabView`, `DocsTabView`, `ProjectDashboardTabView` (exported)
-- `AutomationTabView`, `ImageTabView`, `KanbanTabView`, `OfficeTabView` (default/not exported)
+- `AutomationTabView`, `CodeEditorTabView`, `ImageTabView`, `KanbanTabView`, `OfficeTabView` (default/not exported)
 
 ---
 
