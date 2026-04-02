@@ -2,13 +2,13 @@
  * CodeEditorTabView
  *
  * Thin wrapper that renders CodeEditorView inside a tab.
- * Follows the same pattern as KanbanTabView and AutomationTabView.
+ * Passes editorFilePath so the view syncs with the correct file.
  *
  * @module CodeEditorTabView
  */
 
 // Brain: pattern-code-editor-tab
-import { memo, lazy, Suspense } from 'react';
+import { memo, lazy, Suspense, useEffect } from 'react';
 import type { Tab } from '../components/TabBar';
 import CodeEditorSkeleton from '../components/skeletons/CodeEditorSkeleton';
 
@@ -20,6 +20,18 @@ interface CodeEditorTabViewProps {
 }
 
 function CodeEditorTabView({ tab, isActive }: CodeEditorTabViewProps) {
+  // Sync editor store when switching between code-editor tabs
+  useEffect(() => {
+    if (isActive && tab.editorFilePath) {
+      import('../stores/editorStore').then(({ useEditorStore }) => {
+        const store = useEditorStore.getState();
+        if (store.filePath !== tab.editorFilePath) {
+          store.openFile(tab.editorFilePath!);
+        }
+      });
+    }
+  }, [isActive, tab.editorFilePath]);
+
   if (!isActive || tab.type !== 'code-editor') {
     return null;
   }

@@ -14,7 +14,7 @@ import { EditorState } from '@codemirror/state';
 import { EditorView, keymap, lineNumbers } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { bracketMatching, foldGutter, indentOnInput } from '@codemirror/language';
-import { highlightSelectionMatches } from '@codemirror/search';
+import { highlightSelectionMatches, search, searchKeymap } from '@codemirror/search';
 import { javascript } from '@codemirror/lang-javascript';
 import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
@@ -183,9 +183,10 @@ const CodeEditorEngine = forwardRef<CodeEditorRef, CodeEditorProps>(({
         EditorView.editable.of(!readOnly),
         EditorState.readOnly.of(readOnly),
         highlightSelectionMatches(),
+        search({ top: true }),
         searchMatchesField,
         diffDecorationsField,
-        keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+        keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
         saveKeyBinding,
         EditorView.updateListener.of(update => {
           if (update.docChanged) handleChange(update.state.doc.toString());

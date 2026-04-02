@@ -1,8 +1,8 @@
 /**
  * useCodeEditorTab
  *
- * Singleton hook for the integrated code editor tab.
- * Follows the same pattern as useKanbanTab and useAutomationTab.
+ * Per-file hook for the integrated code editor tab.
+ * Each opened file gets its own tab with a unique ID.
  *
  * @module useCodeEditorTab
  */
@@ -22,15 +22,20 @@ function extractFilename(filePath: string): string {
   return parts[parts.length - 1] || 'Editor';
 }
 
+/** Generate a unique tab ID for a file path */
+export function codeEditorTabId(filePath: string): string {
+  return `code-editor-${filePath}`;
+}
+
 /**
- * Hook to manage the Code Editor tab (singleton).
- * Only one editor tab exists at a time.
+ * Hook to manage Code Editor tabs (one per file).
+ * Each file gets its own tab with a unique ID.
  */
 export function useCodeEditorTab(): UseCodeEditorTabReturn {
   const openCodeEditorTab = useCallback((filePath?: string): Tab => {
     const label = filePath ? extractFilename(filePath) : 'Editor';
     return {
-      id: 'code-editor',
+      id: filePath ? codeEditorTabId(filePath) : `code-editor-new-${Date.now()}`,
       label,
       type: 'code-editor',
       closable: true,

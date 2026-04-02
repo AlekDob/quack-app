@@ -3,7 +3,7 @@ type: pattern
 project: quack-app
 created: 2026-04-02
 last_verified: 2026-04-02
-tags: [editor, codemirror, tab, diff, singleton]
+tags: [editor, codemirror, tab, diff, multi-tab]
 ---
 
 # Code Editor Tab Pattern
@@ -31,7 +31,7 @@ App.tsx
 | File | Purpose |
 |------|---------|
 | `src/stores/editorStore.ts` | Zustand store: file state, diff mode, editFile resolution |
-| `src/hooks/useCodeEditorTab.ts` | Singleton tab hook (same pattern as useKanbanTab) |
+| `src/hooks/useCodeEditorTab.ts` | Per-file tab hook: `codeEditorTabId(path)` generates unique IDs |
 | `src/views/CodeEditorTabView.tsx` | Tab wrapper with lazy-loaded CodeEditorView |
 | `src/components/editor/CodeEditorEngine.tsx` | Core CM6 component (refactored from CodeEditorCodeMirror) |
 | `src/components/editor/CodeMirrorMergeView.tsx` | Side-by-side diff via @codemirror/merge |
@@ -64,11 +64,14 @@ Agent emits editFile tool call
 
 ## Tab Integration
 
-Follows the singleton tab pattern documented in `pattern-tab-system-singleton.md`:
-- Fixed tab ID: `'code-editor'`
+Per-file multi-tab (each file gets its own editor tab):
+- Tab ID: `code-editor-${filePath}` (unique per file, via `codeEditorTabId()`)
 - Tab type: `'code-editor'`
-- Keyboard shortcut: Cmd+E (toggleCodeEditor)
+- Keyboard shortcut: Cmd+E (toggleCodeEditor — toggles active code-editor tab)
 - ActionIcons button: code bracket icon `<> `
+- `isCodeEditorTabActive` uses `activeTabId.startsWith('code-editor')`
+- `CodeEditorTabView` syncs editorStore when switching between tabs
+- Popout window: `TabPopoutWindowApp.tsx` has `case 'code-editor'` using Tauri file load
 
 ## Italian UI Labels
 

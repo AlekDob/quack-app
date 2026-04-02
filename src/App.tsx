@@ -85,7 +85,7 @@ import AutomationTabView from "./views/AutomationTabView";
 import OfficeTabView from "./views/OfficeTabView";
 import CodeEditorTabView from "./views/CodeEditorTabView";
 import { useOfficeTab } from "./hooks/useOfficeTab";
-import { useCodeEditorTab } from "./hooks/useCodeEditorTab";
+import { useCodeEditorTab, codeEditorTabId } from "./hooks/useCodeEditorTab";
 import ProjectDashboardTabView from "./views/ProjectDashboardTabView";
 import ImageTabView from "./views/ImageTabView";
 import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
@@ -859,7 +859,7 @@ function AppContent() {
   // This replaces the old isKanbanTabActive overlay approach
   const isKanbanTabActive = activeTabId === 'kanban-board';
   const isOfficeTabActive = activeTabId === 'office-view';
-  const isCodeEditorTabActive = activeTabId === 'code-editor';
+  const isCodeEditorTabActive = activeTabId.startsWith('code-editor');
   // Brain: fix-office-webgl-shader-remount
   // Track if office was ever opened so we keep OfficeView mounted (hidden)
   // even after tab close, preventing WebGL context loss → stale shader errors
@@ -6333,16 +6333,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return;
     }
 
-    // Try opening in external IDE if preferred IDE is set
+    // Open in external IDE or internal code editor
     if (filePath) {
-      const { preferredIDE } = useIDEStore.getState();
-      if (preferredIDE) {
+      const { fileOpenTarget } = useIDEStore.getState();
+      if (fileOpenTarget === 'external') {
         void tryOpenInIDE(filePath);
-        return;
+      } else {
+        handleOpenFileInEditorTab(filePath);
       }
+      return;
     }
 
-    // Fallback: open internal tab
+    // No filePath: open legacy internal tab
     const agentTabId = `agent-${agentName}-${agentScope}`;
     const existingTab = tabs.find(t => t.id === agentTabId);
 
@@ -6378,16 +6380,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Command tab handler - opens in external IDE if available, falls back to internal tab
   const handleSelectCommand = useCallback((commandName: string, commandScope: 'global' | 'project', isNew = false, filePath?: string) => {
-    // For existing commands with a file path, try opening in external IDE
+    // Open in external IDE or internal code editor
     if (!isNew && filePath) {
-      const { preferredIDE } = useIDEStore.getState();
-      if (preferredIDE) {
+      const { fileOpenTarget } = useIDEStore.getState();
+      if (fileOpenTarget === 'external') {
         void tryOpenInIDE(filePath);
-        return;
+      } else {
+        handleOpenFileInEditorTab(filePath);
       }
+      return;
     }
 
-    // Fallback: open internal tab
+    // No filePath (new command): open legacy internal tab
     const commandTabId = isNew ? `command-new-${Date.now()}` : `command-${commandName}-${commandScope}`;
     const existingTab = tabs.find(t => t.id === commandTabId);
 
@@ -6410,16 +6414,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Rule tab handler - opens in external IDE if available, falls back to internal tab
   const handleSelectRule = useCallback((ruleName: string, ruleScope: 'global' | 'project', isNew = false, filePath?: string) => {
-    // For existing rules with a file path, try opening in external IDE
+    // Open in external IDE or internal code editor
     if (!isNew && filePath) {
-      const { preferredIDE } = useIDEStore.getState();
-      if (preferredIDE) {
+      const { fileOpenTarget } = useIDEStore.getState();
+      if (fileOpenTarget === 'external') {
         void tryOpenInIDE(filePath);
-        return;
+      } else {
+        handleOpenFileInEditorTab(filePath);
       }
+      return;
     }
 
-    // Fallback: open internal tab
+    // No filePath (new rule): open legacy internal tab
     const ruleTabId = isNew ? `rule-new-${Date.now()}` : `rule-${ruleName}-${ruleScope}`;
     const existingTab = tabs.find(t => t.id === ruleTabId);
 
@@ -6478,16 +6484,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return;
     }
 
-    // Try opening in external IDE if preferred IDE is set
+    // Open in external IDE or internal code editor
     if (skillInfo.file_path) {
-      const { preferredIDE } = useIDEStore.getState();
-      if (preferredIDE) {
+      const { fileOpenTarget } = useIDEStore.getState();
+      if (fileOpenTarget === 'external') {
         const opened = await tryOpenInIDE(skillInfo.file_path);
         if (opened) return;
+      } else {
+        handleOpenFileInEditorTab(skillInfo.file_path);
+        return;
       }
     }
 
-    // Fallback: open internal tab
+    // No file_path: open legacy internal tab
     try {
       const skillTabId = `skill-${skillInfo.name}-${skillInfo.scope}`;
       const existingTab = tabs.find(t => t.id === skillTabId);
@@ -7156,9 +7165,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         }
       }
 
-      // Try opening in external IDE if available
-      const { preferredIDE } = useIDEStore.getState();
-      if (preferredIDE) {
+      // Open in external IDE only if user prefers it
+      const { fileOpenTarget } = useIDEStore.getState();
+      if (fileOpenTarget === 'external') {
         toast('Opening in your IDE...', { duration: 2000 });
         try {
           const { openFileInIDE } = useIDEStore.getState();
@@ -7170,7 +7179,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         }
       }
 
-      // Fallback: open internal tab
+      // Open internal tab (default)
       const fileName = absolutePath.split('/').pop() || 'Document';
       const fileExtension = fileName.split('.').pop()?.toLowerCase() || '';
 
@@ -9025,9 +9034,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Centralized helper: try to open file in preferred IDE with toast notification
   // Returns true if opened in IDE, false if no IDE set (caller should fallback)
+  // Brain: pattern-code-editor-tab
+  // Respects fileOpenTarget setting: only opens in IDE when user prefers 'external'
   const tryOpenInIDE = useCallback(async (filePath: string, line?: number): Promise<boolean> => {
-    const { preferredIDE, openFileInIDE } = useIDEStore.getState();
-    if (!preferredIDE) return false;
+    const { preferredIDE, fileOpenTarget, openFileInIDE } = useIDEStore.getState();
+    if (!preferredIDE || fileOpenTarget !== 'external') return false;
 
     try {
       toast('Opening in your IDE...', { duration: 2000 });
@@ -9046,10 +9057,19 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         return;
       }
 
-      // Try opening in external IDE if available (skip for files with lineChanges - need internal diff view)
+      // Brain: pattern-code-editor-tab
+      // Check user preference: internal editor tab or external IDE
       if (!lineChanges) {
-        const opened = await tryOpenInIDE(entry.path);
-        if (opened) return;
+        const { fileOpenTarget } = useIDEStore.getState();
+        if (fileOpenTarget === 'external') {
+          const opened = await tryOpenInIDE(entry.path);
+          if (opened) return;
+        }
+        // Default: open in internal editor tab
+        const { useEditorStore } = await import('./stores/editorStore');
+        useEditorStore.getState().openFile(entry.path);
+        handleOpenCodeEditorTab(entry.path);
+        return;
       }
 
       // Check if file is modified by AI and has lineChanges
@@ -9624,28 +9644,35 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [openOfficeTab, activeTabId, tabs]);
 
-  // Handler for opening/focusing Code Editor tab (toggle with Cmd+E)
+  // Handler for opening/focusing Code Editor tab (toggle with Cmd+E, per-file tabs)
   // Brain: pattern-code-editor-tab
   const handleOpenCodeEditorTab = useCallback((filePath?: string) => {
-    if (!filePath && activeTabId === 'code-editor') {
+    // Toggle: if no filePath and current tab is a code-editor tab, switch to chat
+    if (!filePath && activeTabId.startsWith('code-editor')) {
       setActiveTabId('chat');
       return;
     }
-    const existingTab = tabs.find(t => t.type === 'code-editor');
+    if (!filePath) return;
+
+    const fileTabId = codeEditorTabId(filePath);
+    const existingTab = tabs.find(t => t.id === fileTabId);
+
     if (existingTab) {
-      if (filePath) {
-        // Update tab label with new filename
-        setTabs(prev => prev.map(t =>
-          t.type === 'code-editor' ? { ...t, label: filePath.split('/').pop() || 'Editor', editorFilePath: filePath } : t
-        ));
-      }
-      setActiveTabId('code-editor');
+      setActiveTabId(fileTabId);
     } else {
       const newTab = openCodeEditorTab(filePath);
       setTabs(prevTabs => [...prevTabs, newTab]);
-      setActiveTabId('code-editor');
+      setActiveTabId(newTab.id);
     }
   }, [openCodeEditorTab, activeTabId, tabs]);
+
+  // Handler to open a file in the editor tab (used by ChangesPanel, etc.)
+  const handleOpenFileInEditorTab = useCallback((filePath: string) => {
+    import('./stores/editorStore').then(({ useEditorStore }) => {
+      useEditorStore.getState().openFile(filePath);
+      handleOpenCodeEditorTab(filePath);
+    });
+  }, [handleOpenCodeEditorTab]);
 
   // Handler for firing an automation job — creates a session and sends the prompt
   const handleAutomationFireJob = useCallback(async (job: AutomationJob) => {
@@ -10987,14 +11014,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // Handler to open .mcp.json file - opens in external IDE if available
   const handleOpenMcpConfig = useCallback(
     (filePath: string) => {
-      // Try opening in external IDE first
-      const { preferredIDE } = useIDEStore.getState();
-      if (preferredIDE) {
+      // Open in external IDE only if user prefers it
+      const { fileOpenTarget } = useIDEStore.getState();
+      if (fileOpenTarget === 'external') {
         void tryOpenInIDE(filePath);
         return;
       }
 
-      // Fallback: open in internal editor
+      // Open in internal editor (default)
       const fileName = filePath.split('/').pop() || '.mcp.json';
       const fakeEntry: DirectoryEntry = {
         name: fileName,
@@ -12166,10 +12193,10 @@ You have access to all Bash tools to execute git commands like:
                 />
               )}
 
-              {/* Code Editor Tab View */}
+              {/* Code Editor Tab View (per-file multi-tab) */}
               {/* Brain: pattern-code-editor-tab */}
               {isCodeEditorTabActive && (() => {
-                const editorTab = tabs.find(t => t.type === 'code-editor');
+                const editorTab = tabs.find(t => t.id === activeTabId && t.type === 'code-editor');
                 if (editorTab) {
                   return (
                     <CodeEditorTabView
@@ -12963,6 +12990,7 @@ You have access to all Bash tools to execute git commands like:
           // Changes panel props
           onRefreshGitStatus={refreshGitSummary}
           onClearModifiedFiles={() => setModifiedFiles(new Map())}
+          onOpenInEditor={handleOpenFileInEditorTab}
           branch={gitBranch || null}
           isWorktree={!!activeTerminal?.useWorktree}
           gitHistory={commitHistory}

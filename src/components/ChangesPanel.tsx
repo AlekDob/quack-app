@@ -18,6 +18,7 @@ interface ChangesPanelProps {
   onRefreshGitStatus: () => void
   onClearModifiedFiles?: () => void
   onRemoveModifiedFiles?: (paths: string[]) => void
+  onOpenInEditor?: (filePath: string) => void
   // Branch context (US1)
   branch?: string | null
   isWorktree?: boolean
@@ -39,6 +40,7 @@ export default function ChangesPanel({
   onRefreshGitStatus,
   onClearModifiedFiles,
   onRemoveModifiedFiles,
+  onOpenInEditor,
   branch,
   isWorktree,
   projectName,
@@ -380,6 +382,19 @@ export default function ChangesPanel({
             {dirPath}
           </span>
           <div className="changes-file-actions" onClick={(e) => e.stopPropagation()}>
+            {onOpenInEditor && (
+              <button
+                type="button"
+                className="changes-btn changes-btn-editor"
+                onClick={() => onOpenInEditor(filePath)}
+                title="Open in editor"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="16 18 22 12 16 6" />
+                  <polyline points="8 6 2 12 8 18" />
+                </svg>
+              </button>
+            )}
             <OpenInIDEButton path={filePath} iconOnly className="changes-btn changes-btn-ide" />
             {!isCommitted && (
               <>

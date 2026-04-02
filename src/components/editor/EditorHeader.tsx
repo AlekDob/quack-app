@@ -6,12 +6,13 @@
  * @module EditorHeader
  */
 
+// Brain: pattern-code-editor-tab
 import { useEditorStore } from '../../stores/editorStore';
+import EditorIDEDropdown from './EditorIDEDropdown';
 
 /** Extract path segments for breadcrumb display */
 function buildBreadcrumb(filePath: string): string[] {
   const parts = filePath.split('/');
-  // Show last 3 segments max
   return parts.length > 3 ? ['...', ...parts.slice(-3)] : parts;
 }
 
@@ -32,7 +33,6 @@ function EditorHeader() {
   return (
     <div className="editor-header">
       <div className="editor-header-left">
-        {/* Breadcrumb */}
         <div className="editor-breadcrumb">
           {breadcrumb.map((segment, i) => (
             <span key={i} className="editor-breadcrumb-segment">
@@ -41,23 +41,24 @@ function EditorHeader() {
             </span>
           ))}
         </div>
-        {/* Dirty indicator */}
         {isDirty && <span className="editor-dirty-dot" title="Non salvato" />}
-        {/* Mode badge */}
         <span className={`editor-mode-badge ${isDiffMode ? 'diff' : ''}`}>
           {isDiffMode ? 'Revisione modifiche' : 'Modifica'}
         </span>
       </div>
       <div className="editor-header-right">
         {isEditMode && (
-          <button
-            type="button"
-            className="editor-btn editor-btn-save"
-            onClick={() => save()}
-            disabled={!isDirty}
-          >
-            Salva
-          </button>
+          <>
+            <button
+              type="button"
+              className="editor-btn editor-btn-save"
+              onClick={() => save()}
+              disabled={!isDirty}
+            >
+              Salva
+            </button>
+            <EditorIDEDropdown filePath={filePath} />
+          </>
         )}
         {isDiffMode && pendingEdit && (
           <>

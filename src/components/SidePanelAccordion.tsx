@@ -285,6 +285,7 @@ interface SidePanelAccordionProps {
   onRefreshGitStatus?: () => void;
   onClearModifiedFiles?: () => void;
   onRemoveModifiedFiles?: (paths: string[]) => void;
+  onOpenInEditor?: (filePath: string) => void;
   // Changes panel — branch context + history
   branch?: string | null;
   isWorktree?: boolean;
@@ -380,6 +381,7 @@ export default function SidePanelAccordion({
   onRefreshGitStatus,
   onClearModifiedFiles,
   onRemoveModifiedFiles,
+  onOpenInEditor,
   branch,
   isWorktree,
   gitHistory,
@@ -513,6 +515,7 @@ export default function SidePanelAccordion({
             onRefreshGitStatus={onRefreshGitStatus || (() => {})}
             onClearModifiedFiles={onClearModifiedFiles}
             onRemoveModifiedFiles={onRemoveModifiedFiles}
+            onOpenInEditor={onOpenInEditor}
             branch={branch}
             isWorktree={isWorktree}
             projectName={projectName}

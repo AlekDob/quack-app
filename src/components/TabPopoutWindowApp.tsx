@@ -83,12 +83,14 @@ const TabPopoutWindowApp: React.FC = () => {
     }
   }, []);
 
-  // Load content when tab changes
+  // Load content when tab changes (supports both file and code-editor tabs)
   useEffect(() => {
     if (!tab) return;
 
     if (tab.type === 'file' && tab.filePath) {
       loadFileContent(tab.filePath);
+    } else if (tab.type === 'code-editor' && tab.editorFilePath) {
+      loadFileContent(tab.editorFilePath);
     }
   }, [tab, loadFileContent]);
 
@@ -186,18 +188,18 @@ const TabPopoutWindowApp: React.FC = () => {
 
   // File save handler
   const handleSaveFile = useCallback(async (content: string) => {
-    if (!tab?.filePath) return;
+    const savePath = tab?.filePath || tab?.editorFilePath;
+    if (!savePath) return;
 
     try {
-      // Use correct Tauri command name: write_file_content
-      await invoke('write_file_content', { path: tab.filePath, content });
+      await invoke('write_file_content', { path: savePath, content });
       setFileContent(content);
       setHasUnsavedChanges(false);
       console.log('[TabPopoutWindow] File saved successfully');
     } catch (error) {
       console.error('[TabPopoutWindow] Failed to save file:', error);
     }
-  }, [tab?.filePath]);
+  }, [tab?.filePath, tab?.editorFilePath]);
 
   // Handle content change in editor
   const handleContentChange = useCallback((newContent: string) => {
@@ -230,6 +232,8 @@ const TabPopoutWindowApp: React.FC = () => {
         return '🧠';
       case 'kanban':
         return null; // Kanban uses SVG icon, not emoji
+      case 'code-editor':
+        return '</>';
       default:
         return '📄';
     }
@@ -326,6 +330,30 @@ const TabPopoutWindowApp: React.FC = () => {
         return (
           <Suspense fallback={<LoadingSpinner message="Loading Kanban board..." />}>
             <KanbanPopoutView />
+          </Suspense>
+        );
+
+      case 'code-editor':
+        if (fileLoading) {
+          return <LoadingSpinner message="Loading file..." />;
+        }
+        if (fileError) {
+          return (
+            <ErrorDisplay
+              error={fileError}
+              onRetry={tab.editorFilePath ? () => loadFileContent(tab.editorFilePath!) : undefined}
+            />
+          );
+        }
+        return (
+          <Suspense fallback={<LoadingSpinner message="Loading editor..." />}>
+            <CodeEditor
+              content={editedContent || fileContent}
+              filename={tab.editorFilePath || null}
+              readOnly={false}
+              onChange={handleContentChange}
+              onSave={handleSaveFile}
+            />
           </Suspense>
         );
 

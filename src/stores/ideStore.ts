@@ -33,12 +33,15 @@ export interface CustomIDE {
   icon_base64: string | null;
 }
 
+export type FileOpenTarget = 'internal' | 'external';
+
 export interface IDEConfig {
   preferredIDE: string | null;
   autoLaunch: boolean;
   syncFocus: boolean;
   installedIDEs: string[];
   hasCompletedOnboarding: boolean;
+  fileOpenTarget: FileOpenTarget;
 }
 
 interface IDEState extends IDEConfig {
@@ -56,6 +59,7 @@ interface IDEState extends IDEConfig {
   setPreferredIDE: (ideId: string) => Promise<void>;
   setAutoLaunch: (enabled: boolean) => void;
   setSyncFocus: (enabled: boolean) => void;
+  setFileOpenTarget: (target: FileOpenTarget) => void;
   completeOnboarding: () => void;
   resetOnboarding: () => void;
 
@@ -167,6 +171,7 @@ export const useIDEStore = create<IDEState>()(
       preferredIDE: null,
       autoLaunch: false,
       syncFocus: true,
+      fileOpenTarget: 'internal' as FileOpenTarget,
       installedIDEs: [],
       hasCompletedOnboarding: false,
       detectedIDEs: [],
@@ -278,6 +283,7 @@ export const useIDEStore = create<IDEState>()(
       // Settings
       setAutoLaunch: (enabled: boolean) => set({ autoLaunch: enabled }),
       setSyncFocus: (enabled: boolean) => set({ syncFocus: enabled }),
+      setFileOpenTarget: (target: FileOpenTarget) => set({ fileOpenTarget: target }),
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
       resetOnboarding: () => set({
         hasCompletedOnboarding: false,
@@ -372,6 +378,7 @@ export const useIDEStore = create<IDEState>()(
         preferredIDE: state.preferredIDE,
         autoLaunch: state.autoLaunch,
         syncFocus: state.syncFocus,
+        fileOpenTarget: state.fileOpenTarget,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
       }),
     }

@@ -97,7 +97,7 @@ export const customTheme = EditorView.theme({
     outline: 'none !important',
     border: '1px solid #528bff !important',
   },
-  '.cm-panel button': {
+  '.cm-panel button, .cm-panel.cm-search button, .cm-search button': {
     backgroundColor: '#2a2a2a !important',
     color: '#ffffff !important',
     border: '1px solid #3a3a3a !important',
@@ -107,14 +107,35 @@ export const customTheme = EditorView.theme({
     fontSize: '12px !important',
     fontWeight: '500 !important',
     transition: 'all 0.15s ease !important',
+    appearance: 'none !important',
+    WebkitAppearance: 'none !important',
   },
-  '.cm-panel button:hover': {
+  '.cm-panel button:hover, .cm-search button:hover': {
     backgroundColor: '#3a3a3a !important',
     borderColor: '#4a4a4a !important',
   },
-  '.cm-panel button:active': { backgroundColor: '#4a4a4a !important' },
-  '.cm-panel label': { color: '#ffffff !important', fontSize: '12px !important' },
-  '.cm-panel input[type=checkbox]': { cursor: 'pointer !important' },
+  '.cm-panel button:active, .cm-search button:active': {
+    backgroundColor: '#4a4a4a !important',
+  },
+  '.cm-panel button[name="close"]': {
+    color: '#888 !important',
+    backgroundColor: 'transparent !important',
+    border: 'none !important',
+    fontSize: '16px !important',
+    padding: '2px 6px !important',
+  },
+  '.cm-panel button[name="close"]:hover': {
+    color: '#fff !important',
+    backgroundColor: 'transparent !important',
+  },
+  '.cm-panel label, .cm-search label': {
+    color: '#aaa !important',
+    fontSize: '12px !important',
+  },
+  '.cm-panel input[type=checkbox], .cm-search input[type=checkbox]': {
+    cursor: 'pointer !important',
+    accentColor: '#f28c52 !important',
+  },
   '&.cm-editor .cm-panels-bottom': {
     order: '-1 !important',
     borderTop: 'none !important',
@@ -191,6 +212,15 @@ export const customHighlightStyle = HighlightStyle.define([
   { tag: t.typeName, color: '#4ec9b0' },
   { tag: t.self, color: '#569cd6' },
   { tag: t.constant(t.variableName), color: '#4fc1ff' },
+  // Markdown-specific
+  { tag: [t.heading, t.heading1, t.heading2, t.heading3], color: '#569cd6', fontWeight: 'bold' },
+  { tag: t.emphasis, fontStyle: 'italic' },
+  { tag: t.strong, fontWeight: 'bold' },
+  { tag: t.strikethrough, textDecoration: 'line-through', color: '#808080' },
+  { tag: t.link, color: '#4fc1ff', textDecoration: 'underline' },
+  { tag: t.url, color: '#4fc1ff' },
+  { tag: t.quote, color: '#6a9955', fontStyle: 'italic' },
+  { tag: t.monospace, backgroundColor: 'rgba(255,255,255,0.06)' },
 ]);
 
 /** Pre-built syntax highlighting extension */

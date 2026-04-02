@@ -31,6 +31,7 @@ export default function IDESettings() {
   const preferredIDE = useIDEStore(s => s.preferredIDE);
   const autoLaunch = useIDEStore(s => s.autoLaunch);
   const syncFocus = useIDEStore(s => s.syncFocus);
+  const fileOpenTarget = useIDEStore(s => s.fileOpenTarget);
   const isLoadingApps = useIDEStore(s => s.isLoadingApps);
   const installedApps = useIDEStore(s => s.installedApps);
   const isAddingCustomIDE = useIDEStore(s => s.isAddingCustomIDE);
@@ -107,7 +108,7 @@ export default function IDESettings() {
         </div>
       </div>
 
-      {/* Current Selection */}
+      {/* Current Selection + File Open Target Toggle */}
       {preferredIDE && preferredApp && (
         <div className="ide-settings-current">
           <div className="ide-settings-current-badge">
@@ -115,6 +116,20 @@ export default function IDESettings() {
             <span>Currently using</span>
             <strong>{preferredIDEName}</strong>
           </div>
+          <label className="ide-settings-toggle ide-settings-current-toggle">
+            <div className="ide-settings-toggle-info">
+              <span className="ide-settings-toggle-label">Open files in external IDE</span>
+              <span className="ide-settings-toggle-description">
+                When disabled, files open in Quack's built-in editor (Cmd+E)
+              </span>
+            </div>
+            <input
+              type="checkbox"
+              checked={fileOpenTarget === 'external'}
+              onChange={(e) => useIDEStore.getState().setFileOpenTarget(e.target.checked ? 'external' : 'internal')}
+            />
+            <span className="ide-settings-toggle-switch" />
+          </label>
         </div>
       )}
 
