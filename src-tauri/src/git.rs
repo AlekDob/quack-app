@@ -211,29 +211,52 @@ fn git_status_summary_impl(root_path: Option<String>) -> Result<GitStatusSummary
 fn git_diff_impl(
     path: String,
     staged: bool,
-    untracked: bool,
+    _untracked: bool,
     root_path: Option<String>,
 ) -> Result<String> {
     let starting_path = root_path.map(PathBuf::from);
     let root = git_root(starting_path)?;
-    let mut args = vec!["diff", "--no-color"]; // baseline args
+
+    // 1. Try requested mode (unstaged or staged)
+    let mut args = vec!["diff", "--no-color"];
     if staged {
         args.push("--cached");
     }
     args.push("--");
     args.push(&path);
-
     let mut diff = run_git(&root, &args, true)?;
 
-    if diff.trim().is_empty() && untracked && !staged {
-        // For untracked files git diff returns nothing; fallback to no-index diff
+    // 2. If unstaged is empty, try staged (--cached)
+    if diff.trim().is_empty() && !staged {
+        let cached_args = vec!["diff", "--cached", "--no-color", "--", &path];
+        diff = run_git(&root, &cached_args, true)?;
+    }
+
+    // 3. If still empty, try HEAD (includes both staged + unstaged)
+    if diff.trim().is_empty() && !staged {
+        let head_args = vec!["diff", "HEAD", "--no-color", "--", &path];
+        diff = run_git(&root, &head_args, true)?;
+    }
+
+    // 4. If still empty, try last commit (HEAD~1..HEAD) for recently committed changes
+    if diff.trim().is_empty() {
+        let last_commit_args = vec!["diff", "HEAD~1", "HEAD", "--no-color", "--", &path];
+        if let Ok(last_diff) = run_git(&root, &last_commit_args, true) {
+            diff = last_diff;
+        }
+    }
+
+    // 5. Last resort: treat as untracked file, diff against /dev/null
+    //    (shows entire file as added — better than showing nothing)
+    if diff.trim().is_empty() {
         let no_index_args = vec!["diff", "--no-index", "--no-color", "--", "/dev/null", &path];
-        diff = run_git(&root, &no_index_args, true)?;
+        // no-index exits with code 1 on diff found, so ignore error
+        if let Ok(no_index_diff) = run_git(&root, &no_index_args, true) {
+            diff = no_index_diff;
+        }
     }
 
     if diff.trim().is_empty() {
-        // Return empty string so frontend can handle the "no diff" case properly
-        // This allows the frontend to show appropriate messages or close the drawer
         Ok(String::new())
     } else {
         Ok(diff)

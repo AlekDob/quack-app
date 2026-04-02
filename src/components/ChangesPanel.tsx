@@ -155,7 +155,7 @@ export default function ChangesPanel({
           content = await invoke<string>('git_diff', {
             path: relativePath,
             staged: false,
-            untracked: false,
+            untracked: true,
             rootPath,
           })
         }

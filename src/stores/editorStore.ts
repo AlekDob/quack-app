@@ -11,7 +11,8 @@
 import { create } from 'zustand';
 import { invoke } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
-import type { EditorMode, PendingEdit, DiffRequest, EditFileResponse, CursorPosition } from '../components/editor/editorTypes';
+import type { EditorMode, PendingEdit, DiffRequest, EditFileResponse, CursorPosition, LineChange } from '../components/editor/editorTypes';
+import { parseDiffToLineChanges } from '../components/editor/editorDiff';
 
 interface EditorState {
   // File state
@@ -24,12 +25,14 @@ interface EditorState {
 
   // Diff state
   pendingEdit: PendingEdit | null;
+  lineChanges: LineChange[];
 
   // Cursor
   cursorPosition: CursorPosition;
 
   // Actions
-  openFile: (filePath: string) => Promise<void>;
+  openFile: (filePath: string, lineChanges?: LineChange[]) => Promise<void>;
+  setLineChanges: (changes: LineChange[]) => void;
   updateContent: (content: string) => void;
   save: () => Promise<boolean>;
   openDiff: (request: DiffRequest) => void;
@@ -46,16 +49,33 @@ const INITIAL_STATE = {
   isDirty: false,
   isLoading: false,
   pendingEdit: null,
+  lineChanges: [] as LineChange[],
   cursorPosition: { line: 1, column: 1 },
 };
 
 export const useEditorStore = create<EditorState>()((set, get) => ({
   ...INITIAL_STATE,
 
-  openFile: async (filePath: string) => {
+  openFile: async (filePath: string, _lineChanges?: LineChange[]) => {
     set({ isLoading: true });
     try {
       const content = await invoke<string>('read_file_content', { path: filePath });
+
+      // Compute real line changes from git diff (absolute line numbers)
+      let resolvedChanges: LineChange[] = [];
+      try {
+        const diffOutput = await invoke<string>('git_diff', {
+          path: filePath,
+          staged: false,
+          untracked: true,
+        });
+        if (diffOutput && diffOutput.trim()) {
+          resolvedChanges = parseDiffToLineChanges(diffOutput);
+        }
+      } catch {
+        // Git diff unavailable (not a git repo, etc.) — no highlighting
+      }
+
       set({
         filePath,
         content,
@@ -64,11 +84,16 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
         isDirty: false,
         isLoading: false,
         pendingEdit: null,
+        lineChanges: resolvedChanges,
       });
     } catch (error) {
       console.error('[editorStore] Failed to open file:', error);
       set({ isLoading: false });
     }
+  },
+
+  setLineChanges: (changes: LineChange[]) => {
+    set({ lineChanges: changes });
   },
 
   updateContent: (content: string) => {

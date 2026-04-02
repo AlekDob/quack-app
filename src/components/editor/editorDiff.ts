@@ -95,6 +95,53 @@ function buildFromDiffInfo(
   return decorations;
 }
 
+// ==========================================
+// Unified diff parser
+// ==========================================
+
+/**
+ * Parse unified diff output into LineChange array.
+ * Extracts added/modified/removed lines from `@@ ... @@` hunks.
+ * Line numbers are absolute in the NEW file (post-edit).
+ */
+export function parseDiffToLineChanges(diffOutput: string): LineChange[] {
+  const changes: LineChange[] = [];
+  if (!diffOutput || !diffOutput.trim()) return changes;
+
+  const lines = diffOutput.split('\n');
+  let newLineNum = 0;
+
+  for (const line of lines) {
+    // Parse hunk header: @@ -oldStart,oldCount +newStart,newCount @@
+    const hunkMatch = line.match(/^@@\s+-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@/);
+    if (hunkMatch) {
+      newLineNum = parseInt(hunkMatch[1], 10);
+      continue;
+    }
+
+    // Skip diff headers (---, +++, diff, index, etc.)
+    if (line.startsWith('diff ') || line.startsWith('index ') ||
+        line.startsWith('--- ') || line.startsWith('+++ ') ||
+        line.startsWith('\\')) {
+      continue;
+    }
+
+    if (line.startsWith('+')) {
+      changes.push({ line: newLineNum, type: 'added' });
+      newLineNum++;
+    } else if (line.startsWith('-')) {
+      // Removed lines: mark at current position in new file
+      changes.push({ line: newLineNum, type: 'removed' });
+      // Don't increment newLineNum — removed lines don't exist in new file
+    } else {
+      // Context line (starts with space or is empty in diff)
+      newLineNum++;
+    }
+  }
+
+  return changes;
+}
+
 /**
  * Apply diff decorations to an EditorView.
  * Prefers lineChanges over diffInfo when both provided.

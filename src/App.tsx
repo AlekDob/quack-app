@@ -9235,7 +9235,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       if (opened) return;
     }
 
-    // Fallback: open in internal tab
+    // Brain: pattern-code-editor-tab — respect fileOpenTarget for internal editor
+    const { fileOpenTarget } = useIDEStore.getState();
+    if (fileOpenTarget !== 'external') {
+      // Inline editor open to avoid TDZ (handleOpenFileInEditorTab defined later)
+      import('./stores/editorStore').then(({ useEditorStore }) => {
+        const fileEdit = fileEditsMap.get(filePath);
+        const lc = fileEdit?.lineChanges;
+        useEditorStore.getState().openFile(filePath, lc);
+        handleOpenCodeEditorTab(filePath);
+      });
+      return;
+    }
+
+    // Fallback: open in preview drawer
     const name = filePath.split('/').pop() || filePath;
     const fakeEntry: DirectoryEntry = {
       name,
@@ -9244,7 +9257,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       is_symlink: false,
     };
     handleOpenFilePreview(fakeEntry, lineChanges);
-  }, [tryOpenInIDE, handleOpenFilePreview]);
+  }, [tryOpenInIDE, fileEditsMap, handleOpenFilePreview]);
 
   // Handler to open file in preferred IDE (legacy, used by other components)
   const handleOpenInIDE = useCallback(async (path: string) => {
@@ -9322,13 +9335,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           diffContent = await invoke<string>('git_diff', {
             path: relativePath,
             staged: false,
-            untracked: false,
+            untracked: true,
             rootPath,
           });
 
           if (!diffContent || diffContent.trim() === '') {
             // No diff available - file might have been committed already
-            // Show informative message instead of treating as new file
             setDiffLoading(false);
             setShowDiffDrawer(false);
             toast.info('No changes to show', {
@@ -9368,7 +9380,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           diffContent = await invoke<string>('git_diff', {
             path: relativePath,
             staged: false,
-            untracked: false,
+            untracked: true,
             rootPath,
           });
 
@@ -9667,12 +9679,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [openCodeEditorTab, activeTabId, tabs]);
 
   // Handler to open a file in the editor tab (used by ChangesPanel, etc.)
+  // Brain: pattern-code-editor-tab — pass lineChanges from fileEditsMap for diff highlighting
   const handleOpenFileInEditorTab = useCallback((filePath: string) => {
     import('./stores/editorStore').then(({ useEditorStore }) => {
-      useEditorStore.getState().openFile(filePath);
+      const fileEdit = fileEditsMap.get(filePath);
+      const lineChanges = fileEdit?.lineChanges;
+      useEditorStore.getState().openFile(filePath, lineChanges);
       handleOpenCodeEditorTab(filePath);
     });
-  }, [handleOpenCodeEditorTab]);
+  }, [handleOpenCodeEditorTab, fileEditsMap]);
 
   // Handler for firing an automation job — creates a session and sends the prompt
   const handleAutomationFireJob = useCallback(async (job: AutomationJob) => {

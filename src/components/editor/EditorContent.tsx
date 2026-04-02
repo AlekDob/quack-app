@@ -21,6 +21,7 @@ function EditorContent() {
   const filePath = useEditorStore(s => s.filePath);
   const content = useEditorStore(s => s.content);
   const pendingEdit = useEditorStore(s => s.pendingEdit);
+  const lineChanges = useEditorStore(s => s.lineChanges);
   const isLoading = useEditorStore(s => s.isLoading);
   const updateContent = useEditorStore(s => s.updateContent);
   const save = useEditorStore(s => s.save);
@@ -57,6 +58,7 @@ function EditorContent() {
       filename={filePath}
       onChange={handleChange}
       onSave={handleSave}
+      lineChanges={lineChanges}
     />
   );
 }
