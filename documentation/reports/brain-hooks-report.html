@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenWolf → Quack Brain: What We Built & Why It Matters</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #000; color: rgba(255,255,255,0.85); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Inter', sans-serif; padding: 24px; max-width: 640px; margin: 0 auto; }
+
+  .hero { text-align: center; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .hero h1 { font-size: 22px; color: #FF6B35; line-height: 1.3; }
+  .hero .sub { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 6px; }
+  .hero .date { font-size: 10px; color: rgba(255,255,255,0.25); margin-top: 4px; }
+
+  .section { margin-bottom: 24px; }
+  .section-title { font-size: 14px; font-weight: 700; margin-bottom: 10px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .section-title.orange { color: #FF6B35; }
+  .section-title.cyan { color: #00D9FF; }
+  .section-title.green { color: #2ecc71; }
+  .section-title.purple { color: #bb86fc; }
+
+  .story { font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.7; margin-bottom: 14px; }
+  .story strong { color: rgba(255,255,255,0.9); }
+  .story a { color: #00D9FF; text-decoration: none; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; }
+  .kpi { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px 8px; text-align: center; }
+  .kpi .val { font-size: 24px; font-weight: 700; }
+  .kpi .lbl { font-size: 9px; color: rgba(255,255,255,0.4); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi.o .val { color: #FF6B35; }
+  .kpi.c .val { color: #00D9FF; }
+  .kpi.g .val { color: #2ecc71; }
+
+  .ps-card { display: grid; grid-template-columns: 1fr 20px 1fr; gap: 0; margin-bottom: 10px; align-items: stretch; }
+  .ps-box { padding: 10px 12px; border-radius: 8px; font-size: 11px; line-height: 1.5; }
+  .ps-box.problem { background: rgba(231,76,60,0.08); border: 1px solid rgba(231,76,60,0.15); color: rgba(255,255,255,0.5); }
+  .ps-box.solution { background: rgba(46,204,113,0.08); border: 1px solid rgba(46,204,113,0.15); color: rgba(255,255,255,0.7); }
+  .ps-box strong { display: block; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+  .ps-box.problem strong { color: #e74c3c; }
+  .ps-box.solution strong { color: #2ecc71; }
+  .ps-arrow { display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.15); font-size: 14px; }
+
+  .arch-layers { display: flex; flex-direction: column; gap: 6px; }
+  .arch-layer { display: grid; grid-template-columns: 100px 1fr 80px; gap: 8px; align-items: center; padding: 10px 12px; border-radius: 8px; }
+  .arch-layer.l1 { background: rgba(255,107,53,0.08); border: 1px solid rgba(255,107,53,0.2); }
+  .arch-layer.l2 { background: rgba(0,217,255,0.06); border: 1px solid rgba(0,217,255,0.15); }
+  .arch-layer.l3 { background: rgba(46,204,113,0.06); border: 1px solid rgba(46,204,113,0.15); }
+  .arch-name { font-size: 11px; font-weight: 700; }
+  .arch-layer.l1 .arch-name { color: #FF6B35; }
+  .arch-layer.l2 .arch-name { color: #00D9FF; }
+  .arch-layer.l3 .arch-name { color: #2ecc71; }
+  .arch-desc { font-size: 10px; color: rgba(255,255,255,0.55); line-height: 1.4; }
+  .arch-badge { font-size: 9px; font-weight: 600; padding: 3px 8px; border-radius: 4px; text-align: center; }
+  .arch-layer.l1 .arch-badge { background: rgba(255,107,53,0.15); color: #FF6B35; }
+  .arch-layer.l2 .arch-badge { background: rgba(0,217,255,0.1); color: #00D9FF; }
+  .arch-layer.l3 .arch-badge { background: rgba(46,204,113,0.1); color: #2ecc71; }
+
+  .feat-list { display: flex; flex-direction: column; gap: 6px; }
+  .feat { display: flex; gap: 10px; padding: 8px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 8px; align-items: flex-start; }
+  .feat-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .feat-text { font-size: 11px; color: rgba(255,255,255,0.65); line-height: 1.5; }
+  .feat-text strong { color: rgba(255,255,255,0.9); }
+  .tag { display: inline-block; font-size: 8px; font-weight: 700; padding: 1px 4px; border-radius: 2px; margin-left: 4px; vertical-align: middle; }
+  .tag.native { background: rgba(46,204,113,0.15); color: #2ecc71; }
+  .tag.plugin { background: rgba(255,107,53,0.15); color: #FF6B35; }
+
+  .comp-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .comp-table th { text-align: left; padding: 6px 10px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .comp-table th.h-ow { color: #666; }
+  .comp-table th.h-qb { color: #FF6B35; }
+  .comp-table td { padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.03); color: rgba(255,255,255,0.55); }
+  .comp-table td.feat { color: rgba(255,255,255,0.7); font-weight: 500; }
+  .comp-table .yes { color: #2ecc71; }
+  .comp-table .no { color: rgba(255,255,255,0.2); }
+  .comp-table .better { color: #00D9FF; }
+
+  .ss-mock { background: rgba(20,20,30,0.9); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; overflow: hidden; margin: 12px 0; }
+  .ss-tab { background: rgba(255,255,255,0.04); padding: 4px 10px; font-size: 9px; color: rgba(255,255,255,0.35); display: flex; align-items: center; gap: 5px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .ss-dot { width: 5px; height: 5px; border-radius: 50%; background: #2ecc71; }
+  .ss-banner { background: rgba(30,30,40,0.95); border-bottom: 1px solid rgba(255,107,53,0.2); padding: 6px 12px; }
+  .ss-row { display: flex; align-items: center; justify-content: space-between; }
+  .ss-left { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #b0b0b0; }
+  .ss-badge { background: rgba(255,107,53,0.2); color: #FF6B35; padding: 0 4px; border-radius: 3px; font-size: 9px; font-weight: 700; }
+  .ss-stats { display: flex; gap: 10px; margin-top: 4px; }
+  .ss-stat { text-align: center; }
+  .ss-stat-v { font-size: 14px; font-weight: 700; }
+  .ss-stat-l { font-size: 8px; color: #666; text-transform: uppercase; }
+  .ss-meta { font-size: 9px; color: #777; margin-top: 4px; }
+  .ss-warn { color: #F7931E; }
+  .ss-empty { padding: 20px; text-align: center; color: rgba(255,255,255,0.1); font-size: 11px; }
+
+  .impact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .impact { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; }
+  .impact-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .impact-icon { font-size: 14px; }
+  .impact-title { font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.8); }
+  .impact-desc { font-size: 10px; color: rgba(255,255,255,0.45); line-height: 1.5; }
+
+  .next { background: rgba(255,107,53,0.05); border: 1px solid rgba(255,107,53,0.15); border-radius: 10px; padding: 14px; }
+  .next-item { display: flex; gap: 8px; margin-bottom: 6px; font-size: 11px; }
+  .next-check { color: rgba(255,255,255,0.2); flex-shrink: 0; }
+  .next-text { color: rgba(255,255,255,0.6); line-height: 1.5; }
+  .next-text strong { color: rgba(255,255,255,0.85); }
+
+  .footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06); }
+  .footer-text { font-size: 10px; color: rgba(255,255,255,0.25); }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>🐺 → 🧠 From OpenWolf to Quack Brain Hooks</h1>
+  <div class="sub">How we turned an open-source CLI middleware into a native Quack feature</div>
+  <div class="date">April 1, 2026 · quack-app</div>
+</div>
+
+<div class="section">
+  <div class="section-title orange">The Inspiration</div>
+  <div class="story">
+    <strong><a href="https://github.com/cytostack/openwolf">OpenWolf</a></strong> is an open-source middleware that sits between developers and Claude Code. It uses <strong>6 hooks</strong> to automatically track file reads/writes, surface project knowledge before actions, and prevent repeated mistakes. They claim <strong>65-80% token reduction</strong> through intelligent caching and pre-read intelligence.<br><br>
+    We studied their architecture and cherry-picked the best ideas — then adapted them to work <strong>natively inside Quack</strong>, where our existing Brain system (220+ knowledge entries) already had the data but lacked the automation.
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title cyan">What We Took vs What We Skipped</div>
+  <table class="comp-table">
+    <tr>
+      <th style="width:40%">Feature</th>
+      <th class="h-ow" style="width:30%">OpenWolf</th>
+      <th class="h-qb" style="width:30%">Quack Brain</th>
+    </tr>
+    <tr><td class="feat">Pre-read intelligence</td><td class="yes">anatomy.md lookup</td><td class="better">AST.md + gotcha scan</td></tr>
+    <tr><td class="feat">Pre-write safety</td><td class="yes">Do-Not-Repeat check</td><td class="better">+ Brain breadcrumbs</td></tr>
+    <tr><td class="feat">Session tracking</td><td class="yes">_session.json</td><td class="yes">_brain-session.json</td></tr>
+    <tr><td class="feat">Auto diary</td><td class="yes">memory.md append</td><td class="better">diary/ + Mark as Done</td></tr>
+    <tr><td class="feat">Token estimation</td><td class="yes">3.5/4.0 char ratio</td><td class="yes">Same approach</td></tr>
+    <tr><td class="feat">Visual UI banner</td><td class="no">❌ CLI only</td><td class="better">✨ Native banner</td></tr>
+    <tr><td class="feat">Knowledge depth</td><td class="no">Starts empty</td><td class="better">220+ entries</td></tr>
+    <tr><td class="feat">Daemon / cron</td><td class="yes">Weekly cleanup</td><td class="no">Skipped (YAGNI)</td></tr>
+    <tr><td class="feat">Design QC</td><td class="yes">Puppeteer screenshots</td><td class="no">Skipped (not relevant)</td></tr>
+    <tr><td class="feat">Bug auto-detection</td><td class="yes">Pattern matching</td><td class="no">Skipped (v2 maybe)</td></tr>
+  </table>
+</div>
+
+<div class="section">
+  <div class="section-title green">5 Problems This Solves</div>
+
+  <div class="ps-card">
+    <div class="ps-box problem"><strong>Before</strong>Agent starts a session with zero context about the project's 220+ knowledge entries</div>
+    <div class="ps-arrow">→</div>
+    <div class="ps-box solution"><strong>After</strong>Banner shows Brain stats instantly: 40 gotchas, 52 bugs, 68 patterns. Agent knows what knowledge exists</div>
+  </div>
+
+  <div class="ps-card">
+    <div class="ps-box problem"><strong>Before</strong>Agent reads App.tsx (12k lines, ~153k tokens) without knowing 3 gotchas exist for that file</div>
+    <div class="ps-arrow">→</div>
+    <div class="ps-box solution"><strong>After</strong>Pre-read hook shows AST description + surfaces gotchas before the read even happens</div>
+  </div>
+
+  <div class="ps-card">
+    <div class="ps-box problem"><strong>Before</strong>Agent modifies a file with 10 documented bug fixes (Brain breadcrumbs) — risks breaking them</div>
+    <div class="ps-arrow">→</div>
+    <div class="ps-box solution"><strong>After</strong>Pre-write hook resolves all // Brain: slug comments and warns about each documented fix</div>
+  </div>
+
+  <div class="ps-card">
+    <div class="ps-box problem"><strong>Before</strong>Agent re-reads the same file 3 times in one session — wastes ~450k tokens</div>
+    <div class="ps-arrow">→</div>
+    <div class="ps-box solution"><strong>After</strong>Pre-read hook warns: "Already read this session (~153k tok). Use existing knowledge if possible"</div>
+  </div>
+
+  <div class="ps-card">
+    <div class="ps-box problem"><strong>Before</strong>Session ends with "Mark as Done" — no record of what happened</div>
+    <div class="ps-arrow">→</div>
+    <div class="ps-box solution"><strong>After</strong>Auto-diary entry: "Session completed: 'Fix auth flow', 15 messages, 23 min"</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title purple">Three-Layer Architecture</div>
+  <div class="story">Unlike OpenWolf (CLI-only), we built a <strong>three-layer system</strong> where two layers work natively for every Quack user with zero setup:</div>
+  <div class="arch-layers">
+    <div class="arch-layer l1">
+      <div class="arch-name">UI Banner</div>
+      <div class="arch-desc">BrainContextBanner in ChatView — shows stats, stale warnings, last diary. Visible on every empty session.</div>
+      <div class="arch-badge">Native ✓</div>
+    </div>
+    <div class="arch-layer l2">
+      <div class="arch-name">Auto-Diary</div>
+      <div class="arch-desc">brainSessionService hooks into sessionStore.markDone() — appends diary entry with title, messages, duration.</div>
+      <div class="arch-badge">Native ✓</div>
+    </div>
+    <div class="arch-layer l3">
+      <div class="arch-name">CLI Hooks</div>
+      <div class="arch-desc">4 Node.js hooks (pre-read, pre-write, session-start, stop) — feed Brain context to Claude invisibly.</div>
+      <div class="arch-badge">Plugin</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title orange">Live in Quack</div>
+  <div class="ss-mock">
+    <div class="ss-tab"><span class="ss-dot"></span> Agent Jack — calendar</div>
+    <div class="ss-banner">
+      <div class="ss-row">
+        <div class="ss-left">💡 Brain <span class="ss-badge">15</span></div>
+      </div>
+      <div class="ss-stats">
+        <div class="ss-stat"><div class="ss-stat-v" style="color:#e74c3c">11</div><div class="ss-stat-l">Gotcha</div></div>
+        <div class="ss-stat"><div class="ss-stat-v" style="color:#F7931E">0</div><div class="ss-stat-l">Bug</div></div>
+        <div class="ss-stat"><div class="ss-stat-v" style="color:#00D9FF">4</div><div class="ss-stat-l">Pattern</div></div>
+        <div class="ss-stat"><div class="ss-stat-v" style="color:#2ecc71">0</div><div class="ss-stat-l">Decision</div></div>
+      </div>
+      <div class="ss-meta">Last diary: 2026-03-24 · <span class="ss-warn">14 entries not verified in 7+ days</span></div>
+    </div>
+    <div class="ss-empty">>~)>  >.·)>  >^)>  Quack! Start chatting...</div>
+  </div>
+  <div style="font-size: 10px; color: rgba(255,255,255,0.35); text-align: center;">Real screenshot from Quack v0.8.1 — banner appears on every new session</div>
+</div>
+
+<div class="section">
+  <div class="section-title cyan">What Was Delivered</div>
+  <div class="kpi-grid">
+    <div class="kpi o"><div class="val">14</div><div class="lbl">Files changed</div></div>
+    <div class="kpi c"><div class="val">1,214</div><div class="lbl">Lines added</div></div>
+    <div class="kpi g"><div class="val">0</div><div class="lbl">Dependencies</div></div>
+  </div>
+  <div class="feat-list">
+    <div class="feat">
+      <div class="feat-icon">📊</div>
+      <div class="feat-text"><strong>BrainContextBanner</strong> — collapsible React component showing Brain stats, stale warnings, "Open Brain" button <span class="tag native">NATIVE</span></div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">📝</div>
+      <div class="feat-text"><strong>Auto-Diary on Done</strong> — brainSessionService auto-appends session summary to diary when "Mark as Done" is clicked <span class="tag native">NATIVE</span></div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🔍</div>
+      <div class="feat-text"><strong>pre-read.js</strong> — shows AST.md entry + gotcha/bug matches + repeated-read warning before file reads <span class="tag plugin">PLUGIN</span></div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🛡️</div>
+      <div class="feat-text"><strong>pre-write.js</strong> — resolves Brain breadcrumbs, checks Do-Not-Repeat patterns, surfaces gotchas before writes <span class="tag plugin">PLUGIN</span></div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">🏪</div>
+      <div class="feat-text"><strong>brain-hooks v1.0.0</strong> — marketplace plugin for Quack Store distribution to all users <span class="tag plugin">PLUGIN</span></div>
+    </div>
+    <div class="feat">
+      <div class="feat-icon">📐</div>
+      <div class="feat-text"><strong>Spec-Kit 005</strong> — full specification, implementation plan, and task breakdown via constitution-based workflow</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title green">Expected Impact</div>
+  <div class="impact-grid">
+    <div class="impact">
+      <div class="impact-header"><span class="impact-icon">💰</span><span class="impact-title">Token Savings</span></div>
+      <div class="impact-desc">Repeated reads flagged with token cost. Pre-read shows AST summary before full file reads. OpenWolf claims 65% reduction.</div>
+    </div>
+    <div class="impact">
+      <div class="impact-header"><span class="impact-icon">🛡️</span><span class="impact-title">Bug Prevention</span></div>
+      <div class="impact-desc">220+ gotchas/bugs surfaced automatically before writes. Brain breadcrumbs resolved in real-time. No more silent regressions.</div>
+    </div>
+    <div class="impact">
+      <div class="impact-header"><span class="impact-icon">📝</span><span class="impact-title">Knowledge Capture</span></div>
+      <div class="impact-desc">Every "Mark as Done" auto-generates diary. No more forgotten sessions. Project history builds itself.</div>
+    </div>
+    <div class="impact">
+      <div class="impact-header"><span class="impact-icon">👁️</span><span class="impact-title">Brain Visibility</span></div>
+      <div class="impact-desc">Stats banner on every session start. Users see their knowledge base health, stale entries, and last activity at a glance.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title orange">Next Steps</div>
+  <div class="next">
+    <div class="next-item"><span class="next-check">☐</span><span class="next-text"><strong>Verify plugin install flow</strong> — ensure Quack Store "Get" handles hook files + settings.json registration</span></div>
+    <div class="next-item"><span class="next-check">☐</span><span class="next-text"><strong>Hook activity indicator</strong> — small UI badge confirming hooks are active during a session</span></div>
+    <div class="next-item"><span class="next-check">☐</span><span class="next-text"><strong>Stale entry cleanup</strong> — automated job to flag/prune entries with last_verified > 90 days</span></div>
+    <div class="next-item"><span class="next-check">☐</span><span class="next-text"><strong>Token waste dashboard</strong> — visualize repeated reads and savings over time (v2)</span></div>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="footer-text">Built in one session · Commit fefa8a3 · 14 files · +1,214 lines · Zero dependencies<br>Quack App · April 2026</div>
+</div>
+
+</body>
+</html>

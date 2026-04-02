@@ -74,14 +74,15 @@ File in `~/.quack/hooks/brain/`. Registrazione in `.claude/settings.json`:
 }
 ```
 
-## Token Estimation
+## Limiti noti
 
-Approccio character-ratio (da OpenWolf):
-- Code: 3.5 chars/token
-- Prose: 4.0 chars/token
-- Mixed: 3.75 chars/token
+I 4 hook CLI scrivono contesto su stderr che Claude riceve come input. Non è verificabile
+se Claude usa effettivamente queste informazioni. I hook non bloccano azioni (exit 0 sempre),
+quindi non c'è un risparmio token misurabile — solo contesto aggiuntivo.
 
-Accuratezza ~85%. Sufficiente per warnings, non per billing.
+Le uniche due funzionalità con impatto verificabile sono:
+1. **BrainContextBanner** — l'utente VEDE le stats Brain (dati reali da filesystem)
+2. **Auto-Diary su Mark as Done** — il file diary viene SCRITTO (verificabile su disco)
 
 ## Quack UI Integration (nativa, zero setup)
 

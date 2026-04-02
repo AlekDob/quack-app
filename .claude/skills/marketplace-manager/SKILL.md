@@ -1,6 +1,6 @@
 ---
 name: marketplace-manager
-description: This skill should be used when adding, modifying, or removing plugins from the Quack Marketplace repository. Also use when creating new agent templates, adding skills to existing plugins, updating marketplace.json, researching skills.sh for relevant skills to bundle, or reviewing marketplace structure for consistency.
+description: This skill should be used when adding, modifying, or removing plugins from the Quack Marketplace repository. Also use when creating new agent templates, adding skills to existing plugins, updating marketplace.json, researching skills.sh for relevant skills to bundle, or reviewing marketplace structure for consistency. Uses the `find-skills` skill proactively to discover skills from the open ecosystem when building agent bundles.
 ---
 
 # Quack Marketplace Manager
@@ -199,15 +199,16 @@ color: cyan
 
 ## Researching Skills from skills.sh
 
-When adding skills to an agent bundle, search https://skills.sh/ for relevant existing skills:
+When adding skills to an agent bundle, use the `find-skills` skill to discover and evaluate existing skills from the open ecosystem:
 
-1. Search by technology keyword (e.g., `?q=react`, `?q=swift`)
-2. Check trending skills at `/trending`
+1. **Use find-skills first**: Invoke the `find-skills` skill to search by keyword (e.g., `npx skills find react`, `npx skills find swift`)
+2. Browse https://skills.sh/ for additional results and trending skills at `/trending`
 3. Evaluate by:
    - **Install count**: Higher is generally better quality
    - **Publisher reputation**: Prefer official publishers (vercel-labs, anthropics, antfu, obra, avdlee, dimillian)
    - **Coverage**: Does it fill a gap in the bundle?
-4. Write custom SKILL.md files inspired by the best external skills but tailored for the Quack marketplace format
+4. Install promising skills globally with `npx skills add <owner/repo@skill> -g -y`
+5. Write custom SKILL.md files inspired by the best external skills but tailored for the Quack marketplace format
 
 ## Naming Conventions
 

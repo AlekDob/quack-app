@@ -1,8 +1,9 @@
 /**
  * BrainContextBanner Component
  *
- * Shows Brain knowledge stats at the top of chat when a
- * new session starts. Collapsible, follows AgentRulesBanner pattern.
+ * Shows Brain knowledge stats at the top of chat
+ * when a new session starts. Only shows REAL data:
+ * entry counts and diary status — no fake "savings".
  */
 
 import { useState } from 'react';
@@ -83,30 +84,10 @@ export default function BrainContextBanner({
       {isExpanded && (
         <div className="brain-banner-content">
           <div className="brain-stats-grid">
-            <div className="brain-stat">
-              <span className="brain-stat-value brain-stat-gotcha">
-                {stats.gotchas}
-              </span>
-              <span className="brain-stat-label">Gotcha</span>
-            </div>
-            <div className="brain-stat">
-              <span className="brain-stat-value brain-stat-bug">
-                {stats.bugs}
-              </span>
-              <span className="brain-stat-label">Bug</span>
-            </div>
-            <div className="brain-stat">
-              <span className="brain-stat-value brain-stat-pattern">
-                {stats.patterns}
-              </span>
-              <span className="brain-stat-label">Pattern</span>
-            </div>
-            <div className="brain-stat">
-              <span className="brain-stat-value brain-stat-decision">
-                {stats.decisions}
-              </span>
-              <span className="brain-stat-label">Decision</span>
-            </div>
+            <StatCell value={stats.gotchas} label="Gotcha" color="gotcha" />
+            <StatCell value={stats.bugs} label="Bug" color="bug" />
+            <StatCell value={stats.patterns} label="Pattern" color="pattern" />
+            <StatCell value={stats.decisions} label="Decision" color="decision" />
           </div>
 
           <div className="brain-meta-row">
@@ -153,6 +134,21 @@ export default function BrainContextBanner({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function StatCell({ value, label, color }: {
+  value: number;
+  label: string;
+  color: string;
+}) {
+  return (
+    <div className="brain-stat">
+      <span className={`brain-stat-value brain-stat-${color}`}>
+        {value}
+      </span>
+      <span className="brain-stat-label">{label}</span>
     </div>
   );
 }

@@ -3,6 +3,7 @@
  *
  * Computes Brain knowledge stats for the current project.
  * Used by BrainContextBanner to show stats at session start.
+ * Only real, verifiable data — no fake "savings" metrics.
  */
 
 import { useState, useEffect } from 'react';
@@ -84,7 +85,6 @@ async function computeStats(basePath: string): Promise<BrainStats> {
       );
       (stats[dir.key] as number) = mdFiles.length;
 
-      // Get last diary date
       if (dir.key === 'diary' && mdFiles.length > 0) {
         const sorted = mdFiles
           .map((f) => f.name.replace('.md', ''))
@@ -100,7 +100,6 @@ async function computeStats(basePath: string): Promise<BrainStats> {
   stats.total = stats.gotchas + stats.bugs
     + stats.patterns + stats.decisions;
 
-  // Stale count: check a sample of entries
   stats.staleCount = await countStaleEntries(docsPath);
 
   return stats;
