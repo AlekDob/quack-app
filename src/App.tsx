@@ -5119,6 +5119,33 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       togglePipWindow();
     });
 
+    // Brain: pattern-code-editor-tab
+    // Listen for editFile tool requests from agent
+    const unlistenEditFilePromise = listen<{
+      filePath: string;
+      newContent: string;
+      sessionKey: string;
+      toolUseId: string;
+    }>('edit-file-request', async (event) => {
+      const { filePath: editPath, newContent, sessionKey, toolUseId } = event.payload;
+      console.log('[Editor] edit-file-request received:', editPath);
+      try {
+        const original = await invoke<string>('read_file_content', { path: editPath });
+        const { useEditorStore } = await import('./stores/editorStore');
+        useEditorStore.getState().openDiff({
+          filePath: editPath,
+          original,
+          proposed: newContent,
+          source: 'agent',
+          sessionKey,
+          toolUseId,
+        });
+        handleOpenCodeEditorTab(editPath);
+      } catch (err) {
+        console.error('[Editor] Failed to handle edit-file-request:', err);
+      }
+    });
+
     // 🗣️ GLOBAL AskUserQuestion listener - more reliable than agent-specific listeners
     // This catches events even when agent-specific listener doesn't exist (e.g., task chats, sessions)
     const unlistenAskUserQuestionGlobalPromise = listen<{
@@ -5455,6 +5482,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unlistenCheckUpdatesPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenEditFilePromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAskUserQuestionGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenPlanApprovalGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionsUpdatedPromise.then(unlisten => unlisten()).catch(() => undefined);
