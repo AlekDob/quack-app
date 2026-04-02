@@ -30,6 +30,7 @@ interface FilePreviewDrawerProps {
   imageData?: string | null;
   embedded?: boolean; // When true, renders without drawer backdrop (for tab system)
   onEditorSelectionChange?: (selection: { selectedText: string; startLine: number; endLine: number } | null) => void;
+  onOpenInEditor?: (filePath: string) => void;
 }
 
 export interface FilePreviewDrawerRef {
@@ -55,6 +56,7 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
   onHasUnsavedChanges,
   imageData,
   embedded = false,
+  onOpenInEditor,
 }, ref) => {
   const [editedContent, setEditedContent] = useState(content);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -272,6 +274,17 @@ const FilePreviewDrawer = forwardRef<FilePreviewDrawerRef, FilePreviewDrawerProp
                         title="Open in IDE"
                       >
                         Open in IDE
+                      </button>
+                    )}
+                    {onOpenInEditor && (
+                      <button
+                        type="button"
+                        className="preview-action"
+                        onClick={() => onOpenInEditor(path)}
+                        disabled={loading}
+                        title="Apri nell'editor"
+                      >
+                        Apri nell&apos;editor
                       </button>
                     )}
                     <RevealInFinderButton path={path} className="preview-action" />

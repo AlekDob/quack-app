@@ -12605,6 +12605,12 @@ You have access to all Bash tools to execute git commands like:
                     onHasUnsavedChanges={setPreviewHasUnsavedChanges}
                     imageData={previewImageData}
                     embedded={true}
+                    onOpenInEditor={(filePath) => {
+                      handleOpenCodeEditorTab(filePath);
+                      import('./stores/editorStore').then(({ useEditorStore }) => {
+                        useEditorStore.getState().openFile(filePath);
+                      });
+                    }}
                   />
                   <FileActionButtons
                     onRefresh={handleRefreshPreview}
@@ -13010,6 +13016,12 @@ You have access to all Bash tools to execute git commands like:
           onRefresh={handleRefreshPreview}
           onFormat={handleFormatPreview}
           onSave={handleSaveFile}
+          onOpenInEditor={(filePath) => {
+            handleOpenCodeEditorTab(filePath);
+            import('./stores/editorStore').then(({ useEditorStore }) => {
+              useEditorStore.getState().openFile(filePath);
+            });
+          }}
         />
 
         <SavedCommandsDrawer
