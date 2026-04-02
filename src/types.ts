@@ -1684,7 +1684,8 @@ export type ShortcutActionId =
   | 'chatInsertXml'
   | 'chatNewLine'
   | 'toggleSidebarView'
-  | 'toggleBTW';
+  | 'toggleBTW'
+  | 'toggleCodeEditor';
 
 /**
  * Configuration for a single keyboard shortcut

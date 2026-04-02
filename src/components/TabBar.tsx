@@ -7,7 +7,7 @@ import './TabBar.css';
 export interface Tab {
   id: string;
   label: string;
-  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'rule' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'project-dashboard' | 'image' | 'teammate-stream' | 'automation' | 'office';
+  type: 'chat' | 'file' | 'agent-terminal' | 'agent' | 'browser' | 'skill' | 'command' | 'rule' | 'docs' | 'memory-graph' | 'second-brain' | 'claude-assets' | 'kanban' | 'task' | 'project-dashboard' | 'image' | 'teammate-stream' | 'automation' | 'office' | 'code-editor';
   closable: boolean;
   filePath?: string;
   color?: string; // Color indicator for chat tabs
@@ -34,6 +34,7 @@ export interface Tab {
   initialProjectPath?: string; // Initial project to select for claude-assets tabs
   teammateSessionId?: string; // Session ID for teammate stream tabs
   teammateName?: string; // Teammate name for teammate stream tabs
+  editorFilePath?: string; // File path for code-editor tabs
 }
 
 interface ContextMenuState {
