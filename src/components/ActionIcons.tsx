@@ -47,6 +47,9 @@ interface ActionIconsProps {
   // Office
   onOfficeClick?: () => void;
   isOfficeActive?: boolean;
+  // Code Editor
+  onCodeEditorClick?: () => void;
+  isCodeEditorActive?: boolean;
   // Quack Store
   onStoreClick?: () => void;
   isStoreOpen?: boolean;
@@ -68,6 +71,8 @@ function ActionIcons({
   runningAutomationCount = 0,
   onOfficeClick,
   isOfficeActive = false,
+  onCodeEditorClick,
+  isCodeEditorActive = false,
   onStoreClick,
   isStoreOpen = false,
 }: ActionIconsProps) {
@@ -390,6 +395,23 @@ function ActionIcons({
               <line x1="9" y1="10" x2="15" y2="10" />
               <line x1="9" y1="14" x2="15" y2="14" />
               <line x1="9" y1="18" x2="12" y2="18" />
+            </svg>
+          </button>
+        </KeyboardShortcutTooltip>
+      )}
+
+      {/* Code Editor Icon */}
+      {onCodeEditorClick && (
+        <KeyboardShortcutTooltip label="Editor" shortcut={formatShortcut("⌘E")}>
+          <button
+            type="button"
+            className={`action-icon ${isCodeEditorActive ? 'active' : ''}`}
+            onClick={onCodeEditorClick}
+            aria-label={`Open Editor (${formatShortcut("⌘E")})`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
             </svg>
           </button>
         </KeyboardShortcutTooltip>

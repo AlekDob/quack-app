@@ -102,6 +102,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
 - Codebase Health Workflow: `documentation/decisions/decision-codebase-health-workflow.md`
 - /code Skill Workflow: `documentation/decisions/decision-code-skill-workflow.md`
+- Editor: CodeMirror tab: `documentation/decisions/decision-024-editor-codemirror-tab.md`
 
 **Key patterns**: `documentation/patterns/` — search by name before implementing similar features.
 - Multi-provider LLM: `documentation/patterns/pattern-multi-provider-llm.md`
@@ -119,6 +120,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Agent Result Card (droid reports): `documentation/patterns/pattern-agent-result-card.md`
 - HTML Visualizer (inline iframe): `documentation/patterns/pattern-html-visualizer-inline.md`
 - Brain Hooks (automated knowledge surfacing): `documentation/patterns/pattern-brain-hooks.md`
+- Code Editor Tab (integrated editor): `documentation/patterns/pattern-code-editor-tab.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)

@@ -59,6 +59,13 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = (() =
       defaultKeys: buildShortcut("O"),
       currentKeys: buildShortcut("O"),
     },
+    toggleCodeEditor: {
+      id: "toggleCodeEditor" as const,
+      label: "Toggle Code Editor",
+      description: "Open or close the integrated code editor tab",
+      defaultKeys: buildShortcut("E"),
+      currentKeys: buildShortcut("E"),
+    },
     openTerminalWindow: {
       id: "openTerminalWindow" as const,
       label: "Terminal Window",

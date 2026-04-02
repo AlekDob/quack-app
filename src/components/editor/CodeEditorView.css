@@ -1,0 +1,209 @@
+/* CodeEditorView styles */
+
+.code-editor-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #000000;
+  color: #abb2bf;
+}
+
+/* Header */
+.editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 12px;
+  background: #111111;
+  border-bottom: 1px solid #1a1a1a;
+  flex-shrink: 0;
+}
+
+.editor-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.editor-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Breadcrumb */
+.editor-breadcrumb {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: #808080;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor-breadcrumb-segment:last-child {
+  color: #d4d4d4;
+  font-weight: 500;
+}
+
+.editor-breadcrumb-separator {
+  margin: 0 4px;
+  color: #4a4a4a;
+}
+
+/* Dirty indicator */
+.editor-dirty-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f28c52;
+  flex-shrink: 0;
+  animation: editor-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes editor-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Mode badge */
+.editor-mode-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #1a1a1a;
+  color: #808080;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.editor-mode-badge.diff {
+  background: rgba(255, 220, 0, 0.15);
+  color: #ffdc00;
+}
+
+/* Buttons */
+.editor-btn {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #3a3a3a;
+  background: #2a2a2a;
+  color: #d4d4d4;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-weight: 500;
+}
+
+.editor-btn:hover {
+  background: #3a3a3a;
+  border-color: #4a4a4a;
+}
+
+.editor-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.editor-btn-accept {
+  background: rgba(0, 200, 80, 0.15);
+  border-color: rgba(0, 200, 80, 0.3);
+  color: #00c850;
+}
+
+.editor-btn-accept:hover {
+  background: rgba(0, 200, 80, 0.25);
+}
+
+.editor-btn-reject {
+  background: rgba(255, 60, 60, 0.15);
+  border-color: rgba(255, 60, 60, 0.3);
+  color: #ff5555;
+}
+
+.editor-btn-reject:hover {
+  background: rgba(255, 60, 60, 0.25);
+}
+
+.editor-btn-edit {
+  background: rgba(100, 150, 255, 0.15);
+  border-color: rgba(100, 150, 255, 0.3);
+  color: #6496ff;
+}
+
+.editor-btn-edit:hover {
+  background: rgba(100, 150, 255, 0.25);
+}
+
+.editor-btn-save:not(:disabled) {
+  background: rgba(242, 140, 82, 0.15);
+  border-color: rgba(242, 140, 82, 0.3);
+  color: #f28c52;
+}
+
+.editor-btn-save:not(:disabled):hover {
+  background: rgba(242, 140, 82, 0.25);
+}
+
+/* Status Bar */
+.editor-status-bar {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 12px;
+  background: #111111;
+  border-top: 1px solid #1a1a1a;
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.editor-status-item {
+  font-size: 11px;
+  color: #636d83;
+}
+
+.editor-status-lang {
+  text-transform: capitalize;
+}
+
+.editor-status-unsaved {
+  color: #f28c52;
+}
+
+/* Empty state */
+.editor-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  background: #000000;
+}
+
+.editor-empty-state-icon {
+  color: #636d83;
+}
+
+.editor-empty-state-text {
+  font-size: 14px;
+  color: #636d83;
+  text-align: center;
+}
+
+/* Merge view container */
+.code-mirror-merge-view {
+  flex: 1;
+  overflow: auto;
+}
+
+.code-mirror-merge-view .cm-mergeView {
+  height: 100%;
+}
+
+.code-mirror-merge-view .cm-mergeViewEditor {
+  height: 100%;
+}

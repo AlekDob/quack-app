@@ -83,7 +83,9 @@ import ClaudeAssetsTabView from "./views/ClaudeAssetsTabView";
 import KanbanTabView from "./views/KanbanTabView";
 import AutomationTabView from "./views/AutomationTabView";
 import OfficeTabView from "./views/OfficeTabView";
+import CodeEditorTabView from "./views/CodeEditorTabView";
 import { useOfficeTab } from "./hooks/useOfficeTab";
+import { useCodeEditorTab } from "./hooks/useCodeEditorTab";
 import ProjectDashboardTabView from "./views/ProjectDashboardTabView";
 import ImageTabView from "./views/ImageTabView";
 import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
@@ -445,6 +447,10 @@ function AppContent() {
 
   // Office tab management
   const { openOfficeTab } = useOfficeTab();
+
+  // Code Editor tab management
+  // Brain: pattern-code-editor-tab
+  const { openCodeEditorTab } = useCodeEditorTab();
 
   // Project Dashboard tab management
   const { openProjectDashboardTab } = useProjectDashboardTab();
@@ -853,6 +859,7 @@ function AppContent() {
   // This replaces the old isKanbanTabActive overlay approach
   const isKanbanTabActive = activeTabId === 'kanban-board';
   const isOfficeTabActive = activeTabId === 'office-view';
+  const isCodeEditorTabActive = activeTabId === 'code-editor';
   // Brain: fix-office-webgl-shader-remount
   // Track if office was ever opened so we keep OfficeView mounted (hidden)
   // even after tab close, preventing WebGL context loss → stale shader errors
@@ -5120,6 +5127,33 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       togglePipWindow();
     });
 
+    // Brain: pattern-code-editor-tab
+    // Listen for editFile tool requests from agent
+    const unlistenEditFilePromise = listen<{
+      filePath: string;
+      newContent: string;
+      sessionKey: string;
+      toolUseId: string;
+    }>('edit-file-request', async (event) => {
+      const { filePath: editPath, newContent, sessionKey, toolUseId } = event.payload;
+      console.log('[Editor] edit-file-request received:', editPath);
+      try {
+        const original = await invoke<string>('read_file_content', { path: editPath });
+        const { useEditorStore } = await import('./stores/editorStore');
+        useEditorStore.getState().openDiff({
+          filePath: editPath,
+          original,
+          proposed: newContent,
+          source: 'agent',
+          sessionKey,
+          toolUseId,
+        });
+        handleOpenCodeEditorTab(editPath);
+      } catch (err) {
+        console.error('[Editor] Failed to handle edit-file-request:', err);
+      }
+    });
+
     // 🗣️ GLOBAL AskUserQuestion listener - more reliable than agent-specific listeners
     // This catches events even when agent-specific listener doesn't exist (e.g., task chats, sessions)
     const unlistenAskUserQuestionGlobalPromise = listen<{
@@ -5456,6 +5490,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unlistenCheckUpdatesPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenBackgroundsPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenEditFilePromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAskUserQuestionGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenPlanApprovalGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionsUpdatedPromise.then(unlisten => unlisten()).catch(() => undefined);
@@ -9589,6 +9624,29 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [openOfficeTab, activeTabId, tabs]);
 
+  // Handler for opening/focusing Code Editor tab (toggle with Cmd+E)
+  // Brain: pattern-code-editor-tab
+  const handleOpenCodeEditorTab = useCallback((filePath?: string) => {
+    if (!filePath && activeTabId === 'code-editor') {
+      setActiveTabId('chat');
+      return;
+    }
+    const existingTab = tabs.find(t => t.type === 'code-editor');
+    if (existingTab) {
+      if (filePath) {
+        // Update tab label with new filename
+        setTabs(prev => prev.map(t =>
+          t.type === 'code-editor' ? { ...t, label: filePath.split('/').pop() || 'Editor', editorFilePath: filePath } : t
+        ));
+      }
+      setActiveTabId('code-editor');
+    } else {
+      const newTab = openCodeEditorTab(filePath);
+      setTabs(prevTabs => [...prevTabs, newTab]);
+      setActiveTabId('code-editor');
+    }
+  }, [openCodeEditorTab, activeTabId, tabs]);
+
   // Handler for firing an automation job — creates a session and sends the prompt
   const handleAutomationFireJob = useCallback(async (job: AutomationJob) => {
     console.log('[Automation] Firing job:', job.name, 'agent:', job.agentId);
@@ -10172,6 +10230,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     toggleKanban: handleOpenKanbanTab,
     toggleAutomation: handleOpenAutomationTab,
     toggleOffice: handleOpenOfficeTab,
+    toggleCodeEditor: useCallback(() => handleOpenCodeEditorTab(), [handleOpenCodeEditorTab]),
     openTerminalWindow: handleCreateAgentTerminal,  // Cmd+T opens Terminal Window App
     newAgent: handleOpenNewTerminalModal,           // Cmd+N opens New Agent modal
     toggleSidePanel: useCallback(() => {
@@ -12018,6 +12077,8 @@ You have access to all Bash tools to execute git commands like:
               isAutomationActive={tabs.some(t => t.type === 'automation' && t.id === activeTabId)}
               onOfficeClick={handleOpenOfficeTab}
               isOfficeActive={isOfficeTabActive}
+              onCodeEditorClick={() => handleOpenCodeEditorTab()}
+              isCodeEditorActive={isCodeEditorTabActive}
               onStoreClick={() => setShowStoreDrawer(!showStoreDrawer)}
               isStoreOpen={showStoreDrawer}
             />
@@ -12104,6 +12165,21 @@ You have access to all Bash tools to execute git commands like:
                   onDismiss={dismissNotification}
                 />
               )}
+
+              {/* Code Editor Tab View */}
+              {/* Brain: pattern-code-editor-tab */}
+              {isCodeEditorTabActive && (() => {
+                const editorTab = tabs.find(t => t.type === 'code-editor');
+                if (editorTab) {
+                  return (
+                    <CodeEditorTabView
+                      tab={editorTab}
+                      isActive={true}
+                    />
+                  );
+                }
+                return null;
+              })()}
 
               {/* Automation Tab View - shown when automation tab is active */}
               {activeTabId === 'automation-board' && (() => {
@@ -12537,6 +12613,12 @@ You have access to all Bash tools to execute git commands like:
                     onHasUnsavedChanges={setPreviewHasUnsavedChanges}
                     imageData={previewImageData}
                     embedded={true}
+                    onOpenInEditor={(filePath) => {
+                      handleOpenCodeEditorTab(filePath);
+                      import('./stores/editorStore').then(({ useEditorStore }) => {
+                        useEditorStore.getState().openFile(filePath);
+                      });
+                    }}
                   />
                   <FileActionButtons
                     onRefresh={handleRefreshPreview}
@@ -12942,6 +13024,12 @@ You have access to all Bash tools to execute git commands like:
           onRefresh={handleRefreshPreview}
           onFormat={handleFormatPreview}
           onSave={handleSaveFile}
+          onOpenInEditor={(filePath) => {
+            handleOpenCodeEditorTab(filePath);
+            import('./stores/editorStore').then(({ useEditorStore }) => {
+              useEditorStore.getState().openFile(filePath);
+            });
+          }}
         />
 
         <SavedCommandsDrawer
