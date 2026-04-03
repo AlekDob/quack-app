@@ -17,11 +17,16 @@ tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers]
 | Model/Type | `src/components/featureMap/featureMapTypes.ts` | FeatureNode, FeatureFile, FeatureLink, FeatureGraph, NodePosition |
 | Service | `src/services/featureMapService.ts` | Parses feature markdown docs into FeatureGraph (parseFrontmatter, parseFilesTable, parseFeatureDoc, calculateLinks, buildFeatureGraph) |
 | Service | `src/components/featureMap/featureMapLayout.ts` | Architecture Layers layout engine — classifies nodes into layers, positions in horizontal rows (LAYERS, classifyNode, groupByLayer, calculateLayeredLayout) |
-| Component | `src/components/featureMap/FeatureMapCanvas.tsx` | Pure SVG canvas with layer backgrounds, layer-tinted nodes, curved cross-layer links, pan/zoom, hover dimming, click emits screen coordinates |
-| Component | `src/components/featureMap/FeatureMapView.tsx` | Main container composing data hook + canvas + popover; handles loading/error/empty states |
+| Component | `src/components/featureMap/FeatureMapCanvas.tsx` | SVG canvas with layers, nodes, links, annotations, pan/zoom, node drag, annotation mode handling |
+| Component | `src/components/featureMap/FeatureMapView.tsx` | Main container composing data + annotations + canvas + popover + toolbar |
 | Component | `src/components/featureMap/FeatureMapPopover.tsx` | Portal-based popover near clicked node with collapsible file list and connected features |
+| Component | `src/components/featureMap/CanvasPostIt.tsx` | SVG post-it note — draggable, editable text, color cycling, delete on hover |
+| Component | `src/components/featureMap/CanvasGroupRect.tsx` | SVG group rectangle — draggable, resizable (4 corner handles), editable label, color cycling |
+| Component | `src/components/featureMap/AnnotationToolbar.tsx` | Floating HTML toolbar for Select/Post-it/Group mode toggle |
+| Model/Type | `src/components/featureMap/annotationTypes.ts` | PostIt, GroupRect, CanvasAnnotations, AnnotationMode types + color constants |
+| Store/State | `src/hooks/useAnnotations.ts` | Annotation CRUD hook with localStorage persistence (addPostIt, addGroup, update, remove, clearAll) |
 | Component | `src/components/featureMap/FeatureMapDetailPanel.tsx` | Legacy slide-in sidebar (unused, kept as reference) |
-| Component | `src/components/featureMap/FeatureMapView.css` | Dark-theme styles for canvas, popover, file list, loading/error/empty states |
+| Component | `src/components/featureMap/FeatureMapView.css` | Dark-theme styles for canvas, popover, toolbar, file list, loading/error/empty states |
 | Component | `src/components/FeaturesPanel.tsx` | Sidebar accordion panel listing features grouped by layer with drag-to-mention |
 | Component | `src/components/FeaturesPanel.css` | Styles for features sidebar panel |
 | Store/State | `src/hooks/useFeatureMapData.ts` | Fetches feature docs via Tauri list_directory + read_file_content, builds FeatureGraph |
@@ -71,6 +76,15 @@ tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers]
   - **Canvas pan**: mousedown on background → drag → pan viewport
   - **Node click**: mousedown on node → no movement → release → open popover
   - **Node drag**: mousedown on node → movement past threshold → reposition node
+
+### Annotations (Post-its + Group Rectangles)
+- **Post-it notes**: click canvas in Post-it mode to create; drag to move; click to edit text; hover for delete/color buttons; 6 preset colors cycling
+- **Group rectangles**: click-drag canvas in Group mode to draw; resizable via 4 corner handles; editable label (click); dashed border when unselected
+- Annotations stored in localStorage key: `quack:featureMap:annotations:{projectPath}`
+- Z-order (bottom→top): group rects → layer backgrounds → links → feature nodes → post-its
+- Toolbar (floating, bottom-center): Select / Post-it / Group mode toggle
+- Escape key resets to Select mode
+- `useAnnotations` hook: CRUD operations with auto-persist
 
 ### Drag-to-Mention (Sidebar Panel)
 - MIME type: `application/quack-feature`
