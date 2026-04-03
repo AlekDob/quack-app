@@ -1,49 +1,85 @@
 /**
  * Feature Map — Main container
  * Composes: useFeatureMapData + FeatureMapCanvas + popover detail
+ * Manages custom node positions (drag-to-reposition) with localStorage persistence.
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useFeatureMapData } from '../../hooks/useFeatureMapData';
 import FeatureMapCanvas from './FeatureMapCanvas';
 import type { NodeClickInfo } from './FeatureMapCanvas';
 import FeatureMapPopover from './FeatureMapPopover';
+import type { NodePosition } from './featureMapTypes';
 import './FeatureMapView.css';
 
-interface FeatureMapViewProps {
+const STORAGE_KEY_PREFIX = 'quack:featureMap:positions:';
+
+/** Load custom positions from localStorage */
+function loadPositions(projectPath: string): Map<string, NodePosition> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_PREFIX + projectPath);
+    if (!raw) return new Map();
+    const obj = JSON.parse(raw) as Record<string, NodePosition>;
+    return new Map(Object.entries(obj));
+  } catch { return new Map(); }
+}
+
+/** Save custom positions to localStorage */
+function savePositions(projectPath: string, positions: Map<string, NodePosition>) {
+  const obj: Record<string, NodePosition> = {};
+  positions.forEach((v, k) => { obj[k] = v; });
+  localStorage.setItem(STORAGE_KEY_PREFIX + projectPath, JSON.stringify(obj));
+}
+
+interface Props {
   projectPath?: string;
   onOpenFileInEditor?: (filePath: string) => void;
 }
 
-export default function FeatureMapView({
-  projectPath,
-  onOpenFileInEditor,
-}: FeatureMapViewProps) {
+export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Props) {
   const { graph, loading, error, refresh } = useFeatureMapData(projectPath);
   const [clickInfo, setClickInfo] = useState<NodeClickInfo | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [customPositions, setCustomPositions] = useState<Map<string, NodePosition>>(new Map());
+
+  // Load saved positions when project changes
+  useEffect(() => {
+    if (projectPath) setCustomPositions(loadPositions(projectPath));
+  }, [projectPath]);
 
   const selectedNodeId = clickInfo?.nodeId ?? null;
+  const hasCustom = customPositions.size > 0;
 
   const handleNodeSelect = useCallback((info: NodeClickInfo | null) => {
     setClickInfo(info);
   }, []);
 
+  const handleNodeDrag = useCallback((nodeId: string, x: number, y: number) => {
+    setCustomPositions(prev => {
+      const next = new Map(prev);
+      next.set(nodeId, { x, y });
+      if (projectPath) savePositions(projectPath, next);
+      return next;
+    });
+  }, [projectPath]);
+
+  const handleResetLayout = useCallback(() => {
+    setCustomPositions(new Map());
+    if (projectPath) localStorage.removeItem(STORAGE_KEY_PREFIX + projectPath);
+  }, [projectPath]);
+
   const handleFileClick = useCallback((relativePath: string) => {
-    // Feature docs store relative paths — Code Editor needs absolute
-    const absPath = projectPath
-      ? `${projectPath}/${relativePath}`
-      : relativePath;
+    const absPath = projectPath ? `${projectPath}/${relativePath}` : relativePath;
     onOpenFileInEditor?.(absPath);
   }, [onOpenFileInEditor, projectPath]);
 
   const handleNodeNavigate = useCallback((nodeId: string) => {
-    // Navigate to another node — we'd need its screen position
-    // For now just center it logically
     setClickInfo(prev => prev ? { ...prev, nodeId } : null);
   }, []);
 
-  const selectedNode = graph?.nodes.find(n => n.id === selectedNodeId) ?? null;
+  const selectedNode = useMemo(
+    () => graph?.nodes.find(n => n.id === selectedNodeId) ?? null,
+    [graph?.nodes, selectedNodeId],
+  );
 
   // Close popover on Escape
   useEffect(() => {
@@ -58,8 +94,7 @@ export default function FeatureMapView({
     return (
       <div className="fm-container">
         <div className="fm-loading">
-          <div className="fm-spinner" />
-          <span>Caricamento feature map...</span>
+          <div className="fm-spinner" /><span>Caricamento feature map...</span>
         </div>
       </div>
     );
@@ -76,9 +111,7 @@ export default function FeatureMapView({
     );
   }
 
-  if (!graph) return null;
-
-  if (graph.nodes.length === 0) {
+  if (!graph || graph.nodes.length === 0) {
     return (
       <div className="fm-container">
         <div className="fm-empty">
@@ -100,14 +133,27 @@ export default function FeatureMapView({
   }
 
   return (
-    <div className="fm-container" ref={containerRef}>
+    <div className="fm-container">
       {/* Header */}
       <div className="fm-header">
         <h2 className="fm-title">Feature Map</h2>
         <div className="fm-stats">
           {graph.nodes.length} feature &middot; {graph.links.length} connessioni
         </div>
-        <button className="fm-refresh-btn" onClick={refresh} title="Aggiorna">
+        {hasCustom && (
+          <button className="fm-reset-btn" onClick={handleResetLayout}
+            title="Ripristina layout automatico">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2">
+              <path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16" />
+              <path d="M3 21v-5h5" />
+            </svg>
+            Reset
+          </button>
+        )}
+        <button className="fm-refresh-btn" onClick={refresh} title="Aggiorna dati">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2">
             <path d="M21 12a9 9 0 11-3.21-6.88" />
@@ -116,18 +162,20 @@ export default function FeatureMapView({
         </button>
       </div>
 
-      {/* Canvas (full area) */}
+      {/* Canvas */}
       <div className="fm-body">
         <div className="fm-canvas-area">
           <FeatureMapCanvas
             graph={graph}
             onNodeSelect={handleNodeSelect}
             selectedNodeId={selectedNodeId}
+            customPositions={customPositions}
+            onNodeDrag={handleNodeDrag}
           />
         </div>
       </div>
 
-      {/* Popover over node */}
+      {/* Popover */}
       {selectedNode && clickInfo && (
         <FeatureMapPopover
           node={selectedNode}

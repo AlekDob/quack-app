@@ -51,6 +51,25 @@
   border-color: #475569;
 }
 
+.fm-reset-btn {
+  background: none;
+  border: 1px solid #fbbf2444;
+  border-radius: 6px;
+  padding: 4px 8px;
+  color: #fbbf24;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  transition: all 0.15s;
+}
+
+.fm-reset-btn:hover {
+  background: rgba(251, 191, 36, 0.1);
+  border-color: #fbbf24;
+}
+
 /* Body */
 .fm-body {
   display: flex;
