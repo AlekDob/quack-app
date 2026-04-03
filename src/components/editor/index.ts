@@ -9,3 +9,4 @@ export * from './editorTypes';
 export * from './editorTheme';
 export * from './editorSearch';
 export * from './editorDiff';
+export * from './editorLanguages';

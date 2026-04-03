@@ -13,35 +13,13 @@ import { MergeView } from '@codemirror/merge';
 import { EditorView } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { getLanguageFromFilename } from '../../utils/languageDetection';
-import { javascript } from '@codemirror/lang-javascript';
-import { html } from '@codemirror/lang-html';
-import { css } from '@codemirror/lang-css';
-import { json } from '@codemirror/lang-json';
-import { markdown } from '@codemirror/lang-markdown';
-import { python } from '@codemirror/lang-python';
-import { rust } from '@codemirror/lang-rust';
 import { customTheme, highlightExtension } from './editorTheme';
+import { getLanguageExtension } from './editorLanguages';
 
 interface CodeMirrorMergeViewProps {
   original: string;
   modified: string;
   filePath: string;
-}
-
-/** Map language string to CodeMirror extension */
-function getLanguageExtension(language: string) {
-  switch (language) {
-    case 'javascript':
-    case 'typescript':
-      return javascript({ typescript: language === 'typescript', jsx: true });
-    case 'html': return html();
-    case 'css': return css();
-    case 'json': return json();
-    case 'markdown': return markdown();
-    case 'python': return python();
-    case 'rust': return rust();
-    default: return [];
-  }
 }
 
 /** Shared extensions for both panes */

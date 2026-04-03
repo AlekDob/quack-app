@@ -27,6 +27,7 @@ tags: [editor, codemirror, tab, diff, multi-tab, search, popout]
 | Component | `src/components/editor/EditorEmptyState.tsx` | Empty state with code bracket icon and instructions |
 | Component | `src/components/skeletons/CodeEditorSkeleton.tsx` | Skeleton loader for lazy-loaded editor |
 | Config | `src/components/editor/editorTheme.ts` | `customTheme`, `customHighlightStyle`, `highlightExtension` -- dark theme |
+| Config | `src/components/editor/editorLanguages.ts` | `getLanguageExtension(lang)`, `supportedLanguages` -- shared CM6 language factory (23 languages) |
 | Config | `src/components/editor/editorSearch.ts` | `setSearchMatches`, `searchMatchesField`, `findAllMatches()`, `buildSearchDecorations()` |
 | Config | `src/components/editor/editorDiff.ts` | `diffDecorationsField`, `applyDiffDecorations()` -- line-level added/modified/removed |
 | Model/Type | `src/components/editor/editorTypes.ts` | All TS interfaces: `EditorMode`, `PendingEdit`, `DiffRequest`, `CodeEditorRef`, etc. |
@@ -120,7 +121,8 @@ User pops out code-editor tab
 - `@codemirror/view`, `@codemirror/state`, `@codemirror/commands`: core CM6
 - `@codemirror/language`: bracket matching, fold gutter, syntax highlighting
 - `@codemirror/search`: built-in search panel
-- `@codemirror/lang-javascript`, `lang-html`, `lang-css`, `lang-json`, `lang-markdown`, `lang-python`, `lang-rust`: language support
+- **Official CM6 langs:** `lang-javascript`, `lang-html`, `lang-css`, `lang-json`, `lang-markdown`, `lang-python`, `lang-rust`, `lang-go`, `lang-java`, `lang-php`, `lang-cpp`, `lang-sql`, `lang-yaml`, `lang-xml`, `lang-sass`, `lang-less`, `lang-vue`
+- **Legacy CM5 modes** (`@codemirror/legacy-modes` via `StreamLanguage`): Swift, Kotlin, Dart, Shell, Ruby, TOML
 - `@lezer/highlight`: syntax highlighting tags
 - `@tauri-apps/api/core`: `invoke` for file read/write
 - `@tauri-apps/api/event`: `listen`/`emit` for edit-file-request/response
