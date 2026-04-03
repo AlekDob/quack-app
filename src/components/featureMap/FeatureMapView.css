@@ -80,8 +80,9 @@
 
 .fm-canvas-area {
   flex: 1;
-  min-width: 0; /* Allow flex shrink below SVG content size */
+  min-width: 0;
   overflow: hidden;
+  position: relative; /* Anchor for annotation toolbar */
   position: relative;
 }
 
@@ -343,4 +344,45 @@
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 11px;
+}
+
+/* Annotation Toolbar */
+.fm-ann-toolbar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+  background: #111827;
+  border: 1px solid #1e293b;
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  z-index: 10;
+}
+
+.fm-ann-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.fm-ann-btn:hover {
+  background: #1e293b;
+  color: #e2e8f0;
+}
+
+.fm-ann-btn.active {
+  background: #1e293b;
+  color: #00d9ff;
+  box-shadow: 0 0 0 1px #00d9ff33;
 }
