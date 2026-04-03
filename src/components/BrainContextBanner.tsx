@@ -8,6 +8,7 @@
 
 import { useState } from 'react';
 import { useBrainStats } from '../hooks/useBrainStats';
+import { useFeatureMapData } from '../hooks/useFeatureMapData';
 import './BrainContextBanner.css';
 
 interface BrainContextBannerProps {
@@ -24,6 +25,8 @@ export default function BrainContextBanner({
   const [isExpanded, setIsExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const { stats, isLoading } = useBrainStats(basePath, sessionId);
+  const { graph: featureGraph } = useFeatureMapData(basePath);
+  const featureCount = featureGraph?.nodes.length ?? 0;
 
   if (dismissed || isLoading || !stats || stats.total === 0) {
     return null;
@@ -61,7 +64,7 @@ export default function BrainContextBanner({
         <div className="brain-banner-right">
           {!isExpanded && (
             <span className="brain-preview">
-              {stats.gotchas}G {stats.bugs}B {stats.patterns}P {stats.decisions}D
+              {stats.gotchas}G {stats.bugs}B {stats.patterns}P {stats.decisions}D {featureCount}F
               {stats.staleCount > 0 && (
                 <span className="brain-stale-badge">
                   {stats.staleCount} stale
@@ -88,6 +91,7 @@ export default function BrainContextBanner({
             <StatCell value={stats.bugs} label="Bug" color="bug" />
             <StatCell value={stats.patterns} label="Pattern" color="pattern" />
             <StatCell value={stats.decisions} label="Decision" color="decision" />
+            <StatCell value={featureCount} label="Feature" color="feature" />
           </div>
 
           <div className="brain-meta-row">

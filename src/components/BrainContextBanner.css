@@ -144,6 +144,7 @@
 .brain-stat-bug { color: #F7931E; }
 .brain-stat-pattern { color: #00D9FF; }
 .brain-stat-decision { color: #2ecc71; }
+.brain-stat-feature { color: #FFD700; }
 
 .brain-stat-label {
   font-size: 9px;
