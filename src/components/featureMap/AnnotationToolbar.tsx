@@ -40,9 +40,9 @@ function GroupIcon() {
 }
 
 const BUTTONS: { mode: AnnotationMode; label: string; Icon: () => JSX.Element }[] = [
-  { mode: 'select', label: 'Seleziona', Icon: SelectIcon },
+  { mode: 'select', label: 'Select', Icon: SelectIcon },
   { mode: 'postit', label: 'Post-it', Icon: PostItIcon },
-  { mode: 'group', label: 'Gruppo', Icon: GroupIcon },
+  { mode: 'group', label: 'Group', Icon: GroupIcon },
 ];
 
 export default function AnnotationToolbar({ mode, onModeChange }: Props) {

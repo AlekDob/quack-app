@@ -19,9 +19,10 @@ const LAYER_BADGE: Record<string, { bg: string; color: string; label: string }> 
 
 interface Props {
   projectPath: string | null;
+  onOpenInEditor?: (filePath: string) => void;
 }
 
-export default function FeaturesPanel({ projectPath }: Props) {
+export default function FeaturesPanel({ projectPath, onOpenInEditor }: Props) {
   const { graph, loading, error, refresh } = useFeatureMapData(projectPath ?? undefined);
 
   const handleDragStart = useCallback((e: React.DragEvent, node: FeatureNode) => {
@@ -40,7 +41,7 @@ export default function FeaturesPanel({ projectPath }: Props) {
     return (
       <div className="fp-loading">
         <div className="fm-spinner" />
-        <span>Caricamento...</span>
+        <span>Loading...</span>
       </div>
     );
   }
@@ -49,7 +50,7 @@ export default function FeaturesPanel({ projectPath }: Props) {
     return (
       <div className="fp-error">
         <span>{error}</span>
-        <button className="fp-retry" onClick={refresh}>Riprova</button>
+        <button className="fp-retry" onClick={refresh}>Retry</button>
       </div>
     );
   }
@@ -57,7 +58,7 @@ export default function FeaturesPanel({ projectPath }: Props) {
   if (!graph || graph.nodes.length === 0) {
     return (
       <div className="fp-empty">
-        <span>Nessuna feature in <code>documentation/features/</code></span>
+        <span>No features in <code>documentation/features/</code></span>
       </div>
     );
   }
@@ -76,7 +77,7 @@ export default function FeaturesPanel({ projectPath }: Props) {
     <div className="fp-container">
       <div className="fp-header">
         <span className="fp-count">{graph.nodes.length} feature</span>
-        <button className="fp-refresh" onClick={refresh} title="Aggiorna">
+        <button className="fp-refresh" onClick={refresh} title="Refresh">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2">
             <path d="M21 12a9 9 0 11-3.21-6.88" />
@@ -106,7 +107,9 @@ export default function FeaturesPanel({ projectPath }: Props) {
                 className="fp-item"
                 draggable
                 onDragStart={(e) => handleDragStart(e, node)}
-                title={`Trascina nel chat per citare • ${node.purpose || node.title}`}
+                onClick={() => onOpenInEditor?.(node.docPath)}
+                title={`Click to open • Drag to chat to mention`}
+                style={{ cursor: onOpenInEditor ? 'pointer' : undefined }}
               >
                 <span className="fp-item-title">{node.title}</span>
                 <span

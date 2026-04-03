@@ -88,13 +88,13 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
 
   if (loading) return (
     <div className="fm-container"><div className="fm-loading">
-      <div className="fm-spinner" /><span>Caricamento feature map...</span>
+      <div className="fm-spinner" /><span>Loading feature map...</span>
     </div></div>
   );
   if (error) return (
     <div className="fm-container"><div className="fm-error">
-      <span>Errore: {error}</span>
-      <button className="fm-retry-btn" onClick={refresh}>Riprova</button>
+      <span>Error: {error}</span>
+      <button className="fm-retry-btn" onClick={refresh}>Retry</button>
     </div></div>
   );
   if (!graph || graph.nodes.length === 0) return (
@@ -105,8 +105,8 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
         <line x1="9.5" y1="10.5" x2="6.5" y2="7.5" /><line x1="14.5" y1="10.5" x2="17.5" y2="7.5" />
         <line x1="9.5" y1="13.5" x2="6.5" y2="16.5" /><line x1="14.5" y1="13.5" x2="17.5" y2="16.5" />
       </svg>
-      <h3>Nessuna feature documentata</h3>
-      <p>Aggiungi file .md in <code>documentation/features/</code></p>
+      <h3>No documented features</h3>
+      <p>Add .md files in <code>documentation/features/</code></p>
     </div></div>
   );
 
@@ -115,10 +115,10 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
       <div className="fm-header">
         <h2 className="fm-title">Feature Map</h2>
         <div className="fm-stats">
-          {graph.nodes.length} feature &middot; {graph.links.length} connessioni
+          {graph.nodes.length} features &middot; {graph.links.length} connections
         </div>
         {(hasCustom || ann.hasAnnotations) && (
-          <button className="fm-reset-btn" onClick={handleResetLayout} title="Ripristina tutto">
+          <button className="fm-reset-btn" onClick={handleResetLayout} title="Reset all">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8" />
               <path d="M21 3v5h-5" /><path d="M21 12a9 9 0 01-9 9 9.75 9.75 0 01-6.74-2.74L3 16" />
@@ -127,7 +127,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
             Reset
           </button>
         )}
-        <button className="fm-refresh-btn" onClick={refresh} title="Aggiorna dati">
+        <button className="fm-refresh-btn" onClick={refresh} title="Refresh">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 12a9 9 0 11-3.21-6.88" /><path d="M21 3v6h-6" />
           </svg>
@@ -163,6 +163,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
           screenX={clickInfo.screenX} screenY={clickInfo.screenY}
           onClose={() => setClickInfo(null)}
           onFileClick={handleFileClick} onNodeNavigate={handleNodeNavigate}
+          onOpenDoc={onOpenFileInEditor}
         />
       )}
     </div>

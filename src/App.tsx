@@ -9869,6 +9869,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
     const existingTab = tabs.find(t => t.type === 'feature-map');
     if (existingTab) {
+      // Ensure initialProjectPath is set (may be missing on tabs created before the fix)
+      if (!existingTab.initialProjectPath && activeTerminal?.cwd) {
+        setTabs(prev => prev.map(t =>
+          t.id === existingTab.id ? { ...t, initialProjectPath: activeTerminal.cwd } : t
+        ));
+      }
       setActiveTabId('feature-map');
     } else {
       const newTab = openFeatureMapTab(activeTerminal?.cwd);
@@ -10494,7 +10500,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     toggleAutomation: handleOpenAutomationTab,
     toggleOffice: handleOpenOfficeTab,
     toggleFeatureMap: handleOpenFeatureMapTab,
-    toggleCodeEditor: useCallback(() => handleOpenCodeEditorTab(), [handleOpenCodeEditorTab]),
     openTerminalWindow: handleCreateAgentTerminal,  // Cmd+T opens Terminal Window App
     newAgent: handleOpenNewTerminalModal,           // Cmd+N opens New Agent modal
     toggleSidePanel: useCallback(() => {
@@ -10659,9 +10664,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
 
     try {
+      // Enrich feature-map tab with projectPath if missing (tabs created before fix)
+      const enrichedTab = (tab.type === 'feature-map' && !tab.initialProjectPath && activeTerminal?.cwd)
+        ? { ...tab, initialProjectPath: activeTerminal.cwd }
+        : tab;
+
       // Create popout window
       console.log('[App] Calling popoutTab...');
-      const windowLabel = await popoutTab(tab, position);
+      const windowLabel = await popoutTab(enrichedTab, position);
       console.log('[App] popoutTab returned:', windowLabel);
 
       if (windowLabel) {
@@ -10680,7 +10690,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     } catch (error) {
       console.error('[App] Tab popout error:', error);
     }
-  }, [popoutTab, isTabPoppedOut, activeTabId]);
+  }, [popoutTab, isTabPoppedOut, activeTabId, activeTerminal?.cwd]);
 
   // Keyboard navigation for tabs (TAB key)
   useEffect(() => {

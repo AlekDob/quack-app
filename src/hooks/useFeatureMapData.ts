@@ -33,7 +33,7 @@ export function useFeatureMapData(projectPath: string | undefined): UseFeatureMa
 
   const fetchData = useCallback(async () => {
     if (!projectPath) {
-      setError('Nessun progetto attivo');
+      setError('No active project');
       setLoading(false);
       return;
     }
@@ -45,10 +45,18 @@ export function useFeatureMapData(projectPath: string | undefined): UseFeatureMa
       // Build absolute path to documentation/features/
       const featuresDir = `${projectPath}/documentation/features`;
 
-      // list_directory returns { path, entries } — NOT a flat array
-      const listing = await invoke<DirectoryListing>('list_directory', {
-        path: featuresDir,
-      });
+      // list_directory may fail if the directory doesn't exist — treat as empty
+      let listing: DirectoryListing;
+      try {
+        listing = await invoke<DirectoryListing>('list_directory', {
+          path: featuresDir,
+        });
+      } catch {
+        // Directory doesn't exist — show empty state, not an error
+        setGraph({ nodes: [], links: [] });
+        setLoading(false);
+        return;
+      }
 
       const mdFiles = listing.entries.filter(
         e => !e.is_dir && e.name.endsWith('.md'),

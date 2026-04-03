@@ -233,6 +233,8 @@ const TabPopoutWindowApp: React.FC = () => {
         return '🧠';
       case 'kanban':
         return null; // Kanban uses SVG icon, not emoji
+      case 'feature-map':
+        return null; // Feature Map uses no icon in popout titlebar
       case 'code-editor':
         return '</>';
       default:
@@ -397,6 +399,12 @@ const TabPopoutWindowApp: React.FC = () => {
             {/* Show full file path for file tabs */}
             {tab.type === 'file' && tab.filePath && (
               <span className="tab-popout-filepath">{tab.filePath}</span>
+            )}
+            {/* Show project name for feature-map tabs */}
+            {tab.type === 'feature-map' && tab.initialProjectPath && (
+              <span className="tab-popout-filepath">
+                {tab.initialProjectPath.split('/').pop() || tab.initialProjectPath}
+              </span>
             )}
           </div>
           {/* Return to tab button */}

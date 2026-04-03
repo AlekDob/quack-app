@@ -17,13 +17,14 @@ interface Props {
   onClose: () => void;
   onFileClick: (path: string) => void;
   onNodeNavigate: (nodeId: string) => void;
+  onOpenDoc?: (docPath: string) => void;
 }
 
 const POP_W = 340;
 
 export default function FeatureMapPopover({
   node, links, allNodes, screenX, screenY,
-  onClose, onFileClick, onNodeNavigate,
+  onClose, onFileClick, onNodeNavigate, onOpenDoc,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: 0, y: 0, ready: false });
@@ -92,9 +93,16 @@ export default function FeatureMapPopover({
         zIndex: 9999,
       }}
     >
-      {/* Header */}
+      {/* Header — click title to open feature doc in editor */}
       <div className="fm-pop-header">
-        <h3 className="fm-pop-title">{node.title}</h3>
+        <h3
+          className="fm-pop-title"
+          style={{ cursor: onOpenDoc ? 'pointer' : undefined }}
+          onClick={() => onOpenDoc?.(node.docPath)}
+          title="Open in Code Editor"
+        >
+          {node.title}
+        </h3>
         <button className="fm-pop-close" onClick={onClose}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2.5">
@@ -164,7 +172,7 @@ export default function FeatureMapPopover({
                 transition: 'transform 0.15s' }}>
               <path d="M3 1l5 4-5 4z" />
             </svg>
-            Collegate ({connectedNodes.length})
+            Connected ({connectedNodes.length})
           </button>
           {showConnected && (
             <ul className="fm-connected-list">

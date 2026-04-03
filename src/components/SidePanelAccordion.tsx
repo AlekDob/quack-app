@@ -449,7 +449,7 @@ export default function SidePanelAccordion({
   }, [focusedSection]);
 
   // Section IDs for reference (order is determined by DOM position, not dynamically)
-  const sectionIds = ['changes', 'context', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'features', 'sessions'];
+  const sectionIds = ['changes', 'context', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions'];
 
   // Handle forceExpandSection from parent
   useEffect(() => {
@@ -561,6 +561,20 @@ export default function SidePanelAccordion({
             onLoadChildren={onLoadChildren}
             onMentionFile={onMentionFile}
           />
+        </AccordionSection>
+
+        {/* Features — after File Explorer */}
+        <AccordionSection
+          id="features"
+          title="Features"
+          icon={icons.features}
+          isExpanded={focusedSection === "features"}
+          isFocused={focusedSection === "features"}
+          order={getOrder("features")}
+          category="features"
+          onToggle={() => toggleSection("features")}
+        >
+          <FeaturesPanel projectPath={rootPath} onOpenInEditor={onOpenInEditor} />
         </AccordionSection>
 
         {/* Agent Personality - Second accordion */}
@@ -730,20 +744,6 @@ export default function SidePanelAccordion({
             onDeleteHook={onDeleteHook}
             onToggleHook={onToggleHook}
           />
-        </AccordionSection>
-
-        {/* Features */}
-        <AccordionSection
-          id="features"
-          title="Features"
-          icon={icons.features}
-          isExpanded={focusedSection === "features"}
-          isFocused={focusedSection === "features"}
-          order={getOrder("features")}
-          category="features"
-          onToggle={() => toggleSection("features")}
-        >
-          <FeaturesPanel projectPath={rootPath} />
         </AccordionSection>
 
         {/* Sessions */}

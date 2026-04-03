@@ -22,10 +22,15 @@ export function parseAgentMentions(text: string): AgentMention[] {
   const mentions: AgentMention[] = [];
   // Match @ followed by word characters and hyphens, but NOT inside emails
   // Brain: fix-mention-regex-email-false-positive
+  // Skip structured mentions like @file:, @folder:, @skill: (they are NOT agent mentions)
   const mentionRegex = /(?<!\w)@([\w-]+)/g;
   let match;
 
   while ((match = mentionRegex.exec(text)) !== null) {
+    // Skip if followed by ':' — structured mention, not agent
+    const nextChar = text[match.index + match[0].length];
+    if (nextChar === ':') continue;
+
     mentions.push({
       agentName: match[1],
       startIndex: match.index,
