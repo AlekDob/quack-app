@@ -69,6 +69,7 @@ mod background_tasks; // 🚀 Background tasks for async agent execution
 mod claude_assets; // 📦 Claude Assets Manager for .claude/ folder management
 mod ide_integration; // 🖥️ Universal IDE integration (VS Code, Cursor, JetBrains, etc.)
 mod semantic_search; // 🔍 Semantic code search file watcher
+mod code_intel; // 🧠 Tree-sitter code intelligence (outline, definitions, references)
 mod git_watcher; // 🔀 Git branch change watcher
 mod teammate_watcher; // 👥 Teammate session stream watcher
 mod remote_api; // 🌐 Remote REST API for external tools and mobile dashboard
@@ -693,6 +694,10 @@ pub fn run() {
                 log::warn!("⚠️ Failed to install bundled commands: {}", e);
             }
 
+            // 🦆 Install bundled skills (feature-creator, quack-brain) with semver updates
+            if let Err(e) = skills::install_bundled_skills() {
+                log::warn!("⚠️ Failed to install bundled skills: {}", e);
+            }
 
             // Setup native menu for macOS
             #[cfg(target_os = "macos")]
@@ -1355,6 +1360,10 @@ pub fn run() {
             semantic_search::semantic_search_code,
             semantic_search::semantic_search_get_status,
             semantic_search::semantic_search_generate_embeddings,
+            // 🧠 Code Intelligence commands
+            code_intel::code_intel_outline,
+            code_intel::code_intel_find_definition,
+            code_intel::code_intel_find_references,
             // 🔀 Git Branch Watcher commands
             git_watcher::start_git_branch_watcher,
             git_watcher::stop_git_branch_watcher,

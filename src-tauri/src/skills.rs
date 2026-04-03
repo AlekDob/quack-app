@@ -3,6 +3,10 @@ use std::{fs, path::PathBuf};
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
+// Bundled skills — embedded at compile time from templates/skills/
+const BUNDLED_SKILL_FEATURE_CREATOR: &str = include_str!("../templates/skills/feature-creator.md");
+const BUNDLED_SKILL_QUACK_BRAIN: &str = include_str!("../templates/skills/quack-brain.md");
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SkillInfo {
     pub name: String,
@@ -300,4 +304,145 @@ fn check_skills_directory_impl(working_dir: Option<String>) -> Result<bool> {
     // Check for .claude/skills ONLY in the specified directory (don't traverse up)
     let skills_dir = current.join(".claude").join("skills");
     Ok(skills_dir.exists())
+}
+
+// ---------------------------------------------------------------------------
+// Built-in Skills Installation (semver-aware)
+// ---------------------------------------------------------------------------
+
+struct BundledSkill {
+    name: &'static str,
+    content: &'static str,
+}
+
+const BUNDLED_SKILLS: &[BundledSkill] = &[
+    BundledSkill {
+        name: "feature-creator",
+        content: BUNDLED_SKILL_FEATURE_CREATOR,
+    },
+    BundledSkill {
+        name: "quack-brain",
+        content: BUNDLED_SKILL_QUACK_BRAIN,
+    },
+];
+
+/// Extract `version: X.Y.Z` from YAML frontmatter in markdown content.
+/// Returns None if no frontmatter or no version field.
+fn extract_version(content: &str) -> Option<(u32, u32, u32)> {
+    // Check for frontmatter (starts with ---)
+    if !content.starts_with("---") {
+        return None;
+    }
+    // Find closing ---
+    let rest = &content[3..];
+    let end = rest.find("---")?;
+    let frontmatter = &rest[..end];
+
+    for line in frontmatter.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("version:") {
+            let ver_str = trimmed.trim_start_matches("version:").trim();
+            return parse_semver(ver_str);
+        }
+    }
+    None
+}
+
+/// Parse "1.2.3" into (1, 2, 3)
+fn parse_semver(s: &str) -> Option<(u32, u32, u32)> {
+    let parts: Vec<&str> = s.split('.').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    Some((
+        parts[0].parse().ok()?,
+        parts[1].parse().ok()?,
+        parts[2].parse().ok()?,
+    ))
+}
+
+/// Returns true if `bundled` version is newer than `local` version.
+fn is_newer(bundled: (u32, u32, u32), local: (u32, u32, u32)) -> bool {
+    bundled > local
+}
+
+/// Install bundled skills to ~/.claude/skills/ on app startup.
+///
+/// Semver-aware: installs if skill doesn't exist, or updates if bundled
+/// version is higher than the locally installed version.
+/// Preserves user customizations: if local file has no version field
+/// (meaning user edited it and removed frontmatter), skip update.
+pub fn install_bundled_skills() -> std::result::Result<(), String> {
+    let home_dir = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map_err(|_| "Could not determine home directory".to_string())?;
+
+    let global_skills_dir = PathBuf::from(home_dir).join(".claude").join("skills");
+
+    // Create directory if it doesn't exist
+    if !global_skills_dir.exists() {
+        fs::create_dir_all(&global_skills_dir)
+            .map_err(|e| format!("Failed to create global skills directory: {}", e))?;
+        log::info!("Created global skills directory: {:?}", global_skills_dir);
+    }
+
+    let mut installed = 0;
+    let mut updated = 0;
+    let mut skipped = 0;
+
+    for skill in BUNDLED_SKILLS {
+        let skill_dir = global_skills_dir.join(skill.name);
+        let skill_file = skill_dir.join("SKILL.md");
+
+        let bundled_version = extract_version(skill.content);
+
+        if skill_file.exists() {
+            // Skill exists — check version
+            let local_content = fs::read_to_string(&skill_file).unwrap_or_default();
+            let local_version = extract_version(&local_content);
+
+            match (bundled_version, local_version) {
+                (Some(bv), Some(lv)) if is_newer(bv, lv) => {
+                    // Bundled is newer — update
+                    fs::write(&skill_file, skill.content)
+                        .map_err(|e| format!("Failed to update skill '{}': {}", skill.name, e))?;
+                    log::info!(
+                        "Updated bundled skill '{}': {}.{}.{} -> {}.{}.{}",
+                        skill.name, lv.0, lv.1, lv.2, bv.0, bv.1, bv.2
+                    );
+                    updated += 1;
+                }
+                (Some(_bv), None) => {
+                    // Local has no version — user may have customized, skip
+                    log::debug!(
+                        "Bundled skill '{}' exists without version, skipping (user customized?)",
+                        skill.name
+                    );
+                    skipped += 1;
+                }
+                _ => {
+                    // Same version or local is newer — skip
+                    log::debug!("Bundled skill '{}' is up to date, skipping", skill.name);
+                    skipped += 1;
+                }
+            }
+        } else {
+            // Skill doesn't exist — fresh install
+            fs::create_dir_all(&skill_dir)
+                .map_err(|e| format!("Failed to create skill directory '{}': {}", skill.name, e))?;
+            fs::write(&skill_file, skill.content)
+                .map_err(|e| format!("Failed to install skill '{}': {}", skill.name, e))?;
+            log::info!("Installed bundled skill: {}", skill.name);
+            installed += 1;
+        }
+    }
+
+    if installed > 0 || updated > 0 {
+        log::info!(
+            "Bundled skills: {} installed, {} updated, {} skipped",
+            installed, updated, skipped
+        );
+    }
+
+    Ok(())
 }
