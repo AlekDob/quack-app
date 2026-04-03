@@ -188,6 +188,8 @@ struct ExecuteRequest {
     project_path: Option<String>,
     #[serde(default)]
     model: Option<String>,
+    #[serde(default)]
+    lead_session_id: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -965,6 +967,7 @@ async fn handle_execute(
         "projectName": project_name,
         "prompt": payload.prompt,
         "model": payload.model.as_deref().filter(|m| !m.is_empty()),
+        "leadSessionId": payload.lead_session_id,
         "source": "remote-api",
         "autoSend": true,
     });

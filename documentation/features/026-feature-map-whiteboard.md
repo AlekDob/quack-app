@@ -56,9 +56,21 @@ tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers]
 - `graph`: FeatureGraph | null — parsed feature graph (component state)
 - `loading/error`: fetch state (component state)
 - `clickInfo`: {nodeId, screenX, screenY} | null — popover anchor (component state)
+- `customPositions`: Map<nodeId, {x, y}> — user-dragged overrides (component state + localStorage)
 - `hovered`: string | null — node under cursor for dimming effect (canvas state)
 - `viewport`: {zoom, panX, panY} — canvas pan/zoom (canvas state)
 - `size`: {w, h} — ResizeObserver-tracked container dimensions (canvas state)
+- `draggingId`: string | null — node currently being dragged (canvas state)
+
+### Node Drag-to-Reposition
+- Nodes can be dragged to custom positions; auto-layout is the default
+- Custom positions persisted in `localStorage` key: `quack:featureMap:positions:{projectPath}`
+- Yellow dot indicator on nodes with custom positions
+- "Reset" button in header clears all overrides (visible only when custom positions exist)
+- Three interaction modes distinguished via separate refs with drag threshold:
+  - **Canvas pan**: mousedown on background → drag → pan viewport
+  - **Node click**: mousedown on node → no movement → release → open popover
+  - **Node drag**: mousedown on node → movement past threshold → reposition node
 
 ### Drag-to-Mention (Sidebar Panel)
 - MIME type: `application/quack-feature`

@@ -1,0 +1,155 @@
+/* Brain: 025-team-delegation-footer */
+.team-delegation-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  z-index: 1000;
+  width: 300px;
+  background: rgba(20, 22, 28, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5),
+              0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  padding: 12px;
+  animation: teamPopoverSlideUp 0.15s ease-out;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@keyframes teamPopoverSlideUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.team-delegation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.team-delegation-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.team-delegation-close:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.team-delegation-agents {
+  max-height: 160px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.team-delegation-agent-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  transition: background 0.1s;
+}
+
+.team-delegation-agent-row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.team-delegation-agent-row input[type="checkbox"] {
+  accent-color: #FF6B35;
+}
+
+.team-delegation-agent-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.team-delegation-agent-status {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.team-delegation-agent-status.idle {
+  color: #00D9FF;
+}
+
+.team-delegation-agent-status.busy {
+  color: #F7931E;
+}
+
+.team-delegation-empty {
+  text-align: center;
+  padding: 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.team-delegation-task {
+  width: 100%;
+  min-height: 60px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.9);
+  padding: 8px;
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.team-delegation-task::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.team-delegation-task:focus {
+  outline: none;
+  border-color: rgba(255, 107, 53, 0.5);
+}
+
+.team-delegation-error {
+  font-size: 11px;
+  color: #ff4444;
+  padding: 4px 0;
+}
+
+.team-delegation-submit {
+  width: 100%;
+  padding: 8px;
+  background: #FF6B35;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.team-delegation-submit:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.team-delegation-submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

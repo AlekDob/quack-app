@@ -1,0 +1,29 @@
+sequenceDiagram
+    participant U as User
+    participant P as TeamDelegationPopover
+    participant API as Remote API
+    participant T as Teammate Agent
+    participant L as Lead Session
+
+    U->>P: Click team icon in footer
+    P->>API: GET /api/agents
+    API-->>P: Agent list (id, label, status)
+    P->>P: Filter out current agent
+    U->>P: Select agents + write task
+    U->>P: Click "Delega"
+
+    loop For each selected agent
+        P->>API: POST /api/execute<br/>(agentId, prompt, leadSessionId, projectPath)
+        API->>T: Create session with [Team] prefix
+        API-->>P: { success, sessionId }
+    end
+
+    P->>U: Close popover
+
+    Note over T: Teammate works on task...
+
+    T->>T: Stream ends + leadSessionId present
+    T->>T: Auto-set status: done + completedAt
+    T->>API: POST /api/sessions/:leadSessionId/send
+    API->>L: Inject notification message
+    L-->>U: "🦆 [Team Complete] Agent X ha completato..."
