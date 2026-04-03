@@ -8,6 +8,7 @@ import HooksPanel from "./HooksPanel";
 import { CommandsPanel } from "./CommandsPanel";
 import { RulesPanel } from "./RulesPanel";
 import { SessionsPanel } from "./SessionsPanel";
+import FeaturesPanel from "./FeaturesPanel";
 import { useRules } from "../hooks/useRules";
 import { useSlashCommands } from "../hooks/useSlashCommands";
 import { useMCPServers } from "../hooks/useMCPServers";
@@ -30,6 +31,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   droids: '#4ecdc4',      // Teal - automation
   rules: '#60a5fa',       // Blue - governance
   hooks: '#a78bfa',       // Purple - events
+  features: '#FFD700',    // Gold - feature map
   sessions: '#00d9ff',    // Cyan - sessions
   mcp: '#34d399',         // Green - servers
   commands: '#f472b6',    // Pink - commands
@@ -184,6 +186,19 @@ const icons = {
     <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
       <path d="M5 3h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
       <path d="M7 7h6M7 10h6M7 13h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
+  features: (
+    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+      <circle cx="10" cy="10" r="3" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="5" cy="5" r="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="15" cy="5" r="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="5" cy="15" r="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="15" cy="15" r="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <line x1="7.5" y1="8" x2="6.5" y2="6.5" stroke="currentColor" strokeWidth="1" />
+      <line x1="12.5" y1="8" x2="13.5" y2="6.5" stroke="currentColor" strokeWidth="1" />
+      <line x1="7.5" y1="12" x2="6.5" y2="13.5" stroke="currentColor" strokeWidth="1" />
+      <line x1="12.5" y1="12" x2="13.5" y2="13.5" stroke="currentColor" strokeWidth="1" />
     </svg>
   ),
   sessions: (
@@ -434,7 +449,7 @@ export default function SidePanelAccordion({
   }, [focusedSection]);
 
   // Section IDs for reference (order is determined by DOM position, not dynamically)
-  const sectionIds = ['changes', 'context', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions'];
+  const sectionIds = ['changes', 'context', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'features', 'sessions'];
 
   // Handle forceExpandSection from parent
   useEffect(() => {
@@ -715,6 +730,20 @@ export default function SidePanelAccordion({
             onDeleteHook={onDeleteHook}
             onToggleHook={onToggleHook}
           />
+        </AccordionSection>
+
+        {/* Features */}
+        <AccordionSection
+          id="features"
+          title="Features"
+          icon={icons.features}
+          isExpanded={focusedSection === "features"}
+          isFocused={focusedSection === "features"}
+          order={getOrder("features")}
+          category="features"
+          onToggle={() => toggleSection("features")}
+        >
+          <FeaturesPanel projectPath={rootPath} />
         </AccordionSection>
 
         {/* Sessions */}

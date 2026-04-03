@@ -66,6 +66,13 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = (() =
       defaultKeys: buildShortcut("E"),
       currentKeys: buildShortcut("E"),
     },
+    toggleFeatureMap: {
+      id: "toggleFeatureMap" as const,
+      label: "Toggle Feature Map",
+      description: "Open or close the Feature Map whiteboard",
+      defaultKeys: buildShortcut("M", true),
+      currentKeys: buildShortcut("M", true),
+    },
     openTerminalWindow: {
       id: "openTerminalWindow" as const,
       label: "Terminal Window",

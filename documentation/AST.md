@@ -175,6 +175,10 @@ Exported symbols per file. Generated 2026-03-13.
 - `TerminalMetadata`, `STORAGE_KEY`, `TABS_BY_TERMINAL_KEY`, `NATIVE_TERMINALS_STORAGE_KEY`
 - `saveTerminalsToStorage()`, `loadTerminalsFromStorage()`, `loadActiveAgentsWithData()`, `migrateToActiveAgentsIndex()`
 
+### services/featureMapService.ts
+- `parseFeatureDoc()`, `buildFeatureGraph()`, `calculateLinks()`, `parseFilesTable()`
+- `FeatureNode`, `FeatureFile`, `FeatureLink`, `FeatureGraph` (types in `featureMapTypes.ts`)
+
 ### services/brainFileService.ts
 - `BrainEntry`, `getProjectDocPath()`, `initBrainStructure()`, `saveBrainEntry()`, `appendDiaryEntry()`
 - `listBrainEntries()`, `readBrainEntry()`, `openBrainFolder()`, `getBrainRootPath()`
@@ -263,7 +267,8 @@ Exported symbols per file. Generated 2026-03-13.
 - `useProjectDashboard()` -- `GitStatusData`, `GitCommit`, `ProjectDashboardData`
 
 ### Tab & UI Hooks
-- `useAutomationTab()`, `useKanbanTab()`, `useOfficeTab()`, `useCodeEditorTab()`, `useDocsTab()`, `useClaudeAssetsTab()`
+- `useAutomationTab()`, `useKanbanTab()`, `useOfficeTab()`, `useFeatureMapTab()`, `useCodeEditorTab()`, `useDocsTab()`, `useClaudeAssetsTab()`
+- `useFeatureMapData()` — fetches feature docs via Tauri, builds FeatureGraph
 - `useProjectDashboardTab()`, `useTabPopoutWindow()`, `useDrawerAnimation()`
 - `usePipWindow()`, `useWindowFocus()`, `useGlobalKeyboardShortcuts()`
 
@@ -351,6 +356,14 @@ Exported symbols per file. Generated 2026-03-13.
 ### components/modal-steps/ (6 files)
 - `CreateRuleModal`, `StepProjectContext`, `StepProjectSelection`, `StepProgress`, `StepStarterBundles`
 - `types.ts`: `ModalStep`, `ActiveProject`, `StepProjectContextProps`, `SkillMetadata`, `DroidMetadata`
+
+### components/featureMap/ (6 files)
+- `FeatureMapCanvas`: PixiJS canvas with radial node layout, pan/zoom, hover highlighting, click selection
+- `FeatureMapView`: Main container composing data hook + canvas + detail panel + loading/error/empty states
+- `FeatureMapDetailPanel`: Slide-in sidebar with feature details, file list, connected features
+- `featureMapLayout.ts`: `calculateRadialLayout()` — concentric rings positioning
+- `featureMapTypes.ts`: `FeatureNode`, `FeatureFile`, `FeatureLink`, `FeatureGraph`, `NodePosition`
+- `FeatureMapView.css`: Dark theme styles
 
 ### components/office/ (10 files)
 - `OfficeActionMenu`, `OfficeTooltip`, `OfficeView`

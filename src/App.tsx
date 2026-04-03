@@ -83,8 +83,10 @@ import ClaudeAssetsTabView from "./views/ClaudeAssetsTabView";
 import KanbanTabView from "./views/KanbanTabView";
 import AutomationTabView from "./views/AutomationTabView";
 import OfficeTabView from "./views/OfficeTabView";
+import FeatureMapTabView from "./views/FeatureMapTabView";
 import CodeEditorTabView from "./views/CodeEditorTabView";
 import { useOfficeTab } from "./hooks/useOfficeTab";
+import { useFeatureMapTab } from "./hooks/useFeatureMapTab";
 import { useCodeEditorTab, codeEditorTabId } from "./hooks/useCodeEditorTab";
 import ProjectDashboardTabView from "./views/ProjectDashboardTabView";
 import ImageTabView from "./views/ImageTabView";
@@ -449,6 +451,9 @@ function AppContent() {
 
   // Office tab management
   const { openOfficeTab } = useOfficeTab();
+
+  // Feature Map tab management
+  const { openFeatureMapTab } = useFeatureMapTab();
 
   // Code Editor tab management
   // Brain: pattern-code-editor-tab
@@ -868,6 +873,7 @@ function AppContent() {
   // This replaces the old isKanbanTabActive overlay approach
   const isKanbanTabActive = activeTabId === 'kanban-board';
   const isOfficeTabActive = activeTabId === 'office-view';
+  const isFeatureMapTabActive = activeTabId === 'feature-map';
   const isCodeEditorTabActive = activeTabId.startsWith('code-editor');
   // Brain: fix-office-webgl-shader-remount
   // Track if office was ever opened so we keep OfficeView mounted (hidden)
@@ -2552,6 +2558,31 @@ function AppContent() {
       return;
     }
 
+    // Brain: 025-team-delegation-footer — enrich @team with quack-remote instructions
+    let resolvedContent = content;
+    if (content.includes('@team')) {
+      const teamHint = [
+        '[TEAM DELEGATION MODE — MANDATORY INSTRUCTIONS]',
+        'You MUST use the quack-remote skill to delegate this task to other agents.',
+        '',
+        'CRITICAL: You MUST include "leadSessionId" in the POST body. This is what makes it a TEAM session (not a Remote session).',
+        `Your leadSessionId is: "${activeSessionId}"`,
+        '',
+        'Exact curl template (ALWAYS use this format):',
+        '```',
+        'curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \\',
+        `  -d '{"agentId":"AGENT_ID_HERE","prompt":"TASK_HERE","leadSessionId":"${activeSessionId}"}' \\`,
+        '  http://127.0.0.1:$PORT/api/execute',
+        '```',
+        '',
+        'Steps: 1) Read quack-remote config from ~/Library/Application\\ Support/com.quack.terminal/quack-remote.json',
+        '2) GET /api/agents to find the right agent(s)',
+        `3) POST /api/execute with leadSessionId="${activeSessionId}" — DO NOT OMIT THIS FIELD`,
+        '',
+      ].join('\n');
+      resolvedContent = teamHint + content.replace(/@team\s*/g, '').trim();
+    }
+
     // 🦆 DIAGNOSTIC: Check if previous assistant message is incomplete (late-render bug)
     {
       const sessionMsgs = chatSessions.get(activeSessionId) ?? [];
@@ -2700,10 +2731,12 @@ function AppContent() {
     // Create user message
     const attachments = options?.attachments ?? [];
     const attachmentLines = attachments.map((item, index) => `Attachment ${index + 1}: ${item.path}`);
+    // Brain: 025-team-delegation-footer — use enriched content for SDK prompt
+    const sdkContent = resolvedContent;
     const contentWithAttachments =
       attachmentLines.length > 0
-        ? `${content}\n\nAttachments:\n${attachmentLines.join('\n')}`
-        : content;
+        ? `${sdkContent}\n\nAttachments:\n${attachmentLines.join('\n')}`
+        : sdkContent;
 
     const userMessage: ChatMessage = {
       id: `msg-${Date.now()}-user-${Math.random().toString(36).substr(2, 9)}`,
@@ -5594,7 +5627,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           leadSessionId: leadSessionId || undefined,
         });
 
-        console.log(`📱 [Remote Execute] Session created: ${newSession.id}`);
+        console.log(`📱 [Remote Execute] Session created: ${newSession.id}, leadSessionId: ${leadSessionId ?? 'none'}`);
 
         // Set active and send
         setActiveId(agentId);
@@ -9828,6 +9861,22 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [openOfficeTab, activeTabId, tabs]);
 
+  // Handler for opening/focusing Feature Map tab (toggle with Cmd+Shift+M)
+  const handleOpenFeatureMapTab = useCallback(() => {
+    if (activeTabId === 'feature-map') {
+      setActiveTabId('chat');
+      return;
+    }
+    const existingTab = tabs.find(t => t.type === 'feature-map');
+    if (existingTab) {
+      setActiveTabId('feature-map');
+    } else {
+      const newTab = openFeatureMapTab();
+      setTabs(prevTabs => [...prevTabs, newTab]);
+      setActiveTabId('feature-map');
+    }
+  }, [openFeatureMapTab, activeTabId, tabs]);
+
   // Handler for opening/focusing Code Editor tab (toggle with Cmd+E, per-file tabs)
   // Brain: pattern-code-editor-tab
   const handleOpenCodeEditorTab = useCallback((filePath?: string) => {
@@ -10444,6 +10493,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     toggleKanban: handleOpenKanbanTab,
     toggleAutomation: handleOpenAutomationTab,
     toggleOffice: handleOpenOfficeTab,
+    toggleFeatureMap: handleOpenFeatureMapTab,
     toggleCodeEditor: useCallback(() => handleOpenCodeEditorTab(), [handleOpenCodeEditorTab]),
     openTerminalWindow: handleCreateAgentTerminal,  // Cmd+T opens Terminal Window App
     newAgent: handleOpenNewTerminalModal,           // Cmd+N opens New Agent modal
@@ -11886,7 +11936,7 @@ You have access to all Bash tools to execute git commands like:
 
       <div
         ref={appShellRef}
-        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive && !isOfficeTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) || isOfficeTabActive ? 'side-panel-collapsed' : ''} ${terminals.length === 0 && persistedProjects.size === 0 ? 'no-agents sidebar-hidden' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''} ${isOfficeTabActive ? 'office-mode' : ''} ${isChatFullscreen ? 'chat-fullscreen' : ''}`}
+        className={`app-shell ${sidePanelCollapsed || (!activeId && !isKanbanTabActive && !isOfficeTabActive && !isFeatureMapTabActive) || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) || isOfficeTabActive || isFeatureMapTabActive ? 'side-panel-collapsed' : ''} ${terminals.length === 0 && persistedProjects.size === 0 ? 'no-agents sidebar-hidden' : ''} ${isKanbanTabActive ? 'kanban-mode' : ''} ${isOfficeTabActive || isFeatureMapTabActive ? 'office-mode' : ''} ${isChatFullscreen ? 'chat-fullscreen' : ''}`}
         style={{ gridTemplateColumns }}
       >
         {/* Hide sidebar when no projects/agents */}
@@ -11986,7 +12036,7 @@ You have access to all Bash tools to execute git commands like:
         />}
 
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
-        <section className={`terminal-pane ${activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || isOfficeTabActive ? 'full-width-tab' : ''}`}>
+        <section className={`terminal-pane ${activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || isOfficeTabActive || isFeatureMapTabActive ? 'full-width-tab' : ''}`}>
           {terminals.length === 0 && persistedProjects.size === 0 ? (
             /* Empty state when no projects at all - show image or guide */
             <div
@@ -12291,6 +12341,8 @@ You have access to all Bash tools to execute git commands like:
               isAutomationActive={tabs.some(t => t.type === 'automation' && t.id === activeTabId)}
               onOfficeClick={handleOpenOfficeTab}
               isOfficeActive={isOfficeTabActive}
+              onFeatureMapClick={handleOpenFeatureMapTab}
+              isFeatureMapActive={isFeatureMapTabActive}
               onCodeEditorClick={() => handleOpenCodeEditorTab()}
               isCodeEditorActive={isCodeEditorTabActive}
               onStoreClick={() => setShowStoreDrawer(!showStoreDrawer)}
@@ -12437,6 +12489,20 @@ You have access to all Bash tools to execute git commands like:
                     }}
                     onSessionClick={handleSessionClick}
                     onExitOffice={() => setActiveTabId('chat')}
+                  />
+                );
+              })()}
+
+              {/* Feature Map Tab View — pure SVG, no WebGL context issues */}
+              {(() => {
+                const fmTab = tabs.find(t => t.type === 'feature-map');
+                if (!fmTab) return null;
+                return (
+                  <FeatureMapTabView
+                    tab={fmTab}
+                    isActive={isFeatureMapTabActive}
+                    projectPath={activeTerminal?.cwd}
+                    onOpenFileInEditor={handleOpenCodeEditorTab}
                   />
                 );
               })()}
@@ -13185,7 +13251,7 @@ You have access to all Bash tools to execute git commands like:
           onSessionClick={handleSessionClick}
           activeSessionId={activeSessionId ?? undefined}
           // Collapse props
-          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) || isOfficeTabActive}
+          isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) || isOfficeTabActive || isFeatureMapTabActive}
           onToggleCollapse={() => {
             if (isKanbanTabActive) {
               setKanbanSidePanelExpanded(!kanbanSidePanelExpanded);

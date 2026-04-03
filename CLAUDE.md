@@ -173,4 +173,5 @@ Full knowledge store: `documentation/` (project) + `~/.quack/brain/` (global). U
 - N/A (reads from Git via Tauri commands) (003-changes-panel-branch-commits)
 
 ## Recent Changes
+- 004-feature-map-whiteboard: Added TypeScript strict (React 18 frontend) + PixiJS (@pixi/react), Tauri v2 invoke API (list_directory, read_file_content)
 - 001-fulltext-search: Added Rust 1.75+ (Tauri backend), TypeScript strict (React frontend) + Tauri v2, walkdir, rayon, ignore (gitignore support), React 18, Zustand

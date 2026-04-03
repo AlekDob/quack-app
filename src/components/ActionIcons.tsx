@@ -50,6 +50,9 @@ interface ActionIconsProps {
   // Code Editor
   onCodeEditorClick?: () => void;
   isCodeEditorActive?: boolean;
+  // Feature Map
+  onFeatureMapClick?: () => void;
+  isFeatureMapActive?: boolean;
   // Quack Store
   onStoreClick?: () => void;
   isStoreOpen?: boolean;
@@ -73,6 +76,8 @@ function ActionIcons({
   isOfficeActive = false,
   onCodeEditorClick,
   isCodeEditorActive = false,
+  onFeatureMapClick,
+  isFeatureMapActive = false,
   onStoreClick,
   isStoreOpen = false,
 }: ActionIconsProps) {
@@ -400,18 +405,25 @@ function ActionIcons({
         </KeyboardShortcutTooltip>
       )}
 
-      {/* Code Editor Icon */}
-      {onCodeEditorClick && (
-        <KeyboardShortcutTooltip label="Editor" shortcut={formatShortcut("⌘E")}>
+      {/* Feature Map Icon */}
+      {onFeatureMapClick && (
+        <KeyboardShortcutTooltip label="Feature Map" shortcut={formatShortcut("⇧⌘M")}>
           <button
             type="button"
-            className={`action-icon ${isCodeEditorActive ? 'active' : ''}`}
-            onClick={onCodeEditorClick}
-            aria-label={`Open Editor (${formatShortcut("⌘E")})`}
+            className={`action-icon ${isFeatureMapActive ? 'active' : ''}`}
+            onClick={onFeatureMapClick}
+            aria-label="Open Feature Map"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="16 18 22 12 16 6" />
-              <polyline points="8 6 2 12 8 18" />
+              <circle cx="12" cy="12" r="3" />
+              <circle cx="5" cy="6" r="2" />
+              <circle cx="19" cy="6" r="2" />
+              <circle cx="5" cy="18" r="2" />
+              <circle cx="19" cy="18" r="2" />
+              <line x1="9.5" y1="10.5" x2="6.5" y2="7.5" />
+              <line x1="14.5" y1="10.5" x2="17.5" y2="7.5" />
+              <line x1="9.5" y1="13.5" x2="6.5" y2="16.5" />
+              <line x1="14.5" y1="13.5" x2="17.5" y2="16.5" />
             </svg>
           </button>
         </KeyboardShortcutTooltip>
