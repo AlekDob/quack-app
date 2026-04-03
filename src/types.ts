@@ -593,6 +593,7 @@ export interface OllamaModel {
 export interface AgentModePresets {
   bypass: ModePreset;
   plan: ModePreset;
+  ask: ModePreset;
   debug: ModePreset;
   chat: ModePreset;
 }
@@ -831,6 +832,19 @@ export interface PendingUserQuestion {
   input: AskUserQuestionInput;
   timestamp: number;
   answered: boolean;
+}
+
+/**
+ * State for a pending tool permission request (Ask mode)
+ * Brain: pattern-permission-modes (Ask mode)
+ */
+export interface PendingToolPermission {
+  requestId: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  agentId: string;
+  sessionKey?: string;
+  timestamp: number;
 }
 
 // Slash Commands types

@@ -183,6 +183,11 @@ const defaultAgentModePresets: AgentModePresets = {
     thinkingMode: 'hard', // Forces extended thinking for root cause analysis
     effort: 'high',
   },
+  ask: {
+    model: 'opus46',
+    thinkingMode: 'auto',
+    effort: 'medium',
+  },
   chat: {
     model: 'sonnet45',
     thinkingMode: 'auto',
@@ -336,7 +341,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
-        version: 6,
+        version: 7,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
@@ -355,7 +360,7 @@ export const useSettingsStore = create<SettingsState>()(
             }
             // Normalize legacy model IDs in mode presets
             if (persisted.agentModePresets) {
-              for (const mode of ['bypass', 'plan', 'debug', 'chat'] as const) {
+              for (const mode of ['bypass', 'plan', 'ask', 'debug', 'chat'] as const) {
                 if (persisted.agentModePresets[mode]?.model) {
                   persisted.agentModePresets[mode].model = normalizeModelId(persisted.agentModePresets[mode].model);
                 }
@@ -385,8 +390,14 @@ export const useSettingsStore = create<SettingsState>()(
               persisted.agentModePresets.chat = defaultAgentModePresets.chat;
             }
           }
-          // v6: Add Typography settings (font size presets + font family)
+          // v6: Add Ask mode preset (Opus, medium effort, supervised execution)
           if (version < 6) {
+            if (persisted.agentModePresets && !persisted.agentModePresets.ask) {
+              persisted.agentModePresets.ask = defaultAgentModePresets.ask;
+            }
+          }
+          // v7: Add Typography settings (font size presets + font family)
+          if (version < 7) {
             if (!persisted.typography) {
               persisted.typography = {
                 ...DEFAULT_TYPOGRAPHY,

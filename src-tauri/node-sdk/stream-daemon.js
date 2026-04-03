@@ -705,7 +705,7 @@ async function handleQuery(cmd) {
     queryId, prompt, model = 'opus', permissionMode, thinkingMode,
     cwd, sessionId, agents, attachments, outputFormat, effort,
     mcpServers: passedMcpServers, allowedTools, teamContext, ideContext,
-    provider, providerBaseUrl, providerApiKey, debugMode, chatMode,
+    provider, providerBaseUrl, providerApiKey, debugMode, chatMode, askMode,
   } = cmd;
 
   const abortController = new AbortController();
@@ -757,8 +757,15 @@ async function handleQuery(cmd) {
       'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
       'BashOutput', 'KillShell', 'ExitPlanMode', 'AskUserQuestion',
     ];
-    const resolvedAllowedTools = allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0
+    // 🛡️ Ask mode: only auto-approve read-only tools + AskUserQuestion.
+    // Write/Edit/Bash/etc. must fall through to canUseTool for user approval.
+    // Brain: pattern-permission-modes (Ask mode — SDK allowedTools gate)
+    const askModeAllowedTools = [
+      'Read', 'Glob', 'Grep', 'AskUserQuestion', 'ExitPlanMode', 'TodoWrite',
+    ];
+    const baseAllowedTools = allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0
       ? allowedTools : defaultAllowedTools;
+    const resolvedAllowedTools = askMode ? askModeAllowedTools : baseAllowedTools;
 
     // Brain: gotcha-sdk-bundled-cli-200k-context-window
     // The native Claude CLI binary handles prompt caching ~20x more efficiently
@@ -919,7 +926,31 @@ ${hintsBlock}
           }
         }
 
-        // Default: allow
+        // 🛡️ Ask mode: prompt user before allowing tool execution
+        // Brain: pattern-permission-modes (Ask = default + no skill injection)
+        if (askMode) {
+          diag(`canUseTool ASK MODE: tool=${toolName} for query=${queryId}`);
+          try {
+            const response = await requestFromFrontend(queryId, 'tool_permission_request', {
+              toolName,
+              input,
+            });
+            const answers = response.answers || response;
+            const isApproved = answers.approved === 'true' || answers.approved === true;
+            if (isApproved) {
+              log('INTERACT', `[INFO] Tool ${toolName} APPROVED by user for query=${queryId}`);
+              return { behavior: 'allow', updatedInput: input };
+            } else {
+              log('INTERACT', `[INFO] Tool ${toolName} DENIED by user for query=${queryId}`);
+              return { behavior: 'deny', message: answers.feedback || `User denied ${toolName}` };
+            }
+          } catch (error) {
+            log('INTERACT', `[WARN] Tool permission request FAILED for query=${queryId}: ${error.message}`);
+            return { behavior: 'deny', message: `Failed to get tool permission: ${error.message}` };
+          }
+        }
+
+        // Default: allow (Build mode, Chat mode uses prompt-level enforcement)
         return { behavior: 'allow', updatedInput: input };
       },
     };
@@ -1072,6 +1103,31 @@ ${hintsBlock}
           return { behavior: 'deny', message: `Failed to get plan approval: ${error.message}` };
         }
       }
+      // 🛡️ Ask mode: prompt user before allowing tool execution
+      // Brain: pattern-permission-modes (Ask = default + no skill injection)
+      if (askMode) {
+        diag(`canUseTool ASK MODE (subprocess): tool=${toolName} for query=${queryId}`);
+        try {
+          const response = await requestFromFrontend(queryId, 'tool_permission_request', {
+            toolName,
+            input,
+          });
+          const answers = response.answers || response;
+          const isApproved = answers.approved === 'true' || answers.approved === true;
+          if (isApproved) {
+            log('INTERACT', `[INFO] Tool ${toolName} APPROVED by user for query=${queryId}`);
+            return { behavior: 'allow', updatedInput: input };
+          } else {
+            log('INTERACT', `[INFO] Tool ${toolName} DENIED by user for query=${queryId}`);
+            return { behavior: 'deny', message: answers.feedback || `User denied ${toolName}` };
+          }
+        } catch (error) {
+          log('INTERACT', `[WARN] Tool permission request FAILED for query=${queryId}: ${error.message}`);
+          return { behavior: 'deny', message: `Failed to get tool permission: ${error.message}` };
+        }
+      }
+
+      // Default: allow (Build mode, Chat mode uses prompt-level enforcement)
       return { behavior: 'allow', updatedInput: input };
     };
 

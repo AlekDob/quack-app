@@ -39,7 +39,7 @@ export function getProviderRequestFields(remoteModels?: ModelConfig[], modelOver
 export interface ClaudeSDKOptions {
   model?: string;
   thinkingMode?: string;
-  permissionMode?: 'plan' | 'act' | 'bypass' | 'debug';
+  permissionMode?: 'plan' | 'act' | 'bypass' | 'ask' | 'debug';
   sessionId?: string;
   workingDirectory?: string;
   mcpServers?: Record<string, {
@@ -269,7 +269,9 @@ export async function* streamClaudeMessage(
         ? 'bypassPermissions'
         : permissionMode === 'plan'
           ? 'plan'
-          : undefined; // 'act' mode = undefined = auto-approve in SDK
+          : permissionMode === 'ask'
+            ? 'default'
+            : undefined; // 'act' mode = undefined = auto-approve in SDK
 
     // Load MCP servers from .mcp.json (if not explicitly provided)
     console.log('🔍 [MCP DEBUG] Checking if mcpServers provided in options:', !!options.mcpServers);

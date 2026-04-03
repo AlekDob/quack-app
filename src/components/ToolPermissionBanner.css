@@ -1,0 +1,87 @@
+/* Brain: pattern-permission-modes (Ask mode) */
+
+.tp-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 12px;
+  background: rgba(245, 158, 11, 0.05);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  border-left: 2px solid rgba(245, 158, 11, 0.6);
+  border-radius: 6px;
+  margin: 4px 8px;
+  animation: tp-in 0.25s ease-out, tp-pulse 2s ease-in-out 0.3s 3;
+}
+
+@keyframes tp-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes tp-pulse {
+  0%, 100% { border-left-color: rgba(245, 158, 11, 0.6); background: rgba(245, 158, 11, 0.05); }
+  50% { border-left-color: rgba(245, 158, 11, 0.9); background: rgba(245, 158, 11, 0.09); }
+}
+
+.tp-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tp-tool {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(245, 158, 11, 0.8);
+  flex-shrink: 0;
+}
+
+.tp-target {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.tp-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.tp-btn {
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.tp-deny {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.tp-deny:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.tp-allow {
+  color: rgba(245, 158, 11, 0.75);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.tp-allow:hover {
+  background: rgba(245, 158, 11, 0.18);
+  color: rgba(245, 158, 11, 0.95);
+}

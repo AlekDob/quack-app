@@ -2,19 +2,20 @@
 type: pattern
 project: quack-app
 created: 2026-02-28
-last_verified: 2026-03-24
-tags: [permission-mode, build, plan, debug, chat, agent-mode, sdk]
+last_verified: 2026-04-03
+tags: [permission-mode, build, plan, ask, debug, chat, agent-mode, sdk]
 ---
-# Permission Modes System (Build / Plan / Debug / Chat)
+# Permission Modes System (Build / Plan / Ask / Debug / Chat)
 
 ## Overview
 
-Quack has four agent permission modes that control SDK behavior and system prompt:
+Quack has five agent permission modes that control SDK behavior and system prompt:
 
 | Mode | Internal Value | SDK permissionMode | Default Model | Default Effort | Color | Icon |
 |------|---------------|-------------------|---------------|----------------|-------|------|
 | **Build** | `bypass` | `bypassPermissions` | Opus 4.6 | medium | `#f87171` (red) | ⬢ |
 | **Plan** | `plan` | `plan` | Opus 4.6 | medium | `#60a5fa` (blue) | ◇ |
+| **Ask** | `ask` | `default` | Opus 4.6 | medium | `#f59e0b` (amber) | 🛡️ |
 | **Debug** | `debug` | `bypassPermissions` | Opus 4.6 | high | `#22c55e` (green) | ⬡ |
 | **Chat** | `chat` | `default` | Sonnet 4.5 | low | `#00D9FF` (cyan) | ○ |
 
@@ -39,6 +40,7 @@ User selects mode in UI (footer dropdown or Shift+Tab)
 Frontend  → Rust           → SDK/Daemon
 'bypass'  → bypassPermissions         (no confirmations)
 'plan'    → plan                       (planning only)
+'ask'     → default                    (asks before tool use, no skill injection)
 'debug'   → bypassPermissions + debugMode: true
 'chat'    → default        + chatMode: true  (asks before tool use)
 'act'     → (omitted)      = auto-approve
@@ -116,4 +118,24 @@ When `chatMode === true`, the Node.js layer injects the `chat-interaction` skill
 
 New modes require `version` bump in `settingsStore.ts` persist config so existing users get the new preset via migration. Also add a `?? fallback` in `ModePresetCard` for defensive rendering.
 
-Current version: **5** (added Chat mode preset).
+Current version: **7** (v6: added Ask mode preset, v7: added Typography settings).
+
+### Ask Mode
+
+Ask mode is a "supervised Build" — same power (Opus 4.6, medium effort) but SDK `permissionMode: 'default'` which asks the user to approve each tool use. No system prompt injection (no debugMode, no chatMode). No banner in ChatView. Silent mode like Build.
+
+**Key difference from Chat:**
+- Chat uses Sonnet + low effort + chatMode skill injection → lightweight conversational
+- Ask uses Opus + medium effort + no injection → full coding power with supervision
+
+**Implementation details:**
+- Rust passes `askMode: true` flag to daemon (like `debugMode` / `chatMode`)
+- Daemon's `canUseTool` checks `askMode` → emits `tool_permission_request` via `requestFromFrontend()`
+- Rust routes `tool_permission_request` events to frontend via Tauri emit
+- Frontend shows `ToolPermissionBanner` (amber, inline, above ChatInput)
+- User clicks Allow/Deny → response via `answer_user_question` Tauri command (reused)
+- Daemon resolves the pending Promise → `canUseTool` returns `allow` or `deny`
+
+**Files added:**
+- `src/components/ToolPermissionBanner.tsx` — compact Allow/Deny UI
+- `src/components/ToolPermissionBanner.css` — amber-themed styling

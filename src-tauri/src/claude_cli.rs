@@ -588,6 +588,29 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                 }
             }
 
+            "tool_permission_request" => {
+                // Ask mode: daemon requests user permission before tool execution
+                if let Some(ref qid) = query_id {
+                    let queries = DAEMON_QUERIES.lock().await;
+                    if let Some(state) = queries.get(qid.as_str()) {
+                        let request_id = msg.get("requestId").and_then(|r| r.as_str()).unwrap_or("");
+                        let tool_name = msg.get("toolName").and_then(|t| t.as_str()).unwrap_or("unknown");
+                        log::info!("[DAEMON:INTERACT] ToolPermissionRequest query={} requestId={} tool={} -> emitting to frontend", qid, request_id, tool_name);
+                        state.waiting_for_user.store(true, std::sync::atomic::Ordering::Relaxed);
+
+                        let payload = serde_json::json!({
+                            "requestId": request_id,
+                            "toolName": tool_name,
+                            "input": msg.get("input").cloned().unwrap_or(serde_json::Value::Null),
+                            "agentId": state.agent_id,
+                            "sessionKey": state.session_key,
+                            "queryId": qid
+                        });
+                        let _ = state.app.emit("tool-permission-request", payload);
+                    }
+                }
+            }
+
             "plan_approval_request" => {
                 if let Some(ref qid) = query_id {
                     let queries = DAEMON_QUERIES.lock().await;
@@ -833,6 +856,17 @@ pub enum ClaudeEvent {
         #[serde(rename = "requestId")]
         request_id: String,
         questions: Vec<AskUserQuestionQuestion>,
+        #[serde(flatten)]
+        extra: serde_json::Value,
+    },
+    // ToolPermissionRequest event - Ask mode requires user approval for each tool
+    #[serde(rename = "tool_permission_request")]
+    ToolPermissionRequest {
+        #[serde(rename = "requestId")]
+        request_id: String,
+        #[serde(rename = "toolName")]
+        tool_name: String,
+        input: serde_json::Value,
         #[serde(flatten)]
         extra: serde_json::Value,
     },
@@ -1975,6 +2009,7 @@ async fn send_message_via_daemon(
     let permission_value = request.permission_mode.as_ref().and_then(|mode| match mode.as_str() {
         "bypass" => Some("bypassPermissions".to_string()),
         "plan" => Some("plan".to_string()),
+        "ask" => Some("default".to_string()),
         "debug" => Some("bypassPermissions".to_string()),
         "chat" => Some("default".to_string()),
         "act" => None,
@@ -1994,6 +2029,9 @@ async fn send_message_via_daemon(
 
     if let Some(perm) = permission_value {
         query_cmd["permissionMode"] = serde_json::Value::String(perm);
+    }
+    if request.permission_mode.as_deref() == Some("ask") {
+        query_cmd["askMode"] = serde_json::Value::Bool(true);
     }
     if request.permission_mode.as_deref() == Some("debug") {
         query_cmd["debugMode"] = serde_json::Value::Bool(true);

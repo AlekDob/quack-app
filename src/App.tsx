@@ -197,6 +197,7 @@ import type {
   KanbanTask,
   KanbanTaskInitialValues,
   AskUserQuestionAnswers,
+  PendingToolPermission,
   AutomationJob,
   ContextUsageCategory,
 } from "./types";
@@ -570,6 +571,10 @@ function AppContent() {
   // Maps requestId -> { agentId, sessionKey, questions } for responding via stdin
   // 🦆 FIX: Added sessionKey to track which specific session has the pending question
   const [pendingUserQuestions, setPendingUserQuestions] = useState<Map<string, { agentId: string; sessionKey?: string; questions: unknown[] }>>(new Map());
+
+  // 🛡️ ToolPermission: Track pending tool permission requests (Ask mode)
+  // Brain: pattern-permission-modes (Ask mode)
+  const [pendingToolPermissions, setPendingToolPermissions] = useState<Map<string, PendingToolPermission>>(new Map());
 
   // 📋 PlanApproval: Track pending plan approval requests from ExitPlanMode
   // Maps requestId -> { agentId, sessionKey, plan } for responding via stdin
@@ -2933,22 +2938,17 @@ function AppContent() {
       // The messageKey is the session ID, which is what we need to use
       // Brain: fix-remote-team-session-tracking
       // Save messageCount so Remote API polling can detect progress.
-      // Auto-done ONLY for remote-execute sessions (title starts with "[Remote]")
-      // to avoid closing interactive sessions after the first response.
+      // NOTE: Auto-done for remote sessions removed — a single response doesn't mean
+      // the task is complete. The manager or user decides when to mark done.
       try {
         const finalMessages = chatSessions.get(messageKey) ?? [];
-        const isRemoteSession = capturedSession?.title?.startsWith('[Remote]');
         const completionUpdate: Record<string, unknown> = {
           claudeSessionId: response.session_id,
           messageCount: finalMessages.length,
           updatedAt: Date.now(),
         };
-        if (isRemoteSession) {
-          completionUpdate.status = 'done';
-          completionUpdate.completedAt = Date.now();
-        }
         await updateSession(messageKey, completionUpdate);
-        console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}, messageCount=${finalMessages.length}${isRemoteSession ? ', status=done' : ''}`);
+        console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}, messageCount=${finalMessages.length}`);
       } catch (err) {
         console.warn(`[SESSION-FIX] Failed to save claudeSessionId:`, err);
       }
@@ -4158,6 +4158,52 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [activeId]);
 
+  // 🛡️ ToolPermission: Respond to a tool permission request (Ask mode)
+  // Brain: pattern-permission-modes (Ask mode)
+  const respondToToolPermission = useCallback(async (
+    requestId: string,
+    approved: boolean,
+    feedback?: string
+  ) => {
+    const pending = pendingToolPermissions.get(requestId);
+    if (!pending) {
+      console.error('[App] Cannot respond to tool permission: no pending request', requestId);
+      return;
+    }
+
+    const processKey = pending.sessionKey || pending.agentId;
+    try {
+      await invoke('answer_user_question', {
+        agentId: processKey,
+        requestId,
+        answers: { approved, feedback: feedback || '' },
+      });
+      console.log(`🛡️ Tool permission ${approved ? 'ALLOWED' : 'DENIED'}: ${pending.toolName} (requestId=${requestId})`);
+    } catch (error) {
+      console.error('[App] Failed to respond to tool permission:', error);
+    }
+
+    // Remove from pending + clear sidebar dot via pendingQuestionIdsMap
+    // Must use this path (not direct chatStore) so the sync useEffect propagates removal
+    const pendingKey = pending.sessionKey || pending.agentId;
+    setPendingQuestionIdsMap((prev) => {
+      const newMap = new Map(prev);
+      const pendingSet = new Set<string>(newMap.get(pendingKey) || new Set<string>());
+      pendingSet.delete(`tp-${requestId}`);
+      if (pendingSet.size === 0) {
+        newMap.delete(pendingKey);
+      } else {
+        newMap.set(pendingKey, pendingSet);
+      }
+      return newMap;
+    });
+    setPendingToolPermissions((prev) => {
+      const next = new Map(prev);
+      next.delete(requestId);
+      return next;
+    });
+  }, [pendingToolPermissions]);
+
   // 🗣️ AskUserQuestion: Answer a question from Claude for the current agent
   // Uses stdin bidirectional communication with requestId
   // 🦆 FIX: Now accepts sessionKey to prevent cross-session contamination
@@ -4395,7 +4441,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Auto-switch settings based on permission mode using presets from settings
       let finalUpdates = { ...updates };
       if (updates.permissionMode !== undefined && updates.permissionMode !== current.permissionMode) {
-        const preset = presets[updates.permissionMode as 'bypass' | 'plan' | 'debug' | 'chat'];
+        const preset = presets[updates.permissionMode as 'bypass' | 'plan' | 'ask' | 'debug' | 'chat'];
         if (preset) {
           finalUpdates.model = normalizeModelName(preset.model);
           finalUpdates.thinkingMode = preset.thinkingMode;
@@ -5242,6 +5288,78 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
     });
 
+    // 🛡️ GLOBAL ToolPermissionRequest listener - Ask mode tool approval
+    // Brain: pattern-permission-modes (Ask mode)
+    const unlistenToolPermissionGlobalPromise = listen<{
+      requestId: string;
+      toolName: string;
+      input: Record<string, unknown>;
+      agentId: string;
+      sessionKey?: string;
+    }>('tool-permission-request', async (event) => {
+      console.log(`🛡️ [GLOBAL] ToolPermissionRequest event received:`, event.payload);
+      const { requestId, toolName, input, agentId, sessionKey } = event.payload;
+
+      setPendingToolPermissions((prev) => {
+        const next = new Map(prev);
+        next.set(requestId, {
+          requestId,
+          toolName,
+          input,
+          agentId,
+          sessionKey,
+          timestamp: Date.now(),
+        });
+        return next;
+      });
+
+      // 🛡️ Add to pendingQuestionIdsMap for sidebar dot indicator
+      // Must use this path (not direct chatStore) so the sync useEffect propagates it
+      // Same pattern as AskUserQuestion (line 5230) and PlanApproval (line 5362)
+      const pendingKey = sessionKey || agentId;
+      setPendingQuestionIdsMap((prev) => {
+        const newMap = new Map(prev);
+        const pending = new Set<string>(newMap.get(pendingKey) || new Set<string>());
+        pending.add(`tp-${requestId}`);
+        newMap.set(pendingKey, pending);
+        return newMap;
+      });
+
+      // 🔔 Notification: toast + native (same pattern as AskUserQuestion)
+      const terminal = terminalsRef.current.find((t) => t.id === agentId);
+      const agentName = terminal?.label || 'Agent';
+      let projectName = 'Quack';
+      if (terminal?.cwd) {
+        const pathParts = terminal.cwd.split(/[/\\]/);
+        projectName = pathParts.filter(Boolean).pop() || 'Quack';
+      }
+      const filePath = input.file_path || input.filePath || input.path;
+      const target = typeof filePath === 'string'
+        ? filePath.split(/[/\\]/).pop() || toolName
+        : toolName;
+
+      const avatarResult = getAgentAvatar(agentName, terminal?.avatar);
+      const agentAvatar = typeof avatarResult === 'string' ? avatarResult : getDuckdroidUrl();
+      showProjectToast({
+        projectName,
+        projectColor: '#f59e0b',
+        agentName,
+        agentAvatar,
+        message: `Wants to use ${toolName} on ${target}`,
+        type: 'warning',
+      }, 6000);
+
+      try {
+        await sendNotification({
+          id: Number(Date.now() % 2147483647),
+          title: `${agentName} needs permission`,
+          body: `${toolName} on ${target} — Allow or Deny`,
+        });
+      } catch (notifyError) {
+        console.warn('Failed to send tool permission notification:', notifyError);
+      }
+    });
+
     // 📋 GLOBAL PlanApprovalRequest listener - catches ExitPlanMode events
     const unlistenPlanApprovalGlobalPromise = listen<{
       requestId: string;
@@ -5492,6 +5610,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       unlistenOpenPipPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenEditFilePromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenAskUserQuestionGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
+      unlistenToolPermissionGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenPlanApprovalGlobalPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionsUpdatedPromise.then(unlisten => unlisten()).catch(() => undefined);
       unlistenSessionAutoStartPromise.then(unlisten => unlisten()).catch(() => undefined);
@@ -12483,6 +12602,17 @@ You have access to all Bash tools to execute git commands like:
                       return ids;
                     })()}
                     onPlanApprovalResponse={respondToPlanApproval}
+                    pendingToolPermissions={(() => {
+                      const key = isTaskChat ? activeTaskId! : (activeId ?? '');
+                      const perms: PendingToolPermission[] = [];
+                      for (const [, data] of pendingToolPermissions.entries()) {
+                        if (data.agentId === key || data.sessionKey === key) {
+                          perms.push(data);
+                        }
+                      }
+                      return perms;
+                    })()}
+                    onToolPermissionResponse={respondToToolPermission}
                     onTeammateDrillDown={handleTeammateDrillDown}
                   />
                 );
@@ -12629,6 +12759,16 @@ You have access to all Bash tools to execute git commands like:
                       return ids;
                     })()}
                     onPlanApprovalResponse={respondToPlanApproval}
+                    pendingToolPermissions={(() => {
+                      const perms: PendingToolPermission[] = [];
+                      for (const [, data] of pendingToolPermissions.entries()) {
+                        if (data.agentId === taskSessionId || data.sessionKey === taskSessionId) {
+                          perms.push(data);
+                        }
+                      }
+                      return perms;
+                    })()}
+                    onToolPermissionResponse={respondToToolPermission}
                     onTeammateDrillDown={handleTeammateDrillDown}
                   />
                 );

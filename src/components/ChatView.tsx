@@ -8,6 +8,7 @@ import ChatSettingsMenu from './ChatSettingsMenu';
 import TokenUsageIndicator from './TokenUsageIndicator';
 import StaminaBarBorder from './StaminaBarBorder';
 import EditSummaryBar from './EditSummaryBar';
+import ToolPermissionBanner from './ToolPermissionBanner';
 import TodoProgressBar from './TodoProgressBar';
 import type { TodoItem } from './TodoProgressBar';
 import AgentRulesBanner from './AgentRulesBanner';
@@ -145,6 +146,9 @@ interface ChatViewProps {
   // Plan approval
   pendingPlanApprovalIds?: Set<string>;
   onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
+  // Tool permission (Ask mode)
+  pendingToolPermissions?: import('../types').PendingToolPermission[];
+  onToolPermissionResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
   // Teammate stream drill-down
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
 }
@@ -229,6 +233,8 @@ export default function ChatView({
   onOpenPersonality,
   pendingPlanApprovalIds,
   onPlanApprovalResponse,
+  pendingToolPermissions,
+  onToolPermissionResponse,
   onTeammateDrillDown,
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
@@ -699,7 +705,7 @@ export default function ChatView({
         e.preventDefault();
 
         // Cycle through permission modes
-        const modes: PermissionMode[] = ['plan', 'bypass', 'debug', 'chat'];
+        const modes: PermissionMode[] = ['plan', 'bypass', 'ask', 'debug', 'chat'];
         const currentIndex = modes.indexOf(permissionMode);
         const nextIndex = (currentIndex + 1) % modes.length;
         onPermissionModeChange(modes[nextIndex]);
@@ -984,6 +990,18 @@ export default function ChatView({
             </button>
           )}
         </div>
+        {/* 🛡️ Ask mode: tool permission banners */}
+        {pendingToolPermissions && pendingToolPermissions.length > 0 && onToolPermissionResponse && (
+          <div className="tool-permission-banners">
+            {pendingToolPermissions.map((perm) => (
+              <ToolPermissionBanner
+                key={perm.requestId}
+                permission={perm}
+                onRespond={onToolPermissionResponse}
+              />
+            ))}
+          </div>
+        )}
         <ChatInput
           onSend={handleSend}
           placeholder="Ask Claude about your code, commands, or project..."
