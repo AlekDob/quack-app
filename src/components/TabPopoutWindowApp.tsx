@@ -12,6 +12,7 @@ const DocsViewer = lazy(() => import('./docs/DocsViewer'));
 const SkillViewer = lazy(() => import('./SkillViewer'));
 const AgentViewer = lazy(() => import('./AgentViewer'));
 const KanbanPopoutView = lazy(() => import('./kanban/KanbanPopoutView'));
+const FeatureMapView = lazy(() => import('./featureMap/FeatureMapView'));
 
 // Loading spinner component
 const LoadingSpinner: React.FC<{ message?: string }> = ({ message = 'Loading...' }) => (
@@ -330,6 +331,13 @@ const TabPopoutWindowApp: React.FC = () => {
         return (
           <Suspense fallback={<LoadingSpinner message="Loading Kanban board..." />}>
             <KanbanPopoutView />
+          </Suspense>
+        );
+
+      case 'feature-map':
+        return (
+          <Suspense fallback={<LoadingSpinner message="Loading Feature Map..." />}>
+            <FeatureMapView projectPath={tab.initialProjectPath} />
           </Suspense>
         );
 

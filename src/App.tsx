@@ -9871,11 +9871,11 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     if (existingTab) {
       setActiveTabId('feature-map');
     } else {
-      const newTab = openFeatureMapTab();
+      const newTab = openFeatureMapTab(activeTerminal?.cwd);
       setTabs(prevTabs => [...prevTabs, newTab]);
       setActiveTabId('feature-map');
     }
-  }, [openFeatureMapTab, activeTabId, tabs]);
+  }, [openFeatureMapTab, activeTabId, tabs, activeTerminal?.cwd]);
 
   // Handler for opening/focusing Code Editor tab (toggle with Cmd+E, per-file tabs)
   // Brain: pattern-code-editor-tab
