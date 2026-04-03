@@ -3,6 +3,7 @@
  * HTML overlay positioned over the canvas.
  */
 
+import React from 'react';
 import type { AnnotationMode } from './annotationTypes';
 import './FeatureMapView.css';
 
@@ -39,7 +40,7 @@ function GroupIcon() {
   );
 }
 
-const BUTTONS: { mode: AnnotationMode; label: string; Icon: () => JSX.Element }[] = [
+const BUTTONS: { mode: AnnotationMode; label: string; Icon: () => React.JSX.Element }[] = [
   { mode: 'select', label: 'Select', Icon: SelectIcon },
   { mode: 'postit', label: 'Post-it', Icon: PostItIcon },
   { mode: 'group', label: 'Group', Icon: GroupIcon },

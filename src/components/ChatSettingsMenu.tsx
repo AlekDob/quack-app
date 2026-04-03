@@ -139,6 +139,7 @@ export default function ChatSettingsMenu({
     const colors: Record<PermissionMode, string> = {
       plan: '#60a5fa',
       bypass: '#f87171',
+      ask: '#a78bfa',
       debug: '#22c55e',
       chat: '#00D9FF',
     };

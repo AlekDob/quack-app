@@ -111,7 +111,7 @@ interface SettingsState {
   importSettings: (json: string) => boolean;
 
   // Actions - Agent Mode Presets
-  updateModePreset: (mode: 'bypass' | 'plan' | 'debug' | 'chat', preset: Partial<ModePreset>) => void;
+  updateModePreset: (mode: 'bypass' | 'plan' | 'ask' | 'debug' | 'chat', preset: Partial<ModePreset>) => void;
   resetModePresets: () => void;
 }
 
