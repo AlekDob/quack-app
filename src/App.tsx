@@ -937,6 +937,8 @@ function AppContent() {
   });
   // NEW: Track modified files for FileExplorer indicators
   const [modifiedFiles, setModifiedFiles] = useState<Map<string, 'created' | 'modified' | 'deleted'>>(new Map());
+  // Agent commit detection — bumped when any ChatView detects an agent `git commit`
+  const [agentCommitTs, setAgentCommitTs] = useState(0);
   // NEW: Track complete file edits for line highlighting
   const [fileEditsMap, setFileEditsMap] = useState<Map<string, FileEdit>>(new Map());
   const [editingTerminal, setEditingTerminal] = useState<TerminalInfo | null>(
@@ -9265,6 +9267,51 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Brain: pattern-code-editor-tab
       // Check user preference: internal editor tab or external IDE
       if (!lineChanges) {
+        // Detect image files — open in ImageTabView instead of CodeEditor
+        const imageExtensions = /\.(jpe?g|png|gif|webp|svg|ico|bmp|tiff?)$/i;
+        if (imageExtensions.test(entry.name)) {
+          const imgTabId = `image-${entry.path}`;
+          const existingImgTab = tabs.find(t => t.id === imgTabId);
+          if (existingImgTab) {
+            setActiveTabId(imgTabId);
+            return;
+          }
+          const ext = entry.name.split('.').pop()?.toLowerCase() || '';
+          const mimeMap: Record<string, string> = {
+            jpg: 'image/jpeg', jpeg: 'image/jpeg',
+            png: 'image/png', gif: 'image/gif',
+            webp: 'image/webp', svg: 'image/svg+xml',
+            ico: 'image/x-icon', bmp: 'image/bmp',
+            tif: 'image/tiff', tiff: 'image/tiff',
+          };
+          try {
+            // Read file as binary bytes via Tauri, then convert to base64
+            const bytes = await invoke<number[]>('read_binary_file', { path: entry.path });
+            const uint8 = new Uint8Array(bytes);
+            // Convert to base64 in chunks to avoid call stack overflow on large files
+            let binary = '';
+            const chunkSize = 8192;
+            for (let i = 0; i < uint8.length; i += chunkSize) {
+              binary += String.fromCharCode(...uint8.slice(i, i + chunkSize));
+            }
+            const base64Data = btoa(binary);
+            const imgTab: Tab = {
+              id: imgTabId,
+              label: entry.name,
+              type: 'image',
+              closable: true,
+              filePath: entry.path,
+              imageData: base64Data,
+              mediaType: mimeMap[ext] || 'image/png',
+            };
+            setTabs(prev => [...prev, imgTab]);
+            setActiveTabId(imgTabId);
+          } catch (err) {
+            console.error('[FileExplorer] Failed to read image:', err);
+          }
+          return;
+        }
+
         const { fileOpenTarget } = useIDEStore.getState();
         if (fileOpenTarget === 'external') {
           const opened = await tryOpenInIDE(entry.path);
@@ -9421,7 +9468,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         setLoadingPreview(false);
       }
     },
-    [tauriAvailable, gitSummary, explorerRoot, activeId, fileEditsMap]
+    [tauriAvailable, gitSummary, explorerRoot, activeId, fileEditsMap, tabs]
   );
 
   const handleFilePathClick = useCallback(async (path: string, lineChanges?: LineChange[]) => {
@@ -9767,7 +9814,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const handleOpenSecondBrainWithNode = useCallback((_nodeId: string, _nodeLabel: string) => {
     console.log('[Quack] Second Brain with node deprecated - use Obsidian vault directly');
   }, []);
-  // Handler for opening image in a dedicated tab
+  // Handler for opening image in a dedicated tab (used by agent/chat with base64 data)
   const handleOpenImageTab = useCallback((filePath: string, imageData: string, mediaType: string) => {
     const fileName = filePath.split("/").pop() || "Image";
     const newTab: Tab = {
@@ -12744,6 +12791,10 @@ You have access to all Bash tools to execute git commands like:
                     onToolPermissionResponse={respondToToolPermission}
                     onAllowAlwaysTool={handleAllowAlwaysTool}
                     onTeammateDrillDown={handleTeammateDrillDown}
+                    onAgentCommitDetected={() => {
+                      void refreshGitSummary();
+                      setAgentCommitTs(Date.now());
+                    }}
                   />
                 );
               })()}
@@ -12901,6 +12952,10 @@ You have access to all Bash tools to execute git commands like:
                     onToolPermissionResponse={respondToToolPermission}
                     onAllowAlwaysTool={handleAllowAlwaysTool}
                     onTeammateDrillDown={handleTeammateDrillDown}
+                    onAgentCommitDetected={() => {
+                      void refreshGitSummary();
+                      setAgentCommitTs(Date.now());
+                    }}
                   />
                 );
               })()}
@@ -13281,6 +13336,7 @@ You have access to all Bash tools to execute git commands like:
           isWorktree={!!activeTerminal?.useWorktree}
           gitHistory={commitHistory}
           gitHistoryLoading={loadingGit}
+          lastRefreshTs={agentCommitTs}
           // Force expand section
           forceExpandSection={forceExpandSection}
           onForceExpandHandled={() => setForceExpandSection(null)}
