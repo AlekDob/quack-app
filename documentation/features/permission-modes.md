@@ -45,14 +45,38 @@ User selects mode (footer dropdown / Shift+Tab)
 |----------|-----------|-------|------------------------|
 | `bypass` | `bypassPermissions` | none | none |
 | `plan` | `plan` | none | none |
-| `ask` | `default` | none | none |
+| `ask` | `default` | `askMode: true` | none (but `canUseTool` emits `tool_permission_request` per tool call) |
 | `debug` | `bypassPermissions` | `debugMode: true` | systematic-debugging skill + brain hints + git context |
 | `chat` | `default` | `chatMode: true` | chat-interaction skill |
+
+### Ask Mode Tool Permission Flow
+```
+Agent calls tool (Write/Edit/Bash/etc.)
+  → daemon canUseTool() detects askMode
+  → emits 'tool_permission_request' via requestFromFrontend()
+  → Rust routes event to frontend via Tauri emit
+  → App.tsx stores PendingToolPermission in state Map
+  → ChatView renders ToolPermissionBanner (amber, inline, above ChatInput)
+  → User clicks Allow/Deny
+  → handleToolPermissionResponse() calls Tauri 'answer_user_question'
+  → daemon resolves pending Promise → canUseTool returns 'allow' or 'deny'
+```
+
+### Ask Mode Files
+| Type | Path | Exports/Purpose |
+|------|------|-----------------|
+| Component | `src/components/ToolPermissionBanner.tsx` | Compact Allow/Deny UI for tool approval |
+| Component | `src/components/ToolPermissionBanner.css` | Amber-themed banner styling |
+| Model/Type | `src/types.ts` | `PendingToolPermission` interface (requestId, toolName, input, agentId) |
+| Route/Page | `src/App.tsx` | `pendingToolPermissions` state Map + `handleToolPermissionResponse()` |
+| Service | `src-tauri/node-sdk/stream-daemon.js` | `canUseTool` askMode branch + `askModeAllowedTools` whitelist |
 
 ### Key Functions
 - `updateAgentSettings(updates: Partial<AgentChatSettings>) → void` — applies mode change and auto-loads preset from settingsStore (App.tsx)
 - `updateModePreset(mode, preset: Partial<ModePreset>) → void` — persists user customization per mode (settingsStore)
 - `resetModePresets() → void` — restores Anthropic recommended defaults (settingsStore)
+- `handleToolPermissionResponse(requestId: string, approved: boolean) → void` — sends Allow/Deny response to daemon via Tauri command (App.tsx)
+- `getToolTarget(input: Record<string, unknown>) → string` — extracts display-friendly target from tool input (ToolPermissionBanner.tsx)
 - `loadBundledSkill(skillName: string) → string` — reads .md skill file from disk (stream-daemon.js)
 - `loadBrainHints(projectCwd: string) → string[]` — lists documentation/bugs/ and gotchas/ file paths (stream-daemon.js)
 - `loadGitContext(projectCwd: string) → string` — returns git log + diff stat markdown block, 3s timeout (stream-daemon.js)
@@ -61,6 +85,7 @@ User selects mode (footer dropdown / Shift+Tab)
 - `agentModePresets`: `AgentModePresets` — persisted preset config for all 5 modes (global)
 - `permissionMode`: `PermissionMode` — current active mode per chat session (component)
 - `claude.permissionMode`: `'plan' | 'act' | 'bypass'` — legacy SDK-level permission in settingsStore (global)
+- `pendingToolPermissions`: `Map<string, PendingToolPermission>` — pending tool approval requests for Ask mode (component, App.tsx)
 
 ### Default Presets
 | Mode | Model | Thinking | Effort |
