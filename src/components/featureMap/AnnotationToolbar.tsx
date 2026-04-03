@@ -11,26 +11,51 @@ interface Props {
   onModeChange: (mode: AnnotationMode) => void;
 }
 
-const BUTTONS: { mode: AnnotationMode; label: string; icon: string }[] = [
-  { mode: 'select', label: 'Seleziona', icon: 'M5 3l14 9-14 9V3z' },
-  { mode: 'postit', label: 'Post-it', icon: 'M4 4h16v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4z M4 4l5 5' },
-  { mode: 'group', label: 'Gruppo', icon: 'M3 3h18v18H3z' },
+function SelectIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+      <path d="M4 4l7.07 17 2.51-7.39L21 11.1 4 4z"
+        stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PostItIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15.5 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V8.5L15.5 3z" />
+      <polyline points="14 3 14 9 21 9" />
+    </svg>
+  );
+}
+
+function GroupIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="3" strokeDasharray="5 3" />
+    </svg>
+  );
+}
+
+const BUTTONS: { mode: AnnotationMode; label: string; Icon: () => JSX.Element }[] = [
+  { mode: 'select', label: 'Seleziona', Icon: SelectIcon },
+  { mode: 'postit', label: 'Post-it', Icon: PostItIcon },
+  { mode: 'group', label: 'Gruppo', Icon: GroupIcon },
 ];
 
 export default function AnnotationToolbar({ mode, onModeChange }: Props) {
   return (
     <div className="fm-ann-toolbar">
-      {BUTTONS.map(btn => (
+      {BUTTONS.map(({ mode: m, label, Icon }) => (
         <button
-          key={btn.mode}
-          className={`fm-ann-btn ${mode === btn.mode ? 'active' : ''}`}
-          onClick={() => onModeChange(btn.mode)}
-          title={btn.label}
+          key={m}
+          className={`fm-ann-btn ${mode === m ? 'active' : ''}`}
+          onClick={() => onModeChange(m)}
+          title={label}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d={btn.icon} />
-          </svg>
+          <Icon />
         </button>
       ))}
     </div>
