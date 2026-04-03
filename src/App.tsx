@@ -153,6 +153,7 @@ import { showProjectToast } from "./components/ProjectToast";
 import { loadAvailableDroids } from "./utils/skillsAndDroidsLoader";
 import { loadProjectColors, getProjectColor, DEFAULT_PROJECT_COLORS } from "./utils/projectColors";
 import { cleanupOldSessions } from "./utils/sessionCleanup";
+import { notifyLeadAgent } from "./services/remoteApi";
 import type { DroidMetadata, ActiveProject } from "./components/modal-steps/types";
 // TEMPORARILY DISABLED: MaxPlanProvider causing TDZ error - will fix separately
 // import { MaxPlanProvider, useMaxPlan } from "./contexts/MaxPlanContext";
@@ -575,6 +576,9 @@ function AppContent() {
   // 🛡️ ToolPermission: Track pending tool permission requests (Ask mode)
   // Brain: pattern-permission-modes (Ask mode)
   const [pendingToolPermissions, setPendingToolPermissions] = useState<Map<string, PendingToolPermission>>(new Map());
+  // 🛡️ "Allow always for [ToolName]" — per-session auto-approved tools
+  // Ref (not state) because it's only read inside event handlers, no re-render needed
+  const autoApprovedToolsRef = useRef<Map<string, Set<string>>>(new Map());
 
   // 📋 PlanApproval: Track pending plan approval requests from ExitPlanMode
   // Maps requestId -> { agentId, sessionKey, plan } for responding via stdin
@@ -2938,8 +2942,8 @@ function AppContent() {
       // The messageKey is the session ID, which is what we need to use
       // Brain: fix-remote-team-session-tracking
       // Save messageCount so Remote API polling can detect progress.
-      // NOTE: Auto-done for remote sessions removed — a single response doesn't mean
-      // the task is complete. The manager or user decides when to mark done.
+      // Brain: 025-team-delegation-footer
+      // leadSessionId-driven auto-done: only sessions with a lead get auto-completed
       try {
         const finalMessages = chatSessions.get(messageKey) ?? [];
         const completionUpdate: Record<string, unknown> = {
@@ -2947,8 +2951,19 @@ function AppContent() {
           messageCount: finalMessages.length,
           updatedAt: Date.now(),
         };
+        // Auto-done ONLY when leadSessionId is set (managed delegation)
+        if (capturedSession?.leadSessionId) {
+          completionUpdate.status = 'done';
+          completionUpdate.completedAt = Date.now();
+        }
         await updateSession(messageKey, completionUpdate);
         console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}, messageCount=${finalMessages.length}`);
+        // Notify lead agent (fire-and-forget)
+        if (capturedSession?.leadSessionId) {
+          notifyLeadAgent(capturedSession.leadSessionId, capturedSession).catch(
+            (e) => console.warn('[Team] Failed to notify lead:', e)
+          );
+        }
       } catch (err) {
         console.warn(`[SESSION-FIX] Failed to save claudeSessionId:`, err);
       }
@@ -4204,6 +4219,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, [pendingToolPermissions]);
 
+  // 🛡️ "Allow always for [ToolName]": approve + whitelist tool for rest of session
+  // Brain: pattern-permission-modes (Ask mode)
+  const handleAllowAlwaysTool = useCallback(async (requestId: string) => {
+    const pending = pendingToolPermissions.get(requestId);
+    if (!pending) return;
+
+    // 1. Add tool to auto-approved set for this session
+    const approveKey = pending.sessionKey || pending.agentId;
+    const existing = autoApprovedToolsRef.current.get(approveKey) || new Set<string>();
+    existing.add(pending.toolName);
+    autoApprovedToolsRef.current.set(approveKey, existing);
+    console.log(`🛡️ [ALLOW-ALWAYS] ${pending.toolName} whitelisted for session ${approveKey}. Auto-approved tools:`, Array.from(existing));
+
+    // 2. Approve this request (reuses respondToToolPermission logic)
+    await respondToToolPermission(requestId, true);
+  }, [pendingToolPermissions, respondToToolPermission]);
+
   // 🗣️ AskUserQuestion: Answer a question from Claude for the current agent
   // Uses stdin bidirectional communication with requestId
   // 🦆 FIX: Now accepts sessionKey to prevent cross-session contamination
@@ -5300,6 +5332,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       console.log(`🛡️ [GLOBAL] ToolPermissionRequest event received:`, event.payload);
       const { requestId, toolName, input, agentId, sessionKey } = event.payload;
 
+      // 🛡️ "Allow always" check: if tool was previously approved for this session, auto-respond
+      const approveKey = sessionKey || agentId;
+      const autoApproved = autoApprovedToolsRef.current.get(approveKey);
+      if (autoApproved?.has(toolName)) {
+        console.log(`🛡️ [AUTO-APPROVE] ${toolName} auto-approved for session ${approveKey}`);
+        try {
+          await invoke('answer_user_question', {
+            agentId: approveKey,
+            requestId,
+            answers: { approved: true, feedback: '' },
+          });
+        } catch (err) {
+          console.error('[App] Failed to auto-approve tool permission:', err);
+        }
+        return; // Don't show banner, don't add to pending
+      }
+
       setPendingToolPermissions((prev) => {
         const next = new Map(prev);
         next.set(requestId, {
@@ -5506,11 +5555,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       projectName: string;
       prompt: string;
       model?: string;
+      leadSessionId?: string;
       source: string;
       autoSend: boolean;
     }>("remote-execute", async (event) => {
       console.log("📱 [Remote Execute] Request:", event.payload);
-      const { sessionId: remoteSessionId, agentId, prompt, projectPath, projectName, model: remoteModel } = event.payload;
+      const { sessionId: remoteSessionId, agentId, prompt, projectPath, projectName, model: remoteModel, leadSessionId } = event.payload;
 
       // Dedup guard: synchronous check BEFORE any async work
       // pendingAutoStartRef check fails because it's set after createSession (async race)
@@ -5530,15 +5580,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       try {
         // Create a new session
         // Use the session ID from Rust so mobile can poll with the correct ID
+        // Brain: 025-team-delegation-footer
+        const titlePrefix = leadSessionId ? '[Team]' : '[Remote]';
         const newSession = await useSessionStore.getState().createSession({
           id: remoteSessionId,
-          title: `[Remote] ${prompt.slice(0, 50)}...`,
+          title: `${titlePrefix} ${prompt.slice(0, 50)}...`,
           agentId,
           projectPath: projectPath || agent.cwd,
           projectName: projectName || extractProjectId(agent.cwd) || 'project',
           status: 'in_progress',
           messageCount: 0,
           initialPrompt: prompt,
+          leadSessionId: leadSessionId || undefined,
         });
 
         console.log(`📱 [Remote Execute] Session created: ${newSession.id}`);
@@ -12613,6 +12666,7 @@ You have access to all Bash tools to execute git commands like:
                       return perms;
                     })()}
                     onToolPermissionResponse={respondToToolPermission}
+                    onAllowAlwaysTool={handleAllowAlwaysTool}
                     onTeammateDrillDown={handleTeammateDrillDown}
                   />
                 );
@@ -12769,6 +12823,7 @@ You have access to all Bash tools to execute git commands like:
                       return perms;
                     })()}
                     onToolPermissionResponse={respondToToolPermission}
+                    onAllowAlwaysTool={handleAllowAlwaysTool}
                     onTeammateDrillDown={handleTeammateDrillDown}
                   />
                 );

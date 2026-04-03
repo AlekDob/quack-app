@@ -236,7 +236,8 @@
 
 /* BTW, Loop toolbar buttons — neutral white, same pattern as other toolbar icons */
 .chat-btw-btn,
-.chat-loop-btn {
+.chat-loop-btn,
+.chat-team-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -254,13 +255,15 @@
 }
 
 .chat-btw-btn svg,
-.chat-loop-btn svg {
+.chat-loop-btn svg,
+.chat-team-btn svg {
   width: 14px;
   height: 14px;
 }
 
 .chat-btw-btn:hover,
-.chat-loop-btn:hover {
+.chat-loop-btn:hover,
+.chat-team-btn:hover {
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.9);
 }

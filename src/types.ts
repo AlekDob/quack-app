@@ -451,6 +451,9 @@ export interface AgentSession {
   useWorktree?: boolean;             // Whether this session uses an isolated worktree
   worktreePath?: string;             // Path to worktree directory
 
+  // Team delegation — lead agent notification on completion
+  leadSessionId?: string;           // Session ID of lead agent to notify on completion
+
   // Initial prompt and attachments from Kanban task creation
   // These are pre-populated in ChatInput when opening the session for the first time
   initialPrompt?: string;

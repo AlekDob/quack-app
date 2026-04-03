@@ -2,9 +2,8 @@
 
 .tp-banner {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  gap: 0;
   padding: 7px 12px;
   background: rgba(245, 158, 11, 0.05);
   border: 1px solid rgba(245, 158, 11, 0.15);
@@ -12,6 +11,10 @@
   border-radius: 6px;
   margin: 4px 8px;
   animation: tp-in 0.25s ease-out, tp-pulse 2s ease-in-out 0.3s 3;
+}
+
+.tp-banner.tp-expanded {
+  padding-bottom: 8px;
 }
 
 @keyframes tp-in {
@@ -22,6 +25,13 @@
 @keyframes tp-pulse {
   0%, 100% { border-left-color: rgba(245, 158, 11, 0.6); background: rgba(245, 158, 11, 0.05); }
   50% { border-left-color: rgba(245, 158, 11, 0.9); background: rgba(245, 158, 11, 0.09); }
+}
+
+.tp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
 .tp-left {
@@ -47,6 +57,24 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+}
+
+.tp-toggle {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.tp-toggle:hover {
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .tp-actions {
@@ -84,4 +112,42 @@
 .tp-allow:hover {
   background: rgba(245, 158, 11, 0.18);
   color: rgba(245, 158, 11, 0.95);
+}
+
+.tp-always {
+  color: rgba(34, 197, 94, 0.75);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.tp-always:hover {
+  background: rgba(34, 197, 94, 0.18);
+  color: rgba(34, 197, 94, 0.95);
+}
+
+/* Expandable code preview */
+.tp-preview {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.6);
+  overflow-x: auto;
+  max-height: 240px;
+  overflow-y: auto;
+  white-space: pre;
+  tab-size: 2;
+  animation: tp-preview-in 0.15s ease-out;
+}
+
+@keyframes tp-preview-in {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 240px; }
+}
+
+/* Diff-style coloring for Edit tool */
+.tp-preview.tp-diff {
+  color: rgba(255, 255, 255, 0.5);
 }

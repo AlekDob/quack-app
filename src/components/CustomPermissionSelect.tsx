@@ -11,9 +11,9 @@ interface PermissionOption {
 
 const permissionOptions: PermissionOption[] = [
   { value: 'plan', label: 'Plan · Planning only', icon: '◇', color: '#60a5fa' },
-  { value: 'bypass', label: 'Build · No confirmations', icon: '⬢', color: '#f87171' },
-  { value: 'ask', label: 'Ask · Ask before acting', icon: '🛡️', color: '#f59e0b' },
-  { value: 'debug', label: 'Debug · Systematic debugging', icon: '⬡', color: '#22c55e' },
+  { value: 'bypass', label: 'Build · No confirmations', icon: '●', color: '#f87171' },
+  { value: 'ask', label: 'Ask · Ask before acting', icon: '◆', color: '#f59e0b' },
+  { value: 'debug', label: 'Debug · Systematic debugging', icon: '○', color: '#22c55e' },
   { value: 'chat', label: 'Chat · Conversational', icon: '○', color: '#00D9FF' },
 ];
 

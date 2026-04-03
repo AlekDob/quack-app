@@ -10,6 +10,7 @@ import StaminaBarBorder from './StaminaBarBorder';
 import EditSummaryBar from './EditSummaryBar';
 import ToolPermissionBanner from './ToolPermissionBanner';
 import TodoProgressBar from './TodoProgressBar';
+import TeamDelegationPopover from './TeamDelegationPopover';
 import type { TodoItem } from './TodoProgressBar';
 import AgentRulesBanner from './AgentRulesBanner';
 import BrainContextBanner from './BrainContextBanner';
@@ -149,6 +150,7 @@ interface ChatViewProps {
   // Tool permission (Ask mode)
   pendingToolPermissions?: import('../types').PendingToolPermission[];
   onToolPermissionResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
+  onAllowAlwaysTool?: (requestId: string) => void;
   // Teammate stream drill-down
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
 }
@@ -235,6 +237,7 @@ export default function ChatView({
   onPlanApprovalResponse,
   pendingToolPermissions,
   onToolPermissionResponse,
+  onAllowAlwaysTool,
   onTeammateDrillDown,
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
@@ -245,6 +248,9 @@ export default function ChatView({
 
   // Debug mode banner accordion state
   const [debugBannerExpanded, setDebugBannerExpanded] = useState(false);
+
+  // Team delegation popover
+  const [showTeamPopover, setShowTeamPopover] = useState(false);
 
   // Load active rules using the hook (automatic, zero config)
   const { activeRules, hasRules } = useAgentRules(selectedRules, basePath || '');
@@ -989,6 +995,31 @@ export default function ChatView({
               </svg>
             </button>
           )}
+          {/* Team Delegation — Brain: 025-team-delegation-footer */}
+          {internalSessionId && activeAgent && (
+            <div style={{ position: 'relative' }}>
+              <button
+                className="chat-team-btn"
+                onClick={() => setShowTeamPopover(!showTeamPopover)}
+                disabled={isLoading}
+                title="Delega al Team"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </button>
+              <TeamDelegationPopover
+                isOpen={showTeamPopover}
+                onClose={() => setShowTeamPopover(false)}
+                currentAgentId={activeAgent.id}
+                currentSessionId={internalSessionId}
+                projectPath={basePath || ''}
+              />
+            </div>
+          )}
         </div>
         {/* 🛡️ Ask mode: tool permission banners */}
         {pendingToolPermissions && pendingToolPermissions.length > 0 && onToolPermissionResponse && (
@@ -998,6 +1029,7 @@ export default function ChatView({
                 key={perm.requestId}
                 permission={perm}
                 onRespond={onToolPermissionResponse}
+                onAllowAlways={onAllowAlwaysTool}
               />
             ))}
           </div>

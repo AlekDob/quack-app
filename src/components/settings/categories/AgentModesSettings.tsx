@@ -1,17 +1,9 @@
 import { useSettingsStore } from '../../../stores/settingsStore';
-import type { EffortLevel, ThinkingMode } from '../../../types';
+import type { EffortLevel } from '../../../types';
 import { getModelOptions } from '../../../services/modelService';
 import { useModelsConfig } from '../../../hooks/useAppConfig';
 import SectionHeader from '../controls/SectionHeader';
 import './AgentModesSettings.css';
-
-const thinkingModeOptions = [
-  { value: 'auto' as ThinkingMode, label: 'Auto', desc: 'Let model decide' },
-  { value: 'think' as ThinkingMode, label: 'Think', desc: 'Step-by-step' },
-  { value: 'hard' as ThinkingMode, label: 'Think Hard', desc: 'Deeper reasoning' },
-  { value: 'harder' as ThinkingMode, label: 'Think Harder', desc: 'Thorough reasoning' },
-  { value: 'ultra' as ThinkingMode, label: 'Ultra Think', desc: 'Maximum deliberation' },
-];
 
 const effortOptions = [
   { value: 'low' as EffortLevel, label: 'Fast', desc: 'Quick responses, lower cost', icon: '>' },
@@ -53,21 +45,6 @@ function ModePresetCard({ mode, title, description, color, icon }: ModePresetCar
           >
             {modelOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="mode-preset-row">
-          <label className="mode-preset-label">Thinking</label>
-          <select
-            value={preset.thinkingMode}
-            onChange={(e) => updateModePreset(mode, { thinkingMode: e.target.value as ThinkingMode })}
-            className="mode-preset-select"
-          >
-            {thinkingModeOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label} - {opt.desc}
-              </option>
             ))}
           </select>
         </div>

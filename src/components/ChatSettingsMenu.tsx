@@ -24,9 +24,9 @@ interface ChatSettingsMenuProps {
 
 const permissionModeOptions = [
   { value: 'plan' as PermissionMode, label: '◇ Plan · Planning only' },
-  { value: 'bypass' as PermissionMode, label: '⬢ Build · No confirmations' },
-  { value: 'ask' as PermissionMode, label: '🛡️ Ask · Ask before acting' },
-  { value: 'debug' as PermissionMode, label: '⬡ Debug · Systematic debugging' },
+  { value: 'bypass' as PermissionMode, label: '● Build · No confirmations' },
+  { value: 'ask' as PermissionMode, label: '◆ Ask · Ask before acting' },
+  { value: 'debug' as PermissionMode, label: '○ Debug · Systematic debugging' },
   { value: 'chat' as PermissionMode, label: '○ Chat · Conversational' },
 ];
 
