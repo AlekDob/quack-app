@@ -19,6 +19,7 @@ import {
 const POLL_MS = 2000;
 const WRITE_LOCK_MS = 500;
 const ONBOARDING_KEY = 'quack:featureMap:onboardingSeen:';
+const MAX_UNDO = 50;
 
 function uid(): string { return crypto.randomUUID(); }
 
@@ -46,9 +47,12 @@ export function useWhiteboardFile(projectPath?: string) {
   const lastWriteTs = useRef(0);
   const lastJson = useRef('');
   const mounted = useRef(true);
+  // Undo/redo stacks (snapshots of WhiteboardFile as JSON strings)
+  const undoStack = useRef<string[]>([]);
+  const redoStack = useRef<string[]>([]);
 
-  // Persist to file (fire-and-forget)
-  const persist = useCallback((next: WhiteboardFile) => {
+  // Persist to file (fire-and-forget), no undo tracking
+  const persistRaw = useCallback((next: WhiteboardFile) => {
     setFile(next);
     if (!projectPath) return;
     lastWriteTs.current = Date.now();
@@ -56,6 +60,35 @@ export function useWhiteboardFile(projectPath?: string) {
     lastJson.current = json;
     writeWhiteboardFile(projectPath, next).catch(() => { /* silent */ });
   }, [projectPath]);
+
+  // Track whether we're in a drag operation (suppress per-move undo snapshots)
+  const dragging = useRef(false);
+
+  // Persist with undo snapshot — pushes current state to undo stack before applying
+  const persist = useCallback((next: WhiteboardFile, prev: WhiteboardFile) => {
+    if (!dragging.current) {
+      undoStack.current.push(JSON.stringify(prev));
+      if (undoStack.current.length > MAX_UNDO) undoStack.current.shift();
+      redoStack.current = [];
+    }
+    persistRaw(next);
+  }, [persistRaw]);
+
+  /** Call before starting a drag — saves one undo snapshot for the entire drag */
+  const beginDrag = useCallback(() => {
+    setFile(prev => {
+      undoStack.current.push(JSON.stringify(prev));
+      if (undoStack.current.length > MAX_UNDO) undoStack.current.shift();
+      redoStack.current = [];
+      dragging.current = true;
+      return prev;
+    });
+  }, []);
+
+  /** Call when drag ends — re-enables per-action undo snapshots */
+  const endDrag = useCallback(() => {
+    dragging.current = false;
+  }, []);
 
   // Initial load + migration
   useEffect(() => {
@@ -120,7 +153,7 @@ export function useWhiteboardFile(projectPath?: string) {
   const updateAnnotations = useCallback((updater: (a: CanvasAnnotations) => CanvasAnnotations) => {
     setFile(prev => {
       const next = { ...prev, annotations: updater(prev.annotations) };
-      persist(next);
+      persist(next, prev);
       return next;
     });
   }, [persist]);
@@ -182,15 +215,44 @@ export function useWhiteboardFile(projectPath?: string) {
   const setNodePosition = useCallback((nodeId: string, x: number, y: number) => {
     setFile(prev => {
       const next = { ...prev, positions: { ...prev.positions, [nodeId]: { x, y } } };
-      persist(next);
+      persist(next, prev);
       return next;
     });
   }, [persist]);
 
   const clearAll = useCallback(() => {
-    const fresh = emptyFile();
-    persist(fresh);
+    setFile(prev => {
+      const fresh = emptyFile();
+      persist(fresh, prev);
+      return fresh;
+    });
   }, [persist]);
+
+  // --- Undo / Redo ---
+  const undo = useCallback(() => {
+    const snapshot = undoStack.current.pop();
+    if (!snapshot) return;
+    setFile(prev => {
+      redoStack.current.push(JSON.stringify(prev));
+      const restored: WhiteboardFile = JSON.parse(snapshot);
+      persistRaw(restored);
+      return restored;
+    });
+  }, [persistRaw]);
+
+  const redo = useCallback(() => {
+    const snapshot = redoStack.current.pop();
+    if (!snapshot) return;
+    setFile(prev => {
+      undoStack.current.push(JSON.stringify(prev));
+      const restored: WhiteboardFile = JSON.parse(snapshot);
+      persistRaw(restored);
+      return restored;
+    });
+  }, [persistRaw]);
+
+  const canUndo = undoStack.current.length > 0;
+  const canRedo = redoStack.current.length > 0;
 
   const { postIts, groups, images } = file.annotations;
   const hasAnnotations = postIts.length > 0 || groups.length > 0 || images.length > 0;
@@ -206,5 +268,7 @@ export function useWhiteboardFile(projectPath?: string) {
     addImage, updateImage, removeImage,
     setNodePosition,
     clearAll,
+    undo, redo, canUndo, canRedo,
+    beginDrag, endDrag,
   };
 }

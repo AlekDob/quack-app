@@ -24,9 +24,11 @@ interface Props {
   onSelect: (id: string | null) => void;
   onMultiToggle?: (id: string) => void;
   onGroupDragStart?: (clientX: number, clientY: number) => void;
+  onBeginDrag?: () => void;
+  onEndDrag?: () => void;
 }
 
-export default function CanvasImage({ image, zoom, projectPath, isSelected, isMultiSelected, onUpdate, onRemove, onSelect, onMultiToggle, onGroupDragStart }: Props) {
+export default function CanvasImage({ image, zoom, projectPath, isSelected, isMultiSelected, onUpdate, onRemove, onSelect, onMultiToggle, onGroupDragStart, onBeginDrag, onEndDrag }: Props) {
   const [hov, setHov] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; did: boolean } | null>(null);
@@ -61,6 +63,7 @@ export default function CanvasImage({ image, zoom, projectPath, isSelected, isMu
     if (e.shiftKey && onMultiToggle) { onMultiToggle(image.id); return; }
     // If multi-selected, start group drag (Canvas handles all selected items)
     if (isMultiSelected && onGroupDragStart) { onGroupDragStart(e.clientX, e.clientY); return; }
+    onBeginDrag?.();
     dragRef.current = { sx: e.clientX, sy: e.clientY, ox: image.x, oy: image.y, did: false };
     onSelect(image.id);
   }, [image.x, image.y, image.id, onSelect, onMultiToggle, isMultiSelected, onGroupDragStart]);
@@ -85,9 +88,10 @@ export default function CanvasImage({ image, zoom, projectPath, isSelected, isMu
   }, [image.id, zoom, onUpdate]);
 
   const handleMouseUp = useCallback(() => {
+    if (dragRef.current?.did || resizeRef.current) onEndDrag?.();
     dragRef.current = null;
     resizeRef.current = null;
-  }, []);
+  }, [onEndDrag]);
 
   const handleResizeDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();

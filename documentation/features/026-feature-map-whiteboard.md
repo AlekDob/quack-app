@@ -204,6 +204,15 @@ image: images/026-whiteboard-overview.png
 - Selection state is ephemeral (not persisted)
 - Hook: `useCanvasSelection.ts` manages selectedIds Set + lasso rect; Canvas does hit-test locally (has access to getPos + graph.nodes + annotations)
 
+### Undo / Redo
+- **Cmd+Z** (macOS) / **Ctrl+Z** (Windows): undo last whiteboard action
+- **Cmd+Shift+Z** / **Ctrl+Shift+Z**: redo
+- Undo stack: max 50 snapshots, stored as JSON strings in memory (not persisted)
+- Drag optimization: `beginDrag()` saves one snapshot at drag start; per-move updates are suppressed; `endDrag()` re-enables snapshots — single undo step per entire drag
+- Covers: post-it/group/image CRUD, node repositioning, clearAll
+- Redo stack is cleared on any new action (standard undo behavior)
+- Keyboard listener in `FeatureMapView.tsx`, stack logic in `useWhiteboardFile.ts`
+
 ### Component Types (for nested whiteboards — Phase 1 only, not yet functional)
 - `parentComponentId?: string` on PostIt, GroupRect, CanvasImage — for future nested component assignment
 - `isComponent?: boolean` on GroupRect — marks a group as an enterable component

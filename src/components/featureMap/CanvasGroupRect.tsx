@@ -20,11 +20,13 @@ interface Props {
   onSelect: (id: string | null) => void;
   onMultiToggle?: (id: string) => void;
   onGroupDragStart?: (clientX: number, clientY: number) => void;
+  onBeginDrag?: () => void;
+  onEndDrag?: () => void;
 }
 
 type Corner = 'tl' | 'tr' | 'bl' | 'br';
 
-export default function CanvasGroupRect({ group, zoom, isSelected, isMultiSelected, onUpdate, onRemove, onSelect, onMultiToggle, onGroupDragStart }: Props) {
+export default function CanvasGroupRect({ group, zoom, isSelected, isMultiSelected, onUpdate, onRemove, onSelect, onMultiToggle, onGroupDragStart, onBeginDrag, onEndDrag }: Props) {
   const [hov, setHov] = useState(false);
   const [editLabel, setEditLabel] = useState(false);
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; did: boolean } | null>(null);
@@ -41,6 +43,7 @@ export default function CanvasGroupRect({ group, zoom, isSelected, isMultiSelect
     if (e.shiftKey && onMultiToggle) { onMultiToggle(group.id); return; }
     // If multi-selected, start group drag (Canvas handles all selected items)
     if (isMultiSelected && onGroupDragStart) { onGroupDragStart(e.clientX, e.clientY); return; }
+    onBeginDrag?.();
     dragRef.current = { sx: e.clientX, sy: e.clientY, ox: group.x, oy: group.y, did: false };
     onSelect(group.id);
   }, [group.x, group.y, group.id, onSelect, onMultiToggle, isMultiSelected, onGroupDragStart]);
@@ -75,9 +78,10 @@ export default function CanvasGroupRect({ group, zoom, isSelected, isMultiSelect
 
   const handleUp = useCallback(() => {
     if (dragRef.current && !dragRef.current.did) setEditLabel(true);
+    else if (dragRef.current?.did || resizeRef.current) onEndDrag?.();
     dragRef.current = null;
     resizeRef.current = null;
-  }, []);
+  }, [onEndDrag]);
 
   const handleResizeDown = useCallback((corner: Corner, e: React.MouseEvent) => {
     e.stopPropagation();

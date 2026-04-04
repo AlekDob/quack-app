@@ -148,10 +148,15 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
           return MODES[(idx + 1) % MODES.length];
         });
       }
+      // Cmd+Z / Ctrl+Z = undo, Cmd+Shift+Z / Ctrl+Shift+Z = redo
+      if (e.key === 'z' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        if (e.shiftKey) { wb.redo(); } else { wb.undo(); }
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [wb]);
 
   if (loading) return (
     <div className="fm-container"><div className="fm-loading">
@@ -255,6 +260,8 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
             onLassoReset={selection.resetLasso}
             onMultiToggle={selection.toggleSelect}
             onMultiClear={selection.clearSelection}
+            onBeginDrag={wb.beginDrag}
+            onEndDrag={wb.endDrag}
           />
           <AnnotationToolbar
             mode={annotationMode}

@@ -69,6 +69,8 @@ interface Props {
   onLassoReset: () => void;
   onMultiToggle: (id: string) => void;
   onMultiClear: () => void;
+  onBeginDrag: () => void;
+  onEndDrag: () => void;
 }
 
 export default function FeatureMapCanvas(props: Props) {
@@ -80,7 +82,7 @@ export default function FeatureMapCanvas(props: Props) {
     onImageAdd, onImageUpdate, onImageRemove, onImageFilePick, onImageDrop,
     projectPath, onResetMode, searchQuery,
     multiSelectedIds, lassoRect: lassoRectProp,
-    onLassoStart, onLassoUpdate, onLassoSelect, onLassoReset, onMultiToggle, onMultiClear,
+    onLassoStart, onLassoUpdate, onLassoSelect, onLassoReset, onMultiToggle, onMultiClear, onBeginDrag, onEndDrag,
   } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -253,8 +255,9 @@ export default function FeatureMapCanvas(props: Props) {
       const img = annotations.images.find(ii => ii.id === id);
       if (img) { origins.set(id, { x: img.x, y: img.y }); continue; }
     }
+    onBeginDrag();
     multiDragRef.current = { startX: clientX, startY: clientY, didDrag: false, origins };
-  }, [multiSelectedIds, annotations, graph.nodes, getPos]);
+  }, [multiSelectedIds, annotations, graph.nodes, getPos, onBeginDrag]);
 
   const handleNodeMouseDown = useCallback((nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -265,9 +268,10 @@ export default function FeatureMapCanvas(props: Props) {
     if (multiSelectedIds.has(nodeId)) { handleGroupDragStart(e.clientX, e.clientY); return; }
     const pos = getPos(nodeId);
     if (!pos) return;
+    onBeginDrag();
     nodeDragRef.current = { nodeId, startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, didDrag: false };
     setDraggingId(nodeId);
-  }, [getPos, onMultiToggle, multiSelectedIds, handleGroupDragStart]);
+  }, [getPos, onMultiToggle, multiSelectedIds, handleGroupDragStart, onBeginDrag]);
 
   /** Apply delta to all multi-selected elements (feature nodes + annotations) */
   const applyMultiDragDelta = useCallback((dx: number, dy: number, origins: Map<string, { x: number; y: number }>) => {
@@ -341,6 +345,7 @@ export default function FeatureMapCanvas(props: Props) {
     // Multi-drag finalize
     if (multiDragRef.current) {
       multiDragRef.current = null;
+      onEndDrag();
       return;
     }
     // Lasso finalize — hit-test all elements (feature nodes + annotations) directly
@@ -378,12 +383,13 @@ export default function FeatureMapCanvas(props: Props) {
     const nd = nodeDragRef.current;
     if (nd) {
       if (!nd.didDrag) onNodeSelect({ nodeId: nd.nodeId, screenX: e.clientX, screenY: e.clientY });
+      else onEndDrag();
       nodeDragRef.current = null;
       setDraggingId(null);
       return;
     }
     panRef.current.active = false;
-  }, [onNodeSelect, onGroupAdd, drawingRect, lassoRectProp, annotationMode, onLassoSelect, onLassoReset, graph.nodes, getPos, annotations]);
+  }, [onNodeSelect, onGroupAdd, drawingRect, lassoRectProp, annotationMode, onLassoSelect, onLassoReset, graph.nodes, getPos, annotations, onEndDrag]);
 
   const handleBgClick = useCallback(() => {
     if (panRef.current.didDrag) return;
@@ -439,7 +445,7 @@ export default function FeatureMapCanvas(props: Props) {
                 isMultiSelected={multiSelectedIds.has(g.id)}
                 onUpdate={onGroupUpdate} onRemove={onGroupRemove}
                 onSelect={onAnnotationSelect} onMultiToggle={onMultiToggle}
-                onGroupDragStart={handleGroupDragStart} />
+                onGroupDragStart={handleGroupDragStart} onBeginDrag={onBeginDrag} onEndDrag={onEndDrag} />
             ))}
 
             {/* Z1.5: Image annotations */}
@@ -449,7 +455,7 @@ export default function FeatureMapCanvas(props: Props) {
                 isMultiSelected={multiSelectedIds.has(img.id)}
                 onUpdate={onImageUpdate} onRemove={onImageRemove}
                 onSelect={onAnnotationSelect} onMultiToggle={onMultiToggle}
-                onGroupDragStart={handleGroupDragStart} />
+                onGroupDragStart={handleGroupDragStart} onBeginDrag={onBeginDrag} onEndDrag={onEndDrag} />
             ))}
 
             {/* Z2: Legend row */}
@@ -540,7 +546,7 @@ export default function FeatureMapCanvas(props: Props) {
                 isMultiSelected={multiSelectedIds.has(p.id)}
                 onUpdate={onPostItUpdate} onRemove={onPostItRemove}
                 onSelect={onAnnotationSelect} onMultiToggle={onMultiToggle}
-                onGroupDragStart={handleGroupDragStart} />
+                onGroupDragStart={handleGroupDragStart} onBeginDrag={onBeginDrag} onEndDrag={onEndDrag} />
             ))}
 
             {/* Group drawing preview */}

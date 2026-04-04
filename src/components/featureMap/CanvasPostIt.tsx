@@ -19,9 +19,11 @@ interface Props {
   onSelect: (id: string | null) => void;
   onMultiToggle?: (id: string) => void;
   onGroupDragStart?: (clientX: number, clientY: number) => void;
+  onBeginDrag?: () => void;
+  onEndDrag?: () => void;
 }
 
-export default function CanvasPostIt({ postIt, zoom, isSelected, isMultiSelected, onUpdate, onRemove, onSelect, onMultiToggle, onGroupDragStart }: Props) {
+export default function CanvasPostIt({ postIt, zoom, isSelected, isMultiSelected, onUpdate, onRemove, onSelect, onMultiToggle, onGroupDragStart, onBeginDrag, onEndDrag }: Props) {
   const [hov, setHov] = useState(false);
   const [editing, setEditing] = useState(false);
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; did: boolean } | null>(null);
@@ -34,6 +36,7 @@ export default function CanvasPostIt({ postIt, zoom, isSelected, isMultiSelected
     if (e.shiftKey && onMultiToggle) { onMultiToggle(postIt.id); return; }
     // If multi-selected, start group drag (Canvas handles all selected items)
     if (isMultiSelected && onGroupDragStart) { onGroupDragStart(e.clientX, e.clientY); return; }
+    onBeginDrag?.();
     dragRef.current = { sx: e.clientX, sy: e.clientY, ox: postIt.x, oy: postIt.y, did: false };
     onSelect(postIt.id);
   }, [postIt.x, postIt.y, postIt.id, onSelect, onMultiToggle, isMultiSelected, onGroupDragStart]);
@@ -50,12 +53,13 @@ export default function CanvasPostIt({ postIt, zoom, isSelected, isMultiSelected
   const handleMouseUp = useCallback(() => {
     const d = dragRef.current;
     if (d && !d.did) {
-      // Click → start editing
       setEditing(true);
       setTimeout(() => inputRef.current?.focus(), 50);
+    } else if (d?.did) {
+      onEndDrag?.();
     }
     dragRef.current = null;
-  }, []);
+  }, [onEndDrag]);
 
   const handleTextBlur = useCallback(() => {
     setEditing(false);
