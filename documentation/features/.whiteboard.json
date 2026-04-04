@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "annotations": {
+    "postIts": [
+      {
+        "id": "a1b2c3d4-1111-4aaa-bbbb-000000000001",
+        "text": "12 features / 3 layers / organized by Agent Leo",
+        "x": 620,
+        "y": -80,
+        "color": "#4ade80"
+      },
+      {
+        "id": "a1b2c3d4-1111-4aaa-bbbb-000000000002",
+        "text": "UI = editor, explorer, whiteboard, panels. Logic = agents, modes, skills. Infra = IDE, terminal, platform.",
+        "x": 794,
+        "y": -80,
+        "color": "#60a5fa"
+      }
+    ],
+    "groups": [
+      {
+        "id": "g0000001-aaaa-4bbb-cccc-111111111111",
+        "label": "UI Components",
+        "x": -10,
+        "y": -8,
+        "w": 580,
+        "h": 330,
+        "color": "#00d9ff"
+      },
+      {
+        "id": "g0000002-aaaa-4bbb-cccc-222222222222",
+        "label": "Business Logic",
+        "x": -22.51886880555579,
+        "y": 346,
+        "w": 592.5188688055558,
+        "h": 244,
+        "color": "#a855f7"
+      },
+      {
+        "id": "g0000003-aaaa-4bbb-cccc-333333333333",
+        "label": "Infrastructure",
+        "x": -10,
+        "y": 614,
+        "w": 320,
+        "h": 330,
+        "color": "#64748b"
+      }
+    ],
+    "images": []
+  },
+  "positions": {
+    "024-integrated-code-editor": {
+      "x": 69.21280798552495,
+      "y": 55.9633826578208
+    },
+    "026-feature-map-whiteboard": {
+      "x": 407.4111118689167,
+      "y": 115.672286619228
+    },
+    "031-edit-summary-bar-per-turn": {
+      "x": 81.28301437952683,
+      "y": 118
+    },
+    "033-file-explorer": {
+      "x": 408.76066487890427,
+      "y": 212.4687106991284
+    },
+    "035-accordion-content-features": {
+      "x": 135.26513477902878,
+      "y": 212.0973180599253
+    },
+    "025-team-delegation-footer": {
+      "x": 160.75262974691603,
+      "y": 431.9025189537046
+    },
+    "029-permission-modes": {
+      "x": 433.2714985524718,
+      "y": 440.2484314907418
+    },
+    "030-built-in-skills": {
+      "x": 145.4517900956812,
+      "y": 526.2484314907417
+    },
+    "032-changes-panel-agent-commit-refresh": {
+      "x": 441.617411089509,
+      "y": 527.6394169135813
+    },
+    "027-saved-commands": {
+      "x": 30,
+      "y": 654
+    },
+    "028-ide-context-injection": {
+      "x": 30,
+      "y": 740
+    },
+    "034-windows-cross-platform-compat": {
+      "x": 30,
+      "y": 826
+    }
+  }
+}

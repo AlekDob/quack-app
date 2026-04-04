@@ -27,6 +27,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
   const [clickInfo, setClickInfo] = useState<NodeClickInfo | null>(null);
   const [annotationMode, setAnnotationMode] = useState<AnnotationMode>('select');
   const [selectedAnnId, setSelectedAnnId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingImagePos = useRef<{ x: number; y: number } | null>(null);
 
@@ -132,7 +133,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setClickInfo(null); setAnnotationMode('select'); }
+      if (e.key === 'Escape') { setClickInfo(null); setAnnotationMode('select'); setSearchQuery(''); }
       if (e.key === 'Control') {
         e.preventDefault();
         setAnnotationMode(prev => {
@@ -176,6 +177,26 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
         <div className="fm-stats">
           {graph.nodes.length} features &middot; {graph.links.length} connections
         </div>
+        <div className="fm-search-wrap">
+          <svg className="fm-search-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            className="fm-search-input"
+            type="text"
+            placeholder="Search features..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') { setSearchQuery(''); e.currentTarget.blur(); } }}
+          />
+          {searchQuery && (
+            <button className="fm-search-clear" onClick={() => setSearchQuery('')}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
         {(hasCustom || wb.hasAnnotations) && (
           <button className="fm-reset-btn" onClick={handleResetLayout} title="Reset all">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -218,6 +239,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
             onImageDrop={handleImageDrop}
             projectPath={projectPath ?? ''}
             onResetMode={handleResetMode}
+            searchQuery={searchQuery}
           />
           <AnnotationToolbar mode={annotationMode} onModeChange={setAnnotationMode} />
         </div>

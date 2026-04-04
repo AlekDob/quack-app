@@ -4,7 +4,7 @@
  * Polls for external changes (agent writes) every 2 seconds.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type {
   CanvasAnnotations, PostIt, GroupRect, CanvasImage, WhiteboardFile,
 } from '../components/featureMap/annotationTypes';
@@ -174,7 +174,10 @@ export function useWhiteboardFile(projectPath?: string) {
   }, [updateAnnotations]);
 
   // --- Node positions ---
-  const customPositions = new Map(Object.entries(file.positions)) as Map<string, NodePosition>;
+  const customPositions = useMemo(
+    () => new Map(Object.entries(file.positions)) as Map<string, NodePosition>,
+    [file.positions],
+  );
 
   const setNodePosition = useCallback((nodeId: string, x: number, y: number) => {
     setFile(prev => {

@@ -59,6 +59,7 @@ interface Props {
   onImageDrop: (file: File, x: number, y: number) => void;
   projectPath: string;
   onResetMode: () => void;
+  searchQuery: string;
 }
 
 export default function FeatureMapCanvas(props: Props) {
@@ -68,7 +69,7 @@ export default function FeatureMapCanvas(props: Props) {
     onPostItAdd, onPostItUpdate, onPostItRemove,
     onGroupAdd, onGroupUpdate, onGroupRemove,
     onImageAdd, onImageUpdate, onImageRemove, onImageFilePick, onImageDrop,
-    projectPath, onResetMode,
+    projectPath, onResetMode, searchQuery,
   } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -111,6 +112,30 @@ export default function FeatureMapCanvas(props: Props) {
   const getPos = useCallback((id: string) => customPositions.get(id) ?? layout.positions.get(id), [customPositions, layout.positions]);
   const nodeLayerMap = useMemo(() => { const m = new Map<string, string>(); for (const n of graph.nodes) m.set(n.id, classifyNode(n)); return m; }, [graph.nodes]);
   const connected = useMemo(() => { if (!hovered) return new Set<string>(); const s = new Set<string>(); for (const l of graph.links) { if (l.source === hovered) s.add(l.target); if (l.target === hovered) s.add(l.source); } return s; }, [hovered, graph.links]);
+
+  // Search: matching node IDs
+  const searchMatches = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    const q = searchQuery.toLowerCase();
+    return new Set(graph.nodes.filter(n =>
+      n.title.toLowerCase().includes(q) || n.tags.some(t => t.toLowerCase().includes(q)),
+    ).map(n => n.id));
+  }, [searchQuery, graph.nodes]);
+
+  // Auto-pan to single search match (only when query changes)
+  const getPosRef = useRef(getPos);
+  getPosRef.current = getPos;
+  useEffect(() => {
+    if (!searchMatches || searchMatches.size !== 1 || size.w === 0) return;
+    const nodeId = [...searchMatches][0];
+    const pos = getPosRef.current(nodeId);
+    if (!pos) return;
+    setViewport(v => ({
+      ...v,
+      panX: size.w / 2 - pos.x * v.zoom,
+      panY: size.h / 2 - pos.y * v.zoom,
+    }));
+  }, [searchMatches, size.w, size.h]);
 
   const toSvg = useCallback((clientX: number, clientY: number) => {
     const r = containerRef.current?.getBoundingClientRect();
@@ -226,8 +251,16 @@ export default function FeatureMapCanvas(props: Props) {
     setViewport(v => ({ ...v, panX, panY }));
   }, []);
 
-  const nodeOp = (id: string) => (!hovered ? 1 : id === hovered || connected.has(id) ? 1 : DIM);
-  const linkOp = (s: string, t: string) => (!hovered ? 0.35 : s === hovered || t === hovered ? 1 : DIM);
+  const nodeOp = (id: string) => {
+    if (searchMatches && !searchMatches.has(id)) return DIM;
+    if (!hovered) return 1;
+    return id === hovered || connected.has(id) ? 1 : DIM;
+  };
+  const linkOp = (s: string, t: string) => {
+    if (searchMatches && !searchMatches.has(s) && !searchMatches.has(t)) return DIM;
+    if (!hovered) return 0.35;
+    return s === hovered || t === hovered ? 1 : DIM;
+  };
   const linkCol = (s: string, t: string) => (!hovered ? LINK_COLOR : s === hovered || t === hovered ? LINK_HL : LINK_COLOR);
   const trunc = (t: string, m: number) => (t.length > m ? t.slice(0, m - 1) + '\u2026' : t);
   const curvePath = (x1: number, y1: number, x2: number, y2: number) => { const d = Math.abs(y2 - y1) * 0.3; return `M${x1},${y1} C${x1 + d},${y1} ${x2 - d},${y2} ${x2},${y2}`; };
