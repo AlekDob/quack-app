@@ -109,11 +109,6 @@ function EditorIDEDropdown({ filePath }: EditorIDEDropdownProps) {
         disabled={!preferredIDE}
         title={`Apri in ${preferredName}`}
       >
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="2" y="3" width="20" height="14" rx="2" />
-          <path d="M7 8l3 3-3 3" />
-          <path d="M13 11h4" />
-        </svg>
         {shortName}
       </button>
       {/* Chevron — toggle dropdown */}

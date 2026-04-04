@@ -59,9 +59,9 @@ function EditorHeader({ outlineOpen, onToggleOutline }: EditorHeaderProps) {
               type="button"
               className={`editor-btn editor-btn-outline${outlineOpen ? ' active' : ''}`}
               onClick={onToggleOutline}
-              title="Toggle Outline"
+              title="Toggle Outline panel — shows file structure (functions, classes, variables)"
             >
-              &#9776;
+              Outline
             </button>
             <button
               type="button"

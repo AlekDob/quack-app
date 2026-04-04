@@ -340,7 +340,8 @@ Exported symbols per file. Generated 2026-03-13.
 - `CodeMirrorMergeView` (component): side-by-side diff via @codemirror/merge
 - `EditorContent` (component): mode switch between edit (Engine) and diff (MergeView)
 - `EditorEmptyState` (component): "Nessun file aperto" placeholder
-- `EditorHeader` (component): breadcrumb, mode badge, Accept/Reject/Edit/Save buttons
+- `EditorHeader` (component): breadcrumb, mode badge, Outline/Save buttons, IDE dropdown
+- `EditorIDEDropdown` (component): split button to open file in IDE + reveal in Finder/Explorer
 - `EditorStatusBar` (component): Ln/Col, language, encoding, save status
 - `editorTheme.ts`: `customTheme`, `customHighlightStyle`, `highlightExtension`
 - `editorSearch.ts`: `setSearchMatches`, `searchMatchesField`, `findAllMatches()`, `buildSearchDecorations()`
