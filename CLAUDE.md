@@ -128,6 +128,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Popout search panel CSS scope: `documentation/gotchas/gotcha-popout-search-panel-css-scope.md`
 - SDK allowedTools bypasses canUseTool: `documentation/gotchas/gotcha-sdk-allowedtools-bypasses-canuse.md`
 - EditSummaryBar cumulative regression: `documentation/bugs/fix-edit-summary-bar-cumulative-regression.md`
+- ChangesPanel CPU loop: `documentation/bugs/fix-changes-panel-cpu-loop.md`
 - Windows path separators: `documentation/gotchas/gotcha-windows-path-separators.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.

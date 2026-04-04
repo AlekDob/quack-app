@@ -648,11 +648,15 @@ export default function ChatView({
     return lastTs;
   }, [messages]);
 
+  // Brain: fix-changes-panel-cpu-loop
+  const onAgentCommitDetectedRef = useRef(onAgentCommitDetected);
+  useEffect(() => { onAgentCommitDetectedRef.current = onAgentCommitDetected; }, [onAgentCommitDetected]);
+
   useEffect(() => {
-    if (lastAgentCommitTs > 0 && onAgentCommitDetected) {
-      onAgentCommitDetected();
+    if (lastAgentCommitTs > 0 && onAgentCommitDetectedRef.current) {
+      onAgentCommitDetectedRef.current();
     }
-  }, [lastAgentCommitTs, onAgentCommitDetected]);
+  }, [lastAgentCommitTs]);
 
   // Detect if any messages have ThinkingBlocks (thinkingContent or thinking events)
   const hasThinkingBlocks = useMemo<boolean>(() => {
