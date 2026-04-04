@@ -19,6 +19,9 @@ import { customTheme, highlightExtension } from './editorTheme';
 import { setSearchMatches, searchMatchesField, findAllMatches, buildSearchDecorations } from './editorSearch';
 import { diffDecorationsField, applyDiffDecorations } from './editorDiff';
 import { getLanguageExtension } from './editorLanguages';
+import { buildAutocompleteExtension } from './editorAutocomplete';
+import { buildMinimapExtension } from './editorMinimap';
+import { buildLintExtension } from './editorLint';
 import type { CodeEditorRef, CodeEditorProps, SearchOptions } from './editorTypes';
 import type { SearchMatch } from './editorSearch';
 
@@ -29,6 +32,7 @@ const CodeEditorEngine = forwardRef<CodeEditorRef, CodeEditorProps>(({
   readOnly = false,
   onChange,
   onSave,
+  onSelectionChange,
   diffInfo,
   lineChanges,
 }, ref) => {
@@ -157,6 +161,9 @@ const CodeEditorEngine = forwardRef<CodeEditorRef, CodeEditorProps>(({
         bracketMatching(),
         highlightExtension,
         customTheme,
+        buildAutocompleteExtension(),
+        buildMinimapExtension(),
+        buildLintExtension(),
         EditorView.editable.of(!readOnly),
         EditorState.readOnly.of(readOnly),
         highlightSelectionMatches(),
@@ -167,6 +174,17 @@ const CodeEditorEngine = forwardRef<CodeEditorRef, CodeEditorProps>(({
         saveKeyBinding,
         EditorView.updateListener.of(update => {
           if (update.docChanged) handleChange(update.state.doc.toString());
+          if (update.selectionSet && onSelectionChange) {
+            const { from, to } = update.state.selection.main;
+            if (from === to) {
+              onSelectionChange(null);
+            } else {
+              const text = update.state.sliceDoc(from, to);
+              const startLine = update.state.doc.lineAt(from).number;
+              const endLine = update.state.doc.lineAt(to).number;
+              onSelectionChange({ selectedText: text, startLine, endLine });
+            }
+          }
         }),
         ...(Array.isArray(languageExtension) ? languageExtension : [languageExtension]),
       ],
@@ -204,7 +222,7 @@ const CodeEditorEngine = forwardRef<CodeEditorRef, CodeEditorProps>(({
         width: '100%',
         height: '100%',
         overflow: 'auto',
-        fontFamily: 'JetBrains Mono, SF Mono, Monaco, Inconsolata, "Courier New", monospace',
+        fontFamily: '"JetBrains Mono", "Cascadia Code", "Cascadia Mono", "SF Mono", Monaco, Consolas, Inconsolata, "Courier New", monospace',
         fontSize: '14px',
       }}
     />

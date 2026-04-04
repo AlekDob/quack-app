@@ -84,6 +84,16 @@ export function normalizePath(path: string): string {
   return path;
 }
 
+// Brain: gotcha-windows-path-separators
+/**
+ * Normalize path to forward slashes (cross-platform).
+ * Used for localStorage keys and template-literal path building
+ * so that keys/paths are consistent regardless of OS.
+ */
+export function normalizeToForwardSlash(path: string): string {
+  return path.replace(/\\/g, '/');
+}
+
 /**
  * Get the modifier key symbol for the current platform
  * @returns '⌘' for macOS, 'Ctrl' for Windows/Linux

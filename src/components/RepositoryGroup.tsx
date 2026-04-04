@@ -2030,7 +2030,7 @@ export default function RepositoryGroup({
                 onClick={() => onOpenSavedCommands(repoPath)}
                 title="Saved Commands"
                 className="repo-action-btn"
-                style={{ color: 'rgba(78, 205, 196, 0.8)' }}
+                style={undefined}
               >
                 <svg
                   width="14"
@@ -2054,7 +2054,7 @@ export default function RepositoryGroup({
                 onClick={() => onOpenBrain(repoPath)}
                 title="Open Brain"
                 className="repo-action-btn"
-                style={{ color: 'rgba(167, 139, 250, 0.8)' }}
+                style={undefined}
               >
                 <svg
                   width="14"
@@ -2091,7 +2091,7 @@ export default function RepositoryGroup({
               }}
               title="Open Memory Folder"
               className="repo-action-btn"
-              style={{ color: 'rgba(0, 217, 255, 0.7)' }}
+              style={undefined}
             >
               <svg
                 width="14"
@@ -2143,7 +2143,7 @@ export default function RepositoryGroup({
                 onClick={() => setShowTeamModal(true)}
                 title="Create Agent Team"
                 className="repo-action-btn"
-                style={{ color: "rgba(255, 107, 53, 0.7)" }}
+                style={undefined}
               >
                 <svg
                   width="14"
@@ -2170,7 +2170,7 @@ export default function RepositoryGroup({
                 onClick={() => onRemoveProject(repoPath)}
                 title="Remove Project"
                 className="repo-action-btn"
-                style={{ color: "rgba(255, 255, 255, 0.35)" }}
+                style={undefined}
               >
                 <svg
                   width="14"

@@ -183,6 +183,79 @@ export const customTheme = EditorView.theme({
     borderLeft: '2px solid rgba(255, 0, 0, 0.5)',
     paddingLeft: '6px',
   },
+  // Autocomplete tooltip
+  '.cm-tooltip': {
+    backgroundColor: '#1a1a1a !important',
+    border: '1px solid #3a3a3a !important',
+    borderRadius: '6px !important',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.5) !important',
+  },
+  '.cm-tooltip-autocomplete': {
+    backgroundColor: '#1a1a1a !important',
+  },
+  '.cm-tooltip-autocomplete ul li': {
+    padding: '4px 8px !important',
+    color: '#abb2bf !important',
+    fontSize: '13px !important',
+  },
+  '.cm-tooltip-autocomplete ul li[aria-selected]': {
+    backgroundColor: 'rgba(82, 139, 255, 0.2) !important',
+    color: '#ffffff !important',
+  },
+  '.cm-completionIcon': {
+    color: '#636d83 !important',
+    marginRight: '4px !important',
+  },
+  '.cm-completionLabel': {
+    color: '#abb2bf !important',
+  },
+  '.cm-completionMatchedText': {
+    color: '#f28c52 !important',
+    textDecoration: 'none !important',
+    fontWeight: '600 !important',
+  },
+  '.cm-completionDetail': {
+    color: '#636d83 !important',
+    fontStyle: 'italic !important',
+  },
+  // Lint gutter & tooltips
+  '.cm-lint-marker': {
+    width: '8px !important',
+    height: '8px !important',
+  },
+  '.cm-lint-marker-error': {
+    content: '"" !important',
+    backgroundColor: '#f44747 !important',
+    borderRadius: '50% !important',
+  },
+  '.cm-lint-marker-warning': {
+    content: '"" !important',
+    backgroundColor: '#f7931e !important',
+    borderRadius: '50% !important',
+  },
+  '.cm-lint-marker-info': {
+    content: '"" !important',
+    backgroundColor: '#528bff !important',
+    borderRadius: '50% !important',
+  },
+  '.cm-tooltip-lint': {
+    backgroundColor: '#1a1a1a !important',
+    border: '1px solid #3a3a3a !important',
+    borderRadius: '6px !important',
+    padding: '8px 12px !important',
+    color: '#abb2bf !important',
+    fontSize: '13px !important',
+  },
+  // Minimap
+  '.cm-minimap': {
+    backgroundColor: '#0a0a0a !important',
+    borderLeft: '1px solid #1a1a1a !important',
+  },
+  '.cm-minimap-overlay': {
+    backgroundColor: 'rgba(82, 139, 255, 0.15) !important',
+    borderTop: '1px solid rgba(82, 139, 255, 0.3)',
+    borderBottom: '1px solid rgba(82, 139, 255, 0.3)',
+  },
 });
 
 /** VS Code Dark+ inspired syntax highlighting */

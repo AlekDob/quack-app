@@ -6,6 +6,9 @@
  * @module EditorEmptyState
  */
 
+const isMac = typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac');
+const MOD_KEY = isMac ? 'Cmd' : 'Ctrl';
+
 function EditorEmptyState() {
   return (
     <div className="editor-empty-state">
@@ -16,7 +19,7 @@ function EditorEmptyState() {
         </svg>
       </div>
       <p className="editor-empty-state-text">
-        Nessun file aperto. Apri un file dal chat o usa Cmd+P.
+        Nessun file aperto. Apri un file dal chat o usa {MOD_KEY}+P.
       </p>
     </div>
   );

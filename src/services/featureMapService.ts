@@ -66,11 +66,13 @@ export function parseFeatureDoc(
   const bodyMatch = normalized.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
   const body = bodyMatch ? bodyMatch[1] : normalized;
 
-  // Title from first H2 heading
+  // Title from first H2 heading, strip leading "NNN - " or "NNN " prefix
   const h2Match = body.match(/^##\s+(.+)$/m);
+  // Brain: gotcha-windows-path-separators
   // Fallback title from filename
-  const filename = filePath.split('/').pop()?.replace('.md', '') ?? 'unknown';
-  const title = h2Match ? h2Match[1].trim() : filename;
+  const filename = filePath.split(/[\\/]/).pop()?.replace('.md', '') ?? 'unknown';
+  const rawTitle = h2Match ? h2Match[1].trim() : filename;
+  const title = rawTitle.replace(/^\d{2,4}\s*[-–—]\s*/, '').replace(/^\d{2,4}\s+/, '');
 
   // Purpose: line starting with **Purpose:**
   const purposeMatch = body.match(/\*\*Purpose:\*\*\s*(.+)$/m);
@@ -86,6 +88,7 @@ export function parseFeatureDoc(
     stack: fm.stack || '',
     files,
     docPath: filePath,
+    image: fm.image || undefined,
   };
 }
 

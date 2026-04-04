@@ -3,32 +3,18 @@
  * Composes: data hook + canvas + popover + annotations + toolbar
  */
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useFeatureMapData } from '../../hooks/useFeatureMapData';
-import { useAnnotations } from '../../hooks/useAnnotations';
+import { useWhiteboardFile } from '../../hooks/useWhiteboardFile';
+import { IMAGE_DEFAULT_W, IMAGE_DEFAULT_H } from './annotationTypes';
 import FeatureMapCanvas from './FeatureMapCanvas';
 import type { NodeClickInfo } from './FeatureMapCanvas';
 import FeatureMapPopover from './FeatureMapPopover';
 import AnnotationToolbar from './AnnotationToolbar';
-import type { NodePosition } from './featureMapTypes';
 import type { AnnotationMode } from './annotationTypes';
+import { normalizeToForwardSlash } from '../../utils/platform';
 import './FeatureMapView.css';
-
-const POS_KEY = 'quack:featureMap:positions:';
-
-function loadPositions(path: string): Map<string, NodePosition> {
-  try {
-    const raw = localStorage.getItem(POS_KEY + path);
-    if (!raw) return new Map();
-    return new Map(Object.entries(JSON.parse(raw) as Record<string, NodePosition>));
-  } catch { return new Map(); }
-}
-
-function savePositions(path: string, m: Map<string, NodePosition>) {
-  const obj: Record<string, NodePosition> = {};
-  m.forEach((v, k) => { obj[k] = v; });
-  localStorage.setItem(POS_KEY + path, JSON.stringify(obj));
-}
 
 interface Props {
   projectPath?: string;
@@ -37,36 +23,100 @@ interface Props {
 
 export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Props) {
   const { graph, loading, error, refresh } = useFeatureMapData(projectPath);
-  const ann = useAnnotations(projectPath);
+  const wb = useWhiteboardFile(projectPath);
   const [clickInfo, setClickInfo] = useState<NodeClickInfo | null>(null);
-  const [customPositions, setCustomPositions] = useState<Map<string, NodePosition>>(new Map());
   const [annotationMode, setAnnotationMode] = useState<AnnotationMode>('select');
   const [selectedAnnId, setSelectedAnnId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingImagePos = useRef<{ x: number; y: number } | null>(null);
 
-  useEffect(() => {
-    if (projectPath) setCustomPositions(loadPositions(projectPath));
+  /** Save an image file to documentation/features/images/ and return relative path */
+  const saveImageFile = useCallback(async (file: File): Promise<string> => {
+    if (!projectPath) throw new Error('No project path');
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? 'png';
+    const name = `${crypto.randomUUID().slice(0, 8)}.${ext}`;
+    const normProject = normalizeToForwardSlash(projectPath);
+    const dir = `${normProject}/documentation/features/images`;
+    // Ensure directory exists
+    try { await invoke('create_directory', { path: dir }); } catch { /* exists */ }
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await invoke('write_binary_file', { path: `${dir}/${name}`, data: Array.from(bytes) });
+    return `images/${name}`;
   }, [projectPath]);
+
+  const handleImageFilePick = useCallback((x: number, y: number) => {
+    pendingImagePos.current = { x, y };
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileInputChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !pendingImagePos.current) {
+      // User cancelled file picker — reset to select
+      setAnnotationMode('select');
+      return;
+    }
+    const pos = pendingImagePos.current;
+    pendingImagePos.current = null;
+    try {
+      const src = await saveImageFile(file);
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const ratio = img.naturalWidth / img.naturalHeight;
+        const w = IMAGE_DEFAULT_W;
+        const h = w / ratio;
+        wb.addImage(src, pos.x, pos.y, w, h);
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => {
+        wb.addImage(src, pos.x, pos.y);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    } catch { /* silent */ }
+    // Reset input + mode after use
+    e.target.value = '';
+    setAnnotationMode('select');
+  }, [saveImageFile, wb]);
+
+  const handleImageDrop = useCallback(async (file: File, x: number, y: number) => {
+    try {
+      const src = await saveImageFile(file);
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const ratio = img.naturalWidth / img.naturalHeight;
+        const w = IMAGE_DEFAULT_W;
+        const h = w / ratio;
+        wb.addImage(src, x, y, w, h);
+        URL.revokeObjectURL(url);
+      };
+      img.onerror = () => {
+        wb.addImage(src, x, y);
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
+    } catch { /* silent */ }
+    setAnnotationMode('select');
+  }, [saveImageFile, wb]);
 
   const selectedNodeId = clickInfo?.nodeId ?? null;
-  const hasCustom = customPositions.size > 0;
+  const hasCustom = wb.hasCustomPositions;
 
+  const handleResetMode = useCallback(() => setAnnotationMode('select'), []);
   const handleNodeSelect = useCallback((info: NodeClickInfo | null) => setClickInfo(info), []);
   const handleNodeDrag = useCallback((nodeId: string, x: number, y: number) => {
-    setCustomPositions(prev => {
-      const next = new Map(prev); next.set(nodeId, { x, y });
-      if (projectPath) savePositions(projectPath, next);
-      return next;
-    });
-  }, [projectPath]);
+    wb.setNodePosition(nodeId, x, y);
+  }, [wb]);
 
   const handleResetLayout = useCallback(() => {
-    setCustomPositions(new Map());
-    if (projectPath) localStorage.removeItem(POS_KEY + projectPath);
-    ann.clearAll();
-  }, [projectPath, ann]);
+    wb.clearAll();
+  }, [wb]);
 
   const handleFileClick = useCallback((rel: string) => {
-    onOpenFileInEditor?.(projectPath ? `${projectPath}/${rel}` : rel);
+    const base = projectPath ? normalizeToForwardSlash(projectPath) : '';
+    onOpenFileInEditor?.(base ? `${base}/${rel}` : rel);
   }, [onOpenFileInEditor, projectPath]);
 
   const handleNodeNavigate = useCallback((nodeId: string) => {
@@ -78,9 +128,18 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
     [graph?.nodes, selectedNodeId],
   );
 
+  const MODES: AnnotationMode[] = ['select', 'postit', 'group', 'image'];
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setClickInfo(null); setAnnotationMode('select'); }
+      if (e.key === 'Control') {
+        e.preventDefault();
+        setAnnotationMode(prev => {
+          const idx = MODES.indexOf(prev);
+          return MODES[(idx + 1) % MODES.length];
+        });
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -117,7 +176,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
         <div className="fm-stats">
           {graph.nodes.length} features &middot; {graph.links.length} connections
         </div>
-        {(hasCustom || ann.hasAnnotations) && (
+        {(hasCustom || wb.hasAnnotations) && (
           <button className="fm-reset-btn" onClick={handleResetLayout} title="Reset all">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M3 12a9 9 0 019-9 9.75 9.75 0 016.74 2.74L21 8" />
@@ -140,22 +199,33 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
             graph={graph}
             onNodeSelect={handleNodeSelect}
             selectedNodeId={selectedNodeId}
-            customPositions={customPositions}
+            customPositions={wb.customPositions}
             onNodeDrag={handleNodeDrag}
-            annotations={ann.annotations}
+            annotations={wb.annotations}
             annotationMode={annotationMode}
             selectedAnnotationId={selectedAnnId}
             onAnnotationSelect={setSelectedAnnId}
-            onPostItAdd={ann.addPostIt}
-            onPostItUpdate={ann.updatePostIt}
-            onPostItRemove={ann.removePostIt}
-            onGroupAdd={ann.addGroup}
-            onGroupUpdate={ann.updateGroup}
-            onGroupRemove={ann.removeGroup}
+            onPostItAdd={wb.addPostIt}
+            onPostItUpdate={wb.updatePostIt}
+            onPostItRemove={wb.removePostIt}
+            onGroupAdd={wb.addGroup}
+            onGroupUpdate={wb.updateGroup}
+            onGroupRemove={wb.removeGroup}
+            onImageAdd={wb.addImage}
+            onImageUpdate={wb.updateImage}
+            onImageRemove={wb.removeImage}
+            onImageFilePick={handleImageFilePick}
+            onImageDrop={handleImageDrop}
+            projectPath={projectPath ?? ''}
+            onResetMode={handleResetMode}
           />
           <AnnotationToolbar mode={annotationMode} onModeChange={setAnnotationMode} />
         </div>
       </div>
+
+      {/* Hidden file input for image picker */}
+      <input ref={fileInputRef} type="file" accept="image/*"
+        style={{ display: 'none' }} onChange={handleFileInputChange} />
 
       {selectedNode && clickInfo && (
         <FeatureMapPopover
@@ -163,7 +233,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
           screenX={clickInfo.screenX} screenY={clickInfo.screenY}
           onClose={() => setClickInfo(null)}
           onFileClick={handleFileClick} onNodeNavigate={handleNodeNavigate}
-          onOpenDoc={onOpenFileInEditor}
+          onOpenDoc={onOpenFileInEditor} projectPath={projectPath}
         />
       )}
     </div>

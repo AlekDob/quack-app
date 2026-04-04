@@ -163,16 +163,45 @@ pub fn get_login_path() -> String {
         .unwrap_or_else(get_extended_path)
 }
 
-/// Build extended PATH for macOS app bundles.
-/// When launched as .app, Tauri processes don't inherit the user's shell PATH,
-/// so tools installed via Homebrew, nvm, volta, fnm, etc. are invisible.
+/// Build extended PATH for GUI-launched app bundles.
+/// When launched as .app (macOS) or from Start Menu (Windows), Tauri processes
+/// don't inherit the user's shell PATH, so tools installed via Homebrew, nvm,
+/// volta, fnm, etc. are invisible.
 ///
 /// This is used as a fallback when login-shell capture fails, and also by
 /// `prerequisites.rs` for prerequisite checks.
+// Brain: fix-windows-shell-env-path
+// Brain: gotcha-windows-path-separators
 pub fn get_extended_path() -> String {
     let current = env::var("PATH").unwrap_or_default();
     let home = dirs::home_dir().unwrap_or_default();
 
+    #[cfg(target_os = "windows")]
+    let extra_dirs: Vec<String> = {
+        let appdata = env::var("APPDATA").unwrap_or_default();
+        let localappdata = env::var("LOCALAPPDATA").unwrap_or_default();
+        let programfiles = env::var("ProgramFiles")
+            .unwrap_or_else(|_| r"C:\Program Files".to_string());
+        vec![
+            // Default Node.js installer location
+            format!(r"{}\nodejs", programfiles),
+            // nvm-windows
+            format!(r"{}\nvm", appdata),
+            // volta
+            home.join(".volta").join("bin")
+                .to_string_lossy().to_string(),
+            // fnm
+            format!(r"{}\fnm_multishells", localappdata),
+            home.join(".fnm").join("aliases").join("default")
+                .to_string_lossy().to_string(),
+            // pnpm global
+            format!(r"{}\pnpm", localappdata),
+            // npm global
+            format!(r"{}\npm", appdata),
+        ]
+    };
+
+    #[cfg(not(target_os = "windows"))]
     let extra_dirs: Vec<String> = vec![
         // Homebrew (Apple Silicon + Intel)
         "/opt/homebrew/bin".to_string(),
@@ -208,5 +237,10 @@ pub fn get_extended_path() -> String {
 
     let mut parts: Vec<String> = extra_dirs;
     parts.push(current);
-    parts.join(":")
+
+    // Brain: fix-windows-shell-env-path
+    #[cfg(target_os = "windows")]
+    { parts.join(";") }
+    #[cfg(not(target_os = "windows"))]
+    { parts.join(":") }
 }

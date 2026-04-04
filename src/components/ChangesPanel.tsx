@@ -26,6 +26,8 @@ interface ChangesPanelProps {
   // History tab (US2)
   history?: GitCommitEntry[]
   historyLoading?: boolean
+  // Agent commit detection — bumped by parent when agent runs `git commit`
+  lastRefreshTs?: number
 }
 
 interface DiffState {
@@ -46,6 +48,7 @@ export default function ChangesPanel({
   projectName,
   history,
   historyLoading,
+  lastRefreshTs,
 }: ChangesPanelProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('pending')
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set())
@@ -67,50 +70,58 @@ export default function ChangesPanel({
   const pendingEntries = allEntries.filter(([fp]) => !committedFiles.has(fp))
   const committedEntries = allEntries.filter(([fp]) => committedFiles.has(fp))
 
-  // Window focus: reconcile modifiedFiles with actual git status
-  useEffect(() => {
-    const handleFocus = async () => {
-      if (!rootPath || modifiedFiles.size === 0) return
-      const relativePaths = Array.from(modifiedFiles.keys()).map((fp) => {
-        if (rootPath && fp.startsWith(rootPath)) {
-          let rel = fp.substring(rootPath.length)
-          if (rel.startsWith('/')) rel = rel.substring(1)
-          return rel
-        }
-        return fp
-      })
-
-      try {
-        const stillDirty = await invoke<string[]>('git_check_files_dirty', {
-          paths: relativePaths,
-          rootPath,
-        })
-        const dirtySet = new Set(stillDirty)
-
-        // Files no longer dirty → mark as committed
-        const newCommitted = new Set(committedFiles)
-        let changed = false
-        for (const [fp] of modifiedFiles.entries()) {
-          const rel = rootPath && fp.startsWith(rootPath)
-            ? fp.substring(rootPath.length).replace(/^\//, '')
-            : fp
-          if (!dirtySet.has(rel) && !committedFiles.has(fp)) {
-            newCommitted.add(fp)
-            changed = true
-          }
-        }
-        if (changed) {
-          setCommittedFiles(newCommitted)
-          onRefreshGitStatus()
-        }
-      } catch {
-        // Silent fail — will retry on next focus
+  // Reconcile modifiedFiles with actual git status (shared by window focus + agent commit detection)
+  const reconcileWithGit = useCallback(async () => {
+    if (!rootPath || modifiedFiles.size === 0) return
+    const relativePaths = Array.from(modifiedFiles.keys()).map((fp) => {
+      if (rootPath && fp.startsWith(rootPath)) {
+        let rel = fp.substring(rootPath.length)
+        if (rel.startsWith('/')) rel = rel.substring(1)
+        return rel
       }
-    }
+      return fp
+    })
 
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
+    try {
+      const stillDirty = await invoke<string[]>('git_check_files_dirty', {
+        paths: relativePaths,
+        rootPath,
+      })
+      const dirtySet = new Set(stillDirty)
+
+      // Files no longer dirty → mark as committed
+      const newCommitted = new Set(committedFiles)
+      let changed = false
+      for (const [fp] of modifiedFiles.entries()) {
+        const rel = rootPath && fp.startsWith(rootPath)
+          ? fp.substring(rootPath.length).replace(/^\//, '')
+          : fp
+        if (!dirtySet.has(rel) && !committedFiles.has(fp)) {
+          newCommitted.add(fp)
+          changed = true
+        }
+      }
+      if (changed) {
+        setCommittedFiles(newCommitted)
+        onRefreshGitStatus()
+      }
+    } catch {
+      // Silent fail — will retry on next trigger
+    }
   }, [rootPath, modifiedFiles, committedFiles, onRefreshGitStatus])
+
+  // Window focus: reconcile with git when user switches back to the app
+  useEffect(() => {
+    window.addEventListener('focus', reconcileWithGit)
+    return () => window.removeEventListener('focus', reconcileWithGit)
+  }, [reconcileWithGit])
+
+  // Agent commit detection: reconcile when parent detects an agent `git commit`
+  useEffect(() => {
+    if (lastRefreshTs && lastRefreshTs > 0) {
+      void reconcileWithGit()
+    }
+  }, [lastRefreshTs, reconcileWithGit])
 
   const shortenPath = (fullPath: string): string => {
     const parts = fullPath.split('/').filter(Boolean)

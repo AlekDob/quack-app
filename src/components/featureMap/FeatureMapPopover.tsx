@@ -5,7 +5,9 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { invoke } from '@tauri-apps/api/core';
 import type { FeatureNode, FeatureLink } from './featureMapTypes';
+import { normalizeToForwardSlash } from '../../utils/platform';
 import './FeatureMapView.css';
 
 interface Props {
@@ -18,18 +20,42 @@ interface Props {
   onFileClick: (path: string) => void;
   onNodeNavigate: (nodeId: string) => void;
   onOpenDoc?: (docPath: string) => void;
+  projectPath?: string;
 }
 
 const POP_W = 340;
 
 export default function FeatureMapPopover({
   node, links, allNodes, screenX, screenY,
-  onClose, onFileClick, onNodeNavigate, onOpenDoc,
+  onClose, onFileClick, onNodeNavigate, onOpenDoc, projectPath,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ x: 0, y: 0, ready: false });
   const [showFiles, setShowFiles] = useState(false);
   const [showConnected, setShowConnected] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  // Load feature image from frontmatter
+  useEffect(() => {
+    if (!node.image || !projectPath) { setImageUrl(null); return; }
+    let revoke: string | null = null;
+    const normProject = normalizeToForwardSlash(projectPath);
+    const absPath = `${normProject}/documentation/features/${node.image}`;
+    invoke<number[]>('read_binary_file', { path: absPath })
+      .then(bytes => {
+        const ext = node.image!.split('.').pop()?.toLowerCase() ?? 'png';
+        const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+          : ext === 'gif' ? 'image/gif'
+          : ext === 'webp' ? 'image/webp'
+          : 'image/png';
+        const blob = new Blob([new Uint8Array(bytes)], { type: mime });
+        const url = URL.createObjectURL(blob);
+        revoke = url;
+        setImageUrl(url);
+      })
+      .catch(() => setImageUrl(null));
+    return () => { if (revoke) URL.revokeObjectURL(revoke); };
+  }, [node.image, projectPath]);
 
   // Connected features
   const connectedIds = new Set<string>();
@@ -111,6 +137,14 @@ export default function FeatureMapPopover({
         </button>
       </div>
 
+      {/* Feature image preview */}
+      {imageUrl && (
+        <div className="fm-pop-image">
+          <img src={imageUrl} alt={node.title}
+            style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8 }} />
+        </div>
+      )}
+
       {/* Purpose */}
       {node.purpose && (
         <p className="fm-pop-purpose">{node.purpose}</p>
@@ -152,7 +186,7 @@ export default function FeatureMapPopover({
                     title={file.purpose}>
                     <span className="fm-file-type">{file.type}</span>
                     <span className="fm-file-path">
-                      {file.path.split('/').pop()}
+                      {file.path.split(/[\\/]/).pop()}
                     </span>
                   </button>
                 </li>

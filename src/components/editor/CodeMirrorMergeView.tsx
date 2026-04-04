@@ -72,7 +72,7 @@ function CodeMirrorMergeViewComponent({ original, modified, filePath }: CodeMirr
       style={{
         flex: 1,
         overflow: 'auto',
-        fontFamily: 'JetBrains Mono, SF Mono, Monaco, Inconsolata, "Courier New", monospace',
+        fontFamily: '"JetBrains Mono", "Cascadia Code", "Cascadia Mono", "SF Mono", Monaco, Consolas, Inconsolata, "Courier New", monospace',
         fontSize: '14px',
       }}
     />

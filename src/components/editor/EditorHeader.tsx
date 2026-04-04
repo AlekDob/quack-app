@@ -10,13 +10,19 @@
 import { useEditorStore } from '../../stores/editorStore';
 import EditorIDEDropdown from './EditorIDEDropdown';
 
-/** Extract path segments for breadcrumb display */
+// Brain: gotcha-windows-path-separators
+/** Extract path segments for breadcrumb display (cross-platform) */
 function buildBreadcrumb(filePath: string): string[] {
-  const parts = filePath.split('/');
+  const parts = filePath.split(/[\\/]/);
   return parts.length > 3 ? ['...', ...parts.slice(-3)] : parts;
 }
 
-function EditorHeader() {
+interface EditorHeaderProps {
+  outlineOpen?: boolean;
+  onToggleOutline?: () => void;
+}
+
+function EditorHeader({ outlineOpen, onToggleOutline }: EditorHeaderProps) {
   const filePath = useEditorStore(s => s.filePath);
   const mode = useEditorStore(s => s.mode);
   const isDirty = useEditorStore(s => s.isDirty);
@@ -49,6 +55,14 @@ function EditorHeader() {
       <div className="editor-header-right">
         {isEditMode && (
           <>
+            <button
+              type="button"
+              className={`editor-btn editor-btn-outline${outlineOpen ? ' active' : ''}`}
+              onClick={onToggleOutline}
+              title="Toggle Outline"
+            >
+              &#9776;
+            </button>
             <button
               type="button"
               className="editor-btn editor-btn-save"

@@ -12,11 +12,15 @@ import { lazy, Suspense, useRef, useCallback } from 'react';
 import { useEditorStore } from '../../stores/editorStore';
 import CodeEditorSkeleton from '../skeletons/CodeEditorSkeleton';
 import CodeEditorEngine from './CodeEditorEngine';
-import type { CodeEditorRef } from './editorTypes';
+import type { CodeEditorRef, EditorSelectionInfo } from './editorTypes';
 
 const CodeMirrorMergeView = lazy(() => import('./CodeMirrorMergeView'));
 
-function EditorContent() {
+interface EditorContentProps {
+  onSelectionChange?: (selection: EditorSelectionInfo | null) => void;
+}
+
+function EditorContent({ onSelectionChange }: EditorContentProps) {
   const mode = useEditorStore(s => s.mode);
   const filePath = useEditorStore(s => s.filePath);
   const content = useEditorStore(s => s.content);
@@ -58,6 +62,7 @@ function EditorContent() {
       filename={filePath}
       onChange={handleChange}
       onSave={handleSave}
+      onSelectionChange={onSelectionChange}
       lineChanges={lineChanges}
     />
   );

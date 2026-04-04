@@ -1,30 +1,34 @@
 ---
 type: feature-doc
 project: quack-app
-stack: TypeScript strict (React 18 frontend), Tauri v2 invoke API (list_directory, read_file_content)
+stack: TypeScript strict (React 18 frontend), Tauri v2 invoke API (list_directory, read_file_content, read_binary_file, write_binary_file, create_directory)
 created: 2026-04-03
-last_verified: 2026-04-03
-tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, mention, autocomplete]
+last_verified: 2026-04-04
+tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, mention, autocomplete, image, agent-bridge, skill]
+image: images/026-whiteboard-overview.png
 ---
 
 ## Feature Map Whiteboard
-**Purpose:** Interactive SVG canvas that visualizes all feature docs in `documentation/features/` as architecture layers. Nodes auto-classified into UI Components, Business Logic, and Infrastructure layers with cross-layer connections based on shared source files. Includes portal-based popover detail (with click-to-open-in-editor), sidebar accordion panel with drag-to-mention and click-to-open, mention autocomplete with feature chip, and popout window support.
+**Purpose:** Interactive SVG canvas that visualizes all feature docs in `documentation/features/` as architecture layers. Nodes auto-classified into UI Components, Business Logic, and Infrastructure layers with cross-layer connections based on shared source files. Includes portal-based popover detail (with click-to-open-in-editor and image preview), sidebar accordion panel with drag-to-mention and click-to-open, mention autocomplete with feature chip, popout window support, and canvas image annotations (drag & drop + file picker).
 **Stack:** React 18 + TypeScript strict + Tauri v2
 
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Model/Type | `src/components/featureMap/featureMapTypes.ts` | FeatureNode, FeatureFile, FeatureLink, FeatureGraph, NodePosition |
-| Service | `src/services/featureMapService.ts` | Parses feature markdown docs into FeatureGraph (parseFrontmatter, parseFilesTable, parseFeatureDoc, calculateLinks, buildFeatureGraph) |
-| Service | `src/components/featureMap/featureMapLayout.ts` | Architecture Layers layout engine — classifies nodes into layers, positions in horizontal rows (LAYERS, classifyNode, groupByLayer, calculateLayeredLayout) |
-| Component | `src/components/featureMap/FeatureMapCanvas.tsx` | SVG canvas with layers, nodes, links, annotations, pan/zoom, node drag, annotation mode handling |
-| Component | `src/components/featureMap/FeatureMapView.tsx` | Main container composing data + annotations + canvas + popover + toolbar |
-| Component | `src/components/featureMap/FeatureMapPopover.tsx` | Portal-based popover near clicked node with collapsible file list, connected features, and click-title-to-open-in-editor |
+| Model/Type | `src/components/featureMap/featureMapTypes.ts` | FeatureNode (incl. image?), FeatureFile, FeatureLink, FeatureGraph, NodePosition |
+| Service | `src/services/featureMapService.ts` | Parses feature markdown docs into FeatureGraph (parseFrontmatter, parseFilesTable, parseFeatureDoc, calculateLinks, buildFeatureGraph) — includes `image` field from frontmatter |
+| Service | `src/components/featureMap/featureMapLayout.ts` | Architecture Layers layout engine — left-aligned column layout with collapsible layers (LAYERS, classifyNode, groupByLayer, calculateLayeredLayout) |
+| Component | `src/components/featureMap/FeatureMapCanvas.tsx` | SVG canvas with minimal layer headers, collapsible layers, nodes, links, annotations (incl. images), pan/zoom with auto-fit, node drag, annotation mode handling, image drop zone, minimap |
+| Component | `src/components/featureMap/FeatureMapView.tsx` | Main container composing data + annotations + canvas + popover + toolbar + image file saving/picking |
+| Component | `src/components/featureMap/FeatureMapPopover.tsx` | Portal-based popover near clicked node with feature image preview, collapsible file list, connected features, and click-title-to-open-in-editor |
 | Component | `src/components/featureMap/CanvasPostIt.tsx` | SVG post-it note — draggable, editable text, color cycling, delete on hover |
 | Component | `src/components/featureMap/CanvasGroupRect.tsx` | SVG group rectangle — draggable, resizable (4 corner handles), editable label, color cycling |
-| Component | `src/components/featureMap/AnnotationToolbar.tsx` | Floating HTML toolbar for Select/Post-it/Group mode toggle |
-| Model/Type | `src/components/featureMap/annotationTypes.ts` | PostIt, GroupRect, CanvasAnnotations, AnnotationMode types + color constants |
-| Store/State | `src/hooks/useAnnotations.ts` | Annotation CRUD hook with localStorage persistence (addPostIt, addGroup, update, remove, clearAll) |
+| Component | `src/components/featureMap/CanvasImage.tsx` | SVG canvas image annotation — draggable, aspect-ratio resize (corner handle), delete on hover, blob URL loading from filesystem |
+| Component | `src/components/featureMap/AnnotationToolbar.tsx` | Floating HTML toolbar for Select/Post-it/Group/Image mode toggle |
+| Component | `src/components/featureMap/FeatureMapMinimap.tsx` | Minimap overview panel — node dots + viewport rect + click-to-navigate |
+| Model/Type | `src/components/featureMap/annotationTypes.ts` | PostIt, GroupRect, CanvasImage, CanvasAnnotations, WhiteboardFile, AnnotationMode types + color/dimension constants |
+| Service | `src/services/whiteboardFileService.ts` | File-based I/O for `.whiteboard.json` — readWhiteboardFile, writeWhiteboardFile, migrateFromLocalStorage (Tauri read_file_content + write_file_content) |
+| Store/State | `src/hooks/useWhiteboardFile.ts` | Unified annotation + position CRUD hook with file-based persistence + 2s polling for external changes (agent bridge) |
 | Component | `src/components/featureMap/FeatureMapDetailPanel.tsx` | Legacy slide-in sidebar (unused, kept as reference) |
 | Component | `src/components/featureMap/FeatureMapView.css` | Dark-theme styles for canvas, popover, toolbar, file list, loading/error/empty states |
 | Component | `src/components/FeaturesPanel.tsx` | Sidebar accordion panel listing features grouped by layer with drag-to-mention and click-to-open-in-editor |
@@ -39,6 +43,7 @@ tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, 
 | Component | `src/components/ChatInput.tsx` | Feature mention autocomplete section + feature chip rendering for @file:...documentation/features/... |
 | Component | `src/components/ChatInput.css` | Feature chip styles (.chat-input-feature-chip) |
 | Util | `src/utils/agentMentions.ts` | Excludes structured mentions (@file:, @skill:) from agent matching |
+| Skill | `.claude/commands/whiteboard.md` | Agent skill for whiteboard interaction — list, add-postit, add-group, move, clear, organize |
 
 ### Data Flow
 `documentation/features/*.md` → Tauri `list_directory` + `read_file_content` → `useFeatureMapData` → `featureMapService.buildFeatureGraph()` → `FeatureGraph` → `calculateLayeredLayout()` → layer rects + node positions → SVG rendering (layers → links → nodes) → click → portal popover
@@ -50,7 +55,7 @@ tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, 
 - `calculateLinks(nodes) → FeatureLink[]` — O(n^2) comparison of file paths to find shared files
 - `classifyNode(node) → layerId` — scores node tags against layer keywords to auto-classify
 - `groupByLayer(nodes) → Map<layerId, FeatureNode[]>` — groups nodes by classified layer
-- `calculateLayeredLayout(nodes, canvasWidth) → LayoutResult` — positions nodes in horizontal rows within layer rectangles
+- `calculateLayeredLayout(nodes, canvasWidth, collapsedLayers?) → LayoutResult` — positions nodes in left-aligned columns; skips collapsed layers; returns totalWidth/totalHeight for fit-to-content zoom
 
 ### Architecture Layers
 | Layer | Color | Keywords |
@@ -59,19 +64,48 @@ tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, 
 | Business Logic | Purple (#c084fc) | permission, delegation, team, remote-api, agent-mode, sdk, build, plan, ask, debug, chat, mention |
 | Infrastructure | Slate (#94a3b8) | terminal, ide, context-injection, saved-commands, git, tauri |
 
+### Layout System
+- **Left-aligned column layout**: nodes anchored to left margin (`LEFT_MARGIN=30`), right area free for annotations/workspace
+- **Dynamic columns**: 1 column if <= 3 features total, otherwise 2 columns (`DEFAULT_COLS=2`)
+- **Node dimensions**: 240x72px (`NODE_W`/`NODE_H`), 12px border radius, 20px horizontal gap, 14px vertical gap
+- **Minimal layer headers**: collapse arrow (triangle) + layer label + node count — no background rectangles, only a subtle 0.5px underline at `opacity=0.2`
+- **Collapsible layers**: click layer header to collapse/expand; collapsed layers set rows=0 and hide their nodes; state in `collapsedLayers: Set<string>` (component state)
+- **Section gap**: 24px between layer sections (`SECTION_GAP`), 32px reserved for header (`SECTION_HEADER_H`)
+- **Left-aligned node text**: title and subtitle use `textAnchor="start"` at `x=-NW/2+14` (14px inset from left edge)
+
+### Fit-to-Content Zoom
+- On first render, auto-calculates zoom to fit all content within the viewport
+- `zoomX = containerWidth / (totalWidth + 40px padding)`
+- `zoomY = containerHeight / (totalHeight + 40px padding)`
+- Zoom clamped between 0.4 and 1.0 (`Math.min(Math.max(0.4, Math.min(zoomX, zoomY, 1)), 1)`)
+- Pan offset set to `padding/2` (20px) for centering
+- Fires only once via `hasAutoFit` ref guard; does not re-trigger on resize or data change
+
+### Minimap
+- Small overview panel (160x100px) in bottom-right corner, `position: absolute`
+- Shows all nodes as colored dots (`r=3`) using layer border colors
+- Displays current viewport as a transparent rectangle with white 30% opacity stroke
+- Click anywhere on minimap to navigate: converts minimap coords to SVG coords, centers viewport
+- Scale factor: `Math.min(fitX, fitY)` where fit = `(dimension - 12px padding) / totalLayoutDimension`
+- Glass-morphism background: `rgba(10,14,26,0.85)` + `backdrop-filter: blur(8px)` + 1px border at 8% white
+- Hidden when graph has 0 nodes
+- Component: `FeatureMapMinimap.tsx`
+
 ### State
 - `graph`: FeatureGraph | null — parsed feature graph (component state)
 - `loading/error`: fetch state (component state)
 - `clickInfo`: {nodeId, screenX, screenY} | null — popover anchor (component state)
-- `customPositions`: Map<nodeId, {x, y}> — user-dragged overrides (component state + localStorage)
+- `customPositions`: Map<nodeId, {x, y}> — user-dragged overrides (from useWhiteboardFile hook, persisted to .whiteboard.json)
+- `collapsedLayers`: Set<string> — layer IDs currently collapsed (component state)
 - `hovered`: string | null — node under cursor for dimming effect (canvas state)
-- `viewport`: {zoom, panX, panY} — canvas pan/zoom (canvas state)
+- `viewport`: {zoom, panX, panY} — canvas pan/zoom with fit-to-content auto-fit on first render (canvas state)
+- `hasAutoFit`: ref<boolean> — guards one-time fit-to-content zoom calculation (canvas ref)
 - `size`: {w, h} — ResizeObserver-tracked container dimensions (canvas state)
 - `draggingId`: string | null — node currently being dragged (canvas state)
 
 ### Node Drag-to-Reposition
 - Nodes can be dragged to custom positions; auto-layout is the default
-- Custom positions persisted in `localStorage` key: `quack:featureMap:positions:{projectPath}`
+- Custom positions persisted in `documentation/features/.whiteboard.json` (positions field)
 - Yellow dot indicator on nodes with custom positions
 - "Reset" button in header clears all overrides (visible only when custom positions exist)
 - Three interaction modes distinguished via separate refs with drag threshold:
@@ -79,14 +113,34 @@ tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, 
   - **Node click**: mousedown on node → no movement → release → open popover
   - **Node drag**: mousedown on node → movement past threshold → reposition node
 
-### Annotations (Post-its + Group Rectangles)
+### Annotations (Post-its + Group Rectangles + Images)
 - **Post-it notes**: click canvas in Post-it mode to create; drag to move; click to edit text; hover for delete/color buttons; 6 preset colors cycling
 - **Group rectangles**: click-drag canvas in Group mode to draw; resizable via 4 corner handles; editable label (click); dashed border when unselected
-- Annotations stored in localStorage key: `quack:featureMap:annotations:{projectPath}`
-- Z-order (bottom→top): group rects → layer backgrounds → links → feature nodes → post-its
-- Toolbar (floating, bottom-center): Select / Post-it / Group mode toggle
+- **Images**: drag & drop from OS or Image mode + file picker; draggable; aspect-ratio resize; saved to filesystem (see Canvas Images section)
+- Annotations + node positions stored in `documentation/features/.whiteboard.json` (file-based, replaces localStorage)
+- Z-order (bottom→top): group rects → **images** → layer backgrounds → links → feature nodes → post-its
+- Toolbar (floating, bottom-center): Select / Post-it / Group / Image mode toggle
 - Escape key resets to Select mode
-- `useAnnotations` hook: CRUD operations with auto-persist
+- `useWhiteboardFile` hook: unified CRUD for annotations + positions with file persistence + 2s external change polling
+
+### Canvas Images
+- **Insert via toolbar**: select Image mode in toolbar, click canvas → file picker opens, selected image placed at click point
+- **Insert via drag & drop**: drag image file from OS (Finder/Explorer) onto the canvas → image placed at drop point
+- Images saved to `documentation/features/images/{uuid}.{ext}` via Tauri `write_binary_file`
+- `CanvasImage` SVG component: `<image>` element with blob URL loaded via `read_binary_file`
+- Draggable (same pattern as post-it), aspect-ratio-locked resize via bottom-right corner handle
+- Delete button on hover (red circle), border highlight when selected
+- Blob URLs cached per component instance, revoked on unmount
+- Z-order: rendered between group rects and layer backgrounds (Z1.5)
+- Annotations stored in `.whiteboard.json` (same `CanvasAnnotations` structure, `images: CanvasImage[]` array)
+- Migration: existing localStorage data auto-migrated to file on first load; missing `images` field gets empty array fallback
+
+### Feature Image (Frontmatter)
+- Add `image: images/screenshot.png` to feature doc YAML frontmatter
+- Parsed by `parseFeatureDoc()` in `featureMapService.ts` → `FeatureNode.image?: string`
+- Relative path from `documentation/features/` directory
+- Displayed as preview at top of popover (max-height: 160px, object-fit: cover)
+- Loaded via `read_binary_file` → blob URL (same pattern as canvas images)
 
 ### Drag-to-Mention (Sidebar Panel)
 - MIME type: `application/quack-feature`
@@ -120,14 +174,34 @@ tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, 
 - Features section positioned after File Explorer (order index 2)
 - Gold color (#FFD700) for category
 
+### File-Based Storage (Agent Bridge)
+- All whiteboard state stored in `documentation/features/.whiteboard.json`
+- Schema: `WhiteboardFile { version: 1, annotations: CanvasAnnotations, positions: Record<string, {x,y}> }`
+- `whiteboardFileService.ts`: read/write via Tauri `read_file_content`/`write_file_content`
+- `useWhiteboardFile` hook polls file every 2s (`POLL_MS`) to detect external changes (agent writes)
+- Write-lock: ignores poll results within 500ms (`WRITE_LOCK_MS`) of own writes to prevent flickering
+- Change detection: compares JSON string of file content against last known state
+- Migration: on first load, if file missing, migrates from legacy localStorage keys (`quack:featureMap:annotations:` + `quack:featureMap:positions:`)
+
+### Agent Skill (`/whiteboard`)
+- Skill file: `.claude/commands/whiteboard.md`
+- Operates via `Read`/`Write` tools on `.whiteboard.json` — no Tauri or React dependency
+- Actions: `list` (show state), `add-postit` (with `--color`/`--near`), `add-group` (with `--around`), `move` (reposition node), `clear` (selective reset), `organize` (auto-layout + groups + summary)
+- Changes appear on canvas within 2s (polling interval)
+- Embeds layer classification keywords and layout constants for accurate positioning
+
 ### External Dependencies
 - Zero external deps — pure SVG rendering (no PixiJS/WebGL)
-- Tauri commands: `list_directory`, `read_file_content` (existing, zero new Rust)
+- Tauri commands: `list_directory`, `read_file_content`, `write_file_content`, `read_binary_file`, `write_binary_file`, `create_directory` (all existing, zero new Rust)
 
 ### Config
 - Layer definitions in `LAYERS` array (featureMapLayout.ts)
-- Node dimensions: 240x72px, 12px border radius
-- Max columns: dynamic based on canvas width (2-4)
+- Node dimensions: 240x72px (`NODE_W`/`NODE_H`), 12px border radius (`NR`)
+- Left margin: 30px (`LEFT_MARGIN`)
+- Section header height: 32px, section gap: 24px
+- Columns: 1 if <= 3 nodes, else 2 (`DEFAULT_COLS`)
+- Minimap: 160x100px (`MM_W`/`MM_H`), dot radius 3px, padding 6px
+- Auto-fit zoom range: 0.4-1.0, manual zoom range: 0.3-2.5
 
 ### UI Language
 - All user-facing strings in English (international audience)

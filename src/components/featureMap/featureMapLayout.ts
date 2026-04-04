@@ -84,15 +84,13 @@ export function groupByLayer(
 }
 
 // Layout constants
-const LAYER_PADDING_X = 24;
-const LAYER_PADDING_TOP = 44; // Space for layer label
-const LAYER_PADDING_BOTTOM = 20;
-const NODE_W = 240;
-const NODE_H = 72;
-const NODE_GAP_X = 28;
-const NODE_GAP_Y = 16;
-const LAYER_GAP = 20;
-const NODES_PER_ROW = 4;
+export const LEFT_MARGIN = 30;
+export const LEGEND_H = 36;       // Space for legend row at top
+export const NODE_W = 240;
+export const NODE_H = 72;
+export const NODE_GAP_X = 16;
+export const NODE_GAP_Y = 12;
+const DEFAULT_COLS = 2;
 
 export interface LayerRect {
   x: number;
@@ -104,71 +102,48 @@ export interface LayerRect {
 
 export interface LayoutResult {
   positions: Map<string, NodePosition>;
-  layerRects: LayerRect[];
+  layerRects: LayerRect[];  // kept for compatibility, empty in flat mode
   totalWidth: number;
   totalHeight: number;
 }
 
-/** Calculate layered positions for all nodes */
+/** Flat layout — all nodes in 2 columns, sorted by layer then title */
 export function calculateLayeredLayout(
   nodes: FeatureNode[],
-  canvasWidth: number,
+  _canvasWidth: number,
+  _collapsedLayers?: Set<string>,
 ): LayoutResult {
-  const groups = groupByLayer(nodes);
   const positions = new Map<string, NodePosition>();
-  const layerRects: LayerRect[] = [];
 
-  // Dynamic columns based on canvas width
-  const maxCols = Math.max(2, Math.min(NODES_PER_ROW, Math.floor(
-    (canvasWidth - LAYER_PADDING_X * 2) / (NODE_W + NODE_GAP_X),
-  )));
+  // Sort: by layer order, then alphabetically by title
+  const layerOrder = LAYERS.map(l => l.id);
+  const sorted = [...nodes].sort((a, b) => {
+    const la = layerOrder.indexOf(classifyNode(a));
+    const lb = layerOrder.indexOf(classifyNode(b));
+    if (la !== lb) return la - lb;
+    return a.title.localeCompare(b.title);
+  });
 
-  const layerWidth = Math.max(
-    canvasWidth - 60,
-    maxCols * (NODE_W + NODE_GAP_X) + LAYER_PADDING_X * 2,
-  );
-  const startX = (canvasWidth - layerWidth) / 2;
+  const cols = sorted.length <= 3 ? 1 : DEFAULT_COLS;
+  const contentWidth = cols * NODE_W + (cols - 1) * NODE_GAP_X;
+  const startY = LEGEND_H + 16; // after legend
 
-  let currentY = 30;
-
-  for (const layer of LAYERS) {
-    const layerNodes = groups.get(layer.id) ?? [];
-    if (layerNodes.length === 0) continue;
-
-    const rows = Math.ceil(layerNodes.length / maxCols);
-    const layerHeight = LAYER_PADDING_TOP + rows * (NODE_H + NODE_GAP_Y)
-      - NODE_GAP_Y + LAYER_PADDING_BOTTOM;
-
-    layerRects.push({
-      x: startX,
-      y: currentY,
-      width: layerWidth,
-      height: layerHeight,
-      layer,
+  for (let i = 0; i < sorted.length; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    positions.set(sorted[i].id, {
+      x: LEFT_MARGIN + col * (NODE_W + NODE_GAP_X) + NODE_W / 2,
+      y: startY + row * (NODE_H + NODE_GAP_Y) + NODE_H / 2,
     });
-
-    // Position nodes inside this layer
-    for (let i = 0; i < layerNodes.length; i++) {
-      const col = i % maxCols;
-      const row = Math.floor(i / maxCols);
-      // Center nodes within layer
-      const nodesInRow = Math.min(maxCols, layerNodes.length - row * maxCols);
-      const rowWidth = nodesInRow * (NODE_W + NODE_GAP_X) - NODE_GAP_X;
-      const rowStartX = startX + (layerWidth - rowWidth) / 2;
-
-      positions.set(layerNodes[i].id, {
-        x: rowStartX + col * (NODE_W + NODE_GAP_X) + NODE_W / 2,
-        y: currentY + LAYER_PADDING_TOP + row * (NODE_H + NODE_GAP_Y) + NODE_H / 2,
-      });
-    }
-
-    currentY += layerHeight + LAYER_GAP;
   }
+
+  const rows = Math.ceil(sorted.length / cols);
+  const totalHeight = startY + rows * (NODE_H + NODE_GAP_Y);
 
   return {
     positions,
-    layerRects,
-    totalWidth: layerWidth + startX * 2,
-    totalHeight: currentY,
+    layerRects: [], // no layer rects in flat mode
+    totalWidth: LEFT_MARGIN + contentWidth + 60,
+    totalHeight,
   };
 }

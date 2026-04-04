@@ -47,6 +47,13 @@ export interface LineChange {
   type: 'added' | 'modified' | 'removed';
 }
 
+/** Selection state emitted by CodeEditorEngine */
+export interface EditorSelectionInfo {
+  selectedText: string;
+  startLine: number;
+  endLine: number;
+}
+
 /** Props for the CodeEditorEngine component */
 export interface CodeEditorProps {
   content: string;
@@ -55,6 +62,7 @@ export interface CodeEditorProps {
   readOnly?: boolean;
   onChange?: (value: string) => void;
   onSave?: (value: string) => void;
+  onSelectionChange?: (selection: EditorSelectionInfo | null) => void;
   diffInfo?: DiffInfo | null;
   lineChanges?: LineChange[];
 }

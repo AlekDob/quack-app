@@ -3,13 +3,13 @@ type: feature-doc
 project: quack-app
 stack: React 18 + TypeScript strict + Tauri v2 + CodeMirror 6
 created: 2026-04-02
-last_verified: 2026-04-02
-tags: [editor, codemirror, tab, diff, multi-tab, search, popout]
+last_verified: 2026-04-03
+tags: [editor, codemirror, tab, diff, multi-tab, search, popout, autocomplete, minimap, lint, code-intel, outline]
 ---
 
 ## 024 - Integrated Code Editor
-**Purpose:** Multi-tab code editor with edit/diff modes, search/replace, popout window support, and agent editFile integration.
-**Stack:** React 18, TypeScript strict, Tauri v2, CodeMirror 6, @codemirror/merge, Zustand
+**Purpose:** Multi-tab code editor with edit/diff modes, search/replace, autocomplete, minimap, lint/diagnostics, code-intel outline panel, popout window support, and agent editFile integration.
+**Stack:** React 18, TypeScript strict, Tauri v2, CodeMirror 6, @codemirror/merge, @codemirror/autocomplete, @codemirror/lint, @replit/codemirror-minimap, Zustand
 
 ### Files
 | Type | Path | Exports/Purpose |
@@ -18,20 +18,27 @@ tags: [editor, codemirror, tab, diff, multi-tab, search, popout]
 | Store/State | `src/stores/ideStore.ts` | `useIDEStore` -- IDE detection, file open target (internal/external), IDE operations |
 | Service | `src/hooks/useCodeEditorTab.ts` | `useCodeEditorTab()`, `codeEditorTabId(path)` -- per-file tab ID generation |
 | Component | `src/views/CodeEditorTabView.tsx` | Tab wrapper with lazy-loaded CodeEditorView, syncs editorStore on tab switch |
-| Component | `src/components/editor/CodeEditorView.tsx` | Main orchestrator: EditorHeader + EditorContent + EditorStatusBar |
-| Component | `src/components/editor/CodeEditorEngine.tsx` | Core CM6 component with forwardRef; search/replace imperative API |
+| Component | `src/components/editor/CodeEditorView.tsx` | Main orchestrator: EditorHeader + EditorContent + EditorOutlinePanel + EditorStatusBar |
+| Component | `src/components/editor/CodeEditorEngine.tsx` | Core CM6 component with forwardRef; search/replace, autocomplete, minimap, lint extensions |
 | Component | `src/components/editor/CodeMirrorMergeView.tsx` | Side-by-side diff via @codemirror/merge MergeView |
-| Component | `src/components/editor/EditorHeader.tsx` | Breadcrumb, mode badge, Save/Accept/Reject/Edit buttons |
+| Component | `src/components/editor/EditorHeader.tsx` | Breadcrumb, mode badge, outline toggle, Save/Accept/Reject/Edit buttons |
 | Component | `src/components/editor/EditorContent.tsx` | Mode switch: edit (CodeEditorEngine) vs diff (CodeMirrorMergeView) |
+| Component | `src/components/editor/EditorOutlinePanel.tsx` | Collapsible sidebar showing AST outline symbols via code-intel Tauri commands |
 | Component | `src/components/editor/EditorStatusBar.tsx` | Cursor position, language, encoding, save status |
 | Component | `src/components/editor/EditorEmptyState.tsx` | Empty state with code bracket icon and instructions |
 | Component | `src/components/skeletons/CodeEditorSkeleton.tsx` | Skeleton loader for lazy-loaded editor |
-| Config | `src/components/editor/editorTheme.ts` | `customTheme`, `customHighlightStyle`, `highlightExtension` -- dark theme |
+| Config | `src/components/editor/editorTheme.ts` | `customTheme`, `customHighlightStyle`, `highlightExtension` -- dark theme + autocomplete/lint/minimap styles |
 | Config | `src/components/editor/editorLanguages.ts` | `getLanguageExtension(lang)`, `supportedLanguages` -- shared CM6 language factory (23 languages) |
+| Config | `src/components/editor/editorAutocomplete.ts` | `buildAutocompleteExtension()` -- CM6 autocompletion + closeBrackets |
+| Config | `src/components/editor/editorMinimap.ts` | `buildMinimapExtension()` -- @replit/codemirror-minimap blocks display |
+| Config | `src/components/editor/editorLint.ts` | `buildLintExtension()`, `pushDiagnostics()`, `ExternalDiagnostic` -- external diagnostics via StateEffect |
 | Config | `src/components/editor/editorSearch.ts` | `setSearchMatches`, `searchMatchesField`, `findAllMatches()`, `buildSearchDecorations()` |
 | Config | `src/components/editor/editorDiff.ts` | `diffDecorationsField`, `applyDiffDecorations()` -- line-level added/modified/removed |
 | Model/Type | `src/components/editor/editorTypes.ts` | All TS interfaces: `EditorMode`, `PendingEdit`, `DiffRequest`, `CodeEditorRef`, etc. |
 | Config | `src/components/editor/index.ts` | Barrel export for editor submodules |
+| Service | `src/services/codeIntelService.ts` | `getOutline()`, `findDefinition()`, `findReferences()` -- typed Tauri invoke wrappers |
+| Rust | `src-tauri/src/code_intel.rs` | 3 Tauri commands: `code_intel_outline`, `code_intel_find_definition`, `code_intel_find_references` |
+| Bridge | `src-tauri/node-sdk/code-intel-bridge.js` | Stdin/stdout JSON bridge to tree-sitter code-intel scripts |
 | Component | `src/components/settings/categories/IDESettings.tsx` | Settings UI: preferred IDE, file open target toggle (internal/external) |
 | Route/Page | `src/tab-popout-entry.tsx` | Entry point for popout window (renders TabPopoutWindowApp) |
 | Component | `src/components/TabPopoutWindowApp.tsx` | Popout window: `case 'code-editor'` loads file via Tauri and renders CodeEditor |
@@ -88,6 +95,25 @@ User pops out code-editor tab
   -> Renders CodeEditorCodeMirror in standalone window
 ```
 
+**Outline panel (code-intel):**
+```
+User clicks outline toggle button in EditorHeader
+  -> CodeEditorView shows EditorOutlinePanel
+  -> EditorOutlinePanel calls getOutline(filePath) via codeIntelService
+  -> codeIntelService invokes Tauri 'code_intel_outline'
+  -> Rust spawns node code-intel-bridge.js (stdin JSON, stdout JSON)
+  -> Bridge calls tree-sitter getOutline() from outline.js
+  -> Symbols displayed in collapsible tree (kind icon + name + line number)
+```
+
+**Diagnostics push (tsc/eslint):**
+```
+Backend runs linter (tsc --noEmit / eslint)
+  -> Parses output into ExternalDiagnostic[] (line, column, severity, message)
+  -> pushDiagnostics(editorView, diagnostics) dispatches StateEffect
+  -> CM6 linter extension reads StateField and renders gutter markers + tooltips
+```
+
 ### Key Functions
 - `useEditorStore.openFile(path) -> Promise<void>` -- reads file via Tauri, sets edit mode
 - `useEditorStore.updateContent(content) -> void` -- updates content, tracks dirty state
@@ -104,6 +130,13 @@ User pops out code-editor tab
 - `buildSearchDecorations(matches, currentIndex) -> Range<Decoration>[]` -- highlight decorations
 - `applyDiffDecorations(view, lineChanges?, diffInfo?) -> void` -- line-level diff highlighting
 - `buildBreadcrumb(filePath) -> string[]` -- last 3 path segments for header
+- `buildAutocompleteExtension() -> Extension` -- CM6 autocomplete + closeBrackets + keymaps
+- `buildMinimapExtension() -> Extension` -- minimap sidebar via @replit/codemirror-minimap
+- `buildLintExtension() -> Extension` -- lint gutter + external diagnostics StateField
+- `pushDiagnostics(view, diagnostics) -> void` -- push ExternalDiagnostic[] into editor
+- `codeIntelService.getOutline(filePath) -> Promise<OutlineSymbol[]>` -- AST outline via Tauri
+- `codeIntelService.findDefinition(symbol, projectPath) -> Promise<FindDefinitionResult>` -- symbol definitions
+- `codeIntelService.findReferences(symbol, projectPath) -> Promise<FindReferencesResult>` -- symbol references
 
 ### State
 - `filePath`: `string | null` -- currently open file path (global)
@@ -121,11 +154,15 @@ User pops out code-editor tab
 - `@codemirror/view`, `@codemirror/state`, `@codemirror/commands`: core CM6
 - `@codemirror/language`: bracket matching, fold gutter, syntax highlighting
 - `@codemirror/search`: built-in search panel
+- `@codemirror/autocomplete`: autocompletion UI + closeBrackets
+- `@codemirror/lint`: diagnostics gutter markers + tooltips
+- `@replit/codemirror-minimap`: code overview sidebar
 - **Official CM6 langs:** `lang-javascript`, `lang-html`, `lang-css`, `lang-json`, `lang-markdown`, `lang-python`, `lang-rust`, `lang-go`, `lang-java`, `lang-php`, `lang-cpp`, `lang-sql`, `lang-yaml`, `lang-xml`, `lang-sass`, `lang-less`, `lang-vue`
 - **Legacy CM5 modes** (`@codemirror/legacy-modes` via `StreamLanguage`): Swift, Kotlin, Dart, Shell, Ruby, TOML
 - `@lezer/highlight`: syntax highlighting tags
-- `@tauri-apps/api/core`: `invoke` for file read/write
+- `@tauri-apps/api/core`: `invoke` for file read/write + code-intel commands
 - `@tauri-apps/api/event`: `listen`/`emit` for edit-file-request/response
+- `tree-sitter` (via Node.js bridge): AST-based code outline, find-definition, find-references
 
 ### Config
 - Tab ID pattern: `code-editor-${filePath}` (unique per file)
@@ -143,3 +180,7 @@ User pops out code-editor tab
 - `Modifica` -- edit/switch to edit mode
 - `Revisione modifiche` -- diff mode badge
 - `Nessun file aperto. Apri un file dal chat o usa Cmd+P.` -- empty state text
+- `Outline` -- outline panel header
+- `Caricamento...` -- outline loading state
+- `Nessun simbolo` -- outline empty state
+- `Toggle Outline` -- outline toggle button title

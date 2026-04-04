@@ -18,6 +18,7 @@ export interface FeatureNode {
   stack: string;      // From frontmatter
   files: FeatureFile[];
   docPath: string;    // Full path to the .md file
+  image?: string;     // Relative path to feature image (from frontmatter)
 }
 
 /** A connection between two feature nodes sharing source files */

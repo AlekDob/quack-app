@@ -127,6 +127,8 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Explorer refresh stale cache: `documentation/bugs/fix-file-explorer-refresh-stale-cache.md`
 - Popout search panel CSS scope: `documentation/gotchas/gotcha-popout-search-panel-css-scope.md`
 - SDK allowedTools bypasses canUseTool: `documentation/gotchas/gotcha-sdk-allowedtools-bypasses-canuse.md`
+- EditSummaryBar cumulative regression: `documentation/bugs/fix-edit-summary-bar-cumulative-regression.md`
+- Windows path separators: `documentation/gotchas/gotcha-windows-path-separators.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
@@ -147,6 +149,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Marketplace versioning: `documentation/patterns/pattern-marketplace-versioning.md`
 - Changes Panel (Codex diffs): `documentation/patterns/pattern-changes-panel.md`
 - Changes Panel all-messages fix: `documentation/bugs/fix-changes-panel-all-messages.md`
+- Agent commit detection: `documentation/patterns/pattern-agent-commit-detection.md`
 - Agent Result Card (droid reports): `documentation/patterns/pattern-agent-result-card.md`
 - HTML Visualizer (inline iframe): `documentation/patterns/pattern-html-visualizer-inline.md`
 - Brain Hooks (automated knowledge surfacing): `documentation/patterns/pattern-brain-hooks.md`

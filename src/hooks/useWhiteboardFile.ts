@@ -1,0 +1,207 @@
+/**
+ * Unified whiteboard hook — file-based persistence for annotations + node positions.
+ * Replaces useAnnotations (localStorage) with JSON file via Tauri commands.
+ * Polls for external changes (agent writes) every 2 seconds.
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import type {
+  CanvasAnnotations, PostIt, GroupRect, CanvasImage, WhiteboardFile,
+} from '../components/featureMap/annotationTypes';
+import {
+  POST_IT_COLORS, GROUP_COLORS, IMAGE_DEFAULT_W, IMAGE_DEFAULT_H,
+} from '../components/featureMap/annotationTypes';
+import type { NodePosition } from '../components/featureMap/featureMapTypes';
+import {
+  readWhiteboardFile, writeWhiteboardFile, migrateFromLocalStorage, emptyFile,
+} from '../services/whiteboardFileService';
+
+const POLL_MS = 2000;
+const WRITE_LOCK_MS = 500;
+const ONBOARDING_KEY = 'quack:featureMap:onboardingSeen:';
+
+function uid(): string { return crypto.randomUUID(); }
+
+/** Default onboarding post-its for first-time users */
+function createOnboardingPostIts(): PostIt[] {
+  const y = -80;
+  const gap = 174;
+  const startX = 560;
+  return [
+    { id: uid(), x: startX, y, color: '#60a5fa',
+      text: 'Click a feature card to see details, files, and connections' },
+    { id: uid(), x: startX + gap, y, color: '#4ade80',
+      text: 'Drag cards to rearrange. Use this right area for notes and sketches' },
+    { id: uid(), x: startX + gap * 2, y, color: '#c084fc',
+      text: 'Drop images from Finder onto the canvas to annotate your map' },
+    { id: uid(), x: startX + gap * 3, y, color: '#fbbf24',
+      text: 'Press Ctrl to cycle tools: Select, Post-it, Group, Image' },
+  ];
+}
+
+function normKey(p: string): string { return p.replace(/\\/g, '/'); }
+
+export function useWhiteboardFile(projectPath?: string) {
+  const [file, setFile] = useState<WhiteboardFile>(emptyFile());
+  const lastWriteTs = useRef(0);
+  const lastJson = useRef('');
+  const mounted = useRef(true);
+
+  // Persist to file (fire-and-forget)
+  const persist = useCallback((next: WhiteboardFile) => {
+    setFile(next);
+    if (!projectPath) return;
+    lastWriteTs.current = Date.now();
+    const json = JSON.stringify(next);
+    lastJson.current = json;
+    writeWhiteboardFile(projectPath, next).catch(() => { /* silent */ });
+  }, [projectPath]);
+
+  // Initial load + migration
+  useEffect(() => {
+    mounted.current = true;
+    if (!projectPath) return;
+
+    (async () => {
+      let data = await readWhiteboardFile(projectPath);
+
+      if (!data) {
+        // Try localStorage migration
+        const migrated = migrateFromLocalStorage(projectPath);
+        if (migrated) {
+          data = migrated;
+          await writeWhiteboardFile(projectPath, data).catch(() => {});
+        }
+      }
+
+      if (!data) {
+        // First time — onboarding
+        const key = normKey(projectPath);
+        if (!localStorage.getItem(ONBOARDING_KEY + key)) {
+          localStorage.setItem(ONBOARDING_KEY + key, '1');
+          data = { ...emptyFile(), annotations: { postIts: createOnboardingPostIts(), groups: [], images: [] } };
+          await writeWhiteboardFile(projectPath, data).catch(() => {});
+        } else {
+          data = emptyFile();
+        }
+      }
+
+      if (mounted.current) {
+        setFile(data);
+        lastJson.current = JSON.stringify(data);
+      }
+    })();
+
+    return () => { mounted.current = false; };
+  }, [projectPath]);
+
+  // Poll for external changes (agent writes)
+  useEffect(() => {
+    if (!projectPath) return;
+
+    const timer = setInterval(async () => {
+      // Skip if we wrote recently (avoid overwriting our own changes)
+      if (Date.now() - lastWriteTs.current < WRITE_LOCK_MS) return;
+
+      const data = await readWhiteboardFile(projectPath);
+      if (!data || !mounted.current) return;
+
+      const json = JSON.stringify(data);
+      if (json !== lastJson.current) {
+        lastJson.current = json;
+        setFile(data);
+      }
+    }, POLL_MS);
+
+    return () => clearInterval(timer);
+  }, [projectPath]);
+
+  // --- Annotation CRUD ---
+  const updateAnnotations = useCallback((updater: (a: CanvasAnnotations) => CanvasAnnotations) => {
+    setFile(prev => {
+      const next = { ...prev, annotations: updater(prev.annotations) };
+      persist(next);
+      return next;
+    });
+  }, [persist]);
+
+  const addPostIt = useCallback((x: number, y: number) => {
+    const p: PostIt = { id: uid(), text: '', x, y, color: POST_IT_COLORS[0] };
+    updateAnnotations(a => ({ ...a, postIts: [...a.postIts, p] }));
+    return p.id;
+  }, [updateAnnotations]);
+
+  const updatePostIt = useCallback((id: string, partial: Partial<PostIt>) => {
+    updateAnnotations(a => ({
+      ...a, postIts: a.postIts.map(p => p.id === id ? { ...p, ...partial } : p),
+    }));
+  }, [updateAnnotations]);
+
+  const removePostIt = useCallback((id: string) => {
+    updateAnnotations(a => ({ ...a, postIts: a.postIts.filter(p => p.id !== id) }));
+  }, [updateAnnotations]);
+
+  const addGroup = useCallback((x: number, y: number, w: number, h: number) => {
+    const g: GroupRect = { id: uid(), label: 'Gruppo', x, y, w, h, color: GROUP_COLORS[0] };
+    updateAnnotations(a => ({ ...a, groups: [...a.groups, g] }));
+    return g.id;
+  }, [updateAnnotations]);
+
+  const updateGroup = useCallback((id: string, partial: Partial<GroupRect>) => {
+    updateAnnotations(a => ({
+      ...a, groups: a.groups.map(g => g.id === id ? { ...g, ...partial } : g),
+    }));
+  }, [updateAnnotations]);
+
+  const removeGroup = useCallback((id: string) => {
+    updateAnnotations(a => ({ ...a, groups: a.groups.filter(g => g.id !== id) }));
+  }, [updateAnnotations]);
+
+  const addImage = useCallback((src: string, x: number, y: number, w?: number, h?: number) => {
+    const img: CanvasImage = { id: uid(), src, x, y, w: w ?? IMAGE_DEFAULT_W, h: h ?? IMAGE_DEFAULT_H };
+    updateAnnotations(a => ({ ...a, images: [...a.images, img] }));
+    return img.id;
+  }, [updateAnnotations]);
+
+  const updateImage = useCallback((id: string, partial: Partial<CanvasImage>) => {
+    updateAnnotations(a => ({
+      ...a, images: a.images.map(i => i.id === id ? { ...i, ...partial } : i),
+    }));
+  }, [updateAnnotations]);
+
+  const removeImage = useCallback((id: string) => {
+    updateAnnotations(a => ({ ...a, images: a.images.filter(i => i.id !== id) }));
+  }, [updateAnnotations]);
+
+  // --- Node positions ---
+  const customPositions = new Map(Object.entries(file.positions)) as Map<string, NodePosition>;
+
+  const setNodePosition = useCallback((nodeId: string, x: number, y: number) => {
+    setFile(prev => {
+      const next = { ...prev, positions: { ...prev.positions, [nodeId]: { x, y } } };
+      persist(next);
+      return next;
+    });
+  }, [persist]);
+
+  const clearAll = useCallback(() => {
+    const fresh = emptyFile();
+    persist(fresh);
+  }, [persist]);
+
+  const { postIts, groups, images } = file.annotations;
+  const hasAnnotations = postIts.length > 0 || groups.length > 0 || images.length > 0;
+  const hasCustomPositions = Object.keys(file.positions).length > 0;
+
+  return {
+    annotations: file.annotations,
+    customPositions,
+    hasAnnotations,
+    hasCustomPositions,
+    addPostIt, updatePostIt, removePostIt,
+    addGroup, updateGroup, removeGroup,
+    addImage, updateImage, removeImage,
+    setNodePosition,
+    clearAll,
+  };
+}

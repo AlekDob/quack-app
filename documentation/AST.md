@@ -357,13 +357,18 @@ Exported symbols per file. Generated 2026-03-13.
 - `CreateRuleModal`, `StepProjectContext`, `StepProjectSelection`, `StepProgress`, `StepStarterBundles`
 - `types.ts`: `ModalStep`, `ActiveProject`, `StepProjectContextProps`, `SkillMetadata`, `DroidMetadata`
 
-### components/featureMap/ (6 files)
-- `FeatureMapCanvas`: PixiJS canvas with radial node layout, pan/zoom, hover highlighting, click selection
-- `FeatureMapView`: Main container composing data hook + canvas + detail panel + loading/error/empty states
-- `FeatureMapDetailPanel`: Slide-in sidebar with feature details, file list, connected features
-- `featureMapLayout.ts`: `calculateRadialLayout()` — concentric rings positioning
-- `featureMapTypes.ts`: `FeatureNode`, `FeatureFile`, `FeatureLink`, `FeatureGraph`, `NodePosition`
-- `FeatureMapView.css`: Dark theme styles
+### components/featureMap/ (10 files)
+- `FeatureMapCanvas`: SVG canvas with architecture layers, nodes, links, annotations (post-its, groups, images), pan/zoom, hover highlighting, click selection, image drop zone
+- `FeatureMapView`: Main container composing data hook + canvas + popover + toolbar + image file saving/picking
+- `FeatureMapPopover`: Portal-based popover near clicked node with feature image preview, collapsible file list, connected features
+- `CanvasPostIt`: SVG post-it note — draggable, editable text, color cycling, delete on hover
+- `CanvasGroupRect`: SVG group rectangle — draggable, resizable (4 corner handles), editable label
+- `CanvasImage`: SVG canvas image — draggable, aspect-ratio resize, blob URL loading from filesystem, delete on hover
+- `AnnotationToolbar`: Floating toolbar for Select/Post-it/Group/Image mode toggle
+- `featureMapLayout.ts`: `LAYERS`, `classifyNode()`, `groupByLayer()`, `calculateLayeredLayout()` — architecture layers positioning
+- `featureMapTypes.ts`: `FeatureNode` (incl. `image?`), `FeatureFile`, `FeatureLink`, `FeatureGraph`, `NodePosition`
+- `annotationTypes.ts`: `PostIt`, `GroupRect`, `CanvasImage`, `CanvasAnnotations`, `AnnotationMode` types + constants
+- `FeatureMapView.css`: Dark theme styles (canvas, popover, toolbar, image preview)
 
 ### components/office/ (10 files)
 - `OfficeActionMenu`, `OfficeTooltip`, `OfficeView`
@@ -407,7 +412,7 @@ Exported symbols per file. Generated 2026-03-13.
 - `debounce()`, `throttle()`, `rafThrottle()`, `memoize()`, `batchUpdates()`, `shallowEqual()`, `deepEqual()`
 
 ### utils/platform.ts
-- `getPlatform()`, `isMacOS()`, `isWindows()`, `isLinux()`, `getModifierKey()`, `formatShortcut()`, `cleanPath()`, `normalizePath()`
+- `getPlatform()`, `isMacOS()`, `isWindows()`, `isLinux()`, `getModifierKey()`, `formatShortcut()`, `cleanPath()`, `normalizePath()`, `normalizeToForwardSlash()`
 
 ### utils/terminalUtils.ts
 - `TERMINAL_COLORS`, `ANSI_REGEX`, `normalizeKey()`, `slugify()`, `stripAnsi()`, `debounce()`, `getRandomTerminalColor()`

@@ -2264,6 +2264,28 @@ export default function ChatInput({
         className="chat-input-wrapper"
         onDragLeave={handleDragLeave}
       >
+        {/* Show editor selection context chip */}
+        {editorSelection && ideContextEnabled && (
+          <div className="chat-input-mentions">
+            <div className="chat-input-editor-selection-chip">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              <span className="chat-input-editor-selection-label">
+                {editorSelection.filePath.split('/').pop()}:{editorSelection.startLine}-{editorSelection.endLine}
+              </span>
+              <button
+                type="button"
+                className="chat-input-editor-selection-close"
+                onClick={() => useFileSystemStore.getState().clearEditorSelection()}
+                aria-label="Remove selection context"
+              >
+                x
+              </button>
+            </div>
+          </div>
+        )}
         {/* Show agent mention chips */}
         {(() => {
           const mentions = parseAgentMentions(input);
@@ -2342,6 +2364,29 @@ export default function ChatInput({
             </div>
           );
         })()}
+        {/* Editor selection context chip */}
+        {editorSelection && ideContextEnabled && (
+          <div className="chat-input-mentions">
+            <div className="chat-input-editor-selection-chip">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+              <span>
+                {editorSelection.filePath.split('/').pop()}:{editorSelection.startLine}-{editorSelection.endLine}
+              </span>
+              <button
+                type="button"
+                className="chat-input-editor-selection-dismiss"
+                onClick={() => useFileSystemStore.getState().clearEditorSelection()}
+                aria-label="Clear selection"
+              >
+                x
+              </button>
+            </div>
+          </div>
+        )}
         <div className="chat-input-field-row">
           <div className="chat-input-actions" onMouseDown={(e) => e.preventDefault()}>
           <div className="chat-input-actions-left">
@@ -2498,21 +2543,27 @@ export default function ChatInput({
             </div>
           )}
           {/* IDE context icon — full detail in Context accordion panel */}
-          {isMacOS() && (previewFile || editorSelection || externalIdeContext) && (
+          {(previewFile || editorSelection || (isMacOS() && externalIdeContext)) && (
             <button
               type="button"
               className={`chat-input-action-btn chat-input-ide-btn ${!ideContextEnabled ? 'chat-input-ide-btn--disabled' : ''}`}
               onClick={toggleIdeContext}
               data-tooltip={(() => {
-                if (!ideContextEnabled) return 'IDE context disabled';
-                if (!externalIdeContext?.activeFile) return 'IDE context active';
-                const name = externalIdeContext.activeFile.split('/').pop() ?? externalIdeContext.activeFile;
-                const sel = externalIdeContext.selection;
-                const hasSelection = sel && (sel.startLine !== sel.endLine || sel.startChar !== sel.endChar);
-                if (hasSelection) {
-                  return `${name} · L${sel.startLine}:${sel.startChar} → L${sel.endLine}:${sel.endChar}`;
+                if (!ideContextEnabled) return 'Context disabled';
+                if (editorSelection) {
+                  const name = editorSelection.filePath.split('/').pop() ?? editorSelection.filePath;
+                  return `${name}:${editorSelection.startLine}-${editorSelection.endLine}`;
                 }
-                return `IDE context: ${name}`;
+                if (externalIdeContext?.activeFile) {
+                  const name = externalIdeContext.activeFile.split('/').pop() ?? externalIdeContext.activeFile;
+                  const sel = externalIdeContext.selection;
+                  const hasSelection = sel && (sel.startLine !== sel.endLine || sel.startChar !== sel.endChar);
+                  if (hasSelection) {
+                    return `${name} · L${sel.startLine}:${sel.startChar} → L${sel.endLine}:${sel.endChar}`;
+                  }
+                  return `IDE context: ${name}`;
+                }
+                return 'Context active';
               })()}
               aria-label="Toggle IDE context"
             >

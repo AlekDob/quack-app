@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { buildFeatureGraph } from '../services/featureMapService';
 import type { FeatureGraph } from '../components/featureMap/featureMapTypes';
+import { normalizeToForwardSlash } from '../utils/platform';
 
 interface DirectoryEntry {
   name: string;
@@ -42,8 +43,9 @@ export function useFeatureMapData(projectPath: string | undefined): UseFeatureMa
     setError(null);
 
     try {
-      // Build absolute path to documentation/features/
-      const featuresDir = `${projectPath}/documentation/features`;
+      // Build absolute path to documentation/features/ (normalize \ to / for Windows)
+      const normProject = normalizeToForwardSlash(projectPath);
+      const featuresDir = `${normProject}/documentation/features`;
 
       // list_directory may fail if the directory doesn't exist — treat as empty
       let listing: DirectoryListing;

@@ -235,7 +235,7 @@ export const useIDEStore = create<IDEState>()(
           directory: isMac, // macOS: select .app directory; Windows/Linux: select executable file
           multiple: false,
           title: isMac ? 'Select IDE Application' : 'Select IDE Executable',
-          defaultPath: isMac ? '/Applications' : isLinux ? '/usr/bin' : undefined,
+          defaultPath: isMac ? '/Applications' : isLinux ? '/usr/bin' : 'C:\\Program Files',
           // macOS and Linux: no file filters; Windows: only .exe
           filters: (isMac || isLinux) ? undefined : [{ name: 'Executables', extensions: ['exe'] }],
         });

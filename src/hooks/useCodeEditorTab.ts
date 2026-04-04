@@ -16,9 +16,9 @@ interface UseCodeEditorTabReturn {
   isCodeEditorTab: (tab: Tab) => boolean;
 }
 
-/** Extract filename from a full path */
+/** Extract filename from a full path (cross-platform) */
 function extractFilename(filePath: string): string {
-  const parts = filePath.split('/');
+  const parts = filePath.split(/[\\/]/);
   return parts[parts.length - 1] || 'Editor';
 }
 

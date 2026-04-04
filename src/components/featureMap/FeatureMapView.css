@@ -135,6 +135,13 @@
   background: #1e293b;
 }
 
+.fm-pop-image {
+  margin-bottom: 10px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #1e293b;
+}
+
 .fm-pop-purpose {
   font-size: 11px;
   color: #94a3b8;
@@ -386,3 +393,4 @@
   color: #00d9ff;
   box-shadow: 0 0 0 1px #00d9ff33;
 }
+

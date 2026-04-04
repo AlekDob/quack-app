@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 // Bundled skills — embedded at compile time from templates/skills/
 const BUNDLED_SKILL_FEATURE_CREATOR: &str = include_str!("../templates/skills/feature-creator.md");
 const BUNDLED_SKILL_QUACK_BRAIN: &str = include_str!("../templates/skills/quack-brain.md");
+const BUNDLED_SKILL_WHITEBOARD: &str = include_str!("../templates/skills/whiteboard.md");
+const BUNDLED_SKILL_QUACK_REMOTE: &str = include_str!("../templates/skills/quack-remote.md");
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SkillInfo {
@@ -323,6 +325,14 @@ const BUNDLED_SKILLS: &[BundledSkill] = &[
     BundledSkill {
         name: "quack-brain",
         content: BUNDLED_SKILL_QUACK_BRAIN,
+    },
+    BundledSkill {
+        name: "whiteboard",
+        content: BUNDLED_SKILL_WHITEBOARD,
+    },
+    BundledSkill {
+        name: "quack-remote",
+        content: BUNDLED_SKILL_QUACK_REMOTE,
     },
 ];
 

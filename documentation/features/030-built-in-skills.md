@@ -17,6 +17,8 @@ tags: [skills, built-in-skills, bundled-skills, marketplace, droid-factory]
 | Service | src-tauri/src/skills.rs | `list_skills`, `get_skill_details`, `check_skills_directory`, `install_bundled_skills` -- Rust backend for skill discovery, detail loading, and bundled skill installation |
 | Config | src-tauri/templates/skills/feature-creator.md | Bundled skill template embedded at compile time via `include_str!` |
 | Config | src-tauri/templates/skills/quack-brain.md | Bundled skill template embedded at compile time via `include_str!` |
+| Config | src-tauri/templates/skills/whiteboard.md | Bundled skill template — whiteboard interaction (post-its, groups, organize) |
+| Config | src-tauri/templates/skills/quack-remote.md | Bundled skill template — Remote API control (agents, sessions, jobs, teams) |
 | Config | src-tauri/src/lib.rs (line ~698) | Calls `install_bundled_skills()` during Tauri app setup |
 | Model/Type | src/types.ts (SkillInfo, SkillDetails) | TypeScript interfaces mirroring Rust structs |
 | Model/Type | src/components/modal-steps/types.ts (SkillMetadata) | Extended metadata for skill selection with marketplace flag |
@@ -81,7 +83,7 @@ tags: [skills, built-in-skills, bundled-skills, marketplace, droid-factory]
 - `dirs::home_dir()` (Rust crate): resolve ~/.claude/skills/ path
 
 ### Config
-- Bundled skills: `BUNDLED_SKILLS` const array in skills.rs (feature-creator, quack-brain)
+- Bundled skills: `BUNDLED_SKILLS` const array in skills.rs (feature-creator, quack-brain, whiteboard, quack-remote)
 - Skill file patterns: `{name}.md` (single file) or `{name}/SKILL.md` (directory skill)
 - Skill scopes: `"global"` (~/.claude/skills/) and `"project"` (.claude/skills/)
 - Sort order: global first, then alphabetical by name

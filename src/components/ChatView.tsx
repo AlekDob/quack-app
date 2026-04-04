@@ -152,6 +152,8 @@ interface ChatViewProps {
   onAllowAlwaysTool?: (requestId: string) => void;
   // Teammate stream drill-down
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
+  // Agent commit detection — called when agent runs `git commit` in a Bash tool
+  onAgentCommitDetected?: () => void;
 }
 
 export default function ChatView({
@@ -238,6 +240,7 @@ export default function ChatView({
   onToolPermissionResponse,
   onAllowAlwaysTool,
   onTeammateDrillDown,
+  onAgentCommitDetected,
 }: ChatViewProps) {
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
   const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
@@ -493,20 +496,17 @@ export default function ChatView({
     return changes;
   };
 
-  // Track file edits and deletions from the LAST assistant message only
   // Brain: fix-changes-panel-all-messages
-  // Scan ALL assistant messages to collect cumulative file edits across the entire session.
+  // Dual edit tracking:
+  // - allFileEdits/allFileDeletes: cumulative across ALL assistant messages → feeds ChangesPanel (sidebar)
+  // - lastTurnFileEdits/lastTurnFileDeletes: LAST assistant message only → feeds EditSummaryBar (inline)
   // Previously only scanned lastAssistantMessage, losing edits from earlier turns
   // on session restore, tab switch, or component remount.
-  const { currentFileEdits, currentFileDeletes } = useMemo(() => {
-    const assistantMessages = messages.filter(msg => msg.role === 'assistant');
-
-    if (assistantMessages.length === 0) return { currentFileEdits: [], currentFileDeletes: [] };
-
+  const scanMessagesForEdits = (msgs: typeof messages) => {
     const fileEdits: Map<string, FileEdit> = new Map();
     const fileDeletes: Set<string> = new Set();
 
-    for (const assistantMessage of assistantMessages) {
+    for (const assistantMessage of msgs) {
       if (!assistantMessage.events || !Array.isArray(assistantMessage.events)) continue;
 
       assistantMessage.events.forEach((event: any) => {
@@ -596,17 +596,63 @@ export default function ChatView({
     }
 
     return {
-      currentFileEdits: Array.from(fileEdits.values()),
-      currentFileDeletes: Array.from(fileDeletes).map(filePath => ({ filePath }))
+      edits: Array.from(fileEdits.values()),
+      deletes: Array.from(fileDeletes).map(filePath => ({ filePath })),
+    };
+  };
+
+  const { allFileEdits, allFileDeletes, lastTurnFileEdits, lastTurnFileDeletes } = useMemo(() => {
+    const assistantMessages = messages.filter(msg => msg.role === 'assistant');
+
+    if (assistantMessages.length === 0) {
+      return { allFileEdits: [], allFileDeletes: [], lastTurnFileEdits: [], lastTurnFileDeletes: [] };
+    }
+
+    const all = scanMessagesForEdits(assistantMessages);
+    const lastMsg = assistantMessages[assistantMessages.length - 1];
+    const lastTurn = scanMessagesForEdits([lastMsg]);
+
+    return {
+      allFileEdits: all.edits,
+      allFileDeletes: all.deletes,
+      lastTurnFileEdits: lastTurn.edits,
+      lastTurnFileDeletes: lastTurn.deletes,
     };
   }, [messages]);
 
   // Notify parent when edits change (for FileExplorer indicators)
   useEffect(() => {
     if (onEditsChange) {
-      onEditsChange(currentFileEdits, currentFileDeletes);
+      onEditsChange(allFileEdits, allFileDeletes);
     }
-  }, [currentFileEdits, currentFileDeletes, onEditsChange]);
+  }, [allFileEdits, allFileDeletes, onEditsChange]);
+
+  // Detect agent `git commit` calls to trigger ChangesPanel reconciliation
+  const lastAgentCommitTs = useMemo(() => {
+    let lastTs = 0;
+    const assistantMessages = messages.filter(msg => msg.role === 'assistant');
+    for (const msg of assistantMessages) {
+      if (!msg.events || !Array.isArray(msg.events)) continue;
+      for (const event of msg.events as any[]) {
+        if (event.type !== 'assistant' || !Array.isArray(event.message?.content)) continue;
+        for (const item of event.message.content as any[]) {
+          if (item.type === 'tool_use' && item.name?.toLowerCase() === 'bash') {
+            const cmd = item.input?.command as string | undefined;
+            if (cmd?.includes('git commit')) {
+              lastTs = msg.timestamp || Date.now();
+            }
+          }
+        }
+      }
+    }
+    return lastTs;
+  }, [messages]);
+
+  useEffect(() => {
+    if (lastAgentCommitTs > 0 && onAgentCommitDetected) {
+      onAgentCommitDetected();
+    }
+  }, [lastAgentCommitTs, onAgentCommitDetected]);
 
   // Detect if any messages have ThinkingBlocks (thinkingContent or thinking events)
   const hasThinkingBlocks = useMemo<boolean>(() => {
@@ -836,10 +882,10 @@ export default function ChatView({
         onPlanApprovalResponse={onPlanApprovalResponse}
         onTeammateDrillDown={onTeammateDrillDown}
       />
-      {(currentFileEdits.length > 0 || currentFileDeletes.length > 0) && (
+      {(lastTurnFileEdits.length > 0 || lastTurnFileDeletes.length > 0) && (
         <EditSummaryBar
-          edits={currentFileEdits}
-          deletes={currentFileDeletes}
+          edits={lastTurnFileEdits}
+          deletes={lastTurnFileDeletes}
           onFileClick={onFilePathClick}
           onDiffClick={onDiffClick}
           onClear={() => {

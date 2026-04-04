@@ -4,7 +4,7 @@
  * Dragging a feature into ChatInput inserts @feature:doc-path mention.
  */
 
-import { useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useFeatureMapData } from '../hooks/useFeatureMapData';
 import { classifyNode, LAYERS } from './featureMap/featureMapLayout';
 import type { FeatureNode } from './featureMap/featureMapTypes';
@@ -24,6 +24,7 @@ interface Props {
 
 export default function FeaturesPanel({ projectPath, onOpenInEditor }: Props) {
   const { graph, loading, error, refresh } = useFeatureMapData(projectPath ?? undefined);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const handleDragStart = useCallback((e: React.DragEvent, node: FeatureNode) => {
     const data = JSON.stringify({
@@ -36,6 +37,17 @@ export default function FeaturesPanel({ projectPath, onOpenInEditor }: Props) {
     e.dataTransfer.setData('application/quack-feature', data);
     e.dataTransfer.setData('text/plain', node.docPath);
   }, []);
+
+  // Filter by search query — MUST be before early returns (Rules of Hooks)
+  const q = searchQuery.toLowerCase();
+  const filteredNodes = useMemo(() => {
+    if (!graph || !q) return graph?.nodes ?? [];
+    return graph.nodes.filter(n =>
+      n.title.toLowerCase().includes(q) ||
+      n.purpose.toLowerCase().includes(q) ||
+      n.tags.some(t => t.toLowerCase().includes(q))
+    );
+  }, [graph, q]);
 
   if (loading) {
     return (
@@ -66,7 +78,7 @@ export default function FeaturesPanel({ projectPath, onOpenInEditor }: Props) {
   // Group by layer
   const grouped = new Map<string, FeatureNode[]>();
   for (const layer of LAYERS) grouped.set(layer.id, []);
-  for (const node of graph.nodes) {
+  for (const node of filteredNodes) {
     const layerId = classifyNode(node);
     const list = grouped.get(layerId) ?? [];
     list.push(node);
@@ -76,7 +88,11 @@ export default function FeaturesPanel({ projectPath, onOpenInEditor }: Props) {
   return (
     <div className="fp-container">
       <div className="fp-header">
-        <span className="fp-count">{graph.nodes.length} feature</span>
+        <span className="fp-count">
+          {searchQuery
+            ? `${filteredNodes.length} / ${graph.nodes.length} feature`
+            : `${graph.nodes.length} feature`}
+        </span>
         <button className="fp-refresh" onClick={refresh} title="Refresh">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2">
@@ -85,6 +101,27 @@ export default function FeaturesPanel({ projectPath, onOpenInEditor }: Props) {
           </svg>
         </button>
       </div>
+
+      {graph.nodes.length > 0 && (
+        <div className="fp-search-wrap">
+          <svg className="fp-search-icon" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            type="text"
+            className="fp-search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search features..."
+          />
+        </div>
+      )}
+
+      {searchQuery && filteredNodes.length === 0 && (
+        <div className="fp-no-results">Nessun risultato per "{searchQuery}"</div>
+      )}
 
       {LAYERS.map(layer => {
         const nodes = grouped.get(layer.id) ?? [];

@@ -306,6 +306,8 @@ interface SidePanelAccordionProps {
   isWorktree?: boolean;
   gitHistory?: import('../types').GitCommitEntry[];
   gitHistoryLoading?: boolean;
+  // Agent commit detection — bumped when an agent runs `git commit`
+  lastRefreshTs?: number;
 
   // Force expand a specific section (controlled from parent)
   forceExpandSection?: string | null;
@@ -401,6 +403,7 @@ export default function SidePanelAccordion({
   isWorktree,
   gitHistory,
   gitHistoryLoading,
+  lastRefreshTs,
 
   // Force expand
   forceExpandSection,
@@ -536,6 +539,7 @@ export default function SidePanelAccordion({
             projectName={projectName}
             history={gitHistory}
             historyLoading={gitHistoryLoading}
+            lastRefreshTs={lastRefreshTs}
           />
         </AccordionSection>
 
