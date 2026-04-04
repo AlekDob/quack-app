@@ -2,7 +2,7 @@
 
 ## Phase 1: Data Model (Foundation)
 
-- [ ] 1.1 Extend annotation types with component fields
+- [x] 1.1 Extend annotation types with component fields
   - Add `parentComponentId?: string` to PostIt, GroupRect, CanvasImage interfaces
   - Add `isComponent?: boolean` to GroupRect
   - Add `NavigationState` type (ephemeral, not in WhiteboardFile)
@@ -11,7 +11,7 @@
   - **Requirement**: FR-007, FR-008
   - **File**: `src/components/featureMap/annotationTypes.ts`
 
-- [ ] 1.2 Add orphan detection and filtering to useWhiteboardFile hook
+- [x] 1.2 Add orphan detection and filtering to useWhiteboardFile hook
   - Add `fixOrphans()` — clears invalid `parentComponentId` on load
   - Add `getVisibleAnnotations(componentId: string | null)` — filter by parent
   - Call `fixOrphans()` after file read + migration
@@ -21,7 +21,7 @@
 
 ## Phase 2: Multi-Select System
 
-- [ ] 2.1 Implement lasso selection in FeatureMapCanvas
+- [x] 2.1 Implement lasso selection in FeatureMapCanvas
   - Add `selectedIds: Set<string>` and `lassoRect` state
   - Mousedown on empty canvas (Select mode) starts lasso
   - Drag draws dashed rectangle overlay (SVG rect)
@@ -31,7 +31,7 @@
   - **Requirement**: FR-001
   - **File**: `src/components/featureMap/FeatureMapCanvas.tsx`
 
-- [ ] 2.2 [P] Implement Shift+click additive selection
+- [x] 2.2 [P] Implement Shift+click additive selection
   - Shift+click on annotation toggles it in/out of `selectedIds`
   - Click without Shift on empty canvas clears selection
   - Escape clears selection
@@ -39,14 +39,14 @@
   - **Requirement**: FR-001
   - **File**: `src/components/featureMap/FeatureMapCanvas.tsx`
 
-- [ ] 2.3 [P] Add selection visual feedback
+- [x] 2.3 [P] Add selection visual feedback
   - Selected annotations get a blue highlight border (2px solid #3b82f6)
   - Pass `isSelected` prop to CanvasPostIt, CanvasGroupRect, CanvasImage
   - **Depends on**: 2.1
   - **Requirement**: FR-001
   - **Files**: `CanvasPostIt.tsx`, `CanvasGroupRect.tsx`, `CanvasImage.tsx`
 
-- [ ] 2.4 Extract selection logic to useCanvasSelection hook (if Canvas exceeds 300 lines)
+- [x] 2.4 Extract selection logic to useCanvasSelection hook (if Canvas exceeds 300 lines)
   - Move selectedIds, lassoRect, lasso handlers to dedicated hook
   - Keep Canvas clean and under 300 lines
   - **Depends on**: 2.1, 2.2, 2.3
@@ -55,7 +55,7 @@
 
 ## Phase 3: Component CRUD
 
-- [ ] 3.1 Add createComponent method to useWhiteboardFile
+- [x] 3.1 Add createComponent method to useWhiteboardFile
   - Creates new GroupRect with `isComponent: true` at bounding box of selected children
   - Sets `parentComponentId` on all selected annotations
   - Label defaults to "Component" (editable after creation)
@@ -63,14 +63,14 @@
   - **Requirement**: FR-002, FR-007
   - **File**: `src/hooks/useWhiteboardFile.ts`
 
-- [ ] 3.2 Add dissolveComponent method to useWhiteboardFile
+- [x] 3.2 Add dissolveComponent method to useWhiteboardFile
   - Removes the component GroupRect
   - Clears `parentComponentId` on all children (promotes them to parent level)
   - **Depends on**: 3.1
   - **Requirement**: FR-013
   - **File**: `src/hooks/useWhiteboardFile.ts`
 
-- [ ] 3.3 Add "Create Component" button to AnnotationToolbar
+- [x] 3.3 Add "Create Component" button to AnnotationToolbar
   - Visible only when 2+ annotations are selected
   - Calls `createComponent()` with selected IDs
   - Clears selection after creation
@@ -80,7 +80,7 @@
 
 ## Phase 4: Navigation (Matryoshka)
 
-- [ ] 4.1 Add navigation state to FeatureMapView
+- [x] 4.1 Add navigation state to FeatureMapView
   - Add `navigation: NavigationState` state (currentComponentId, breadcrumb)
   - Add `enterComponent(id, label)` — push to breadcrumb
   - Add `exitToLevel(index)` — slice breadcrumb to index
@@ -90,7 +90,7 @@
   - **Requirement**: FR-003, FR-004, FR-005, FR-015
   - **File**: `src/components/featureMap/FeatureMapView.tsx`
 
-- [ ] 4.2 Create WhiteboardBreadcrumb component
+- [x] 4.2 Create WhiteboardBreadcrumb component
   - Horizontal bar above canvas (fixed position, not SVG)
   - Shows `Root > Parent > Current` with clickable segments
   - Current level is bold
@@ -99,7 +99,7 @@
   - **Requirement**: FR-004, FR-005
   - **File**: `src/components/featureMap/WhiteboardBreadcrumb.tsx` (new)
 
-- [ ] 4.3 Implement canvas filtering based on navigation
+- [x] 4.3 Implement canvas filtering based on navigation
   - When `currentComponentId !== null`: show only annotations with matching `parentComponentId`
   - When `currentComponentId !== null`: hide feature nodes and layer headers
   - When at root: show annotations with `parentComponentId === undefined`
@@ -108,7 +108,7 @@
   - **Requirement**: FR-003, FR-006, FR-016
   - **File**: `src/components/featureMap/FeatureMapCanvas.tsx`
 
-- [ ] 4.4 Add Escape/Backspace navigation handlers
+- [x] 4.4 Add Escape/Backspace navigation handlers
   - Escape inside component: go up one level (exitUp)
   - Backspace inside component: go up one level
   - At root: Escape clears selection (existing behavior)
@@ -118,7 +118,7 @@
 
 ## Phase 5: Component Appearance
 
-- [ ] 5.1 Enhance CanvasGroupRect for component mode
+- [x] 5.1 Enhance CanvasGroupRect for component mode
   - When `isComponent: true`: solid border (not dashed), layers icon, child count badge
   - Double-click → `onEnterComponent(id, label)` callback
   - Single click → existing edit behavior (backward compat)
@@ -126,7 +126,7 @@
   - **Requirement**: FR-003, FR-012
   - **File**: `src/components/featureMap/CanvasGroupRect.tsx`
 
-- [ ] 5.2 Add nesting depth check
+- [x] 5.2 Add nesting depth check
   - Calculate depth by walking `parentComponentId` chain
   - Block "Create Component" if current depth >= 5
   - Show subtle warning in toolbar
@@ -145,7 +145,7 @@
   - **Requirement**: FR-009
   - **File**: `src/components/featureMap/FeatureMapCanvas.tsx`
 
-- [ ] 6.2 [P] Add assignToComponent / ejectFromComponent to hook
+- [x] 6.2 [P] Add assignToComponent / ejectFromComponent to hook
   - `assignToComponent(annotationId, componentId)` — set parentComponentId
   - `ejectFromComponent(annotationId)` — clear parentComponentId (promote to component's parent)
   - **Depends on**: 1.2
@@ -183,7 +183,7 @@
 
 ## Phase 9: Styles + Polish
 
-- [ ] 9.1 Add CSS for breadcrumb, selection, lasso, component
+- [x] 9.1 Add CSS for breadcrumb, selection, lasso, component
   - Breadcrumb bar: glass-morphism, fixed top position
   - Lasso: dashed blue border, semi-transparent fill
   - Selection highlight: blue glow on selected annotations

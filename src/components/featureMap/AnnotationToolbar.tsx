@@ -11,6 +11,8 @@ interface Props {
   mode: AnnotationMode;
   onModeChange: (mode: AnnotationMode) => void;
   selectionCount?: number;
+  onCreateComponent?: () => void;
+  canCreateComponent?: boolean;
 }
 
 function SelectIcon() {
@@ -70,7 +72,9 @@ const BUTTONS: { mode: AnnotationMode; label: string; Icon: () => React.JSX.Elem
   { mode: 'image', label: 'Image', Icon: ImageIcon },
 ];
 
-export default function AnnotationToolbar({ mode, onModeChange, selectionCount = 0 }: Props) {
+export default function AnnotationToolbar({ mode, onModeChange, selectionCount = 0, onCreateComponent, canCreateComponent = true }: Props) {
+  const showCreate = selectionCount >= 2 && canCreateComponent;
+
   return (
     <div className="fm-ann-toolbar">
       {BUTTONS.map(({ mode: m, label, Icon }) => (
@@ -88,6 +92,23 @@ export default function AnnotationToolbar({ mode, onModeChange, selectionCount =
         <span className="fm-ann-selection-badge" title={`${selectionCount} selected`}>
           {selectionCount}
         </span>
+      )}
+      {/* Create Component button — visible when 2+ items selected */}
+      {selectionCount >= 2 && (
+        <button
+          className="fm-ann-component-btn"
+          onClick={onCreateComponent}
+          disabled={!showCreate}
+          title={showCreate ? 'Create Component' : 'Max nesting depth reached'}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+          </svg>
+        </button>
       )}
     </div>
   );

@@ -22,11 +22,14 @@ interface Props {
   onGroupDragStart?: (clientX: number, clientY: number) => void;
   onBeginDrag?: () => void;
   onEndDrag?: () => void;
+  onEnterComponent?: (id: string, label: string) => void;
+  childCount?: number;
 }
 
 type Corner = 'tl' | 'tr' | 'bl' | 'br';
 
-export default function CanvasGroupRect({ group, zoom, isSelected, isMultiSelected, onUpdate, onRemove, onSelect, onMultiToggle, onGroupDragStart, onBeginDrag, onEndDrag }: Props) {
+export default function CanvasGroupRect({ group, zoom, isSelected, isMultiSelected, onUpdate, onRemove, onSelect, onMultiToggle, onGroupDragStart, onBeginDrag, onEndDrag, onEnterComponent, childCount = 0 }: Props) {
+  const isComp = group.isComponent === true;
   const [hov, setHov] = useState(false);
   const [editLabel, setEditLabel] = useState(false);
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; did: boolean } | null>(null);
@@ -114,18 +117,27 @@ export default function CanvasGroupRect({ group, zoom, isSelected, isMultiSelect
       {/* Body rect */}
       <rect
         x={group.x} y={group.y} width={group.w} height={group.h}
-        rx={12} fill={group.color} fillOpacity={0.07}
+        rx={12} fill={group.color} fillOpacity={isComp ? 0.1 : 0.07}
         stroke={isMultiSelected ? '#3b82f6' : group.color}
-        strokeWidth={isMultiSelected || isSelected ? 2 : 1.5}
-        strokeOpacity={isMultiSelected ? 0.8 : isSelected ? 0.7 : 0.35}
-        strokeDasharray={isMultiSelected || isSelected ? 'none' : '8 4'}
+        strokeWidth={isMultiSelected || isSelected ? 2 : isComp ? 2 : 1.5}
+        strokeOpacity={isMultiSelected ? 0.8 : isSelected ? 0.7 : isComp ? 0.5 : 0.35}
+        strokeDasharray={isMultiSelected || isSelected || isComp ? 'none' : '8 4'}
         style={{ cursor: 'move' }}
         onMouseDown={handleBodyDown}
+        onDoubleClick={() => isComp && onEnterComponent?.(group.id, group.label)}
       />
+
+      {/* Component icon (layers) */}
+      {isComp && (
+        <g transform={`translate(${group.x + 10}, ${group.y + 10})`} opacity={0.6}>
+          <rect x={0} y={0} width={10} height={6} rx={1} fill={group.color} />
+          <rect x={0} y={8} width={10} height={6} rx={1} fill={group.color} />
+        </g>
+      )}
 
       {/* Label */}
       {editLabel ? (
-        <foreignObject x={group.x + 12} y={group.y + 6} width={group.w - 50} height={24}>
+        <foreignObject x={group.x + (isComp ? 26 : 12)} y={group.y + 6} width={group.w - 60} height={24}>
           <input
             autoFocus
             value={group.label}
@@ -140,11 +152,22 @@ export default function CanvasGroupRect({ group, zoom, isSelected, isMultiSelect
           />
         </foreignObject>
       ) : (
-        <text x={group.x + 14} y={group.y + 20}
+        <text x={group.x + (isComp ? 28 : 14)} y={group.y + 20}
           fill={group.color} fontSize={12} fontWeight="700"
           fontFamily="Inter, system-ui, sans-serif" opacity={0.8}>
           {group.label}
         </text>
+      )}
+
+      {/* Child count badge (components only) */}
+      {isComp && childCount > 0 && (
+        <g>
+          <rect x={group.x + group.w - 28} y={group.y + 6} width={22} height={16} rx={8}
+            fill={group.color} fillOpacity={0.2} stroke={group.color} strokeWidth={0.5} strokeOpacity={0.4} />
+          <text x={group.x + group.w - 17} y={group.y + 17} textAnchor="middle"
+            dominantBaseline="central" fill={group.color} fontSize={9} fontWeight="bold"
+            fontFamily="Inter, system-ui, sans-serif">{childCount}</text>
+        </g>
       )}
 
       {/* Controls on hover */}

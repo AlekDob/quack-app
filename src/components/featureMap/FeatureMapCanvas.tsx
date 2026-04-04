@@ -71,6 +71,10 @@ interface Props {
   onMultiClear: () => void;
   onBeginDrag: () => void;
   onEndDrag: () => void;
+  // Component navigation
+  currentComponentId?: string | null;
+  onEnterComponent?: (id: string, label: string) => void;
+  getChildCount?: (componentId: string) => number;
 }
 
 export default function FeatureMapCanvas(props: Props) {
@@ -83,6 +87,7 @@ export default function FeatureMapCanvas(props: Props) {
     projectPath, onResetMode, searchQuery,
     multiSelectedIds, lassoRect: lassoRectProp,
     onLassoStart, onLassoUpdate, onLassoSelect, onLassoReset, onMultiToggle, onMultiClear, onBeginDrag, onEndDrag,
+    currentComponentId, onEnterComponent, getChildCount,
   } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -123,6 +128,7 @@ export default function FeatureMapCanvas(props: Props) {
     return () => obs.disconnect();
   }, []);
 
+  const insideComponent = currentComponentId != null;
   const layout = useMemo(() => calculateLayeredLayout(graph.nodes, size.w > 0 ? size.w : 900), [graph.nodes, size.w]);
 
   // Auto-fit content on first render
@@ -373,7 +379,6 @@ export default function FeatureMapCanvas(props: Props) {
           const cx = img.x + img.w / 2; const cy = img.y + img.h / 2;
           if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) hits.add(img.id);
         }
-        console.log('[lasso] hits:', hits.size, [...hits]);
         onLassoSelect(hits);
       }
       onLassoReset();
@@ -445,7 +450,9 @@ export default function FeatureMapCanvas(props: Props) {
                 isMultiSelected={multiSelectedIds.has(g.id)}
                 onUpdate={onGroupUpdate} onRemove={onGroupRemove}
                 onSelect={onAnnotationSelect} onMultiToggle={onMultiToggle}
-                onGroupDragStart={handleGroupDragStart} onBeginDrag={onBeginDrag} onEndDrag={onEndDrag} />
+                onGroupDragStart={handleGroupDragStart} onBeginDrag={onBeginDrag} onEndDrag={onEndDrag}
+                onEnterComponent={onEnterComponent}
+                childCount={g.isComponent ? getChildCount?.(g.id) ?? 0 : 0} />
             ))}
 
             {/* Z1.5: Image annotations */}
@@ -458,6 +465,8 @@ export default function FeatureMapCanvas(props: Props) {
                 onGroupDragStart={handleGroupDragStart} onBeginDrag={onBeginDrag} onEndDrag={onEndDrag} />
             ))}
 
+            {/* Z2: Legend row — hidden inside components */}
+            {!insideComponent && (<>
             {/* Z2: Legend row */}
             {(() => {
               let lx = LEFT_MARGIN;
@@ -538,6 +547,8 @@ export default function FeatureMapCanvas(props: Props) {
                   {customPositions.has(node.id) && <circle cx={-NW/2+8} cy={-NH/2+8} r={3} fill={BORDER_DRAGGING} opacity={0.6} />}
                 </g>);
             })}
+
+            </>)}
 
             {/* Z5: Post-it annotations */}
             {annotations.postIts.map(p => (

@@ -9,11 +9,12 @@ import { useFeatureMapData } from '../../hooks/useFeatureMapData';
 import { useWhiteboardFile } from '../../hooks/useWhiteboardFile';
 import { useCanvasSelection } from '../../hooks/useCanvasSelection';
 import { IMAGE_DEFAULT_W, IMAGE_DEFAULT_H } from './annotationTypes';
+import type { AnnotationMode, ComponentNavigation } from './annotationTypes';
 import FeatureMapCanvas from './FeatureMapCanvas';
 import type { NodeClickInfo } from './FeatureMapCanvas';
 import FeatureMapPopover from './FeatureMapPopover';
 import AnnotationToolbar from './AnnotationToolbar';
-import type { AnnotationMode } from './annotationTypes';
+import WhiteboardBreadcrumb from './WhiteboardBreadcrumb';
 import { normalizeToForwardSlash } from '../../utils/platform';
 import './FeatureMapView.css';
 
@@ -32,6 +33,53 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
   const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingImagePos = useRef<{ x: number; y: number } | null>(null);
+
+  // --- Component navigation (matryoshka) ---
+  const [navigation, setNavigation] = useState<ComponentNavigation>({
+    currentComponentId: null, breadcrumb: [],
+  });
+
+  const enterComponent = useCallback((id: string, label: string) => {
+    setNavigation(prev => ({
+      currentComponentId: id,
+      breadcrumb: [...prev.breadcrumb, { id, label }],
+    }));
+    selection.clearSelection();
+  }, [selection]);
+
+  const exitToRoot = useCallback(() => {
+    setNavigation({ currentComponentId: null, breadcrumb: [] });
+    selection.clearSelection();
+  }, [selection]);
+
+  const navigateToLevel = useCallback((index: number) => {
+    setNavigation(prev => ({
+      currentComponentId: prev.breadcrumb[index]?.id ?? null,
+      breadcrumb: prev.breadcrumb.slice(0, index + 1),
+    }));
+    selection.clearSelection();
+  }, [selection]);
+
+  const exitUp = useCallback(() => {
+    setNavigation(prev => {
+      if (prev.breadcrumb.length <= 1) return { currentComponentId: null, breadcrumb: [] };
+      const newBc = prev.breadcrumb.slice(0, -1);
+      return { currentComponentId: newBc[newBc.length - 1].id, breadcrumb: newBc };
+    });
+    selection.clearSelection();
+  }, [selection]);
+
+  // Visible annotations filtered by current navigation level
+  const visibleAnnotations = useMemo(
+    () => wb.getVisibleAnnotations(navigation.currentComponentId),
+    [wb, navigation.currentComponentId],
+  );
+
+  const handleCreateComponent = useCallback(() => {
+    if (selection.selectionCount < 2) return;
+    wb.createComponent(selection.selectedIds, 'Component', navigation.currentComponentId);
+    selection.clearSelection();
+  }, [wb, selection, navigation.currentComponentId]);
 
   /** Receive lasso selection results from Canvas */
   const handleLassoSelect = useCallback((ids: Set<string>) => {
@@ -140,7 +188,11 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setClickInfo(null); setAnnotationMode('select'); setSearchQuery(''); selection.clearSelection(); }
+      if (e.key === 'Escape') {
+        if (navigation.currentComponentId) { exitUp(); } // inside component: go up
+        else { setClickInfo(null); setAnnotationMode('select'); setSearchQuery(''); selection.clearSelection(); }
+      }
+      if (e.key === 'Backspace' && navigation.currentComponentId) { exitUp(); }
       if (e.key === 'Control') {
         e.preventDefault();
         setAnnotationMode(prev => {
@@ -156,7 +208,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [wb]);
+  }, [wb, navigation.currentComponentId, exitUp]);
 
   if (loading) return (
     <div className="fm-container"><div className="fm-loading">
@@ -226,6 +278,8 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
         </button>
       </div>
 
+      <WhiteboardBreadcrumb navigation={navigation} onNavigate={navigateToLevel} onExitToRoot={exitToRoot} />
+
       <div className="fm-body">
         <div className="fm-canvas-area">
           <FeatureMapCanvas
@@ -234,8 +288,9 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
             selectedNodeId={selectedNodeId}
             customPositions={wb.customPositions}
             onNodeDrag={handleNodeDrag}
-            annotations={wb.annotations}
+            annotations={visibleAnnotations}
             annotationMode={annotationMode}
+            currentComponentId={navigation.currentComponentId}
             selectedAnnotationId={selectedAnnId}
             onAnnotationSelect={setSelectedAnnId}
             onPostItAdd={wb.addPostIt}
@@ -262,11 +317,15 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
             onMultiClear={selection.clearSelection}
             onBeginDrag={wb.beginDrag}
             onEndDrag={wb.endDrag}
+            onEnterComponent={enterComponent}
+            getChildCount={wb.getChildCount}
           />
           <AnnotationToolbar
             mode={annotationMode}
             onModeChange={setAnnotationMode}
             selectionCount={selection.selectionCount}
+            onCreateComponent={handleCreateComponent}
+            canCreateComponent={wb.canCreateComponent(navigation.currentComponentId)}
           />
         </div>
       </div>

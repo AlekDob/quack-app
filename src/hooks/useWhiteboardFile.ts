@@ -20,6 +20,8 @@ const POLL_MS = 2000;
 const WRITE_LOCK_MS = 500;
 const ONBOARDING_KEY = 'quack:featureMap:onboardingSeen:';
 const MAX_UNDO = 50;
+const MAX_NESTING = 5;
+const COMPONENT_PADDING = 20;
 
 function uid(): string { return crypto.randomUUID(); }
 
@@ -41,6 +43,57 @@ function createOnboardingPostIts(): PostIt[] {
 }
 
 function normKey(p: string): string { return p.replace(/\\/g, '/'); }
+
+/** Clear invalid parentComponentId refs (orphan detection) */
+function fixOrphans(a: CanvasAnnotations): CanvasAnnotations {
+  const componentIds = new Set(a.groups.filter(g => g.isComponent).map(g => g.id));
+  const fix = <T extends { parentComponentId?: string }>(items: T[]): T[] =>
+    items.map(item => item.parentComponentId && !componentIds.has(item.parentComponentId)
+      ? { ...item, parentComponentId: undefined } : item);
+  return { postIts: fix(a.postIts), groups: fix(a.groups), images: fix(a.images) };
+}
+
+/** Filter annotations visible at a given navigation level */
+function filterByParent(a: CanvasAnnotations, componentId: string | null): CanvasAnnotations {
+  const match = <T extends { parentComponentId?: string }>(items: T[]): T[] =>
+    items.filter(item => (item.parentComponentId ?? null) === componentId);
+  return { postIts: match(a.postIts), groups: match(a.groups), images: match(a.images) };
+}
+
+/** Calculate nesting depth of a component by walking parentComponentId chain */
+function getNestingDepth(componentId: string, groups: GroupRect[]): number {
+  let depth = 0;
+  let current: string | undefined = componentId;
+  while (current) {
+    const parent = groups.find(g => g.id === current);
+    current = parent?.parentComponentId;
+    depth++;
+    if (depth > MAX_NESTING + 1) break; // safety
+  }
+  return depth;
+}
+
+/** Compute bounding box of annotation IDs */
+function computeBoundingBox(ids: Set<string>, a: CanvasAnnotations): { x: number; y: number; w: number; h: number } {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of a.postIts) {
+    if (!ids.has(p.id)) continue;
+    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x + 160); maxY = Math.max(maxY, p.y + 100);
+  }
+  for (const g of a.groups) {
+    if (!ids.has(g.id)) continue;
+    minX = Math.min(minX, g.x); minY = Math.min(minY, g.y);
+    maxX = Math.max(maxX, g.x + g.w); maxY = Math.max(maxY, g.y + g.h);
+  }
+  for (const img of a.images) {
+    if (!ids.has(img.id)) continue;
+    minX = Math.min(minX, img.x); minY = Math.min(minY, img.y);
+    maxX = Math.max(maxX, img.x + img.w); maxY = Math.max(maxY, img.y + img.h);
+  }
+  return { x: minX - COMPONENT_PADDING, y: minY - COMPONENT_PADDING - 24,
+    w: maxX - minX + COMPONENT_PADDING * 2, h: maxY - minY + COMPONENT_PADDING * 2 + 24 };
+}
 
 export function useWhiteboardFile(projectPath?: string) {
   const [file, setFile] = useState<WhiteboardFile>(emptyFile());
@@ -120,6 +173,8 @@ export function useWhiteboardFile(projectPath?: string) {
       }
 
       if (mounted.current) {
+        // Fix orphaned parentComponentId refs on load
+        data = { ...data, annotations: fixOrphans(data.annotations) };
         setFile(data);
         lastJson.current = JSON.stringify(data);
       }
@@ -254,6 +309,101 @@ export function useWhiteboardFile(projectPath?: string) {
   const canUndo = undoStack.current.length > 0;
   const canRedo = redoStack.current.length > 0;
 
+  // --- Component CRUD ---
+
+  /** Create a component from selected annotation IDs */
+  const createComponent = useCallback((childIds: Set<string>, label = 'Component', currentParent: string | null = null) => {
+    const id = uid();
+    updateAnnotations(a => {
+      const depth = currentParent ? getNestingDepth(currentParent, a.groups) + 1 : 1;
+      if (depth > MAX_NESTING) return a; // block if too deep
+      const box = computeBoundingBox(childIds, a);
+      const comp: GroupRect = {
+        id, label, x: box.x, y: box.y, w: box.w, h: box.h,
+        color: GROUP_COLORS[0], isComponent: true,
+        parentComponentId: currentParent ?? undefined,
+      };
+      // Assign children to component
+      const assign = <T extends { id: string; parentComponentId?: string }>(items: T[]): T[] =>
+        items.map(item => childIds.has(item.id) ? { ...item, parentComponentId: id } : item);
+      return {
+        postIts: assign(a.postIts),
+        groups: [...assign(a.groups), comp],
+        images: assign(a.images),
+      };
+    });
+    return id;
+  }, [updateAnnotations]);
+
+  /** Dissolve a component — promote children to parent level, remove the component */
+  const dissolveComponent = useCallback((componentId: string) => {
+    updateAnnotations(a => {
+      const comp = a.groups.find(g => g.id === componentId && g.isComponent);
+      if (!comp) return a;
+      const parentId = comp.parentComponentId;
+      // Promote children to parent level
+      const promote = <T extends { parentComponentId?: string }>(items: T[]): T[] =>
+        items.map(item => item.parentComponentId === componentId
+          ? { ...item, parentComponentId: parentId } : item);
+      return {
+        postIts: promote(a.postIts),
+        groups: promote(a.groups).filter(g => g.id !== componentId),
+        images: promote(a.images),
+      };
+    });
+  }, [updateAnnotations]);
+
+  /** Assign an annotation to a component */
+  const assignToComponent = useCallback((annotationId: string, componentId: string) => {
+    updateAnnotations(a => {
+      const set = <T extends { id: string; parentComponentId?: string }>(items: T[]): T[] =>
+        items.map(item => item.id === annotationId ? { ...item, parentComponentId: componentId } : item);
+      return { postIts: set(a.postIts), groups: set(a.groups), images: set(a.images) };
+    });
+  }, [updateAnnotations]);
+
+  /** Eject an annotation from its component (promote to component's parent) */
+  const ejectFromComponent = useCallback((annotationId: string) => {
+    updateAnnotations(a => {
+      // Find annotation's current parent component
+      const findParent = (): string | undefined => {
+        const p = a.postIts.find(pi => pi.id === annotationId);
+        if (p) return p.parentComponentId;
+        const g = a.groups.find(gi => gi.id === annotationId);
+        if (g) return g.parentComponentId;
+        const img = a.images.find(ii => ii.id === annotationId);
+        return img?.parentComponentId;
+      };
+      const currentParent = findParent();
+      if (!currentParent) return a; // already at root
+      // Find grandparent
+      const parentComp = a.groups.find(g => g.id === currentParent);
+      const grandParent = parentComp?.parentComponentId;
+      const set = <T extends { id: string; parentComponentId?: string }>(items: T[]): T[] =>
+        items.map(item => item.id === annotationId ? { ...item, parentComponentId: grandParent } : item);
+      return { postIts: set(a.postIts), groups: set(a.groups), images: set(a.images) };
+    });
+  }, [updateAnnotations]);
+
+  /** Get visible annotations filtered by navigation level */
+  const getVisibleAnnotations = useCallback((componentId: string | null): CanvasAnnotations => {
+    return filterByParent(file.annotations, componentId);
+  }, [file.annotations]);
+
+  /** Count children of a component */
+  const getChildCount = useCallback((componentId: string): number => {
+    const a = file.annotations;
+    return a.postIts.filter(p => p.parentComponentId === componentId).length
+      + a.groups.filter(g => g.parentComponentId === componentId).length
+      + a.images.filter(i => i.parentComponentId === componentId).length;
+  }, [file.annotations]);
+
+  /** Check if creating a component at current level would exceed max nesting */
+  const canCreateComponent = useCallback((currentParentId: string | null): boolean => {
+    if (!currentParentId) return true; // root level always OK
+    return getNestingDepth(currentParentId, file.annotations.groups) < MAX_NESTING;
+  }, [file.annotations.groups]);
+
   const { postIts, groups, images } = file.annotations;
   const hasAnnotations = postIts.length > 0 || groups.length > 0 || images.length > 0;
   const hasCustomPositions = Object.keys(file.positions).length > 0;
@@ -270,5 +420,9 @@ export function useWhiteboardFile(projectPath?: string) {
     clearAll,
     undo, redo, canUndo, canRedo,
     beginDrag, endDrag,
+    // Component operations
+    createComponent, dissolveComponent,
+    assignToComponent, ejectFromComponent,
+    getVisibleAnnotations, getChildCount, canCreateComponent,
   };
 }

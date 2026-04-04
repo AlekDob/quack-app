@@ -462,3 +462,70 @@
   margin-left: 4px;
 }
 
+/* Breadcrumb navigation bar */
+.fm-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 16px;
+  background: rgba(10, 14, 26, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: Inter, system-ui, sans-serif;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.fm-breadcrumb-item {
+  background: none;
+  border: none;
+  color: #60a5fa;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.fm-breadcrumb-item:hover {
+  background: rgba(96, 165, 250, 0.12);
+}
+
+.fm-breadcrumb-sep {
+  color: #475569;
+  margin: 0 2px;
+  font-size: 14px;
+}
+
+.fm-breadcrumb-current {
+  color: #f1f5f9;
+  font-weight: 600;
+  padding: 2px 6px;
+}
+
+/* Component appearance in toolbar */
+.fm-ann-component-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  color: #f1f5f9;
+  background: rgba(59, 130, 246, 0.15);
+  margin-left: 4px;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.fm-ann-component-btn:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+.fm-ann-component-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
