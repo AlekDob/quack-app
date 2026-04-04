@@ -50,7 +50,7 @@ interface ActionIconsProps {
   // Code Editor
   onCodeEditorClick?: () => void;
   isCodeEditorActive?: boolean;
-  // Feature Map
+  // Whiteboard
   onFeatureMapClick?: () => void;
   isFeatureMapActive?: boolean;
   // Quack Store
@@ -405,14 +405,14 @@ function ActionIcons({
         </KeyboardShortcutTooltip>
       )}
 
-      {/* Feature Map Icon */}
+      {/* Whiteboard Icon */}
       {onFeatureMapClick && (
-        <KeyboardShortcutTooltip label="Feature Map" shortcut={formatShortcut("⇧⌘M")}>
+        <KeyboardShortcutTooltip label="Whiteboard" shortcut={formatShortcut("⌘W")}>
           <button
             type="button"
             className={`action-icon ${isFeatureMapActive ? 'active' : ''}`}
             onClick={onFeatureMapClick}
-            aria-label="Open Feature Map"
+            aria-label="Open Whiteboard"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3" />

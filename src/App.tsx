@@ -452,7 +452,7 @@ function AppContent() {
   // Office tab management
   const { openOfficeTab } = useOfficeTab();
 
-  // Feature Map tab management
+  // Whiteboard tab management
   const { openFeatureMapTab } = useFeatureMapTab();
 
   // Code Editor tab management
@@ -9908,7 +9908,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [openOfficeTab, activeTabId, tabs]);
 
-  // Handler for opening/focusing Feature Map tab (toggle with Cmd+Shift+M)
+  // Handler for opening/focusing Whiteboard tab (toggle with Cmd+W)
   const handleOpenFeatureMapTab = useCallback(() => {
     if (activeTabId === 'feature-map') {
       setActiveTabId('chat');
@@ -12550,7 +12550,7 @@ You have access to all Bash tools to execute git commands like:
                 );
               })()}
 
-              {/* Feature Map Tab View — pure SVG, no WebGL context issues */}
+              {/* Whiteboard Tab View — pure SVG, no WebGL context issues */}
               {(() => {
                 const fmTab = tabs.find(t => t.type === 'feature-map');
                 if (!fmTab) return null;

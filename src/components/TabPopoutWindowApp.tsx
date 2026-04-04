@@ -234,7 +234,7 @@ const TabPopoutWindowApp: React.FC = () => {
       case 'kanban':
         return null; // Kanban uses SVG icon, not emoji
       case 'feature-map':
-        return null; // Feature Map uses no icon in popout titlebar
+        return null; // Whiteboard uses no icon in popout titlebar
       case 'code-editor':
         return '</>';
       default:
@@ -338,7 +338,7 @@ const TabPopoutWindowApp: React.FC = () => {
 
       case 'feature-map':
         return (
-          <Suspense fallback={<LoadingSpinner message="Loading Feature Map..." />}>
+          <Suspense fallback={<LoadingSpinner message="Loading Whiteboard..." />}>
             <FeatureMapView projectPath={tab.initialProjectPath} />
           </Suspense>
         );

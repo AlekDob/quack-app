@@ -173,7 +173,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
   return (
     <div className="fm-container">
       <div className="fm-header">
-        <h2 className="fm-title">Feature Map</h2>
+        <h2 className="fm-title">Whiteboard</h2>
         <div className="fm-stats">
           {graph.nodes.length} features &middot; {graph.links.length} connections
         </div>

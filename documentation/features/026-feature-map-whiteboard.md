@@ -4,13 +4,15 @@ project: quack-app
 stack: TypeScript strict (React 18 frontend), Tauri v2 invoke API (list_directory, read_file_content, read_binary_file, write_binary_file, create_directory)
 created: 2026-04-03
 last_verified: 2026-04-04
+shortcut: Cmd+W (Meta+W)
 tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, mention, autocomplete, image, agent-bridge, skill]
 image: images/026-whiteboard-overview.png
 ---
 
-## Feature Map Whiteboard
+## Whiteboard (Feature Map)
 **Purpose:** Interactive SVG canvas that visualizes all feature docs in `documentation/features/` as architecture layers. Nodes auto-classified into UI Components, Business Logic, and Infrastructure layers with cross-layer connections based on shared source files. Includes portal-based popover detail (with click-to-open-in-editor and image preview), sidebar accordion panel with drag-to-mention and click-to-open, mention autocomplete with feature chip, popout window support, and canvas image annotations (drag & drop + file picker).
 **Stack:** React 18 + TypeScript strict + Tauri v2
+**Shortcut:** Cmd+W (macOS) / Ctrl+W (Windows/Linux)
 
 ### Files
 | Type | Path | Exports/Purpose |
@@ -36,9 +38,9 @@ image: images/026-whiteboard-overview.png
 | Store/State | `src/hooks/useFeatureMapData.ts` | Fetches feature docs via Tauri list_directory + read_file_content, builds FeatureGraph (graceful fallback for missing directory) |
 | Store/State | `src/hooks/useFeatureMapTab.ts` | Singleton tab hook with initialProjectPath support (follows useKanbanTab pattern) |
 | Route/Page | `src/views/FeatureMapTabView.tsx` | Tab view wrapper — simple mount/unmount (no WebGL preservation needed) |
-| Component | `src/components/ActionIcons.tsx` | Feature Map icon button in action bar (onFeatureMapClick, isFeatureMapActive) |
+| Component | `src/components/ActionIcons.tsx` | Whiteboard icon button in action bar (onFeatureMapClick, isFeatureMapActive) |
 | Component | `src/components/TabBar.tsx` | Tab type 'feature-map' registered in Tab.type union |
-| Route/Page | `src/App.tsx` | Feature Map tab integration (open/close, singleton, initialProjectPath enrichment for popout) |
+| Route/Page | `src/App.tsx` | Whiteboard tab integration (open/close, singleton, initialProjectPath enrichment for popout) |
 | Component | `src/components/TabPopoutWindowApp.tsx` | Popout window support — feature-map case in switch + project name in titlebar |
 | Component | `src/components/ChatInput.tsx` | Feature mention autocomplete section + feature chip rendering for @file:...documentation/features/... |
 | Component | `src/components/ChatInput.css` | Feature chip styles (.chat-input-feature-chip) |

@@ -9,7 +9,9 @@
 
 // Brain: pattern-code-editor-tab
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { useIDEStore, IDE_REGISTRY, type InstalledApp } from '../../stores/ideStore';
+import { getFileManagerName } from '../../utils/platform';
 
 interface EditorIDEDropdownProps {
   filePath: string;
@@ -52,6 +54,17 @@ function EditorIDEDropdown({ filePath }: EditorIDEDropdownProps) {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [isOpen]);
+
+  const fileManagerName = useMemo(() => getFileManagerName(), []);
+
+  const handleRevealInFinder = useCallback(async () => {
+    try {
+      await invoke('reveal_in_finder', { path: filePath });
+    } catch (error) {
+      console.error('[EditorIDEDropdown] Failed to reveal file:', error);
+    }
+    setIsOpen(false);
+  }, [filePath]);
 
   const handleOpenInIDE = useCallback(async (ideId?: string) => {
     const targetIDE = ideId || preferredIDE;
@@ -104,7 +117,7 @@ function EditorIDEDropdown({ filePath }: EditorIDEDropdownProps) {
         {shortName}
       </button>
       {/* Chevron — toggle dropdown */}
-      {installedIDEApps.length > 1 && (
+      {installedIDEApps.length > 0 && (
         <button
           type="button"
           className="editor-btn editor-btn-ide-chevron"
@@ -138,6 +151,17 @@ function EditorIDEDropdown({ filePath }: EditorIDEDropdownProps) {
               {app.id === preferredIDE && <span className="editor-ide-check">✓</span>}
             </button>
           ))}
+          <div className="editor-ide-dropdown-separator" />
+          <button
+            type="button"
+            className="editor-ide-dropdown-item"
+            onClick={handleRevealInFinder}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+            <span>Mostra in {fileManagerName}</span>
+          </button>
         </div>
       )}
     </div>

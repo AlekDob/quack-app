@@ -14,7 +14,7 @@ export function useFeatureMapTab(): UseFeatureMapTabReturn {
   const openFeatureMapTab = useCallback((projectPath?: string): Tab => {
     return {
       id: 'feature-map',
-      label: 'Feature Map',
+      label: 'Whiteboard',
       type: 'feature-map',
       closable: true,
       initialProjectPath: projectPath,

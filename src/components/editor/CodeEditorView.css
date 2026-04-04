@@ -363,6 +363,12 @@
   color: #8ab4ff;
 }
 
+.editor-ide-dropdown-separator {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+}
+
 /* Outline Panel */
 .editor-outline-panel {
   width: 220px;

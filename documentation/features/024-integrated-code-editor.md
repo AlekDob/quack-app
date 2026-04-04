@@ -25,6 +25,7 @@ tags: [editor, codemirror, tab, diff, multi-tab, search, popout, autocomplete, m
 | Component | `src/components/editor/EditorContent.tsx` | Mode switch: edit (CodeEditorEngine) vs diff (CodeMirrorMergeView) |
 | Component | `src/components/editor/EditorOutlinePanel.tsx` | Collapsible sidebar showing AST outline symbols via code-intel Tauri commands |
 | Component | `src/components/editor/EditorStatusBar.tsx` | Cursor position, language, encoding, save status |
+| Component | `src/components/editor/EditorIDEDropdown.tsx` | Split button + dropdown: open in IDE, reveal in Finder/Explorer |
 | Component | `src/components/editor/EditorEmptyState.tsx` | Empty state with code bracket icon and instructions |
 | Component | `src/components/skeletons/CodeEditorSkeleton.tsx` | Skeleton loader for lazy-loaded editor |
 | Config | `src/components/editor/editorTheme.ts` | `customTheme`, `customHighlightStyle`, `highlightExtension` -- dark theme + autocomplete/lint/minimap styles |
@@ -184,3 +185,4 @@ Backend runs linter (tsc --noEmit / eslint)
 - `Caricamento...` -- outline loading state
 - `Nessun simbolo` -- outline empty state
 - `Toggle Outline` -- outline toggle button title
+- `Mostra in {Finder|Explorer|Files}` -- reveal file in system file manager (platform-aware)
