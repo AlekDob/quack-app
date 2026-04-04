@@ -124,7 +124,7 @@ export default function RemoteApiSettings() {
         />
         <SettingsRow
           label="Port"
-          description="HTTP server port for the API"
+          description="HTTP server port for the API (restart required)"
           control={
             <span className="settings-status-value">{config.port}</span>
           }
