@@ -4,7 +4,7 @@ project: quack-app
 stack: TypeScript strict (React 18 frontend), Tauri v2 invoke API (list_directory, read_file_content, read_binary_file, write_binary_file, create_directory)
 created: 2026-04-03
 last_verified: 2026-04-04
-shortcut: Cmd+W (Meta+W)
+shortcut: Cmd+Shift+W (Meta+Shift+W)
 tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, mention, autocomplete, image, agent-bridge, skill]
 image: images/026-whiteboard-overview.png
 ---
@@ -12,7 +12,7 @@ image: images/026-whiteboard-overview.png
 ## Whiteboard (Feature Map)
 **Purpose:** Interactive SVG canvas that visualizes all feature docs in `documentation/features/` as architecture layers. Nodes auto-classified into UI Components, Business Logic, and Infrastructure layers with cross-layer connections based on shared source files. Includes portal-based popover detail (with click-to-open-in-editor and image preview), sidebar accordion panel with drag-to-mention and click-to-open, mention autocomplete with feature chip, popout window support, and canvas image annotations (drag & drop + file picker).
 **Stack:** React 18 + TypeScript strict + Tauri v2
-**Shortcut:** Cmd+W (macOS) / Ctrl+W (Windows/Linux)
+**Shortcut:** Cmd+Shift+W (macOS) / Ctrl+Shift+W (Windows/Linux)
 
 ### Files
 | Type | Path | Exports/Purpose |
@@ -28,7 +28,8 @@ image: images/026-whiteboard-overview.png
 | Component | `src/components/featureMap/CanvasImage.tsx` | SVG canvas image annotation — draggable, aspect-ratio resize (corner handle), delete on hover, blob URL loading from filesystem |
 | Component | `src/components/featureMap/AnnotationToolbar.tsx` | Floating HTML toolbar for Select/Post-it/Group/Image mode toggle |
 | Component | `src/components/featureMap/FeatureMapMinimap.tsx` | Minimap overview panel — node dots + viewport rect + click-to-navigate |
-| Model/Type | `src/components/featureMap/annotationTypes.ts` | PostIt, GroupRect, CanvasImage, CanvasAnnotations, WhiteboardFile, AnnotationMode types + color/dimension constants |
+| Model/Type | `src/components/featureMap/annotationTypes.ts` | PostIt, GroupRect, CanvasImage, CanvasAnnotations, WhiteboardFile, AnnotationMode (incl. 'lasso'), ComponentNavigation, LassoRect types + color/dimension constants |
+| Store/State | `src/hooks/useCanvasSelection.ts` | Multi-selection hook — lasso rect state, selectedIds Set, startLasso/updateLasso/resetLasso/setSelection/toggleSelect/clearSelection |
 | Service | `src/services/whiteboardFileService.ts` | File-based I/O for `.whiteboard.json` — readWhiteboardFile, writeWhiteboardFile, migrateFromLocalStorage (Tauri read_file_content + write_file_content) |
 | Store/State | `src/hooks/useWhiteboardFile.ts` | Unified annotation + position CRUD hook with file-based persistence + 2s polling for external changes (agent bridge) |
 | Component | `src/components/featureMap/FeatureMapDetailPanel.tsx` | Legacy slide-in sidebar (unused, kept as reference) |
@@ -121,8 +122,8 @@ image: images/026-whiteboard-overview.png
 - **Images**: drag & drop from OS or Image mode + file picker; draggable; aspect-ratio resize; saved to filesystem (see Canvas Images section)
 - Annotations + node positions stored in `documentation/features/.whiteboard.json` (file-based, replaces localStorage)
 - Z-order (bottom→top): group rects → **images** → layer backgrounds → links → feature nodes → post-its
-- Toolbar (floating, bottom-center): Select / Post-it / Group / Image mode toggle
-- Escape key resets to Select mode
+- Toolbar (floating, bottom-center): Select / Lasso / Post-it / Group / Image mode toggle + selection count badge
+- Escape key resets to Select mode and clears multi-selection
 - `useWhiteboardFile` hook: unified CRUD for annotations + positions with file persistence + 2s external change polling
 
 ### Canvas Images
@@ -191,6 +192,29 @@ image: images/026-whiteboard-overview.png
 - Actions: `list` (show state), `add-postit` (with `--color`/`--near`), `add-group` (with `--around`), `move` (reposition node), `clear` (selective reset), `organize` (auto-layout + groups + summary)
 - Changes appear on canvas within 2s (polling interval)
 - Embeds layer classification keywords and layout constants for accurate positioning
+
+### Multi-Select (Lasso + Shift+click)
+- **Lasso mode**: dedicated toolbar button (dashed rectangle icon); click-drag on canvas draws selection rectangle; on release, hit-tests all feature nodes + annotations whose center is inside
+- **Shift+click**: on any feature node, post-it, group rect, or image to toggle in/out of multi-selection
+- **Visual feedback**: blue border (#3b82f6) on all multi-selected elements (nodes + annotations); badge in toolbar shows count
+- **Group drag**: clicking and dragging any multi-selected element moves ALL selected elements together
+- **Space+drag**: hold spacebar to force pan mode in any annotation mode (Figma-style)
+- **Middle-click drag**: always pans regardless of mode
+- **Trackpad**: two-finger scroll = pan, pinch = zoom (ctrlKey detection)
+- Selection state is ephemeral (not persisted)
+- Hook: `useCanvasSelection.ts` manages selectedIds Set + lasso rect; Canvas does hit-test locally (has access to getPos + graph.nodes + annotations)
+
+### Component Types (for nested whiteboards — Phase 1 only, not yet functional)
+- `parentComponentId?: string` on PostIt, GroupRect, CanvasImage — for future nested component assignment
+- `isComponent?: boolean` on GroupRect — marks a group as an enterable component
+- `ComponentNavigation` type — ephemeral navigation state for future matryoshka navigation
+
+### Shortcut Migration
+- Original shortcut: `Cmd+Shift+M` (as "Feature Map") — renamed to `Cmd+Shift+W` (as "Whiteboard") on 2026-04-04
+- Migration in `shortcutsStorage.ts` `loadShortcuts()`: `SHORTCUT_MIGRATIONS` map auto-migrates `Meta+Shift+M` → `Meta+Shift+W` (macOS) and `Ctrl+Shift+M` → `Ctrl+Shift+W` (Windows)
+- Users who customized a different keybinding are not affected (migration only triggers on exact old-default match)
+- Migration is idempotent — runs on every load, no-op after first migration
+- `Cmd+W` was rejected due to conflict with file tab close handler in App.tsx
 
 ### External Dependencies
 - Zero external deps — pure SVG rendering (no PixiJS/WebGL)

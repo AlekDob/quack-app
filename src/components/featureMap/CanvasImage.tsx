@@ -18,12 +18,15 @@ interface Props {
   zoom: number;
   projectPath: string;
   isSelected: boolean;
+  isMultiSelected?: boolean;
   onUpdate: (id: string, partial: Partial<CanvasImageType>) => void;
   onRemove: (id: string) => void;
   onSelect: (id: string | null) => void;
+  onMultiToggle?: (id: string) => void;
+  onGroupDragStart?: (clientX: number, clientY: number) => void;
 }
 
-export default function CanvasImage({ image, zoom, projectPath, isSelected, onUpdate, onRemove, onSelect }: Props) {
+export default function CanvasImage({ image, zoom, projectPath, isSelected, isMultiSelected, onUpdate, onRemove, onSelect, onMultiToggle, onGroupDragStart }: Props) {
   const [hov, setHov] = useState(false);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; did: boolean } | null>(null);
@@ -54,9 +57,13 @@ export default function CanvasImage({ image, zoom, projectPath, isSelected, onUp
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (e.button !== 0) return;
+    // Shift+click toggles multi-select
+    if (e.shiftKey && onMultiToggle) { onMultiToggle(image.id); return; }
+    // If multi-selected, start group drag (Canvas handles all selected items)
+    if (isMultiSelected && onGroupDragStart) { onGroupDragStart(e.clientX, e.clientY); return; }
     dragRef.current = { sx: e.clientX, sy: e.clientY, ox: image.x, oy: image.y, did: false };
     onSelect(image.id);
-  }, [image.x, image.y, image.id, onSelect]);
+  }, [image.x, image.y, image.id, onSelect, onMultiToggle, isMultiSelected, onGroupDragStart]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     // Resize
@@ -89,7 +96,7 @@ export default function CanvasImage({ image, zoom, projectPath, isSelected, onUp
     onSelect(image.id);
   }, [image.w, image.h, image.id, onSelect]);
 
-  const border = isSelected ? BORDER_SELECTED : hov ? BORDER_COLOR : 'transparent';
+  const border = isMultiSelected ? '#3b82f6' : isSelected ? BORDER_SELECTED : hov ? BORDER_COLOR : 'transparent';
 
   return (
     <g

@@ -14,14 +14,17 @@ interface Props {
   group: GroupRect;
   zoom: number;
   isSelected: boolean;
+  isMultiSelected?: boolean;
   onUpdate: (id: string, partial: Partial<GroupRect>) => void;
   onRemove: (id: string) => void;
   onSelect: (id: string | null) => void;
+  onMultiToggle?: (id: string) => void;
+  onGroupDragStart?: (clientX: number, clientY: number) => void;
 }
 
 type Corner = 'tl' | 'tr' | 'bl' | 'br';
 
-export default function CanvasGroupRect({ group, zoom, isSelected, onUpdate, onRemove, onSelect }: Props) {
+export default function CanvasGroupRect({ group, zoom, isSelected, isMultiSelected, onUpdate, onRemove, onSelect, onMultiToggle, onGroupDragStart }: Props) {
   const [hov, setHov] = useState(false);
   const [editLabel, setEditLabel] = useState(false);
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; did: boolean } | null>(null);
@@ -34,9 +37,13 @@ export default function CanvasGroupRect({ group, zoom, isSelected, onUpdate, onR
   const handleBodyDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (e.button !== 0) return;
+    // Shift+click toggles multi-select
+    if (e.shiftKey && onMultiToggle) { onMultiToggle(group.id); return; }
+    // If multi-selected, start group drag (Canvas handles all selected items)
+    if (isMultiSelected && onGroupDragStart) { onGroupDragStart(e.clientX, e.clientY); return; }
     dragRef.current = { sx: e.clientX, sy: e.clientY, ox: group.x, oy: group.y, did: false };
     onSelect(group.id);
-  }, [group.x, group.y, group.id, onSelect]);
+  }, [group.x, group.y, group.id, onSelect, onMultiToggle, isMultiSelected, onGroupDragStart]);
 
   const handleMove = useCallback((e: React.MouseEvent) => {
     // Resize
@@ -104,9 +111,10 @@ export default function CanvasGroupRect({ group, zoom, isSelected, onUpdate, onR
       <rect
         x={group.x} y={group.y} width={group.w} height={group.h}
         rx={12} fill={group.color} fillOpacity={0.07}
-        stroke={group.color} strokeWidth={isSelected ? 2 : 1.5}
-        strokeOpacity={isSelected ? 0.7 : 0.35}
-        strokeDasharray={isSelected ? 'none' : '8 4'}
+        stroke={isMultiSelected ? '#3b82f6' : group.color}
+        strokeWidth={isMultiSelected || isSelected ? 2 : 1.5}
+        strokeOpacity={isMultiSelected ? 0.8 : isSelected ? 0.7 : 0.35}
+        strokeDasharray={isMultiSelected || isSelected ? 'none' : '8 4'}
         style={{ cursor: 'move' }}
         onMouseDown={handleBodyDown}
       />

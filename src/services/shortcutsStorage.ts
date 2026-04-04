@@ -70,8 +70,8 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = (() =
       id: "toggleFeatureMap" as const,
       label: "Toggle Whiteboard",
       description: "Open or close the Whiteboard",
-      defaultKeys: buildShortcut("W"),
-      currentKeys: buildShortcut("W"),
+      defaultKeys: buildShortcut("W", true),
+      currentKeys: buildShortcut("W", true),
     },
     openTerminalWindow: {
       id: "openTerminalWindow" as const,
@@ -256,13 +256,22 @@ export const loadShortcuts = async (): Promise<Record<ShortcutActionId, Shortcut
       return { ...DEFAULT_SHORTCUTS };
     }
 
+    // Migrate renamed default shortcuts (old default → new default)
+    // Users who never customized should get the new default automatically
+    const SHORTCUT_MIGRATIONS: Record<string, string> = {
+      // toggleFeatureMap: Cmd+Shift+M → Cmd+Shift+W (renamed to Whiteboard)
+      [`${getPrimaryModifier()}+Shift+M`]: `${getPrimaryModifier()}+Shift+W`,
+    };
+
     // Merge stored shortcuts with defaults (in case new shortcuts were added)
     const merged: Record<ShortcutActionId, ShortcutConfig> = { ...DEFAULT_SHORTCUTS };
     for (const key of Object.keys(stored) as ShortcutActionId[]) {
       if (merged[key] && stored[key]) {
+        const storedKeys = stored[key].currentKeys || merged[key].defaultKeys;
+        const migratedKeys = SHORTCUT_MIGRATIONS[storedKeys] ?? storedKeys;
         merged[key] = {
           ...merged[key],
-          currentKeys: stored[key].currentKeys || merged[key].defaultKeys,
+          currentKeys: migratedKeys,
         };
       }
     }

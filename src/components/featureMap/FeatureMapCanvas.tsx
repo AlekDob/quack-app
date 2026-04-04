@@ -7,7 +7,7 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { calculateLayeredLayout, classifyNode, LAYERS, LEFT_MARGIN, LEGEND_H } from './featureMapLayout';
 import type { FeatureGraph, NodePosition } from './featureMapTypes';
-import type { CanvasAnnotations, AnnotationMode, PostIt, GroupRect, CanvasImage as CanvasImageType } from './annotationTypes';
+import type { CanvasAnnotations, AnnotationMode, PostIt, GroupRect, CanvasImage as CanvasImageType, LassoRect } from './annotationTypes';
 import { GROUP_MIN_W, GROUP_MIN_H } from './annotationTypes';
 import CanvasPostIt from './CanvasPostIt';
 import CanvasGroupRect from './CanvasGroupRect';
@@ -60,6 +60,15 @@ interface Props {
   projectPath: string;
   onResetMode: () => void;
   searchQuery: string;
+  // Multi-select (lasso + shift+click)
+  multiSelectedIds: Set<string>;
+  lassoRect: LassoRect | null;
+  onLassoStart: (svgX: number, svgY: number) => void;
+  onLassoUpdate: (svgX: number, svgY: number) => void;
+  onLassoSelect: (ids: Set<string>) => void;
+  onLassoReset: () => void;
+  onMultiToggle: (id: string) => void;
+  onMultiClear: () => void;
 }
 
 export default function FeatureMapCanvas(props: Props) {
@@ -70,6 +79,8 @@ export default function FeatureMapCanvas(props: Props) {
     onGroupAdd, onGroupUpdate, onGroupRemove,
     onImageAdd, onImageUpdate, onImageRemove, onImageFilePick, onImageDrop,
     projectPath, onResetMode, searchQuery,
+    multiSelectedIds, lassoRect: lassoRectProp,
+    onLassoStart, onLassoUpdate, onLassoSelect, onLassoReset, onMultiToggle, onMultiClear,
   } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -84,6 +95,24 @@ export default function FeatureMapCanvas(props: Props) {
   const panRef = useRef({ active: false, x: 0, y: 0, panX: 0, panY: 0, didDrag: false });
   const nodeDragRef = useRef<{ nodeId: string; startX: number; startY: number; origX: number; origY: number; didDrag: boolean } | null>(null);
   const groupDrawRef = useRef<{ sx: number; sy: number; svgSx: number; svgSy: number } | null>(null);
+  // Group-drag ref: tracks multi-selection drag (all selected items move together)
+  const multiDragRef = useRef<{ startX: number; startY: number; didDrag: boolean; origins: Map<string, { x: number; y: number }> } | null>(null);
+  // Space key held = force pan mode (like Figma)
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const spaceRef = useRef(false); // ref for synchronous access in handlers
+
+  // Track Space key for pan override
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) { spaceRef.current = true; setSpaceHeld(true); }
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code === 'Space') { spaceRef.current = false; setSpaceHeld(false); }
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    return () => { window.removeEventListener('keydown', down); window.removeEventListener('keyup', up); };
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -143,10 +172,29 @@ export default function FeatureMapCanvas(props: Props) {
     return { x: (clientX - r.left - viewport.panX) / viewport.zoom, y: (clientY - r.top - viewport.panY) / viewport.zoom };
   }, [viewport]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => { e.preventDefault(); setViewport(v => ({ ...v, zoom: Math.max(0.3, Math.min(2.5, v.zoom - e.deltaY * 0.002)) })); }, []);
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    // Pinch-zoom: ctrlKey is set by trackpad pinch gesture
+    if (e.ctrlKey) {
+      setViewport(v => ({ ...v, zoom: Math.max(0.3, Math.min(2.5, v.zoom - e.deltaY * 0.002)) }));
+    } else {
+      // Trackpad two-finger scroll OR mouse wheel: pan
+      setViewport(v => ({ ...v, panX: v.panX - e.deltaX, panY: v.panY - e.deltaY }));
+    }
+  }, []);
 
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
+    // Middle-click always starts pan (any mode)
+    if (e.button === 1) {
+      panRef.current = { active: true, x: e.clientX, y: e.clientY, panX: viewport.panX, panY: viewport.panY, didDrag: false };
+      return;
+    }
     if (e.button !== 0) return;
+    // Space held = force pan in any mode
+    if (spaceRef.current) {
+      panRef.current = { active: true, x: e.clientX, y: e.clientY, panX: viewport.panX, panY: viewport.panY, didDrag: false };
+      return;
+    }
     if (annotationMode === 'postit') {
       const svg = toSvg(e.clientX, e.clientY);
       onPostItAdd(svg.x, svg.y);
@@ -165,8 +213,15 @@ export default function FeatureMapCanvas(props: Props) {
       setDrawingRect({ x: svg.x, y: svg.y, w: 0, h: 0 });
       return;
     }
+    // Lasso mode: draw selection rectangle
+    if (annotationMode === 'lasso') {
+      const svg = toSvg(e.clientX, e.clientY);
+      onLassoStart(svg.x, svg.y);
+      return;
+    }
+    // Select mode (and fallback): pan canvas
     panRef.current = { active: true, x: e.clientX, y: e.clientY, panX: viewport.panX, panY: viewport.panY, didDrag: false };
-  }, [annotationMode, viewport.panX, viewport.panY, toSvg, onPostItAdd, onImageFilePick]);
+  }, [annotationMode, viewport.panX, viewport.panY, toSvg, onPostItAdd, onImageFilePick, onLassoStart]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setIsDragOver(true); }
@@ -183,14 +238,51 @@ export default function FeatureMapCanvas(props: Props) {
     onImageDrop(file, svg.x, svg.y);
   }, [toSvg, onImageDrop]);
 
+  /** Start group-drag when mousedown on a multi-selected element */
+  const handleGroupDragStart = useCallback((clientX: number, clientY: number) => {
+    const origins = new Map<string, { x: number; y: number }>();
+    for (const id of multiSelectedIds) {
+      // Check feature nodes first
+      const nodePos = getPos(id);
+      if (nodePos && graph.nodes.some(n => n.id === id)) { origins.set(id, { x: nodePos.x, y: nodePos.y }); continue; }
+      // Then annotations
+      const p = annotations.postIts.find(pi => pi.id === id);
+      if (p) { origins.set(id, { x: p.x, y: p.y }); continue; }
+      const g = annotations.groups.find(gi => gi.id === id);
+      if (g) { origins.set(id, { x: g.x, y: g.y }); continue; }
+      const img = annotations.images.find(ii => ii.id === id);
+      if (img) { origins.set(id, { x: img.x, y: img.y }); continue; }
+    }
+    multiDragRef.current = { startX: clientX, startY: clientY, didDrag: false, origins };
+  }, [multiSelectedIds, annotations, graph.nodes, getPos]);
+
   const handleNodeMouseDown = useCallback((nodeId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (e.button !== 0) return;
+    // Shift+click toggles multi-select on feature nodes
+    if (e.shiftKey) { onMultiToggle(nodeId); return; }
+    // If multi-selected, start group drag
+    if (multiSelectedIds.has(nodeId)) { handleGroupDragStart(e.clientX, e.clientY); return; }
     const pos = getPos(nodeId);
     if (!pos) return;
     nodeDragRef.current = { nodeId, startX: e.clientX, startY: e.clientY, origX: pos.x, origY: pos.y, didDrag: false };
     setDraggingId(nodeId);
-  }, [getPos]);
+  }, [getPos, onMultiToggle, multiSelectedIds, handleGroupDragStart]);
+
+  /** Apply delta to all multi-selected elements (feature nodes + annotations) */
+  const applyMultiDragDelta = useCallback((dx: number, dy: number, origins: Map<string, { x: number; y: number }>) => {
+    for (const [id, orig] of origins) {
+      const nx = orig.x + dx;
+      const ny = orig.y + dy;
+      // Feature node?
+      if (graph.nodes.some(n => n.id === id)) { onNodeDrag(id, nx, ny); continue; }
+      // Annotations
+      const np = { x: nx, y: ny };
+      if (annotations.postIts.some(p => p.id === id)) onPostItUpdate(id, np);
+      else if (annotations.groups.some(g => g.id === id)) onGroupUpdate(id, np);
+      else if (annotations.images.some(i => i.id === id)) onImageUpdate(id, np);
+    }
+  }, [annotations, graph.nodes, onNodeDrag, onPostItUpdate, onGroupUpdate, onImageUpdate]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     // Group drawing
@@ -200,6 +292,21 @@ export default function FeatureMapCanvas(props: Props) {
       const x = Math.min(gd.svgSx, svg.x);
       const y = Math.min(gd.svgSy, svg.y);
       setDrawingRect({ x, y, w: Math.abs(svg.x - gd.svgSx), h: Math.abs(svg.y - gd.svgSy) });
+      return;
+    }
+    // Multi-selection group drag
+    const md = multiDragRef.current;
+    if (md) {
+      const dx = e.clientX - md.startX;
+      const dy = e.clientY - md.startY;
+      if (Math.abs(dx) > DRAG_T || Math.abs(dy) > DRAG_T) md.didDrag = true;
+      if (md.didDrag) applyMultiDragDelta(dx / viewport.zoom, dy / viewport.zoom, md.origins);
+      return;
+    }
+    // Lasso selection (only in lasso mode)
+    if (lassoRectProp && annotationMode === 'lasso') {
+      const svg = toSvg(e.clientX, e.clientY);
+      onLassoUpdate(svg.x, svg.y);
       return;
     }
     // Node drag
@@ -217,7 +324,7 @@ export default function FeatureMapCanvas(props: Props) {
     const dx = e.clientX - d.x; const dy = e.clientY - d.y;
     if (Math.abs(dx) > DRAG_T || Math.abs(dy) > DRAG_T) d.didDrag = true;
     if (d.didDrag) setViewport(v => ({ ...v, panX: d.panX + dx, panY: d.panY + dy }));
-  }, [viewport.zoom, onNodeDrag, toSvg]);
+  }, [viewport.zoom, onNodeDrag, toSvg, lassoRectProp, annotationMode, onLassoUpdate, applyMultiDragDelta]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     // Group drawing finalize
@@ -231,6 +338,42 @@ export default function FeatureMapCanvas(props: Props) {
       onResetMode();
       return;
     }
+    // Multi-drag finalize
+    if (multiDragRef.current) {
+      multiDragRef.current = null;
+      return;
+    }
+    // Lasso finalize — hit-test all elements (feature nodes + annotations) directly
+    if (lassoRectProp && annotationMode === 'lasso') {
+      const r = lassoRectProp;
+      if (r.w > 5 && r.h > 5) {
+        const hits = new Set<string>();
+        // Hit-test feature nodes (center = getPos)
+        for (const node of graph.nodes) {
+          const pos = getPos(node.id);
+          if (pos && pos.x >= r.x && pos.x <= r.x + r.w && pos.y >= r.y && pos.y <= r.y + r.h) {
+            hits.add(node.id);
+          }
+        }
+        // Hit-test annotations (post-its center, group center, image center)
+        for (const p of annotations.postIts) {
+          const cx = p.x + 80; const cy = p.y + 50;
+          if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) hits.add(p.id);
+        }
+        for (const g of annotations.groups) {
+          const cx = g.x + g.w / 2; const cy = g.y + g.h / 2;
+          if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) hits.add(g.id);
+        }
+        for (const img of annotations.images) {
+          const cx = img.x + img.w / 2; const cy = img.y + img.h / 2;
+          if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) hits.add(img.id);
+        }
+        console.log('[lasso] hits:', hits.size, [...hits]);
+        onLassoSelect(hits);
+      }
+      onLassoReset();
+      return;
+    }
     // Node drag finalize
     const nd = nodeDragRef.current;
     if (nd) {
@@ -240,32 +383,39 @@ export default function FeatureMapCanvas(props: Props) {
       return;
     }
     panRef.current.active = false;
-  }, [onNodeSelect, onGroupAdd, drawingRect]);
+  }, [onNodeSelect, onGroupAdd, drawingRect, lassoRectProp, annotationMode, onLassoSelect, onLassoReset, graph.nodes, getPos, annotations]);
 
   const handleBgClick = useCallback(() => {
     if (panRef.current.didDrag) return;
-    if (annotationMode === 'select') { onNodeSelect(null); onAnnotationSelect(null); }
-  }, [onNodeSelect, onAnnotationSelect, annotationMode]);
+    if (annotationMode === 'select') {
+      onNodeSelect(null);
+      onAnnotationSelect(null);
+      onMultiClear();
+    }
+  }, [onNodeSelect, onAnnotationSelect, annotationMode, onMultiClear]);
 
   const handleMinimapNavigate = useCallback((panX: number, panY: number) => {
     setViewport(v => ({ ...v, panX, panY }));
   }, []);
 
+  // Nodes: dim only for search filter, never for hover
   const nodeOp = (id: string) => {
     if (searchMatches && !searchMatches.has(id)) return DIM;
-    if (!hovered) return 1;
-    return id === hovered || connected.has(id) ? 1 : DIM;
+    return 1;
   };
+  // Links: highlight connected on hover (full opacity + cyan), dim only for search
   const linkOp = (s: string, t: string) => {
     if (searchMatches && !searchMatches.has(s) && !searchMatches.has(t)) return DIM;
     if (!hovered) return 0.35;
-    return s === hovered || t === hovered ? 1 : DIM;
+    return s === hovered || t === hovered ? 1 : 0.35;
   };
   const linkCol = (s: string, t: string) => (!hovered ? LINK_COLOR : s === hovered || t === hovered ? LINK_HL : LINK_COLOR);
   const trunc = (t: string, m: number) => (t.length > m ? t.slice(0, m - 1) + '\u2026' : t);
   const curvePath = (x1: number, y1: number, x2: number, y2: number) => { const d = Math.abs(y2 - y1) * 0.3; return `M${x1},${y1} C${x1 + d},${y1} ${x2 - d},${y2} ${x2},${y2}`; };
 
-  const cursor = draggingId ? 'grabbing'
+  const cursor = draggingId || multiDragRef.current ? 'grabbing'
+    : spaceHeld ? 'grab'
+    : annotationMode === 'lasso' ? 'crosshair'
     : annotationMode === 'postit' || annotationMode === 'group' || annotationMode === 'image' ? 'crosshair'
     : 'grab';
 
@@ -286,14 +436,20 @@ export default function FeatureMapCanvas(props: Props) {
             {annotations.groups.map(g => (
               <CanvasGroupRect key={g.id} group={g} zoom={viewport.zoom}
                 isSelected={selectedAnnotationId === g.id}
-                onUpdate={onGroupUpdate} onRemove={onGroupRemove} onSelect={onAnnotationSelect} />
+                isMultiSelected={multiSelectedIds.has(g.id)}
+                onUpdate={onGroupUpdate} onRemove={onGroupRemove}
+                onSelect={onAnnotationSelect} onMultiToggle={onMultiToggle}
+                onGroupDragStart={handleGroupDragStart} />
             ))}
 
             {/* Z1.5: Image annotations */}
             {annotations.images.map(img => (
               <CanvasImage key={img.id} image={img} zoom={viewport.zoom}
                 projectPath={projectPath} isSelected={selectedAnnotationId === img.id}
-                onUpdate={onImageUpdate} onRemove={onImageRemove} onSelect={onAnnotationSelect} />
+                isMultiSelected={multiSelectedIds.has(img.id)}
+                onUpdate={onImageUpdate} onRemove={onImageRemove}
+                onSelect={onAnnotationSelect} onMultiToggle={onMultiToggle}
+                onGroupDragStart={handleGroupDragStart} />
             ))}
 
             {/* Z2: Legend row */}
@@ -343,7 +499,8 @@ export default function FeatureMapCanvas(props: Props) {
               const layerId = nodeLayerMap.get(node.id) ?? 'infra';
               const layer = LAYERS.find(l => l.id === layerId);
               const accentColor = layer?.borderColor ?? '#94a3b8';
-              const borderColor = isDrag ? BORDER_DRAGGING : sel ? BORDER_SELECTED : hov ? BORDER_HOVER : BORDER_DEFAULT;
+              const isMultiSel = multiSelectedIds.has(node.id);
+              const borderColor = isMultiSel ? '#3b82f6' : isDrag ? BORDER_DRAGGING : sel ? BORDER_SELECTED : hov ? BORDER_HOVER : BORDER_DEFAULT;
               const title = trunc(node.title, 28);
               const sub = node.files.length > 0 ? `${node.files.length} file \u00B7 ${node.tags.slice(0, 2).join(', ')}` : node.tags.slice(0, 3).join(', ');
               return (
@@ -380,7 +537,10 @@ export default function FeatureMapCanvas(props: Props) {
             {annotations.postIts.map(p => (
               <CanvasPostIt key={p.id} postIt={p} zoom={viewport.zoom}
                 isSelected={selectedAnnotationId === p.id}
-                onUpdate={onPostItUpdate} onRemove={onPostItRemove} onSelect={onAnnotationSelect} />
+                isMultiSelected={multiSelectedIds.has(p.id)}
+                onUpdate={onPostItUpdate} onRemove={onPostItRemove}
+                onSelect={onAnnotationSelect} onMultiToggle={onMultiToggle}
+                onGroupDragStart={handleGroupDragStart} />
             ))}
 
             {/* Group drawing preview */}
@@ -388,6 +548,14 @@ export default function FeatureMapCanvas(props: Props) {
               <rect x={drawingRect.x} y={drawingRect.y} width={drawingRect.w} height={drawingRect.h}
                 rx={12} fill="rgba(0,217,255,0.05)" stroke="#00d9ff" strokeWidth={2}
                 strokeDasharray="8 4" strokeOpacity={0.6} />
+            )}
+
+            {/* Lasso selection rectangle */}
+            {lassoRectProp && lassoRectProp.w > 3 && lassoRectProp.h > 3 && (
+              <rect x={lassoRectProp.x} y={lassoRectProp.y}
+                width={lassoRectProp.w} height={lassoRectProp.h}
+                rx={4} fill="rgba(59,130,246,0.08)" stroke="#3b82f6" strokeWidth={1.5}
+                strokeDasharray="6 3" strokeOpacity={0.7} />
             )}
           </g>
         </svg>

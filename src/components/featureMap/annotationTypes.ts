@@ -2,7 +2,7 @@
  * Feature Map — Annotation types (post-its, group rectangles, images)
  */
 
-export type AnnotationMode = 'select' | 'postit' | 'group' | 'image';
+export type AnnotationMode = 'select' | 'lasso' | 'postit' | 'group' | 'image';
 
 export interface PostIt {
   id: string;
@@ -10,6 +10,7 @@ export interface PostIt {
   x: number;
   y: number;
   color: string;
+  parentComponentId?: string;
 }
 
 export interface GroupRect {
@@ -20,11 +21,28 @@ export interface GroupRect {
   w: number;
   h: number;
   color: string;
+  isComponent?: boolean;
+  parentComponentId?: string;
 }
 
 export interface CanvasImage {
   id: string;
   src: string;   // relative path: "images/screenshot.png"
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  parentComponentId?: string;
+}
+
+/** Navigation state for nested components (ephemeral, not persisted) */
+export interface ComponentNavigation {
+  currentComponentId: string | null;
+  breadcrumb: Array<{ id: string; label: string }>;
+}
+
+/** Lasso selection rectangle (ephemeral) */
+export interface LassoRect {
   x: number;
   y: number;
   w: number;

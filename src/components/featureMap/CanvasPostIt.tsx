@@ -13,12 +13,15 @@ interface Props {
   postIt: PostIt;
   zoom: number;
   isSelected: boolean;
+  isMultiSelected?: boolean;
   onUpdate: (id: string, partial: Partial<PostIt>) => void;
   onRemove: (id: string) => void;
   onSelect: (id: string | null) => void;
+  onMultiToggle?: (id: string) => void;
+  onGroupDragStart?: (clientX: number, clientY: number) => void;
 }
 
-export default function CanvasPostIt({ postIt, zoom, isSelected, onUpdate, onRemove, onSelect }: Props) {
+export default function CanvasPostIt({ postIt, zoom, isSelected, isMultiSelected, onUpdate, onRemove, onSelect, onMultiToggle, onGroupDragStart }: Props) {
   const [hov, setHov] = useState(false);
   const [editing, setEditing] = useState(false);
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; did: boolean } | null>(null);
@@ -27,9 +30,13 @@ export default function CanvasPostIt({ postIt, zoom, isSelected, onUpdate, onRem
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (e.button !== 0) return;
+    // Shift+click toggles multi-select
+    if (e.shiftKey && onMultiToggle) { onMultiToggle(postIt.id); return; }
+    // If multi-selected, start group drag (Canvas handles all selected items)
+    if (isMultiSelected && onGroupDragStart) { onGroupDragStart(e.clientX, e.clientY); return; }
     dragRef.current = { sx: e.clientX, sy: e.clientY, ox: postIt.x, oy: postIt.y, did: false };
     onSelect(postIt.id);
-  }, [postIt.x, postIt.y, postIt.id, onSelect]);
+  }, [postIt.x, postIt.y, postIt.id, onSelect, onMultiToggle, isMultiSelected, onGroupDragStart]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const d = dragRef.current;
@@ -81,7 +88,8 @@ export default function CanvasPostIt({ postIt, zoom, isSelected, onUpdate, onRem
       {/* Background */}
       <rect width={POST_IT_W} height={POST_IT_H} rx={4}
         fill={postIt.color} opacity={0.9}
-        stroke={isSelected ? '#fff' : 'transparent'} strokeWidth={isSelected ? 2 : 0} />
+        stroke={isMultiSelected ? '#3b82f6' : isSelected ? '#fff' : 'transparent'}
+        strokeWidth={isMultiSelected || isSelected ? 2 : 0} />
       {/* Folded corner */}
       <path d={`M${POST_IT_W - 16},0 L${POST_IT_W},16 L${POST_IT_W - 16},16 Z`}
         fill="rgba(0,0,0,0.15)" />

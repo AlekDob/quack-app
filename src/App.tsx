@@ -4826,12 +4826,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     ? kanbanSidePanelExpanded && !sidePanelCollapsed
     : !sidePanelCollapsed;
 
-  // When no agents, use 0px for sidebar column to completely hide it
+  // WHY: compact strip (44px) only when user explicitly collapsed, otherwise 0px
   const gridTemplateColumns = !showSidebar
     ? "0px minmax(0, 1fr) 0px"  // Empty state: full width center
     : shouldShowSidePanel
       ? "360px minmax(0, 1fr) 420px"
-      : "360px minmax(0, 1fr) 0px";
+      : (sidePanelCollapsed && activeId)
+        ? "360px minmax(0, 1fr) 44px"  // Compact icon strip
+        : "360px minmax(0, 1fr) 0px";  // Auto-collapsed or no agent
 
   // Update PiP window with current agent states
   useEffect(() => {
@@ -9908,7 +9910,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [openOfficeTab, activeTabId, tabs]);
 
-  // Handler for opening/focusing Whiteboard tab (toggle with Cmd+W)
+  // Handler for opening/focusing Whiteboard tab (toggle with Cmd+Shift+W)
   const handleOpenFeatureMapTab = useCallback(() => {
     if (activeTabId === 'feature-map') {
       setActiveTabId('chat');
@@ -11194,7 +11196,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const rootPath = activeSession?.worktreePath || activeTerminal?.cwd || explorerPath || undefined;
       const [statusResult, historyResult] = await Promise.allSettled([
         invoke<GitStatusSummary>("git_status_summary", { rootPath }),
-        invoke<GitCommitEntry[]>("git_commit_history", { limit: 50, branchName: null, rootPath }),
+        invoke<GitCommitEntry[]>("git_commit_history", { limit: 50, branchName: null, rootPath, all: true }),
       ]);
 
       if (statusResult.status === "fulfilled") {
@@ -13317,6 +13319,7 @@ You have access to all Bash tools to execute git commands like:
           activeSessionId={activeSessionId ?? undefined}
           // Collapse props
           isCollapsed={sidePanelCollapsed || activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || (isKanbanTabActive && !kanbanSidePanelExpanded) || isOfficeTabActive || isFeatureMapTabActive}
+          userCollapsed={sidePanelCollapsed}
           onToggleCollapse={() => {
             if (isKanbanTabActive) {
               setKanbanSidePanelExpanded(!kanbanSidePanelExpanded);

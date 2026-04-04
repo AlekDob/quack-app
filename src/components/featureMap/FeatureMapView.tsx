@@ -7,6 +7,7 @@ import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useFeatureMapData } from '../../hooks/useFeatureMapData';
 import { useWhiteboardFile } from '../../hooks/useWhiteboardFile';
+import { useCanvasSelection } from '../../hooks/useCanvasSelection';
 import { IMAGE_DEFAULT_W, IMAGE_DEFAULT_H } from './annotationTypes';
 import FeatureMapCanvas from './FeatureMapCanvas';
 import type { NodeClickInfo } from './FeatureMapCanvas';
@@ -24,12 +25,18 @@ interface Props {
 export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Props) {
   const { graph, loading, error, refresh } = useFeatureMapData(projectPath);
   const wb = useWhiteboardFile(projectPath);
+  const selection = useCanvasSelection();
   const [clickInfo, setClickInfo] = useState<NodeClickInfo | null>(null);
   const [annotationMode, setAnnotationMode] = useState<AnnotationMode>('select');
   const [selectedAnnId, setSelectedAnnId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingImagePos = useRef<{ x: number; y: number } | null>(null);
+
+  /** Receive lasso selection results from Canvas */
+  const handleLassoSelect = useCallback((ids: Set<string>) => {
+    selection.setSelection(ids);
+  }, [selection]);
 
   /** Save an image file to documentation/features/images/ and return relative path */
   const saveImageFile = useCallback(async (file: File): Promise<string> => {
@@ -129,11 +136,11 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
     [graph?.nodes, selectedNodeId],
   );
 
-  const MODES: AnnotationMode[] = ['select', 'postit', 'group', 'image'];
+  const MODES: AnnotationMode[] = ['select', 'lasso', 'postit', 'group', 'image'];
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setClickInfo(null); setAnnotationMode('select'); setSearchQuery(''); }
+      if (e.key === 'Escape') { setClickInfo(null); setAnnotationMode('select'); setSearchQuery(''); selection.clearSelection(); }
       if (e.key === 'Control') {
         e.preventDefault();
         setAnnotationMode(prev => {
@@ -240,8 +247,20 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
             projectPath={projectPath ?? ''}
             onResetMode={handleResetMode}
             searchQuery={searchQuery}
+            multiSelectedIds={selection.selectedIds}
+            lassoRect={selection.lassoRect}
+            onLassoStart={selection.startLasso}
+            onLassoUpdate={selection.updateLasso}
+            onLassoSelect={handleLassoSelect}
+            onLassoReset={selection.resetLasso}
+            onMultiToggle={selection.toggleSelect}
+            onMultiClear={selection.clearSelection}
           />
-          <AnnotationToolbar mode={annotationMode} onModeChange={setAnnotationMode} />
+          <AnnotationToolbar
+            mode={annotationMode}
+            onModeChange={setAnnotationMode}
+            selectionCount={selection.selectionCount}
+          />
         </div>
       </div>
 

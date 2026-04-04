@@ -407,7 +407,7 @@ function ActionIcons({
 
       {/* Whiteboard Icon */}
       {onFeatureMapClick && (
-        <KeyboardShortcutTooltip label="Whiteboard" shortcut={formatShortcut("⌘W")}>
+        <KeyboardShortcutTooltip label="Whiteboard" shortcut={formatShortcut("⇧⌘W")}>
           <button
             type="button"
             className={`action-icon ${isFeatureMapActive ? 'active' : ''}`}
