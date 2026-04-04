@@ -514,68 +514,101 @@ fn start_output_thread(
   child: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
 ) {
   std::thread::spawn(move || {
-    // Performance: buffer più grande per leggere più dati per volta
-    let mut buffer = [0u8; 65536]; // 64KB invece di 8KB
+    // Channel-based architecture: a dedicated reader thread sends chunks
+    // through a channel, while the main loop uses recv_timeout to ensure
+    // buffered data is flushed even when the reader blocks (e.g. password
+    // prompts that don't end with \n).
+    // Brain: fix-pty-output-flush-blocking-read
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
 
-    // Performance: accumulator per batching temporale ADATTIVO
+    // Reader thread — blocks on PTY read, sends chunks through channel
+    std::thread::spawn(move || {
+      let mut buffer = [0u8; 65536]; // 64KB read buffer
+      loop {
+        match reader.read(&mut buffer) {
+          Ok(0) => break,           // EOF
+          Ok(size) => {
+            if tx.send(buffer[..size].to_vec()).is_err() {
+              break; // Receiver dropped
+            }
+          }
+          Err(_) => break,
+        }
+      }
+    });
+
+    // Accumulator for adaptive batching
     let mut accumulated_bytes = Vec::with_capacity(131072); // 128KB capacity
     let mut last_flush = std::time::Instant::now();
 
-    // Performance: batch interval ADATTIVO basato sul volume di dati
-    // - Input utente (pochi bytes): flush quasi immediato (1ms)
-    // - Output massiccio (molti bytes): batch ottimizzato (8ms) per output fluido
+    // Adaptive batch intervals based on data volume:
+    // - Small input (likely user typing): flush almost immediately (1ms)
+    // - Large output (command output): optimized batching (8ms)
     let min_flush_interval = std::time::Duration::from_millis(1);
     let max_flush_interval = std::time::Duration::from_millis(8);
 
+    // Timeout for recv — ensures we flush buffered data even when the PTY
+    // reader is blocked waiting for more output (e.g. password prompts)
+    let recv_timeout = std::time::Duration::from_millis(10);
+
     loop {
-      match reader.read(&mut buffer) {
-        Ok(0) => break,
-        Ok(size) => {
-          // Aggiungi bytes all'accumulator
-          accumulated_bytes.extend_from_slice(&buffer[..size]);
-
-          // Check se ci sono caratteri critici che richiedono flush immediato
+      match rx.recv_timeout(recv_timeout) {
+        Ok(data) => {
+          // Check for critical chars that require immediate flush
           // \r (13) = Enter, \n (10) = Newline, \x03 (3) = Ctrl+C
-          let has_critical_char = buffer[..size].iter().any(|&b| b == 13 || b == 10 || b == 3);
+          let has_critical_char = data.iter().any(|&b| b == 13 || b == 10 || b == 3);
 
-          // Batching ADATTIVO: se pochi dati (probabile input utente), flush rapido
-          let is_small_input = accumulated_bytes.len() < 64; // < 64 bytes = probabilmente input utente
+          accumulated_bytes.extend_from_slice(&data);
+
+          // Adaptive batching: small data = likely user input, flush fast
+          let is_small_input = accumulated_bytes.len() < 64;
           let flush_interval = if is_small_input {
-            min_flush_interval // 1ms per input responsivo
+            min_flush_interval
           } else {
-            max_flush_interval // 50ms per output massiccio
+            max_flush_interval
           };
 
-          // Flush se: caratteri critici O timeout scaduto O accumulator troppo grande (>64KB)
+          // Flush on: critical chars OR timeout elapsed OR accumulator full (>64KB)
           let should_flush = has_critical_char
             || last_flush.elapsed() >= flush_interval
             || accumulated_bytes.len() >= 65536;
 
           if should_flush && !accumulated_bytes.is_empty() {
-            // Converti tutto in una volta sola
             let text = String::from_utf8_lossy(&accumulated_bytes).to_string();
-
-            // Port detection solo al flush (non su ogni chunk)
             if let Some(port) = detect_port_from_output(&text) {
               update_terminal_port(&id, port);
             }
-
             let payload = TerminalDataPayload {
               id: id.clone(),
               data: text,
             };
             let _ = app.emit("terminal-data", payload);
-
-            // Reset accumulator
             accumulated_bytes.clear();
             last_flush = std::time::Instant::now();
           }
         }
-        Err(_) => break,
+        Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+          // Reader is blocked (e.g. process waiting for password input).
+          // Flush any accumulated data so prompts without trailing \n are shown.
+          if !accumulated_bytes.is_empty() {
+            let text = String::from_utf8_lossy(&accumulated_bytes).to_string();
+            if let Some(port) = detect_port_from_output(&text) {
+              update_terminal_port(&id, port);
+            }
+            let payload = TerminalDataPayload {
+              id: id.clone(),
+              data: text,
+            };
+            let _ = app.emit("terminal-data", payload);
+            accumulated_bytes.clear();
+            last_flush = std::time::Instant::now();
+          }
+        }
+        Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break, // Reader thread exited
       }
     }
 
-    // Flush eventuali dati rimanenti
+    // Flush any remaining data
     if !accumulated_bytes.is_empty() {
       let text = String::from_utf8_lossy(&accumulated_bytes).to_string();
       if let Some(port) = detect_port_from_output(&text) {
