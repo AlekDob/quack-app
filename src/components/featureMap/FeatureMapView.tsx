@@ -257,7 +257,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
   return (
     <div className="fm-container">
       <div className="fm-header">
-        <h2 className="fm-title">Whiteboard</h2>
+        <h2 className="fm-title">{projectPath?.split('/').pop() ?? 'Whiteboard'}</h2>
         <div className="fm-stats">
           {safeGraph.nodes.length > 0
             ? `${safeGraph.nodes.length} features \u00B7 ${safeGraph.links.length} connections`
