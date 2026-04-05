@@ -11,12 +11,22 @@ tags: [whiteboard, nested-components, matryoshka, drag-assign, drag-eject]
 
 Components are nestable sub-whiteboards within the Whiteboard. Think of them as folders — you can group related annotations together and double-click to enter and see only that group's contents.
 
+## What Goes Inside Components?
+
+Both **feature nodes** (the architecture cards from .md files) and **annotations** (post-its, groups, images) can be placed inside components.
+
+When you create a component with feature nodes selected:
+- The nodes **disappear from the main canvas**
+- They're only visible when you **enter the component** (double-click)
+- Deleting or dissolving the component **puts them back** on the main canvas
+- Internally, node assignments are stored in `.whiteboard.json` as `nodeAssignments: { nodeId: componentId }`
+
 ## How to Create a Component
 
-1. Switch to **Lasso** mode (toolbar) or use **Shift+click** to select 2+ annotations
+1. Switch to **Lasso** mode (toolbar) or use **Shift+click** to select 2+ elements (nodes and/or annotations)
 2. A blue badge shows the selection count in the toolbar
 3. Click the **Create Component** button (grid icon, appears when 2+ selected)
-4. A component rect wraps the selected annotations
+4. A component rect wraps the selected elements — nodes disappear from the main view
 5. Click the component label to rename it
 
 ## Navigating Components
@@ -85,10 +95,19 @@ dissolve-component --id component-id
 
 Changes appear in the UI within 2 seconds (polling).
 
+## Deleting vs Dissolving a Component
+
+- **Delete** (X button on hover): removes the component rect, promotes ALL children (nodes + annotations) back to the parent level
+- **Dissolve** (via agent skill): same behavior — children are promoted, component is removed
+- Both are safe — children are never lost
+
+If a component is deleted while you're inside it, `fixOrphans()` cleans up orphaned references on next load.
+
 ## Architecture Notes
 
-- **Flat data model**: annotations have optional `parentComponentId` field, not a tree structure
-- **Filtering**: `filterByParent()` shows only annotations matching the current navigation level
+- **Flat data model**: annotations use `parentComponentId` field, nodes use `nodeAssignments` record in WhiteboardFile
+- **Filtering**: `filterByParent()` for annotations, `visibleNodeIds` Set for nodes — both driven by current navigation level
 - **Ephemeral navigation**: `ComponentNavigation` state is NOT persisted — always starts at root on reload
-- **Orphan detection**: `fixOrphans()` clears invalid `parentComponentId` refs on file load
-- See `documentation/guide/whiteboard-nested-components/nested-components-flow.mmd` for the flow diagram
+- **Orphan detection**: `fixOrphans()` clears invalid `parentComponentId` refs AND orphaned `nodeAssignments` on file load
+- **Links filtering**: links between hidden nodes are also hidden (Canvas filters by `visibleNodeIds`)
+- See `nested-components-flow.mmd` in this directory for the full flow diagram

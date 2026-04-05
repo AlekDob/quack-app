@@ -269,6 +269,8 @@ Exported symbols per file. Generated 2026-03-13.
 ### Tab & UI Hooks
 - `useAutomationTab()`, `useKanbanTab()`, `useOfficeTab()`, `useFeatureMapTab()`, `useCodeEditorTab()`, `useDocsTab()`, `useClaudeAssetsTab()`
 - `useFeatureMapData()` — fetches feature docs via Tauri, builds FeatureGraph
+- `useWhiteboardFile()` — annotation + position + nodeAssignment CRUD, undo/redo, component ops, file persistence + 2s polling
+- `useCanvasSelection()` — multi-selection (lasso rect, selectedIds Set, toggle/clear)
 - `useProjectDashboardTab()`, `useTabPopoutWindow()`, `useDrawerAnimation()`
 - `usePipWindow()`, `useWindowFocus()`, `useGlobalKeyboardShortcuts()`
 
@@ -363,13 +365,15 @@ Exported symbols per file. Generated 2026-03-13.
 - `FeatureMapView`: Main container composing data hook + canvas + popover + toolbar + image file saving/picking
 - `FeatureMapPopover`: Portal-based popover near clicked node with feature image preview, collapsible file list, connected features
 - `CanvasPostIt`: SVG post-it note — draggable, editable text, color cycling, delete on hover
-- `CanvasGroupRect`: SVG group rectangle — draggable, resizable (4 corner handles), editable label
+- `CanvasGroupRect`: SVG group rectangle — draggable, resizable (4 corner handles), editable label, component mode (mini-preview, drop target)
 - `CanvasImage`: SVG canvas image — draggable, aspect-ratio resize, blob URL loading from filesystem, delete on hover
-- `AnnotationToolbar`: Floating toolbar for Select/Post-it/Group/Image mode toggle
+- `AnnotationToolbar`: Floating toolbar for Select/Lasso/Post-it/Group/Image mode toggle + selection badge + Create Component
+- `WhiteboardBreadcrumb`: Navigation breadcrumb for nested components — Root > Parent > Current, clickable segments
+- `FeatureMapMinimap`: Minimap overview panel — node dots + viewport rect + click-to-navigate
 - `featureMapLayout.ts`: `LAYERS`, `classifyNode()`, `groupByLayer()`, `calculateLayeredLayout()` — architecture layers positioning
 - `featureMapTypes.ts`: `FeatureNode` (incl. `image?`), `FeatureFile`, `FeatureLink`, `FeatureGraph`, `NodePosition`
-- `annotationTypes.ts`: `PostIt`, `GroupRect`, `CanvasImage`, `CanvasAnnotations`, `AnnotationMode` types + constants
-- `FeatureMapView.css`: Dark theme styles (canvas, popover, toolbar, image preview)
+- `annotationTypes.ts`: `PostIt`, `GroupRect`, `CanvasImage`, `CanvasAnnotations`, `WhiteboardFile` (incl. `nodeAssignments`), `AnnotationMode`, `ComponentNavigation`, `LassoRect` types + constants
+- `FeatureMapView.css`: Dark theme styles (canvas, popover, toolbar, breadcrumb, eject zone, image preview)
 
 ### components/office/ (10 files)
 - `OfficeActionMenu`, `OfficeTooltip`, `OfficeView`

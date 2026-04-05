@@ -163,6 +163,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Automations: `documentation/guide/automations/` (overview, screenshots, cron presets, how jobs fire)
 - Memory leaks: `documentation/guide/memory-leak-prevention.md` (5 rules, bounded collections, how to spot leaks)
 - Droid reports: `documentation/guide/droid-reports/` (rapporti droid, nested tool indentation, flow diagram)
+- Nested components: `documentation/guide/whiteboard-nested-components/` (matryoshka whiteboards, node assignments, drag-assign/eject, flow diagram)
 
 **Brain breadcrumbs in code**: When writing code related to a Brain entry (bug fix, pattern, gotcha), add `// Brain: {slug}` above the relevant block. This links code back to its documentation. Example: `// Brain: fix-stamina-bar-prompt-caching`. See quack-brain skill for full rules.
 
