@@ -70,6 +70,9 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
     selection.clearSelection();
   }, [selection]);
 
+  // Empty graph fallback — whiteboard still works for annotations
+  const safeGraph = graph ?? { nodes: [], links: [] };
+
   // Visible annotations filtered by current navigation level
   const visibleAnnotations = useMemo(
     () => wb.getVisibleAnnotations(navigation.currentComponentId),
@@ -251,9 +254,6 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
       <button className="fm-retry-btn" onClick={refresh}>Retry</button>
     </div></div>
   );
-  // Empty graph fallback — whiteboard still works for annotations
-  const safeGraph = graph ?? { nodes: [], links: [] };
-
   return (
     <div className="fm-container">
       <div className="fm-header">
