@@ -288,6 +288,7 @@ interface SidePanelAccordionProps {
 
   // Collapse props
   isCollapsed?: boolean;
+  userCollapsed?: boolean; // WHY: distinguish user toggle from auto-collapse (tab switch)
   onToggleCollapse?: () => void;
 
   // MCP props
@@ -386,6 +387,7 @@ export default function SidePanelAccordion({
 
   // Collapse
   isCollapsed = false,
+  userCollapsed = false,
   onToggleCollapse,
 
   // MCP
@@ -412,6 +414,10 @@ export default function SidePanelAccordion({
   // Track focused section (single accordion in focus mode)
   const [focusedSection, setFocusedSection] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Peek expand state for compact icon-strip mode
+  const [isPeekExpanded, setIsPeekExpanded] = useState(false);
+  const peekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load rules for badge counter
   const { rules } = useRules(rootPath || '');
@@ -470,27 +476,62 @@ export default function SidePanelAccordion({
   };
 
   const toggleSection = (sectionId: string) => {
+    // In compact mode, ensure peek expands on icon click
+    if (isCompact && !isPeekExpanded) {
+      if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current);
+      setIsPeekExpanded(true);
+      setFocusedSection(sectionId);
+      return;
+    }
     if (focusedSection === sectionId) {
-      // Click on focused section -> unfocus (collapse all)
       setFocusedSection(null);
     } else {
-      // Click on any section -> focus it
       setFocusedSection(sectionId);
     }
   };
 
-  // Auto-hide panel when no agent is selected
-  const shouldBeCollapsed = isCollapsed || !activeAgentId;
+  // WHY: compact strip only when USER explicitly collapsed, not auto-collapse (tab switch)
+  const isCompact = userCollapsed && !!activeAgentId;
+  const shouldBeHidden = !activeAgentId || (isCollapsed && !userCollapsed);
+
+  // WHY: debounced hover handlers for peek-expand overlay
+  const handlePeekEnter = () => {
+    if (!isCompact) return;
+    if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current);
+    peekTimeoutRef.current = setTimeout(() => setIsPeekExpanded(true), 80);
+  };
+
+  const handlePeekLeave = () => {
+    if (!isCompact) return;
+    if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current);
+    peekTimeoutRef.current = setTimeout(() => setIsPeekExpanded(false), 300);
+  };
+
+  // Cleanup peek timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current);
+    };
+  }, []);
+
+  // Reset peek when leaving compact mode
+  useEffect(() => {
+    if (!isCompact) setIsPeekExpanded(false);
+  }, [isCompact]);
 
   return (
-    <aside className={`side-panel-accordion ${shouldBeCollapsed ? 'collapsed' : ''}`}>
-      {/* Toggle button */}
-      {onToggleCollapse && (
+    <aside
+      className={`side-panel-accordion ${shouldBeHidden ? 'collapsed' : ''} ${isCompact ? 'compact' : ''} ${isPeekExpanded ? 'peek-expanded' : ''}`}
+      onMouseEnter={handlePeekEnter}
+      onMouseLeave={handlePeekLeave}
+    >
+      {/* Toggle button — hidden in compact mode (ActionIcons button used) */}
+      {onToggleCollapse && !isCompact && (
         <button
           type="button"
           className="side-panel-toggle"
           onClick={onToggleCollapse}
-          aria-label={shouldBeCollapsed ? "Expand side panel" : "Collapse side panel"}
+          aria-label={shouldBeHidden ? "Expand side panel" : "Collapse side panel"}
         >
           <svg
             viewBox="0 0 20 20"
@@ -498,7 +539,7 @@ export default function SidePanelAccordion({
             height="16"
             aria-hidden="true"
             style={{
-              transform: shouldBeCollapsed ? 'rotate(0deg)' : 'rotate(180deg)',
+              transform: shouldBeHidden ? 'rotate(0deg)' : 'rotate(180deg)',
               transition: 'transform 0.3s ease'
             }}
           >
@@ -514,7 +555,12 @@ export default function SidePanelAccordion({
         </button>
       )}
 
-      <div className={`accordion-container ${focusedSection ? 'has-focus' : ''}`} ref={containerRef}>
+      <div
+        className={`accordion-container ${focusedSection ? 'has-focus' : ''}`}
+        ref={containerRef}
+        onMouseEnter={handlePeekEnter}
+        onMouseLeave={handlePeekLeave}
+      >
         {/* Changes - Codex-style diff panel (always visible, shows branch/history even without changes) */}
         <AccordionSection
           id="changes"

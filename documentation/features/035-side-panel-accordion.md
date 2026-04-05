@@ -7,8 +7,8 @@ last_verified: 2026-04-04
 tags: [accordion, side-panel, ui, layout, navigation]
 ---
 
-## Accordion Content Features
-**Purpose:** Collapsible side panel with 12 sections (focus-one-at-a-time pattern), each hosting a dedicated content panel for workspace management.
+## Side Panel Accordion
+**Purpose:** Collapsible side panel with 12 sections (focus-one-at-a-time pattern), compact icon-strip mode with peek-on-hover overlay, each section hosting a dedicated content panel for workspace management.
 **Stack:** React 18, TypeScript strict, CSS (glassmorphism)
 
 ### Files
@@ -45,15 +45,32 @@ tags: [accordion, side-panel, ui, layout, navigation]
 
 ### State
 - `focusedSection`: string | null -- which section is expanded (single-focus pattern) (component)
+- `isPeekExpanded`: boolean -- whether peek overlay is shown in compact mode (component)
+- `peekTimeoutRef`: RefObject -- debounce timer for peek enter/leave (component)
 - `containerRef`: RefObject<HTMLDivElement> -- scroll-to-top on focus change (component)
 - `rules`: RulesResponse -- fetched via useRules for badge count (component)
 - `commands`: SlashCommandsResponse -- fetched via useSlashCommands for badge count (component)
 - `mcpServers`: MCPServer[] -- fetched via useMCPServers for badge count (component)
 
+### Compact Mode (Icon Strip + Peek Overlay)
+| Concept | Detail |
+|---------|--------|
+| Trigger | `userCollapsed=true` (user clicked toggle) AND `activeAgentId` exists |
+| Strip width | 44px grid column, icons centered with colored badge dots |
+| Peek trigger | mouseEnter 80ms debounce → `isPeekExpanded=true` |
+| Peek close | mouseLeave 300ms debounce → `isPeekExpanded=false` |
+| Overlay | `position: fixed; right: 0; width: 420px; z-index: 9999;` |
+| Animation | CSS `transition: transform 0.3s` with `translateX(calc(100% - 44px))` → `translateX(0)` |
+| Shadow | `-12px 0 40px rgba(0,0,0,0.6)` — bi-directional transition |
+| Auto-collapse tabs | `isCollapsed && !userCollapsed` → fully hidden (`display: none`), NOT compact strip |
+
+- `isCompact`: derived — `userCollapsed && !!activeAgentId`
+- `shouldBeHidden`: derived — `!activeAgentId || (isCollapsed && !userCollapsed)`
+- `userCollapsed` prop: distinguishes user-initiated collapse from tab-auto-collapse (docs, kanban, feature map)
+
 ### Config
 - `CATEGORY_COLORS`: per-section color map (changes=#34d399, skills=#f28c52, agents=#f28c52, droids=#4ecdc4, rules=#60a5fa, hooks=#a78bfa, features=#FFD700, sessions=#00d9ff, mcp=#34d399, commands=#f472b6, context=#f28c52, project-context=#60a5fa)
 - `sectionIds`: fixed order array -- `['changes', 'context', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions']`
-- `shouldBeCollapsed`: auto-hides panel when no agent is selected (`isCollapsed || !activeAgentId`)
 
 ### Sections (12 total, 1 hidden)
 | # | ID | Title | Content Panel | Badge Source |
@@ -75,5 +92,8 @@ tags: [accordion, side-panel, ui, layout, navigation]
 - **Glassmorphism base**: `rgba(17,18,22,0.5)` + `backdrop-filter: blur(var(--blur-heavy))`
 - **Focus mode**: `.accordion-section.focused` gets `flex: 1` + content scrolls up to `80vh - 50px`
 - **Category color**: CSS custom property `--category-color` set per section, used by badge and icon styles
-- **Compact mode**: `!important` overrides for all child panels (12px base font, 6px padding cards, 14px icons)
+- **Content compact mode**: `!important` overrides for all child panels (12px base font, 6px padding cards, 14px icons)
 - **Changes badge**: always-visible glow animation (`changes-badge-pulse` keyframe)
+- **Compact strip**: `.compact:not(.peek-expanded)` — icons centered in 44px, chevron/title hidden, badge as 6px dot
+- **Peek overlay**: `.compact .accordion-container` fixed at right, `translateX` transition for smooth slide
+- **Hidden**: `.collapsed` — `display: none` (no agent or auto-collapsed by tab)

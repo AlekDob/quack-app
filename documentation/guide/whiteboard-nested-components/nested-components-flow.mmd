@@ -1,0 +1,51 @@
+%%{init: {'theme': 'dark'}}%%
+flowchart TB
+    subgraph DataModel["Data Model (Flat + Filtering)"]
+        A[PostIt / GroupRect / CanvasImage] -->|parentComponentId?| B[Component GroupRect]
+        B -->|isComponent: true| C[Nestable Container]
+        C -->|max depth: 5| C
+    end
+
+    subgraph Create["Create Component"]
+        D[Select 2+ annotations] --> E[Click Create Component btn]
+        E --> F[computeBoundingBox]
+        F --> G[New GroupRect isComponent=true]
+        G --> H[Set parentComponentId on children]
+    end
+
+    subgraph Navigation["Navigation (Matryoshka)"]
+        I[Root Level] -->|double-click component| J[Enter Component]
+        J --> K[filterByParent componentId]
+        K --> L[Show only children]
+        L --> M[Breadcrumb: Root > Parent > Current]
+        M -->|click segment| N[Navigate to level]
+        M -->|Escape / Backspace| O[Exit up one level]
+    end
+
+    subgraph DragAssign["Drag-Assign"]
+        P[Start dragging annotation] --> Q[handleMouseMove hit-test]
+        Q -->|over component rect| R[Amber glow drop target]
+        R -->|canDropOnTarget check| S{Valid target?}
+        S -->|yes| T[assignToComponent]
+        S -->|no circular ref| U[Reject]
+        T --> V[Annotation moves to component children]
+    end
+
+    subgraph DragEject["Drag-Eject"]
+        W[Inside component, drag annotation] --> X[Mouse near top 40px]
+        X --> Y[Orange eject zone appears]
+        Y -->|drop| Z[ejectFromComponent]
+        Z --> AA[Annotation promoted to parent level]
+    end
+
+    subgraph Preview["Mini-Preview"]
+        BB[Component at parent level] --> CC[getChildAnnotations]
+        CC --> DD[Scale children to fit rect]
+        DD --> EE[Render colored rects 45% opacity]
+        EE --> FF[Max 12 items + N more]
+    end
+
+    Create --> Navigation
+    Navigation --> DragAssign
+    Navigation --> DragEject
+    DataModel --> Preview

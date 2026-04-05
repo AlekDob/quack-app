@@ -31,6 +31,8 @@ pub struct GitCommitEntry {
     pub author: String,
     pub relative_time: String,
     pub timestamp: Option<i64>,
+    pub parent_hashes: Vec<String>,
+    pub refs: Vec<String>,
 }
 
 #[tauri::command]
@@ -88,8 +90,10 @@ pub fn git_commit_history(
     limit: Option<usize>,
     branch_name: Option<String>,
     root_path: Option<String>,
+    all: Option<bool>,
 ) -> Result<Vec<GitCommitEntry>, String> {
-    git_commit_history_impl(limit, branch_name, root_path).map_err(|err| err.to_string())
+    git_commit_history_impl(limit, branch_name, root_path, all)
+        .map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -353,19 +357,36 @@ fn git_commit_impl(message: String, root_path: Option<String>) -> Result<()> {
     Ok(())
 }
 
+fn parse_refs(raw: &str) -> Vec<String> {
+    let trimmed = raw.trim().trim_start_matches('(').trim_end_matches(')');
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+    trimmed
+        .split(", ")
+        .map(|s| s.trim().replace("HEAD -> ", ""))
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
 fn git_commit_history_impl(
     limit: Option<usize>,
     branch_name: Option<String>,
     root_path: Option<String>,
+    all: Option<bool>,
 ) -> Result<Vec<GitCommitEntry>> {
     let starting_path = root_path.map(PathBuf::from);
     let root = git_root(starting_path)?;
     let limit = limit.unwrap_or(50).min(200);
-    let pretty = "--pretty=format:%H%x1f%an%x1f%ad%x1f%at%x1f%s";
+    let pretty = "--pretty=format:%H%x1f%P%x1f%d%x1f%an%x1f%ad%x1f%at%x1f%s";
     let limit_arg = format!("-n{limit}");
 
-    // Build args with optional branch name
-    let mut args = vec!["log", "--date=relative", pretty, limit_arg.as_str()];
+    // Build args with optional --all and branch name
+    let mut args = vec!["log", "--date=relative", pretty];
+    if all.unwrap_or(false) {
+        args.push("--all");
+    }
+    args.push(limit_arg.as_str());
     let branch_str: String;
     if let Some(ref branch) = branch_name {
         branch_str = branch.clone();
@@ -373,28 +394,32 @@ fn git_commit_history_impl(
     }
 
     let output = run_git(&root, &args, false)?;
+    parse_commit_lines(&output)
+}
 
+fn parse_commit_lines(output: &str) -> Result<Vec<GitCommitEntry>> {
     let mut entries = Vec::new();
     for line in output.lines() {
         if line.trim().is_empty() {
             continue;
         }
-        let mut parts = line.split('\x1f');
-        let hash = parts.next().unwrap_or_default().to_string();
-        let author = parts.next().unwrap_or_default().to_string();
-        let relative_time = parts.next().unwrap_or_default().to_string();
-        let timestamp_str = parts.next().unwrap_or_default();
-        let timestamp = timestamp_str.parse::<i64>().ok();
-        let summary = parts.next().unwrap_or_default().to_string();
+        let parts: Vec<&str> = line.splitn(7, '\x1f').collect();
+        if parts.len() < 7 { continue; }
+        let parent_hashes = parts[1]
+            .split(' ')
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .collect();
         entries.push(GitCommitEntry {
-            hash,
-            author,
-            relative_time,
-            timestamp,
-            summary,
+            hash: parts[0].to_string(),
+            parent_hashes,
+            refs: parse_refs(parts[2]),
+            author: parts[3].to_string(),
+            relative_time: parts[4].to_string(),
+            timestamp: parts[5].parse::<i64>().ok(),
+            summary: parts[6].to_string(),
         });
     }
-
     Ok(entries)
 }
 
@@ -1490,4 +1515,41 @@ fn git_set_user_config_impl(name: String, email: String) -> Result<()> {
     }
 
     Ok(())
+}
+
+// ============================================================================
+// Git Remote Support
+// ============================================================================
+
+#[derive(Serialize, Clone)]
+pub struct GitRemote {
+    pub name: String,
+    pub url: String,
+}
+
+#[tauri::command]
+pub fn git_list_remotes(root_path: Option<String>) -> Result<Vec<GitRemote>, String> {
+    git_list_remotes_impl(root_path).map_err(|err| err.to_string())
+}
+
+fn git_list_remotes_impl(root_path: Option<String>) -> Result<Vec<GitRemote>> {
+    let starting_path = root_path.map(PathBuf::from);
+    let root = git_root(starting_path)?;
+
+    let stdout = run_git(&root, &["remote", "-v"], false)?;
+    let mut remotes: Vec<GitRemote> = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() >= 2 {
+            let name = parts[0].to_string();
+            let url = parts[1].to_string();
+            if seen.insert(name.clone()) {
+                remotes.push(GitRemote { name, url });
+            }
+        }
+    }
+
+    Ok(remotes)
 }

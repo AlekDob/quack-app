@@ -138,12 +138,24 @@ export interface GitStatusSummary {
   clean: boolean;
 }
 
+/** File change status tracked during a session */
+export type FileStatus = 'created' | 'modified' | 'deleted'
+
+/** Lazy-loaded diff content for a single file */
+export interface DiffState {
+  content: string
+  loading: boolean
+  error: string | null
+}
+
 export interface GitCommitEntry {
   hash: string;
   summary: string;
   author: string;
   relativeTime: string;
   timestamp?: number;
+  parentHashes?: string[];
+  refs?: string[];
 }
 
 export interface GitBranch {
@@ -172,6 +184,11 @@ export interface GitPullResult {
 export interface GitConflictFile {
   path: string;
   status: string;
+}
+
+export interface GitRemote {
+  name: string;
+  url: string;
 }
 
 export interface GitWorktree {

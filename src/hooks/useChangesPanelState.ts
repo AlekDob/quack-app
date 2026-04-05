@@ -1,14 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
-
-type FileStatus = 'created' | 'modified' | 'deleted'
-
-interface DiffState {
-  content: string
-  loading: boolean
-  error: string | null
-}
+import type { FileStatus, DiffState } from '../types'
 
 interface UseChangesPanelStateParams {
   rootPath: string | null

@@ -529,3 +529,29 @@
   cursor: not-allowed;
 }
 
+/* Eject zone — top of canvas during annotation drag inside component */
+.fm-eject-zone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  font-family: Inter, system-ui, sans-serif;
+  color: transparent;
+  pointer-events: none;
+  z-index: 8;
+  transition: all 0.2s ease;
+}
+
+.fm-eject-zone.active {
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.1);
+  border-bottom: 2px solid rgba(249, 115, 22, 0.5);
+  backdrop-filter: blur(4px);
+}
+

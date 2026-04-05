@@ -28,7 +28,12 @@
  */
 
 .app-shell.side-panel-collapsed {
-  grid-template-columns: 850px minmax(0, 1fr) 0px; /* ← 0px, toggle button is fixed */
+  grid-template-columns: 850px minmax(0, 1fr) 44px; /* Compact icon strip */
+}
+
+/* When truly no agents, fully hide the column */
+.app-shell.side-panel-collapsed.sidebar-hidden {
+  grid-template-columns: 850px minmax(0, 1fr) 0px;
 }
 
 /* Chat fullscreen mode - hide side panel and expand chat */
@@ -40,8 +45,8 @@
   display: none;
 }
 
-/* Full-width tabs (docs, second-brain) should expand to fill the space */
-.app-shell.side-panel-collapsed .terminal-pane.full-width-tab {
+/* Full-width tabs only extend when panel is truly hidden (no agents) */
+.app-shell.side-panel-collapsed.sidebar-hidden .terminal-pane.full-width-tab {
   grid-column: 2 / 4; /* Extend to cover both column 2 and 3 */
 }
 

@@ -12,90 +12,149 @@
       {
         "id": "a1b2c3d4-1111-4aaa-bbbb-000000000002",
         "text": "UI = editor, explorer, whiteboard, panels. Logic = agents, modes, skills. Infra = IDE, terminal, platform.",
-        "x": 794,
+        "x": 817.279307770018,
         "y": -80,
         "color": "#60a5fa"
+      },
+      {
+        "id": "d0468606-91ec-45fc-84f4-f9e04db1564c",
+        "text": "Settings e parti importanti",
+        "x": -217.24297858170578,
+        "y": 805.1887635403044,
+        "color": "#fbbf24"
+      },
+      {
+        "id": "0fee5da0-9929-4f06-bbed-a26b7c80b55d",
+        "text": "Dsadas",
+        "x": 274.8337825763113,
+        "y": -162.31793870278787,
+        "color": "#fbbf24"
       }
     ],
     "groups": [
       {
-        "id": "g0000001-aaaa-4bbb-cccc-111111111111",
-        "label": "UI Components",
-        "x": -10,
-        "y": -8,
-        "w": 580,
-        "h": 330,
-        "color": "#00d9ff"
+        "id": "4f33512d-a92b-4c8e-91d0-2b8cb895a8d3",
+        "label": "Component",
+        "x": null,
+        "y": null,
+        "w": null,
+        "h": null,
+        "color": "#00d9ff",
+        "isComponent": true
       },
       {
-        "id": "g0000002-aaaa-4bbb-cccc-222222222222",
-        "label": "Business Logic",
-        "x": -22.51886880555579,
-        "y": 346,
-        "w": 592.5188688055558,
-        "h": 244,
-        "color": "#a855f7"
+        "id": "4f33512d-a92b-4c8e-91d0-2b8cb895a8d3",
+        "label": "Component",
+        "x": null,
+        "y": null,
+        "w": null,
+        "h": null,
+        "color": "#00d9ff",
+        "isComponent": true
       },
       {
-        "id": "g0000003-aaaa-4bbb-cccc-333333333333",
-        "label": "Infrastructure",
-        "x": -10,
-        "y": 614,
-        "w": 320,
-        "h": 330,
-        "color": "#64748b"
+        "id": "9c4504b9-f12c-43a3-bd48-2ba2e8485849",
+        "label": "Component",
+        "x": null,
+        "y": null,
+        "w": null,
+        "h": null,
+        "color": "#00d9ff",
+        "isComponent": true
+      },
+      {
+        "id": "9c4504b9-f12c-43a3-bd48-2ba2e8485849",
+        "label": "Component",
+        "x": null,
+        "y": null,
+        "w": null,
+        "h": null,
+        "color": "#00d9ff",
+        "isComponent": true
       }
     ],
     "images": []
   },
   "positions": {
     "024-integrated-code-editor": {
-      "x": 69.21280798552495,
-      "y": 55.9633826578208
+      "x": 886.3930794083954,
+      "y": 210.94098583148852
     },
     "026-feature-map-whiteboard": {
-      "x": 407.4111118689167,
-      "y": 115.672286619228
+      "x": 1302.8630430759783,
+      "y": 438.2664395419659
     },
     "031-edit-summary-bar-per-turn": {
-      "x": 81.28301437952683,
-      "y": 118
+      "x": 445.3009748548424,
+      "y": 921.5535972726864
     },
     "033-file-explorer": {
-      "x": 408.76066487890427,
-      "y": 212.4687106991284
+      "x": 634.332816055006,
+      "y": 674.4404763077852
     },
     "035-accordion-content-features": {
-      "x": 135.26513477902878,
-      "y": 212.0973180599253
+      "x": 214.33488741409164,
+      "y": 362.2049559996766
     },
     "025-team-delegation-footer": {
-      "x": 160.75262974691603,
-      "y": 431.9025189537046
+      "x": 728.3629424407826,
+      "y": 1077.4462014487767
     },
     "029-permission-modes": {
-      "x": 433.2714985524718,
-      "y": 440.2484314907418
+      "x": -94.58205473645513,
+      "y": 1063.0152992861797
     },
     "030-built-in-skills": {
-      "x": 145.4517900956812,
-      "y": 526.2484314907417
+      "x": -92.79359458724481,
+      "y": 1156.5592804233147
     },
     "032-changes-panel-agent-commit-refresh": {
-      "x": 441.617411089509,
-      "y": 527.6394169135813
+      "x": 892.4907639432528,
+      "y": 577.8925912669655
     },
     "027-saved-commands": {
-      "x": 30,
-      "y": 654
+      "x": 886.0223235725882,
+      "y": 317.5067591058271
     },
     "028-ide-context-injection": {
-      "x": 30,
-      "y": 740
+      "x": 880.3947448929353,
+      "y": 142.34957639380514
     },
     "034-windows-cross-platform-compat": {
-      "x": 30,
-      "y": 826
+      "x": 407.4134001507306,
+      "y": 1170.7392545163716
+    },
+    "036-terminal": {
+      "x": 240.22096947347373,
+      "y": 268.93071512608356
+    },
+    "040-git-graph-visualization": {
+      "x": 892.6503651921988,
+      "y": 494.71527491050887
+    },
+    "038-quack-store": {
+      "x": 1288.6835360286047,
+      "y": 259.8759488170229
+    },
+    "039-source-control-sections": {
+      "x": 897.1922609535147,
+      "y": 660.9691896520443
+    },
+    "037-unified-settings-panel": {
+      "x": -100.8581012615569,
+      "y": 971.8818780615591
+    },
+    "035-side-panel-accordion": {
+      "x": 196.35577922927592,
+      "y": 403.330088380564
+    },
+    "041-chat-breadcrumb": {
+      "x": 242.6598228300126,
+      "y": 131.20101625197222
     }
+  },
+  "nodeAssignments": {
+    "036-terminal": "8f7677b8-db38-4465-a518-95be8e4da7ae",
+    "041-chat-breadcrumb": "8f7677b8-db38-4465-a518-95be8e4da7ae"
   }
 }

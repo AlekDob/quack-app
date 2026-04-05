@@ -1,0 +1,147 @@
+/* ─── Git Graph Container ─── */
+.git-graph-container {
+  position: relative;
+  padding: 0.5rem 0 1rem 0;
+}
+
+.git-graph-row {
+  display: flex;
+  align-items: stretch;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  position: relative;
+  min-height: 36px;
+}
+.git-graph-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.git-graph-column {
+  flex-shrink: 0;
+  position: relative;
+}
+
+.git-graph-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 4px 8px 4px 4px;
+  gap: 2px;
+}
+
+.git-graph-summary {
+  font-size: 0.78rem;
+  color: #f1f2f5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.git-graph-meta {
+  font-size: 0.68rem;
+  color: #a8aebd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Ref Badges ─── */
+.ref-badge-group {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 1px;
+}
+
+.ref-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-weight: 500;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* ─── Commit Popover ─── */
+.commit-popover {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  z-index: 50;
+  background: rgba(22, 24, 35, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: popover-in 0.15s ease;
+}
+
+@keyframes popover-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.commit-popover-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.commit-popover-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  min-width: 52px;
+}
+
+.commit-popover-value {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+  word-break: break-word;
+}
+
+.commit-popover-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 10px;
+}
+
+.commit-popover-dim {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.commit-popover-hash {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  padding: 1px 6px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.commit-popover-hash:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+/* ─── SVG Graph Lines ─── */
+.graph-dot {
+  transition: r 0.15s ease;
+}
+.git-graph-row:hover .graph-dot {
+  r: 5;
+}

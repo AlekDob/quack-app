@@ -17,7 +17,7 @@ function filePath(projectPath: string): string {
 }
 
 function emptyFile(): WhiteboardFile {
-  return { version: 1, annotations: { postIts: [], groups: [], images: [] }, positions: {} };
+  return { version: 1, annotations: { postIts: [], groups: [], images: [] }, positions: {}, nodeAssignments: {} };
 }
 
 export async function readWhiteboardFile(projectPath: string): Promise<WhiteboardFile | null> {
@@ -28,6 +28,7 @@ export async function readWhiteboardFile(projectPath: string): Promise<Whiteboar
     if (!parsed.annotations) parsed.annotations = { postIts: [], groups: [], images: [] };
     if (!parsed.annotations.images) parsed.annotations.images = [];
     if (!parsed.positions) parsed.positions = {};
+    if (!parsed.nodeAssignments) parsed.nodeAssignments = {};
     return parsed;
   } catch {
     return null;

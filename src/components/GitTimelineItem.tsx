@@ -29,9 +29,11 @@ interface GitTimelineItemProps {
   entry: GitCommitEntry
   lineLeft: number
   isLast: boolean
+  /** When true, hide timeline line + avatar (used inside git graph) */
+  graphMode?: boolean
 }
 
-export default function GitTimelineItem({ entry, lineLeft, isLast }: GitTimelineItemProps) {
+export default function GitTimelineItem({ entry, lineLeft, isLast, graphMode }: GitTimelineItemProps) {
   const formattedDate = entry.timestamp
     ? new Date(entry.timestamp * 1000).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -44,6 +46,15 @@ export default function GitTimelineItem({ entry, lineLeft, isLast }: GitTimeline
 
   const initials = getAuthorInitials(entry.author)
   const avatarColor = getAuthorColor(entry.author)
+
+  if (graphMode) {
+    return (
+      <div className="git-graph-content">
+        <span className="git-graph-summary">{entry.summary}</span>
+        <span className="git-graph-meta">{entry.author} • {entry.relativeTime}</span>
+      </div>
+    )
+  }
 
   return (
     <div

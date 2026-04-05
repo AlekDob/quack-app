@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { homeDir } from '@tauri-apps/api/path';
+import { homeDir, join } from '@tauri-apps/api/path';
 import type { SavedAgent } from '../types';
 import {
   exportAgentBundleAsZip,
@@ -35,12 +35,8 @@ async function readFileContent(path: string): Promise<string> {
   }
 }
 
-/** Resolve home directory with trailing slash */
-async function getHome(): Promise<string> {
-  let home = await homeDir();
-  if (!home.endsWith('/')) home += '/';
-  return home;
-}
+// Brain: bug-marketplace-install-windows-path-separators
+// getHome() removed — was broken on Windows (hardcoded '/'). Use homeDir() + join() instead.
 
 /**
  * Hook for bundle export/import operations
@@ -65,14 +61,14 @@ export function useBundleOperations(): BundleOperations {
     setState((prev) => ({ ...prev, exporting: true, error: null }));
 
     try {
-      const home = await getHome();
+      const home = await homeDir();
 
       // Read real skill files from disk
       const skillNames = agent.personality?.selectedSkills || agent.personality?.skills || [];
       const skills = await Promise.all(
         skillNames.map(async (name) => {
-          const dirPath = `${home}.claude/skills/${name}/SKILL.md`;
-          const flatPath = `${home}.claude/skills/${name}.md`;
+          const dirPath = await join(home, '.claude', 'skills', name, 'SKILL.md');
+          const flatPath = await join(home, '.claude', 'skills', `${name}.md`);
           let content = await readFileContent(dirPath);
           if (!content) content = await readFileContent(flatPath);
           return { id: name, content };
@@ -93,8 +89,8 @@ export function useBundleOperations(): BundleOperations {
       const commandNames = agent.personality?.toolkit?.commands || [];
       const commands = await Promise.all(
         commandNames.map(async (name) => {
-          const path = `${home}.claude/commands/${name}.md`;
-          const content = await readFileContent(path);
+          const cmdPath = await join(home, '.claude', 'commands', `${name}.md`);
+          const content = await readFileContent(cmdPath);
           return { id: name, content };
         })
       );
@@ -103,7 +99,7 @@ export function useBundleOperations(): BundleOperations {
       let avatarData: Uint8Array | undefined;
       if (agent.avatar) {
         try {
-          const avatarPath = `${home}.claude/avatars/${agent.avatar}`;
+          const avatarPath = await join(home, '.claude', 'avatars', agent.avatar);
           const data = await invoke<number[]>('read_binary_file', { path: avatarPath });
           avatarData = new Uint8Array(data);
         } catch {
@@ -174,15 +170,15 @@ export function useBundleOperations(): BundleOperations {
       const rawData = await invoke<number[]>('read_binary_file', { path: selectedPath as string });
       const bundleData = new Uint8Array(rawData);
       const result = await importAgentBundle(bundleData);
-      const home = await getHome();
+      const home = await homeDir();
 
       // Install skills to ~/.claude/skills/
       for (const skill of result.skills) {
         if (!skill.content) continue;
-        const targetDir = `${home}.claude/skills/${skill.id}`;
+        const targetDir = await join(home, '.claude', 'skills', skill.id);
         try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
         await invoke('write_file_content', {
-          path: `${targetDir}/SKILL.md`,
+          path: await join(targetDir, 'SKILL.md'),
           content: skill.content,
         });
       }
@@ -190,10 +186,10 @@ export function useBundleOperations(): BundleOperations {
       // Install rules to ~/.claude/rules/
       for (const rule of result.rules) {
         if (!rule.content) continue;
-        const targetDir = `${home}.claude/rules`;
+        const targetDir = await join(home, '.claude', 'rules');
         try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
         await invoke('write_file_content', {
-          path: `${targetDir}/${rule.id}.md`,
+          path: await join(targetDir, `${rule.id}.md`),
           content: rule.content,
         });
       }
@@ -201,18 +197,19 @@ export function useBundleOperations(): BundleOperations {
       // Install commands to ~/.claude/commands/
       for (const cmd of result.commands) {
         if (!cmd.content) continue;
-        const targetDir = `${home}.claude/commands`;
+        const targetDir = await join(home, '.claude', 'commands');
         try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
         await invoke('write_file_content', {
-          path: `${targetDir}/${cmd.id}.md`,
+          path: await join(targetDir, `${cmd.id}.md`),
           content: cmd.content,
         });
       }
 
       // Update rule paths to point to installed location
-      const installedRulePaths = result.rules
-        .filter(r => r.content)
-        .map(r => `${home}.claude/rules/${r.id}.md`);
+      const installedRulePaths: string[] = [];
+      for (const r of result.rules.filter(r => r.content)) {
+        installedRulePaths.push(await join(home, '.claude', 'rules', `${r.id}.md`));
+      }
 
       // Save agent with correct references
       saveAgent({

@@ -21,8 +21,99 @@
   padding-top: 0;
 }
 
+/* Fully hidden — no agent selected */
 .side-panel-accordion.collapsed {
   display: none;
+}
+
+/* ===================================
+   COMPACT MODE — Icon strip (44px)
+   =================================== */
+.side-panel-accordion.compact {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  overflow: visible;
+  border-left: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Icon-only headers in compact mode (first 44px visible via translateX) */
+.side-panel-accordion.compact:not(.peek-expanded) .accordion-chevron,
+.side-panel-accordion.compact:not(.peek-expanded) .accordion-title {
+  display: none;
+}
+
+.side-panel-accordion.compact:not(.peek-expanded) .accordion-header {
+  padding: 10px 0;
+  justify-content: flex-start;
+  gap: 0;
+  position: relative;
+}
+
+/* Badge becomes a small colored dot — positioned within visible 44px strip */
+.side-panel-accordion.compact:not(.peek-expanded) .accordion-badge,
+.side-panel-accordion.compact:not(.peek-expanded) .accordion-badge-label {
+  position: absolute;
+  top: 6px;
+  left: 30px;
+  right: auto;
+  width: 6px;
+  height: 6px;
+  min-width: 6px;
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
+  border-radius: 50%;
+  background: var(--category-color, #f28c52);
+  box-shadow: 0 0 4px var(--category-color, #f28c52);
+}
+
+/* Icon container fills the 44px visible strip */
+.side-panel-accordion.compact:not(.peek-expanded) .accordion-icon {
+  width: 44px;
+  min-width: 44px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Hide content in compact (icon-only) */
+.side-panel-accordion.compact:not(.peek-expanded) .accordion-content {
+  display: none;
+}
+
+/* Hover hint on individual icons */
+.side-panel-accordion.compact:not(.peek-expanded) .accordion-header:hover .accordion-icon {
+  color: var(--category-color, #f28c52);
+}
+
+/* ===================================
+   PEEK EXPANDED — Overlay from right
+   =================================== */
+
+/* Fixed container in compact mode — always positioned, uses translateX for smooth slide */
+.side-panel-accordion.compact .accordion-container {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 420px;
+  z-index: 9999;
+  background: rgba(17, 18, 22, 0.96);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  /* Shifted right: only 44px visible (icon strip) */
+  transform: translateX(calc(100% - 44px));
+  pointer-events: auto;
+  transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
+              box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  box-shadow: none;
+}
+
+/* Slide fully in when peek expanded */
+.side-panel-accordion.compact.peek-expanded .accordion-container {
+  transform: translateX(0);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.6), -4px 0 12px rgba(0, 0, 0, 0.4);
 }
 
 /* Toggle button */

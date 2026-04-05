@@ -8,6 +8,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useFeatureMapData } from '../../hooks/useFeatureMapData';
 import { useWhiteboardFile } from '../../hooks/useWhiteboardFile';
 import { useCanvasSelection } from '../../hooks/useCanvasSelection';
+import { calculateLayeredLayout } from './featureMapLayout';
 import { IMAGE_DEFAULT_W, IMAGE_DEFAULT_H } from './annotationTypes';
 import type { AnnotationMode, ComponentNavigation } from './annotationTypes';
 import FeatureMapCanvas from './FeatureMapCanvas';
@@ -75,11 +76,40 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
     [wb, navigation.currentComponentId],
   );
 
+  // Visible nodes filtered by component level
+  const visibleNodeIds = useMemo((): Set<string> | null => {
+    const na = wb.nodeAssignments;
+    const hasAssignments = Object.keys(na).length > 0;
+    if (!navigation.currentComponentId) {
+      if (!hasAssignments) return null; // no filtering, show all
+      // Root: show nodes NOT assigned to any component
+      const assignedIds = new Set(Object.keys(na));
+      return new Set(graph?.nodes.filter(n => !assignedIds.has(n.id)).map(n => n.id) ?? []);
+    }
+    // Inside component: show only nodes assigned to this component
+    const visible = new Set<string>();
+    for (const [nodeId, compId] of Object.entries(na)) {
+      if (compId === navigation.currentComponentId) visible.add(nodeId);
+    }
+    return visible;
+  }, [wb.nodeAssignments, navigation.currentComponentId, graph?.nodes]);
+
   const handleCreateComponent = useCallback(() => {
     if (selection.selectionCount < 2) return;
-    wb.createComponent(selection.selectedIds, 'Component', navigation.currentComponentId);
+    // Build full node positions map (custom overrides + layout defaults)
+    const allNodePositions = new Map<string, { x: number; y: number }>();
+    if (graph) {
+      const layout = calculateLayeredLayout(graph.nodes, 900);
+      for (const node of graph.nodes) {
+        const custom = wb.customPositions.get(node.id);
+        const layoutPos = layout.positions.get(node.id);
+        if (custom) allNodePositions.set(node.id, custom);
+        else if (layoutPos) allNodePositions.set(node.id, layoutPos);
+      }
+    }
+    wb.createComponent(selection.selectedIds, 'Component', navigation.currentComponentId, allNodePositions);
     selection.clearSelection();
-  }, [wb, selection, navigation.currentComponentId]);
+  }, [wb, selection, navigation.currentComponentId, graph]);
 
   /** Receive lasso selection results from Canvas */
   const handleLassoSelect = useCallback((ids: Set<string>) => {
@@ -319,6 +349,10 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
             onEndDrag={wb.endDrag}
             onEnterComponent={enterComponent}
             getChildCount={wb.getChildCount}
+            getChildAnnotations={wb.getChildAnnotations}
+            visibleNodeIds={visibleNodeIds}
+            onAssignToComponent={wb.assignToComponent}
+            onEjectFromComponent={wb.ejectFromComponent}
           />
           <AnnotationToolbar
             mode={annotationMode}

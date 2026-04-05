@@ -86,6 +86,9 @@ export default function CanvasPostIt({ postIt, zoom, isSelected, isMultiSelected
       onMouseUp={handleMouseUp}
       style={{ cursor: dragRef.current?.did ? 'grabbing' : 'grab' }}
     >
+      {/* Invisible hover extension — captures mouse above body for delete/color buttons */}
+      <rect x={-14} y={-18} width={POST_IT_W + 28} height={18}
+        fill="transparent" />
       {/* Shadow */}
       <rect x={2} y={3} width={POST_IT_W} height={POST_IT_H}
         rx={4} fill="rgba(0,0,0,0.25)" />

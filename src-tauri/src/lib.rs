@@ -1153,6 +1153,7 @@ pub fn run() {
             git::git_get_conflicts,
             git::git_push,
             git::git_pull,
+            git::git_list_remotes,
             git::git_list_worktrees,
             git::git_add_worktree,
             git::git_remove_worktree,

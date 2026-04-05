@@ -82,8 +82,9 @@ async function downloadSkillDirectory(
     if (!res.ok) throw new Error(`Failed to download skill: ${res.status}`);
     const content = await res.text();
     try { await invoke('create_directory', { path: targetDir }); } catch { /* exists */ }
+    // Brain: bug-marketplace-install-windows-path-separators
     await invoke('write_file_content', {
-      path: `${targetDir}/SKILL.md`,
+      path: await join(targetDir, 'SKILL.md'),
       content,
     });
   }
@@ -100,8 +101,9 @@ async function downloadDirectoryEntries(
         const fileRes = await fetch(entry.download_url);
         if (!fileRes.ok) continue;
         const content = await fileRes.text();
+        // Brain: bug-marketplace-install-windows-path-separators
         await invoke('write_file_content', {
-          path: `${targetDir}/${entry.name}`,
+          path: await join(targetDir, entry.name),
           content,
         });
       } catch {
@@ -114,7 +116,8 @@ async function downloadDirectoryEntries(
         });
         if (!subRes.ok) continue;
         const subEntries: GitHubContentEntry[] = await subRes.json();
-        await downloadDirectoryEntries(subEntries, `${targetDir}/${entry.name}`);
+        // Brain: bug-marketplace-install-windows-path-separators
+        await downloadDirectoryEntries(subEntries, await join(targetDir, entry.name));
       } catch {
         // Skip subdirectory failures
       }

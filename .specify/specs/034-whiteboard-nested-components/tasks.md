@@ -136,7 +136,7 @@
 
 ## Phase 6: Drag In/Out
 
-- [ ] 6.1 Implement drag-assign (drop annotation onto component)
+- [x] 6.1 Implement drag-assign (drop annotation onto component)
   - During annotation drag, hit-test against component rects
   - Highlight component as drop target (glow border)
   - On drop over component: call `assignToComponent()`
@@ -152,7 +152,7 @@
   - **Requirement**: FR-009, FR-010
   - **File**: `src/hooks/useWhiteboardFile.ts`
 
-- [ ] 6.3 Implement drag-eject (drop annotation onto breadcrumb)
+- [x] 6.3 Implement drag-eject (drop annotation onto breadcrumb)
   - Inside a component, dragging annotation to breadcrumb bar highlights it as drop zone
   - On drop: call `ejectFromComponent()`
   - **Depends on**: 4.2, 6.2
@@ -161,7 +161,7 @@
 
 ## Phase 7: Component Preview (P2)
 
-- [ ] 7.1 Render mini-preview inside component rects
+- [x] 7.1 Render mini-preview inside component rects
   - At parent level, component rects show a scaled SVG of their children
   - Scale factor: fit children bounds into component rect with padding
   - Reduce opacity to 50% for preview
@@ -172,7 +172,7 @@
 
 ## Phase 8: Agent Skill Update (P3)
 
-- [ ] 8.1 Update /whiteboard skill with component operations
+- [x] 8.1 Update /whiteboard skill with component operations
   - Add `create-component --around [id1, id2] --label "Name"` action
   - Add `--inside component-id` flag to `add-postit` and existing actions
   - Add `list --inside component-id` to show component children

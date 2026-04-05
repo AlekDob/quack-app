@@ -5,7 +5,7 @@ stack: TypeScript strict (React 18 frontend), Tauri v2 invoke API (list_director
 created: 2026-04-03
 last_verified: 2026-04-04
 shortcut: Cmd+Shift+W (Meta+Shift+W)
-tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, mention, autocomplete, image, agent-bridge, skill]
+tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, mention, autocomplete, image, agent-bridge, skill, nested-components, matryoshka, drag-assign, drag-eject]
 image: images/026-whiteboard-overview.png
 ---
 
@@ -26,8 +26,9 @@ image: images/026-whiteboard-overview.png
 | Component | `src/components/featureMap/CanvasPostIt.tsx` | SVG post-it note — draggable, editable text, color cycling, delete on hover |
 | Component | `src/components/featureMap/CanvasGroupRect.tsx` | SVG group rectangle — draggable, resizable (4 corner handles), editable label, color cycling |
 | Component | `src/components/featureMap/CanvasImage.tsx` | SVG canvas image annotation — draggable, aspect-ratio resize (corner handle), delete on hover, blob URL loading from filesystem |
-| Component | `src/components/featureMap/AnnotationToolbar.tsx` | Floating HTML toolbar for Select/Post-it/Group/Image mode toggle |
+| Component | `src/components/featureMap/AnnotationToolbar.tsx` | Floating HTML toolbar for Select/Lasso/Post-it/Group/Image mode toggle + selection count badge + Create Component button |
 | Component | `src/components/featureMap/FeatureMapMinimap.tsx` | Minimap overview panel — node dots + viewport rect + click-to-navigate |
+| Component | `src/components/featureMap/WhiteboardBreadcrumb.tsx` | Navigation breadcrumb for nested components — Root > Parent > Current |
 | Model/Type | `src/components/featureMap/annotationTypes.ts` | PostIt, GroupRect, CanvasImage, CanvasAnnotations, WhiteboardFile, AnnotationMode (incl. 'lasso'), ComponentNavigation, LassoRect types + color/dimension constants |
 | Store/State | `src/hooks/useCanvasSelection.ts` | Multi-selection hook — lasso rect state, selectedIds Set, startLasso/updateLasso/resetLasso/setSelection/toggleSelect/clearSelection |
 | Service | `src/services/whiteboardFileService.ts` | File-based I/O for `.whiteboard.json` — readWhiteboardFile, writeWhiteboardFile, migrateFromLocalStorage (Tauri read_file_content + write_file_content) |
@@ -213,10 +214,56 @@ image: images/026-whiteboard-overview.png
 - Redo stack is cleared on any new action (standard undo behavior)
 - Keyboard listener in `FeatureMapView.tsx`, stack logic in `useWhiteboardFile.ts`
 
-### Component Types (for nested whiteboards — Phase 1 only, not yet functional)
-- `parentComponentId?: string` on PostIt, GroupRect, CanvasImage — for future nested component assignment
+### Nested Components (Matryoshka Whiteboards)
+Components are nestable group rects that act as sub-whiteboards. Select 2+ annotations, click "Create Component" in toolbar, and a component is created wrapping them. Double-click a component to enter it; breadcrumb shows navigation path.
+
+**Data Model (flat with filtering, not tree)**:
+- `parentComponentId?: string` on PostIt, GroupRect, CanvasImage — links annotation to parent component
 - `isComponent?: boolean` on GroupRect — marks a group as an enterable component
-- `ComponentNavigation` type — ephemeral navigation state for future matryoshka navigation
+- `ComponentNavigation` type — ephemeral navigation state (currentComponentId + breadcrumb), NOT persisted
+- Filtering via `filterByParent()` — shows only annotations matching current level
+- Orphan detection: `fixOrphans()` clears invalid parentComponentId on file load
+- Max nesting depth: 5 levels
+
+**Navigation**:
+- Double-click a component to enter (see children only, feature nodes hidden)
+- Breadcrumb bar (`WhiteboardBreadcrumb.tsx`) shows `Root > Parent > Current` with clickable segments
+- Escape/Backspace inside component: go up one level
+- Breadcrumb hidden at root level
+
+**Component Appearance**:
+- Solid border (not dashed), layers icon (stacked rects), child count badge (top-right)
+- Mini-preview: scaled SVG showing children as colored rectangles (max 12 items, "+N more" overflow), 45% opacity, non-interactive
+- Components render at Z1 (same as group rects)
+
+**Drag-Assign (drop annotation onto component)**:
+- During single annotation drag, hit-test against visible component rects
+- Drop target highlighted with amber glow (#f59e0b, 3px border)
+- Circular nesting prevention: `canDropOnTarget()` walks component descendants to prevent cycles
+- On drop, `assignToComponent(annotationId, componentId)` sets parentComponentId
+- Annotation disappears from current view (filtered to component's children)
+- Stale drag ref cleanup on next mousedown or mouse-leave
+
+**Drag-Eject (eject annotation from component)**:
+- Inside a component, dragging annotation to top 40px of canvas shows orange eject zone
+- On drop in eject zone, `ejectFromComponent(annotationId)` promotes to parent level
+- Also triggered when mouse leaves canvas toward top (onMouseLeave handler)
+
+**Component CRUD** (in `useWhiteboardFile.ts`):
+- `createComponent(childIds, label, currentParent)` — computes bounding box, creates isComponent group, assigns children
+- `dissolveComponent(componentId)` — removes group, promotes children to parent level
+- `assignToComponent(annotationId, componentId)` — sets parentComponentId
+- `ejectFromComponent(annotationId)` — clears parentComponentId (promotes to grandparent)
+- `getVisibleAnnotations(componentId)` — filters by parentComponentId
+- `getChildAnnotations(componentId)` — returns children for mini-preview
+- `getChildCount(componentId)` — counts children across all annotation types
+- `canCreateComponent(parentId)` — checks nesting depth < 5
+
+**Agent Skill** (`/whiteboard`):
+- `create-component --around [id1, id2] --label "Name"` — creates component from existing annotations
+- `--inside component-id` flag on `add-postit`, `add-group` — creates annotation inside component
+- `list --inside component-id` — shows component children
+- `dissolve-component --id`, `assign-to-component --id --target`, `eject-from-component --id`
 
 ### Shortcut Migration
 - Original shortcut: `Cmd+Shift+M` (as "Feature Map") — renamed to `Cmd+Shift+W` (as "Whiteboard") on 2026-04-04

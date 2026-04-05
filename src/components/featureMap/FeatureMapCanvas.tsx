@@ -75,6 +75,12 @@ interface Props {
   currentComponentId?: string | null;
   onEnterComponent?: (id: string, label: string) => void;
   getChildCount?: (componentId: string) => number;
+  getChildAnnotations?: (componentId: string) => CanvasAnnotations;
+  /** null = show all nodes, Set = show ONLY these node IDs */
+  visibleNodeIds?: Set<string> | null;
+  // Drag-assign / drag-eject
+  onAssignToComponent?: (annotationId: string, componentId: string) => void;
+  onEjectFromComponent?: (annotationId: string) => void;
 }
 
 export default function FeatureMapCanvas(props: Props) {
@@ -83,11 +89,13 @@ export default function FeatureMapCanvas(props: Props) {
     annotations, annotationMode, selectedAnnotationId, onAnnotationSelect,
     onPostItAdd, onPostItUpdate, onPostItRemove,
     onGroupAdd, onGroupUpdate, onGroupRemove,
-    onImageAdd, onImageUpdate, onImageRemove, onImageFilePick, onImageDrop,
+    onImageUpdate, onImageRemove, onImageFilePick, onImageDrop,
     projectPath, onResetMode, searchQuery,
     multiSelectedIds, lassoRect: lassoRectProp,
     onLassoStart, onLassoUpdate, onLassoSelect, onLassoReset, onMultiToggle, onMultiClear, onBeginDrag, onEndDrag,
-    currentComponentId, onEnterComponent, getChildCount,
+    currentComponentId, onEnterComponent, getChildCount, getChildAnnotations,
+    visibleNodeIds,
+    onAssignToComponent, onEjectFromComponent,
   } = props;
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -104,6 +112,13 @@ export default function FeatureMapCanvas(props: Props) {
   const groupDrawRef = useRef<{ sx: number; sy: number; svgSx: number; svgSy: number } | null>(null);
   // Group-drag ref: tracks multi-selection drag (all selected items move together)
   const multiDragRef = useRef<{ startX: number; startY: number; didDrag: boolean; origins: Map<string, { x: number; y: number }> } | null>(null);
+  // Drag-assign/eject state
+  const dragAnnotationRef = useRef<string | null>(null);
+  const dropTargetRef = useRef<string | null>(null);
+  const ejectRef = useRef(false);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+  const [ejectActive, setEjectActive] = useState(false);
+
   // Space key held = force pan mode (like Figma)
   const [spaceHeld, setSpaceHeld] = useState(false);
   const spaceRef = useRef(false); // ref for synchronous access in handlers
@@ -148,8 +163,6 @@ export default function FeatureMapCanvas(props: Props) {
 
   const getPos = useCallback((id: string) => customPositions.get(id) ?? layout.positions.get(id), [customPositions, layout.positions]);
   const nodeLayerMap = useMemo(() => { const m = new Map<string, string>(); for (const n of graph.nodes) m.set(n.id, classifyNode(n)); return m; }, [graph.nodes]);
-  const connected = useMemo(() => { if (!hovered) return new Set<string>(); const s = new Set<string>(); for (const l of graph.links) { if (l.source === hovered) s.add(l.target); if (l.target === hovered) s.add(l.source); } return s; }, [hovered, graph.links]);
-
   // Search: matching node IDs
   const searchMatches = useMemo(() => {
     if (!searchQuery.trim()) return null;
@@ -192,6 +205,14 @@ export default function FeatureMapCanvas(props: Props) {
   }, []);
 
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent) => {
+    // Clean up stale annotation drag ref (e.g. click without drag)
+    if (dragAnnotationRef.current) {
+      dragAnnotationRef.current = null;
+      dropTargetRef.current = null;
+      ejectRef.current = false;
+      setDropTargetId(null);
+      setEjectActive(false);
+    }
     // Middle-click always starts pan (any mode)
     if (e.button === 1) {
       panRef.current = { active: true, x: e.clientX, y: e.clientY, panX: viewport.panX, panY: viewport.panY, didDrag: false };
@@ -294,6 +315,40 @@ export default function FeatureMapCanvas(props: Props) {
     }
   }, [annotations, graph.nodes, onNodeDrag, onPostItUpdate, onGroupUpdate, onImageUpdate]);
 
+  /** Check if target is a valid drop destination (prevents circular nesting) */
+  const canDropOnTarget = useCallback((dragId: string, targetId: string): boolean => {
+    if (dragId === targetId) return false;
+    const dragged = annotations.groups.find(g => g.id === dragId);
+    if (!dragged?.isComponent) return true; // non-component can drop anywhere
+    // Walk descendants of dragged component to check if target is one
+    const seen = new Set<string>();
+    const isDesc = (pid: string): boolean => {
+      if (seen.has(pid)) return false;
+      seen.add(pid);
+      return annotations.groups.some(g =>
+        g.parentComponentId === pid &&
+        (g.id === targetId || (g.isComponent && isDesc(g.id))),
+      );
+    };
+    return !isDesc(dragId);
+  }, [annotations.groups]);
+
+  /** Finalize annotation drag — check drop target or eject zone */
+  const handleAnnotationDragEnd = useCallback((id: string) => {
+    const target = dropTargetRef.current;
+    if (target && canDropOnTarget(id, target)) {
+      onAssignToComponent?.(id, target);
+    } else if (ejectRef.current && currentComponentId) {
+      onEjectFromComponent?.(id);
+    }
+    dragAnnotationRef.current = null;
+    dropTargetRef.current = null;
+    ejectRef.current = false;
+    setDropTargetId(null);
+    setEjectActive(false);
+    onEndDrag();
+  }, [canDropOnTarget, currentComponentId, onAssignToComponent, onEjectFromComponent, onEndDrag]);
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     // Group drawing
     const gd = groupDrawRef.current;
@@ -319,6 +374,31 @@ export default function FeatureMapCanvas(props: Props) {
       onLassoUpdate(svg.x, svg.y);
       return;
     }
+    // Annotation drag-assign hit-test (fires during child-component drag)
+    if (dragAnnotationRef.current) {
+      const svg = toSvg(e.clientX, e.clientY);
+      const dragId = dragAnnotationRef.current;
+      let hit: string | null = null;
+      for (const g of annotations.groups) {
+        if (!g.isComponent || g.id === dragId) continue;
+        if (svg.x >= g.x && svg.x <= g.x + g.w && svg.y >= g.y && svg.y <= g.y + g.h) {
+          if (canDropOnTarget(dragId, g.id)) { hit = g.id; break; }
+        }
+      }
+      if (hit !== dropTargetRef.current) {
+        dropTargetRef.current = hit;
+        setDropTargetId(hit);
+      }
+      // Eject zone: top 40px of canvas when inside a component
+      if (currentComponentId) {
+        const rect = containerRef.current?.getBoundingClientRect();
+        const inEject = !hit && rect ? e.clientY < rect.top + 40 : false;
+        if (inEject !== ejectRef.current) {
+          ejectRef.current = inEject;
+          setEjectActive(inEject);
+        }
+      }
+    }
     // Node drag
     const nd = nodeDragRef.current;
     if (nd) {
@@ -334,9 +414,27 @@ export default function FeatureMapCanvas(props: Props) {
     const dx = e.clientX - d.x; const dy = e.clientY - d.y;
     if (Math.abs(dx) > DRAG_T || Math.abs(dy) > DRAG_T) d.didDrag = true;
     if (d.didDrag) setViewport(v => ({ ...v, panX: d.panX + dx, panY: d.panY + dy }));
-  }, [viewport.zoom, onNodeDrag, toSvg, lassoRectProp, annotationMode, onLassoUpdate, applyMultiDragDelta]);
+  }, [viewport.zoom, onNodeDrag, toSvg, lassoRectProp, annotationMode, onLassoUpdate, applyMultiDragDelta, annotations.groups, canDropOnTarget, currentComponentId]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    // Annotation drag cleanup (e.g. mouse left canvas during child drag)
+    if (dragAnnotationRef.current) {
+      const dragId = dragAnnotationRef.current;
+      const rect = containerRef.current?.getBoundingClientRect();
+      // If mouse exited toward top and inside component → eject
+      if (rect && e.clientY <= rect.top + 10 && currentComponentId) {
+        onEjectFromComponent?.(dragId);
+      } else if (dropTargetRef.current && canDropOnTarget(dragId, dropTargetRef.current)) {
+        onAssignToComponent?.(dragId, dropTargetRef.current);
+      }
+      dragAnnotationRef.current = null;
+      dropTargetRef.current = null;
+      ejectRef.current = false;
+      setDropTargetId(null);
+      setEjectActive(false);
+      onEndDrag();
+      return;
+    }
     // Group drawing finalize
     const gd = groupDrawRef.current;
     if (gd && drawingRect) {
@@ -359,8 +457,9 @@ export default function FeatureMapCanvas(props: Props) {
       const r = lassoRectProp;
       if (r.w > 5 && r.h > 5) {
         const hits = new Set<string>();
-        // Hit-test feature nodes (center = getPos)
+        // Hit-test feature nodes (center = getPos, filtered by visibility)
         for (const node of graph.nodes) {
+          if (visibleNodeIds && !visibleNodeIds.has(node.id)) continue;
           const pos = getPos(node.id);
           if (pos && pos.x >= r.x && pos.x <= r.x + r.w && pos.y >= r.y && pos.y <= r.y + r.h) {
             hits.add(node.id);
@@ -394,7 +493,7 @@ export default function FeatureMapCanvas(props: Props) {
       return;
     }
     panRef.current.active = false;
-  }, [onNodeSelect, onGroupAdd, drawingRect, lassoRectProp, annotationMode, onLassoSelect, onLassoReset, graph.nodes, getPos, annotations, onEndDrag]);
+  }, [onNodeSelect, onGroupAdd, drawingRect, lassoRectProp, annotationMode, onLassoSelect, onLassoReset, graph.nodes, getPos, annotations, onEndDrag, currentComponentId, onAssignToComponent, onEjectFromComponent, canDropOnTarget]);
 
   const handleBgClick = useCallback(() => {
     if (panRef.current.didDrag) return;
@@ -450,9 +549,13 @@ export default function FeatureMapCanvas(props: Props) {
                 isMultiSelected={multiSelectedIds.has(g.id)}
                 onUpdate={onGroupUpdate} onRemove={onGroupRemove}
                 onSelect={onAnnotationSelect} onMultiToggle={onMultiToggle}
-                onGroupDragStart={handleGroupDragStart} onBeginDrag={onBeginDrag} onEndDrag={onEndDrag}
+                onGroupDragStart={handleGroupDragStart}
+                onBeginDrag={() => { dragAnnotationRef.current = g.id; onBeginDrag(); }}
+                onEndDrag={() => handleAnnotationDragEnd(g.id)}
                 onEnterComponent={onEnterComponent}
-                childCount={g.isComponent ? getChildCount?.(g.id) ?? 0 : 0} />
+                childCount={g.isComponent ? getChildCount?.(g.id) ?? 0 : 0}
+                childAnnotations={g.isComponent ? getChildAnnotations?.(g.id) : undefined}
+                isDropTarget={dropTargetId === g.id} />
             ))}
 
             {/* Z1.5: Image annotations */}
@@ -462,13 +565,13 @@ export default function FeatureMapCanvas(props: Props) {
                 isMultiSelected={multiSelectedIds.has(img.id)}
                 onUpdate={onImageUpdate} onRemove={onImageRemove}
                 onSelect={onAnnotationSelect} onMultiToggle={onMultiToggle}
-                onGroupDragStart={handleGroupDragStart} onBeginDrag={onBeginDrag} onEndDrag={onEndDrag} />
+                onGroupDragStart={handleGroupDragStart}
+                onBeginDrag={() => { dragAnnotationRef.current = img.id; onBeginDrag(); }}
+                onEndDrag={() => handleAnnotationDragEnd(img.id)} />
             ))}
 
             {/* Z2: Legend row — hidden inside components */}
-            {!insideComponent && (<>
-            {/* Z2: Legend row */}
-            {(() => {
+            {!insideComponent && (() => {
               let lx = LEFT_MARGIN;
               return LAYERS.map(layer => {
                 const count = graph.nodes.filter(n => classifyNode(n) === layer.id).length;
@@ -487,8 +590,10 @@ export default function FeatureMapCanvas(props: Props) {
               });
             })()}
 
-            {/* Z3: Links */}
+            {/* Z3: Links — filtered to only visible nodes */}
             {graph.links.map(link => {
+              // Skip links where either node is hidden
+              if (visibleNodeIds && (!visibleNodeIds.has(link.source) || !visibleNodeIds.has(link.target))) return null;
               const from = getPos(link.source); const to = getPos(link.target);
               if (!from || !to) return null;
               const isHl = hovered === link.source || hovered === link.target;
@@ -507,8 +612,10 @@ export default function FeatureMapCanvas(props: Props) {
                 </g>);
             })}
 
-            {/* Z4: Feature nodes — uniform cards with left accent bar */}
+            {/* Z4: Feature nodes — filtered by visibleNodeIds */}
             {graph.nodes.map(node => {
+              // Skip nodes not in visible set
+              if (visibleNodeIds && !visibleNodeIds.has(node.id)) return null;
               const pos = getPos(node.id); if (!pos) return null;
               const sel = node.id === selectedNodeId; const hov = node.id === hovered; const isDrag = node.id === draggingId;
               const layerId = nodeLayerMap.get(node.id) ?? 'infra';
@@ -548,8 +655,6 @@ export default function FeatureMapCanvas(props: Props) {
                 </g>);
             })}
 
-            </>)}
-
             {/* Z5: Post-it annotations */}
             {annotations.postIts.map(p => (
               <CanvasPostIt key={p.id} postIt={p} zoom={viewport.zoom}
@@ -557,7 +662,9 @@ export default function FeatureMapCanvas(props: Props) {
                 isMultiSelected={multiSelectedIds.has(p.id)}
                 onUpdate={onPostItUpdate} onRemove={onPostItRemove}
                 onSelect={onAnnotationSelect} onMultiToggle={onMultiToggle}
-                onGroupDragStart={handleGroupDragStart} onBeginDrag={onBeginDrag} onEndDrag={onEndDrag} />
+                onGroupDragStart={handleGroupDragStart}
+                onBeginDrag={() => { dragAnnotationRef.current = p.id; onBeginDrag(); }}
+                onEndDrag={() => handleAnnotationDragEnd(p.id)} />
             ))}
 
             {/* Group drawing preview */}
@@ -582,6 +689,15 @@ export default function FeatureMapCanvas(props: Props) {
         customPositions={customPositions} viewport={viewport}
         containerSize={size} onNavigate={handleMinimapNavigate}
       />
+      {/* Eject zone hint — top of canvas when dragging inside a component */}
+      {insideComponent && ejectActive && (
+        <div className="fm-eject-zone active">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
+          Drop to eject from component
+        </div>
+      )}
     </div>
   );
 }

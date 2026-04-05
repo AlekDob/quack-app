@@ -88,8 +88,10 @@ export default function QuackStoreDrawer({ onClose, onRefresh, activeProjects = 
         return true;
       }
       return false;
-    } catch {
-      toast.error('Failed to install', { id: toastId });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[QuackStore] Install failed for ${resource.name} (${resource.category}):`, msg);
+      toast.error(`Failed to install: ${msg}`, { id: toastId });
       return false;
     }
   };

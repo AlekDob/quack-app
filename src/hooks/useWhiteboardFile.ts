@@ -44,13 +44,24 @@ function createOnboardingPostIts(): PostIt[] {
 
 function normKey(p: string): string { return p.replace(/\\/g, '/'); }
 
-/** Clear invalid parentComponentId refs (orphan detection) */
-function fixOrphans(a: CanvasAnnotations): CanvasAnnotations {
+/** Clear invalid parentComponentId refs + orphaned nodeAssignments */
+function fixOrphans(a: CanvasAnnotations, nodeAssignments?: Record<string, string>): {
+  annotations: CanvasAnnotations;
+  nodeAssignments: Record<string, string>;
+} {
   const componentIds = new Set(a.groups.filter(g => g.isComponent).map(g => g.id));
   const fix = <T extends { parentComponentId?: string }>(items: T[]): T[] =>
     items.map(item => item.parentComponentId && !componentIds.has(item.parentComponentId)
       ? { ...item, parentComponentId: undefined } : item);
-  return { postIts: fix(a.postIts), groups: fix(a.groups), images: fix(a.images) };
+  const fixedAnnotations = { postIts: fix(a.postIts), groups: fix(a.groups), images: fix(a.images) };
+  // Clean orphaned node assignments
+  const fixedNA: Record<string, string> = {};
+  if (nodeAssignments) {
+    for (const [nodeId, compId] of Object.entries(nodeAssignments)) {
+      if (componentIds.has(compId)) fixedNA[nodeId] = compId;
+    }
+  }
+  return { annotations: fixedAnnotations, nodeAssignments: fixedNA };
 }
 
 /** Filter annotations visible at a given navigation level */
@@ -73,8 +84,18 @@ function getNestingDepth(componentId: string, groups: GroupRect[]): number {
   return depth;
 }
 
-/** Compute bounding box of annotation IDs */
-function computeBoundingBox(ids: Set<string>, a: CanvasAnnotations): { x: number; y: number; w: number; h: number } {
+/** Node card dimensions (must match FeatureMapCanvas NW/NH) */
+const NODE_W = 240;
+const NODE_H = 72;
+const MIN_COMPONENT_W = 200;
+const MIN_COMPONENT_H = 120;
+
+/** Compute bounding box of annotation + node IDs */
+function computeBoundingBox(
+  ids: Set<string>,
+  a: CanvasAnnotations,
+  positions: Record<string, { x: number; y: number }>,
+): { x: number; y: number; w: number; h: number } {
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const p of a.postIts) {
     if (!ids.has(p.id)) continue;
@@ -91,8 +112,17 @@ function computeBoundingBox(ids: Set<string>, a: CanvasAnnotations): { x: number
     minX = Math.min(minX, img.x); minY = Math.min(minY, img.y);
     maxX = Math.max(maxX, img.x + img.w); maxY = Math.max(maxY, img.y + img.h);
   }
-  return { x: minX - COMPONENT_PADDING, y: minY - COMPONENT_PADDING - 24,
-    w: maxX - minX + COMPONENT_PADDING * 2, h: maxY - minY + COMPONENT_PADDING * 2 + 24 };
+  // Feature nodes (center-based, so expand by half NW/NH)
+  for (const [nodeId, pos] of Object.entries(positions)) {
+    if (!ids.has(nodeId)) continue;
+    minX = Math.min(minX, pos.x - NODE_W / 2);
+    minY = Math.min(minY, pos.y - NODE_H / 2);
+    maxX = Math.max(maxX, pos.x + NODE_W / 2);
+    maxY = Math.max(maxY, pos.y + NODE_H / 2);
+  }
+  const w = Math.max(MIN_COMPONENT_W, maxX - minX + COMPONENT_PADDING * 2);
+  const h = Math.max(MIN_COMPONENT_H, maxY - minY + COMPONENT_PADDING * 2 + 24);
+  return { x: minX - COMPONENT_PADDING, y: minY - COMPONENT_PADDING - 24, w, h };
 }
 
 export function useWhiteboardFile(projectPath?: string) {
@@ -173,8 +203,9 @@ export function useWhiteboardFile(projectPath?: string) {
       }
 
       if (mounted.current) {
-        // Fix orphaned parentComponentId refs on load
-        data = { ...data, annotations: fixOrphans(data.annotations) };
+        // Fix orphaned parentComponentId refs + node assignments on load
+        const fixed = fixOrphans(data.annotations, data.nodeAssignments);
+        data = { ...data, annotations: fixed.annotations, nodeAssignments: fixed.nodeAssignments };
         setFile(data);
         lastJson.current = JSON.stringify(data);
       }
@@ -241,9 +272,37 @@ export function useWhiteboardFile(projectPath?: string) {
     }));
   }, [updateAnnotations]);
 
+  /** Remove a group — if it's a component, promote children (annotations + nodes) to parent */
   const removeGroup = useCallback((id: string) => {
-    updateAnnotations(a => ({ ...a, groups: a.groups.filter(g => g.id !== id) }));
-  }, [updateAnnotations]);
+    setFile(prev => {
+      const a = prev.annotations;
+      const comp = a.groups.find(g => g.id === id);
+      const isComp = comp?.isComponent;
+      const parentId = comp?.parentComponentId;
+      // Promote annotation children to parent level
+      const promote = <T extends { parentComponentId?: string }>(items: T[]): T[] =>
+        isComp ? items.map(item => item.parentComponentId === id
+          ? { ...item, parentComponentId: parentId } : item) : items;
+      const nextAnnotations = {
+        postIts: promote(a.postIts),
+        groups: promote(a.groups).filter(g => g.id !== id),
+        images: promote(a.images),
+      };
+      // Promote node children
+      const nextNodeAssignments = { ...(prev.nodeAssignments ?? {}) };
+      if (isComp) {
+        for (const [nodeId, compId] of Object.entries(nextNodeAssignments)) {
+          if (compId === id) {
+            if (parentId) nextNodeAssignments[nodeId] = parentId;
+            else delete nextNodeAssignments[nodeId];
+          }
+        }
+      }
+      const next = { ...prev, annotations: nextAnnotations, nodeAssignments: nextNodeAssignments };
+      persist(next, prev);
+      return next;
+    });
+  }, [persist]);
 
   const addImage = useCallback((src: string, x: number, y: number, w?: number, h?: number) => {
     const img: CanvasImage = { id: uid(), src, x, y, w: w ?? IMAGE_DEFAULT_W, h: h ?? IMAGE_DEFAULT_H };
@@ -311,92 +370,179 @@ export function useWhiteboardFile(projectPath?: string) {
 
   // --- Component CRUD ---
 
-  /** Create a component from selected annotation IDs */
-  const createComponent = useCallback((childIds: Set<string>, label = 'Component', currentParent: string | null = null) => {
+  /** Create a component from selected annotation + node IDs.
+   *  nodePositions: Map of ALL node positions (custom + layout-calculated) for bounding box */
+  const createComponent = useCallback((childIds: Set<string>, label = 'Component', currentParent: string | null = null, nodePositions?: Map<string, { x: number; y: number }>) => {
     const id = uid();
-    updateAnnotations(a => {
+    setFile(prev => {
+      const a = prev.annotations;
       const depth = currentParent ? getNestingDepth(currentParent, a.groups) + 1 : 1;
-      if (depth > MAX_NESTING) return a; // block if too deep
-      const box = computeBoundingBox(childIds, a);
+      if (depth > MAX_NESTING) return prev;
+      // Merge persisted positions with passed layout positions for bounding box calc
+      const allPositions: Record<string, { x: number; y: number }> = { ...prev.positions };
+      if (nodePositions) {
+        for (const [nid, pos] of nodePositions) {
+          if (childIds.has(nid) && !allPositions[nid]) allPositions[nid] = pos;
+        }
+      }
+      const box = computeBoundingBox(childIds, a, allPositions);
       const comp: GroupRect = {
         id, label, x: box.x, y: box.y, w: box.w, h: box.h,
         color: GROUP_COLORS[0], isComponent: true,
         parentComponentId: currentParent ?? undefined,
       };
-      // Assign children to component
+      // Assign annotation children to component
       const assign = <T extends { id: string; parentComponentId?: string }>(items: T[]): T[] =>
         items.map(item => childIds.has(item.id) ? { ...item, parentComponentId: id } : item);
-      return {
+      const nextAnnotations = {
         postIts: assign(a.postIts),
         groups: [...assign(a.groups), comp],
         images: assign(a.images),
       };
+      // Assign node children to component
+      const nextNodeAssignments = { ...(prev.nodeAssignments ?? {}) };
+      for (const childId of childIds) {
+        // Only assign if it's a node (not an annotation)
+        const isAnnotation = a.postIts.some(p => p.id === childId) ||
+          a.groups.some(g => g.id === childId) ||
+          a.images.some(i => i.id === childId);
+        if (!isAnnotation) nextNodeAssignments[childId] = id;
+      }
+      const next = { ...prev, annotations: nextAnnotations, nodeAssignments: nextNodeAssignments };
+      persist(next, prev);
+      return next;
     });
     return id;
-  }, [updateAnnotations]);
+  }, [persist]);
 
-  /** Dissolve a component — promote children to parent level, remove the component */
+  /** Dissolve a component — promote children (annotations + nodes) to parent level */
   const dissolveComponent = useCallback((componentId: string) => {
-    updateAnnotations(a => {
+    setFile(prev => {
+      const a = prev.annotations;
       const comp = a.groups.find(g => g.id === componentId && g.isComponent);
-      if (!comp) return a;
+      if (!comp) return prev;
       const parentId = comp.parentComponentId;
-      // Promote children to parent level
+      // Promote annotation children
       const promote = <T extends { parentComponentId?: string }>(items: T[]): T[] =>
         items.map(item => item.parentComponentId === componentId
           ? { ...item, parentComponentId: parentId } : item);
-      return {
+      const nextAnnotations = {
         postIts: promote(a.postIts),
         groups: promote(a.groups).filter(g => g.id !== componentId),
         images: promote(a.images),
       };
+      // Promote node children: reassign to parent or remove assignment
+      const nextNodeAssignments = { ...(prev.nodeAssignments ?? {}) };
+      for (const [nodeId, compId] of Object.entries(nextNodeAssignments)) {
+        if (compId === componentId) {
+          if (parentId) nextNodeAssignments[nodeId] = parentId;
+          else delete nextNodeAssignments[nodeId];
+        }
+      }
+      const next = { ...prev, annotations: nextAnnotations, nodeAssignments: nextNodeAssignments };
+      persist(next, prev);
+      return next;
     });
-  }, [updateAnnotations]);
+  }, [persist]);
 
-  /** Assign an annotation to a component */
-  const assignToComponent = useCallback((annotationId: string, componentId: string) => {
-    updateAnnotations(a => {
-      const set = <T extends { id: string; parentComponentId?: string }>(items: T[]): T[] =>
-        items.map(item => item.id === annotationId ? { ...item, parentComponentId: componentId } : item);
-      return { postIts: set(a.postIts), groups: set(a.groups), images: set(a.images) };
+  /** Assign an annotation or node to a component */
+  const assignToComponent = useCallback((itemId: string, componentId: string) => {
+    setFile(prev => {
+      const a = prev.annotations;
+      const isAnnotation = a.postIts.some(p => p.id === itemId) ||
+        a.groups.some(g => g.id === itemId) ||
+        a.images.some(i => i.id === itemId);
+      if (isAnnotation) {
+        const set = <T extends { id: string; parentComponentId?: string }>(items: T[]): T[] =>
+          items.map(item => item.id === itemId ? { ...item, parentComponentId: componentId } : item);
+        const nextAnnotations = { postIts: set(a.postIts), groups: set(a.groups), images: set(a.images) };
+        const next = { ...prev, annotations: nextAnnotations };
+        persist(next, prev);
+        return next;
+      }
+      // It's a node — update nodeAssignments
+      const nextNodeAssignments = { ...(prev.nodeAssignments ?? {}), [itemId]: componentId };
+      const next = { ...prev, nodeAssignments: nextNodeAssignments };
+      persist(next, prev);
+      return next;
     });
-  }, [updateAnnotations]);
+  }, [persist]);
 
-  /** Eject an annotation from its component (promote to component's parent) */
-  const ejectFromComponent = useCallback((annotationId: string) => {
-    updateAnnotations(a => {
-      // Find annotation's current parent component
+  /** Eject an annotation or node from its component (promote to parent level) */
+  const ejectFromComponent = useCallback((itemId: string) => {
+    setFile(prev => {
+      const a = prev.annotations;
+      const na = prev.nodeAssignments ?? {};
+      // Check if it's a node assignment
+      if (na[itemId]) {
+        const currentParent = na[itemId];
+        const parentComp = a.groups.find(g => g.id === currentParent);
+        const grandParent = parentComp?.parentComponentId;
+        const nextNodeAssignments = { ...na };
+        if (grandParent) nextNodeAssignments[itemId] = grandParent;
+        else delete nextNodeAssignments[itemId];
+        const next = { ...prev, nodeAssignments: nextNodeAssignments };
+        persist(next, prev);
+        return next;
+      }
+      // It's an annotation
       const findParent = (): string | undefined => {
-        const p = a.postIts.find(pi => pi.id === annotationId);
+        const p = a.postIts.find(pi => pi.id === itemId);
         if (p) return p.parentComponentId;
-        const g = a.groups.find(gi => gi.id === annotationId);
+        const g = a.groups.find(gi => gi.id === itemId);
         if (g) return g.parentComponentId;
-        const img = a.images.find(ii => ii.id === annotationId);
+        const img = a.images.find(ii => ii.id === itemId);
         return img?.parentComponentId;
       };
       const currentParent = findParent();
-      if (!currentParent) return a; // already at root
-      // Find grandparent
+      if (!currentParent) return prev;
       const parentComp = a.groups.find(g => g.id === currentParent);
       const grandParent = parentComp?.parentComponentId;
       const set = <T extends { id: string; parentComponentId?: string }>(items: T[]): T[] =>
-        items.map(item => item.id === annotationId ? { ...item, parentComponentId: grandParent } : item);
-      return { postIts: set(a.postIts), groups: set(a.groups), images: set(a.images) };
+        items.map(item => item.id === itemId ? { ...item, parentComponentId: grandParent } : item);
+      const nextAnnotations = { postIts: set(a.postIts), groups: set(a.groups), images: set(a.images) };
+      const next = { ...prev, annotations: nextAnnotations };
+      persist(next, prev);
+      return next;
     });
-  }, [updateAnnotations]);
+  }, [persist]);
 
   /** Get visible annotations filtered by navigation level */
   const getVisibleAnnotations = useCallback((componentId: string | null): CanvasAnnotations => {
     return filterByParent(file.annotations, componentId);
   }, [file.annotations]);
 
-  /** Count children of a component */
+  /** Get child annotations of a component (for mini-preview) */
+  const getChildAnnotations = useCallback((componentId: string): CanvasAnnotations => {
+    return filterByParent(file.annotations, componentId);
+  }, [file.annotations]);
+
+  /** Get node IDs visible at a given navigation level */
+  const getVisibleNodeIds = useCallback((componentId: string | null): Set<string> | null => {
+    const na = file.nodeAssignments ?? {};
+    if (!componentId) {
+      // Root level: show nodes NOT assigned to any component
+      const assignedIds = new Set(Object.keys(na));
+      return assignedIds.size > 0 ? assignedIds : null; // null = show all (no filtering)
+    }
+    // Inside component: show only nodes assigned to this component
+    const visible = new Set<string>();
+    for (const [nodeId, compId] of Object.entries(na)) {
+      if (compId === componentId) visible.add(nodeId);
+    }
+    return visible;
+  }, [file.nodeAssignments]);
+
+  /** Count children of a component (annotations + nodes) */
   const getChildCount = useCallback((componentId: string): number => {
     const a = file.annotations;
+    const na = file.nodeAssignments ?? {};
+    const nodeCount = Object.values(na).filter(cid => cid === componentId).length;
     return a.postIts.filter(p => p.parentComponentId === componentId).length
       + a.groups.filter(g => g.parentComponentId === componentId).length
-      + a.images.filter(i => i.parentComponentId === componentId).length;
-  }, [file.annotations]);
+      + a.images.filter(i => i.parentComponentId === componentId).length
+      + nodeCount;
+  }, [file.annotations, file.nodeAssignments]);
 
   /** Check if creating a component at current level would exceed max nesting */
   const canCreateComponent = useCallback((currentParentId: string | null): boolean => {
@@ -423,6 +569,7 @@ export function useWhiteboardFile(projectPath?: string) {
     // Component operations
     createComponent, dissolveComponent,
     assignToComponent, ejectFromComponent,
-    getVisibleAnnotations, getChildCount, canCreateComponent,
+    getVisibleAnnotations, getChildAnnotations, getChildCount, getVisibleNodeIds, canCreateComponent,
+    nodeAssignments: file.nodeAssignments ?? {},
   };
 }

@@ -848,6 +848,18 @@ export default function ChatView({
           )}
         </div>
       )}
+      {/* Project Breadcrumb — liquid glass context indicator */}
+      {projectName && (
+        <div className="chat-breadcrumb">
+          <span className="chat-breadcrumb-project">{projectName}</span>
+          {gitBranch && (
+            <>
+              <span className="chat-breadcrumb-sep">/</span>
+              <span className="chat-breadcrumb-branch">{gitBranch}</span>
+            </>
+          )}
+        </div>
+      )}
       {/* Remote Team Widget — shown to lead agent when a team is active */}
       {remoteTeam && activeAgent?.name === remoteTeam.leadAgentId && (
         <RemoteTeamWidget

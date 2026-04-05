@@ -60,6 +60,8 @@ export interface WhiteboardFile {
   version: 1;
   annotations: CanvasAnnotations;
   positions: Record<string, { x: number; y: number }>;
+  /** Maps feature node IDs to component IDs (for nesting nodes inside components) */
+  nodeAssignments?: Record<string, string>;
 }
 
 export const POST_IT_COLORS = ['#fbbf24', '#4ade80', '#f472b6', '#60a5fa', '#c084fc', '#fb923c'];
