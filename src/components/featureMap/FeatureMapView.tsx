@@ -261,7 +261,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
         <div className="fm-stats">
           {safeGraph.nodes.length > 0
             ? `${safeGraph.nodes.length} features \u00B7 ${safeGraph.links.length} connections`
-            : 'Whiteboard'}
+            : (projectPath?.split('/').pop() ?? '')}
         </div>
         <div className="fm-search-wrap">
           <svg className="fm-search-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

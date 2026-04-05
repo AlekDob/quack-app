@@ -86,10 +86,11 @@
 
 .fm-refresh-btn {
   background: none;
-  border: 1px solid #334155;
+  border: 1px solid #1e293b;
   border-radius: 6px;
   padding: 4px 8px;
-  color: #94a3b8;
+  height: 26px;
+  color: #e2e8f0;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -98,16 +99,16 @@
 
 .fm-refresh-btn:hover {
   background: #1e293b;
-  color: #e2e8f0;
-  border-color: #475569;
+  border-color: #334155;
 }
 
 .fm-reset-btn {
   background: none;
-  border: 1px solid #fbbf2444;
+  border: 1px solid #1e293b;
   border-radius: 6px;
   padding: 4px 8px;
-  color: #fbbf24;
+  height: 26px;
+  color: #e2e8f0;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -117,8 +118,8 @@
 }
 
 .fm-reset-btn:hover {
-  background: rgba(251, 191, 36, 0.1);
-  border-color: #fbbf24;
+  background: #1e293b;
+  border-color: #334155;
 }
 
 /* Body */
