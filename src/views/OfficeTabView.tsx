@@ -60,6 +60,7 @@ function OfficeTabView({
     >
       <OfficeView
         terminals={terminals}
+        isActive={isActive}
         onRoomClick={onRoomClick}
         onDuckClick={onDuckClick}
         onSessionClick={onSessionClick}

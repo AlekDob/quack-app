@@ -45,9 +45,14 @@
   display: none;
 }
 
-/* Full-width tabs only extend when panel is truly hidden (no agents) */
-.app-shell.side-panel-collapsed.sidebar-hidden .terminal-pane.full-width-tab {
+/* Full-width tabs span both columns when side panel is collapsed */
+.app-shell.side-panel-collapsed .terminal-pane.full-width-tab {
   grid-column: 2 / 4; /* Extend to cover both column 2 and 3 */
+}
+
+/* WHY: office/whiteboard tabs always need full width — the grid col 3 is 0px but the pane must span it */
+.app-shell.office-mode .terminal-pane.full-width-tab {
+  grid-column: 2 / 4;
 }
 
 .app-shell::before {

@@ -73,6 +73,7 @@ PixiApplication.prototype.destroy = function (
 
 interface OfficeViewProps {
   terminals: TerminalInfo[];
+  isActive?: boolean;
   onRoomClick?: (projectPath: string) => void;
   onDuckClick?: (agentId: string) => void;
   onSessionClick?: (sessionId: string) => void;
@@ -81,6 +82,7 @@ interface OfficeViewProps {
 
 export default function OfficeView({
   terminals,
+  isActive = true,
   onRoomClick,
   onDuckClick,
   onSessionClick,
@@ -146,6 +148,20 @@ export default function OfficeView({
     obs.observe(containerRef.current);
     return () => obs.disconnect();
   }, []);
+
+  // WHY: force re-measure when tab becomes active (container resized while hidden via position:absolute)
+  useEffect(() => {
+    if (!isActive || !containerRef.current) return;
+    // Delay to let the DOM reflow after position:absolute → static switch
+    const raf = requestAnimationFrame(() => {
+      if (!containerRef.current) return;
+      const { width, height } = containerRef.current.getBoundingClientRect();
+      if (width > 0) {
+        setContainerSize({ w: width, h: height });
+      }
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isActive]);
 
   // Zoom via scroll wheel
   const handleWheel = useCallback((e: React.WheelEvent) => {
