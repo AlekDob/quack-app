@@ -4822,18 +4822,20 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // In Kanban mode: default collapsed unless kanbanSidePanelExpanded is true (user clicked on project)
   // When no agents/projects: hide sidebar completely (empty state)
   const showSidebar = terminals.length > 0 || persistedProjects.size > 0;
+  // WHY: auto-collapsed tabs (docs, whiteboard, office) must fully hide panel, not show 420px gap
+  const isAutoCollapsedTab = activeTabId.startsWith('docs-') || activeTabId.startsWith('second-brain-') || activeTabId.startsWith('memory-graph-') || activeTabId.startsWith('claude-assets-') || activeTabId.startsWith('project-dashboard-') || isOfficeTabActive || isFeatureMapTabActive;
   const shouldShowSidePanel = isKanbanTabActive
     ? kanbanSidePanelExpanded && !sidePanelCollapsed
-    : !sidePanelCollapsed;
+    : !sidePanelCollapsed && !isAutoCollapsedTab;
 
-  // WHY: compact strip (44px) only when user explicitly collapsed, otherwise 0px
+  // WHY: compact strip (44px) only when user explicitly collapsed + normal tab, otherwise 0px
   const gridTemplateColumns = !showSidebar
     ? "0px minmax(0, 1fr) 0px"  // Empty state: full width center
     : shouldShowSidePanel
       ? "360px minmax(0, 1fr) 420px"
-      : (sidePanelCollapsed && activeId)
+      : (sidePanelCollapsed && activeId && !isAutoCollapsedTab)
         ? "360px minmax(0, 1fr) 44px"  // Compact icon strip
-        : "360px minmax(0, 1fr) 0px";  // Auto-collapsed or no agent
+        : "360px minmax(0, 1fr) 0px";  // Auto-collapsed tab or no agent
 
   // Update PiP window with current agent states
   useEffect(() => {
