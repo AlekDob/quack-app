@@ -27,18 +27,18 @@ function uid(): string { return crypto.randomUUID(); }
 
 /** Default onboarding post-its for first-time users */
 function createOnboardingPostIts(): PostIt[] {
-  const y = -80;
   const gap = 174;
-  const startX = 560;
+  const startX = 100;
+  const y = 60;
   return [
     { id: uid(), x: startX, y, color: '#60a5fa',
-      text: 'Click a feature card to see details, files, and connections' },
+      text: 'This is your Whiteboard. Add post-its, groups, images and organize your ideas freely.' },
     { id: uid(), x: startX + gap, y, color: '#4ade80',
-      text: 'Drag cards to rearrange. Use this right area for notes and sketches' },
+      text: 'Add feature docs in documentation/features/ to see architecture cards here.' },
     { id: uid(), x: startX + gap * 2, y, color: '#c084fc',
-      text: 'Drop images from Finder onto the canvas to annotate your map' },
+      text: 'Drop images from Finder onto the canvas. Press Ctrl to cycle tools.' },
     { id: uid(), x: startX + gap * 3, y, color: '#fbbf24',
-      text: 'Press Ctrl to cycle tools: Select, Post-it, Group, Image' },
+      text: 'Select 2+ elements and click Create Component to group them into nested whiteboards.' },
   ];
 }
 

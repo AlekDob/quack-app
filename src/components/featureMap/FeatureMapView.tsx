@@ -84,7 +84,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
       if (!hasAssignments) return null; // no filtering, show all
       // Root: show nodes NOT assigned to any component
       const assignedIds = new Set(Object.keys(na));
-      return new Set(graph?.nodes.filter(n => !assignedIds.has(n.id)).map(n => n.id) ?? []);
+      return new Set(safeGraph.nodes.filter(n => !assignedIds.has(n.id)).map(n => n.id));
     }
     // Inside component: show only nodes assigned to this component
     const visible = new Set<string>();
@@ -92,15 +92,15 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
       if (compId === navigation.currentComponentId) visible.add(nodeId);
     }
     return visible;
-  }, [wb.nodeAssignments, navigation.currentComponentId, graph?.nodes]);
+  }, [wb.nodeAssignments, navigation.currentComponentId, safeGraph.nodes]);
 
   const handleCreateComponent = useCallback(() => {
     if (selection.selectionCount < 2) return;
     // Build full node positions map (custom overrides + layout defaults)
     const allNodePositions = new Map<string, { x: number; y: number }>();
-    if (graph) {
-      const layout = calculateLayeredLayout(graph.nodes, 900);
-      for (const node of graph.nodes) {
+    if (safeGraph.nodes.length > 0) {
+      const layout = calculateLayeredLayout(safeGraph.nodes, 900);
+      for (const node of safeGraph.nodes) {
         const custom = wb.customPositions.get(node.id);
         const layoutPos = layout.positions.get(node.id);
         if (custom) allNodePositions.set(node.id, custom);
@@ -109,7 +109,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
     }
     wb.createComponent(selection.selectedIds, 'Component', navigation.currentComponentId, allNodePositions);
     selection.clearSelection();
-  }, [wb, selection, navigation.currentComponentId, graph]);
+  }, [wb, selection, navigation.currentComponentId, safeGraph]);
 
   /** Receive lasso selection results from Canvas */
   const handleLassoSelect = useCallback((ids: Set<string>) => {
@@ -210,8 +210,8 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
   }, []);
 
   const selectedNode = useMemo(
-    () => graph?.nodes.find(n => n.id === selectedNodeId) ?? null,
-    [graph?.nodes, selectedNodeId],
+    () => safeGraph.nodes.find(n => n.id === selectedNodeId) ?? null,
+    [safeGraph.nodes, selectedNodeId],
   );
 
   const MODES: AnnotationMode[] = ['select', 'lasso', 'postit', 'group', 'image'];
@@ -251,25 +251,17 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
       <button className="fm-retry-btn" onClick={refresh}>Retry</button>
     </div></div>
   );
-  if (!graph || graph.nodes.length === 0) return (
-    <div className="fm-container"><div className="fm-empty">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" opacity={0.4}>
-        <circle cx="12" cy="12" r="3" /><circle cx="5" cy="6" r="2" /><circle cx="19" cy="6" r="2" />
-        <circle cx="5" cy="18" r="2" /><circle cx="19" cy="18" r="2" />
-        <line x1="9.5" y1="10.5" x2="6.5" y2="7.5" /><line x1="14.5" y1="10.5" x2="17.5" y2="7.5" />
-        <line x1="9.5" y1="13.5" x2="6.5" y2="16.5" /><line x1="14.5" y1="13.5" x2="17.5" y2="16.5" />
-      </svg>
-      <h3>No documented features</h3>
-      <p>Add .md files in <code>documentation/features/</code></p>
-    </div></div>
-  );
+  // Empty graph fallback — whiteboard still works for annotations
+  const safeGraph = graph ?? { nodes: [], links: [] };
 
   return (
     <div className="fm-container">
       <div className="fm-header">
         <h2 className="fm-title">Whiteboard</h2>
         <div className="fm-stats">
-          {graph.nodes.length} features &middot; {graph.links.length} connections
+          {safeGraph.nodes.length > 0
+            ? `${safeGraph.nodes.length} features \u00B7 ${safeGraph.links.length} connections`
+            : 'Whiteboard'}
         </div>
         <div className="fm-search-wrap">
           <svg className="fm-search-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -313,7 +305,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
       <div className="fm-body">
         <div className="fm-canvas-area">
           <FeatureMapCanvas
-            graph={graph}
+            graph={safeGraph}
             onNodeSelect={handleNodeSelect}
             selectedNodeId={selectedNodeId}
             customPositions={wb.customPositions}
@@ -370,7 +362,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
 
       {selectedNode && clickInfo && (
         <FeatureMapPopover
-          node={selectedNode} links={graph.links} allNodes={graph.nodes}
+          node={selectedNode} links={safeGraph.links} allNodes={safeGraph.nodes}
           screenX={clickInfo.screenX} screenY={clickInfo.screenY}
           onClose={() => setClickInfo(null)}
           onFileClick={handleFileClick} onNodeNavigate={handleNodeNavigate}
