@@ -27,9 +27,12 @@ function SelectIcon() {
 function LassoIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="4 3" />
-      <path d="M8 8h8v8H8z" fill="currentColor" opacity="0.15" stroke="none" />
+      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      {/* Crosshair corners — marquee selection tool */}
+      <path d="M3 8V5a2 2 0 012-2h3" />
+      <path d="M16 3h3a2 2 0 012 2v3" />
+      <path d="M21 16v3a2 2 0 01-2 2h-3" />
+      <path d="M8 21H5a2 2 0 01-2-2v-3" />
     </svg>
   );
 }
@@ -47,8 +50,11 @@ function PostItIcon() {
 function GroupIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="18" height="18" rx="3" strokeDasharray="5 3" />
+      stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      {/* Group rect with header bar */}
+      <rect x="3" y="6" width="18" height="15" rx="2" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="6" y1="8" x2="12" y2="8" strokeWidth="2" />
     </svg>
   );
 }

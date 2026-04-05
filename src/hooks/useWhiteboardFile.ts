@@ -18,7 +18,6 @@ import {
 
 const POLL_MS = 2000;
 const WRITE_LOCK_MS = 500;
-const ONBOARDING_KEY = 'quack:featureMap:onboardingSeen:';
 const MAX_UNDO = 50;
 const MAX_NESTING = 5;
 const COMPONENT_PADDING = 20;
@@ -41,8 +40,6 @@ function createOnboardingPostIts(): PostIt[] {
       text: 'Select 2+ elements and click Create Component to group them into nested whiteboards.' },
   ];
 }
-
-function normKey(p: string): string { return p.replace(/\\/g, '/'); }
 
 /** Clear invalid parentComponentId refs + orphaned nodeAssignments */
 function fixOrphans(a: CanvasAnnotations, nodeAssignments?: Record<string, string>): {
@@ -191,14 +188,18 @@ export function useWhiteboardFile(projectPath?: string) {
       }
 
       if (!data) {
-        // First time — onboarding
-        const key = normKey(projectPath);
-        if (!localStorage.getItem(ONBOARDING_KEY + key)) {
-          localStorage.setItem(ONBOARDING_KEY + key, '1');
-          data = { ...emptyFile(), annotations: { postIts: createOnboardingPostIts(), groups: [], images: [] } };
+        // First time ever — create with onboarding post-its
+        data = { ...emptyFile(), annotations: { postIts: createOnboardingPostIts(), groups: [], images: [] } };
+        await writeWhiteboardFile(projectPath, data).catch(() => {});
+      } else {
+        // File exists but empty — add welcome post-its if no content at all
+        const { postIts, groups, images } = data.annotations;
+        const hasContent = postIts.length > 0 || groups.length > 0 || images.length > 0
+          || Object.keys(data.positions).length > 0
+          || Object.keys(data.nodeAssignments ?? {}).length > 0;
+        if (!hasContent) {
+          data = { ...data, annotations: { ...data.annotations, postIts: createOnboardingPostIts() } };
           await writeWhiteboardFile(projectPath, data).catch(() => {});
-        } else {
-          data = emptyFile();
         }
       }
 
