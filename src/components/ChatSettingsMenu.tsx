@@ -23,17 +23,17 @@ interface ChatSettingsMenuProps {
 // ThinkingMode options removed - now controlled via brain icon toggle in footer
 
 const permissionModeOptions = [
-  { value: 'plan' as PermissionMode, label: '◇ Plan · Planning only' },
-  { value: 'bypass' as PermissionMode, label: '● Build · No confirmations' },
-  { value: 'ask' as PermissionMode, label: '◆ Ask · Ask before acting' },
-  { value: 'debug' as PermissionMode, label: '○ Debug · Systematic debugging' },
-  { value: 'chat' as PermissionMode, label: '○ Chat · Conversational' },
+  { value: 'plan' as PermissionMode, label: 'Plan · Planning only' },
+  { value: 'bypass' as PermissionMode, label: 'Build · No confirmations' },
+  { value: 'ask' as PermissionMode, label: 'Ask · Ask before acting' },
+  { value: 'debug' as PermissionMode, label: 'Debug · Systematic debugging' },
+  { value: 'chat' as PermissionMode, label: 'Chat · Conversational' },
 ];
 
 const effortOptions = [
-  { value: 'low' as EffortLevel, label: 'Fast · Quick responses, lower cost', icon: '>' },
-  { value: 'medium' as EffortLevel, label: 'Balanced · Default quality', icon: '>>' },
-  { value: 'high' as EffortLevel, label: 'Quality · Thorough responses', icon: '>>>' },
+  { value: 'low' as EffortLevel, label: 'Fast · Quick responses, lower cost', icon: '' },
+  { value: 'medium' as EffortLevel, label: 'Balanced · Default quality', icon: '' },
+  { value: 'high' as EffortLevel, label: 'Quality · Thorough responses', icon: '' },
 ];
 
 export default function ChatSettingsMenu({

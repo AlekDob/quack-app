@@ -7,8 +7,10 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 17, 21, 0.7);
+  backdrop-filter: blur(var(--blur-heavy)) saturate(120%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(120%);
+  border-bottom: 1px solid var(--border-subtle);
   justify-content: flex-start;
   /* Enable window dragging on empty areas */
   -webkit-app-region: drag;

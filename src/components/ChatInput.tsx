@@ -13,7 +13,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { parseAgentMentions, matchMentionsToAgents } from '../utils/agentMentions';
 import { AgentMentionChip } from './AgentMentionChip';
 import { AgentAvatar } from './AgentAvatar';
-import type { ChatAttachment, AgentInfo, SearchResult } from '../types';
+import type { ChatAttachment, AgentInfo, SearchResult, TerminalInfo } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
 import { useSlashCommands, type SlashCommand } from '../hooks/useSlashCommands';
 import { useMicRecorder } from '../hooks/useMicRecorder';
@@ -24,7 +24,6 @@ import EquipBar from './chat/EquipBar';
 import CodeEditorCodeMirror from './CodeEditorCodeMirror';
 import { useShortcutsStore } from '../stores/shortcutsStore';
 import { useFileSystemStore } from '../stores/fileSystemStore';
-import { useTeamStore } from '../stores/teamStore';
 import { loadAvailableSkills } from '../utils/skillsAndDroidsLoader';
 import { useFeatureMapData } from '../hooks/useFeatureMapData';
 import type { FeatureNode } from './featureMap/featureMapTypes';
@@ -54,6 +53,7 @@ interface ChatInputProps {
   disabled?: boolean;
   placeholder?: string;
   agents?: AgentInfo[];
+  projectTerminals?: TerminalInfo[];
   onSelectAgent?: (agent: AgentInfo) => void;
   activeAgent?: AgentInfo | null;
   onClearAgent?: () => void;
@@ -96,6 +96,7 @@ export default function ChatInput({
   disabled,
   placeholder = 'Ask Claude anything...',
   agents,
+  projectTerminals,
   pendingAgentMention,
   onMentionInserted,
   pendingFileMention,
@@ -330,17 +331,15 @@ export default function ChatInput({
     });
   }, [featureGraph?.nodes, showAgentAutocomplete, agentFilter]);
 
-  // Filter team members based on current @ mention
-  const activeTeam = useTeamStore((s) => s.activeTeam);
+  // Filter project teammates — sibling terminals in the same project
   const filteredTeammates = useMemo(() => {
-    if (!activeTeam?.members.length || !showAgentAutocomplete) return [];
+    if (!projectTerminals?.length || !showAgentAutocomplete) return [];
     const filter = agentFilter.toLowerCase();
-    return activeTeam.members.filter(member => {
-      const name = member.name.toLowerCase().replace(/-/g, ' ');
-      const role = member.role.toLowerCase();
-      return name.includes(filter) || role.includes(filter) || 'team'.includes(filter);
+    return projectTerminals.filter(t => {
+      const name = t.label.toLowerCase().replace(/-/g, ' ');
+      return name.includes(filter) || 'team'.includes(filter);
     });
-  }, [activeTeam?.members, showAgentAutocomplete, agentFilter]);
+  }, [projectTerminals, showAgentAutocomplete, agentFilter]);
 
   // Search files when @ mention is active
   useEffect(() => {
@@ -2041,28 +2040,25 @@ export default function ChatInput({
                 </svg>
                 <span>Team</span>
               </div>
-              {filteredTeammates.map((member, index) => (
+              {filteredTeammates.map((terminal, index) => (
                 <button
-                  key={member.agentId}
+                  key={terminal.id}
                   type="button"
                   className={`agent-autocomplete-item team-member-item ${selectedAgentIndex === index ? 'selected' : ''}`}
-                  onMouseDown={(e) => { e.preventDefault(); selectTeammate(member.name); }}
+                  onMouseDown={(e) => { e.preventDefault(); selectTeammate(terminal.label); }}
                   onMouseEnter={() => setSelectedAgentIndex(index)}
                 >
                   <AgentAvatar
-                    agentName={member.name}
-                    avatarFilename={member.avatar}
+                    agentName={terminal.label}
+                    avatarFilename={terminal.avatar}
                     className="agent-autocomplete-avatar"
                   />
                   <div className="agent-autocomplete-info">
-                    <div className="agent-autocomplete-name">{member.name}</div>
-                    <div className="agent-autocomplete-description">{member.role}</div>
+                    <div className="agent-autocomplete-name">{terminal.label}</div>
+                    {terminal.workingOn && (
+                      <div className="agent-autocomplete-description">{terminal.workingOn}</div>
+                    )}
                   </div>
-                  {member.isLead && (
-                    <div className="agent-autocomplete-model">
-                      <span style={{ color: '#FF6B35', fontSize: '10px' }}>Lead</span>
-                    </div>
-                  )}
                 </button>
               ))}
             </div>
@@ -2303,6 +2299,38 @@ export default function ChatInput({
               {matchedAgents.map((agent, idx) => (
                 <div key={idx} className="chat-input-mention-chip-wrapper">
                   <AgentMentionChip agentName={agent.name} />
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+        {/* Show teammate mention chips — @team delegate to <name>: */}
+        {(() => {
+          if (!projectTerminals?.length) return null;
+          const teamDelegateRegex = /@team\s+delegate\s+to\s+([\w\s-]+?):/gi;
+          const teammateNames: string[] = [];
+          let tm;
+          while ((tm = teamDelegateRegex.exec(input)) !== null) {
+            teammateNames.push(tm[1].trim());
+          }
+          if (teammateNames.length === 0) return null;
+          // Match names to project terminals
+          const matched = teammateNames
+            .map(name => projectTerminals.find(t =>
+              t.label.toLowerCase().includes(name.toLowerCase())
+            ))
+            .filter(Boolean) as typeof projectTerminals;
+          if (matched.length === 0) return null;
+          return (
+            <div className="chat-input-mentions">
+              {matched.map((terminal, idx) => (
+                <div key={idx} className="chat-input-mention-chip chat-input-team-chip">
+                  <AgentAvatar
+                    agentName={terminal.label}
+                    avatarFilename={terminal.avatar}
+                    className="chat-input-mention-avatar"
+                  />
+                  <span className="chat-input-mention-name">@{terminal.label}</span>
                 </div>
               ))}
             </div>

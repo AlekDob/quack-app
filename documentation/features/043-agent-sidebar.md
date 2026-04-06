@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React 18)
 created: 2026-04-05
-last_verified: 2026-04-05
+last_verified: 2026-04-06
 tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sessions]
 ---
 
@@ -83,6 +83,9 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 - `@tauri-apps/plugin-store`: persist project order/colors/favorites to `.quack-repo-order.dat`
 - `@tauri-apps/api/core` (invoke): Tauri commands for group CRUD (`list_groups`, `create_group`, `update_group`, `delete_group`, `sync_group_contexts`)
 - `@tauri-apps/plugin-shell` (open): open external links (Discord, changelog)
+
+### Cross-Feature: @ Mention Popup (→ 025-team-delegation-footer)
+The sidebar `terminals` (agents grouped by project) are the same data source used for the `@` mention popup's "Team" section. App.tsx filters `terminals` by matching `cwd` (excluding the active agent) and passes them as `projectTerminals` prop to `ChatView` → `ChatInput`. This means every agent visible in the sidebar under the same project is also citeable via `@` in the chat input. See `025-team-delegation-footer.md` for delegation flow details.
 
 ### Config
 - `DEFAULT_PROJECT_COLORS`: 8-color palette for auto-assigning project border colors (default: `['#FF6B35', '#4DA6FF', '#9B59B6', '#2ECC71', '#E74C3C', '#F39C12', '#1ABC9C', '#E84393']`)

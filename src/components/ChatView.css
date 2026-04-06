@@ -123,19 +123,22 @@
 .chat-view-footer-controls {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
-/* Toolbar icon buttons — all neutral white, monochrome minimal */
+/* Toolbar icon buttons — unified style, all same size */
 .chat-brain-btn,
 .chat-compact-btn,
 .chat-terminal-btn,
-.chat-clear-btn {
+.chat-clear-btn,
+.chat-btw-btn,
+.chat-loop-btn,
+.chat-team-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   background: transparent;
   border: none;
@@ -150,52 +153,44 @@
 .chat-brain-btn svg,
 .chat-compact-btn svg,
 .chat-terminal-btn svg,
-.chat-clear-btn svg {
-  width: 14px;
-  height: 14px;
+.chat-clear-btn svg,
+.chat-btw-btn svg,
+.chat-loop-btn svg,
+.chat-team-btn svg {
+  width: 13px;
+  height: 13px;
 }
 
-.chat-brain-btn:hover,
+.chat-brain-btn:hover:not(:disabled),
 .chat-compact-btn:hover:not(:disabled),
 .chat-terminal-btn:hover:not(:disabled),
-.chat-clear-btn:hover:not(:disabled) {
+.chat-clear-btn:hover:not(:disabled),
+.chat-btw-btn:hover:not(:disabled),
+.chat-loop-btn:hover:not(:disabled),
+.chat-team-btn:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--text-primary);
 }
 
-.chat-brain-btn:active,
+.chat-brain-btn:active:not(:disabled),
 .chat-compact-btn:active:not(:disabled),
 .chat-terminal-btn:active:not(:disabled),
-.chat-clear-btn:active:not(:disabled) {
+.chat-clear-btn:active:not(:disabled),
+.chat-btw-btn:active:not(:disabled),
+.chat-loop-btn:active:not(:disabled),
+.chat-team-btn:active:not(:disabled) {
   opacity: 0.8;
 }
 
 .chat-brain-btn:disabled,
 .chat-compact-btn:disabled,
 .chat-terminal-btn:disabled,
-.chat-clear-btn:disabled {
+.chat-clear-btn:disabled,
+.chat-btw-btn:disabled,
+.chat-loop-btn:disabled,
+.chat-team-btn:disabled {
   opacity: 0.3;
   cursor: not-allowed;
-}
-
-/* BTW, Loop toolbar buttons — neutral white, same pattern as other toolbar icons */
-.chat-btw-btn,
-.chat-loop-btn,
-.chat-btw-btn svg,
-.chat-loop-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-.chat-btw-btn:hover,
-.chat-loop-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.chat-btw-btn:active,
-.chat-loop-btn:active {
-  opacity: 0.8;
 }
 
 .chat-stop-btn {

@@ -278,6 +278,20 @@
   color: #4A9EFF;
 }
 
+/* Team mention chip in chat input — project agent delegation */
+.chat-input-team-chip {
+  background: rgba(255, 107, 53, 0.15);
+  border-color: rgba(255, 107, 53, 0.3);
+}
+
+.chat-input-team-chip .chat-input-mention-name {
+  color: #FF6B35;
+}
+
+.chat-input-team-chip .chat-input-mention-avatar {
+  border-color: rgba(255, 107, 53, 0.3);
+}
+
 /* Skill mention chip in chat input */
 .chat-input-skill-chip {
   display: inline-flex;

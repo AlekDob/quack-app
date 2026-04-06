@@ -7,7 +7,10 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background: transparent;
+  /* Adaptive glass: transparent on solid bg, blurred on image bg */
+  background: rgba(15, 17, 21, 0.7);
+  backdrop-filter: blur(var(--blur-heavy)) saturate(120%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(120%);
   border-left: 1px solid var(--border-subtle);
   position: relative;
   overflow: hidden;
@@ -97,7 +100,9 @@
   bottom: 0;
   width: 420px;
   z-index: 9999;
-  background: var(--bg-base);
+  background: rgba(15, 17, 21, 0.85);
+  backdrop-filter: blur(var(--blur-heavy)) saturate(120%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(120%);
   border-left: 1px solid var(--border-subtle);
   /* Shifted right: only 44px visible (icon strip) */
   transform: translateX(calc(100% - 44px));

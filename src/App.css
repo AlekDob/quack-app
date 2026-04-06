@@ -1064,7 +1064,10 @@ button.directory-chooser:disabled {
   min-height: 0;
   overflow: hidden;
   border-right: 1px solid var(--border-subtle);
-  background: transparent;
+  /* Adaptive glass: transparent on solid bg, blurred on image bg */
+  background: rgba(15, 17, 21, 0.7);
+  backdrop-filter: blur(var(--blur-heavy)) saturate(120%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(120%);
   box-shadow: none;
   position: relative;
   grid-column: 1;
@@ -1201,7 +1204,7 @@ button.directory-chooser:disabled {
    =================================== */
 
 .sidebar.sidebar-codex {
-  background: transparent;
+  /* Inherits glass from .sidebar */
   border-right: 1px solid var(--border-subtle);
   box-shadow: none;
 }
@@ -2030,9 +2033,9 @@ button.directory-chooser:disabled {
 .terminal-pane {
   display: flex;
   flex-direction: column;
-  background: rgba(17, 18, 22, 0.5);
-  backdrop-filter: blur(var(--blur-heavy)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(150%);
+  background: rgba(15, 17, 21, 0.7);
+  backdrop-filter: blur(var(--blur-heavy)) saturate(120%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(120%);
   min-width: 320px;
   min-height: 0;
   height: 100%;

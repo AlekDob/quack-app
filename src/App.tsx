@@ -12640,6 +12640,7 @@ You have access to all Bash tools to execute git commands like:
                 return (
                   <ChatView
                     key={isTaskChat ? `task-${activeTaskId}` : `${activeId ?? 'no-agent'}-${activeSessionId ?? 'no-session'}`}
+                    projectTerminals={activeTerminal ? terminals.filter(t => t.cwd === activeTerminal.cwd && t.id !== activeId) : []}
                     messages={isTaskChat ? taskMessages : currentAgentMessages}
                     isLoading={isTaskChat ? taskLoading : currentAgentLoading}
                     onSendMessage={isTaskChat
@@ -12828,6 +12829,7 @@ You have access to all Bash tools to execute git commands like:
                 return (
                   <ChatView
                     key={`task-${taskSessionId}`}
+                    projectTerminals={activeTerminal ? terminals.filter(t => t.cwd === activeTerminal.cwd && t.id !== activeId) : []}
                     messages={taskMessages}
                     isLoading={taskLoading}
                     onSendMessage={(content, opts) => sendMessageForTargetAgent(taskSessionId, content, {

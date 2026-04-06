@@ -25,7 +25,7 @@ import { useAgentRules } from '../hooks/useAgentRules';
 import { RemoteTeamWidget } from './RemoteTeamWidget';
 import { useTeamStore } from '../stores/teamStore';
 import KeyboardShortcutTooltip from './KeyboardShortcutTooltip';
-import type { ChatMessage, AgentInfo, ChatAttachment, AskUserQuestionAnswers } from '../types';
+import type { ChatMessage, AgentInfo, ChatAttachment, AskUserQuestionAnswers, TerminalInfo } from '../types';
 import type {
   ChatSendOptions,
   ThinkingMode,
@@ -58,6 +58,7 @@ interface ChatViewProps {
   activeAgent?: AgentInfo | null;
   onClearAgent?: () => void;
   agents?: AgentInfo[];
+  projectTerminals?: TerminalInfo[];
   onSelectAgent?: (agent: AgentInfo) => void;
   onFilePathClick?: (path: string, lineChanges?: LineChange[]) => void;
   onOpenInIDE?: (path: string) => void;
@@ -164,6 +165,7 @@ export default function ChatView({
   activeAgent,
   onClearAgent,
   agents,
+  projectTerminals,
   onSelectAgent,
   onFilePathClick,
   onOpenInIDE,
@@ -1080,6 +1082,7 @@ export default function ChatView({
           onSend={handleSend}
           placeholder="Ask Claude about your code, commands, or project..."
           agents={agents}
+          projectTerminals={projectTerminals}
           onSelectAgent={onSelectAgent}
           activeAgent={activeAgent}
           onClearAgent={onClearAgent}

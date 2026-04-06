@@ -158,7 +158,7 @@ function SortableRepositoryGroup({
         onMouseEnter={() => !isDragging && setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <RepositoryGroup {...props} />
+        <RepositoryGroup {...props} projectColor={projectColor} />
       </div>
     </div>
   );

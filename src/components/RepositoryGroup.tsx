@@ -84,6 +84,7 @@ interface RepositoryGroupProps {
   // Favorite/star
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
+  projectColor?: string;
 }
 
 // Helper function to get avatar image URL (works in both dev and production)
@@ -627,40 +628,38 @@ function SortableAgent({
           onMouseLeave={() => setIsHovered(false)}
           style={{
             flex: 1,
-            padding: "6px 10px",
+            padding: "8px 10px",
             paddingLeft: "8px",
-            marginTop: "4px",
-            background: agentCardBg,
-            borderRadius: "5px",
+            marginTop: "0",
+            background: isActive ? `${agent.color}30` : "transparent",
+            borderRadius: "0",
             cursor: "pointer",
             transition:
-              "background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease",
+              "background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease",
             position: "relative",
             display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            minHeight: "36px",
-            // Border with agent color (more visible when active)
-            border: isActive
-              ? `2px solid ${agent.color}`
-              : `1px solid ${agent.color}55`,
-            boxShadow: isActive ? `0 0 8px ${agent.color}40` : undefined,
+            alignItems: "flex-start",
+            gap: "10px",
+            minHeight: "40px",
+            border: "none",
+            borderBottom: `1px solid rgba(255,255,255,0.04)`,
             // Reduce opacity for dormant/empty agents
-            opacity: isActive ? 1 : isChatEmpty || isDormant ? 0.7 : 1,
+            opacity: isActive ? 1 : isChatEmpty || isDormant ? 0.6 : 0.85,
           }}
         >
-          {/* 🎨 Avatar - Full height, squared with border-radius, with IMAGE */}
+          {/* Avatar — larger, rounded, top-aligned */}
           <div
             style={{
-              width: "32px",
-              height: "32px",
-              borderRadius: "5px",
-              border: `2px solid ${agent.color}66`,
+              width: "38px",
+              height: "38px",
+              borderRadius: "10px",
+              border: isActive ? `2px solid ${agent.color}88` : `1px solid rgba(255,255,255,0.08)`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
               overflow: "hidden",
+              marginTop: "1px",
             }}
           >
             {avatarUrl ? (
@@ -1135,6 +1134,7 @@ export default function RepositoryGroup({
   onOpenSavedCommands,
   isFavorite,
   onToggleFavorite,
+  projectColor,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [showGitMenu, setShowGitMenu] = useState<string | null>(null);
@@ -1848,15 +1848,15 @@ export default function RepositoryGroup({
         style={{
           padding: "10px 12px",
           marginBottom: "8px",
-          background: "rgba(255, 255, 255, 0.02)",
+          background: projectColor ? `${projectColor}40` : "rgba(255, 255, 255, 0.04)",
           borderRadius: "6px",
           transition: "background 0.2s ease",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(255, 255, 255, 0.05)";
+          e.currentTarget.style.background = projectColor ? `${projectColor}55` : "rgba(255, 255, 255, 0.08)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = "rgba(255, 255, 255, 0.02)";
+          e.currentTarget.style.background = projectColor ? `${projectColor}40` : "rgba(255, 255, 255, 0.04)";
         }}
       >
         <div className="flex w-full flex-col gap-1">
@@ -2783,50 +2783,40 @@ export default function RepositoryGroup({
                               onMouseLeave={() => setHoveredAgentId(null)}
                               style={{
                                 flex: 1,
-                                padding: "8px 12px",
+                                padding: "8px 10px",
                                 paddingLeft: "8px",
-                                background: isActive
-                                  ? `${agent.color}28` // Increased from 15 to 28 (2x opacity, ~16%)
-                                  : isHovered
-                                    ? "rgba(255, 255, 255, 0.03)"
-                                    : "transparent",
-                                borderRadius: "6px",
+                                background: isActive ? `${agent.color}30` : "transparent",
+                                borderRadius: "0",
                                 cursor: "pointer",
                                 transition:
-                                  "background 0.2s ease, border 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease",
+                                  "background 0.2s ease, border-color 0.2s ease, opacity 0.2s ease",
                                 position: "relative",
                                 display: "flex",
-                                alignItems: "center",
-                                gap: "12px",
-                                minHeight: "48px",
-                                // Add white border only when selected (in focus)
-                                border: isActive
-                                  ? "2px solid rgba(255, 255, 255, 0.6)"
-                                  : "1px solid rgba(255, 255, 255, 0.1)",
-                                boxShadow: isActive
-                                  ? "0 0 12px rgba(255, 255, 255, 0.15)"
-                                  : undefined,
-                                // Reduce opacity for dormant/empty agents (matches sleep icon in TerminalActivityBar)
-                                // But always full opacity when selected (isActive)
+                                alignItems: "flex-start",
+                                gap: "10px",
+                                minHeight: "40px",
+                                border: "none",
+                                borderBottom: "1px solid rgba(255,255,255,0.04)",
                                 opacity: isActive
                                   ? 1
                                   : isChatEmpty || isDormant
-                                    ? 0.65
-                                    : 1,
+                                    ? 0.6
+                                    : 0.85,
                               }}
                             >
-                              {/* 🎨 Avatar - Full height, squared with border-radius, with IMAGE */}
+                              {/* Avatar — larger, rounded, top-aligned */}
                               <div
                                 style={{
-                                  width: "40px",
-                                  height: "40px",
-                                  borderRadius: "6px",
-                                  border: `2px solid ${agent.color}66`,
+                                  width: "38px",
+                                  height: "38px",
+                                  borderRadius: "10px",
+                                  border: isActive ? `2px solid ${agent.color}88` : "1px solid rgba(255,255,255,0.08)",
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
                                   flexShrink: 0,
                                   overflow: "hidden",
+                                  marginTop: "1px",
                                 }}
                               >
                                 {(() => {
