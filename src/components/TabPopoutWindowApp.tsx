@@ -37,7 +37,6 @@ const ErrorDisplay: React.FC<{ error: string; onRetry?: () => void }> = ({ error
 
 const TabPopoutWindowApp: React.FC = () => {
   const [tab, setTab] = useState<Tab | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
 
   // File content state
   const [fileContent, setFileContent] = useState<string>('');
@@ -126,17 +125,12 @@ const TabPopoutWindowApp: React.FC = () => {
 
   // Handle titlebar drag to move window
   const handleTitlebarMouseDown = useCallback(async () => {
-    setIsDragging(true);
     const window = getCurrentWindow();
     try {
       await window.startDragging();
     } catch (error) {
       console.error('Failed to start window dragging:', error);
     }
-  }, []);
-
-  const handleTitlebarMouseUp = useCallback(() => {
-    setIsDragging(false);
   }, []);
 
   // Handle window close - save position and size
@@ -386,9 +380,8 @@ const TabPopoutWindowApp: React.FC = () => {
       {/* Hide titlebar for kanban - it has its own header with drag region */}
       {tab.type !== 'kanban' && (
         <div
-          className={`tab-popout-titlebar ${isDragging ? 'dragging' : ''}`}
+          className="tab-popout-titlebar"
           onMouseDown={handleTitlebarMouseDown}
-          onMouseUp={handleTitlebarMouseUp}
         >
           <div className="tab-popout-title">
             <span className="tab-popout-icon">{getTabIcon(tab.type)}</span>

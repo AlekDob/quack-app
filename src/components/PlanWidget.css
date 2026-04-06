@@ -1,109 +1,89 @@
+/* Brain: 047-plan-delegate-remote */
+
 .plan-widget {
-  background: rgba(99, 102, 241, 0.10);
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  border-radius: 8px;
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.04));
+  border-radius: var(--radius-md, 14px);
   margin: 8px 0;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.12);
-  animation: plan-slide-in 0.3s ease-out;
 }
 
-@keyframes plan-slide-in {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.plan-widget-pending {
+  border-color: var(--border-strong, rgba(255, 255, 255, 0.12));
 }
 
+/* Header */
 .plan-widget-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
+  padding: 12px 16px;
   cursor: pointer;
   user-select: none;
-  background: rgba(99, 102, 241, 0.12);
-  border-bottom: 1px solid rgba(99, 102, 241, 0.2);
-  transition: background 0.2s ease;
+  transition: background 150ms ease;
 }
 
 .plan-widget-header:hover {
-  background: rgba(99, 102, 241, 0.18);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
 }
 
 .plan-widget-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex: 1;
-}
-
-.plan-widget-icon {
-  color: #818cf8;
-  flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  min-width: 0;
 }
 
 .plan-title-text {
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  font-size: var(--fs-base, 14px);
+  font-weight: var(--fw-semibold, 600);
+  color: var(--text-primary, #e7ebf3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .plan-widget-badge {
   display: inline-flex;
-  align-items: center;
-  padding: 2px 6px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  color: white;
-  font-size: 10px;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  background: rgba(var(--accent-rgb, 242, 140, 82), 0.15);
+  color: var(--accent-color, #f28c52);
+  font-size: var(--fs-xs, 11px);
+  font-weight: var(--fw-semibold, 600);
+  border-radius: var(--radius-full, 999px);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .plan-widget-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
-.plan-widget-copy-btn {
+.plan-widget-action-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 4px;
-  background: rgba(99, 102, 241, 0.15);
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm, 8px);
   cursor: pointer;
-  transition: all 0.2s ease;
-  color: #818cf8;
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.35));
+  transition: color 150ms ease, background 150ms ease;
 }
 
-.plan-widget-copy-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-.plan-widget-copy-btn:hover {
-  background: rgba(99, 102, 241, 0.25);
-  border-color: rgba(99, 102, 241, 0.4);
-}
-
-.plan-widget-copy-btn:active {
-  transform: scale(0.95);
+.plan-widget-action-btn:hover {
+  color: var(--text-secondary, rgba(255, 255, 255, 0.55));
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
 }
 
 .plan-widget-chevron {
-  color: #818cf8;
-  transition: transform 0.2s ease;
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.35));
+  transition: transform 200ms ease;
   flex-shrink: 0;
 }
 
@@ -111,179 +91,119 @@
   transform: rotate(180deg);
 }
 
+/* Content */
 .plan-widget-content {
   padding: 0;
 }
 
 .plan-widget-markdown {
-  padding: 12px 14px;
-  color: rgba(255, 255, 255, 0.8);
-  line-height: 1.5;
-  font-size: 13px;
+  padding: 16px 20px;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.55));
+  line-height: var(--lh-normal, 1.6);
+  font-size: var(--fs-sm, 12px);
 }
 
-/* Style markdown headers inside plan */
 .plan-widget-markdown h1,
 .plan-widget-markdown h2,
 .plan-widget-markdown h3 {
-  color: #a5b4fc;
-  margin-top: 12px;
-  margin-bottom: 6px;
+  color: var(--text-primary, #e7ebf3);
+  margin-top: 16px;
+  margin-bottom: 8px;
 }
 
-.plan-widget-markdown h1 {
-  font-size: 14px;
-  font-weight: 700;
-  border-bottom: 2px solid rgba(99, 102, 241, 0.3);
-  padding-bottom: 4px;
-}
-
-.plan-widget-markdown h2 {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.plan-widget-markdown h3 {
-  font-size: 12px;
-  font-weight: 600;
-}
+.plan-widget-markdown h1 { font-size: var(--fs-base, 14px); font-weight: 600; }
+.plan-widget-markdown h2 { font-size: var(--fs-sm, 12px); font-weight: 600; }
+.plan-widget-markdown h3 { font-size: var(--fs-sm, 12px); font-weight: 500; }
 
 .plan-widget-markdown ul,
 .plan-widget-markdown ol {
   margin-left: 16px;
-  margin-top: 6px;
-  margin-bottom: 6px;
+  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
-.plan-widget-markdown li {
-  margin-bottom: 3px;
-}
-
-.plan-widget-markdown strong {
-  color: #a5b4fc;
-  font-weight: 600;
-}
+.plan-widget-markdown li { margin-bottom: 4px; }
+.plan-widget-markdown strong { color: var(--text-primary, #e7ebf3); }
+.plan-widget-markdown p { margin-bottom: 8px; }
 
 .plan-widget-markdown code {
-  background: rgba(99, 102, 241, 0.15);
-  color: #a5b4fc;
-  padding: 1px 4px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary, #e7ebf3);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: var(--fs-xs, 11px);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
 }
 
-.plan-widget-markdown p {
-  margin-bottom: 6px;
-}
-
+/* Footer */
 .plan-widget-footer {
-  padding: 8px 12px;
-  background: rgba(99, 102, 241, 0.08);
-  border-top: 1px solid rgba(99, 102, 241, 0.2);
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.04));
 }
 
-.plan-widget-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.plan-widget-info svg {
-  color: #818cf8;
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-}
-
-/* Pending approval state */
-.plan-widget-pending {
-  border-color: rgba(245, 158, 11, 0.5);
-  box-shadow: 0 2px 16px rgba(245, 158, 11, 0.2);
-}
-
-.plan-widget-badge-pending {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  animation: pulse-badge 2s ease-in-out infinite;
-}
-
-@keyframes pulse-badge {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
-}
-
-/* Plan approval actions */
-.plan-approval-actions {
-  width: 100%;
-}
+/* Approval actions */
+.plan-approval-actions { width: 100%; }
 
 .plan-approval-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.plan-approval-label {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  justify-content: flex-end;
 }
 
 .plan-approval-buttons {
   display: flex;
   gap: 8px;
-  flex-shrink: 0;
 }
 
-.plan-approval-btn {
+/* Buttons — 3 levels */
+.plan-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 5px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: var(--radius-sm);
+  padding: 6px 16px;
+  font-size: var(--fs-sm, 12px);
+  font-weight: var(--fw-semibold, 600);
+  border-radius: var(--radius-sm, 8px);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 150ms ease;
   border: 1px solid transparent;
+  white-space: nowrap;
 }
 
-.plan-approve-btn {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+.plan-btn-primary {
+  background: var(--accent-color, #f28c52);
   color: white;
-  border-color: rgba(22, 163, 74, 0.3);
+  border-color: transparent;
 }
 
-.plan-approve-btn:hover {
-  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+.plan-btn-primary:hover {
+  opacity: 0.9;
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.3);
 }
 
-.plan-reject-btn {
-  background: rgba(239, 68, 68, 0.1);
-  color: #f87171;
-  border-color: rgba(239, 68, 68, 0.2);
+.plan-btn-secondary {
+  background: transparent;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.55));
+  border-color: var(--border-default, rgba(255, 255, 255, 0.08));
 }
 
-.plan-reject-btn:hover {
-  background: rgba(239, 68, 68, 0.2);
-  border-color: rgba(239, 68, 68, 0.3);
+.plan-btn-secondary:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary, #e7ebf3);
 }
 
-.plan-cancel-btn {
-  background: rgba(255, 255, 255, 0.06);
-  color: rgba(255, 255, 255, 0.5);
-  border-color: rgba(255, 255, 255, 0.1);
+.plan-btn-ghost {
+  background: transparent;
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.35));
+  border: none;
+  padding: 6px 12px;
 }
 
-.plan-cancel-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+.plan-btn-ghost:hover {
+  color: var(--text-secondary, rgba(255, 255, 255, 0.55));
 }
 
-/* Feedback input row */
+/* Feedback row */
 .plan-feedback-row {
   display: flex;
   align-items: center;
@@ -292,38 +212,115 @@
 
 .plan-feedback-input {
   flex: 1;
-  padding: 5px 10px;
-  font-size: 12px;
-  border: 1px solid rgba(239, 68, 68, 0.4);
-  border-radius: var(--radius-sm);
-  background: rgba(239, 68, 68, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+  padding: 6px 12px;
+  font-size: var(--fs-sm, 12px);
+  border: 1px solid var(--border-default, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-sm, 8px);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary, #e7ebf3);
   outline: none;
 }
 
 .plan-feedback-input:focus {
-  border-color: rgba(239, 68, 68, 0.5);
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.1);
+  border-color: var(--accent-color, #f28c52);
 }
 
 .plan-feedback-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.35));
 }
 
-/* Approved state */
-.plan-widget-approved {
-  color: #22c55e !important;
+/* Agent picker — inline in footer */
+.plan-agent-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.plan-widget-approved svg {
-  color: #22c55e !important;
+.plan-agent-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-sm, 12px);
+  font-weight: var(--fw-semibold, 600);
+  color: var(--text-secondary, rgba(255, 255, 255, 0.55));
 }
 
-/* Rejected state */
-.plan-widget-rejected {
-  color: #f87171 !important;
+.plan-agent-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 140px;
+  overflow-y: auto;
 }
 
-.plan-widget-rejected svg {
-  color: #f87171 !important;
+.plan-agent-picker-empty {
+  font-size: var(--fs-sm, 12px);
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.35));
+  text-align: center;
+  padding: 12px;
+}
+
+.plan-agent-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 8px);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 150ms ease;
+  width: 100%;
+  text-align: left;
+}
+
+.plan-agent-picker-row:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+}
+
+.plan-agent-picker-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm, 8px);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.plan-agent-picker-name {
+  flex: 1;
+  font-size: var(--fs-sm, 12px);
+  font-weight: var(--fw-medium, 500);
+  color: var(--text-primary, #e7ebf3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-agent-picker-status {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full, 999px);
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.04));
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.35));
+}
+
+.plan-agent-picker-status.idle {
+  color: var(--semantic-success, #22c55e);
+}
+
+.plan-agent-picker-status.busy {
+  color: var(--accent-color, #f28c52);
+}
+
+/* Result state */
+.plan-result {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs, 11px);
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.35));
+}
+
+.plan-result-rejected {
+  color: var(--semantic-error, #ef4444);
 }

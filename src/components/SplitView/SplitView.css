@@ -1,0 +1,76 @@
+/* Split Pane Container */
+.split-pane-container {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Individual Pane */
+.split-pane {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+  position: relative;
+}
+
+.split-pane.focused {
+  outline: 1px solid rgba(var(--accent-rgb, 255, 107, 53), 0.3);
+  outline-offset: -1px;
+}
+
+/* Resizable Divider */
+.split-divider {
+  width: 4px;
+  cursor: col-resize;
+  background: var(--border-subtle, rgba(255, 255, 255, 0.08));
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.split-divider:hover {
+  background: var(--accent, #FF6B35);
+}
+
+/* Drop Zone Overlay */
+.split-drop-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  z-index: 9990;
+  pointer-events: auto;
+}
+
+.split-drop-zone {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed transparent;
+  transition: all 0.15s ease;
+  margin: 8px;
+  border-radius: 8px;
+}
+
+.split-drop-zone.active {
+  background: rgba(0, 110, 255, 0.1);
+  border-color: rgba(0, 110, 255, 0.4);
+}
+
+.split-drop-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  pointer-events: none;
+}
+
+.split-drop-zone.active .split-drop-label {
+  color: rgba(0, 110, 255, 0.7);
+}
+

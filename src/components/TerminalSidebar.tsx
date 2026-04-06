@@ -57,6 +57,7 @@ const DEFAULT_PROJECT_COLORS = [
 
 // Sortable Repository Group wrapper
 interface SortableRepositoryGroupProps {
+  insideGroup?: boolean;
   repoKey: string;
   repoPath: string;
   repoName: string;
@@ -103,6 +104,7 @@ interface SortableRepositoryGroupProps {
 function SortableRepositoryGroup({
   repoKey,
   projectColor,
+  insideGroup,
   ...props
 }: SortableRepositoryGroupProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -122,9 +124,10 @@ function SortableRepositoryGroup({
     opacity: isDragging ? 0.5 : 1,
     willChange: isDragging ? 'transform' : 'auto',
     // No background — border-left + subtle bottom separator
+    // Inside a group: skip project borders — the group's dashed border is enough
     background: 'transparent',
-    borderLeft: projectColor ? `2px solid ${projectColor}` : undefined,
-    borderBottom: projectColor ? `2px solid ${projectColor}30` : '2px solid rgba(255,255,255,0.04)',
+    borderLeft: insideGroup ? 'none' : (projectColor ? `2px solid ${projectColor}` : undefined),
+    borderBottom: insideGroup ? 'none' : (projectColor ? `2px solid ${projectColor}30` : '2px solid rgba(255,255,255,0.04)'),
     borderRadius: '0',
     marginBottom: '0',
     padding: '4px',
@@ -414,6 +417,19 @@ export default function TerminalSidebar({
       }
     }
   }, [groups, handleDisbandGroup, updateGroup]);
+
+  // === ADD PROJECT TO GROUP ===
+  const handleAddToGroup = useCallback(async (groupId: string, projectPath: string, projectLabel: string) => {
+    const group = groups.find((g) => g.id === groupId);
+    if (!group) return;
+    try {
+      const updated = [...group.projects, { path: projectPath, label: projectLabel, role: 'member' }];
+      await updateGroup(groupId, { projects: updated });
+      setGroupContextMenu(null);
+    } catch (error) {
+      console.error('[TerminalSidebar] Failed to add project to group:', error);
+    }
+  }, [groups, updateGroup]);
 
   const handleStartRenameGroup = useCallback((groupId: string, currentName: string) => {
     setRenamingGroupId(groupId);
@@ -1272,8 +1288,11 @@ export default function TerminalSidebar({
                       ) : (
                         <span style={{ flex: 1, textAlign: 'left' }}>{grp.name}</span>
                       )}
-                      <span style={{ fontSize: '9px', opacity: 0.5 }}>
-                        {projects.length} projects
+                      <span style={{
+                        fontSize: '8px', opacity: 0.35, letterSpacing: '0.08em',
+                        fontWeight: 500,
+                      }}>
+                        GROUP · {projects.length}
                       </span>
                       {/* Hover action icons */}
                       <span
@@ -1306,9 +1325,9 @@ export default function TerminalSidebar({
                     {/* Group Projects (collapsible) — dashed border shows belonging */}
                     {!isGroupCollapsed && (
                     <div style={{
-                      borderLeft: `2px dashed ${groupColor}70`,
-                      borderRight: `2px dashed ${groupColor}70`,
-                      borderBottom: `2px dashed ${groupColor}70`,
+                      borderLeft: `2px dashed ${groupColor}`,
+                      borderRight: `2px dashed ${groupColor}`,
+                      borderBottom: `2px dashed ${groupColor}`,
                       borderTop: 'none',
                       borderRadius: '0 0 6px 6px',
                       padding: '4px 2px 2px 2px',
@@ -1320,6 +1339,7 @@ export default function TerminalSidebar({
                         <SortableRepositoryGroup
                           key={repoKey}
                           repoKey={repoKey}
+                          insideGroup
                           repoPath={repoData.repoPath}
                           repoName={repoName}
                           mainAgents={repoData.mainAgents}
@@ -1568,6 +1588,44 @@ export default function TerminalSidebar({
               Rename group
             </button>
 
+            {/* Group color picker */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '7px 10px',
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="rgba(255,255,255,0.4)" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="12" cy="12" r="4" fill="rgba(255,255,255,0.4)" />
+              </svg>
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                {DEFAULT_PROJECT_COLORS.map((color) => {
+                  const grp = groups.find((g) => g.id === groupContextMenu.groupId);
+                  const isActive = grp?.color === color;
+                  return (
+                    <button
+                      key={color}
+                      onClick={async () => {
+                        await updateGroup(groupContextMenu.groupId, { color });
+                        setGroupContextMenu(null);
+                      }}
+                      style={{
+                        width: '16px', height: '16px', borderRadius: '50%',
+                        background: color, border: isActive
+                          ? '2px solid rgba(255,255,255,0.9)'
+                          : '1.5px solid rgba(255,255,255,0.15)',
+                        cursor: 'pointer', padding: 0,
+                        transition: 'transform 0.1s ease, border-color 0.1s ease',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                      title={color}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Separator */}
             <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.06)', margin: '2px 0' }} />
 
@@ -1601,6 +1659,44 @@ export default function TerminalSidebar({
                   </button>
                 );
               });
+            })()}
+
+            {/* Add project to group — shows projects not already in this group */}
+            {(() => {
+              const grp = groups.find((g) => g.id === groupContextMenu.groupId);
+              if (!grp) return null;
+              const groupPaths = new Set(grp.projects.map((p) => p.path));
+              const available = orderedRepositoryGroups.filter(
+                ([, data]) => !groupPaths.has(data.repoPath),
+              );
+              if (available.length === 0) return null;
+              return (
+                <>
+                  <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.06)', margin: '2px 0' }} />
+                  {available.map(([name, data]) => (
+                    <button
+                      key={data.repoPath}
+                      onClick={() => handleAddToGroup(groupContextMenu.groupId, data.repoPath, name)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '8px',
+                        width: '100%', padding: '7px 10px', background: 'none',
+                        border: 'none', cursor: 'pointer', borderRadius: '4px',
+                        color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px',
+                        textAlign: 'left',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                        stroke="rgba(255,255,255,0.4)" strokeWidth="2">
+                        <line x1="12" y1="5" x2="12" y2="19" />
+                        <line x1="5" y1="12" x2="19" y2="12" />
+                      </svg>
+                      Add {name}
+                    </button>
+                  ))}
+                </>
+              );
             })()}
 
             {/* Separator */}

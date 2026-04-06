@@ -58,13 +58,19 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
   // Check if file is markdown
   const isMarkdownFile = (filePath: string) => filePath.endsWith('.md');
 
-  // Separate files by type: Markdown vs Code
-  const markdownFiles = edits.filter(edit => isMarkdownFile(edit.filePath));
+  // Check if file is a feature doc (documentation/features/*.md)
+  const isFeatureFile = (filePath: string) =>
+    filePath.endsWith('.md') && /\/features\/[^/]+\.md$/.test(filePath);
+
+  // Separate files by type: Features vs Markdown vs Code
+  const featureFiles = edits.filter(edit => isFeatureFile(edit.filePath));
+  const markdownFiles = edits.filter(edit => isMarkdownFile(edit.filePath) && !isFeatureFile(edit.filePath));
   const codeEdits = edits.filter(edit => !isMarkdownFile(edit.filePath));
 
   // Separate code files by status (NEW vs MODIFIED)
   const newFiles = codeEdits.filter(edit => edit.status === 'created');
   const modifiedFiles = codeEdits.filter(edit => edit.status !== 'created'); // includes undefined (backwards compat)
+  const hasFeatureFiles = featureFiles.length > 0;
   const hasMarkdownFiles = markdownFiles.length > 0;
 
   const totalChanges = edits.reduce((sum, edit) => sum + edit.editCount, 0);
@@ -72,6 +78,10 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
   const hasModifiedFiles = modifiedFiles.length > 0;
   const hasDeletes = deletes.length > 0;
   const hasCodeFiles = hasNewFiles || hasModifiedFiles;
+
+  // Feature-only: yellow bar when features present (yellow takes priority)
+  const isFeatureOnly = hasFeatureFiles && !hasCodeFiles && !hasDeletes && !hasMarkdownFiles;
+  const hasFeaturePriority = hasFeatureFiles; // yellow header when any feature present
 
   // Brain: gotcha-popout-search-panel-css-scope — respects fileOpenTarget
   const handleFileClick = async (filePath: string, lineChanges?: LineChange[]) => {
@@ -115,7 +125,10 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
   };
 
   return (
-    <div className={`edit-summary-bar ${hasMarkdownFiles && !hasCodeFiles && !hasDeletes ? 'edit-summary-bar-markdown-only' : ''}`}>
+    <div className={`edit-summary-bar ${
+      hasFeaturePriority ? 'edit-summary-bar-feature-priority' :
+      hasMarkdownFiles && !hasCodeFiles && !hasDeletes ? 'edit-summary-bar-markdown-only' : ''
+    }`}>
       <div className="edit-summary-bar-header" onClick={() => setIsExpanded(!isExpanded)}>
         <div className="edit-summary-bar-title">
           {hasCodeFiles && (
@@ -129,7 +142,19 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
               {hasModifiedFiles && <span className="edit-summary-bar-badge">{modifiedFiles.length} edited</span>}
             </>
           )}
-          {hasCodeFiles && hasMarkdownFiles && <span className="edit-summary-bar-separator">•</span>}
+          {hasCodeFiles && (hasFeatureFiles || hasMarkdownFiles) && <span className="edit-summary-bar-separator">•</span>}
+          {hasFeatureFiles && (
+            <>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="#FFD700" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                className="edit-summary-bar-feature-icon">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+              <span className="edit-summary-bar-label edit-summary-bar-label-feature">Features ({featureFiles.length})</span>
+              <span className="edit-summary-bar-badge edit-summary-bar-badge-feature">{featureFiles.length} feat</span>
+            </>
+          )}
+          {hasFeatureFiles && hasMarkdownFiles && <span className="edit-summary-bar-separator">•</span>}
           {hasMarkdownFiles && (
             <>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="edit-summary-bar-markdown-icon">
@@ -241,6 +266,50 @@ export default function EditSummaryBar({ edits, deletes = [], onFileClick, onDif
                           <FileDiffButton
                             filePath={edit.filePath}
                             onDiffClick={(path) => handleDiffClick(path, 'modified')}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* FEATURE FILES Section - Gold/Yellow theme */}
+            {hasFeatureFiles && (
+              <div className="edit-summary-bar-section edit-summary-bar-section-feature">
+                <div className="edit-summary-bar-section-title">Features</div>
+                <div className="edit-summary-bar-files">
+                  {featureFiles.map((edit, index) => {
+                    const fileName = edit.filePath.split('/').pop() || edit.filePath;
+                    const dirPath = edit.filePath.substring(0, edit.filePath.lastIndexOf('/'));
+                    const isNew = edit.status === 'created';
+
+                    return (
+                      <div
+                        key={index}
+                        className="edit-summary-bar-file edit-summary-bar-file-feature"
+                        onClick={() => handleFileClick(edit.filePath, edit.lineChanges)}
+                        title={shouldUseExternalIDE ? 'Open in IDE' : 'Open file'}
+                      >
+                        <div className="edit-summary-bar-file-info">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                          </svg>
+                          <span className="edit-summary-bar-file-name">{fileName}</span>
+                          <FileStatusBadge status={isNew ? 'created' : 'modified'} />
+                          {dirPath && <span className="edit-summary-bar-file-path" title={dirPath}>{shortenPath(dirPath)}</span>}
+                        </div>
+                        <div className="edit-summary-bar-file-actions">
+                          {!isNew && (
+                            <span className="edit-summary-bar-file-count edit-summary-bar-file-count-feature hide-on-small">
+                              {edit.editCount} {edit.editCount === 1 ? 'edit' : 'edits'}
+                            </span>
+                          )}
+                          <FileDiffButton
+                            filePath={edit.filePath}
+                            onDiffClick={(path) => handleDiffClick(path, isNew ? 'created' : 'modified')}
                           />
                         </div>
                       </div>

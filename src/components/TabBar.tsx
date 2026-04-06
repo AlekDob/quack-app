@@ -54,13 +54,18 @@ export interface PopoutPosition {
 interface TabBarProps {
   tabs: Tab[];
   activeTabId: string;
+  splitTabId?: string | null;
+  splitRatio?: number;
   onTabClick: (tabId: string) => void;
   onTabClose: (tabId: string) => void;
   onTabReorder?: (tabs: Tab[]) => void;
   onTabPopout?: (tab: Tab, position: PopoutPosition) => void;
+  onDragStateChange?: (tabId: string | null) => void;
+  onCloseSplit?: () => void;
+  onTabSplit?: (tabId: string) => void;
 }
 
-function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTabPopout }: TabBarProps) {
+function TabBar({ tabs, activeTabId, splitTabId, splitRatio = 0.5, onTabClick, onTabClose, onTabReorder, onTabPopout, onDragStateChange, onCloseSplit, onTabSplit }: TabBarProps) {
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -69,12 +74,8 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
     y: 0,
     tabId: null,
   });
-  const [hasTriggeredPopout, setHasTriggeredPopout] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const tabBarRef = useRef<HTMLDivElement>(null);
-
-  // Threshold in pixels - how far outside the tab bar to trigger popout
-  const POPOUT_THRESHOLD = 60;
 
   // Close context menu when clicking outside
   useEffect(() => {
@@ -181,6 +182,7 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
     }
 
     setDraggedTabId(tab.id);
+    onDragStateChange?.(tab.id);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', tab.id);
 
@@ -213,6 +215,11 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
       return;
     }
 
+    // If dragging the split tab onto a left-side tab, close the split
+    if (draggedTabId === splitTabId && targetTab.id !== splitTabId) {
+      onCloseSplit?.();
+    }
+
     // Reorder tabs
     const draggedIndex = tabs.findIndex(t => t.id === draggedTabId);
     const targetIndex = tabs.findIndex(t => t.id === targetTab.id);
@@ -225,7 +232,6 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
     const [draggedTab] = newTabs.splice(draggedIndex, 1);
     newTabs.splice(targetIndex, 0, draggedTab);
 
-    // Notify parent of reorder
     if (onTabReorder) {
       onTabReorder(newTabs);
     }
@@ -233,76 +239,69 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
     setDragOverTabId(null);
   };
 
-  // Check if cursor is outside tab bar bounds (for popout detection)
-  const isOutsideTabBar = useCallback((clientX: number, clientY: number): boolean => {
-    if (!tabBarRef.current) return false;
-
-    const rect = tabBarRef.current.getBoundingClientRect();
-    const isOutside = (
-      clientY < rect.top - POPOUT_THRESHOLD ||
-      clientY > rect.bottom + POPOUT_THRESHOLD ||
-      clientX < rect.left - POPOUT_THRESHOLD ||
-      clientX > rect.right + POPOUT_THRESHOLD
-    );
-
-    return isOutside;
-  }, [POPOUT_THRESHOLD]);
-
-  // Track popout state per tab to prevent duplicates
-  const popoutTriggeredRef = useRef<Set<string>>(new Set());
-
-  // Handle drag event to detect when tab is dragged outside
-  const handleDrag = useCallback((e: React.DragEvent, tab: Tab) => {
-    // Skip if no valid coordinates
-    if (e.clientX === 0 && e.clientY === 0) return;
-    if (!onTabPopout) return;
-
-    // Skip if popout already triggered for this specific tab (using ref for immediate check)
-    if (popoutTriggeredRef.current.has(tab.id)) return;
-
-    // Check if outside bounds
-    if (isOutsideTabBar(e.clientX, e.clientY)) {
-      console.log('[TabBar] Tab dragged outside bounds:', tab.id);
-
-      // Mark as triggered IMMEDIATELY using ref (synchronous)
-      popoutTriggeredRef.current.add(tab.id);
-      setHasTriggeredPopout(true);
-
-      // Trigger popout with position
-      onTabPopout(tab, {
-        x: e.clientX,
-        y: e.clientY,
-        screenX: e.screenX,
-        screenY: e.screenY,
-      });
-    }
-  }, [isOutsideTabBar, onTabPopout]);
-
   const handleDragEnd = useCallback(() => {
     setDraggedTabId(null);
     setDragOverTabId(null);
-    setHasTriggeredPopout(false);
-    // Clear the ref for next drag operation
-    popoutTriggeredRef.current.clear();
+    onDragStateChange?.(null);
+  }, [onDragStateChange]);
+
+  // Handle drop on right tab-bar group: move tab to split pane
+  const handleGroupDropRight = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const tabId = e.dataTransfer.getData('text/plain');
+    if (!tabId) return;
+
+    const tab = tabs.find(t => t.id === tabId);
+    // Chat tab cannot move to right group
+    if (!tab || tab.type === 'chat') return;
+
+    // If tab is already the split tab, nothing to do
+    if (tabId === splitTabId) return;
+
+    // Move this tab to split (right pane)
+    onTabSplit?.(tabId);
+    setDraggedTabId(null);
+    setDragOverTabId(null);
+  }, [tabs, splitTabId, onTabSplit]);
+
+  // Handle drop on left tab-bar group: move split tab back to close split
+  const handleGroupDropLeft = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const tabId = e.dataTransfer.getData('text/plain');
+    if (!tabId) return;
+
+    // Only close split when the split tab is dragged back to left
+    if (tabId === splitTabId) {
+      onCloseSplit?.();
+      setDraggedTabId(null);
+      setDragOverTabId(null);
+    }
+  }, [splitTabId, onCloseSplit]);
+
+  const handleGroupDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
   }, []);
 
-  return (
-    <div className="tab-bar" role="tablist" ref={tabBarRef}>
-      {tabs.map((tab) => (
+  // Split tabs into left group (everything except splitTab) and right group (splitTab)
+  const leftTabs = splitTabId ? tabs.filter(t => t.id !== splitTabId) : tabs;
+  const splitTab = splitTabId ? tabs.find(t => t.id === splitTabId) : null;
+
+  const renderTab = (tab: Tab) => (
         <button
           key={tab.id}
           type="button"
           role="tab"
-          aria-selected={activeTabId === tab.id}
+          aria-selected={activeTabId === tab.id || splitTabId === tab.id}
           className={`tab-item ${activeTabId === tab.id ? 'active' : ''} ${
-            draggedTabId === tab.id ? 'dragging' : ''
+            splitTabId === tab.id ? 'split-active' : ''
+          } ${draggedTabId === tab.id ? 'dragging' : ''
           } ${dragOverTabId === tab.id ? 'drag-over' : ''}`}
           onClick={() => handleTabClick(tab)}
           onContextMenu={(e) => handleContextMenu(e, tab)}
           title={tab.filePath || tab.label}
           draggable={tab.type !== 'chat'}
           onDragStart={(e) => handleDragStart(e, tab)}
-          onDrag={(e) => handleDrag(e, tab)}
           onDragOver={(e) => handleDragOver(e, tab)}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, tab)}
@@ -469,7 +468,34 @@ function TabBar({ tabs, activeTabId, onTabClick, onTabClose, onTabReorder, onTab
             </span>
           )}
         </button>
-      ))}
+  );
+
+  return (
+    <div className="tab-bar" role="tablist" ref={tabBarRef}>
+      {splitTab ? (
+        <>
+          {/* Left group - matches left pane width */}
+          <div
+            className="tab-bar-group tab-bar-group-left"
+            style={{ flex: splitRatio }}
+            onDragOver={handleGroupDragOver}
+            onDrop={handleGroupDropLeft}
+          >
+            {leftTabs.map(renderTab)}
+          </div>
+          {/* Right group - matches right pane width */}
+          <div
+            className="tab-bar-group tab-bar-group-right"
+            style={{ flex: 1 - splitRatio }}
+            onDragOver={handleGroupDragOver}
+            onDrop={handleGroupDropRight}
+          >
+            {renderTab(splitTab)}
+          </div>
+        </>
+      ) : (
+        leftTabs.map(renderTab)
+      )}
 
       {/* Context Menu - rendered via Portal to avoid overflow issues */}
       {contextMenu.visible && createPortal(

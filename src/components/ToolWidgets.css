@@ -1,22 +1,23 @@
-/* System Initialized Widget - Ultra Minimal */
+/* System Initialized Widget - Matches tool-minimal-line style */
 .system-init-widget {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
-  margin: 2px 0;
+  gap: 6px;
+  padding: 4px 10px;
+  margin: 3px 0;
   margin-bottom: 12px;
-  margin-left: 40px; /* Indent like tools */
   background: transparent;
-  border: 1px solid rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
 
 .system-init-widget:hover {
-  background: rgba(34, 197, 94, 0.05);
-  border-color: rgba(34, 197, 94, 0.25);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .system-init-header {
@@ -36,8 +37,8 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 4px 8px;
-  background: rgba(34, 197, 94, 0.05);
+  padding: 4px 10px;
+  background: transparent;
   border-radius: var(--radius-sm);
 }
 
@@ -45,14 +46,14 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(34, 197, 94, 0.7);
+  background: #22c55e;
 }
 
 .system-init-title {
-  font-weight: 400;
-  font-size: 10px;
+  font-weight: 500;
+  font-size: 11px;
   font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-  color: var(--text-tertiary);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .system-init-chevron {
@@ -73,7 +74,7 @@
   flex-direction: column;
   gap: 4px;
   padding-top: 6px;
-  border-top: 1px solid rgba(34, 197, 94, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   margin-top: 4px;
   width: 100%;
 }
@@ -89,7 +90,7 @@
 .system-init-row svg {
   width: 12px;
   height: 12px;
-  color: rgba(34, 197, 94, 0.5);
+  color: rgba(255, 255, 255, 0.35);
   flex-shrink: 0;
 }
 

@@ -23,6 +23,8 @@ import { saveSessionBackup, cleanupOldBackups } from "./utils/sessionRecovery";
 import TerminalSidebar from "./components/TerminalSidebar";
 import SidePanel from "./components/SidePanel";
 import SidePanelAccordion from "./components/SidePanelAccordion";
+import { SplitPaneDivider, SplitDropZone, SplitCodeEditor } from "./components/SplitView";
+import "./components/SplitView/SplitView.css";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FilePreviewDrawer";
 // Editor selection type for IDE context injection
@@ -100,6 +102,7 @@ import { useKanbanStore } from "./stores/kanbanStore";
 import { useAutomationStore } from "./stores/automationStore";
 import { useSessionStore } from "./stores/sessionStore";
 import { useTeamStore } from "./stores/teamStore";
+import { useTerminalStore } from "./stores/terminalStore";
 import { useChatStore } from "./stores/chatStore";
 import { useIDEStore } from "./stores/ideStore";
 import KanbanNotificationBar from "./components/KanbanNotificationBar";
@@ -859,6 +862,13 @@ function AppContent() {
     } catch { /* ignore parse errors */ }
     return 'chat';
   });
+
+  // Split View state
+  const [splitTabId, setSplitTabId] = useState<string | null>(null);
+  const [splitRatio, setSplitRatio] = useState(0.5);
+  const [isDraggingTab, setIsDraggingTab] = useState(false);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+
   // Clear editor selection when navigating away from file tab
   useEffect(() => {
     if (!activeTabId.startsWith('file-')) {
@@ -4918,6 +4928,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   // Listen for click-to-focus events from PiP window
   // Use ref to avoid teardown/setup on every terminals change (prevents Tauri listener race condition)
   terminalsRef.current = terminals;
+
+  // Sync terminals to Zustand store so components (e.g. PlanWidget agent picker)
+  // can read them without prop drilling through the entire tree
+  // Brain: 047-plan-delegate-remote
+  const syncTerminalsToStore = useTerminalStore(s => s.setTerminals);
+  const syncActiveIdToStore = useTerminalStore(s => s.setActiveId);
+  useEffect(() => {
+    syncTerminalsToStore(terminals);
+  }, [terminals, syncTerminalsToStore]);
+  useEffect(() => {
+    syncActiveIdToStore(activeId);
+  }, [activeId, syncActiveIdToStore]);
 
   useEffect(() => {
     if (!tauriAvailable) return;
@@ -10649,17 +10671,26 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       setPreviewError(null);
     }
 
+    // Handle split view: if closing the split tab, just close the split
+    if (splitTabId === tabId) {
+      setSplitTabId(null);
+    }
+
     setTabs((prevTabs) => {
       const filtered = prevTabs.filter(t => t.id !== tabId);
 
       // If closing active tab, switch to previous tab or chat
       if (activeTabId === tabId) {
-        const closedIndex = prevTabs.findIndex(t => t.id === tabId);
-        const newActiveTab = filtered[Math.max(0, closedIndex - 1)];
-        const newActiveTabId = newActiveTab?.id || 'chat';
-
-        // Use handleTabClick instead of setActiveTabId to trigger file loading
-        handleTabClick(newActiveTabId);
+        // If split is active, promote split tab to primary
+        if (splitTabId && splitTabId !== tabId) {
+          handleTabClick(splitTabId);
+          setSplitTabId(null);
+        } else {
+          const closedIndex = prevTabs.findIndex(t => t.id === tabId);
+          const newActiveTab = filtered[Math.max(0, closedIndex - 1)];
+          const newActiveTabId = newActiveTab?.id || 'chat';
+          handleTabClick(newActiveTabId);
+        }
       }
 
       return filtered;
@@ -10704,6 +10735,37 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       });
     }
   }, [activeId]);
+
+  // Split View handlers
+  const handleSplitDropLeft = useCallback((tabId: string) => {
+    setIsDraggingTab(false); // Always reset drag state on drop
+    if (tabId === activeTabId && !splitTabId) return;
+    if (tabId === splitTabId) {
+      setSplitTabId(activeTabId);
+      setActiveTabId(tabId);
+      return;
+    }
+    if (tabId === activeTabId) return;
+    if (!splitTabId) {
+      setSplitTabId(activeTabId);
+    }
+    handleTabClick(tabId);
+  }, [activeTabId, splitTabId]);
+
+  const handleSplitDropRight = useCallback((tabId: string) => {
+    setIsDraggingTab(false); // Always reset drag state on drop
+    if (tabId === splitTabId) return;
+    if (tabId === activeTabId) {
+      setSplitTabId(tabId);
+      setActiveTabId('chat');
+      return;
+    }
+    setSplitTabId(tabId);
+  }, [activeTabId, splitTabId]);
+
+  const handleCloseSplit = useCallback(() => {
+    setSplitTabId(null);
+  }, []);
 
   // Handle tab popout - drag tab outside tab bar to create floating window
   const handleTabPopout = useCallback(async (tab: Tab, position: PopoutPosition) => {
@@ -12422,14 +12484,28 @@ You have access to all Bash tools to execute git commands like:
             <TabBar
               tabs={displayTabs}
               activeTabId={activeTabId}
+              splitTabId={splitTabId}
+              splitRatio={splitRatio}
               onTabClick={handleTabClick}
               onTabClose={handleTabClose}
               onTabReorder={handleTabReorder}
               onTabPopout={handleTabPopout}
+              onDragStateChange={(id) => setIsDraggingTab(!!id)}
+              onCloseSplit={handleCloseSplit}
+              onTabSplit={(tabId) => setSplitTabId(tabId)}
             />
 
             {/* Content Area - fills remaining space */}
-            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div ref={splitContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: splitTabId ? 'row' : 'column', position: 'relative' }}>
+              {/* Split Drop Zone overlay */}
+              <SplitDropZone
+                visible={isDraggingTab && !splitTabId}
+                onDropLeft={handleSplitDropLeft}
+                onDropRight={handleSplitDropRight}
+              />
+
+              {/* Left Pane (or full pane when not split) */}
+              <div style={{ flex: splitTabId ? splitRatio : 1, minHeight: 0, minWidth: splitTabId ? 300 : undefined, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               {/* Kanban Tab View - shown when kanban tab is active */}
               {activeTabId === 'kanban-board' && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
@@ -13243,7 +13319,119 @@ You have access to all Bash tools to execute git commands like:
                   }
                 </div>
               )}
-            </div>
+              </div>{/* End Left Pane */}
+
+              {/* Split Divider + Right Pane */}
+              {splitTabId && (
+                <>
+                  <SplitPaneDivider
+                    onRatioChange={setSplitRatio}
+                    containerRef={splitContainerRef}
+                  />
+                  <div style={{ flex: 1 - splitRatio, minHeight: 0, minWidth: 300, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                    {/* Split pane content - render the split tab */}
+                    {(() => {
+                      const sTab = tabs.find(t => t.id === splitTabId);
+                      if (!sTab) return null;
+
+                      // Code Editor — standalone instance, not singleton editorStore
+                      if (sTab.type === 'code-editor' && sTab.editorFilePath) {
+                        return (
+                          <SplitCodeEditor
+                            key={sTab.editorFilePath}
+                            filePath={sTab.editorFilePath}
+                          />
+                        );
+                      }
+
+                      // Feature Map (Whiteboard)
+                      if (sTab.type === 'feature-map') {
+                        return (
+                          <FeatureMapTabView
+                            tab={sTab}
+                            isActive={true}
+                            projectPath={activeTerminal?.cwd}
+                            onOpenFileInEditor={handleOpenCodeEditorTab}
+                          />
+                        );
+                      }
+
+                      // File Preview
+                      if (sTab.type === 'file' && sTab.filePath) {
+                        return (
+                          <FilePreviewDrawer
+                            open={true}
+                            filename={sTab.filePath.split('/').pop() ?? null}
+                            path={sTab.filePath}
+                            content={previewContent}
+                            loading={loadingPreview}
+                            error={previewError}
+                            formatting={formattingPreview}
+                            diffInfo={previewDiffInfo}
+                            lineChanges={previewLineChanges ?? undefined}
+                            onClose={handleCloseSplit}
+                            onRefresh={handleRefreshPreview}
+                            onFormat={handleFormatPreview}
+                            onSave={handleSaveFile}
+                            onHasUnsavedChanges={() => {}}
+                            imageData={previewImageData}
+                            embedded={true}
+                          />
+                        );
+                      }
+
+                      // Docs
+                      if (sTab.type === 'docs') {
+                        return <DocsTabView tab={sTab} isActive={true} />;
+                      }
+
+                      // Image
+                      if (sTab.type === 'image') {
+                        return <ImageTabView tab={sTab} isActive={true} />;
+                      }
+
+                      // Agent viewer
+                      if (sTab.type === 'agent' && sTab.agentScope && sTab.agentName !== undefined) {
+                        return (
+                          <AgentViewer
+                            key={sTab.id}
+                            agentName={sTab.agentName}
+                            agentScope={sTab.agentScope}
+                            workingDir={activeTerminal?.cwd || explorerPath || undefined}
+                            onRefresh={loadAgents}
+                            isNewAgent={sTab.isNewAgent}
+                          />
+                        );
+                      }
+
+                      // Skill viewer
+                      if (sTab.type === 'skill' && sTab.skillName && sTab.skillScope) {
+                        return (
+                          <SkillViewer
+                            skillName={sTab.skillName}
+                            skillScope={sTab.skillScope}
+                            workingDir={activeTerminal?.cwd || explorerPath || undefined}
+                            onRefresh={loadSkills}
+                          />
+                        );
+                      }
+
+                      // Browser
+                      if (sTab.type === 'browser') {
+                        return <BrowserManager />;
+                      }
+
+                      // Fallback: unsupported tab type for split
+                      return (
+                        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+                          Questo tipo di tab non supporta la split view
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </>
+              )}
+            </div>{/* End Content Area */}
           </div>
           )}
         </section>

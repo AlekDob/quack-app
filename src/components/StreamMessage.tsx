@@ -539,6 +539,7 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
             defaultExpanded={true}
             pendingApprovalRequestId={pendingRequestId}
             onApprovalResponse={onPlanApprovalResponse}
+            currentSessionId={sessionId}
           />
         );
       }

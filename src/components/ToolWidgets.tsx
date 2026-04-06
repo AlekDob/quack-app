@@ -371,20 +371,9 @@ export const SystemInitializedWidget: React.FC<{
   return (
     <div className="system-init-widget">
       <div className="system-init-header" onClick={() => setIsExpanded(!isExpanded)}>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" className="system-icon">
-          <path d="M8 0a8 8 0 110 16A8 8 0 018 0zM1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0z"/>
-          <path d="M8 3.5a.5.5 0 01.5.5v4a.5.5 0 01-1 0V4a.5.5 0 01.5-.5z"/>
-        </svg>
+        <span className="system-icon" />
         <span className="system-init-title">System Initialized</span>
-        <svg
-          className={`tool-widget-chevron ${isExpanded ? 'expanded' : ''}`}
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="currentColor"
-        >
-          <path d="M12.78 6.22a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06 0L3.22 7.28a.75.75 0 011.06-1.06L8 9.94l3.72-3.72a.75.75 0 011.06 0z"/>
-        </svg>
+        <span className={`tool-minimal-chevron ${isExpanded ? 'rotated' : ''}`}>›</span>
       </div>
       {isExpanded && (<div className="system-init-content">
         {sessionId && (
@@ -793,7 +782,8 @@ export const ExitPlanModeWidget: React.FC<{
   workingDirectory?: string;
   pendingApprovalRequestId?: string;
   onApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
-}> = ({ plan, defaultExpanded = true, workingDirectory, pendingApprovalRequestId, onApprovalResponse }) => {
+  currentSessionId?: string;
+}> = ({ plan, defaultExpanded = true, workingDirectory, pendingApprovalRequestId, onApprovalResponse, currentSessionId }) => {
   return (
     <PlanWidget
       plan={plan}
@@ -801,6 +791,7 @@ export const ExitPlanModeWidget: React.FC<{
       workingDirectory={workingDirectory}
       pendingApprovalRequestId={pendingApprovalRequestId}
       onApprovalResponse={onApprovalResponse}
+      currentSessionId={currentSessionId}
     />
   );
 };

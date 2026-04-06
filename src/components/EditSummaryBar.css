@@ -304,6 +304,68 @@
 }
 
 /* ============================================
+   FEATURE FILES - Gold/Yellow Theme (#FFD700)
+   ============================================ */
+
+/* Feature-priority bar - when features are present (yellow takes priority) */
+.edit-summary-bar-feature-priority {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.08) 0%, rgba(255, 193, 7, 0.08) 100%);
+  border-top: 1px solid rgba(255, 215, 0, 0.25);
+  border-bottom: 1px solid rgba(255, 215, 0, 0.25);
+}
+
+.edit-summary-bar-feature-priority .edit-summary-bar-header:hover {
+  background: rgba(255, 215, 0, 0.05);
+}
+
+.edit-summary-bar-feature-priority .edit-summary-bar-chevron {
+  color: rgba(255, 215, 0, 0.7);
+}
+
+/* Feature icon in header */
+.edit-summary-bar-feature-icon {
+  color: #FFD700 !important;
+  flex-shrink: 0;
+}
+
+/* Feature label in header */
+.edit-summary-bar-label-feature {
+  color: #FFD700;
+}
+
+/* Feature badge in header */
+.edit-summary-bar-badge-feature {
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  color: #FFD700;
+}
+
+/* Feature section title */
+.edit-summary-bar-section-feature .edit-summary-bar-section-title {
+  color: rgba(255, 215, 0, 0.9);
+}
+
+/* Feature file items - gold theme */
+.edit-summary-bar-file-feature {
+  border-color: rgba(255, 215, 0, 0.2);
+}
+
+.edit-summary-bar-file-feature:hover {
+  background: rgba(255, 215, 0, 0.1);
+  border-color: rgba(255, 215, 0, 0.35);
+}
+
+.edit-summary-bar-file-feature .edit-summary-bar-file-info svg {
+  color: rgba(255, 215, 0, 0.7);
+}
+
+/* Feature edit count */
+.edit-summary-bar-file-count-feature {
+  color: rgba(255, 215, 0, 0.8);
+  background: rgba(255, 215, 0, 0.1);
+}
+
+/* ============================================
    MARKDOWN FILES - Purple/Violet Theme
    ============================================ */
 
@@ -402,6 +464,14 @@
 
   .edit-summary-bar-file:hover {
     background: rgba(34, 197, 94, 0.08);
+  }
+
+  .edit-summary-bar-file-feature {
+    background: rgba(255, 215, 0, 0.03);
+  }
+
+  .edit-summary-bar-file-feature:hover {
+    background: rgba(255, 215, 0, 0.08);
   }
 
   .edit-summary-bar-file-markdown {

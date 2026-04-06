@@ -3,155 +3,170 @@
   "annotations": {
     "postIts": [
       {
-        "id": "a1b2c3d4-1111-4aaa-bbbb-000000000001",
-        "text": "12 features / 3 layers / organized by Agent Leo",
+        "id": "a1b2c3d4-0001-4aaa-bbbb-000000000001",
+        "text": "25 features / 5 gruppi / riorganizzato 2026-04-06",
         "x": 620,
         "y": -80,
         "color": "#4ade80"
       },
       {
-        "id": "a1b2c3d4-1111-4aaa-bbbb-000000000002",
-        "text": "UI = editor, explorer, whiteboard, panels. Logic = agents, modes, skills. Infra = IDE, terminal, platform.",
-        "x": 817.279307770018,
+        "id": "a1b2c3d4-0001-4aaa-bbbb-000000000002",
+        "text": "Col 1: Panels + Platform / Col 2: Chat + Agents / Col 3: Views",
+        "x": 820,
         "y": -80,
         "color": "#60a5fa"
-      },
-      {
-        "id": "d0468606-91ec-45fc-84f4-f9e04db1564c",
-        "text": "Settings e parti importanti",
-        "x": -217.24297858170578,
-        "y": 805.1887635403044,
-        "color": "#fbbf24"
       }
     ],
     "groups": [
       {
-        "id": "4f33512d-a92b-4c8e-91d0-2b8cb895a8d3",
-        "label": "Component",
-        "x": null,
-        "y": null,
-        "w": null,
-        "h": null,
-        "color": "#00d9ff",
-        "isComponent": true
+        "id": "g0000001-aaaa-4bbb-cccc-000000000001",
+        "label": "Panels & Navigation",
+        "x": -10,
+        "y": 20,
+        "w": 300,
+        "h": 540,
+        "color": "#00d9ff"
       },
       {
-        "id": "4f33512d-a92b-4c8e-91d0-2b8cb895a8d3",
-        "label": "Component",
-        "x": null,
-        "y": null,
-        "w": null,
-        "h": null,
-        "color": "#00d9ff",
-        "isComponent": true
+        "id": "g0000001-aaaa-4bbb-cccc-000000000002",
+        "label": "Platform & Settings",
+        "x": -10,
+        "y": 610,
+        "w": 300,
+        "h": 740,
+        "color": "#64748b"
       },
       {
-        "id": "9c4504b9-f12c-43a3-bd48-2ba2e8485849",
-        "label": "Component",
-        "x": null,
-        "y": null,
-        "w": null,
-        "h": null,
-        "color": "#00d9ff",
-        "isComponent": true
+        "id": "g0000001-aaaa-4bbb-cccc-000000000003",
+        "label": "Chat & Editing",
+        "x": 340,
+        "y": 20,
+        "w": 300,
+        "h": 440,
+        "color": "#a855f7"
       },
       {
-        "id": "9c4504b9-f12c-43a3-bd48-2ba2e8485849",
-        "label": "Component",
-        "x": null,
-        "y": null,
-        "w": null,
-        "h": null,
-        "color": "#00d9ff",
-        "isComponent": true
+        "id": "g0000001-aaaa-4bbb-cccc-000000000004",
+        "label": "Agents & Logic",
+        "x": 340,
+        "y": 510,
+        "w": 300,
+        "h": 540,
+        "color": "#f97316"
+      },
+      {
+        "id": "g0000001-aaaa-4bbb-cccc-000000000005",
+        "label": "Views & Visualization",
+        "x": 690,
+        "y": 20,
+        "w": 300,
+        "h": 440,
+        "color": "#22c55e"
       }
     ],
     "images": []
   },
   "positions": {
-    "024-integrated-code-editor": {
-      "x": 879.8826627417287,
-      "y": 225.26390249815518
-    },
-    "026-feature-map-whiteboard": {
-      "x": 1302.8630430759783,
-      "y": 438.2664395419659
-    },
-    "031-edit-summary-bar-per-turn": {
-      "x": 445.3009748548424,
-      "y": 921.5535972726864
-    },
     "033-file-explorer": {
-      "x": 190.25250593533073,
-      "y": 505.18181882169785
-    },
-    "035-accordion-content-features": {
-      "x": 214.33488741409164,
-      "y": 362.2049559996766
-    },
-    "025-team-delegation-footer": {
-      "x": 728.3629424407826,
-      "y": 1077.4462014487767
-    },
-    "029-permission-modes": {
-      "x": -94.58205473645513,
-      "y": 1063.0152992861797
-    },
-    "030-built-in-skills": {
-      "x": -92.79359458724481,
-      "y": 1156.5592804233147
-    },
-    "032-changes-panel-agent-commit-refresh": {
-      "x": 892.4907639432528,
-      "y": 577.8925912669655
-    },
-    "027-saved-commands": {
-      "x": 881.9394062411883,
-      "y": 307.2994657773273
-    },
-    "028-ide-context-injection": {
-      "x": 880.3947448929353,
-      "y": 142.34957639380514
-    },
-    "034-windows-cross-platform-compat": {
-      "x": 411.21605160011177,
-      "y": 1080.7431702143501
-    },
-    "036-terminal": {
-      "x": 240.22096947347373,
-      "y": 268.93071512608356
-    },
-    "040-git-graph-visualization": {
-      "x": 892.6503651921988,
-      "y": 494.71527491050887
-    },
-    "038-quack-store": {
-      "x": 1288.6835360286047,
-      "y": 259.8759488170229
-    },
-    "039-source-control-sections": {
-      "x": 897.1922609535147,
-      "y": 660.9691896520443
-    },
-    "037-unified-settings-panel": {
-      "x": -100.8581012615569,
-      "y": 971.8818780615591
+      "x": 140,
+      "y": 100
     },
     "035-side-panel-accordion": {
-      "x": 196.35577922927592,
-      "y": 403.330088380564
-    },
-    "041-chat-breadcrumb": {
-      "x": 242.6598228300126,
-      "y": 131.20101625197222
+      "x": 140,
+      "y": 200
     },
     "043-agent-sidebar": {
-      "x": 195.5820207495018,
-      "y": 594.6069919481353
+      "x": 140,
+      "y": 300
+    },
+    "032-changes-panel-agent-commit-refresh": {
+      "x": 140,
+      "y": 400
+    },
+    "039-source-control-sections": {
+      "x": 140,
+      "y": 500
+    },
+    "027-saved-commands": {
+      "x": 140,
+      "y": 690
+    },
+    "028-ide-context-injection": {
+      "x": 140,
+      "y": 790
+    },
+    "034-windows-cross-platform-compat": {
+      "x": 140,
+      "y": 890
+    },
+    "036-terminal": {
+      "x": 140,
+      "y": 990
+    },
+    "037-unified-settings-panel": {
+      "x": 140,
+      "y": 1090
+    },
+    "046-accent-color-theming": {
+      "x": 140,
+      "y": 1190
+    },
+    "024-integrated-code-editor": {
+      "x": 490,
+      "y": 100
+    },
+    "031-edit-summary-bar-per-turn": {
+      "x": 490,
+      "y": 200
+    },
+    "041-chat-breadcrumb": {
+      "x": 490,
+      "y": 300
+    },
+    "042-tooltip-unification": {
+      "x": 490,
+      "y": 400
+    },
+    "025-team-delegation-footer": {
+      "x": 490,
+      "y": 590
+    },
+    "029-permission-modes": {
+      "x": 490,
+      "y": 690
+    },
+    "030-built-in-skills": {
+      "x": 490,
+      "y": 790
+    },
+    "038-quack-store": {
+      "x": 490,
+      "y": 890
+    },
+    "026-feature-map-whiteboard": {
+      "x": 840,
+      "y": 100
+    },
+    "040-git-graph-visualization": {
+      "x": 840,
+      "y": 200
+    },
+    "044-kanban-view": {
+      "x": 840,
+      "y": 300
+    },
+    "045-office-view": {
+      "x": 840,
+      "y": 400
+    },
+    "048-tool-call-rendering": {
+      "x": 140,
+      "y": 1290
+    },
+    "047-plan-delegate-remote": {
+      "x": 490,
+      "y": 990
     }
   },
-  "nodeAssignments": {
-    "036-terminal": "8f7677b8-db38-4465-a518-95be8e4da7ae",
-    "041-chat-breadcrumb": "8f7677b8-db38-4465-a518-95be8e4da7ae"
-  }
+  "nodeAssignments": {}
 }

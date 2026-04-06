@@ -1,0 +1,79 @@
+---
+type: feature-doc
+project: quack-app
+stack: React 18 + TypeScript strict + CSS custom properties
+created: 2026-04-06
+last_verified: 2026-04-06
+tags: [tool-call-rendering, chat, ui, badges, widgets]
+---
+
+## Tool Call Rendering
+**Purpose:** Renders agent tool invocations in chat as compact expandable badges (ToolCallMinimal) and specialized rich widgets (ToolWidgets), with consecutive tool grouping, status animations, and Brain path detection.
+**Stack:** React 18, CSS custom properties, monospace font system
+
+### Files
+| Type | Path | Exports/Purpose |
+|------|------|-----------------|
+| Component | src/components/ToolCallMinimal.tsx | `ToolCallMinimal` (default, memo) -- compact expandable badge for any tool call |
+| Component | src/components/ToolWidgets.tsx | `getToolColor`, `ToolIcon`, `SystemInitializedWidget`, `EditWidget`, `WriteWidget`, `BashWidget`, `ReadWidget`, `GrepWidget`, `TodoWriteWidget`, `ExitPlanModeWidget`, `EnterPlanModeWidget`, `ImagePreviewWidget` -- specialized rich widgets |
+| Component | src/components/DiffViewer.tsx | `DiffViewer` -- renders unified diffs inside Edit/ToolCallMinimal expanded content |
+| Component | src/components/TodoWidget.tsx | `TodoWidget` -- renders TodoWrite items (used by both ToolCallMinimal and TodoWriteWidget) |
+| Component | src/components/PlanWidget.tsx | `PlanWidget` -- renders ExitPlanMode plan content with approval UI |
+| Component | src/components/RevealInFinderButton.tsx | `RevealInFinderButton` -- Finder/Explorer button used in ImagePreviewWidget |
+| Component | src/components/TaskOutputWidget.tsx | `TaskOutputWidget` -- renders background task (subagent) output |
+| Component | src/components/StreamMessage.tsx | Orchestrates tool rendering inside chat stream, decides ToolCallMinimal vs widget |
+| Component | src/components/ChatMessage.tsx | Renders completed messages with tool calls |
+| Component | src/components/ToolCallCard.tsx | Legacy/alternative card-style tool rendering |
+| Util | src/utils/brainPathDetection.ts | `isBrainRead`, `isBrainPath`, `BRAIN_COLOR` -- detects Brain knowledge path access |
+| Config | src/components/ToolCallMinimal.css | Styles for compact badges, status indicators, animations, tool-group-row |
+| Config | src/components/ToolWidgets.css | Styles for rich widgets (SystemInit, Edit, Write, Bash, Read, Grep, Task, EnterPlanMode, ImagePreview) |
+
+### Data Flow
+```
+[SDK stream event (tool_use/tool_result)] --> [StreamMessage / ChatMessage] --> [ToolCallMinimal (badge)] or [ToolWidgets (specialized widget)]
+[ToolCallMinimal] --> [DiffViewer] (if hasDiff) or [<pre> result] (if hasResult)
+[ToolCallMinimal] --> [TodoWidget] (if TodoWrite tool)
+[Consecutive same-type tools] --> [.tool-group-row flex container] (horizontal flow)
+[tool.input path] --> [isBrainRead()] --> [Brain badge + rose styling]
+```
+
+### Key Functions
+- `ToolCallMinimal({ tool, onOpenFile, onUndoEdit }) --> JSX` -- renders a single tool as inline badge with expand/collapse
+- `getToolColor(toolName) --> string` -- maps tool name to CSS color (MCP Brain rose, MCP IDE purple, Bash purple, Edit accent, Read cyan, Write green, etc.)
+- `ToolIcon({ name }) --> JSX` -- returns SVG icon for each tool type (30+ tool icons)
+- `SystemInitializedWidget({ sessionId, model, cwd, tools }) --> JSX` -- session init banner with available tools grid
+- `EditWidget({ file_path, old_string, new_string, result }) --> JSX` -- diff viewer with file link
+- `WriteWidget({ filePath, content, result }) --> JSX` -- file creation with line count
+- `BashWidget({ command, description, result }) --> JSX` -- command + output viewer
+- `ReadWidget({ filePath, result }) --> JSX` -- file content viewer
+- `GrepWidget({ pattern, path, result }) --> JSX` -- search results with match count
+- `EnterPlanModeWidget({ objective }) --> JSX` -- purple header plan mode entry
+- `ExitPlanModeWidget({ plan, pendingApprovalRequestId, onApprovalResponse }) --> JSX` -- plan display with approval
+- `ImagePreviewWidget({ filePath, imageData, mediaType, onOpenInTab }) --> JSX` -- inline image with open-in-tab overlay
+- `isBrainRead(toolName, input) --> boolean` -- detects if tool targets documentation/ or .quack/brain/ paths
+- `isBrainPath(path) --> boolean` -- checks path against Brain path regex patterns
+- `createDiffFromStrings(oldString, newString, fileName) --> ToolDiff` -- converts raw strings to diff format
+
+### State
+- `isExpanded`: boolean -- toggle for badge/widget content (component)
+- `copied`: boolean -- clipboard feedback on target click (component)
+- `tool.status`: `'running' | 'completed' | 'error'` -- drives status indicator + animations (component)
+
+### External Dependencies
+- `ChatToolCall` type from `src/types.ts`: tool name, input, result, status, diff fields
+- `TodoItem` type from `src/types.ts`: todo structure for TodoWrite rendering
+- `ToolDiff` / `DiffLine` types from `src/types.ts`: diff data model
+
+### Config
+- `--accent-color`: Edit tool badge color (CSS variable, user-customizable)
+- `--radius-sm` / `--radius-md` / `--radius-lg`: border radius tokens
+- `--bg-elevated` / `--bg-hover` / `--border-default` / `--text-tertiary`: theme tokens
+- Tool color map (hardcoded in `getToolColor`): Edit=accent, Read=#00D9FF, Write=#22c55e, Bash=#9B59B6, Grep/Glob=#6b7280, MCP Brain=#E84A7F, MCP IDE=#a855f7, Skill=#fbbf24, etc.
+
+### CSS Animations
+- `typing-bounce`: 3-dot bounce for running status
+- `shimmer`: horizontal sweep on running badge
+- `text-glow`: brightness pulse on running tool name
+- `pulse-dot`: scale/opacity pulse on status dot
+- `expand-down`: slide-in for expanded content
+- `spin`: spinner rotation for widget loading state

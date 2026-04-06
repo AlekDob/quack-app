@@ -196,12 +196,8 @@ export const useTerminalStore = create<TerminalState>()(
         name: 'terminal-storage',
         partialize: (state) => ({
           // Persist only non-runtime data
-          terminals: state.terminals.map(t => ({
-            id: t.id,
-            label: t.label,
-            cwd: t.cwd,
-            color: t.color,
-          })),
+          // NOTE: terminals + activeId are NOT persisted — they are synced from
+          // App.tsx useState at runtime (Brain: 047-plan-delegate-remote)
           projectTerminals: state.projectTerminals.map(t => ({
             id: t.id,
             name: t.name,

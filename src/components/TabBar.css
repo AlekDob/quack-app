@@ -47,7 +47,7 @@
 /* Active Tab - Orange Accent */
 .tab-item.active {
   background: rgba(var(--accent-rgb), 0.12);
-  color: var(--accent);
+  color: rgba(255, 255, 255, 0.95);
   border-bottom: 2px solid var(--accent);
 }
 
@@ -59,6 +59,41 @@
   right: 0;
   height: 2px;
   background: var(--accent);
+}
+
+/* Split Active Tab - secondary indicator */
+.tab-item.split-active {
+  background: rgba(0, 110, 255, 0.1);
+  color: rgba(255, 255, 255, 0.95);
+  border-bottom: 2px solid rgba(0, 110, 255, 0.6);
+}
+
+.tab-item.split-active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(0, 110, 255, 0.6);
+}
+
+/* Split tab bar groups */
+.tab-bar-group {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.tab-bar-group::-webkit-scrollbar {
+  display: none;
+}
+
+.tab-bar-group-right {
+  border-left: 2px solid rgba(0, 110, 255, 0.4);
 }
 
 /* Color Indicator - Agent Badge */

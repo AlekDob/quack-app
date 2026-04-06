@@ -125,6 +125,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Anchor nav sandboxed iframe: `documentation/gotchas/gotcha-anchor-navigation-sandboxed-iframe.md`
 - Explorer deep indent clip: `documentation/gotchas/gotcha-explorer-row-deep-indent-clip.md`
 - Explorer refresh stale cache: `documentation/bugs/fix-file-explorer-refresh-stale-cache.md`
+- Worktree hooks violation: `documentation/gotchas/gotcha-worktree-hooks-violation.md`
 - Popout search panel CSS scope: `documentation/gotchas/gotcha-popout-search-panel-css-scope.md`
 - SDK allowedTools bypasses canUseTool: `documentation/gotchas/gotcha-sdk-allowedtools-bypasses-canuse.md`
 - EditSummaryBar cumulative regression: `documentation/bugs/fix-edit-summary-bar-cumulative-regression.md`

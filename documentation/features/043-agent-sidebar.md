@@ -45,7 +45,7 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 
 ### Key Functions
 - `TerminalSidebar(props) --> JSX` -- main sidebar with search, DnD, project iteration, footer
-- `SortableRepositoryGroup(props) --> JSX` -- dnd-kit sortable wrapper with colored border-left
+- `SortableRepositoryGroup(props) --> JSX` -- dnd-kit sortable wrapper; insideGroup prop hides project borders when nested in a group
 - `SortableGroupSection(props) --> JSX` -- sortable wrapper for group sections (multiple projects)
 - `fuzzyMatch(query: string, target: string) --> boolean` -- sidebar search filter
 - `RepositoryGroup(props) --> JSX` -- project section with agents, sessions, git menu
@@ -64,6 +64,7 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 - `useGroupStore.createGroup(name, projects, color?, notes?) --> Promise<ProjectGroup>` -- create group
 - `useGroupStore.deleteGroup(groupId) --> Promise<void>` -- delete group
 - `useGroupStore.getGroupForProject(path) --> Promise<ProjectGroup | null>` -- lookup
+- `handleAddToGroup(groupId, projectPath, label) --> Promise<void>` -- add standalone project to existing group via context menu
 
 ### State
 - `query`: string -- sidebar search filter text (component)
