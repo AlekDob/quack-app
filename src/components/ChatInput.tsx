@@ -12,6 +12,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { invoke } from '@tauri-apps/api/core';
 import { parseAgentMentions, matchMentionsToAgents } from '../utils/agentMentions';
 import { AgentMentionChip } from './AgentMentionChip';
+import { AgentAvatar } from './AgentAvatar';
 import type { ChatAttachment, AgentInfo, SearchResult } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
 import { useSlashCommands, type SlashCommand } from '../hooks/useSlashCommands';
@@ -23,6 +24,7 @@ import EquipBar from './chat/EquipBar';
 import CodeEditorCodeMirror from './CodeEditorCodeMirror';
 import { useShortcutsStore } from '../stores/shortcutsStore';
 import { useFileSystemStore } from '../stores/fileSystemStore';
+import { useTeamStore } from '../stores/teamStore';
 import { loadAvailableSkills } from '../utils/skillsAndDroidsLoader';
 import { useFeatureMapData } from '../hooks/useFeatureMapData';
 import type { FeatureNode } from './featureMap/featureMapTypes';
@@ -40,17 +42,6 @@ import './ChatInput.css';
 
 const MAX_ATTACHMENTS = 6;
 const MAX_PREVIEW_SIZE = 3 * 1024 * 1024;
-
-// Agent color mapping
-const AGENT_COLORS: Record<string, string> = {
-  blue: "#4A9EFF",
-  purple: "#A855F7",
-  green: "#10B981",
-  orange: "#F59E0B",
-  yellow: "#EAB308",
-  red: "#EF4444",
-  pink: "#EC4899",
-};
 
 interface FileStatResult {
   size: number;
@@ -283,10 +274,6 @@ export default function ChatInput({
     return `attachment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   }, []);
 
-  const getAgentColor = useCallback((colorName: string): string => {
-    return AGENT_COLORS[colorName.toLowerCase()] || "#6B7280";
-  }, []);
-
   // State for all available skills (loaded from project + global)
   const [allAvailableSkills, setAllAvailableSkills] = useState<string[]>([]);
 
@@ -343,12 +330,17 @@ export default function ChatInput({
     });
   }, [featureGraph?.nodes, showAgentAutocomplete, agentFilter]);
 
-  // Brain: 025-team-delegation-footer — show @team option in mention dropdown
-  const showTeamOption = useMemo(() => {
-    if (!showAgentAutocomplete) return false;
+  // Filter team members based on current @ mention
+  const activeTeam = useTeamStore((s) => s.activeTeam);
+  const filteredTeammates = useMemo(() => {
+    if (!activeTeam?.members.length || !showAgentAutocomplete) return [];
     const filter = agentFilter.toLowerCase();
-    return 'team'.includes(filter);
-  }, [showAgentAutocomplete, agentFilter]);
+    return activeTeam.members.filter(member => {
+      const name = member.name.toLowerCase().replace(/-/g, ' ');
+      const role = member.role.toLowerCase();
+      return name.includes(filter) || role.includes(filter) || 'team'.includes(filter);
+    });
+  }, [activeTeam?.members, showAgentAutocomplete, agentFilter]);
 
   // Search files when @ mention is active
   useEffect(() => {
@@ -543,26 +535,6 @@ export default function ChatInput({
     setShowCommandAutocomplete(false);
   }, [agents, commands, setInput, tryAutoExpandSnippet]);
 
-  // Brain: 025-team-delegation-footer — select @team from autocomplete
-  const selectTeam = useCallback(() => {
-    if (!textareaRef.current) return;
-    const beforeMention = input.substring(0, atMentionStart);
-    const afterMention = input.substring(textareaRef.current.selectionStart);
-    const fullMention = '@team ';
-    const newInput = beforeMention + fullMention + afterMention;
-    setInput(newInput);
-    setShowAgentAutocomplete(false);
-    setAgentFilter('');
-    setAtMentionStart(-1);
-    setFileSearchResults([]);
-    setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-        const pos = beforeMention.length + fullMention.length;
-        textareaRef.current.setSelectionRange(pos, pos);
-      }
-    }, 0);
-  }, [input, atMentionStart, setInput]);
 
   // Select an agent from autocomplete
   const selectAgent = useCallback((agent: AgentInfo) => {
@@ -586,6 +558,27 @@ export default function ChatInput({
         textareaRef.current.focus();
         const newCursorPos = beforeMention.length + fullMention.length;
         textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+  }, [input, atMentionStart, setInput]);
+
+  // Select a teammate from autocomplete — inserts @team with agent hint
+  const selectTeammate = useCallback((memberName: string) => {
+    if (!textareaRef.current) return;
+    const beforeMention = input.substring(0, atMentionStart);
+    const afterMention = input.substring(textareaRef.current.selectionStart);
+    const fullMention = `@team delegate to ${memberName}: `;
+    const newInput = beforeMention + fullMention + afterMention;
+    setInput(newInput);
+    setShowAgentAutocomplete(false);
+    setAgentFilter('');
+    setAtMentionStart(-1);
+    setFileSearchResults([]);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const pos = beforeMention.length + fullMention.length;
+        textareaRef.current.setSelectionRange(pos, pos);
       }
     }, 0);
   }, [input, atMentionStart, setInput]);
@@ -1872,10 +1865,11 @@ export default function ChatInput({
       }
     }
 
-    // Handle agent/file/skill/feature autocomplete navigation
-    const teamCount = showTeamOption ? 1 : 0;
-    if (showAgentAutocomplete && (teamCount > 0 || filteredSkills.length > 0 || filteredAgents.length > 0 || filteredFeatures.length > 0 || fileSearchResults.length > 0)) {
-      const totalItems = teamCount + filteredSkills.length + filteredAgents.length + filteredFeatures.length + fileSearchResults.length;
+    // Handle agent/file/skill/feature/team autocomplete navigation
+    // Order: team > skills > droids > features > files
+    const hasAutocompleteItems = filteredTeammates.length > 0 || filteredSkills.length > 0 || filteredAgents.length > 0 || filteredFeatures.length > 0 || fileSearchResults.length > 0;
+    if (showAgentAutocomplete && hasAutocompleteItems) {
+      const totalItems = filteredTeammates.length + filteredSkills.length + filteredAgents.length + filteredFeatures.length + fileSearchResults.length;
 
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -1890,37 +1884,36 @@ export default function ChatInput({
       if (e.key === 'Enter' || e.key === 'Tab') {
         e.preventDefault();
 
-        // Brain: 025-team-delegation-footer — @team is first item
-        if (showTeamOption && selectedAgentIndex === 0) {
-          selectTeam();
-          return;
-        }
-        const adjustedIndex = selectedAgentIndex - teamCount;
-
-        // Check if selecting a skill, agent, or file
-        if (adjustedIndex < filteredSkills.length) {
+        // Offset chain: team > skills > droids > features > files
+        if (selectedAgentIndex < filteredTeammates.length) {
+          // Selecting a teammate
+          const teammate = filteredTeammates[selectedAgentIndex];
+          if (teammate) {
+            selectTeammate(teammate.name);
+          }
+        } else if (selectedAgentIndex < filteredTeammates.length + filteredSkills.length) {
           // Selecting a skill
-          const selectedSkill = filteredSkills[adjustedIndex];
+          const selectedSkill = filteredSkills[selectedAgentIndex - filteredTeammates.length];
           if (selectedSkill) {
             selectSkill(selectedSkill);
           }
-        } else if (adjustedIndex < filteredSkills.length + filteredAgents.length) {
+        } else if (selectedAgentIndex < filteredTeammates.length + filteredSkills.length + filteredAgents.length) {
           // Selecting an agent (droid)
-          const agentIndex = adjustedIndex - filteredSkills.length;
+          const agentIndex = selectedAgentIndex - filteredTeammates.length - filteredSkills.length;
           const selectedAgent = filteredAgents[agentIndex];
           if (selectedAgent) {
             selectAgent(selectedAgent);
           }
-        } else if (adjustedIndex < filteredSkills.length + filteredAgents.length + filteredFeatures.length) {
+        } else if (selectedAgentIndex < filteredTeammates.length + filteredSkills.length + filteredAgents.length + filteredFeatures.length) {
           // Selecting a feature doc
-          const featureIndex = adjustedIndex - filteredSkills.length - filteredAgents.length;
+          const featureIndex = selectedAgentIndex - filteredTeammates.length - filteredSkills.length - filteredAgents.length;
           const selectedFeatureNode = filteredFeatures[featureIndex];
           if (selectedFeatureNode) {
             selectFeature(selectedFeatureNode);
           }
         } else {
           // Selecting a file
-          const fileIndex = adjustedIndex - filteredSkills.length - filteredAgents.length - filteredFeatures.length;
+          const fileIndex = selectedAgentIndex - filteredTeammates.length - filteredSkills.length - filteredAgents.length - filteredFeatures.length;
           const selectedFile = fileSearchResults[fileIndex];
           if (selectedFile) {
             selectFile(selectedFile);
@@ -2034,10 +2027,10 @@ export default function ChatInput({
       )}
 
       {/* Agent, Skill, Feature & File autocomplete dropdown */}
-      {showAgentAutocomplete && (showTeamOption || filteredSkills.length > 0 || filteredAgents.length > 0 || filteredFeatures.length > 0 || fileSearchResults.length > 0) && (
+      {showAgentAutocomplete && (filteredTeammates.length > 0 || filteredSkills.length > 0 || filteredAgents.length > 0 || filteredFeatures.length > 0 || fileSearchResults.length > 0) && (
         <div className="agent-autocomplete mention-autocomplete">
-          {/* Team Delegation — Brain: 025-team-delegation-footer */}
-          {showTeamOption && (
+          {/* Team Section — project agents with avatars */}
+          {filteredTeammates.length > 0 && (
             <div className="mention-section">
               <div className="mention-section-header team-header">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="#FF6B35">
@@ -2048,21 +2041,33 @@ export default function ChatInput({
                 </svg>
                 <span>Team</span>
               </div>
-              <button
-                type="button"
-                className={`agent-autocomplete-item team-item ${selectedAgentIndex === 0 ? 'selected' : ''}`}
-                onMouseDown={(e) => { e.preventDefault(); selectTeam(); }}
-                onMouseEnter={() => setSelectedAgentIndex(0)}
-              >
-                <div className="agent-autocomplete-badge" style={{ backgroundColor: '#FF6B35' }} />
-                <div className="agent-autocomplete-info">
-                  <div className="agent-autocomplete-name">team</div>
-                  <div className="agent-autocomplete-description">Delegate tasks to project agents</div>
-                </div>
-              </button>
+              {filteredTeammates.map((member, index) => (
+                <button
+                  key={member.agentId}
+                  type="button"
+                  className={`agent-autocomplete-item team-member-item ${selectedAgentIndex === index ? 'selected' : ''}`}
+                  onMouseDown={(e) => { e.preventDefault(); selectTeammate(member.name); }}
+                  onMouseEnter={() => setSelectedAgentIndex(index)}
+                >
+                  <AgentAvatar
+                    agentName={member.name}
+                    avatarFilename={member.avatar}
+                    className="agent-autocomplete-avatar"
+                  />
+                  <div className="agent-autocomplete-info">
+                    <div className="agent-autocomplete-name">{member.name}</div>
+                    <div className="agent-autocomplete-description">{member.role}</div>
+                  </div>
+                  {member.isLead && (
+                    <div className="agent-autocomplete-model">
+                      <span style={{ color: '#FF6B35', fontSize: '10px' }}>Lead</span>
+                    </div>
+                  )}
+                </button>
+              ))}
             </div>
           )}
-          {/* Skills Section - FIRST */}
+          {/* Skills Section */}
           {filteredSkills.length > 0 && (
             <div className="mention-section">
               <div className="mention-section-header skills-header">
@@ -2081,8 +2086,7 @@ export default function ChatInput({
                 <span>Skills</span>
               </div>
               {filteredSkills.map((skill, index) => {
-                const teamOffset = showTeamOption ? 1 : 0;
-                const gIdx = teamOffset + index;
+                const gIdx = filteredTeammates.length + index;
                 return (
                 <button
                   key={skill}
@@ -2113,7 +2117,7 @@ export default function ChatInput({
             </div>
           )}
 
-          {/* Droids Section */}
+          {/* Droids Section — agents with avatars */}
           {filteredAgents.length > 0 && (
             <div className="mention-section">
               <div className="mention-section-header droids-header">
@@ -2123,8 +2127,7 @@ export default function ChatInput({
                 <span>Droids</span>
               </div>
               {filteredAgents.map((agent, index) => {
-                // Offset index by team + skills count
-                const globalIndex = (showTeamOption ? 1 : 0) + filteredSkills.length + index;
+                const globalIndex = filteredTeammates.length + filteredSkills.length + index;
                 return (
                 <button
                   key={agent.name}
@@ -2136,9 +2139,10 @@ export default function ChatInput({
                   }}
                   onMouseEnter={() => setSelectedAgentIndex(globalIndex)}
                 >
-                  <div
-                    className="agent-autocomplete-badge"
-                    style={{ backgroundColor: getAgentColor(agent.color) }}
+                  <AgentAvatar
+                    agentName={agent.name}
+                    avatarFilename={agent.avatar}
+                    className="agent-autocomplete-avatar"
                   />
                   <div className="agent-autocomplete-info">
                     <div className="agent-autocomplete-name">
@@ -2174,7 +2178,7 @@ export default function ChatInput({
                 <span>Features</span>
               </div>
               {filteredFeatures.map((feature, index) => {
-                const globalIndex = (showTeamOption ? 1 : 0) + filteredSkills.length + filteredAgents.length + index;
+                const globalIndex = filteredTeammates.length + filteredSkills.length + filteredAgents.length + index;
                 return (
                   <button
                     key={feature.id}
@@ -2217,8 +2221,7 @@ export default function ChatInput({
                 <span>Files</span>
               </div>
               {fileSearchResults.map((file, index) => {
-                // Offset index by team + skills + droids + features count
-                const globalIndex = (showTeamOption ? 1 : 0) + filteredSkills.length + filteredAgents.length + filteredFeatures.length + index;
+                const globalIndex = filteredTeammates.length + filteredSkills.length + filteredAgents.length + filteredFeatures.length + index;
                 return (
                   <button
                     key={file.path}

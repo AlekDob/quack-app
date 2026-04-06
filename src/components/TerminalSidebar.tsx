@@ -120,13 +120,12 @@ function SortableRepositoryGroup({
     transition: isDragging ? 'none' : transition,
     opacity: isDragging ? 0.5 : 1,
     willChange: isDragging ? 'transform' : 'auto',
-    // Project color background at 4% opacity
-    background: projectColor
-      ? `${projectColor}0A`
-      : undefined,
-    borderLeft: projectColor ? `3px solid ${projectColor}` : undefined,
+    // No background — border-left + subtle bottom separator
+    background: 'transparent',
+    borderLeft: projectColor ? `2px solid ${projectColor}` : undefined,
+    borderBottom: projectColor ? `2px solid ${projectColor}30` : '2px solid rgba(255,255,255,0.04)',
     borderRadius: '0',
-    marginBottom: '2px',
+    marginBottom: '0',
     padding: '4px',
   };
 

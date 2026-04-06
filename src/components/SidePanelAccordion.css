@@ -7,15 +7,8 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  /* Liquid glass container */
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.06) 0%,
-    rgba(255, 255, 255, 0.02) 100%
-  );
-  backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
-  border-left: 1px solid var(--border-default);
+  background: transparent;
+  border-left: 1px solid var(--border-subtle);
   position: relative;
   overflow: hidden;
   /* Grid positioning - same row as terminal-pane */
@@ -25,23 +18,7 @@
   padding-top: 0;
 }
 
-/* Top-edge light reflection on main panel */
-.side-panel-accordion::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.15),
-    transparent
-  );
-  pointer-events: none;
-  z-index: 1;
-}
+/* No top-edge reflection — clean transparent panel */
 
 /* Fully hidden — no agent selected */
 .side-panel-accordion.collapsed {
@@ -120,14 +97,8 @@
   bottom: 0;
   width: 420px;
   z-index: 9999;
-  background: linear-gradient(
-    135deg,
-    rgba(17, 18, 22, 0.97) 0%,
-    rgba(15, 16, 20, 0.97) 100%
-  );
-  backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
-  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
-  border-left: 1px solid var(--border-default);
+  background: var(--bg-base);
+  border-left: 1px solid var(--border-subtle);
   /* Shifted right: only 44px visible (icon strip) */
   transform: translateX(calc(100% - 44px));
   pointer-events: auto;

@@ -4,6 +4,7 @@
  * Dark theme styling matching Quack's aesthetic.
  * Uses CSS custom properties for theming.
  */
+/* Brain: pattern-dark-theme-css-values */
 
 /* CSS Custom Properties */
 :root {
@@ -30,7 +31,7 @@
   flex-direction: column;
   height: 100%;
   width: 100%;
-  padding: 20px 24px;
+  padding: 0;
   background: transparent;
   overflow: hidden;
   overflow-x: hidden !important; /* Prevent horizontal scroll during drag */
@@ -38,15 +39,14 @@
   min-height: 0;
 }
 
-/* Header */
+/* Header — aligned with FM/Office header style */
 .kanban-header {
   display: flex;
-  justify-content: flex-start;
   align-items: center;
-  gap: 16px;
-  padding-bottom: 16px;
-  margin-bottom: 16px;
-  border-bottom: 1px solid var(--kanban-border);
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #1e293b;
+  flex-shrink: 0;
 }
 
 .kanban-exit-button {
@@ -71,9 +71,9 @@
 }
 
 .kanban-title {
-  font-size: 18px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--kanban-text-primary);
+  color: #f8fafc;
   margin: 0;
 }
 
@@ -82,33 +82,35 @@
   position: relative;
   display: flex;
   align-items: center;
+  flex: 1;
+  max-width: 220px;
 }
 
 .kanban-filter-icon {
   position: absolute;
-  left: 10px;
-  color: var(--kanban-text-secondary, #888);
+  left: 8px;
+  color: #475569;
   pointer-events: none;
 }
 
 .kanban-filter-input {
-  width: 220px;
-  padding: 6px 30px 6px 32px;
-  font-size: 13px;
-  border: 1px solid var(--kanban-border, #333);
+  width: 100%;
+  padding: 4px 28px 4px 26px;
+  font-size: 12px;
+  border: 1px solid #1e293b;
   border-radius: var(--radius-sm);
-  background: var(--kanban-card-bg, #1e1e1e);
-  color: var(--kanban-text-primary, #e0e0e0);
+  background: #111827;
+  color: #e2e8f0;
   outline: none;
   transition: border-color 0.15s ease;
 }
 
 .kanban-filter-input::placeholder {
-  color: var(--kanban-text-secondary, #888);
+  color: #475569;
 }
 
 .kanban-filter-input:focus {
-  border-color: var(--kanban-accent, #6366f1);
+  border-color: #334155;
 }
 
 .kanban-filter-clear {
@@ -197,6 +199,7 @@
   flex: 1;
   overflow: hidden;
   min-height: 0;
+  padding: 16px 20px;
 }
 
 /* Single column */

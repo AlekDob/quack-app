@@ -1,14 +1,11 @@
 /**
  * BrainContextBanner Styles
- *
- * Collapsible banner showing Brain knowledge stats.
- * Orange accent (#FF6B35) to match Quack brand.
+ * Minimal monochrome — Linear/Cursor style
  */
 
 .brain-context-banner {
-  background: rgba(30, 30, 40, 0.9);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 107, 53, 0.15);
+  background: transparent;
+  border-bottom: 1px solid var(--border-subtle);
   border-radius: 0;
   margin: 0;
   overflow: hidden;
@@ -16,12 +13,11 @@
 }
 
 .brain-context-banner:hover {
-  background: rgba(30, 30, 40, 0.95);
+  background: var(--bg-elevated);
 }
 
 .brain-context-banner.expanded {
-  background: rgba(30, 30, 40, 0.95);
-  border-bottom-color: rgba(255, 107, 53, 0.25);
+  background: var(--bg-elevated);
 }
 
 /* Header */
@@ -40,7 +36,7 @@
 }
 
 .brain-banner-header:hover {
-  background: rgba(255, 107, 53, 0.04);
+  background: var(--bg-hover);
 }
 
 .brain-banner-left {
@@ -52,22 +48,22 @@
 .brain-icon {
   width: 13px;
   height: 13px;
-  color: #FF6B35;
+  color: var(--text-tertiary);
   flex-shrink: 0;
 }
 
 .brain-banner-title {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 500;
-  color: #b0b0b0;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   gap: 5px;
 }
 
 .brain-count-badge {
-  background: rgba(255, 107, 53, 0.2);
-  color: #FF6B35;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
   padding: 0px 5px;
   border-radius: var(--radius-sm);
   font-size: 9px;
@@ -82,15 +78,15 @@
 
 .brain-preview {
   font-size: 10px;
-  color: #666;
+  color: var(--text-tertiary);
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
 .brain-stale-badge {
-  background: rgba(247, 147, 30, 0.15);
-  color: #F7931E;
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
   padding: 0px 4px;
   border-radius: var(--radius-sm);
   font-size: 9px;
@@ -100,7 +96,7 @@
 .brain-chevron {
   width: 12px;
   height: 12px;
-  color: #555;
+  color: var(--text-tertiary);
   transition: transform 0.2s ease;
 }
 
@@ -111,7 +107,7 @@
 /* Expanded content */
 .brain-banner-content {
   padding: 6px 12px 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--border-subtle);
   animation: brainSlideDown 0.2s ease;
 }
 
@@ -136,19 +132,23 @@
 
 .brain-stat-value {
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
+  color: var(--text-primary);
 }
 
-.brain-stat-gotcha { color: #e74c3c; }
-.brain-stat-bug { color: #F7931E; }
-.brain-stat-pattern { color: #00D9FF; }
-.brain-stat-decision { color: #2ecc71; }
-.brain-stat-feature { color: #FFD700; }
+/* All stat types — same neutral color */
+.brain-stat-gotcha,
+.brain-stat-bug,
+.brain-stat-pattern,
+.brain-stat-decision,
+.brain-stat-feature {
+  color: var(--text-primary);
+}
 
 .brain-stat-label {
   font-size: 9px;
-  color: #666;
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -163,14 +163,14 @@
 
 .brain-meta-item {
   font-size: 10px;
-  color: #777;
+  color: var(--text-tertiary);
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
 .brain-meta-warn {
-  color: #F7931E;
+  color: var(--text-secondary);
 }
 
 .brain-warn-dot {
@@ -178,7 +178,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #F7931E;
+  background: var(--text-tertiary);
   margin-left: 2px;
 }
 
@@ -193,19 +193,19 @@
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  background: rgba(255, 107, 53, 0.1);
-  border: 1px solid rgba(255, 107, 53, 0.25);
+  background: transparent;
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-sm);
-  color: #FF6B35;
+  color: var(--text-secondary);
   font-size: 10px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--duration-fast) ease;
 }
 
 .brain-open-btn:hover {
-  background: rgba(255, 107, 53, 0.2);
-  border-color: rgba(255, 107, 53, 0.4);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .brain-open-btn svg {
@@ -216,15 +216,15 @@
 .brain-dismiss-btn {
   padding: 3px 8px;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
-  color: #666;
+  color: var(--text-tertiary);
   font-size: 10px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--duration-fast) ease;
 }
 
 .brain-dismiss-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #999;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }

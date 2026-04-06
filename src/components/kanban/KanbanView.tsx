@@ -526,8 +526,7 @@ export default function KanbanView({
     <div className="kanban-view">
       {/* Header - draggable region */}
       <div className="kanban-header" data-tauri-drag-region>
-        <h1 className="kanban-title" data-tauri-drag-region>Kanban Board</h1>
-        <div style={{ flex: 1 }} data-tauri-drag-region />
+        <h2 className="kanban-title" data-tauri-drag-region>Kanban Board</h2>
         <div className="kanban-filter-input-wrapper">
           <svg className="kanban-filter-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />

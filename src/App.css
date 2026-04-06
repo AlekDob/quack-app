@@ -1063,31 +1063,12 @@ button.directory-chooser:disabled {
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  border-right: 1px solid var(--border-strong);
-  /* Glassmorphism effect - performance optimized */
-  background: rgba(15, 17, 22, 0.6);
-  backdrop-filter: blur(var(--blur-heavy)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(150%);
-  box-shadow: var(--shadow-sm);
+  border-right: 1px solid var(--border-subtle);
+  background: transparent;
+  box-shadow: none;
   position: relative;
   grid-column: 1;
   grid-row: 1 / 3;
-}
-
-.sidebar::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(120, 130, 150, 0.4) 50%,
-    transparent 100%
-  );
-  pointer-events: none;
 }
 
 .sidebar-header {
@@ -1097,16 +1078,9 @@ button.directory-chooser:disabled {
   padding: 0.85rem 1rem;
   padding-top: 0.5rem; /* Compact - traffic lights float over content */
   min-height: auto;
-  border-bottom: 1px solid rgba(65, 75, 95, 0.35);
-  /* Subtle gradient for depth */
-  background: linear-gradient(
-    180deg,
-    rgba(25, 28, 36, 0.6) 0%,
-    rgba(20, 24, 31, 0.4) 100%
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.02),
-    var(--shadow-sm);
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  box-shadow: none;
   position: relative;
   box-sizing: border-box;
 }
@@ -1199,7 +1173,7 @@ button.directory-chooser:disabled {
   padding: 0.5rem 0.65rem 0.8rem;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0;
   overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
@@ -1227,11 +1201,8 @@ button.directory-chooser:disabled {
    =================================== */
 
 .sidebar.sidebar-codex {
-  /* Glass effect */
-  background: rgba(17, 18, 22, 0.3);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-right: 1px solid var(--border-default);
+  background: transparent;
+  border-right: 1px solid var(--border-subtle);
   box-shadow: none;
 }
 

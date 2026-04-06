@@ -260,7 +260,20 @@
   color: #f28c52;
 }
 
-/* Droid-specific styling */
+/* Droid-specific styling — avatar replaces badge */
+.agent-autocomplete-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+/* Team member styling — project agents */
+.team-member-item .agent-autocomplete-name {
+  color: #FF6B35;
+}
+
 .droid-item .agent-autocomplete-name {
   color: #4A9EFF;
 }

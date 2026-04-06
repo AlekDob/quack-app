@@ -12,9 +12,9 @@ tags: [025-team-delegation-footer, team, delegation, remote-api, mention]
 **Stack:** Tauri v2 (Rust backend) + React 18 (TypeScript frontend)
 
 ### UX Flow
-1. User types `@team` in chat (or clicks team icon in footer → inserts `@team `)
-2. `@team` appears in the `@` mention dropdown as first option
-3. User writes the task: `@team assign Leo to fix the bug`
+1. User types `@agentname` in chat to mention a specific droid directly (team icon removed)
+2. Droids appear in the `@` mention dropdown with their avatar (AgentAvatar component)
+3. User writes the task: `@leo fix the bug` or `@team assign Leo to fix the bug` (manual @team still works)
 4. On send, content is enriched with quack-remote instructions (hidden from UI)
 5. Lead agent uses `quack-remote` skill to: list agents → choose who → POST /api/execute with `leadSessionId`
 6. Teammate sessions auto-complete + notify lead when done
