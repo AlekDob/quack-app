@@ -92,8 +92,8 @@ export function AssemblyLine() {
               <div
                 className="mb-1 flex justify-center"
                 style={{
-                  color: index === currentPhase ? '#FF6B35' : 'rgba(255, 255, 255, 0.3)',
-                  filter: index === currentPhase ? 'drop-shadow(0 0 8px rgba(255, 107, 53, 0.6))' : 'none',
+                  color: index === currentPhase ? 'var(--accent-color)' : 'rgba(255, 255, 255, 0.3)',
+                  filter: index === currentPhase ? 'drop-shadow(0 0 8px rgba(var(--accent-rgb), 0.60))' : 'none',
                 }}
               >
                 {PHASE_ICONS[index]}
@@ -110,8 +110,8 @@ export function AssemblyLine() {
                 <div
                   className="mt-0.5 w-10 h-0.5 mx-auto"
                   style={{
-                    background: '#FF6B35',
-                    boxShadow: '0 0 6px rgba(255, 107, 53, 0.6)',
+                    background: 'var(--accent-color)',
+                    boxShadow: '0 0 6px rgba(var(--accent-rgb), 0.60)',
                   }}
                 />
               )}
@@ -142,8 +142,8 @@ export function AssemblyLine() {
             className="h-full rounded-full transition-all duration-200"
             style={{
               width: `${progress}%`,
-              background: '#FF6B35',
-              boxShadow: '0 0 8px rgba(255, 107, 53, 0.5)',
+              background: 'var(--accent-color)',
+              boxShadow: '0 0 8px rgba(var(--accent-rgb), 0.50)',
             }}
           />
         </div>

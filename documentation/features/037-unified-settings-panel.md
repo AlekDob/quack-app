@@ -28,7 +28,8 @@ tags: [settings, unified-settings, preferences, configuration]
 | Component | src/components/settings/categories/LicenseSettings.tsx | `LicenseSettings` -- license status, deactivation, Gumroad purchase links |
 | Component | src/components/settings/categories/NotificationSettings.tsx | `NotificationSettings` -- mobile push toggle, Telegram bot config and test |
 | Component | src/components/settings/categories/RemoteApiSettings.tsx | `RemoteApiSettings` -- enable/disable remote, token management, endpoint reference |
-| Component | src/components/settings/categories/AppearanceSettings.tsx | `AppearanceSettings` -- background selector (images, gradients, transparent) |
+| Component | src/components/settings/categories/AppearanceSettings.tsx | `AppearanceSettings` -- accent color picker (10 presets + custom) + background selector (images, gradients, transparent) |
+| Util | src/utils/accentColor.ts | `applyAccentColor()`, `ACCENT_PRESETS`, `DEFAULT_ACCENT` -- hex-to-CSS-variable theming engine |
 | Component | src/components/settings/categories/TypographySettings.tsx | `TypographySettings`, `PresetCard`, `PreviewBlock` -- font size presets (S/M/L/XL), UI/mono font family |
 | Component | src/components/settings/categories/KeyboardShortcutsSettings.tsx | `KeyboardShortcutsSettings` -- shortcut customization with conflict detection |
 | Component | src/components/settings/categories/DebugSettings.tsx | `DebugSettings` -- wraps `DebugPanel` for production diagnostics |
@@ -86,6 +87,7 @@ tags: [settings, unified-settings, preferences, configuration]
 - `general`: GeneralSettings -- userName, autoSave, notifications, sounds, GIF reactions, Giphy key (global)
 - `agentModePresets`: AgentModePresets -- per-mode model/effort/thinking config for bypass/plan/ask/debug/chat (global)
 - `typography`: TypographySettings -- font size preset (S/M/L/XL), UI font, mono font (global)
+- `appearance`: AppearanceSettings -- accent color hex (global) — see `046-accent-color-theming.md`
 - `activeCategory`: SettingsCategory -- currently selected sidebar category (component)
 - `closing`: boolean -- overlay close animation state (component)
 - `preferredIDE`: string -- selected IDE identifier (global, ideStore)
@@ -103,7 +105,7 @@ tags: [settings, unified-settings, preferences, configuration]
 - **Remote API > Port**: changing the port requires a Quack restart — the HTTP server binds at launch time and cannot rebind at runtime
 
 ### Config
-- `settings-storage` version: 7 (migration chain v0-v7 handling legacy model IDs, debug mode, BTW, chat mode, ask mode, typography)
+- `settings-storage` version: 8 (migration chain v0-v8 handling legacy model IDs, debug mode, BTW, chat mode, ask mode, typography, accent color)
 - Default model: `opus46` (Supabase ID format)
 - Default BTW model: `haiku45`
 - Default effort: `medium`

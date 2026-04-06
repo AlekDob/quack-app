@@ -2,7 +2,7 @@
  * ToolGifWidget Styles
  *
  * Follows Quack Design System:
- * - Orange accent color (#f28c52)
+ * - Orange accent color (var(--accent-color))
  * - Dark theme with glassmorphism
  * - Smooth animations with cubic-bezier
  */
@@ -38,10 +38,10 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   background: rgba(18, 20, 27, 0.9);
-  border: 1px solid rgba(242, 140, 82, 0.2);
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
   box-shadow:
     0 4px 16px rgba(0, 0, 0, 0.3),
-    0 0 20px rgba(242, 140, 82, 0.1);
+    0 0 20px rgba(var(--accent-rgb), 0.1);
   max-width: 200px;
   min-width: 120px;
 }
@@ -60,7 +60,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(242, 140, 82, 0.2) 0%, rgba(242, 140, 82, 0.4) 100%);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.2) 0%, rgba(var(--accent-rgb), 0.4) 100%);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -127,7 +127,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 .tool-gif-spinner svg {

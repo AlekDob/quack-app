@@ -9,15 +9,15 @@
 
 /* Focused state styling */
 .chat-input-container.focused {
-  border-color: rgba(242, 140, 82, 0.3);
+  border-color: rgba(var(--accent-rgb), 0.3);
   background: var(--bg-surface);
 }
 
 /* Drag & drop visual feedback */
 .chat-input-container.drag-over {
-  border-top: 2px solid #f28c52;
-  background: rgba(242, 140, 82, 0.08);
-  box-shadow: 0 -2px 12px rgba(242, 140, 82, 0.2);
+  border-top: 2px solid var(--accent-color);
+  background: rgba(var(--accent-rgb), 0.08);
+  box-shadow: 0 -2px 12px rgba(var(--accent-rgb), 0.2);
 }
 
 .chat-input-container.drag-over::before {
@@ -27,7 +27,7 @@
   left: 50%;
   transform: translateX(-50%);
   padding: 6px 12px;
-  background: rgba(242, 140, 82, 0.95);
+  background: rgba(var(--accent-rgb), 0.95);
   color: white;
   font-size: 12px;
   font-weight: 600;
@@ -84,7 +84,7 @@
   overflow-y: auto;
   background: var(--bg-surface);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(242, 140, 82, 0.3);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);
   z-index: 1000;
@@ -111,7 +111,7 @@
 
 .agent-autocomplete-item:hover,
 .agent-autocomplete-item.selected {
-  background: rgba(242, 140, 82, 0.12);
+  background: rgba(var(--accent-rgb), 0.12);
 }
 
 .agent-autocomplete-badge {
@@ -143,11 +143,11 @@
 
 .agent-autocomplete-model {
   padding: 4px 8px;
-  background: rgba(242, 140, 82, 0.15);
+  background: rgba(var(--accent-rgb), 0.15);
   border-radius: var(--radius-sm);
   font-size: 10px;
   font-family: "IBM Plex Mono", "JetBrains Mono", "Fira Code", monospace;
-  color: #f28c52;
+  color: var(--accent-color);
   flex-shrink: 0;
 }
 
@@ -213,7 +213,7 @@
 
 /* Skills header with orange star */
 .mention-section-header.skills-header {
-  color: rgba(242, 140, 82, 0.8);
+  color: rgba(var(--accent-rgb), 0.8);
 }
 
 .mention-section-header.skills-header svg {
@@ -247,17 +247,17 @@
 
 /* Skill-specific styling */
 .skill-badge {
-  background: rgba(242, 140, 82, 0.15);
+  background: rgba(var(--accent-rgb), 0.15);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 4px;
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 .skill-item .agent-autocomplete-name {
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 /* Droid-specific styling — avatar replaces badge */
@@ -271,7 +271,7 @@
 
 /* Team member styling — project agents */
 .team-member-item .agent-autocomplete-name {
-  color: #FF6B35;
+  color: var(--accent-color);
 }
 
 .droid-item .agent-autocomplete-name {
@@ -285,7 +285,7 @@
 }
 
 .chat-input-team-chip .chat-input-mention-name {
-  color: #FF6B35;
+  color: var(--accent-color);
 }
 
 .chat-input-team-chip .chat-input-mention-avatar {
@@ -298,12 +298,12 @@
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  background: rgba(242, 140, 82, 0.15);
-  border: 1px solid rgba(242, 140, 82, 0.3);
+  background: rgba(var(--accent-rgb), 0.15);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   border-radius: var(--radius-md);
   font-size: 11px;
   font-weight: 500;
-  color: #f28c52;
+  color: var(--accent-color);
   animation: chipSlideIn 0.2s ease-out;
 }
 
@@ -446,7 +446,7 @@
   width: 14px;
   height: 14px;
   border: 2px solid var(--border-default);
-  border-top-color: #f28c52;
+  border-top-color: var(--accent-color);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -479,8 +479,8 @@
   align-items: center;
   gap: 6px;
   padding: 4px 8px;
-  background: rgba(242, 140, 82, 0.12);
-  border: 1px solid rgba(242, 140, 82, 0.25);
+  background: rgba(var(--accent-rgb), 0.12);
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
   border-radius: var(--radius-md);
   font-size: 11px;
   font-weight: 500;
@@ -507,7 +507,7 @@
   object-fit: contain;
   flex-shrink: 0;
   background: var(--bg-elevated);
-  border: 1px solid rgba(242, 140, 82, 0.3);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
 }
 
 .chat-input-agent-name {
@@ -566,8 +566,8 @@
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  background: rgba(242, 140, 82, 0.15);
-  border: 1px solid rgba(242, 140, 82, 0.3);
+  background: rgba(var(--accent-rgb), 0.15);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   border-radius: var(--radius-md);
   font-size: 11px;
   font-weight: 500;
@@ -593,7 +593,7 @@
   object-fit: contain;
   flex-shrink: 0;
   background: var(--bg-elevated);
-  border: 1px solid rgba(242, 140, 82, 0.2);
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
 }
 
 .chat-input-mention-name {
@@ -626,8 +626,8 @@
 
 .chat-input-field:focus {
   background: var(--bg-hover);
-  border-color: rgba(242, 140, 82, 0.4);
-  box-shadow: 0 0 0 2px rgba(242, 140, 82, 0.08);
+  border-color: rgba(var(--accent-rgb), 0.4);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.08);
 }
 
 .chat-input-field.expanded {
@@ -756,7 +756,7 @@
 
 
 .chat-input-send {
-  background: #f28c52;
+  background: var(--accent-color);
 }
 
 .chat-input-send:hover:not(:disabled) {
@@ -991,9 +991,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(242, 140, 82, 0.15);
+  background: rgba(var(--accent-rgb), 0.15);
   border-radius: var(--radius-sm);
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 .chat-focus-title {
@@ -1120,7 +1120,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  background: linear-gradient(135deg, #f28c52 0%, #e67a40 100%);
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%);
   border: none;
   border-radius: var(--radius-sm);
   color: white;
@@ -1132,7 +1132,7 @@
 }
 
 .chat-focus-send-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, #ff9d63 0%, #f28c52 100%);
+  background: linear-gradient(135deg, #ff9d63 0%, var(--accent-color) 100%);
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }

@@ -66,8 +66,8 @@
   font-size: 0;
   line-height: 0;
   border-radius: 50%;
-  background: var(--category-color, #f28c52);
-  box-shadow: 0 0 4px var(--category-color, #f28c52);
+  background: var(--category-color, var(--accent-color));
+  box-shadow: 0 0 4px var(--category-color, var(--accent-color));
 }
 
 /* Icon container fills the 44px visible strip */
@@ -85,7 +85,7 @@
 
 /* Hover hint on individual icons */
 .side-panel-accordion.compact:not(.peek-expanded) .accordion-header:hover .accordion-icon {
-  color: var(--category-color, #f28c52);
+  color: var(--category-color, var(--accent-color));
 }
 
 /* ===================================
@@ -250,7 +250,7 @@
 }
 
 .accordion-section.expanded .accordion-icon {
-  color: var(--category-color, #f28c52);
+  color: var(--category-color, var(--accent-color));
 }
 
 /* Title */
@@ -273,8 +273,8 @@
 }
 
 .accordion-section.expanded .accordion-badge {
-  background: color-mix(in srgb, var(--category-color, #f28c52) 20%, transparent);
-  color: var(--category-color, #f28c52);
+  background: color-mix(in srgb, var(--category-color, var(--accent-color)) 20%, transparent);
+  color: var(--category-color, var(--accent-color));
 }
 
 /* Changes badge always glows (even when collapsed) */
@@ -301,8 +301,8 @@
 }
 
 .accordion-section.expanded .accordion-badge-label {
-  background: color-mix(in srgb, var(--category-color, #f28c52) 20%, transparent);
-  color: var(--category-color, #f28c52);
+  background: color-mix(in srgb, var(--category-color, var(--accent-color)) 20%, transparent);
+  color: var(--category-color, var(--accent-color));
 }
 
 /* Content */

@@ -138,7 +138,7 @@ export default function PluginsPanel({
       >
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-3">
-            <h3 className="text-sm font-semibold" style={{ color: "#f28c52" }}>
+            <h3 className="text-sm font-semibold" style={{ color: "var(--accent-color)" }}>
               Plugin Marketplace
             </h3>
             {installedCount > 0 && (
@@ -221,15 +221,15 @@ export default function PluginsPanel({
               style={{
                 background:
                   selectedCategory === cat.value
-                    ? "rgba(242, 140, 82, 0.2)"
+                    ? "rgba(var(--accent-rgb), 0.2)"
                     : "rgba(255, 255, 255, 0.05)",
                 border:
                   selectedCategory === cat.value
-                    ? "1px solid rgba(242, 140, 82, 0.4)"
+                    ? "1px solid rgba(var(--accent-rgb), 0.4)"
                     : "1px solid rgba(255, 255, 255, 0.12)",
                 color:
                   selectedCategory === cat.value
-                    ? "#f28c52"
+                    ? "var(--accent-color)"
                     : "rgba(255, 255, 255, 0.7)",
               }}
             >
@@ -330,7 +330,7 @@ export default function PluginsPanel({
             <div className="flex items-start justify-between mb-4">
               <h2
                 className="text-lg font-semibold"
-                style={{ color: "#f28c52" }}
+                style={{ color: "var(--accent-color)" }}
               >
                 {selectedPlugin.name}
               </h2>
@@ -393,7 +393,7 @@ export default function PluginsPanel({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm hover:underline"
-                    style={{ color: "#f28c52" }}
+                    style={{ color: "var(--accent-color)" }}
                   >
                     {selectedPlugin.repository}
                   </a>
@@ -439,9 +439,9 @@ export default function PluginsPanel({
                   }}
                   className="flex-1 px-4 py-2 rounded text-sm font-medium transition-all duration-200"
                   style={{
-                    background: "rgba(242, 140, 82, 0.1)",
-                    border: "1px solid rgba(242, 140, 82, 0.3)",
-                    color: "#f28c52",
+                    background: "rgba(var(--accent-rgb), 0.1)",
+                    border: "1px solid rgba(var(--accent-rgb), 0.3)",
+                    color: "var(--accent-color)",
                   }}
                 >
                   Install (Project)

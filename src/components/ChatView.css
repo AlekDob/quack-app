@@ -243,7 +243,7 @@
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  background: rgba(242, 140, 82, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
   border: none;
   border-radius: var(--radius-sm);
   font-size: 10px;
@@ -253,7 +253,7 @@
 }
 
 .active-agent-label {
-  color: rgba(242, 140, 82, 0.8);
+  color: rgba(var(--accent-rgb), 0.8);
   font-weight: 600;
 }
 
@@ -296,7 +296,7 @@
   object-position: center;
   flex-shrink: 0;
   background: var(--bg-elevated);
-  border: 1px solid rgba(242, 140, 82, 0.2);
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
 }
 
 /* Debug Mode Banner - Accordion */

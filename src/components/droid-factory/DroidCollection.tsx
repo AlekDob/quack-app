@@ -17,7 +17,7 @@ export function DroidCollection({ userStats }: DroidCollectionProps) {
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 2L15 8.5L22 9.5L17 14.5L18 21.5L12 18L6 21.5L7 14.5L2 9.5L9 8.5L12 2Z" fill="rgba(255, 255, 255, 0.5)" />
           </svg>
-          <h4 className="text-sm font-semibold" style={{ color: '#FF6B35' }}>
+          <h4 className="text-sm font-semibold" style={{ color: 'var(--accent-color)' }}>
             Achievements Unlocked ({userStats.achievements.length})
           </h4>
         </div>
@@ -42,7 +42,7 @@ export function DroidCollection({ userStats }: DroidCollectionProps) {
                     }}
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M12 2L15 8.5L22 9.5L17 14.5L18 21.5L12 18L6 21.5L7 14.5L2 9.5L9 8.5L12 2Z" fill="#FF6B35" />
+                      <path d="M12 2L15 8.5L22 9.5L17 14.5L18 21.5L12 18L6 21.5L7 14.5L2 9.5L9 8.5L12 2Z" fill="var(--accent-color)" />
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0">
@@ -102,7 +102,7 @@ export function DroidCollection({ userStats }: DroidCollectionProps) {
             <rect x="14" y="3" width="7" height="7" rx="1" fill="rgba(255, 255, 255, 0.5)" />
             <rect x="14" y="14" width="7" height="7" rx="1" fill="rgba(255, 255, 255, 0.5)" opacity="0.6" />
           </svg>
-          <h4 className="text-sm font-semibold" style={{ color: '#FF6B35' }}>
+          <h4 className="text-sm font-semibold" style={{ color: 'var(--accent-color)' }}>
             Statistics
           </h4>
         </div>
@@ -159,9 +159,9 @@ export function DroidCollection({ userStats }: DroidCollectionProps) {
         <div className="mt-4">
           <div className="flex items-center gap-2 mb-2">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 2L15 8.5L22 9.5L17 14.5L18 21.5L12 18L6 21.5L7 14.5L2 9.5L9 8.5L12 2Z" fill="#FF6B35" />
+              <path d="M12 2L15 8.5L22 9.5L17 14.5L18 21.5L12 18L6 21.5L7 14.5L2 9.5L9 8.5L12 2Z" fill="var(--accent-color)" />
             </svg>
-            <h4 className="text-sm font-semibold" style={{ color: '#FF6B35' }}>
+            <h4 className="text-sm font-semibold" style={{ color: 'var(--accent-color)' }}>
               Favorite Template
             </h4>
           </div>

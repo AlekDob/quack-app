@@ -147,7 +147,7 @@ export default function QuackAgencySetupWizard({
           >
             <h2
               className="text-xl font-bold"
-              style={{ color: "#f28c52" }}
+              style={{ color: "var(--accent-color)" }}
             >
               🦆 Quack Agency Setup
             </h2>
@@ -229,8 +229,8 @@ export default function QuackAgencySetupWizard({
                 <div
                   className="w-20 h-20 rounded-full flex items-center justify-center mb-6 animate-bounce"
                   style={{
-                    background: "linear-gradient(135deg, #f28c52 0%, #e67339 100%)",
-                    boxShadow: "0 8px 24px rgba(242, 140, 82, 0.4)",
+                    background: "linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)",
+                    boxShadow: "0 8px 24px rgba(var(--accent-rgb), 0.4)",
                   }}
                 >
                   <span className="text-4xl">🦆</span>
@@ -238,7 +238,7 @@ export default function QuackAgencySetupWizard({
 
                 <h3
                   className="text-2xl font-bold mb-2"
-                  style={{ color: "#f28c52" }}
+                  style={{ color: "var(--accent-color)" }}
                 >
                   Setup Complete!
                 </h3>
@@ -254,20 +254,20 @@ export default function QuackAgencySetupWizard({
                   <div
                     className="w-full max-w-md p-4 rounded-lg text-sm"
                     style={{
-                      background: "rgba(242, 140, 82, 0.05)",
-                      border: "1px solid rgba(242, 140, 82, 0.2)",
+                      background: "rgba(var(--accent-rgb), 0.05)",
+                      border: "1px solid rgba(var(--accent-rgb), 0.2)",
                       color: "rgba(255, 255, 255, 0.8)",
                     }}
                   >
                     <div className="flex justify-between mb-2">
                       <span>Files created:</span>
-                      <span className="font-semibold" style={{ color: "#f28c52" }}>
+                      <span className="font-semibold" style={{ color: "var(--accent-color)" }}>
                         {setupResult.filesCreated.length}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Agents created:</span>
-                      <span className="font-semibold" style={{ color: "#f28c52" }}>
+                      <span className="font-semibold" style={{ color: "var(--accent-color)" }}>
                         {setupResult.agentsCreated}
                       </span>
                     </div>
@@ -317,23 +317,23 @@ export default function QuackAgencySetupWizard({
                   className="px-6 py-2 rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     background: canProceed()
-                      ? "linear-gradient(135deg, #f28c52 0%, #e67339 100%)"
+                      ? "linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)"
                       : "rgba(255, 255, 255, 0.1)",
                     color: "#ffffff",
                     boxShadow: canProceed()
-                      ? "0 4px 12px rgba(242, 140, 82, 0.3)"
+                      ? "0 4px 12px rgba(var(--accent-rgb), 0.3)"
                       : "none",
                   }}
                   onMouseEnter={(e) => {
                     if (canProceed() && !isSubmitting) {
                       e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 6px 20px rgba(242, 140, 82, 0.4)";
+                      e.currentTarget.style.boxShadow = "0 6px 20px rgba(var(--accent-rgb), 0.4)";
                     }
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = "translateY(0)";
                     e.currentTarget.style.boxShadow = canProceed()
-                      ? "0 4px 12px rgba(242, 140, 82, 0.3)"
+                      ? "0 4px 12px rgba(var(--accent-rgb), 0.3)"
                       : "none";
                   }}
                 >
@@ -346,19 +346,19 @@ export default function QuackAgencySetupWizard({
                   disabled={isSubmitting}
                   className="px-6 py-2 rounded-lg font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
-                    background: "linear-gradient(135deg, #f28c52 0%, #e67339 100%)",
+                    background: "linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)",
                     color: "#ffffff",
-                    boxShadow: "0 4px 12px rgba(242, 140, 82, 0.3)",
+                    boxShadow: "0 4px 12px rgba(var(--accent-rgb), 0.3)",
                   }}
                   onMouseEnter={(e) => {
                     if (!isSubmitting) {
                       e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 6px 20px rgba(242, 140, 82, 0.4)";
+                      e.currentTarget.style.boxShadow = "0 6px 20px rgba(var(--accent-rgb), 0.4)";
                     }
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(242, 140, 82, 0.3)";
+                    e.currentTarget.style.boxShadow = "0 4px 12px rgba(var(--accent-rgb), 0.3)";
                   }}
                 >
                   {isSubmitting ? "Setting up..." : "Complete Setup"}

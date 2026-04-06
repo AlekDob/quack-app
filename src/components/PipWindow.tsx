@@ -92,15 +92,15 @@ const PipWindow: React.FC = () => {
       >
         <div className="flex items-center gap-2">
           <span className="text-xl">🦆</span>
-          <span className="text-sm font-semibold" style={{ color: '#f28c52' }}>
+          <span className="text-sm font-semibold" style={{ color: 'var(--accent-color)' }}>
             Active Agents
           </span>
           {agents.length > 0 && (
             <span
               className="px-1.5 py-0.5 rounded text-xs font-medium"
               style={{
-                background: 'rgba(242, 140, 82, 0.2)',
-                color: '#f28c52',
+                background: 'rgba(var(--accent-rgb), 0.2)',
+                color: 'var(--accent-color)',
               }}
             >
               {agents.length}
@@ -156,7 +156,7 @@ const PipWindow: React.FC = () => {
         className="pip-content flex-1 overflow-y-auto p-4"
         style={{
           scrollbarWidth: 'thin',
-          scrollbarColor: 'rgba(242, 140, 82, 0.3) rgba(255, 255, 255, 0.05)',
+          scrollbarColor: 'rgba(var(--accent-rgb), 0.3) rgba(255, 255, 255, 0.05)',
         }}
       >
         {agents.length === 0 ? (

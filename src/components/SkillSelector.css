@@ -70,7 +70,7 @@
 
 .skill-search-input:focus {
   outline: none;
-  border-color: rgba(242, 140, 82, 0.4) !important;
+  border-color: rgba(var(--accent-rgb), 0.4) !important;
   background: rgba(255, 255, 255, 0.06) !important;
   box-shadow: none !important;
 }
@@ -132,7 +132,7 @@
 }
 
 .skill-group-icon.installed {
-  background: linear-gradient(135deg, #f28c52, #e67339);
+  background: linear-gradient(135deg, var(--accent-color), var(--accent-gradient-end));
 }
 
 .skill-group-icon.not-installed {
@@ -187,14 +187,14 @@
 }
 
 .skill-chip.selected {
-  background: rgba(242, 140, 82, 0.15);
-  border-color: rgba(242, 140, 82, 0.4);
-  color: rgba(242, 140, 82, 1);
+  background: rgba(var(--accent-rgb), 0.15);
+  border-color: rgba(var(--accent-rgb), 0.4);
+  color: rgba(var(--accent-rgb), 1);
 }
 
 .skill-chip.selected:hover {
-  background: rgba(242, 140, 82, 0.25);
-  border-color: rgba(242, 140, 82, 0.6);
+  background: rgba(var(--accent-rgb), 0.25);
+  border-color: rgba(var(--accent-rgb), 0.6);
 }
 
 /* Marketplace (not installed) skills - slightly dimmed */
@@ -238,6 +238,6 @@
 
 .skill-selector-selected-count {
   font-size: 10px;
-  color: rgba(242, 140, 82, 0.8);
+  color: rgba(var(--accent-rgb), 0.8);
   font-style: italic;
 }

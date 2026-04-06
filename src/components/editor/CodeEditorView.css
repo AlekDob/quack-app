@@ -72,7 +72,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #f28c52;
+  background: var(--accent-color);
   flex-shrink: 0;
   animation: editor-pulse 1.5s ease-in-out infinite;
 }
@@ -159,19 +159,19 @@
 }
 
 .editor-btn-outline.active {
-  background: rgba(242, 140, 82, 0.15);
-  border-color: rgba(242, 140, 82, 0.3);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.15);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  color: var(--accent-color);
 }
 
 .editor-btn-save:not(:disabled) {
-  background: rgba(242, 140, 82, 0.15);
-  border-color: rgba(242, 140, 82, 0.3);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.15);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  color: var(--accent-color);
 }
 
 .editor-btn-save:not(:disabled):hover {
-  background: rgba(242, 140, 82, 0.25);
+  background: rgba(var(--accent-rgb), 0.25);
 }
 
 /* Status Bar */
@@ -196,7 +196,7 @@
 }
 
 .editor-status-unsaved {
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 /* Empty state */
@@ -258,7 +258,7 @@
   font-size: 12px !important;
 }
 .code-editor-view .cm-panel.cm-search input[type="checkbox"] {
-  accent-color: #f28c52 !important;
+  accent-color: var(--accent-color) !important;
 }
 
 /* IDE Dropdown in editor header */
@@ -497,7 +497,7 @@
 }
 
 .editor-status-diagnostics-warning {
-  color: #f7931e;
+  color: var(--accent-color);
 }
 
 /* Merge view container */

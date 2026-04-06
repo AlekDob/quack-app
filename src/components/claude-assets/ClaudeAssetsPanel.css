@@ -57,7 +57,7 @@
 }
 
 .claude-assets-search:focus {
-  border-color: var(--accent-color, #f28c52);
+  border-color: var(--accent-color, var(--accent-color));
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -181,7 +181,7 @@
 
 .filter-tab.active {
   background: rgba(var(--filter-color), 0.12);
-  color: var(--filter-color, #f28c52);
+  color: var(--filter-color, var(--accent-color));
 }
 
 .filter-icon {
@@ -213,14 +213,14 @@
   padding: 6px 10px;
   border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.85);
-  border: 1px solid var(--drag-color, #f28c52);
+  border: 1px solid var(--drag-color, var(--accent-color));
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   pointer-events: none;
 }
 
 .drag-icon {
   display: flex;
-  color: var(--drag-color, #f28c52);
+  color: var(--drag-color, var(--accent-color));
 }
 
 .drag-name {

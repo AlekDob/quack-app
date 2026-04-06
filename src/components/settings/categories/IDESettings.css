@@ -19,13 +19,13 @@
 .ide-settings-header-icon {
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, rgba(242, 140, 82, 0.2), rgba(242, 140, 82, 0.1));
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.2), rgba(var(--accent-rgb), 0.1));
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 .ide-settings-header-text h3 {
@@ -55,8 +55,8 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: rgba(242, 140, 82, 0.15);
-  border: 1px solid rgba(242, 140, 82, 0.3);
+  background: rgba(var(--accent-rgb), 0.15);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   border-radius: var(--radius-lg);
   font-size: 13px;
   color: #f3f4f6;
@@ -67,7 +67,7 @@
 }
 
 .ide-settings-current-badge strong {
-  color: #f28c52;
+  color: var(--accent-color);
   font-weight: 600;
 }
 
@@ -101,7 +101,7 @@
 
 .ide-settings-detecting {
   font-size: 12px;
-  color: #f28c52;
+  color: var(--accent-color);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -111,7 +111,7 @@
   content: '';
   width: 6px;
   height: 6px;
-  background: #f28c52;
+  background: var(--accent-color);
   border-radius: 50%;
   animation: pulse 1.5s infinite;
 }
@@ -151,8 +151,8 @@
 }
 
 .ide-settings-card.selected {
-  background: rgba(242, 140, 82, 0.1);
-  border-color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.1);
+  border-color: var(--accent-color);
 }
 
 .ide-settings-card.not-installed {
@@ -264,7 +264,7 @@
 }
 
 .ide-settings-toggle input:checked + .ide-settings-toggle-switch {
-  background: #f28c52;
+  background: var(--accent-color);
 }
 
 .ide-settings-toggle input:checked + .ide-settings-toggle-switch::after {
@@ -306,7 +306,7 @@
 
 .ide-settings-arrange-btn svg {
   flex-shrink: 0;
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 .ide-settings-arrange-hint {
@@ -326,9 +326,9 @@
   margin: 0 20px 20px;
   padding: 12px 16px;
   background: transparent;
-  border: 1px dashed rgba(242, 140, 82, 0.3);
+  border: 1px dashed rgba(var(--accent-rgb), 0.3);
   border-radius: var(--radius-md);
-  color: #f28c52;
+  color: var(--accent-color);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -336,8 +336,8 @@
 }
 
 .ide-settings-add-custom-btn:hover:not(:disabled) {
-  background: rgba(242, 140, 82, 0.08);
-  border-color: rgba(242, 140, 82, 0.5);
+  background: rgba(var(--accent-rgb), 0.08);
+  border-color: rgba(var(--accent-rgb), 0.5);
 }
 
 .ide-settings-add-custom-btn:disabled {
@@ -384,8 +384,8 @@
   align-items: flex-start;
   gap: 12px;
   padding: 14px 16px;
-  background: rgba(242, 140, 82, 0.1);
-  border: 1px solid rgba(242, 140, 82, 0.2);
+  background: rgba(var(--accent-rgb), 0.1);
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
   border-radius: var(--radius-md);
   font-size: 13px;
   color: #d1d5db;
@@ -394,6 +394,6 @@
 
 .ide-settings-notice svg {
   flex-shrink: 0;
-  color: #f28c52;
+  color: var(--accent-color);
   margin-top: 2px;
 }

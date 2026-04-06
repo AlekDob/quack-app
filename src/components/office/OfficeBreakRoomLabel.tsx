@@ -19,7 +19,7 @@ function OfficeBreakRoomLabel({ position }: OfficeBreakRoomLabelProps) {
         anchor={0.5}
         rotation={WALL_ANGLE}
         style={{
-          fill: '#ff6b35',
+          fill: '#ff6b35', // PixiJS requires resolved hex (no CSS variables) — accent fallback
           fontSize: 13,
           fontFamily: 'Inter, system-ui, sans-serif',
           fontWeight: '700',

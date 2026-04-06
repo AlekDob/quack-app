@@ -4,7 +4,7 @@
   position: relative;
   margin: 8px 0;
   border-radius: 8px;
-  border: 1px solid rgba(242, 140, 82, 0.3);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   overflow: hidden;
   background: #000;
 }
@@ -21,7 +21,7 @@
 
 .html-viz-label {
   font-size: 11px;
-  color: #f28c52;
+  color: var(--accent-color);
   font-weight: 600;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -51,8 +51,8 @@
 }
 
 .html-viz-btn.active {
-  background: rgba(242, 140, 82, 0.15);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent-color);
 }
 
 /* Iframe container */
@@ -105,8 +105,8 @@
 .html-viz-spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(242, 140, 82, 0.2);
-  border-top-color: #f28c52;
+  border: 2px solid rgba(var(--accent-rgb), 0.2);
+  border-top-color: var(--accent-color);
   border-radius: 50%;
   animation: html-viz-spin 0.6s linear infinite;
 }

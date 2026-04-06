@@ -13,7 +13,7 @@
   --kanban-column-hover-bg: rgba(255, 255, 255, 0.05);
   --kanban-card-bg: rgba(255, 255, 255, 0.06);
   --kanban-card-hover-bg: rgba(255, 255, 255, 0.09);
-  --kanban-card-selected-bg: rgba(242, 140, 82, 0.12);
+  --kanban-card-selected-bg: rgba(var(--accent-rgb), 0.12);
   --kanban-border: rgba(255, 255, 255, 0.08);
   --kanban-text-primary: rgba(255, 255, 255, 0.9);
   --kanban-text-secondary: rgba(255, 255, 255, 0.6);
@@ -22,7 +22,7 @@
   --kanban-progress-color: #f59e0b;
   --kanban-review-color: #a855f7;
   --kanban-done-color: #22c55e;
-  --kanban-accent: #f28c52;
+  --kanban-accent: var(--accent-color);
 }
 
 /* Main container - Full width mode */
@@ -182,7 +182,7 @@
 }
 
 .kanban-mini-panel-toggle.active {
-  background: rgba(242, 140, 82, 0.15);
+  background: rgba(var(--accent-rgb), 0.15);
   color: var(--kanban-accent);
   border-color: var(--kanban-accent);
 }
@@ -215,9 +215,9 @@
 }
 
 .kanban-column.drop-target {
-  background: rgba(242, 140, 82, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
   border-color: var(--kanban-accent);
-  box-shadow: 0 0 0 2px rgba(242, 140, 82, 0.2), inset 0 0 20px rgba(242, 140, 82, 0.05);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.2), inset 0 0 20px rgba(var(--accent-rgb), 0.05);
 }
 
 /* Ghost card placeholder when dragging agent from sidebar */
@@ -522,8 +522,8 @@
 }
 
 .kanban-card-project.kanban-card-project-clickable:hover {
-  background: rgba(242, 140, 82, 0.12);
-  border-color: rgba(242, 140, 82, 0.3);
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.3);
   color: var(--kanban-accent);
 }
 
@@ -944,7 +944,7 @@
 }
 
 .kanban-modal-button.primary:disabled {
-  background: rgba(242, 140, 82, 0.4);
+  background: rgba(var(--accent-rgb), 0.4);
   cursor: not-allowed;
 }
 
@@ -1019,7 +1019,7 @@
 }
 
 .kanban-agent-card.selected {
-  background: rgba(242, 140, 82, 0.1);
+  background: rgba(var(--accent-rgb), 0.1);
   border-color: var(--kanban-accent);
 }
 
@@ -1082,7 +1082,7 @@
 }
 
 .kanban-new-agent-card:hover {
-  background: rgba(242, 140, 82, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
   border-color: var(--kanban-accent);
 }
 
@@ -1095,12 +1095,12 @@
 }
 
 .kanban-new-agent-icon {
-  background: rgba(242, 140, 82, 0.15);
+  background: rgba(var(--accent-rgb), 0.15);
   color: var(--kanban-accent);
 }
 
 .kanban-new-agent-card:hover .kanban-new-agent-icon {
-  background: rgba(242, 140, 82, 0.25);
+  background: rgba(var(--accent-rgb), 0.25);
 }
 
 /* Droids and Skills selection grid */
@@ -1133,7 +1133,7 @@
 }
 
 .kanban-selection-card.selected {
-  background: rgba(242, 140, 82, 0.1);
+  background: rgba(var(--accent-rgb), 0.1);
   border-color: var(--kanban-accent);
 }
 
@@ -1162,10 +1162,10 @@
   flex-shrink: 0;
 }
 
-/* Droid icon - orange like side panel (#f28c52) */
+/* Droid icon - orange like side panel (var(--accent-color)) */
 .kanban-selection-icon.droid {
-  background: rgba(242, 140, 82, 0.15);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent-color);
 }
 
 /* Skill icon - yellow like side panel (#fbbf24) */
@@ -1175,7 +1175,7 @@
 }
 
 .kanban-selection-card.selected .kanban-selection-icon.droid {
-  background: rgba(242, 140, 82, 0.25);
+  background: rgba(var(--accent-rgb), 0.25);
 }
 
 .kanban-selection-card.selected .kanban-selection-icon.skill {
@@ -1354,7 +1354,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: rgba(242, 140, 82, 0.15);
+  background: rgba(var(--accent-rgb), 0.15);
   border: 2px dashed var(--kanban-accent);
   border-radius: var(--radius-sm);
   color: var(--kanban-accent);
@@ -1565,7 +1565,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    var(--kanban-accent, #f28c52),
+    var(--kanban-accent, var(--accent-color)),
     transparent
   );
   animation: kanbanProgressSlide 1.5s ease-in-out infinite;
@@ -2029,7 +2029,7 @@
   font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
   font-size: 12px;
   color: var(--kanban-accent);
-  background: rgba(242, 140, 82, 0.1);
+  background: rgba(var(--accent-rgb), 0.1);
   padding: 4px 8px;
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -2505,7 +2505,7 @@
   justify-content: center;
   margin-left: 6px;
   padding: 2px 4px;
-  background: rgba(242, 140, 82, 0.2);
+  background: rgba(var(--accent-rgb), 0.2);
   border-radius: var(--radius-sm);
   color: var(--kanban-accent);
 }
@@ -2563,8 +2563,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(242, 140, 82, 0.15);
-  border: 1px solid rgba(242, 140, 82, 0.3);
+  background: rgba(var(--accent-rgb), 0.15);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   color: var(--kanban-accent);
   font-size: 10px;
   font-weight: 600;

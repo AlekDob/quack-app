@@ -28,8 +28,8 @@ export function SkillTemplateGallery({ onSelectTemplate }: SkillTemplateGalleryP
               <div
                 className="w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center overflow-hidden"
                 style={{
-                  background: 'rgba(247, 147, 30, 0.15)',
-                  border: '1px solid rgba(247, 147, 30, 0.3)',
+                  background: 'rgba(var(--accent-rgb), 0.15)',
+                  border: '1px solid rgba(var(--accent-rgb), 0.30)',
                 }}
               >
                 <img
@@ -49,9 +49,9 @@ export function SkillTemplateGallery({ onSelectTemplate }: SkillTemplateGalleryP
                   <span
                     className="text-xs px-2 py-1 rounded"
                     style={{
-                      background: 'rgba(247, 147, 30, 0.15)',
-                      color: '#F7931E',
-                      border: '1px solid rgba(247, 147, 30, 0.3)',
+                      background: 'rgba(var(--accent-rgb), 0.15)',
+                      color: 'var(--accent-color)',
+                      border: '1px solid rgba(var(--accent-rgb), 0.30)',
                     }}
                   >
                     {template.category}

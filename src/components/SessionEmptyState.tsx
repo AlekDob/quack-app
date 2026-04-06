@@ -6,7 +6,7 @@
  *
  * Following Quack Design System:
  * - Minimal modern design
- * - Orange accent (#f28c52)
+ * - Orange accent (var(--accent-color))
  * - SVG icons (no emoji)
  * - General Sans typography
  */
@@ -356,7 +356,7 @@ export default function SessionEmptyState({
                     flexShrink: 0,
                     background:
                       status === 'loading'
-                        ? '#f28c52'
+                        ? 'var(--accent-color)'
                         : status === 'active'
                         ? '#22c55e'
                         : 'rgba(255, 255, 255, 0.3)',
@@ -442,7 +442,7 @@ export default function SessionEmptyState({
           justifyContent: 'center',
           gap: '8px',
           padding: '12px 24px',
-          background: 'linear-gradient(135deg, #f28c52 0%, #ffb26f 100%)',
+          background: 'linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)',
           border: 'none',
           borderRadius: '10px',
           color: 'white',
@@ -450,17 +450,17 @@ export default function SessionEmptyState({
           fontWeight: 600,
           cursor: 'pointer',
           transition: 'all 0.2s ease',
-          boxShadow: '0 4px 12px rgba(242, 140, 82, 0.3)',
+          boxShadow: '0 4px 12px rgba(var(--accent-rgb), 0.3)',
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'linear-gradient(135deg, #e17940 0%, #ffa05d 100%)';
+          e.currentTarget.style.background = 'linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)';
           e.currentTarget.style.transform = 'translateY(-2px)';
-          e.currentTarget.style.boxShadow = '0 6px 16px rgba(242, 140, 82, 0.4)';
+          e.currentTarget.style.boxShadow = '0 6px 16px rgba(var(--accent-rgb), 0.4)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'linear-gradient(135deg, #f28c52 0%, #ffb26f 100%)';
+          e.currentTarget.style.background = 'linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)';
           e.currentTarget.style.transform = 'translateY(0)';
-          e.currentTarget.style.boxShadow = '0 4px 12px rgba(242, 140, 82, 0.3)';
+          e.currentTarget.style.boxShadow = '0 4px 12px rgba(var(--accent-rgb), 0.3)';
         }}
       >
         {/* Plus Icon */}

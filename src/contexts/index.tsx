@@ -12,12 +12,12 @@ import ErrorBoundary from '../components/ErrorBoundary';
 const ProviderErrorFallback = ({ providerName }: { providerName: string }) => (
   <div style={{
     padding: '20px',
-    background: 'rgba(242, 140, 82, 0.1)',
-    borderLeft: '3px solid #f28c52',
+    background: 'rgba(var(--accent-rgb), 0.1)',
+    borderLeft: '3px solid var(--accent-color)',
     margin: '10px',
     borderRadius: '4px'
   }}>
-    <h3 style={{ color: '#f28c52', margin: '0 0 8px 0' }}>
+    <h3 style={{ color: 'var(--accent-color)', margin: '0 0 8px 0' }}>
       Provider Error: {providerName}
     </h3>
     <p style={{ margin: 0, fontSize: '14px', opacity: 0.8 }}>

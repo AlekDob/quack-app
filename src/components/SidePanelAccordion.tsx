@@ -26,8 +26,8 @@ import "./SidePanelAccordion.css";
 // Category-specific colors matching Quack Store
 const CATEGORY_COLORS: Record<string, string> = {
   changes: '#34d399',     // Green - git changes
-  skills: '#f28c52',      // Orange - main accent
-  agents: '#f28c52',      // Orange - personas
+  skills: 'var(--accent-color)',      // Orange - main accent
+  agents: 'var(--accent-color)',      // Orange - personas
   droids: '#4ecdc4',      // Teal - automation
   rules: '#60a5fa',       // Blue - governance
   hooks: '#a78bfa',       // Purple - events
@@ -35,10 +35,10 @@ const CATEGORY_COLORS: Record<string, string> = {
   sessions: '#00d9ff',    // Cyan - sessions
   mcp: '#34d399',         // Green - servers
   commands: '#f472b6',    // Pink - commands
-  context: '#f28c52',     // Orange - file explorer
-  'agent-context': '#f28c52', // Orange - personality
+  context: 'var(--accent-color)',     // Orange - file explorer
+  'agent-context': 'var(--accent-color)', // Orange - personality
   'project-context': '#60a5fa', // Blue - project notes
-  default: '#f28c52',     // Orange fallback
+  default: 'var(--accent-color)',     // Orange fallback
 };
 
 // Accordion Section Component

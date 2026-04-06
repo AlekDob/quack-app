@@ -13,7 +13,7 @@
  * Used for terminal tab colors and visual identification
  */
 export const TERMINAL_COLORS = [
-  "#f28c52",
+  "var(--accent-color)",
   "#ffb26f",
   "#ffd166",
   "#f77aa6",
@@ -147,7 +147,7 @@ export function debounce<T extends (...args: unknown[]) => void>(
  * @returns Hex color string from TERMINAL_COLORS
  *
  * @example
- * getRandomTerminalColor() // "#f28c52" (random from palette)
+ * getRandomTerminalColor() // "var(--accent-color)" (random from palette)
  */
 export const getRandomTerminalColor = (): string => {
   return TERMINAL_COLORS[Math.floor(Math.random() * TERMINAL_COLORS.length)];
@@ -161,8 +161,8 @@ export const getRandomTerminalColor = (): string => {
  * @returns Hex color string from TERMINAL_COLORS
  *
  * @example
- * getTerminalColorByIndex(0) // "#f28c52" (first color)
- * getTerminalColorByIndex(7) // "#f28c52" (wraps to first)
+ * getTerminalColorByIndex(0) // "var(--accent-color)" (first color)
+ * getTerminalColorByIndex(7) // "var(--accent-color)" (wraps to first)
  */
 export const getTerminalColorByIndex = (index: number): string => {
   return TERMINAL_COLORS[index % TERMINAL_COLORS.length];

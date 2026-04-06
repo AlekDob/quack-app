@@ -36,15 +36,15 @@
 
 .equip-bar-button:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(242, 140, 82, 0.4);
+  border-color: rgba(var(--accent-rgb), 0.4);
   color: rgba(255, 255, 255, 0.9);
   transform: translateY(-1px);
 }
 
 .equip-bar-button.active {
-  background: rgba(242, 140, 82, 0.12);
-  border-color: rgba(242, 140, 82, 0.5);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.12);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  color: var(--accent-color);
 }
 
 .equip-bar-button:disabled {
@@ -146,12 +146,12 @@
 }
 
 .equip-bar-item-button:hover {
-  background: rgba(242, 140, 82, 0.15);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent-color);
 }
 
 .equip-bar-item-button:active {
-  background: rgba(242, 140, 82, 0.25);
+  background: rgba(var(--accent-rgb), 0.25);
   transform: scale(0.98);
 }
 

@@ -166,7 +166,7 @@ function NewTerminalModal({
           id: agentId,
           name: name || '',
           avatar: avatar || '',
-          color: color || '#FF6B35',
+          color: color || 'var(--accent-color)',
           workingOn: workingOn || '',
           personality: personality || {},
           createdAt: Date.now(),
@@ -447,7 +447,7 @@ function NewTerminalModal({
 
     // Reset to defaults for new agent with random name
     onNameChange(randomName);
-    onColorChange(selectedProjectColor || availableColors[0] || '#FF6B35');
+    onColorChange(selectedProjectColor || availableColors[0] || 'var(--accent-color)');
     onAvatarChange?.('');
     onWorkingOnChange?.('');
     onPersonalityChange?.({});

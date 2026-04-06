@@ -50,7 +50,7 @@
 }
 
 .chat-message.user .chat-message-body .user-message-text {
-  background: linear-gradient(135deg, #f28c52 0%, #e67a40 100%);
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%);
   color: white;
   padding: 10px 14px;
   border-radius: 18px 18px 4px 18px; /* iMessage tail on bottom-right */
@@ -124,7 +124,7 @@
 }
 
 .chat-message.sticky-user-message .chat-message-body .user-message-text {
-  background: linear-gradient(135deg, #f28c52 0%, #e67a40 100%);
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%);
   color: white;
   padding: 10px 14px;
   border-radius: 18px 18px 4px 18px;

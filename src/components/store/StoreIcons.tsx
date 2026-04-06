@@ -3,9 +3,9 @@ import { getAvatarUrl } from '../../utils/agentAvatars';
 
 // Category-specific gradients - each type has its own color
 export const CATEGORY_GRADIENTS: Record<string, string> = {
-  skills: 'linear-gradient(135deg, #f28c52, #e67339)',
-  agents: 'linear-gradient(135deg, #f28c52, #fbbf24)',
-  'agent-bundles': 'linear-gradient(135deg, #f28c52, #fbbf24)',
+  skills: 'linear-gradient(135deg, var(--accent-color), var(--accent-gradient-end))',
+  agents: 'linear-gradient(135deg, var(--accent-color), #fbbf24)',
+  'agent-bundles': 'linear-gradient(135deg, var(--accent-color), #fbbf24)',
   droids: 'linear-gradient(135deg, #4ecdc4, #26a69a)',
   rules: 'linear-gradient(135deg, #60a5fa, #3b82f6)',
   hooks: 'linear-gradient(135deg, #a78bfa, #8b5cf6)',

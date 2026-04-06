@@ -7,10 +7,15 @@ interface TerminalSearchBarProps {
   onClose: () => void;
 }
 
-const SEARCH_DECORATIONS = {
-  matchOverviewRuler: '#f28c52',
-  activeMatchColorOverviewRuler: '#f28c52',
-};
+function getAccentHex(): string {
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue('--accent-color').trim() || '#f28c52';
+}
+
+function getSearchDecorations() {
+  const hex = getAccentHex();
+  return { matchOverviewRuler: hex, activeMatchColorOverviewRuler: hex };
+}
 
 function TerminalSearchBarComponent({ searchAddon, onClose }: TerminalSearchBarProps) {
   const [query, setQuery] = useState('');
@@ -33,7 +38,7 @@ function TerminalSearchBarComponent({ searchAddon, onClose }: TerminalSearchBarP
 
     const result = searchAddon.findNext(query, {
       caseSensitive,
-      decorations: SEARCH_DECORATIONS,
+      decorations: getSearchDecorations(),
     });
 
     setHasMatches(!!result);
@@ -43,7 +48,7 @@ function TerminalSearchBarComponent({ searchAddon, onClose }: TerminalSearchBarP
     if (!query) return;
     const result = searchAddon.findNext(query, {
       caseSensitive,
-      decorations: SEARCH_DECORATIONS,
+      decorations: getSearchDecorations(),
     });
     setHasMatches(!!result);
   }, [query, caseSensitive, searchAddon]);
@@ -52,7 +57,7 @@ function TerminalSearchBarComponent({ searchAddon, onClose }: TerminalSearchBarP
     if (!query) return;
     const result = searchAddon.findPrevious(query, {
       caseSensitive,
-      decorations: SEARCH_DECORATIONS,
+      decorations: getSearchDecorations(),
     });
     setHasMatches(!!result);
   }, [query, caseSensitive, searchAddon]);

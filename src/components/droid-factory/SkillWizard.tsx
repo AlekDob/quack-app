@@ -121,8 +121,8 @@ export function SkillWizard({ initialSpec, onCreateSkill, isCreating }: SkillWiz
               onClick={() => setCategory(cat.value)}
               className="p-3 rounded-lg text-left transition-all"
               style={{
-                background: category === cat.value ? 'rgba(247, 147, 30, 0.15)' : 'rgba(255, 255, 255, 0.03)',
-                border: category === cat.value ? '2px solid #F7931E' : '2px solid rgba(255, 255, 255, 0.1)',
+                background: category === cat.value ? 'rgba(var(--accent-rgb), 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                border: category === cat.value ? '2px solid var(--accent-color)' : '2px solid rgba(255, 255, 255, 0.1)',
               }}
             >
               <div className="font-semibold text-sm mb-1" style={{ color: '#ffffff' }}>
@@ -201,7 +201,7 @@ export function SkillWizard({ initialSpec, onCreateSkill, isCreating }: SkillWiz
         disabled={!isValid || isCreating}
         className="w-full px-4 py-3 rounded-lg font-semibold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         style={{
-          background: isValid ? 'linear-gradient(135deg, #F7931E 0%, #FF6B35 100%)' : 'rgba(255, 255, 255, 0.1)',
+          background: isValid ? 'linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)' : 'rgba(255, 255, 255, 0.1)',
           color: '#ffffff',
         }}
       >

@@ -141,7 +141,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Multi-provider LLM: `documentation/patterns/pattern-multi-provider-llm.md`
 - Automation layer: `documentation/patterns/pattern-automation-layer.md`
 - Tab system: `documentation/patterns/pattern-tab-system-singleton.md`
-- Dark theme CSS: `documentation/patterns/pattern-dark-theme-css-values.md`
+- Dark theme CSS + accent tokens: `documentation/patterns/pattern-dark-theme-css-values.md`
 - Remote API architecture: `documentation/patterns/pattern-remote-api-architecture.md`
 - Claude Code Memory Settings: `documentation/patterns/pattern-claude-code-memory-settings.md`
 - Permission Modes (Build/Plan/Debug): `documentation/patterns/pattern-permission-modes.md`

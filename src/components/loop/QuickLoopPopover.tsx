@@ -129,7 +129,7 @@ function IdleForm({ onStart }: { onStart: (prompt: string, intervalMs: number, m
         style={{
           marginTop: 12,
           width: '100%',
-          background: '#FF6B35',
+          background: 'var(--accent-color)',
           border: 'none',
           borderRadius: 8,
           padding: '9px 0',
@@ -155,7 +155,7 @@ function RunningStatus({ prompt, currentRun, onStop }: { prompt: string; current
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <span style={{
-          width: 8, height: 8, borderRadius: '50%', background: '#FF6B35',
+          width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-color)',
           animation: 'quickloop-pulse 1.4s ease-in-out infinite',
           flexShrink: 0,
         }} />
@@ -222,7 +222,7 @@ export function QuickLoopPopover({
       `}</style>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <span style={{ fontSize: 12, fontWeight: 700, color: '#FF6B35', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent-color)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           Quick Loop
         </span>
         <button

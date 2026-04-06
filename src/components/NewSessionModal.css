@@ -356,7 +356,7 @@
 .new-session-branch-from-current input[type="checkbox"] {
   width: 14px;
   height: 14px;
-  accent-color: #FF6B35;
+  accent-color: var(--accent-color);
 }
 
 .new-session-branch-hint {
@@ -386,7 +386,7 @@
 .new-session-worktree-toggle input[type="checkbox"] {
   width: 14px;
   height: 14px;
-  accent-color: #FF6B35;
+  accent-color: var(--accent-color);
   margin-top: 2px;
   flex-shrink: 0;
 }

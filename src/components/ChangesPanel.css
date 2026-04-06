@@ -45,7 +45,7 @@
   flex-shrink: 0;
   font-size: 9px;
   font-weight: 700;
-  color: #FF6B35;
+  color: var(--accent-color);
   background: rgba(255, 107, 53, 0.15);
   padding: 1px 6px;
   border-radius: var(--radius-sm);

@@ -34,10 +34,15 @@ export default function PluginCard({
       case "mcp":
         return "#ec4899"; // pink
       case "stack":
-        return "#f28c52"; // orange
+        return "var(--accent-color)"; // orange
       default:
         return "#6b7280"; // gray
     }
+  };
+
+  const getCategoryBg = (category: string) => {
+    if (category === "stack") return "rgba(var(--accent-rgb), 0.12)";
+    return `${getCategoryColor(category)}20`;
   };
 
   const getCategoryIcon = (category: string) => {
@@ -154,7 +159,7 @@ export default function PluginCard({
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = "rgba(12, 16, 24, 0.8)";
-        e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
+        e.currentTarget.style.borderColor = "rgba(var(--accent-rgb), 0.3)";
         e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseLeave={(e) => {
@@ -169,7 +174,7 @@ export default function PluginCard({
           <div
             className="flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium"
             style={{
-              background: `${getCategoryColor(plugin.category)}20`,
+              background: getCategoryBg(plugin.category),
               color: getCategoryColor(plugin.category),
             }}
           >
@@ -321,19 +326,19 @@ export default function PluginCard({
               disabled={isInstalling}
               className="flex-1 px-2 py-1.5 rounded text-xs font-medium transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
               style={{
-                background: "rgba(242, 140, 82, 0.1)",
-                border: "1px solid rgba(242, 140, 82, 0.3)",
-                color: "#f28c52",
+                background: "rgba(var(--accent-rgb), 0.1)",
+                border: "1px solid rgba(var(--accent-rgb), 0.3)",
+                color: "var(--accent-color)",
               }}
               onMouseEnter={(e) => {
                 if (!isInstalling) {
-                  e.currentTarget.style.background = "rgba(242, 140, 82, 0.2)";
-                  e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.5)";
+                  e.currentTarget.style.background = "rgba(var(--accent-rgb), 0.2)";
+                  e.currentTarget.style.borderColor = "rgba(var(--accent-rgb), 0.5)";
                 }
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(242, 140, 82, 0.1)";
-                e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
+                e.currentTarget.style.background = "rgba(var(--accent-rgb), 0.1)";
+                e.currentTarget.style.borderColor = "rgba(var(--accent-rgb), 0.3)";
               }}
             >
               {isInstalling ? (

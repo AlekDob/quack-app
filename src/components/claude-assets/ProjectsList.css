@@ -77,8 +77,8 @@
 }
 
 .project-item.selected {
-  background: rgba(242, 140, 82, 0.08);
-  border-color: rgba(242, 140, 82, 0.2);
+  background: rgba(var(--accent-rgb), 0.08);
+  border-color: rgba(var(--accent-rgb), 0.2);
 }
 
 .project-item.can-drop {

@@ -221,7 +221,7 @@
 .repo-new-agent-btn:hover {
   background: rgba(255, 107, 53, 0.2);
   border-color: rgba(255, 107, 53, 0.4);
-  color: #FF6B35;
+  color: var(--accent-color);
 }
 
 .repo-new-agent-btn:active {

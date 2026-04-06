@@ -2,14 +2,16 @@
 type: pattern
 project: quack-app
 created: 2026-04-03
-last_verified: 2026-04-03
-tags: [team, delegation, remote-api, popover, footer, agents]
+last_verified: 2026-04-06
+tags: [team, delegation, remote-api, mention, projectTerminals, agents]
 ---
-# Pattern: Team Delegation from Chat Footer
+# Pattern: Team Delegation via @ Mention
 
 ## Context
 
-Team delegation lives in the chat footer controls, allowing users to dispatch tasks to other agents without leaving the active conversation. This replaces the old team creation flow that lived in `RepositoryGroup.tsx` (hidden on hover, 3+ clicks away).
+Team delegation lets users dispatch tasks to project agents via `@` mentions in the chat input. Typing `@` shows sibling agents from the same project, each with their avatar. Selecting one inserts `@team delegate to <name>:` which triggers the content enrichment in App.tsx.
+
+This replaced the old team icon button + generic `@team` entry (removed 2026-04-06).
 
 ## Two Delegation Patterns
 
@@ -18,57 +20,77 @@ Quack has two distinct delegation modes, both using `POST /api/execute`:
 | Mode | Trigger | `leadSessionId` | Auto-done | Notification |
 |------|---------|-----------------|-----------|-------------|
 | **Direct** | `quack-remote` skill / user prompt | NOT set | No | No |
-| **Managed** | Team footer icon (this pattern) | SET | Yes | Yes |
+| **Managed** | `@team` mention (this pattern) | SET | Yes | Yes |
 
-The **only programmatic difference** is whether `leadSessionId` is populated. Title prefixes (`[Team]` vs `[Remote]`) are cosmetic — all logic checks `leadSessionId`.
+The **only programmatic difference** is whether `leadSessionId` is populated. Title prefixes (`[Team]` vs `[Remote]`) are cosmetic.
 
 ## Architecture
+
+### Data Source: projectTerminals
+
+The mention popup's "Team" section sources agents from the sidebar terminals. The flow:
+
+```
+App.tsx state: terminals[] (all active agents)
+  ↓ filter: same cwd as activeTerminal, exclude self
+  ↓
+projectTerminals prop → ChatView → ChatInput
+  ↓
+filteredTeammates (useMemo, filtered by @mention text)
+  ↓
+Team section in mention popup (AgentAvatar + label + workingOn)
+```
+
+This means: **every agent visible in the sidebar under the same project is citeable via `@`**.
 
 ### Components
 
 | File | Role |
 |------|------|
-| `src/components/TeamDelegationPopover.tsx` | Popover UI: agent checkboxes + task textarea + submit |
-| `src/components/TeamDelegationPopover.css` | Glassmorphism styling, slide-up animation |
-| `src/services/remoteApi.ts` | `fetchRemoteAgents()`, `executeRemoteTask()`, `notifyLeadAgent()` |
-| `src/components/ActionIcons.tsx` | Footer icon that toggles the popover |
+| `src/App.tsx` | Filters `terminals` by cwd → `projectTerminals` prop; `@team` content enrichment |
+| `src/components/ChatView.tsx` | Passes `projectTerminals` prop through to ChatInput |
+| `src/components/ChatInput.tsx` | `filteredTeammates`, `selectTeammate()`, Team section JSX, teammate mention chips |
+| `src/components/AgentAvatar.tsx` | Reused for teammate avatars in popup (DRY) |
+| `src/services/remoteApi.ts` | `notifyLeadAgent()`, `executeRemoteTask()`, `fetchRemoteAgents()` |
 
-### Data Flow
+### Mention Popup Order
 
-1. User clicks team icon in `div.chat-view-footer-controls`
-2. `TeamDelegationPopover` opens, calls `fetchRemoteAgents()` → `GET /api/agents`
-3. User selects agents + writes task description
-4. `handleDelegate()` calls `executeRemoteTask()` for each selected agent with `leadSessionId = currentSessionId`
-5. Each teammate receives a new session via `POST /api/execute`
-6. On teammate completion (stream ends + `leadSessionId` present) → auto-done + `notifyLeadAgent()`
-7. Lead receives inline notification via `POST /api/sessions/:leadSessionId/send`
+1. **Team** — project terminals (same cwd, exclude self)
+2. **Skills** — from `loadAvailableSkills(basePath)`
+3. **Droids** — from `agents` prop (AgentInfo[] from list_agents)
+4. **Features** — from `useFeatureMapData(basePath)`
+5. **Files** — from `search_files_recursive` (debounced)
 
 ### Key Implementation Details
 
-- **Outside click dismiss**: `useEffect` with `mousedown` listener and `popoverRef.contains()` check
-- **Agent filtering**: current agent is excluded from the list (`agents.filter(a => a.id !== currentAgentId)`)
-- **Project override**: agents without a project receive the lead's `projectPath` as fallback
-- **Parallel dispatch**: tasks are sent sequentially per agent (for loop), but could be parallelized if needed
-- **Error aggregation**: failures are collected per-agent and displayed; partial success still closes the popover
+- **Teammate filtering**: `projectTerminals.filter(t => t.label.includes(filter) || 'team'.includes(filter))`
+- **selectTeammate(name)**: inserts `@team delegate to <name>: ` at cursor — triggers existing `@team` content enrichment
+- **Mention chip**: regex `/@team\s+delegate\s+to\s+([\w\s-]+?):/gi` extracts teammate names → renders orange-branded chip with AgentAvatar
+- **Index chain**: keyboard nav offsets: `filteredTeammates.length + filteredSkills.length + filteredAgents.length + ...`
+- **No store dependency**: uses `projectTerminals` prop from App.tsx, not any Zustand store
 
-### CSS Pattern
+### CSS Classes
 
-Popover uses `position: absolute; bottom: calc(100% + 8px)` to float above the footer. Glassmorphism with `backdrop-filter: blur(20px)`, dark translucent background, and a 0.15s slide-up animation.
+| Class | Purpose |
+|-------|---------|
+| `.team-member-item` | Mention popup row for teammates |
+| `.team-member-item .agent-autocomplete-name` | Orange (#FF6B35) name color |
+| `.agent-autocomplete-avatar` | 24px round avatar (shared with droids) |
+| `.chat-input-team-chip` | Input mention chip (orange background/border) |
+| `.chat-input-team-chip .chat-input-mention-name` | Orange (#FF6B35) chip text |
 
 ## Notification Format
 
 ```
-🦆 [Team Complete] Agent {agentId} ha completato il task assegnato.
+[Team Complete] Agent {agentId} ha completato il task assegnato.
 
 Task: {taskSummary}
 Status: Completato
 ```
 
-The `taskSummary` is derived from `session.title` with `[Team]`/`[Remote]` prefix stripped.
-
 ## When to Use This Pattern
 
-- Adding new delegation targets (e.g., MCP servers, external agents)
+- Adding new delegation targets (MCP servers, external agents)
 - Modifying the auto-done/notification flow
-- Extending the popover with agent status, progress, or result preview
-- Building similar footer popovers (same positioning + dismiss + animation pattern)
+- Adding new mention types to the popup (same index chain pattern)
+- Building teammate-aware UI (use `projectTerminals` prop, not store)

@@ -69,10 +69,11 @@ describe('Background Tasks UI - Accessibility', () => {
   });
 
   it('should have proper focus states', () => {
-    const focusBorderColor = 'rgba(242, 140, 82, 0.5)';
+    // Focus border uses CSS variable — resolved at runtime via var(--accent-rgb)
+    const focusBorderColor = 'rgba(var(--accent-rgb), 0.5)';
 
-    // Orange accent color for focus
-    expect(focusBorderColor).toContain('242, 140, 82');
+    // Accent color for focus is now CSS-variable based
+    expect(focusBorderColor).toContain('--accent-rgb');
   });
 
   it('should have adequate spacing between elements', () => {

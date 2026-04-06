@@ -329,7 +329,7 @@ function ActionIcons({
                   position: 'absolute',
                   top: '-2px',
                   right: '-2px',
-                  background: '#f28c52',
+                  background: 'var(--accent-color)',
                   color: '#fff',
                   fontSize: '8px',
                   fontWeight: 600,

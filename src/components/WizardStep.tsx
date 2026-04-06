@@ -33,7 +33,7 @@ export default function WizardStep({
               className="flex-1 h-1.5 rounded-full transition-all duration-300"
               style={{
                 background: isActive || isCompleted
-                  ? "linear-gradient(135deg, #f28c52 0%, #e67339 100%)"
+                  ? "linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)"
                   : "rgba(255, 255, 255, 0.1)",
               }}
             />
@@ -45,7 +45,7 @@ export default function WizardStep({
       <div
         className="inline-flex items-center justify-center w-10 h-10 rounded-full mb-4 text-sm font-semibold"
         style={{
-          background: "linear-gradient(135deg, #f28c52 0%, #e67339 100%)",
+          background: "linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)",
           color: "#ffffff",
         }}
       >
@@ -55,7 +55,7 @@ export default function WizardStep({
       {/* Title and description */}
       <h2
         className="text-2xl font-bold mb-2"
-        style={{ color: "#f28c52" }}
+        style={{ color: "var(--accent-color)" }}
       >
         {title}
       </h2>

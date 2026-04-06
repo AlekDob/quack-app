@@ -223,9 +223,9 @@ Save the skill to .claude/skills/${spec.name}/ in the current project.`;
               onClick={() => setMode('skill')}
               className="flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2"
               style={{
-                background: mode === 'skill' ? 'rgba(247, 147, 30, 0.15)' : 'rgba(255, 255, 255, 0.05)',
-                color: mode === 'skill' ? '#F7931E' : 'rgba(255, 255, 255, 0.6)',
-                border: mode === 'skill' ? '1px solid #F7931E' : '1px solid rgba(255, 255, 255, 0.1)',
+                background: mode === 'skill' ? 'rgba(var(--accent-rgb), 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                color: mode === 'skill' ? 'var(--accent-color)' : 'rgba(255, 255, 255, 0.6)',
+                border: mode === 'skill' ? '1px solid var(--accent-color)' : '1px solid rgba(255, 255, 255, 0.1)',
               }}
             >
               <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">

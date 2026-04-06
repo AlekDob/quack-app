@@ -16,16 +16,22 @@ export default function MermaidDiagram({ children }: MermaidDiagramProps) {
   const [isRendering, setIsRendering] = useState(true);
 
   useEffect(() => {
+    // Read accent color from CSS variable at runtime (mermaid needs resolved values)
+    const accentColor = getComputedStyle(document.documentElement)
+      .getPropertyValue('--accent-color').trim() || '#f28c52';
+    const accentRgb = getComputedStyle(document.documentElement)
+      .getPropertyValue('--accent-rgb').trim() || '242, 140, 82';
+
     // Initialize mermaid with dark theme settings
     mermaid.initialize({
       startOnLoad: false,
       theme: 'dark',
       themeVariables: {
-        primaryColor: '#f28c52',
+        primaryColor: accentColor,
         primaryTextColor: '#fff',
-        primaryBorderColor: '#f28c52',
+        primaryBorderColor: accentColor,
         lineColor: 'rgba(255, 255, 255, 0.3)',
-        secondaryColor: 'rgba(242, 140, 82, 0.2)',
+        secondaryColor: `rgba(${accentRgb}, 0.2)`,
         tertiaryColor: 'rgba(255, 255, 255, 0.05)',
         background: 'transparent',
         mainBkg: 'rgba(255, 255, 255, 0.05)',

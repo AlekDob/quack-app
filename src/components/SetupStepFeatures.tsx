@@ -55,13 +55,13 @@ export default function SetupStepFeatures({
                 className="flex items-center gap-4 px-6 py-6 rounded-lg border transition-all duration-200 text-left"
                 style={{
                   background: isSelected
-                    ? "rgba(242, 140, 82, 0.1)"
+                    ? "rgba(var(--accent-rgb), 0.1)"
                     : "rgba(12, 16, 24, 0.6)",
                   border: isSelected
-                    ? "1px solid #f28c52"
+                    ? "1px solid var(--accent-color)"
                     : "1px solid rgba(255, 255, 255, 0.12)",
                   boxShadow: isSelected
-                    ? "0 4px 12px rgba(242, 140, 82, 0.2)"
+                    ? "0 4px 12px rgba(var(--accent-rgb), 0.2)"
                     : "0 2px 8px rgba(0, 0, 0, 0.2)",
                   transform: isSelected ? "scale(1.02)" : "scale(1)",
                 }}
@@ -70,8 +70,8 @@ export default function SetupStepFeatures({
                 <div
                   className="flex items-center justify-center w-6 h-6 rounded border-2 transition-all duration-200 flex-shrink-0"
                   style={{
-                    borderColor: isSelected ? "#f28c52" : "rgba(255, 255, 255, 0.3)",
-                    background: isSelected ? "#f28c52" : "transparent",
+                    borderColor: isSelected ? "var(--accent-color)" : "rgba(255, 255, 255, 0.3)",
+                    background: isSelected ? "var(--accent-color)" : "transparent",
                   }}
                 >
                   {isSelected && (
@@ -92,7 +92,7 @@ export default function SetupStepFeatures({
                 <span
                   className="flex-1 text-base font-medium"
                   style={{
-                    color: isSelected ? "#f28c52" : "rgba(255, 255, 255, 0.9)",
+                    color: isSelected ? "var(--accent-color)" : "rgba(255, 255, 255, 0.9)",
                   }}
                 >
                   {feature.name}
@@ -107,8 +107,8 @@ export default function SetupStepFeatures({
           <div
             className="mt-4 p-3 rounded-lg text-center text-sm font-medium"
             style={{
-              background: "rgba(242, 140, 82, 0.1)",
-              color: "#f28c52",
+              background: "rgba(var(--accent-rgb), 0.1)",
+              color: "var(--accent-color)",
             }}
           >
             ✓ {features.length} feature{features.length !== 1 ? "s" : ""} selected
@@ -120,15 +120,15 @@ export default function SetupStepFeatures({
           <div
             className="mt-4 p-4 rounded-lg border"
             style={{
-              background: "rgba(242, 140, 82, 0.05)",
-              border: "1px solid rgba(242, 140, 82, 0.2)",
+              background: "rgba(var(--accent-rgb), 0.05)",
+              border: "1px solid rgba(var(--accent-rgb), 0.2)",
             }}
           >
             <p
               className="text-sm leading-relaxed"
               style={{ color: "rgba(255, 255, 255, 0.7)" }}
             >
-              💡 <strong style={{ color: "#f28c52" }}>Tip:</strong> Select at least one feature to help the team understand your project needs. You can skip this if you're not sure yet!
+              💡 <strong style={{ color: "var(--accent-color)" }}>Tip:</strong> Select at least one feature to help the team understand your project needs. You can skip this if you're not sure yet!
             </p>
           </div>
         )}

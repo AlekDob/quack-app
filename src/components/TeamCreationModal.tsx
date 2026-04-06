@@ -269,9 +269,9 @@ export default function TeamCreationModal({
             onClick={handleSubmit}
             disabled={isSubmitting || selectedAgentIds.size < 2 || !leadAgentId}
             style={{
-              background: 'rgba(255, 107, 53, 0.2)',
-              color: 'rgba(255, 107, 53, 0.95)',
-              borderColor: 'rgba(255, 107, 53, 0.3)',
+              background: 'rgba(var(--accent-rgb), 0.20)',
+              color: 'rgba(var(--accent-rgb), 0.95)',
+              borderColor: 'rgba(var(--accent-rgb), 0.30)',
             }}
           >
             {isSubmitting ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Team'}

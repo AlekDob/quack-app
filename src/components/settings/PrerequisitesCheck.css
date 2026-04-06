@@ -76,13 +76,13 @@
 .prerequisites-icon {
   width: 44px;
   height: 44px;
-  background: linear-gradient(135deg, rgba(242, 140, 82, 0.2), rgba(242, 140, 82, 0.1));
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.2), rgba(var(--accent-rgb), 0.1));
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 10px;
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 .prerequisites-icon svg {
@@ -171,7 +171,7 @@
 
 .prerequisite-action {
   padding: 6px 12px;
-  background: linear-gradient(135deg, #f28c52, #e67a42);
+  background: linear-gradient(135deg, var(--accent-color), var(--accent-gradient-end));
   border: none;
   border-radius: var(--radius-sm);
   color: white;
@@ -179,7 +179,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 8px rgba(242, 140, 82, 0.3);
+  box-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.3);
   display: flex;
   align-items: center;
   gap: 5px;
@@ -189,7 +189,7 @@
 
 .prerequisite-action:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(242, 140, 82, 0.4);
+  box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.4);
 }
 
 .prerequisite-action:disabled {
@@ -227,8 +227,8 @@
 .prerequisites-spinner {
   width: 24px;
   height: 24px;
-  border: 2px solid rgba(242, 140, 82, 0.2);
-  border-top-color: #f28c52;
+  border: 2px solid rgba(var(--accent-rgb), 0.2);
+  border-top-color: var(--accent-color);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -325,7 +325,7 @@
 .prerequisites-continue {
   flex: 2;
   padding: 10px 16px;
-  background: linear-gradient(135deg, #f28c52, #e67a42);
+  background: linear-gradient(135deg, var(--accent-color), var(--accent-gradient-end));
   border: none;
   border-radius: 8px;
   color: white;
@@ -333,12 +333,12 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(242, 140, 82, 0.3);
+  box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.3);
 }
 
 .prerequisites-continue:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(242, 140, 82, 0.4);
+  box-shadow: 0 6px 16px rgba(var(--accent-rgb), 0.4);
 }
 
 .prerequisites-continue:disabled {

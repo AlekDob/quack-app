@@ -124,7 +124,7 @@ export default function SkillsPanel({
             <div className="text-5xl mb-4">⚡</div>
             <h4
               className="text-base font-semibold mb-2"
-              style={{ color: "#f28c52" }}
+              style={{ color: "var(--accent-color)" }}
             >
               No Project Skills
             </h4>
@@ -132,7 +132,7 @@ export default function SkillsPanel({
               className="text-sm mb-6 max-w-xs"
               style={{ color: "rgba(255, 255, 255, 0.6)" }}
             >
-              Create a <code className="px-1 py-0.5 rounded text-xs font-mono" style={{ background: "rgba(242, 140, 82, 0.1)", color: "#f28c52" }}>.claude/skills/</code> directory in this project to add project-specific skills.
+              Create a <code className="px-1 py-0.5 rounded text-xs font-mono" style={{ background: "rgba(var(--accent-rgb), 0.1)", color: "var(--accent-color)" }}>.claude/skills/</code> directory in this project to add project-specific skills.
             </p>
             <p
               className="text-xs max-w-xs"
@@ -160,8 +160,8 @@ export default function SkillsPanel({
               <code
                 className="px-1.5 py-0.5 rounded text-xs font-mono"
                 style={{
-                  background: "rgba(242, 140, 82, 0.1)",
-                  color: "#f28c52",
+                  background: "rgba(var(--accent-rgb), 0.1)",
+                  color: "var(--accent-color)",
                 }}
               >
                 .claude/skills/
@@ -218,7 +218,7 @@ export default function SkillsPanel({
                         onDragStart={(e) => handleSkillDragStart(e, skill)}
                       >
                         {/* Star Icon - Orange gradient background with white icon (matches Quack Store) */}
-                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f28c52, #e67339)' }}>
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--accent-color), var(--accent-gradient-end))' }}>
                           <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
                             <path d="M10 2l2.4 4.8 5.3.8-3.8 3.7.9 5.2L10 14l-4.8 2.5.9-5.2-3.8-3.7 5.3-.8L10 2z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
                           </svg>
@@ -272,7 +272,7 @@ export default function SkillsPanel({
                         onDragStart={(e) => handleSkillDragStart(e, skill)}
                       >
                         {/* Star Icon - Orange gradient background with white icon (matches Quack Store) */}
-                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f28c52, #e67339)' }}>
+                        <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--accent-color), var(--accent-gradient-end))' }}>
                           <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
                             <path d="M10 2l2.4 4.8 5.3.8-3.8 3.7.9 5.2L10 14l-4.8 2.5.9-5.2-3.8-3.7 5.3-.8L10 2z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
                           </svg>

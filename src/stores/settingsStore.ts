@@ -3,6 +3,7 @@ import { devtools, persist } from 'zustand/middleware';
 import type { EffortLevel, ModePreset, AgentModePresets, LLMProviderType } from '../types';
 import { applyTypography, DEFAULT_TYPOGRAPHY } from '../constants/typography';
 import type { TypographySettings, FontSizePreset } from '../constants/typography';
+import { applyAccentColor, DEFAULT_ACCENT } from '../utils/accentColor';
 
 /**
  * Normalize legacy model short names to Supabase IDs.
@@ -73,6 +74,10 @@ interface GeneralSettings {
   btwShortcut: string; // Keyboard shortcut for BTW drawer (default: Ctrl+B)
 }
 
+interface AppearanceSettings {
+  accentColor: string; // Hex color for primary accent (default #f28c52)
+}
+
 interface SettingsState {
   // Settings groups
   claude: ClaudeSettings;
@@ -80,6 +85,7 @@ interface SettingsState {
   general: GeneralSettings;
   agentModePresets: AgentModePresets;
   typography: TypographySettings;
+  appearance: AppearanceSettings;
 
   // Actions - Claude
   setClaudeApiKey: (key: string | null) => void;
@@ -104,6 +110,10 @@ interface SettingsState {
   setFontSizePreset: (preset: FontSizePreset) => void;
   updateTypography: (settings: Partial<TypographySettings>) => void;
   resetTypography: () => void;
+
+  // Actions - Appearance
+  setAccentColor: (hex: string) => void;
+  resetAccentColor: () => void;
 
   // Actions - Global
   resetAllSettings: () => void;
@@ -205,6 +215,7 @@ export const useSettingsStore = create<SettingsState>()(
         general: defaultGeneralSettings,
         agentModePresets: defaultAgentModePresets,
         typography: DEFAULT_TYPOGRAPHY,
+        appearance: { accentColor: DEFAULT_ACCENT },
 
         // Claude actions
         setClaudeApiKey: (key) => set((state) => ({
@@ -283,14 +294,27 @@ export const useSettingsStore = create<SettingsState>()(
           set({ typography: DEFAULT_TYPOGRAPHY });
         },
 
+        // Appearance actions
+        setAccentColor: (hex: string) => {
+          applyAccentColor(hex);
+          set({ appearance: { accentColor: hex } });
+        },
+
+        resetAccentColor: () => {
+          applyAccentColor(DEFAULT_ACCENT);
+          set({ appearance: { accentColor: DEFAULT_ACCENT } });
+        },
+
         // Global actions
         resetAllSettings: () => {
           applyTypography(DEFAULT_TYPOGRAPHY);
+          applyAccentColor(DEFAULT_ACCENT);
           set({
             claude: defaultClaudeSettings,
             terminal: defaultTerminalSettings,
             general: defaultGeneralSettings,
             typography: DEFAULT_TYPOGRAPHY,
+            appearance: { accentColor: DEFAULT_ACCENT },
           });
         },
 
@@ -341,7 +365,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
-        version: 7,
+        version: 8,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
@@ -349,6 +373,7 @@ export const useSettingsStore = create<SettingsState>()(
           general: state.general,
           agentModePresets: state.agentModePresets,
           typography: state.typography,
+          appearance: state.appearance,
         }),
         // Migrate persisted legacy model IDs (sonnet→sonnet45, opus→opus46, haiku→haiku45)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -404,6 +429,12 @@ export const useSettingsStore = create<SettingsState>()(
                 // Preserve existing mono font from terminal settings if available
                 fontFamilyMono: persisted.terminal?.fontFamily || DEFAULT_TYPOGRAPHY.fontFamilyMono,
               };
+            }
+          }
+          // v8: Add Appearance settings (accent color)
+          if (version < 8) {
+            if (!persisted.appearance) {
+              persisted.appearance = { accentColor: DEFAULT_ACCENT };
             }
           }
           return persisted;

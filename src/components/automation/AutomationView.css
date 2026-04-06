@@ -103,7 +103,7 @@
   font-size: 13px;
   font-weight: 500;
   border: none;
-  background: #f28c52;
+  background: var(--accent-color);
   color: white;
   border-radius: var(--radius-sm);
   cursor: pointer;
@@ -214,7 +214,7 @@
 }
 
 .automation-toggle.on {
-  background: #f28c52;
+  background: var(--accent-color);
 }
 
 .automation-toggle.off {
@@ -409,7 +409,7 @@
 .automation-form-input:focus,
 .automation-form-select:focus,
 .automation-form-textarea:focus {
-  border-color: rgba(242, 140, 82, 0.5);
+  border-color: rgba(var(--accent-rgb), 0.5);
 }
 
 .automation-form-textarea {
@@ -450,9 +450,9 @@
 }
 
 .cron-preset-btn.active {
-  background: rgba(242, 140, 82, 0.1);
-  border-color: rgba(242, 140, 82, 0.3);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.1);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  color: var(--accent-color);
 }
 
 .cron-preset-label {
@@ -475,7 +475,7 @@
 
 .cron-preview {
   font-size: 11px;
-  color: rgba(242, 140, 82, 0.8);
+  color: rgba(var(--accent-rgb), 0.8);
   margin-top: 6px;
   font-style: italic;
 }
@@ -543,7 +543,7 @@
 }
 
 .automation-form-btn.save {
-  background: #f28c52;
+  background: var(--accent-color);
   color: #fff;
 }
 
@@ -620,7 +620,7 @@
 
 .automation-history-session-link {
   font-size: 11px;
-  color: #f28c52;
+  color: var(--accent-color);
   background: none;
   border: none;
   cursor: pointer;
@@ -630,7 +630,7 @@
 }
 
 .automation-history-session-link:hover {
-  background: rgba(242, 140, 82, 0.1);
+  background: rgba(var(--accent-rgb), 0.1);
 }
 
 /* ─── Agent Selection List ───────────────────────────────────────── */
@@ -675,8 +675,8 @@
 }
 
 .automation-agent-option.selected {
-  background: rgba(242, 140, 82, 0.1);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent-color);
 }
 
 .automation-agent-option-info {
@@ -697,7 +697,7 @@
 
 .automation-selected-summary {
   font-size: 11px;
-  color: rgba(242, 140, 82, 0.7);
+  color: rgba(var(--accent-rgb), 0.7);
   margin-top: 6px;
   font-style: italic;
 }

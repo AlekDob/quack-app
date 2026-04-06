@@ -65,8 +65,8 @@ export default function SetupStepProject({
               boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = "#f28c52";
-              e.target.style.boxShadow = "0 0 0 3px rgba(242, 140, 82, 0.1)";
+              e.target.style.borderColor = "var(--accent-color)";
+              e.target.style.boxShadow = "0 0 0 3px rgba(var(--accent-rgb), 0.1)";
             }}
             onBlur={(e) => {
               e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
@@ -96,8 +96,8 @@ export default function SetupStepProject({
               boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
             }}
             onFocus={(e) => {
-              e.target.style.borderColor = "#f28c52";
-              e.target.style.boxShadow = "0 0 0 3px rgba(242, 140, 82, 0.1)";
+              e.target.style.borderColor = "var(--accent-color)";
+              e.target.style.boxShadow = "0 0 0 3px rgba(var(--accent-rgb), 0.1)";
             }}
             onBlur={(e) => {
               e.target.style.borderColor = "rgba(255, 255, 255, 0.12)";
@@ -116,15 +116,15 @@ export default function SetupStepProject({
         <div
           className="mt-4 p-4 rounded-lg border"
           style={{
-            background: "rgba(242, 140, 82, 0.05)",
-            border: "1px solid rgba(242, 140, 82, 0.2)",
+            background: "rgba(var(--accent-rgb), 0.05)",
+            border: "1px solid rgba(var(--accent-rgb), 0.2)",
           }}
         >
           <p
             className="text-sm leading-relaxed"
             style={{ color: "rgba(255, 255, 255, 0.7)" }}
           >
-            🦆 <strong style={{ color: "#f28c52" }}>Quack Tip:</strong> Don't worry about being too specific. Jack and the team will help refine your project direction as you go!
+            🦆 <strong style={{ color: "var(--accent-color)" }}>Quack Tip:</strong> Don't worry about being too specific. Jack and the team will help refine your project direction as you go!
           </p>
         </div>
       </div>

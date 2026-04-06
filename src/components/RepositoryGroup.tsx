@@ -8,6 +8,7 @@ import {
   useRef,
 } from "react";
 import { createPortal } from "react-dom";
+import KeyboardShortcutTooltip from "./KeyboardShortcutTooltip";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { Store } from "@tauri-apps/plugin-store";
 import { toast } from "sonner";
@@ -85,6 +86,7 @@ interface RepositoryGroupProps {
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
   projectColor?: string;
+  onProjectColorChange?: (color: string) => void;
 }
 
 // Helper function to get avatar image URL (works in both dev and production)
@@ -1135,8 +1137,11 @@ export default function RepositoryGroup({
   isFavorite,
   onToggleFavorite,
   projectColor,
+  onProjectColorChange,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const colorBtnRef = useRef<HTMLButtonElement>(null);
   const [showGitMenu, setShowGitMenu] = useState<string | null>(null);
   const [commitHistoryModal, setCommitHistoryModal] = useState<{
     branchName: string;
@@ -1947,13 +1952,13 @@ export default function RepositoryGroup({
           >
             {/* Star/Favorite button */}
             {onToggleFavorite && (
+              <KeyboardShortcutTooltip label={isFavorite ? "Unfavorite" : "Favorite"}>
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleFavorite();
                 }}
-                title={isFavorite ? "Remove from favorites" : "Add to favorites"}
                 className={`repo-action-btn${isFavorite ? ' repo-action-btn--favorite' : ''}`}
                 style={isFavorite ? { color: 'rgba(251, 191, 36, 0.9)' } : undefined}
               >
@@ -1970,8 +1975,10 @@ export default function RepositoryGroup({
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                 </svg>
               </button>
+              </KeyboardShortcutTooltip>
             )}
             {/* Copy Path button */}
+            <KeyboardShortcutTooltip label="Copy Path">
             <button
               type="button"
               onClick={async () => {
@@ -1983,7 +1990,6 @@ export default function RepositoryGroup({
                   toast.error("Failed to copy path");
                 }
               }}
-              title="Copy path to clipboard"
               className="repo-action-btn"
             >
               <svg
@@ -2000,12 +2006,13 @@ export default function RepositoryGroup({
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
               </svg>
             </button>
+            </KeyboardShortcutTooltip>
             {/* Open Terminal Window button */}
             {onOpenTerminalWindow && (
+              <KeyboardShortcutTooltip label="Terminal">
               <button
                 type="button"
                 onClick={() => onOpenTerminalWindow(repoPath, repoName)}
-                title="Open in Terminal Window"
                 className="repo-action-btn"
               >
                 <svg
@@ -2022,15 +2029,15 @@ export default function RepositoryGroup({
                   <line x1="12" y1="19" x2="20" y2="19" />
                 </svg>
               </button>
+              </KeyboardShortcutTooltip>
             )}
             {/* Saved Commands button */}
             {onOpenSavedCommands && (
+              <KeyboardShortcutTooltip label="Commands">
               <button
                 type="button"
                 onClick={() => onOpenSavedCommands(repoPath)}
-                title="Saved Commands"
                 className="repo-action-btn"
-                style={undefined}
               >
                 <svg
                   width="14"
@@ -2046,15 +2053,15 @@ export default function RepositoryGroup({
                   <path d="M7 8h10M7 12h6" />
                 </svg>
               </button>
+              </KeyboardShortcutTooltip>
             )}
             {/* Open Brain button */}
             {onOpenBrain && (
+              <KeyboardShortcutTooltip label="Brain">
               <button
                 type="button"
                 onClick={() => onOpenBrain(repoPath)}
-                title="Open Brain"
                 className="repo-action-btn"
-                style={undefined}
               >
                 <svg
                   width="14"
@@ -2072,43 +2079,73 @@ export default function RepositoryGroup({
                   <path d="M12 18v4" />
                 </svg>
               </button>
+              </KeyboardShortcutTooltip>
             )}
-            {/* Open Memory Folder button */}
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await invoke("open_claude_memory_folder", { workingDir: repoPath });
-                } catch (err) {
-                  const msg = String(err);
-                  if (msg.includes("not found")) {
-                    toast.error("Memory not initialized. Start a Claude Code session first.");
-                  } else {
-                    console.error("Failed to open memory folder:", err);
-                    toast.error("Failed to open memory folder");
-                  }
-                }
-              }}
-              title="Open Memory Folder"
-              className="repo-action-btn"
-              style={undefined}
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
-                <path d="M9 13a4.5 4.5 0 0 0 3 4" />
-                <path d="M12 18v2" />
-                <path d="M12 5V3" />
-              </svg>
-            </button>
+            {/* Project Color picker */}
+            {onProjectColorChange && (
+              <div style={{ position: 'relative' }}>
+                <KeyboardShortcutTooltip label="Color">
+                <button
+                  ref={colorBtnRef}
+                  type="button"
+                  onClick={() => setShowColorPicker(!showColorPicker)}
+                  className="repo-action-btn"
+                >
+                  <div style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
+                    background: projectColor || 'var(--text-tertiary)',
+                    border: '1.5px solid rgba(255,255,255,0.2)',
+                  }} />
+                </button>
+                </KeyboardShortcutTooltip>
+                {showColorPicker && createPortal(
+                  <div
+                    style={{
+                      position: 'fixed',
+                      top: (colorBtnRef.current?.getBoundingClientRect().bottom ?? 0) + 6,
+                      left: (colorBtnRef.current?.getBoundingClientRect().left ?? 0) - 40,
+                      display: 'flex',
+                      gap: '6px',
+                      padding: '8px 10px',
+                      background: 'rgba(15, 17, 21, 0.95)',
+                      backdropFilter: 'blur(20px)',
+                      WebkitBackdropFilter: 'blur(20px)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      zIndex: 2147483647,
+                    }}
+                    onMouseLeave={() => setShowColorPicker(false)}
+                  >
+                    {['#FF6B35', '#4DA6FF', '#9B59B6', '#2ECC71', '#E74C3C', '#F39C12', '#1ABC9C', '#E84393'].map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => {
+                          onProjectColorChange(c);
+                          setShowColorPicker(false);
+                        }}
+                        style={{
+                          width: 16,
+                          height: 16,
+                          borderRadius: '50%',
+                          background: c,
+                          border: c === projectColor ? '2px solid #fff' : '1.5px solid rgba(255,255,255,0.15)',
+                          cursor: 'pointer',
+                          padding: 0,
+                          transition: 'transform 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.25)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                      />
+                    ))}
+                  </div>,
+                  document.body,
+                )}
+              </div>
+            )}
             {/* Reveal in Finder button */}
             <button
               type="button"
@@ -2136,32 +2173,7 @@ export default function RepositoryGroup({
                 <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2Z" />
               </svg>
             </button>
-            {/* Create Team button (only when Agent Teams feature is enabled) */}
-            {mainAgents.length >= 2 && !activeTeam && (
-              <button
-                type="button"
-                onClick={() => setShowTeamModal(true)}
-                title="Create Agent Team"
-                className="repo-action-btn"
-                style={undefined}
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-              </button>
-            )}
+            {/* Team button removed — use @team in chat instead */}
             {/* New Agent button moved to project header row */}
             {/* Remove Project button */}
             {onRemoveProject && (

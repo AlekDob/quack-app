@@ -135,7 +135,7 @@ interface UIContextValue {
 const UIContext = createContext<UIContextValue | null>(null);
 
 const COLORS = [
-  '#f28c52',
+  'var(--accent-color)',
   '#ffb26f',
   '#ffd166',
   '#f77aa6',

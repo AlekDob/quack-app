@@ -17,7 +17,9 @@ import FeatureMapMinimap from './FeatureMapMinimap';
 const BG = '#0a0e1a';
 const BORDER_DEFAULT = '#1e293b';
 const BORDER_HOVER = '#00d9ff';
-const BORDER_SELECTED = '#ff6b35';
+// Brain: gotcha-pixi-csp-unsafe-eval — SVG/Canvas requires resolved hex values (no CSS variables)
+const BORDER_SELECTED = getComputedStyle(document.documentElement)
+  .getPropertyValue('--accent-color').trim() || '#ff6b35';
 const BORDER_DRAGGING = '#fbbf24';
 const LINK_COLOR = '#334155';
 const LINK_HL = '#00d9ff';

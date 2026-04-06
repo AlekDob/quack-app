@@ -82,9 +82,9 @@
 }
 
 .brain-scope-btn.active {
-  background: #FF6B35;
+  background: var(--accent-color);
   color: white;
-  border-color: #FF6B35;
+  border-color: var(--accent-color);
 }
 
 .brain-path-row {
@@ -104,7 +104,7 @@
 }
 
 .brain-path-project {
-  color: #FF6B35;
+  color: var(--accent-color);
   font-size: 10px;
   font-weight: 600;
 }
@@ -177,7 +177,7 @@
 }
 
 .brain-nav-item.active {
-  background: #FF6B35;
+  background: var(--accent-color);
   color: white;
 }
 
@@ -188,7 +188,7 @@
 }
 
 .brain-nav-map {
-  color: #FF6B35;
+  color: var(--accent-color);
   font-size: 11px;
   padding: 5px 12px;
   gap: 8px;
@@ -196,7 +196,7 @@
 
 .brain-nav-subitem.active {
   background: #2a2a30;
-  color: #FF6B35;
+  color: var(--accent-color);
 }
 
 .brain-nav-group {
@@ -263,8 +263,8 @@
 }
 
 .brain-nav-page.active {
-  background: #FF6B3515;
-  color: #FF6B35;
+  background: rgba(var(--accent-rgb), 0.08);
+  color: var(--accent-color);
   font-weight: 500;
 }
 
@@ -327,7 +327,7 @@
 }
 
 .brain-timeline-search:focus-within {
-  border-color: #FF6B35;
+  border-color: var(--accent-color);
 }
 
 .brain-timeline-search input {
@@ -366,9 +366,9 @@
 }
 
 .brain-timeline-filters button.active {
-  background: #FF6B35;
+  background: var(--accent-color);
   color: white;
-  border-color: #FF6B35;
+  border-color: var(--accent-color);
 }
 
 .brain-timeline-group {
@@ -393,7 +393,7 @@
 }
 
 .brain-event-card:hover {
-  border-color: #FF6B35;
+  border-color: var(--accent-color);
 }
 
 .brain-event-header {
@@ -418,7 +418,7 @@
 .brain-event-icon-decision { background: #3b82f620; color: #3b82f6; }
 .brain-event-icon-deploy { background: #a855f720; color: #a855f7; }
 .brain-event-icon-refactor { background: #eab30820; color: #eab308; }
-.brain-event-icon-feature { background: #FF6B3520; color: #FF6B35; }
+.brain-event-icon-feature { background: rgba(var(--accent-rgb), 0.12); color: var(--accent-color); }
 .brain-event-icon-pattern { background: #06b6d420; color: #06b6d4; }
 .brain-event-icon-gotcha { background: #f59e0b20; color: #f59e0b; }
 .brain-event-icon-diary { background: #22c55e20; color: #22c55e; }
@@ -486,7 +486,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  background: #FF6B35;
+  background: var(--accent-color);
   color: white;
   border: none;
   border-radius: var(--radius-sm);
@@ -517,7 +517,7 @@
 }
 
 .brain-entry-card:hover {
-  border-color: #FF6B35;
+  border-color: var(--accent-color);
   transform: translateY(-2px);
 }
 
@@ -621,9 +621,9 @@
 }
 
 .brain-graph-filters button.active {
-  background: #FF6B35;
+  background: var(--accent-color);
   color: white;
-  border-color: #FF6B35;
+  border-color: var(--accent-color);
 }
 
 .brain-graph {
@@ -740,9 +740,9 @@
 .brain-editor-view code { background: #2a2a30; padding: 1px 5px; border-radius: var(--radius-sm); font-size: 11px; font-family: 'Fira Code', 'JetBrains Mono', monospace; }
 .brain-editor-view ul { padding-left: 20px; margin: 4px 0; }
 .brain-editor-view li { margin: 2px 0; }
-.brain-editor-view a { color: #FF6B35; text-decoration: none; }
+.brain-editor-view a { color: var(--accent-color); text-decoration: none; }
 .brain-editor-view a:hover { text-decoration: underline; }
-.brain-table a { color: #FF6B35; text-decoration: none; }
+.brain-table a { color: var(--accent-color); text-decoration: none; }
 .brain-table a:hover { text-decoration: underline; }
 
 /* Tables */
@@ -901,7 +901,7 @@
 }
 
 .brain-guide-page:hover {
-  border-color: #FF6B35;
+  border-color: var(--accent-color);
   transform: translateY(-1px);
 }
 

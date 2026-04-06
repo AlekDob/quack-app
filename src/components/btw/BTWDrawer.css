@@ -51,7 +51,7 @@
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--accent-color, #f28c52);
+  color: var(--accent-color, var(--accent-color));
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
@@ -87,7 +87,7 @@
 }
 
 .btw-close-btn:focus-visible {
-  outline: 1.5px solid var(--accent-color, #f28c52);
+  outline: 1.5px solid var(--accent-color, var(--accent-color));
   outline-offset: 1px;
 }
 
@@ -134,7 +134,7 @@
 }
 
 .btw-query-bubble .btw-bubble-label {
-  color: var(--accent-color, #f28c52);
+  color: var(--accent-color, var(--accent-color));
 }
 
 .btw-response-bubble .btw-bubble-label {
@@ -204,7 +204,7 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--accent-color, #f28c52);
+  background: var(--accent-color, var(--accent-color));
   animation: btw-pulse 1.4s ease-in-out infinite;
 }
 
@@ -263,7 +263,7 @@
   width: 38px;
   border-radius: 8px;
   border: none;
-  background: var(--accent-color, #f28c52);
+  background: var(--accent-color, var(--accent-color));
   color: #0f1115;
   font-size: 0;
   font-weight: 700;
@@ -284,7 +284,7 @@
 }
 
 .btw-send-btn:focus-visible {
-  outline: 1.5px solid var(--accent-color, #f28c52);
+  outline: 1.5px solid var(--accent-color, var(--accent-color));
   outline-offset: 2px;
 }
 

@@ -58,10 +58,10 @@ export default function SetupStepOptions({
               className="relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
               style={{
                 background: initGit
-                  ? "linear-gradient(135deg, #f28c52 0%, #e67339 100%)"
+                  ? "linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)"
                   : "rgba(255, 255, 255, 0.2)",
                 boxShadow: initGit
-                  ? "0 2px 8px rgba(242, 140, 82, 0.4)"
+                  ? "0 2px 8px rgba(var(--accent-rgb), 0.4)"
                   : "0 2px 4px rgba(0, 0, 0, 0.2)",
               }}
             >
@@ -108,8 +108,8 @@ export default function SetupStepOptions({
                 <div
                   className="mt-3 p-3 rounded-lg text-xs"
                   style={{
-                    background: "rgba(242, 140, 82, 0.05)",
-                    border: "1px solid rgba(242, 140, 82, 0.2)",
+                    background: "rgba(var(--accent-rgb), 0.05)",
+                    border: "1px solid rgba(var(--accent-rgb), 0.2)",
                   }}
                 >
                   <ul
@@ -135,10 +135,10 @@ export default function SetupStepOptions({
               className="relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2"
               style={{
                 background: createAgents
-                  ? "linear-gradient(135deg, #f28c52 0%, #e67339 100%)"
+                  ? "linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)"
                   : "rgba(255, 255, 255, 0.2)",
                 boxShadow: createAgents
-                  ? "0 2px 8px rgba(242, 140, 82, 0.4)"
+                  ? "0 2px 8px rgba(var(--accent-rgb), 0.4)"
                   : "0 2px 4px rgba(0, 0, 0, 0.2)",
               }}
             >
@@ -158,15 +158,15 @@ export default function SetupStepOptions({
         <div
           className="mt-2 p-4 rounded-lg border"
           style={{
-            background: "rgba(242, 140, 82, 0.05)",
-            border: "1px solid rgba(242, 140, 82, 0.2)",
+            background: "rgba(var(--accent-rgb), 0.05)",
+            border: "1px solid rgba(var(--accent-rgb), 0.2)",
           }}
         >
           <p
             className="text-sm leading-relaxed"
             style={{ color: "rgba(255, 255, 255, 0.7)" }}
           >
-            💡 <strong style={{ color: "#f28c52" }}>Recommended:</strong> Enable both options for the full Quack Agency experience. Quack quack!
+            💡 <strong style={{ color: "var(--accent-color)" }}>Recommended:</strong> Enable both options for the full Quack Agency experience. Quack quack!
           </p>
         </div>
       </div>

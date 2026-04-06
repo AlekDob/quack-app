@@ -158,7 +158,7 @@ export default function IDESettings() {
                 {isSelected && (
                   <div className="ide-settings-card-check">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <circle cx="8" cy="8" r="7" fill="#f28c52" />
+                      <circle cx="8" cy="8" r="7" fill="var(--accent-color)" />
                       <path d="M5 8l2 2 4-4" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>

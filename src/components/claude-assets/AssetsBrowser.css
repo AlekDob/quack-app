@@ -85,7 +85,7 @@
 }
 
 .project-group-header:focus {
-  outline: 2px solid var(--accent-primary, #FF6B35);
+  outline: 2px solid var(--accent-primary, var(--accent-color));
   outline-offset: 2px;
 }
 

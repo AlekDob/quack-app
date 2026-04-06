@@ -241,7 +241,7 @@
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
-  color: #F7931E;
+  color: var(--accent-color);
   margin-bottom: 8px;
 }
 
@@ -302,7 +302,7 @@
   font-weight: 700;
   letter-spacing: 1.2px;
   text-transform: uppercase;
-  color: #F7931E;
+  color: var(--accent-color);
   margin-bottom: 10px;
 }
 
@@ -552,12 +552,12 @@
 }
 
 .store-get-btn-update {
-  background: rgba(242, 140, 82, 0.15);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent-color);
 }
 
 .store-get-btn-update:hover {
-  background: rgba(242, 140, 82, 0.25);
+  background: rgba(var(--accent-rgb), 0.25);
   color: #f9a06e;
 }
 
@@ -566,8 +566,8 @@
   font-weight: 600;
   padding: 2px 7px;
   border-radius: var(--radius-sm);
-  background: rgba(242, 140, 82, 0.15);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent-color);
 }
 
 /* === Empty & Error States === */

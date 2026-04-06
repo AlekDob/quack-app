@@ -62,13 +62,13 @@
 
 /* Active state - icon is "on" (e.g., sidebar open) */
 .action-icon.active {
-  background: rgba(242, 140, 82, 0.15);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent-color);
 }
 
 .action-icon.active:hover {
-  background: rgba(242, 140, 82, 0.25);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.25);
+  color: var(--accent-color);
 }
 
 .action-icon svg {
@@ -145,23 +145,23 @@
 
 /* Auth Status Icon - Not Authenticated (orange/red pulsing) */
 .action-icon.auth-status-required {
-  color: #f28c52;
+  color: var(--accent-color);
   animation: auth-pulse 2s ease-in-out infinite;
 }
 
 .action-icon.auth-status-required:hover {
-  background: rgba(242, 140, 82, 0.2);
-  color: #ff6b35;
+  background: rgba(var(--accent-rgb), 0.2);
+  color: var(--accent-color);
   animation: none;
 }
 
 @keyframes auth-pulse {
   0%, 100% {
-    color: #f28c52;
+    color: var(--accent-color);
     transform: scale(1);
   }
   50% {
-    color: #ff6b35;
+    color: var(--accent-color);
     transform: scale(1.05);
   }
 }

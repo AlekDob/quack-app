@@ -83,7 +83,7 @@ export default function SecondBrainSettings() {
           description={
             brainPath ? (
               <span style={{
-                color: isCustom ? '#FF6B35' : '#4CAF50',
+                color: isCustom ? 'var(--accent-color)' : '#4CAF50',
                 fontFamily: 'monospace',
                 fontSize: '12px',
                 wordBreak: 'break-all'

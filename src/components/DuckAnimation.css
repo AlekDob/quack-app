@@ -15,9 +15,9 @@
   border-radius: var(--radius-md);
   background: linear-gradient(
     90deg,
-    rgba(242, 140, 82, 0.02) 0%,
-    rgba(242, 140, 82, 0.05) 50%,
-    rgba(242, 140, 82, 0.02) 100%
+    rgba(var(--accent-rgb), 0.02) 0%,
+    rgba(var(--accent-rgb), 0.05) 50%,
+    rgba(var(--accent-rgb), 0.02) 100%
   );
   mask-image: linear-gradient(
     90deg,
@@ -41,10 +41,10 @@
   font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
   font-size: 24px;
   font-weight: 600;
-  color: #f28c52;
+  color: var(--accent-color);
   white-space: nowrap;
   animation: duckMarch 10s linear infinite, duckWaddle 1.5s ease-in-out infinite;
-  text-shadow: 0 2px 8px rgba(242, 140, 82, 0.3);
+  text-shadow: 0 2px 8px rgba(var(--accent-rgb), 0.3);
   transform-origin: center;
 }
 

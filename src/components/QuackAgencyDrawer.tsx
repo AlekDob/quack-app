@@ -355,7 +355,7 @@ export default function QuackAgencyDrawer({
                   <div className="text-6xl mb-6">🦆</div>
                   <h3
                     className="text-2xl font-bold mb-4"
-                    style={{ color: "#f28c52" }}
+                    style={{ color: "var(--accent-color)" }}
                   >
                     Setup Quack Agency
                   </h3>
@@ -373,8 +373,8 @@ export default function QuackAgencyDrawer({
                     <code
                       className="px-2 py-1 rounded text-xs font-mono"
                       style={{
-                        background: "rgba(242, 140, 82, 0.1)",
-                        color: "#f28c52",
+                        background: "rgba(var(--accent-rgb), 0.1)",
+                        color: "var(--accent-color)",
                       }}
                     >
                       .claude/agents/
@@ -385,18 +385,18 @@ export default function QuackAgencyDrawer({
                     type="button"
                     className="px-6 py-3 rounded-lg font-semibold text-base transition-all duration-200"
                     style={{
-                      background: "linear-gradient(135deg, #f28c52 0%, #e67339 100%)",
+                      background: "linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)",
                       color: "#ffffff",
-                      boxShadow: "0 4px 12px rgba(242, 140, 82, 0.3)",
+                      boxShadow: "0 4px 12px rgba(var(--accent-rgb), 0.3)",
                     }}
                     onClick={() => setShowWizard(true)}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 6px 20px rgba(242, 140, 82, 0.4)";
+                      e.currentTarget.style.boxShadow = "0 6px 20px rgba(var(--accent-rgb), 0.4)";
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(242, 140, 82, 0.3)";
+                      e.currentTarget.style.boxShadow = "0 4px 12px rgba(var(--accent-rgb), 0.3)";
                     }}
                   >
                     🚀 Setup Quack Agency

@@ -176,7 +176,7 @@ export default function MarketplaceDrawer({
       >
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-semibold" style={{ color: '#f28c52' }}>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--accent-color)' }}>
               Marketplace
             </h3>
             {installedCount > 0 && (
@@ -189,7 +189,7 @@ export default function MarketplaceDrawer({
               >
                 {installedCount} installed
                 {updateCount > 0 && (
-                  <span style={{ color: '#f28c52', marginLeft: '4px' }}>
+                  <span style={{ color: 'var(--accent-color)', marginLeft: '4px' }}>
                     · {updateCount} update{updateCount > 1 ? 's' : ''}
                   </span>
                 )}
@@ -266,13 +266,13 @@ export default function MarketplaceDrawer({
               className="px-2.5 py-1 rounded text-xs font-medium whitespace-nowrap transition-all duration-200"
               style={{
                 background: activeCategory === cat.value
-                  ? 'rgba(242, 140, 82, 0.2)'
+                  ? 'rgba(var(--accent-rgb), 0.2)'
                   : 'rgba(255, 255, 255, 0.05)',
                 border: `1px solid ${activeCategory === cat.value
-                  ? 'rgba(242, 140, 82, 0.4)'
+                  ? 'rgba(var(--accent-rgb), 0.4)'
                   : 'rgba(255, 255, 255, 0.12)'}`,
                 color: activeCategory === cat.value
-                  ? '#f28c52'
+                  ? 'var(--accent-color)'
                   : 'rgba(255, 255, 255, 0.7)',
               }}
             >

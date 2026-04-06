@@ -88,13 +88,13 @@
 }
 
 .preview-btn.edit {
-  background: rgba(242, 140, 82, 0.1);
-  border-color: rgba(242, 140, 82, 0.3);
-  color: var(--accent-color, #f28c52);
+  background: rgba(var(--accent-rgb), 0.1);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  color: var(--accent-color, var(--accent-color));
 }
 
 .preview-btn.edit:hover {
-  background: rgba(242, 140, 82, 0.2);
+  background: rgba(var(--accent-rgb), 0.2);
 }
 
 .preview-btn.close {

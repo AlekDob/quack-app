@@ -20,8 +20,8 @@ const pillStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: 5,
-  background: 'rgba(255, 107, 53, 0.15)',
-  border: '1px solid rgba(255, 107, 53, 0.3)',
+  background: 'rgba(var(--accent-rgb), 0.15)',
+  border: '1px solid rgba(var(--accent-rgb), 0.30)',
   borderRadius: 20,
   padding: '3px 9px 3px 6px',
   cursor: 'pointer',
@@ -33,7 +33,7 @@ const dotStyle: React.CSSProperties = {
   width: 6,
   height: 6,
   borderRadius: '50%',
-  background: '#FF6B35',
+  background: 'var(--accent-color)',
   flexShrink: 0,
   animation: 'quickloop-indicator-pulse 1.4s ease-in-out infinite',
 };
@@ -41,7 +41,7 @@ const dotStyle: React.CSSProperties = {
 const textStyle: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 600,
-  color: '#FF6B35',
+  color: 'var(--accent-color)',
   letterSpacing: '0.03em',
   lineHeight: 1,
 };

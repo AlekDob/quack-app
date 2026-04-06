@@ -87,7 +87,7 @@ export function DroidWizard({ initialSpec, onCreateDroid, isCreating }: DroidWiz
               <line x1="8" y1="9" x2="16" y2="9" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="2" strokeLinecap="round" />
               <line x1="8" y1="15" x2="12" y2="15" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="2" strokeLinecap="round" />
             </svg>
-            <h4 className="text-sm font-semibold" style={{ color: '#FF6B35' }}>
+            <h4 className="text-sm font-semibold" style={{ color: 'var(--accent-color)' }}>
               Basic Information
             </h4>
           </div>
@@ -111,7 +111,7 @@ export function DroidWizard({ initialSpec, onCreateDroid, isCreating }: DroidWiz
                   height: '36px',
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = errors.displayName ? '#ef4444' : '#FF6B35';
+                  e.currentTarget.style.borderColor = errors.displayName ? '#ef4444' : 'var(--accent-color)';
                   e.currentTarget.style.background = '#1e1e24';
                 }}
                 onBlur={(e) => {
@@ -141,7 +141,7 @@ export function DroidWizard({ initialSpec, onCreateDroid, isCreating }: DroidWiz
                   color: '#ffffff',
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = errors.description ? '#ef4444' : '#FF6B35';
+                  e.currentTarget.style.borderColor = errors.description ? '#ef4444' : 'var(--accent-color)';
                   e.currentTarget.style.background = '#1e1e24';
                 }}
                 onBlur={(e) => {
@@ -172,7 +172,7 @@ export function DroidWizard({ initialSpec, onCreateDroid, isCreating }: DroidWiz
                   height: '36px',
                 }}
                 onFocus={(e) => {
-                  e.currentTarget.style.borderColor = errors.specialization ? '#ef4444' : '#FF6B35';
+                  e.currentTarget.style.borderColor = errors.specialization ? '#ef4444' : 'var(--accent-color)';
                   e.currentTarget.style.background = '#1e1e24';
                 }}
                 onBlur={(e) => {
@@ -200,7 +200,7 @@ export function DroidWizard({ initialSpec, onCreateDroid, isCreating }: DroidWiz
               <circle cx="12" cy="12" r="9" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="2" />
               <path d="M12 8v4M12 16h.01" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="2" strokeLinecap="round" />
             </svg>
-            <h4 className="text-sm font-semibold" style={{ color: '#FF6B35' }}>
+            <h4 className="text-sm font-semibold" style={{ color: 'var(--accent-color)' }}>
               AI Model
             </h4>
           </div>
@@ -244,7 +244,7 @@ export function DroidWizard({ initialSpec, onCreateDroid, isCreating }: DroidWiz
               <rect x="5" y="11" width="14" height="10" rx="2" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="2" />
               <path d="M12 11V7M12 7C12 5.34315 13.3431 4 15 4C15.7403 4 16.3866 4.4022 16.7324 5M12 7C12 5.34315 10.6569 4 9 4C8.25972 4 7.61337 4.4022 7.26756 5" stroke="rgba(255, 255, 255, 0.5)" strokeWidth="2" strokeLinecap="round" />
             </svg>
-            <h4 className="text-sm font-semibold" style={{ color: '#FF6B35' }}>
+            <h4 className="text-sm font-semibold" style={{ color: 'var(--accent-color)' }}>
               Tool Permissions
             </h4>
           </div>
@@ -331,19 +331,19 @@ export function DroidWizard({ initialSpec, onCreateDroid, isCreating }: DroidWiz
           disabled={isCreating || !spec.displayName || !spec.description || !spec.specialization}
           className="w-full py-2.5 px-4 rounded-lg text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           style={{
-            background: '#FF6B35',
+            background: 'var(--accent-color)',
             color: '#ffffff',
-            boxShadow: isCreating ? 'none' : '0 2px 8px rgba(255, 107, 53, 0.3)',
+            boxShadow: isCreating ? 'none' : '0 2px 8px rgba(var(--accent-rgb), 0.30)',
           }}
           onMouseEnter={(e) => {
             if (!isCreating && spec.displayName && spec.description && spec.specialization) {
-              e.currentTarget.style.background = '#E55A24';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(255, 107, 53, 0.4)';
+              e.currentTarget.style.background = 'var(--accent-hover)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(var(--accent-rgb), 0.40)';
             }
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#FF6B35';
-            e.currentTarget.style.boxShadow = isCreating ? 'none' : '0 2px 8px rgba(255, 107, 53, 0.3)';
+            e.currentTarget.style.background = 'var(--accent-color)';
+            e.currentTarget.style.boxShadow = isCreating ? 'none' : '0 2px 8px rgba(var(--accent-rgb), 0.30)';
           }}
         >
           {isCreating ? 'Assembling Droid...' : 'Create Droid'}

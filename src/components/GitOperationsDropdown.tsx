@@ -154,8 +154,8 @@ export default function GitOperationsDropdown({
                     : 'none',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(242, 140, 82, 0.15)';
-                e.currentTarget.style.color = '#f28c52';
+                e.currentTarget.style.background = 'rgba(var(--accent-rgb), 0.15)';
+                e.currentTarget.style.color = 'var(--accent-color)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';

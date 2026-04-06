@@ -32,7 +32,7 @@
 }
 
 .mini-panel-icon {
-  color: var(--accent-color, #f28c52);
+  color: var(--accent-color, var(--accent-color));
 }
 
 .mini-panel-title {
@@ -74,13 +74,13 @@
 }
 
 .mini-panel-action-btn.primary {
-  background: linear-gradient(135deg, #f28c52 0%, #ffb26f 100%);
+  background: linear-gradient(135deg, var(--accent-color) 0%, #ffb26f 100%);
   color: white;
 }
 
 .mini-panel-action-btn.primary:hover {
   background: linear-gradient(135deg, #e17940 0%, #ffa05d 100%);
-  box-shadow: 0 4px 12px rgba(242, 140, 82, 0.3);
+  box-shadow: 0 4px 12px rgba(var(--accent-rgb), 0.3);
   transform: translateY(-1px);
 }
 
@@ -92,7 +92,7 @@
 
 .mini-panel-action-btn.secondary:hover {
   background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(242, 140, 82, 0.4);
+  border-color: rgba(var(--accent-rgb), 0.4);
 }
 
 /* Sections Container */
@@ -224,7 +224,7 @@
 
 .mini-task-card:hover {
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(242, 140, 82, 0.3);
+  border-color: rgba(var(--accent-rgb), 0.3);
   transform: translateX(2px);
 }
 
@@ -247,7 +247,7 @@
 }
 
 .mini-task-status.working {
-  background: #f28c52;
+  background: var(--accent-color);
   animation: pulse 1.5s infinite;
 }
 

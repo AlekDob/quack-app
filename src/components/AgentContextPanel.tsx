@@ -238,12 +238,12 @@ export default function AgentContextPanel({
     return (
       <div className="agent-context-panel">
         <div className="context-fallback">
-          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#f28c52" strokeWidth="1.5" style={{ margin: '0 auto 1.5rem' }}>
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" strokeWidth="1.5" style={{ margin: '0 auto 1.5rem' }}>
             <circle cx="12" cy="7" r="3"/>
             <path d="M5 17a5 5 0 0 1 10 0"/>
             <path d="M14 5l2-2M6 5L4 3"/>
           </svg>
-          <h3 className="text-xl font-bold mb-3" style={{ color: '#f28c52' }}>
+          <h3 className="text-xl font-bold mb-3" style={{ color: 'var(--accent-color)' }}>
             Agent Context
           </h3>
           <p

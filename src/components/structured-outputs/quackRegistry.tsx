@@ -206,7 +206,7 @@ export const { registry: quackRegistry } = defineRegistry(quackCatalog, {
         onClick={() => emit('press')}
         style={{
           padding: '6px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: 500, cursor: 'pointer', border: 'none', transition: 'opacity 0.2s',
-          ...(props.variant === 'primary' ? { background: '#FF6B35', color: '#fff' } :
+          ...(props.variant === 'primary' ? { background: 'var(--accent-color)', color: '#fff' } :
             props.variant === 'ghost' ? { background: 'transparent', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)' } :
             { background: 'rgba(255,255,255,0.08)', color: '#e0e0e0' }),
         }}
@@ -222,7 +222,7 @@ export const { registry: quackRegistry } = defineRegistry(quackCatalog, {
           <div>
             <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid rgba(255,255,255,0.08)', marginBottom: '12px' }}>
               {props.tabs.map((tab) => (
-                <button key={tab.id} onClick={() => setActive(tab.id)} style={{ padding: '8px 16px', background: 'none', border: 'none', color: active === tab.id ? '#FF6B35' : 'var(--color-text-secondary, #999)', borderBottom: active === tab.id ? '2px solid #FF6B35' : '2px solid transparent', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>
+                <button key={tab.id} onClick={() => setActive(tab.id)} style={{ padding: '8px 16px', background: 'none', border: 'none', color: active === tab.id ? 'var(--accent-color)' : 'var(--color-text-secondary, #999)', borderBottom: active === tab.id ? '2px solid var(--accent-color)' : '2px solid transparent', cursor: 'pointer', fontSize: '13px', fontWeight: 500 }}>
                   {tab.label}
                 </button>
               ))}

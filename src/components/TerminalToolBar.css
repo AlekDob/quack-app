@@ -32,8 +32,8 @@
 }
 
 .terminal-tool-button.active {
-  background: rgba(242, 140, 82, 0.15);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent-color);
 }
 
 .terminal-tool-button svg {

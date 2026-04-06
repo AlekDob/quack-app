@@ -521,7 +521,7 @@
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 1px;
-  color: #f7931e;
+  color: var(--accent-color);
   text-shadow: 0 0 10px rgba(247, 147, 30, 0.5);
 }
 
@@ -817,7 +817,7 @@
 }
 
 .context-summary-row.cost .context-summary-value {
-  color: #f7931e;
+  color: var(--accent-color);
   text-shadow: 0 0 8px rgba(247, 147, 30, 0.5);
 }
 

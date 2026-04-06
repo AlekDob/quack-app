@@ -41,12 +41,12 @@
 }
 
 .typo-preset-card.active {
-  background: rgba(242, 140, 82, 0.08);
-  border-color: rgba(242, 140, 82, 0.45);
+  background: rgba(var(--accent-rgb), 0.08);
+  border-color: rgba(var(--accent-rgb), 0.45);
   color: rgba(255, 255, 255, 0.95);
   box-shadow:
-    0 0 0 1px rgba(242, 140, 82, 0.15),
-    0 4px 12px rgba(242, 140, 82, 0.1);
+    0 0 0 1px rgba(var(--accent-rgb), 0.15),
+    0 4px 12px rgba(var(--accent-rgb), 0.1);
 }
 
 .typo-preset-letter {
@@ -57,7 +57,7 @@
 }
 
 .typo-preset-card.active .typo-preset-letter {
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 .typo-preset-label {
@@ -79,7 +79,7 @@
   right: 8px;
   width: 16px;
   height: 16px;
-  background: #f28c52;
+  background: var(--accent-color);
   color: white;
   border-radius: 50%;
   padding: 2px;
@@ -146,7 +146,7 @@
 
 .typo-font-select:focus {
   outline: none;
-  border-color: rgba(242, 140, 82, 0.5);
+  border-color: rgba(var(--accent-rgb), 0.5);
   background: rgba(255, 255, 255, 0.08);
 }
 

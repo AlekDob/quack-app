@@ -131,8 +131,8 @@ export default function MCPTemplateCard({
         border: "1px solid rgba(255, 255, 255, 0.08)",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "rgba(242, 140, 82, 0.08)";
-        e.currentTarget.style.borderColor = "rgba(242, 140, 82, 0.3)";
+        e.currentTarget.style.background = "rgba(var(--accent-rgb), 0.08)";
+        e.currentTarget.style.borderColor = "rgba(var(--accent-rgb), 0.3)";
         e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseLeave={(e) => {

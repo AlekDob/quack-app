@@ -269,8 +269,8 @@ export default function ClaudeCodeSettings() {
           <div style={{
             display: 'flex', alignItems: 'flex-start', gap: 8,
             padding: '8px 12px', margin: '12px 12px', borderRadius: 8,
-            backgroundColor: 'rgba(242, 140, 82, 0.06)',
-            border: '1px solid rgba(242, 140, 82, 0.12)',
+            backgroundColor: 'rgba(var(--accent-rgb), 0.06)',
+            border: '1px solid rgba(var(--accent-rgb), 0.12)',
           }}>
             <span style={{ fontSize: 13, lineHeight: '18px', flexShrink: 0, opacity: 0.7 }}>⚠</span>
             <span style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, opacity: 0.8 }}>
@@ -379,8 +379,8 @@ export default function ClaudeCodeSettings() {
               <div style={{
                 display: 'flex', alignItems: 'flex-start', gap: 8,
                 padding: '8px 12px', margin: '0 12px 12px', borderRadius: 8,
-                backgroundColor: 'rgba(242, 140, 82, 0.06)',
-                border: '1px solid rgba(242, 140, 82, 0.12)',
+                backgroundColor: 'rgba(var(--accent-rgb), 0.06)',
+                border: '1px solid rgba(var(--accent-rgb), 0.12)',
               }}>
                 <span style={{ fontSize: 13, lineHeight: '18px', flexShrink: 0, opacity: 0.7 }}>&#x26A0;</span>
                 <span style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5, opacity: 0.8 }}>

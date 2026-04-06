@@ -36,7 +36,7 @@
 }
 
 .memory-graph-toolbar-icon {
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 .memory-graph-toolbar-title {
@@ -68,8 +68,8 @@
 }
 
 .memory-graph-stat.quack {
-  background: rgba(242, 140, 82, 0.12);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-color);
 }
 
 /* Source filter */
@@ -108,8 +108,8 @@
 }
 
 .memory-graph-filter-btn.active.quack {
-  background: rgba(242, 140, 82, 0.2);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.2);
+  color: var(--accent-color);
 }
 
 .memory-graph-toolbar-right {
@@ -136,7 +136,7 @@
 .memory-graph-toolbar-btn:hover {
   background: var(--bg-hover);
   color: rgba(255, 255, 255, 0.9);
-  border-color: rgba(242, 140, 82, 0.3);
+  border-color: rgba(var(--accent-rgb), 0.3);
 }
 
 .memory-graph-toolbar-btn:disabled {
@@ -145,22 +145,22 @@
 }
 
 .memory-graph-toolbar-btn.add {
-  background: rgba(242, 140, 82, 0.15);
-  border-color: rgba(242, 140, 82, 0.3);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.15);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  color: var(--accent-color);
 }
 
 .memory-graph-toolbar-btn.add:hover,
 .memory-graph-toolbar-btn.add.active {
-  background: rgba(242, 140, 82, 0.25);
+  background: rgba(var(--accent-rgb), 0.25);
   color: #ffb26f;
 }
 
 /* Add Memory Form */
 .memory-graph-add-form {
   padding: 10px 16px;
-  background: rgba(242, 140, 82, 0.06);
-  border-bottom: 1px solid rgba(242, 140, 82, 0.15);
+  background: rgba(var(--accent-rgb), 0.06);
+  border-bottom: 1px solid rgba(var(--accent-rgb), 0.15);
   /* Removed animation to prevent flickering */
 }
 
@@ -189,8 +189,8 @@
 }
 
 .memory-graph-add-input:focus {
-  border-color: rgba(242, 140, 82, 0.5);
-  box-shadow: 0 0 0 2px rgba(242, 140, 82, 0.1);
+  border-color: rgba(var(--accent-rgb), 0.5);
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.1);
 }
 
 .memory-graph-add-select {
@@ -207,13 +207,13 @@
 }
 
 .memory-graph-add-select:focus {
-  border-color: rgba(242, 140, 82, 0.5);
+  border-color: rgba(var(--accent-rgb), 0.5);
 }
 
 .memory-graph-add-btn {
   height: 34px;
   padding: 0 16px;
-  background: linear-gradient(135deg, #f28c52 0%, #ffb26f 100%);
+  background: linear-gradient(135deg, var(--accent-color) 0%, #ffb26f 100%);
   border: none;
   border-radius: var(--radius-sm);
   font-size: 12px;
@@ -256,7 +256,7 @@
   overflow: hidden;
   background: radial-gradient(
     circle at center,
-    rgba(242, 140, 82, 0.02) 0%,
+    rgba(var(--accent-rgb), 0.02) 0%,
     transparent 70%
   );
 }
@@ -274,7 +274,7 @@
 }
 
 .memory-graph-loading svg {
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 /* Empty State */
@@ -373,8 +373,8 @@
 }
 
 .memory-graph-details-source.quack {
-  background: rgba(242, 140, 82, 0.15);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent-color);
 }
 
 .memory-graph-details-type {

@@ -134,7 +134,7 @@ export const customTheme = EditorView.theme({
   },
   '.cm-panel input[type=checkbox], .cm-search input[type=checkbox]': {
     cursor: 'pointer !important',
-    accentColor: '#f28c52 !important',
+    accentColor: 'var(--accent-color) !important',
   },
   '&.cm-editor .cm-panels-bottom': {
     order: '-1 !important',
@@ -162,10 +162,10 @@ export const customTheme = EditorView.theme({
     borderRadius: '2px',
   },
   '.cm-search-match-current': {
-    backgroundColor: 'rgba(242, 140, 82, 0.4) !important',
-    border: '1px solid rgba(242, 140, 82, 0.6)',
+    backgroundColor: 'rgba(var(--accent-rgb), 0.4) !important',
+    border: '1px solid rgba(var(--accent-rgb), 0.6)',
     borderRadius: '2px',
-    outline: '2px solid rgba(242, 140, 82, 0.3)',
+    outline: '2px solid rgba(var(--accent-rgb), 0.3)',
   },
   // Diff line highlighting
   '.cm-line-added': {
@@ -210,7 +210,7 @@ export const customTheme = EditorView.theme({
     color: '#abb2bf !important',
   },
   '.cm-completionMatchedText': {
-    color: '#f28c52 !important',
+    color: 'var(--accent-color) !important',
     textDecoration: 'none !important',
     fontWeight: '600 !important',
   },
@@ -230,7 +230,7 @@ export const customTheme = EditorView.theme({
   },
   '.cm-lint-marker-warning': {
     content: '"" !important',
-    backgroundColor: '#f7931e !important',
+    backgroundColor: 'var(--accent-color) !important',
     borderRadius: '50% !important',
   },
   '.cm-lint-marker-info': {

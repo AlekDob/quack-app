@@ -57,7 +57,7 @@ export default function ContextPanel({
     return (
       <div className="context-panel">
         <div className="text-6xl mb-6">📝</div>
-        <h3 className="text-xl font-bold mb-3" style={{ color: "#f28c52" }}>
+        <h3 className="text-xl font-bold mb-3" style={{ color: "var(--accent-color)" }}>
           Context Panel
         </h3>
         <p

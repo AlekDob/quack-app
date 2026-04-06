@@ -247,7 +247,7 @@ export default function AgentsPanel({
             <div className="text-5xl mb-4">🦆</div>
             <h4
               className="text-base font-semibold mb-2"
-              style={{ color: "#f28c52" }}
+              style={{ color: "var(--accent-color)" }}
             >
               No Agents Yet
             </h4>
@@ -283,8 +283,8 @@ export default function AgentsPanel({
               <code
                 className="px-1.5 py-0.5 rounded text-xs font-mono"
                 style={{
-                  background: "rgba(242, 140, 82, 0.1)",
-                  color: "#f28c52",
+                  background: "rgba(var(--accent-rgb), 0.1)",
+                  color: "var(--accent-color)",
                 }}
               >
                 .claude/agents/

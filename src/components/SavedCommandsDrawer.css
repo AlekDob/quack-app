@@ -190,13 +190,13 @@
 }
 
 .saved-command-card.compact:hover {
-  border-color: rgba(242, 140, 82, 0.5);
+  border-color: rgba(var(--accent-rgb), 0.5);
   background: rgba(24, 28, 38, 0.82);
   box-shadow: 0 14px 30px rgba(12, 16, 24, 0.55);
 }
 
 .saved-command-card.compact:hover .saved-command-code {
-  border-color: rgba(242, 140, 82, 0.35);
+  border-color: rgba(var(--accent-rgb), 0.35);
   color: rgba(255, 255, 255, 0.88);
 }
 
@@ -277,8 +277,8 @@
 
 .saved-command-icon-actions .icon:hover {
   transform: translateY(-1px);
-  border-color: rgba(242, 140, 82, 0.55);
-  color: #f28c52;
+  border-color: rgba(var(--accent-rgb), 0.55);
+  color: var(--accent-color);
 }
 
 .saved-command-icon-actions .icon.danger:hover {

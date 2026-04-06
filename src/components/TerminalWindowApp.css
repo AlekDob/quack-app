@@ -93,9 +93,9 @@
 .terminal-add-project-btn {
   width: 24px;
   height: 24px;
-  background: rgba(242, 140, 82, 0.1);
-  border: 1px solid rgba(242, 140, 82, 0.3);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.1);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
+  color: var(--accent-color);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -108,8 +108,8 @@
 }
 
 .terminal-add-project-btn:hover {
-  background: rgba(242, 140, 82, 0.2);
-  border-color: rgba(242, 140, 82, 0.5);
+  background: rgba(var(--accent-rgb), 0.2);
+  border-color: rgba(var(--accent-rgb), 0.5);
   transform: scale(1.05);
 }
 

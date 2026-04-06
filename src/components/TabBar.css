@@ -141,8 +141,8 @@
 }
 
 .tab-popout-btn:hover {
-  background: rgba(242, 140, 82, 0.2);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.2);
+  color: var(--accent-color);
 }
 
 .tab-popout-btn svg {

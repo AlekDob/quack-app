@@ -202,7 +202,7 @@ export default function GeneralSettings() {
         {/* Category toggles - only show if GIFs are enabled */}
         {enableToolGifs && giphyApiKey && (
           <>
-            <div style={{ paddingLeft: '16px', borderLeft: '2px solid rgba(255, 107, 53, 0.3)', marginLeft: '8px' }}>
+            <div style={{ paddingLeft: '16px', borderLeft: '2px solid rgba(var(--accent-rgb), 0.30)', marginLeft: '8px' }}>
               <SettingsRow
                 label="Brain/Memory Tools"
                 description="Show GIFs for brain search and memory operations"

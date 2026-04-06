@@ -707,7 +707,7 @@ function AppRefactored() {
                 const newAgent: AgentChat = {
                   id: Date.now().toString(),
                   name: 'New Agent',
-                  color: '#f28c52',
+                  color: 'var(--accent-color)',
                   cwd: explorerPath,
                   avatar: '',
                   personality: {},
@@ -795,7 +795,7 @@ function AppRefactored() {
           personality={newTerminalPersonality}
           branch={newTerminalBranch}
           useWorktree={newTerminalUseWorktree}
-          availableColors={['#f28c52', '#ffb26f', '#ffd166', '#f77aa6', '#4dd4b3', '#8fa6ff', '#f2a57b']}
+          availableColors={['var(--accent-color)', '#ffb26f', '#ffd166', '#f77aa6', '#4dd4b3', '#8fa6ff', '#f2a57b']}
           selectingDirectory={selectingDirectory}
           creating={creatingTerminal}
           error={newTerminalError}

@@ -13,7 +13,7 @@ export interface ProjectStorageData {
 
 // Default color palette for auto-assignment
 export const DEFAULT_PROJECT_COLORS = [
-  '#FF6B35', // Orange (Quack primary)
+  '#FF6B35', // Orange (Quack primary) — fallback hex; accent uses var(--accent-color) at runtime
   '#4DA6FF', // Blue
   '#9B59B6', // Purple
   '#2ECC71', // Green

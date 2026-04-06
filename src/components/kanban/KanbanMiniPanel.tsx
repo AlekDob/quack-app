@@ -342,7 +342,7 @@ export default function KanbanMiniPanel({
           onTaskClick={handleTaskClick}
           chatLoadingMap={chatLoadingMap}
           chatSessions={chatSessions}
-          accentColor="#f28c52"
+          accentColor="var(--accent-color)"
         />
 
         <ColumnSection

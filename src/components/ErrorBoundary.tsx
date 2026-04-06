@@ -110,7 +110,7 @@ ${lastCrash}
         <div className="app-fallback">
           <div className="fallback-card" style={{ maxWidth: '700px' }}>
             <h1>⚠️ Something went wrong</h1>
-            <p style={{ marginTop: '16px', color: '#f28c52' }}>
+            <p style={{ marginTop: '16px', color: 'var(--accent-color)' }}>
               The app encountered an unexpected error and crashed.
             </p>
 
@@ -127,7 +127,7 @@ ${lastCrash}
                     fontSize: '12px',
                     overflow: 'auto',
                     maxHeight: '200px',
-                    border: '1px solid rgba(242, 140, 82, 0.3)',
+                    border: '1px solid rgba(var(--accent-rgb), 0.3)',
                   }}>
                     {this.state.error.toString()}
                     {this.state.errorInfo?.componentStack}
@@ -186,7 +186,7 @@ ${lastCrash}
                 onClick={this.handleReset}
                 style={{
                   padding: '10px 20px',
-                  background: '#f28c52',
+                  background: 'var(--accent-color)',
                   color: '#080a0d',
                   border: 'none',
                   borderRadius: '6px',
@@ -204,8 +204,8 @@ ${lastCrash}
                 style={{
                   padding: '10px 20px',
                   background: '#1a1d24',
-                  color: '#f28c52',
-                  border: '1px solid #f28c52',
+                  color: 'var(--accent-color)',
+                  border: '1px solid var(--accent-color)',
                   borderRadius: '6px',
                   fontWeight: '600',
                   cursor: 'pointer',

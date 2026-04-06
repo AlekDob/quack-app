@@ -975,7 +975,7 @@ export default function AddKanbanTaskModal({
             <div className="kanban-form-field">
               <label>
                 {/* Robot icon - same as side panel droids tab */}
-                <svg viewBox="0 0 20 20" width="14" height="14" style={{ color: '#f28c52' }}>
+                <svg viewBox="0 0 20 20" width="14" height="14" style={{ color: 'var(--accent-color)' }}>
                   <rect x="4" y="4" width="12" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
                   <line x1="10" y1="2" x2="10" y2="4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                   <circle cx="10" cy="2" r="1" fill="currentColor" />

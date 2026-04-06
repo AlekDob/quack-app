@@ -459,7 +459,7 @@ export default function HooksPanel({
                   type="text"
                   value={editingHook.name}
                   onChange={(e) => setEditingHook({ ...editingHook, name: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-[#f28c52]/50"
+                  className="w-full px-3 py-2 rounded-lg text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-white/30"
                   placeholder="My Hook"
                 />
               </div>
@@ -470,7 +470,7 @@ export default function HooksPanel({
                 <select
                   value={editingHook.type}
                   onChange={(e) => setEditingHook({ ...editingHook, type: e.target.value as HookType })}
-                  className="w-full px-3 py-2 rounded-lg text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-[#f28c52]/50"
+                  className="w-full px-3 py-2 rounded-lg text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-white/30"
                 >
                   <option value="PreToolUse">PreToolUse</option>
                   <option value="PostToolUse">PostToolUse</option>
@@ -489,7 +489,7 @@ export default function HooksPanel({
                   type="text"
                   value={editingHook.matcher}
                   onChange={(e) => setEditingHook({ ...editingHook, matcher: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg text-sm text-white font-mono bg-white/5 border border-white/10 focus:outline-none focus:border-[#f28c52]/50"
+                  className="w-full px-3 py-2 rounded-lg text-sm text-white font-mono bg-white/5 border border-white/10 focus:outline-none focus:border-white/30"
                   placeholder="Write, Read, Bash, *"
                 />
               </div>
@@ -501,7 +501,7 @@ export default function HooksPanel({
                   value={editingHook.command}
                   onChange={(e) => setEditingHook({ ...editingHook, command: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 rounded-lg text-sm text-white font-mono bg-white/5 border border-white/10 focus:outline-none focus:border-[#f28c52]/50 resize-none"
+                  className="w-full px-3 py-2 rounded-lg text-sm text-white font-mono bg-white/5 border border-white/10 focus:outline-none focus:border-white/30 resize-none"
                   placeholder='echo "Hook executed"'
                 />
               </div>
@@ -545,7 +545,7 @@ export default function HooksPanel({
                   type="text"
                   value={editingHook.description || ''}
                   onChange={(e) => setEditingHook({ ...editingHook, description: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-[#f28c52]/50"
+                  className="w-full px-3 py-2 rounded-lg text-sm text-white bg-white/5 border border-white/10 focus:outline-none focus:border-white/30"
                   placeholder="What this hook does..."
                 />
               </div>

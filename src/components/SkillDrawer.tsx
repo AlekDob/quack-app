@@ -194,8 +194,8 @@ export default function SkillDrawer({
                 <div
                   className="w-14 h-14 rounded-lg flex-shrink-0 flex items-center justify-center text-2xl"
                   style={{
-                    background: "rgba(242, 140, 82, 0.15)",
-                    border: "1px solid rgba(242, 140, 82, 0.3)",
+                    background: "rgba(var(--accent-rgb), 0.15)",
+                    border: "1px solid rgba(var(--accent-rgb), 0.3)",
                   }}
                 >
                   ⚡

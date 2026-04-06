@@ -67,7 +67,7 @@ interface TerminalContextValue {
 const TerminalContext = createContext<TerminalContextValue | null>(null);
 
 const COLORS = [
-  '#f28c52',
+  'var(--accent-color)',
   '#ffb26f',
   '#ffd166',
   '#f77aa6',

@@ -452,7 +452,7 @@ function TerminalView({ activeId, terminals, onUserInput, onOutput, onUpdateRece
         terminal.open(viewEntry.element)
         viewEntry.mounted = true
       }
-      const accent = terminals.find((item) => item.id === id)?.color ?? '#f28c52'
+      const accent = terminals.find((item) => item.id === id)?.color ?? 'var(--accent-color)'
       terminal.options = {
         theme: {
           background: 'rgba(15, 17, 21, 0.2)',

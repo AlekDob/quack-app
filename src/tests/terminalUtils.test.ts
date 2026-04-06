@@ -18,7 +18,7 @@ describe('terminalUtils', () => {
     it('should export terminal color palette', () => {
       expect(TERMINAL_COLORS).toBeDefined();
       expect(TERMINAL_COLORS).toHaveLength(7);
-      expect(TERMINAL_COLORS[0]).toBe('#f28c52');
+      expect(TERMINAL_COLORS[0]).toBe('var(--accent-color)');
     });
 
     it('should export regex patterns', () => {

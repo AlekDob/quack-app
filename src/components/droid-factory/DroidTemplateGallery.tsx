@@ -77,9 +77,9 @@ export function DroidTemplateGallery({ onSelectTemplate }: DroidTemplateGalleryP
                 <span
                   className="px-2 py-1 rounded text-xs font-medium font-mono"
                   style={{
-                    background: 'rgba(255, 107, 53, 0.15)',
-                    color: '#FF6B35',
-                    border: '1px solid rgba(255, 107, 53, 0.3)',
+                    background: 'rgba(var(--accent-rgb), 0.15)',
+                    color: 'var(--accent-color)',
+                    border: '1px solid rgba(var(--accent-rgb), 0.30)',
                   }}
                 >
                   {template.model}
@@ -91,21 +91,21 @@ export function DroidTemplateGallery({ onSelectTemplate }: DroidTemplateGalleryP
                 type="button"
                 className="w-full py-1.5 px-3 rounded text-xs font-semibold transition-all"
                 style={{
-                  background: '#FF6B35',
+                  background: 'var(--accent-color)',
                   color: '#ffffff',
-                  border: '1px solid rgba(255, 107, 53, 0.3)',
+                  border: '1px solid rgba(var(--accent-rgb), 0.30)',
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelectTemplate(template);
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#E55A24';
-                  e.currentTarget.style.borderColor = '#FF6B35';
+                  e.currentTarget.style.background = 'var(--accent-hover)';
+                  e.currentTarget.style.borderColor = 'var(--accent-color)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = '#FF6B35';
-                  e.currentTarget.style.borderColor = 'rgba(255, 107, 53, 0.3)';
+                  e.currentTarget.style.background = 'var(--accent-color)';
+                  e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb), 0.30)';
                 }}
               >
                 Use Template

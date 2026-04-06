@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import SectionHeader from '../controls/SectionHeader';
+import { useSettingsStore } from '../../../stores/settingsStore';
+import { ACCENT_PRESETS, DEFAULT_ACCENT } from '../../../utils/accentColor';
 
 // Import background images using Vite's URL constructor
 const ducksPatternImage = new URL('../../../../images/backgrounds/ducks-pattern.png', import.meta.url).href;
@@ -137,6 +139,10 @@ const BACKGROUND_GROUPS: BackgroundGroup[] = [
 export default function AppearanceSettings() {
   const [currentBackground, setCurrentBackground] = useState<string>('transparent');
   const [loading, setLoading] = useState(false);
+  const accentColor = useSettingsStore((s) => s.appearance.accentColor);
+  const setAccentColor = useSettingsStore((s) => s.setAccentColor);
+  const resetAccentColor = useSettingsStore((s) => s.resetAccentColor);
+  const colorInputRef = useRef<HTMLInputElement>(null);
 
   // Load current background on mount
   useEffect(() => {
@@ -204,8 +210,71 @@ export default function AppearanceSettings() {
     </svg>
   );
 
+  const isCustomColor = !ACCENT_PRESETS.some(p => p.hex === accentColor);
+
   return (
     <div className="settings-category">
+      <SectionHeader
+        title="Accent Color"
+        description="Primary color used across the entire interface"
+      />
+      <div className="settings-group">
+        <div className="accent-color-grid">
+          {ACCENT_PRESETS.map((preset) => (
+            <button
+              key={preset.hex}
+              type="button"
+              className={`accent-color-swatch ${accentColor === preset.hex ? 'active' : ''}`}
+              onClick={() => setAccentColor(preset.hex)}
+              title={preset.label}
+            >
+              <div
+                className="accent-swatch-circle"
+                style={{ background: preset.hex }}
+              />
+              {accentColor === preset.hex && <CheckIcon />}
+              <span className="accent-swatch-label">{preset.label}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className={`accent-color-swatch ${isCustomColor ? 'active' : ''}`}
+            onClick={() => colorInputRef.current?.click()}
+            title="Custom color"
+          >
+            <div
+              className="accent-swatch-circle accent-swatch-custom"
+              style={isCustomColor ? { background: accentColor } : undefined}
+            >
+              {!isCustomColor && (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              )}
+            </div>
+            {isCustomColor && <CheckIcon />}
+            <span className="accent-swatch-label">Custom</span>
+            <input
+              ref={colorInputRef}
+              type="color"
+              value={accentColor}
+              onChange={(e) => setAccentColor(e.target.value)}
+              className="accent-color-input-hidden"
+            />
+          </button>
+        </div>
+        {accentColor !== DEFAULT_ACCENT && (
+          <button
+            type="button"
+            className="accent-reset-btn"
+            onClick={resetAccentColor}
+          >
+            Reset to default
+          </button>
+        )}
+      </div>
+
       <SectionHeader
         title="Background"
         description="Choose your preferred app background"

@@ -44,7 +44,7 @@
 }
 
 .tab-popout-titlebar.dragging {
-  background: rgba(242, 140, 82, 0.15);
+  background: rgba(var(--accent-rgb), 0.15);
 }
 
 .tab-popout-title {
@@ -64,7 +64,7 @@
 .tab-popout-label {
   font-size: 13px;
   font-weight: 600;
-  color: #f28c52;
+  color: var(--accent-color);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -104,12 +104,12 @@
 }
 
 .tab-popout-content::-webkit-scrollbar-thumb {
-  background: rgba(242, 140, 82, 0.3);
+  background: rgba(var(--accent-rgb), 0.3);
   border-radius: 4px;
 }
 
 .tab-popout-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(242, 140, 82, 0.5);
+  background: rgba(var(--accent-rgb), 0.5);
 }
 
 /* Placeholder Content */
@@ -194,7 +194,7 @@
 
 /* Focus styles for accessibility */
 .tab-popout-control-btn:focus-visible {
-  outline: 2px solid #f28c52;
+  outline: 2px solid var(--accent-color);
   outline-offset: 2px;
 }
 
@@ -226,12 +226,12 @@
 }
 
 .tab-popout-return-btn:hover {
-  background: rgba(242, 140, 82, 0.2);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.2);
+  color: var(--accent-color);
 }
 
 .tab-popout-return-btn:active {
-  background: rgba(242, 140, 82, 0.3);
+  background: rgba(var(--accent-rgb), 0.3);
   transform: scale(0.95);
 }
 
@@ -261,7 +261,7 @@
   width: 40px;
   height: 40px;
   border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #f28c52;
+  border-top-color: var(--accent-color);
   border-radius: 50%;
   animation: tab-popout-spin 1s linear infinite;
 }
@@ -312,10 +312,10 @@
 
 .tab-popout-retry-btn {
   padding: 8px 16px;
-  background: rgba(242, 140, 82, 0.2);
-  border: 1px solid rgba(242, 140, 82, 0.4);
+  background: rgba(var(--accent-rgb), 0.2);
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
   border-radius: 6px;
-  color: #f28c52;
+  color: var(--accent-color);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -323,8 +323,8 @@
 }
 
 .tab-popout-retry-btn:hover {
-  background: rgba(242, 140, 82, 0.3);
-  border-color: rgba(242, 140, 82, 0.6);
+  background: rgba(var(--accent-rgb), 0.3);
+  border-color: rgba(var(--accent-rgb), 0.6);
 }
 
 /* Code editor container - ensure full height */
@@ -371,5 +371,5 @@
   font-size: 12px !important;
 }
 .tab-popout-content .cm-panel.cm-search input[type="checkbox"] {
-  accent-color: #f28c52 !important;
+  accent-color: var(--accent-color) !important;
 }

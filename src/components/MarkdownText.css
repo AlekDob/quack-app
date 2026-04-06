@@ -20,12 +20,12 @@
 
 .md-h2 {
   font-size: var(--fs-h2);
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 .md-h3 {
   font-size: var(--fs-body);
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 .md-h4 {
@@ -60,7 +60,7 @@
 }
 
 .md-list li::marker {
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 /* Horizontal Rule */
@@ -72,13 +72,13 @@
 
 /* Inline code */
 .md-inline-code {
-  background: rgba(242, 140, 82, 0.15);
-  border: 1px solid rgba(242, 140, 82, 0.25);
+  background: rgba(var(--accent-rgb), 0.15);
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
   border-radius: var(--radius-sm);
   padding: 1px 4px;
   font-family: var(--font-mono);
   font-size: var(--fs-code);
-  color: #f28c52;
+  color: var(--accent-color);
 }
 
 /* Code blocks wrapper with copy button */
@@ -114,10 +114,10 @@
   align-items: center;
   gap: 5px;
   padding: 5px 8px;
-  background: rgba(242, 140, 82, 0.15);
-  border: 1px solid rgba(242, 140, 82, 0.3);
+  background: rgba(var(--accent-rgb), 0.15);
+  border: 1px solid rgba(var(--accent-rgb), 0.3);
   border-radius: var(--radius-sm);
-  color: #f28c52;
+  color: var(--accent-color);
   font-size: 10px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   cursor: pointer;
@@ -125,8 +125,8 @@
 }
 
 .md-copy-button:hover {
-  background: rgba(242, 140, 82, 0.25);
-  border-color: rgba(242, 140, 82, 0.5);
+  background: rgba(var(--accent-rgb), 0.25);
+  border-color: rgba(var(--accent-rgb), 0.5);
   transform: translateY(-1px);
 }
 
@@ -189,7 +189,7 @@
 .md-blockquote {
   margin: 6px 0;
   padding: 4px 12px;
-  border-left: 3px solid rgba(242, 140, 82, 0.5);
+  border-left: 3px solid rgba(var(--accent-rgb), 0.5);
   background: rgba(255, 255, 255, 0.03);
   border-radius: 0 4px 4px 0;
   color: rgba(255, 255, 255, 0.8);

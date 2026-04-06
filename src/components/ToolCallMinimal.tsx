@@ -38,7 +38,7 @@ function ToolCallMinimal({ tool, onOpenFile, onUndoEdit }: ToolCallMinimalProps)
   // Tool colors based on type
   const getToolColor = (name: string): string => {
     const toolName = name.toLowerCase();
-    if (toolName === 'edit' || toolName === 'multiedit') return '#F7931E'; // orange
+    if (toolName === 'edit' || toolName === 'multiedit') return 'var(--accent-color)'; // orange
     if (toolName === 'read') return '#00D9FF'; // cyan
     if (toolName === 'write') return '#22c55e'; // green
     if (toolName === 'bash') return '#9B59B6'; // purple

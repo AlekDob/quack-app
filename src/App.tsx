@@ -95,6 +95,7 @@ import { useMarketplace } from "./hooks/useMarketplace";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { applyTypography } from "./constants/typography";
+import { applyAccentColor } from "./utils/accentColor";
 import { useKanbanStore } from "./stores/kanbanStore";
 import { useAutomationStore } from "./stores/automationStore";
 import { useSessionStore } from "./stores/sessionStore";
@@ -720,6 +721,12 @@ function AppContent() {
   useLayoutEffect(() => {
     applyTypography(typography);
   }, [typography]);
+
+  // Apply accent color before first paint + on every change
+  const accentColor = useSettingsStore((s) => s.appearance.accentColor);
+  useLayoutEffect(() => {
+    applyAccentColor(accentColor);
+  }, [accentColor]);
 
   // Fetch app version for intro screen
   useEffect(() => {
@@ -5336,7 +5343,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         const agentAvatar = typeof avatarResult === 'string' ? avatarResult : getDuckdroidUrl();
         showProjectToast({
           projectName,
-          projectColor: '#FF6B35',
+          projectColor: 'var(--accent-color)',
           agentName,
           agentAvatar,
           message: questionCount === 1
@@ -5493,7 +5500,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         const agentAvatar = typeof avatarResult === 'string' ? avatarResult : getDuckdroidUrl();
         showProjectToast({
           projectName,
-          projectColor: '#FF6B35',
+          projectColor: 'var(--accent-color)',
           agentName,
           agentAvatar,
           message: 'Needs plan approval — review and approve',
@@ -12171,7 +12178,7 @@ You have access to all Bash tools to execute git commands like:
                       </svg>
                       Back
                     </button>
-                    <span style={{ color: '#f28c52', fontWeight: 600, fontSize: '14px' }}>
+                    <span style={{ color: 'var(--accent-color)', fontWeight: 600, fontSize: '14px' }}>
                       Quack Guide
                     </span>
                   </div>
@@ -12225,22 +12232,22 @@ You have access to all Bash tools to execute git commands like:
                       fontWeight: 600,
                       borderRadius: '8px',
                       border: 'none',
-                      background: 'linear-gradient(135deg, #f28c52, #e67339)',
+                      background: 'linear-gradient(135deg, var(--accent-color), var(--accent-gradient-end))',
                       color: 'white',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
                       transition: 'all 0.2s ease',
-                      boxShadow: '0 4px 16px rgba(242, 140, 82, 0.35)',
+                      boxShadow: '0 4px 16px rgba(var(--accent-rgb), 0.35)',
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.transform = 'translateY(-2px)';
-                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(242, 140, 82, 0.45)';
+                      e.currentTarget.style.boxShadow = '0 6px 20px rgba(var(--accent-rgb), 0.45)';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(242, 140, 82, 0.35)';
+                      e.currentTarget.style.boxShadow = '0 4px 16px rgba(var(--accent-rgb), 0.35)';
                     }}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">

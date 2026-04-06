@@ -11,7 +11,9 @@ import { normalizeToForwardSlash } from '../../utils/platform';
 const DRAG_T = 4;
 const HANDLE_SIZE = 10;
 const BORDER_COLOR = '#00d9ff';
-const BORDER_SELECTED = '#ff6b35';
+// Brain: gotcha-pixi-csp-unsafe-eval — SVG/Canvas requires resolved hex values (no CSS variables)
+const BORDER_SELECTED = getComputedStyle(document.documentElement)
+  .getPropertyValue('--accent-color').trim() || '#ff6b35';
 
 interface Props {
   image: CanvasImageType;

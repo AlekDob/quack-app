@@ -6,12 +6,16 @@ import MermaidDiagram from '../MermaidDiagram';
 import { readBrainEntry } from '../../services/brainFileService';
 import type { BrainEntry } from '../../services/brainFileService';
 
+// Brain: pattern-code-editor-tab
+// Note: mermaid themeVariables require resolved hex values (no CSS variables).
+// Using default accent fallback — re-initialize inside a hook if dynamic theming is needed.
+const accentColorFallback = '#f28c52';
 mermaid.initialize({
   startOnLoad: false,
   securityLevel: 'loose',
   theme: 'dark',
   themeVariables: {
-    primaryColor: '#FF6B35',
+    primaryColor: accentColorFallback,
     primaryTextColor: '#e4e4e7',
     primaryBorderColor: '#3a3a40',
     lineColor: '#71717a',

@@ -91,7 +91,7 @@ export default function AgentSelector({
   editingMode,
   editingAgent,
   name = '',
-  color = '#FF6B35',
+  color = 'var(--accent-color)',
   avatar = '',
   availableColors = [],
   customAvatars = [],

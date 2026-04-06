@@ -45,7 +45,7 @@ interface ProjectStorageData {
 
 // Default color palette for auto-assignment
 const DEFAULT_PROJECT_COLORS = [
-  '#FF6B35', // Orange (Quack primary)
+  '#FF6B35', // Orange (Quack primary) — fallback hex; accent uses var(--accent-color) at runtime
   '#4DA6FF', // Blue
   '#9B59B6', // Purple
   '#2ECC71', // Green
@@ -97,6 +97,7 @@ interface SortableRepositoryGroupProps {
   // Favorite/star
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
+  onProjectColorChange?: (color: string) => void;
 }
 
 function SortableRepositoryGroup({
@@ -543,6 +544,13 @@ export default function TerminalSidebar({
     setFavorites(next);
     saveRepositoryOrder(repositoryOrder, projectColors, next);
   }, [repositoryOrder, projectColors, saveRepositoryOrder]);
+
+  // Handle project color change from inline picker
+  const handleProjectColorChange = useCallback((repoKey: string, color: string) => {
+    const updated = { ...projectColors, [repoKey]: color };
+    setProjectColors(updated);
+    saveRepositoryOrder(repositoryOrder, updated, favoritesRef.current);
+  }, [projectColors, repositoryOrder, saveRepositoryOrder]);
 
   // Handle repository drag start
   const handleRepoDragStart = (event: DragStartEvent) => {
@@ -1160,6 +1168,7 @@ export default function TerminalSidebar({
                       onOpenSavedCommands={onOpenProjectSavedCommands}
                       isFavorite={favorites.has(repoKey)}
                       onToggleFavorite={() => toggleFavorite(repoKey)}
+                      onProjectColorChange={(color: string) => handleProjectColorChange(repoKey, color)}
                     />
                   );
                 }
@@ -1167,7 +1176,7 @@ export default function TerminalSidebar({
                 // Group section — collapsible wrapper around multiple projects
                 const { group: grp, projects } = section;
                 const isGroupCollapsed = collapsedGroupSections.has(grp.id);
-                const groupColor = grp.color || '#FF6B35';
+                const groupColor = grp.color || 'var(--accent-color)';
 
                 return (
                   <SortableGroupSection key={`grp-${grp.id}`} sectionId={`group-${grp.id}`}>
@@ -1343,6 +1352,7 @@ export default function TerminalSidebar({
                           onOpenSavedCommands={onOpenProjectSavedCommands}
                           isFavorite={favorites.has(repoKey)}
                           onToggleFavorite={() => toggleFavorite(repoKey)}
+                          onProjectColorChange={(color: string) => handleProjectColorChange(repoKey, color)}
                         />
                       );
                     })}
@@ -1365,7 +1375,7 @@ export default function TerminalSidebar({
                     (s) => s.type === 'group' && s.group.id === groupId
                   );
                   if (!groupSection || groupSection.type !== 'group') return null;
-                  const groupColor = groupSection.group.color || '#FF6B35';
+                  const groupColor = groupSection.group.color || 'var(--accent-color)';
                   return (
                     <div
                       style={{
@@ -1395,10 +1405,10 @@ export default function TerminalSidebar({
                   <div
                     style={{
                       padding: '10px 12px',
-                      background: 'rgba(242, 140, 82, 0.15)',
-                      border: '2px dashed #f28c52',
+                      background: 'rgba(var(--accent-rgb), 0.15)',
+                      border: '2px dashed var(--accent-color)',
                       borderRadius: '6px',
-                      boxShadow: '0 8px 24px rgba(242, 140, 82, 0.25), 0 0 40px rgba(242, 140, 82, 0.2)',
+                      boxShadow: '0 8px 24px rgba(var(--accent-rgb), 0.25), 0 0 40px rgba(var(--accent-rgb), 0.2)',
                       pointerEvents: 'none',
                       opacity: 0.8,
                     }}
@@ -1420,15 +1430,15 @@ export default function TerminalSidebar({
                   width: 72,
                   height: 72,
                   borderRadius: '50%',
-                  background: 'radial-gradient(circle, rgba(242, 140, 82, 0.25) 0%, rgba(242, 140, 82, 0.05) 70%)',
+                  background: 'radial-gradient(circle, rgba(var(--accent-rgb), 0.25) 0%, rgba(var(--accent-rgb), 0.05) 70%)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginBottom: 16,
-                  boxShadow: '0 0 40px rgba(242, 140, 82, 0.15)',
+                  boxShadow: '0 0 40px rgba(var(--accent-rgb), 0.15)',
                 }}
               >
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f28c52" strokeWidth={1.5}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-color)" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
               </div>
@@ -1444,7 +1454,7 @@ export default function TerminalSidebar({
                 className="onboarding-cta-button"
                 title="Create your first project"
                 style={{
-                  background: 'linear-gradient(135deg, #f28c52 0%, #e06b2a 100%)',
+                  background: 'linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)',
                   border: 'none',
                   borderRadius: 10,
                   color: '#fff',
@@ -1455,15 +1465,15 @@ export default function TerminalSidebar({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  boxShadow: '0 4px 20px rgba(242, 140, 82, 0.35), 0 0 0 1px rgba(242, 140, 82, 0.2)',
+                  boxShadow: '0 4px 20px rgba(var(--accent-rgb), 0.35), 0 0 0 1px rgba(var(--accent-rgb), 0.2)',
                   transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 6px 28px rgba(242, 140, 82, 0.5), 0 0 0 1px rgba(242, 140, 82, 0.4)';
+                  e.currentTarget.style.boxShadow = '0 6px 28px rgba(var(--accent-rgb), 0.5), 0 0 0 1px rgba(var(--accent-rgb), 0.4)';
                   e.currentTarget.style.transform = 'translateY(-1px)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(242, 140, 82, 0.35), 0 0 0 1px rgba(242, 140, 82, 0.2)';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(var(--accent-rgb), 0.35), 0 0 0 1px rgba(var(--accent-rgb), 0.2)';
                   e.currentTarget.style.transform = 'translateY(0)';
                 }}
               >

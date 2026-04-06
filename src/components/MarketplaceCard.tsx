@@ -28,7 +28,7 @@ export default function MarketplaceCard({
 }: MarketplaceCardProps) {
   // Unified accent color for all categories
   const getCategoryColor = (_category: string) => {
-    return '#f28c52';
+    return 'var(--accent-color)';
   };
 
   /** Icons matching SidePanel.tsx tab icons */
@@ -169,7 +169,7 @@ export default function MarketplaceCard({
             border: 'none',
             cursor: 'pointer',
             padding: '2px',
-            color: favorited ? '#f28c52' : 'rgba(255, 255, 255, 0.2)',
+            color: favorited ? 'var(--accent-color)' : 'rgba(255, 255, 255, 0.2)',
             transition: 'color 0.15s ease',
             flexShrink: 0,
           }}
@@ -210,7 +210,7 @@ export default function MarketplaceCard({
         <span style={{ color: 'rgba(255, 255, 255, 0.35)' }}>
           {resource.author}
         </span>
-        <span style={{ color: hasUpdate ? '#f28c52' : 'rgba(255, 255, 255, 0.25)' }}>
+        <span style={{ color: hasUpdate ? 'var(--accent-color)' : 'rgba(255, 255, 255, 0.25)' }}>
           v{resource.version}{hasUpdate ? ' ↑' : ''}
         </span>
         {resource.featured && (
@@ -231,20 +231,20 @@ export default function MarketplaceCard({
             }}
             className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200"
             style={{
-              background: '#f28c52',
-              border: '1px solid #f28c52',
+              background: 'var(--accent-color)',
+              border: '1px solid var(--accent-color)',
               color: '#0c1018',
               letterSpacing: '0.02em',
-              boxShadow: '0 2px 8px rgba(242, 140, 82, 0.3)',
+              boxShadow: '0 2px 8px rgba(var(--accent-rgb), 0.3)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f9a06e';
-              e.currentTarget.style.boxShadow = '0 4px 14px rgba(242, 140, 82, 0.45)';
+              e.currentTarget.style.background = 'var(--accent-color)';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(var(--accent-rgb), 0.45)';
               e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#f28c52';
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(242, 140, 82, 0.3)';
+              e.currentTarget.style.background = 'var(--accent-color)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(var(--accent-rgb), 0.3)';
               e.currentTarget.style.transform = 'translateY(0)';
             }}
           >
@@ -273,20 +273,20 @@ export default function MarketplaceCard({
             }}
             className="flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all duration-200"
             style={{
-              background: '#f28c52',
-              border: '1px solid #f28c52',
+              background: 'var(--accent-color)',
+              border: '1px solid var(--accent-color)',
               color: '#0c1018',
               letterSpacing: '0.02em',
-              boxShadow: '0 2px 8px rgba(242, 140, 82, 0.3)',
+              boxShadow: '0 2px 8px rgba(var(--accent-rgb), 0.3)',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#f9a06e';
-              e.currentTarget.style.boxShadow = '0 4px 14px rgba(242, 140, 82, 0.45)';
+              e.currentTarget.style.background = 'var(--accent-color)';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(var(--accent-rgb), 0.45)';
               e.currentTarget.style.transform = 'translateY(-1px)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#f28c52';
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(242, 140, 82, 0.3)';
+              e.currentTarget.style.background = 'var(--accent-color)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(var(--accent-rgb), 0.3)';
               e.currentTarget.style.transform = 'translateY(0)';
             }}
           >

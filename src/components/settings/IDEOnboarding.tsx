@@ -126,7 +126,7 @@ export default function IDEOnboarding() {
                   {isSelected && (
                     <div className="ide-onboarding-card-check">
                       <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                        <circle cx="10" cy="10" r="9" fill="#f28c52" />
+                        <circle cx="10" cy="10" r="9" fill="var(--accent-color)" />
                         <path d="M6 10l3 3 5-6" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     </div>

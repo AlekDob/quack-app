@@ -71,7 +71,7 @@ export function StepStarterBundles({
           width: 40,
           height: 40,
           border: '3px solid rgba(255,255,255,0.1)',
-          borderTopColor: '#f28c52',
+          borderTopColor: 'var(--accent-color)',
           borderRadius: '50%',
           animation: 'spin 0.8s linear infinite',
         }} />
@@ -124,10 +124,10 @@ export function StepStarterBundles({
                   padding: '12px 14px',
                   borderRadius: 10,
                   border: isSelected
-                    ? '1px solid rgba(242, 140, 82, 0.5)'
+                    ? '1px solid rgba(var(--accent-rgb), 0.5)'
                     : '1px solid rgba(255,255,255,0.08)',
                   background: isSelected
-                    ? 'rgba(242, 140, 82, 0.08)'
+                    ? 'rgba(var(--accent-rgb), 0.08)'
                     : 'rgba(255,255,255,0.03)',
                   cursor: 'pointer',
                   textAlign: 'left',
@@ -248,7 +248,7 @@ export function StepStarterBundles({
               fontWeight: 600,
               color: selectedIds.size > 0 ? '#fff' : 'rgba(255,255,255,0.3)',
               background: selectedIds.size > 0
-                ? 'linear-gradient(135deg, #f28c52 0%, #e06b2a 100%)'
+                ? 'linear-gradient(135deg, var(--accent-color) 0%, var(--accent-gradient-end) 100%)'
                 : 'rgba(255,255,255,0.05)',
               border: 'none',
               cursor: selectedIds.size > 0 ? 'pointer' : 'default',

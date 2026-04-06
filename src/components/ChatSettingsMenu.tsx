@@ -212,8 +212,8 @@ export default function ChatSettingsMenu({
                   style={{
                     flex: 1, padding: '4px 8px', fontSize: 12, fontWeight: 500,
                     border: 'none', borderRadius: 4, cursor: 'pointer',
-                    backgroundColor: provider === tab.value ? 'rgba(242, 140, 82, 0.2)' : 'transparent',
-                    color: provider === tab.value ? '#f28c52' : 'var(--text-secondary)',
+                    backgroundColor: provider === tab.value ? 'rgba(var(--accent-rgb), 0.2)' : 'transparent',
+                    color: provider === tab.value ? 'var(--accent-color)' : 'var(--text-secondary)',
                     transition: 'all 0.2s ease',
                   }}
                 >
@@ -225,7 +225,7 @@ export default function ChatSettingsMenu({
 
           {providerSwitched && (
             <div style={{
-              fontSize: 11, color: '#f28c52', opacity: 0.85,
+              fontSize: 11, color: 'var(--accent-color)', opacity: 0.85,
               padding: '4px 0 0', lineHeight: 1.4,
             }}>
               Start a new chat for the switch to take effect

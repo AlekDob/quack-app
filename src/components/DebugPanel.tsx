@@ -147,9 +147,9 @@ export default function DebugPanel() {
 
   const getCategoryColor = (category: DebugLogEntry['category']) => {
     switch (category) {
-      case 'deduplication': return '#FF6B35'; // Orange (primary color)
+      case 'deduplication': return 'var(--accent-color)'; // Orange (primary color)
       case 'rendering': return '#00D9FF'; // Cyan (success color)
-      case 'events': return '#F7931E'; // Yellow (accent)
+      case 'events': return 'var(--accent-color)'; // Yellow (accent)
       case 'general': return '#004E89'; // Blue (secondary)
       default: return '#888';
     }
@@ -195,7 +195,7 @@ export default function DebugPanel() {
           </div>
           <div className="debug-stat">
             <span className="debug-stat-label">Duplicates:</span>
-            <span className="debug-stat-value" style={{ color: '#FF6B35' }}>
+            <span className="debug-stat-value" style={{ color: 'var(--accent-color)' }}>
               {stats.byCategory.deduplication || 0}
             </span>
           </div>
@@ -406,9 +406,9 @@ export default function DebugPanel() {
 
         <h3>🔍 Categories</h3>
         <ul>
-          <li><span style={{ color: '#FF6B35' }}>●</span> <strong>Deduplication:</strong> Event duplicate detection</li>
+          <li><span style={{ color: 'var(--accent-color)' }}>●</span> <strong>Deduplication:</strong> Event duplicate detection</li>
           <li><span style={{ color: '#00D9FF' }}>●</span> <strong>Rendering:</strong> UI rendering issues</li>
-          <li><span style={{ color: '#F7931E' }}>●</span> <strong>Events:</strong> Event stream processing</li>
+          <li><span style={{ color: 'var(--accent-color)' }}>●</span> <strong>Events:</strong> Event stream processing</li>
           <li><span style={{ color: '#004E89' }}>●</span> <strong>General:</strong> General system logs</li>
         </ul>
       </div>

@@ -148,10 +148,10 @@ export function StepProjectSelection({
                     position: 'relative',
                     padding: '10px 12px',
                     background: isSelected
-                      ? 'rgba(255, 107, 53, 0.12)'
+                      ? 'rgba(var(--accent-rgb), 0.12)'
                       : 'rgba(255, 255, 255, 0.03)',
                     border: isSelected
-                      ? '1px solid #FF6B35'
+                      ? '1px solid var(--accent-color)'
                       : '1px solid rgba(255, 255, 255, 0.08)',
                     borderRadius: '6px',
                     cursor: 'pointer',
@@ -182,7 +182,7 @@ export function StepProjectSelection({
                       right: '8px',
                       width: '16px',
                       height: '16px',
-                      background: '#FF6B35',
+                      background: 'var(--accent-color)',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',

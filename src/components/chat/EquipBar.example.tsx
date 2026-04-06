@@ -87,7 +87,7 @@ export function EquipBarExample() {
         <button
           style={{
             padding: '10px 20px',
-            background: '#f28c52',
+            background: 'var(--accent-color)',
             border: 'none',
             borderRadius: '8px',
             color: '#fff',
@@ -107,7 +107,7 @@ export function EquipBarExample() {
         border: '1px solid rgba(255, 255, 255, 0.08)',
         borderRadius: '8px',
       }}>
-        <h3 style={{ color: '#f28c52', marginBottom: '8px', fontSize: '14px' }}>Current Prompt:</h3>
+        <h3 style={{ color: 'var(--accent-color)', marginBottom: '8px', fontSize: '14px' }}>Current Prompt:</h3>
         <pre style={{ color: '#fff', fontSize: '13px', margin: 0 }}>
           {prompt || '(empty)'}
         </pre>

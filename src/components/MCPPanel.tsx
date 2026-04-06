@@ -233,7 +233,7 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
               strokeLinecap="round"
               strokeLinejoin="round"
               className="mb-6"
-              style={{ color: "rgba(242, 140, 82, 0.4)" }}
+              style={{ color: "rgba(var(--accent-rgb), 0.4)" }}
             >
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
@@ -241,7 +241,7 @@ export default function MCPPanel({ workingDir, onRefresh, onOpenMcpConfig }: MCP
             </svg>
             <h4
               className="text-lg font-bold mb-2"
-              style={{ color: "#f28c52" }}
+              style={{ color: "var(--accent-color)" }}
             >
               No MCP Servers
             </h4>

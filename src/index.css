@@ -15,13 +15,15 @@
      Inspired by Apple, Vercel, Cursor, OpenAI
      ============================================ */
 
-  /* Accent — the ONLY chromatic color */
+  /* Accent — the ONLY chromatic color (overridden at runtime by applyAccentColor) */
   --accent-color: #f28c52;
   --accent-rgb: 242, 140, 82;
   --accent-surface: rgba(var(--accent-rgb), 0.10);
   --accent-surface-strong: rgba(var(--accent-rgb), 0.20);
   --accent-border: rgba(var(--accent-rgb), 0.25);
   --accent-text: #ffecd9;
+  --accent-gradient-end: #b6693d;
+  --accent-hover: #f4a176;
 
   /* Neutral surfaces */
   --bg-base: #0f1115;

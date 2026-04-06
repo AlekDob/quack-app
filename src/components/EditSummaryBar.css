@@ -289,18 +289,18 @@
 
 /* IDE-enabled Open All button - orange theme */
 .edit-summary-bar-open-all-btn.ide-enabled {
-  background: rgba(242, 140, 82, 0.15);
-  border-color: rgba(242, 140, 82, 0.3);
-  color: #f28c52;
+  background: rgba(var(--accent-rgb), 0.15);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  color: var(--accent-color);
 }
 
 .edit-summary-bar-open-all-btn.ide-enabled:hover:not(:disabled) {
-  background: rgba(242, 140, 82, 0.25);
-  border-color: rgba(242, 140, 82, 0.5);
+  background: rgba(var(--accent-rgb), 0.25);
+  border-color: rgba(var(--accent-rgb), 0.5);
 }
 
 .edit-summary-bar-open-all-btn.ide-enabled svg {
-  color: rgba(242, 140, 82, 0.8);
+  color: rgba(var(--accent-rgb), 0.8);
 }
 
 /* ============================================

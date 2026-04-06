@@ -26,7 +26,7 @@ export default function StandaloneTerminal() {
         const params = new URLSearchParams(window.location.search);
         const terminalId = params.get('terminal');
         const cwd = params.get('cwd');
-        const color = params.get('color') || '#f28c52';
+        const color = params.get('color') || 'var(--accent-color)';
 
         if (!terminalId) {
           throw new Error('Missing terminal ID in URL parameters');

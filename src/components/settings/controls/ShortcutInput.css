@@ -41,27 +41,27 @@
 
 .shortcut-input:focus {
   outline: none;
-  border-color: rgba(242, 140, 82, 0.5);
+  border-color: rgba(var(--accent-rgb), 0.5);
 }
 
 /* Recording state - pulsing orange glow */
 .shortcut-input.recording {
-  border-color: #f28c52;
-  background: rgba(242, 140, 82, 0.1);
+  border-color: var(--accent-color);
+  background: rgba(var(--accent-rgb), 0.1);
   animation: shortcut-pulse 1.5s ease-in-out infinite;
 }
 
 @keyframes shortcut-pulse {
   0%, 100% {
-    box-shadow: 0 0 8px rgba(242, 140, 82, 0.4);
+    box-shadow: 0 0 8px rgba(var(--accent-rgb), 0.4);
   }
   50% {
-    box-shadow: 0 0 20px rgba(242, 140, 82, 0.7);
+    box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.7);
   }
 }
 
 .shortcut-recording-text {
-  color: #f28c52;
+  color: var(--accent-color);
   font-style: italic;
   font-size: 12px;
 }

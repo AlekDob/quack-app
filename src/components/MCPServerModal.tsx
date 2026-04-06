@@ -223,7 +223,7 @@ export default function MCPServerModal({
             borderColor: "rgba(255, 255, 255, 0.1)",
           }}
         >
-          <h2 className="text-lg font-semibold" style={{ color: "#f28c52" }}>
+          <h2 className="text-lg font-semibold" style={{ color: "var(--accent-color)" }}>
             {server ? "Edit MCP Server" : "Add MCP Server"}
           </h2>
           <button
@@ -276,8 +276,8 @@ export default function MCPServerModal({
             <div
               className="p-3 rounded-lg flex items-start gap-3"
               style={{
-                background: "rgba(242, 140, 82, 0.1)",
-                border: "1px solid rgba(242, 140, 82, 0.3)",
+                background: "rgba(var(--accent-rgb), 0.1)",
+                border: "1px solid rgba(var(--accent-rgb), 0.3)",
               }}
             >
               <svg
@@ -289,13 +289,13 @@ export default function MCPServerModal({
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                style={{ color: "#f28c52", flexShrink: 0 }}
+                style={{ color: "var(--accent-color)", flexShrink: 0 }}
               >
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                 <polyline points="22 4 12 14.01 9 11.01" />
               </svg>
               <div className="flex-1">
-                <p className="text-sm font-medium" style={{ color: "#f28c52" }}>
+                <p className="text-sm font-medium" style={{ color: "var(--accent-color)" }}>
                   Using {templates.find((t) => t.id === selectedTemplateId)?.name} template
                 </p>
                 <p
@@ -308,7 +308,7 @@ export default function MCPServerModal({
                   type="button"
                   onClick={() => setSelectedTemplateId("")}
                   className="text-xs mt-2 underline"
-                  style={{ color: "#f28c52" }}
+                  style={{ color: "var(--accent-color)" }}
                 >
                   Clear and start from scratch
                 </button>
@@ -613,9 +613,9 @@ export default function MCPServerModal({
               disabled={saving}
               className="flex-1 px-4 py-2 rounded text-sm font-medium transition-all duration-200 disabled:opacity-50"
               style={{
-                background: "rgba(242, 140, 82, 0.2)",
-                border: "1px solid rgba(242, 140, 82, 0.5)",
-                color: "#f28c52",
+                background: "rgba(var(--accent-rgb), 0.2)",
+                border: "1px solid rgba(var(--accent-rgb), 0.5)",
+                color: "var(--accent-color)",
               }}
             >
               {saving ? "Saving..." : server ? "Update Server" : "Add Server"}

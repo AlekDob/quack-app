@@ -92,7 +92,7 @@ export default function SetupStepReview({
             </div>
             <div
               className="text-sm font-mono"
-              style={{ color: "#f28c52" }}
+              style={{ color: "var(--accent-color)" }}
             >
               {projectPath}
             </div>
@@ -157,9 +157,9 @@ export default function SetupStepReview({
             <div
               className="inline-block px-3 py-1 rounded-full text-sm font-medium"
               style={{
-                background: "rgba(242, 140, 82, 0.1)",
-                color: "#f28c52",
-                border: "1px solid rgba(242, 140, 82, 0.3)",
+                background: "rgba(var(--accent-rgb), 0.1)",
+                color: "var(--accent-color)",
+                border: "1px solid rgba(var(--accent-rgb), 0.3)",
               }}
             >
               {getTechStackName(data.techStack)}
@@ -181,9 +181,9 @@ export default function SetupStepReview({
                     key={index}
                     className="px-2 py-1 rounded text-xs font-medium"
                     style={{
-                      background: "rgba(242, 140, 82, 0.1)",
+                      background: "rgba(var(--accent-rgb), 0.1)",
                       color: "rgba(255, 255, 255, 0.8)",
-                      border: "1px solid rgba(242, 140, 82, 0.2)",
+                      border: "1px solid rgba(var(--accent-rgb), 0.2)",
                     }}
                   >
                     {feature}
@@ -222,14 +222,14 @@ export default function SetupStepReview({
         <div
           className="p-4 rounded-lg border text-center"
           style={{
-            background: "rgba(242, 140, 82, 0.05)",
-            border: "1px solid rgba(242, 140, 82, 0.2)",
+            background: "rgba(var(--accent-rgb), 0.05)",
+            border: "1px solid rgba(var(--accent-rgb), 0.2)",
           }}
         >
           <div className="text-2xl mb-2">🦆</div>
           <p
             className="text-base font-semibold mb-1"
-            style={{ color: "#f28c52" }}
+            style={{ color: "var(--accent-color)" }}
           >
             Ready to set up Quack Agency!
           </p>

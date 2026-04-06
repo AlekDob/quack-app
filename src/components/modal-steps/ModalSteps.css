@@ -34,7 +34,7 @@
 
 .step-item.current .step-indicator {
   background: rgba(255, 107, 53, 0.15);
-  border-color: #FF6B35;
+  border-color: var(--accent-color);
   box-shadow: 0 0 10px rgba(255, 107, 53, 0.2);
 }
 
@@ -57,7 +57,7 @@
 }
 
 .step-item.current .step-icon svg {
-  stroke: #FF6B35;
+  stroke: var(--accent-color);
 }
 
 .step-item.completed .step-icon {
@@ -91,7 +91,7 @@
 }
 
 .step-item.current .step-label {
-  color: #FF6B35;
+  color: var(--accent-color);
 }
 
 .step-item.completed .step-label {
@@ -142,7 +142,7 @@
 .personality-textarea:focus {
   outline: none;
   background: var(--bg-hover);
-  border-color: #FF6B35;
+  border-color: var(--accent-color);
 }
 
 .personality-input::placeholder,
@@ -183,7 +183,7 @@
 
 .communication-style-option.selected {
   background: rgba(255, 107, 53, 0.12);
-  border-color: #FF6B35;
+  border-color: var(--accent-color);
 }
 
 .style-label {
@@ -258,7 +258,7 @@
 .config-icon {
   width: 16px;
   height: 16px;
-  stroke: #FF6B35;
+  stroke: var(--accent-color);
   flex-shrink: 0;
   margin-top: 1px;
 }
@@ -393,8 +393,8 @@
 }
 
 .config-item input:checked + .config-checkbox {
-  background: #FF6B35;
-  border-color: #FF6B35;
+  background: var(--accent-color);
+  border-color: var(--accent-color);
 }
 
 .config-item input:checked + .config-checkbox::after {
@@ -424,7 +424,7 @@
 }
 
 .config-item input:checked ~ .config-item-avatar {
-  border-color: #FF6B35;
+  border-color: var(--accent-color);
 }
 
 .config-item-content {
@@ -457,7 +457,7 @@
 
 .config-item-specialization {
   font-size: 10px;
-  color: #F7931E;
+  color: var(--accent-color);
   font-weight: 500;
 }
 
@@ -523,7 +523,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);
+  background: linear-gradient(135deg, var(--accent-color) 0%, var(--accent-color) 100%);
   color: white;
   border: none;
   border-radius: var(--radius-sm);
@@ -615,7 +615,7 @@
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #FF6B35 0%, #00D9FF 100%);
+  background: linear-gradient(90deg, var(--accent-color) 0%, #00D9FF 100%);
   border-radius: 2px;
   transition: width 0.2s ease;
 }
@@ -688,7 +688,7 @@
 
 .trigger-type-badge.skill {
   background: rgba(247, 147, 30, 0.15);
-  color: #F7931E;
+  color: var(--accent-color);
   border: 1px solid rgba(247, 147, 30, 0.25);
 }
 
@@ -749,7 +749,7 @@
 }
 
 .auto-invoke-toggle input:checked + .toggle-slider {
-  background: #FF6B35;
+  background: var(--accent-color);
 }
 
 .auto-invoke-toggle input:checked + .toggle-slider::after {
@@ -847,7 +847,7 @@
 
 .trigger-input:focus {
   outline: none;
-  border-color: #FF6B35;
+  border-color: var(--accent-color);
   background: rgba(0, 0, 0, 0.2);
 }
 
@@ -1016,7 +1016,7 @@
 .suggestion-chip:hover {
   background: rgba(255, 107, 53, 0.1);
   border-color: rgba(255, 107, 53, 0.25);
-  color: #FF6B35;
+  color: var(--accent-color);
 }
 
 .triggers-quick-actions {
@@ -1349,13 +1349,13 @@
 .create-rule-cta svg {
   width: 14px;
   height: 14px;
-  stroke: #FF6B35;
+  stroke: var(--accent-color);
 }
 
 .create-rule-cta span {
   font-size: 11px;
   font-weight: 500;
-  color: #FF6B35;
+  color: var(--accent-color);
 }
 
 /* Summary list missing item - Compact */

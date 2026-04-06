@@ -53,7 +53,7 @@ export function useTerminalWindows() {
         // Create new webview window with Tauri using terminal.html entry point
         console.log('🦆 useTerminalWindows: Creating WebviewWindow...');
         const webview = new WebviewWindow(windowLabel, {
-          url: `terminal.html?terminal=${terminalId}&cwd=${encodeURIComponent(cwd)}&color=${encodeURIComponent(options.color || '#f28c52')}`,
+          url: `terminal.html?terminal=${terminalId}&cwd=${encodeURIComponent(cwd)}&color=${encodeURIComponent(options.color || 'var(--accent-color)')}`,
           title: windowLabel,
           width: options.width || 1200,
           height: options.height || 800,
