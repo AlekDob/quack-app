@@ -4,7 +4,6 @@ import { toast } from 'sonner';
 import MarkdownText from './MarkdownText';
 import { AgentAvatar } from './AgentAvatar';
 import { useTerminalStore } from '../stores/terminalStore';
-import { executeRemoteTask } from '../services/remoteApi';
 import './PlanWidget.css';
 
 interface PlanWidgetProps {
@@ -35,11 +34,14 @@ const PlanWidget: React.FC<PlanWidgetProps> = ({
   const [feedback, setFeedback] = useState('');
 
   // Agent picker: read from synced terminal store (App.tsx syncs useState → Zustand)
+  // Filter: same project (cwd) as active agent, excluding self
   const terminals = useTerminalStore(s => s.terminals);
   const activeId = useTerminalStore(s => s.activeId);
 
   const availableAgents = useMemo(() => {
-    return terminals.filter(t => t.id !== activeId);
+    const active = terminals.find(t => t.id === activeId);
+    if (!active) return terminals.filter(t => t.id !== activeId);
+    return terminals.filter(t => t.id !== activeId && t.cwd === active.cwd);
   }, [terminals, activeId]);
 
   const handleCopy = async () => {
@@ -105,6 +107,7 @@ const PlanWidget: React.FC<PlanWidgetProps> = ({
     );
   };
 
+  // Brain: 047-plan-delegate-remote
   const handleDelegateToAgent = useCallback(async (agentId: string) => {
     const agent = terminals.find(t => t.id === agentId);
     if (!agent) return;
@@ -114,17 +117,29 @@ const PlanWidget: React.FC<PlanWidgetProps> = ({
     setApprovalResult('delegated');
     setDelegatedTo(agent.label);
 
-    const result = await executeRemoteTask({
-      agentId,
-      prompt: `Execute the following approved plan:\n\n${plan}`,
-      leadSessionId: currentSessionId,
-      projectPath: agent.cwd || workingDirectory,
-    });
+    try {
+      // Use Tauri invoke (not HTTP fetch) to avoid CORS issues.
+      // The Rust command emits "remote-execute" → App.tsx listener creates session.
+      await invoke<string>('delegate_plan_to_agent', {
+        agentId,
+        prompt: `Execute the following approved plan:\n\n${plan}`,
+        leadSessionId: currentSessionId || null,
+        projectPath: agent.cwd || workingDirectory || null,
+      });
 
-    if (result.success) {
+      // Reject locally so the lead agent exits plan mode WITHOUT executing.
+      // The feedback tells the agent the plan was delegated to someone else.
+      if (pendingApprovalRequestId && onApprovalResponse) {
+        onApprovalResponse(
+          pendingApprovalRequestId,
+          false,
+          `Plan delegated to ${agent.label}. Do not execute this plan — another agent is handling it.`
+        );
+      }
+
       toast.success(`Plan delegated to ${agent.label}`);
-    } else {
-      toast.error(`Delegation failed: ${result.error}`);
+    } catch (err) {
+      toast.error(`Delegation failed: ${err}`);
       setIsResponded(false);
       setApprovalResult(null);
       setDelegatedTo(null);

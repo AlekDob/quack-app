@@ -809,7 +809,22 @@ function AppContent() {
   const [showStoreDrawer, setShowStoreDrawer] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsInitialCategory, setSettingsInitialCategory] = useState<'general' | 'about' | undefined>(undefined);
-  const [sidePanelCollapsed, setSidePanelCollapsed] = useState(false);
+  const [sidePanelCollapsed, setSidePanelCollapsed] = useState(() => {
+    try {
+      const stored = localStorage.getItem('ui-storage');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed?.state?.sidePanelCollapsed ?? false;
+      }
+    } catch { /* ignore */ }
+    return false;
+  });
+  // Sync sidePanelCollapsed to Zustand store for persistence
+  const setSidePanelCollapsedStore = useUIStore((s) => s.setSidePanelCollapsed);
+  useEffect(() => {
+    setSidePanelCollapsedStore(sidePanelCollapsed);
+  }, [sidePanelCollapsed, setSidePanelCollapsedStore]);
+
   // Force expand a specific section in the side panel accordion
   const [forceExpandSection, setForceExpandSection] = useState<string | null>(null);
   // Chat fullscreen mode - hides side panel and expands chat
@@ -868,6 +883,12 @@ function AppContent() {
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [isDraggingTab, setIsDraggingTab] = useState(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
+
+  // Close split view when switching agent/terminal
+  useEffect(() => {
+    setSplitTabId(null);
+    setIsDraggingTab(false);
+  }, [activeId]);
 
   // Clear editor selection when navigating away from file tab
   useEffect(() => {
@@ -10765,6 +10786,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   const handleCloseSplit = useCallback(() => {
     setSplitTabId(null);
+    setIsDraggingTab(false);
   }, []);
 
   // Handle tab popout - drag tab outside tab bar to create floating window

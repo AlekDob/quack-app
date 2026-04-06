@@ -1100,3 +1100,65 @@ async fn handle_avatar(
 
     StatusCode::NOT_FOUND.into_response()
 }
+
+// ─── Tauri Command: Delegate Plan ────────────────────────────────────
+// Brain: 047-plan-delegate-remote
+// Called from PlanWidget.tsx to delegate a plan to another agent.
+// Same logic as handle_execute but invoked directly via Tauri (no HTTP/CORS).
+
+#[tauri::command]
+pub async fn delegate_plan_to_agent(
+    app: AppHandle,
+    agent_id: String,
+    prompt: String,
+    lead_session_id: Option<String>,
+    project_path: Option<String>,
+) -> Result<String, String> {
+    let storage = read_agents_storage().map_err(|e| format!("{:?}", e))?;
+
+    let agent = storage
+        .get("agents")
+        .and_then(|a| a.as_array())
+        .and_then(|arr| {
+            arr.iter()
+                .find(|a| a.get("id").and_then(|v| v.as_str()) == Some(&agent_id))
+        })
+        .cloned()
+        .ok_or_else(|| format!("Agent not found: {}", agent_id))?;
+
+    let path = project_path.unwrap_or_else(|| {
+        agent.get("cwd").and_then(|v| v.as_str()).unwrap_or("").to_string()
+    });
+
+    let name = std::path::Path::new(&path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    let session_id = format!("session-{}", uuid::Uuid::new_v4());
+
+    let event = serde_json::json!({
+        "sessionId": session_id,
+        "agentId": agent_id,
+        "agentName": agent.get("label").and_then(|v| v.as_str()).unwrap_or(""),
+        "projectPath": path,
+        "projectName": name,
+        "prompt": prompt,
+        "model": serde_json::Value::Null,
+        "leadSessionId": lead_session_id,
+        "source": "plan-delegate",
+        "autoSend": true,
+    });
+
+    if let Ok(mut map) = crate::AGENT_STATUS.write() {
+        map.insert(agent_id.clone(), "busy".to_string());
+    }
+
+    app.emit("remote-execute", &event)
+        .map_err(|e| format!("Failed to emit: {}", e))?;
+
+    log::info!("📋 [Delegate Plan] agent={}, session={}", agent_id, session_id);
+
+    Ok(session_id)
+}

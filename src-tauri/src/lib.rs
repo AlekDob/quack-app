@@ -1379,6 +1379,7 @@ pub fn run() {
             remote_config::regenerate_remote_token,
             remote_config::get_local_ip,
             remote_config::get_local_hostname,
+            remote_api::delegate_plan_to_agent,
             // BTW side-chain query
             btw::btw_query,
         ])

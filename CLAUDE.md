@@ -131,6 +131,8 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - EditSummaryBar cumulative regression: `documentation/bugs/fix-edit-summary-bar-cumulative-regression.md`
 - ChangesPanel CPU loop: `documentation/bugs/fix-changes-panel-cpu-loop.md`
 - Windows path separators: `documentation/gotchas/gotcha-windows-path-separators.md`
+- Webview fetch CORS: `documentation/gotchas/gotcha-webview-fetch-cors-use-invoke.md`
+- TerminalStore sync persist quota: `documentation/gotchas/gotcha-terminal-store-sync-persist-quota.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
