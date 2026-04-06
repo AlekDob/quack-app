@@ -25,16 +25,31 @@
 }
 
 .token-modal {
-  background: #1a1a1a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%);
+  backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
   width: 90%;
   max-width: 420px;
   max-height: calc(100vh - 160px);
   overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: var(--shadow-lg);
   pointer-events: auto;
-  animation: modalSlideUpFromBottom 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: modalSlideUpFromBottom 0.3s var(--ease-spring);
+  position: relative;
+  overflow: hidden;
+}
+
+.token-modal::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  pointer-events: none;
 }
 
 @keyframes modalSlideUp {
@@ -64,30 +79,30 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .token-modal-header h3 {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
 }
 
 .token-modal-close {
   background: none;
   border: none;
   font-size: 20px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: all 0.2s;
 }
 
 .token-modal-close:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .token-modal-content {
@@ -108,8 +123,8 @@
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 8px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
 }
 
 .token-breakdown-item {
@@ -120,26 +135,26 @@
 
 .token-breakdown-label {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
 }
 
 .token-breakdown-value {
   font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
 }
 
 .token-breakdown-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
   margin: 4px 0;
 }
 
 .token-suggestion {
   padding: 16px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
 }
 
 .token-suggestion.critical {
@@ -160,13 +175,13 @@
 .token-suggestion-title {
   font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   margin-bottom: 8px;
 }
 
 .token-suggestion-message {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   line-height: 1.5;
   margin-bottom: 12px;
 }
@@ -179,7 +194,7 @@
 .token-action-btn {
   flex: 1;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -257,10 +272,10 @@
   display: flex;
   gap: 8px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -277,8 +292,8 @@
 .fallout-style {
   background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%);
   border: 2px solid #4dd4b3;
-  box-shadow: 0 0 30px rgba(77, 212, 179, 0.3), 0 20px 60px rgba(0, 0, 0, 0.5);
-  animation: modalSlideUpFallout 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), borderGlowPulse 2s ease-in-out infinite;
+  box-shadow: var(--shadow-lg);
+  animation: modalSlideUpFallout 0.4s var(--ease-spring), borderGlowPulse 2s ease-in-out infinite;
   max-height: calc(100vh - 160px);
 }
 
@@ -286,21 +301,21 @@
   from {
     opacity: 0;
     transform: translateY(40px) scale(0.9);
-    box-shadow: 0 0 0 rgba(77, 212, 179, 0), 0 10px 30px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
   }
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
-    box-shadow: 0 0 30px rgba(77, 212, 179, 0.3), 0 20px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-lg);
   }
 }
 
 @keyframes borderGlowPulse {
   0%, 100% {
-    box-shadow: 0 0 30px rgba(77, 212, 179, 0.3), 0 20px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-lg);
   }
   50% {
-    box-shadow: 0 0 40px rgba(77, 212, 179, 0.5), 0 20px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--shadow-lg);
   }
 }
 
@@ -330,7 +345,7 @@
   padding: 8px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(77, 212, 179, 0.2);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .fallout-duck-container {
@@ -363,14 +378,14 @@
   top: 5px;
   right: 5px;
   padding: 6px 12px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.8px;
   color: white;
   border: 2px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-md);
 }
 
 .fallout-stamina-section {
@@ -411,7 +426,7 @@
   height: 20px;
   background: rgba(0, 0, 0, 0.6);
   border: 2px solid #4dd4b3;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   position: relative;
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
@@ -484,7 +499,7 @@
   padding: 12px;
   background: rgba(247, 147, 30, 0.05);
   border: 1px solid rgba(247, 147, 30, 0.3);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin-top: 4px;
 }
 
@@ -524,19 +539,19 @@
 
 .max-plan-label {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
 }
 
 .max-plan-value {
   font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
 }
 
 .max-plan-percentage {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
 }
 
 .max-plan-divider {
@@ -559,7 +574,7 @@
   align-items: flex-start;
   gap: 8px;
   padding: 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   line-height: 1.4;
   margin-top: 4px;
@@ -592,7 +607,7 @@
   padding: 12px 16px;
   background: rgba(77, 212, 179, 0.1);
   border: 1px solid rgba(77, 212, 179, 0.3);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: #4dd4b3;
   font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
   font-size: 13px;
@@ -606,7 +621,7 @@
 .max-plan-analytics-btn:hover {
   background: rgba(77, 212, 179, 0.2);
   border-color: rgba(77, 212, 179, 0.5);
-  box-shadow: 0 0 15px rgba(77, 212, 179, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 /* ============================================ */
@@ -623,7 +638,7 @@
   padding: 12px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(77, 212, 179, 0.2);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 /* Center Column: Duck + Model + Progress (full-width) */
@@ -669,7 +684,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   text-transform: uppercase;
 }
 
@@ -705,7 +720,7 @@
 .context-usage-tokens {
   font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
 }
 
 /* Right Column: Breakdown */
@@ -722,7 +737,7 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   text-transform: uppercase;
   padding-bottom: 4px;
   border-bottom: 1px solid rgba(77, 212, 179, 0.2);
@@ -742,14 +757,14 @@
 
 .context-breakdown-label {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 .context-breakdown-value {
   font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   text-align: right;
 }
 
@@ -760,7 +775,7 @@
   padding: 12px;
   background: rgba(77, 212, 179, 0.05);
   border: 1px solid rgba(77, 212, 179, 0.2);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin-top: 4px;
 }
 
@@ -779,7 +794,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   text-transform: uppercase;
 }
 
@@ -792,7 +807,7 @@
 }
 
 .context-summary-row.free .context-summary-value {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   text-shadow: none;
 }
 
@@ -808,7 +823,7 @@
 
 .context-summary-note {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   font-style: italic;
   margin-top: 2px;
 }
@@ -849,12 +864,12 @@
 /* Note about data source */
 .context-breakdown-note {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   font-style: italic;
   margin-top: 8px;
   padding: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 4px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
 }
 
 .context-breakdown-note.success {
@@ -872,7 +887,7 @@
   padding: 12px;
   background: rgba(77, 212, 179, 0.03);
   border: 1px solid rgba(77, 212, 179, 0.15);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .context-breakdown-title {
@@ -880,7 +895,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 1.5px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   text-transform: uppercase;
   margin-bottom: 10px;
 }
@@ -913,7 +928,7 @@
 .context-breakdown-name {
   font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   flex: 1;
   text-transform: capitalize;
 }

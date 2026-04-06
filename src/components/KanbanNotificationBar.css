@@ -100,7 +100,7 @@
   justify-content: center;
   gap: 6px;
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -126,7 +126,7 @@
   background: transparent;
   color: var(--color-text-secondary);
   padding: 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .kanban-notification-bar-btn-dismiss:hover {

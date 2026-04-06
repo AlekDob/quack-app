@@ -37,7 +37,7 @@
   gap: 4px;
   padding: 3px 8px;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.6);
   font-size: 11px;

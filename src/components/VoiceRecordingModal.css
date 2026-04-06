@@ -107,7 +107,7 @@
     rgba(255, 193, 7, 0.08) 0%,
     rgba(255, 152, 0, 0.12) 100%
   );
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -174,7 +174,7 @@
   overflow-y: auto;
   padding: 12px;
   background: rgba(0, 0, 0, 0.02);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
@@ -211,7 +211,7 @@
   font-size: 15px;
   padding: 12px;
   background: rgba(229, 62, 62, 0.1);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   border: 1px solid rgba(229, 62, 62, 0.2);
 }
 
@@ -233,7 +233,7 @@
   justify-content: center;
   gap: 6px;
   padding: 18px 24px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   border: none;
   font-size: 14px;
   font-weight: 600;
@@ -341,7 +341,7 @@
 
 .voice-modal-transcript::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .voice-modal-transcript::-webkit-scrollbar-thumb:hover {

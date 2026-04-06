@@ -93,7 +93,7 @@
 .todo-progress-bar {
   height: 4px;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   margin-bottom: 10px;
   position: relative;
@@ -102,7 +102,7 @@
 .todo-progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #10b981 0%, #059669 100%);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: width 0.4s ease;
 }
 
@@ -120,7 +120,7 @@
   padding: 6px 10px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition: all 0.15s ease;
   position: relative;
   overflow: hidden;

@@ -35,7 +35,7 @@
 /* GIF Container */
 .tool-gif-container {
   position: relative;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: rgba(18, 20, 27, 0.9);
   border: 1px solid rgba(242, 140, 82, 0.2);
@@ -108,7 +108,7 @@
   padding: 6px 10px;
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(8px);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 

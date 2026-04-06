@@ -32,7 +32,7 @@
   color: rgba(255, 255, 255, 0.8);
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -86,7 +86,7 @@
   padding: 0.75rem;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .debug-item.full-width {
@@ -107,7 +107,7 @@
   padding: 0.25rem;
   background: rgba(242, 140, 82, 0.1);
   border: 1px solid rgba(242, 140, 82, 0.2);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   color: rgba(242, 140, 82, 0.9);
   transition: all 0.2s;

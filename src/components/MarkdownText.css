@@ -74,7 +74,7 @@
 .md-inline-code {
   background: rgba(242, 140, 82, 0.15);
   border: 1px solid rgba(242, 140, 82, 0.25);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   padding: 1px 4px;
   font-family: var(--font-mono);
   font-size: var(--fs-code);
@@ -116,7 +116,7 @@
   padding: 5px 8px;
   background: rgba(242, 140, 82, 0.15);
   border: 1px solid rgba(242, 140, 82, 0.3);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: #f28c52;
   font-size: 10px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

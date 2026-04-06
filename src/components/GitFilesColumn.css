@@ -106,7 +106,7 @@
   min-width: 18px;
   height: 18px;
   padding: 0 0.25rem;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 0.65rem;
   font-weight: 700;
   flex-shrink: 0;

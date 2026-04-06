@@ -56,7 +56,7 @@
   padding: 0.5rem; /* ← Ridotto da 0.75rem */
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px; /* ← Ridotto da 8px */
+  border-radius: var(--radius-sm); /* ← Ridotto da 8px */
   cursor: pointer;
   transition: all 0.2s ease;
   user-select: none;
@@ -78,7 +78,7 @@
   margin-left: 0.5rem;
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.15) 100%);
   border: 1.5px solid rgba(59, 130, 246, 0.4);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: rgba(59, 130, 246, 1);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -149,7 +149,7 @@
   padding: 0.5rem 0.75rem; /* ← Ridotto da 0.75rem 1rem */
   background: rgba(20, 20, 25, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px; /* ← Ridotto da 8px */
+  border-radius: var(--radius-sm); /* ← Ridotto da 8px */
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -221,7 +221,7 @@
 
 .agent-context-panel::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .agent-context-panel::-webkit-scrollbar-thumb:hover {
@@ -244,7 +244,7 @@
   padding: 6px 12px;
   background: linear-gradient(135deg, rgba(78, 205, 196, 0.15) 0%, rgba(78, 205, 196, 0.08) 100%);
   border: 1px dashed rgba(78, 205, 196, 0.4);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: #4ecdc4;
   font-size: 0.7rem;
   font-weight: 500;

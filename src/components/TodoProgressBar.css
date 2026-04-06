@@ -45,7 +45,7 @@
 
 .todo-fixed-progress-bar-badge {
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 11px;
   font-weight: 500;
 }
@@ -76,7 +76,7 @@
   flex: 1;
   height: 6px;
   background: rgba(20, 184, 166, 0.15);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   min-width: 60px;
   max-width: 200px;
@@ -85,7 +85,7 @@
 .todo-fixed-progress-bar-fill {
   height: 100%;
   background: linear-gradient(90deg, #14b8a6 0%, #10b981 100%);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -181,7 +181,7 @@
   padding: 6px 10px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(20, 184, 166, 0.15);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition: all 0.15s ease;
   position: relative;
   overflow: hidden;
@@ -288,12 +288,12 @@
 
 .todo-fixed-progress-bar-content-inner::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .todo-fixed-progress-bar-content-inner::-webkit-scrollbar-thumb {
   background: rgba(20, 184, 166, 0.3);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .todo-fixed-progress-bar-content-inner::-webkit-scrollbar-thumb:hover {

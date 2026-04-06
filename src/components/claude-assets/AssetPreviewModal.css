@@ -18,7 +18,7 @@
   width: 100%;
   max-width: 800px;
   max-height: 80vh;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--panel-border, rgba(128, 132, 150, 0.2));
   background: linear-gradient(
     145deg,
@@ -73,7 +73,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--panel-border, rgba(128, 132, 150, 0.2));
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary, rgba(255, 255, 255, 0.7));

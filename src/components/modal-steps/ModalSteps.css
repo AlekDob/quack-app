@@ -10,7 +10,7 @@
   gap: 8px;
   padding: 10px 0;
   margin-bottom: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .step-item {
@@ -27,8 +27,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
   transition: all 0.2s ease;
 }
 
@@ -86,7 +86,7 @@
 .step-label {
   font-size: 11px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   transition: color 0.2s ease;
 }
 
@@ -113,7 +113,7 @@
 .personality-section-title {
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   margin-bottom: 14px;
   display: flex;
   align-items: center;
@@ -128,9 +128,9 @@
 .personality-textarea {
   width: 100%;
   padding: 10px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.95);
   font-size: 12px;
   font-family: inherit;
@@ -141,13 +141,13 @@
 .personality-input:focus,
 .personality-textarea:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
   border-color: #FF6B35;
 }
 
 .personality-input::placeholder,
 .personality-textarea::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 .personality-textarea {
@@ -164,9 +164,9 @@
 
 .communication-style-option {
   padding: 8px 10px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -177,7 +177,7 @@
 }
 
 .communication-style-option:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-elevated);
   border-color: rgba(255, 255, 255, 0.2);
 }
 
@@ -189,12 +189,12 @@
 .style-label {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
 }
 
 .style-description {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
 }
 
 /* ===== Intro Message - Compact ===== */
@@ -206,7 +206,7 @@
   margin-bottom: 14px;
   background: rgba(0, 217, 255, 0.06);
   border: 1px solid rgba(0, 217, 255, 0.15);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .intro-icon {
@@ -222,18 +222,18 @@
   margin: 0;
   font-size: 11px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 .intro-text strong {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .intro-text code {
   padding: 1px 4px;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-family: 'Fira Code', 'Monaco', monospace;
   font-size: 10px;
   color: #00D9FF;
@@ -243,9 +243,9 @@
 .config-section {
   margin-bottom: 16px;
   padding: 12px;
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
 }
 
 .config-section-header {
@@ -266,13 +266,13 @@
 .config-section-title {
   font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   margin: 0;
 }
 
 .config-section-subtitle {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   margin: 2px 0 0 0;
 }
 
@@ -299,9 +299,9 @@
 .search-input {
   width: 100%;
   padding: 8px 32px 8px 10px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 5px;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.95);
   font-size: 11px;
   font-family: inherit;
@@ -311,12 +311,12 @@
 
 .search-input:focus {
   outline: none;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
   border-color: #00D9FF;
 }
 
 .search-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 .search-clear {
@@ -325,9 +325,9 @@
   width: 18px;
   height: 18px;
   padding: 2px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-elevated);
   border: none;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -365,16 +365,16 @@
   align-items: flex-start;
   gap: 8px;
   padding: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .config-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
 }
 
 .config-item input[type="checkbox"] {
@@ -385,7 +385,7 @@
   width: 16px;
   height: 16px;
   border: 1.5px solid rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
   margin-top: 1px;
   position: relative;
@@ -412,10 +412,10 @@
 .config-item-avatar {
   width: 32px;
   height: 32px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
   object-fit: cover;
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
+  border: 1.5px solid var(--border-default);
   transition: all 0.2s ease;
 }
 
@@ -437,7 +437,7 @@
 .config-item-name {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -448,7 +448,7 @@
   padding: 1px 4px;
   background: rgba(0, 217, 255, 0.2);
   border: 1px solid rgba(0, 217, 255, 0.3);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 8px;
   font-weight: 700;
   color: #00D9FF;
@@ -469,7 +469,7 @@
 
 .config-item-path {
   font-size: 9px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
   font-family: 'Fira Code', 'Monaco', monospace;
   margin-top: 2px;
 }
@@ -499,7 +499,7 @@
 
 .empty-hint {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
   margin: 0;
   max-width: 240px;
 }
@@ -510,7 +510,7 @@
   padding: 14px;
   background: linear-gradient(135deg, rgba(255, 107, 53, 0.08) 0%, rgba(247, 147, 30, 0.08) 100%);
   border: 1.5px dashed rgba(255, 107, 53, 0.25);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -526,7 +526,7 @@
   background: linear-gradient(135deg, #FF6B35 0%, #F7931E 100%);
   color: white;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
@@ -551,7 +551,7 @@
   padding: 10px;
   background: rgba(0, 217, 255, 0.04);
   border: 1px solid rgba(0, 217, 255, 0.15);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .summary-title {
@@ -572,7 +572,7 @@
 .summary-label {
   font-size: 10px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   display: block;
   margin-bottom: 4px;
 }
@@ -588,8 +588,8 @@
 
 .summary-list li {
   padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-sm);
   font-size: 10px;
   color: rgba(255, 255, 255, 0.85);
 }
@@ -601,8 +601,8 @@
   gap: 8px;
   margin-bottom: 12px;
   padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 5px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
 }
 
 .progress-bar {
@@ -622,7 +622,7 @@
 
 .progress-text {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   white-space: nowrap;
 }
 
@@ -634,15 +634,15 @@
 }
 
 .trigger-item {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   overflow: hidden;
   transition: all 0.2s ease;
 }
 
 .trigger-item:hover {
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--border-strong);
 }
 
 .trigger-item.expanded {
@@ -669,7 +669,7 @@
 }
 
 .trigger-header:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-elevated);
 }
 
 .trigger-info {
@@ -680,7 +680,7 @@
 
 .trigger-type-badge {
   padding: 2px 5px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.3px;
@@ -701,7 +701,7 @@
 .trigger-name {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
 }
 
 .configured-icon {
@@ -731,7 +731,7 @@
   width: 28px;
   height: 16px;
   background: rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   position: relative;
   transition: all 0.2s ease;
 }
@@ -758,7 +758,7 @@
 
 .toggle-label {
   font-size: 9px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -776,12 +776,12 @@
 
 .trigger-content {
   padding: 0 10px 10px 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--border-default);
 }
 
 .trigger-description {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   margin: 8px 0;
   line-height: 1.4;
 }
@@ -811,7 +811,7 @@
   padding: 4px 8px;
   background: rgba(0, 217, 255, 0.08);
   border: 1px solid rgba(0, 217, 255, 0.25);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: #00D9FF;
   font-size: 9px;
   font-weight: 600;
@@ -835,9 +835,9 @@
   width: 100%;
   padding: 8px 10px;
   background: rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 5px;
-  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
   font-size: 11px;
   font-family: inherit;
   resize: vertical;
@@ -878,7 +878,7 @@
 
 .quality-bar {
   height: 3px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-elevated);
   border-radius: 1.5px;
   overflow: hidden;
 }
@@ -928,7 +928,7 @@
   justify-content: center;
   width: 16px;
   height: 16px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 10px;
   font-weight: 700;
   transition: all 0.2s ease;
@@ -958,7 +958,7 @@
   padding: 6px 8px;
   background: rgba(0, 217, 255, 0.04);
   border-left: 2px solid rgba(0, 217, 255, 0.3);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -979,7 +979,7 @@
   font-family: 'Fira Code', 'Monaco', monospace;
   background: rgba(0, 0, 0, 0.15);
   padding: 4px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   display: block;
 }
 
@@ -991,7 +991,7 @@
 
 .suggestions-label {
   font-size: 9px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -1004,9 +1004,9 @@
 
 .suggestion-chip {
   padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
   font-size: 9px;
   color: rgba(255, 255, 255, 0.65);
   cursor: pointer;
@@ -1024,14 +1024,14 @@
   gap: 6px;
   margin-bottom: 12px;
   padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--border-default);
 }
 
 .quick-action {
   padding: 5px 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   font-size: 10px;
   color: rgba(255, 255, 255, 0.65);
   cursor: pointer;
@@ -1039,7 +1039,7 @@
 }
 
 .quick-action:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
   border-color: rgba(255, 255, 255, 0.15);
 }
 
@@ -1054,7 +1054,7 @@
   padding: 8px 10px;
   background: rgba(255, 193, 7, 0.08);
   border: 1px solid rgba(255, 193, 7, 0.2);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   margin-bottom: 10px;
 }
 
@@ -1228,15 +1228,15 @@
 
 /* Pattern-only generate button (muted) - Compact */
 .generate-trigger-btn.pattern-only {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-elevated);
   border-color: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.55);
 }
 
 .generate-trigger-btn.pattern-only:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-hover);
   border-color: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 /* ===== Rules Sections - Compact ===== */
@@ -1247,9 +1247,9 @@
 }
 
 .rules-section {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-elevated);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
@@ -1269,7 +1269,7 @@
 }
 
 .rules-section-header:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-elevated);
 }
 
 .section-chevron {
@@ -1296,7 +1296,7 @@
   margin-left: auto;
   padding: 1px 5px;
   background: rgba(0, 217, 255, 0.12);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 9px;
   font-weight: 600;
   color: #00D9FF;
@@ -1312,7 +1312,7 @@
   padding: 1px 4px;
   background: rgba(255, 193, 7, 0.15);
   border: 1px solid rgba(255, 193, 7, 0.3);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 8px;
   font-weight: 700;
   color: #FFC107;
@@ -1336,7 +1336,7 @@
   margin-top: 10px;
   background: rgba(255, 107, 53, 0.06);
   border: 1.5px dashed rgba(255, 107, 53, 0.25);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
 }

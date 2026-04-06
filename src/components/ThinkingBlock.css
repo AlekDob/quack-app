@@ -1,6 +1,6 @@
 .thinking-block {
   margin: 4px 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(168, 85, 247, 0.08);
   border: 1px solid rgba(168, 85, 247, 0.15);
   overflow: hidden;
@@ -82,7 +82,7 @@
   margin: 0;
   padding: 12px;
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 12px;
   line-height: 1.5;

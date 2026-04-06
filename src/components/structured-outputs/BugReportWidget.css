@@ -2,7 +2,7 @@
 .bug-report-widget {
   background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(251, 146, 60, 0.05) 100%);
   border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 1.5rem;
   margin: 1rem 0;
 }
@@ -89,14 +89,14 @@
   flex: 1;
   height: 8px;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
 .risk-fill {
   height: 100%;
   transition: width 0.3s ease, background-color 0.3s ease;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .risk-score {
@@ -122,7 +122,7 @@
   padding: 0.5rem 0.875rem;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition: all 0.2s ease;
 }
 
@@ -148,7 +148,7 @@
   font-weight: 700;
   padding: 0.125rem 0.5rem;
   background: rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 /* Bug List */
@@ -243,7 +243,7 @@
 
 .bug-severity-label {
   padding: 0.25rem 0.625rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -298,7 +298,7 @@
   padding: 0.75rem;
   background: rgba(16, 185, 129, 0.1);
   border: 1px solid rgba(16, 185, 129, 0.2);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .bug-fix-content {
@@ -317,7 +317,7 @@
   padding: 0.5rem 0.875rem;
   background: rgba(59, 130, 246, 0.15);
   border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: #93C5FD;
   font-size: 0.8125rem;
   font-weight: 500;

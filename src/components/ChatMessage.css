@@ -130,9 +130,7 @@
   border-radius: 18px 18px 4px 18px;
   font-size: var(--fs-user-msg);
   line-height: 1.4;
-  box-shadow:
-    0 2px 8px rgba(242, 140, 82, 0.3),
-    0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md);
   flex: 1;
   min-width: 0;
   /* Truncation */
@@ -154,9 +152,7 @@
 }
 
 .chat-message.sticky-user-message:hover .chat-message-body .user-message-text {
-  box-shadow:
-    0 2px 12px rgba(242, 140, 82, 0.4),
-    0 4px 20px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
 }
 
 .chat-message.error {
@@ -208,34 +204,29 @@
   height: 20px;
   padding: 0;
   border: none;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
+  background: transparent;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.6);
-  transition: all 0.15s ease;
-  backdrop-filter: blur(8px);
+  color: var(--text-tertiary);
+  transition: all var(--duration-fast) ease;
 }
 
 .sticky-action-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.9);
-  transform: scale(1.05);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .sticky-action-btn:active {
-  transform: scale(0.95);
+  opacity: 0.8;
 }
 
 .sticky-action-btn.copied {
-  background: rgba(52, 199, 89, 0.2);
-  color: rgba(52, 199, 89, 1);
-  border: 1px solid rgba(52, 199, 89, 0.4);
+  color: var(--semantic-success);
   animation: copySuccess 0.3s ease;
 }
 
 .sticky-action-btn.copied:hover {
-  background: rgba(52, 199, 89, 0.25);
-  color: rgba(52, 199, 89, 1);
+  color: var(--semantic-success);
 }
 
 @keyframes copySuccess {
@@ -251,20 +242,20 @@
 }
 
 .chat-message-role {
-  font-weight: 600;
+  font-weight: 500;
   font-size: var(--fs-small);
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 .chat-message-timestamp {
   font-size: var(--fs-small);
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-tertiary);
 }
 
 .chat-message-body {
   font-size: var(--fs-body);
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-primary);
   word-wrap: break-word;
   white-space: pre-wrap;
 }
@@ -294,17 +285,17 @@
   border: none;
   padding: 0;
   margin-left: 4px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   text-decoration: none;
-  transition: color 0.15s ease;
+  transition: color var(--duration-fast) ease;
   white-space: nowrap;
 }
 
 .see-more-btn:hover {
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-primary);
 }
 
 .chat-message-attachments {
@@ -328,7 +319,7 @@
 .chat-message-attachments.compact .chat-message-attachment-preview {
   width: 32px;
   height: 32px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .chat-message-attachments.compact .chat-message-attachment-name {
@@ -346,14 +337,14 @@
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   max-width: 320px;
 }
 
 .chat-message-attachment-preview {
   width: 48px;
   height: 48px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   display: flex;
   align-items: center;
@@ -371,7 +362,7 @@
 .chat-message-attachment-icon {
   width: 18px;
   height: 18px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
 }
 
 .chat-message-attachment-meta {
@@ -384,7 +375,7 @@
 .chat-message-attachment-name {
   font-size: var(--fs-body);
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -392,7 +383,7 @@
 
 .chat-message-attachment-size {
   font-size: var(--fs-small);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
 }
 
 .chat-message-error {
@@ -400,7 +391,7 @@
   padding: 6px 10px;
   background: rgba(255, 59, 48, 0.1);
   border: 1px solid rgba(255, 59, 48, 0.2);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: var(--fs-small);
   color: #ff3b30;
 }
@@ -434,12 +425,12 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: rgba(77, 212, 179, 0.1);
-  border: 1px solid rgba(77, 212, 179, 0.2);
-  border-radius: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
   font-size: var(--fs-small);
   font-weight: 500;
-  color: rgba(77, 212, 179, 0.9);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
@@ -450,8 +441,8 @@
   object-fit: contain;
   object-position: center;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
 }
 
 /* Agent mention chips in messages */
@@ -461,9 +452,9 @@
   gap: 4px;
   padding: 2px 6px;
   margin: 0 2px;
-  background: rgba(242, 140, 82, 0.15);
-  border: 1px solid rgba(242, 140, 82, 0.3);
-  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
   font-size: var(--fs-small);
   font-weight: 500;
   vertical-align: middle;
@@ -475,12 +466,12 @@
   border-radius: 50%;
   object-fit: contain;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(242, 140, 82, 0.2);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
 }
 
 .agent-mention-name {
-  color: rgba(255, 255, 255, 0.95);
+  color: var(--text-primary);
   font-family: var(--font-mono);
   line-height: 1;
 }

@@ -120,9 +120,9 @@ function SortableRepositoryGroup({
     transition: isDragging ? 'none' : transition,
     opacity: isDragging ? 0.5 : 1,
     willChange: isDragging ? 'transform' : 'auto',
-    // Solid background with project color (no glass effect)
+    // Project color background at 4% opacity
     background: projectColor
-      ? `${projectColor}10`
+      ? `${projectColor}0A`
       : undefined,
     borderLeft: projectColor ? `3px solid ${projectColor}` : undefined,
     borderRadius: '0',
@@ -1026,59 +1026,61 @@ export default function TerminalSidebar({
 
         {/* Create Group button — only show when 2+ projects exist */}
         {orderedRepositoryGroups.length >= 2 && (
-          <button
-            type="button"
-            className="new-project-btn-sidebar action-icon"
-            onClick={() => setShowGroupModal(true)}
-            aria-label="Create Group"
-            style={{ marginLeft: '4px', padding: '0 6px', height: '22px', minWidth: 'unset', boxSizing: 'border-box' }}
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="3" width="20" height="18" rx="2" />
-              <line x1="12" y1="3" x2="12" y2="21" />
-            </svg>
-            <span className="action-icon-tooltip">Create Group</span>
-          </button>
+          <KeyboardShortcutTooltip label="Create Group">
+            <button
+              type="button"
+              className="new-project-btn-sidebar action-icon"
+              onClick={() => setShowGroupModal(true)}
+              aria-label="Create Group"
+              style={{ marginLeft: '4px', padding: '0 6px', height: '22px', minWidth: 'unset', boxSizing: 'border-box' }}
+            >
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="18" rx="2" />
+                <line x1="12" y1="3" x2="12" y2="21" />
+              </svg>
+            </button>
+          </KeyboardShortcutTooltip>
         )}
 
         <SidebarViewToggle activeView={sidebarView} onChange={setSidebarView} />
 
         {/* Favorites filter toggle */}
         {favorites.size > 0 && (
-          <button
-            type="button"
-            className="action-icon"
-            onClick={() => setShowFavoritesOnly((prev) => !prev)}
-            aria-label={showFavoritesOnly ? "Show all projects" : "Show favorites only"}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '24px',
-              height: '22px',
-              marginLeft: '4px',
-              background: showFavoritesOnly ? 'rgba(251, 191, 36, 0.15)' : 'rgba(255, 255, 255, 0.06)',
-              border: 'none',
-              borderRadius: '4px',
-              color: showFavoritesOnly ? 'rgba(251, 191, 36, 0.9)' : 'rgba(255, 255, 255, 0.4)',
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill={showFavoritesOnly ? 'rgba(251, 191, 36, 0.9)' : 'none'}
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          <KeyboardShortcutTooltip label={showFavoritesOnly ? "Show all" : "Favorites"}>
+            <button
+              type="button"
+              className="action-icon"
+              onClick={() => setShowFavoritesOnly((prev) => !prev)}
+              aria-label={showFavoritesOnly ? "Show all projects" : "Show favorites only"}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '24px',
+                height: '22px',
+                marginLeft: '4px',
+                background: showFavoritesOnly ? 'var(--accent-surface)' : 'transparent',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                color: showFavoritesOnly ? 'var(--accent-color)' : 'var(--text-tertiary)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
             >
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-            </svg>
-            <span className="action-icon-tooltip">{showFavoritesOnly ? "Show all" : "Favorites"}</span>
-          </button>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill={showFavoritesOnly ? 'currentColor' : 'none'}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            </button>
+          </KeyboardShortcutTooltip>
         )}
       </div>
 

@@ -5,8 +5,8 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background: var(--background-primary, #0f1115);
-  color: var(--text-primary, #e7ebf3);
+  background: var(--bg-base);
+  color: var(--text-primary);
   font-family: 'General Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
@@ -27,7 +27,7 @@
 }
 
 .command-viewer-loading {
-  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  color: var(--text-secondary);
 }
 
 .command-viewer-error p {
@@ -57,7 +57,7 @@
 .command-viewer-icon {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -65,7 +65,7 @@
   background: linear-gradient(135deg, #f472b6, #ec4899);
   border: none;
   color: white;
-  box-shadow: 0 4px 12px rgba(244, 114, 182, 0.2);
+  box-shadow: var(--shadow-md);
 }
 
 .command-viewer-icon svg {
@@ -90,7 +90,7 @@
 .command-viewer-title {
   font-size: 1.125rem;
   font-weight: 600;
-  color: var(--text-primary, #e7ebf3);
+  color: var(--text-primary);
   margin: 0;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   letter-spacing: -0.01em;
@@ -101,7 +101,7 @@
   align-items: center;
   gap: 0.625rem;
   font-size: 0.75rem;
-  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  color: var(--text-secondary);
   flex-wrap: wrap;
 }
 
@@ -118,7 +118,7 @@
   /* Pink for Commands - matching Quack Store */
   background: rgba(244, 114, 182, 0.12);
   border: 1px solid rgba(244, 114, 182, 0.2);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.625rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -137,7 +137,7 @@
 .command-viewer-parameters-label {
   font-size: 0.625rem;
   font-weight: 600;
-  color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -146,12 +146,12 @@
   display: inline-flex;
   align-items: center;
   padding: 0.125rem 0.375rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   font-size: 0.6875rem;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  color: var(--text-secondary);
 }
 
 .command-viewer-actions {
@@ -168,7 +168,7 @@
   height: 24px;
   min-width: 24px;
   min-height: 24px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .command-viewer-actions .command-viewer-icon-button svg,
@@ -192,20 +192,20 @@
   min-height: 24px;
   flex-shrink: 0;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text-secondary, rgba(255, 255, 255, 0.6));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
 }
 
 .command-viewer-icon-button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-  color: var(--text-primary, #e7ebf3);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md);
 }
 
 .command-viewer-icon-button:active:not(:disabled) {
@@ -256,7 +256,7 @@
 
 .command-viewer-content::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .command-viewer-content::-webkit-scrollbar-thumb:hover {
@@ -274,7 +274,7 @@
   gap: 1rem;
   padding: 0.75rem 2rem;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-elevated);
 }
 
 .command-viewer-path {
@@ -284,7 +284,7 @@
   white-space: nowrap;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 0.6875rem;
-  color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
+  color: var(--text-tertiary);
   letter-spacing: 0.01em;
 }
 
@@ -316,7 +316,7 @@
 .command-viewer-edit-header h2 {
   font-size: 1.125rem;
   font-weight: 600;
-  color: var(--text-primary, #e7ebf3);
+  color: var(--text-primary);
   margin: 0;
   letter-spacing: -0.01em;
 }
@@ -335,11 +335,11 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.625rem 1rem;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
   white-space: nowrap;
 }
 
@@ -354,9 +354,9 @@
 }
 
 .command-viewer-cancel {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--text-secondary, rgba(255, 255, 255, 0.8));
+  background: var(--bg-hover);
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
 }
 
 .command-viewer-cancel:hover:not(:disabled) {
@@ -369,12 +369,12 @@
   background: linear-gradient(135deg, #f472b6 0%, #ec4899 100%);
   border: none;
   color: white;
-  box-shadow: 0 4px 12px rgba(244, 114, 182, 0.25);
+  box-shadow: var(--shadow-md);
 }
 
 .command-viewer-save:hover:not(:disabled) {
   background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
-  box-shadow: 0 6px 16px rgba(244, 114, 182, 0.35);
+  box-shadow: var(--shadow-lg);
   transform: translateY(-1px);
 }
 
@@ -409,7 +409,7 @@
 .command-viewer-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -417,18 +417,18 @@
 .command-viewer-input,
 .command-viewer-textarea {
   padding: 0.75rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.25);
-  color: var(--text-primary, #e7ebf3);
+  color: var(--text-primary);
   font-size: 0.875rem;
   font-family: inherit;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
 }
 
 .command-viewer-input::placeholder,
 .command-viewer-textarea::placeholder {
-  color: var(--text-tertiary, rgba(255, 255, 255, 0.4));
+  color: var(--text-tertiary);
 }
 
 .command-viewer-input:focus,
@@ -467,16 +467,16 @@
   gap: 0.625rem;
   cursor: pointer;
   padding: 0.625rem 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
   flex: 1;
 }
 
 .command-viewer-radio-label:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.18);
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
 }
 
 .command-viewer-radio-label input[type="radio"] {
@@ -487,7 +487,7 @@
   border: 2px solid rgba(255, 255, 255, 0.25);
   border-radius: 50%;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
   position: relative;
 }
 
@@ -512,7 +512,7 @@
 .command-viewer-radio-label span {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: var(--text-secondary, rgba(255, 255, 255, 0.75));
+  color: var(--text-secondary);
 }
 
 .command-viewer-radio-label:has(input:checked) {
@@ -543,14 +543,14 @@
   display: flex;
   align-items: center;
   padding: 0.75rem 2rem;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-elevated);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .command-viewer-editor-label {
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--text-secondary, rgba(255, 255, 255, 0.7));
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -562,7 +562,7 @@
   flex-direction: column;
   background: rgba(0, 0, 0, 0.15);
   margin: 0 1.5rem 1.5rem 1.5rem;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 

@@ -13,7 +13,7 @@
   padding: 4px 8px;
   background: rgba(139, 92, 246, 0.15);
   border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font-size: 12px;
   color: #a78bfa;
 }
@@ -91,7 +91,7 @@
   background: rgba(139, 92, 246, 0.2);
   color: #c4b5fd;
   padding: 0px 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 9px;
   font-weight: 600;
 }
@@ -153,7 +153,7 @@
 .rule-item {
   padding: 5px 8px;
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -228,7 +228,7 @@
   margin-top: 4px;
   background: rgba(139, 92, 246, 0.1);
   border: 1px solid rgba(139, 92, 246, 0.2);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: #a78bfa;
   font-size: 10px;
   font-weight: 500;

@@ -31,7 +31,7 @@
   gap: 0.4rem; /* More gap between icon and name */
   padding: 0.25rem 0.5rem; /* Increased padding */
   margin-bottom: 2px; /* Small gap between rows */
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: none; /* Remove heavy borders */
   background: transparent; /* Start transparent */
   backdrop-filter: none;
@@ -140,7 +140,7 @@
   min-width: 16px;
   min-height: 16px;
   font-size: 0.6rem;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -154,7 +154,7 @@
   min-width: 16px !important;
   min-height: 16px !important;
   padding: 0 !important;
-  border-radius: 3px !important;
+  border-radius: var(--radius-sm) !important;
   border: none !important;
   background: transparent !important;
   display: inline-flex !important;
@@ -184,7 +184,7 @@
   min-width: 16px !important;
   min-height: 16px !important;
   padding: 0 !important;
-  border-radius: 3px !important;
+  border-radius: var(--radius-sm) !important;
   border: none !important;
   background: transparent !important;
   display: inline-flex !important;

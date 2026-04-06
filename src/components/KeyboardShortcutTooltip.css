@@ -1,8 +1,7 @@
 /**
  * KeyboardShortcutTooltip Styles
  *
- * Modern glassmorphism tooltip with instant show and smooth animations.
- * Features a gradient background, blur effect, and styled kbd element.
+ * Minimal dark tooltip — consistent across the entire app.
  * Uses fixed positioning via portal for maximum z-index priority.
  */
 
@@ -16,28 +15,20 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  background: linear-gradient(
-    135deg,
-    rgba(25, 25, 35, 0.98) 0%,
-    rgba(15, 15, 25, 0.99) 100%
-  );
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.5),
-    0 2px 8px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  padding: 6px 10px;
+  background: rgba(15, 15, 20, 0.95);
+  backdrop-filter: blur(var(--blur-medium));
+  -webkit-backdrop-filter: blur(var(--blur-medium));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
   white-space: nowrap;
   pointer-events: none;
-  /* Maximum z-index to always be on top of everything */
   z-index: 2147483647;
 
   /* Animation */
   opacity: 0;
-  transform: scale(0.95);
+  transform: scale(0.97);
   transition:
     opacity 0.12s ease-out,
     transform 0.12s ease-out;
@@ -50,33 +41,28 @@
 
 /* Label text */
 .kbd-tooltip-label {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 500;
-  color: #e8e8ec;
-  letter-spacing: 0.3px;
+  color: var(--text-primary);
+  letter-spacing: 0.2px;
+  line-height: 20px; /* Match kbd-tooltip-key height for vertical alignment */
 }
 
-/* Keyboard shortcut badge */
+/* Keyboard shortcut badge — only shown when shortcut is provided */
 .kbd-tooltip-key {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 26px;
-  height: 22px;
-  padding: 0 7px;
-  background: linear-gradient(
-    180deg,
-    rgba(242, 140, 82, 0.28) 0%,
-    rgba(242, 140, 82, 0.18) 100%
-  );
-  border: 1px solid rgba(242, 140, 82, 0.45);
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 5px;
-  font-family: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, monospace;
-  font-size: 11px;
-  font-weight: 600;
-  color: #f5a060;
-  letter-spacing: 0.5px;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.25),
-    0 0 10px rgba(242, 140, 82, 0.12) inset;
+  font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: 2px;
+  line-height: 1;
 }

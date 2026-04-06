@@ -57,7 +57,7 @@
   letter-spacing: 0.5px;
   text-transform: uppercase;
   padding: 2px 7px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   flex-shrink: 0;
 }
 
@@ -78,7 +78,7 @@
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 1px 7px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   white-space: nowrap;
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
 }

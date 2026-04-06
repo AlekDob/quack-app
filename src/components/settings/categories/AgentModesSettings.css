@@ -8,7 +8,7 @@
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-left: 3px solid;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 20px;
   transition: border-color 0.15s ease;
 }
@@ -63,7 +63,7 @@
   flex: 1;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 8px 12px;
   font-size: 13px;
   color: #f3f4f6;
@@ -116,7 +116,7 @@
 .rule-badge {
   font-size: 11px;
   padding: 3px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.08);

@@ -71,7 +71,7 @@
   background: transparent;
   color: #71717a;
   font-size: 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -127,7 +127,7 @@
   background: transparent;
   border: 1px solid #2a2a30;
   color: #71717a;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -143,7 +143,7 @@
 
 .brain-sidebar-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--border-default);
   margin: 4px 12px;
 }
 
@@ -163,7 +163,7 @@
   background: transparent;
   color: #a1a1aa;
   font-size: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
   text-align: left;
@@ -254,7 +254,7 @@
   transition: all 0.15s ease;
   text-align: left;
   width: 100%;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .brain-nav-page:hover {
@@ -279,7 +279,7 @@
   color: #71717a;
   background: #2a2a30;
   padding: 2px 6px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 /* Content Area */
@@ -321,7 +321,7 @@
   gap: 6px;
   background: #1a1a1e;
   border: 1px solid #2a2a30;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 4px 10px;
   color: #a1a1aa;
 }
@@ -354,7 +354,7 @@
   border: 1px solid #2a2a30;
   background: transparent;
   color: #a1a1aa;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: none;
   font-size: 11px;
@@ -387,7 +387,7 @@
 .brain-event-card {
   background: #2a2a30;
   border: 1px solid #3a3a40;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin-bottom: 12px;
   transition: border-color 0.15s ease;
 }
@@ -406,7 +406,7 @@
 .brain-event-icon {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -489,7 +489,7 @@
   background: #FF6B35;
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -510,7 +510,7 @@
 .brain-entry-card {
   background: #2a2a30;
   border: 1px solid #3a3a40;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   padding: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -533,7 +533,7 @@
   font-weight: 600;
   text-transform: uppercase;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: white;
   letter-spacing: 0.3px;
 }
@@ -562,7 +562,7 @@
   color: #a1a1aa;
   background: #3a3a40;
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .brain-entry-preview {
@@ -609,7 +609,7 @@
   border: 1px solid #2a2a30;
   background: transparent;
   color: #a1a1aa;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
   font-size: 11px;
@@ -687,7 +687,7 @@
   background: #3b82f6;
   color: white;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -711,7 +711,7 @@
   background: #2a2a30;
   color: #e4e4e7;
   border: 1px solid #3a3a40;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 11px;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -737,7 +737,7 @@
 .brain-editor-view h1 { font-size: 16px; margin: 10px 0 6px; }
 .brain-editor-view h2 { font-size: 14px; margin: 60px 0 4px; }
 .brain-editor-view h3 { font-size: 13px; margin: 6px 0 3px; }
-.brain-editor-view code { background: #2a2a30; padding: 1px 5px; border-radius: 3px; font-size: 11px; font-family: 'Fira Code', 'JetBrains Mono', monospace; }
+.brain-editor-view code { background: #2a2a30; padding: 1px 5px; border-radius: var(--radius-sm); font-size: 11px; font-family: 'Fira Code', 'JetBrains Mono', monospace; }
 .brain-editor-view ul { padding-left: 20px; margin: 4px 0; }
 .brain-editor-view li { margin: 2px 0; }
 .brain-editor-view a { color: #FF6B35; text-decoration: none; }
@@ -775,14 +775,14 @@
 .brain-table code {
   background: #1e1e22;
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 10px;
 }
 
 .brain-code-block {
   background: #1e1e22;
   border: 1px solid #3a3a40;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 8px 12px;
   margin: 4px 0;
   overflow-x: auto;
@@ -803,7 +803,7 @@
   background: #2a2a30;
   color: #e4e4e7;
   border: 1px solid #3a3a40;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 16px;
   font-size: 12px;
   font-family: 'Fira Code', 'JetBrains Mono', monospace;
@@ -836,7 +836,7 @@
   justify-content: center;
   width: 18px;
   height: 18px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   margin-left: auto;
   flex-shrink: 0;
 }
@@ -876,7 +876,7 @@
   color: #22c55e;
   background: #22c55e15;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .brain-guide-list {
@@ -892,7 +892,7 @@
   padding: 12px 16px;
   background: #2a2a30;
   border: 1px solid #3a3a40;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
   text-align: left;
@@ -913,7 +913,7 @@
   justify-content: center;
   background: #22c55e20;
   color: #22c55e;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
   flex-shrink: 0;
@@ -968,7 +968,7 @@
   background: #2a2a30;
   border: 1px solid #3a3a40;
   color: #a1a1aa;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -992,7 +992,7 @@
   align-items: center;
   justify-content: center;
   cursor: grab;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: #1e1e22;
   border: 1px solid #2a2a30;
 }
@@ -1010,7 +1010,7 @@
   color: #FF6B6B;
   background: #2a2a30;
   border: 1px solid #3a3a40;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 12px 16px;
   font-size: 11px;
   font-family: 'Fira Code', 'JetBrains Mono', monospace;
@@ -1027,7 +1027,7 @@
   padding: 1.5rem;
   background: #1e1e22;
   border: 1px solid #2a2a30;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
 }
 
 .brain-editor-view .mermaid-diagram svg {
@@ -1056,7 +1056,7 @@
 .brain-editor-view::-webkit-scrollbar-thumb,
 .brain-editor-textarea::-webkit-scrollbar-thumb {
   background: #3a3a40;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .brain-sidebar::-webkit-scrollbar-thumb:hover,

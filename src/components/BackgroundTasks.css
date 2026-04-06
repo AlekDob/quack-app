@@ -14,13 +14,13 @@
   height: 100%;
   background: rgba(20, 20, 25, 0.95);
   backdrop-filter: blur(20px);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid var(--border-default);
 }
 
 /* Header */
 .background-tasks-header {
   padding: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .background-tasks-title {
@@ -33,7 +33,7 @@
 .background-tasks-title h2 {
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -45,14 +45,14 @@
   height: 24px;
   border: none;
   background: transparent;
-  color: rgba(255, 255, 255, 0.5);
-  border-radius: 4px;
+  color: var(--text-tertiary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .background-tasks-close:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-hover);
   color: rgba(255, 255, 255, 0.8);
 }
 
@@ -82,12 +82,12 @@
 .stat-value {
   font-size: 12px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
 }
 
 .stat-label {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
 }
 
 /* Toolbar */
@@ -96,7 +96,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .background-tasks-search {
@@ -107,10 +107,10 @@
   min-width: 140px;
   padding: 0 10px;
   height: 28px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
-  color: rgba(255, 255, 255, 0.5);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
   box-sizing: border-box;
 }
 
@@ -120,11 +120,11 @@
   border: none;
   outline: none;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
 }
 
 .background-tasks-search input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 .background-tasks-filters {
@@ -136,9 +136,9 @@
 .background-tasks-filters select {
   padding: 0 8px;
   height: 28px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   font-size: 11px;
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
@@ -164,10 +164,10 @@
   justify-content: center;
   padding: 0 10px;
   height: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.7);
-  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
   flex-shrink: 0;
@@ -177,8 +177,8 @@
 }
 
 .action-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .action-btn:disabled {
@@ -194,8 +194,8 @@
 /* Settings panel */
 .background-tasks-settings {
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .settings-row {
@@ -206,7 +206,7 @@
 
 .settings-row label {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 .settings-control {
@@ -221,17 +221,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.7);
-  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
 }
 
 .settings-control button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-hover);
 }
 
 .settings-control button:disabled {
@@ -242,7 +242,7 @@
 .settings-control span {
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   min-width: 20px;
   text-align: center;
 }
@@ -272,13 +272,13 @@
 .background-tasks-empty p {
   font-size: 14px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   margin: 0 0 4px;
 }
 
 .background-tasks-empty span {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 /* Footer */
@@ -288,8 +288,8 @@
   justify-content: center;
   gap: 12px;
   padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border-default);
 }
 
 .background-tasks-footer.paused {
@@ -309,7 +309,7 @@
   padding: 4px 12px;
   background: rgba(99, 102, 241, 0.2);
   border: 1px solid rgba(99, 102, 241, 0.3);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: #818cf8;
   font-size: 11px;
   font-weight: 500;
@@ -325,9 +325,9 @@
    ============================================ */
 
 .background-task-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   margin-bottom: 6px;
   overflow: hidden;
   transition: all 0.15s ease;
@@ -335,8 +335,8 @@
 }
 
 .background-task-card:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
 }
 
 .background-task-card:focus {
@@ -400,7 +400,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
 }
 
 .task-info {
@@ -411,7 +411,7 @@
 .task-name {
   font-size: 12px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -426,7 +426,7 @@
 
 .task-meta span {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 .task-agent {
@@ -450,7 +450,7 @@
   padding: 2px 8px;
   background: transparent;
   border: 1px solid;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 10px;
   font-weight: 500;
   cursor: pointer;
@@ -458,7 +458,7 @@
 }
 
 .task-priority-badge:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-elevated);
 }
 
 .task-priority-menu {
@@ -468,8 +468,8 @@
   margin-top: 4px;
   padding: 4px;
   background: rgba(30, 30, 35, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   z-index: 100;
 }
@@ -483,15 +483,15 @@
   font-size: 11px;
   text-align: left;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .task-priority-menu button:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
 }
 
 .task-priority-menu button.active {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-hover);
 }
 
 /* Quick actions */
@@ -510,15 +510,15 @@
   height: 24px;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 4px;
-  color: rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .quick-action-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--bg-hover);
+  border-color: var(--border-default);
   color: rgba(255, 255, 255, 0.8);
 }
 
@@ -550,7 +550,7 @@
 }
 
 .background-task-card:hover .task-details-arrow {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   transform: translateX(2px);
 }
 
@@ -558,7 +558,7 @@
 .task-progress-bar {
   position: relative;
   height: 3px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-elevated);
 }
 
 .task-progress-bar.compact {
@@ -576,7 +576,7 @@
   right: 8px;
   top: 6px;
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
 }
 
 /* Result summary - compact inline display */
@@ -619,7 +619,7 @@
 .task-result {
   padding: 10px;
   margin-top: 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .task-result.success {
@@ -653,7 +653,7 @@
   gap: 16px;
   margin-top: 8px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
 }
 
 /* Card actions */
@@ -668,18 +668,18 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.7);
-  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
   font-size: 11px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .task-card-actions button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .action-pause:hover {
@@ -720,8 +720,8 @@
 
 .background-task-logs {
   margin-top: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
@@ -730,8 +730,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .logs-filters {
@@ -749,20 +749,20 @@
   padding: 3px 8px;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
   font-size: 10px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .logs-level-filters button:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-elevated);
   color: rgba(255, 255, 255, 0.6);
 }
 
 .logs-level-filters button.active {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .logs-search {
@@ -773,9 +773,9 @@
 .logs-search input {
   width: 100%;
   padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   font-size: 10px;
   color: rgba(255, 255, 255, 0.8);
   outline: none;
@@ -798,14 +798,14 @@
   height: 24px;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.4);
-  border-radius: 4px;
+  color: var(--text-tertiary);
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 
 .logs-actions button:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.7);
+  background: var(--bg-hover);
+  color: var(--text-secondary);
 }
 
 .logs-autoscroll.active {
@@ -824,7 +824,7 @@
 .logs-empty {
   padding: 16px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
   font-size: 11px;
 }
 
@@ -838,7 +838,7 @@
 }
 
 .log-entry:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-elevated);
 }
 
 .log-time {
@@ -854,7 +854,7 @@
 }
 
 .log-source {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   flex-shrink: 0;
 }
 
@@ -877,27 +877,27 @@
   align-items: center;
   justify-content: space-between;
   padding: 4px 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border-default);
 }
 
 .logs-footer span {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 .logs-footer button {
   padding: 3px 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   font-size: 10px;
   color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
 }
 
 .logs-footer button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--bg-hover);
   color: rgba(255, 255, 255, 0.8);
 }
 
@@ -914,7 +914,7 @@
   padding: 0 5px;
   background: rgba(242, 140, 82, 0.2);
   border: 1px solid rgba(242, 140, 82, 0.3);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   font-size: 10px;
   font-weight: 600;
   color: #f28c52;
@@ -971,7 +971,7 @@
   width: 620px;
   max-width: 92vw;
   transform: translateX(100%);
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.25s var(--ease-default);
 }
 
 .background-tasks-drawer.open .background-tasks-drawer-panel {
@@ -988,19 +988,19 @@
   justify-content: space-between;
   width: 100%;
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.7);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
   font-size: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .sidebar-background-tasks-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bg-hover);
+  border-color: var(--border-default);
+  color: var(--text-primary);
 }
 
 .sidebar-background-tasks-btn.has-active {
@@ -1025,7 +1025,7 @@
   justify-content: center;
   width: 20px;
   height: 20px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
 }
 
 .sidebar-background-tasks-btn.has-active .sidebar-background-tasks-btn-icon {

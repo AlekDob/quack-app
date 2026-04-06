@@ -7,39 +7,139 @@
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
-  color: #e7ebf3;
-  background-color: #0f1115;
+  color: var(--text-primary);
+  background-color: var(--bg-base);
+
+  /* ============================================
+     DESIGN TOKENS — Quack Minimal Design System
+     Inspired by Apple, Vercel, Cursor, OpenAI
+     ============================================ */
+
+  /* Accent — the ONLY chromatic color */
   --accent-color: #f28c52;
   --accent-rgb: 242, 140, 82;
-  --accent-surface: rgba(var(--accent-rgb), 0.16);
-  --accent-surface-strong: rgba(var(--accent-rgb), 0.3);
-  --accent-border: rgba(var(--accent-rgb), 0.38);
+  --accent-surface: rgba(var(--accent-rgb), 0.10);
+  --accent-surface-strong: rgba(var(--accent-rgb), 0.20);
+  --accent-border: rgba(var(--accent-rgb), 0.25);
   --accent-text: #ffecd9;
-  --panel-border: rgba(128, 132, 150, 0.32);
-  --panel-border-strong: rgba(128, 132, 150, 0.45);
 
-  /* Performance optimized blur values - reduced from 20-24px to 8-12px */
-  --blur-light: 4px;
-  --blur-medium: 8px;
-  --blur-heavy: 12px;
+  /* Neutral surfaces */
+  --bg-base: #0f1115;
+  --bg-surface: rgba(18, 20, 27, 0.97);
+  --bg-elevated: rgba(255, 255, 255, 0.04);
+  --bg-hover: rgba(255, 255, 255, 0.06);
 
-  /* Typography — CSS variables set by applyTypography(), M preset defaults */
+  /* Text */
+  --text-primary: #e7ebf3;
+  --text-secondary: rgba(255, 255, 255, 0.55);
+  --text-tertiary: rgba(255, 255, 255, 0.35);
+
+  /* Borders — nearly invisible */
+  --border-subtle: rgba(255, 255, 255, 0.04);
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  /* Legacy aliases — gradual migration, do not use in new code */
+  --panel-border: var(--border-default);
+  --panel-border-strong: var(--border-strong);
+
+  /* Semantic — ONLY for meaning, not decoration */
+  --semantic-error: #ef4444;
+  --semantic-success: #22c55e;
+  --semantic-warning: #f59e0b;
+
+  /* Shadows — 3 levels only */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.25);
+
+  /* Border radius — 3 values + pill */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 999px;
+
+  /* Blur scale — liquid glass */
+  --blur-light: 8px;
+  --blur-medium: 16px;
+  --blur-heavy: 40px;
+
+  /* Animations */
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+
+  /* Typography */
   --font-ui: 'General Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', monospace;
-  --fs-body: 12px;
-  --fs-user-msg: 13px;
-  --fs-h1: 14px;
-  --fs-h2: 13px;
-  --fs-h4: 11px;
-  --fs-h6: 10px;
-  --fs-code: 11px;
-  --fs-small: 10px;
-  --fs-terminal: 14px;
+
+  /* Font scale — bumped +2px for premium feel */
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-base: 14px;
+  --fs-md: 15px;
+  --fs-lg: 16px;
+  --fs-xl: 18px;
+  --fs-2xl: 22px;
+
+  /* Legacy font aliases — gradual migration */
+  --fs-body: var(--fs-base);
+  --fs-user-msg: var(--fs-md);
+  --fs-h1: var(--fs-lg);
+  --fs-h2: var(--fs-md);
+  --fs-h4: var(--fs-sm);
+  --fs-h6: var(--fs-xs);
+  --fs-code: var(--fs-sm);
+  --fs-small: var(--fs-xs);
+  --fs-terminal: var(--fs-base);
+
+  /* Weights */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  /* Line height */
+  --lh-tight: 1.4;
+  --lh-normal: 1.6;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Liquid Glass utility class — use on static surfaces only */
+.liquid-glass {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Top-edge light reflection — signature liquid glass touch */
+.liquid-glass::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  pointer-events: none;
 }
 
 /* Performance: Respect user's reduced motion preference */
@@ -103,12 +203,12 @@ body {
 }
 
 a {
-  color: #7cc4ff;
+  color: var(--accent-color);
   text-decoration: none;
 }
 
 a:hover {
-  color: #a0d7ff;
+  color: var(--accent-text);
 }
 
 button {

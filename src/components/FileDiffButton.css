@@ -9,7 +9,7 @@
   height: 16px;
   background: rgba(59, 130, 246, 0.1);
   border: 1px solid rgba(59, 130, 246, 0.3);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: #3b82f6;
   font-size: 9px;
   font-weight: 500;

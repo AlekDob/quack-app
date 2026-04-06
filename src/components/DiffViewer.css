@@ -127,7 +127,7 @@
 
 .diff-viewer-content::-webkit-scrollbar-thumb {
   background: rgba(100, 150, 255, 0.3);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .diff-viewer-content::-webkit-scrollbar-thumb:hover {

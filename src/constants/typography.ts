@@ -17,12 +17,12 @@ interface FontSizeScale {
   terminal: number;
 }
 
-/** Preset definitions — M matches current hardcoded defaults */
+/** Preset definitions — M bumped +2px for premium minimal feel (was S-sized before redesign) */
 export const FONT_SIZE_PRESETS: Record<FontSizePreset, FontSizeScale> = {
-  S:  { body: 11, userMsg: 12, h1: 13, h2: 12, h4: 10, h6: 9,  code: 10, small: 9,  terminal: 12 },
-  M:  { body: 12, userMsg: 13, h1: 14, h2: 13, h4: 11, h6: 10, code: 11, small: 10, terminal: 14 },
-  L:  { body: 14, userMsg: 15, h1: 16, h2: 15, h4: 13, h6: 12, code: 13, small: 12, terminal: 16 },
-  XL: { body: 16, userMsg: 17, h1: 18, h2: 17, h4: 15, h6: 14, code: 15, small: 14, terminal: 18 },
+  S:  { body: 12, userMsg: 13, h1: 14, h2: 13, h4: 11, h6: 10, code: 11, small: 10, terminal: 13 },
+  M:  { body: 14, userMsg: 15, h1: 16, h2: 15, h4: 12, h6: 11, code: 12, small: 11, terminal: 14 },
+  L:  { body: 15, userMsg: 16, h1: 18, h2: 16, h4: 13, h6: 12, code: 13, small: 12, terminal: 16 },
+  XL: { body: 16, userMsg: 17, h1: 20, h2: 18, h4: 14, h6: 13, code: 14, small: 13, terminal: 18 },
 };
 
 export const PRESET_LABELS: Record<FontSizePreset, string> = {

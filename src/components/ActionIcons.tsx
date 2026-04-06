@@ -430,20 +430,21 @@ function ActionIcons({
       )}
 
       {/* Git Icon */}
-      <button
-        type="button"
-        className="action-icon"
-        onClick={onGitClick}
-        aria-label="Open Git panel"
-      >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M14.5 7.5L8.5 1.5L7.5 2.5L6.5 3.5L2.5 7.5C2 8 2 8.5 2 9C2 9.5 2 10 2.5 10.5L7.5 15.5L8.5 14.5L9.5 13.5L13.5 9.5C14 9 14 8.5 14 8C14 7.5 14 7 13.5 6.5M8 11C6.9 11 6 10.1 6 9C6 7.9 6.9 7 8 7C9.1 7 10 7.9 10 9C10 10.1 9.1 11 8 11Z"
-            fill="currentColor"
-          />
-        </svg>
-        <span className="action-icon-tooltip">Git Panel</span>
-      </button>
+      <KeyboardShortcutTooltip label="Git Panel">
+        <button
+          type="button"
+          className="action-icon"
+          onClick={onGitClick}
+          aria-label="Open Git panel"
+        >
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M14.5 7.5L8.5 1.5L7.5 2.5L6.5 3.5L2.5 7.5C2 8 2 8.5 2 9C2 9.5 2 10 2.5 10.5L7.5 15.5L8.5 14.5L9.5 13.5L13.5 9.5C14 9 14 8.5 14 8C14 7.5 14 7 13.5 6.5M8 11C6.9 11 6 10.1 6 9C6 7.9 6.9 7 8 7C9.1 7 10 7.9 10 9C10 10.1 9.1 11 8 11Z"
+              fill="currentColor"
+            />
+          </svg>
+        </button>
+      </KeyboardShortcutTooltip>
 
       {/* Terminal Icon */}
       <KeyboardShortcutTooltip label="Terminal" shortcut={formatShortcut("⌘T")}>
@@ -483,34 +484,36 @@ function ActionIcons({
 
       {/* Quack Store Icon */}
       {onStoreClick && (
-        <button
-          type="button"
-          className={`action-icon ${isStoreOpen ? 'active' : ''}`}
-          onClick={onStoreClick}
-          aria-label="Open Quack Store"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" />
-            <path d="M2 17l10 5 10-5" />
-            <path d="M2 12l10 5 10-5" />
-          </svg>
-          <span className="action-icon-tooltip">Quack Store</span>
-        </button>
+        <KeyboardShortcutTooltip label="Quack Store">
+          <button
+            type="button"
+            className={`action-icon ${isStoreOpen ? 'active' : ''}`}
+            onClick={onStoreClick}
+            aria-label="Open Quack Store"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+          </button>
+        </KeyboardShortcutTooltip>
       )}
 
       {/* Telegram Icon */}
-      <button
-        type="button"
-        className="action-icon"
-        onClick={onTelegramClick}
-        aria-label="Telegram Setup"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M22 2L11 13" />
-          <path d="M22 2L15 22L11 13L2 9L22 2Z" />
-        </svg>
-        <span className="action-icon-tooltip">Telegram</span>
-      </button>
+      <KeyboardShortcutTooltip label="Telegram">
+        <button
+          type="button"
+          className="action-icon"
+          onClick={onTelegramClick}
+          aria-label="Telegram Setup"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 2L11 13" />
+            <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+          </svg>
+        </button>
+      </KeyboardShortcutTooltip>
 
       {/* Open Dropdown - Codex style with real app icons */}
       {projectPath && (

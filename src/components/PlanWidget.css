@@ -63,7 +63,7 @@
   color: white;
   font-size: 10px;
   font-weight: 600;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -81,7 +81,7 @@
   padding: 4px;
   background: rgba(99, 102, 241, 0.15);
   border: 1px solid rgba(99, 102, 241, 0.3);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
   color: #818cf8;
@@ -168,7 +168,7 @@
   background: rgba(99, 102, 241, 0.15);
   color: #a5b4fc;
   padding: 1px 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
@@ -244,7 +244,7 @@
   padding: 5px 14px;
   font-size: 12px;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
   border: 1px solid transparent;
@@ -295,7 +295,7 @@
   padding: 5px 10px;
   font-size: 12px;
   border: 1px solid rgba(239, 68, 68, 0.4);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(239, 68, 68, 0.1);
   color: rgba(255, 255, 255, 0.9);
   outline: none;

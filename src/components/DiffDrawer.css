@@ -85,7 +85,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.6);
@@ -118,7 +118,7 @@
   padding: 0.45rem 0.875rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.7);
   font-size: 0.8rem;
   font-weight: 500;
@@ -147,7 +147,7 @@
   padding: 0.45rem 0.875rem;
   background: rgba(59, 130, 246, 0.12);
   border: 1px solid rgba(59, 130, 246, 0.25);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: #93c5fd;
   font-size: 0.8rem;
   font-weight: 500;
@@ -198,7 +198,7 @@
 
 .diff-line {
   display: flex;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 0.18rem 0.65rem;
   white-space: pre-wrap;
   word-break: break-word;

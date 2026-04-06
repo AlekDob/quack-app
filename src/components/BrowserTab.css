@@ -29,7 +29,7 @@
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-secondary, #999);
   cursor: pointer;
   transition: all 0.15s ease;

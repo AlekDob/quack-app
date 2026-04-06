@@ -5,8 +5,8 @@
   margin-top: 1rem;
   padding: 1rem;
   background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
 }
 
 .personality-header {
@@ -22,7 +22,7 @@
   font-weight: 500;
   color: rgba(255, 255, 255, 0.6);
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .expand-toggle {
@@ -34,13 +34,13 @@
   color: rgba(255, 255, 255, 0.8);
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .expand-toggle:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
   border-color: rgba(242, 140, 82, 0.4);
   transform: translateY(-1px);
 }
@@ -95,9 +95,9 @@
   padding: 0.625rem 0.875rem;
   font-size: 0.875rem;
   color: rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-elevated);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   outline: none;
   transition: all 0.15s;
 }
@@ -109,7 +109,7 @@
 }
 
 .personality-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 .personality-textarea {
@@ -117,9 +117,9 @@
   padding: 0.625rem 0.875rem;
   font-size: 0.875rem;
   color: rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-elevated);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   outline: none;
   transition: all 0.15s;
   font-family: inherit;
@@ -134,7 +134,7 @@
 }
 
 .personality-textarea::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 .field-badge-small {
@@ -144,7 +144,7 @@
   font-weight: 500;
   color: rgba(255, 255, 255, 0.6);
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .tag-grid {
@@ -160,9 +160,9 @@
   padding: 0.5rem 0.75rem;
   font-size: 0.8125rem;
   color: rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
@@ -206,9 +206,9 @@
   gap: 0.25rem;
   padding: 0.75rem;
   text-align: left;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -244,7 +244,7 @@
   padding: 0.5rem;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .skill-checkbox {
@@ -255,12 +255,12 @@
   font-size: 0.8125rem;
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: background 0.15s;
 }
 
 .skill-checkbox:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-elevated);
 }
 
 .skill-checkbox input[type='checkbox'] {
@@ -282,7 +282,7 @@
   padding: 1rem;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .preview-label {
@@ -325,7 +325,7 @@
 
 .rules-list.dragging {
   border: 2px dashed rgba(242, 140, 82, 0.5);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(242, 140, 82, 0.05);
 }
 
@@ -341,7 +341,7 @@
   justify-content: center;
   gap: 0.5rem;
   background: rgba(242, 140, 82, 0.1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   z-index: 10;
   pointer-events: none;
 }
@@ -371,15 +371,15 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.625rem 0.875rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   transition: all 0.15s;
 }
 
 .rule-item:hover {
   background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: var(--border-strong);
 }
 
 .rule-bullet {
@@ -407,7 +407,7 @@
   color: rgba(255, 255, 255, 0.5);
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s;
   opacity: 0.7;
@@ -429,9 +429,9 @@
   padding: 0.625rem 0.875rem;
   font-size: 0.875rem;
   color: rgba(255, 255, 255, 0.95);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-elevated);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   outline: none;
   transition: all 0.15s;
 }
@@ -443,7 +443,7 @@
 }
 
 .rule-input::placeholder {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 .rule-add-button {
@@ -456,7 +456,7 @@
   color: rgba(255, 255, 255, 0.9);
   background: rgba(242, 140, 82, 0.15);
   border: 1px solid rgba(242, 140, 82, 0.3);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
@@ -483,7 +483,7 @@
   color: rgba(255, 255, 255, 0.9);
   background: rgba(78, 205, 196, 0.15);
   border: 1px solid rgba(78, 205, 196, 0.3);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
@@ -509,7 +509,7 @@
   margin-bottom: 0.75rem;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition: all 0.2s;
 }
 
@@ -575,9 +575,9 @@
   padding: 0.5rem 0.75rem;
   font-size: 0.8125rem;
   color: rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;

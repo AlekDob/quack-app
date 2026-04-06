@@ -39,7 +39,7 @@
   flex-shrink: 0;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   border: 2px solid var(--project-color, #F4AF8E);
   box-shadow: 0 0 12px color-mix(in srgb, var(--project-color, #F4AF8E) 40%, transparent);
@@ -76,7 +76,7 @@
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   text-transform: lowercase;
   white-space: nowrap;
 }

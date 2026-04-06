@@ -8,7 +8,7 @@
   background: rgba(245, 158, 11, 0.05);
   border: 1px solid rgba(245, 158, 11, 0.15);
   border-left: 2px solid rgba(245, 158, 11, 0.6);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   margin: 4px 8px;
   animation: tp-in 0.25s ease-out, tp-pulse 2s ease-in-out 0.3s 3;
 }
@@ -66,7 +66,7 @@
   cursor: pointer;
   font-size: 10px;
   padding: 2px 4px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   line-height: 1;
   flex-shrink: 0;
   transition: color 0.12s ease, background 0.12s ease;
@@ -129,7 +129,7 @@
   margin: 6px 0 0;
   padding: 8px 10px;
   background: rgba(0, 0, 0, 0.25);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
   font-size: 11px;
   line-height: 1.5;

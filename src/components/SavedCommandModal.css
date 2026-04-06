@@ -20,7 +20,7 @@
   max-width: 60vw;
   max-height: 85vh;
   background: #0F1116;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--panel-border);
   padding: 1.2rem;
   padding-bottom: 0;
@@ -49,7 +49,7 @@
 
 .modal-field input[type="text"] {
   border: 1px solid rgba(var(--accent-rgb), 0.25);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 0.55rem 0.8rem;
   background: rgba(14, 20, 38, 0.86);
   color: #e5ecff;
@@ -65,7 +65,7 @@
 
 .modal-field textarea {
   border: 1px solid rgba(var(--accent-rgb), 0.25);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 0.55rem 0.8rem;
   background: rgba(14, 20, 38, 0.86);
   color: #e5ecff;
@@ -82,7 +82,7 @@
 
 .modal-field select {
   border: 1px solid rgba(var(--accent-rgb), 0.25);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 0.55rem 0.8rem;
   background: rgba(14, 20, 38, 0.86);
   color: #e5ecff;
@@ -106,7 +106,7 @@
   padding: 0.75rem 1rem;
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .modal-actions {
@@ -117,7 +117,7 @@
 }
 
 .modal-actions button {
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid transparent;
   padding: 0.55rem 1rem;
   font-size: 0.9rem;

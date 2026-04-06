@@ -34,7 +34,7 @@
   max-width: 520px;
   background: rgba(26, 26, 30, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   overflow: hidden;
   animation: slideUp 0.2s ease-out;
@@ -74,7 +74,7 @@
   border: none;
   color: rgba(255, 255, 255, 0.4);
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -186,7 +186,7 @@
 .group-creation-project-checkbox {
   width: 16px;
   height: 16px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 2px solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
@@ -246,7 +246,7 @@
   padding: 4px 8px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.7rem;
   color: rgba(255, 255, 255, 0.85);
   text-align: center;
@@ -269,7 +269,7 @@
   color: rgba(231, 76, 60, 0.9);
   background: rgba(231, 76, 60, 0.1);
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid rgba(231, 76, 60, 0.2);
 }
 
@@ -283,7 +283,7 @@
 .group-creation-color-option {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 2px solid transparent;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -321,7 +321,7 @@
   padding: 0.5rem 1rem;
   font-size: 0.75rem;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
   border: none;

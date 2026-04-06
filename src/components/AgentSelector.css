@@ -15,12 +15,12 @@
 
 .agent-selector::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .agent-selector::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .agent-selector::-webkit-scrollbar-thumb:hover {
@@ -40,12 +40,12 @@
 
 .agent-selector-editing::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .agent-selector-editing::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .agent-selector-editing::-webkit-scrollbar-thumb:hover {
@@ -100,20 +100,20 @@
   align-items: center;
   gap: 5px;
   padding: 6px 12px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
 }
 
 .agent-selector-create-new:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .agent-selector-create-new svg {
@@ -132,20 +132,20 @@
   align-items: center;
   gap: 5px;
   padding: 5px 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
+  background: var(--bg-elevated);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-sm);
   font-size: 10px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
 }
 
 .agent-selector-import-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.75);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
 }
 
 .agent-selector-import-btn:disabled {
@@ -162,7 +162,7 @@
   color: rgba(239, 68, 68, 0.8);
   cursor: pointer;
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: rgba(239, 68, 68, 0.08);
 }
 
@@ -170,7 +170,7 @@
   font-size: 10px;
   color: rgba(34, 197, 94, 0.8);
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   background: rgba(34, 197, 94, 0.08);
 }
 
@@ -199,11 +199,11 @@
   width: 100%;
   padding: 6px 28px 6px 32px;
   background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   font-size: 11px;
   color: var(--color-text);
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
 }
 
 .agent-selector-search input:focus {
@@ -220,7 +220,7 @@
   border: none;
   cursor: pointer;
   color: var(--color-text-secondary);
-  transition: color 0.2s ease;
+  transition: color 0.2s var(--ease-default);
 }
 
 .agent-selector-clear-search:hover {
@@ -247,8 +247,8 @@
 .agent-selector-sort select {
   padding: 5px 24px 5px 8px;
   background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   font-size: 11px;
   color: var(--color-text);
   cursor: pointer;
@@ -256,11 +256,11 @@
   background-image: url('data:image/svg+xml;charset=UTF-8,<svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L5 5L9 1" stroke="%23888" stroke-width="1.5" stroke-linecap="round"/></svg>');
   background-repeat: no-repeat;
   background-position: right 6px center;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
 }
 
 .agent-selector-sort select:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--border-strong);
   background-color: rgba(0, 0, 0, 0.3);
 }
 
@@ -281,14 +281,14 @@
   gap: 10px;
   padding: 8px 10px;
   background: rgba(0, 0, 0, 0.2);
-  border: 1.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  transition: all 0.2s ease;
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  transition: all 0.2s var(--ease-default);
 }
 
 .agent-card:hover {
   background: rgba(0, 0, 0, 0.3);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--border-strong);
 }
 
 /* Avatar Section - Left Side */
@@ -305,7 +305,7 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s var(--ease-default);
 }
 
 .agent-card:hover .agent-card-avatar {
@@ -346,7 +346,7 @@
 
 .agent-card-working-on {
   font-size: 9px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   margin: 2px 0 0 0;
   font-style: italic;
   white-space: nowrap;
@@ -391,11 +391,11 @@
   justify-content: center;
   gap: 3px;
   padding: 5px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
   border: 1px solid;
   white-space: nowrap;
 }
@@ -414,23 +414,23 @@
 /* All buttons - Monochrome neutral theme */
 .agent-card-use-btn,
 .agent-card-edit-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.75);
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
 }
 
 .agent-card-use-btn:hover:not(:disabled),
 .agent-card-edit-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 /* Delete Button - Subtle red on hover only */
 .agent-card-delete-btn {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.15);
-  color: rgba(255, 255, 255, 0.5);
+  background: var(--bg-elevated);
+  border-color: var(--border-strong);
+  color: var(--text-tertiary);
   padding: 5px 8px;
 }
 
@@ -506,10 +506,10 @@
   padding: 8px 0 4px 0;
   font-size: 10px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid var(--border-subtle);
   margin-top: 8px;
 }
 
@@ -535,11 +535,11 @@
 .agent-selector-section-count {
   margin-left: auto;
   padding: 1px 6px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
   font-size: 9px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 .agent-selector-loading-indicator {
@@ -598,7 +598,7 @@
 
 .agent-card-style {
   font-size: 9px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
   margin: 2px 0 0 0;
   white-space: nowrap;
   overflow: hidden;
@@ -619,13 +619,13 @@ p.agent-card-description {
 .agent-card-more-info {
   display: inline-block;
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
   cursor: pointer;
   padding: 1px 6px;
   margin-top: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  transition: all 0.15s;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  transition: all 0.15s var(--ease-default);
 }
 
 .agent-card-more-info:hover {
@@ -650,21 +650,21 @@ p.agent-card-description {
 /* Skeleton loading cards */
 .skeleton-card {
   pointer-events: none;
-  border-color: rgba(255, 255, 255, 0.06) !important;
-  background: rgba(255, 255, 255, 0.02) !important;
+  border-color: var(--border-subtle) !important;
+  background: var(--bg-elevated) !important;
 }
 
 .skeleton-avatar {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-hover);
   animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
 
 .skeleton-line {
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
   animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
 

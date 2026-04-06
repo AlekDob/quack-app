@@ -2,8 +2,8 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #1a1a1a;
-  color: #fff;
+  background: var(--bg-base);
+  color: var(--text-primary);
   overflow: hidden;
   position: relative;
 }
@@ -21,7 +21,7 @@
 .terminal-window-title {
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   letter-spacing: 0.3px;
 }
 
@@ -36,8 +36,8 @@
 .terminal-sidebar {
   width: 220px;
   min-width: 220px;
-  background: #0B0C0E;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-base);
+  border-right: 1px solid var(--border-default);
   display: flex;
   flex-direction: column;
 }
@@ -49,9 +49,9 @@
   align-items: center;
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
   letter-spacing: 0.5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
   cursor: grab;
   -webkit-app-region: drag;
 }
@@ -75,7 +75,7 @@
 .terminal-sidebar-empty {
   padding: 24px 16px;
   text-align: center;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
   font-size: 13px;
 }
 
@@ -85,7 +85,7 @@
 
 .terminal-sidebar-hint {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-tertiary);
   line-height: 1.4;
 }
 
@@ -100,8 +100,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: all 0.15s ease;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s var(--ease-default);
   flex-shrink: 0;
   margin-left: auto; /* Push to the end */
   -webkit-app-region: no-drag; /* Exclude from drag region */
@@ -132,7 +132,7 @@
 }
 
 .project-header:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-elevated);
 }
 
 .project-header.selected {
@@ -142,8 +142,8 @@
 .project-chevron {
   width: 16px;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.4);
-  transition: transform 0.15s ease;
+  color: var(--text-tertiary);
+  transition: transform 0.15s var(--ease-default);
 }
 
 .project-chevron.expanded {
@@ -155,7 +155,7 @@
   min-width: 0; /* Allow text to shrink for ellipsis */
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -174,8 +174,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: all 0.15s ease;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s var(--ease-default);
   flex-shrink: 0;
   padding: 0;
   padding-bottom: 1px; /* Optical adjustment for + character */
@@ -196,7 +196,7 @@
 .project-no-terminals {
   padding: 8px 12px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-tertiary);
   font-style: italic;
 }
 
@@ -205,13 +205,13 @@
   align-items: center;
   padding: 5px 12px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   margin: 2px 8px 2px 0;
-  transition: background 0.15s ease;
+  transition: background 0.15s var(--ease-default);
 }
 
 .terminal-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-elevated);
 }
 
 .terminal-item.active {
@@ -229,7 +229,7 @@
 .terminal-name {
   flex: 1;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -239,7 +239,7 @@
 /* Main Terminal Area */
 .terminal-main {
   flex: 1;
-  background: #1e1e1e;
+  background: var(--bg-base);
   min-height: 0; /* Critical for flexbox to allow shrinking */
   min-width: 0; /* Also needed for flexbox */
   display: flex;
@@ -290,7 +290,7 @@
   justify-content: center;
   flex: 1;
   min-height: 0;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
 }
 
 .terminal-empty-icon {
@@ -314,19 +314,19 @@
 .terminal-name-input {
   flex: 1;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  background: var(--border-default);
   border: 1px solid rgba(77, 212, 179, 0.4);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 2px 6px;
   outline: none;
   font-family: inherit;
   min-width: 0;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
 }
 
 .terminal-name-input:focus {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--bg-hover);
   border-color: rgba(77, 212, 179, 0.6);
   box-shadow: 0 0 0 2px rgba(77, 212, 179, 0.15);
 }
@@ -337,14 +337,14 @@
   height: 20px;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-tertiary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   opacity: 0;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
   flex-shrink: 0;
   margin-right: 2px;
 }
@@ -364,14 +364,14 @@
   height: 20px;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-tertiary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   opacity: 0;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
   flex-shrink: 0;
 }
 
@@ -386,12 +386,12 @@
 
 /* Context Menu */
 .terminal-context-menu {
-  background: rgba(30, 30, 30, 0.98);
+  background: var(--bg-surface);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   padding: 4px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-lg);
   min-width: 140px;
   animation: contextMenuFadeIn 0.12s ease-out;
 }
@@ -410,16 +410,16 @@
 .terminal-context-menu-item {
   padding: 8px 12px;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.12s ease;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s var(--ease-default);
   user-select: none;
 }
 
 .terminal-context-menu-item:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .terminal-context-menu-item.danger {
@@ -433,7 +433,7 @@
 
 .terminal-context-menu-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
   margin: 4px 8px;
 }
 
@@ -444,7 +444,7 @@
   gap: 6px;
   padding: 8px;
   background: rgba(0, 0, 0, 0.25);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   margin: 4px;
 }
 
@@ -487,22 +487,22 @@
 .terminal-action-btn {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(20, 22, 28, 0.75);
-  color: rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
   padding: 0;
 }
 
 .terminal-action-btn:hover {
-  background: rgba(30, 34, 44, 0.9);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .terminal-action-dropdown {
@@ -510,11 +510,11 @@
   top: calc(100% + 4px);
   right: 0;
   min-width: 170px;
-  background: #1a1d24;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
   padding: 4px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-md);
 }
 
 .terminal-action-item {
@@ -524,16 +524,16 @@
   width: 100%;
   padding: 6px 10px;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   background: transparent;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-primary);
   font-size: 12px;
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background 0.12s var(--ease-default);
 }
 
 .terminal-action-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
 }
 
 .terminal-action-item span {
@@ -544,7 +544,7 @@
 .terminal-action-item kbd {
   font-family: inherit;
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-tertiary);
   background: none;
   border: none;
   padding: 0;
@@ -552,6 +552,6 @@
 
 .terminal-action-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--border-subtle);
   margin: 4px 6px;
 }

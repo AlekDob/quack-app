@@ -2,7 +2,7 @@
 .transcript-viewer {
   background: linear-gradient(135deg, rgba(139, 92, 246, 0.05) 0%, rgba(59, 130, 246, 0.05) 100%);
   border: 1px solid rgba(139, 92, 246, 0.2);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 1.5rem;
   margin: 1rem 0;
 }
@@ -59,7 +59,7 @@
 
 .transcript-badge {
   padding: 0.25rem 0.625rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -169,7 +169,7 @@
   padding: 0.375rem 0.75rem;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 0.8125rem;
@@ -261,7 +261,7 @@
 
 .transcript-body::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .transcript-body::-webkit-scrollbar-thumb:hover {
@@ -273,7 +273,7 @@
   display: flex;
   gap: 0.75rem;
   padding: 0.375rem 0.5rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: background 0.15s ease;
 }
 
@@ -336,7 +336,7 @@
   background: rgba(139, 92, 246, 0.9);
   color: white;
   padding: 0.5rem 1rem;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 0.8125rem;
   font-weight: 500;
   pointer-events: none;

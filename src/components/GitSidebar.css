@@ -3,53 +3,79 @@
    ==================================== */
 
 .git-sidebar {
-  background: #12141a;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  /* Liquid glass container */
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(18, 20, 26, 0.97) 100%
+  );
+  backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  border-right: 1px solid var(--border-subtle);
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-width: 0;
 }
 
+/* Top-edge light reflection */
+.git-sidebar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.15),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
 /* Filter Input */
 .git-sidebar-filter {
   padding: 0.65rem 0.85rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
 .git-sidebar-filter svg {
-  color: rgba(168, 182, 221, 0.4);
+  color: var(--text-tertiary);
   flex-shrink: 0;
 }
 
 .git-sidebar-filter-input {
   flex: 1;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   padding: 0.35rem 0.5rem;
   font-size: 0.75rem;
-  color: #e5ecff;
+  color: var(--text-primary);
   outline: none;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
 }
 
 .git-sidebar-filter-input::placeholder {
-  color: rgba(168, 182, 221, 0.4);
+  color: var(--text-tertiary);
 }
 
 .git-sidebar-filter-input:focus {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-hover);
   border-color: rgba(var(--accent-rgb), 0.3);
   box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.1);
 }
 
 /* Sections */
 .git-sidebar-section {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .git-sidebar-section:last-child {
@@ -64,23 +90,23 @@
   padding: 0.5rem 0.85rem;
   background: transparent;
   border: none;
-  color: rgba(168, 182, 221, 0.8);
+  color: var(--text-secondary);
   font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
 }
 
 .git-sidebar-section-header:hover {
-  background: rgba(255, 255, 255, 0.03);
-  color: #a8b6dd;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
 }
 
 .git-sidebar-section-header svg {
   flex-shrink: 0;
-  color: rgba(168, 182, 221, 0.5);
+  color: var(--text-tertiary);
 }
 
 .git-sidebar-section-header span {
@@ -105,12 +131,12 @@
 }
 
 .git-sidebar-section-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  background: var(--border-default);
+  border-radius: var(--radius-sm);
 }
 
 .git-sidebar-section-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--border-strong);
 }
 
 /* Branch Items */
@@ -133,15 +159,15 @@
   padding: 0.4rem 0.85rem;
   background: transparent;
   border: none;
-  color: #d6dae4;
+  color: var(--text-primary);
   font-size: 0.75rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
   text-align: left;
 }
 
 .git-sidebar-branch-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-hover);
   color: #fff;
 }
 
@@ -157,7 +183,7 @@
 
 .git-sidebar-branch-item svg {
   flex-shrink: 0;
-  color: rgba(168, 182, 221, 0.6);
+  color: var(--text-tertiary);
 }
 
 .git-sidebar-branch-item.current svg {
@@ -184,7 +210,7 @@
   height: 18px;
   border-radius: 50%;
   flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-strong);
 }
 
 /* Merge Button */
@@ -199,11 +225,11 @@
   margin-right: 0.5rem;
   background: rgba(34, 197, 94, 0.15);
   border: 1px solid rgba(34, 197, 94, 0.3);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: #86efac;
   cursor: pointer;
   opacity: 0;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
 }
 
 .git-sidebar-branch-merge:hover {
@@ -242,10 +268,10 @@
   padding: 0.4rem 0.85rem;
   background: transparent;
   border: none;
-  color: rgba(168, 182, 221, 0.75);
+  color: var(--text-secondary);
   font-size: 0.75rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
   text-align: left;
   min-width: auto;
   overflow: visible;
@@ -256,13 +282,13 @@
 }
 
 .git-sidebar-folder-header:not(.static):hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: #a8b6dd;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
 }
 
 .git-sidebar-folder-header svg {
   flex-shrink: 0;
-  color: rgba(168, 182, 221, 0.5);
+  color: var(--text-tertiary);
 }
 
 .git-sidebar-folder-header span {
@@ -291,15 +317,15 @@
   padding: 0.4rem 0.85rem;
   background: transparent;
   border: none;
-  color: #d6dae4;
+  color: var(--text-primary);
   font-size: 0.75rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
   text-align: left;
 }
 
 .git-sidebar-file-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-hover);
   color: #fff;
 }
 
@@ -314,7 +340,7 @@
 
 .git-sidebar-file-item svg {
   flex-shrink: 0;
-  color: rgba(168, 182, 221, 0.6);
+  color: var(--text-tertiary);
 }
 
 .git-sidebar-file-name {
@@ -329,7 +355,7 @@
   font-size: 0.65rem;
   font-weight: 600;
   padding: 0.15rem 0.35rem;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .git-sidebar-file-status.unstaged {
@@ -346,7 +372,7 @@
 .git-sidebar .git-empty {
   padding: 0.75rem 0.85rem;
   font-size: 0.7rem;
-  color: rgba(168, 182, 221, 0.4);
+  color: var(--text-tertiary);
   text-align: center;
 }
 
@@ -358,7 +384,7 @@
 
 .git-sidebar-branch-item.readonly:hover {
   background: transparent;
-  color: #d6dae4;
+  color: var(--text-primary);
 }
 
 /* Fork Layout - 3 Columns (Diff moved to drawer) */
@@ -386,7 +412,7 @@
   flex-direction: column;
   min-width: 0;
   flex: 1;
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  border-right: 1px solid var(--border-subtle);
 }
 
 .git-right-column {
@@ -411,7 +437,7 @@
 .git-sidebar-branch-wrapper.drag-over {
   background: rgba(34, 197, 94, 0.1);
   border: 2px solid rgba(34, 197, 94, 0.3);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   margin: 2px 0;
 }
 
@@ -426,7 +452,7 @@
 .git-sidebar-section-count {
   font-size: 0.7rem;
   font-weight: 500;
-  color: rgba(168, 182, 221, 0.6);
+  color: var(--text-secondary);
   margin-left: auto;
 }
 
@@ -435,11 +461,11 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.25rem 0.5rem 0.25rem 0.85rem;
-  transition: background 0.15s ease;
+  transition: background 0.15s var(--ease-default);
 }
 
 .git-sidebar-worktree-item:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-elevated);
 }
 
 .git-sidebar-worktree-item:hover .git-sidebar-worktree-actions {
@@ -452,21 +478,21 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.35rem 0.5rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
-  color: #d6dae4;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
   font-size: 0.75rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
   text-align: left;
   min-width: 0;
   overflow: hidden;
 }
 
 .git-sidebar-worktree-main:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--bg-hover);
+  border-color: var(--border-default);
   color: #fff;
 }
 
@@ -487,7 +513,7 @@
 .git-sidebar-worktree-name {
   font-size: 0.75rem;
   font-weight: 500;
-  color: #e5ecff;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -495,7 +521,7 @@
 
 .git-sidebar-worktree-branch {
   font-size: 0.65rem;
-  color: rgba(168, 182, 221, 0.6);
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -505,7 +531,7 @@
   display: flex;
   gap: 0.25rem;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s var(--ease-default);
 }
 
 .git-sidebar-worktree-action {
@@ -515,10 +541,10 @@
   width: 24px;
   height: 24px;
   padding: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   border: 1px solid;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
 }
 
 .git-sidebar-worktree-action.merge {

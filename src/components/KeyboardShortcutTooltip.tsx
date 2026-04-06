@@ -13,7 +13,7 @@ import "./KeyboardShortcutTooltip.css";
 interface KeyboardShortcutTooltipProps {
   children: ReactNode;
   label: string;
-  shortcut: string; // e.g., "⌘K" or "⌘T"
+  shortcut?: string; // e.g., "⌘K" or "⌘T" — omit to show label-only tooltip
   position?: "top" | "bottom" | "left" | "right";
   delay?: number; // Delay before showing (default: 0 for instant)
 }
@@ -128,7 +128,7 @@ export default function KeyboardShortcutTooltip({
       }}
     >
       <span className="kbd-tooltip-label">{label}</span>
-      <kbd className="kbd-tooltip-key">{shortcut}</kbd>
+      {shortcut && <kbd className="kbd-tooltip-key">{shortcut}</kbd>}
     </div>
   );
 

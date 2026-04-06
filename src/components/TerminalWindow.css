@@ -18,7 +18,7 @@
   max-width: 1400px;
   max-height: 900px;
   background: #1a1a1a;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6),
@@ -62,7 +62,7 @@
   height: 28px;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   font-size: 16px;

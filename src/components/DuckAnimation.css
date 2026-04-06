@@ -12,7 +12,7 @@
   max-width: 1400px;
   height: 60px;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: linear-gradient(
     90deg,
     rgba(242, 140, 82, 0.02) 0%,

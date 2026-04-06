@@ -52,7 +52,7 @@
   width: 100%;
   background: #111827;
   border: 1px solid #1e293b;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 4px 28px 4px 26px;
   font-size: 12px;
   color: #e2e8f0;
@@ -87,7 +87,7 @@
 .fm-refresh-btn {
   background: none;
   border: 1px solid #1e293b;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 4px 8px;
   height: 26px;
   color: #e2e8f0;
@@ -105,7 +105,7 @@
 .fm-reset-btn {
   background: none;
   border: 1px solid #1e293b;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 4px 8px;
   height: 26px;
   color: #e2e8f0;
@@ -144,9 +144,9 @@
   overflow-y: auto;
   background: #111827;
   border: 1px solid #1e293b;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 14px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 1px rgba(0,217,255,0.15);
+  box-shadow: var(--shadow-lg);
   z-index: 100;
   animation: fm-pop-in 0.15s ease-out;
 }
@@ -178,7 +178,7 @@
   color: #64748b;
   cursor: pointer;
   padding: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
 }
 
@@ -189,7 +189,7 @@
 
 .fm-pop-image {
   margin-bottom: 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   border: 1px solid #1e293b;
 }
@@ -211,7 +211,7 @@
 .fm-tag {
   font-size: 10px;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: #1e293b;
   color: #94a3b8;
   border: 1px solid #334155;
@@ -269,7 +269,7 @@
   width: 100%;
   padding: 6px 8px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: #e2e8f0;
   cursor: pointer;
@@ -285,7 +285,7 @@
 .fm-file-type {
   font-size: 9px;
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: #334155;
   color: #94a3b8;
   white-space: nowrap;
@@ -310,7 +310,7 @@
   width: 100%;
   padding: 6px 8px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: #ff6b35;
   cursor: pointer;
@@ -363,7 +363,7 @@
 .fm-retry-btn {
   padding: 6px 16px;
   border: 1px solid #334155;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: #1e293b;
   color: #e2e8f0;
   cursor: pointer;
@@ -401,7 +401,7 @@
 .fm-empty code {
   background: #1e293b;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 11px;
 }
 
@@ -415,9 +415,9 @@
   gap: 2px;
   background: #111827;
   border: 1px solid #1e293b;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 4px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  box-shadow: var(--shadow-md);
   z-index: 10;
 }
 
@@ -428,7 +428,7 @@
   width: 32px;
   height: 32px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: #64748b;
   cursor: pointer;
@@ -454,7 +454,7 @@
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: #3b82f6;
   color: #fff;
   font-size: 11px;
@@ -484,7 +484,7 @@
   color: #60a5fa;
   cursor: pointer;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-family: inherit;
 }
@@ -512,7 +512,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   border: none;
   cursor: pointer;
   color: #f1f5f9;
@@ -555,4 +555,3 @@
   border-bottom: 2px solid rgba(249, 115, 22, 0.5);
   backdrop-filter: blur(4px);
 }
-

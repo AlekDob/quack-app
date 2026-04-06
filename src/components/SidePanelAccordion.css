@@ -7,11 +7,15 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  /* Glass effect - performance optimized */
-  background: rgba(17, 18, 22, 0.5);
-  backdrop-filter: blur(var(--blur-heavy)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(150%);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  /* Liquid glass container */
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  border-left: 1px solid var(--border-default);
   position: relative;
   overflow: hidden;
   /* Grid positioning - same row as terminal-pane */
@@ -19,6 +23,24 @@
   grid-row: 2;
   /* No padding-top needed since header is now above */
   padding-top: 0;
+}
+
+/* Top-edge light reflection on main panel */
+.side-panel-accordion::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.15),
+    transparent
+  );
+  pointer-events: none;
+  z-index: 1;
 }
 
 /* Fully hidden — no agent selected */
@@ -34,7 +56,7 @@
   min-width: 44px;
   max-width: 44px;
   overflow: visible;
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 1px solid var(--border-subtle);
 }
 
 /* Icon-only headers in compact mode (first 44px visible via translateX) */
@@ -98,22 +120,26 @@
   bottom: 0;
   width: 420px;
   z-index: 9999;
-  background: rgba(17, 18, 22, 0.96);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(
+    135deg,
+    rgba(17, 18, 22, 0.97) 0%,
+    rgba(15, 16, 20, 0.97) 100%
+  );
+  backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  border-left: 1px solid var(--border-default);
   /* Shifted right: only 44px visible (icon strip) */
   transform: translateX(calc(100% - 44px));
   pointer-events: auto;
-  transition: transform 0.3s cubic-bezier(0.25, 0.1, 0.25, 1),
-              box-shadow 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+  transition: transform 0.3s var(--ease-default),
+              box-shadow 0.3s var(--ease-default);
   box-shadow: none;
 }
 
 /* Slide fully in when peek expanded */
 .side-panel-accordion.compact.peek-expanded .accordion-container {
   transform: translateX(0);
-  box-shadow: -12px 0 40px rgba(0, 0, 0, 0.6), -4px 0 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg), -4px 0 12px rgba(0, 0, 0, 0.4);
 }
 
 /* Toggle button */
@@ -125,21 +151,21 @@
   width: 24px;
   height: 48px;
   background: rgba(30, 30, 32, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-default);
   border-right: none;
-  border-radius: 6px 0 0 6px;
-  color: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  color: var(--text-tertiary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: all 0.2s var(--ease-default);
   z-index: 10;
 }
 
 .side-panel-accordion .side-panel-toggle:hover {
   background: rgba(40, 40, 44, 0.95);
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
 }
 
 /* Accordion container */
@@ -167,18 +193,18 @@
 }
 
 .accordion-container::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  background: var(--border-default);
+  border-radius: var(--radius-sm);
 }
 
 .accordion-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--border-strong);
 }
 
 /* Accordion Section */
 .accordion-section {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  transition: all 0.3s ease;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: all 0.3s var(--ease-default);
   flex-shrink: 0;
 }
 
@@ -209,33 +235,33 @@
   padding: 10px 12px;
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
 }
 
 .accordion-header:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.9);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
 }
 
 .accordion-section.expanded .accordion-header {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
 }
 
 /* Chevron */
 .accordion-chevron {
   flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.4);
-  transition: transform 0.2s ease;
+  color: var(--text-tertiary);
+  transition: transform 0.2s var(--ease-default);
 }
 
 .accordion-section.expanded .accordion-chevron {
   transform: rotate(90deg);
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
 }
 
 /* Icon */
@@ -244,7 +270,7 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
 }
 
 .accordion-section.expanded .accordion-icon {
@@ -263,11 +289,11 @@
 .accordion-badge {
   flex-shrink: 0;
   padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-md);
   font-size: 10px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
 }
 
 .accordion-section.expanded .accordion-badge {
@@ -291,11 +317,11 @@
 .accordion-badge-label {
   flex-shrink: 0;
   padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-md);
   font-size: 10px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-secondary);
 }
 
 .accordion-section.expanded .accordion-badge-label {
@@ -306,7 +332,7 @@
 /* Content */
 .accordion-content {
   padding: 0;
-  animation: accordionSlideIn 0.2s ease;
+  animation: accordionSlideIn 0.2s var(--ease-default);
 }
 
 @keyframes accordionSlideIn {
@@ -332,15 +358,15 @@
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 6px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
   font-size: 12px;
   color: rgba(255, 255, 255, 0.8);
 }
 
 .workspace-item svg {
   flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-tertiary);
 }
 
 .workspace-item.branch svg {
@@ -409,7 +435,7 @@
 .accordion-content .mcp-server-card {
   padding: 6px 8px !important;
   margin-bottom: 4px !important;
-  border-radius: 4px !important;
+  border-radius: var(--radius-sm) !important;
 }
 
 /* Smaller icons everywhere */
@@ -452,7 +478,7 @@
 .accordion-content .search-input {
   padding: 6px 10px 6px 32px !important; /* Extra left padding for search icon */
   font-size: 12px !important;
-  border-radius: 4px !important;
+  border-radius: var(--radius-sm) !important;
 }
 
 /* Compact buttons */
@@ -467,7 +493,7 @@
 .accordion-content .param-badge {
   padding: 2px 5px !important;
   font-size: 9px !important;
-  border-radius: 3px !important;
+  border-radius: var(--radius-sm) !important;
 }
 
 /* Compact section headers inside panels */
@@ -563,7 +589,7 @@
   margin-bottom: 4px !important;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.5) !important;
+  color: var(--text-tertiary) !important;
 }
 
 /* Hide only the rules section inside Agent Personality accordion */
@@ -574,8 +600,8 @@
 /* Combine Project Context and Global Context into one visual box */
 .accordion-content .agent-context-panel > .context-section.project-context-section,
 .accordion-content .agent-context-panel > .context-section.global-context-section {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
   padding: 4px 6px !important;
   margin-bottom: 0 !important;
 }
@@ -586,7 +612,7 @@
   border-bottom-right-radius: 0;
   margin-bottom: 0 !important;
   padding-bottom: 2px !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .accordion-content .agent-context-panel > .context-section.global-context-section {
@@ -612,7 +638,7 @@
 .accordion-content .agent-bundle-actions button {
   padding: 5px 12px !important;
   font-size: 10px !important;
-  border-radius: 4px !important;
+  border-radius: var(--radius-sm) !important;
 }
 
 /* Compact communication style badge */

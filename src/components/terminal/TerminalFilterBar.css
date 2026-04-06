@@ -34,7 +34,7 @@
   padding: 4px 80px 4px 8px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(77, 212, 179, 0.2);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.9);
   font-size: 12px;
   font-family: 'Menlo', 'Monaco', monospace;
@@ -70,7 +70,7 @@
   margin-left: auto;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.4);
   cursor: pointer;
   transition: all 0.15s ease;

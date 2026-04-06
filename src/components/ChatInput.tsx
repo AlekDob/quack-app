@@ -27,6 +27,7 @@ import { loadAvailableSkills } from '../utils/skillsAndDroidsLoader';
 import { useFeatureMapData } from '../hooks/useFeatureMapData';
 import type { FeatureNode } from './featureMap/featureMapTypes';
 import { isMacOS } from '../utils/platform';
+import KeyboardShortcutTooltip from './KeyboardShortcutTooltip';
 import {
   compressImage,
   blobToBase64,
@@ -2390,22 +2391,23 @@ export default function ChatInput({
         <div className="chat-input-field-row">
           <div className="chat-input-actions" onMouseDown={(e) => e.preventDefault()}>
           <div className="chat-input-actions-left">
+          <KeyboardShortcutTooltip label="Attach files" shortcut={formatShortcut(shortcuts.chatAttachFile?.currentKeys || '') || undefined} position="top">
           <button
             type="button"
             className="chat-input-action-btn"
             onClick={handleAttach}
-            data-tooltip={`Attach files (${formatShortcut(shortcuts.chatAttachFile?.currentKeys || '')})`}
             aria-label="Attach files"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
               <path d="M10.5 3.5a2.5 2.5 0 0 1 5 0V11h-1V3.5a1.5 1.5 0 0 0-3 0V12a3 3 0 1 1-6 0V3h1v9a2 2 0 1 0 4 0V3.5Z"/>
             </svg>
           </button>
+          </KeyboardShortcutTooltip>
+          <KeyboardShortcutTooltip label="Prompt Engineer" position="top">
           <button
             type="button"
             className="chat-input-action-btn"
             onClick={onOpenPromptEngineer}
-            data-tooltip="Prompt Engineer"
             aria-label="Prompt Engineer"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2413,13 +2415,14 @@ export default function ChatInput({
               <path d="M12 2l0.5 1.5L14 4l-1.5 0.5L12 6l-0.5-1.5L10 4l1.5-0.5L12 2Z" opacity="0.6"/>
             </svg>
           </button>
+          </KeyboardShortcutTooltip>
           {/* Fullscreen toggle button */}
           {onToggleFullscreen && (
+            <KeyboardShortcutTooltip label={isFullscreen ? "Exit fullscreen" : "Fullscreen mode"} shortcut={formatShortcut(shortcuts.chatToggleFullscreen?.currentKeys || '') || undefined} position="top">
             <button
               type="button"
               className={`chat-input-action-btn ${isFullscreen ? 'active' : ''}`}
               onClick={onToggleFullscreen}
-              data-tooltip={isFullscreen ? `Exit fullscreen (${formatShortcut(shortcuts.chatToggleFullscreen?.currentKeys || '')})` : `Fullscreen mode (${formatShortcut(shortcuts.chatToggleFullscreen?.currentKeys || '')})`}
               aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen mode"}
             >
               {isFullscreen ? (
@@ -2432,13 +2435,14 @@ export default function ChatInput({
                 </svg>
               )}
             </button>
+            </KeyboardShortcutTooltip>
           )}
+          <KeyboardShortcutTooltip label={isSpeechSupported ? "Voice input" : "Voice input not supported"} shortcut={isSpeechSupported ? (formatShortcut(shortcuts.chatVoiceRecord?.currentKeys || '') || undefined) : undefined} position="top">
           <button
             type="button"
             className="chat-input-action-btn"
             onClick={handleVoiceClick}
             disabled={!isSpeechSupported}
-            data-tooltip={isSpeechSupported ? `Voice input (${formatShortcut(shortcuts.chatVoiceRecord?.currentKeys || '')})` : "Voice input not supported"}
             aria-label="Voice input"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2446,11 +2450,13 @@ export default function ChatInput({
               <path d="M4 7v1a4 4 0 0 0 8 0V7h1v1a5 5 0 0 1-4.5 4.975V15h3v1h-7v-1h3v-2.025A5 5 0 0 1 3 8V7h1Z"/>
             </svg>
           </button>
+          </KeyboardShortcutTooltip>
           {/* Focus-only helper icons - at end so they wrap to top with wrap-reverse */}
           {/* Keep visible when snippet popover is open to prevent it from unmounting */}
           {(isFocused || showSnippetPopover) && (
             <div className="focus-helper-icon-wrapper" onMouseDown={(e) => e.preventDefault()}>
               {/* Snippet button - opens modal */}
+              <KeyboardShortcutTooltip label="Prompt Snippets" shortcut={formatShortcut(shortcuts.chatOpenSnippets?.currentKeys || '') || undefined} position="top">
               <button
                 type="button"
                 className="chat-input-action-btn focus-helper-icon"
@@ -2458,7 +2464,6 @@ export default function ChatInput({
                   e.preventDefault();
                   setShowSnippetPopover(!showSnippetPopover);
                 }}
-                data-tooltip={`Prompt Snippets (${formatShortcut(shortcuts.chatOpenSnippets?.currentKeys || '')})`}
                 aria-label="Prompt Snippets"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -2466,6 +2471,8 @@ export default function ChatInput({
                   <path d="M5 5h6v1H5zM5 7.5h4v1H5zM5 10h5v1H5z"/>
                 </svg>
               </button>
+              </KeyboardShortcutTooltip>
+              <KeyboardShortcutTooltip label="New line with _" shortcut={formatShortcut(shortcuts.chatNewLine?.currentKeys || '') || undefined} position="top">
               <button
                 type="button"
                 className="chat-input-action-btn focus-helper-icon"
@@ -2486,13 +2493,14 @@ export default function ChatInput({
                     }
                   }, 0);
                 }}
-                data-tooltip={`New line with _ (${formatShortcut(shortcuts.chatNewLine?.currentKeys || '')})`}
                 aria-label="New line with underscore"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M2 3l4 4m0 0l-4 4m4-4h8M5 13h6" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
+              </KeyboardShortcutTooltip>
+              <KeyboardShortcutTooltip label="XML tag" shortcut={formatShortcut(shortcuts.chatInsertXml?.currentKeys || '') || undefined} position="top">
               <button
                 type="button"
                 className="chat-input-action-btn focus-helper-icon"
@@ -2533,22 +2541,19 @@ export default function ChatInput({
                     }, 0);
                   }
                 }}
-                data-tooltip={`XML tag (${formatShortcut(shortcuts.chatInsertXml?.currentKeys || '')})`}
                 aria-label="XML tag"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M4 5L2 8l2 3M12 5l2 3-2 3M9 3L7 13" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
+              </KeyboardShortcutTooltip>
             </div>
           )}
           {/* IDE context icon — full detail in Context accordion panel */}
           {(previewFile || editorSelection || (isMacOS() && externalIdeContext)) && (
-            <button
-              type="button"
-              className={`chat-input-action-btn chat-input-ide-btn ${!ideContextEnabled ? 'chat-input-ide-btn--disabled' : ''}`}
-              onClick={toggleIdeContext}
-              data-tooltip={(() => {
+            <KeyboardShortcutTooltip
+              label={(() => {
                 if (!ideContextEnabled) return 'Context disabled';
                 if (editorSelection) {
                   const name = editorSelection.filePath.split('/').pop() ?? editorSelection.filePath;
@@ -2565,6 +2570,12 @@ export default function ChatInput({
                 }
                 return 'Context active';
               })()}
+              position="top"
+            >
+            <button
+              type="button"
+              className={`chat-input-action-btn chat-input-ide-btn ${!ideContextEnabled ? 'chat-input-ide-btn--disabled' : ''}`}
+              onClick={toggleIdeContext}
               aria-label="Toggle IDE context"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2572,29 +2583,31 @@ export default function ChatInput({
                 <polyline points="8 6 2 12 8 18" />
               </svg>
             </button>
+            </KeyboardShortcutTooltip>
           )}
           </div>
           {/* Send/Stop button - aligned to right */}
           <div className="chat-input-actions-right">
             {isStreaming ? (
+              <KeyboardShortcutTooltip label="Stop" shortcut="ESC" position="top">
               <button
                 type="button"
                 className="chat-input-send streaming"
                 onClick={handleStop}
-                data-tooltip="Stop (ESC)"
                 aria-label="Stop streaming"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                   <rect x="6" y="6" width="12" height="12" rx="2" />
                 </svg>
               </button>
+              </KeyboardShortcutTooltip>
             ) : (
+              <KeyboardShortcutTooltip label="Send" shortcut={formatShortcut(shortcuts.chatSendMessage?.currentKeys || '') || undefined} position="top">
               <button
                 type="button"
                 className="chat-input-send"
                 onClick={() => void handleSend()}
                 disabled={!input.trim() && attachments.length === 0}
-                data-tooltip={`Send (${formatShortcut(shortcuts.chatSendMessage?.currentKeys || '')})`}
                 aria-label="Send message"
               >
                 <svg
@@ -2614,6 +2627,7 @@ export default function ChatInput({
                   />
                 </svg>
               </button>
+              </KeyboardShortcutTooltip>
             )}
           </div>
           </div>
@@ -2821,41 +2835,44 @@ export default function ChatInput({
                 <div className="chat-focus-actions-row">
                   <div className="chat-focus-actions-left" onMouseDown={(e) => e.preventDefault()}>
                     {/* Attach */}
+                    <KeyboardShortcutTooltip label="Attach files" shortcut={formatShortcut(shortcuts.chatAttachFile?.currentKeys || '') || undefined} position="top">
                     <button
                       type="button"
                       className="chat-input-action-btn"
                       onClick={handleAttach}
-                      data-tooltip={`Attach files (${formatShortcut(shortcuts.chatAttachFile?.currentKeys || '')})`}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M10.5 3.5a2.5 2.5 0 0 1 5 0V11h-1V3.5a1.5 1.5 0 0 0-3 0V12a3 3 0 1 1-6 0V3h1v9a2 2 0 1 0 4 0V3.5Z"/>
                       </svg>
                     </button>
+                    </KeyboardShortcutTooltip>
                     {/* Snippets */}
+                    <KeyboardShortcutTooltip label="Snippets" shortcut={formatShortcut(shortcuts.chatOpenSnippets?.currentKeys || '') || undefined} position="top">
                     <button
                       type="button"
                       className="chat-input-action-btn"
                       onClick={() => setShowSnippetPopover(!showSnippetPopover)}
-                      data-tooltip={`Snippets (${formatShortcut(shortcuts.chatOpenSnippets?.currentKeys || '')})`}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M4 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4z"/>
                         <path d="M5 5h6v1H5zM5 7.5h4v1H5zM5 10h5v1H5z"/>
                       </svg>
                     </button>
+                    </KeyboardShortcutTooltip>
                     {/* Voice */}
+                    <KeyboardShortcutTooltip label={isSpeechSupported ? "Voice" : "Voice not supported"} shortcut={isSpeechSupported ? (formatShortcut(shortcuts.chatVoiceRecord?.currentKeys || '') || undefined) : undefined} position="top">
                     <button
                       type="button"
                       className="chat-input-action-btn"
                       onClick={handleVoiceClick}
                       disabled={!isSpeechSupported}
-                      data-tooltip={isSpeechSupported ? `Voice (${formatShortcut(shortcuts.chatVoiceRecord?.currentKeys || '')})` : "Voice not supported"}
                     >
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M8 1a2 2 0 0 0-2 2v4a2 2 0 1 0 4 0V3a2 2 0 0 0-2-2Z"/>
                         <path d="M4 7v1a4 4 0 0 0 8 0V7h1v1a5 5 0 0 1-4.5 4.975V15h3v1h-7v-1h3v-2.025A5 5 0 0 1 3 8V7h1Z"/>
                       </svg>
                     </button>
+                    </KeyboardShortcutTooltip>
                   </div>
 
                   <div className="chat-focus-actions-right">

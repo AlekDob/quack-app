@@ -2,47 +2,44 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 6px;
-  font-size: 9px;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
-  color: var(--text-secondary);
-  background: rgba(180, 100, 40, 0.12);
-  border: 1px solid rgba(180, 100, 40, 0.2);
-  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--duration-fast) ease;
   user-select: none;
   white-space: nowrap;
   vertical-align: middle;
 }
 
 .session-id-display:hover {
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  background: var(--bg-hover);
 }
 
 .session-id-display:active {
-  transform: scale(0.95);
+  opacity: 0.8;
 }
 
 .session-id-display.copied {
-  color: var(--success-color, #22c55e);
-  background: rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.3);
+  color: var(--semantic-success);
 }
 
 .session-icon {
   flex-shrink: 0;
-  opacity: 0.7;
+  opacity: 0.5;
 }
 
 .session-id-display:hover .session-icon {
-  opacity: 1;
+  opacity: 0.8;
 }
 
 .session-id-text {
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1;
 }
 

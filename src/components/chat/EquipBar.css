@@ -24,7 +24,7 @@
   height: 32px;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.65);
   font-size: 11px;
   font-weight: 500;
@@ -116,7 +116,7 @@
 
 .equip-bar-list::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
 }
 
 .equip-bar-list::-webkit-scrollbar-thumb:hover {
@@ -134,7 +134,7 @@
   padding: 8px 10px;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.75);
   font-size: 12px;
   font-weight: 400;

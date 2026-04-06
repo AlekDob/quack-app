@@ -9,7 +9,7 @@
   margin-left: 40px; /* Indent like tools */
   background: transparent;
   border: 1px solid rgba(34, 197, 94, 0.15);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -38,7 +38,7 @@
   align-items: flex-start;
   padding: 4px 8px;
   background: rgba(34, 197, 94, 0.05);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 .system-icon {
@@ -52,7 +52,7 @@
   font-weight: 400;
   font-size: 10px;
   font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 .system-init-chevron {
@@ -94,7 +94,7 @@
 }
 
 .system-init-label {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
   min-width: fit-content;
 }
 
@@ -103,7 +103,7 @@
   font-size: 10px;
   background: rgba(0, 0, 0, 0.25);
   padding: 2px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.8);
 }
 
@@ -121,7 +121,7 @@
   background: rgba(34, 197, 94, 0.08);
   border: 1px solid rgba(34, 197, 94, 0.15);
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 9px;
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
   color: rgba(34, 197, 94, 0.8);
@@ -135,9 +135,9 @@
 
 /* Tool Widget Base - Compact */
 .tool-widget {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--bg-elevated);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   margin-bottom: 6px;
   overflow: hidden;
   transition: all 0.2s ease;
@@ -145,7 +145,7 @@
 
 .tool-widget:hover {
   border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--bg-hover);
 }
 
 .tool-widget-header {
@@ -183,7 +183,7 @@
   font-size: 9px;
   background: rgba(0, 0, 0, 0.3);
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.8);
 }
 
@@ -192,7 +192,7 @@
   font-size: 9px;
   background: rgba(147, 197, 253, 0.15);
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   color: rgba(147, 197, 253, 0.9);
 }
 
@@ -209,7 +209,7 @@
   background: rgba(147, 197, 253, 0.1);
   border: 1px solid rgba(147, 197, 253, 0.2);
   padding: 2px 8px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-size: 9px;
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
   color: rgba(147, 197, 253, 0.9);
@@ -280,7 +280,7 @@
   color: rgba(255, 255, 255, 0.9);
   background: rgba(0, 0, 0, 0.3);
   padding: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow-x: auto;
   margin: 0;
 }
@@ -293,7 +293,7 @@
   padding: 12px;
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 10px; /* ← Ridotto da 12px */
   color: rgba(239, 68, 68, 1);
   line-height: 1.5;
@@ -363,7 +363,7 @@
   padding: 8px 12px;
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 10px; /* ← Ridotto da 12px */
   color: rgba(239, 68, 68, 1);
 }
@@ -386,8 +386,8 @@
   margin-top: -4px; /* Pull up slightly to attach to previous message */
   margin-bottom: 12px;
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
   font-size: 10px; /* ← Ridotto da 12px */
   color: rgba(255, 255, 255, 0.6);
   font-family: 'SF Mono', 'Monaco', 'Cascadia Code', monospace;
@@ -398,7 +398,7 @@
 .task-widget {
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin-bottom: 8px;
   overflow: hidden;
 }
@@ -435,9 +435,9 @@
 /* Tool Widget with GIF - Compact WhatsApp style */
 .tool-widget-with-gif {
   overflow: hidden;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   transition: border-color 0.2s ease;
 }
 
@@ -464,9 +464,9 @@
 
 /* Collapsible Tool Widget - Compact, collapsed by default */
 .collapsible-tool-widget {
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   overflow: hidden;
   transition: all 0.2s ease;
 }
@@ -519,7 +519,7 @@
 .task-output-widget {
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   margin-bottom: 8px;
   overflow: hidden;
 }
@@ -548,7 +548,7 @@
   align-items: center;
   background: rgba(0, 0, 0, 0.25);
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .task-output-id-badge code {
@@ -563,7 +563,7 @@
   align-items: center;
   gap: 5px;
   padding: 3px 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   font-size: 10px;
   font-weight: 500;
   border: 1px solid;
@@ -577,7 +577,7 @@
 .task-output-content {
   padding: 12px 14px;
   background: rgba(0, 0, 0, 0.2);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-default);
 }
 
 /* Config info row */
@@ -607,7 +607,7 @@
   color: rgba(255, 255, 255, 0.9);
   background: rgba(0, 0, 0, 0.3);
   padding: 10px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   overflow-x: auto;
   margin: 0;
   white-space: pre-wrap;
@@ -648,7 +648,7 @@
 
 /* EnterPlanMode Widget - Purple header with white text */
 .enter-plan-mode-widget {
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   margin: 8px 0;
   border: 1px solid rgba(139, 92, 246, 0.4);
@@ -697,7 +697,7 @@
   color: white;
   font-size: 10px;
   font-weight: 700;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-left: 4px;
@@ -728,7 +728,7 @@
 /* Image Preview Widget */
 .image-preview-widget {
   margin: 8px 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(0, 0, 0, 0.2);
@@ -741,7 +741,7 @@
   gap: 8px;
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-default);
   font-size: 11px;
   color: rgba(255, 255, 255, 0.8);
 }
@@ -780,7 +780,7 @@
   padding: 8px 16px;
   background: rgba(139, 92, 246, 0.8);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: white;
   font-size: 13px;
   cursor: pointer;
@@ -798,10 +798,10 @@
   margin-left: auto;
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
   cursor: pointer;
   padding: 2px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: color 0.2s ease, background 0.2s ease;
   display: flex;
   align-items: center;

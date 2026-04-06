@@ -48,7 +48,7 @@
   font-size: 1rem;
   background: rgba(255, 255, 255, 0.05);
   border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   color: #fff;
   transition: all 0.2s ease;
 }
@@ -84,7 +84,7 @@
   background: linear-gradient(135deg, #4dd4b3 0%, #3ba68f 100%);
   color: #000;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
@@ -143,7 +143,7 @@
   padding: 1rem 1.5rem;
   background: rgba(255, 255, 255, 0.05);
   border: 2px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   color: #fff;
   font-size: 0.95rem;
   font-weight: 500;
@@ -175,7 +175,7 @@
   padding: 1.5rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   transition: all 0.2s ease;
 }
 
@@ -208,7 +208,7 @@
   padding: 0.125rem 0.375rem;
   background: rgba(77, 212, 179, 0.1);
   color: #4dd4b3;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.85rem;
   font-family: 'Monaco', 'Menlo', monospace;
 }
@@ -219,7 +219,7 @@
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.85rem;
   font-family: 'Monaco', 'Menlo', monospace;
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);

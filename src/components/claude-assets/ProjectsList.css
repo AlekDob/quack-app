@@ -24,7 +24,7 @@
 .projects-count {
   font-size: 9px;
   padding: 1px 5px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.06);
   color: var(--text-tertiary, rgba(255, 255, 255, 0.4));
 }
@@ -129,7 +129,7 @@
 .total-count {
   font-size: 10px;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-tertiary, rgba(255, 255, 255, 0.45));
 }

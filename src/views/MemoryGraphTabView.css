@@ -6,7 +6,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #0f1115;
+  background: var(--bg-base);
   position: relative;
 }
 
@@ -42,7 +42,7 @@
 .memory-graph-toolbar-title {
   font-size: 13px;
   font-weight: 600;
-  color: #e7ebf3;
+  color: var(--text-primary);
 }
 
 /* Stats badges */
@@ -57,7 +57,7 @@
   align-items: center;
   gap: 4px;
   padding: 3px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 11px;
   font-weight: 500;
 }
@@ -76,8 +76,8 @@
 .memory-graph-source-filter {
   display: flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 6px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
   padding: 2px;
 }
 
@@ -85,12 +85,12 @@
   padding: 5px 12px;
   background: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 11px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
 }
 
 .memory-graph-filter-btn:hover {
@@ -125,16 +125,16 @@
   width: 28px;
   height: 28px;
   padding: 0;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--bg-elevated);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: rgba(255, 255, 255, 0.5);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
 }
 
 .memory-graph-toolbar-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
   color: rgba(255, 255, 255, 0.9);
   border-color: rgba(242, 140, 82, 0.3);
 }
@@ -176,16 +176,16 @@
   padding: 0 12px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
-  color: #e7ebf3;
+  color: var(--text-primary);
   outline: none;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
   box-sizing: border-box;
 }
 
 .memory-graph-add-input::placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-tertiary);
 }
 
 .memory-graph-add-input:focus {
@@ -198,9 +198,9 @@
   padding: 0 12px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
-  color: #e7ebf3;
+  color: var(--text-primary);
   cursor: pointer;
   outline: none;
   box-sizing: border-box;
@@ -215,12 +215,12 @@
   padding: 0 16px;
   background: linear-gradient(135deg, #f28c52 0%, #ffb26f 100%);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
   color: #ffffff;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
   box-sizing: border-box;
 }
 
@@ -235,17 +235,17 @@
   width: 34px;
   height: 34px;
   padding: 0;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
   box-sizing: border-box;
 }
 
 .memory-graph-add-cancel:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
   color: rgba(255, 255, 255, 0.8);
 }
 
@@ -304,7 +304,7 @@
 .memory-graph-empty p {
   margin: 0;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
 }
 
 /* Selected Node Details */
@@ -315,11 +315,11 @@
   right: 16px;
   max-height: 180px;
   background: rgba(20, 22, 28, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
   padding: 14px;
   backdrop-filter: blur(12px);
-  animation: slideUp 0.2s ease;
+  animation: slideUp 0.2s var(--ease-default);
   overflow: hidden;
 }
 
@@ -353,14 +353,14 @@
   margin: 0;
   font-size: 13px;
   font-weight: 600;
-  color: #e7ebf3;
+  color: var(--text-primary);
   flex: 1;
   min-width: 100px;
 }
 
 .memory-graph-details-source {
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
@@ -379,11 +379,11 @@
 
 .memory-graph-details-type {
   padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
+  background: var(--border-default);
+  border-radius: var(--radius-sm);
   font-size: 10px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -392,12 +392,12 @@
   padding: 4px 10px;
   background: rgba(239, 68, 68, 0.15);
   border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 10px;
   font-weight: 500;
   color: #ef4444;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
 }
 
 .memory-graph-details-delete:hover {
@@ -413,14 +413,14 @@
   padding: 0;
   background: none;
   border: none;
-  border-radius: 4px;
-  color: rgba(255, 255, 255, 0.4);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease-default);
 }
 
 .memory-graph-details-close:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-hover);
   color: rgba(255, 255, 255, 0.8);
 }
 
@@ -435,10 +435,10 @@
 .memory-graph-observation {
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   line-height: 1.5;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-secondary);
 }
 
 /* Legend */
@@ -451,8 +451,8 @@
   gap: 8px;
   padding: 10px 12px;
   background: rgba(20, 22, 28, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
   backdrop-filter: blur(8px);
   z-index: 10;
 }
@@ -466,7 +466,7 @@
 .memory-graph-legend-title {
   font-size: 9px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin-bottom: 2px;
@@ -522,7 +522,7 @@
 }
 
 .memory-graph-details-observations::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-strong);
   border-radius: 2px;
 }
 

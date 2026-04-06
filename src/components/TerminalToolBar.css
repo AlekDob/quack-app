@@ -18,7 +18,7 @@
   width: 32px;
   height: 32px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.03);
   color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
@@ -55,7 +55,7 @@
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.1s ease, transform 0.1s ease;

@@ -26,7 +26,7 @@
   position: relative;
   max-width: 400px;
   width: auto;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   /* Subtle glassmorphism */
   background: rgba(255, 255, 255, 0.05);
@@ -86,7 +86,7 @@
 .tool-gif-inline--loading .tool-gif-inline__skeleton {
   width: 350px;
   height: 200px;
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   background: linear-gradient(
     90deg,
     rgba(255, 107, 53, 0.08) 0%,
@@ -118,7 +118,7 @@
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 7px;
   border: none;
   opacity: 0;
