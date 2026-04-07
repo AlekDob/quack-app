@@ -3,8 +3,9 @@
  * HTML overlay positioned over the canvas.
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { AnnotationMode } from './annotationTypes';
+import KeyboardShortcutTooltip from '../KeyboardShortcutTooltip';
 import './FeatureMapView.css';
 
 interface Props {
@@ -70,51 +71,76 @@ function ImageIcon() {
   );
 }
 
-const BUTTONS: { mode: AnnotationMode; label: string; Icon: () => React.JSX.Element }[] = [
-  { mode: 'select', label: 'Select', Icon: SelectIcon },
-  { mode: 'lasso', label: 'Lasso Select', Icon: LassoIcon },
-  { mode: 'postit', label: 'Post-it', Icon: PostItIcon },
-  { mode: 'group', label: 'Group', Icon: GroupIcon },
-  { mode: 'image', label: 'Image', Icon: ImageIcon },
+const BUTTONS: { mode: AnnotationMode; label: string; shortcut: string; Icon: () => React.JSX.Element }[] = [
+  { mode: 'select', label: 'Select', shortcut: '1', Icon: SelectIcon },
+  { mode: 'lasso', label: 'Lasso Select', shortcut: '2', Icon: LassoIcon },
+  { mode: 'postit', label: 'Post-it', shortcut: '3', Icon: PostItIcon },
+  { mode: 'group', label: 'Group', shortcut: '4', Icon: GroupIcon },
+  { mode: 'image', label: 'Image', shortcut: '5', Icon: ImageIcon },
 ];
+
+const SHORTCUT_MAP: Record<string, AnnotationMode> = {
+  '1': 'select', '2': 'lasso', '3': 'postit', '4': 'group', '5': 'image',
+};
 
 export default function AnnotationToolbar({ mode, onModeChange, selectionCount = 0, onCreateComponent, canCreateComponent = true }: Props) {
   const showCreate = selectionCount >= 2 && canCreateComponent;
 
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const m = SHORTCUT_MAP[e.key];
+      if (m) onModeChange(m);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onModeChange]);
+
   return (
     <div className="fm-ann-toolbar">
-      {BUTTONS.map(({ mode: m, label, Icon }) => (
-        <button
+      {BUTTONS.map(({ mode: m, label, shortcut, Icon }) => (
+        <KeyboardShortcutTooltip
           key={m}
-          className={`fm-ann-btn ${mode === m ? 'active' : ''}`}
-          onClick={() => onModeChange(m)}
-          title={label}
+          label={`${label} · Ctrl to cycle`}
+          shortcut={shortcut}
+          position="top"
         >
-          <Icon />
-        </button>
+          <button
+            className={`fm-ann-btn ${mode === m ? 'active' : ''}`}
+            onClick={() => onModeChange(m)}
+          >
+            <Icon />
+          </button>
+        </KeyboardShortcutTooltip>
       ))}
       {/* Selection counter badge */}
       {selectionCount > 0 && (
-        <span className="fm-ann-selection-badge" title={`${selectionCount} selected`}>
-          {selectionCount}
-        </span>
+        <KeyboardShortcutTooltip label={`${selectionCount} selected`} position="top">
+          <span className="fm-ann-selection-badge">
+            {selectionCount}
+          </span>
+        </KeyboardShortcutTooltip>
       )}
       {/* Create Component button — visible when 2+ items selected */}
       {selectionCount >= 2 && (
-        <button
-          className="fm-ann-component-btn"
-          onClick={onCreateComponent}
-          disabled={!showCreate}
-          title={showCreate ? 'Create Component' : 'Max nesting depth reached'}
+        <KeyboardShortcutTooltip
+          label={showCreate ? 'Create Component' : 'Max nesting depth reached'}
+          position="top"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="7" height="7" rx="1" />
-          </svg>
-        </button>
+          <button
+            className="fm-ann-component-btn"
+            onClick={onCreateComponent}
+            disabled={!showCreate}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+            </svg>
+          </button>
+        </KeyboardShortcutTooltip>
       )}
     </div>
   );

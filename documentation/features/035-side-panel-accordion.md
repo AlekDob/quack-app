@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React 18)
 created: 2026-04-04
-last_verified: 2026-04-04
+last_verified: 2026-04-06
 tags: [accordion, side-panel, ui, layout, navigation]
 ---
 
@@ -68,6 +68,12 @@ tags: [accordion, side-panel, ui, layout, navigation]
 - `shouldBeHidden`: derived — `!activeAgentId || (isCollapsed && !userCollapsed)`
 - `userCollapsed` prop: distinguishes user-initiated collapse from tab-auto-collapse (docs, kanban, feature map)
 
+### Persistence
+- `sidePanelCollapsed` persisted via Zustand `ui-storage` localStorage key
+- App.tsx reads initial value from localStorage on mount, syncs back via `useEffect` → `setSidePanelCollapsed` store action
+- Compact mode preference survives app restart
+- Hydration flow: localStorage → `ui-storage` JSON parse → `sidePanelCollapsed` boolean → App.tsx `useEffect` sets Zustand store on mount
+
 ### Config
 - `CATEGORY_COLORS`: per-section color map (changes=#34d399, skills=#f28c52, agents=#f28c52, droids=#4ecdc4, rules=#60a5fa, hooks=#a78bfa, features=#FFD700, sessions=#00d9ff, mcp=#34d399, commands=#f472b6, context=#f28c52, project-context=#60a5fa)
 - `sectionIds`: fixed order array -- `['changes', 'context', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions']`
@@ -89,7 +95,7 @@ tags: [accordion, side-panel, ui, layout, navigation]
 | 11 | sessions | Sessions | SessionsPanel | -- |
 
 ### CSS Architecture
-- **Glassmorphism base**: `rgba(17,18,22,0.5)` + `backdrop-filter: blur(var(--blur-heavy))`
+- **Glassmorphism base**: `rgba(17,18,22,0.88)` + `backdrop-filter: blur(var(--blur-heavy)) saturate(150%)` (opacity raised from 0.7 to 0.88, saturate from 120% to 150% for better readability)
 - **Focus mode**: `.accordion-section.focused` gets `flex: 1` + content scrolls up to `80vh - 50px`
 - **Category color**: CSS custom property `--category-color` set per section, used by badge and icon styles
 - **Content compact mode**: `!important` overrides for all child panels (12px base font, 6px padding cards, 14px icons)

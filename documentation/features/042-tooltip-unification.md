@@ -25,6 +25,7 @@ tags: [tooltip, keyboard-shortcut, ui-consistency, portal-rendering]
 | Component | `src/components/ChatView.tsx` | Update Brain, BTW, Quick Loop buttons |
 | Component | `src/components/SidebarViewToggle.tsx` | Projects / Task Hub toggle |
 | Component | `src/components/TerminalSidebar.tsx` | New Project, Create Group, Favorites toggle |
+| Component | `src/components/featureMap/AnnotationToolbar.tsx` | Select (1), Lasso (2), Post-it (3), Group (4), Image (5), selection badge, Create Component |
 
 ### Data Flow
 [MouseEnter/Focus on wrapper] → [getBoundingClientRect() calculates position] → [createPortal to document.body] → [CSS transition opacity+scale]

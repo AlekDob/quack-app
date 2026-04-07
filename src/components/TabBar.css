@@ -61,21 +61,10 @@
   background: var(--accent);
 }
 
-/* Split Active Tab - secondary indicator */
+/* Split Active Tab - same style as regular active tab */
 .tab-item.split-active {
-  background: rgba(0, 110, 255, 0.1);
+  background: rgba(var(--accent-rgb), 0.12);
   color: rgba(255, 255, 255, 0.95);
-  border-bottom: 2px solid rgba(0, 110, 255, 0.6);
-}
-
-.tab-item.split-active::after {
-  content: '';
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: rgba(0, 110, 255, 0.6);
 }
 
 /* Split tab bar groups */
@@ -93,7 +82,20 @@
 }
 
 .tab-bar-group-right {
-  border-left: 2px solid rgba(0, 110, 255, 0.4);
+  border-left: 1px solid var(--border-subtle);
+}
+
+/* Force full white text on all tabs in right group */
+.tab-bar-group-right .tab-item,
+.tab-bar-group-right .tab-item:hover,
+.tab-bar-group-right .tab-item.split-active,
+.tab-bar-group-right .tab-item.dragging {
+  color: #fff !important;
+  opacity: 1 !important;
+}
+
+.tab-bar-group-right .tab-item .tab-label {
+  color: #fff !important;
 }
 
 /* Color Indicator - Agent Badge */

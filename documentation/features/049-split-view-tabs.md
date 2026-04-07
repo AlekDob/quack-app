@@ -15,8 +15,9 @@ tags: [split-view, tabs, drag-drop, layout, editor]
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Component | `src/components/SplitView/SplitDropZone.tsx` | `SplitDropZone` -- drag overlay with left/right drop zones |
+| Component | `src/components/SplitView/SplitCodeEditor.tsx` | `SplitCodeEditor` -- standalone code editor for split pane (independent of editorStore) |
 | Component | `src/components/SplitView/SplitPaneDivider.tsx` | `SplitPaneDivider` -- resizable divider with mouse drag |
-| Config | `src/components/SplitView/index.ts` | Barrel export for `SplitPaneDivider`, `SplitDropZone` |
+| Config | `src/components/SplitView/index.ts` | Barrel export for `SplitPaneDivider`, `SplitDropZone`, `SplitCodeEditor` |
 | Config | `src/components/SplitView/SplitView.css` | Split pane layout, divider, drop zone, pane header styles |
 | Route/Page | `src/App.tsx` | Split state management, drop handlers, pane rendering |
 | Component | `src/components/TabBar.tsx` | `splitTabId` prop, `split-active` CSS class on tab |
@@ -35,6 +36,8 @@ tags: [split-view, tabs, drag-drop, layout, editor]
 - `handleSplitDropLeft(tabId: string) → void` -- moves dragged tab to left pane, current to right
 - `handleSplitDropRight(tabId: string) → void` -- places dragged tab in right pane
 - `handleCloseSplit() → void` -- resets splitTabId to null
+- `SplitCodeEditor({ filePath: string }) → JSX` -- standalone editor that reads file via Tauri invoke, bypasses editorStore singleton
+- `getLanguageFromPath(path: string) → string` -- maps file extension to CodeMirror language name
 
 ### State
 - `splitTabId`: `string | null` -- ID of tab shown in right pane (component, App.tsx)

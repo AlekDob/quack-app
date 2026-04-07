@@ -166,6 +166,8 @@ function TabBar({ tabs, activeTabId, splitTabId, splitRatio = 0.5, onTabClick, o
   }, [contextMenu.tabId, tabs, onTabClose]);
 
   const handleTabClick = (tab: Tab) => {
+    // If clicking the split tab, don't change the left pane
+    if (tab.id === splitTabId) return;
     onTabClick(tab.id);
   };
 
@@ -260,9 +262,10 @@ function TabBar({ tabs, activeTabId, splitTabId, splitRatio = 0.5, onTabClick, o
 
     // Move this tab to split (right pane)
     onTabSplit?.(tabId);
+    onDragStateChange?.(null);
     setDraggedTabId(null);
     setDragOverTabId(null);
-  }, [tabs, splitTabId, onTabSplit]);
+  }, [tabs, splitTabId, onTabSplit, onDragStateChange]);
 
   // Handle drop on left tab-bar group: move split tab back to close split
   const handleGroupDropLeft = useCallback((e: React.DragEvent) => {
@@ -273,10 +276,11 @@ function TabBar({ tabs, activeTabId, splitTabId, splitRatio = 0.5, onTabClick, o
     // Only close split when the split tab is dragged back to left
     if (tabId === splitTabId) {
       onCloseSplit?.();
+      onDragStateChange?.(null);
       setDraggedTabId(null);
       setDragOverTabId(null);
     }
-  }, [splitTabId, onCloseSplit]);
+  }, [splitTabId, onCloseSplit, onDragStateChange]);
 
   const handleGroupDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
