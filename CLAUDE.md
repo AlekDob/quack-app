@@ -142,6 +142,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - TerminalStore sync persist quota: `documentation/gotchas/gotcha-terminal-store-sync-persist-quota.md`
 - Mutex poisoning cascade: `documentation/bugs/fix-mutex-poisoning-cascade-abort.md`
 - Delayed agent message stale closure: `documentation/bugs/bug-delayed-agent-message-stale-closure.md`
+- Custom color picker WebKit: `documentation/bugs/fix-custom-color-picker-webkit.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

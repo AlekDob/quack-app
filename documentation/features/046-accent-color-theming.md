@@ -16,10 +16,11 @@ tags: [046-accent-color-theming, appearance, theming, accent-color, css-variable
 |------|------|-----------------|
 | Util | src/utils/accentColor.ts | `applyAccentColor(hex)`, `ACCENT_PRESETS`, `DEFAULT_ACCENT`, `AccentPreset` (type) -- hex-to-CSS-variable theming engine |
 | Store | src/stores/settingsStore.ts | `appearance.accentColor` field, `setAccentColor()`, `resetAccentColor()` -- persisted accent color state (v8 migration) |
-| Component | src/components/settings/categories/AppearanceSettings.tsx | Accent color UI -- preset grid + custom color picker + reset button |
+| Component | src/components/settings/categories/AppearanceSettings.tsx | Accent color UI -- preset grid + custom color picker popover + reset button |
+| Component | src/components/settings/controls/CustomColorPicker.tsx | `CustomColorPicker` -- HSL-based color picker with S/L 2D area, hue bar, hex input. Rendered as portal with `position: fixed` (Brain: fix-custom-color-picker-webkit) |
 | Bootstrap | src/App.tsx | `useLayoutEffect` applying accent color before first paint |
 | Tokens | src/index.css | `:root` CSS variables -- source of truth for all accent-derived values |
-| Style | src/components/settings/UnifiedSettings.css | `.accent-color-grid`, `.accent-swatch-*`, `.accent-reset-btn` styles |
+| Style | src/components/settings/UnifiedSettings.css | `.accent-color-grid`, `.accent-swatch-*`, `.accent-reset-btn`, `.custom-color-picker`, `.ccp-*` styles |
 
 ### CSS Variables (source of truth in index.css :root)
 | Variable | Default | Purpose |
@@ -57,6 +58,9 @@ tags: [046-accent-color-theming, appearance, theming, accent-color, css-variable
 - `hexToRgb(hex: string) -> [r, g, b]` -- converts #rrggbb or #rgb to RGB tuple
 - `darken(rgb, amount) -> [r, g, b]` -- darkens by percentage (0-1)
 - `lighten(rgb, amount) -> [r, g, b]` -- lightens by mixing with white
+- `CustomColorPicker({ value, onChange, onClose, anchorPos }) -> JSX` -- portal-based floating HSL picker
+- `hexToHsl(hex) -> [h, s, l]` -- converts hex to HSL (in CustomColorPicker)
+- `hslToHex(h, s, l) -> string` -- converts HSL to hex (in CustomColorPicker)
 
 ### State
 - `appearance.accentColor`: string -- hex color (global, persisted in `settings-storage` v8)
@@ -80,5 +84,6 @@ tags: [046-accent-color-theming, appearance, theming, accent-color, css-variable
 
 ### UX Notes
 - Color change is instant (no restart required)
-- Custom color picker uses native `<input type="color">`
+- Custom color picker opens as floating popover above the "Custom" swatch (portal + `position: fixed`). Built from scratch because `<input type="color">` does not work in WKWebView (Brain: fix-custom-color-picker-webkit)
+- Picker features: 2D saturation/lightness area, hue slider, hex input, live preview. Closes on outside click. Auto-flips below if no space above
 - Reset button only appears when color differs from default

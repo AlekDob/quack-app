@@ -4,6 +4,7 @@ project: quack-app
 stack: Tauri (Rust + React)
 created: 2026-04-06
 last_verified: 2026-04-07
+last_updated: 2026-04-07
 tags: [split-view, tabs, drag-drop, layout, editor, sidebar-drag]
 ---
 
@@ -15,7 +16,7 @@ tags: [split-view, tabs, drag-drop, layout, editor, sidebar-drag]
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Component | `src/components/SplitView/SplitDropZone.tsx` | `SplitDropZone`, `SidebarDropData` -- drag overlay with left/right zones, accepts tab and sidebar MIME types |
-| Component | `src/components/SplitView/SplitCodeEditor.tsx` | `SplitCodeEditor` -- standalone code editor for split pane (independent of editorStore) |
+| Component | `src/components/SplitView/SplitCodeEditor.tsx` | `SplitCodeEditor` -- standalone code editor for split pane with full header (Save, IDE dropdown), dirty tracking, independent of editorStore |
 | Component | `src/components/SplitView/SplitPaneDivider.tsx` | `SplitPaneDivider` -- resizable divider with mouse drag |
 | Config | `src/components/SplitView/index.ts` | Barrel export for `SplitPaneDivider`, `SplitDropZone`, `SplitCodeEditor` |
 | Config | `src/components/SplitView/SplitView.css` | Split pane layout, divider, drop zone, pane header styles |
@@ -49,7 +50,7 @@ tags: [split-view, tabs, drag-drop, layout, editor, sidebar-drag]
 - `handleSplitDropLeft(tabId: string) → void` -- moves dragged tab to left pane, current to right
 - `handleSplitDropRight(tabId: string) → void` -- places dragged tab in right pane
 - `handleCloseSplit() → void` -- resets splitTabId to null
-- `SplitCodeEditor({ filePath: string }) → JSX` -- standalone editor that reads file via Tauri invoke, bypasses editorStore singleton
+- `SplitCodeEditor({ filePath: string }) → JSX` -- standalone editor with full header (breadcrumb, dirty dot, mode badge, Save button, IDE dropdown), reads file via Tauri invoke, bypasses editorStore singleton. Uses same CSS classes as EditorHeader (.editor-header, .editor-btn-save, etc.)
 - `getLanguageFromPath(path: string) → string` -- maps file extension to CodeMirror language name
 
 ### State

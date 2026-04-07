@@ -38,6 +38,7 @@ tags: [settings, unified-settings, preferences, configuration]
 | Component | src/components/settings/controls/IOSSwitch.tsx | `IOSSwitch` -- iOS-style toggle switch control |
 | Component | src/components/settings/controls/IOSInput.tsx | `IOSInput` -- styled text input control |
 | Component | src/components/settings/controls/SectionHeader.tsx | `SectionHeader` -- title + description section divider |
+| Component | src/components/settings/controls/CustomColorPicker.tsx | `CustomColorPicker` -- HSL color picker popover (portal, position:fixed) for Appearance accent color |
 | Component | src/components/settings/controls/ShortcutInput.tsx | `ShortcutInput` -- key recording input with conflict display |
 | Store/State | src/stores/settingsStore.ts | `useSettingsStore` -- Zustand store with claude, terminal, general, agentModePresets, typography groups |
 | Store/State | src/stores/ideStore.ts | `useIDEStore` -- IDE selection, auto-launch, sync focus, file open target |
@@ -62,6 +63,8 @@ tags: [settings, unified-settings, preferences, configuration]
 | Style | src/components/settings/categories/TypographySettings.css | Preset cards, preview block, font selector styles |
 | Style | src/components/settings/categories/KeyboardShortcutsSettings.css | Shortcut input, footer, help text styles |
 | Style | src/components/settings/controls/ShortcutInput.css | Key recording animation and conflict indicator styles |
+
+**Note:** `CustomColorPicker` styles (`.custom-color-picker`, `.ccp-*`) live in `UnifiedSettings.css`, not a separate file.
 
 ### Data Flow
 - [User clicks gear icon] -> [UnifiedSettings overlay renders] -> [SettingsSidebar emits category] -> [renderCategory() switches component]

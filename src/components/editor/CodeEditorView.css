@@ -38,12 +38,16 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  overflow: hidden;
+  flex: 1;
 }
 
 .editor-header-right {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
 /* Breadcrumb */
@@ -55,6 +59,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+  flex-shrink: 1;
 }
 
 .editor-breadcrumb-segment:last-child {
@@ -91,6 +97,8 @@
   color: #808080;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .editor-mode-badge.diff {
@@ -153,7 +161,6 @@
 
 /* Outline toggle */
 .editor-btn-outline {
-  font-size: 13px;
   padding: 4px 6px;
   line-height: 1;
 }
@@ -236,6 +243,8 @@
   padding: 4px 10px !important;
   cursor: pointer !important;
   font-size: 12px !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
 }
 .code-editor-view .cm-panel.cm-search button:hover {
   background: #3a3a3a !important;

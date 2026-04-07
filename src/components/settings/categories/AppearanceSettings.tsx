@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import SectionHeader from '../controls/SectionHeader';
+import CustomColorPicker from '../controls/CustomColorPicker';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { ACCENT_PRESETS, DEFAULT_ACCENT } from '../../../utils/accentColor';
 
@@ -139,10 +140,12 @@ const BACKGROUND_GROUPS: BackgroundGroup[] = [
 export default function AppearanceSettings() {
   const [currentBackground, setCurrentBackground] = useState<string>('transparent');
   const [loading, setLoading] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickerPos, setPickerPos] = useState({ x: 0, y: 0 });
+  const customBtnRef = useRef<HTMLButtonElement>(null);
   const accentColor = useSettingsStore((s) => s.appearance.accentColor);
   const setAccentColor = useSettingsStore((s) => s.setAccentColor);
   const resetAccentColor = useSettingsStore((s) => s.resetAccentColor);
-  const colorInputRef = useRef<HTMLInputElement>(null);
 
   // Load current background on mount
   useEffect(() => {
@@ -236,10 +239,18 @@ export default function AppearanceSettings() {
               <span className="accent-swatch-label">{preset.label}</span>
             </button>
           ))}
+          {/* Brain: fix-custom-color-picker-webkit — custom picker, WKWebView no <input type="color"> */}
           <button
+            ref={customBtnRef}
             type="button"
             className={`accent-color-swatch ${isCustomColor ? 'active' : ''}`}
-            onClick={() => colorInputRef.current?.click()}
+            onClick={() => {
+              if (!showPicker && customBtnRef.current) {
+                const rect = customBtnRef.current.getBoundingClientRect();
+                setPickerPos({ x: rect.left + rect.width / 2, y: rect.top });
+              }
+              setShowPicker(!showPicker);
+            }}
             title="Custom color"
           >
             <div
@@ -255,13 +266,6 @@ export default function AppearanceSettings() {
             </div>
             {isCustomColor && <CheckIcon />}
             <span className="accent-swatch-label">Custom</span>
-            <input
-              ref={colorInputRef}
-              type="color"
-              value={accentColor}
-              onChange={(e) => setAccentColor(e.target.value)}
-              className="accent-color-input-hidden"
-            />
           </button>
         </div>
         {accentColor !== DEFAULT_ACCENT && (
@@ -272,6 +276,14 @@ export default function AppearanceSettings() {
           >
             Reset to default
           </button>
+        )}
+        {showPicker && (
+          <CustomColorPicker
+            value={accentColor}
+            onChange={setAccentColor}
+            onClose={() => setShowPicker(false)}
+            anchorPos={pickerPos}
+          />
         )}
       </div>
 

@@ -5,9 +5,11 @@
  * Reads file independently via Tauri invoke — does NOT use the singleton editorStore.
  * This prevents the two panes from fighting over the same store state.
  */
-import { memo, useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { memo, useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import CodeEditorSkeleton from '../skeletons/CodeEditorSkeleton';
+import EditorIDEDropdown from '../editor/EditorIDEDropdown';
+import '../editor/CodeEditorView.css';
 
 const CodeEditorEngine = lazy(() => import('../editor/CodeEditorEngine'));
 
@@ -18,14 +20,18 @@ interface SplitCodeEditorProps {
 function SplitCodeEditor({ filePath }: SplitCodeEditorProps) {
   const [content, setContent] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isDirty, setIsDirty] = useState(false);
+  const savedContentRef = useRef('');
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
+    setIsDirty(false);
     invoke<string>('read_file_content', { path: filePath })
       .then((text) => {
         if (!cancelled) {
           setContent(text);
+          savedContentRef.current = text;
           setIsLoading(false);
         }
       })
@@ -37,25 +43,49 @@ function SplitCodeEditor({ filePath }: SplitCodeEditorProps) {
 
   const handleChange = useCallback((value: string) => {
     setContent(value);
+    setIsDirty(value !== savedContentRef.current);
   }, []);
+
+  const handleSave = useCallback(async () => {
+    try {
+      await invoke('write_file_content', {
+        path: filePath,
+        content,
+      });
+      savedContentRef.current = content;
+      setIsDirty(false);
+    } catch (error) {
+      console.error('[SplitCodeEditor] Save failed:', error);
+    }
+  }, [filePath, content]);
 
   if (isLoading) {
     return <CodeEditorSkeleton />;
   }
 
+  const breadcrumb = filePath.split('/').slice(-3).join(' / ');
+
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{
-        padding: '4px 12px',
-        fontSize: 11,
-        color: 'rgba(255,255,255,0.45)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        flexShrink: 0,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
-      }}>
-        {filePath.split('/').slice(-3).join(' / ')}
+    <div className="code-editor-view">
+      <div className="editor-header">
+        <div className="editor-header-left">
+          <div className="editor-breadcrumb">
+            {breadcrumb}
+          </div>
+          {isDirty && <span className="editor-dirty-dot" title="Non salvato" />}
+          <span className="editor-mode-badge">Modifica</span>
+        </div>
+        <div className="editor-header-right">
+          <button
+            type="button"
+            className="editor-btn editor-btn-save"
+            onClick={handleSave}
+            disabled={!isDirty}
+          >
+            Salva
+          </button>
+          <EditorIDEDropdown filePath={filePath} />
+        </div>
       </div>
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <Suspense fallback={<CodeEditorSkeleton />}>
