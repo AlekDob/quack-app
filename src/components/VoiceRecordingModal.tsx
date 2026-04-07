@@ -41,9 +41,8 @@ export default function VoiceRecordingModal({
       ctx.scale(dpr, dpr);
     };
 
-    // Duck-inspired color palette
-    const duckYellow = { r: 255, g: 193, b: 7 };
-    const duckOrange = { r: 255, g: 152, b: 0 };
+    // Accent color palette (matches --accent: #f28c52)
+    const accentColor = { r: 242, g: 140, b: 82 };
 
     let time = 0;
     const waves: Array<{
@@ -54,24 +53,24 @@ export default function VoiceRecordingModal({
       opacity: number;
     }> = [
       {
-        amplitude: 20,
+        amplitude: 16,
         frequency: 0.02,
         phase: 0,
-        color: duckYellow,
+        color: accentColor,
         opacity: 0.15,
       },
       {
-        amplitude: 15,
+        amplitude: 12,
         frequency: 0.025,
         phase: Math.PI / 3,
-        color: duckYellow,
+        color: accentColor,
         opacity: 0.2,
       },
       {
-        amplitude: 25,
+        amplitude: 20,
         frequency: 0.015,
         phase: Math.PI / 2,
-        color: duckOrange,
+        color: accentColor,
         opacity: 0.1,
       },
     ];

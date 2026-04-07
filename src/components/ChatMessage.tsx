@@ -881,7 +881,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
         {message.toolCalls && message.toolCalls.length > 0 && (
           <div className="chat-message-tools-minimal">
             {message.toolCalls.map((tool) => (
-              <ToolCallMinimal key={tool.id} tool={tool} onOpenFile={onOpenFile} />
+              <ToolCallMinimal key={tool.id} tool={tool} onOpenFile={onFilePathClick || onOpenFile} />
             ))}
           </div>
         )}

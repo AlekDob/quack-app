@@ -34,19 +34,22 @@ tags: [accordion, side-panel, ui, layout, navigation]
 
 ### Data Flow
 - [App.tsx] --> props --> [SidePanelAccordion] --> renders --> [AccordionSection x12]
-- [AccordionSection] --> conditional render (isExpanded) --> [ContentPanel child]
+- [AccordionSection] --> CSS class toggle (accordion-content--open/closed) --> [ContentPanel child]
 - [useRules/useSlashCommands/useMCPServers] --> badge counts --> [AccordionSection badge prop]
 - [Parent] --> forceExpandSection prop --> [SidePanelAccordion] --> setFocusedSection --> auto-scroll top
 
 ### Key Functions
-- `AccordionSection(props: AccordionSectionProps) --> JSX` -- collapsible section with chevron, icon, badge, category color CSS var
+- `AccordionSection(props: AccordionSectionProps) --> JSX` -- collapsible section with chevron, icon, badge, category color CSS var; supports hover-to-open via onHoverEnter/onHoverLeave
 - `toggleSection(sectionId: string) --> void` -- focus/unfocus pattern (click focused = collapse, click other = focus it)
+- `handleSectionHoverEnter(sectionId: string) --> void` -- debounced (500ms) hover-to-open: sets focusedSection on mouseenter (compact mode only)
+- `handleSectionHoverLeave() --> void` -- debounced (300ms) hover-to-close: clears focusedSection on mouseleave (compact mode only)
 - `getOrder(sectionId: string) --> number` -- fixed DOM order via sectionIds array index
 
 ### State
 - `focusedSection`: string | null -- which section is expanded (single-focus pattern) (component)
 - `isPeekExpanded`: boolean -- whether peek overlay is shown in compact mode (component)
 - `peekTimeoutRef`: RefObject -- debounce timer for peek enter/leave (component)
+- `hoverTimeoutRef`: RefObject -- debounce timer for section hover-to-open/close (component)
 - `containerRef`: RefObject<HTMLDivElement> -- scroll-to-top on focus change (component)
 - `rules`: RulesResponse -- fetched via useRules for badge count (component)
 - `commands`: SlashCommandsResponse -- fetched via useSlashCommands for badge count (component)
@@ -62,6 +65,8 @@ tags: [accordion, side-panel, ui, layout, navigation]
 | Overlay | `position: fixed; right: 0; width: 420px; z-index: 9999;` |
 | Animation | CSS `transition: transform 0.3s` with `translateX(calc(100% - 44px))` → `translateX(0)` |
 | Shadow | `-12px 0 40px rgba(0,0,0,0.6)` — bi-directional transition |
+| Hover-to-open | mouseEnter on section → 500ms debounce → expand section (compact mode only) |
+| Hover-to-close | mouseLeave from section → 300ms debounce → collapse section (compact mode only) |
 | Auto-collapse tabs | `isCollapsed && !userCollapsed` → fully hidden (`display: none`), NOT compact strip |
 
 - `isCompact`: derived — `userCollapsed && !!activeAgentId`
@@ -95,11 +100,12 @@ tags: [accordion, side-panel, ui, layout, navigation]
 | 11 | sessions | Sessions | SessionsPanel | -- |
 
 ### CSS Architecture
-- **Glassmorphism base**: `rgba(17,18,22,0.88)` + `backdrop-filter: blur(var(--blur-heavy)) saturate(150%)` (opacity raised from 0.7 to 0.88, saturate from 120% to 150% for better readability)
+- **Glassmorphism base**: `rgba(15,17,21,0.96)` + `backdrop-filter: blur(var(--blur-heavy)) saturate(150%)` (near-opaque for readability)
+- **Content animation**: `.accordion-content--open` (max-height 80vh, opacity 1, 0.4s ease-out) / `.accordion-content--closed` (max-height 0, opacity 0, 0.25s ease-in) — smooth expand/collapse without conditional render
 - **Focus mode**: `.accordion-section.focused` gets `flex: 1` + content scrolls up to `80vh - 50px`
 - **Category color**: CSS custom property `--category-color` set per section, used by badge and icon styles
 - **Content compact mode**: `!important` overrides for all child panels (12px base font, 6px padding cards, 14px icons)
 - **Changes badge**: always-visible glow animation (`changes-badge-pulse` keyframe)
 - **Compact strip**: `.compact:not(.peek-expanded)` — icons centered in 44px, chevron/title hidden, badge as 6px dot
-- **Peek overlay**: `.compact .accordion-container` fixed at right, `translateX` transition for smooth slide
+- **Peek overlay**: `.compact .accordion-container` fixed at right, `translateX` transition for smooth slide, `rgba(15,17,21,0.96)` background
 - **Hidden**: `.collapsed` — `display: none` (no agent or auto-collapsed by tab)

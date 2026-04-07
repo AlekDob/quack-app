@@ -122,11 +122,13 @@ function ToolCallMinimal({ tool, onOpenFile, onUndoEdit }: ToolCallMinimalProps)
   const hasDiff = tool.diff && tool.diff.lines.length > 0;
   const hasContent = hasResult || hasDiff;
 
+  // Extract file path from any tool that references a file
   const filePath = (() => {
+    if (!tool.input) return null;
+    const inp = tool.input as Record<string, unknown>;
+    if (typeof inp.file_path === 'string') return inp.file_path;
     const toolName = tool.name.toLowerCase();
-    if ((toolName === 'edit' || toolName === 'write') && tool.input) {
-      return (tool.input as { file_path?: string }).file_path || null;
-    }
+    if ((toolName === 'read' || toolName === 'glob') && typeof inp.path === 'string') return inp.path;
     return null;
   })();
 
@@ -188,6 +190,53 @@ function ToolCallMinimal({ tool, onOpenFile, onUndoEdit }: ToolCallMinimalProps)
 
       {isExpanded && hasContent && (
         <div className="tool-minimal-content">
+          {/* File path bar with Open button + drag-to-split */}
+          {filePath && (
+            <div
+              className="tool-minimal-file-path"
+              draggable
+              onDragStart={(e) => {
+                const fileName = filePath.split('/').pop() || filePath;
+                const fileData = JSON.stringify({ type: 'file', name: fileName, path: filePath });
+                e.dataTransfer.effectAllowed = 'copy';
+                e.dataTransfer.setData('application/quack-file', fileData);
+                e.dataTransfer.setData('text/plain', filePath);
+              }}
+            >
+              <svg className="tool-minimal-file-path-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span
+                className="tool-minimal-file-path-text"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onOpenFile) onOpenFile(filePath);
+                }}
+                style={{ cursor: onOpenFile ? 'pointer' : 'default' }}
+                title={onOpenFile ? 'Apri in Quack' : undefined}
+              >
+                {filePath}
+              </span>
+              {onOpenFile && (
+                <button
+                  className="tool-minimal-open-ide-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenFile(filePath);
+                  }}
+                  title="Apri file"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                  Open
+                </button>
+              )}
+            </div>
+          )}
           {hasDiff && tool.diff ? (
             <>
               <DiffViewer diff={tool.diff} />
@@ -208,17 +257,6 @@ function ToolCallMinimal({ tool, onOpenFile, onUndoEdit }: ToolCallMinimalProps)
               <code>{tool.result}</code>
             </pre>
           ) : null}
-          {filePath && onOpenFile && (
-            <button
-              className="tool-minimal-open-file"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenFile(filePath);
-              }}
-            >
-              Open {filePath.split('/').pop()}
-            </button>
-          )}
         </div>
       )}
     </div>

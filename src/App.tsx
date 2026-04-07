@@ -885,11 +885,8 @@ function AppContent() {
   const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
 
-  // Close split view when switching agent/terminal
-  useEffect(() => {
-    setSplitTabId(null);
-    setIsDraggingTab(false);
-  }, [activeId]);
+  // Save/restore split view per agent (persisted in ref, no re-renders)
+  const splitByAgentRef = useRef<Map<string, string>>(new Map());
 
   // Clear editor selection when navigating away from file tab
   useEffect(() => {
@@ -2130,9 +2127,15 @@ function AppContent() {
   useEffect(() => {
     const previousId = previousActiveIdRef.current;
 
-    // Save current tabs for previous agent (if any)
+    // Save current tabs + split state for previous agent (if any)
     if (previousId && previousId !== activeId) {
-      // console.log(`🦆 [Tab Management] Saving tabs for agent: ${previousId}`, tabs); // Performance: Disabled logging
+      // Save split state
+      if (splitTabId) {
+        splitByAgentRef.current.set(previousId, splitTabId);
+      } else {
+        splitByAgentRef.current.delete(previousId);
+      }
+
       setTabsByTerminal((prev) => {
         const updated = new Map(prev);
         // Filter out chat tab (always present) and special tabs - save only file tabs
@@ -2169,7 +2172,7 @@ function AppContent() {
         const merged = [
           { id: 'chat', label: 'Chat', type: 'chat' as const, closable: false },
           ...restoredTabs,
-          ...specialTabs
+          ...specialTabs,
         ];
         // Deduplicate by id (keep first occurrence)
         const seen = new Set<string>();
@@ -2192,6 +2195,12 @@ function AppContent() {
         // Users expect to see the agent chat first, not the last visited tab
         setActiveTabId('chat');
       }
+
+      // Restore split state for this agent
+      const savedSplit = splitByAgentRef.current.get(activeId);
+      setSplitTabId(savedSplit ?? null);
+      setIsDraggingTab(false);
+      setIsDraggingSidebar(false);
     }
 
     // Update previous activeId ref

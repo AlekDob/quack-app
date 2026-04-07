@@ -307,28 +307,40 @@
 /* File path with Open in IDE button */
 .tool-minimal-file-path {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   padding: 6px 10px;
   margin-bottom: 12px;
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-sm);
+  cursor: grab;
+}
+
+.tool-minimal-file-path:active {
+  cursor: grabbing;
+}
+
+.tool-minimal-file-path.dragging {
+  opacity: 0.5;
 }
 
 .tool-minimal-file-path-icon {
   color: rgba(255, 255, 255, 0.35);
   flex-shrink: 0;
+  margin-top: 2px;
 }
+
+
 
 .tool-minimal-file-path-text {
   flex: 1;
+  min-width: 0;
   font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.6);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-all;
+  line-height: 1.4;
 }
 
 .tool-minimal-open-ide-btn {

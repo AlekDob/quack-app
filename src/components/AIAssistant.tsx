@@ -58,6 +58,19 @@ export default function AIAssistant({
     }, 250)
   }
 
+  const handleBack = () => {
+    setMode('selection')
+    setHasSubmitted(false)
+    setLoading(false)
+    setError(null)
+    setSuggestion(null)
+    setQuestions([])
+    setAnswers(new Map())
+    setImprovement(null)
+    setCurrentQuestionIndex(0)
+    setPromptEngineerStep('input')
+  }
+
   const handleModeSelect = (selectedMode: 'terminal-helper' | 'prompt-engineer') => {
     setMode(selectedMode)
     if (selectedMode === 'terminal-helper' && inputValue.trim().length > 0) {
@@ -237,6 +250,17 @@ export default function AIAssistant({
       <div className={`ai-assistant-modal ${isImprovementView ? 'ai-modal-large' : 'ai-modal-compact'}`} onClick={(e) => e.stopPropagation()}>
         <div className="ai-assistant-header">
           <div className="ai-assistant-title">
+            {mode !== 'selection' && !initialMode && (
+              <button
+                className="ai-back-btn"
+                onClick={handleBack}
+                aria-label="Back"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 12L6 8l4-4" />
+                </svg>
+              </button>
+            )}
             <div className="ai-icon-minimal">
               <div className="ai-icon-pulse"></div>
             </div>
@@ -310,15 +334,6 @@ export default function AIAssistant({
                       placeholder="e.g., list all files, find large files, git status..."
                       autoFocus
                     />
-                  </div>
-                  <div className="ai-input-button-wrapper">
-                    <button
-                      className="ai-btn ai-btn-primary"
-                      onClick={handleSubmit}
-                      disabled={inputValue.trim().length === 0}
-                    >
-                      Ask AI
-                    </button>
                   </div>
                 </div>
               ) : (
@@ -399,15 +414,6 @@ export default function AIAssistant({
                       rows={4}
                       autoFocus
                     />
-                  </div>
-                  <div className="ai-input-button-wrapper">
-                    <button
-                      className="ai-btn ai-btn-primary"
-                      onClick={handleSubmit}
-                      disabled={inputValue.trim().length === 0}
-                    >
-                      Improve Prompt
-                    </button>
                   </div>
                 </div>
               )}
@@ -598,6 +604,24 @@ export default function AIAssistant({
             <button className="ai-btn ai-btn-secondary" onClick={handleClose}>
               Cancel <span className="ai-kbd">Esc</span>
             </button>
+            {mode === 'prompt-engineer' && promptEngineerStep === 'input' && (
+              <button
+                className="ai-btn ai-btn-primary"
+                onClick={handleSubmit}
+                disabled={inputValue.trim().length === 0}
+              >
+                Improve Prompt
+              </button>
+            )}
+            {mode === 'terminal-helper' && (
+              <button
+                className="ai-btn ai-btn-primary"
+                onClick={handleSubmit}
+                disabled={inputValue.trim().length === 0}
+              >
+                Ask AI
+              </button>
+            )}
           </div>
         )}
       </div>

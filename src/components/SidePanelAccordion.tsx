@@ -53,10 +53,12 @@ interface AccordionSectionProps {
   order?: number;
   category?: string;
   onToggle: () => void;
+  onHoverEnter?: () => void;
+  onHoverLeave?: () => void;
   children: ReactNode;
 }
 
-function AccordionSection({ id, title, icon, badge, badgeLabel, isExpanded, isFocused = false, order = 0, category, onToggle, children }: AccordionSectionProps) {
+function AccordionSection({ id, title, icon, badge, badgeLabel, isExpanded, isFocused = false, order = 0, category, onToggle, onHoverEnter, onHoverLeave, children }: AccordionSectionProps) {
   const color = CATEGORY_COLORS[category || id] || CATEGORY_COLORS.default;
 
   return (
@@ -65,6 +67,8 @@ function AccordionSection({ id, title, icon, badge, badgeLabel, isExpanded, isFo
       data-section={id}
       data-category={category || id}
       style={{ order, '--category-color': color } as React.CSSProperties}
+      onMouseEnter={onHoverEnter}
+      onMouseLeave={onHoverLeave}
     >
       <button
         type="button"
@@ -94,11 +98,12 @@ function AccordionSection({ id, title, icon, badge, badgeLabel, isExpanded, isFo
           <span className="accordion-badge">{badge}</span>
         ) : null}
       </button>
-      {isExpanded && (
-        <div className="accordion-content" id={`accordion-content-${id}`}>
-          {children}
-        </div>
-      )}
+      <div
+        className={`accordion-content ${isExpanded ? 'accordion-content--open' : 'accordion-content--closed'}`}
+        id={`accordion-content-${id}`}
+      >
+        {children}
+      </div>
     </div>
   );
 }
@@ -419,6 +424,9 @@ export default function SidePanelAccordion({
   const [isPeekExpanded, setIsPeekExpanded] = useState(false);
   const peekTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Hover-to-open debounce for accordion sections
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Load rules for badge counter
   const { rules } = useRules(rootPath || '');
   const rulesCount = rules.project.length + rules.global.length;
@@ -507,10 +515,29 @@ export default function SidePanelAccordion({
     peekTimeoutRef.current = setTimeout(() => setIsPeekExpanded(false), 300);
   };
 
-  // Cleanup peek timeout on unmount
+  // Hover-to-open: only in compact mode (icon strip + peek overlay)
+  const handleSectionHoverEnter = (sectionId: string) => {
+    if (!isCompact) return;
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setFocusedSection(sectionId);
+    }, 500);
+  };
+
+  // Hover-to-close: only in compact mode
+  const handleSectionHoverLeave = () => {
+    if (!isCompact) return;
+    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => {
+      setFocusedSection(null);
+    }, 300);
+  };
+
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (peekTimeoutRef.current) clearTimeout(peekTimeoutRef.current);
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     };
   }, []);
 
@@ -572,6 +599,8 @@ export default function SidePanelAccordion({
           order={getOrder("changes")}
           category="changes"
           onToggle={() => toggleSection("changes")}
+          onHoverEnter={() => handleSectionHoverEnter("changes")}
+          onHoverLeave={handleSectionHoverLeave}
         >
           <ChangesPanel
             rootPath={rootPath}
@@ -598,6 +627,8 @@ export default function SidePanelAccordion({
           isFocused={focusedSection === "context"}
           order={getOrder("context")}
           onToggle={() => toggleSection("context")}
+          onHoverEnter={() => handleSectionHoverEnter("context")}
+          onHoverLeave={handleSectionHoverLeave}
         >
           <FileExplorer
             rootPath={rootPath}
@@ -623,6 +654,8 @@ export default function SidePanelAccordion({
           order={getOrder("features")}
           category="features"
           onToggle={() => toggleSection("features")}
+          onHoverEnter={() => handleSectionHoverEnter("features")}
+          onHoverLeave={handleSectionHoverLeave}
         >
           <FeaturesPanel projectPath={rootPath} onOpenInEditor={onOpenInEditor} />
         </AccordionSection>
@@ -636,6 +669,8 @@ export default function SidePanelAccordion({
           isFocused={focusedSection === "agent-context"}
           order={getOrder("agent-context")}
           onToggle={() => toggleSection("agent-context")}
+          onHoverEnter={() => handleSectionHoverEnter("agent-context")}
+          onHoverLeave={handleSectionHoverLeave}
         >
           <AgentContextPanel
             tauriAvailable={tauriAvailable}
@@ -668,6 +703,8 @@ export default function SidePanelAccordion({
           order={getOrder("project-context")}
           category="project-context"
           onToggle={() => toggleSection("project-context")}
+          onHoverEnter={() => handleSectionHoverEnter("project-context")}
+          onHoverLeave={handleSectionHoverLeave}
         >
           <ProjectContextPanel rootPath={rootPath || ''} />
         </AccordionSection>
@@ -683,6 +720,8 @@ export default function SidePanelAccordion({
           order={getOrder("rules")}
           category="rules"
           onToggle={() => toggleSection("rules")}
+          onHoverEnter={() => handleSectionHoverEnter("rules")}
+          onHoverLeave={handleSectionHoverLeave}
         >
           <RulesPanel
             basePath={rootPath || ''}
@@ -701,6 +740,8 @@ export default function SidePanelAccordion({
           order={getOrder("agents")}
           category="droids"
           onToggle={() => toggleSection("agents")}
+          onHoverEnter={() => handleSectionHoverEnter("agents")}
+          onHoverLeave={handleSectionHoverLeave}
         >
           <AgentsPanel
             agents={agents}
@@ -728,6 +769,8 @@ export default function SidePanelAccordion({
           order={getOrder("skills")}
           category="skills"
           onToggle={() => toggleSection("skills")}
+          onHoverEnter={() => handleSectionHoverEnter("skills")}
+          onHoverLeave={handleSectionHoverLeave}
         >
           <SkillsPanel
             skills={skills}
@@ -768,6 +811,8 @@ export default function SidePanelAccordion({
           order={getOrder("mcp")}
           category="mcp"
           onToggle={() => toggleSection("mcp")}
+          onHoverEnter={() => handleSectionHoverEnter("mcp")}
+          onHoverLeave={handleSectionHoverLeave}
         >
           <MCPPanel workingDir={workingDir} onOpenMcpConfig={onOpenMcpConfig} />
         </AccordionSection>
@@ -783,6 +828,8 @@ export default function SidePanelAccordion({
           order={getOrder("hooks")}
           category="hooks"
           onToggle={() => toggleSection("hooks")}
+          onHoverEnter={() => handleSectionHoverEnter("hooks")}
+          onHoverLeave={handleSectionHoverLeave}
         >
           <HooksPanel
             hooks={hooks}
@@ -806,6 +853,8 @@ export default function SidePanelAccordion({
           order={getOrder("sessions")}
           category="sessions"
           onToggle={() => toggleSection("sessions")}
+          onHoverEnter={() => handleSectionHoverEnter("sessions")}
+          onHoverLeave={handleSectionHoverLeave}
         >
           <SessionsPanel
             onSelectSession={(session) => onSelectSession?.(session)}

@@ -232,9 +232,20 @@ const ToolMinimalStream: React.FC<ToolMinimalStreamProps> = ({
 
       {isExpanded && hasExpandableContent && (
         <div className="tool-minimal-content">
-          {/* File path with Open in IDE button */}
+          {/* File path with Open button + drag-to-split */}
           {typeof input?.file_path === 'string' && (
-            <div className="tool-minimal-file-path">
+            <div
+              className="tool-minimal-file-path"
+              draggable
+              onDragStart={(e) => {
+                const filePath = input.file_path as string;
+                const fileName = filePath.split('/').pop() || filePath;
+                const fileData = JSON.stringify({ type: 'file', name: fileName, path: filePath });
+                e.dataTransfer.effectAllowed = 'copy';
+                e.dataTransfer.setData('application/quack-file', fileData);
+                e.dataTransfer.setData('text/plain', filePath);
+              }}
+            >
               <svg className="tool-minimal-file-path-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                 <polyline points="14 2 14 8 20 8" />
@@ -246,18 +257,18 @@ const ToolMinimalStream: React.FC<ToolMinimalStreamProps> = ({
                   if (onFilePathClick) onFilePathClick(input.file_path as string);
                 }}
                 style={{ cursor: onFilePathClick ? 'pointer' : 'default' }}
-                title={onFilePathClick ? "Open in Quack" : undefined}
+                title={onFilePathClick ? "Apri in Quack" : undefined}
               >
                 {input.file_path}
               </span>
-              {onOpenInIDE && (
+              {onFilePathClick && (
                 <button
                   className="tool-minimal-open-ide-btn"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onOpenInIDE(input.file_path as string);
+                    onFilePathClick(input.file_path as string);
                   }}
-                  title="Open in IDE"
+                  title="Apri file"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />

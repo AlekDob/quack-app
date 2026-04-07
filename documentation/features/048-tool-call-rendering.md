@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: React 18 + TypeScript strict + CSS custom properties
 created: 2026-04-06
-last_verified: 2026-04-06
-tags: [tool-call-rendering, chat, ui, badges, widgets]
+last_verified: 2026-04-07
+tags: [tool-call-rendering, chat, ui, badges, widgets, drag-drop, split-view]
 ---
 
 ## Tool Call Rendering
@@ -38,7 +38,7 @@ tags: [tool-call-rendering, chat, ui, badges, widgets]
 ```
 
 ### Key Functions
-- `ToolCallMinimal({ tool, onOpenFile, onUndoEdit }) --> JSX` -- renders a single tool as inline badge with expand/collapse
+- `ToolCallMinimal({ tool, onOpenFile, onUndoEdit }) --> JSX` -- renders a single tool as inline badge with expand/collapse, file-path bar with Open button + drag-to-split
 - `getToolColor(toolName) --> string` -- maps tool name to CSS color (MCP Brain rose, MCP IDE purple, Bash purple, Edit accent, Read cyan, Write green, etc.)
 - `ToolIcon({ name }) --> JSX` -- returns SVG icon for each tool type (30+ tool icons)
 - `SystemInitializedWidget({ sessionId, model, cwd, tools }) --> JSX` -- session init banner with available tools grid
@@ -69,6 +69,13 @@ tags: [tool-call-rendering, chat, ui, badges, widgets]
 - `--radius-sm` / `--radius-md` / `--radius-lg`: border radius tokens
 - `--bg-elevated` / `--bg-hover` / `--border-default` / `--text-tertiary`: theme tokens
 - Tool color map (hardcoded in `getToolColor`): Edit=accent, Read=#00D9FF, Write=#22c55e, Bash=#9B59B6, Grep/Glob=#6b7280, MCP Brain=#E84A7F, MCP IDE=#a855f7, Skill=#fbbf24, etc.
+
+### Behaviors
+- **File path wrapping**: `.tool-minimal-file-path-text` uses `word-break: break-all` so long paths wrap instead of being truncated with ellipsis
+- **Open button**: Both StreamMessage and ToolCallMinimal render an "Open" button inside the `.tool-minimal-file-path` bar. The button calls `onFilePathClick` (which is `handleFilePathClick` in App.tsx), respecting the `fileOpenTarget` setting: `internal` opens in Code Editor tab, `external` opens in preferred IDE
+- **Drag-to-split**: The `.tool-minimal-file-path` bar is `draggable` with `application/quack-file` MIME type (same format as FileExplorer). Users can drag file paths from tool results onto `SplitDropZone` to open in split view
+- **File path detection**: ToolCallMinimal extracts `filePath` from `input.file_path` (Edit/Write/Read) or `input.path` (Read/Glob), showing the file-path bar for all file-referencing tools
+- **ChatMessage wiring**: `ChatMessage` passes `onFilePathClick || onOpenFile` to ToolCallMinimal, preferring the fileOpenTarget-aware handler
 
 ### CSS Animations
 - `typing-bounce`: 3-dot bounce for running status

@@ -109,7 +109,7 @@ export default function SecondBrainSettings() {
                 <button
                   className="ios-button ios-button-secondary"
                   onClick={handleResetPath}
-                  style={{ fontSize: '11px', opacity: 0.8 }}
+
                 >
                   Reset
                 </button>
