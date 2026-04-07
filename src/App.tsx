@@ -3028,7 +3028,10 @@ function AppContent() {
       // Brain: 025-team-delegation-footer
       // leadSessionId-driven auto-done: only sessions with a lead get auto-completed
       try {
-        const finalMessages = chatSessions.get(messageKey) ?? [];
+        // Brain: bug-delayed-agent-message-stale-closure
+        // Use ref instead of closure variable — chatSessions captured by useCallback
+        // is stale by the time streaming completes, causing messageCount regression.
+        const finalMessages = chatSessionsRef.current.get(messageKey) ?? [];
         const completionUpdate: Record<string, unknown> = {
           claudeSessionId: response.session_id,
           messageCount: finalMessages.length,
