@@ -155,6 +155,15 @@ export default function ChatInput({
     attachmentsRef.current = attachments;
   }, [attachments]);
 
+  // Auto-focus textarea on mount (triggers when session changes because ChatView remounts via key)
+  useEffect(() => {
+    // Small delay to ensure DOM is fully ready after remount
+    const timer = setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Auto-resize textarea to fit content (2-line minimum, expands up to max-height)
   useEffect(() => {
     const el = textareaRef.current;
@@ -1897,7 +1906,7 @@ export default function ChatInput({
           // Selecting a teammate
           const teammate = filteredTeammates[selectedAgentIndex];
           if (teammate) {
-            selectTeammate(teammate.name);
+            selectTeammate(teammate.label);
           }
         } else if (selectedAgentIndex < filteredTeammates.length + filteredSkills.length) {
           // Selecting a skill

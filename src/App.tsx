@@ -10605,7 +10605,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     openTerminalWindow: handleCreateAgentTerminal,  // Cmd+T opens Terminal Window App
     newAgent: handleOpenNewTerminalModal,           // Cmd+N opens New Agent modal
     toggleSidePanel: useCallback(() => {
-      setSidePanelCollapsed(prev => !prev);
+      setSidePanelCollapsed((prev: boolean) => !prev);
     }, []),
     focusFileSearch: useCallback(() => {
       // Focus the File Explorer search input

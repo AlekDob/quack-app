@@ -38,7 +38,7 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 [Tauri Store (.quack-repo-order.dat)] --> [TerminalSidebar (load order/colors/favorites)]
 [TerminalSidebar] --> [DndContext (dnd-kit)] --> [SortableRepositoryGroup] --> [RepositoryGroup]
 [RepositoryGroup] --> [SortableAgent (dnd-kit)] --> [AgentPersonalityCard / AgentSessionItem]
-[AgentSessionItem click] --> [onSessionClick(sessionId)] --> [App (session activation)]
+[AgentSessionItem click] --> [onSessionClick(sessionId)] --> [App (session activation)] --> [ChatView remount (key change)] --> [ChatInput mount → auto-focus textarea]
 [useGroupStore] --> [Tauri invoke (list_groups/create_group/update_group/delete_group)]
 [SidebarViewToggle] --> [useUIStore.setSidebarView] --> [projects | taskhub conditional render]
 ```
@@ -84,6 +84,9 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 - `@tauri-apps/plugin-store`: persist project order/colors/favorites to `.quack-repo-order.dat`
 - `@tauri-apps/api/core` (invoke): Tauri commands for group CRUD (`list_groups`, `create_group`, `update_group`, `delete_group`, `sync_group_contexts`)
 - `@tauri-apps/plugin-shell` (open): open external links (Discord, changelog)
+
+### UX: Auto-Focus on Session Select
+When a session is clicked (or a new session is created), `ChatView` remounts because its React `key` includes `activeSessionId`. This triggers `ChatInput`'s mount `useEffect` which auto-focuses `textarea.chat-input-field` with a 100ms delay (ensures DOM readiness). This replaces a previous custom-event approach (`quack:focus-chat-input`) that failed due to the unmount/remount cycle.
 
 ### Cross-Feature: @ Mention Popup (→ 025-team-delegation-footer)
 The sidebar `terminals` (agents grouped by project) are the same data source used for the `@` mention popup's "Team" section. App.tsx filters `terminals` by matching `cwd` (excluding the active agent) and passes them as `projectTerminals` prop to `ChatView` → `ChatInput`. This means every agent visible in the sidebar under the same project is also citeable via `@` in the chat input. See `025-team-delegation-footer.md` for delegation flow details.
