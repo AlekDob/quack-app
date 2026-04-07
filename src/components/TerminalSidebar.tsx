@@ -1542,141 +1542,110 @@ export default function TerminalSidebar({
           <div
             style={{
               position: 'absolute',
-              top: groupContextMenu.position.y,
+              top: Math.min(groupContextMenu.position.y, window.innerHeight - 320),
               left: groupContextMenu.position.x,
               background: 'rgba(30, 30, 30, 0.95)',
               border: '1px solid rgba(255, 255, 255, 0.12)',
               borderRadius: '8px',
               padding: '4px',
               minWidth: '180px',
+              maxHeight: '300px',
+              display: 'flex',
+              flexDirection: 'column',
               backdropFilter: 'blur(12px)',
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Group name label */}
-            <div style={{
-              padding: '6px 10px',
-              fontSize: '10px',
-              color: 'rgba(255, 255, 255, 0.4)',
-              fontFamily: "'JetBrains Mono', monospace",
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-              marginBottom: '2px',
-            }}>
-              {groupContextMenu.groupName}
+            {/* === HEADER (fixed) === */}
+            <div style={{ flexShrink: 0 }}>
+              {/* Group name label */}
+              <div style={{
+                padding: '6px 10px',
+                fontSize: '10px',
+                color: 'rgba(255, 255, 255, 0.4)',
+                fontFamily: "'JetBrains Mono', monospace",
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
+                marginBottom: '2px',
+              }}>
+                {groupContextMenu.groupName}
+              </div>
+
+              {/* Rename group */}
+              <button
+                onClick={() => handleStartRenameGroup(groupContextMenu.groupId, groupContextMenu.groupName)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  width: '100%', padding: '7px 10px', background: 'none',
+                  border: 'none', cursor: 'pointer', borderRadius: '4px',
+                  color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px',
+                  textAlign: 'left',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                  stroke="rgba(255,255,255,0.4)" strokeWidth="2">
+                  <path d="M17 3a2.85 2.85 0 014 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                </svg>
+                Rename group
+              </button>
+
+              {/* Group color picker */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '7px 10px',
+              }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                  stroke="rgba(255,255,255,0.4)" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <circle cx="12" cy="12" r="4" fill="rgba(255,255,255,0.4)" />
+                </svg>
+                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                  {DEFAULT_PROJECT_COLORS.map((color) => {
+                    const grp = groups.find((g) => g.id === groupContextMenu.groupId);
+                    const isActive = grp?.color === color;
+                    return (
+                      <button
+                        key={color}
+                        onClick={async () => {
+                          await updateGroup(groupContextMenu.groupId, { color });
+                          setGroupContextMenu(null);
+                        }}
+                        style={{
+                          width: '16px', height: '16px', borderRadius: '50%',
+                          background: color, border: isActive
+                            ? '2px solid rgba(255,255,255,0.9)'
+                            : '1.5px solid rgba(255,255,255,0.15)',
+                          cursor: 'pointer', padding: 0,
+                          transition: 'transform 0.1s ease, border-color 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+                        title={color}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.06)', margin: '2px 0' }} />
             </div>
 
-            {/* Rename group */}
-            <button
-              onClick={() => handleStartRenameGroup(groupContextMenu.groupId, groupContextMenu.groupName)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                width: '100%', padding: '7px 10px', background: 'none',
-                border: 'none', cursor: 'pointer', borderRadius: '4px',
-                color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px',
-                textAlign: 'left',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                stroke="rgba(255,255,255,0.4)" strokeWidth="2">
-                <path d="M17 3a2.85 2.85 0 014 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
-              </svg>
-              Rename group
-            </button>
-
-            {/* Group color picker */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '7px 10px',
-            }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                stroke="rgba(255,255,255,0.4)" strokeWidth="2">
-                <circle cx="12" cy="12" r="10" />
-                <circle cx="12" cy="12" r="4" fill="rgba(255,255,255,0.4)" />
-              </svg>
-              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-                {DEFAULT_PROJECT_COLORS.map((color) => {
-                  const grp = groups.find((g) => g.id === groupContextMenu.groupId);
-                  const isActive = grp?.color === color;
+            {/* === SCROLLABLE PROJECT LIST === */}
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+              {/* Remove individual projects */}
+              {(() => {
+                const grp = groups.find((g) => g.id === groupContextMenu.groupId);
+                if (!grp) return null;
+                return grp.projects.map((p) => {
+                  const projectName = p.label || p.path.replace(/^[\\/]{2}\?[\\/]/, '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p.path;
                   return (
                     <button
-                      key={color}
-                      onClick={async () => {
-                        await updateGroup(groupContextMenu.groupId, { color });
-                        setGroupContextMenu(null);
-                      }}
-                      style={{
-                        width: '16px', height: '16px', borderRadius: '50%',
-                        background: color, border: isActive
-                          ? '2px solid rgba(255,255,255,0.9)'
-                          : '1.5px solid rgba(255,255,255,0.15)',
-                        cursor: 'pointer', padding: 0,
-                        transition: 'transform 0.1s ease, border-color 0.1s ease',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.2)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-                      title={color}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Separator */}
-            <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.06)', margin: '2px 0' }} />
-
-            {/* Remove individual projects */}
-            {(() => {
-              const grp = groups.find((g) => g.id === groupContextMenu.groupId);
-              if (!grp) return null;
-              return grp.projects.map((p) => {
-                const projectName = p.label || p.path.replace(/^[\\/]{2}\?[\\/]/, '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || p.path;
-                return (
-                  <button
-                    key={p.path}
-                    onClick={() => handleRemoveFromGroup(groupContextMenu.groupId, p.path)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: '8px',
-                      width: '100%', padding: '7px 10px', background: 'none',
-                      border: 'none', cursor: 'pointer', borderRadius: '4px',
-                      color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px',
-                      textAlign: 'left',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                      stroke="rgba(255,255,255,0.4)" strokeWidth="2">
-                      <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-                      <polyline points="16 17 21 12 16 7" />
-                      <line x1="21" y1="12" x2="9" y2="12" />
-                    </svg>
-                    Remove {projectName}
-                  </button>
-                );
-              });
-            })()}
-
-            {/* Add project to group — shows projects not already in this group */}
-            {(() => {
-              const grp = groups.find((g) => g.id === groupContextMenu.groupId);
-              if (!grp) return null;
-              const groupPaths = new Set(grp.projects.map((p) => p.path));
-              const available = orderedRepositoryGroups.filter(
-                ([, data]) => !groupPaths.has(data.repoPath),
-              );
-              if (available.length === 0) return null;
-              return (
-                <>
-                  <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.06)', margin: '2px 0' }} />
-                  {available.map(([name, data]) => (
-                    <button
-                      key={data.repoPath}
-                      onClick={() => handleAddToGroup(groupContextMenu.groupId, data.repoPath, name)}
+                      key={p.path}
+                      onClick={() => handleRemoveFromGroup(groupContextMenu.groupId, p.path)}
                       style={{
                         display: 'flex', alignItems: 'center', gap: '8px',
                         width: '100%', padding: '7px 10px', background: 'none',
@@ -1689,37 +1658,76 @@ export default function TerminalSidebar({
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
                         stroke="rgba(255,255,255,0.4)" strokeWidth="2">
-                        <line x1="12" y1="5" x2="12" y2="19" />
-                        <line x1="5" y1="12" x2="19" y2="12" />
+                        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+                        <polyline points="16 17 21 12 16 7" />
+                        <line x1="21" y1="12" x2="9" y2="12" />
                       </svg>
-                      Add {name}
+                      Remove {projectName}
                     </button>
-                  ))}
-                </>
-              );
-            })()}
+                  );
+                });
+              })()}
 
-            {/* Separator */}
-            <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.06)', margin: '2px 0' }} />
+              {/* Add project to group — shows projects not already in this group */}
+              {(() => {
+                const grp = groups.find((g) => g.id === groupContextMenu.groupId);
+                if (!grp) return null;
+                const groupPaths = new Set(grp.projects.map((p) => p.path));
+                const available = orderedRepositoryGroups.filter(
+                  ([, data]) => !groupPaths.has(data.repoPath),
+                );
+                if (available.length === 0) return null;
+                return (
+                  <>
+                    <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.06)', margin: '2px 0' }} />
+                    {available.map(([name, data]) => (
+                      <button
+                        key={data.repoPath}
+                        onClick={() => handleAddToGroup(groupContextMenu.groupId, data.repoPath, name)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '8px',
+                          width: '100%', padding: '7px 10px', background: 'none',
+                          border: 'none', cursor: 'pointer', borderRadius: '4px',
+                          color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px',
+                          textAlign: 'left',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                          stroke="rgba(255,255,255,0.4)" strokeWidth="2">
+                          <line x1="12" y1="5" x2="12" y2="19" />
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Add {name}
+                      </button>
+                    ))}
+                  </>
+                );
+              })()}
+            </div>
 
-            {/* Disband group */}
-            <button
-              onClick={() => handleDisbandGroup(groupContextMenu.groupId)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                width: '100%', padding: '7px 10px', background: 'none',
-                border: 'none', cursor: 'pointer', borderRadius: '4px',
-                color: '#E74C3C', fontSize: '12px', textAlign: 'left',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(231, 76, 60, 0.12)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                stroke="#E74C3C" strokeWidth="2">
-                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
-              </svg>
-              Disband group
-            </button>
+            {/* === FOOTER (fixed) === */}
+            <div style={{ flexShrink: 0 }}>
+              <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.06)', margin: '2px 0' }} />
+              <button
+                onClick={() => handleDisbandGroup(groupContextMenu.groupId)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  width: '100%', padding: '7px 10px', background: 'none',
+                  border: 'none', cursor: 'pointer', borderRadius: '4px',
+                  color: '#E74C3C', fontSize: '12px', textAlign: 'left',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(231, 76, 60, 0.12)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                  stroke="#E74C3C" strokeWidth="2">
+                  <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
+                </svg>
+                Disband group
+              </button>
+            </div>
           </div>
         </div>
       )}
