@@ -74,7 +74,12 @@ export default function UnifiedActionBar(props: UnifiedActionBarProps) {
   const loopBtnRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <div className="unified-action-bar" onMouseDown={(e) => e.preventDefault()}>
+    <div className="unified-action-bar" onMouseDown={(e) => {
+      // Prevent textarea blur only for bar buttons, not for popover content (selects, inputs)
+      const target = e.target as HTMLElement;
+      if (target.closest('.uab-popover') || target.closest('.chat-settings-menu')) return;
+      e.preventDefault();
+    }}>
       <div className="uab-left">
         {/* Settings - existing popover component */}
         <ChatSettingsMenu
