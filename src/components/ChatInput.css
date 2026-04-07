@@ -9,7 +9,6 @@
 
 /* Focused state styling */
 .chat-input-container.focused {
-  border-color: rgba(var(--accent-rgb), 0.3);
   background: var(--bg-surface);
 }
 
