@@ -43,14 +43,31 @@ const SDK_BUILTIN_COMMANDS: &[(&str, &str)] = &[
     ("undo", "Undo the last file change"),
 ];
 
+/// Quack built-in slash commands — handled by Quack, not the SDK.
+/// These have actual content that gets expanded like custom commands.
+const QUACK_BUILTIN_COMMANDS: &[(&str, &str, &str)] = &[
+    (
+        "brain",
+        "Update Quack Brain with session discoveries",
+        "Update the Quack Brain with the progress and discoveries made in this session. Only add new items not already documented — check existing brain entries before creating duplicates.",
+    ),
+];
+
 /// Check if a command name is an SDK built-in slash command
 fn is_sdk_builtin(command_name: &str) -> bool {
     SDK_BUILTIN_COMMANDS.iter().any(|(name, _)| *name == command_name)
 }
 
-/// Built-in commands: SDK commands that the CLI handles natively
+/// Get the content of a Quack built-in command
+fn get_quack_builtin_content(command_name: &str) -> Option<&'static str> {
+    QUACK_BUILTIN_COMMANDS.iter()
+        .find(|(name, _, _)| *name == command_name)
+        .map(|(_, _, content)| *content)
+}
+
+/// Built-in commands: SDK commands + Quack commands
 fn get_builtin_commands() -> Vec<SlashCommand> {
-    SDK_BUILTIN_COMMANDS
+    let mut commands: Vec<SlashCommand> = SDK_BUILTIN_COMMANDS
         .iter()
         .map(|(name, desc)| SlashCommand {
             name: name.to_string(),
@@ -60,7 +77,19 @@ fn get_builtin_commands() -> Vec<SlashCommand> {
             parameters: None,
             scope: "sdk".to_string(),
         })
-        .collect()
+        .collect();
+
+    // Add Quack built-in commands
+    commands.extend(QUACK_BUILTIN_COMMANDS.iter().map(|(name, desc, content)| SlashCommand {
+        name: name.to_string(),
+        description: desc.to_string(),
+        content: content.to_string(),
+        is_builtin: true,
+        parameters: None,
+        scope: "quack".to_string(),
+    }));
+
+    commands
 }
 
 /// Parse frontmatter from markdown file
@@ -334,6 +363,12 @@ pub fn expand_slash_command(
         };
         log::info!("🦆 SDK built-in command: {}", raw);
         return Ok(raw);
+    }
+
+    // Quack built-in commands have their own content — expand inline
+    if let Some(content) = get_quack_builtin_content(&command_name) {
+        log::info!("🦆 Quack built-in command: /{}", command_name);
+        return Ok(content.to_string());
     }
 
     // Try to find command in project commands first

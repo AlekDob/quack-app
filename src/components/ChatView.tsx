@@ -994,10 +994,7 @@ export default function ChatView({
             },
             hasMessages: messages.length > 0,
             isLoading,
-            onBrainUpdate: () => {
-              const prompt = 'Update the Quack Brain with the progress and discoveries made in this session. Only add new items not already documented — check existing brain entries before creating duplicates.';
-              onSendMessage(prompt);
-            },
+            onBrainUpdate: () => onSendMessage('/brain'),
             onToggleBTW: btw.isOpen ? btw.closeBTW : btw.openBTW,
             btwIsOpen: btw.isOpen,
             quickLoop: {
