@@ -37,7 +37,8 @@ const EMERGENCY_FALLBACK: ModelConfig[] = [
  * This allows gradual migration without breaking existing code.
  */
 const LEGACY_ID_MAP: Record<string, string> = {
-  'sonnet': 'sonnet45',
+  'sonnet': 'sonnet46',
+  'sonnet45': 'sonnet46', // Sonnet 4.5 deprecated, upgrade to 4.6
   'haiku': 'haiku45',
   'opus': 'opus46',
 };

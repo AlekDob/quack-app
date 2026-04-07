@@ -5015,7 +5015,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const normalizeModelName = (model: string): string => {
     // Map legacy short names to Supabase IDs
     const legacyMap: Record<string, string> = {
-      'sonnet': 'sonnet45',
+      'sonnet': 'sonnet46',
+      'sonnet45': 'sonnet46', // Sonnet 4.5 deprecated
       'opus': 'opus46',
       'haiku': 'haiku45',
     };
@@ -5025,9 +5026,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     if (model.startsWith("claude-")) {
       if (model.includes("opus")) return "opus46";
       if (model.includes("haiku")) return "haiku45";
-      if (model.includes("sonnet")) return "sonnet45";
+      if (model.includes("sonnet")) return "sonnet46";
     }
-    // Supabase IDs (sonnet45, opus46, haiku45) pass through as-is
+    // Supabase IDs (sonnet46, opus46, haiku45) pass through as-is
     return model;
   };
 

@@ -11,7 +11,8 @@ import { applyAccentColor, DEFAULT_ACCENT } from '../utils/accentColor';
  * These don't match <select> option values, causing visual mismatch bugs.
  */
 const LEGACY_MODEL_MAP: Record<string, string> = {
-  'sonnet': 'sonnet45',
+  'sonnet': 'sonnet46',
+  'sonnet45': 'sonnet46', // Sonnet 4.5 deprecated, upgrade to 4.6
   'opus': 'opus46',
   'haiku': 'haiku45',
 };
@@ -199,7 +200,7 @@ const defaultAgentModePresets: AgentModePresets = {
     effort: 'medium',
   },
   chat: {
-    model: 'sonnet45',
+    model: 'sonnet46',
     thinkingMode: 'auto',
     effort: 'low', // Minimize token consumption for conversational use
   },
@@ -365,7 +366,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
-        version: 8,
+        version: 9,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
@@ -435,6 +436,19 @@ export const useSettingsStore = create<SettingsState>()(
           if (version < 8) {
             if (!persisted.appearance) {
               persisted.appearance = { accentColor: DEFAULT_ACCENT };
+            }
+          }
+          // v9: Migrate sonnet45 → sonnet46 in all mode presets and main model
+          if (version < 9) {
+            if (persisted.claude?.model === 'sonnet45') {
+              persisted.claude.model = 'sonnet46';
+            }
+            if (persisted.agentModePresets) {
+              for (const mode of ['bypass', 'plan', 'ask', 'debug', 'chat'] as const) {
+                if (persisted.agentModePresets[mode]?.model === 'sonnet45') {
+                  persisted.agentModePresets[mode].model = 'sonnet46';
+                }
+              }
             }
           }
           return persisted;
