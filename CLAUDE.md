@@ -122,6 +122,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Subagent tools invisible: `documentation/gotchas/gotcha-subagent-tools-invisible-to-parent.md`
 - AskUserQuestion/Plan hang: `documentation/bugs/fix-ask-user-question-stream-event-not-emitted.md`
 - Mention regex email false positive: `documentation/bugs/fix-mention-regex-email-false-positive.md`
+- Snippet modal stale tags: `documentation/bugs/fix-snippet-modal-stale-tags.md`
 - Anchor nav sandboxed iframe: `documentation/gotchas/gotcha-anchor-navigation-sandboxed-iframe.md`
 - Explorer deep indent clip: `documentation/gotchas/gotcha-explorer-row-deep-indent-clip.md`
 - Explorer refresh stale cache: `documentation/bugs/fix-file-explorer-refresh-stale-cache.md`

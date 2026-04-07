@@ -190,7 +190,7 @@ export default function ChatInput({
   const { commands: commandsResponse } = useSlashCommands(basePath || '');
 
   // Snippets hook for tag expansion
-  const { snippets, detectTag, expandVariables } = useSnippets();
+  const { snippets, detectTag, expandVariables, refresh: refreshSnippets } = useSnippets();
 
   // Flatten commands for autocomplete (builtin + custom)
   const commands = useMemo(() => {
@@ -224,6 +224,15 @@ export default function ChatInput({
   // Snippet popover state
   const [showSnippetPopover, setShowSnippetPopover] = useState(false);
   const snippetButtonRef = useRef<HTMLButtonElement>(null);
+  const prevShowSnippetRef = useRef(false);
+
+  // Reload snippets when modal closes (so ChatInput sees newly created tags)
+  useEffect(() => {
+    if (prevShowSnippetRef.current && !showSnippetPopover) {
+      refreshSnippets();
+    }
+    prevShowSnippetRef.current = showSnippetPopover;
+  }, [showSnippetPopover, refreshSnippets]);
 
   // XML tag auto-complete state
   const [xmlTagPair, setXmlTagPair] = useState<{ start: number; end: number; tagName: string } | null>(null);
