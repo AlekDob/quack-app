@@ -63,11 +63,17 @@
   cursor: not-allowed;
 }
 
-/* Buttons with chevron indicator */
+/* Buttons with label + chevron */
 .uab-btn--with-chevron {
   width: auto;
-  gap: 2px;
-  padding: 0 6px;
+  gap: 4px;
+  padding: 0 8px 0 6px;
+}
+
+.uab-btn-label {
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .uab-btn--active {

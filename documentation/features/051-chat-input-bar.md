@@ -4,10 +4,10 @@ project: quack-app
 stack: Tauri (Rust + React)
 created: 2026-04-07
 last_verified: 2026-04-07
-tags: [unified-action-bar, chat, ui, compose, session, popover]
+tags: [chat-input-bar, chat, ui, compose, session, popover]
 ---
 
-## Unified Action Bar
+## Chat Input Bar
 **Purpose:** Single merged toolbar below the chat textarea that consolidates settings, compose tools, session tools, and send/stop into one row.
 **Stack:** React 18, TypeScript, CSS
 
