@@ -1,32 +1,88 @@
 import React, { useState, useCallback } from 'react';
 
+// MIME types used by sidebar drag sources
+const SIDEBAR_MIME_TYPES = [
+  'application/quack-file',
+  'application/quack-skill',
+  'application/quack-rule',
+  'application/quack-command',
+] as const;
+
+export interface SidebarDropData {
+  mimeType: string;
+  payload: string;
+}
+
 interface SplitDropZoneProps {
   visible: boolean;
   onDropLeft: (tabId: string) => void;
   onDropRight: (tabId: string) => void;
+  onSidebarDropLeft?: (data: SidebarDropData) => void;
+  onSidebarDropRight?: (data: SidebarDropData) => void;
 }
 
-export function SplitDropZone({ visible, onDropLeft, onDropRight }: SplitDropZoneProps) {
-  const [activeZone, setActiveZone] = useState<'left' | 'right' | null>(null);
+function extractSidebarData(
+  dt: DataTransfer,
+): SidebarDropData | null {
+  for (const mime of SIDEBAR_MIME_TYPES) {
+    const raw = dt.getData(mime);
+    if (raw) return { mimeType: mime, payload: raw };
+  }
+  return null;
+}
 
-  const handleDragOver = useCallback((e: React.DragEvent, zone: 'left' | 'right') => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    setActiveZone(zone);
-  }, []);
+function isSidebarDrag(dt: DataTransfer): boolean {
+  return SIDEBAR_MIME_TYPES.some((m) => dt.types.includes(m));
+}
+
+export function SplitDropZone({
+  visible,
+  onDropLeft,
+  onDropRight,
+  onSidebarDropLeft,
+  onSidebarDropRight,
+}: SplitDropZoneProps) {
+  const [activeZone, setActiveZone] = useState<
+    'left' | 'right' | null
+  >(null);
+
+  const handleDragOver = useCallback(
+    (e: React.DragEvent, zone: 'left' | 'right') => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = isSidebarDrag(e.dataTransfer)
+        ? 'copy'
+        : 'move';
+      setActiveZone(zone);
+    },
+    [],
+  );
 
   const handleDragLeave = useCallback(() => {
     setActiveZone(null);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent, zone: 'left' | 'right') => {
-    e.preventDefault();
-    const tabId = e.dataTransfer.getData('text/plain');
-    if (!tabId) return;
-    if (zone === 'left') onDropLeft(tabId);
-    else onDropRight(tabId);
-    setActiveZone(null);
-  }, [onDropLeft, onDropRight]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent, zone: 'left' | 'right') => {
+      e.preventDefault();
+
+      // Check sidebar MIME types first
+      const sidebarData = extractSidebarData(e.dataTransfer);
+      if (sidebarData) {
+        if (zone === 'left') onSidebarDropLeft?.(sidebarData);
+        else onSidebarDropRight?.(sidebarData);
+        setActiveZone(null);
+        return;
+      }
+
+      // Fallback: tab ID from tab bar drag
+      const tabId = e.dataTransfer.getData('text/plain');
+      if (!tabId) { setActiveZone(null); return; }
+      if (zone === 'left') onDropLeft(tabId);
+      else onDropRight(tabId);
+      setActiveZone(null);
+    },
+    [onDropLeft, onDropRight, onSidebarDropLeft, onSidebarDropRight],
+  );
 
   if (!visible) return null;
 

@@ -1,3 +1,4 @@
+import React from 'react';
 import type { Rule } from '../types';
 
 interface RuleItemProps {
@@ -9,11 +10,25 @@ interface RuleItemProps {
 export function RuleItem({ rule, onEdit, onDelete }: RuleItemProps) {
   const hasGlobs = rule.frontmatter?.globs && rule.frontmatter.globs.length > 0;
 
+  const handleDragStart = (e: React.DragEvent) => {
+    const data = JSON.stringify({
+      type: 'rule',
+      name: rule.name,
+      scope: rule.scope,
+      path: rule.filePath,
+    });
+    e.dataTransfer.setData('application/quack-rule', data);
+    e.dataTransfer.setData('text/plain', data);
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
   return (
     <div
       className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
       onClick={() => onEdit(rule)}
       title="Click to edit rule"
+      draggable
+      onDragStart={handleDragStart}
     >
       {/* Rule Icon - Blue gradient background with white icon (matches Quack Store) */}
       <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #60a5fa, #3b82f6)' }}>

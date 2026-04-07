@@ -1,3 +1,4 @@
+import React from 'react';
 import type { SlashCommand } from '../hooks/useSlashCommands';
 
 interface CommandItemProps {
@@ -6,10 +7,23 @@ interface CommandItemProps {
 }
 
 export function CommandItem({ command, onEdit }: CommandItemProps) {
+  const handleDragStart = (e: React.DragEvent) => {
+    const data = JSON.stringify({
+      type: 'command',
+      name: command.name,
+      scope: command.scope || 'project',
+    });
+    e.dataTransfer.setData('application/quack-command', data);
+    e.dataTransfer.setData('text/plain', data);
+    e.dataTransfer.effectAllowed = 'copy';
+  };
+
   return (
     <div
       className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-pointer"
       onClick={() => onEdit?.(command)}
+      draggable
+      onDragStart={handleDragStart}
     >
       {/* Command Icon - Pink gradient background with white icon (matches Quack Store) */}
       <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f472b6, #ec4899)' }}>

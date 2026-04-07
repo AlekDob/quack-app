@@ -23,7 +23,7 @@ import { saveSessionBackup, cleanupOldBackups } from "./utils/sessionRecovery";
 import TerminalSidebar from "./components/TerminalSidebar";
 import SidePanel from "./components/SidePanel";
 import SidePanelAccordion from "./components/SidePanelAccordion";
-import { SplitPaneDivider, SplitDropZone, SplitCodeEditor } from "./components/SplitView";
+import { SplitPaneDivider, SplitDropZone, SplitCodeEditor, type SidebarDropData } from "./components/SplitView";
 import "./components/SplitView/SplitView.css";
 import NewTerminalModal from "./components/NewTerminalModal";
 import FilePreviewDrawer, { type FilePreviewDrawerRef } from "./components/FilePreviewDrawer";
@@ -882,6 +882,7 @@ function AppContent() {
   const [splitTabId, setSplitTabId] = useState<string | null>(null);
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [isDraggingTab, setIsDraggingTab] = useState(false);
+  const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
 
   // Close split view when switching agent/terminal
@@ -10789,6 +10790,98 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     setIsDraggingTab(false);
   }, []);
 
+  // Create or find a tab from sidebar drop data, return its ID
+  const resolveTabFromSidebarDrop = useCallback((data: SidebarDropData): string | null => {
+    try {
+      const parsed = JSON.parse(data.payload);
+
+      if (data.mimeType === 'application/quack-file' && parsed.path) {
+        const tabId = codeEditorTabId(parsed.path);
+        if (!tabs.find(t => t.id === tabId)) {
+          const newTab = openCodeEditorTab(parsed.path);
+          setTabs(prev => [...prev, newTab]);
+        }
+        return tabId;
+      }
+
+      if (data.mimeType === 'application/quack-skill' && parsed.path) {
+        const tabId = codeEditorTabId(parsed.path);
+        if (!tabs.find(t => t.id === tabId)) {
+          const newTab = openCodeEditorTab(parsed.path);
+          setTabs(prev => [...prev, newTab]);
+        }
+        return tabId;
+      }
+
+      if (data.mimeType === 'application/quack-rule' && parsed.path) {
+        const tabId = codeEditorTabId(parsed.path);
+        if (!tabs.find(t => t.id === tabId)) {
+          const newTab = openCodeEditorTab(parsed.path);
+          setTabs(prev => [...prev, newTab]);
+        }
+        return tabId;
+      }
+
+      if (data.mimeType === 'application/quack-command') {
+        const cmdTabId = `command-${parsed.name}-${parsed.scope || 'project'}`;
+        if (!tabs.find(t => t.id === cmdTabId)) {
+          const newTab: Tab = {
+            id: cmdTabId,
+            label: `/${parsed.name}`,
+            type: 'command',
+            closable: true,
+            commandName: parsed.name,
+            commandScope: parsed.scope || 'project',
+          };
+          setTabs(prev => [...prev, newTab]);
+        }
+        return cmdTabId;
+      }
+    } catch {
+      console.warn('[SplitView] Failed to parse sidebar drop data');
+    }
+    return null;
+  }, [tabs, openCodeEditorTab]);
+
+  // Handle sidebar item dropped on split zone
+  const handleSidebarDropRight = useCallback((data: SidebarDropData) => {
+    setIsDraggingSidebar(false);
+    const tabId = resolveTabFromSidebarDrop(data);
+    if (!tabId) return;
+    setSplitTabId(tabId);
+  }, [resolveTabFromSidebarDrop]);
+
+  const handleSidebarDropLeft = useCallback((data: SidebarDropData) => {
+    setIsDraggingSidebar(false);
+    const tabId = resolveTabFromSidebarDrop(data);
+    if (!tabId) return;
+    setActiveTabId(tabId);
+  }, [resolveTabFromSidebarDrop]);
+
+  // Detect sidebar drag over content area
+  const handleContentDragOver = useCallback((e: React.DragEvent) => {
+    const types = e.dataTransfer.types;
+    const isSidebar = types.includes('application/quack-file') ||
+      types.includes('application/quack-skill') ||
+      types.includes('application/quack-rule') ||
+      types.includes('application/quack-command');
+    if (isSidebar) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      if (!isDraggingSidebar) setIsDraggingSidebar(true);
+    }
+  }, [isDraggingSidebar]);
+
+  const handleContentDragLeave = useCallback((e: React.DragEvent) => {
+    // Only reset if leaving the content area entirely
+    const rect = splitContainerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const { clientX: x, clientY: y } = e;
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+      setIsDraggingSidebar(false);
+    }
+  }, []);
+
   // Handle tab popout - drag tab outside tab bar to create floating window
   const handleTabPopout = useCallback(async (tab: Tab, position: PopoutPosition) => {
     console.log('[App] Tab popout requested:', tab.id, tab.type, position);
@@ -12518,12 +12611,19 @@ You have access to all Bash tools to execute git commands like:
             />
 
             {/* Content Area - fills remaining space */}
-            <div ref={splitContainerRef} style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: splitTabId ? 'row' : 'column', position: 'relative' }}>
+            <div
+              ref={splitContainerRef}
+              style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: splitTabId ? 'row' : 'column', position: 'relative' }}
+              onDragOver={handleContentDragOver}
+              onDragLeave={handleContentDragLeave}
+            >
               {/* Split Drop Zone overlay */}
               <SplitDropZone
-                visible={isDraggingTab && !splitTabId}
+                visible={(isDraggingTab && !splitTabId) || isDraggingSidebar}
                 onDropLeft={handleSplitDropLeft}
                 onDropRight={handleSplitDropRight}
+                onSidebarDropLeft={handleSidebarDropLeft}
+                onSidebarDropRight={handleSidebarDropRight}
               />
 
               {/* Left Pane (or full pane when not split) */}
