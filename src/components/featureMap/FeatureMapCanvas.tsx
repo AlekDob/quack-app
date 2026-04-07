@@ -523,7 +523,27 @@ export default function FeatureMapCanvas(props: Props) {
   };
   const linkCol = (s: string, t: string) => (!hovered ? LINK_COLOR : s === hovered || t === hovered ? LINK_HL : LINK_COLOR);
   const trunc = (t: string, m: number) => (t.length > m ? t.slice(0, m - 1) + '\u2026' : t);
-  const curvePath = (x1: number, y1: number, x2: number, y2: number) => { const d = Math.abs(y2 - y1) * 0.3; return `M${x1},${y1} C${x1 + d},${y1} ${x2 - d},${y2} ${x2},${y2}`; };
+  // Returns the center of the side facing the target + outward direction (nx,ny)
+  const edgePoint = (cx: number, cy: number, tx: number, ty: number) => {
+    const dx = tx - cx, dy = ty - cy;
+    if (dx === 0 && dy === 0) return { x: cx, y: cy, nx: 0, ny: 0 };
+    const hw = NW / 2, hh = NH / 2;
+    if (Math.abs(dx) * hh > Math.abs(dy) * hw) {
+      const dir = dx > 0 ? 1 : -1;
+      return { x: cx + dir * hw, y: cy, nx: dir, ny: 0 };
+    } else {
+      const dir = dy > 0 ? 1 : -1;
+      return { x: cx, y: cy + dir * hh, nx: 0, ny: dir };
+    }
+  };
+  // Cubic Bézier that exits straight from each anchor point's normal direction
+  const curvePath = (ep1: { x: number; y: number; nx: number; ny: number }, ep2: { x: number; y: number; nx: number; ny: number }) => {
+    const dist = Math.hypot(ep2.x - ep1.x, ep2.y - ep1.y);
+    const arm = Math.max(40, dist * 0.35);
+    const c1x = ep1.x + ep1.nx * arm, c1y = ep1.y + ep1.ny * arm;
+    const c2x = ep2.x + ep2.nx * arm, c2y = ep2.y + ep2.ny * arm;
+    return `M${ep1.x},${ep1.y} C${c1x},${c1y} ${c2x},${c2y} ${ep2.x},${ep2.y}`;
+  };
 
   const cursor = draggingId || multiDragRef.current ? 'grabbing'
     : spaceHeld ? 'grab'
@@ -599,18 +619,19 @@ export default function FeatureMapCanvas(props: Props) {
               const from = getPos(link.source); const to = getPos(link.target);
               if (!from || !to) return null;
               const isHl = hovered === link.source || hovered === link.target;
-              const mx = (from.x + to.x) / 2; const my = (from.y + to.y) / 2;
+              const ep1 = edgePoint(from.x, from.y, to.x, to.y);
+              const ep2 = edgePoint(to.x, to.y, from.x, from.y);
+              const mx = (ep1.x + ep2.x) / 2; const my = (ep1.y + ep2.y) / 2;
+              const col = linkCol(link.source, link.target);
+              const op = linkOp(link.source, link.target);
               return (
                 <g key={`lk-${link.source}-${link.target}`}>
-                  <path d={curvePath(from.x, from.y, to.x, to.y)} fill="none"
-                    stroke={linkCol(link.source, link.target)}
+                  <path d={curvePath(ep1, ep2)} fill="none"
+                    stroke={col}
                     strokeWidth={Math.min(1 + link.sharedFiles.length * 0.5, 4)}
-                    opacity={linkOp(link.source, link.target)} strokeLinecap="round" />
-                  {isHl && link.sharedFiles.length > 0 && (
-                    <><rect x={mx - 22} y={my - 11} width={44} height={22} rx={11} fill={LINK_HL} />
-                    <text x={mx} y={my + 1} textAnchor="middle" dominantBaseline="central"
-                      fill="#0a0e1a" fontSize={9} fontWeight="bold" fontFamily="Inter, system-ui, sans-serif">{link.sharedFiles.length} file</text></>
-                  )}
+                    opacity={op} strokeLinecap="round" />
+                  <circle cx={ep1.x} cy={ep1.y} r={3.5} fill={col} opacity={op} />
+                  <circle cx={ep2.x} cy={ep2.y} r={3.5} fill={col} opacity={op} />
                 </g>);
             })}
 
@@ -657,7 +678,53 @@ export default function FeatureMapCanvas(props: Props) {
                 </g>);
             })}
 
-            {/* Z5: Post-it annotations */}
+            {/* Z5: Hovered link overlay — renders above nodes so splines show through */}
+            {hovered && graph.links.map(link => {
+              if (link.source !== hovered && link.target !== hovered) return null;
+              if (visibleNodeIds && (!visibleNodeIds.has(link.source) || !visibleNodeIds.has(link.target))) return null;
+              const from = getPos(link.source); const to = getPos(link.target);
+              if (!from || !to) return null;
+              const ep1 = edgePoint(from.x, from.y, to.x, to.y);
+              const ep2 = edgePoint(to.x, to.y, from.x, from.y);
+              const mx = (ep1.x + ep2.x) / 2; const my = (ep1.y + ep2.y) / 2;
+              return (
+                <g key={`lk-ov-${link.source}-${link.target}`}>
+                  <path d={curvePath(ep1, ep2)} fill="none"
+                    stroke={LINK_HL}
+                    strokeWidth={Math.min(1 + link.sharedFiles.length * 0.5, 4)}
+                    opacity={0.18} strokeLinecap="round" />
+                  <circle cx={ep1.x} cy={ep1.y} r={3.5} fill={LINK_HL} opacity={0.18} />
+                  <circle cx={ep2.x} cy={ep2.y} r={3.5} fill={LINK_HL} opacity={0.18} />
+                </g>);
+            })}
+
+            {/* Z6: Link pills — rendered above nodes and hover overlay */}
+            {graph.links.map(link => {
+              if (visibleNodeIds && (!visibleNodeIds.has(link.source) || !visibleNodeIds.has(link.target))) return null;
+              const isHl = hovered === link.source || hovered === link.target;
+              if (!isHl || link.sharedFiles.length === 0) return null;
+              const from = getPos(link.source); const to = getPos(link.target);
+              if (!from || !to) return null;
+              const ep1 = edgePoint(from.x, from.y, to.x, to.y);
+              const ep2 = edgePoint(to.x, to.y, from.x, from.y);
+              const mx = (ep1.x + ep2.x) / 2; const my = (ep1.y + ep2.y) / 2;
+              // Dim pill if it overlaps any node box
+              const overlapsNode = graph.nodes.some(n => {
+                if (visibleNodeIds && !visibleNodeIds.has(n.id)) return false;
+                const p = getPos(n.id);
+                if (!p) return false;
+                return mx > p.x - NW / 2 && mx < p.x + NW / 2 && my > p.y - NH / 2 && my < p.y + NH / 2;
+              });
+              const pillOp = overlapsNode ? 0.15 : 1;
+              return (
+                <g key={`pill-${link.source}-${link.target}`} opacity={pillOp}>
+                  <rect x={mx - 22} y={my - 11} width={44} height={22} rx={11} fill={LINK_HL} />
+                  <text x={mx} y={my + 1} textAnchor="middle" dominantBaseline="central"
+                    fill="#0a0e1a" fontSize={9} fontWeight="bold" fontFamily="Inter, system-ui, sans-serif">{link.sharedFiles.length} file</text>
+                </g>);
+            })}
+
+            {/* Z7: Post-it annotations */}
             {annotations.postIts.map(p => (
               <CanvasPostIt key={p.id} postIt={p} zoom={viewport.zoom}
                 isSelected={selectedAnnotationId === p.id}
