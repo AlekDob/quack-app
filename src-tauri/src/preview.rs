@@ -70,7 +70,7 @@ async fn create_preview_webview_impl(
     url: url.clone(),
   };
 
-  *WEBVIEW_STATE.lock().unwrap() = Some(state);
+  *WEBVIEW_STATE.lock().unwrap_or_else(|e| e.into_inner()) = Some(state);
 
   Ok(WebviewInfo {
     label: PREVIEW_WEBVIEW_LABEL.to_string(),
@@ -122,7 +122,7 @@ async fn destroy_preview_webview_impl(app: &AppHandle) -> Result<()> {
     webview.close()?;
   }
 
-  *WEBVIEW_STATE.lock().unwrap() = None;
+  *WEBVIEW_STATE.lock().unwrap_or_else(|e| e.into_inner()) = None;
 
   Ok(())
 }

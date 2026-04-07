@@ -133,6 +133,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Windows path separators: `documentation/gotchas/gotcha-windows-path-separators.md`
 - Webview fetch CORS: `documentation/gotchas/gotcha-webview-fetch-cors-use-invoke.md`
 - TerminalStore sync persist quota: `documentation/gotchas/gotcha-terminal-store-sync-persist-quota.md`
+- Mutex poisoning cascade: `documentation/bugs/fix-mutex-poisoning-cascade-abort.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

@@ -166,7 +166,7 @@ impl RateLimiter {
 // ============================================================================
 
 fn get_cached_suggestion(intent: &str) -> Option<AISuggestion> {
-    let cache = SUGGESTION_CACHE.lock().unwrap();
+    let cache = SUGGESTION_CACHE.lock().unwrap_or_else(|e| e.into_inner());
     if let Some((suggestion, timestamp)) = cache.get(intent) {
         // Cache valid for 1 hour
         if timestamp.elapsed() < Duration::from_secs(3600) {
@@ -177,7 +177,7 @@ fn get_cached_suggestion(intent: &str) -> Option<AISuggestion> {
 }
 
 fn store_in_cache(intent: String, suggestion: AISuggestion) {
-    let mut cache = SUGGESTION_CACHE.lock().unwrap();
+    let mut cache = SUGGESTION_CACHE.lock().unwrap_or_else(|e| e.into_inner());
     cache.insert(intent, (suggestion, Instant::now()));
 }
 
@@ -186,7 +186,7 @@ fn store_in_cache(intent: String, suggestion: AISuggestion) {
 // ============================================================================
 
 fn track_token_usage(tokens: u32, model: &str) {
-    let mut stats = TOKEN_STATS.lock().unwrap();
+    let mut stats = TOKEN_STATS.lock().unwrap_or_else(|e| e.into_inner());
     stats.total_tokens_used += tokens;
     stats.request_count += 1;
 
@@ -248,7 +248,7 @@ pub async fn test_api_connection(app: AppHandle) -> Result<bool, String> {
 
 #[tauri::command]
 pub fn get_token_usage_stats() -> Result<TokenStats, String> {
-    let stats = TOKEN_STATS.lock().unwrap();
+    let stats = TOKEN_STATS.lock().unwrap_or_else(|e| e.into_inner());
     Ok(stats.clone())
 }
 
@@ -584,7 +584,7 @@ pub async fn get_ai_suggestion(
 ) -> Result<AISuggestion, String> {
     // Check rate limit
     {
-        let mut limiter = RATE_LIMITER.lock().unwrap();
+        let mut limiter = RATE_LIMITER.lock().unwrap_or_else(|e| e.into_inner());
         if !limiter.can_proceed() {
             return Err("Rate limit exceeded. Please wait a moment.".to_string());
         }
@@ -658,7 +658,7 @@ pub async fn get_prompt_engineering_questions(
 ) -> Result<Vec<AIQuestion>, String> {
     // Check rate limit
     {
-        let mut limiter = RATE_LIMITER.lock().unwrap();
+        let mut limiter = RATE_LIMITER.lock().unwrap_or_else(|e| e.into_inner());
         if !limiter.can_proceed() {
             return Err("Rate limit exceeded. Please wait a moment.".to_string());
         }
@@ -720,7 +720,7 @@ pub async fn improve_prompt_with_answers(
 ) -> Result<AIPromptImprovement, String> {
     // Check rate limit
     {
-        let mut limiter = RATE_LIMITER.lock().unwrap();
+        let mut limiter = RATE_LIMITER.lock().unwrap_or_else(|e| e.into_inner());
         if !limiter.can_proceed() {
             return Err("Rate limit exceeded. Please wait a moment.".to_string());
         }

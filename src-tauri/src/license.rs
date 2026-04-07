@@ -228,9 +228,9 @@ pub async fn validate_license(
     state: State<'_, LicenseState>,
 ) -> Result<LicenseValidationResponse, String> {
     // Get API credentials
-    let product_id = state.gumroad_product_id.lock().unwrap().clone();
-    let supabase_url = state.supabase_url.lock().unwrap().clone();
-    let supabase_key = state.supabase_key.lock().unwrap().clone();
+    let product_id = state.gumroad_product_id.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let supabase_url = state.supabase_url.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let supabase_key = state.supabase_key.lock().unwrap_or_else(|e| e.into_inner()).clone();
 
     if product_id.is_none() {
         return Ok(LicenseValidationResponse {
@@ -441,9 +441,9 @@ pub async fn revalidate_license(
     device_id: String,
     state: State<'_, LicenseState>,
 ) -> Result<serde_json::Value, String> {
-    let product_id = state.gumroad_product_id.lock().unwrap().clone();
-    let supabase_url = state.supabase_url.lock().unwrap().clone();
-    let supabase_key = state.supabase_key.lock().unwrap().clone();
+    let product_id = state.gumroad_product_id.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let supabase_url = state.supabase_url.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let supabase_key = state.supabase_key.lock().unwrap_or_else(|e| e.into_inner()).clone();
 
     if product_id.is_none() {
         return Ok(serde_json::json!({
@@ -581,8 +581,8 @@ pub async fn deactivate_license(
     device_id: String,
     state: State<'_, LicenseState>,
 ) -> Result<bool, String> {
-    let supabase_url = state.supabase_url.lock().unwrap().clone();
-    let supabase_key = state.supabase_key.lock().unwrap().clone();
+    let supabase_url = state.supabase_url.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let supabase_key = state.supabase_key.lock().unwrap_or_else(|e| e.into_inner()).clone();
 
     if supabase_url.is_none() || supabase_key.is_none() {
         return Err("Supabase not configured".to_string());
@@ -624,8 +624,8 @@ pub async fn get_license_devices(
     license_key: String,
     state: State<'_, LicenseState>,
 ) -> Result<DeviceListResponse, String> {
-    let supabase_url = state.supabase_url.lock().unwrap().clone();
-    let supabase_key = state.supabase_key.lock().unwrap().clone();
+    let supabase_url = state.supabase_url.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let supabase_key = state.supabase_key.lock().unwrap_or_else(|e| e.into_inner()).clone();
 
     if supabase_url.is_none() || supabase_key.is_none() {
         return Err("Supabase not configured".to_string());

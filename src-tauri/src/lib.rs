@@ -633,7 +633,7 @@ pub fn run() {
 
             // Load Gumroad Product ID (compile-time environment variable)
             if let Some(product_id) = option_env!("GUMROAD_PRODUCT_ID") {
-                *license_state.gumroad_product_id.lock().unwrap() = Some(product_id.to_string());
+                *license_state.gumroad_product_id.lock().unwrap_or_else(|e| e.into_inner()) = Some(product_id.to_string());
                 log::info!("🦆 Gumroad Product ID loaded from build-time environment");
             } else {
                 log::warn!("⚠️ Gumroad Product ID not configured at build time");
@@ -644,8 +644,8 @@ pub fn run() {
                 option_env!("SUPABASE_URL"),
                 option_env!("SUPABASE_ANON_KEY")
             ) {
-                *license_state.supabase_url.lock().unwrap() = Some(supabase_url.to_string());
-                *license_state.supabase_key.lock().unwrap() = Some(supabase_key.to_string());
+                *license_state.supabase_url.lock().unwrap_or_else(|e| e.into_inner()) = Some(supabase_url.to_string());
+                *license_state.supabase_key.lock().unwrap_or_else(|e| e.into_inner()) = Some(supabase_key.to_string());
                 log::info!("🦆 Supabase credentials loaded from build-time environment");
             } else {
                 log::warn!("⚠️ Supabase credentials not configured at build time");

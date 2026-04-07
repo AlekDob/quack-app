@@ -50,7 +50,7 @@ pub async fn start_claude_oauth(app: AppHandle) -> Result<String, String> {
     let state = generate_state();
 
     // Store state for validation
-    *OAUTH_STATE.lock().unwrap() = Some(state.clone());
+    *OAUTH_STATE.lock().unwrap_or_else(|e| e.into_inner()) = Some(state.clone());
 
     // Build authorization URL
     let auth_url = format!(
@@ -103,7 +103,7 @@ async fn run_oauth_callback_server(app: AppHandle) -> Result<()> {
 
             // Validate state
             if let Some(received_state) = params.get("state") {
-                let stored_state = OAUTH_STATE.lock().unwrap().clone();
+                let stored_state = OAUTH_STATE.lock().unwrap_or_else(|e| e.into_inner()).clone();
 
                 if stored_state.as_ref() != Some(received_state) {
                     let response = Response::from_string("Invalid state parameter")
