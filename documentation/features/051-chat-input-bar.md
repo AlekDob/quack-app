@@ -59,6 +59,15 @@ tags: [chat-input-bar, chat, ui, compose, session, popover]
 | Session | `hasMessages`, `isLoading`, `onBrainUpdate`, `onToggleBTW`, `btwIsOpen`, `quickLoop`, `onCompact`, `onOpenTerminal`, `onClear` |
 | Send/Stop | `isStreaming`, `onSend`, `onStop`, `canSend`, `sendShortcut` |
 
+### Popover Button Labels
+The Compose and Session triggers display text labels ("Compose", "Session") via `.uab-btn-label` spans so users understand what each popover contains. Styled at 11px/500 weight.
+
+### /brain Slash Command
+The "Update Brain" action in SessionPopover sends `/brain` — a **Quack built-in** slash command defined in `src-tauri/src/slash_commands.rs` (`QUACK_BUILTIN_COMMANDS`). Unlike SDK builtins (passed raw to CLI), Quack builtins have their own content that gets expanded by `expand_slash_command`. Users can also type `/brain` directly in the textarea autocomplete.
+
+### mouseDown Prevention
+The `.unified-action-bar` uses `onMouseDown={(e) => { ... e.preventDefault() }}` to keep textarea focus, but **skips** `preventDefault` when the click target is inside `.uab-popover` or `.chat-settings-menu` — otherwise native `<select>` dropdowns in ChatSettingsMenu would be blocked.
+
 ### CSS Architecture
 - `.unified-action-bar` -- flex row container with left/spacer/right layout
 - `.uab-btn` -- 28px icon buttons, transparent bg, hover/active states
