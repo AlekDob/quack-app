@@ -21,6 +21,7 @@ import { useSnippets, getCursorPosition, removeCursorMarker } from '../hooks/use
 import VoiceRecordingModal from './VoiceRecordingModal';
 import { SnippetModal } from './SnippetModal';
 import EquipBar from './chat/EquipBar';
+import UnifiedActionBar, { type UnifiedActionBarProps } from './chat/UnifiedActionBar';
 import CodeEditorCodeMirror from './CodeEditorCodeMirror';
 import { useShortcutsStore } from '../stores/shortcutsStore';
 import { useFileSystemStore } from '../stores/fileSystemStore';
@@ -89,6 +90,13 @@ interface ChatInputProps {
     droids: string[];
     commands: string[];
   };
+  // Unified Action Bar - session-level props (passed through from ChatView)
+  unifiedBarProps?: Omit<UnifiedActionBarProps,
+    'onAttach' | 'attachShortcut' | 'onOpenPromptEngineer' | 'onVoiceClick' |
+    'isSpeechSupported' | 'onToggleSnippets' | 'onInsertNewLine' | 'onInsertXmlTag' |
+    'hasIdeContext' | 'ideContextEnabled' | 'onToggleIdeContext' | 'isFullscreen' |
+    'onToggleFullscreen' | 'isStreaming' | 'onSend' | 'onStop' | 'canSend' | 'sendShortcut'
+  >;
 }
 
 export default function ChatInput({
@@ -117,6 +125,7 @@ export default function ChatInput({
   isFullscreen = false,
   onToggleFullscreen,
   agentToolkit,
+  unifiedBarProps,
 }: ChatInputProps) {
   // IDE context: icon in action bar, full detail in ProjectContextPanel
   const { previewFile, editorSelection, externalIdeContext, ideContextEnabled, toggleIdeContext } = useFileSystemStore();
@@ -1244,6 +1253,49 @@ export default function ChatInput({
       }
     }
   };
+
+  // Insert newline + underscore at cursor (compose helper)
+  const handleInsertNewLine = useCallback(() => {
+    if (!textareaRef.current) return;
+    const cursorPos = textareaRef.current.selectionStart;
+    const before = input.substring(0, cursorPos);
+    const after = input.substring(cursorPos);
+    setInput(before + '\n_ ' + after);
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(cursorPos + 3, cursorPos + 3);
+      }
+    }, 0);
+  }, [input, setInput]);
+
+  // Insert XML tag or closing tag at cursor (compose helper)
+  const handleInsertXmlTag = useCallback(() => {
+    if (!textareaRef.current) return;
+    const cursorPos = textareaRef.current.selectionStart;
+    const before = input.substring(0, cursorPos);
+    const after = input.substring(cursorPos);
+    const openTagMatch = before.match(/<(\w+)(?:\s[^>]*)?>(?![\s\S]*<\/\1>)/);
+    if (openTagMatch) {
+      const tagName = openTagMatch[1];
+      setInput(before + `</${tagName}>` + after);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          const pos = cursorPos + tagName.length + 3;
+          textareaRef.current.setSelectionRange(pos, pos);
+        }
+      }, 0);
+    } else {
+      setInput(before + '<tag>' + after);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+          textareaRef.current.setSelectionRange(cursorPos + 1, cursorPos + 4);
+        }
+      }, 0);
+    }
+  }, [input, setInput]);
 
   // Voice recording handlers
   const handleVoiceClick = useCallback(() => {
@@ -2438,248 +2490,6 @@ export default function ChatInput({
           </div>
         )}
         <div className="chat-input-field-row">
-          <div className="chat-input-actions" onMouseDown={(e) => e.preventDefault()}>
-          <div className="chat-input-actions-left">
-          <KeyboardShortcutTooltip label="Attach files" shortcut={formatShortcut(shortcuts.chatAttachFile?.currentKeys || '') || undefined} position="top">
-          <button
-            type="button"
-            className="chat-input-action-btn"
-            onClick={handleAttach}
-            aria-label="Attach files"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M10.5 3.5a2.5 2.5 0 0 1 5 0V11h-1V3.5a1.5 1.5 0 0 0-3 0V12a3 3 0 1 1-6 0V3h1v9a2 2 0 1 0 4 0V3.5Z"/>
-            </svg>
-          </button>
-          </KeyboardShortcutTooltip>
-          <KeyboardShortcutTooltip label="Prompt Engineer" position="top">
-          <button
-            type="button"
-            className="chat-input-action-btn"
-            onClick={onOpenPromptEngineer}
-            aria-label="Prompt Engineer"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 1l1.5 4.5L14 7l-4.5 1.5L8 13l-1.5-4.5L2 7l4.5-1.5L8 1Z" opacity="0.8"/>
-              <path d="M12 2l0.5 1.5L14 4l-1.5 0.5L12 6l-0.5-1.5L10 4l1.5-0.5L12 2Z" opacity="0.6"/>
-            </svg>
-          </button>
-          </KeyboardShortcutTooltip>
-          {/* Fullscreen toggle button */}
-          {onToggleFullscreen && (
-            <KeyboardShortcutTooltip label={isFullscreen ? "Exit fullscreen" : "Fullscreen mode"} shortcut={formatShortcut(shortcuts.chatToggleFullscreen?.currentKeys || '') || undefined} position="top">
-            <button
-              type="button"
-              className={`chat-input-action-btn ${isFullscreen ? 'active' : ''}`}
-              onClick={onToggleFullscreen}
-              aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen mode"}
-            >
-              {isFullscreen ? (
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 2L2 2L2 6M10 2L14 2L14 6M6 14L2 14L2 10M10 14L14 14L14 10"/>
-                </svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M2 6L2 2L6 2M14 6L14 2L10 2M2 10L2 14L6 14M14 10L14 14L10 14"/>
-                </svg>
-              )}
-            </button>
-            </KeyboardShortcutTooltip>
-          )}
-          <KeyboardShortcutTooltip label={isSpeechSupported ? "Voice input" : "Voice input not supported"} shortcut={isSpeechSupported ? (formatShortcut(shortcuts.chatVoiceRecord?.currentKeys || '') || undefined) : undefined} position="top">
-          <button
-            type="button"
-            className="chat-input-action-btn"
-            onClick={handleVoiceClick}
-            disabled={!isSpeechSupported}
-            aria-label="Voice input"
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M8 1a2 2 0 0 0-2 2v4a2 2 0 1 0 4 0V3a2 2 0 0 0-2-2Z"/>
-              <path d="M4 7v1a4 4 0 0 0 8 0V7h1v1a5 5 0 0 1-4.5 4.975V15h3v1h-7v-1h3v-2.025A5 5 0 0 1 3 8V7h1Z"/>
-            </svg>
-          </button>
-          </KeyboardShortcutTooltip>
-          {/* Focus-only helper icons - at end so they wrap to top with wrap-reverse */}
-          {/* Keep visible when snippet popover is open to prevent it from unmounting */}
-          {(isFocused || showSnippetPopover) && (
-            <div className="focus-helper-icon-wrapper" onMouseDown={(e) => e.preventDefault()}>
-              {/* Snippet button - opens modal */}
-              <KeyboardShortcutTooltip label="Prompt Snippets" shortcut={formatShortcut(shortcuts.chatOpenSnippets?.currentKeys || '') || undefined} position="top">
-              <button
-                type="button"
-                className="chat-input-action-btn focus-helper-icon"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  setShowSnippetPopover(!showSnippetPopover);
-                }}
-                aria-label="Prompt Snippets"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                  <path d="M4 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 1a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4z"/>
-                  <path d="M5 5h6v1H5zM5 7.5h4v1H5zM5 10h5v1H5z"/>
-                </svg>
-              </button>
-              </KeyboardShortcutTooltip>
-              <KeyboardShortcutTooltip label="New line with _" shortcut={formatShortcut(shortcuts.chatNewLine?.currentKeys || '') || undefined} position="top">
-              <button
-                type="button"
-                className="chat-input-action-btn focus-helper-icon"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  if (!textareaRef.current) return;
-                  const cursorPos = textareaRef.current.selectionStart;
-                  const beforeCursor = input.substring(0, cursorPos);
-                  const afterCursor = input.substring(cursorPos);
-                  const newInput = beforeCursor + '\n_ ' + afterCursor;
-                  setInput(newInput);
-
-                  setTimeout(() => {
-                    if (textareaRef.current) {
-                      textareaRef.current.focus();
-                      const newCursorPos = cursorPos + 3;
-                      textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
-                    }
-                  }, 0);
-                }}
-                aria-label="New line with underscore"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M2 3l4 4m0 0l-4 4m4-4h8M5 13h6" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-              </KeyboardShortcutTooltip>
-              <KeyboardShortcutTooltip label="XML tag" shortcut={formatShortcut(shortcuts.chatInsertXml?.currentKeys || '') || undefined} position="top">
-              <button
-                type="button"
-                className="chat-input-action-btn focus-helper-icon"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  if (!textareaRef.current) return;
-                  const cursorPos = textareaRef.current.selectionStart;
-                  const beforeCursor = input.substring(0, cursorPos);
-                  const afterCursor = input.substring(cursorPos);
-
-                  const openTagMatch = beforeCursor.match(/<(\w+)(?:\s[^>]*)?>(?![\s\S]*<\/\1>)/);
-
-                  if (openTagMatch) {
-                    // There's an open tag - add closing tag
-                    const tagName = openTagMatch[1];
-                    const newInput = beforeCursor + `</${tagName}>` + afterCursor;
-                    setInput(newInput);
-
-                    setTimeout(() => {
-                      if (textareaRef.current) {
-                        textareaRef.current.focus();
-                        const newCursorPos = cursorPos + tagName.length + 3;
-                        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
-                      }
-                    }, 0);
-                  } else {
-                    // No open tag - insert only opening tag, let user type
-                    const newInput = beforeCursor + '<tag>' + afterCursor;
-                    setInput(newInput);
-
-                    setTimeout(() => {
-                      if (textareaRef.current) {
-                        textareaRef.current.focus();
-                        const startPos = cursorPos + 1;
-                        const endPos = cursorPos + 4;
-                        textareaRef.current.setSelectionRange(startPos, endPos);
-                      }
-                    }, 0);
-                  }
-                }}
-                aria-label="XML tag"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M4 5L2 8l2 3M12 5l2 3-2 3M9 3L7 13" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-              </KeyboardShortcutTooltip>
-            </div>
-          )}
-          {/* IDE context icon — full detail in Context accordion panel */}
-          {(previewFile || editorSelection || (isMacOS() && externalIdeContext)) && (
-            <KeyboardShortcutTooltip
-              label={(() => {
-                if (!ideContextEnabled) return 'Context disabled';
-                if (editorSelection) {
-                  const name = editorSelection.filePath.split('/').pop() ?? editorSelection.filePath;
-                  return `${name}:${editorSelection.startLine}-${editorSelection.endLine}`;
-                }
-                if (externalIdeContext?.activeFile) {
-                  const name = externalIdeContext.activeFile.split('/').pop() ?? externalIdeContext.activeFile;
-                  const sel = externalIdeContext.selection;
-                  const hasSelection = sel && (sel.startLine !== sel.endLine || sel.startChar !== sel.endChar);
-                  if (hasSelection) {
-                    return `${name} · L${sel.startLine}:${sel.startChar} → L${sel.endLine}:${sel.endChar}`;
-                  }
-                  return `IDE context: ${name}`;
-                }
-                return 'Context active';
-              })()}
-              position="top"
-            >
-            <button
-              type="button"
-              className={`chat-input-action-btn chat-input-ide-btn ${!ideContextEnabled ? 'chat-input-ide-btn--disabled' : ''}`}
-              onClick={toggleIdeContext}
-              aria-label="Toggle IDE context"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="16 18 22 12 16 6" />
-                <polyline points="8 6 2 12 8 18" />
-              </svg>
-            </button>
-            </KeyboardShortcutTooltip>
-          )}
-          </div>
-          {/* Send/Stop button - aligned to right */}
-          <div className="chat-input-actions-right">
-            {isStreaming ? (
-              <KeyboardShortcutTooltip label="Stop" shortcut="ESC" position="top">
-              <button
-                type="button"
-                className="chat-input-send streaming"
-                onClick={handleStop}
-                aria-label="Stop streaming"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
-                </svg>
-              </button>
-              </KeyboardShortcutTooltip>
-            ) : (
-              <KeyboardShortcutTooltip label="Send" shortcut={formatShortcut(shortcuts.chatSendMessage?.currentKeys || '') || undefined} position="top">
-              <button
-                type="button"
-                className="chat-input-send"
-                onClick={() => void handleSend()}
-                disabled={!input.trim() && attachments.length === 0}
-                aria-label="Send message"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    d="M2 8L14 2L8 14L6.5 9.5L2 8Z"
-                    fill="currentColor"
-                    stroke="currentColor"
-                    strokeWidth="1.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-              </KeyboardShortcutTooltip>
-            )}
-          </div>
-          </div>
           <textarea
             ref={textareaRef}
             className="chat-input-field"
@@ -2689,18 +2499,13 @@ export default function ChatInput({
             onPaste={handlePaste}
             onFocus={() => {
               setIsFocused(true);
-              // Notify sidebar to scroll active session into view
               window.dispatchEvent(new CustomEvent('quack:scroll-to-active-session'));
             }}
             onBlur={(e) => {
-              // Keep focus state if clicking inside chat-view-footer (parent component)
               const relatedTarget = e.relatedTarget as HTMLElement | null;
               if (relatedTarget) {
-                const chatFooter = relatedTarget.closest('.chat-view-footer');
-                if (chatFooter) {
-                  // Click is inside chat-view-footer, don't collapse
-                  return;
-                }
+                const inFooter = relatedTarget.closest('.chat-view-footer') || relatedTarget.closest('.unified-action-bar');
+                if (inFooter) return;
               }
               setIsFocused(false);
             }}
@@ -2712,7 +2517,7 @@ export default function ChatInput({
             rows={1}
           />
 
-        {/* EquipBar - Agent toolkit quick-access (shown below textarea when focused) */}
+        {/* EquipBar - Agent toolkit quick-access */}
         {isFocused && agentToolkit && (agentToolkit.skills.length > 0 || agentToolkit.droids.length > 0 || agentToolkit.commands.length > 0) && (
           <div className="chat-input-equip-bar-wrapper" onMouseDown={(e) => e.preventDefault()}>
             <EquipBar
@@ -2724,6 +2529,31 @@ export default function ChatInput({
               onInsertCommand={(command) => setInput(input + `/${command} `)}
             />
           </div>
+        )}
+
+        {/* Unified Action Bar - always visible below textarea */}
+        {unifiedBarProps && (
+          <UnifiedActionBar
+            {...unifiedBarProps}
+            onAttach={handleAttach}
+            attachShortcut={formatShortcut(shortcuts.chatAttachFile?.currentKeys || '') || undefined}
+            onOpenPromptEngineer={onOpenPromptEngineer}
+            onVoiceClick={handleVoiceClick}
+            isSpeechSupported={isSpeechSupported}
+            onToggleSnippets={() => setShowSnippetPopover(!showSnippetPopover)}
+            onInsertNewLine={handleInsertNewLine}
+            onInsertXmlTag={handleInsertXmlTag}
+            hasIdeContext={!!(previewFile || editorSelection || (isMacOS() && externalIdeContext))}
+            ideContextEnabled={ideContextEnabled}
+            onToggleIdeContext={toggleIdeContext}
+            isFullscreen={isFullscreen}
+            onToggleFullscreen={onToggleFullscreen}
+            isStreaming={isStreaming}
+            onSend={() => void handleSend()}
+            onStop={handleStop}
+            canSend={!!(input.trim() || attachments.length > 0)}
+            sendShortcut={formatShortcut(shortcuts.chatSendMessage?.currentKeys || '') || undefined}
+          />
         )}
         </div>
       </div>

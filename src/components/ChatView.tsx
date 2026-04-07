@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
-import { Brain } from 'lucide-react';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
-import ChatSettingsMenu from './ChatSettingsMenu';
 import TokenUsageIndicator from './TokenUsageIndicator';
 import StaminaBarBorder from './StaminaBarBorder';
 import EditSummaryBar from './EditSummaryBar';
@@ -16,15 +14,12 @@ import BrainContextBanner from './BrainContextBanner';
 import BTWDrawer from './btw/BTWDrawer';
 import { useBTW } from '../hooks/useBTW';
 import { useQuickLoop } from '../hooks/useQuickLoop';
-import { QuickLoopPopover } from './loop/QuickLoopPopover';
-import { QuickLoopIndicator } from './loop/QuickLoopIndicator';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
 import { createBackgroundTask } from '../services/backgroundAgentService';
 import { useChatStore } from '../stores/chatStore';
 import { useAgentRules } from '../hooks/useAgentRules';
 import { RemoteTeamWidget } from './RemoteTeamWidget';
 import { useTeamStore } from '../stores/teamStore';
-import KeyboardShortcutTooltip from './KeyboardShortcutTooltip';
 import type { ChatMessage, AgentInfo, ChatAttachment, AskUserQuestionAnswers, TerminalInfo } from '../types';
 import type {
   ChatSendOptions,
@@ -266,7 +261,7 @@ export default function ChatView({
   const remoteTeam = useTeamStore(s => s.activeTeam);
 
   // Quick Loop - recurring prompts
-  const [showLoopPopover, setShowLoopPopover] = useState(false);
+  // showLoopPopover moved to UnifiedActionBar
   const quickLoop = useQuickLoop((prompt) => {
     onSendMessage(prompt);
   });
@@ -933,138 +928,7 @@ export default function ChatView({
           onClear={onClearConversation}
           contextUsageBreakdown={sessionTokens.contextUsageBreakdown}
         />
-        <div className="chat-view-footer-controls">
-          <ChatSettingsMenu
-            model={model}
-            thinkingMode={thinkingMode}
-            permissionMode={permissionMode}
-            effort={effort}
-            onModelChange={(m) => onModelChange?.(m)}
-            onThinkingModeChange={(mode) => onThinkingModeChange?.(mode)}
-            onPermissionModeChange={(mode) => onPermissionModeChange?.(mode)}
-            onEffortChange={(e) => onEffortChange?.(e)}
-            disabled={isLoading}
-          />
-          {/* Brain Update - injects prompt to update Quack Brain with session progress */}
-          {messages.length > 0 && (
-            <KeyboardShortcutTooltip label="Update Brain" position="top">
-              <button
-                className="chat-brain-btn"
-                onClick={() => {
-                  const prompt = 'Update the Quack Brain with the progress and discoveries made in this session. Only add new items not already documented — check existing brain entries before creating duplicates.';
-                  onSendMessage(prompt);
-                }}
-                disabled={isLoading}
-              >
-                  <Brain size={16} />
-              </button>
-            </KeyboardShortcutTooltip>
-          )}
-          {/* BTW Side-Chain - quick questions without interrupting the agent */}
-          {messages.length > 0 && (
-            <KeyboardShortcutTooltip label="BTW" shortcut="⌃B" position="top">
-              <button
-                className="chat-btw-btn"
-                onClick={btw.isOpen ? btw.closeBTW : btw.openBTW}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                </svg>
-              </button>
-            </KeyboardShortcutTooltip>
-          )}
-          {/* Quick Loop - recurring prompts */}
-          {messages.length > 0 && (
-            <div style={{ position: 'relative' }}>
-              <KeyboardShortcutTooltip label="Quick Loop" position="top">
-                <button
-                  className="chat-loop-btn"
-                  onClick={() => setShowLoopPopover(!showLoopPopover)}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 1l4 4-4 4" /><path d="M3 11V9a4 4 0 0 1 4-4h14" />
-                    <path d="M7 23l-4-4 4-4" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
-                  </svg>
-                </button>
-              </KeyboardShortcutTooltip>
-              <QuickLoopPopover
-                isOpen={showLoopPopover}
-                onClose={() => setShowLoopPopover(false)}
-                onStartLoop={quickLoop.startLoop}
-                status={quickLoop.status}
-                activePrompt={quickLoop.prompt}
-                onStopLoop={quickLoop.stopLoop}
-                currentRun={quickLoop.currentRun}
-              />
-            </div>
-          )}
-          {/* Quick Loop Indicator */}
-          <QuickLoopIndicator
-            status={quickLoop.status}
-            currentRun={quickLoop.currentRun}
-            onClick={() => setShowLoopPopover(true)}
-          />
-          {isLoading && onAbortStream && (
-            <KeyboardShortcutTooltip label="Stop" shortcut="ESC" position="top">
-              <button
-                className="chat-stop-btn"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={onAbortStream}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                  <rect x="6" y="6" width="12" height="12" rx="2" />
-                </svg>
-                <span>Stop</span>
-              </button>
-            </KeyboardShortcutTooltip>
-          )}
-          {messages.length > 0 && (
-            <KeyboardShortcutTooltip label="Compact" position="top">
-              <button
-                className="chat-compact-btn"
-                onClick={() => onSendMessage('/compact')}
-                disabled={isLoading}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                  <polyline points="7.5 4.21 12 6.81 16.5 4.21" />
-                  <polyline points="7.5 19.79 7.5 14.6 3 12" />
-                  <polyline points="21 12 16.5 14.6 16.5 19.79" />
-                  <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-                  <line x1="12" y1="22.08" x2="12" y2="12" />
-                </svg>
-              </button>
-            </KeyboardShortcutTooltip>
-          )}
-          {messages.length > 0 && onOpenSessionInTerminal && (
-            <KeyboardShortcutTooltip label="Terminal" position="top">
-              <button
-                className="chat-terminal-btn"
-                onClick={onOpenSessionInTerminal}
-                disabled={isLoading}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="4 17 10 11 4 5" />
-                  <line x1="12" y1="19" x2="20" y2="19" />
-                </svg>
-              </button>
-            </KeyboardShortcutTooltip>
-          )}
-          {messages.length > 0 && onClearConversation && (
-            <KeyboardShortcutTooltip label="Clear" position="top">
-              <button
-                className="chat-clear-btn"
-                onClick={onClearConversation}
-                disabled={isLoading}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                </svg>
-              </button>
-            </KeyboardShortcutTooltip>
-          )}
-        </div>
+        {/* Footer controls moved to UnifiedActionBar inside ChatInput */}
         {/* 🛡️ Ask mode: tool permission banners */}
         {pendingToolPermissions && pendingToolPermissions.length > 0 && onToolPermissionResponse && (
           <div className="tool-permission-banners">
@@ -1115,6 +979,38 @@ export default function ChatView({
           // Fullscreen mode
           isFullscreen={isFullscreen}
           onToggleFullscreen={onToggleFullscreen}
+          // Unified Action Bar - session-level controls
+          unifiedBarProps={{
+            settingsProps: {
+              model,
+              thinkingMode,
+              permissionMode,
+              effort,
+              onModelChange: (m) => onModelChange?.(m),
+              onThinkingModeChange: (mode) => onThinkingModeChange?.(mode),
+              onPermissionModeChange: (mode) => onPermissionModeChange?.(mode),
+              onEffortChange: (e) => onEffortChange?.(e),
+              disabled: isLoading,
+            },
+            hasMessages: messages.length > 0,
+            isLoading,
+            onBrainUpdate: () => {
+              const prompt = 'Update the Quack Brain with the progress and discoveries made in this session. Only add new items not already documented — check existing brain entries before creating duplicates.';
+              onSendMessage(prompt);
+            },
+            onToggleBTW: btw.isOpen ? btw.closeBTW : btw.openBTW,
+            btwIsOpen: btw.isOpen,
+            quickLoop: {
+              status: quickLoop.status,
+              currentRun: quickLoop.currentRun,
+              prompt: quickLoop.prompt,
+              startLoop: quickLoop.startLoop,
+              stopLoop: quickLoop.stopLoop,
+            },
+            onCompact: () => onSendMessage('/compact'),
+            onOpenTerminal: onOpenSessionInTerminal,
+            onClear: onClearConversation,
+          }}
         />
       </div>
       {/* BTW Side-Chain Drawer */}

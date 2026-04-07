@@ -1,0 +1,273 @@
+/* ===================================
+   UnifiedActionBar - Merged action bar below textarea
+   Replaces chat-input-actions + chat-view-footer-controls
+   =================================== */
+
+.unified-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 2px;
+  min-height: 32px;
+}
+
+.uab-left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.uab-spacer {
+  flex: 1;
+}
+
+.uab-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* ===================================
+   Icon Buttons - Reuses chat-input-action-btn pattern
+   =================================== */
+
+.uab-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.15s var(--ease-default);
+  outline: none;
+  position: relative;
+}
+
+.uab-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.uab-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.uab-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Buttons with chevron indicator */
+.uab-btn--with-chevron {
+  width: auto;
+  gap: 2px;
+  padding: 0 6px;
+}
+
+.uab-btn--active {
+  background: rgba(var(--accent-rgb), 0.12);
+  color: var(--accent-color);
+}
+
+.uab-chevron {
+  width: 8px !important;
+  height: 8px !important;
+  opacity: 0.5;
+  transition: transform 0.15s ease;
+}
+
+.uab-btn--active .uab-chevron {
+  transform: rotate(180deg);
+  opacity: 0.8;
+}
+
+/* ===================================
+   Send / Stop Button
+   =================================== */
+
+.uab-send {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--accent-color);
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s var(--ease-default);
+  outline: none;
+}
+
+.uab-send:hover:not(:disabled) {
+  background: #ff9d63;
+  box-shadow: var(--shadow-sm);
+}
+
+.uab-send:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.uab-send:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.uab-send--streaming {
+  background: #ef4444;
+  animation: uab-pulse 1.5s ease-in-out infinite;
+}
+
+.uab-send--streaming:hover:not(:disabled) {
+  background: #dc2626;
+  box-shadow: var(--shadow-sm);
+}
+
+@keyframes uab-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.85; }
+}
+
+/* ===================================
+   Popover - Shared by Compose & Session
+   =================================== */
+
+.uab-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 1000;
+  min-width: 190px;
+  max-width: 260px;
+  background: rgba(18, 20, 27, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(20px);
+  padding: 4px;
+  animation: uab-slide-up 0.15s ease-out;
+}
+
+@keyframes uab-slide-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.uab-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+/* ===================================
+   Popover Items - Icon + Label
+   =================================== */
+
+.uab-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 12px;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  outline: none;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.uab-popover-item:hover:not(:disabled) {
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent-color);
+}
+
+.uab-popover-item:active:not(:disabled) {
+  background: rgba(var(--accent-rgb), 0.25);
+}
+
+.uab-popover-item:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.uab-popover-item svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.uab-popover-item:hover:not(:disabled) svg {
+  opacity: 1;
+}
+
+.uab-popover-item--active {
+  color: var(--accent-color);
+}
+
+.uab-popover-item--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+  color: rgba(239, 68, 68, 0.9);
+}
+
+/* Badge for toggleable items (e.g., IDE Context ON) */
+.uab-popover-badge {
+  margin-left: auto;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  border-radius: 4px;
+  background: rgba(var(--accent-rgb), 0.2);
+  color: var(--accent-color);
+  letter-spacing: 0.5px;
+}
+
+/* Keyboard shortcut hint */
+.uab-popover-shortcut {
+  margin-left: auto;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  font-weight: 500;
+}
+
+/* Separator line between groups */
+.uab-popover-separator {
+  height: 1px;
+  margin: 3px 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ===================================
+   Responsive
+   =================================== */
+
+@media (max-width: 768px) {
+  .unified-action-bar {
+    gap: 1px;
+    padding: 2px 0;
+  }
+
+  .uab-btn {
+    width: 26px;
+    height: 26px;
+  }
+
+  .uab-send {
+    width: 26px;
+    height: 26px;
+  }
+}
