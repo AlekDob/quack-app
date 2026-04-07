@@ -3,7 +3,7 @@
  * Draggable body, resizable via corner handles, editable label.
  */
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 import type { GroupRect, CanvasAnnotations } from './annotationTypes';
 import { GROUP_MIN_W, GROUP_MIN_H, GROUP_COLORS, POST_IT_W, POST_IT_H } from './annotationTypes';
 
@@ -40,53 +40,68 @@ export default function CanvasGroupRect({ group, zoom, isSelected, isMultiSelect
     ox: number; oy: number; ow: number; oh: number;
   } | null>(null);
 
-  // Body drag
-  const handleBodyDown = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (e.button !== 0) return;
-    // Shift+click toggles multi-select
-    if (e.shiftKey && onMultiToggle) { onMultiToggle(group.id); return; }
-    // If multi-selected, start group drag (Canvas handles all selected items)
-    if (isMultiSelected && onGroupDragStart) { onGroupDragStart(e.clientX, e.clientY); return; }
-    onBeginDrag?.();
-    dragRef.current = { sx: e.clientX, sy: e.clientY, ox: group.x, oy: group.y, did: false };
-    onSelect(group.id);
-  }, [group.x, group.y, group.id, onSelect, onMultiToggle, isMultiSelected, onGroupDragStart]);
+  // Brain: fix-group-resize-mouse-escape — stable ref for props used in window listeners
+  const propsRef = useRef({ zoom, groupId: group.id, groupX: group.x, groupY: group.y, onUpdate, onEndDrag });
+  propsRef.current = { zoom, groupId: group.id, groupX: group.x, groupY: group.y, onUpdate, onEndDrag };
 
-  const handleMove = useCallback((e: React.MouseEvent) => {
-    // Resize
+  // Stable window-level handlers (no deps = never recreated = never stale-removed)
+  const handleWindowMove = useCallback((e: MouseEvent) => {
+    const { zoom: z, groupId, groupX, groupY, onUpdate: update } = propsRef.current;
     const r = resizeRef.current;
     if (r) {
-      const dx = (e.clientX - r.sx) / zoom;
-      const dy = (e.clientY - r.sy) / zoom;
+      const dx = (e.clientX - r.sx) / z;
+      const dy = (e.clientY - r.sy) / z;
       let { ox, oy, ow, oh } = r;
       if (r.corner === 'br') { ow += dx; oh += dy; }
       else if (r.corner === 'bl') { ox += dx; ow -= dx; oh += dy; }
       else if (r.corner === 'tr') { oy += dy; ow += dx; oh -= dy; }
       else { ox += dx; oy += dy; ow -= dx; oh -= dy; }
-      onUpdate(group.id, {
-        x: ow >= GROUP_MIN_W ? ox : group.x,
-        y: oh >= GROUP_MIN_H ? oy : group.y,
+      update(groupId, {
+        x: ow >= GROUP_MIN_W ? ox : groupX,
+        y: oh >= GROUP_MIN_H ? oy : groupY,
         w: Math.max(GROUP_MIN_W, ow),
         h: Math.max(GROUP_MIN_H, oh),
       });
       return;
     }
-    // Body drag
     const d = dragRef.current;
     if (!d) return;
     const dx = e.clientX - d.sx;
     const dy = e.clientY - d.sy;
     if (Math.abs(dx) > DRAG_T || Math.abs(dy) > DRAG_T) d.did = true;
-    if (d.did) onUpdate(group.id, { x: d.ox + dx / zoom, y: d.oy + dy / zoom });
-  }, [group.id, group.x, group.y, zoom, onUpdate]);
+    if (d.did) update(groupId, { x: d.ox + dx / z, y: d.oy + dy / z });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleUp = useCallback(() => {
+  const handleWindowUp = useCallback(() => {
     if (dragRef.current && !dragRef.current.did) setEditLabel(true);
-    else if (dragRef.current?.did || resizeRef.current) onEndDrag?.();
+    else if (dragRef.current?.did || resizeRef.current) propsRef.current.onEndDrag?.();
     dragRef.current = null;
     resizeRef.current = null;
-  }, [onEndDrag]);
+    window.removeEventListener('mousemove', handleWindowMove);
+    window.removeEventListener('mouseup', handleWindowUp);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cleanup only on unmount
+  useEffect(() => () => {
+    window.removeEventListener('mousemove', handleWindowMove);
+    window.removeEventListener('mouseup', handleWindowUp);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Body drag
+  const handleBodyDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    if (e.shiftKey && onMultiToggle) { onMultiToggle(group.id); return; }
+    if (isMultiSelected && onGroupDragStart) { onGroupDragStart(e.clientX, e.clientY); return; }
+    onBeginDrag?.();
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ox: group.x, oy: group.y, did: false };
+    onSelect(group.id);
+    window.addEventListener('mousemove', handleWindowMove);
+    window.addEventListener('mouseup', handleWindowUp);
+  }, [group.x, group.y, group.id, onSelect, onMultiToggle, isMultiSelected, onGroupDragStart, handleWindowMove, handleWindowUp]);
 
   const handleResizeDown = useCallback((corner: Corner, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -94,7 +109,9 @@ export default function CanvasGroupRect({ group, zoom, isSelected, isMultiSelect
       corner, sx: e.clientX, sy: e.clientY,
       ox: group.x, oy: group.y, ow: group.w, oh: group.h,
     };
-  }, [group.x, group.y, group.w, group.h]);
+    window.addEventListener('mousemove', handleWindowMove);
+    window.addEventListener('mouseup', handleWindowUp);
+  }, [group.x, group.y, group.w, group.h, handleWindowMove, handleWindowUp]);
 
   const cycleColor = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -112,9 +129,7 @@ export default function CanvasGroupRect({ group, zoom, isSelected, isMultiSelect
   return (
     <g
       onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => { setHov(false); dragRef.current = null; resizeRef.current = null; }}
-      onMouseMove={handleMove}
-      onMouseUp={handleUp}
+      onMouseLeave={() => { if (!dragRef.current && !resizeRef.current) setHov(false); }}
     >
       {/* Invisible hover extension — captures mouse above body for delete/color buttons */}
       <rect

@@ -36,6 +36,10 @@ export default function CanvasImage({ image, zoom, projectPath, isSelected, isMu
   const dragRef = useRef<{ sx: number; sy: number; ox: number; oy: number; did: boolean } | null>(null);
   const resizeRef = useRef<{ sx: number; sy: number; ow: number; oh: number; ratio: number } | null>(null);
 
+  // Brain: fix-group-resize-mouse-escape — stable ref for props used in window listeners
+  const propsRef = useRef({ zoom, imageId: image.id, onUpdate, onEndDrag });
+  propsRef.current = { zoom, imageId: image.id, onUpdate, onEndDrag };
+
   // Load image from filesystem as blob URL
   useEffect(() => {
     let revoke: string | null = null;
@@ -58,49 +62,62 @@ export default function CanvasImage({ image, zoom, projectPath, isSelected, isMu
     return () => { if (revoke) URL.revokeObjectURL(revoke); };
   }, [projectPath, image.src]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (e.button !== 0) return;
-    // Shift+click toggles multi-select
-    if (e.shiftKey && onMultiToggle) { onMultiToggle(image.id); return; }
-    // If multi-selected, start group drag (Canvas handles all selected items)
-    if (isMultiSelected && onGroupDragStart) { onGroupDragStart(e.clientX, e.clientY); return; }
-    onBeginDrag?.();
-    dragRef.current = { sx: e.clientX, sy: e.clientY, ox: image.x, oy: image.y, did: false };
-    onSelect(image.id);
-  }, [image.x, image.y, image.id, onSelect, onMultiToggle, isMultiSelected, onGroupDragStart]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    // Resize
+  // Stable window-level handlers (no deps = never recreated = never stale-removed)
+  const handleWindowMove = useCallback((e: MouseEvent) => {
+    const { zoom: z, imageId, onUpdate: update } = propsRef.current;
     const rs = resizeRef.current;
     if (rs) {
-      const dx = (e.clientX - rs.sx) / zoom;
+      const dx = (e.clientX - rs.sx) / z;
       const newW = Math.max(60, rs.ow + dx);
       const newH = newW / rs.ratio;
-      onUpdate(image.id, { w: newW, h: newH });
+      update(imageId, { w: newW, h: newH });
       return;
     }
-    // Drag
     const d = dragRef.current;
     if (!d) return;
     const dx = e.clientX - d.sx;
     const dy = e.clientY - d.sy;
     if (Math.abs(dx) > DRAG_T || Math.abs(dy) > DRAG_T) d.did = true;
-    if (d.did) onUpdate(image.id, { x: d.ox + dx / zoom, y: d.oy + dy / zoom });
-  }, [image.id, zoom, onUpdate]);
+    if (d.did) update(imageId, { x: d.ox + dx / z, y: d.oy + dy / z });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleMouseUp = useCallback(() => {
-    if (dragRef.current?.did || resizeRef.current) onEndDrag?.();
+  const handleWindowUp = useCallback(() => {
+    if (dragRef.current?.did || resizeRef.current) propsRef.current.onEndDrag?.();
     dragRef.current = null;
     resizeRef.current = null;
-  }, [onEndDrag]);
+    window.removeEventListener('mousemove', handleWindowMove);
+    window.removeEventListener('mouseup', handleWindowUp);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cleanup only on unmount
+  useEffect(() => () => {
+    window.removeEventListener('mousemove', handleWindowMove);
+    window.removeEventListener('mouseup', handleWindowUp);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (e.button !== 0) return;
+    if (e.shiftKey && onMultiToggle) { onMultiToggle(image.id); return; }
+    if (isMultiSelected && onGroupDragStart) { onGroupDragStart(e.clientX, e.clientY); return; }
+    onBeginDrag?.();
+    dragRef.current = { sx: e.clientX, sy: e.clientY, ox: image.x, oy: image.y, did: false };
+    onSelect(image.id);
+    window.addEventListener('mousemove', handleWindowMove);
+    window.addEventListener('mouseup', handleWindowUp);
+  }, [image.x, image.y, image.id, onSelect, onMultiToggle, isMultiSelected, onGroupDragStart, handleWindowMove, handleWindowUp]);
 
   const handleResizeDown = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     if (e.button !== 0) return;
     resizeRef.current = { sx: e.clientX, sy: e.clientY, ow: image.w, oh: image.h, ratio: image.w / image.h };
     onSelect(image.id);
-  }, [image.w, image.h, image.id, onSelect]);
+    window.addEventListener('mousemove', handleWindowMove);
+    window.addEventListener('mouseup', handleWindowUp);
+  }, [image.w, image.h, image.id, onSelect, handleWindowMove, handleWindowUp]);
 
   const border = isMultiSelected ? '#3b82f6' : isSelected ? BORDER_SELECTED : hov ? BORDER_COLOR : 'transparent';
 
@@ -108,10 +125,8 @@ export default function CanvasImage({ image, zoom, projectPath, isSelected, isMu
     <g
       transform={`translate(${image.x}, ${image.y})`}
       onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => { setHov(false); dragRef.current = null; resizeRef.current = null; }}
+      onMouseLeave={() => { if (!dragRef.current && !resizeRef.current) setHov(false); }}
       onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
       style={{ cursor: dragRef.current?.did ? 'grabbing' : 'grab' }}
     >
       {/* Shadow */}

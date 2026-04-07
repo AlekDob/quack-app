@@ -119,8 +119,8 @@ image: images/026-whiteboard-overview.png
 
 ### Annotations (Post-its + Group Rectangles + Images)
 - **Post-it notes**: click canvas in Post-it mode to create; drag to move; click to edit text; hover for delete/color buttons; 6 preset colors cycling
-- **Group rectangles**: click-drag canvas in Group mode to draw; resizable via 4 corner handles; editable label (click); dashed border when unselected
-- **Images**: drag & drop from OS or Image mode + file picker; draggable; aspect-ratio resize; saved to filesystem (see Canvas Images section)
+- **Group rectangles**: click-drag canvas in Group mode to draw; resizable via 4 corner handles; editable label (click); dashed border when unselected. Drag/resize uses window-level listeners with stable `propsRef` pattern (see Brain: fix-group-resize-mouse-escape)
+- **Images**: drag & drop from OS or Image mode + file picker; draggable; aspect-ratio resize; saved to filesystem (see Canvas Images section). Same stable window-listener pattern as group rects
 - Annotations + node positions stored in `documentation/features/.whiteboard.json` (file-based, replaces localStorage)
 - Z-order (bottom→top): group rects → **images** → layer backgrounds → links → feature nodes → post-its
 - Toolbar (floating, bottom-center): Select / Lasso / Post-it / Group / Image mode toggle + selection count badge
