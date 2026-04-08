@@ -69,6 +69,11 @@ Installed resources are tracked in `~/.quack/marketplace-registry.json` with ver
 - **Agent-bundle routing**: `QuackStoreDrawer` detects `category === 'agent-bundles'` and routes to project picker instead of direct install
 - **Scope toggle**: Global (`~/.claude/`) vs Project (`{project}/.claude/`) — only global for agent-bundles
 
+### Layout Notes
+- **Item grid**: 2-column fixed layout (`repeat(2, 1fr)`), featured section uses its own responsive grid
+- **Detail modal**: near-opaque dark background (`rgba(30,30,35,0.95)`) with strong overlay (`rgba(0,0,0,0.75)` + `blur(8px)`)
+- **Manual install command**: detail modal shows a copyable `curl`/`npx` command for each resource type, built from `_pluginSource` + category-specific path fields. Uses `@tauri-apps/plugin-clipboard-manager` for copy.
+
 ### Cross-Platform Notes
 - ALL path construction MUST use `join()` from `@tauri-apps/api/path` — never template literals with `/`
 - `homeDir()` returns OS-native separators (`/` on macOS, `\` on Windows)

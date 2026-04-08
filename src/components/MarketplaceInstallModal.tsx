@@ -5,6 +5,46 @@ import type { ActiveProject } from './modal-steps/types';
 import { getCategoryGradient, getCategoryIcon, VerifiedIcon, formatInstallCount, hasDuckAvatar, getDuckAvatarUrl } from './store/StoreIcons';
 import MarkdownText from './MarkdownText';
 
+const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/AlekDob/quack-marketplace/main';
+
+type ExtResource = MarketplaceResource & {
+  _pluginSource?: string;
+  _skillPath?: string;
+  _commandPath?: string;
+  _agentPath?: string;
+  _rulePath?: string;
+  _mcpServerName?: string;
+  _mcpServerConfig?: { command: string; args?: string[] };
+};
+
+function buildManualCommand(resource: ExtResource): string | null {
+  const src = resource._pluginSource;
+  if (!src) return null;
+
+  if (resource._skillPath) {
+    const name = resource._skillPath.split('/').pop() || '';
+    return `mkdir -p ~/.claude/skills/${name} && curl -sL "${GITHUB_RAW_BASE}/${src}/${resource._skillPath}/SKILL.md" -o ~/.claude/skills/${name}/SKILL.md`;
+  }
+  if (resource._commandPath) {
+    const file = resource._commandPath.split('/').pop() || '';
+    return `mkdir -p ~/.claude/commands && curl -sL "${GITHUB_RAW_BASE}/${src}/${resource._commandPath}" -o ~/.claude/commands/${file}`;
+  }
+  if (resource._agentPath) {
+    const file = resource._agentPath.split('/').pop() || '';
+    return `mkdir -p ~/.claude/agents && curl -sL "${GITHUB_RAW_BASE}/${src}/${resource._agentPath}" -o ~/.claude/agents/${file}`;
+  }
+  if (resource._rulePath) {
+    const file = resource._rulePath.split('/').pop() || '';
+    return `mkdir -p ~/.claude/rules && curl -sL "${GITHUB_RAW_BASE}/${src}/${resource._rulePath}" -o ~/.claude/rules/${file}`;
+  }
+  if (resource._mcpServerName && resource._mcpServerConfig) {
+    const cfg = resource._mcpServerConfig;
+    const args = cfg.args ? ` ${cfg.args.join(' ')}` : '';
+    return `npx ${cfg.command}${args}`;
+  }
+  return null;
+}
+
 interface MarketplaceInstallModalProps {
   resource: MarketplaceResource | null;
   installed: boolean;
@@ -22,10 +62,12 @@ export default function MarketplaceInstallModal({
 }: MarketplaceInstallModalProps) {
   const [installing, setInstalling] = useState(false);
   const [scope, setScope] = useState<'global' | 'project'>('global');
+  const [copied, setCopied] = useState(false);
 
   if (!resource) return null;
 
   const isAgentBundle = resource.category === 'agent-bundles';
+  const manualCommand = buildManualCommand(resource as ExtResource);
 
   const handleInstall = async () => {
     setInstalling(true);
@@ -111,6 +153,29 @@ export default function MarketplaceInstallModal({
         <div className="store-detail-body">
           <MarkdownText>{resource.longDescription || resource.description}</MarkdownText>
         </div>
+
+        {/* Manual install command */}
+        {manualCommand && (
+          <div className="store-detail-manual">
+            <span className="store-detail-manual-label">Manual install</span>
+            <div className="store-detail-manual-cmd">
+              <code>{manualCommand}</code>
+              <button
+                type="button"
+                className="store-detail-manual-copy"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(manualCommand);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  } catch { /* clipboard fallback */ }
+                }}
+              >
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Tags */}
         {resource.tags.length > 0 && (

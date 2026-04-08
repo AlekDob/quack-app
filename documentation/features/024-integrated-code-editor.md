@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-app
 stack: React 18 + TypeScript strict + Tauri v2 + CodeMirror 6
 created: 2026-04-02
-last_verified: 2026-04-03
+last_verified: 2026-04-08
 tags: [editor, codemirror, tab, diff, multi-tab, search, popout, autocomplete, minimap, lint, code-intel, outline, preview, markdown, mermaid, keyboard-shortcuts]
 ---
 
@@ -117,6 +117,8 @@ User clicks outline toggle button in EditorHeader
   -> Rust spawns node code-intel-bridge.js (stdin JSON, stdout JSON)
   -> Bridge calls tree-sitter getOutline() from outline.js
   -> Symbols displayed in collapsible tree (kind icon + name + line number)
+  -> Click symbol -> CodeEditorRef.navigateToLine(line) scrolls + centers + focuses
+  -> Outline button only rendered when file language is in outlineSupportedLanguages (14 langs)
 ```
 
 **Diagnostics push (tsc/eslint):**
