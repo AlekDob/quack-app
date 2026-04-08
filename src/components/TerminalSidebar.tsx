@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef, type MouseEvent } from "react";
+import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from '@tauri-apps/plugin-shell';
 import { Store } from '@tauri-apps/plugin-store';
@@ -1573,8 +1574,8 @@ export default function TerminalSidebar({
         />
       )}
 
-      {/* Group context menu */}
-      {groupContextMenu && (
+      {/* Group context menu — portal to escape sidebar's backdrop-filter containing block */}
+      {groupContextMenu && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -1774,7 +1775,8 @@ export default function TerminalSidebar({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Footer Bar - Minimal with text labels */}

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { EffortLevel, ModePreset, AgentModePresets, LLMProviderType } from '../types';
-import { applyTypography, DEFAULT_TYPOGRAPHY } from '../constants/typography';
+import { applyTypography, DEFAULT_TYPOGRAPHY, DEFAULT_CUSTOM_FONT_SIZE, safeCustomSize } from '../constants/typography';
 import type { TypographySettings, FontSizePreset } from '../constants/typography';
 import { applyAccentColor, DEFAULT_ACCENT } from '../utils/accentColor';
 
@@ -109,6 +109,7 @@ interface SettingsState {
 
   // Actions - Typography
   setFontSizePreset: (preset: FontSizePreset) => void;
+  setCustomFontSize: (size: number) => void;
   updateTypography: (settings: Partial<TypographySettings>) => void;
   resetTypography: () => void;
 
@@ -282,6 +283,15 @@ export const useSettingsStore = create<SettingsState>()(
           });
         },
 
+        setCustomFontSize: (size) => {
+          const clamped = safeCustomSize(size);
+          set((state) => {
+            const newTypo = { ...state.typography, fontSizePreset: 'C' as FontSizePreset, customFontSize: clamped };
+            applyTypography(newTypo);
+            return { typography: newTypo };
+          });
+        },
+
         updateTypography: (settings) => {
           set((state) => {
             const newTypo = { ...state.typography, ...settings };
@@ -366,7 +376,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
-        version: 9,
+        version: 10,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
@@ -448,6 +458,14 @@ export const useSettingsStore = create<SettingsState>()(
                 if (persisted.agentModePresets[mode]?.model === 'sonnet45') {
                   persisted.agentModePresets[mode].model = 'sonnet46';
                 }
+              }
+            }
+          }
+          // v10: Add customFontSize field + M preset now 13px base (was 14px)
+          if (version < 10) {
+            if (persisted.typography) {
+              if (!persisted.typography.customFontSize || Number.isNaN(persisted.typography.customFontSize)) {
+                persisted.typography.customFontSize = DEFAULT_CUSTOM_FONT_SIZE;
               }
             }
           }

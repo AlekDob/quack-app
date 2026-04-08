@@ -88,6 +88,7 @@ Exported symbols per file. Generated 2026-03-13.
 
 ### stores/settingsStore.ts
 - `useSettingsStore` (store)
+- Typography actions: `setCustomFontSize`
 
 ### stores/sessionStore.ts
 - `useSessionStore` (store)
@@ -387,7 +388,7 @@ Exported symbols per file. Generated 2026-03-13.
 ### components/settings/ (18 files)
 - `GitConfigOnboarding`, `IDEOnboarding`, `PrerequisitesCheck`, `SettingsContent`, `SettingsIcon`, `SettingsSidebar` (`SettingsCategory`), `UnifiedSettings`
 - Controls: `IOSInput`, `IOSSwitch`, `SectionHeader`, `SettingsRow`, `ShortcutInput`
-- Categories: `AboutSettings`, `AgentModesSettings`, `AIAssistantSettings`, `AppearanceSettings`, `ClaudeCodeSettings`, `DebugSettings`, `GeneralSettings`, `IDESettings`, `IntegrationsSettings`, `KeyboardShortcutsSettings`, `LicenseSettings`, `NotificationSettings`, `RemoteApiSettings`, `SecondBrainSettings`, `TerminalSettings`
+- Categories: `AboutSettings`, `AgentModesSettings`, `AIAssistantSettings`, `AppearanceSettings`, `ClaudeCodeSettings`, `DebugSettings`, `GeneralSettings`, `IDESettings`, `IntegrationsSettings`, `KeyboardShortcutsSettings`, `LicenseSettings`, `NotificationSettings`, `RemoteApiSettings`, `SecondBrainSettings`, `TerminalSettings`, `TypographySettings` (5 presets S/M/L/XL/Custom, custom font size stepper)
 
 ### components/store/ (8 files)
 - `StoreEmptyState`, `StoreFeaturedCard`, `StoreHeroBanner`, `StoreIcons` (`CATEGORY_GRADIENTS`, `getCategoryGradient`, `VerifiedIcon`, `formatInstallCount`), `StoreItemCard`, `StoreMainContent`, `StoreProjectPickerModal`, `StoreSidebar`
@@ -487,7 +488,15 @@ Exported symbols per file. Generated 2026-03-13.
 
 ---
 
-## 9. Schemas (src/schemas/)
+## 9. Constants (src/constants/)
+
+### constants/typography.ts
+- `FixedPreset` (type), `FONT_SIZE_PRESETS`, `DEFAULT_CUSTOM_FONT_SIZE`, `MIN_CUSTOM_FONT_SIZE`, `MAX_CUSTOM_FONT_SIZE`
+- `buildCustomScale()`, `resolveScale()`, `safeCustomSize()`
+
+---
+
+## 10. Schemas (src/schemas/)
 
 ### schemas/kanbanTask.schema.ts
 - `KanbanTaskOutput` (interface), `kanbanTaskSchema` (const)
@@ -500,7 +509,7 @@ Exported symbols per file. Generated 2026-03-13.
 
 ---
 
-## 10. Backend -- Rust (src-tauri/src/)
+## 11. Backend -- Rust (src-tauri/src/)
 
 ### Core
 

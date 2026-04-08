@@ -1,0 +1,129 @@
+name: Windows Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_version:
+        description: 'Bump patch version before building'
+        required: false
+        type: boolean
+        default: false
+      create_release:
+        description: 'Create a GitHub release with artifacts'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: 'src-tauri -> target'
+
+      - name: Get current version
+        id: get_version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Bump version (patch)
+        if: ${{ inputs.bump_version }}
+        id: bump_version
+        shell: bash
+        run: |
+          npm version patch --no-git-tag-version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          node -e "const fs = require('fs'); const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json')); conf.version = '$NEW_VERSION'; fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2));"
+
+      - name: Resolve build version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ inputs.bump_version }}" == "true" ]; then
+            echo "value=${{ steps.bump_version.outputs.new_version }}" >> $GITHUB_OUTPUT
+          else
+            echo "value=${{ steps.get_version.outputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Remove macOS-only beforeBundleCommand
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json'));
+            delete conf.build.beforeBundleCommand;
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2));
+          "
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build the app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASES_GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          tagName: v${{ steps.version.outputs.value }}-windows
+          releaseName: 'Quack v${{ steps.version.outputs.value }} (Windows)'
+          releaseBody: |
+            ## Quack v${{ steps.version.outputs.value }} - Windows
+
+            ### Installation
+            - Download the `.exe` installer (NSIS)
+            - The installer will check for Git and Node.js and offer to install them
+
+            ### Requirements
+            - Windows 10/11 (64-bit)
+            - WebView2 (auto-installed if missing)
+
+            ---
+            Built with GitHub Actions
+          releaseDraft: ${{ !inputs.create_release }}
+          prerelease: false
+          owner: AlekDob
+          repo: quack-releases
+
+      - name: Send Discord Notification
+        if: ${{ inputs.create_release }}
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        shell: bash
+        run: |
+          curl -H "Content-Type: application/json" \
+            -d '{
+              "embeds": [{
+                "title": "New Quack Windows Release!",
+                "description": "Version **v${{ steps.version.outputs.value }}** is now available for Windows!",
+                "color": 5814783,
+                "fields": [
+                  {
+                    "name": "Downloads",
+                    "value": "[GitHub Releases](https://github.com/AlekDob/quack-releases/releases/tag/v${{ steps.version.outputs.value }}-windows)"
+                  }
+                ],
+                "timestamp": "'"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'"
+              }]
+            }' \
+            $DISCORD_WEBHOOK

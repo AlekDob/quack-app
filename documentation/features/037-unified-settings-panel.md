@@ -30,7 +30,7 @@ tags: [settings, unified-settings, preferences, configuration]
 | Component | src/components/settings/categories/RemoteApiSettings.tsx | `RemoteApiSettings` -- enable/disable remote, token management, endpoint reference |
 | Component | src/components/settings/categories/AppearanceSettings.tsx | `AppearanceSettings` -- accent color picker (10 presets + custom) + background selector (images, gradients, transparent) |
 | Util | src/utils/accentColor.ts | `applyAccentColor()`, `ACCENT_PRESETS`, `DEFAULT_ACCENT` -- hex-to-CSS-variable theming engine |
-| Component | src/components/settings/categories/TypographySettings.tsx | `TypographySettings`, `PresetCard`, `PreviewBlock` -- font size presets (S/M/L/XL), UI/mono font family |
+| Component | src/components/settings/categories/TypographySettings.tsx | `TypographySettings`, `PresetCard`, `PreviewBlock` -- font size presets (S/M/L/XL/Custom), custom font size stepper, UI/mono font family |
 | Component | src/components/settings/categories/KeyboardShortcutsSettings.tsx | `KeyboardShortcutsSettings` -- shortcut customization with conflict detection |
 | Component | src/components/settings/categories/DebugSettings.tsx | `DebugSettings` -- wraps `DebugPanel` for production diagnostics |
 | Component | src/components/settings/categories/AboutSettings.tsx | `AboutSettings` -- version, update checker, changelog, credits, external links |
@@ -43,7 +43,7 @@ tags: [settings, unified-settings, preferences, configuration]
 | Store/State | src/stores/settingsStore.ts | `useSettingsStore` -- Zustand store with claude, terminal, general, agentModePresets, typography groups |
 | Store/State | src/stores/ideStore.ts | `useIDEStore` -- IDE selection, auto-launch, sync focus, file open target |
 | Store/State | src/stores/shortcutsStore.ts | `useShortcutsStore` -- keyboard shortcut bindings and conflict detection |
-| Config | src/constants/typography.ts | `FONT_SIZE_PRESETS`, `UI_FONT_OPTIONS`, `MONO_FONT_OPTIONS`, `DEFAULT_TYPOGRAPHY`, `applyTypography()` |
+| Config | src/constants/typography.ts | `FONT_SIZE_PRESETS`, `UI_FONT_OPTIONS`, `MONO_FONT_OPTIONS`, `DEFAULT_TYPOGRAPHY`, `applyTypography()`, `buildCustomScale()`, `resolveScale()`, `DEFAULT_CUSTOM_FONT_SIZE`, `MIN_CUSTOM_FONT_SIZE`, `MAX_CUSTOM_FONT_SIZE` |
 | Config | src/config/features.ts | `getLicenseData()`, `clearLicenseData()` -- license data persistence |
 | Service | src/services/ollamaService.ts | `checkOllamaRunning()`, `fetchOllamaModels()`, `getOllamaModelOptions()` |
 | Service | src/services/brainFileService.ts | `getBrainRootPath()`, `setBrainCustomPath()`, `getCustomBrainPath()`, `initBrainStructure()`, `openBrainFolder()` |
@@ -89,7 +89,7 @@ tags: [settings, unified-settings, preferences, configuration]
 - `terminal`: TerminalSettings -- shell, font, cursor, scrollback (global)
 - `general`: GeneralSettings -- userName, autoSave, notifications, sounds, GIF reactions, Giphy key (global)
 - `agentModePresets`: AgentModePresets -- per-mode model/effort/thinking config for bypass/plan/ask/debug/chat (global)
-- `typography`: TypographySettings -- font size preset (S/M/L/XL), UI font, mono font (global)
+- `typography`: TypographySettings -- font size preset (S/M/L/XL/Custom), custom font size (10-22px, default 13), UI font, mono font (global)
 - `appearance`: AppearanceSettings -- accent color hex (global) — see `046-accent-color-theming.md`
 - `activeCategory`: SettingsCategory -- currently selected sidebar category (component)
 - `closing`: boolean -- overlay close animation state (component)
@@ -108,11 +108,12 @@ tags: [settings, unified-settings, preferences, configuration]
 - **Remote API > Port**: changing the port requires a Quack restart — the HTTP server binds at launch time and cannot rebind at runtime
 
 ### Config
-- `settings-storage` version: 8 (migration chain v0-v8 handling legacy model IDs, debug mode, BTW, chat mode, ask mode, typography, accent color)
+- `settings-storage` version: 10 (migration chain v0-v10 handling legacy model IDs, debug mode, BTW, chat mode, ask mode, typography, accent color, sonnet45 deprecation, custom font size)
 - Default model: `opus46` (Supabase ID format)
 - Default BTW model: `haiku45`
 - Default effort: `medium`
 - Default shell: `/bin/zsh`
-- Default font size preset: `M`
+- Default font size preset: `M` (Medium, 13px body)
+- Custom font size range: 10-22px (via 'C' preset with +/- stepper)
 - Gumroad Setup URL: `https://alekdob.gumroad.com/l/tsvgt`
 - Gumroad Expert URL: `https://alekdob.gumroad.com/l/nwuhis`

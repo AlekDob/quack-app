@@ -77,25 +77,25 @@
   --font-ui: 'General Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'IBM Plex Mono', 'Fira Code', monospace;
 
-  /* Font scale — bumped +2px for premium feel */
-  --fs-xs: 11px;
-  --fs-sm: 12px;
-  --fs-base: 14px;
-  --fs-md: 15px;
-  --fs-lg: 16px;
-  --fs-xl: 18px;
-  --fs-2xl: 22px;
+  /* Font scale — base 13px (custom default), overridden at runtime by applyTypography() */
+  --fs-xs: 10px;
+  --fs-sm: 11px;
+  --fs-base: 13px;
+  --fs-md: 14px;
+  --fs-lg: 15px;
+  --fs-xl: 17px;
+  --fs-2xl: 21px;
 
-  /* Legacy font aliases — gradual migration */
-  --fs-body: var(--fs-base);
-  --fs-user-msg: var(--fs-md);
-  --fs-h1: var(--fs-lg);
-  --fs-h2: var(--fs-md);
-  --fs-h4: var(--fs-sm);
-  --fs-h6: var(--fs-xs);
-  --fs-code: var(--fs-sm);
-  --fs-small: var(--fs-xs);
-  --fs-terminal: var(--fs-base);
+  /* Font aliases — values match buildCustomScale(13) */
+  --fs-body: 13px;
+  --fs-user-msg: 14px;
+  --fs-h1: 15px;
+  --fs-h2: 14px;
+  --fs-h4: 11px;
+  --fs-h6: 10px;
+  --fs-code: 11px;
+  --fs-small: 10px;
+  --fs-terminal: 13px;
 
   /* Weights */
   --fw-regular: 400;

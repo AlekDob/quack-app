@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import ChangesPanel from "./ChangesPanel";
 import FileExplorer from "./FileExplorer";
 import AgentsPanel from "./AgentsPanel";
@@ -14,7 +15,7 @@ import { useSlashCommands } from "../hooks/useSlashCommands";
 import { useMCPServers } from "../hooks/useMCPServers";
 import AgentContextPanel from "./AgentContextPanel";
 import ProjectContextPanel from "./ProjectContextPanel";
-import type { DirectoryEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionInfo, AgentPersonality, HookConfig, ChatMessage } from "../types";
+import type { DirectoryEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionInfo, AgentPersonality, HookConfig, ChatMessage, SearchResult } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 import "./SidePanelAccordion.css";
 
@@ -31,6 +32,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   droids: '#4ecdc4',      // Teal - automation
   rules: '#60a5fa',       // Blue - governance
   hooks: '#a78bfa',       // Purple - events
+  brain: '#e879f9',       // Fuchsia - knowledge/brain
   features: '#FFD700',    // Gold - feature map
   sessions: '#00d9ff',    // Cyan - sessions
   mcp: '#34d399',         // Green - servers
@@ -210,6 +212,12 @@ const icons = {
     <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
       <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="1.5" />
       <path d="M10 6v4l3 2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  brain: (
+    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+      <path d="M10 3c-2 0-3.5 1-4.2 2.5C4.3 6 3 7.5 3 9.5c0 1.5.8 2.8 2 3.5.2 1.8 1.8 3 4 3h2c2.2 0 3.8-1.2 4-3 1.2-.7 2-2 2-3.5 0-2-1.3-3.5-2.8-4C13.5 4 12 3 10 3z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M10 5v11M7.5 8c.8-.8 1.5-.8 2.5 0s1.7.8 2.5 0" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
     </svg>
   ),
 };
@@ -439,6 +447,12 @@ export default function SidePanelAccordion({
   const { servers: mcpServers } = useMCPServers(workingDir);
   const mcpCount = mcpServers.length;
 
+  // Brain section state (lazy-loaded documentation explorer)
+  const [brainLoaded, setBrainLoaded] = useState(false);
+  const [brainLoading, setBrainLoading] = useState(false);
+  const [brainFileCount, setBrainFileCount] = useState(0);
+  const brainRootPath = rootPath ? `${rootPath}/documentation` : null;
+
   // Auto-refresh when sections are focused
   useEffect(() => {
     if (focusedSection === "agents" && onRefreshAgents) {
@@ -458,6 +472,32 @@ export default function SidePanelAccordion({
     }
   }, [focusedSection, onRefreshHooks]);
 
+  // Brain: load documentation/ on first expand + count .md/.mmd for badge
+  useEffect(() => {
+    if (focusedSection === 'brain' && !brainLoaded && brainRootPath) {
+      setBrainLoading(true);
+      onLoadChildren(brainRootPath)
+        .then(() => {
+          setBrainLoaded(true);
+          setBrainLoading(false);
+        })
+        .catch(() => setBrainLoading(false));
+      invoke<SearchResult[]>('search_files_recursive', {
+        path: brainRootPath, query: '.md', maxResults: 500, maxDepth: 5,
+      })
+        .then((results) => {
+          setBrainFileCount(results.filter(r => r.path.endsWith('.md') || r.path.endsWith('.mmd')).length);
+        })
+        .catch(() => {});
+    }
+  }, [focusedSection, brainLoaded, brainRootPath, onLoadChildren]);
+
+  // Brain: reset when project changes
+  useEffect(() => {
+    setBrainLoaded(false);
+    setBrainFileCount(0);
+  }, [rootPath]);
+
   // Scroll to top when a section is focused
   useEffect(() => {
     if (focusedSection && containerRef.current) {
@@ -466,7 +506,7 @@ export default function SidePanelAccordion({
   }, [focusedSection]);
 
   // Section IDs for reference (order is determined by DOM position, not dynamically)
-  const sectionIds = ['changes', 'context', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions'];
+  const sectionIds = ['changes', 'context', 'brain', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions'];
 
   // Handle forceExpandSection from parent
   useEffect(() => {
@@ -642,6 +682,40 @@ export default function SidePanelAccordion({
             onLoadChildren={onLoadChildren}
             onMentionFile={onMentionFile}
           />
+        </AccordionSection>
+
+        {/* Brain — Documentation explorer */}
+        <AccordionSection
+          id="brain"
+          title="Brain"
+          icon={icons.brain}
+          badge={brainFileCount || undefined}
+          isExpanded={focusedSection === "brain"}
+          isFocused={focusedSection === "brain"}
+          order={getOrder("brain")}
+          category="brain"
+          onToggle={() => toggleSection("brain")}
+          onHoverEnter={() => handleSectionHoverEnter("brain")}
+          onHoverLeave={handleSectionHoverLeave}
+        >
+          {brainLoading ? (
+            <div style={{ padding: '12px', opacity: 0.5, fontSize: '12px' }}>Loading documentation...</div>
+          ) : brainRootPath ? (
+            <FileExplorer
+              rootPath={brainRootPath}
+              tree={tree}
+              loading={false}
+              error={null}
+              activePath={brainRootPath}
+              activeFilePath={activeFilePath}
+              onOpenFile={onOpenFile}
+              onLoadChildren={onLoadChildren}
+              onMentionFile={onMentionFile}
+              modifiedFiles={modifiedFiles}
+            />
+          ) : (
+            <div style={{ padding: '12px', opacity: 0.5, fontSize: '12px' }}>No documentation found</div>
+          )}
         </AccordionSection>
 
         {/* Features — after File Explorer */}

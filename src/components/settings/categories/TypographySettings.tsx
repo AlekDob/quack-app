@@ -6,27 +6,35 @@ import {
   PRESET_LABELS,
   UI_FONT_OPTIONS,
   MONO_FONT_OPTIONS,
+  MIN_CUSTOM_FONT_SIZE,
+  MAX_CUSTOM_FONT_SIZE,
+  resolveScale,
+  safeCustomSize,
 } from '../../../constants/typography';
-import type { FontSizePreset } from '../../../constants/typography';
+import type { FontSizePreset, TypographySettings as TypoSettings } from '../../../constants/typography';
 
-const PRESETS: FontSizePreset[] = ['S', 'M', 'L', 'XL'];
+const PRESETS: FontSizePreset[] = ['S', 'M', 'L', 'XL', 'C'];
 
-function PresetCard({ preset, active, onSelect }: {
+function PresetCard({ preset, active, onSelect, customSize }: {
   preset: FontSizePreset;
   active: boolean;
   onSelect: () => void;
+  customSize?: number;
 }) {
-  const sizes = FONT_SIZE_PRESETS[preset];
+  const isCustom = preset === 'C';
+  const sizeLabel = isCustom
+    ? `${customSize ?? 13}px`
+    : `${FONT_SIZE_PRESETS[preset as Exclude<FontSizePreset, 'C'>].body}px`;
   return (
     <button
       type="button"
-      className={`typo-preset-card ${active ? 'active' : ''}`}
+      className={`typo-preset-card ${active ? 'active' : ''} ${isCustom ? 'custom' : ''}`}
       onClick={onSelect}
       aria-pressed={active}
     >
-      <span className="typo-preset-letter">{preset}</span>
+      <span className="typo-preset-letter">{isCustom ? '#' : preset}</span>
       <span className="typo-preset-label">{PRESET_LABELS[preset]}</span>
-      <span className="typo-preset-size">{sizes.body}px</span>
+      <span className="typo-preset-size">{sizeLabel}</span>
       {active && <CheckIcon />}
     </button>
   );
@@ -40,18 +48,18 @@ function CheckIcon() {
   );
 }
 
-function PreviewBlock({ preset, fontUI, fontMono }: {
-  preset: FontSizePreset;
+function PreviewBlock({ typography, fontUI, fontMono }: {
+  typography: TypoSettings;
   fontUI: string;
   fontMono: string;
 }) {
-  const sizes = FONT_SIZE_PRESETS[preset];
+  const sizes = resolveScale(typography);
   return (
     <div className="typo-preview-wrapper">
       <div className="typo-preview-label">Preview</div>
       <div className="typo-preview-box">
         <p className="typo-preview-body" style={{ fontFamily: fontUI, fontSize: `${sizes.body}px` }}>
-          The quick brown fox jumps over the lazy duck. 🦆
+          The quick brown fox jumps over the lazy duck.
         </p>
         <p className="typo-preview-heading" style={{ fontFamily: fontUI, fontSize: `${sizes.h1}px` }}>
           Heading Example
@@ -60,7 +68,7 @@ function PreviewBlock({ preset, fontUI, fontMono }: {
           const quack = &quot;hello world&quot;;
         </code>
         <p className="typo-preview-meta" style={{ fontFamily: fontUI, fontSize: `${sizes.small}px` }}>
-          Meta text · {sizes.body}px body · {sizes.code}px code
+          Meta text - {sizes.body}px body - {sizes.code}px code
         </p>
       </div>
     </div>
@@ -70,8 +78,12 @@ function PreviewBlock({ preset, fontUI, fontMono }: {
 export default function TypographySettings() {
   const typography = useSettingsStore((s) => s.typography);
   const setPreset = useSettingsStore((s) => s.setFontSizePreset);
+  const setCustomSize = useSettingsStore((s) => s.setCustomFontSize);
   const updateTypo = useSettingsStore((s) => s.updateTypography);
   const resetTypo = useSettingsStore((s) => s.resetTypography);
+
+  const isCustom = typography.fontSizePreset === 'C';
+  const currentCustom = safeCustomSize(typography.customFontSize);
 
   return (
     <div className="settings-category">
@@ -90,9 +102,38 @@ export default function TypographySettings() {
               preset={p}
               active={typography.fontSizePreset === p}
               onSelect={() => setPreset(p)}
+              customSize={currentCustom}
             />
           ))}
         </div>
+
+        {/* Custom size stepper — visible when Custom preset is active */}
+        {isCustom && (
+          <div className="typo-custom-row">
+            <span className="typo-custom-label">Base font size</span>
+            <div className="typo-stepper">
+              <button
+                type="button"
+                className="typo-stepper-btn"
+                disabled={currentCustom <= MIN_CUSTOM_FONT_SIZE}
+                onClick={() => setCustomSize(currentCustom - 1)}
+                aria-label="Decrease font size"
+              >
+                -
+              </button>
+              <span className="typo-stepper-value">{currentCustom}px</span>
+              <button
+                type="button"
+                className="typo-stepper-btn"
+                disabled={currentCustom >= MAX_CUSTOM_FONT_SIZE}
+                onClick={() => setCustomSize(currentCustom + 1)}
+                aria-label="Increase font size"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Font Families */}
@@ -136,7 +177,7 @@ export default function TypographySettings() {
       {/* Live Preview */}
       <div className="settings-group">
         <PreviewBlock
-          preset={typography.fontSizePreset}
+          typography={typography}
           fontUI={typography.fontFamilyUI}
           fontMono={typography.fontFamilyMono}
         />
@@ -146,7 +187,7 @@ export default function TypographySettings() {
       <div className="settings-group">
         <div className="typo-reset-row">
           <button type="button" className="typo-reset-btn" onClick={resetTypo}>
-            ⟲ Reset to defaults
+            Reset to defaults
           </button>
         </div>
       </div>
