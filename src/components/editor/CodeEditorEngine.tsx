@@ -129,6 +129,19 @@ const CodeEditorEngine = forwardRef<CodeEditorRef, CodeEditorProps>(({
     currentMatchIndexRef.current = -1;
   }, []);
 
+  const navigateToLine = useCallback((line: number) => {
+    const view = viewRef.current;
+    if (!view) return;
+    const docLines = view.state.doc.lines;
+    const clampedLine = Math.max(1, Math.min(line, docLines));
+    const lineObj = view.state.doc.line(clampedLine);
+    view.dispatch({
+      selection: { anchor: lineObj.from },
+      effects: EditorView.scrollIntoView(lineObj.from, { y: 'center' }),
+    });
+    view.focus();
+  }, []);
+
   useImperativeHandle(ref, () => ({
     search: performSearch,
     nextMatch: () => navigateMatch('next'),
@@ -136,7 +149,8 @@ const CodeEditorEngine = forwardRef<CodeEditorRef, CodeEditorProps>(({
     clearSearch,
     replace,
     replaceAll,
-  }), [performSearch, navigateMatch, clearSearch, replace, replaceAll]);
+    navigateToLine,
+  }), [performSearch, navigateMatch, clearSearch, replace, replaceAll, navigateToLine]);
 
   // --- EditorView lifecycle ---
 

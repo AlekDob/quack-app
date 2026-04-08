@@ -80,3 +80,21 @@ export function getLanguageExtension(language: string): Extension {
 
 /** List of all supported language IDs */
 export const supportedLanguages = Object.keys(factories);
+
+/** Languages with reliable tree-sitter outline support */
+export const outlineSupportedLanguages = new Set([
+  'javascript',
+  'typescript',
+  'python',
+  'rust',
+  'go',
+  'java',
+  'php',
+  'cpp',
+  'c',
+  'ruby',
+  'swift',
+  'kotlin',
+  'dart',
+  'vue',
+]);

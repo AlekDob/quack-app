@@ -192,6 +192,14 @@
     "046-accent-color-theming": {
       "x": 840,
       "y": 1090
+    },
+    "051-chat-input-bar": {
+      "x": 1200.011385199241,
+      "y": 485.53320683111957
+    },
+    "052-markdown-mermaid-preview": {
+      "x": 121.39011424158082,
+      "y": 1048.4938355082113
     }
   },
   "nodeAssignments": {}

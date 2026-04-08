@@ -9,7 +9,7 @@
  */
 
 // Brain: pattern-code-editor-tab
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useEditorStore } from '../../stores/editorStore';
 import { useFileSystemStore } from '../../stores/fileSystemStore';
 import { useShortcutsStore } from '../../stores/shortcutsStore';
@@ -19,7 +19,8 @@ import EditorHeader from './EditorHeader';
 import EditorContent from './EditorContent';
 import EditorOutlinePanel from './EditorOutlinePanel';
 import EditorStatusBar from './EditorStatusBar';
-import type { EditorSelectionInfo } from './editorTypes';
+import { outlineSupportedLanguages } from './editorLanguages';
+import type { CodeEditorRef, EditorSelectionInfo } from './editorTypes';
 import './CodeEditorView.css';
 
 /** Build key string from KeyboardEvent matching shortcutsStore format */
@@ -39,11 +40,14 @@ function buildKeyString(e: KeyboardEvent): string {
 function CodeEditorView() {
   const filePath = useEditorStore(s => s.filePath);
   const isLoading = useEditorStore(s => s.isLoading);
+  const editorContentRef = useRef<CodeEditorRef>(null);
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const isMarkdown = filePath ? /\.(md|mdx|markdown)$/i.test(filePath) : false;
   const isMermaid = filePath ? /\.mmd$/i.test(filePath) : false;
   const hasPreview = isMarkdown || isMermaid;
+  const detectedLang = filePath ? getLanguageFromFilename(filePath) : '';
+  const outlineAvailable = outlineSupportedLanguages.has(detectedLang);
   const save = useEditorStore(s => s.save);
   const isDirty = useEditorStore(s => s.isDirty);
   const shortcuts = useShortcutsStore(s => s.shortcuts);
@@ -86,8 +90,8 @@ function CodeEditorView() {
     });
   }, [filePath]);
 
-  const handleNavigateToLine = useCallback((_line: number) => {
-    // TODO: wire to CodeEditorEngine imperative ref for scroll-to-line
+  const handleNavigateToLine = useCallback((line: number) => {
+    editorContentRef.current?.navigateToLine(line);
   }, []);
 
   if (!filePath && !isLoading) {
@@ -102,10 +106,11 @@ function CodeEditorView() {
         isMarkdown={hasPreview}
         previewOpen={previewOpen && hasPreview}
         onTogglePreview={() => setPreviewOpen(p => !p)}
+        outlineAvailable={outlineAvailable}
       />
       <div className="editor-body">
-        <EditorContent onSelectionChange={handleSelectionChange} previewOpen={previewOpen && hasPreview} isMermaid={isMermaid} />
-        {outlineOpen && !(previewOpen && hasPreview) && (
+        <EditorContent ref={editorContentRef} onSelectionChange={handleSelectionChange} previewOpen={previewOpen && hasPreview} isMermaid={isMermaid} />
+        {outlineOpen && outlineAvailable && !(previewOpen && hasPreview) && (
           <EditorOutlinePanel onNavigateToLine={handleNavigateToLine} />
         )}
       </div>

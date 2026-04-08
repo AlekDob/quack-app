@@ -147,6 +147,7 @@ Backend runs linter (tsc --noEmit / eslint)
 - `buildMinimapExtension() -> Extension` -- minimap sidebar via @replit/codemirror-minimap
 - `buildLintExtension() -> Extension` -- lint gutter + external diagnostics StateField
 - `pushDiagnostics(view, diagnostics) -> void` -- push ExternalDiagnostic[] into editor
+- `CodeEditorRef.navigateToLine(line) -> void` -- scrolls editor to given line number, centers it, and focuses the view (CM6 `EditorView.dispatch` with `selection` + `scrollIntoView`)
 - `codeIntelService.getOutline(filePath) -> Promise<OutlineSymbol[]>` -- AST outline via Tauri
 - `codeIntelService.findDefinition(symbol, projectPath) -> Promise<FindDefinitionResult>` -- symbol definitions
 - `codeIntelService.findReferences(symbol, projectPath) -> Promise<FindReferencesResult>` -- symbol references
@@ -183,6 +184,7 @@ Backend runs linter (tsc --noEmit / eslint)
 - Keyboard shortcut: `Cmd+E` (toggle editor tab), `Cmd+S` (save), `Cmd+Shift+P` (toggle preview)
 - Preview-eligible extensions: `.md`, `.mdx`, `.mmd`
 - ShortcutActionId entries: `toggleEditorPreview`, `editorSave`
+- `outlineSupportedLanguages`: Set of 14 languages with reliable tree-sitter parsers (js, ts, python, rust, go, java, php, cpp, c, ruby, swift, kotlin, dart, vue) -- Outline button only shown for these
 - Theme: pure black (#000000) background, Atom One Dark / VS Code Dark+ syntax colors
 - Font: JetBrains Mono, SF Mono, Monaco fallback chain, 14px
 - `quack-ide-settings` localStorage key: persists preferredIDE, fileOpenTarget, autoLaunch, syncFocus

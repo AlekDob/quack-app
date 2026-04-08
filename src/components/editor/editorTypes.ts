@@ -39,6 +39,7 @@ export interface CodeEditorRef {
   clearSearch: () => void;
   replace: (replaceText: string) => void;
   replaceAll: (replaceText: string) => void;
+  navigateToLine: (line: number) => void;
 }
 
 /** Per-line change indicator for diff decorations */

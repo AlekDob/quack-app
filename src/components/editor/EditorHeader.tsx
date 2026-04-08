@@ -25,9 +25,10 @@ interface EditorHeaderProps {
   isMarkdown?: boolean;
   previewOpen?: boolean;
   onTogglePreview?: () => void;
+  outlineAvailable?: boolean;
 }
 
-function EditorHeader({ outlineOpen, onToggleOutline, isMarkdown, previewOpen, onTogglePreview }: EditorHeaderProps) {
+function EditorHeader({ outlineOpen, onToggleOutline, isMarkdown, previewOpen, onTogglePreview, outlineAvailable = true }: EditorHeaderProps) {
   const filePath = useEditorStore(s => s.filePath);
   const mode = useEditorStore(s => s.mode);
   const isDirty = useEditorStore(s => s.isDirty);
@@ -80,7 +81,7 @@ function EditorHeader({ outlineOpen, onToggleOutline, isMarkdown, previewOpen, o
                 </button>
               </KeyboardShortcutTooltip>
             )}
-            {!previewOpen && (
+            {!previewOpen && outlineAvailable && (
               <KeyboardShortcutTooltip label="Outline" position="bottom">
                 <button
                   type="button"

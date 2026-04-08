@@ -8,7 +8,7 @@
  */
 
 // Brain: pattern-code-editor-tab
-import { lazy, Suspense, useRef, useCallback } from 'react';
+import { lazy, Suspense, useRef, useCallback, forwardRef } from 'react';
 import { useEditorStore } from '../../stores/editorStore';
 import CodeEditorSkeleton from '../skeletons/CodeEditorSkeleton';
 import CodeEditorEngine from './CodeEditorEngine';
@@ -24,7 +24,7 @@ interface EditorContentProps {
   isMermaid?: boolean;
 }
 
-function EditorContent({ onSelectionChange, previewOpen, isMermaid }: EditorContentProps) {
+const EditorContent = forwardRef<CodeEditorRef, EditorContentProps>(function EditorContent({ onSelectionChange, previewOpen, isMermaid }, ref) {
   const mode = useEditorStore(s => s.mode);
   const filePath = useEditorStore(s => s.filePath);
   const content = useEditorStore(s => s.content);
@@ -33,7 +33,8 @@ function EditorContent({ onSelectionChange, previewOpen, isMermaid }: EditorCont
   const isLoading = useEditorStore(s => s.isLoading);
   const updateContent = useEditorStore(s => s.updateContent);
   const save = useEditorStore(s => s.save);
-  const editorRef = useRef<CodeEditorRef>(null);
+  const internalRef = useRef<CodeEditorRef>(null);
+  const editorRef = (ref as React.RefObject<CodeEditorRef | null>) || internalRef;
 
   const handleChange = useCallback((value: string) => {
     updateContent(value);
@@ -78,6 +79,6 @@ function EditorContent({ onSelectionChange, previewOpen, isMermaid }: EditorCont
       lineChanges={lineChanges}
     />
   );
-}
+});
 
 export default EditorContent;
