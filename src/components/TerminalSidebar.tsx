@@ -575,7 +575,7 @@ export default function TerminalSidebar({
     document.body.classList.add('dragging-active');
   };
 
-  // Handle repository drag end — works on section-level IDs
+  // Handle repository drag end — works on section-level IDs + intra-group reordering
   const handleRepoDragEnd = (event: DragEndEvent) => {
     // Remove dragging class to re-enable animations
     document.body.classList.remove('dragging-active');
@@ -587,13 +587,53 @@ export default function TerminalSidebar({
       return;
     }
 
-    // Build current section IDs from sidebarSections
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    // Check if both items are repo-* inside the same group (intra-group reorder)
+    if (activeId.startsWith('repo-') && overId.startsWith('repo-')) {
+      for (const section of sidebarSections) {
+        if (section.type !== 'group') continue;
+        const projectKeys = section.projects.map(([name]) => `repo-${name}`);
+        const aIdx = projectKeys.indexOf(activeId);
+        const oIdx = projectKeys.indexOf(overId);
+        if (aIdx !== -1 && oIdx !== -1) {
+          // Intra-group drag — reorder the group's projects array
+          const reordered = arrayMove(section.group.projects, aIdx, oIdx);
+          updateGroup(section.group.id, { projects: reordered });
+
+          // Also update local repositoryOrder to match new intra-group order
+          const newRepoOrder: string[] = [];
+          for (const s of sidebarSections) {
+            if (s.type === 'standalone') {
+              newRepoOrder.push(`repo-${s.project[0]}`);
+            } else if (s.group.id === section.group.id) {
+              // Use new reordered projects
+              const reorderedNames = arrayMove(section.projects, aIdx, oIdx);
+              for (const [name] of reorderedNames) {
+                newRepoOrder.push(`repo-${name}`);
+              }
+            } else {
+              for (const [name] of s.projects) {
+                newRepoOrder.push(`repo-${name}`);
+              }
+            }
+          }
+          setRepositoryOrder(newRepoOrder);
+          saveRepositoryOrder(newRepoOrder, projectColors, favorites);
+          setActiveRepoId(null);
+          return;
+        }
+      }
+    }
+
+    // Top-level section reordering (groups + standalone projects)
     const currentSectionIds = sidebarSections.map((s) =>
       s.type === 'group' ? `group-${s.group.id}` : `repo-${s.project[0]}`
     );
 
-    const activeIdx = currentSectionIds.indexOf(String(active.id));
-    const overIdx = currentSectionIds.indexOf(String(over.id));
+    const activeIdx = currentSectionIds.indexOf(activeId);
+    const overIdx = currentSectionIds.indexOf(overId);
 
     if (activeIdx !== -1 && overIdx !== -1) {
       // Reorder sections
@@ -1333,6 +1373,10 @@ export default function TerminalSidebar({
                       padding: '4px 2px 2px 2px',
                       marginBottom: '2px',
                     }}>
+                    <SortableContext
+                      items={projects.map(([name]) => `repo-${name}`)}
+                      strategy={verticalListSortingStrategy}
+                    >
                     {projects.map(([repoName, repoData]) => {
                       const repoKey = `repo-${repoName}`;
                       return (
@@ -1376,6 +1420,7 @@ export default function TerminalSidebar({
                         />
                       );
                     })}
+                    </SortableContext>
                     </div>
                     )}
                   </div>

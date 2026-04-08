@@ -36,11 +36,13 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 ### Data Flow
 ```
 [Tauri Store (.quack-repo-order.dat)] --> [TerminalSidebar (load order/colors/favorites)]
-[TerminalSidebar] --> [DndContext (dnd-kit)] --> [SortableRepositoryGroup] --> [RepositoryGroup]
+[TerminalSidebar] --> [DndContext (dnd-kit)] --> [SortableContext (top-level sections)] --> [SortableRepositoryGroup | SortableGroupSection]
+[SortableGroupSection] --> [SortableContext (intra-group projects)] --> [SortableRepositoryGroup (insideGroup)]
 [RepositoryGroup] --> [SortableAgent (dnd-kit)] --> [AgentPersonalityCard / AgentSessionItem]
 [AgentSessionItem click] --> [onSessionClick(sessionId)] --> [App (session activation)] --> [ChatView remount (key change)] --> [ChatInput mount → auto-focus textarea]
 [useGroupStore] --> [Tauri invoke (list_groups/create_group/update_group/delete_group)]
 [SidebarViewToggle] --> [useUIStore.setSidebarView] --> [projects | taskhub conditional render]
+[Intra-group drag] --> [handleRepoDragEnd detects both repo-* in same group] --> [arrayMove on group.projects] --> [updateGroup (Rust persist) + saveRepositoryOrder (local)]
 ```
 
 ### Key Functions
@@ -65,6 +67,7 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 - `useGroupStore.deleteGroup(groupId) --> Promise<void>` -- delete group
 - `useGroupStore.getGroupForProject(path) --> Promise<ProjectGroup | null>` -- lookup
 - `handleAddToGroup(groupId, projectPath, label) --> Promise<void>` -- add standalone project to existing group via context menu
+- `handleRepoDragEnd (intra-group branch)` -- detects both active/over inside same group, reorders group.projects via updateGroup + repositoryOrder sync
 
 ### State
 - `query`: string -- sidebar search filter text (component)
