@@ -3029,12 +3029,17 @@ function AppContent() {
       // leadSessionId-driven auto-done: only sessions with a lead get auto-completed
       try {
         // Brain: bug-delayed-agent-message-stale-closure
-        // Use ref instead of closure variable — chatSessions captured by useCallback
-        // is stale by the time streaming completes, causing messageCount regression.
-        const finalMessages = chatSessionsRef.current.get(messageKey) ?? [];
+        // Neither the closure `chatSessions` nor `chatSessionsRef` are reliable here:
+        // both depend on React's render cycle which may not have flushed yet.
+        // useSessionMessageSync may have already written the correct count to the store.
+        // Strategy: read BOTH sources and take the max — never regress messageCount.
+        const storeSession = useSessionStore.getState().sessions.find(s => s.id === messageKey);
+        const storeCount = storeSession?.messageCount ?? 0;
+        const refCount = (chatSessionsRef.current.get(messageKey) ?? []).length;
+        const messageCount = Math.max(storeCount, refCount);
         const completionUpdate: Record<string, unknown> = {
           claudeSessionId: response.session_id,
-          messageCount: finalMessages.length,
+          messageCount,
           updatedAt: Date.now(),
         };
         // Auto-done ONLY when leadSessionId is set (managed delegation)
@@ -3043,7 +3048,7 @@ function AppContent() {
           completionUpdate.completedAt = Date.now();
         }
         await updateSession(messageKey, completionUpdate);
-        console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}, messageCount=${finalMessages.length}`);
+        console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}, messageCount=${messageCount} (store=${storeCount}, ref=${refCount})`);
         // Notify lead agent (fire-and-forget)
         if (capturedSession?.leadSessionId) {
           notifyLeadAgent(capturedSession.leadSessionId, capturedSession).catch(

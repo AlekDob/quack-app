@@ -2,7 +2,7 @@
 type: bug_fix
 project: quack-app
 created: 2026-04-07
-last_verified: 2026-04-07
+last_verified: 2026-04-08
 tags: [react, closure, zustand, streaming, session]
 ---
 # Fix: Delayed Agent Message Stale Closure
@@ -18,48 +18,47 @@ This caused `messageCount` to regress to the value it had when the callback was 
 Classic React stale closure: `useCallback` captures `chatSessions` at creation time. During a long-running streaming response, React state updates (new messages appended via `setChatSessions`) produce new Map references, but the callback still holds the old one. When the stream completes and the `.then()` block reads `chatSessions.get(messageKey).length`, it gets the stale count.
 
 ```
-t=0   useCallback captures chatSessions (3 messages)
-t=1   stream starts, new messages arrive → state: 5 messages
-t=2   stream continues → state: 8 messages
-t=3   stream completes → .then() reads captured chatSessions → 3 messages ❌
-      updateSession({ messageCount: 3 }) → regression!
+t=0   useCallback captures chatSessions (8 messages)
+t=1   stream starts, new messages arrive → state: 9 messages
+t=2   stream continues → state: 10 messages
+t=3   stream completes → .then() reads captured chatSessions → 8 messages ❌
+      updateSession({ messageCount: 8 }) → regression overwrites 10!
 ```
 
-## Solution
+## Fix Attempt 1 (INSUFFICIENT): chatSessionsRef
 
-Replace the closure read with a ref read. A `chatSessionsRef` (`useRef`) is kept in sync with `chatSessions` via a `useEffect`, providing synchronous access to the latest value without re-creating the callback.
+Replaced `chatSessions.get()` with `chatSessionsRef.current.get()`. The ref is synced via `useEffect`, which runs *after* React renders. This still races with the completion handler — the ref can be one render behind.
+
+## Fix Attempt 2 (CORRECT): Max of store + ref
+
+The `useSessionMessageSync` hook writes the correct messageCount to `sessionStore` (Zustand). The completion handler now reads from **both** the store and the ref, taking the max:
 
 ```typescript
-// Before (stale):
-const finalMessages = chatSessions.get(messageKey) ?? [];
-
-// After (fixed):
-const finalMessages = chatSessionsRef.current.get(messageKey) ?? [];
+const storeSession = useSessionStore.getState().sessions.find(s => s.id === messageKey);
+const storeCount = storeSession?.messageCount ?? 0;
+const refCount = (chatSessionsRef.current.get(messageKey) ?? []).length;
+const messageCount = Math.max(storeCount, refCount);
 ```
 
-The ref is synced in a dedicated effect:
-
-```typescript
-const chatSessionsRef = useRef<Map<string, ChatMessage[]>>(new Map());
-
-useEffect(() => {
-  chatSessionsRef.current = chatSessions;
-}, [chatSessions]);
-```
+This handles all scenarios:
+- **Active session**: `useSessionMessageSync` already wrote correct count to store → store wins
+- **Background session**: hook didn't fire (only syncs activeSessionId) → ref is best available
+- **Both stale**: max ensures we never regress below what either source reports
 
 ## Key Insight
 
-Any `useCallback` that runs asynchronously after a delay (streaming `.then()`, `setTimeout`, event listeners) will capture stale state. The fix pattern is:
+The general pattern: **never overwrite a monotonically-increasing value without checking the current state first.** messageCount should never decrease during normal operation, so `Math.max()` is a safe monotonic guard. This avoids the entire class of stale-closure / stale-ref timing bugs.
 
-1. Create a `useRef` mirror of the state value
-2. Keep it in sync via `useEffect`
-3. Read from `ref.current` inside the async path
+## Debug Log
 
-This is the same pattern used in `ChatInput.tsx` (attachmentsRef), `TerminalSidebar.tsx` (favorites), and `RepositoryGroup.tsx` (rendered order). The codebase marks these with comments like `// Use ref to avoid stale closure`.
-
-**Caveat**: `chatSessionsRef` may be one render behind since the sync effect runs after paint. For cases where exact-latest state is critical (e.g., session backup), use a functional state updater (`setChatSessions(current => { ... })`) instead — this reads the true latest value from React's internal queue.
+The completion handler now logs both sources:
+```
+[SESSION-FIX] Saved claudeSessionId abc... messageCount=10 (store=10, ref=8)
+```
+If `ref < store`, it confirms the ref was stale but the store had the right value.
 
 ## Related Files
 
-- `src/App.tsx` — lines ~1097 (ref declaration), ~1195-1198 (sync effect), ~3022-3025 (fix site)
-- `src/components/ChatInput.tsx` — same pattern for `attachmentsRef`
+- `src/App.tsx` — lines ~3030-3051 (fix site), ~1097 (ref declaration), ~1195-1198 (sync effect)
+- `src/hooks/useSessionMessageSync.ts` — the correct source of truth for active sessions
+- `src/stores/sessionStore.ts` — `updateSession()` uses spread merge (`{ ...session, ...updates }`)
