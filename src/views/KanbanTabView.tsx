@@ -39,6 +39,8 @@ interface KanbanTabViewProps {
   onOpenTerminal?: (path: string, label?: string) => void;
   // Exit Kanban and return to chat
   onExitKanban?: () => void;
+  // When rendered in split pane, enables horizontal scroll with min-width
+  isSplitPane?: boolean;
 }
 
 /**
@@ -73,13 +75,14 @@ function KanbanTabView({
   onSessionClick,
   onOpenTerminal,
   onExitKanban,
+  isSplitPane,
 }: KanbanTabViewProps) {
   if (!isActive || tab.type !== 'kanban') {
     return null;
   }
 
   return (
-    <div className="kanban-tab-view" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className={`kanban-tab-view${isSplitPane ? ' split-pane' : ''}`} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <KanbanView
         terminals={terminals}
         chatSessions={chatSessions}

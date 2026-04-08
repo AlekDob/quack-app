@@ -18,8 +18,8 @@ import type { KanbanTask, KanbanStatus, ChatMessage } from '../../types';
 import { groupTasksByCompletionDate, type DateGroup } from '../../utils/kanbanDateGrouping';
 import { useKanbanStore } from '../../stores/kanbanStore';
 
-// Types for In Progress column grouping by status
-type InProgressBucket = 'ready' | 'working' | 'cold';
+// Types for Human Review column grouping
+type HumanReviewBucket = 'awaiting_input' | 'ready';
 
 interface TaskWithState {
   task: KanbanTask;
@@ -28,34 +28,10 @@ interface TaskWithState {
   isDormant: boolean;
 }
 
-interface InProgressGroup {
-  bucket: InProgressBucket;
+interface HumanReviewGroup {
+  bucket: HumanReviewBucket;
   label: string;
   tasks: TaskWithState[];
-}
-
-/**
- * Determine if an agent task is "cold" (never started, no messages at all)
- */
-function isTaskCold(
-  task: KanbanTask,
-  hasMessages: boolean
-): boolean {
-  const isAgentTask = (task.type || 'agent') === 'agent';
-  return isAgentTask && !hasMessages;
-}
-
-/**
- * Determine if an agent task is "ready" (finished working, awaiting review)
- */
-function isTaskReady(
-  task: KanbanTask,
-  isLoading: boolean,
-  hasMessages: boolean,
-  isDormant: boolean
-): boolean {
-  const isAgentTask = (task.type || 'agent') === 'agent';
-  return isAgentTask && hasMessages && !isLoading && !isDormant;
 }
 
 interface KanbanColumnProps {
@@ -167,13 +143,12 @@ export default function KanbanColumn({
     return [];
   }, [id, tasks]);
 
-  // Group tasks by status for In Progress column (Ready vs Working vs Cold)
-  const inProgressGroups: InProgressGroup[] = useMemo(() => {
-    if (id !== 'in_progress' || tasks.length === 0) return [];
+  // Group tasks for Human Review column (Awaiting Input vs Ready)
+  const humanReviewGroups: HumanReviewGroup[] = useMemo(() => {
+    if (id !== 'human_review' || tasks.length === 0) return [];
 
+    const awaitingInput: TaskWithState[] = [];
     const ready: TaskWithState[] = [];
-    const working: TaskWithState[] = [];
-    const cold: TaskWithState[] = [];
 
     tasks.forEach((task) => {
       const isLoading = chatLoadingMap?.get(task.id) || false;
@@ -182,41 +157,27 @@ export default function KanbanColumn({
       const hasUserMessage = messages.some((msg) => msg.role === 'user');
       const isDormant = !hasUserMessage;
 
-      const taskWithState: TaskWithState = {
-        task,
-        isLoading,
-        hasMessages,
-        isDormant,
-      };
+      const taskWithState: TaskWithState = { task, isLoading, hasMessages, isDormant };
 
-      // Cold = never started (no messages at all)
-      if (isTaskCold(task, hasMessages)) {
-        cold.push(taskWithState);
-      // Ready = finished working, awaiting review
-      } else if (isTaskReady(task, isLoading, hasMessages, isDormant)) {
-        ready.push(taskWithState);
-      // Working = currently being worked on
+      // Awaiting Input: SDK asked a question (AskUserQuestion/PlanApproval)
+      if (pendingQuestionsChecker?.(task.id)) {
+        awaitingInput.push(taskWithState);
       } else {
-        working.push(taskWithState);
+        // Ready: agent finished, no pending question
+        ready.push(taskWithState);
       }
     });
 
-    const groups: InProgressGroup[] = [];
-    // Ready tasks first (at the top)
+    const groups: HumanReviewGroup[] = [];
+    if (awaitingInput.length > 0) {
+      groups.push({ bucket: 'awaiting_input', label: 'AWAITING INPUT', tasks: awaitingInput });
+    }
     if (ready.length > 0) {
       groups.push({ bucket: 'ready', label: 'READY', tasks: ready });
     }
-    // Working tasks in the middle
-    if (working.length > 0) {
-      groups.push({ bucket: 'working', label: 'WORKING', tasks: working });
-    }
-    // Cold tasks at the bottom (never started)
-    if (cold.length > 0) {
-      groups.push({ bucket: 'cold', label: 'COLD', tasks: cold });
-    }
 
     return groups;
-  }, [id, tasks, chatLoadingMap, chatSessions]);
+  }, [id, tasks, chatLoadingMap, chatSessions, pendingQuestionsChecker]);
 
   // Native HTML5 drag handlers for sidebar agent drops
   const handleNativeDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
@@ -343,9 +304,9 @@ export default function KanbanColumn({
                 })}
               </div>
             ))
-          ) : id === 'in_progress' && inProgressGroups.length > 0 ? (
-            // Render grouped tasks for In Progress column (Ready vs Working)
-            inProgressGroups.map((group) => (
+          ) : id === 'human_review' && humanReviewGroups.length > 0 ? (
+            // Render grouped tasks for Human Review column (Awaiting Input vs Ready)
+            humanReviewGroups.map((group) => (
               <div
                 key={group.bucket}
                 className={`kanban-status-group kanban-status-group--${group.bucket}`}

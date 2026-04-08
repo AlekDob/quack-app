@@ -80,6 +80,7 @@ tags: [split-view, tabs, drag-drop, layout, editor, sidebar-drag]
 | `skill` | `SkillViewer` |
 | `browser` | `BrowserManager` |
 | `command` | Command viewer (from sidebar drag) |
+| `kanban` | `KanbanTabView` |
 
 ### Config
 - `minPaneWidth`: 300px minimum per pane (hardcoded in SplitPaneDivider and inline styles)

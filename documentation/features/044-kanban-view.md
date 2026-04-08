@@ -37,9 +37,9 @@ tags: [kanban, board, task-management, drag-and-drop, sessions-first, project-ma
 ### Columns
 | Column | Status | Color Variable | Behavior |
 |--------|--------|---------------|----------|
-| TODO | `todo` | `--kanban-todo-color` (#6b7280) | Flat card list, Start button on agent tasks, blocks move-back if conversation exists |
-| In Progress | `in_progress` | `--kanban-progress-color` (#f59e0b) | Grouped by status: Ready (finished, awaiting review) > Working (streaming) > Cold (never started) |
-| Human Review | virtual (`in_progress`) | `--kanban-review-color` (#a855f7) | Tasks with pending AskUserQuestion/PlanApproval OR manually dragged here; underlying status stays `in_progress` |
+| TODO | `todo` | `--kanban-todo-color` (#6b7280) | Flat card list + Cold tasks (never started, auto-promoted from in_progress). Start button on agent tasks, blocks move-back if conversation exists |
+| In Progress | `in_progress` | `--kanban-progress-color` (#f59e0b) | Flat list, only Working tasks (actively streaming or dormant). No sub-groups |
+| Human Review | virtual (`in_progress`) | `--kanban-review-color` (#a855f7) | Grouped: Awaiting Input (pending AskUserQuestion/PlanApproval) > Ready (agent finished). Manual drag also supported. Underlying status stays `in_progress` |
 | Done | `done` | `--kanban-done-color` (#22c55e) | Grouped by completion date (Today/Yesterday/This Week/Last Week/Older), paginated with infinite scroll, Clear All button |
 
 ### Data Flow
@@ -70,16 +70,22 @@ tags: [kanban, board, task-management, drag-and-drop, sessions-first, project-ma
 | Progress bar | Animated indeterminate bar | Shown when `status === 'in_progress' && isLoading` |
 | Attachments | Image thumbnails (max 3) + overflow count | `task.attachments` filtered by `image/*` MIME |
 
-### In Progress Grouping
+### Task Classification (in KanbanView.tsx)
+| Classification | Destination Column | Condition |
+|----------------|-------------------|-----------|
+| Cold | TODO | Agent task with zero messages (never started) |
+| Ready | Human Review | Agent task: has messages + not loading + has user message |
+| Working | In Progress | Everything else (streaming, dormant, non-agent) |
+| Awaiting Input | Human Review | `hasPendingQuestion(task.id)` is true (AskUserQuestion/PlanApproval) |
+| Manual | Human Review | Dragged to Human Review column by user |
+
+### Human Review Column Grouping
 | Bucket | Label | Condition |
 |--------|-------|-----------|
-| Ready | READY | Has messages + not loading + not dormant |
-| Working | WORKING | Currently streaming (isLoading) or has user messages |
-| Cold | COLD | Agent task with zero messages (never started) |
+| Awaiting Input | AWAITING INPUT | `hasPendingQuestion(task.id)` — SDK asked a question (orange pulse indicator) |
+| Ready | READY | Agent finished, no pending question (green indicator) |
 
-### Human Review Column
 - **Virtual column** — underlying task status remains `in_progress`
-- **Auto-populated:** Tasks where `chatStore.hasPendingQuestion(task.id)` is true (AskUserQuestion or PlanApproval events)
 - **Manual placement:** Tasks dragged into Human Review column tracked in `manualHumanReview` Set (kanbanStore)
 - **Exit:** Moving task out of Human Review clears manual flag via `removeFromHumanReview()`
 

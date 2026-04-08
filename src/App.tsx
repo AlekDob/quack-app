@@ -13556,6 +13556,59 @@ You have access to all Bash tools to execute git commands like:
                         return <BrowserManager />;
                       }
 
+                      // Kanban
+                      if (sTab.type === 'kanban') {
+                        return (
+                          <KanbanTabView
+                            tab={sTab}
+                            isActive={true}
+                            isSplitPane={true}
+                            terminals={terminals}
+                            chatSessions={chatSessions}
+                            chatLoadingMap={chatLoadingMap}
+                            onSendMessage={sendMessageForTargetAgent}
+                            onAbortStream={abortStreamForTargetAgent}
+                            onClearConversation={clearConversationForTargetAgent}
+                            onCompactConversation={compactConversationForTargetAgent}
+                            getLastPrompt={getLastPromptForTargetAgent}
+                            sessionTokensMap={chatTokensMap}
+                            onCreateNewAgent={handleOpenNewAgentForKanban}
+                            defaultModel={currentSettings.model}
+                            defaultThinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
+                            defaultPermissionMode={currentSettings.permissionMode as PermissionMode}
+                            defaultEffort={currentSettings.effort || 'medium'}
+                            onLoadChatSessions={loadKanbanChatSessions}
+                            onDiffClick={handleDiffClick}
+                            onOpenSessionInTerminal={openKanbanSessionInTerminal}
+                            onToggleSidePanel={() => setKanbanSidePanelExpanded(!kanbanSidePanelExpanded)}
+                            sidePanelExpanded={kanbanSidePanelExpanded}
+                            onToggleMiniPanel={() => {
+                              const newValue = !showKanbanMiniPanel;
+                              setShowKanbanMiniPanel(newValue);
+                              if (newValue) {
+                                setActiveTabId('chat');
+                                if (sidePanelCollapsed) {
+                                  setSidePanelCollapsed(false);
+                                }
+                              }
+                            }}
+                            showMiniPanel={showKanbanMiniPanel}
+                            onOpenTaskTab={selectTask}
+                            onSessionClick={handleSessionClick}
+                            onExitKanban={() => setActiveTabId('chat')}
+                            onOpenTerminal={async (path, label) => {
+                              const projectName = label || extractProjectId(path) || 'Terminal';
+                              const uniqueProjects = [{ path, name: projectName }];
+                              await openTerminalWindow(uniqueProjects, {
+                                projectPath: path,
+                                command: '',
+                                terminalLabel: label,
+                              });
+                            }}
+                          />
+                        );
+                      }
+
                       // Fallback: unsupported tab type for split
                       return (
                         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>

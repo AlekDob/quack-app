@@ -8,7 +8,7 @@
  * Uses @dnd-kit for drag-and-drop functionality.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -187,17 +187,54 @@ export default function KanbanView({
   }, []);
 
   // 🦆 SESSIONS-FIRST: Get tasks from sessionStore via getters
-  const todoTasks = getTasksByStatus('todo');
+  const baseTodoTasks = getTasksByStatus('todo');
   const allInProgressTasks = getTasksByStatus('in_progress');
 
-  // 🦆 Split in_progress: tasks with pending questions OR manually placed → Human Review column
+  // 🦆 Classify in_progress tasks into Working / Ready / Cold
   const hasPendingQuestion = useChatStore((s) => s.hasPendingQuestion);
-  const humanReviewTasks = allInProgressTasks.filter(task =>
-    hasPendingQuestion(task.id) || isManualHumanReview(task.id)
-  );
-  const inProgressTasks = allInProgressTasks.filter(task =>
-    !hasPendingQuestion(task.id) && !isManualHumanReview(task.id)
-  );
+
+  const { coldTasks, readyTasks, workingTasks } = useMemo(() => {
+    const cold: KanbanTask[] = [];
+    const ready: KanbanTask[] = [];
+    const working: KanbanTask[] = [];
+
+    for (const task of allInProgressTasks) {
+      // Manual/auto human review → skip classification, goes to humanReviewTasks below
+      if (hasPendingQuestion(task.id) || isManualHumanReview(task.id)) continue;
+
+      const isAgentTask = (task.type || 'agent') === 'agent';
+      const isLoading = chatLoadingMap.get(task.id) || false;
+      const messages = chatSessions.get(task.id) || [];
+      const hasMessages = messages.length > 0;
+      const hasUserMessage = messages.some(msg => msg.role === 'user');
+
+      // Cold: agent task, never started (no messages)
+      if (isAgentTask && !hasMessages) {
+        cold.push(task);
+      // Ready: agent finished (has messages, not streaming, has user message)
+      } else if (isAgentTask && hasMessages && !isLoading && hasUserMessage) {
+        ready.push(task);
+      // Working: everything else (streaming, dormant, non-agent)
+      } else {
+        working.push(task);
+      }
+    }
+    return { coldTasks: cold, readyTasks: ready, workingTasks: working };
+  }, [allInProgressTasks, chatLoadingMap, chatSessions, hasPendingQuestion]);
+
+  // 🦆 Cold tasks appear in TODO (never started)
+  const todoTasks = useMemo(() => [...baseTodoTasks, ...coldTasks], [baseTodoTasks, coldTasks]);
+
+  // 🦆 Human Review: pending questions + manual placement + ready tasks
+  const humanReviewTasks = useMemo(() => {
+    const autoOrManual = allInProgressTasks.filter(task =>
+      hasPendingQuestion(task.id) || isManualHumanReview(task.id)
+    );
+    return [...readyTasks, ...autoOrManual];
+  }, [allInProgressTasks, readyTasks, hasPendingQuestion]);
+
+  // 🦆 In Progress: only working tasks (flat list, no sub-groups)
+  const inProgressTasks = workingTasks;
 
   // Create a combined array for find operations (used in drag handlers and drawer)
   const visibleDoneTasks = getVisibleDoneTasks();

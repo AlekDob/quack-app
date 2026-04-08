@@ -2260,40 +2260,20 @@
   flex-shrink: 0;
 }
 
+/* Human Review groups: Awaiting Input (orange pulse) + Ready (green) */
+.kanban-status-indicator--awaiting_input {
+  background-color: var(--kanban-progress-color, #f59e0b);
+  animation: status-pulse-awaiting 1.5s ease-in-out infinite;
+}
+
 .kanban-status-indicator--ready {
   background-color: var(--kanban-done-color, #22c55e);
   box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
-  animation: status-pulse-ready 2s ease-in-out infinite;
 }
 
-.kanban-status-indicator--working {
-  background-color: var(--kanban-progress-color, #f59e0b);
-  animation: status-pulse-working 1.5s ease-in-out infinite;
-}
-
-.kanban-status-indicator--cold {
-  background-color: var(--kanban-cold-color, #3b82f6);
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
-}
-
-@keyframes status-pulse-ready {
-  0%, 100% {
-    opacity: 1;
-    box-shadow: 0 0 4px rgba(34, 197, 94, 0.4);
-  }
-  50% {
-    opacity: 0.8;
-    box-shadow: 0 0 10px rgba(34, 197, 94, 0.6);
-  }
-}
-
-@keyframes status-pulse-working {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-  }
+@keyframes status-pulse-awaiting {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
 
 .kanban-status-group-label {
@@ -2303,16 +2283,12 @@
   letter-spacing: 0.5px;
 }
 
-.kanban-status-group--ready .kanban-status-group-label {
-  color: var(--kanban-done-color, #22c55e);
-}
-
-.kanban-status-group--working .kanban-status-group-label {
+.kanban-status-group--awaiting_input .kanban-status-group-label {
   color: var(--kanban-progress-color, #f59e0b);
 }
 
-.kanban-status-group--cold .kanban-status-group-label {
-  color: var(--kanban-cold-color, #3b82f6);
+.kanban-status-group--ready .kanban-status-group-label {
+  color: var(--kanban-done-color, #22c55e);
 }
 
 .kanban-status-group-count {
@@ -2327,19 +2303,14 @@
   font-weight: 600;
 }
 
-.kanban-status-group--ready .kanban-status-group-count {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--kanban-done-color, #22c55e);
-}
-
-.kanban-status-group--working .kanban-status-group-count {
+.kanban-status-group--awaiting_input .kanban-status-group-count {
   background: rgba(245, 158, 11, 0.15);
   color: var(--kanban-progress-color, #f59e0b);
 }
 
-.kanban-status-group--cold .kanban-status-group-count {
-  background: rgba(59, 130, 246, 0.15);
-  color: var(--kanban-cold-color, #3b82f6);
+.kanban-status-group--ready .kanban-status-group-count {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--kanban-done-color, #22c55e);
 }
 
 /* Separator line between status groups */
@@ -2661,4 +2632,24 @@
 
 .kanban-reopen-dialog-confirm:active {
   transform: scale(0.98);
+}
+
+/* ── Split Pane: horizontal scroll with min-width ── */
+.kanban-tab-view.split-pane {
+  overflow: hidden;
+}
+
+.kanban-tab-view.split-pane .kanban-view {
+  overflow-x: auto !important;
+}
+
+.kanban-tab-view.split-pane .kanban-columns {
+  min-width: 900px;
+  overflow-x: visible;
+  overflow-y: hidden;
+}
+
+.kanban-tab-view.split-pane .kanban-header {
+  flex-shrink: 0;
+  min-width: 900px;
 }
