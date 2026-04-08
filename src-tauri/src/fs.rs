@@ -150,11 +150,14 @@ pub fn search_files_recursive(
 
 /// Normalize path by removing \\?\ prefix added by fs::canonicalize on Windows
 fn normalize_path(path: &str) -> String {
-    if path.starts_with(r"\\?\") {
-        path[4..].to_string()
+    // Strip Windows extended-path prefix (\\?\), then convert backslashes to
+    // forward slashes so JS path keys are consistent across all platforms.
+    let stripped = if path.starts_with(r"\\?\") {
+        &path[4..]
     } else {
-        path.to_string()
-    }
+        path
+    };
+    stripped.replace('\\', "/")
 }
 
 fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing> {

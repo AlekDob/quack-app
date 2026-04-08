@@ -85,38 +85,114 @@
     ]
   },
   "positions": {
-    "033-file-explorer": { "x": 140, "y": 100 },
-    "035-side-panel-accordion": { "x": 140, "y": 200 },
-    "043-agent-sidebar": { "x": 140, "y": 300 },
-    "041-chat-breadcrumb": { "x": 140, "y": 400 },
-    "049-split-view-tabs": { "x": 140, "y": 500 },
-
-    "032-changes-panel-agent-commit-refresh": { "x": 140, "y": 690 },
-    "039-source-control-sections": { "x": 140, "y": 790 },
-    "040-git-graph-visualization": { "x": 140, "y": 890 },
-
-    "024-integrated-code-editor": { "x": 490, "y": 100 },
-    "031-edit-summary-bar-per-turn": { "x": 490, "y": 200 },
-    "048-tool-call-rendering": { "x": 490, "y": 300 },
-    "050-prompt-snippets": { "x": 490, "y": 400 },
-    "042-tooltip-unification": { "x": 490, "y": 500 },
-
-    "025-team-delegation-footer": { "x": 490, "y": 690 },
-    "029-permission-modes": { "x": 490, "y": 790 },
-    "030-built-in-skills": { "x": 490, "y": 890 },
-    "047-plan-delegate-remote": { "x": 490, "y": 990 },
-
-    "026-feature-map-whiteboard": { "x": 840, "y": 100 },
-    "044-kanban-view": { "x": 840, "y": 200 },
-    "045-office-view": { "x": 840, "y": 300 },
-
-    "027-saved-commands": { "x": 840, "y": 490 },
-    "028-ide-context-injection": { "x": 840, "y": 590 },
-    "034-windows-cross-platform-compat": { "x": 840, "y": 690 },
-    "036-terminal": { "x": 840, "y": 790 },
-    "037-unified-settings-panel": { "x": 840, "y": 890 },
-    "038-quack-store": { "x": 840, "y": 990 },
-    "046-accent-color-theming": { "x": 840, "y": 1090 }
+    "033-file-explorer": {
+      "x": 140,
+      "y": 100
+    },
+    "035-side-panel-accordion": {
+      "x": 140,
+      "y": 200
+    },
+    "043-agent-sidebar": {
+      "x": 140,
+      "y": 300
+    },
+    "041-chat-breadcrumb": {
+      "x": 140,
+      "y": 400
+    },
+    "049-split-view-tabs": {
+      "x": 140,
+      "y": 500
+    },
+    "032-changes-panel-agent-commit-refresh": {
+      "x": 140,
+      "y": 690
+    },
+    "039-source-control-sections": {
+      "x": 140,
+      "y": 790
+    },
+    "040-git-graph-visualization": {
+      "x": 140,
+      "y": 890
+    },
+    "024-integrated-code-editor": {
+      "x": 490,
+      "y": 100
+    },
+    "031-edit-summary-bar-per-turn": {
+      "x": 490,
+      "y": 200
+    },
+    "048-tool-call-rendering": {
+      "x": 490,
+      "y": 300
+    },
+    "050-prompt-snippets": {
+      "x": 490,
+      "y": 400
+    },
+    "042-tooltip-unification": {
+      "x": 490,
+      "y": 500
+    },
+    "025-team-delegation-footer": {
+      "x": 490,
+      "y": 690
+    },
+    "029-permission-modes": {
+      "x": 490,
+      "y": 790
+    },
+    "030-built-in-skills": {
+      "x": 490,
+      "y": 890
+    },
+    "047-plan-delegate-remote": {
+      "x": 490,
+      "y": 990
+    },
+    "026-feature-map-whiteboard": {
+      "x": 840,
+      "y": 100
+    },
+    "044-kanban-view": {
+      "x": 840,
+      "y": 200
+    },
+    "045-office-view": {
+      "x": 840,
+      "y": 300
+    },
+    "027-saved-commands": {
+      "x": 840,
+      "y": 490
+    },
+    "028-ide-context-injection": {
+      "x": 840,
+      "y": 590
+    },
+    "034-windows-cross-platform-compat": {
+      "x": 840,
+      "y": 690
+    },
+    "036-terminal": {
+      "x": 840,
+      "y": 790
+    },
+    "037-unified-settings-panel": {
+      "x": 840,
+      "y": 890
+    },
+    "038-quack-store": {
+      "x": 840,
+      "y": 990
+    },
+    "046-accent-color-theming": {
+      "x": 840,
+      "y": 1090
+    }
   },
   "nodeAssignments": {}
 }

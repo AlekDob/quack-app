@@ -8,6 +8,7 @@ import BrainGuide from './BrainGuide';
 import BrainEditor from './BrainEditor';
 import { invoke } from '@tauri-apps/api/core';
 import { listBrainEntries, readBrainEntry, getProjectDocPath, getBrainRootPath } from '../../services/brainFileService';
+import { normalizeToForwardSlash } from '../../utils/platform';
 import './brain.css';
 
 interface BrainAppProps {
@@ -17,7 +18,9 @@ interface BrainAppProps {
 type ViewType = 'timeline' | 'knowledge' | 'graph' | 'guide';
 type ScopeType = 'project' | 'global';
 
-export default function BrainApp({ projectPath }: BrainAppProps) {
+export default function BrainApp({ projectPath: rawProjectPath }: BrainAppProps) {
+  // Brain: gotcha-windows-path-separators — normalize on entry so all template literals use forward slashes
+  const projectPath = rawProjectPath ? normalizeToForwardSlash(rawProjectPath) : rawProjectPath;
   const [activeView, setActiveView] = useState<ViewType>('timeline');
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [selectedEntry, setSelectedEntry] = useState<string | null>(null);
@@ -67,7 +70,7 @@ export default function BrainApp({ projectPath }: BrainAppProps) {
       }
       setBrainPath(resolvedPath);
       if (resolvedPath) {
-        const mapFile = `${resolvedPath}/map.md`;
+        const mapFile = normalizeToForwardSlash(`${resolvedPath}/map.md`);
         const entry = await readBrainEntry(mapFile);
         setMapPath(entry ? mapFile : null);
       } else {
@@ -75,7 +78,7 @@ export default function BrainApp({ projectPath }: BrainAppProps) {
       }
       // Check for CLAUDE.md at project root (only in project scope)
       if (!isGlobal && projectPath) {
-        const claudeFile = `${projectPath}/CLAUDE.md`;
+        const claudeFile = normalizeToForwardSlash(`${projectPath}/CLAUDE.md`);
         try {
           await invoke('read_file_content', { path: claudeFile });
           setClaudeMdPath(claudeFile);
@@ -95,7 +98,7 @@ export default function BrainApp({ projectPath }: BrainAppProps) {
       return;
     }
     const loadGuides = async () => {
-      const guidePath = `${getProjectDocPath(projectPath)}/guide`;
+      const guidePath = normalizeToForwardSlash(`${getProjectDocPath(projectPath)}/guide`);
       try {
         const listing = await invoke<{
           entries: Array<{ name: string; path: string; is_dir: boolean }>;

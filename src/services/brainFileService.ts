@@ -9,7 +9,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core';
-import { normalizePath } from '../utils/platform';
+import { normalizeToForwardSlash } from '../utils/platform';
 
 const GLOBAL_BRAIN_DIR = '.quack/brain';
 const PROJECT_DOC_DIR = 'documentation';
@@ -43,14 +43,14 @@ async function getGlobalBrainPath(): Promise<string> {
   const customPath = localStorage.getItem(BRAIN_PATH_KEY);
   if (customPath) return customPath;
   const home = await invoke<string>('get_home_directory');
-  return normalizePath(`${home}/${GLOBAL_BRAIN_DIR}`);
+  return normalizeToForwardSlash(`${home}/${GLOBAL_BRAIN_DIR}`);
 }
 
 /**
  * Get the project documentation path
  */
 export function getProjectDocPath(projectRoot: string): string {
-  return normalizePath(`${projectRoot}/${PROJECT_DOC_DIR}`);
+  return normalizeToForwardSlash(`${projectRoot}/${PROJECT_DOC_DIR}`);
 }
 
 /**
@@ -68,8 +68,8 @@ export async function setBrainCustomPath(path: string | null): Promise<void> {
 async function writeBrainPathMarker(customPath: string | null): Promise<void> {
   try {
     const home = await invoke<string>('get_home_directory');
-    const markerPath = normalizePath(`${home}/${BRAIN_PATH_MARKER}`);
-    const brainPath = customPath || normalizePath(`${home}/${GLOBAL_BRAIN_DIR}`);
+    const markerPath = normalizeToForwardSlash(`${home}/${BRAIN_PATH_MARKER}`);
+    const brainPath = customPath || normalizeToForwardSlash(`${home}/${GLOBAL_BRAIN_DIR}`);
     await invoke('write_file_content', { path: markerPath, content: brainPath });
   } catch (err) {
     console.error('Failed to write brain-path marker:', err);
@@ -169,7 +169,7 @@ export async function appendDiaryEntry(
   try {
     existing = await invoke<string>('read_file_content', { path: filePath });
   } catch {
-    const projectName = projectRoot.split('/').pop() || 'unknown';
+    const projectName = projectRoot.split(/[\\/]/).pop() || 'unknown';
     existing = `---\ntype: diary\nproject: ${projectName}\ndate: ${date}\n---\n`;
   }
 
@@ -217,11 +217,13 @@ async function listMdFilesRecursive(dirPath: string): Promise<string[]> {
       path: dirPath,
     });
     for (const entry of listing.entries) {
+      // Brain: gotcha-windows-path-separators — normalize Tauri-returned paths to forward slashes
+      const entryPath = normalizeToForwardSlash(entry.path);
       if (!entry.is_dir && (entry.name.endsWith('.md') || entry.name.endsWith('.mmd'))) {
-        allFiles.push(entry.path);
+        allFiles.push(entryPath);
       }
       if (entry.is_dir) {
-        const subFiles = await listMdFilesRecursive(entry.path);
+        const subFiles = await listMdFilesRecursive(entryPath);
         allFiles.push(...subFiles);
       }
     }
@@ -306,7 +308,7 @@ function formatBrainFile(
 }
 
 function inferTypeFromPath(filePath: string): string {
-  const segments = filePath.split('/');
+  const segments = filePath.split(/[\\/]/);
   const folderMapping: Record<string, string> = {
     bugs: 'bug_fix',
     decisions: 'decision',
@@ -331,7 +333,7 @@ function parseBrainFile(raw: string, filePath: string): BrainEntry | null {
 
   // Handle .mmd files (Mermaid diagrams — no frontmatter)
   if (filePath.endsWith('.mmd')) {
-    const fileName = filePath.split('/').pop()?.replace('.mmd', '') || 'Diagram';
+    const fileName = filePath.split(/[\\/]/).pop()?.replace('.mmd', '') || 'Diagram';
     const title = fileName.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     return {
       type: 'diagram',
@@ -357,7 +359,7 @@ function parseBrainFile(raw: string, filePath: string): BrainEntry | null {
       project: undefined,
       created: dateMatch ? dateMatch[1] : '',
       tags: [],
-      title: titleMatch ? titleMatch[1] : filePath.split('/').pop()?.replace('.md', '') || '',
+      title: titleMatch ? titleMatch[1] : filePath.split(/[\\/]/).pop()?.replace('.md', '') || '',
       content: raw.trim(),
       filePath,
     };
@@ -386,7 +388,7 @@ function parseBrainFile(raw: string, filePath: string): BrainEntry | null {
     project: getField('project') || undefined,
     created: getField('created'),
     tags,
-    title: titleMatch ? titleMatch[1] : filePath.split('/').pop()?.replace('.md', '') || '',
+    title: titleMatch ? titleMatch[1] : filePath.split(/[\\/]/).pop()?.replace('.md', '') || '',
     content: body,
     filePath,
   };

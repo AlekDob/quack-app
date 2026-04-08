@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { normalizeToForwardSlash } from "../utils/platform";
 import ChangesPanel from "./ChangesPanel";
 import FileExplorer from "./FileExplorer";
 import AgentsPanel from "./AgentsPanel";
@@ -451,7 +452,8 @@ export default function SidePanelAccordion({
   const [brainLoaded, setBrainLoaded] = useState(false);
   const [brainLoading, setBrainLoading] = useState(false);
   const [brainFileCount, setBrainFileCount] = useState(0);
-  const brainRootPath = rootPath ? `${rootPath}/documentation` : null;
+  // Brain: gotcha-windows-path-separators — normalize before appending subpath
+  const brainRootPath = rootPath ? normalizeToForwardSlash(`${rootPath}/documentation`) : null;
 
   // Auto-refresh when sections are focused
   useEffect(() => {
