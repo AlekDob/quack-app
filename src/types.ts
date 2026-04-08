@@ -1591,7 +1591,7 @@ export interface CreateRuleParams {
 /**
  * Status of a Kanban task
  */
-export type KanbanStatus = 'todo' | 'in_progress' | 'done';
+export type KanbanStatus = 'todo' | 'in_progress' | 'done' | 'human_review';
 
 /**
  * Type of Kanban task - determines card appearance and behavior
