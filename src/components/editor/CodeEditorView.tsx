@@ -9,7 +9,7 @@
  */
 
 // Brain: pattern-code-editor-tab
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useEditorStore } from '../../stores/editorStore';
 import { useFileSystemStore } from '../../stores/fileSystemStore';
 import { getLanguageFromFilename } from '../../utils/languageDetection';
@@ -25,6 +25,13 @@ function CodeEditorView() {
   const filePath = useEditorStore(s => s.filePath);
   const isLoading = useEditorStore(s => s.isLoading);
   const [outlineOpen, setOutlineOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const isMarkdown = filePath ? /\.(md|markdown)$/i.test(filePath) : false;
+
+  // Reset preview when file changes
+  useEffect(() => {
+    setPreviewOpen(false);
+  }, [filePath]);
 
   const handleSelectionChange = useCallback((sel: EditorSelectionInfo | null) => {
     if (!sel || !filePath) {
@@ -53,10 +60,13 @@ function CodeEditorView() {
       <EditorHeader
         outlineOpen={outlineOpen}
         onToggleOutline={() => setOutlineOpen(o => !o)}
+        isMarkdown={isMarkdown}
+        previewOpen={previewOpen}
+        onTogglePreview={() => setPreviewOpen(p => !p)}
       />
       <div className="editor-body">
-        <EditorContent onSelectionChange={handleSelectionChange} />
-        {outlineOpen && (
+        <EditorContent onSelectionChange={handleSelectionChange} previewOpen={previewOpen} />
+        {outlineOpen && !previewOpen && (
           <EditorOutlinePanel onNavigateToLine={handleNavigateToLine} />
         )}
       </div>

@@ -509,6 +509,26 @@
   color: var(--accent-color);
 }
 
+/* Markdown preview */
+.editor-markdown-preview {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  background: #0a0a0a;
+}
+
+/* Preview toggle button */
+.editor-btn-preview.active {
+  background: rgba(var(--accent-rgb), 0.15);
+  border-color: rgba(var(--accent-rgb), 0.3);
+  color: var(--accent-color);
+}
+
+.editor-mode-badge.preview {
+  background: rgba(var(--accent-rgb), 0.15);
+  color: var(--accent-color);
+}
+
 /* Merge view container */
 .code-mirror-merge-view {
   flex: 1;

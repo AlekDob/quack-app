@@ -12,15 +12,17 @@ import { lazy, Suspense, useRef, useCallback } from 'react';
 import { useEditorStore } from '../../stores/editorStore';
 import CodeEditorSkeleton from '../skeletons/CodeEditorSkeleton';
 import CodeEditorEngine from './CodeEditorEngine';
+import MarkdownText from '../MarkdownText';
 import type { CodeEditorRef, EditorSelectionInfo } from './editorTypes';
 
 const CodeMirrorMergeView = lazy(() => import('./CodeMirrorMergeView'));
 
 interface EditorContentProps {
   onSelectionChange?: (selection: EditorSelectionInfo | null) => void;
+  previewOpen?: boolean;
 }
 
-function EditorContent({ onSelectionChange }: EditorContentProps) {
+function EditorContent({ onSelectionChange, previewOpen }: EditorContentProps) {
   const mode = useEditorStore(s => s.mode);
   const filePath = useEditorStore(s => s.filePath);
   const content = useEditorStore(s => s.content);
@@ -41,6 +43,14 @@ function EditorContent({ onSelectionChange }: EditorContentProps) {
 
   if (isLoading) {
     return <CodeEditorSkeleton />;
+  }
+
+  if (previewOpen && mode === 'edit') {
+    return (
+      <div className="editor-markdown-preview">
+        <MarkdownText>{content}</MarkdownText>
+      </div>
+    );
   }
 
   if (mode === 'diff' && pendingEdit) {

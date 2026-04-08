@@ -20,9 +20,12 @@ function buildBreadcrumb(filePath: string): string[] {
 interface EditorHeaderProps {
   outlineOpen?: boolean;
   onToggleOutline?: () => void;
+  isMarkdown?: boolean;
+  previewOpen?: boolean;
+  onTogglePreview?: () => void;
 }
 
-function EditorHeader({ outlineOpen, onToggleOutline }: EditorHeaderProps) {
+function EditorHeader({ outlineOpen, onToggleOutline, isMarkdown, previewOpen, onTogglePreview }: EditorHeaderProps) {
   const filePath = useEditorStore(s => s.filePath);
   const mode = useEditorStore(s => s.mode);
   const isDirty = useEditorStore(s => s.isDirty);
@@ -48,13 +51,23 @@ function EditorHeader({ outlineOpen, onToggleOutline }: EditorHeaderProps) {
           ))}
         </div>
         {isDirty && <span className="editor-dirty-dot" title="Non salvato" />}
-        <span className={`editor-mode-badge ${isDiffMode ? 'diff' : ''}`}>
-          {isDiffMode ? 'Revisione modifiche' : 'Modifica'}
+        <span className={`editor-mode-badge ${isDiffMode ? 'diff' : previewOpen ? 'preview' : ''}`}>
+          {isDiffMode ? 'Revisione modifiche' : previewOpen ? 'Anteprima' : 'Modifica'}
         </span>
       </div>
       <div className="editor-header-right">
         {isEditMode && (
           <>
+            {isMarkdown && (
+              <button
+                type="button"
+                className={`editor-btn editor-btn-preview${previewOpen ? ' active' : ''}`}
+                onClick={onTogglePreview}
+                title="Toggle Markdown preview"
+              >
+                Preview
+              </button>
+            )}
             <button
               type="button"
               className={`editor-btn editor-btn-outline${outlineOpen ? ' active' : ''}`}
