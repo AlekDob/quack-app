@@ -13,6 +13,7 @@ import { useEditorStore } from '../../stores/editorStore';
 import CodeEditorSkeleton from '../skeletons/CodeEditorSkeleton';
 import CodeEditorEngine from './CodeEditorEngine';
 import MarkdownText from '../MarkdownText';
+import MermaidDiagram from '../MermaidDiagram';
 import type { CodeEditorRef, EditorSelectionInfo } from './editorTypes';
 
 const CodeMirrorMergeView = lazy(() => import('./CodeMirrorMergeView'));
@@ -20,9 +21,10 @@ const CodeMirrorMergeView = lazy(() => import('./CodeMirrorMergeView'));
 interface EditorContentProps {
   onSelectionChange?: (selection: EditorSelectionInfo | null) => void;
   previewOpen?: boolean;
+  isMermaid?: boolean;
 }
 
-function EditorContent({ onSelectionChange, previewOpen }: EditorContentProps) {
+function EditorContent({ onSelectionChange, previewOpen, isMermaid }: EditorContentProps) {
   const mode = useEditorStore(s => s.mode);
   const filePath = useEditorStore(s => s.filePath);
   const content = useEditorStore(s => s.content);
@@ -48,7 +50,7 @@ function EditorContent({ onSelectionChange, previewOpen }: EditorContentProps) {
   if (previewOpen && mode === 'edit') {
     return (
       <div className="editor-markdown-preview">
-        <MarkdownText>{content}</MarkdownText>
+        {isMermaid ? <MermaidDiagram>{content}</MermaidDiagram> : <MarkdownText>{content}</MarkdownText>}
       </div>
     );
   }

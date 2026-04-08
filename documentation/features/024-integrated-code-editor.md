@@ -4,12 +4,12 @@ project: quack-app
 stack: React 18 + TypeScript strict + Tauri v2 + CodeMirror 6
 created: 2026-04-02
 last_verified: 2026-04-03
-tags: [editor, codemirror, tab, diff, multi-tab, search, popout, autocomplete, minimap, lint, code-intel, outline]
+tags: [editor, codemirror, tab, diff, multi-tab, search, popout, autocomplete, minimap, lint, code-intel, outline, preview, markdown, mermaid, keyboard-shortcuts]
 ---
 
 ## 024 - Integrated Code Editor
-**Purpose:** Multi-tab code editor with edit/diff modes, search/replace, autocomplete, minimap, lint/diagnostics, code-intel outline panel, popout window support, and agent editFile integration.
-**Stack:** React 18, TypeScript strict, Tauri v2, CodeMirror 6, @codemirror/merge, @codemirror/autocomplete, @codemirror/lint, @replit/codemirror-minimap, Zustand
+**Purpose:** Multi-tab code editor with edit/diff modes, search/replace, autocomplete, minimap, lint/diagnostics, code-intel outline panel, popout window support, agent editFile integration, markdown/mermaid preview toggle, and keyboard shortcuts.
+**Stack:** React 18, TypeScript strict, Tauri v2, CodeMirror 6, @codemirror/merge, @codemirror/autocomplete, @codemirror/lint, @replit/codemirror-minimap, Zustand, mermaid (lazy)
 
 ### Files
 | Type | Path | Exports/Purpose |
@@ -21,8 +21,8 @@ tags: [editor, codemirror, tab, diff, multi-tab, search, popout, autocomplete, m
 | Component | `src/components/editor/CodeEditorView.tsx` | Main orchestrator: EditorHeader + EditorContent + EditorOutlinePanel + EditorStatusBar |
 | Component | `src/components/editor/CodeEditorEngine.tsx` | Core CM6 component with forwardRef; search/replace, autocomplete, minimap, lint extensions |
 | Component | `src/components/editor/CodeMirrorMergeView.tsx` | Side-by-side diff via @codemirror/merge MergeView |
-| Component | `src/components/editor/EditorHeader.tsx` | Breadcrumb, mode badge, outline toggle, Save/Accept/Reject/Edit buttons |
-| Component | `src/components/editor/EditorContent.tsx` | Mode switch: edit (CodeEditorEngine) vs diff (CodeMirrorMergeView) |
+| Component | `src/components/editor/EditorHeader.tsx` | Breadcrumb, mode badge, outline toggle, Preview toggle, Save/Accept/Reject/Edit buttons with KeyboardShortcutTooltip |
+| Component | `src/components/editor/EditorContent.tsx` | Mode switch: edit (CodeEditorEngine) vs diff (CodeMirrorMergeView) vs preview (MarkdownText/MermaidDiagram) |
 | Component | `src/components/editor/EditorOutlinePanel.tsx` | Collapsible sidebar showing AST outline symbols via code-intel Tauri commands |
 | Component | `src/components/editor/EditorStatusBar.tsx` | Cursor position, language, encoding, save status |
 | Component | `src/components/editor/EditorIDEDropdown.tsx` | Split button + dropdown: open in IDE, reveal in Finder/Explorer |
@@ -78,6 +78,18 @@ User presses Cmd+S in editor
   -> CodeEditorEngine keymap fires onSave
   -> editorStore.save() invokes Tauri write_file_content
   -> isDirty resets to false
+```
+
+**Preview toggle (Cmd+Shift+P):**
+```
+User clicks Preview button or presses Cmd+Shift+P on .md/.mdx/.mmd file
+  -> CodeEditorView toggles previewOpen state
+  -> EditorContent receives previewOpen + isMermaid props
+  -> .md/.mdx: renders MarkdownText (with clickable file chips)
+  -> .mmd: renders MermaidDiagram (with zoom/pan)
+  -> Button text flips: "Preview" <-> "Editor"
+  -> Outline button hidden in preview mode
+  -> Preview state preserved across file switches
 ```
 
 **Search/Replace (Cmd+F):**
@@ -168,7 +180,9 @@ Backend runs linter (tsc --noEmit / eslint)
 ### Config
 - Tab ID pattern: `code-editor-${filePath}` (unique per file)
 - Tab type: `'code-editor'`
-- Keyboard shortcut: `Cmd+E` (toggle editor tab), `Cmd+S` (save)
+- Keyboard shortcut: `Cmd+E` (toggle editor tab), `Cmd+S` (save), `Cmd+Shift+P` (toggle preview)
+- Preview-eligible extensions: `.md`, `.mdx`, `.mmd`
+- ShortcutActionId entries: `toggleEditorPreview`, `editorSave`
 - Theme: pure black (#000000) background, Atom One Dark / VS Code Dark+ syntax colors
 - Font: JetBrains Mono, SF Mono, Monaco fallback chain, 14px
 - `quack-ide-settings` localStorage key: persists preferredIDE, fileOpenTarget, autoLaunch, syncFocus

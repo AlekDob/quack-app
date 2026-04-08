@@ -10036,6 +10036,35 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     });
   }, [handleOpenCodeEditorTab, fileEditsMap]);
 
+  // Listen for quack:open-file events from MarkdownText file link clicks
+  useEffect(() => {
+    const handleOpenFile = (e: Event) => {
+      const { path } = (e as CustomEvent<{ path: string }>).detail;
+      if (!path) return;
+
+      // Absolute path — open directly
+      if (path.startsWith('/')) {
+        handleOpenCodeEditorTab(path);
+        return;
+      }
+
+      // Relative path — resolve against explorerRoot + src/
+      if (explorerRoot) {
+        const candidates = [
+          `${explorerRoot}/src/${path}`,
+          `${explorerRoot}/${path}`,
+        ];
+        // Try src/ first, then root
+        invoke<string>('read_file_content', { path: candidates[0] })
+          .then(() => handleOpenCodeEditorTab(candidates[0]))
+          .catch(() => handleOpenCodeEditorTab(candidates[1]));
+      }
+    };
+
+    window.addEventListener('quack:open-file', handleOpenFile);
+    return () => window.removeEventListener('quack:open-file', handleOpenFile);
+  }, [handleOpenCodeEditorTab, explorerRoot]);
+
   // Handler for firing an automation job — creates a session and sends the prompt
   const handleAutomationFireJob = useCallback(async (job: AutomationJob) => {
     console.log('[Automation] Firing job:', job.name, 'agent:', job.agentId);

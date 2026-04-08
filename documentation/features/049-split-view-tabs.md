@@ -5,7 +5,7 @@ stack: Tauri (Rust + React)
 created: 2026-04-06
 last_verified: 2026-04-07
 last_updated: 2026-04-07
-tags: [split-view, tabs, drag-drop, layout, editor, sidebar-drag]
+tags: [split-view, tabs, drag-drop, layout, editor, sidebar-drag, preview, markdown, mermaid]
 ---
 
 ## Split View Tabs
@@ -50,7 +50,7 @@ tags: [split-view, tabs, drag-drop, layout, editor, sidebar-drag]
 - `handleSplitDropLeft(tabId: string) → void` -- moves dragged tab to left pane, current to right
 - `handleSplitDropRight(tabId: string) → void` -- places dragged tab in right pane
 - `handleCloseSplit() → void` -- resets splitTabId to null
-- `SplitCodeEditor({ filePath: string }) → JSX` -- standalone editor with full header (breadcrumb, dirty dot, mode badge, Save button, IDE dropdown), reads file via Tauri invoke, bypasses editorStore singleton. Uses same CSS classes as EditorHeader (.editor-header, .editor-btn-save, etc.)
+- `SplitCodeEditor({ filePath: string }) → JSX` -- standalone editor with full header (breadcrumb, dirty dot, mode badge, Preview/Editor toggle for .md/.mdx/.mmd files, Save button, IDE dropdown), reads file via Tauri invoke, bypasses editorStore singleton. Uses same CSS classes as EditorHeader (.editor-header, .editor-btn-save, .editor-btn-preview, etc.). Markdown preview uses MarkdownText component, Mermaid preview uses MermaidDiagram component (with zoom/pan). Keydown listener: `Cmd+Shift+P` toggles preview, `Cmd+S` saves in preview mode. Buttons have KeyboardShortcutTooltip. Preview state preserved across file changes.
 - `getLanguageFromPath(path: string) → string` -- maps file extension to CodeMirror language name
 
 ### State

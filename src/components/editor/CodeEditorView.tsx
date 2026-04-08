@@ -12,6 +12,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useEditorStore } from '../../stores/editorStore';
 import { useFileSystemStore } from '../../stores/fileSystemStore';
+import { useShortcutsStore } from '../../stores/shortcutsStore';
 import { getLanguageFromFilename } from '../../utils/languageDetection';
 import EditorEmptyState from './EditorEmptyState';
 import EditorHeader from './EditorHeader';
@@ -21,17 +22,55 @@ import EditorStatusBar from './EditorStatusBar';
 import type { EditorSelectionInfo } from './editorTypes';
 import './CodeEditorView.css';
 
+/** Build key string from KeyboardEvent matching shortcutsStore format */
+function buildKeyString(e: KeyboardEvent): string {
+  const parts: string[] = [];
+  if (e.metaKey) parts.push('Meta');
+  if (e.ctrlKey) parts.push('Ctrl');
+  if (e.altKey) parts.push('Alt');
+  if (e.shiftKey) parts.push('Shift');
+  const key = e.key;
+  if (!['Meta', 'Control', 'Alt', 'Shift', 'Dead'].includes(key)) {
+    parts.push(key.length === 1 ? key.toUpperCase() : key);
+  }
+  return parts.join('+');
+}
+
 function CodeEditorView() {
   const filePath = useEditorStore(s => s.filePath);
   const isLoading = useEditorStore(s => s.isLoading);
   const [outlineOpen, setOutlineOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const isMarkdown = filePath ? /\.(md|markdown)$/i.test(filePath) : false;
+  const isMarkdown = filePath ? /\.(md|mdx|markdown)$/i.test(filePath) : false;
+  const isMermaid = filePath ? /\.mmd$/i.test(filePath) : false;
+  const hasPreview = isMarkdown || isMermaid;
+  const save = useEditorStore(s => s.save);
+  const isDirty = useEditorStore(s => s.isDirty);
+  const shortcuts = useShortcutsStore(s => s.shortcuts);
 
-  // Reset preview when file changes
+  // Keyboard shortcuts: toggle preview (Cmd+Shift+P) + save (Cmd+S) in preview mode
   useEffect(() => {
-    setPreviewOpen(false);
-  }, [filePath]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const previewKeys = shortcuts.toggleEditorPreview?.currentKeys || '';
+      const saveKeys = shortcuts.editorSave?.currentKeys || '';
+      const pressed = buildKeyString(e);
+
+      if (pressed === previewKeys && hasPreview) {
+        e.preventDefault();
+        setPreviewOpen(p => !p);
+        return;
+      }
+
+      // Save when in preview mode (CM handles it in edit mode)
+      if (pressed === saveKeys && previewOpen && isDirty) {
+        e.preventDefault();
+        save();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [shortcuts, hasPreview, previewOpen, isDirty, save]);
 
   const handleSelectionChange = useCallback((sel: EditorSelectionInfo | null) => {
     if (!sel || !filePath) {
@@ -60,13 +99,13 @@ function CodeEditorView() {
       <EditorHeader
         outlineOpen={outlineOpen}
         onToggleOutline={() => setOutlineOpen(o => !o)}
-        isMarkdown={isMarkdown}
-        previewOpen={previewOpen}
+        isMarkdown={hasPreview}
+        previewOpen={previewOpen && hasPreview}
         onTogglePreview={() => setPreviewOpen(p => !p)}
       />
       <div className="editor-body">
-        <EditorContent onSelectionChange={handleSelectionChange} previewOpen={previewOpen} />
-        {outlineOpen && !previewOpen && (
+        <EditorContent onSelectionChange={handleSelectionChange} previewOpen={previewOpen && hasPreview} isMermaid={isMermaid} />
+        {outlineOpen && !(previewOpen && hasPreview) && (
           <EditorOutlinePanel onNavigateToLine={handleNavigateToLine} />
         )}
       </div>

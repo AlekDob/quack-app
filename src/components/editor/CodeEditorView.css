@@ -518,6 +518,11 @@
 }
 
 /* Preview toggle button */
+.editor-btn-preview {
+  padding: 4px 6px;
+  line-height: 1;
+}
+
 .editor-btn-preview.active {
   background: rgba(var(--accent-rgb), 0.15);
   border-color: rgba(var(--accent-rgb), 0.3);

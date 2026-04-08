@@ -199,6 +199,20 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = (() =
       defaultKeys: "Ctrl+B",
       currentKeys: "Ctrl+B",
     },
+    toggleEditorPreview: {
+      id: "toggleEditorPreview" as const,
+      label: "Toggle Editor Preview",
+      description: "Switch between code editor and preview (Markdown/Mermaid)",
+      defaultKeys: buildShortcut("P", true),
+      currentKeys: buildShortcut("P", true),
+    },
+    editorSave: {
+      id: "editorSave" as const,
+      label: "Save File",
+      description: "Save the current file in the code editor",
+      defaultKeys: buildShortcut("S"),
+      currentKeys: buildShortcut("S"),
+    },
   };
   return shortcuts;
 })();

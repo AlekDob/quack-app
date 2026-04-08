@@ -8,6 +8,8 @@
 
 // Brain: pattern-code-editor-tab
 import { useEditorStore } from '../../stores/editorStore';
+import { useShortcutsStore } from '../../stores/shortcutsStore';
+import KeyboardShortcutTooltip from '../KeyboardShortcutTooltip';
 import EditorIDEDropdown from './EditorIDEDropdown';
 
 // Brain: gotcha-windows-path-separators
@@ -32,8 +34,13 @@ function EditorHeader({ outlineOpen, onToggleOutline, isMarkdown, previewOpen, o
   const pendingEdit = useEditorStore(s => s.pendingEdit);
   const save = useEditorStore(s => s.save);
   const resolveEdit = useEditorStore(s => s.resolveEdit);
+  const formatShortcut = useShortcutsStore(s => s.formatShortcut);
+  const shortcuts = useShortcutsStore(s => s.shortcuts);
 
   if (!filePath) return null;
+
+  const previewShortcut = formatShortcut(shortcuts.toggleEditorPreview?.currentKeys || '');
+  const saveShortcut = formatShortcut(shortcuts.editorSave?.currentKeys || '');
 
   const breadcrumb = buildBreadcrumb(filePath);
   const isEditMode = mode === 'edit';
@@ -59,31 +66,41 @@ function EditorHeader({ outlineOpen, onToggleOutline, isMarkdown, previewOpen, o
         {isEditMode && (
           <>
             {isMarkdown && (
+              <KeyboardShortcutTooltip
+                label={previewOpen ? 'Code editor' : 'Preview'}
+                shortcut={previewShortcut}
+                position="bottom"
+              >
+                <button
+                  type="button"
+                  className={`editor-btn editor-btn-preview${previewOpen ? ' active' : ''}`}
+                  onClick={onTogglePreview}
+                >
+                  {previewOpen ? 'Editor' : 'Preview'}
+                </button>
+              </KeyboardShortcutTooltip>
+            )}
+            {!previewOpen && (
+              <KeyboardShortcutTooltip label="Outline" position="bottom">
+                <button
+                  type="button"
+                  className={`editor-btn editor-btn-outline${outlineOpen ? ' active' : ''}`}
+                  onClick={onToggleOutline}
+                >
+                  Outline
+                </button>
+              </KeyboardShortcutTooltip>
+            )}
+            <KeyboardShortcutTooltip label="Salva" shortcut={saveShortcut} position="bottom">
               <button
                 type="button"
-                className={`editor-btn editor-btn-preview${previewOpen ? ' active' : ''}`}
-                onClick={onTogglePreview}
-                title="Toggle Markdown preview"
+                className="editor-btn editor-btn-save"
+                onClick={() => save()}
+                disabled={!isDirty}
               >
-                Preview
+                Salva
               </button>
-            )}
-            <button
-              type="button"
-              className={`editor-btn editor-btn-outline${outlineOpen ? ' active' : ''}`}
-              onClick={onToggleOutline}
-              title="Toggle Outline panel — shows file structure (functions, classes, variables)"
-            >
-              Outline
-            </button>
-            <button
-              type="button"
-              className="editor-btn editor-btn-save"
-              onClick={() => save()}
-              disabled={!isDirty}
-            >
-              Salva
-            </button>
+            </KeyboardShortcutTooltip>
             <EditorIDEDropdown filePath={filePath} />
           </>
         )}

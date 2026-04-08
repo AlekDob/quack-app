@@ -1,7 +1,12 @@
-import React from 'react';
+import React, { useCallback, lazy, Suspense } from 'react';
 import { CopyButton } from './chat/CopyButton';
 import HtmlVisualizer from './chat/HtmlVisualizer';
 import './MarkdownText.css';
+
+const MermaidDiagram = lazy(() => import('./MermaidDiagram'));
+
+/** File extensions that make inline code clickable */
+const FILE_EXTENSIONS = /\.(tsx?|jsx?|css|scss|rs|py|go|html|json|md|mdx|yaml|yml|toml|sh|sql|xml|svg|java|kt|swift|rb|php|cpp|c|h|vue|mjs|cjs)$/i;
 
 interface MarkdownTextProps {
   children: string;
@@ -48,6 +53,12 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
         // Brain: quack-visualizer-inline-html
         if (codeBlockLang === 'quack-viz') {
           elements.push(<HtmlVisualizer key={`viz-${key}`} html={codeContent} />);
+        } else if (codeBlockLang === 'mermaid') {
+          elements.push(
+            <Suspense key={`mermaid-${key}`} fallback={<div className="md-code-block-wrapper"><pre className="md-code-block"><code>{codeContent}</code></pre></div>}>
+              <MermaidDiagram>{codeContent}</MermaidDiagram>
+            </Suspense>
+          );
         } else {
           elements.push(
             <div key={`code-wrapper-${key}`} className="md-code-block-wrapper">
@@ -120,7 +131,14 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
 
     const processInlineMarkdown = (line: string): string => {
       // Inline code: `code` - process FIRST to protect content from other transformations
-      line = line.replace(/`([^`]+)`/g, (_match, code) => `<code class="md-inline-code">${escapeHtml(code)}</code>`);
+      // File-path-like code gets a clickable data attribute
+      line = line.replace(/`([^`]+)`/g, (_match, code: string) => {
+        const escaped = escapeHtml(code);
+        if (FILE_EXTENSIONS.test(code)) {
+          return `<code class="md-inline-code md-file-link" data-filepath="${escaped}" role="button" tabindex="0">${escaped}</code>`;
+        }
+        return `<code class="md-inline-code">${escaped}</code>`;
+      });
 
       // Links: [text](url) - must be processed BEFORE bold/italic to avoid conflicts
       line = line.replace(
@@ -271,5 +289,14 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
     return elements;
   };
 
-  return <div className="markdown-content">{renderMarkdown(children)}</div>;
+  const handleClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const filepath = target.getAttribute('data-filepath');
+    if (filepath && target.classList.contains('md-file-link')) {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('quack:open-file', { detail: { path: filepath } }));
+    }
+  }, []);
+
+  return <div className="markdown-content" onClick={handleClick}>{renderMarkdown(children)}</div>;
 }

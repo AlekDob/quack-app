@@ -102,6 +102,8 @@ export interface DirectoryEntry {
   path: string;
   is_dir: boolean;
   is_symlink: boolean;
+  /** Seconds since UNIX epoch (file modification time) */
+  modified_at?: number;
 }
 
 export interface DirectoryListing {
@@ -1720,7 +1722,9 @@ export type ShortcutActionId =
   | 'toggleSidebarView'
   | 'toggleBTW'
   | 'toggleCodeEditor'
-  | 'toggleFeatureMap';
+  | 'toggleFeatureMap'
+  | 'toggleEditorPreview'
+  | 'editorSave';
 
 /**
  * Configuration for a single keyboard shortcut
