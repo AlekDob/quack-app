@@ -46,29 +46,6 @@ function SplitCodeEditor({ filePath }: SplitCodeEditorProps) {
   const hasPreview = isMarkdown || isMermaid;
   const shortcuts = useShortcutsStore(s => s.shortcuts);
 
-  // Keyboard shortcuts: toggle preview + save in preview mode
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const previewKeys = shortcuts.toggleEditorPreview?.currentKeys || '';
-      const saveKeys = shortcuts.editorSave?.currentKeys || '';
-      const pressed = buildKeyString(e);
-
-      if (pressed === previewKeys && hasPreview) {
-        e.preventDefault();
-        setPreviewOpen(p => !p);
-        return;
-      }
-
-      if (pressed === saveKeys && previewOpen && isDirty) {
-        e.preventDefault();
-        handleSave();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [shortcuts, hasPreview, previewOpen, isDirty, handleSave]);
-
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
@@ -104,6 +81,29 @@ function SplitCodeEditor({ filePath }: SplitCodeEditorProps) {
       console.error('[SplitCodeEditor] Save failed:', error);
     }
   }, [filePath, content]);
+
+  // Keyboard shortcuts: toggle preview + save in preview mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const previewKeys = shortcuts.toggleEditorPreview?.currentKeys || '';
+      const saveKeys = shortcuts.editorSave?.currentKeys || '';
+      const pressed = buildKeyString(e);
+
+      if (pressed === previewKeys && hasPreview) {
+        e.preventDefault();
+        setPreviewOpen(p => !p);
+        return;
+      }
+
+      if (pressed === saveKeys && previewOpen && isDirty) {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [shortcuts, hasPreview, previewOpen, isDirty, handleSave]);
 
   if (isLoading) {
     return <CodeEditorSkeleton />;

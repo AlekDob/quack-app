@@ -16,6 +16,8 @@ pub struct DirectoryEntry {
     pub path: String,
     pub is_dir: bool,
     pub is_symlink: bool,
+    /// Seconds since UNIX epoch (file modification time)
+    pub modified_at: Option<u64>,
 }
 
 #[derive(Serialize)]
@@ -173,11 +175,19 @@ fn list_directory_impl(path: Option<String>) -> Result<DirectoryListing> {
         let entry_path = entry.path();
         let entry_name = entry.file_name().to_string_lossy().to_string();
 
+        let modified_at = entry
+            .metadata()
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs());
+
         entries.push(DirectoryEntry {
             name: entry_name,
             path: normalize_path(&entry_path.to_string_lossy()),
             is_dir: file_type.is_dir(),
             is_symlink: file_type.is_symlink(),
+            modified_at,
         });
     }
 

@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: React 18 + TypeScript strict + CSS custom properties
 created: 2026-04-06
-last_verified: 2026-04-07
-tags: [tool-call-rendering, chat, ui, badges, widgets, drag-drop, split-view]
+last_verified: 2026-04-08
+tags: [tool-call-rendering, chat, ui, badges, widgets, drag-drop, split-view, diff-viewer, fullscreen]
 ---
 
 ## Tool Call Rendering
@@ -16,7 +16,7 @@ tags: [tool-call-rendering, chat, ui, badges, widgets, drag-drop, split-view]
 |------|------|-----------------|
 | Component | src/components/ToolCallMinimal.tsx | `ToolCallMinimal` (default, memo) -- compact expandable badge for any tool call |
 | Component | src/components/ToolWidgets.tsx | `getToolColor`, `ToolIcon`, `SystemInitializedWidget`, `EditWidget`, `WriteWidget`, `BashWidget`, `ReadWidget`, `GrepWidget`, `TodoWriteWidget`, `ExitPlanModeWidget`, `EnterPlanModeWidget`, `ImagePreviewWidget` -- specialized rich widgets |
-| Component | src/components/DiffViewer.tsx | `DiffViewer` -- renders unified diffs inside Edit/ToolCallMinimal expanded content |
+| Component | src/components/DiffViewer.tsx | `DiffViewer` -- renders diffs with 3 modes: unified, split (side-by-side), fullscreen overlay |
 | Component | src/components/TodoWidget.tsx | `TodoWidget` -- renders TodoWrite items (used by both ToolCallMinimal and TodoWriteWidget) |
 | Component | src/components/PlanWidget.tsx | `PlanWidget` -- renders ExitPlanMode plan content with approval UI |
 | Component | src/components/RevealInFinderButton.tsx | `RevealInFinderButton` -- Finder/Explorer button used in ImagePreviewWidget |
@@ -53,11 +53,15 @@ tags: [tool-call-rendering, chat, ui, badges, widgets, drag-drop, split-view]
 - `isBrainRead(toolName, input) --> boolean` -- detects if tool targets documentation/ or .quack/brain/ paths
 - `isBrainPath(path) --> boolean` -- checks path against Brain path regex patterns
 - `createDiffFromStrings(oldString, newString, fileName) --> ToolDiff` -- converts raw strings to diff format
+- `buildSplitRows(lines: DiffLine[]) --> SplitRow[]` -- aligns removed/added lines into left/right pairs for side-by-side view; unchanged lines mirrored on both sides
+- `DiffContent({ lines, splitMode, splitRows }) --> JSX` -- shared rendering component for both inline and fullscreen, avoids duplicating split/unified logic
 
 ### State
 - `isExpanded`: boolean -- toggle for badge/widget content (component)
 - `copied`: boolean -- clipboard feedback on target click (component)
 - `tool.status`: `'running' | 'completed' | 'error'` -- drives status indicator + animations (component)
+- `splitMode`: boolean -- DiffViewer toggle between unified (inline) and split (side-by-side) view
+- `fullscreen`: boolean -- DiffViewer toggle for fullscreen overlay via createPortal
 
 ### External Dependencies
 - `ChatToolCall` type from `src/types.ts`: tool name, input, result, status, diff fields
@@ -76,6 +80,17 @@ tags: [tool-call-rendering, chat, ui, badges, widgets, drag-drop, split-view]
 - **Drag-to-split**: The `.tool-minimal-file-path` bar is `draggable` with `application/quack-file` MIME type (same format as FileExplorer). Users can drag file paths from tool results onto `SplitDropZone` to open in split view
 - **File path detection**: ToolCallMinimal extracts `filePath` from `input.file_path` (Edit/Write/Read) or `input.path` (Read/Glob), showing the file-path bar for all file-referencing tools
 - **ChatMessage wiring**: `ChatMessage` passes `onFilePathClick || onOpenFile` to ToolCallMinimal, preferring the fileOpenTarget-aware handler
+
+### DiffViewer Modes
+| Mode | Trigger | Layout | Description |
+|------|---------|--------|-------------|
+| Unified | Default | Single column, removed (red) then added (green) | Standard inline diff |
+| Split | Toggle button (split-pane icon) | Two 50% columns, left=old right=new | Side-by-side comparison, `buildSplitRows()` pairs removed/added lines |
+| Fullscreen | Toggle button (expand icon) | Portal overlay, no max-height, 12px font | Full-viewport diff viewer, backdrop-blur, Escape/click-outside to close |
+
+- Split + Fullscreen can be combined (split view inside fullscreen overlay)
+- Header buttons: fixed 22x22px, `first-of-type` gets `margin-left: auto` to push right
+- Fullscreen uses `createPortal(document.body)` to escape parent overflow constraints
 
 ### CSS Animations
 - `typing-bounce`: 3-dot bounce for running status

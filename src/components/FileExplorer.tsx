@@ -71,6 +71,8 @@ interface FileExplorerProps {
   onLoadChildren: (path: string) => Promise<DirectoryEntry[]>;
   onMentionFile?: (filePath: string, fileName: string, isDirectory: boolean) => void;
   modifiedFiles?: Map<string, 'created' | 'modified' | 'deleted'>; // NEW: Track modified files
+  /** Sort entries: 'name' (default, dirs first + alpha) or 'modified' (dirs first + newest first) */
+  sortBy?: 'name' | 'modified';
 }
 
 function FileExplorer({
@@ -84,6 +86,7 @@ function FileExplorer({
   onLoadChildren,
   onMentionFile,
   modifiedFiles, // NEW: Modified files tracking
+  sortBy = 'name',
 }: FileExplorerProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set());
@@ -98,12 +101,21 @@ function FileExplorer({
   const loadingNodesRef = useRef<Set<string>>(new Set());
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  /** Sort entries: dirs first, then by name (alpha) or modified_at (newest first) */
+  const sortEntries = useCallback((entries: DirectoryEntry[]): DirectoryEntry[] => {
+    if (sortBy === 'name') return entries; // already sorted by Rust backend
+    return [...entries].sort((a, b) => {
+      if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
+      return (b.modified_at ?? 0) - (a.modified_at ?? 0);
+    });
+  }, [sortBy]);
+
   const rootEntries = useMemo(() => {
     if (!rootPath) {
       return [];
     }
-    return tree[rootPath] ?? [];
-  }, [rootPath, tree]);
+    return sortEntries(tree[rootPath] ?? []);
+  }, [rootPath, tree, sortEntries]);
 
   const rootLabel = useMemo(() => {
     if (!rootPath) {
@@ -404,7 +416,7 @@ function FileExplorer({
                     }
                   }}
                   onContextMenu={(event) => handleContextMenu(event, entry)}
-                  draggable={!isDirectory}
+                  draggable={true}
                   onDragStart={(event) => handleDragStart(event, entry)}
                 >
                   <span
@@ -468,7 +480,7 @@ function FileExplorer({
                     className="explorer-tree-indent"
                     style={{ '--indent-left': `${20 + depth * 24}px` } as React.CSSProperties}
                   >
-                    {renderEntries(tree[entry.path], depth + 1)}
+                    {renderEntries(sortEntries(tree[entry.path]), depth + 1)}
                   </div>
                 )}
             </Fragment>
@@ -485,27 +497,22 @@ function FileExplorer({
       onOpenFile,
       prefetchDirectory,
       query,
+      sortEntries,
       tree,
     ]
   );
 
   const handleDragStart = useCallback((event: React.DragEvent, entry: DirectoryEntry) => {
-    // Only allow dragging files, not directories
-    if (entry.is_dir) {
-      event.preventDefault();
-      return;
-    }
-
-    // Set the file data for drag & drop
     const fileData = JSON.stringify({
       type: 'file',
       name: entry.name,
       path: entry.path,
+      isDir: entry.is_dir,
     });
 
     event.dataTransfer.effectAllowed = 'copy';
     event.dataTransfer.setData('application/quack-file', fileData);
-    event.dataTransfer.setData('text/plain', entry.path); // Fallback
+    event.dataTransfer.setData('text/plain', entry.path);
   }, []);
 
   // State for expanded folders in search results

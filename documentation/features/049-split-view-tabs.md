@@ -3,9 +3,9 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React)
 created: 2026-04-06
-last_verified: 2026-04-07
-last_updated: 2026-04-07
-tags: [split-view, tabs, drag-drop, layout, editor, sidebar-drag, preview, markdown, mermaid]
+last_verified: 2026-04-08
+last_updated: 2026-04-08
+tags: [split-view, tabs, drag-drop, layout, editor, sidebar-drag, preview, markdown, mermaid, chat-drop]
 ---
 
 ## Split View Tabs
@@ -38,9 +38,10 @@ tags: [split-view, tabs, drag-drop, layout, editor, sidebar-drag, preview, markd
 ```
 
 ### Key Functions
-- `SplitDropZone({ visible, onDropLeft, onDropRight, onSidebarDropLeft?, onSidebarDropRight? }) → JSX` -- overlay with left/right drop targets, handles both tab and sidebar MIME types
+- `SplitDropZone({ visible, onDropLeft, onDropRight, onSidebarDropLeft?, onSidebarDropRight?, onChatDrop?, showChatZone? }) → JSX` -- overlay with left/right drop targets + optional chat drop zone at bottom, handles tab, sidebar, and chat MIME types
 - `extractSidebarData(dt: DataTransfer) → SidebarDropData | null` -- checks DataTransfer for sidebar MIME types, returns first match
 - `isSidebarDrag(dt: DataTransfer) → boolean` -- returns true if any sidebar MIME type is present
+- `handleChatDrop(data: SidebarDropData) → void` -- parses `application/quack-file` payload, calls `handleMentionFile` to insert `@file:path` in chat input
 - `resolveTabFromSidebarDrop(data: SidebarDropData) → string | null` -- creates or finds a tab from sidebar drop payload (file/skill/rule open as code-editor, command opens as command tab)
 - `handleSidebarDropRight(data: SidebarDropData) → void` -- resolves sidebar item to tab, places in split pane
 - `handleSidebarDropLeft(data: SidebarDropData) → void` -- resolves sidebar item to tab, sets as active (left) tab
@@ -94,6 +95,7 @@ tags: [split-view, tabs, drag-drop, layout, editor, sidebar-drag, preview, markd
 - Drag a sidebar item (file, skill, rule, command) over the content area to show the drop overlay
 - Drop overlay appears when `(isDraggingTab && !splitTabId) || isDraggingSidebar` -- sidebar drags show overlay even when split is already active (to replace pane content)
 - Sidebar drops create or reuse existing tabs via `resolveTabFromSidebarDrop`
+- **Chat drop zone**: when `showChatZone` is true (sidebar drag only, not tab drag), a green "@ Chat" zone appears at the bottom of the overlay. Dropping a file there inserts `@file:path` mention in chat input via `handleMentionFile`
 - Sidebar left drop sets active tab; sidebar right drop sets split tab
 - `handleContentDragLeave` checks cursor position against container bounds to avoid false resets from child elements
 - Closing the split tab promotes it or falls back gracefully

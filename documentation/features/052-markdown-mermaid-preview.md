@@ -7,7 +7,7 @@ last_verified: 2026-04-08
 tags: [preview, markdown, mermaid, zoom, pan, clickable-chips, code-editor]
 ---
 
-## Markdown & Mermaid Preview
+## 052 - Markdown & Mermaid Preview
 **Purpose:** Preview mode for .md/.mdx/.mmd files in the code editor, with clickable file path chips, Mermaid diagram zoom/pan, and keyboard shortcuts.
 **Stack:** React 18, TypeScript strict, Mermaid.js, Zustand (shortcutsStore)
 

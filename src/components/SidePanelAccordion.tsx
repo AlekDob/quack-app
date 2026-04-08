@@ -712,6 +712,7 @@ export default function SidePanelAccordion({
               onLoadChildren={onLoadChildren}
               onMentionFile={onMentionFile}
               modifiedFiles={modifiedFiles}
+              sortBy="modified"
             />
           ) : (
             <div style={{ padding: '12px', opacity: 0.5, fontSize: '12px' }}>No documentation found</div>

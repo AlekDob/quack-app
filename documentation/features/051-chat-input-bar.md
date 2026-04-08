@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React)
 created: 2026-04-07
-last_verified: 2026-04-07
-tags: [chat-input-bar, chat, ui, compose, session, popover]
+last_verified: 2026-04-08
+tags: [chat-input-bar, chat, ui, compose, session, popover, drag-drop, file-mention]
 ---
 
 ## Chat Input Bar

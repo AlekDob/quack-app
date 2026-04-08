@@ -10929,6 +10929,16 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, []);
 
+  // Handle file drop into chat zone (inserts @file mention)
+  const handleChatDrop = useCallback((data: SidebarDropData) => {
+    if (data.mimeType !== 'application/quack-file') return;
+    try {
+      const fileData = JSON.parse(data.payload) as { name: string; path: string; isDir?: boolean };
+      handleMentionFile(fileData.path, fileData.name, fileData.isDir ?? false);
+    } catch { /* ignore parse errors */ }
+    setIsDraggingSidebar(false);
+  }, [handleMentionFile]);
+
   // Handle tab popout - drag tab outside tab bar to create floating window
   const handleTabPopout = useCallback(async (tab: Tab, position: PopoutPosition) => {
     console.log('[App] Tab popout requested:', tab.id, tab.type, position);
@@ -12671,6 +12681,8 @@ You have access to all Bash tools to execute git commands like:
                 onDropRight={handleSplitDropRight}
                 onSidebarDropLeft={handleSidebarDropLeft}
                 onSidebarDropRight={handleSidebarDropRight}
+                onChatDrop={handleChatDrop}
+                showChatZone={isDraggingSidebar}
               />
 
               {/* Left Pane (or full pane when not split) */}

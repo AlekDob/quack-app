@@ -135,7 +135,7 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
       line = line.replace(/`([^`]+)`/g, (_match, code: string) => {
         const escaped = escapeHtml(code);
         if (FILE_EXTENSIONS.test(code)) {
-          return `<code class="md-inline-code md-file-link" data-filepath="${escaped}" role="button" tabindex="0">${escaped}</code>`;
+          return `<code class="md-inline-code md-file-link" data-filepath="${escaped}" role="button" tabindex="0" draggable="true">${escaped}</code>`;
         }
         return `<code class="md-inline-code">${escaped}</code>`;
       });
@@ -298,5 +298,17 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
     }
   }, []);
 
-  return <div className="markdown-content" onClick={handleClick}>{renderMarkdown(children)}</div>;
+  const handleDragStart = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const filepath = target.getAttribute('data-filepath');
+    if (!filepath || !target.classList.contains('md-file-link')) return;
+
+    const name = filepath.split('/').pop() || filepath;
+    const fileData = JSON.stringify({ type: 'file', name, path: filepath });
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData('application/quack-file', fileData);
+    e.dataTransfer.setData('text/plain', filepath);
+  }, []);
+
+  return <div className="markdown-content" onClick={handleClick} onDragStart={handleDragStart}>{renderMarkdown(children)}</div>;
 }

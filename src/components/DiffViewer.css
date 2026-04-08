@@ -115,6 +115,132 @@
   color: rgba(255, 255, 255, 0.6);
 }
 
+/* Toggle buttons */
+.diff-view-toggle:first-of-type {
+  margin-left: auto;
+}
+
+.diff-view-toggle {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 4px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.diff-view-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.diff-view-toggle.active {
+  background: rgba(100, 150, 255, 0.15);
+  border-color: rgba(100, 150, 255, 0.3);
+  color: rgba(100, 150, 255, 0.9);
+}
+
+/* Split view layout */
+.diff-split {
+  display: flex;
+  gap: 0;
+}
+
+.diff-split-col {
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.diff-split-left {
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.diff-split .diff-line::before {
+  display: none;
+}
+
+.diff-split .diff-line-marker {
+  margin-left: 4px;
+  width: 12px;
+}
+
+.diff-line-empty {
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 3px solid transparent;
+}
+
+.diff-line-empty .diff-line-content {
+  color: transparent;
+}
+
+/* Fullscreen overlay */
+.diff-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: diff-fade-in 0.15s ease;
+}
+
+@keyframes diff-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.diff-fullscreen-container {
+  width: 100%;
+  max-width: 1200px;
+  height: 100%;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.diff-viewer--fullscreen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(100, 150, 255, 0.3);
+}
+
+.diff-viewer--fullscreen .diff-viewer-header {
+  padding: 14px 18px;
+}
+
+.diff-viewer--fullscreen .diff-viewer-filename {
+  font-size: 13px;
+}
+
+.diff-viewer-content--fullscreen {
+  max-height: none !important;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.diff-viewer--fullscreen .diff-line {
+  font-size: 12px;
+  line-height: 1.6;
+  margin-bottom: 1px;
+}
+
+.diff-viewer--fullscreen .diff-line-content {
+  padding: 2px 12px 2px 6px;
+}
+
 /* Scrollbar styling */
 .diff-viewer-content::-webkit-scrollbar {
   width: 8px;
@@ -132,4 +258,21 @@
 
 .diff-viewer-content::-webkit-scrollbar-thumb:hover {
   background: rgba(100, 150, 255, 0.5);
+}
+
+.diff-viewer-content--fullscreen::-webkit-scrollbar {
+  width: 10px;
+}
+
+.diff-viewer-content--fullscreen::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.diff-viewer-content--fullscreen::-webkit-scrollbar-thumb {
+  background: rgba(100, 150, 255, 0.25);
+  border-radius: 5px;
+}
+
+.diff-viewer-content--fullscreen::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 150, 255, 0.45);
 }

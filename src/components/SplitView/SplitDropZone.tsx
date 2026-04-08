@@ -19,6 +19,8 @@ interface SplitDropZoneProps {
   onDropRight: (tabId: string) => void;
   onSidebarDropLeft?: (data: SidebarDropData) => void;
   onSidebarDropRight?: (data: SidebarDropData) => void;
+  onChatDrop?: (data: SidebarDropData) => void;
+  showChatZone?: boolean;
 }
 
 function extractSidebarData(
@@ -41,9 +43,11 @@ export function SplitDropZone({
   onDropRight,
   onSidebarDropLeft,
   onSidebarDropRight,
+  onChatDrop,
+  showChatZone = false,
 }: SplitDropZoneProps) {
   const [activeZone, setActiveZone] = useState<
-    'left' | 'right' | null
+    'left' | 'right' | 'chat' | null
   >(null);
 
   const handleDragOver = useCallback(
@@ -62,13 +66,14 @@ export function SplitDropZone({
   }, []);
 
   const handleDrop = useCallback(
-    (e: React.DragEvent, zone: 'left' | 'right') => {
+    (e: React.DragEvent, zone: 'left' | 'right' | 'chat') => {
       e.preventDefault();
 
       // Check sidebar MIME types first
       const sidebarData = extractSidebarData(e.dataTransfer);
       if (sidebarData) {
-        if (zone === 'left') onSidebarDropLeft?.(sidebarData);
+        if (zone === 'chat') onChatDrop?.(sidebarData);
+        else if (zone === 'left') onSidebarDropLeft?.(sidebarData);
         else onSidebarDropRight?.(sidebarData);
         setActiveZone(null);
         return;
@@ -81,29 +86,41 @@ export function SplitDropZone({
       else onDropRight(tabId);
       setActiveZone(null);
     },
-    [onDropLeft, onDropRight, onSidebarDropLeft, onSidebarDropRight],
+    [onDropLeft, onDropRight, onSidebarDropLeft, onSidebarDropRight, onChatDrop],
   );
 
   if (!visible) return null;
 
   return (
-    <div className="split-drop-overlay">
-      <div
-        className={`split-drop-zone split-drop-left ${activeZone === 'left' ? 'active' : ''}`}
-        onDragOver={(e) => handleDragOver(e, 'left')}
-        onDragLeave={handleDragLeave}
-        onDrop={(e) => handleDrop(e, 'left')}
-      >
-        <span className="split-drop-label">Left</span>
+    <div className={`split-drop-overlay ${showChatZone ? 'split-drop-overlay--with-chat' : ''}`}>
+      <div className="split-drop-panes">
+        <div
+          className={`split-drop-zone split-drop-left ${activeZone === 'left' ? 'active' : ''}`}
+          onDragOver={(e) => handleDragOver(e, 'left')}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, 'left')}
+        >
+          <span className="split-drop-label">Left</span>
+        </div>
+        <div
+          className={`split-drop-zone split-drop-right ${activeZone === 'right' ? 'active' : ''}`}
+          onDragOver={(e) => handleDragOver(e, 'right')}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, 'right')}
+        >
+          <span className="split-drop-label">Right</span>
+        </div>
       </div>
-      <div
-        className={`split-drop-zone split-drop-right ${activeZone === 'right' ? 'active' : ''}`}
-        onDragOver={(e) => handleDragOver(e, 'right')}
-        onDragLeave={handleDragLeave}
-        onDrop={(e) => handleDrop(e, 'right')}
-      >
-        <span className="split-drop-label">Right</span>
-      </div>
+      {showChatZone && (
+        <div
+          className={`split-drop-zone split-drop-chat ${activeZone === 'chat' ? 'active' : ''}`}
+          onDragOver={(e) => handleDragOver(e, 'chat')}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, 'chat')}
+        >
+          <span className="split-drop-label">@ Chat</span>
+        </div>
+      )}
     </div>
   );
 }

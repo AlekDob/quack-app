@@ -38,6 +38,14 @@
   font-size: 10.5px;
 }
 
+.chat-breadcrumb-session {
+  color: var(--text-secondary);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .chat-view-footer {
   display: flex;
   flex-direction: column;

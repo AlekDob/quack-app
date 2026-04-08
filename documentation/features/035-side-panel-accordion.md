@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React 18)
 created: 2026-04-04
-last_verified: 2026-04-06
-tags: [accordion, side-panel, ui, layout, navigation]
+last_verified: 2026-04-08
+tags: [accordion, side-panel, ui, layout, navigation, brain, documentation-explorer]
 ---
 
 ## Side Panel Accordion
@@ -54,6 +54,10 @@ tags: [accordion, side-panel, ui, layout, navigation]
 - `rules`: RulesResponse -- fetched via useRules for badge count (component)
 - `commands`: SlashCommandsResponse -- fetched via useSlashCommands for badge count (component)
 - `mcpServers`: MCPServer[] -- fetched via useMCPServers for badge count (component)
+- `brainLoaded`: boolean -- whether Brain documentation/ root has been loaded (component)
+- `brainLoading`: boolean -- Brain initial load in progress (component)
+- `brainFileCount`: number -- count of .md + .mmd files in documentation/ for badge (component)
+- `brainRootPath`: string | null -- derived from `rootPath + '/documentation'` (component)
 
 ### Compact Mode (Icon Strip + Peek Overlay)
 | Concept | Detail |
@@ -88,7 +92,7 @@ tags: [accordion, side-panel, ui, layout, navigation]
 |---|-----|-------|---------------|-------------|
 | 0 | changes | Changes | ChangesPanel | modifiedFiles.size |
 | 1 | context | File Explorer | FileExplorer | -- |
-| 2 | brain | Brain | FileExplorer (rooted at documentation/) | .md + .mmd file count |
+| 2 | brain | Brain | FileExplorer (rooted at documentation/, sortBy=modified) | .md + .mmd file count |
 | 3 | features | Features | FeaturesPanel | -- |
 | 4 | agent-context | Agent Personality | AgentContextPanel | -- |
 | 5 | project-context | Context | ProjectContextPanel | -- |
@@ -110,3 +114,18 @@ tags: [accordion, side-panel, ui, layout, navigation]
 - **Compact strip**: `.compact:not(.peek-expanded)` — icons centered in 44px, chevron/title hidden, badge as 6px dot
 - **Peek overlay**: `.compact .accordion-container` fixed at right, `translateX` transition for smooth slide, `rgba(15,17,21,0.96)` background
 - **Hidden**: `.collapsed` — `display: none` (no agent or auto-collapsed by tab)
+
+### Brain Section (Documentation Explorer)
+| Aspect | Detail |
+|--------|--------|
+| Root path | `${rootPath}/documentation` — derived, not configurable |
+| Content | Reuses `FileExplorer` component with `sortBy="modified"` |
+| Sort order | Directories first, then files by `modified_at` descending (newest first) |
+| Badge | Count of `.md` + `.mmd` files via `search_files_recursive` (max 500, depth 5) |
+| Lazy load | `documentation/` root loaded on first expand via `onLoadChildren` |
+| Tree cache | Shared with main File Explorer (`explorerTree` in App.tsx, path-keyed) |
+| File open | Same `onOpenFile` handler — opens in integrated CodeMirror editor tab |
+| Reset | `brainLoaded` + `brainFileCount` reset when `rootPath` changes (project switch) |
+| Fallback | "No documentation found" when `brainRootPath` is null |
+| Color | `#e879f9` (fuchsia) |
+| Zero App.tsx changes | All state managed locally in SidePanelAccordion |

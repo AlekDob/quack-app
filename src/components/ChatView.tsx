@@ -20,6 +20,7 @@ import { useChatStore } from '../stores/chatStore';
 import { useAgentRules } from '../hooks/useAgentRules';
 import { RemoteTeamWidget } from './RemoteTeamWidget';
 import { useTeamStore } from '../stores/teamStore';
+import { useSessionStore } from '../stores/sessionStore';
 import type { ChatMessage, AgentInfo, ChatAttachment, AskUserQuestionAnswers, TerminalInfo } from '../types';
 import type {
   ChatSendOptions,
@@ -259,6 +260,12 @@ export default function ChatView({
 
   // Remote Team Widget
   const remoteTeam = useTeamStore(s => s.activeTeam);
+
+  // Session title — reactive from store (updates on rename)
+  const sessionTitle = useSessionStore(s => {
+    if (!internalSessionId) return undefined;
+    return s.sessions.find(sess => sess.id === internalSessionId)?.title;
+  });
 
   // Quick Loop - recurring prompts
   // showLoopPopover moved to UnifiedActionBar
@@ -854,6 +861,12 @@ export default function ChatView({
             <>
               <span className="chat-breadcrumb-sep">/</span>
               <span className="chat-breadcrumb-branch">{gitBranch}</span>
+            </>
+          )}
+          {sessionTitle && (
+            <>
+              <span className="chat-breadcrumb-sep">/</span>
+              <span className="chat-breadcrumb-session">{sessionTitle}</span>
             </>
           )}
         </div>
