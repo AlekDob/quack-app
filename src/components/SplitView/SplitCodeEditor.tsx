@@ -45,6 +45,8 @@ function SplitCodeEditor({ filePath }: SplitCodeEditorProps) {
   const isMermaid = filePath.endsWith('.mmd');
   const hasPreview = isMarkdown || isMermaid;
   const shortcuts = useShortcutsStore(s => s.shortcuts);
+  // Brain: fix-split-code-editor-hooks-order
+  const formatShortcut = useShortcutsStore(s => s.formatShortcut);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,7 +111,6 @@ function SplitCodeEditor({ filePath }: SplitCodeEditorProps) {
     return <CodeEditorSkeleton />;
   }
 
-  const formatShortcut = useShortcutsStore(s => s.formatShortcut);
   const previewShortcut = formatShortcut(shortcuts.toggleEditorPreview?.currentKeys || '');
   const saveShortcut = formatShortcut(shortcuts.editorSave?.currentKeys || '');
   const breadcrumb = filePath.split('/').slice(-3).join(' / ');
