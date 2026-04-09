@@ -107,9 +107,11 @@ pub fn reveal_in_finder(path: String) -> Result<(), String> {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-        // On Windows, use explorer.exe /select, to highlight the file
+        // Brain: gotcha-windows-path-separators — explorer.exe needs backslashes
+        // explorer.exe requires /select,<path> as a single argument
+        let win_path = clean_path.replace('/', "\\");
         let mut cmd = Command::new("explorer");
-        cmd.arg("/select,").arg(clean_path);
+        cmd.arg(format!("/select,{}", win_path));
         cmd.creation_flags(CREATE_NO_WINDOW);
 
         let output = cmd.output()
