@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import type { CSSProperties } from 'react';
-import type { VariableSizeList as VariableSizeListType } from 'react-window';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ReactWindow = require('react-window');
 const VariableSizeList = ReactWindow.VariableSizeList;
@@ -176,7 +176,8 @@ function MessageListVirtualized({
   onPlanApprovalResponse,
   onTeammateDrillDown,
 }: MessageListProps) {
-  const listRef = useRef<VariableSizeListType>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const listRef = useRef<any>(null);
   const outerRef = useRef<HTMLElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -388,7 +389,6 @@ function MessageListVirtualized({
 
   return (
     <div className="message-list">
-      {/* @ts-expect-error - react-virtualized-auto-sizer render prop types */}
       <AutoSizer>
         {({ height, width }: { height: number; width: number }) => (
           <VariableSizeList
