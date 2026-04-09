@@ -120,9 +120,10 @@ const dotBaseStyle: React.CSSProperties = {
 interface PipAgentCardProps {
   agent: PipAgentState;
   onClickAgent: (agent: PipAgentState) => void;
+  onContextMenu: (e: React.MouseEvent, agent: PipAgentState) => void;
 }
 
-const PipAgentCard: React.FC<PipAgentCardProps> = ({ agent, onClickAgent }) => {
+const PipAgentCard: React.FC<PipAgentCardProps> = ({ agent, onClickAgent, onContextMenu }) => {
   const [avatarUrl] = useState(() => resolveAvatarUrl(agent.avatar));
   const [timeStr, setTimeStr] = useState(() => formatTime(agent.lastActivity));
 
@@ -133,6 +134,11 @@ const PipAgentCard: React.FC<PipAgentCardProps> = ({ agent, onClickAgent }) => {
   }, [agent.lastActivity]);
 
   const handleClick = useCallback(() => onClickAgent(agent), [agent, onClickAgent]);
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onContextMenu(e, agent);
+  }, [agent, onContextMenu]);
 
   const dotColor = getStatusColor(agent.status);
   const isActive = agent.status === 'streaming' || agent.status === 'executing' || agent.status === 'thinking';
@@ -146,6 +152,7 @@ const PipAgentCard: React.FC<PipAgentCardProps> = ({ agent, onClickAgent }) => {
   return (
     <div
       onClick={handleClick}
+      onContextMenu={handleContextMenu}
       style={cardStyle}
       onMouseEnter={(e) => {
         e.currentTarget.style.background = 'rgba(255, 255, 255, 0.07)';
