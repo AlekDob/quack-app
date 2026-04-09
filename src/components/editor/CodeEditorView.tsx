@@ -52,6 +52,13 @@ function CodeEditorView() {
   const isDirty = useEditorStore(s => s.isDirty);
   const shortcuts = useShortcutsStore(s => s.shortcuts);
 
+  // Auto-open preview for Brain documentation files
+  useEffect(() => {
+    if (filePath && hasPreview && /[/\\]documentation[/\\]/.test(filePath)) {
+      setPreviewOpen(true);
+    }
+  }, [filePath, hasPreview]);
+
   // Keyboard shortcuts: toggle preview (Cmd+Shift+P) + save (Cmd+S) in preview mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
