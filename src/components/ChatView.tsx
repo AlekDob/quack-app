@@ -1,7 +1,11 @@
-import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useState, useRef, useCallback, lazy, Suspense } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import MessageList from './MessageList';
+
+// Brain: 005-performance-critical-refactor
+// Lazy-load virtualized list to avoid bundling react-window upfront
+const MessageListVirtualized = lazy(() => import('./MessageListVirtualized'));
 import ChatInput from './ChatInput';
 import TokenUsageIndicator from './TokenUsageIndicator';
 import StaminaBarBorder from './StaminaBarBorder';
@@ -886,29 +890,61 @@ export default function ChatView({
           }}
         />
       )}
-      <MessageList
-        messages={messages}
-        loading={isLoading}
-        onFilePathClick={onFilePathClick}
-        onOpenInIDE={onOpenInIDE}
-        onSessionIdClick={onSessionIdClick}
-        agentName={agentName}
-        agentAvatar={agentAvatar}
-        projectName={projectName}
-        gitBranch={gitBranch}
-        thinkingModeResetKey={thinkingModeResetCounter}
-        onUserQuestionAnswer={onUserQuestionAnswer ? stableOnUserQuestionAnswer : undefined}
-        pendingQuestionIds={pendingQuestionIds}
-        answeredQuestions={answeredQuestions}
-        currentSessionId={currentSessionId}
-        showThinkingBlocks={showThinkingBlocks}
-        onRewindFiles={onRewindFiles}
-        onOpenImageTab={onOpenImageTab}
-        onOpenPersonality={onOpenPersonality}
-        pendingPlanApprovalIds={pendingPlanApprovalIds}
-        onPlanApprovalResponse={onPlanApprovalResponse}
-        onTeammateDrillDown={onTeammateDrillDown}
-      />
+      {/* Brain: 005-performance-critical-refactor
+          Use virtualized list for sessions with 100+ messages to avoid DOM bloat.
+          Threshold at 100 (not 50) to avoid mid-session component swap during streaming.
+          Once virtualized kicks in, the session stays virtualized (no swap back). */}
+      {messages.length > 100 ? (
+        <Suspense fallback={<div style={{ flex: 1 }} />}>
+        <MessageListVirtualized
+          messages={messages}
+          loading={isLoading}
+          onFilePathClick={onFilePathClick}
+          onOpenInIDE={onOpenInIDE}
+          onSessionIdClick={onSessionIdClick}
+          agentName={agentName}
+          agentAvatar={agentAvatar}
+          projectName={projectName}
+          gitBranch={gitBranch}
+          thinkingModeResetKey={thinkingModeResetCounter}
+          onUserQuestionAnswer={onUserQuestionAnswer ? stableOnUserQuestionAnswer : undefined}
+          pendingQuestionIds={pendingQuestionIds}
+          answeredQuestions={answeredQuestions}
+          currentSessionId={currentSessionId}
+          showThinkingBlocks={showThinkingBlocks}
+          onRewindFiles={onRewindFiles}
+          onOpenImageTab={onOpenImageTab}
+          onOpenPersonality={onOpenPersonality}
+          pendingPlanApprovalIds={pendingPlanApprovalIds}
+          onPlanApprovalResponse={onPlanApprovalResponse}
+          onTeammateDrillDown={onTeammateDrillDown}
+        />
+        </Suspense>
+      ) : (
+        <MessageList
+          messages={messages}
+          loading={isLoading}
+          onFilePathClick={onFilePathClick}
+          onOpenInIDE={onOpenInIDE}
+          onSessionIdClick={onSessionIdClick}
+          agentName={agentName}
+          agentAvatar={agentAvatar}
+          projectName={projectName}
+          gitBranch={gitBranch}
+          thinkingModeResetKey={thinkingModeResetCounter}
+          onUserQuestionAnswer={onUserQuestionAnswer ? stableOnUserQuestionAnswer : undefined}
+          pendingQuestionIds={pendingQuestionIds}
+          answeredQuestions={answeredQuestions}
+          currentSessionId={currentSessionId}
+          showThinkingBlocks={showThinkingBlocks}
+          onRewindFiles={onRewindFiles}
+          onOpenImageTab={onOpenImageTab}
+          onOpenPersonality={onOpenPersonality}
+          pendingPlanApprovalIds={pendingPlanApprovalIds}
+          onPlanApprovalResponse={onPlanApprovalResponse}
+          onTeammateDrillDown={onTeammateDrillDown}
+        />
+      )}
       {(lastTurnFileEdits.length > 0 || lastTurnFileDeletes.length > 0) && (
         <EditSummaryBar
           edits={lastTurnFileEdits}

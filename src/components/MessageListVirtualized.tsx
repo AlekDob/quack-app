@@ -1,23 +1,40 @@
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import type { CSSProperties } from 'react';
-// @ts-ignore - react-window types issue
-import { VariableSizeList } from 'react-window';
-import { AutoSizer } from 'react-virtualized-auto-sizer';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { VariableSizeList } = require('react-window') as typeof import('react-window');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { AutoSizer } = require('react-virtualized-auto-sizer') as typeof import('react-virtualized-auto-sizer');
 import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
 import DuckAnimation from './DuckAnimation';
-import type { ChatMessage as ChatMessageType } from '../types';
+import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
 import './MessageList.css';
 
+// Brain: 005-performance-critical-refactor
+// Virtualized message list for sessions with 50+ messages
 interface MessageListProps {
   messages: ChatMessageType[];
   loading?: boolean;
   onFilePathClick?: (path: string) => void;
+  onOpenInIDE?: (path: string) => void;
+  onSessionIdClick?: (sessionId: string) => void;
   agentName?: string;
   agentAvatar?: string;
   projectName?: string;
   gitBranch?: string;
   workingDirectory?: string;
+  thinkingModeResetKey?: string | number;
+  onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers, sessionKey?: string) => void;
+  pendingQuestionIds?: Set<string>;
+  answeredQuestions?: Map<string, AskUserQuestionAnswers>;
+  currentSessionId?: string;
+  showThinkingBlocks?: boolean;
+  onRewindFiles?: (userMessageId: string) => void;
+  onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
+  onOpenPersonality?: () => void;
+  pendingPlanApprovalIds?: Set<string>;
+  onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
+  onTeammateDrillDown?: (sessionId: string, name: string) => void;
 }
 
 // Message height cache for virtualization
@@ -36,24 +53,52 @@ const MessageRow = memo(({
     messages: ChatMessageType[];
     loading: boolean;
     onFilePathClick?: (path: string) => void;
+    onOpenInIDE?: (path: string) => void;
+    onSessionIdClick?: (sessionId: string) => void;
     agentName?: string;
     agentAvatar?: string;
     projectName?: string;
     gitBranch?: string;
     workingDirectory?: string;
     lastUserMessageIndex: number;
+    thinkingModeResetKey?: string | number;
+    onUserQuestionAnswer?: (toolUseId: string, answers: AskUserQuestionAnswers, sessionKey?: string) => void;
+    pendingQuestionIds?: Set<string>;
+    answeredQuestions?: Map<string, AskUserQuestionAnswers>;
+    currentSessionId?: string;
+    showThinkingBlocks?: boolean;
+    onRewindFiles?: (userMessageId: string) => void;
+    onOpenImageTab?: (filePath: string, imageData: string, mediaType: string) => void;
+    onOpenPersonality?: () => void;
+    pendingPlanApprovalIds?: Set<string>;
+    onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
+    onTeammateDrillDown?: (sessionId: string, name: string) => void;
   }
 }) => {
   const {
     messages,
     loading,
     onFilePathClick,
+    onOpenInIDE,
+    onSessionIdClick,
     agentName,
     agentAvatar,
     projectName,
     gitBranch,
     workingDirectory,
-    lastUserMessageIndex
+    lastUserMessageIndex,
+    thinkingModeResetKey,
+    onUserQuestionAnswer,
+    pendingQuestionIds,
+    answeredQuestions,
+    currentSessionId,
+    showThinkingBlocks,
+    onRewindFiles,
+    onOpenImageTab,
+    onOpenPersonality,
+    pendingPlanApprovalIds,
+    onPlanApprovalResponse,
+    onTeammateDrillDown,
   } = data;
 
   // Show skeleton for loading state at the end
@@ -78,6 +123,8 @@ const MessageRow = memo(({
       <ChatMessage
         message={message}
         onFilePathClick={onFilePathClick}
+        onOpenInIDE={onOpenInIDE}
+        onSessionIdClick={onSessionIdClick}
         agentName={agentName}
         agentAvatar={agentAvatar}
         projectName={projectName}
@@ -85,6 +132,18 @@ const MessageRow = memo(({
         isLastUserMessage={index === lastUserMessageIndex}
         workingDirectory={workingDirectory}
         showHeader={showHeader}
+        thinkingModeResetKey={thinkingModeResetKey}
+        onUserQuestionAnswer={onUserQuestionAnswer}
+        pendingQuestionIds={pendingQuestionIds}
+        answeredQuestions={answeredQuestions}
+        currentSessionId={currentSessionId}
+        showThinkingBlocks={showThinkingBlocks}
+        onRewindFiles={onRewindFiles}
+        onOpenImageTab={onOpenImageTab}
+        onOpenPersonality={onOpenPersonality}
+        pendingPlanApprovalIds={pendingPlanApprovalIds}
+        onPlanApprovalResponse={onPlanApprovalResponse}
+        onTeammateDrillDown={onTeammateDrillDown}
       />
     </div>
   );
@@ -96,11 +155,25 @@ function MessageListVirtualized({
   messages,
   loading,
   onFilePathClick,
+  onOpenInIDE,
+  onSessionIdClick,
   agentName,
   agentAvatar,
   projectName,
   gitBranch,
-  workingDirectory
+  workingDirectory,
+  thinkingModeResetKey,
+  onUserQuestionAnswer,
+  pendingQuestionIds,
+  answeredQuestions,
+  currentSessionId,
+  showThinkingBlocks = true,
+  onRewindFiles,
+  onOpenImageTab,
+  onOpenPersonality,
+  pendingPlanApprovalIds,
+  onPlanApprovalResponse,
+  onTeammateDrillDown,
 }: MessageListProps) {
   const listRef = useRef<VariableSizeList>(null);
   const outerRef = useRef<HTMLElement>(null);
@@ -290,12 +363,26 @@ function MessageListVirtualized({
     messages,
     loading,
     onFilePathClick,
+    onOpenInIDE,
+    onSessionIdClick,
     agentName,
     agentAvatar,
     projectName,
     gitBranch,
     workingDirectory,
-    lastUserMessageIndex
+    lastUserMessageIndex,
+    thinkingModeResetKey,
+    onUserQuestionAnswer,
+    pendingQuestionIds,
+    answeredQuestions,
+    currentSessionId,
+    showThinkingBlocks,
+    onRewindFiles,
+    onOpenImageTab,
+    onOpenPersonality,
+    pendingPlanApprovalIds,
+    onPlanApprovalResponse,
+    onTeammateDrillDown,
   };
 
   return (

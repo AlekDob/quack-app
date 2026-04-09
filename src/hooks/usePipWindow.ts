@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { emit, listen } from '@tauri-apps/api/event';
 import { Store } from '@tauri-apps/plugin-store';
@@ -11,6 +11,8 @@ export function usePipWindow() {
   const [isPipOpen, setIsPipOpen] = useState(false);
   const [pipWindow, setPipWindow] = useState<WebviewWindow | null>(null);
   const [store, setStore] = useState<Store | null>(null);
+  // Ref keeps latest store value accessible inside stable listener callbacks
+  const storeRef = useRef<Store | null>(null);
 
   // Initialize store on mount
   useEffect(() => {
@@ -19,11 +21,16 @@ export function usePipWindow() {
         const loadedStore = await Store.load('pip-settings.json');
         setStore(loadedStore);
       } catch (error) {
-        console.error('🦆 Failed to load PiP store:', error);
+        console.error('Failed to load PiP store:', error);
       }
     };
     initStore();
   }, []);
+
+  // Keep storeRef in sync with state
+  useEffect(() => {
+    storeRef.current = store;
+  }, [store]);
 
   // Open PiP window
   const openPipWindow = useCallback(async () => {
@@ -53,12 +60,12 @@ export function usePipWindow() {
       }
 
       // Default size and position
-      const width = savedState?.size?.width || 400;
-      const height = savedState?.size?.height || 600;
+      const width = savedState?.size?.width || 320;
+      const height = savedState?.size?.height || 420;
       const x = savedState?.position?.x || undefined;
       const y = savedState?.position?.y || undefined;
 
-      // Create new PiP window (starts hidden)
+      // Create new PiP window (always visible when open)
       const webview = new WebviewWindow(PIP_WINDOW_LABEL, {
         url: '/pip.html',
         title: 'Quack PiP - Active Agents',
@@ -66,15 +73,15 @@ export function usePipWindow() {
         height,
         x,
         y,
-        minWidth: 300,
-        minHeight: 400,
+        minWidth: 260,
+        minHeight: 200,
         resizable: true,
         decorations: false, // Custom titlebar in component
         alwaysOnTop: true,  // Float above all other windows
         skipTaskbar: false,
         transparent: true,
         center: x === undefined && y === undefined, // Center only if no saved position
-        visible: false,     // Start hidden, will show when main window loses focus
+        visible: true,      // Always visible — no auto-hide on focus
       });
 
       await webview.once('tauri://created', () => {
@@ -155,32 +162,27 @@ export function usePipWindow() {
     [isPipOpen]
   );
 
-  // Listen for events from PiP window
+  // Brain: 005-performance-critical-refactor
+  // Register Tauri listeners once on mount — use storeRef for lazy store access
   useEffect(() => {
-    // Listen for PiP window ready event
     const unlistenReady = listen('pip-window-ready', async () => {
-      console.log('🦆 PiP Window is ready, sending initial data');
       // Initial data will be sent by the parent component via updatePipAgents
     });
 
-    // Listen for PiP window closing event (to save position/size)
     const unlistenClosing = listen<{ position: { x: number; y: number }; size: { width: number; height: number } }>(
       'pip-window-closing',
       async (event) => {
-        console.log('🦆 Saving PiP window state:', event.payload);
-        if (!store) {
-          console.warn('🦆 Store not ready, cannot save PiP state');
-          return;
-        }
+        const currentStore = storeRef.current;
+        if (!currentStore) return;
         try {
-          await store.set(STORE_KEY_PIP_STATE, {
+          await currentStore.set(STORE_KEY_PIP_STATE, {
             agents: [], // Don't save agents, only window geometry
             position: event.payload.position,
             size: event.payload.size,
           });
-          await store.save();
+          await currentStore.save();
         } catch (error) {
-          console.error('🦆 Failed to save PiP window state:', error);
+          console.error('Failed to save PiP window state:', error);
         }
       }
     );
@@ -189,7 +191,7 @@ export function usePipWindow() {
       unlistenReady.then((fn) => fn());
       unlistenClosing.then((fn) => fn());
     };
-  }, [store]);
+  }, []);
 
   // Check if PiP window is already open on mount
   useEffect(() => {

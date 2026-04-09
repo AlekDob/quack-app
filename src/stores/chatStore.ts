@@ -16,6 +16,10 @@ interface ChatState {
   // Actions
   addMessage: (sessionId: string, message: ChatMessage) => void;
   updateMessage: (sessionId: string, messageId: string, updates: Partial<ChatMessage>) => void;
+  // Brain: 005-performance-critical-refactor
+  // Single set() for bulk session update — replaces clearSession+addMessage*N loop
+  setSession: (sessionId: string, messages: ChatMessage[]) => void;
+  removeSession: (sessionId: string) => void;
   clearSession: (sessionId: string) => void;
   setLoading: (sessionId: string, loading: boolean) => void;
   updateTokens: (sessionId: string, tokens: SessionUsage) => void;
@@ -68,6 +72,20 @@ export const useChatStore = create<ChatState>()(
         sessionId,
         messages.map((m) => (m.id === messageId ? { ...m, ...updates } : m))
       );
+      return { chatSessions: newSessions };
+    }),
+
+    // Brain: 005-performance-critical-refactor
+    // Single set() replaces the clearSession+addMessage*N sync loop
+    setSession: (sessionId, messages) => set((state) => {
+      const newSessions = new Map(state.chatSessions);
+      newSessions.set(sessionId, messages);
+      return { chatSessions: newSessions };
+    }),
+
+    removeSession: (sessionId) => set((state) => {
+      const newSessions = new Map(state.chatSessions);
+      newSessions.delete(sessionId);
       return { chatSessions: newSessions };
     }),
 

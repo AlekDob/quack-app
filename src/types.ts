@@ -1083,6 +1083,8 @@ export type PipAgentStatus = 'idle' | 'thinking' | 'streaming' | 'executing' | '
 export interface PipAgentState {
   agentId: string;
   agentName: string;
+  projectName?: string;
+  avatar?: string;
   color: string;
   sessionId?: string;
   status: PipAgentStatus;

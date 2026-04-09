@@ -30,6 +30,12 @@ export default defineConfig(({ mode }) => {
       'process.env.NODE_ENV': JSON.stringify(mode),
     },
 
+    // Strip debug logging in production for performance
+    // Brain: 005-performance-critical-refactor
+    esbuild: {
+      pure: isProduction ? ['console.log', 'console.debug'] : [],
+    },
+
     plugins: [
       react(),
 
@@ -147,6 +153,17 @@ export default defineConfig(({ mode }) => {
               return 'tauri-vendor';
             }
 
+            // Mermaid - isolated chunk to prevent TDZ issues with tree-shaking
+            // Brain: 005-performance-critical-refactor
+            if (id.includes('mermaid')) {
+              return 'mermaid';
+            }
+
+            // PixiJS - heavy graphics library, isolated for lazy loading
+            if (id.includes('pixi') || id.includes('@pixi')) {
+              return 'pixi';
+            }
+
             // All other node_modules in a single vendor chunk
             // IMPORTANT: Do NOT split React from other deps — causes circular
             // chunk dependencies that make React undefined at runtime
@@ -174,7 +191,13 @@ export default defineConfig(({ mode }) => {
         // "Cannot access 'st' before initialization" at runtime.
         // IMPORTANT: Do NOT re-enable moduleSideEffects:false — it breaks React.
         // Brain: gotcha-vendor-circular-chunk-dependency
-        treeshake: false,
+        treeshake: {
+          // Re-enabled for performance (was disabled for Mermaid TDZ bug).
+          // Mermaid is now isolated in its own chunk + hoistTransitiveImports:false
+          // handles the class initialization order issue.
+          // Brain: 005-performance-critical-refactor
+          moduleSideEffects: true, // Keep side effects (DO NOT set to false — breaks React)
+        },
       },
     },
 
@@ -221,6 +244,8 @@ export default defineConfig(({ mode }) => {
         '@tauri-apps/plugin-store',
         'lucide-react',
         'sonner',
+        'react-window',
+        'react-virtualized-auto-sizer',
       ],
       exclude: [
         '@anthropic-ai/claude-agent-sdk', // Don't pre-bundle SDK

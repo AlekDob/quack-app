@@ -1146,6 +1146,47 @@ export default function TerminalSidebar({
             </button>
           </KeyboardShortcutTooltip>
         )}
+
+        {/* PiP toggle — no wrapper, same as favorites star */}
+        {onTogglePip && (
+          <KeyboardShortcutTooltip label={isPipOpen ? "Close PiP" : "PiP"}>
+            <button
+              type="button"
+              className="action-icon"
+              onClick={onTogglePip}
+              aria-label={isPipOpen ? "Close PiP window" : "Open PiP window"}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '24px',
+                height: '22px',
+                marginLeft: '4px',
+                background: isPipOpen ? 'var(--accent-surface)' : 'transparent',
+                border: 'none',
+                borderRadius: 'var(--radius-sm)',
+                color: isPipOpen ? 'var(--accent-color)' : 'var(--text-tertiary)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 2 24 18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ display: 'block' }}
+              >
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <rect x="12" y="9" width="8" height="6" rx="1" />
+              </svg>
+            </button>
+          </KeyboardShortcutTooltip>
+        )}
       </div>
 
       <div className="sidebar-header sidebar-header-codex" data-tauri-drag-region>

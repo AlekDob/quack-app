@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { invoke } from "@tauri-apps/api/core";
 import posthog from "posthog-js";
 import { invokeWithTimeout, fireAndForget } from "./utils/invokeWithTimeout";
+import { normalizeModelName } from "./utils/modelUtils";
 import { useClaudeCliAvailability } from "./contexts/TestModeContext";
 import { getTestModeStoreName } from "./utils/testModeStorage";
 import { getCurrentVersion } from "./utils/version";
@@ -1347,18 +1348,13 @@ function AppContent() {
     });
   }, [pendingQuestionIdsMap, agentChats, agentSessions, chatStoreSetPendingQuestion, chatStoreClearPendingQuestions]);
 
-  // 🦆 SESSIONS-FIRST: Sync chatSessions with chatStore for activity indicators
-  // AgentSessionItem needs chatMessages to determine hasUnreadMessages and show "Quack quack..."
-  const chatStoreAddMessage = useChatStore((state) => state.addMessage);
-  const chatStoreClearSession = useChatStore((state) => state.clearSession);
+  // Brain: 005-performance-critical-refactor
+  // Sync chatSessions with chatStore using single setSession() instead of clearSession+addMessage*N
+  const chatStoreSetSession = useChatStore((state) => state.setSession);
   const chatStoreGetSession = useChatStore((state) => state.getSession);
   useEffect(() => {
-    // Sync each session's messages to chatStore
     chatSessions.forEach((messages, sessionId) => {
       const storeMessages = chatStoreGetSession(sessionId);
-      // Check if sync is needed:
-      // 1. Different number of messages
-      // 2. Last message status changed (e.g., streaming -> complete)
       const lastMsg = messages[messages.length - 1];
       const lastStoreMsg = storeMessages[storeMessages.length - 1];
       const needsSync =
@@ -1366,14 +1362,11 @@ function AppContent() {
         (lastMsg && lastStoreMsg && lastMsg.status !== lastStoreMsg.status);
 
       if (needsSync) {
-        // Clear and re-add all messages (simple but effective)
-        chatStoreClearSession(sessionId);
-        messages.forEach(msg => {
-          chatStoreAddMessage(sessionId, msg);
-        });
+        // Single set() — was clearSession + addMessage*N (hundreds of Zustand set() calls/sec)
+        chatStoreSetSession(sessionId, messages);
       }
     });
-  }, [chatSessions, chatStoreAddMessage, chatStoreClearSession, chatStoreGetSession]);
+  }, [chatSessions, chatStoreSetSession, chatStoreGetSession]);
 
   // 🦆 KANBAN SYNC: Emit task changes to popout windows
   // Track previous tasks to detect actual changes (not just re-renders)
@@ -4888,7 +4881,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const [selectedSkill, setSelectedSkill] = useState<SkillInfo | null>(null);
 
   // PiP Window hook
-  const { isPipOpen, togglePipWindow, updatePipAgents, showPipWindow, hidePipWindow } = usePipWindow();
+  const { isPipOpen, openPipWindow, togglePipWindow, closePipWindow, updatePipAgents, showPipWindow, hidePipWindow } = usePipWindow();
 
   // activeTerminal moved to top of component for TypeScript hoisting
 
@@ -4981,75 +4974,72 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         : "360px minmax(0, 1fr) 0px";  // Auto-collapsed tab or no agent
 
   // Update PiP window with current agent states
+  // Uses sessionStore (same source as Task Hub) so all non-done sessions appear
+  // Brain: 005-performance-critical-refactor — debounced to avoid IPC spam during streaming
+  const pipDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!isPipOpen) return;
 
-    const pipAgents: PipAgentState[] = [];
+    // Brain: 005-performance-critical-refactor
+    // Throttle to 2Hz (500ms) — prevents excessive IPC during multi-agent streaming
+    if (pipDebounceRef.current) clearTimeout(pipDebounceRef.current);
+    pipDebounceRef.current = setTimeout(() => {
+      const activeSessions = agentSessions.filter((s) => s.status !== 'done');
+      const pipAgents: PipAgentState[] = activeSessions.map((session) => {
+        const terminal = terminals.find((t) => t.id === session.agentId);
+        const isLoading = chatLoadingMap.get(session.id) === true
+          || chatLoadingMap.get(session.agentId) === true;
 
-    // For each active chat session, build PiP agent state
-    chatSessions.forEach((messages, agentId) => {
-      const terminal = terminals.find((t) => t.id === agentId);
-      if (!terminal) return;
+        let status: PipAgentStatus = 'idle';
+        if (isLoading) status = 'streaming';
 
-      // Determine agent status
-      let status: PipAgentStatus = 'idle';
-      let lastMessage: string | undefined;
-      let currentTool: string | undefined;
-      let toolsExecuted = 0;
-
-      // Check if agent is currently loading/streaming
-      const isLoading = chatLoadingMap.get(agentId) ?? false;
-      if (isLoading) {
-        status = 'streaming';
-      }
-
-      // Get last assistant message
-      const lastMsg = messages.filter((m) => m.role === 'assistant').pop();
-      if (lastMsg) {
-        // Extract last text from events
-        const lastEvent = lastMsg.events?.filter((e) => e.type === 'assistant').pop();
-        if (lastEvent && lastEvent.type === 'assistant') {
-          const textBlocks = lastEvent.message?.content?.filter((c: any) => c.type === 'text') ?? [];
-          if (textBlocks.length > 0) {
-            lastMessage = textBlocks[textBlocks.length - 1].text?.substring(0, 100);
+        let lastMessage: string | undefined;
+        let currentTool: string | undefined;
+        let toolsExecuted = 0;
+        const messages = chatSessions.get(session.agentId);
+        if (messages && messages.length > 0) {
+          const lastMsg = messages.filter((m) => m.role === 'assistant').pop();
+          if (lastMsg) {
+            const lastEvent = lastMsg.events?.filter((e) => e.type === 'assistant').pop();
+            if (lastEvent && lastEvent.type === 'assistant') {
+              const textBlocks = lastEvent.message?.content?.filter((c: any) => c.type === 'text') ?? [];
+              if (textBlocks.length > 0) {
+                lastMessage = textBlocks[textBlocks.length - 1].text?.substring(0, 100);
+              }
+              const toolBlocks = lastEvent.message?.content?.filter((c: any) => c.type === 'tool_use') ?? [];
+              toolsExecuted = toolBlocks.length;
+              if (toolBlocks.length > 0 && isLoading) {
+                currentTool = toolBlocks[toolBlocks.length - 1].name;
+                status = 'executing';
+              }
+            }
+            if (lastMsg.error) status = 'error';
           }
-
-          // Count tools executed
-          const toolBlocks = lastEvent.message?.content?.filter((c: any) => c.type === 'tool_use') ?? [];
-          toolsExecuted = toolBlocks.length;
-
-          // Get current tool if any
-          if (toolBlocks.length > 0 && isLoading) {
-            currentTool = toolBlocks[toolBlocks.length - 1].name;
-            status = 'executing';
-          }
+          if (messages.length === 0 && isLoading) status = 'thinking';
         }
 
-        // Check for error
-        if (lastMsg.error) {
-          status = 'error';
-        }
-      }
-
-      // Check if thinking (no messages yet but loading)
-      if (messages.length === 0 && isLoading) {
-        status = 'thinking';
-      }
-
-      pipAgents.push({
-        agentId: terminal.id,
-        agentName: terminal.label,
-        color: terminal.color,
-        status,
-        lastMessage,
-        lastActivity: messages.length > 0 ? messages[messages.length - 1].timestamp : undefined,
-        toolsExecuted,
-        currentTool,
+        return {
+          agentId: session.agentId,
+          agentName: terminal?.label || session.title,
+          projectName: session.projectName,
+          avatar: terminal?.avatar,
+          sessionId: session.id,
+          color: terminal?.color || '#f28c52',
+          status,
+          lastMessage: lastMessage || session.title,
+          lastActivity: session.updatedAt,
+          toolsExecuted,
+          currentTool,
+        };
       });
-    });
 
-    updatePipAgents(pipAgents);
-  }, [chatSessions, chatLoadingMap, terminals, isPipOpen, updatePipAgents]);
+      updatePipAgents(pipAgents);
+    }, 500);
+
+    return () => {
+      if (pipDebounceRef.current) clearTimeout(pipDebounceRef.current);
+    };
+  }, [agentSessions, chatSessions, chatLoadingMap, terminals, isPipOpen, updatePipAgents]);
 
   // Listen for click-to-focus events from PiP window
   // Use ref to avoid teardown/setup on every terminals change (prevents Tauri listener race condition)
@@ -5089,52 +5079,52 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     };
   }, [tauriAvailable]);
 
-  // Auto-show/hide PiP based on main window focus
+  // PiP stays visible at all times (no auto-hide on main window focus)
+  // The user controls visibility via the PiP button or Settings toggle
+
+  // Connect Settings PiP toggle + auto-open on startup
+  const openPipWindowRef = useRef(openPipWindow);
+  const closePipWindowRef = useRef(closePipWindow);
+  openPipWindowRef.current = openPipWindow;
+  closePipWindowRef.current = closePipWindow;
+
   useEffect(() => {
-    if (!tauriAvailable || !isPipOpen) return;
+    if (!tauriAvailable) return;
 
-    const window = getCurrentWindow();
-
-    // Listen for window focus events
-    const unlistenFocus = window.onFocusChanged(async ({ payload: focused }) => {
-      if (focused) {
-        // Main window gained focus - hide PiP
-        console.log('🦆 Main window focused, hiding PiP');
-        await hidePipWindow();
-      } else {
-        // Main window lost focus - show PiP
-        console.log('🦆 Main window unfocused, showing PiP');
-        await showPipWindow();
+    // Auto-open PiP on startup if pip-enabled was saved in Settings
+    let cancelled = false;
+    (async () => {
+      try {
+        const pipStore = await Store.load('.quack-ui-prefs.dat');
+        const pipEnabled = await pipStore.get<boolean>('pip-enabled');
+        if (pipEnabled && !cancelled) {
+          console.log('🦆 PiP auto-open: pip-enabled is true in settings');
+          openPipWindowRef.current();
+        }
+      } catch {
+        // Store not available, skip
       }
-    });
+    })();
+
+    // Listen for Settings PiP toggle
+    const handlePipSettingChanged = (e: Event) => {
+      const enabled = (e as CustomEvent).detail?.enabled;
+      if (enabled) {
+        openPipWindowRef.current();
+      } else {
+        closePipWindowRef.current();
+      }
+    };
+    window.addEventListener('pip-setting-changed', handlePipSettingChanged);
 
     return () => {
-      unlistenFocus.then((fn) => fn()).catch(() => undefined);
+      cancelled = true;
+      window.removeEventListener('pip-setting-changed', handlePipSettingChanged);
     };
-  }, [tauriAvailable, isPipOpen, showPipWindow, hidePipWindow]);
+  }, [tauriAvailable]); // stable dep - runs once
 
-  // Agent Chat Settings helpers - get or create settings for current agent
-  // Normalize model IDs to Supabase IDs (e.g. "sonnet45", "opus46", "haiku45")
-  // Handles both legacy short names ("sonnet", "opus") and full API IDs ("claude-sonnet-4-5-...")
-  const normalizeModelName = (model: string): string => {
-    // Map legacy short names to Supabase IDs
-    const legacyMap: Record<string, string> = {
-      'sonnet': 'sonnet46',
-      'sonnet45': 'sonnet46', // Sonnet 4.5 deprecated
-      'opus': 'opus46',
-      'haiku': 'haiku45',
-    };
-    if (legacyMap[model]) return legacyMap[model];
-
-    // Normalize full API model IDs to Supabase IDs
-    if (model.startsWith("claude-")) {
-      if (model.includes("opus")) return "opus46";
-      if (model.includes("haiku")) return "haiku45";
-      if (model.includes("sonnet")) return "sonnet46";
-    }
-    // Supabase IDs (sonnet46, opus46, haiku45) pass through as-is
-    return model;
-  };
+  // Brain: 005-performance-critical-refactor
+  // normalizeModelName extracted to src/utils/modelUtils.ts (module-level, no re-creation)
 
   // 🦆 SESSIONS-FIRST: Use sessionId for settings if available, fallback to agentId
   const settingsKey = activeSessionId || activeId;

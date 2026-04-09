@@ -58,6 +58,13 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
     return distanceFromBottom < 100;
   }, []);
 
+  // Brain: 005-performance-critical-refactor
+  // Memoize user message check to avoid linear scan in scroll handler
+  const hasUserMessages = useMemo(
+    () => messages.some(m => m.role === 'user'),
+    [messages]
+  );
+
   // Handle scroll events to show/hide scroll buttons
   const handleScroll = useCallback(() => {
     const isAtBottom = checkIfAtBottom();
@@ -75,9 +82,8 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
     // Show "scroll to top" (previous user message) button when:
     // 1. Not at bottom (scrolled up in conversation)
     // 2. There are user messages to navigate to
-    const hasUserMessages = messages.some(m => m.role === 'user');
     setShowScrollToTopButton(!isAtBottom && hasUserMessages);
-  }, [checkIfAtBottom, messages, loading]);
+  }, [checkIfAtBottom, hasUserMessages, loading]);
 
   // Scroll to bottom function
   const scrollToBottom = useCallback(() => {
