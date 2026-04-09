@@ -92,6 +92,18 @@
   text-decoration: underline;
 }
 
+.md-symbol-link {
+  cursor: pointer;
+  border-left: 2px solid rgba(var(--accent-rgb), 0.6);
+  transition: all 0.15s var(--ease-default);
+}
+
+.md-symbol-link:hover {
+  background: rgba(var(--accent-rgb), 0.25);
+  border-left-color: rgba(var(--accent-rgb), 0.9);
+  text-decoration: underline;
+}
+
 /* Code blocks wrapper with copy button */
 .md-code-block-wrapper {
   position: relative;

@@ -3,13 +3,13 @@ type: feature-doc
 project: quack-app
 stack: React 18 + TypeScript strict + Tauri v2 + CodeMirror 6
 created: 2026-04-02
-last_verified: 2026-04-08
-tags: [editor, codemirror, tab, diff, multi-tab, search, popout, autocomplete, minimap, lint, code-intel, outline, preview, markdown, mermaid, keyboard-shortcuts]
+last_verified: 2026-04-09
+tags: [editor, codemirror, tab, diff, multi-tab, search, popout, autocomplete, minimap, lint, code-intel, outline, preview, markdown, mermaid, html, symbol-navigation, keyboard-shortcuts]
 ---
 
 ## 024 - Integrated Code Editor
-**Purpose:** Multi-tab code editor with edit/diff modes, search/replace, autocomplete, minimap, lint/diagnostics, code-intel outline panel, popout window support, agent editFile integration, markdown/mermaid preview toggle, and keyboard shortcuts.
-**Stack:** React 18, TypeScript strict, Tauri v2, CodeMirror 6, @codemirror/merge, @codemirror/autocomplete, @codemirror/lint, @replit/codemirror-minimap, Zustand, mermaid (lazy)
+**Purpose:** Multi-tab code editor with edit/diff modes, search/replace, autocomplete, minimap, lint/diagnostics, code-intel outline panel, popout window support, agent editFile integration, markdown/mermaid/HTML preview toggle, symbol chip navigation from chat, and keyboard shortcuts.
+**Stack:** React 18, TypeScript strict, Tauri v2, CodeMirror 6, @codemirror/merge, @codemirror/autocomplete, @codemirror/lint, @replit/codemirror-minimap, Zustand, mermaid (lazy), HtmlVisualizer (sandboxed iframe)
 
 ### Files
 | Type | Path | Exports/Purpose |
@@ -82,14 +82,26 @@ User presses Cmd+S in editor
 
 **Preview toggle (Cmd+Shift+P):**
 ```
-User clicks Preview button or presses Cmd+Shift+P on .md/.mdx/.mmd file
+User clicks Preview button or presses Cmd+Shift+P on .md/.mdx/.mmd/.html file
   -> CodeEditorView toggles previewOpen state
-  -> EditorContent receives previewOpen + isMermaid props
-  -> .md/.mdx: renders MarkdownText (with clickable file chips)
+  -> EditorContent receives previewOpen + isMermaid + isHtml props
+  -> .md/.mdx: renders MarkdownText (with clickable file/symbol chips)
   -> .mmd: renders MermaidDiagram (with zoom/pan)
+  -> .html/.htm: renders HtmlVisualizer (sandboxed iframe, auto-resize, no collapsible)
   -> Button text flips: "Preview" <-> "Editor"
   -> Outline button hidden in preview mode
   -> Preview state preserved across file switches
+```
+
+**Symbol chip click (chat -> editor):**
+```
+User clicks symbol chip (e.g. `handleClaudeEvent`) in chat message
+  -> MarkdownText dispatches 'quack:open-symbol' { symbol }
+  -> App.tsx listener calls findDefinition(symbol, explorerRoot)
+  -> On success: handleOpenCodeEditorTab(def.file) opens/focuses tab
+  -> Dispatches 'quack:navigate-to-line' { line: def.line }
+  -> CodeEditorView listener calls navigateToLine(line) via rAF
+  -> On failure: toast "Definizione non trovata"
 ```
 
 **Search/Replace (Cmd+F):**

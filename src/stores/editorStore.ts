@@ -30,9 +30,13 @@ interface EditorState {
   // Cursor
   cursorPosition: CursorPosition;
 
+  // Pending navigation (set by symbol chip click, consumed by editor once ready)
+  pendingNavigationLine: number | null;
+
   // Actions
   openFile: (filePath: string, lineChanges?: LineChange[]) => Promise<void>;
   setLineChanges: (changes: LineChange[]) => void;
+  setPendingNavigationLine: (line: number | null) => void;
   updateContent: (content: string) => void;
   save: () => Promise<boolean>;
   openDiff: (request: DiffRequest) => void;
@@ -51,6 +55,7 @@ const INITIAL_STATE = {
   pendingEdit: null,
   lineChanges: [] as LineChange[],
   cursorPosition: { line: 1, column: 1 },
+  pendingNavigationLine: null,
 };
 
 export const useEditorStore = create<EditorState>()((set, get) => ({
@@ -173,6 +178,10 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
       isDirty: false,
       pendingEdit: null,
     });
+  },
+
+  setPendingNavigationLine: (line: number | null) => {
+    set({ pendingNavigationLine: line });
   },
 
   setCursorPosition: (pos: CursorPosition) => {

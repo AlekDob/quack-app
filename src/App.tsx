@@ -125,6 +125,7 @@ import type { ChatSendOptions, PermissionMode } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useModelsConfig } from "./hooks/useAppConfig";
 import { getModelId } from "./services/modelService";
+import { findDefinition } from "./services/codeIntelService";
 import { getProviderRequestFields, getActiveModelName } from "./services/claudeSDK";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
@@ -10149,6 +10150,42 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
     window.addEventListener('quack:open-file', handleOpenFile);
     return () => window.removeEventListener('quack:open-file', handleOpenFile);
+  }, [handleOpenCodeEditorTab, explorerRoot]);
+
+  // Listen for quack:open-symbol events from MarkdownText symbol chip clicks
+  // Uses editorStore.pendingNavigationLine instead of setTimeout for reliable timing
+  useEffect(() => {
+    let inFlight = false;
+    const handleOpenSymbol = async (e: Event) => {
+      const { symbol } = (e as CustomEvent<{ symbol: string }>).detail;
+      if (!symbol || inFlight) return;
+
+      if (!explorerRoot) {
+        toast.error('Apri un progetto per navigare ai simboli');
+        return;
+      }
+
+      inFlight = true;
+      try {
+        const result = await findDefinition(symbol, explorerRoot);
+        if (result.definitions.length === 0) {
+          toast.error(`Definizione non trovata per \`${symbol}\``);
+          return;
+        }
+        const def = result.definitions[0];
+        // line is 1-based (tree-sitter convention)
+        const { useEditorStore } = await import('./stores/editorStore');
+        useEditorStore.getState().setPendingNavigationLine(def.line);
+        handleOpenCodeEditorTab(def.file);
+      } catch {
+        toast.error(`Definizione non trovata per \`${symbol}\``);
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    window.addEventListener('quack:open-symbol', handleOpenSymbol);
+    return () => window.removeEventListener('quack:open-symbol', handleOpenSymbol);
   }, [handleOpenCodeEditorTab, explorerRoot]);
 
   // Handler for firing an automation job — creates a session and sends the prompt

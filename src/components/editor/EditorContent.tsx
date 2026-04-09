@@ -14,6 +14,7 @@ import CodeEditorSkeleton from '../skeletons/CodeEditorSkeleton';
 import CodeEditorEngine from './CodeEditorEngine';
 import MarkdownText from '../MarkdownText';
 import MermaidDiagram from '../MermaidDiagram';
+import HtmlVisualizer from '../chat/HtmlVisualizer';
 import type { CodeEditorRef, EditorSelectionInfo } from './editorTypes';
 
 const CodeMirrorMergeView = lazy(() => import('./CodeMirrorMergeView'));
@@ -22,9 +23,10 @@ interface EditorContentProps {
   onSelectionChange?: (selection: EditorSelectionInfo | null) => void;
   previewOpen?: boolean;
   isMermaid?: boolean;
+  isHtml?: boolean;
 }
 
-const EditorContent = forwardRef<CodeEditorRef, EditorContentProps>(function EditorContent({ onSelectionChange, previewOpen, isMermaid }, ref) {
+const EditorContent = forwardRef<CodeEditorRef, EditorContentProps>(function EditorContent({ onSelectionChange, previewOpen, isMermaid, isHtml }, ref) {
   const mode = useEditorStore(s => s.mode);
   const filePath = useEditorStore(s => s.filePath);
   const content = useEditorStore(s => s.content);
@@ -51,7 +53,13 @@ const EditorContent = forwardRef<CodeEditorRef, EditorContentProps>(function Edi
   if (previewOpen && mode === 'edit') {
     return (
       <div className="editor-markdown-preview">
-        {isMermaid ? <MermaidDiagram>{content}</MermaidDiagram> : <MarkdownText>{content}</MarkdownText>}
+        {isMermaid ? (
+          <MermaidDiagram>{content}</MermaidDiagram>
+        ) : isHtml ? (
+          <HtmlVisualizer html={content} collapsible={false} maxHeight={4000} />
+        ) : (
+          <MarkdownText>{content}</MarkdownText>
+        )}
       </div>
     );
   }

@@ -45,7 +45,8 @@ function CodeEditorView() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const isMarkdown = filePath ? /\.(md|mdx|markdown)$/i.test(filePath) : false;
   const isMermaid = filePath ? /\.mmd$/i.test(filePath) : false;
-  const hasPreview = isMarkdown || isMermaid;
+  const isHtml = filePath ? /\.html?$/i.test(filePath) : false;
+  const hasPreview = isMarkdown || isMermaid || isHtml;
   const detectedLang = filePath ? getLanguageFromFilename(filePath) : '';
   const outlineAvailable = outlineSupportedLanguages.has(detectedLang);
   const save = useEditorStore(s => s.save);
@@ -83,6 +84,17 @@ function CodeEditorView() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [shortcuts, hasPreview, previewOpen, isDirty, save]);
 
+  // Consume pending navigation line from store (set by symbol chip click)
+  const pendingLine = useEditorStore(s => s.pendingNavigationLine);
+  useEffect(() => {
+    if (!pendingLine || isLoading) return;
+    // Delay one frame to ensure CodeMirror EditorView is mounted after file load
+    requestAnimationFrame(() => {
+      editorContentRef.current?.navigateToLine(pendingLine);
+      useEditorStore.getState().setPendingNavigationLine(null);
+    });
+  }, [pendingLine, isLoading]);
+
   const handleSelectionChange = useCallback((sel: EditorSelectionInfo | null) => {
     if (!sel || !filePath) {
       useFileSystemStore.getState().clearEditorSelection();
@@ -116,7 +128,7 @@ function CodeEditorView() {
         outlineAvailable={outlineAvailable}
       />
       <div className="editor-body">
-        <EditorContent ref={editorContentRef} onSelectionChange={handleSelectionChange} previewOpen={previewOpen && hasPreview} isMermaid={isMermaid} />
+        <EditorContent ref={editorContentRef} onSelectionChange={handleSelectionChange} previewOpen={previewOpen && hasPreview} isMermaid={isMermaid} isHtml={isHtml} />
         {outlineOpen && outlineAvailable && !(previewOpen && hasPreview) && (
           <EditorOutlinePanel onNavigateToLine={handleNavigateToLine} />
         )}

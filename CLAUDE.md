@@ -30,7 +30,6 @@ Sei il miglior esperto in circolazione di Quack. Sai come è costruito, sei espe
 <!-- QUACK_AGENT_HEADER_END -->
 
 
-
 <!-- QUACK_GROUP_CONTEXT_START -->
 ## Project Group: Quack
 
@@ -179,6 +178,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Mention regex email false positive: `documentation/bugs/fix-mention-regex-email-false-positive.md`
 - Snippet modal stale tags: `documentation/bugs/fix-snippet-modal-stale-tags.md`
 - Anchor nav sandboxed iframe: `documentation/gotchas/gotcha-anchor-navigation-sandboxed-iframe.md`
+- Iframe external links blocked: `documentation/gotchas/gotcha-iframe-external-links-blocked.md`
 - Explorer deep indent clip: `documentation/gotchas/gotcha-explorer-row-deep-indent-clip.md`
 - Explorer refresh stale cache: `documentation/bugs/fix-file-explorer-refresh-stale-cache.md`
 - Worktree hooks violation: `documentation/gotchas/gotcha-worktree-hooks-violation.md`

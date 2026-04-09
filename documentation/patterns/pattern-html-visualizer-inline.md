@@ -2,7 +2,7 @@
 type: pattern
 project: quack-app
 created: 2026-03-24
-last_verified: 2026-03-27
+last_verified: 2026-04-09
 tags: [visualizer, iframe, sandbox, html, inline-rendering]
 ---
 
@@ -56,9 +56,12 @@ The `wrapHtmlForSandbox()` function injects a `<script>` block that handles two 
 2. Observes `document.body` with `ResizeObserver` and sends `{ type: 'quack-viz-resize', height }` via `postMessage`.
 3. `HtmlVisualizer.tsx` verifies `event.source === iframeRef.current.contentWindow` before accepting — prevents spoofed messages.
 
-### 2. Anchor Click Interception
+### 2. Link Click Interception
 
-`<a href="#id">` links in a sandboxed srcdoc iframe navigate away from the content (showing the Quack splash page). The injected script intercepts all anchor clicks and uses `scrollIntoView({ behavior: 'smooth' })` instead. See `gotcha-anchor-navigation-sandboxed-iframe.md`.
+All `<a>` clicks are intercepted by the injected script:
+
+- **Anchor links** (`#id`): uses `scrollIntoView({ behavior: 'smooth' })` instead of navigating. See `gotcha-anchor-navigation-sandboxed-iframe.md`.
+- **External links** (`http://`, `https://`, `mailto:`): sends `{ type: 'quack-viz-link-click', url }` via `postMessage` to parent. `HtmlVisualizer.tsx` receives this and calls `invoke('open_external_url', { url })` to open in the system browser. Without this, external links are silently blocked by `sandbox="allow-scripts"` (no `allow-top-navigation`).
 
 ## useMemo for srcDoc Stability
 
@@ -83,6 +86,7 @@ The wrapped HTML is computed with `useMemo` keyed on the raw `html` prop. This p
 | `src/components/chat/CopyButton.tsx` | Reusable copy-to-clipboard button |
 | `src/components/MarkdownText.tsx` | Code fence language detection + routing |
 | `src/components/StreamMessage.tsx` | MCP tool_use detection + widget rendering |
+| `src/components/editor/EditorContent.tsx` | HTML file preview in code editor tab |
 | `src-tauri/node-sdk/visualizer-mcp-server.js` | MCP server with `visualize_html` tool |
 | `src-tauri/node-sdk/stream-daemon.js` | Registers visualizer MCP server |
 

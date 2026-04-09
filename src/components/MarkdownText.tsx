@@ -8,6 +8,13 @@ const MermaidDiagram = lazy(() => import('./MermaidDiagram'));
 /** File extensions that make inline code clickable */
 const FILE_EXTENSIONS = /\.(tsx?|jsx?|css|scss|rs|py|go|html|json|md|mdx|yaml|yml|toml|sh|sql|xml|svg|java|kt|swift|rb|php|cpp|c|h|vue|mjs|cjs)$/i;
 
+/**
+ * Code symbols: camelCase, PascalCase (with mixed case), snake_case (3+ segments or long),
+ * member access (obj.prop), function calls (fn()).
+ * Excludes: single English words, True/False/None/Type, short all-caps, version strings.
+ */
+const CODE_SYMBOL_PATTERN = /^[a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*$|^[A-Z][a-z]+[A-Z][a-zA-Z0-9]*$|^[a-z]{2,}_[a-z][a-z0-9_]*$|^[A-Z][A-Z0-9]+_[A-Z][A-Z0-9_]*$|^[a-zA-Z]\w+\.[a-zA-Z]\w+$|^[a-zA-Z]\w{2,}\(\)$/;
+
 interface MarkdownTextProps {
   children: string;
 }
@@ -136,6 +143,9 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
         const escaped = escapeHtml(code);
         if (FILE_EXTENSIONS.test(code)) {
           return `<code class="md-inline-code md-file-link" data-filepath="${escaped}" role="button" tabindex="0" draggable="true">${escaped}</code>`;
+        }
+        if (CODE_SYMBOL_PATTERN.test(code)) {
+          return `<code class="md-inline-code md-symbol-link" data-symbol="${escaped}" role="button" tabindex="0">${escaped}</code>`;
         }
         return `<code class="md-inline-code">${escaped}</code>`;
       });
@@ -295,6 +305,22 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
     if (filepath && target.classList.contains('md-file-link')) {
       e.preventDefault();
       window.dispatchEvent(new CustomEvent('quack:open-file', { detail: { path: filepath } }));
+      return;
+    }
+    const symbol = target.getAttribute('data-symbol');
+    if (symbol && target.classList.contains('md-symbol-link')) {
+      e.preventDefault();
+      window.dispatchEvent(new CustomEvent('quack:open-symbol', { detail: { symbol } }));
+    }
+  }, []);
+
+  // WCAG AA: Enter/Space activates role="button" chips (file links + symbol links)
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('md-file-link') || target.classList.contains('md-symbol-link')) {
+      e.preventDefault();
+      target.click();
     }
   }, []);
 
@@ -310,5 +336,5 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
     e.dataTransfer.setData('text/plain', filepath);
   }, []);
 
-  return <div className="markdown-content" onClick={handleClick} onDragStart={handleDragStart}>{renderMarkdown(children)}</div>;
+  return <div className="markdown-content" onClick={handleClick} onKeyDown={handleKeyDown} onDragStart={handleDragStart}>{renderMarkdown(children)}</div>;
 }

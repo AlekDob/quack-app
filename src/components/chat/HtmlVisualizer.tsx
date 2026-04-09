@@ -3,6 +3,7 @@
  * Supports auto-resize, code/preview toggle, and copy-to-clipboard.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { wrapHtmlForSandbox } from './htmlVisualizerUtils';
 import { CopyButton } from './CopyButton';
 import './HtmlVisualizer.css';
@@ -43,15 +44,20 @@ export default function HtmlVisualizer({
   // Reset loading state when html content changes
   useEffect(() => { setIsLoaded(false); }, [html]);
 
-  // Listen for auto-resize messages from THIS iframe only
+  // Listen for messages from THIS iframe only (resize + link clicks)
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // WHY: event.source check prevents other iframes from manipulating this visualizer
       if (iframeRef.current && event.source !== iframeRef.current.contentWindow) return;
-      if (event.data?.type !== 'quack-viz-resize') return;
-      const newHeight = Math.max(MIN_HEIGHT, Math.min(event.data.height, maxHeight));
-      setHeight(newHeight);
-      setIsLoaded(true);
+      if (event.data?.type === 'quack-viz-resize') {
+        const newHeight = Math.max(MIN_HEIGHT, Math.min(event.data.height, maxHeight));
+        setHeight(newHeight);
+        setIsLoaded(true);
+      }
+      // Open external links in system browser
+      if (event.data?.type === 'quack-viz-link-click' && event.data.url) {
+        invoke('open_external_url', { url: event.data.url }).catch(console.error);
+      }
     };
 
     window.addEventListener('message', handleMessage);

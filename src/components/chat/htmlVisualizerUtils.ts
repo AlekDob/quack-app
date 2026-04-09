@@ -37,16 +37,27 @@ const AUTO_RESIZE_SCRIPT = `
   // 2. Both preventDefault AND stopImmediatePropagation to kill the event
   // 3. Strip href from all anchor links as CSS-only fallback
   document.addEventListener('click', function(e) {
-    var link = e.target.closest('a[href^="#"]');
+    var link = e.target.closest('a[href]');
     if (!link) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    var targetId = link.getAttribute('href').slice(1);
-    var target = document.getElementById(targetId);
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    var href = link.getAttribute('href') || '';
+    // Anchor links: scroll in-place
+    if (href.startsWith('#')) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      var targetId = href.slice(1);
+      var target = document.getElementById(targetId);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      return false;
     }
-    return false;
+    // External links: forward to parent to open in system browser
+    if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('mailto:')) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      parent.postMessage({ type: 'quack-viz-link-click', url: href }, '*');
+      return false;
+    }
   }, true);
   // Layer 3: strip href from anchor-only links so browser can't navigate even without JS
   document.querySelectorAll('a[href^="#"]').forEach(function(a) {
