@@ -5091,20 +5091,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   useEffect(() => {
     if (!tauriAvailable) return;
 
-    // Auto-open PiP on startup if pip-enabled was saved in Settings
+    // PiP is always closed on startup — user opens it manually via sidebar button
+    // The pip-enabled preference only controls the Settings toggle state, not auto-open
     let cancelled = false;
-    (async () => {
-      try {
-        const pipStore = await Store.load('.quack-ui-prefs.dat');
-        const pipEnabled = await pipStore.get<boolean>('pip-enabled');
-        if (pipEnabled && !cancelled) {
-          console.log('🦆 PiP auto-open: pip-enabled is true in settings');
-          openPipWindowRef.current();
-        }
-      } catch {
-        // Store not available, skip
-      }
-    })();
 
     // Listen for Settings PiP toggle
     const handlePipSettingChanged = (e: Event) => {
