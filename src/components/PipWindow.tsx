@@ -27,6 +27,9 @@ const GROUP_ORDER: StatusGroup[] = ['working', 'done', 'idle'];
 
 const PipWindow: React.FC = () => {
   const [agents, setAgents] = useState<PipAgentState[]>([]);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; agent: PipAgentState } | null>(null);
+  const [renameDialog, setRenameDialog] = useState<{ agentId: string; sessionId: string; currentTitle: string } | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   useEffect(() => {
     const unlisten = listen<PipAgentState[]>('pip-agents-update', (event) => {
@@ -41,6 +44,58 @@ const PipWindow: React.FC = () => {
       agentId: agent.agentId,
       sessionId: agent.sessionId,
     });
+  }, []);
+
+  // Context menu handlers
+  const handleCardContextMenu = useCallback((e: React.MouseEvent, agent: PipAgentState) => {
+    if (!agent.sessionId) return;
+    setContextMenu({ x: e.clientX, y: e.clientY, agent });
+  }, []);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    document.addEventListener('click', close);
+    document.addEventListener('contextmenu', close);
+    return () => {
+      document.removeEventListener('click', close);
+      document.removeEventListener('contextmenu', close);
+    };
+  }, [contextMenu]);
+
+  const handleMarkDone = useCallback(() => {
+    if (!contextMenu?.agent.sessionId) return;
+    emit('pip-session-mark-done', { sessionId: contextMenu.agent.sessionId });
+    setContextMenu(null);
+  }, [contextMenu]);
+
+  const handleDelete = useCallback(() => {
+    if (!contextMenu?.agent.sessionId) return;
+    emit('pip-session-delete', { sessionId: contextMenu.agent.sessionId });
+    setContextMenu(null);
+  }, [contextMenu]);
+
+  const handleRenameRequest = useCallback(() => {
+    if (!contextMenu?.agent.sessionId) return;
+    setRenameDialog({
+      agentId: contextMenu.agent.agentId,
+      sessionId: contextMenu.agent.sessionId,
+      currentTitle: contextMenu.agent.lastMessage || contextMenu.agent.agentName,
+    });
+    setRenameValue(contextMenu.agent.lastMessage || contextMenu.agent.agentName);
+    setContextMenu(null);
+  }, [contextMenu]);
+
+  const handleRenameConfirm = useCallback(() => {
+    if (!renameDialog || !renameValue.trim()) return;
+    emit('pip-session-rename', { sessionId: renameDialog.sessionId, newTitle: renameValue.trim() });
+    setRenameDialog(null);
+    setRenameValue('');
+  }, [renameDialog, renameValue]);
+
+  const handleRenameCancel = useCallback(() => {
+    setRenameDialog(null);
+    setRenameValue('');
   }, []);
 
   const handleDragStart = useCallback(async () => {
@@ -61,7 +116,7 @@ const PipWindow: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
-  // Group agents by status
+  // Group agents by status, sorted by lastActivity descending (most recent first)
   const groupedAgents = useMemo(() => {
     const groups = new Map<StatusGroup, PipAgentState[]>();
     for (const agent of agents) {
@@ -69,6 +124,10 @@ const PipWindow: React.FC = () => {
       const list = groups.get(group) || [];
       list.push(agent);
       groups.set(group, list);
+    }
+    // Sort each group: most recent activity first
+    for (const [, list] of groups) {
+      list.sort((a, b) => (b.lastActivity || 0) - (a.lastActivity || 0));
     }
     return GROUP_ORDER
       .filter((g) => groups.has(g))
@@ -189,6 +248,7 @@ const PipWindow: React.FC = () => {
                   key={`${agent.agentId}-${agent.sessionId}`}
                   agent={agent}
                   onClickAgent={handleAgentClick}
+                  onContextMenu={handleCardContextMenu}
                 />
               ))}
             </div>
@@ -206,6 +266,133 @@ const PipWindow: React.FC = () => {
           textAlign: 'center',
         }}>
           {workingCount > 0 ? `${workingCount} working` : 'All idle'}
+        </div>
+      )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed',
+            left: contextMenu.x,
+            top: contextMenu.y,
+            zIndex: 99999,
+            background: 'rgba(30, 30, 35, 0.98)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '8px',
+            padding: '4px',
+            minWidth: '160px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(12px)',
+          }}
+        >
+          <button
+            onClick={handleMarkDone}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+              padding: '6px 10px', background: 'transparent', border: 'none',
+              borderRadius: '4px', color: 'rgba(255, 255, 255, 0.9)',
+              fontSize: '11px', cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Mark as Done
+          </button>
+          <button
+            onClick={handleRenameRequest}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+              padding: '6px 10px', background: 'transparent', border: 'none',
+              borderRadius: '4px', color: 'rgba(255, 255, 255, 0.9)',
+              fontSize: '11px', cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+            </svg>
+            Rename Session
+          </button>
+          <button
+            onClick={handleDelete}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px', width: '100%',
+              padding: '6px 10px', background: 'transparent', border: 'none',
+              borderRadius: '4px', color: '#ef4444',
+              fontSize: '11px', cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+            Delete Session
+          </button>
+        </div>
+      )}
+
+      {/* Rename Dialog */}
+      {renameDialog && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 100000,
+          background: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <div style={{
+            background: 'rgba(30, 30, 35, 0.98)', border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '12px', padding: '16px', width: '260px',
+            boxShadow: '0 12px 40px rgba(0, 0, 0, 0.5)',
+          }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#e7ebf3', marginBottom: '10px' }}>
+              Rename Session
+            </div>
+            <input
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRenameConfirm();
+                if (e.key === 'Escape') handleRenameCancel();
+              }}
+              autoFocus
+              style={{
+                width: '100%', padding: '8px 10px', fontSize: '11px',
+                background: 'rgba(255, 255, 255, 0.05)', border: '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: '6px', color: '#e7ebf3', outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '10px' }}>
+              <button
+                onClick={handleRenameCancel}
+                style={{
+                  padding: '5px 12px', fontSize: '10px', background: 'transparent',
+                  border: '1px solid rgba(255, 255, 255, 0.15)', borderRadius: '6px',
+                  color: 'rgba(255, 255, 255, 0.7)', cursor: 'pointer',
+                }}
+              >
+                Annulla
+              </button>
+              <button
+                onClick={handleRenameConfirm}
+                style={{
+                  padding: '5px 12px', fontSize: '10px',
+                  background: 'var(--accent-color, #f28c52)', border: 'none',
+                  borderRadius: '6px', color: '#fff', cursor: 'pointer', fontWeight: 600,
+                }}
+              >
+                Rinomina
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

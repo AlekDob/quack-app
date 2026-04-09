@@ -2165,11 +2165,8 @@ export default function ChatInput({
                   onMouseEnter={() => setSelectedAgentIndex(gIdx)}
                 >
                   <div className="agent-autocomplete-badge skill-badge">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                      <path
-                        d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-                        fill="var(--accent-color)"
-                      />
+                    <svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M10 2l2 4 4.5 0.5-3.25 3 1 4.5-4.25-2.5-4.25 2.5 1-4.5L3.5 6.5 8 6z" fill="none" stroke="var(--accent-color)" strokeWidth="1.5" />
                     </svg>
                   </div>
                   <div className="agent-autocomplete-info">
@@ -2256,7 +2253,19 @@ export default function ChatInput({
                     }}
                     onMouseEnter={() => setSelectedAgentIndex(globalIndex)}
                   >
-                    <div className="agent-autocomplete-badge" style={{ backgroundColor: '#FFD700' }} />
+                    <div className="agent-autocomplete-badge feature-badge">
+                      <svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true">
+                        <circle cx="10" cy="10" r="3" fill="none" stroke="#FFD700" strokeWidth="1.5" />
+                        <circle cx="5" cy="5" r="2" fill="none" stroke="#FFD700" strokeWidth="1.5" />
+                        <circle cx="15" cy="5" r="2" fill="none" stroke="#FFD700" strokeWidth="1.5" />
+                        <circle cx="5" cy="15" r="2" fill="none" stroke="#FFD700" strokeWidth="1.5" />
+                        <circle cx="15" cy="15" r="2" fill="none" stroke="#FFD700" strokeWidth="1.5" />
+                        <line x1="7.5" y1="8" x2="6.5" y2="6.5" stroke="#FFD700" strokeWidth="1" />
+                        <line x1="12.5" y1="8" x2="13.5" y2="6.5" stroke="#FFD700" strokeWidth="1" />
+                        <line x1="7.5" y1="12" x2="6.5" y2="13.5" stroke="#FFD700" strokeWidth="1" />
+                        <line x1="12.5" y1="12" x2="13.5" y2="13.5" stroke="#FFD700" strokeWidth="1" />
+                      </svg>
+                    </div>
                     <div className="agent-autocomplete-info">
                       <div className="agent-autocomplete-name">
                         {feature.title}

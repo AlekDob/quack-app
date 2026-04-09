@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React)
 created: 2026-04-07
-last_verified: 2026-04-08
-tags: [chat-input-bar, chat, ui, compose, session, popover, drag-drop, file-mention]
+last_verified: 2026-04-09
+tags: [chat-input-bar, chat, ui, compose, session, popover, drag-drop, file-mention, mention-autocomplete, icons]
 ---
 
 ## Chat Input Bar
@@ -77,3 +77,26 @@ The `.unified-action-bar` uses `onMouseDown={(e) => { ... e.preventDefault() }}`
 - `.uab-popover-badge` -- "ON" badge for toggleable items
 - `.uab-popover-shortcut` -- keyboard shortcut hint (right-aligned)
 - Responsive: buttons shrink to 26px below 768px
+
+### @ Mention Autocomplete Icons
+
+The autocomplete dropdown (`div.agent-autocomplete.mention-autocomplete`) renders five sections in order: Team > Skills > Droids > Features > Files.
+
+#### Section Header Icons
+| Section | Icon | Source/Match |
+|---------|------|-------------|
+| Skills | Star outline (stroke only, `var(--accent-color)` gradient fill) | Matches `icons.skills` in `SidePanelAccordion.tsx` |
+| Features | Connected-circles graph (stroke `#FFD700`, 4 outer circles + 1 center + connecting lines) | Matches `icons.features` in `SidePanelAccordion.tsx` |
+
+#### Per-Item Badge Icons
+| Section | Badge class | Icon | Description |
+|---------|-------------|------|-------------|
+| Skills | `.skill-badge` | Star outline SVG (20x20 viewBox, stroke `var(--accent-color)`, `strokeWidth="1.5"`, no fill) | Matches `icons.skills` star-outline path from `SidePanelAccordion.tsx` |
+| Features | `.feature-badge` | Connected-circles graph SVG (20x20 viewBox, stroke `#FFD700`, 5 circles + 4 connecting lines) | Matches `icons.features` graph from `SidePanelAccordion.tsx` |
+
+#### Badge CSS
+- `.skill-badge` -- `background: rgba(var(--accent-rgb), 0.15)`, `border-radius: var(--radius-sm)`, flex-centered, `color: var(--accent-color)`
+- `.feature-badge` -- `background: rgba(255, 215, 0, 0.15)`, `border-radius: var(--radius-sm)`, flex-centered (gold tint)
+
+#### Icon Consistency Rule
+Both skill and feature icons in the @ mention autocomplete use the **same SVG paths** as the SidePanelAccordion sidebar icons (`icons.skills` = star outline, `icons.features` = connected-circles graph). This ensures visual consistency between sidebar navigation and inline mentions.

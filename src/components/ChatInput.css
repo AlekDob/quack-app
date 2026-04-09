@@ -251,8 +251,22 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  width: auto;
+  height: auto;
   padding: 4px;
   color: var(--accent-color);
+}
+
+/* Feature-specific styling — graph icon */
+.feature-badge {
+  background: rgba(255, 215, 0, 0.15);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: auto;
+  padding: 4px;
 }
 
 .skill-item .agent-autocomplete-name {

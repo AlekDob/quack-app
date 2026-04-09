@@ -996,6 +996,7 @@ function AppContent() {
     new Map()
   );
   const terminalsRef = useRef<TerminalInfo[]>([]);
+  const handleSessionClickRef = useRef<((sessionId: string) => void) | null>(null);
   const IDLE_TIMEOUT_MS = 5000; // 5s - for activity bar (fast response)
   const NOTIFICATION_TIMEOUT_MS = 60000; // 1 minute - for notifications only
   const VISUAL_IDLE_DELAY_MS = 400; // Delay before showing idle status (prevents flickering)
@@ -5062,21 +5063,55 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     if (!tauriAvailable) return;
 
     const unlisten = listen<{ agentId: string; sessionId?: string }>('pip-agent-clicked', async (event) => {
-      const { agentId } = event.payload;
-      console.log('🦆 PiP agent clicked, focusing on agent:', agentId);
+      const { agentId, sessionId } = event.payload;
+      console.log('🦆 PiP agent clicked, focusing on agent:', agentId, 'session:', sessionId);
 
-      // Use ref to get current terminals without re-registering listener
+      // If we have a sessionId, use handleSessionClick for full activation
+      // (selects session, switches tab, focuses chat, injects personality)
+      if (sessionId && handleSessionClickRef.current) {
+        handleSessionClickRef.current(sessionId);
+        const w = getCurrentWindow();
+        await w.setFocus();
+        return;
+      }
+
+      // Fallback: just switch active terminal
       const terminal = terminalsRef.current.find((t) => t.id === agentId);
       if (terminal) {
         setActiveId(terminal.id);
-
-        const window = getCurrentWindow();
-        await window.setFocus();
+        const w = getCurrentWindow();
+        await w.setFocus();
       }
     });
 
     return () => {
       unlisten.then((fn) => fn()).catch(() => undefined);
+    };
+  }, [tauriAvailable]);
+
+  // PiP context menu actions: Mark Done, Delete, Rename
+  useEffect(() => {
+    if (!tauriAvailable) return;
+
+    const unlistenDone = listen<{ sessionId: string }>('pip-session-mark-done', (event) => {
+      const { sessionId } = event.payload;
+      useSessionStore.getState().markDone(sessionId);
+    });
+
+    const unlistenDelete = listen<{ sessionId: string }>('pip-session-delete', (event) => {
+      const { sessionId } = event.payload;
+      useSessionStore.getState().deleteSession(sessionId);
+    });
+
+    const unlistenRename = listen<{ sessionId: string; newTitle: string }>('pip-session-rename', (event) => {
+      const { sessionId, newTitle } = event.payload;
+      useSessionStore.getState().updateSession(sessionId, { title: newTitle });
+    });
+
+    return () => {
+      unlistenDone.then((fn) => fn()).catch(() => undefined);
+      unlistenDelete.then((fn) => fn()).catch(() => undefined);
+      unlistenRename.then((fn) => fn()).catch(() => undefined);
     };
   }, [tauriAvailable]);
 
@@ -8193,6 +8228,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       void loadDirectory(session.projectPath);
     }
   }, [selectSession, terminals, loadDirectory, setActiveSessionIdExclusive, tauriAvailable]);
+  handleSessionClickRef.current = handleSessionClick;
 
   const handleUpdateWorkingOn = useCallback(async (terminalId: string, workingOn: string) => {
     // Update terminal workingOn field
