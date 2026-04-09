@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import type { CSSProperties } from 'react';
+import type { VariableSizeList as VariableSizeListType } from 'react-window';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { VariableSizeList } = require('react-window') as typeof import('react-window');
+const ReactWindow = require('react-window');
+const VariableSizeList = ReactWindow.VariableSizeList;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { AutoSizer } = require('react-virtualized-auto-sizer') as typeof import('react-virtualized-auto-sizer');
+const AutoSizer = require('react-virtualized-auto-sizer').default || require('react-virtualized-auto-sizer');
 import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
 import DuckAnimation from './DuckAnimation';
@@ -140,7 +142,6 @@ const MessageRow = memo(({
         showThinkingBlocks={showThinkingBlocks}
         onRewindFiles={onRewindFiles}
         onOpenImageTab={onOpenImageTab}
-        onOpenPersonality={onOpenPersonality}
         pendingPlanApprovalIds={pendingPlanApprovalIds}
         onPlanApprovalResponse={onPlanApprovalResponse}
         onTeammateDrillDown={onTeammateDrillDown}
@@ -175,7 +176,7 @@ function MessageListVirtualized({
   onPlanApprovalResponse,
   onTeammateDrillDown,
 }: MessageListProps) {
-  const listRef = useRef<VariableSizeList>(null);
+  const listRef = useRef<VariableSizeListType>(null);
   const outerRef = useRef<HTMLElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const [showScrollButton, setShowScrollButton] = useState(false);
