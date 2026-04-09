@@ -39,7 +39,7 @@ export interface KanbanTaskInitialValues {
   agentName?: string;
   agentAvatar?: string;
   agentColor?: string;
-  targetStatus?: 'todo' | 'in_progress' | 'done';
+  targetStatus?: 'todo' | 'in_progress' | 'done' | 'human_review';
 }
 
 // Draft state for persisting form data when modal is closed

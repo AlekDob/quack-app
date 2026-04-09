@@ -1,35 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Edit3, Eye, Save, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/core';
-import mermaid from 'mermaid';
 import MermaidDiagram from '../MermaidDiagram';
 import { readBrainEntry } from '../../services/brainFileService';
 import type { BrainEntry } from '../../services/brainFileService';
 
 // Brain: pattern-code-editor-tab
-// Note: mermaid themeVariables require resolved hex values (no CSS variables).
-// Using default accent fallback — re-initialize inside a hook if dynamic theming is needed.
+// Dynamic import avoids Rollup TDZ bug with Mermaid 11.x in production builds.
+// (static import causes "Cannot access '...' before initialization" at runtime)
+const getMermaid = () => import('mermaid').then(m => m.default);
 const accentColorFallback = '#f28c52';
-mermaid.initialize({
-  startOnLoad: false,
-  securityLevel: 'loose',
-  theme: 'dark',
-  themeVariables: {
-    primaryColor: accentColorFallback,
-    primaryTextColor: '#e4e4e7',
-    primaryBorderColor: '#3a3a40',
-    lineColor: '#71717a',
-    secondaryColor: '#2a2a30',
-    tertiaryColor: '#1a1a1e',
-    background: '#1a1a1e',
-    mainBkg: '#2a2a30',
-    nodeBorder: '#3a3a40',
-    clusterBkg: '#25252a',
-    titleColor: '#e4e4e7',
-    edgeLabelBackground: '#2a2a30',
-  },
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-});
 
 interface BrainEditorProps {
   filePath: string;
@@ -85,6 +65,27 @@ export default function BrainEditor({ filePath, onClose }: BrainEditorProps) {
   const renderMermaid = useCallback(async () => {
     if (!mermaidRef.current || !entry || !isMermaidFile(filePath)) return;
     try {
+      const mermaid = await getMermaid();
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'loose',
+        theme: 'dark',
+        themeVariables: {
+          primaryColor: accentColorFallback,
+          primaryTextColor: '#e4e4e7',
+          primaryBorderColor: '#3a3a40',
+          lineColor: '#71717a',
+          secondaryColor: '#2a2a30',
+          tertiaryColor: '#1a1a1e',
+          background: '#1a1a1e',
+          mainBkg: '#2a2a30',
+          nodeBorder: '#3a3a40',
+          clusterBkg: '#25252a',
+          titleColor: '#e4e4e7',
+          edgeLabelBackground: '#2a2a30',
+        },
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      });
       const id = `mermaid-${Date.now()}`;
       const { svg } = await mermaid.render(id, entry.content);
       if (mermaidRef.current) mermaidRef.current.innerHTML = svg;

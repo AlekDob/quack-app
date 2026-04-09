@@ -142,11 +142,6 @@ export default defineConfig(({ mode }) => {
               return 'claude-sdk';
             }
 
-            // Mermaid - Diagrams library, self-contained
-            if (id.includes('mermaid')) {
-              return 'mermaid';
-            }
-
             // Tauri plugins - self-contained
             if (id.includes('@tauri-apps/')) {
               return 'tauri-vendor';
@@ -166,18 +161,20 @@ export default defineConfig(({ mode }) => {
           entryFileNames: 'assets/[name]-[hash].js',
           assetFileNames: 'assets/[name]-[hash][extname]',
 
+          // Mermaid 11.x TDZ fix: prevent Rollup from reordering transitive
+          // imports which breaks class initialization order (Theme before st).
+          hoistTransitiveImports: false,
+
           // Optimize for tree-shaking
           compact: isProduction,
         },
 
-        // Tree-shaking: use safe defaults only
-        // IMPORTANT: Do NOT set propertyReadSideEffects: false — it can cause
-        // Rollup to reorder module initialization, making React undefined when
-        // libraries call React.createContext() at module scope.
+        // Tree-shaking: disabled entirely to fix Mermaid 11.x TDZ error.
+        // Rollup reorders class declarations inside Mermaid causing
+        // "Cannot access 'st' before initialization" at runtime.
+        // IMPORTANT: Do NOT re-enable moduleSideEffects:false — it breaks React.
         // Brain: gotcha-vendor-circular-chunk-dependency
-        treeshake: isProduction ? {
-          moduleSideEffects: true,
-        } : false,
+        treeshake: false,
       },
     },
 

@@ -259,6 +259,7 @@ export default function KanbanMiniPanel({
     todo: false,
     in_progress: true,
     done: false,
+    human_review: false,
   });
 
   // Filter tasks by status

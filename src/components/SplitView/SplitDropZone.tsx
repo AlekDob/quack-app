@@ -51,7 +51,7 @@ export function SplitDropZone({
   >(null);
 
   const handleDragOver = useCallback(
-    (e: React.DragEvent, zone: 'left' | 'right') => {
+    (e: React.DragEvent, zone: 'left' | 'right' | 'chat') => {
       e.preventDefault();
       e.dataTransfer.dropEffect = isSidebarDrag(e.dataTransfer)
         ? 'copy'
