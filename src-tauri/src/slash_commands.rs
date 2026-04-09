@@ -3,6 +3,15 @@ use std::fs;
 use std::path::PathBuf;
 use tauri::AppHandle;
 
+// Brain: bug-slash-commands-home-env-windows
+/// Cross-platform home directory resolution.
+/// Windows uses USERPROFILE, macOS/Linux use HOME.
+fn get_home_dir() -> Result<String, String> {
+    std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .map_err(|_| "Could not determine home directory".to_string())
+}
+
 /// Bundled command: /background - Run commands or agents in background
 /// This command is installed automatically for all Quack users on first run
 const BUNDLED_COMMAND_BACKGROUND: &str = include_str!("../../.claude/commands/background.md");
@@ -197,7 +206,7 @@ pub fn list_slash_commands(_app: AppHandle, base_path: String) -> Result<SlashCo
     let mut custom = Vec::new();
 
     // 1. Read GLOBAL commands from ~/.claude/commands/
-    if let Ok(home_dir) = std::env::var("HOME") {
+    if let Ok(home_dir) = get_home_dir() {
         let global_commands_dir = PathBuf::from(home_dir).join(".claude/commands");
         log::info!("🦆 Reading global commands from: {:?}", global_commands_dir);
         let global_commands = read_commands_from_dir(&global_commands_dir, "global");
@@ -242,8 +251,7 @@ pub fn create_slash_command(
     let commands_dir = match scope.as_deref() {
         Some("global") => {
             // Global: ~/.claude/commands/
-            let home_dir = std::env::var("HOME")
-                .map_err(|_| "Could not determine home directory")?;
+            let home_dir = get_home_dir()?;
             PathBuf::from(home_dir).join(".claude/commands")
         }
         _ => {
@@ -285,8 +293,7 @@ pub fn update_slash_command(
     // Determine target directory based on scope
     let commands_dir = match scope.as_deref() {
         Some("global") => {
-            let home_dir = std::env::var("HOME")
-                .map_err(|_| "Could not determine home directory")?;
+            let home_dir = get_home_dir()?;
             PathBuf::from(home_dir).join(".claude/commands")
         }
         _ => {
@@ -319,8 +326,7 @@ pub fn delete_slash_command(
     // Determine target directory based on scope
     let commands_dir = match scope.as_deref() {
         Some("global") => {
-            let home_dir = std::env::var("HOME")
-                .map_err(|_| "Could not determine home directory")?;
+            let home_dir = get_home_dir()?;
             PathBuf::from(home_dir).join(".claude/commands")
         }
         _ => {
@@ -376,7 +382,7 @@ pub fn expand_slash_command(
     let project_file = project_commands_dir.join(format!("{}.md", command_name));
 
     // Then try global commands
-    let global_file = if let Ok(home_dir) = std::env::var("HOME") {
+    let global_file = if let Ok(home_dir) = get_home_dir() {
         Some(PathBuf::from(home_dir).join(format!(".claude/commands/{}.md", command_name)))
     } else {
         None
@@ -465,8 +471,7 @@ pub fn get_command_details(
     scope: String,
 ) -> Result<CommandDetails, String> {
     let commands_dir = if scope == "global" {
-        let home_dir = std::env::var("HOME")
-            .map_err(|_| "Could not determine home directory")?;
+        let home_dir = get_home_dir()?;
         PathBuf::from(home_dir).join(".claude/commands")
     } else {
         let base = working_dir.ok_or("Working directory is required for project commands")?;
@@ -506,8 +511,7 @@ pub fn save_command_content(
     working_dir: Option<String>,
 ) -> Result<(), String> {
     let commands_dir = if scope == "global" {
-        let home_dir = std::env::var("HOME")
-            .map_err(|_| "Could not determine home directory")?;
+        let home_dir = get_home_dir()?;
         PathBuf::from(home_dir).join(".claude/commands")
     } else {
         let base = working_dir.ok_or("Working directory is required for project commands")?;
@@ -567,8 +571,7 @@ const BUNDLED_COMMANDS: &[BundledCommand] = &[
 /// Commands are only installed if they don't already exist, preserving
 /// any user customizations.
 pub fn install_bundled_commands() -> Result<(), String> {
-    let home_dir = std::env::var("HOME")
-        .map_err(|_| "Could not determine home directory")?;
+    let home_dir = get_home_dir()?;
 
     let global_commands_dir = PathBuf::from(home_dir).join(".claude/commands");
 

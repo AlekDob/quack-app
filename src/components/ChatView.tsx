@@ -1007,7 +1007,7 @@ export default function ChatView({
             },
             hasMessages: messages.length > 0,
             isLoading,
-            onBrainUpdate: () => onSendMessage('/brain'),
+            onBrainUpdate: () => handleSend('/brain'),
             onToggleBTW: btw.isOpen ? btw.closeBTW : btw.openBTW,
             btwIsOpen: btw.isOpen,
             quickLoop: {
