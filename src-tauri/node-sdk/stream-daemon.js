@@ -422,6 +422,7 @@ class SessionProcess {
     this.eventQueue = [];
     this.eventResolve = null;
     this.pendingControlRequests = new Map();
+    this._postQueryCallback = null; // Brain: bug-background-task-unsolicited-events
   }
 
   spawn(args, cwd, env) {
@@ -480,6 +481,10 @@ class SessionProcess {
   }
 
   startQuery(queryId, canUseToolFn) {
+    // Brain: bug-background-task-unsolicited-events
+    // Stop any active post-query monitor when a new query starts.
+    // Events already in the queue will be consumed by the new query's events() generator.
+    this._postQueryCallback = null;
     this.currentQueryId = queryId;
     this.canUseToolFn = canUseToolFn;
   }
@@ -529,6 +534,27 @@ class SessionProcess {
       return true;
     }
 
+    // Brain: bug-background-task-unsolicited-events
+    // After the query ends, the subprocess may still produce events from background
+    // tasks (run_in_background: true). Set up a callback that re-emits these events
+    // to Rust using the original queryId so they can be routed to the correct session.
+    const capturedQueryId = queryId;
+    this._postQueryCallback = (event) => {
+      emit({ type: 'event', queryId: capturedQueryId, event, unsolicited: true });
+      if (event.type === 'result') {
+        // Background task turn completed — emit query_complete so Rust can clean up
+        emit({ type: 'query_complete', queryId: capturedQueryId, unsolicited: true });
+        this._postQueryCallback = null;
+      }
+    };
+
+    // Drain any already-queued events from the subprocess (background task might
+    // have finished while the main query was still running its completion path)
+    while (this.eventQueue.length > 0 && this._postQueryCallback) {
+      const event = this.eventQueue.shift();
+      this._postQueryCallback(event);
+    }
+
     return false;
   }
 
@@ -566,6 +592,7 @@ class SessionProcess {
   kill() {
     if (!this.child || this.child.killed) return;
     this.alive = false;
+    this._postQueryCallback = null; // Brain: bug-background-task-unsolicited-events — prevent emit after death
     this.currentQueryId = null;
     this.canUseToolFn = null;
     try {
@@ -611,6 +638,14 @@ class SessionProcess {
     if (event.type === 'system' && event.subtype === 'init') {
       this.cachedInitEvent = event;
       diag(`[SessionProcess ${this.sessionId}] captured system/init: tools=${event.tools?.length || 0}, mcp=${event.mcp_servers?.length || 0}`);
+    }
+
+    // Brain: bug-background-task-unsolicited-events
+    // If a post-query monitor is active (background task running after query ended),
+    // emit the event directly to Rust instead of queueing it for the next query.
+    if (this._postQueryCallback && !this.currentQueryId) {
+      this._postQueryCallback(event);
+      return;
     }
 
     if (this.eventResolve) {

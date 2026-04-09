@@ -162,10 +162,15 @@ struct DaemonQueryState {
     /// Frontend-generated turn ID echoed back in every emitted event.
     turn_id: Option<String>,
     app: AppHandle,
-    /// Used to signal the awaiting send_message_via_sdk_streaming call
-    completion_tx: tokio::sync::oneshot::Sender<Result<ClaudeCliResponse, String>>,
+    /// Used to signal the awaiting send_message_via_sdk_streaming call.
+    /// Brain: bug-background-task-unsolicited-events
+    /// Changed to Option so we can take() it on query_complete while keeping the
+    /// entry alive in DAEMON_QUERIES for post-query background task events.
+    completion_tx: Option<tokio::sync::oneshot::Sender<Result<ClaudeCliResponse, String>>>,
     /// Pauses the query timeout while the user is reviewing a plan or answering a question
     waiting_for_user: Arc<std::sync::atomic::AtomicBool>,
+    /// When Some, the query has completed but we keep the entry to route background task events.
+    completed_at: Option<std::time::Instant>,
 }
 
 /// Abort a running SDK stream by sending an abort command to the daemon.
@@ -443,25 +448,36 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                 // Lock ordering: acquire DAEMON_QUERIES briefly, clone needed data, release,
                 // then acquire DAEMON_QUERY_RESULTS if needed
                 if let (Some(ref qid), Some(event)) = (&query_id, msg.get("event")) {
+                    let is_unsolicited = msg.get("unsolicited").and_then(|u| u.as_bool()).unwrap_or(false);
                     let emit_info = {
                         let queries = DAEMON_QUERIES.lock().await;
                         queries.get(qid.as_str()).map(|state| {
-                            (state.agent_id.clone(), state.session_key.clone(), state.turn_id.clone(), state.app.clone())
+                            (state.agent_id.clone(), state.session_key.clone(), state.turn_id.clone(), state.app.clone(), state.completed_at.is_some())
                         })
                     };
 
-                    if let Some((agent_id, session_key, turn_id, app_handle)) = emit_info {
+                    if let Some((agent_id, session_key, turn_id, app_handle, is_completed)) = emit_info {
                         let sdk_event_type = event.get("type").and_then(|t| t.as_str()).unwrap_or("unknown");
-                        log::debug!("[DAEMON:ROUTE] query={} event_type={} -> agent={}", qid, sdk_event_type, agent_id);
+                        // Brain: bug-background-task-unsolicited-events
+                        let effective_unsolicited = is_unsolicited || is_completed;
+                        if effective_unsolicited {
+                            log::info!("[DAEMON:ROUTE] query={} UNSOLICITED event_type={} -> agent={}", qid, sdk_event_type, agent_id);
+                        } else {
+                            log::debug!("[DAEMON:ROUTE] query={} event_type={} -> agent={}", qid, sdk_event_type, agent_id);
+                        }
 
                         let event_name = format!("claude-event:{}", agent_id);
                         // Brain: fix-late-render-abort-stale-buffer
                         // Include turnId (frontend-generated) so the frontend can reject
                         // stale events from aborted/completed queries.
+                        // Brain: bug-background-task-unsolicited-events
+                        // For post-query background task events, send null turnId so the
+                        // frontend doesn't try to match them to the completed message.
                         let wrapped = serde_json::json!({
                             "sessionKey": session_key,
-                            "turnId": turn_id,
-                            "event": event
+                            "turnId": if effective_unsolicited { None } else { turn_id },
+                            "event": event,
+                            "unsolicited": effective_unsolicited
                         });
                         let _ = app_handle.emit(&event_name, &wrapped);
 
@@ -635,7 +651,7 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
 
             "query_complete" => {
                 if let Some(ref qid) = query_id {
-                    log::info!("[DAEMON:QUERY] query={} completed — resolving completion channel", qid);
+                    let is_unsolicited = msg.get("unsolicited").and_then(|u| u.as_bool()).unwrap_or(false);
 
                     // Get the captured Result event data (if any)
                     let stored_result = {
@@ -655,8 +671,21 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                     });
 
                     let mut queries = DAEMON_QUERIES.lock().await;
-                    if let Some(state) = queries.remove(qid.as_str()) {
-                        let _ = state.completion_tx.send(Ok(response));
+                    if is_unsolicited {
+                        // Brain: bug-background-task-unsolicited-events
+                        // This is a query_complete for a background task turn.
+                        // Remove the entry now — the background task is done.
+                        queries.remove(qid.as_str());
+                        log::info!("[DAEMON:QUERY] query={} background task completed — cleaned up", qid);
+                    } else if let Some(state) = queries.get_mut(qid.as_str()) {
+                        // Brain: bug-background-task-unsolicited-events
+                        // Take the completion channel but KEEP the entry alive so we can
+                        // route post-query background task events through it.
+                        if let Some(tx) = state.completion_tx.take() {
+                            let _ = tx.send(Ok(response));
+                        }
+                        state.completed_at = Some(std::time::Instant::now());
+                        log::info!("[DAEMON:QUERY] query={} completed — keeping alive for background events", qid);
                     }
                 }
             }
@@ -673,8 +702,10 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                     }
 
                     let mut queries = DAEMON_QUERIES.lock().await;
-                    if let Some(state) = queries.remove(qid.as_str()) {
-                        let _ = state.completion_tx.send(Err(error_msg.to_string()));
+                    if let Some(mut state) = queries.remove(qid.as_str()) {
+                        if let Some(tx) = state.completion_tx.take() {
+                            let _ = tx.send(Err(error_msg.to_string()));
+                        }
                     }
                 }
             }
@@ -700,12 +731,14 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
         procs.remove("__daemon__");
     }
 
-    // Fail all active queries
+    // Fail all active queries (skip already-completed ones that have no completion_tx)
     let mut queries = DAEMON_QUERIES.lock().await;
     let query_ids: Vec<String> = queries.keys().cloned().collect();
     for qid in query_ids {
-        if let Some(state) = queries.remove(&qid) {
-            let _ = state.completion_tx.send(Err("Daemon process crashed unexpectedly".to_string()));
+        if let Some(mut state) = queries.remove(&qid) {
+            if let Some(tx) = state.completion_tx.take() {
+                let _ = tx.send(Err("Daemon process crashed unexpectedly".to_string()));
+            }
         }
     }
 
@@ -753,8 +786,10 @@ pub async fn restart_daemon(app: AppHandle) -> Result<(), String> {
             log::warn!("[DAEMON:LIFECYCLE] Draining {} in-flight queries before restart", query_ids.len());
         }
         for qid in query_ids {
-            if let Some(state) = queries.remove(&qid) {
-                let _ = state.completion_tx.send(Err("Daemon restarting".to_string()));
+            if let Some(mut state) = queries.remove(&qid) {
+                if let Some(tx) = state.completion_tx.take() {
+                    let _ = tx.send(Err("Daemon restarting".to_string()));
+                }
             }
         }
     }
@@ -1995,13 +2030,20 @@ async fn send_message_via_daemon(
     // Register query
     {
         let mut queries = DAEMON_QUERIES.lock().await;
+        // Brain: bug-background-task-unsolicited-events
+        // Remove any previously completed query for the same agent (cleanup stale entries)
+        let agent_id_str = agent_id.to_string();
+        queries.retain(|_, state| {
+            !(state.agent_id == agent_id_str && state.completed_at.is_some())
+        });
         queries.insert(query_id.clone(), DaemonQueryState {
-            agent_id: agent_id.to_string(),
+            agent_id: agent_id_str,
             session_key: event_session_key.clone(),
             turn_id: request.turn_id.clone(),
             app: app.clone(),
-            completion_tx: tx,
+            completion_tx: Some(tx),
             waiting_for_user: waiting_for_user.clone(),
+            completed_at: None,
         });
     }
 
