@@ -48,6 +48,7 @@ import { AddTerminalWindowModal } from "./components/AddTerminalWindowModal";
 // TitleBar removed - using native macOS decorations
 // import { TitleBar } from "./components/TitleBar";
 import UnifiedSettings from "./components/settings/UnifiedSettings";
+import { TeammateStreamTab } from "./components/TeammateStreamTab";
 import PerformanceMonitor from "./components/PerformanceMonitor";
 import AIAssistant from "./components/AIAssistant";
 import QuackAgencyDrawer from "./components/QuackAgencyDrawer";
@@ -13562,7 +13563,6 @@ You have access to all Bash tools to execute git commands like:
               {activeTabId.startsWith('teammate-') && (() => {
                 const activeTab = tabs.find(t => t.id === activeTabId);
                 if (activeTab?.type === 'teammate-stream' && activeTab.teammateSessionId) {
-                  const { TeammateStreamTab } = require('./components/TeammateStreamTab');
                   return (
                     <TeammateStreamTab
                       sessionId={activeTab.teammateSessionId}
