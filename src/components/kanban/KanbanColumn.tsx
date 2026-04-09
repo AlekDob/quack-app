@@ -14,7 +14,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import KanbanCard from './KanbanCard';
-import type { KanbanTask, KanbanStatus, ChatMessage } from '../../types';
+import type { KanbanTask, KanbanStatus, KanbanColumnId, ChatMessage } from '../../types';
 import { groupTasksByCompletionDate, type DateGroup } from '../../utils/kanbanDateGrouping';
 import { useKanbanStore } from '../../stores/kanbanStore';
 
@@ -35,7 +35,7 @@ interface HumanReviewGroup {
 }
 
 interface KanbanColumnProps {
-  id: KanbanStatus;
+  id: KanbanColumnId;
   title: string;
   icon: React.ReactNode;
   tasks: KanbanTask[];
@@ -52,7 +52,7 @@ interface KanbanColumnProps {
   // Drop target from parent (more reliable than internal isOver)
   isDropTarget?: boolean;
   // Handler for agent drop from sidebar (native HTML5 drag-and-drop)
-  onSidebarAgentDrop?: (agentId: string, targetColumn: KanbanStatus) => void;
+  onSidebarAgentDrop?: (agentId: string, targetColumn: KanbanColumnId) => void;
   // Handler for clearing all tasks in Done column
   onClearAll?: () => void;
   // Infinite scroll props for Done column

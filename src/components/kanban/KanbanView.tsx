@@ -29,7 +29,7 @@ import { KanbanCardOverlay } from './KanbanCard';
 import AddKanbanTaskModal, { type KanbanTaskInitialValues, type KanbanTaskDraft } from './AddKanbanTaskModal';
 import { useKanbanStore } from '../../stores/kanbanStore';
 import { useChatStore } from '../../stores/chatStore';
-import type { KanbanTask, KanbanStatus, TerminalInfo, KanbanAssignedAgent, ChatMessage, ChatAttachment, EffortLevel } from '../../types';
+import type { KanbanTask, KanbanStatus, KanbanColumnId, TerminalInfo, KanbanAssignedAgent, ChatMessage, ChatAttachment, EffortLevel } from '../../types';
 import type { ChatSendOptions, PermissionMode } from '../../hooks/useClaudeChat';
 import { toast } from 'sonner';
 import { confirm } from '@tauri-apps/plugin-dialog';
@@ -510,7 +510,7 @@ export default function KanbanView({
   // Handle agent drop from sidebar (native HTML5 drag-and-drop)
   const handleSidebarAgentDrop = useCallback((
     agentId: string,
-    targetColumn: KanbanStatus
+    targetColumn: KanbanColumnId
   ) => {
     // Find the agent/terminal by id
     const agent = terminals.find(t => t.id === agentId);
@@ -532,7 +532,7 @@ export default function KanbanView({
       agentName: agent.label,
       agentAvatar: agent.avatar,
       agentColor: agent.color,
-      targetStatus: targetColumn,
+      targetStatus: targetColumn === 'human_review' ? 'in_progress' : targetColumn,
     };
 
     // Clear draft when dragging a new agent (starting fresh)
@@ -649,7 +649,7 @@ export default function KanbanView({
           />
 
           <KanbanColumn
-            id={'human_review' as KanbanStatus}
+            id={'human_review'}
             title="Human Review"
             icon={
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

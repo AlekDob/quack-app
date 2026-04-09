@@ -1594,6 +1594,11 @@ export interface CreateRuleParams {
 export type KanbanStatus = 'todo' | 'in_progress' | 'done' | 'human_review';
 
 /**
+ * Column IDs used in the Kanban UI
+ */
+export type KanbanColumnId = KanbanStatus;
+
+/**
  * Type of Kanban task - determines card appearance and behavior
  */
 export type KanbanTaskType = 'agent' | 'shell' | 'watch';

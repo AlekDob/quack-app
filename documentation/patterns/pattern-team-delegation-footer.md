@@ -20,7 +20,7 @@ Quack has two distinct delegation modes, both using `POST /api/execute`:
 | Mode | Trigger | `leadSessionId` | Auto-done | Notification |
 |------|---------|-----------------|-----------|-------------|
 | **Direct** | `quack-remote` skill / user prompt | NOT set | No | No |
-| **Managed** | `@team` mention (this pattern) | SET | Yes | Yes |
+| **Managed** | `@team` mention (this pattern) | SET | No (removed 2026-04-09) | No (removed 2026-04-09) |
 
 The **only programmatic difference** is whether `leadSessionId` is populated. Title prefixes (`[Team]` vs `[Remote]`) are cosmetic.
 

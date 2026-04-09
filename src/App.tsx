@@ -3123,7 +3123,8 @@ function AppContent() {
       // Brain: fix-remote-team-session-tracking
       // Save messageCount so Remote API polling can detect progress.
       // Brain: 025-team-delegation-footer
-      // leadSessionId-driven auto-done: only sessions with a lead get auto-completed
+      // Team sessions stay in_progress — no auto-done on first response.
+      // The user (or a future explicit signal) marks them done manually.
       try {
         // Brain: bug-delayed-agent-message-stale-closure
         // Neither the closure `chatSessions` nor `chatSessionsRef` are reliable here:
@@ -3134,24 +3135,12 @@ function AppContent() {
         const storeCount = storeSession?.messageCount ?? 0;
         const refCount = (chatSessionsRef.current.get(messageKey) ?? []).length;
         const messageCount = Math.max(storeCount, refCount);
-        const completionUpdate: Record<string, unknown> = {
+        await updateSession(messageKey, {
           claudeSessionId: response.session_id,
           messageCount,
           updatedAt: Date.now(),
-        };
-        // Auto-done ONLY when leadSessionId is set (managed delegation)
-        if (capturedSession?.leadSessionId) {
-          completionUpdate.status = 'done';
-          completionUpdate.completedAt = Date.now();
-        }
-        await updateSession(messageKey, completionUpdate);
+        });
         console.log(`[SESSION-FIX] Saved claudeSessionId ${response.session_id.slice(0, 8)}... to session ${messageKey}, messageCount=${messageCount} (store=${storeCount}, ref=${refCount})`);
-        // Notify lead agent (fire-and-forget)
-        if (capturedSession?.leadSessionId) {
-          notifyLeadAgent(capturedSession.leadSessionId, capturedSession).catch(
-            (e) => console.warn('[Team] Failed to notify lead:', e)
-          );
-        }
       } catch (err) {
         console.warn(`[SESSION-FIX] Failed to save claudeSessionId:`, err);
       }

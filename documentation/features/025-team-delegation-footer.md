@@ -41,11 +41,11 @@ User types "@team do X" → sendMessageForAgent enriches with [TEAM DELEGATION M
 → daemon starts for teammate
 ```
 
-#### Auto-done + notification (inbound)
+#### Completion (inbound)
 ```
-Teammate stream finish → completion block checks capturedSession.leadSessionId
-→ YES: updateSession({status:'done', completedAt}) + notifyLeadAgent() fire-and-forget
-→ NO: session stays in_progress (direct delegation, no callback)
+Teammate stream finish → saves claudeSessionId + messageCount
+→ session stays in_progress regardless of leadSessionId
+→ auto-done + notifyLeadAgent() REMOVED (2026-04-09)
 ```
 
 ### Key Functions
@@ -63,10 +63,13 @@ Teammate stream finish → completion block checks capturedSession.leadSessionId
 ### Single Decision Rule
 ```
 session.leadSessionId exists?
-  YES → auto-done + POST /api/sessions/:leadSessionId/send
+  YES → session stays in_progress (no auto-done). Lead notification removed.
+        User (or future explicit signal) marks done manually.
   NO  → stays in_progress, manual completion
 ```
 Title prefixes `[Team]` vs `[Remote]` are COSMETIC ONLY — never checked in logic.
+
+**History:** Before 2026-04-09, `leadSessionId` triggered auto-done + `notifyLeadAgent()` on first response. This was removed because the first response doesn't mean the task is complete — the teammate may need multiple turns.
 
 ### Teammate Source Change (2026-04-06)
 Previously, team members were sourced from `useTeamStore` (remote team config). Now they come from `projectTerminals` — sibling terminals in the same working directory. This means delegation targets are always the actual running agents in the same project, not a static team config. The `useTeamStore` import was removed from ChatInput.tsx.
