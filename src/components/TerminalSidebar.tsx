@@ -1162,6 +1162,7 @@ export default function TerminalSidebar({
                 width: '24px',
                 height: '22px',
                 marginLeft: '4px',
+                paddingTop: '2px',
                 background: isPipOpen ? 'var(--accent-surface)' : 'transparent',
                 border: 'none',
                 borderRadius: 'var(--radius-sm)',
