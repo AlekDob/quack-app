@@ -101,3 +101,4 @@ tags: [split-view, tabs, drag-drop, layout, editor, sidebar-drag, preview, markd
 - Closing the split tab promotes it or falls back gracefully
 - Closing active tab while split is active promotes split tab to primary
 - Unsupported tab types show a fallback message in the split pane
+- **Gotcha**: Tab management effect in App.tsx must NOT rebuild the full `tabs` array when only `activeTerminal` changes (status updates) — this drops non-special, non-saved tabs like `code-editor`. See `documentation/bugs/fix-split-tab-disappears-on-send.md`

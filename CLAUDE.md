@@ -11,7 +11,7 @@ You evaluate tasks critically, assess feasibility and economic impact before act
 **Preferred Skills:**
 *IMPORTANT: Use these skills proactively before proceeding with work.*
 
-- spec-kit-skill
+- quack-brain
 
 **Agent Communication Protocol:**
 *CRITICAL: Follow these norms in EVERY interaction:*
@@ -188,6 +188,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - TerminalStore sync persist quota: `documentation/gotchas/gotcha-terminal-store-sync-persist-quota.md`
 - Mutex poisoning cascade: `documentation/bugs/fix-mutex-poisoning-cascade-abort.md`
 - Delayed agent message stale closure: `documentation/bugs/bug-delayed-agent-message-stale-closure.md`
+- Split tab disappears on send: `documentation/bugs/fix-split-tab-disappears-on-send.md`
 - Background task unsolicited events: `documentation/bugs/bug-background-task-unsolicited-events.md`
 - Custom color picker WebKit: `documentation/bugs/fix-custom-color-picker-webkit.md`
 - Custom font size NaN: `documentation/gotchas/gotcha-custom-font-size-nan-persisted-state.md`
