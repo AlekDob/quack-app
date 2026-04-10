@@ -1184,7 +1184,13 @@ ${hintsBlock}
         sessionProcesses.delete(sessionId);
       }
     }
-    const usePersistentProcess = sessionId && isAnthropicProvider && !isCompactCommand;
+    // Set QUACK_FORCE_QUERY_MODE=1 to bypass persistent subprocess and use query() per message.
+    // This is for A/B testing cache behavior. Remove once migration is confirmed.
+    const forceQueryMode = process.env.QUACK_FORCE_QUERY_MODE === '1';
+    if (forceQueryMode && sessionId) {
+      log('QUERY', `query=${queryId} FORCE_QUERY_MODE: bypassing persistent subprocess, using query() with resume=${sessionId}`);
+    }
+    const usePersistentProcess = !forceQueryMode && sessionId && isAnthropicProvider && !isCompactCommand;
     let eventSource;
 
     if (usePersistentProcess) {
@@ -1297,7 +1303,7 @@ ${hintsBlock}
       // slash command parser recognizes it. AsyncIterable prompts go through streamInput
       // which bypasses slash command parsing.
       const queryPrompt = isCompactCommand ? finalPrompt : generateMessages();
-      log('QUERY', `query=${queryId} calling SDK query() (${isCompactCommand ? 'compact string prompt' : 'streamingInput=true'})`);
+      log('QUERY', `query=${queryId} calling SDK query() (${isCompactCommand ? 'compact string prompt' : 'streamingInput=true'}) resume=${sessionId || 'none'}`);
       queryState.queryHandle = query({
         prompt: queryPrompt,
         options,
