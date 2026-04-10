@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, memo } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
-import { List, useListRef } from 'react-window';
+import { List, useListRef, useDynamicRowHeight } from 'react-window';
 import { AutoSizer } from 'react-virtualized-auto-sizer';
 import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
@@ -62,8 +62,6 @@ interface MessageRowProps {
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
 }
 
-// Message height cache for virtualization
-const messageHeightCache = new Map<string, number>();
 const DEFAULT_MESSAGE_HEIGHT = 120;
 
 // react-window v2 row component receives props directly (not via data)
@@ -173,43 +171,20 @@ function MessageListVirtualized({
   const prevMessagesLengthRef = useRef(messages.length);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [showScrollToTopButton, setShowScrollToTopButton] = useState(false);
-  const rowHeights = useRef<Map<number, number>>(new Map());
+
+  // Use react-window v2's built-in dynamic row height measurement
+  // This uses ResizeObserver to measure actual rendered heights and repositions rows automatically
+  // Pass the entire hook result as rowHeight — List detects the object and uses observeRowElements internally
+  const dynamicRowHeight = useDynamicRowHeight({
+    defaultRowHeight: DEFAULT_MESSAGE_HEIGHT,
+    key: currentSessionId || 'default',
+  });
 
   // Find the last user message index
   const lastUserMessageIndex = messages.reduce(
     (lastIndex, msg, idx) => (msg.role === 'user' ? idx : lastIndex),
     -1,
   );
-
-  // Calculate item size for variable height list
-  const getRowHeight = useCallback((index: number) => {
-    const cachedHeight = rowHeights.current.get(index);
-    if (cachedHeight) return cachedHeight;
-
-    if (index < messages.length) {
-      const messageId = messages[index].id;
-      const cached = messageHeightCache.get(messageId);
-      if (cached) {
-        rowHeights.current.set(index, cached);
-        return cached;
-      }
-    }
-
-    if (index < messages.length) {
-      const message = messages[index];
-      let estimatedHeight = 80;
-      const contentLength = message.content?.length || 0;
-      estimatedHeight += Math.floor(contentLength / 100) * 20;
-      if (message.toolCalls && message.toolCalls.length > 0) {
-        estimatedHeight += message.toolCalls.length * 60;
-      }
-      estimatedHeight = Math.min(estimatedHeight, 800);
-      rowHeights.current.set(index, estimatedHeight);
-      return estimatedHeight;
-    }
-
-    return DEFAULT_MESSAGE_HEIGHT;
-  }, [messages]);
 
   // Check if user is at bottom of scroll
   const checkIfAtBottom = useCallback(() => {
@@ -349,7 +324,7 @@ function MessageListVirtualized({
               listRef={listRef}
               rowComponent={MessageRow}
               rowCount={rowCount}
-              rowHeight={getRowHeight}
+              rowHeight={dynamicRowHeight}
               rowProps={rowProps}
               overscanCount={3}
               style={{ height, width }}
