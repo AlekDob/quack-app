@@ -11182,95 +11182,116 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [activeTerminal]);
 
   // Switch tabs when active terminal (agent) changes
+  // Brain: fix-split-tab-disappears-on-send
+  // This effect handles TWO concerns:
+  // 1. Tab save/restore when SWITCHING agents (activeId changes)
+  // 2. Chat tab label/color update when terminal properties change (activeTerminal changes)
+  //
+  // CRITICAL: The full tab rebuild (setTabs with merged array) must ONLY run when
+  // activeId changes. Previously it ran on every activeTerminal change, which happens
+  // whenever terminal status updates (idle→busy on message send). This caused non-special
+  // tabs (code-editor, file, image, feature-map) to be dropped from the tabs array,
+  // breaking split view.
   useEffect(() => {
     if (!activeId) return;
 
-    console.log('[Tab Switch] Active terminal changed to:', activeId, activeTerminal?.label);
-
-    // Save current tabs for the PREVIOUS terminal (if any)
     const previousId = previousActiveIdRef.current;
-    if (previousId && previousId !== activeId) {
-      setTabsByTerminal((prev) => {
-        const updated = new Map(prev);
+    const isAgentSwitch = previousId !== activeId;
 
-        // Find file tabs (exclude chat tab)
-        const fileTabs = tabs.filter(t => t.type === 'file');
+    if (isAgentSwitch) {
+      console.log('[Tab Switch] Active terminal changed to:', activeId, activeTerminal?.label);
 
-        // Store tabs for the PREVIOUS terminal ID
-        if (fileTabs.length > 0) {
-          const previousTerminalTabs = prev.get(previousId) || [];
-          if (fileTabs.length !== previousTerminalTabs.length ||
-              !fileTabs.every((tab, i) => tab.id === previousTerminalTabs[i]?.id)) {
-            updated.set(previousId, fileTabs);
-            console.log('[Tab Switch] Saved', fileTabs.length, 'tabs for PREVIOUS terminal:', previousId);
+      // Save current tabs for the PREVIOUS terminal (if any)
+      if (previousId) {
+        setTabsByTerminal((prev) => {
+          const updated = new Map(prev);
+
+          // Find file tabs (exclude chat tab)
+          const fileTabs = tabs.filter(t => t.type === 'file');
+
+          // Store tabs for the PREVIOUS terminal ID
+          if (fileTabs.length > 0) {
+            const previousTerminalTabs = prev.get(previousId) || [];
+            if (fileTabs.length !== previousTerminalTabs.length ||
+                !fileTabs.every((tab, i) => tab.id === previousTerminalTabs[i]?.id)) {
+              updated.set(previousId, fileTabs);
+              console.log('[Tab Switch] Saved', fileTabs.length, 'tabs for PREVIOUS terminal:', previousId);
+            }
+          } else if (prev.has(previousId)) {
+            // If no file tabs, remove the entry for the previous terminal
+            updated.delete(previousId);
+            console.log('[Tab Switch] Removed tabs for PREVIOUS terminal (no file tabs):', previousId);
           }
-        } else if (prev.has(previousId)) {
-          // If no file tabs, remove the entry for the previous terminal
-          updated.delete(previousId);
-          console.log('[Tab Switch] Removed tabs for PREVIOUS terminal (no file tabs):', previousId);
-        }
 
-        return updated;
-      });
-    }
-
-    // Load tabs for the NEW active terminal
-    const terminalTabs = tabsByTerminal.get(activeId) || [];
-    console.log('[Tab Switch] Loading', terminalTabs.length, 'tabs for NEW terminal:', activeId);
-
-    // Always include the chat tab with updated name and color, plus any file tabs for this terminal
-    const chatTab: Tab = {
-      id: 'chat',
-      label: activeTerminal?.label || 'Chat',
-      type: 'chat',
-      closable: false,
-      color: activeTerminal?.color
-    };
-
-    // 🦆 FIX: Preserve special tabs (kanban, docs, second-brain, memory-graph, etc.)
-    // These tabs should persist across agent switches - they are not agent-specific
-    // Brain: fix-office-view-snaps-back-to-chat
-    const specialTabTypes = [
-      'kanban', 'docs', 'second-brain', 'memory-graph', 'claude-assets',
-      'agent', 'skill', 'command', 'browser-manager', 'agent-terminal',
-      'office', 'automation'
-    ];
-
-    setTabs(prevTabs => {
-      // Keep any special tabs that were open
-      const specialTabs = prevTabs.filter(t => specialTabTypes.includes(t.type));
-      const merged = [chatTab, ...terminalTabs, ...specialTabs];
-      // Deduplicate by id (keep first occurrence)
-      const seen = new Set<string>();
-      const deduped = merged.filter(t => {
-        if (seen.has(t.id)) return false;
-        seen.add(t.id);
-        return true;
-      });
-      return deduped;
-    });
-
-    // 🦆 FIX: Don't change activeTabId if user is viewing a special tab
-    // This prevents the "tab closes immediately" bug when opening Kanban
-    const isSpecialTabActive = specialTabTypes.some(type =>
-      activeTabId.includes(type) || activeTabId === 'kanban-board'
-    );
-
-    if (!isSpecialTabActive) {
-      // If we have file tabs, keep the current active tab if it exists, otherwise activate first file tab
-      if (terminalTabs.length > 0) {
-        const activeTabExists = ['chat', ...terminalTabs.map(t => t.id)].includes(activeTabId);
-        if (!activeTabExists) {
-          setActiveTabId(terminalTabs[0].id);
-        }
-      } else {
-        // No file tabs, activate chat
-        setActiveTabId('chat');
+          return updated;
+        });
       }
-    }
 
-    // Update the ref to track this terminal as the "previous" for next switch
-    previousActiveIdRef.current = activeId;
+      // Load tabs for the NEW active terminal
+      const terminalTabs = tabsByTerminal.get(activeId) || [];
+      console.log('[Tab Switch] Loading', terminalTabs.length, 'tabs for NEW terminal:', activeId);
+
+      // Always include the chat tab with updated name and color, plus any file tabs for this terminal
+      const chatTab: Tab = {
+        id: 'chat',
+        label: activeTerminal?.label || 'Chat',
+        type: 'chat',
+        closable: false,
+        color: activeTerminal?.color
+      };
+
+      // 🦆 FIX: Preserve special tabs (kanban, docs, second-brain, memory-graph, etc.)
+      // These tabs should persist across agent switches - they are not agent-specific
+      // Brain: fix-office-view-snaps-back-to-chat
+      const specialTabTypes = [
+        'kanban', 'docs', 'second-brain', 'memory-graph', 'claude-assets',
+        'agent', 'skill', 'command', 'browser-manager', 'agent-terminal',
+        'office', 'automation'
+      ];
+
+      setTabs(prevTabs => {
+        // Keep any special tabs that were open
+        const specialTabs = prevTabs.filter(t => specialTabTypes.includes(t.type));
+        const merged = [chatTab, ...terminalTabs, ...specialTabs];
+        // Deduplicate by id (keep first occurrence)
+        const seen = new Set<string>();
+        const deduped = merged.filter(t => {
+          if (seen.has(t.id)) return false;
+          seen.add(t.id);
+          return true;
+        });
+        return deduped;
+      });
+
+      // 🦆 FIX: Don't change activeTabId if user is viewing a special tab
+      // This prevents the "tab closes immediately" bug when opening Kanban
+      const isSpecialTabActive = specialTabTypes.some(type =>
+        activeTabId.includes(type) || activeTabId === 'kanban-board'
+      );
+
+      if (!isSpecialTabActive) {
+        // If we have file tabs, keep the current active tab if it exists, otherwise activate first file tab
+        if (terminalTabs.length > 0) {
+          const activeTabExists = ['chat', ...terminalTabs.map(t => t.id)].includes(activeTabId);
+          if (!activeTabExists) {
+            setActiveTabId(terminalTabs[0].id);
+          }
+        } else {
+          // No file tabs, activate chat
+          setActiveTabId('chat');
+        }
+      }
+
+      // Update the ref to track this terminal as the "previous" for next switch
+      previousActiveIdRef.current = activeId;
+    } else {
+      // NOT an agent switch — only update chat tab label/color (terminal renamed, etc.)
+      setTabs(prevTabs => prevTabs.map(t =>
+        t.id === 'chat'
+          ? { ...t, label: activeTerminal?.label || 'Chat', color: activeTerminal?.color }
+          : t
+      ));
+    }
   }, [activeId, activeTerminal]);
 
   const handleRefreshPreview = useCallback(async () => {
