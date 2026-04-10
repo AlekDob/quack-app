@@ -601,14 +601,28 @@ export interface ModePreset {
   effort: EffortLevel;
 }
 
-// LLM Provider types for multi-provider support (Anthropic, Ollama, Custom)
-export type LLMProviderType = 'anthropic' | 'ollama' | 'custom';
+// LLM Provider types for multi-provider support
+// anthropic: Claude Agent SDK (primary, agentic)
+// openai/google/openrouter: Vercel AI SDK (streamText, non-agentic)
+// ollama/custom: Legacy paths (ANTHROPIC_BASE_URL override)
+export type LLMProviderType = 'anthropic' | 'ollama' | 'custom' | 'openai' | 'google' | 'openrouter';
 
 // Ollama model from /api/tags endpoint
 export interface OllamaModel {
   name: string;
   size: number;
   modified_at: string;
+}
+
+// Vercel AI SDK model entry (from model-registry.js in daemon)
+export interface VercelModelEntry {
+  id: string;
+  label: string;
+  provider: 'openai' | 'google' | 'openrouter';
+  preset: 'fast' | 'smart' | 'pro';
+  toolUse: boolean;
+  vision: boolean;
+  contextWindow: number;
 }
 
 // Agent mode presets stored in settings

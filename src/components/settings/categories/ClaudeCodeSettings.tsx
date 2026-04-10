@@ -19,7 +19,7 @@ export default function ClaudeCodeSettings() {
   const [loading, setLoading] = useState(true);
 
   // LLM Provider state
-  const { provider, providerBaseUrl, providerApiKey, ollamaModel, btwModel, bedrockModelOverride } = useSettingsStore(s => s.claude);
+  const { provider, providerBaseUrl, providerApiKey, ollamaModel, btwModel, bedrockModelOverride, openaiApiKey, googleApiKey, openrouterApiKey } = useSettingsStore(s => s.claude);
   const updateClaude = useSettingsStore(s => s.updateClaudeSettings);
   const [ollamaOnline, setOllamaOnline] = useState<boolean | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
@@ -119,12 +119,12 @@ export default function ClaudeCodeSettings() {
       {/* LLM Provider */}
       <SectionHeader
         title="LLM Provider"
-        description="Choose between Anthropic API, local Ollama models, or a custom endpoint"
+        description="Choose between Anthropic, OpenAI, Google Gemini, OpenRouter, local Ollama, or a custom endpoint"
       />
       <div className="settings-group">
         <SettingsRow
           label="Provider"
-          description="Ollama enables free local models. Custom supports any OpenAI-compatible endpoint."
+          description="Ollama enables free local models. OpenAI, Google and OpenRouter require API keys. Custom supports any OpenAI-compatible endpoint."
           control={
             <select
               className="settings-select"
@@ -132,6 +132,9 @@ export default function ClaudeCodeSettings() {
               onChange={(e) => handleProviderChange(e.target.value as LLMProviderType)}
             >
               <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI (GPT, Codex)</option>
+              <option value="google">Google (Gemini)</option>
+              <option value="openrouter">OpenRouter (Multi-model)</option>
               <option value="ollama">Ollama (Local)</option>
               <option value="custom">Custom Endpoint</option>
             </select>
@@ -260,6 +263,74 @@ export default function ClaudeCodeSettings() {
                 value={ollamaModel}
                 onChange={(e) => updateClaude({ ollamaModel: e.target.value })}
                 placeholder="e.g. gpt-4o, llama-3.3-70b"
+              />
+            }
+          />
+        )}
+
+        {provider === 'openai' && (
+          <SettingsRow
+            label="API Key"
+            description="Your OpenAI API key for GPT and Codex models"
+            control={
+              <input
+                className="settings-input"
+                type="password"
+                value={openaiApiKey}
+                onChange={(e) => updateClaude({ openaiApiKey: e.target.value })}
+                placeholder="sk-..."
+              />
+            }
+          />
+        )}
+
+        {provider === 'google' && (
+          <SettingsRow
+            label="API Key"
+            description="Your Google AI API key for Gemini models"
+            control={
+              <input
+                className="settings-input"
+                type="password"
+                value={googleApiKey}
+                onChange={(e) => updateClaude({ googleApiKey: e.target.value })}
+                placeholder="AIza..."
+              />
+            }
+          />
+        )}
+
+        {provider === 'openrouter' && (
+          <SettingsRow
+            label="API Key"
+            description="Your OpenRouter API key for multi-model access"
+            control={
+              <input
+                className="settings-input"
+                type="password"
+                value={openrouterApiKey}
+                onChange={(e) => updateClaude({ openrouterApiKey: e.target.value })}
+                placeholder="sk-or-v1-..."
+              />
+            }
+          />
+        )}
+
+        {(provider === 'openai' || provider === 'google' || provider === 'openrouter') && (
+          <SettingsRow
+            label="Model"
+            description="Model ID (e.g. gpt-4o, gemini-2.5-flash, meta-llama/llama-4-maverick)"
+            control={
+              <input
+                className="settings-input"
+                type="text"
+                value={ollamaModel}
+                onChange={(e) => updateClaude({ ollamaModel: e.target.value })}
+                placeholder={
+                  provider === 'openai' ? 'gpt-4o' :
+                  provider === 'google' ? 'gemini-2.5-flash' :
+                  'openai/gpt-4o'
+                }
               />
             }
           />

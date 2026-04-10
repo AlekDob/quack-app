@@ -1230,6 +1230,7 @@ pub fn run() {
             claude_cli::rewind_files,            // ⏪ File Checkpointing rewind (SDK 0.2.7+)
             claude_cli::restart_daemon,          // 🔄 Restart persistent daemon (dev/debug)
             claude_cli::reload_mcp_servers,      // 🔌 Hot-reload MCP server configuration
+            claude_cli::get_vercel_models,       // 🗂️ Vercel AI SDK model registry (filtered by API keys)
             claude_oauth::start_claude_oauth,
             slash_commands::list_slash_commands,
             slash_commands::create_slash_command,

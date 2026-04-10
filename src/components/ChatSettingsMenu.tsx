@@ -195,6 +195,9 @@ export default function ChatSettingsMenu({
             }}>
               {([
                 { value: 'anthropic' as LLMProviderType, label: 'Claude' },
+                { value: 'openai' as LLMProviderType, label: 'OpenAI' },
+                { value: 'google' as LLMProviderType, label: 'Gemini' },
+                { value: 'openrouter' as LLMProviderType, label: 'Router' },
                 { value: 'ollama' as LLMProviderType, label: 'Ollama' },
               ]).map(tab => (
                 <button
@@ -289,6 +292,44 @@ export default function ChatSettingsMenu({
                     </button>
                   )}
                 </div>
+              ) : ['openai', 'google', 'openrouter'].includes(provider) ? (
+                <select
+                  value={ollamaModel}
+                  onChange={(e) => updateClaude({ ollamaModel: e.target.value })}
+                  className="chat-settings-select"
+                >
+                  <option value="">-- Select model --</option>
+                  {provider === 'openai' && (
+                    <>
+                      <option value="gpt-4.1">GPT-4.1</option>
+                      <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
+                      <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
+                      <option value="gpt-4o">GPT-4o</option>
+                      <option value="gpt-4o-mini">GPT-4o Mini</option>
+                      <option value="codex-mini-latest">Codex Mini</option>
+                      <option value="o4-mini">o4 Mini</option>
+                      <option value="o3">o3</option>
+                    </>
+                  )}
+                  {provider === 'google' && (
+                    <>
+                      <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                      <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
+                    </>
+                  )}
+                  {provider === 'openrouter' && (
+                    <>
+                      <option value="openai/gpt-4o">GPT-4o (OpenRouter)</option>
+                      <option value="openai/gpt-4o-mini">GPT-4o Mini (OpenRouter)</option>
+                      <option value="google/gemini-2.5-pro">Gemini 2.5 Pro (OpenRouter)</option>
+                      <option value="google/gemini-2.5-flash">Gemini 2.5 Flash (OpenRouter)</option>
+                      <option value="meta-llama/llama-4-maverick">Llama 4 Maverick (OpenRouter)</option>
+                      <option value="deepseek/deepseek-r1">DeepSeek R1 (OpenRouter)</option>
+                      <option value="qwen/qwen3-coder">Qwen3 Coder (OpenRouter)</option>
+                    </>
+                  )}
+                </select>
               ) : (
                 ollamaModelOptions.length > 0 ? (
                   <select

@@ -28,11 +28,15 @@ interface ClaudeSettings {
   maxTokens: number;
   temperature: number;
   effort: EffortLevel; // SDK 0.1.54+ - Controls quality vs speed/cost tradeoff
-  // LLM Provider settings (Anthropic, Ollama, Custom)
+  // LLM Provider settings (Anthropic, Ollama, Custom, OpenAI, Google, OpenRouter)
   provider: LLMProviderType;
   providerBaseUrl: string;  // Custom endpoint (e.g., http://localhost:11434 for Ollama)
   providerApiKey: string;   // API key for custom providers
   ollamaModel: string;      // Model name for Ollama/custom (e.g., 'qwen3-coder')
+  // Vercel AI SDK multi-provider API keys
+  openaiApiKey: string;     // OpenAI API key (for GPT-4o, Codex, o4-mini, etc.)
+  googleApiKey: string;     // Google AI API key (for Gemini models)
+  openrouterApiKey: string; // OpenRouter API key (aggregator for 100+ models)
   // BTW Side-Chain Chat settings
   btwModel: string;         // Model for BTW quick queries (default: haiku45)
   // Bedrock/Vertex model override — when set, bypasses normal model resolution
@@ -172,6 +176,9 @@ const defaultClaudeSettings: ClaudeSettings = {
   providerBaseUrl: '',
   providerApiKey: '',
   ollamaModel: '',
+  openaiApiKey: '',
+  googleApiKey: '',
+  openrouterApiKey: '',
   btwModel: 'haiku45', // BTW Side-Chain: fast & cheap by default
   bedrockModelOverride: '', // Empty = use normal model resolution
 };

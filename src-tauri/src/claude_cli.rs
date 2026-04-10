@@ -2412,6 +2412,74 @@ pub async fn rewind_files(
 }
 
 
+// =============================================================================
+// VERCEL AI SDK MODEL REGISTRY
+// Static mirror of node-sdk/model-registry.js REGISTRY array.
+// Used for UI model discovery without round-tripping through the daemon.
+// =============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VercelModelEntry {
+    pub id: String,
+    pub label: String,
+    pub provider: String,
+    pub preset: String,
+    pub tool_use: bool,
+    pub vision: bool,
+    pub context_window: u64,
+}
+
+/// Static model registry — keep in sync with node-sdk/model-registry.js.
+fn vercel_model_registry() -> Vec<VercelModelEntry> {
+    vec![
+        // OpenAI (direct)
+        VercelModelEntry { id: "codex-mini-latest".into(), label: "Codex Mini".into(), provider: "openai".into(), preset: "smart".into(), tool_use: false, vision: false, context_window: 192000 },
+        VercelModelEntry { id: "o4-mini".into(), label: "o4 Mini".into(), provider: "openai".into(), preset: "smart".into(), tool_use: true, vision: true, context_window: 200000 },
+        VercelModelEntry { id: "o3".into(), label: "o3".into(), provider: "openai".into(), preset: "pro".into(), tool_use: true, vision: true, context_window: 200000 },
+        VercelModelEntry { id: "gpt-4o-mini".into(), label: "GPT-4o Mini".into(), provider: "openai".into(), preset: "fast".into(), tool_use: true, vision: true, context_window: 128000 },
+        VercelModelEntry { id: "gpt-4o".into(), label: "GPT-4o".into(), provider: "openai".into(), preset: "pro".into(), tool_use: true, vision: true, context_window: 128000 },
+        VercelModelEntry { id: "gpt-4.1".into(), label: "GPT-4.1".into(), provider: "openai".into(), preset: "pro".into(), tool_use: true, vision: true, context_window: 1047576 },
+        VercelModelEntry { id: "gpt-4.1-mini".into(), label: "GPT-4.1 Mini".into(), provider: "openai".into(), preset: "smart".into(), tool_use: true, vision: true, context_window: 1047576 },
+        VercelModelEntry { id: "gpt-4.1-nano".into(), label: "GPT-4.1 Nano".into(), provider: "openai".into(), preset: "fast".into(), tool_use: true, vision: false, context_window: 1047576 },
+        // Google (direct)
+        VercelModelEntry { id: "gemini-2.5-pro".into(), label: "Gemini 2.5 Pro".into(), provider: "google".into(), preset: "pro".into(), tool_use: true, vision: true, context_window: 1048576 },
+        VercelModelEntry { id: "gemini-2.5-flash".into(), label: "Gemini 2.5 Flash".into(), provider: "google".into(), preset: "fast".into(), tool_use: true, vision: true, context_window: 1048576 },
+        VercelModelEntry { id: "gemini-2.5-flash-lite".into(), label: "Gemini 2.5 Flash Lite".into(), provider: "google".into(), preset: "fast".into(), tool_use: true, vision: true, context_window: 1048576 },
+        // OpenRouter (aggregator)
+        VercelModelEntry { id: "openai/gpt-4o".into(), label: "GPT-4o (OpenRouter)".into(), provider: "openrouter".into(), preset: "pro".into(), tool_use: true, vision: true, context_window: 128000 },
+        VercelModelEntry { id: "openai/gpt-4o-mini".into(), label: "GPT-4o Mini (OpenRouter)".into(), provider: "openrouter".into(), preset: "fast".into(), tool_use: true, vision: true, context_window: 128000 },
+        VercelModelEntry { id: "google/gemini-2.5-pro".into(), label: "Gemini 2.5 Pro (OpenRouter)".into(), provider: "openrouter".into(), preset: "pro".into(), tool_use: true, vision: true, context_window: 1048576 },
+        VercelModelEntry { id: "google/gemini-2.5-flash".into(), label: "Gemini 2.5 Flash (OpenRouter)".into(), provider: "openrouter".into(), preset: "fast".into(), tool_use: true, vision: true, context_window: 1048576 },
+        VercelModelEntry { id: "meta-llama/llama-4-maverick".into(), label: "Llama 4 Maverick (OpenRouter)".into(), provider: "openrouter".into(), preset: "pro".into(), tool_use: true, vision: true, context_window: 1048576 },
+        VercelModelEntry { id: "deepseek/deepseek-r1".into(), label: "DeepSeek R1 (OpenRouter)".into(), provider: "openrouter".into(), preset: "smart".into(), tool_use: false, vision: false, context_window: 163840 },
+        VercelModelEntry { id: "qwen/qwen3-coder".into(), label: "Qwen3 Coder (OpenRouter)".into(), provider: "openrouter".into(), preset: "smart".into(), tool_use: true, vision: false, context_window: 262144 },
+    ]
+}
+
+/// Return Vercel AI SDK models filtered by which API keys are provided.
+/// `api_keys` map: keys = "openai" | "google" | "openrouter", values = API key strings.
+/// Only models whose provider has a non-empty key are returned.
+#[tauri::command]
+pub fn get_vercel_models(api_keys: HashMap<String, String>) -> Result<String, String> {
+    let has_key = |provider: &str| -> bool {
+        api_keys.get(provider).map_or(false, |k| !k.trim().is_empty())
+    };
+
+    let available: Vec<VercelModelEntry> = vercel_model_registry()
+        .into_iter()
+        .filter(|m| match m.provider.as_str() {
+            "openai" => has_key("openai"),
+            "google" => has_key("google"),
+            "openrouter" => has_key("openrouter"),
+            _ => false,
+        })
+        .collect();
+
+    serde_json::to_string(&available)
+        .map_err(|e| format!("Failed to serialize model registry: {}", e))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2421,5 +2489,38 @@ mod tests {
         // This test will only pass if Claude CLI is installed
         let available = check_claude_cli_available().unwrap_or(false);
         println!("Claude CLI available: {}", available);
+    }
+
+    #[test]
+    fn test_get_vercel_models_filters_by_keys() {
+        let mut keys = HashMap::new();
+        keys.insert("openai".to_string(), "sk-test".to_string());
+
+        let json = get_vercel_models(keys).expect("should serialize");
+        let models: Vec<VercelModelEntry> = serde_json::from_str(&json).expect("valid JSON");
+
+        assert!(!models.is_empty(), "should have OpenAI models");
+        assert!(
+            models.iter().all(|m| m.provider == "openai"),
+            "all models should be openai provider"
+        );
+    }
+
+    #[test]
+    fn test_get_vercel_models_empty_keys() {
+        let keys = HashMap::new();
+        let json = get_vercel_models(keys).expect("should serialize");
+        let models: Vec<VercelModelEntry> = serde_json::from_str(&json).expect("valid JSON");
+        assert!(models.is_empty(), "no keys = no models");
+    }
+
+    #[test]
+    fn test_get_vercel_models_blank_key_ignored() {
+        let mut keys = HashMap::new();
+        keys.insert("openai".to_string(), "  ".to_string());
+
+        let json = get_vercel_models(keys).expect("should serialize");
+        let models: Vec<VercelModelEntry> = serde_json::from_str(&json).expect("valid JSON");
+        assert!(models.is_empty(), "blank key should be treated as absent");
     }
 }

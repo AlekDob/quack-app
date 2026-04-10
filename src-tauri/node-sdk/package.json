@@ -14,9 +14,13 @@
     "test:embeddings": "node lib/embeddings.test.js"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.96",
-    "@anthropic-ai/sdk": "^0.80.0",
+    "@ai-sdk/anthropic": "^3.0.68",
+    "@ai-sdk/google": "^3.0.61",
+    "@ai-sdk/openai": "^3.0.52",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.98",
+    "@anthropic-ai/sdk": "^0.87.0",
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "ai": "^6.0.156",
     "discord.js": "^14.14.1",
     "tree-sitter": "^0.22.4",
     "tree-sitter-java": "^0.23.5",

@@ -781,6 +781,46 @@ async function handleQuery(cmd) {
     }
   }
 
+  // 🔀 Vercel AI SDK routing: non-Anthropic providers use streamText() instead of Claude Agent SDK
+  const isVercelProvider = ['openai', 'google', 'openrouter'].includes(provider);
+  if (isVercelProvider) {
+    try {
+      const { streamVercelQuery } = await import('./stream-vercel.js');
+      const queryStartTime = Date.now();
+
+      await streamVercelQuery({
+        modelId: model,
+        provider,
+        apiKey: providerApiKey,
+        messages: cmd.conversationHistory || [],
+        systemPrompt: cmd.systemPromptText || '',
+        abortController,
+        onEvent: (event) => emit({ type: 'event', queryId, event }),
+        log: (msg) => log('VERCEL', msg),
+      });
+
+      const elapsedMs = Date.now() - queryStartTime;
+      emit({ type: 'query_complete', queryId });
+      log('VERCEL', `query=${queryId} completed (${elapsedMs}ms)`);
+    } catch (err) {
+      if (abortController.signal.aborted) {
+        log('ABORT', `query=${queryId} vercel stream aborted`);
+      } else {
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        log('ERROR', `query=${queryId} vercel error: ${errorMsg}`);
+        emit({ type: 'event', queryId, event: {
+          type: 'error',
+          error: { type: 'provider_error', message: errorMsg, provider },
+        }});
+      }
+      emit({ type: 'query_complete', queryId });
+    } finally {
+      activeQueries.delete(queryId);
+      // Vercel path doesn't touch Anthropic env vars — no restore needed
+    }
+    return;
+  }
+
   try {
     // --- Build SDK options ---
     const modelId = getModelId(model);
@@ -1698,6 +1738,20 @@ async function main() {
         case 'shutdown':
           await handleShutdown();
           break;
+
+        case 'getVercelModels': {
+          try {
+            const { detectApiKeys, getAvailableModels } = await import('./model-registry.js');
+            const keys = detectApiKeys(cmd.apiKeys || {});
+            const models = getAvailableModels(keys);
+            emit({ type: 'vercel_models', models });
+            log('VERCEL', `Listed ${models.length} available models`);
+          } catch (err) {
+            log('VERCEL', `Error listing models: ${err.message}`);
+            emit({ type: 'vercel_models', models: [], error: err.message });
+          }
+          break;
+        }
 
         default:
           log('IPC', `Unknown command type: ${cmd.type}`);

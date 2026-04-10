@@ -8,25 +8,46 @@ import { useSettingsStore } from '../stores/settingsStore';
 /** Get the display-friendly model name for the active provider */
 export function getActiveModelName(fallback?: string): string {
   const { provider, ollamaModel } = useSettingsStore.getState().claude;
-  if (provider !== 'anthropic') return ollamaModel || provider;
+  if (provider !== 'anthropic') {
+    if (ollamaModel) return ollamaModel;
+    // Fallback display names when no model selected
+    const providerLabels: Record<string, string> = {
+      openai: 'OpenAI', google: 'Gemini', openrouter: 'OpenRouter',
+      ollama: 'Ollama', custom: 'Custom',
+    };
+    return providerLabels[provider] || provider;
+  }
   return fallback || 'opus46';
 }
 
 /** Get provider fields for SDK invoke calls */
 // Brain: fix-bedrock-model-override
 export function getProviderRequestFields(remoteModels?: ModelConfig[], modelOverride?: string) {
-  const { provider, providerBaseUrl, providerApiKey, ollamaModel, bedrockModelOverride } = useSettingsStore.getState().claude;
+  const {
+    provider, providerBaseUrl, providerApiKey, ollamaModel, bedrockModelOverride,
+    openaiApiKey, googleApiKey, openrouterApiKey,
+  } = useSettingsStore.getState().claude;
   const isAnthropic = provider === 'anthropic';
+  const isVercel = ['openai', 'google', 'openrouter'].includes(provider);
+
+  // Resolve API key based on provider type
+  const resolveApiKey = (): string | undefined => {
+    if (provider === 'openai') return openaiApiKey || undefined;
+    if (provider === 'google') return googleApiKey || undefined;
+    if (provider === 'openrouter') return openrouterApiKey || undefined;
+    if (provider === 'custom') return providerApiKey || undefined;
+    return undefined;
+  };
 
   return {
     provider: isAnthropic ? undefined : provider,
-    providerBaseUrl: !isAnthropic && providerBaseUrl ? providerBaseUrl : undefined,
-    providerApiKey: provider === 'custom' && providerApiKey ? providerApiKey : undefined,
-    /** Resolve model: Bedrock override > Anthropic Supabase mapping > Ollama/custom */
+    providerBaseUrl: !isAnthropic && !isVercel && providerBaseUrl ? providerBaseUrl : undefined,
+    providerApiKey: resolveApiKey(),
+    /** Resolve model: Bedrock override > Vercel model ID > Anthropic Supabase mapping > Ollama/custom */
     resolveModel: (friendlyName: string) => {
+      if (isVercel) return modelOverride || ollamaModel || friendlyName;
       if (!isAnthropic) return modelOverride || ollamaModel || friendlyName;
       // Bedrock model override: when set, bypass Supabase model ID resolution
-      // Users paste their Bedrock ARN or model ID (e.g. us.anthropic.claude-sonnet-4-5-20250929-v1:0)
       if (bedrockModelOverride?.trim()) {
         console.log(`[getProviderRequestFields] Bedrock model override active: "${bedrockModelOverride}"`);
         return bedrockModelOverride.trim();
