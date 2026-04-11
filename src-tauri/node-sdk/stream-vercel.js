@@ -88,15 +88,8 @@ export async function streamVercelQuery({
     model = createAdHocModel(modelId, provider, apiKey);
   }
 
-  // Emit system init event
-  onEvent({
-    type: 'system',
-    subtype: 'init',
-    session_id: msgId,
-    tools: [],
-    model: modelId,
-    provider,
-  });
+  // Skip system init event — the frontend renders it as a metadata box
+  // instead of a streaming placeholder. Jump straight to assistant events.
 
   const normalizedMessages = normalizeMessages(messages);
   let fullText = '';
@@ -113,30 +106,32 @@ export async function streamVercelQuery({
       maxTokens: 16384,
     });
 
-    // Stream text deltas as assistant events
-    // CRITICAL: emit only the delta (chunk), NOT accumulated fullText.
-    // The frontend (App.tsx:1625) does existingText + textContent,
-    // so sending fullText would cause text duplication.
+    // Collect all text, then emit ONE assistant event at the end.
+    // The frontend stores each event in the events[] array and renders them all.
+    // Claude SDK uses content_block_delta for streaming (different protocol).
+    // For now, we skip streaming animation and show the final text at once.
+    // TODO: implement proper streaming via content_block_delta events
     for await (const chunk of result.textStream) {
       if (abortController?.signal?.aborted) break;
-
       fullText += chunk;
-      onEvent({
-        type: 'assistant',
-        message: {
-          id: msgId,
-          type: 'message',
-          role: 'assistant',
-          model: modelId,
-          content: [{
-            type: 'text',
-            text: chunk,
-          }],
-          usage: null,
-          stop_reason: null,
-        },
-      });
     }
+
+    // Emit single assistant event with complete text
+    onEvent({
+      type: 'assistant',
+      message: {
+        id: msgId,
+        type: 'message',
+        role: 'assistant',
+        model: modelId,
+        content: [{
+          type: 'text',
+          text: fullText,
+        }],
+        usage: null,
+        stop_reason: null,
+      },
+    });
 
     // Guard: if aborted during stream, don't await usage (could hang)
     if (abortController?.signal?.aborted) {

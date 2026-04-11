@@ -25,5 +25,12 @@ fn main() {
         }
     }
 
+    // Force rebuild when any node-sdk JS file changes
+    // Tauri only copies resources on Rust rebuild, so this ensures
+    // JS changes in node-sdk/ trigger a fresh copy to target/debug/
+    println!("cargo:rerun-if-changed=node-sdk/stream-daemon.js");
+    println!("cargo:rerun-if-changed=node-sdk/stream-vercel.js");
+    println!("cargo:rerun-if-changed=node-sdk/model-registry.js");
+
     tauri_build::build()
 }

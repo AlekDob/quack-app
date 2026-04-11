@@ -783,6 +783,7 @@ async function handleQuery(cmd) {
 
   // 🔀 Vercel AI SDK routing: non-Anthropic providers use streamText() instead of Claude Agent SDK
   const isVercelProvider = ['openai', 'google', 'openrouter'].includes(provider);
+  log('QUERY', `Provider routing: provider="${provider}" isVercel=${isVercelProvider} apiKey=${providerApiKey ? 'SET' : 'EMPTY'}`);
   if (isVercelProvider) {
     try {
       const { streamVercelQuery } = await import('./stream-vercel.js');
@@ -792,10 +793,15 @@ async function handleQuery(cmd) {
         modelId: model,
         provider,
         apiKey: providerApiKey,
-        messages: cmd.conversationHistory || [],
+        // Build messages from the prompt field (Rust sends user text as cmd.prompt)
+        // conversationHistory is not passed by Rust — we construct messages here
+        messages: [{ role: 'user', content: prompt }],
         systemPrompt: cmd.systemPromptText || '',
         abortController,
-        onEvent: (event) => emit({ type: 'event', queryId, event }),
+        onEvent: (event) => {
+          log('VERCEL', `Emitting event type=${event.type} queryId=${queryId}`);
+          emit({ type: 'event', queryId, event });
+        },
         log: (msg) => log('VERCEL', msg),
       });
 
