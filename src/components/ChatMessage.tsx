@@ -516,10 +516,17 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 // must be skipped — they create non-nested groups that break consecutive
                 // droid grouping, causing each tool call to get its own DroidActivityBlock.
                 // Brain: fix-compact-not-triggering-sdk-native
+                // Skip the "Compacting context..." status if compaction already completed
+                // (compact_boundary exists later in the events array), so only the
+                // "Context compacted" indicator is shown instead of both.
+                const isCompactingStatus = event.type === 'system' && event.subtype === 'status' && event.status === 'compacting';
+                const hasCompactBoundary = isCompactingStatus && message.events!.some(
+                  (e: any) => e.type === 'system' && e.subtype === 'compact_boundary'
+                );
                 const isAllowedSystemEvent = event.type === 'system' && (
                   event.subtype === 'init' ||
                   event.subtype === 'compact_boundary' ||
-                  (event.subtype === 'status' && event.status === 'compacting')
+                  (isCompactingStatus && !hasCompactBoundary)
                 );
                 if (event.type !== 'assistant' && !isAllowedSystemEvent) return;
 
