@@ -240,12 +240,25 @@ function MessageListVirtualized({
     listRef.current.scrollToRow({ index: targetIndex, align: 'start' });
   }, [listRef, messages]);
 
-  // Auto-scroll on mount
+  // Auto-scroll on mount — retry until listRef is available (AutoSizer may not
+  // have measured yet on first render, so listRef.current is initially null)
   useEffect(() => {
-    if (!listRef.current || messages.length === 0) return;
-    const timeoutId = setTimeout(() => scrollToBottom(), 100);
+    if (messages.length === 0) return;
+
+    let cancelled = false;
+    const tryScroll = () => {
+      if (cancelled) return;
+      if (listRef.current) {
+        scrollToBottom();
+      } else {
+        requestAnimationFrame(tryScroll);
+      }
+    };
+
+    // Small delay to let AutoSizer + List mount, then retry via rAF if needed
+    const timeoutId = setTimeout(tryScroll, 50);
     prevMessagesLengthRef.current = messages.length;
-    return () => clearTimeout(timeoutId);
+    return () => { cancelled = true; clearTimeout(timeoutId); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -256,8 +269,14 @@ function MessageListVirtualized({
     const hasNewMessage = messages.length > prevMessagesLengthRef.current;
     const lastMessage = messages[messages.length - 1];
 
+    // Detect lazy hydration: messages jumped from 0 to many (session loaded)
+    const isLazyHydration = prevMessagesLengthRef.current === 0 && messages.length > 1;
+
     let shouldAutoScroll = false;
-    if (hasNewMessage) {
+    if (isLazyHydration) {
+      // Always scroll to bottom when session is hydrated (loaded from disk)
+      shouldAutoScroll = true;
+    } else if (hasNewMessage) {
       shouldAutoScroll = lastMessage?.role === 'user' || isAtBottom;
     } else if (loading) {
       shouldAutoScroll = true;
