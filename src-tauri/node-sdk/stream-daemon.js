@@ -5,6 +5,14 @@
 Symbol.dispose ??= Symbol('Symbol.dispose');
 Symbol.asyncDispose ??= Symbol('Symbol.asyncDispose');
 
+// Temporary: file-based cache stats log for query-mode A/B testing.
+// Remove after persistent subprocess migration is confirmed.
+import { appendFileSync } from 'node:fs';
+function logCacheStats(line) {
+  try { appendFileSync('/tmp/quack-cache-stats.log', `[${new Date().toISOString()}] ${line}\n`); } catch {}
+}
+logCacheStats(`DAEMON_LOADED pid=${process.pid}`);
+
 /**
  * Persistent Node.js daemon for Claude Agent SDK.
  *
@@ -28,8 +36,6 @@ import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
 import { randomUUID, createHash } from 'crypto';
 import { execSync, spawn } from 'child_process';
-import { appendFileSync } from 'fs';
-
 // 🐛 DIAG: Write diagnostics to a file that's easy to check
 const DIAG_FILE = join(homedir(), '.quack', 'daemon-diag.log');
 function diag(msg) {
@@ -1186,7 +1192,8 @@ ${hintsBlock}
     }
     // Set QUACK_FORCE_QUERY_MODE=1 to bypass persistent subprocess and use query() per message.
     // This is for A/B testing cache behavior. Remove once migration is confirmed.
-    const forceQueryMode = process.env.QUACK_FORCE_QUERY_MODE === '1';
+    // TEMPORARY: hardcoded true for UI A/B test — revert after testing!
+    const forceQueryMode = true; // process.env.QUACK_FORCE_QUERY_MODE === '1';
     if (forceQueryMode && sessionId) {
       log('QUERY', `query=${queryId} FORCE_QUERY_MODE: bypassing persistent subprocess, using query() with resume=${sessionId}`);
     }
@@ -1313,9 +1320,14 @@ ${hintsBlock}
 
     let eventCount = 0;
     let promptTokensEmitted = false;
+    logCacheStats(`QUERY_START query=${queryId} mode=${queryState.mode} session=${sessionId || 'new'} forceQuery=${forceQueryMode}`);
     for await (const event of eventSource) {
       eventCount++;
       if (eventCount <= 5) diag(`EVENT[${eventCount}]: type=${event.type}, subtype=${event.subtype || '-'}`);
+      // Temp: log every event type to /tmp to debug why cache stats aren't written
+      if (eventCount <= 3 || event.type === 'result') {
+        logCacheStats(`EVENT query=${queryId} #${eventCount} type=${event.type} subtype=${event.subtype || '-'}`);
+      }
 
       const latestQueryState = activeQueries.get(queryId);
       const suppressEvent = latestQueryState && latestQueryState.status !== 'active';
@@ -1345,13 +1357,17 @@ ${hintsBlock}
 
       // Log cache and context stats from result events
       if (event.type === 'result') {
+        logCacheStats(`RESULT query=${queryId} mode=${queryState.mode} session=${queryState.sessionId || 'new'} hasUsage=${!!event.usage} keys=${Object.keys(event).join(',')}`);
         diag(`RESULT_EVENT: keys=${Object.keys(event).join(',')}, usage=${!!event.usage}, subtype=${event.subtype}`);
         const u = event.usage;
         if (u) {
           const cRead = u.cache_read_input_tokens || 0;
           const cCreate = u.cache_creation_input_tokens || 0;
-          log('CACHE', `query=${queryId} cacheRead=${cRead} cacheCreation=${cCreate} input=${u.input_tokens || 0} effective=${cRead + cCreate + (u.input_tokens || 0)}`);
-          diag(`CACHE: cacheRead=${cRead} cacheCreation=${cCreate} effective=${cRead + cCreate + (u.input_tokens || 0)}`);
+          const total = cRead + cCreate + (u.input_tokens || 0);
+          const hitPct = total > 0 ? ((cRead / total) * 100).toFixed(1) : '0.0';
+          log('CACHE', `query=${queryId} cacheRead=${cRead} cacheCreation=${cCreate} input=${u.input_tokens || 0} effective=${total} hit=${hitPct}%`);
+          logCacheStats(`CACHE query=${queryId} cacheRead=${cRead} cacheCreate=${cCreate} input=${u.input_tokens || 0} hit=${hitPct}% cost=$${(event.total_cost_usd || 0).toFixed(4)}`);
+          diag(`CACHE: cacheRead=${cRead} cacheCreation=${cCreate} effective=${total}`);
         }
         const mu = event.modelUsage || event.model_usage;
         if (mu) {
