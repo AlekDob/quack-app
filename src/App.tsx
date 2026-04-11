@@ -11187,29 +11187,25 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [tabs, activeTabId, handleTabClose]);
 
   // Update Chat tab label and color based on active terminal (agent)
+  // Brain: fix-model-service-emergency-fallback-spam — activeTerminal recomputes on
+  // every terminals mutation (status tick, personality load). Bail out early when
+  // label/color are already correct to avoid cascading setTabs → re-render loops.
   useEffect(() => {
-    console.log('[Tab Update] activeTerminal:', activeTerminal);
-
     setTabs((prevTabs) => {
       const chatTabIndex = prevTabs.findIndex(t => t.id === 'chat');
       if (chatTabIndex === -1) return prevTabs;
 
-      const updatedTabs = [...prevTabs];
-      const chatTab = { ...updatedTabs[chatTabIndex] };
+      const currentTab = prevTabs[chatTabIndex];
+      const newLabel = activeTerminal?.label ?? 'Chat';
+      const newColor = activeTerminal?.color ?? undefined;
 
-      if (activeTerminal) {
-        // Update chat tab with terminal (agent) label and color
-        console.log('[Tab Update] Setting tab to:', activeTerminal.label, activeTerminal.color);
-        chatTab.label = activeTerminal.label;
-        chatTab.color = activeTerminal.color;
-      } else {
-        // Reset to default "Chat" label without color
-        console.log('[Tab Update] Resetting tab to Chat');
-        chatTab.label = 'Chat';
-        chatTab.color = undefined;
+      // Bail out if nothing changed — prevents cascading re-renders
+      if (currentTab.label === newLabel && currentTab.color === newColor) {
+        return prevTabs;
       }
 
-      updatedTabs[chatTabIndex] = chatTab;
+      const updatedTabs = [...prevTabs];
+      updatedTabs[chatTabIndex] = { ...currentTab, label: newLabel, color: newColor };
       return updatedTabs;
     });
   }, [activeTerminal]);

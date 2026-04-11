@@ -206,6 +206,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Code editor tab disappears Linux: `documentation/bugs/fix-code-editor-tab-disappears-linux.md`
 - Marketplace fetch storm on startup: `documentation/bugs/fix-marketplace-fetch-storm-on-startup.md`
 - ModelService emergency fallback spam: `documentation/bugs/fix-model-service-emergency-fallback-spam.md`
+- Chat tab label update loop: `documentation/bugs/fix-chat-tab-label-update-loop.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
