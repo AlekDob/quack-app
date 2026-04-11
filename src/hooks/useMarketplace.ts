@@ -127,6 +127,9 @@ async function downloadDirectoryEntries(
 
 type InstalledVersionMap = Record<string, string>;
 
+// Module-level guard: prevents multiple hook instances from firing concurrent loads
+let _loading = false;
+
 /**
  * Fetches marketplace data from the quack-marketplace GitHub repo.
  * Dynamically discovers plugins and their contents without hardcoded data.
@@ -149,6 +152,9 @@ export function useMarketplace() {
 
   // Fetch marketplace.json and build resource list from GitHub
   const loadResources = useCallback(async () => {
+    // Prevent concurrent loads from multiple hook instances
+    if (_loading) return;
+    _loading = true;
     setLoading(true);
     setError(null);
 
@@ -347,6 +353,7 @@ export function useMarketplace() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load marketplace');
     } finally {
+      _loading = false;
       setLoading(false);
     }
   }, []);
@@ -993,10 +1000,9 @@ export function useMarketplace() {
       compareVersions(r.version, installedVersions[id]) > 0;
   }).length;
 
-  // Load on mount
-  useEffect(() => {
-    loadResources();
-  }, [loadResources]);
+  // NOTE: No auto-load on mount — consumers must call loadResources() explicitly.
+  // Multiple components use this hook independently; auto-loading caused 300+ parallel
+  // fetch requests on startup (each instance fetches marketplace.json + N plugin.json + M .md files).
 
   return {
     resources: filteredResources(),

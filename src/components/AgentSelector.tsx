@@ -118,7 +118,10 @@ export default function AgentSelector({
   const [detailResource, setDetailResource] = useState<MarketplaceResource | null>(null);
 
   // Load marketplace agent bundles
-  const { allResources, loading: marketplaceLoading, installResource } = useMarketplace();
+  const { allResources, loading: marketplaceLoading, installResource, loadResources } = useMarketplace();
+
+  // Load marketplace data on mount (conditionally rendered, so mount = visible)
+  useEffect(() => { loadResources(); }, [loadResources]);
 
   // Bundle import operations
   const {

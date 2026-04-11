@@ -102,8 +102,9 @@ function NewTerminalModal({
   onConfirm,
   onOpenStore,
 }: NewTerminalModalProps) {
-  // Marketplace for agent templates
-  const { allResources, installResource } = useMarketplace();
+  // Marketplace for agent templates (lazy-loaded when modal opens)
+  const { allResources, installResource, loadResources } = useMarketplace();
+  useEffect(() => { if (open) loadResources(); }, [open, loadResources]);
 
   // Step management - PROJECT-FIRST FLOW (2 steps: project → agent)
   // Edit mode: agent step with inline editing form

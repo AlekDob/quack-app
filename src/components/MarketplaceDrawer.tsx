@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useMarketplace } from '../hooks/useMarketplace';
 import { useSessionStore } from '../stores/sessionStore';
@@ -50,6 +50,9 @@ export default function MarketplaceDrawer({
     updateResource,
     updateCount,
   } = useMarketplace();
+
+  // Load marketplace data when drawer opens (conditionally rendered, so mount = open)
+  useEffect(() => { loadResources(); }, [loadResources]);
 
   const selectedSession = useSessionStore((s) => s.getSelectedSession());
 

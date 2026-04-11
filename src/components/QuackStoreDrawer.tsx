@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useMarketplace } from '../hooks/useMarketplace';
 import type { MarketplaceResource, AgentTemplate } from '../types';
@@ -32,6 +32,9 @@ export default function QuackStoreDrawer({ onClose, onRefresh, activeProjects = 
     installResource, uninstallResource, installBundleSkills, isInstalled,
     hasUpdate, updateResource, installedVersions, updateCount,
   } = useMarketplace();
+
+  // Load marketplace data when drawer opens (conditionally rendered, so mount = open)
+  useEffect(() => { loadResources(); }, [loadResources]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<StoreTab>('all');
