@@ -411,6 +411,27 @@
   gap: 0;
 }
 
+/* Per-turn token/cache stats */
+.turn-token-stats {
+  margin-top: 6px;
+  padding: 4px 0;
+  font-size: 11px;
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.35));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.turn-token-stats-sep {
+  opacity: 0.3;
+}
+
+.turn-token-stats-hit {
+  font-weight: 600;
+}
+
 /* System messages (agent invocation notifications) */
 .chat-message.system {
   display: flex;

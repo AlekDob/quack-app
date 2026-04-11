@@ -7,6 +7,7 @@ import MessageList from './MessageList';
 // Lazy-load virtualized list to avoid bundling react-window upfront
 const MessageListVirtualized = lazy(() => import('./MessageListVirtualized'));
 import ChatInput from './ChatInput';
+import { useSettingsStore } from '../stores/settingsStore';
 import TokenUsageIndicator from './TokenUsageIndicator';
 import StaminaBarBorder from './StaminaBarBorder';
 import EditSummaryBar from './EditSummaryBar';
@@ -245,6 +246,9 @@ export default function ChatView({
   onTeammateDrillDown,
   onAgentCommitDetected,
 }: ChatViewProps) {
+  // Per-turn token stats toggle (from Settings → Chat Experience)
+  const showTurnTokenStats = useSettingsStore((s) => s.general?.showTurnTokenStats ?? false);
+
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
   const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
 
@@ -916,6 +920,7 @@ export default function ChatView({
           pendingPlanApprovalIds={pendingPlanApprovalIds}
           onPlanApprovalResponse={onPlanApprovalResponse}
           onTeammateDrillDown={onTeammateDrillDown}
+          showTurnTokenStats={showTurnTokenStats}
         />
         </Suspense>
       ) : (
@@ -941,6 +946,7 @@ export default function ChatView({
           pendingPlanApprovalIds={pendingPlanApprovalIds}
           onPlanApprovalResponse={onPlanApprovalResponse}
           onTeammateDrillDown={onTeammateDrillDown}
+          showTurnTokenStats={showTurnTokenStats}
         />
       )}
       {(lastTurnFileEdits.length > 0 || lastTurnFileDeletes.length > 0) && (

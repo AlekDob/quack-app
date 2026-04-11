@@ -73,6 +73,7 @@ interface GeneralSettings {
   toolGifCategories: ToolGifCategories; // Per-category toggle
   giphyApiKey: string; // User's own Giphy API key
   btwShortcut: string; // Keyboard shortcut for BTW drawer (default: Ctrl+B)
+  showTurnTokenStats: boolean; // Show per-turn cache/token stats below each response
 }
 
 interface AppearanceSettings {
@@ -159,6 +160,7 @@ const defaultGeneralSettings: GeneralSettings = {
   toolGifCategories: defaultToolGifCategories,
   giphyApiKey: '', // User provides their own key
   btwShortcut: 'Ctrl+B', // BTW drawer shortcut
+  showTurnTokenStats: false, // Off by default — opt-in for power users
 };
 
 const defaultClaudeSettings: ClaudeSettings = {

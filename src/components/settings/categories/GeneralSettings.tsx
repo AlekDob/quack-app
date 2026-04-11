@@ -20,6 +20,7 @@ export default function GeneralSettings() {
   const toolGifCategories = useSettingsStore((s) => s.general?.toolGifCategories);
   const updateGeneralSettings = useSettingsStore((s) => s.updateGeneralSettings);
   const giphyApiKey = useSettingsStore((s) => s.general?.giphyApiKey ?? '');
+  const showTurnTokenStats = useSettingsStore((s) => s.general?.showTurnTokenStats ?? false);
   const setGiphyApiKey = useSettingsStore((s) => s.setGiphyApiKey);
 
   // Default categories if not initialized
@@ -256,6 +257,17 @@ export default function GeneralSettings() {
             </div>
           </>
         )}
+
+        <SettingsRow
+          label="Turn Token Stats"
+          description="Show cache hit % and token counts below each response"
+          control={
+            <IOSSwitch
+              checked={showTurnTokenStats}
+              onChange={() => updateGeneralSettings({ showTurnTokenStats: !showTurnTokenStats })}
+            />
+          }
+        />
       </div>
 
       <SectionHeader

@@ -1736,15 +1736,12 @@ function AppContent() {
 
       // 🦆 SESSION BACKUP: Persist messages to localStorage at end of turn
       // Same frequency as token persistence above — once per turn, no excessive writes.
-      // Uses functional updater to read the latest flushed state (chatSessionsRef may
-      // be one render behind since its sync effect runs after paint).
-      setChatSessions(current => {
-        const msgs = current.get(messageKey);
-        if (msgs && msgs.length > 0) {
-          saveSessionBackup(messageKey, msgs);
-        }
-        return current; // no mutation — React bails out
-      });
+      // Read from ref (synced at line ~1197) — avoids a no-op setChatSessions updater
+      // that was causing spurious React state update cycles and QuotaExceededError spam.
+      const backupMsgs = chatSessionsRef.current.get(messageKey);
+      if (backupMsgs && backupMsgs.length > 0) {
+        saveSessionBackup(messageKey, backupMsgs);
+      }
 
       // Brain: fix-memory-leak-14gb-ram
       // Session-end cleanup: free temporary buffers that are no longer needed
@@ -3010,6 +3007,18 @@ function AppContent() {
                   ...msg,
                   content: response.result,
                   status: 'complete' as const,
+                  metadata: {
+                    ...msg.metadata,
+                    ...(response.usage ? {
+                      turnUsage: {
+                        input_tokens: response.usage.input_tokens || 0,
+                        output_tokens: response.usage.output_tokens || 0,
+                        cache_read_input_tokens: response.usage.cache_read_input_tokens || 0,
+                        cache_creation_input_tokens: response.usage.cache_creation_input_tokens || 0,
+                      },
+                    } : {}),
+                    turnCost: response.total_cost_usd,
+                  },
                 }
               : msg
           )
@@ -3141,7 +3150,10 @@ function AppContent() {
               msg.id === assistantMessageId
                 ? {
                     ...msg,
-                    content: 'Stream stopped by user',
+                    // Preserve already-streamed content instead of replacing it
+                    content: msg.content && msg.content.length > 0
+                      ? msg.content
+                      : 'Stream stopped by user',
                     status: 'error' as const,
                     error: 'Aborted',
                   }
@@ -3191,7 +3203,10 @@ function AppContent() {
               msg.id === assistantMessageId
                 ? {
                     ...msg,
-                    content: displayMessage,
+                    // Preserve already-streamed content; error details are in .error field
+                    content: msg.content && msg.content.length > 0
+                      ? msg.content
+                      : displayMessage,
                     status: 'error' as const,
                     error: errorMessage,
                   }
@@ -3698,6 +3713,18 @@ function AppContent() {
                   ...msg,
                   content: response.result,
                   status: 'complete' as const,
+                  metadata: {
+                    ...msg.metadata,
+                    ...(response.usage ? {
+                      turnUsage: {
+                        input_tokens: response.usage.input_tokens || 0,
+                        output_tokens: response.usage.output_tokens || 0,
+                        cache_read_input_tokens: response.usage.cache_read_input_tokens || 0,
+                        cache_creation_input_tokens: response.usage.cache_creation_input_tokens || 0,
+                      },
+                    } : {}),
+                    turnCost: response.total_cost_usd,
+                  },
                 }
               : msg
           )

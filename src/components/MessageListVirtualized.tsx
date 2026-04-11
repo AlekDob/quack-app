@@ -33,6 +33,7 @@ interface MessageListProps {
   pendingPlanApprovalIds?: Set<string>;
   onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
+  showTurnTokenStats?: boolean;
 }
 
 // Row props passed via List's rowProps
@@ -60,6 +61,7 @@ interface MessageRowProps {
   pendingPlanApprovalIds?: Set<string>;
   onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
+  showTurnTokenStats?: boolean;
 }
 
 const DEFAULT_MESSAGE_HEIGHT = 120;
@@ -90,6 +92,7 @@ function MessageRow({
   pendingPlanApprovalIds,
   onPlanApprovalResponse,
   onTeammateDrillDown,
+  showTurnTokenStats,
 }: {
   index: number;
   style: CSSProperties;
@@ -137,6 +140,7 @@ function MessageRow({
         pendingPlanApprovalIds={pendingPlanApprovalIds}
         onPlanApprovalResponse={onPlanApprovalResponse}
         onTeammateDrillDown={onTeammateDrillDown}
+        showTurnTokenStats={showTurnTokenStats}
       />
     </div>
   );
@@ -165,6 +169,7 @@ function MessageListVirtualized({
   pendingPlanApprovalIds,
   onPlanApprovalResponse,
   onTeammateDrillDown,
+  showTurnTokenStats = false,
 }: MessageListProps) {
   const listRef = useListRef(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -331,6 +336,7 @@ function MessageListVirtualized({
     pendingPlanApprovalIds,
     onPlanApprovalResponse,
     onTeammateDrillDown,
+    showTurnTokenStats,
   };
 
   return (
@@ -389,6 +395,7 @@ export default memo(MessageListVirtualized, (prevProps, nextProps) => {
   const nextLast = nextProps.messages[nextProps.messages.length - 1];
   if (prevLast?.id !== nextLast?.id) return false;
   if (prevLast?.content !== nextLast?.content) return false;
+  if (prevLast?.status !== nextLast?.status) return false;
 
   return true;
 });
