@@ -5980,7 +5980,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     };
   }, [tauriAvailable]);
 
+  // Brain: fix-linux-projects-disappear-on-restart
+  // Immediate save when terminal count changes (project added/removed).
+  // Sessions are saved instantly on creation, but the debounced auto-save below
+  // waits 2 seconds. During that window, saveAgentSessions() writes to disk
+  // without the agents key. This effect ensures agents hit disk BEFORE any
+  // concurrent session save can write a file without them.
+  const savedTerminalCount = useRef(-1);
+  useEffect(() => {
+    if (!tauriAvailable || !hasBootstrapped || terminals.length === 0) return;
+    if (terminals.length !== savedTerminalCount.current) {
+      savedTerminalCount.current = terminals.length;
+      const agents = terminals.map(terminalToUnifiedAgent);
+      void saveUnifiedAgents(agents);
+    }
+  }, [hasBootstrapped, tauriAvailable, terminals]);
+
   // Auto-save terminals to storage (debounced to avoid excessive writes)
+  // Handles property updates (cwd, label, personality, etc.) — not structural changes.
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped) {
       return;
@@ -7669,6 +7686,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         const savedAgents = await loadUnifiedAgents();
         const savedMetadata = savedAgents.map(unifiedAgentToTerminalMetadata);
         setHasSavedAgents(savedAgents.length > 0);
+
+        // Brain: fix-linux-projects-disappear-on-restart
+        // Immediately re-save agents to ensure the 'agents' key exists in the store.
+        // This guards against the race condition where saveAgentSessions() calls
+        // store.save() before agents have been written, causing the agents key to
+        // be absent from the file. By saving eagerly at boot, the key is always present.
+        if (savedAgents.length > 0) {
+          await saveUnifiedAgents(savedAgents);
+        }
 
         // Build persisted projects map from saved agents
         const projectMap = new Map<string, string>();

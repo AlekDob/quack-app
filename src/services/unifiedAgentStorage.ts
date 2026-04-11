@@ -21,6 +21,40 @@ import type { AgentPersonality, AgentSession } from "../types";
 import { sessionWriteLock } from "../stores/sessionWriteLock";
 
 // ============================================
+// Store Write Lock (prevents reload from wiping sibling keys)
+// ============================================
+
+// Brain: fix-linux-projects-disappear-on-restart
+// A store-wide write lock that prevents store.reload() from wiping in-memory
+// data set by a concurrent save. The Tauri Store plugin shares a single in-memory
+// map for all keys in the same file. Calling store.reload() replaces the ENTIRE
+// in-memory state with the disk contents, which can discard pending writes from
+// a concurrent saveAgents/saveAgentSessions that haven't flushed to disk yet.
+const storeWriteLock = {
+  lastWriteAt: 0,
+  DEBOUNCE_MS: 1000,
+  markWrite() {
+    this.lastWriteAt = Date.now();
+  },
+  shouldSkipReload(): boolean {
+    return (Date.now() - this.lastWriteAt) < this.DEBOUNCE_MS;
+  },
+};
+
+// ============================================
+// Shadow Cache (prevents key loss during store.save)
+// ============================================
+
+// Brain: fix-linux-projects-disappear-on-restart
+// The Tauri Store plugin saves ALL in-memory keys on store.save(). If
+// store.reload() wipes a key from memory (because disk didn't have it),
+// the next store.save() writes a file WITHOUT that key — permanently losing data.
+// These shadow copies ensure both 'agents' and 'sessions' are always re-set
+// in the in-memory store before any save, breaking the corruption cycle.
+let _cachedAgents: UnifiedAgent[] | null = null;
+let _cachedSessions: AgentSession[] | null = null;
+
+// ============================================
 // Types
 // ============================================
 
@@ -115,11 +149,16 @@ export async function loadAgents(): Promise<UnifiedAgent[]> {
   try {
     const store = await getStore();
 
-    // Force reload from disk to catch external changes
-    try {
-      await store.reload();
-    } catch (reloadError) {
-      console.warn("[unifiedAgentStorage] Failed to reload from disk:", reloadError);
+    // Brain: fix-linux-projects-disappear-on-restart
+    // Only reload from disk if no recent write happened. store.reload() replaces
+    // the entire in-memory state, which can discard pending agents/sessions data
+    // that was set in memory but not yet flushed to disk by a concurrent save.
+    if (!storeWriteLock.shouldSkipReload()) {
+      try {
+        await store.reload();
+      } catch (reloadError) {
+        console.warn("[unifiedAgentStorage] Failed to reload from disk:", reloadError);
+      }
     }
 
     const stored = await store.get<UnifiedAgent[]>(AGENTS_KEY);
@@ -127,6 +166,7 @@ export async function loadAgents(): Promise<UnifiedAgent[]> {
     // Handle empty storage
     if (!stored) {
       console.log("[unifiedAgentStorage] No agents found in storage");
+      _cachedAgents = [];
       return [];
     }
 
@@ -136,6 +176,7 @@ export async function loadAgents(): Promise<UnifiedAgent[]> {
       toast.error("Agent storage corrupted - resetting to clean state");
       await store.delete(AGENTS_KEY);
       await store.save();
+      _cachedAgents = [];
       return [];
     }
 
@@ -154,11 +195,16 @@ export async function loadAgents(): Promise<UnifiedAgent[]> {
       );
     }
 
+    // Brain: fix-linux-projects-disappear-on-restart
+    // Update shadow cache so saveAgentSessions() can preserve agents during save
+    _cachedAgents = validated;
+
     console.log(`[unifiedAgentStorage] Loaded ${validated.length} agents`);
     return validated;
   } catch (error) {
     console.error("[unifiedAgentStorage] Critical error loading agents:", error);
     toast.error("Failed to load agents - starting fresh");
+    _cachedAgents = [];
     return [];
   }
 }
@@ -171,9 +217,23 @@ export async function loadAgents(): Promise<UnifiedAgent[]> {
 export async function saveAgents(agents: UnifiedAgent[]): Promise<void> {
   try {
     const store = await getStore();
+    // Brain: fix-linux-projects-disappear-on-restart
+    _cachedAgents = agents;
+    storeWriteLock.markWrite();
     await store.set(AGENTS_KEY, agents);
     await store.set(VERSION_KEY, CURRENT_VERSION);
+
+    // Brain: fix-linux-projects-disappear-on-restart
+    // Preserve sessions key — store.save() writes ALL in-memory keys to disk.
+    // If store.reload() wiped sessions from memory, re-set from shadow cache.
+    const sessionsInStore = await store.get<AgentSession[]>(SESSIONS_KEY);
+    if (!sessionsInStore && _cachedSessions !== null) {
+      console.warn('[unifiedAgentStorage] Restoring sessions from shadow cache during agents save');
+      await store.set(SESSIONS_KEY, _cachedSessions);
+    }
+
     await store.save();
+    storeWriteLock.markWrite();
     console.log(`[unifiedAgentStorage] Saved ${agents.length} agents`);
   } catch (error) {
     console.error("[unifiedAgentStorage] Failed to save agents:", error);
@@ -337,11 +397,12 @@ export async function loadAgentSessions(): Promise<AgentSession[]> {
   try {
     const store = await getStore();
 
-    // Brain: fix-automation-session-title-missing
+    // Brain: fix-automation-session-title-missing, fix-linux-projects-disappear-on-restart
     // Skip reload if a write was recently done — prevents race condition where
     // store.reload() overwrites in-memory data before store.save() completes,
-    // causing fields like title/status to be lost from newly created sessions.
-    if (!sessionWriteLock.shouldSkipReload()) {
+    // causing fields like title/status to be lost from newly created sessions,
+    // or agents data to be wiped from the in-memory store.
+    if (!sessionWriteLock.shouldSkipReload() && !storeWriteLock.shouldSkipReload()) {
       try {
         await store.reload();
         console.log("[unifiedAgentStorage] Store reloaded from disk");
@@ -356,6 +417,7 @@ export async function loadAgentSessions(): Promise<AgentSession[]> {
     // Handle empty storage
     if (!stored) {
       console.log("[unifiedAgentStorage] No sessions found in storage");
+      _cachedSessions = [];
       return [];
     }
 
@@ -365,6 +427,7 @@ export async function loadAgentSessions(): Promise<AgentSession[]> {
       toast.error("Session storage corrupted - resetting to clean state");
       await store.delete(SESSIONS_KEY);
       await store.save();
+      _cachedSessions = [];
       return [];
     }
 
@@ -392,11 +455,16 @@ export async function loadAgentSessions(): Promise<AgentSession[]> {
       );
     }
 
+    // Brain: fix-linux-projects-disappear-on-restart
+    // Update shadow cache so saveAgents() can preserve sessions during save
+    _cachedSessions = validated;
+
     console.log(`[unifiedAgentStorage] Loaded ${validated.length} sessions`);
     return validated;
   } catch (error) {
     console.error("[unifiedAgentStorage] Critical error loading sessions:", error);
     toast.error("Failed to load sessions - starting fresh");
+    _cachedSessions = [];
     return [];
   }
 }
@@ -418,8 +486,24 @@ export async function saveAgentSessions(sessions: AgentSession[]): Promise<void>
     }
 
     const store = await getStore();
+    // Brain: fix-linux-projects-disappear-on-restart
+    _cachedSessions = sessions;
+    storeWriteLock.markWrite();
     await store.set(SESSIONS_KEY, sessions);
+
+    // Brain: fix-linux-projects-disappear-on-restart
+    // Preserve agents key — store.save() writes ALL in-memory keys to disk.
+    // If store.reload() wiped agents from memory, re-set from shadow cache.
+    // This is the CRITICAL fix: without this, every session save on Linux
+    // would write a file without the 'agents' key, losing all projects.
+    const agentsInStore = await store.get<UnifiedAgent[]>(AGENTS_KEY);
+    if (!agentsInStore && _cachedAgents !== null) {
+      console.warn('[unifiedAgentStorage] Restoring agents from shadow cache during session save');
+      await store.set(AGENTS_KEY, _cachedAgents);
+    }
+
     await store.save();
+    storeWriteLock.markWrite();
     console.log(`[unifiedAgentStorage] Saved ${sessions.length} sessions`);
   } catch (error) {
     console.error("[unifiedAgentStorage] Failed to save sessions:", error);

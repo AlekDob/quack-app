@@ -11,6 +11,12 @@
 
 set -e
 
+# Skip signing on non-macOS platforms (Linux, Windows)
+if [[ "$(uname -s)" != "Darwin" ]]; then
+    echo "Skipping code signing (not macOS)"
+    exit 0
+fi
+
 # Resolve project root from script location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
