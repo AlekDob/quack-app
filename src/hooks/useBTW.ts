@@ -13,6 +13,7 @@ import { listen } from '@tauri-apps/api/event';
 import { useSettingsStore } from '../stores/settingsStore';
 import { getProviderRequestFields } from '../services/claudeSDK';
 import { getModelId } from '../services/modelService';
+import { useModelsConfig } from './useAppConfig';
 import type { ChatMessage, ClaudeEvent } from '../types';
 
 interface BTWState {
@@ -118,6 +119,7 @@ export function useBTW(options?: UseBTWOptions): UseBTWReturn {
 
   const btwModel = useSettingsStore((s) => s.claude.btwModel) || 'haiku45';
   const btwShortcut = useSettingsStore((s) => s.general.btwShortcut) || 'Ctrl+B';
+  const { models: remoteModels } = useModelsConfig();
 
   const openBTW = useCallback(() => {
     setState((prev) => ({ ...prev, isOpen: true }));
@@ -168,10 +170,10 @@ export function useBTW(options?: UseBTWOptions): UseBTWReturn {
         const enrichedPrompt = context + question;
 
         // Use same SDK pipeline as main chat
-        const prf = getProviderRequestFields();
+        const prf = getProviderRequestFields(remoteModels);
         const resolvedModel = prf.provider
           ? prf.resolveModel(btwModel)
-          : getModelId(btwModel);
+          : getModelId(btwModel, remoteModels);
 
         await invoke('send_message_via_sdk_streaming', {
           agentId: BTW_AGENT_ID,
@@ -199,7 +201,7 @@ export function useBTW(options?: UseBTWOptions): UseBTWReturn {
         unlistenRef.current = null;
       }
     },
-    [btwModel]
+    [btwModel, remoteModels]
   );
 
   // Cleanup listener on unmount

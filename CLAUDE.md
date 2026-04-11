@@ -205,6 +205,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - useMemo dep spurious effects: `documentation/gotchas/gotcha-usememo-dep-spurious-effect-runs.md`
 - Code editor tab disappears Linux: `documentation/bugs/fix-code-editor-tab-disappears-linux.md`
 - Marketplace fetch storm on startup: `documentation/bugs/fix-marketplace-fetch-storm-on-startup.md`
+- ModelService emergency fallback spam: `documentation/bugs/fix-model-service-emergency-fallback-spam.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

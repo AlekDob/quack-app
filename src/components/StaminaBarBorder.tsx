@@ -1,6 +1,7 @@
 import { useState, memo } from 'react';
 import TokenUsageModal from './TokenUsageModal';
 import { getModelLabel } from '../services/modelService';
+import { useModelsConfig } from '../hooks/useAppConfig';
 
 interface ContextCategory {
   name: string;
@@ -51,6 +52,7 @@ function StaminaBarBorder({
   contextUsageBreakdown,
 }: StaminaBarBorderProps) {
   const [showModal, setShowModal] = useState(false);
+  const { models: remoteModels } = useModelsConfig();
 
   // Don't render until SDK reports the actual context window size
   if (!maxTokens) {
@@ -137,7 +139,7 @@ function StaminaBarBorder({
           overhead={overhead}
           status={status}
           onClose={() => setShowModal(false)}
-          model={model ? getModelLabel(model) : undefined}
+          model={model ? getModelLabel(model, remoteModels) : undefined}
           onCompact={onCompact}
           onClear={onClear}
           contextUsageBreakdown={contextUsageBreakdown}

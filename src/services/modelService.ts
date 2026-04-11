@@ -49,14 +49,19 @@ const LEGACY_ID_MAP: Record<string, string> = {
  * Prioritizes remote config from Supabase.
  * Emergency fallback only used when Supabase is unreachable.
  */
+let _fallbackWarned = false;
 export function getModels(remoteModels?: ModelConfig[]): ModelConfig[] {
   const models = remoteModels?.filter(m => m.isActive);
   if (models && models.length > 0) {
+    _fallbackWarned = false; // Reset so we warn again if models disappear later
     const sorted = [...models].sort((a, b) => a.sortOrder - b.sortOrder);
     return sorted;
   }
-  // Emergency fallback - Supabase unreachable
-  console.warn('[ModelService] Using emergency fallback - Supabase models not available');
+  // Emergency fallback - Supabase unreachable (warn once to avoid console flood)
+  if (!_fallbackWarned) {
+    console.warn('[ModelService] Using emergency fallback - Supabase models not available');
+    _fallbackWarned = true;
+  }
   return EMERGENCY_FALLBACK;
 }
 
