@@ -337,18 +337,16 @@ export default function ChatView({
         return;
       }
 
-      // INTERCEPT /context — show token usage from session data
+      // /context should flow through to the SDK as a regular message —
+      // the SDK handles it natively (like /compact).
       if (commandName === 'context') {
-        const total = sessionTokens.inputTokens + sessionTokens.outputTokens;
-        const ctxWindow = sessionTokens.contextWindow || 200_000;
-        const pct = ctxWindow > 0 ? ((total / ctxWindow) * 100).toFixed(1) : '0';
-        const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
-        toast.info(
-          `Context: ${fmt(total)} / ${fmt(ctxWindow)} tokens (${pct}%)\n` +
-          `Input: ${fmt(sessionTokens.inputTokens)} · Output: ${fmt(sessionTokens.outputTokens)}\n` +
-          `Cache read: ${fmt(sessionTokens.cacheReadTokens)} · Cache write: ${fmt(sessionTokens.cacheCreationTokens)}`,
-          { duration: 6000 }
-        );
+        await onSendMessage(trimmedContent, {
+          ...options,
+          model,
+          thinkingMode,
+          permissionMode,
+          effort,
+        });
         return;
       }
 

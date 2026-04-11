@@ -644,13 +644,14 @@ ${hintsBlock}
     }
 
     // Brain: fix-compact-not-triggering-sdk-native
-    // Detect /compact early — it needs special handling throughout the query pipeline.
-    const isCompactCommand = /^\s*\/compact\b/.test(prompt);
+    // Detect SDK slash commands early — they need to be sent as-is without any
+    // context prefix, otherwise the SDK's parser won't recognize them.
+    const isSdkSlashCommand = /^\s*\/(compact|context)\b/.test(prompt);
 
     // Build the final prompt with context prefix
-    // /compact must be sent as-is — appending system-reminder context would prevent
-    // the SDK's slash command parser from recognizing it as a command.
-    const finalPrompt = isCompactCommand
+    // SDK slash commands must be sent as-is — appending system-reminder context
+    // would prevent the SDK's slash command parser from recognizing them.
+    const finalPrompt = isSdkSlashCommand
       ? prompt
       : (contextPrefix ? `${prompt}\n\n<system-reminder>\n${contextPrefix}\n</system-reminder>` : prompt);
 
@@ -676,11 +677,11 @@ ${hintsBlock}
     }
 
     // Brain: fix-compact-not-triggering-sdk-native
-    // /compact must be sent as a string prompt (not AsyncIterable) so the SDK's
-    // slash command parser recognizes it. AsyncIterable prompts go through streamInput
-    // which bypasses slash command parsing.
-    const queryPrompt = isCompactCommand ? finalPrompt : generateMessages();
-    log('QUERY', `query=${queryId} calling SDK query() (${isCompactCommand ? 'compact string prompt' : 'streamingInput=true'}) resume=${sessionId || 'none'}`);
+    // SDK slash commands must be sent as a string prompt (not AsyncIterable) so the
+    // SDK's slash command parser recognizes them. AsyncIterable prompts go through
+    // streamInput which bypasses slash command parsing.
+    const queryPrompt = isSdkSlashCommand ? finalPrompt : generateMessages();
+    log('QUERY', `query=${queryId} calling SDK query() (${isSdkSlashCommand ? 'SDK slash command string prompt' : 'streamingInput=true'}) resume=${sessionId || 'none'}`);
     queryState.queryHandle = query({
       prompt: queryPrompt,
       options,
