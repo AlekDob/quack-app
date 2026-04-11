@@ -66,21 +66,10 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
     try {
       const content = await invoke<string>('read_file_content', { path: filePath });
 
-      // Compute real line changes from git diff (absolute line numbers)
-      let resolvedChanges: LineChange[] = [];
-      try {
-        const diffOutput = await invoke<string>('git_diff', {
-          path: filePath,
-          staged: false,
-          untracked: true,
-        });
-        if (diffOutput && diffOutput.trim()) {
-          resolvedChanges = parseDiffToLineChanges(diffOutput);
-        }
-      } catch {
-        // Git diff unavailable (not a git repo, etc.) — no highlighting
-      }
-
+      // Brain: fix-code-editor-tab-disappears-linux
+      // Show editor immediately after file read — don't block on git_diff.
+      // On Linux, git_diff can hang (git lock, SSH passphrase, slow repo) which
+      // would keep isLoading=true forever. Diff decorations are applied async below.
       set({
         filePath,
         content,
@@ -89,8 +78,25 @@ export const useEditorStore = create<EditorState>()((set, get) => ({
         isDirty: false,
         isLoading: false,
         pendingEdit: null,
-        lineChanges: resolvedChanges,
+        lineChanges: [],
       });
+
+      // Compute real line changes from git diff in background (non-blocking)
+      try {
+        const diffOutput = await invoke<string>('git_diff', {
+          path: filePath,
+          staged: false,
+          untracked: true,
+        });
+        if (diffOutput && diffOutput.trim()) {
+          // Only apply if the same file is still open (user may have switched)
+          if (get().filePath === filePath) {
+            set({ lineChanges: parseDiffToLineChanges(diffOutput) });
+          }
+        }
+      } catch {
+        // Git diff unavailable (not a git repo, etc.) — no highlighting
+      }
     } catch (error) {
       console.error('[editorStore] Failed to open file:', error);
       set({ isLoading: false });

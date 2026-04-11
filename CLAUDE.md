@@ -194,6 +194,10 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Brain button bypass handleSend: `documentation/bugs/fix-brain-button-bypasses-handleSend.md`
 - Slash commands HOME env Windows: `documentation/bugs/bug-slash-commands-home-env-windows.md`
 - Linux projects disappear on restart: `documentation/bugs/fix-linux-projects-disappear-on-restart.md`
+- Linux HMR not working: `documentation/gotchas/gotcha-linux-hmr-not-working.md`
+- Zustand HMR stale actions: `documentation/gotchas/gotcha-zustand-store-hmr-stale-actions.md`
+- useMemo dep spurious effects: `documentation/gotchas/gotcha-usememo-dep-spurious-effect-runs.md`
+- Code editor tab disappears Linux: `documentation/bugs/fix-code-editor-tab-disappears-linux.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

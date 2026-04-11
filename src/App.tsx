@@ -2225,7 +2225,7 @@ function AppContent() {
         const specialTabTypes = [
           'kanban', 'docs', 'second-brain', 'memory-graph', 'claude-assets',
           'agent', 'skill', 'command', 'browser-manager', 'agent-terminal', 'chat',
-          'office', 'automation'
+          'office', 'automation', 'code-editor'
         ];
         const agentTabs = tabs.filter(t => !specialTabTypes.includes(t.type));
         updated.set(previousId, agentTabs);
@@ -2241,10 +2241,11 @@ function AppContent() {
       // 🦆 FIX: Preserve special tabs (kanban, docs, second-brain, memory-graph, etc.)
       // These tabs should persist across agent switches - they are not agent-specific
       // Brain: fix-office-view-snaps-back-to-chat
+      // Brain: fix-code-editor-tab-disappears-linux — code-editor tabs persist across agents
       const specialTabTypes = [
         'kanban', 'docs', 'second-brain', 'memory-graph', 'claude-assets',
         'agent', 'skill', 'command', 'browser-manager', 'agent-terminal',
-        'office', 'automation'
+        'office', 'automation', 'code-editor'
       ];
 
       // Always include chat tab + restored agent tabs + preserve special tabs
@@ -2267,6 +2268,7 @@ function AppContent() {
 
       // 🦆 FIX: Don't change activeTabId if user is viewing a special tab
       // This prevents the "tab closes immediately" bug when opening Kanban
+      // Brain: fix-code-editor-tab-disappears-linux — code-editor is now special
       const isSpecialTabActive = specialTabTypes.some(type =>
         activeTabId.includes(type) || activeTabId === 'kanban-board'
       );
@@ -11172,19 +11174,35 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [activeTerminal]);
 
   // Switch tabs when active terminal (agent) changes
+  // Brain: fix-code-editor-tab-disappears-linux
+  // IMPORTANT: Use a ref to track activeId changes. Previously this effect depended
+  // on [activeId, activeTerminal], but activeTerminal recomputes on ANY terminals
+  // array change (status update, personality change, auto-save). This caused the
+  // effect to run spuriously, replacing all tabs and removing code-editor tabs.
+  // Now: tab replacement logic only runs when activeId actually changes.
+  // Chat tab label/color sync is handled separately below.
+  const prevSwitchIdRef = useRef<string | null>(null);
+  // Brain: fix-code-editor-tab-disappears-linux
+  // Only run tab-replacement logic when activeId actually changes.
+  // activeTerminal is intentionally excluded from deps — it recomputes on every
+  // terminals mutation (status tick, personality load, auto-save) and would cause
+  // spurious runs that blow away open code-editor tabs. Inside the body,
+  // activeTerminal is read from closure which is fine since activeId just changed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!activeId) return;
 
-    console.log('[Tab Switch] Active terminal changed to:', activeId, activeTerminal?.label);
+    const isActualSwitch = prevSwitchIdRef.current !== null && prevSwitchIdRef.current !== activeId;
 
     // Save current tabs for the PREVIOUS terminal (if any)
-    const previousId = previousActiveIdRef.current;
-    if (previousId && previousId !== activeId) {
+    if (isActualSwitch) {
+      const previousId = prevSwitchIdRef.current!;
+
+      // Hoist fileTabs outside the updater to avoid stale closure inside setTabsByTerminal
+      const fileTabs = tabs.filter(t => t.type === 'file');
+
       setTabsByTerminal((prev) => {
         const updated = new Map(prev);
-
-        // Find file tabs (exclude chat tab)
-        const fileTabs = tabs.filter(t => t.type === 'file');
 
         // Store tabs for the PREVIOUS terminal ID
         if (fileTabs.length > 0) {
@@ -11192,76 +11210,75 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           if (fileTabs.length !== previousTerminalTabs.length ||
               !fileTabs.every((tab, i) => tab.id === previousTerminalTabs[i]?.id)) {
             updated.set(previousId, fileTabs);
-            console.log('[Tab Switch] Saved', fileTabs.length, 'tabs for PREVIOUS terminal:', previousId);
           }
         } else if (prev.has(previousId)) {
-          // If no file tabs, remove the entry for the previous terminal
           updated.delete(previousId);
-          console.log('[Tab Switch] Removed tabs for PREVIOUS terminal (no file tabs):', previousId);
         }
 
         return updated;
       });
-    }
 
-    // Load tabs for the NEW active terminal
-    const terminalTabs = tabsByTerminal.get(activeId) || [];
-    console.log('[Tab Switch] Loading', terminalTabs.length, 'tabs for NEW terminal:', activeId);
+      // Load tabs for the NEW active terminal
+      const terminalTabs = tabsByTerminal.get(activeId) || [];
 
-    // Always include the chat tab with updated name and color, plus any file tabs for this terminal
-    const chatTab: Tab = {
-      id: 'chat',
-      label: activeTerminal?.label || 'Chat',
-      type: 'chat',
-      closable: false,
-      color: activeTerminal?.color
-    };
+      // Always include the chat tab with updated name and color, plus any file tabs for this terminal
+      const chatTab: Tab = {
+        id: 'chat',
+        label: activeTerminal?.label || 'Chat',
+        type: 'chat',
+        closable: false,
+        color: activeTerminal?.color
+      };
 
-    // 🦆 FIX: Preserve special tabs (kanban, docs, second-brain, memory-graph, etc.)
-    // These tabs should persist across agent switches - they are not agent-specific
-    // Brain: fix-office-view-snaps-back-to-chat
-    const specialTabTypes = [
-      'kanban', 'docs', 'second-brain', 'memory-graph', 'claude-assets',
-      'agent', 'skill', 'command', 'browser-manager', 'agent-terminal',
-      'office', 'automation'
-    ];
+      // 🦆 FIX: Preserve special tabs (kanban, docs, second-brain, memory-graph, etc.)
+      // These tabs should persist across agent switches - they are not agent-specific
+      // Brain: fix-office-view-snaps-back-to-chat
+      // Brain: fix-code-editor-tab-disappears-linux — code-editor tabs persist across agents
+      const specialTabTypes = [
+        'kanban', 'docs', 'second-brain', 'memory-graph', 'claude-assets',
+        'agent', 'skill', 'command', 'browser-manager', 'agent-terminal',
+        'office', 'automation', 'code-editor'
+      ];
 
-    setTabs(prevTabs => {
-      // Keep any special tabs that were open
-      const specialTabs = prevTabs.filter(t => specialTabTypes.includes(t.type));
-      const merged = [chatTab, ...terminalTabs, ...specialTabs];
-      // Deduplicate by id (keep first occurrence)
-      const seen = new Set<string>();
-      const deduped = merged.filter(t => {
-        if (seen.has(t.id)) return false;
-        seen.add(t.id);
-        return true;
+      setTabs(prevTabs => {
+        // Keep any special tabs that were open
+        const specialTabs = prevTabs.filter(t => specialTabTypes.includes(t.type));
+        const merged = [chatTab, ...terminalTabs, ...specialTabs];
+        // Deduplicate by id (keep first occurrence)
+        const seen = new Set<string>();
+        const deduped = merged.filter(t => {
+          if (seen.has(t.id)) return false;
+          seen.add(t.id);
+          return true;
+        });
+        return deduped;
       });
-      return deduped;
-    });
 
-    // 🦆 FIX: Don't change activeTabId if user is viewing a special tab
-    // This prevents the "tab closes immediately" bug when opening Kanban
-    const isSpecialTabActive = specialTabTypes.some(type =>
-      activeTabId.includes(type) || activeTabId === 'kanban-board'
-    );
+      // 🦆 FIX: Don't change activeTabId if user is viewing a special tab
+      // This prevents the "tab closes immediately" bug when opening Kanban
+      // Brain: fix-code-editor-tab-disappears-linux — code-editor is now special
+      const activeTab = tabs.find(t => t.id === activeTabId);
+      const isSpecialTabActive = activeTab
+        ? specialTabTypes.includes(activeTab.type)
+        : activeTabId === 'kanban-board';
 
-    if (!isSpecialTabActive) {
-      // If we have file tabs, keep the current active tab if it exists, otherwise activate first file tab
-      if (terminalTabs.length > 0) {
-        const activeTabExists = ['chat', ...terminalTabs.map(t => t.id)].includes(activeTabId);
-        if (!activeTabExists) {
-          setActiveTabId(terminalTabs[0].id);
+      if (!isSpecialTabActive) {
+        // If we have file tabs, keep the current active tab if it exists, otherwise activate first file tab
+        if (terminalTabs.length > 0) {
+          const activeTabExists = ['chat', ...terminalTabs.map(t => t.id)].includes(activeTabId);
+          if (!activeTabExists) {
+            setActiveTabId(terminalTabs[0].id);
+          }
+        } else {
+          // No file tabs, activate chat
+          setActiveTabId('chat');
         }
-      } else {
-        // No file tabs, activate chat
-        setActiveTabId('chat');
       }
+      // Note: previousActiveIdRef is owned by Effect 1 (line ~2208) — no dual write
     }
 
-    // Update the ref to track this terminal as the "previous" for next switch
-    previousActiveIdRef.current = activeId;
-  }, [activeId, activeTerminal]);
+    prevSwitchIdRef.current = activeId;
+  }, [activeId]);
 
   const handleRefreshPreview = useCallback(async () => {
     if (!tauriAvailable || !previewFile) {

@@ -70,9 +70,17 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5174,
       strictPort: true,
-      host: process.env.TAURI_DEV_HOST,
+      host: process.env.TAURI_DEV_HOST || '127.0.0.1',
+      hmr: {
+        protocol: 'ws',
+        host: process.env.TAURI_DEV_HOST || '127.0.0.1',
+        port: 5174,
+      },
       // Watch configuration - exclude worktrees to prevent page reload when creating task worktrees
       watch: {
+        // Use polling on Linux — WebKitGTK inotify can miss events
+        usePolling: process.platform === 'linux',
+        interval: 500,
         ignored: [
           '**/node_modules/**',
           '**/.git/**',
