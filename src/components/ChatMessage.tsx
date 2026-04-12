@@ -895,7 +895,7 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
             ))}
           </div>
         )}
-        {!isUser && message.status === 'complete' && showTurnTokenStats && message.metadata?.turnUsage && (
+        {!isUser && message.status === 'complete' && showTurnTokenStats && message.metadata?.turnUsage != null && (
           <TurnTokenStats
             turnUsage={message.metadata.turnUsage as { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }}
             turnCost={message.metadata.turnCost as number | undefined}
