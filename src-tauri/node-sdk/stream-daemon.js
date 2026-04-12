@@ -741,10 +741,13 @@ ${hintsBlock}
             // Timeout getContextUsage() to prevent hanging the entire query completion.
             // If the SDK subprocess is in a bad state, this call can hang indefinitely,
             // blocking query_complete emission and leaving the frontend stuck with loading dots.
+            let timeoutId;
             const rawResult = await Promise.race([
               ctxSource.getContextUsage(),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('getContextUsage timeout (5s)')), 5000)),
-            ]);
+              new Promise((_, reject) => {
+                timeoutId = setTimeout(() => reject(new Error('getContextUsage timeout (5s)')), 5000);
+              }),
+            ]).finally(() => clearTimeout(timeoutId));
             const ctxUsage = rawResult?.response || rawResult;
             if (ctxUsage && (ctxUsage.totalTokens > 0 || ctxUsage.categories?.length > 0)) {
               log('CONTEXT', `query=${queryId} contextUsage: total=${ctxUsage.totalTokens}/${ctxUsage.maxTokens} (${ctxUsage.percentage?.toFixed(1) || 0}%) categories=${ctxUsage.categories?.length || 0}`);
