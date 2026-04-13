@@ -330,6 +330,10 @@ export default function ChatSettingsMenu({
                       <option value="meta-llama/llama-4-maverick">Llama 4 Maverick (OpenRouter)</option>
                       <option value="deepseek/deepseek-r1">DeepSeek R1 (OpenRouter)</option>
                       <option value="qwen/qwen3-coder">Qwen3 Coder (OpenRouter)</option>
+                      <option value="minimax/MiniMax-M2.5">MiniMax M2.5 (OpenRouter)</option>
+                      <option value="minimax/MiniMax-M2.5-highspeed">MiniMax M2.5 HS (OpenRouter)</option>
+                      <option value="z-ai/glm-4.7-flash">GLM 4.7 Flash (OpenRouter)</option>
+                      <option value="z-ai/glm-4.7">GLM 4.7 (OpenRouter)</option>
                     </>
                   )}
                 </select>
