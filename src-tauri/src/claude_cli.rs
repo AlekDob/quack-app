@@ -2434,14 +2434,17 @@ pub struct VercelModelEntry {
 fn vercel_model_registry() -> Vec<VercelModelEntry> {
     vec![
         // OpenAI (direct)
-        VercelModelEntry { id: "codex-mini-latest".into(), label: "Codex Mini".into(), provider: "openai".into(), preset: "smart".into(), tool_use: false, vision: false, context_window: 192000 },
+        VercelModelEntry { id: "codex-mini-latest".into(), label: "Codex Mini".into(), provider: "openai".into(), preset: "smart".into(), tool_use: true, vision: false, context_window: 192000 },
         VercelModelEntry { id: "o4-mini".into(), label: "o4 Mini".into(), provider: "openai".into(), preset: "smart".into(), tool_use: true, vision: true, context_window: 200000 },
         VercelModelEntry { id: "o3".into(), label: "o3".into(), provider: "openai".into(), preset: "pro".into(), tool_use: true, vision: true, context_window: 200000 },
+        VercelModelEntry { id: "o3-pro".into(), label: "o3 Pro".into(), provider: "openai".into(), preset: "pro".into(), tool_use: true, vision: true, context_window: 200000 },
         VercelModelEntry { id: "gpt-4o-mini".into(), label: "GPT-4o Mini".into(), provider: "openai".into(), preset: "fast".into(), tool_use: true, vision: true, context_window: 128000 },
         VercelModelEntry { id: "gpt-4o".into(), label: "GPT-4o".into(), provider: "openai".into(), preset: "pro".into(), tool_use: true, vision: true, context_window: 128000 },
         VercelModelEntry { id: "gpt-4.1".into(), label: "GPT-4.1".into(), provider: "openai".into(), preset: "pro".into(), tool_use: true, vision: true, context_window: 1047576 },
         VercelModelEntry { id: "gpt-4.1-mini".into(), label: "GPT-4.1 Mini".into(), provider: "openai".into(), preset: "smart".into(), tool_use: true, vision: true, context_window: 1047576 },
         VercelModelEntry { id: "gpt-4.1-nano".into(), label: "GPT-4.1 Nano".into(), provider: "openai".into(), preset: "fast".into(), tool_use: true, vision: false, context_window: 1047576 },
+        VercelModelEntry { id: "gpt-5.3-codex".into(), label: "GPT-5.3 Codex".into(), provider: "openai".into(), preset: "pro".into(), tool_use: true, vision: false, context_window: 200000 },
+        VercelModelEntry { id: "gpt-5.3-codex-spark".into(), label: "GPT-5.3 Codex Spark".into(), provider: "openai".into(), preset: "fast".into(), tool_use: true, vision: false, context_window: 128000 },
         // Google (direct)
         VercelModelEntry { id: "gemini-2.5-pro".into(), label: "Gemini 2.5 Pro".into(), provider: "google".into(), preset: "pro".into(), tool_use: true, vision: true, context_window: 1048576 },
         VercelModelEntry { id: "gemini-2.5-flash".into(), label: "Gemini 2.5 Flash".into(), provider: "google".into(), preset: "fast".into(), tool_use: true, vision: true, context_window: 1048576 },

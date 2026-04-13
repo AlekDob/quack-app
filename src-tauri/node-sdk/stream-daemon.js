@@ -118,6 +118,98 @@ function log(tag, ...args) {
   console.error(`[DAEMON:${tag}]`, ...args);
 }
 
+// === VERCEL CONVERSATION HISTORY ===
+// WHY: Claude SDK maintains session state internally via session IDs.
+// Vercel path has no such mechanism — we keep history in-memory in the daemon.
+// Key = queryId prefix (session-XXXXX) which stays constant within a session.
+
+/** @type {Map<string, Array<{role: string, content: string}>>} */
+const vercelSessions = new Map();
+const MAX_VERCEL_HISTORY = 20; // max messages per session (10 user + 10 assistant)
+
+function getVercelSessionKey(queryId) {
+  // queryId format: q_session-XXXXX-YYYYY_UUID — extract session part
+  const match = queryId.match(/^q_(session-[^_]+)/);
+  return match ? match[1] : queryId;
+}
+
+function getVercelHistory(sessionKey) {
+  return vercelSessions.get(sessionKey) || [];
+}
+
+function appendVercelHistory(sessionKey, role, content) {
+  if (!vercelSessions.has(sessionKey)) {
+    vercelSessions.set(sessionKey, []);
+  }
+  const history = vercelSessions.get(sessionKey);
+  history.push({ role, content });
+  // Trim oldest messages if over limit
+  while (history.length > MAX_VERCEL_HISTORY) {
+    history.shift();
+  }
+}
+
+// === VERCEL SYSTEM PROMPT BUILDER ===
+
+/**
+ * Build a system prompt for Vercel AI SDK path from agent/team context.
+ * WHY: Claude SDK uses built-in presets; Vercel models need explicit prompt.
+ * Brain: pattern-vercel-agentic-tools
+ */
+function buildVercelSystemPrompt(cmd) {
+  const parts = [];
+
+  // PRIORITY 1: Tool usage instructions (must come first)
+  // WHY: CLAUDE.md agent rules ("explain before acting") override tool behavior.
+  // Tool instructions must have highest priority.
+  if (cmd.cwd) {
+    parts.push(`## CRITICAL: Tool Usage Rules
+
+You are an AI assistant with file system access. You MUST follow these rules:
+
+1. When the user asks to read a file or mentions @file: — call fileRead IMMEDIATELY. Do NOT announce what you're going to do first.
+2. When the user asks what's in a directory — call listDirectory IMMEDIATELY.
+3. When the user asks to find something in files — call searchFiles IMMEDIATELY.
+4. NEVER say "I cannot access files" or "paste the content" — you HAVE the tools, USE THEM.
+5. After reading a file, summarize or discuss its contents in your response.
+
+Available tools: fileRead, listDirectory, searchFiles, fileWrite.
+Project root: ${cmd.cwd}`);
+  }
+
+  // PRIORITY 2: Agent personality from CLAUDE.md (truncated, skip agent rules)
+  if (cmd.cwd) {
+    const claudeMdPath = join(cmd.cwd, 'CLAUDE.md');
+    try {
+      if (existsSync(claudeMdPath)) {
+        let claudeMd = readFileSync(claudeMdPath, 'utf-8');
+        // WHY: CLAUDE.md contains agent communication rules ("Explain before acting",
+        // "Surface uncertainties") that conflict with tool-first behavior.
+        // Extract only the agent header (name, role, personality).
+        const headerEnd = claudeMd.indexOf('**Agent Communication Protocol:**');
+        if (headerEnd > 0) {
+          claudeMd = claudeMd.substring(0, headerEnd).trim();
+        }
+        // Cap at 2000 chars to avoid filling context
+        if (claudeMd.length > 2000) {
+          claudeMd = claudeMd.substring(0, 2000) + '\n...(truncated)';
+        }
+        parts.push(claudeMd);
+      }
+    } catch { /* ignore read errors */ }
+  }
+
+  // Language hint
+  parts.push('Always respond in the same language as the user message.');
+
+  // IDE context if available
+  if (cmd.ideContext) {
+    parts.push(`## IDE Context\n${cmd.ideContext}`);
+  }
+
+  return parts.join('\n\n');
+}
+
 // =============================================================================
 // ANTHROPIC SDK CLIENT — for countTokens API (precise overhead measurement)
 // Brain: gotcha-stamina-overhead-static-estimate
@@ -782,47 +874,76 @@ async function handleQuery(cmd) {
   }
 
   // 🔀 Vercel AI SDK routing: non-Anthropic providers use streamText() instead of Claude Agent SDK
-  const isVercelProvider = ['openai', 'google', 'openrouter'].includes(provider);
-  log('QUERY', `Provider routing: provider="${provider}" isVercel=${isVercelProvider} apiKey=${providerApiKey ? 'SET' : 'EMPTY'}`);
+  // WHY: log() goes to stderr at debug level (invisible in Rust console).
+  // Use console.error('[INFO]') so Rust captures at info level, plus diag() for file.
+  const isVercelProvider = ['openai', 'google', 'openrouter', 'minimax', 'zai'].includes(provider);
+  const vlog = (msg) => {
+    console.error(`[INFO] [DAEMON:VERCEL] ${msg}`);
+    diag(`VERCEL: ${msg}`);
+  };
+  vlog(`Route: provider=${provider} isVercel=${isVercelProvider} model=${model} apiKey=${providerApiKey ? 'SET' : 'EMPTY'} cwd=${cwd || '(none)'}`);
   if (isVercelProvider) {
     try {
       const { streamVercelQuery } = await import('./stream-vercel.js');
+      vlog(`Import OK: stream-vercel.js loaded`);
       const queryStartTime = Date.now();
+
+      // Build system prompt + conversation history for Vercel path
+      const vercelSystemPrompt = buildVercelSystemPrompt(cmd);
+      const sessionKey = getVercelSessionKey(queryId);
+      const history = getVercelHistory(sessionKey);
+
+      // Build messages: history + current user message
+      const messages = [...history, { role: 'user', content: prompt }];
+      vlog(`System prompt: ${vercelSystemPrompt.length} chars, history: ${history.length} msgs, session: ${sessionKey}`);
+
+      // Save user message to history
+      appendVercelHistory(sessionKey, 'user', prompt);
 
       await streamVercelQuery({
         modelId: model,
         provider,
         apiKey: providerApiKey,
-        // Build messages from the prompt field (Rust sends user text as cmd.prompt)
-        // conversationHistory is not passed by Rust — we construct messages here
-        messages: [{ role: 'user', content: prompt }],
-        systemPrompt: cmd.systemPromptText || '',
+        messages,
+        systemPrompt: vercelSystemPrompt,
+        // Brain: pattern-vercel-agentic-tools
+        cwd: cwd || undefined,
         abortController,
         onEvent: (event) => {
-          log('VERCEL', `Emitting event type=${event.type} queryId=${queryId}`);
+          vlog(`Event: type=${event.type} queryId=${queryId}`);
           emit({ type: 'event', queryId, event });
+          // Save assistant text to conversation history
+          if (event.type === 'assistant' && event.message?.content) {
+            const textParts = event.message.content
+              .filter(c => c.type === 'text' && c.text)
+              .map(c => c.text);
+            if (textParts.length > 0) {
+              appendVercelHistory(sessionKey, 'assistant', textParts.join('\n'));
+            }
+          }
         },
-        log: (msg) => log('VERCEL', msg),
+        log: (msg) => vlog(msg),
       });
 
       const elapsedMs = Date.now() - queryStartTime;
+      vlog(`Done: query=${queryId} elapsed=${elapsedMs}ms`);
       emit({ type: 'query_complete', queryId });
-      log('VERCEL', `query=${queryId} completed (${elapsedMs}ms)`);
     } catch (err) {
       if (abortController.signal.aborted) {
-        log('ABORT', `query=${queryId} vercel stream aborted`);
+        vlog(`Abort: query=${queryId}`);
       } else {
         const errorMsg = err instanceof Error ? err.message : String(err);
-        log('ERROR', `query=${queryId} vercel error: ${errorMsg}`);
+        const errorStack = err instanceof Error ? err.stack : '';
+        vlog(`ERROR: query=${queryId} error=${errorMsg}`);
+        vlog(`STACK: ${errorStack}`);
         emit({ type: 'event', queryId, event: {
           type: 'error',
-          error: { type: 'provider_error', message: errorMsg, provider },
+          error: { type: 'provider_error', message: `[Vercel] ${errorMsg}`, provider },
         }});
       }
       emit({ type: 'query_complete', queryId });
     } finally {
       activeQueries.delete(queryId);
-      // Vercel path doesn't touch Anthropic env vars — no restore needed
     }
     return;
   }

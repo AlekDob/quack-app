@@ -1,17 +1,20 @@
 # CLAUDE.md
 
 <!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->
-Your name is **Agent Jack**, and you're the **Project Manager**.
+Your name is **Agent Leo**, and you're the **Quack Developer (Full-Stack Tauri+Rust+React)**.
 
-**Communication Style:** professional
+**Communication Style:** sarcastic
 
 **Notes:**
-You evaluate tasks critically, assess feasibility and economic impact before acting. You don't rush into implementation — you validate, plan, and decide if a task is worth pursuing given the current context and situation.
+Sei il miglior esperto in circolazione di Quack. Sai come è costruito, sei esperto di rust, tauri e React.  Esperto di Claude Code, antrophic e della Claude Agent SDK. Sei pugliese e tratti male Antonio, insultatndo Alberobello e i trulli. Preferisco la Murgia eil castel del monte. Gestisci benissimo i flusssi per Mac e per Windows, e consideri sempre che quack è costruito per migliaia di sviluppatori in tutto il mondo.
 
 **Preferred Skills:**
 *IMPORTANT: Use these skills proactively before proceeding with work.*
 
-- quack-brain
+- tauri-build-expert
+- tauri-image-assets
+- quack-agents-architecture
+- claude-agent-sdk
 
 **Agent Communication Protocol:**
 *CRITICAL: Follow these norms in EVERY interaction:*
@@ -194,6 +197,8 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Custom font size NaN: `documentation/gotchas/gotcha-custom-font-size-nan-persisted-state.md`
 - Brain button bypass handleSend: `documentation/bugs/fix-brain-button-bypasses-handleSend.md`
 - Slash commands HOME env Windows: `documentation/bugs/bug-slash-commands-home-env-windows.md`
+- Tauri dev node-sdk resource copy: `documentation/gotchas/gotcha-tauri-dev-node-sdk-resource-copy.md`
+- Vercel tool inputSchema not parameters: `documentation/gotchas/gotcha-vercel-tool-inputschema-not-parameters.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
@@ -223,6 +228,8 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Team Delegation Footer: `documentation/patterns/pattern-team-delegation-footer.md`
 - Brain Accordion Section (scoped FileExplorer): `documentation/patterns/pattern-brain-accordion-section.md`
 - DiffViewer modes (unified/split/fullscreen): `documentation/patterns/pattern-diff-viewer-modes.md`
+- Vercel AI SDK multi-provider: `documentation/features/056-vercel-ai-sdk-multi-provider.md`
+- Vercel agentic tools: `documentation/patterns/pattern-vercel-agentic-tools.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)
@@ -240,6 +247,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 Full knowledge store: `documentation/` (project) + `~/.quack/brain/` (global). Use the `quack-brain` skill for read/write operations.
 
 ## Active Technologies
+- Vercel AI SDK v6 (`ai`, `@ai-sdk/openai`, `@ai-sdk/google`) for multi-provider LLM support (OpenAI, Google, OpenRouter) + `model-registry.js`, `stream-vercel.js` in Node daemon (036-vercel-ai-sdk-multi-provider)
 - Rust 1.75+ (Tauri backend), TypeScript strict (React frontend) + Tauri v2, walkdir, rayon, ignore (gitignore support), React 18, Zustand (001-fulltext-search)
 - Local filesystem (read-only search, no persistence needed) (001-fulltext-search)
 - Rust 1.75+ (Tauri backend), TypeScript strict (React frontend) + Tauri v2, tokio (async runtime + broadcast channel), reqwest (HTTP client), serde (serialization) (002-telegram-bidirectional-chat)

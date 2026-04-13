@@ -709,3 +709,28 @@ Exported symbols per file. Generated 2026-03-13.
 
 #### brain_window.rs -- 1 command
 - `open_brain_window`
+
+---
+
+## 11. Node SDK (src-tauri/node-sdk/)
+
+#### vercel-tools.js -- 3 exports
+- `buildVercelTools(projectRoot)` — Build tools scoped to project directory
+- `safePath(projectRoot, relativePath)` — Validate path stays within project root
+- `grepFiles(root, pattern, globPattern)` — Recursive text search in project files
+
+#### stream-vercel.js -- 3 exports
+- `streamVercelQuery()` — Main entry; routes to agentic or chat mode
+- `runAgenticQuery()` — generateText with tools and stepCountIs
+- `runChatQuery()` — streamText without tools (fallback)
+
+#### model-registry.js -- 6 exports
+- `detectApiKeys(override?)` — Merge explicit keys with process.env vars
+- `getAvailableModels(keys)` — Filter registry by available API keys
+- `pickBestModel(preset, keys)` — Auto-select best model for tier
+- `findModel(nameOrId)` — Case-insensitive lookup by ID or label
+- `createModel(entry, keys)` — Instantiate Vercel AI SDK model object
+- `getRegistry()` — Return full model registry array
+
+#### stream-daemon.js -- 1 export
+- `handleDaemonStream()` — Entry point; routes to Claude SDK or Vercel SDK path

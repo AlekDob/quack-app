@@ -306,9 +306,12 @@ export default function ChatSettingsMenu({
                       <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
                       <option value="gpt-4o">GPT-4o</option>
                       <option value="gpt-4o-mini">GPT-4o Mini</option>
+                      <option value="gpt-5.3-codex">GPT-5.3 Codex</option>
+                      <option value="gpt-5.3-codex-spark">GPT-5.3 Codex Spark</option>
                       <option value="codex-mini-latest">Codex Mini</option>
                       <option value="o4-mini">o4 Mini</option>
                       <option value="o3">o3</option>
+                      <option value="o3-pro">o3 Pro</option>
                     </>
                   )}
                   {provider === 'google' && (

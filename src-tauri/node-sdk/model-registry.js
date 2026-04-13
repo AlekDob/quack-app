@@ -12,22 +12,25 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 
 /**
  * @typedef {'fast' | 'smart' | 'pro'} Preset
- * @typedef {'openai' | 'google' | 'openrouter' | 'anthropic-vercel'} VercelProviderName
+ * @typedef {'openai' | 'google' | 'openrouter' | 'anthropic-vercel' | 'minimax' | 'zai'} VercelProviderName
  * @typedef {{ id: string, label: string, provider: VercelProviderName, preset: Preset, toolUse: boolean, vision: boolean, contextWindow: number }} ModelEntry
- * @typedef {{ openai?: string, google?: string, openrouter?: string, anthropic?: string }} DetectedKeys
+ * @typedef {{ openai?: string, google?: string, openrouter?: string, anthropic?: string, minimax?: string, zai?: string }} DetectedKeys
  */
 
 /** @type {ModelEntry[]} */
 const REGISTRY = [
   // === OpenAI === (direct)
-  { id: 'codex-mini-latest', label: 'Codex Mini', provider: 'openai', preset: 'smart', toolUse: false, vision: false, contextWindow: 192000 },
+  { id: 'codex-mini-latest', label: 'Codex Mini', provider: 'openai', preset: 'smart', toolUse: true, vision: false, contextWindow: 192000 },
   { id: 'o4-mini', label: 'o4 Mini', provider: 'openai', preset: 'smart', toolUse: true, vision: true, contextWindow: 200000 },
   { id: 'o3', label: 'o3', provider: 'openai', preset: 'pro', toolUse: true, vision: true, contextWindow: 200000 },
+  { id: 'o3-pro', label: 'o3 Pro', provider: 'openai', preset: 'pro', toolUse: true, vision: true, contextWindow: 200000 },
   { id: 'gpt-4o-mini', label: 'GPT-4o Mini', provider: 'openai', preset: 'fast', toolUse: true, vision: true, contextWindow: 128000 },
   { id: 'gpt-4o', label: 'GPT-4o', provider: 'openai', preset: 'pro', toolUse: true, vision: true, contextWindow: 128000 },
   { id: 'gpt-4.1', label: 'GPT-4.1', provider: 'openai', preset: 'pro', toolUse: true, vision: true, contextWindow: 1047576 },
   { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini', provider: 'openai', preset: 'smart', toolUse: true, vision: true, contextWindow: 1047576 },
   { id: 'gpt-4.1-nano', label: 'GPT-4.1 Nano', provider: 'openai', preset: 'fast', toolUse: true, vision: false, contextWindow: 1047576 },
+  { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex', provider: 'openai', preset: 'pro', toolUse: true, vision: false, contextWindow: 200000 },
+  { id: 'gpt-5.3-codex-spark', label: 'GPT-5.3 Codex Spark', provider: 'openai', preset: 'fast', toolUse: true, vision: false, contextWindow: 128000 },
 
   // === Google === (direct)
   { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', provider: 'google', preset: 'pro', toolUse: true, vision: true, contextWindow: 1048576 },
@@ -42,6 +45,16 @@ const REGISTRY = [
   { id: 'meta-llama/llama-4-maverick', label: 'Llama 4 Maverick (OpenRouter)', provider: 'openrouter', preset: 'pro', toolUse: true, vision: true, contextWindow: 1048576 },
   { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1 (OpenRouter)', provider: 'openrouter', preset: 'smart', toolUse: false, vision: false, contextWindow: 163840 },
   { id: 'qwen/qwen3-coder', label: 'Qwen3 Coder (OpenRouter)', provider: 'openrouter', preset: 'smart', toolUse: true, vision: false, contextWindow: 262144 },
+
+  // === MiniMax === (OpenAI-compatible API)
+  { id: 'MiniMax-M2.5', label: 'MiniMax M2.5', provider: 'minimax', preset: 'smart', toolUse: true, vision: false, contextWindow: 1048576 },
+  { id: 'MiniMax-M2.5-highspeed', label: 'MiniMax M2.5 HighSpeed', provider: 'minimax', preset: 'fast', toolUse: true, vision: false, contextWindow: 1048576 },
+  { id: 'MiniMax-M2.1', label: 'MiniMax M2.1', provider: 'minimax', preset: 'smart', toolUse: true, vision: false, contextWindow: 1048576 },
+
+  // === ZAI / GLM === (OpenAI-compatible API)
+  { id: 'glm-5', label: 'GLM 5', provider: 'zai', preset: 'pro', toolUse: true, vision: false, contextWindow: 128000 },
+  { id: 'glm-4.7', label: 'GLM 4.7', provider: 'zai', preset: 'smart', toolUse: true, vision: false, contextWindow: 128000 },
+  { id: 'glm-4.7-flash', label: 'GLM 4.7 Flash', provider: 'zai', preset: 'fast', toolUse: true, vision: false, contextWindow: 128000 },
 ];
 
 /**
@@ -55,6 +68,8 @@ export function detectApiKeys(override = {}) {
     google: override.google || process.env.GOOGLE_AI_API_KEY,
     openrouter: override.openrouter || process.env.OPENROUTER_API_KEY,
     anthropic: override.anthropic || process.env.ANTHROPIC_API_KEY,
+    minimax: override.minimax || process.env.MINIMAX_API_KEY,
+    zai: override.zai || process.env.ZAI_API_KEY,
   };
 }
 
@@ -69,6 +84,8 @@ export function getAvailableModels(keys) {
     if (m.provider === 'google') return Boolean(keys.google);
     if (m.provider === 'openrouter') return Boolean(keys.openrouter);
     if (m.provider === 'anthropic-vercel') return Boolean(keys.anthropic);
+    if (m.provider === 'minimax') return Boolean(keys.minimax);
+    if (m.provider === 'zai') return Boolean(keys.zai);
     return false;
   });
 }
@@ -135,6 +152,26 @@ export function createModel(entry, keys) {
   if (entry.provider === 'anthropic-vercel') {
     const provider = createAnthropic({ apiKey: keys.anthropic });
     return provider(entry.id);
+  }
+
+  // MiniMax — OpenAI-compatible API (same pattern as Meow)
+  if (entry.provider === 'minimax') {
+    const provider = createOpenAI({
+      baseURL: 'https://api.minimax.io/v1',
+      apiKey: keys.minimax,
+      name: 'minimax',
+    });
+    return provider.chat(entry.id);
+  }
+
+  // ZAI / GLM — OpenAI-compatible API (same pattern as Meow)
+  if (entry.provider === 'zai') {
+    const provider = createOpenAI({
+      baseURL: 'https://api.z.ai/api/coding/paas/v4',
+      apiKey: keys.zai,
+      name: 'zai',
+    });
+    return provider.chat(entry.id);
   }
 
   // OpenRouter — uses OpenAI-compatible endpoint via createOpenAI
