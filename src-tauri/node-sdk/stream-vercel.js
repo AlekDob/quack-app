@@ -410,6 +410,25 @@ export async function streamVercelQuery({
 }) {
   log(`[vercel] Starting: model=${modelId} provider=${provider} cwd=${cwd || '(none)'}`);
 
+  // Early exit: missing API key → clear error to user
+  if (!apiKey) {
+    const providerNames = {
+      openai: 'OpenAI', google: 'Google AI', openrouter: 'OpenRouter',
+      minimax: 'MiniMax', zai: 'ZAI/GLM',
+    };
+    const label = providerNames[provider] || provider;
+    onEvent({
+      type: 'error',
+      error: {
+        type: 'provider_error',
+        message: `API key mancante per ${label}. Vai in Settings > Claude Code e inserisci la ${label} API Key.`,
+        provider,
+        model: modelId,
+      },
+    });
+    return;
+  }
+
   // Resolve model from registry or create ad-hoc
   const keys = detectApiKeys({ [provider]: apiKey });
   const entry = findModel(modelId);
