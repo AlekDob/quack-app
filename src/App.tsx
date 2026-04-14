@@ -19,7 +19,6 @@ import { Store } from "@tauri-apps/plugin-store";
 import { Toaster, toast } from "sonner";
 import "sonner/dist/styles.css";
 import "./sonner-custom.css";
-import { saveSessionBackup, cleanupOldBackups } from "./utils/sessionRecovery";
 
 import TerminalSidebar from "./components/TerminalSidebar";
 import SidePanel from "./components/SidePanel";
@@ -1200,29 +1199,15 @@ function AppContent() {
     activeSessionIdRef.current = activeSessionId;
   }, [activeSessionId]);
 
-  // 🦆 SESSION BACKUP: Flush active session messages to localStorage on app close.
-  // Only the active session is flushed here — other sessions are covered by the
-  // per-turn saveSessionBackup call in the result-event handler.
+  // One-time cleanup: purge legacy session_backup_* keys from localStorage.
+  // Sessions are persisted by Claude Code via .jsonl — these keys are obsolete.
+  // TODO: Remove this effect after a few releases (added 2026-04-14).
   useEffect(() => {
-    const flush = () => {
-      const sid = activeSessionIdRef.current;
-      if (!sid) return;
-      const messages = chatSessionsRef.current.get(sid);
-      if (messages && messages.length > 0) {
-        saveSessionBackup(sid, messages);
-      }
-    };
-    window.addEventListener('beforeunload', flush);
-    window.addEventListener('pagehide', flush);
-    return () => {
-      window.removeEventListener('beforeunload', flush);
-      window.removeEventListener('pagehide', flush);
-    };
-  }, []);
-
-  // Clean up stale localStorage backups on startup (older than 7 days)
-  useEffect(() => {
-    cleanupOldBackups();
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('session_backup_'))
+        .forEach(k => localStorage.removeItem(k));
+    } catch { /* ignore */ }
   }, []);
 
   // Brain: fix-memory-leak-14gb-ram
@@ -1732,15 +1717,6 @@ function AppContent() {
           }
           return newMap;
         });
-      }
-
-      // 🦆 SESSION BACKUP: Persist messages to localStorage at end of turn
-      // Same frequency as token persistence above — once per turn, no excessive writes.
-      // Read from ref (synced at line ~1197) — avoids a no-op setChatSessions updater
-      // that was causing spurious React state update cycles and QuotaExceededError spam.
-      const backupMsgs = chatSessionsRef.current.get(messageKey);
-      if (backupMsgs && backupMsgs.length > 0) {
-        saveSessionBackup(messageKey, backupMsgs);
       }
 
       // Brain: fix-memory-leak-14gb-ram
