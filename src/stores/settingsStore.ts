@@ -37,6 +37,8 @@ interface ClaudeSettings {
   openaiApiKey: string;     // OpenAI API key (for GPT-4o, Codex, o4-mini, etc.)
   googleApiKey: string;     // Google AI API key (for Gemini models)
   openrouterApiKey: string; // OpenRouter API key (aggregator for 100+ models)
+  minimaxApiKey: string;    // MiniMax API key (for M2.5 models)
+  zaiApiKey: string;        // ZAI/GLM API key (for GLM 4.7/5 models)
   // BTW Side-Chain Chat settings
   btwModel: string;         // Model for BTW quick queries (default: haiku45)
   // Bedrock/Vertex model override — when set, bypasses normal model resolution
@@ -179,6 +181,8 @@ const defaultClaudeSettings: ClaudeSettings = {
   openaiApiKey: '',
   googleApiKey: '',
   openrouterApiKey: '',
+  minimaxApiKey: '',
+  zaiApiKey: '',
   btwModel: 'haiku45', // BTW Side-Chain: fast & cheap by default
   bedrockModelOverride: '', // Empty = use normal model resolution
 };

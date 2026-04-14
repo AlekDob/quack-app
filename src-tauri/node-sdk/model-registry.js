@@ -46,11 +46,17 @@ const REGISTRY = [
   { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1 (OpenRouter)', provider: 'openrouter', preset: 'smart', toolUse: false, vision: false, contextWindow: 163840 },
   { id: 'qwen/qwen3-coder', label: 'Qwen3 Coder (OpenRouter)', provider: 'openrouter', preset: 'smart', toolUse: true, vision: false, contextWindow: 262144 },
 
-  // === MiniMax via OpenRouter ===
+  // === MiniMax === (direct + OpenRouter)
+  { id: 'MiniMax-M2.5', label: 'MiniMax M2.5', provider: 'minimax', preset: 'smart', toolUse: true, vision: false, contextWindow: 1048576 },
+  { id: 'MiniMax-M2.5-highspeed', label: 'MiniMax M2.5 HighSpeed', provider: 'minimax', preset: 'fast', toolUse: true, vision: false, contextWindow: 1048576 },
+  { id: 'MiniMax-M2.1', label: 'MiniMax M2.1', provider: 'minimax', preset: 'smart', toolUse: true, vision: false, contextWindow: 1048576 },
   { id: 'minimax/MiniMax-M2.5', label: 'MiniMax M2.5 (OpenRouter)', provider: 'openrouter', preset: 'smart', toolUse: true, vision: false, contextWindow: 1048576 },
   { id: 'minimax/MiniMax-M2.5-highspeed', label: 'MiniMax M2.5 HS (OpenRouter)', provider: 'openrouter', preset: 'fast', toolUse: true, vision: false, contextWindow: 1048576 },
 
-  // === GLM via OpenRouter ===
+  // === ZAI / GLM === (direct + OpenRouter)
+  { id: 'glm-5', label: 'GLM 5', provider: 'zai', preset: 'pro', toolUse: true, vision: false, contextWindow: 128000 },
+  { id: 'glm-4.7', label: 'GLM 4.7', provider: 'zai', preset: 'smart', toolUse: true, vision: false, contextWindow: 128000 },
+  { id: 'glm-4.7-flash', label: 'GLM 4.7 Flash', provider: 'zai', preset: 'fast', toolUse: true, vision: false, contextWindow: 128000 },
   { id: 'z-ai/glm-4.7-flash', label: 'GLM 4.7 Flash (OpenRouter)', provider: 'openrouter', preset: 'fast', toolUse: true, vision: false, contextWindow: 128000 },
   { id: 'z-ai/glm-4.7', label: 'GLM 4.7 (OpenRouter)', provider: 'openrouter', preset: 'smart', toolUse: true, vision: false, contextWindow: 128000 },
 ];

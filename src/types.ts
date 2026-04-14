@@ -605,7 +605,7 @@ export interface ModePreset {
 // anthropic: Claude Agent SDK (primary, agentic)
 // openai/google/openrouter: Vercel AI SDK (streamText, non-agentic)
 // ollama/custom: Legacy paths (ANTHROPIC_BASE_URL override)
-export type LLMProviderType = 'anthropic' | 'ollama' | 'custom' | 'openai' | 'google' | 'openrouter';
+export type LLMProviderType = 'anthropic' | 'ollama' | 'custom' | 'openai' | 'google' | 'openrouter' | 'minimax' | 'zai';
 
 // Ollama model from /api/tags endpoint
 export interface OllamaModel {

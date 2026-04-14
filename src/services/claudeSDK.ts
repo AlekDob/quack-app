@@ -25,16 +25,18 @@ export function getActiveModelName(fallback?: string): string {
 export function getProviderRequestFields(remoteModels?: ModelConfig[], modelOverride?: string) {
   const {
     provider, providerBaseUrl, providerApiKey, ollamaModel, bedrockModelOverride,
-    openaiApiKey, googleApiKey, openrouterApiKey,
+    openaiApiKey, googleApiKey, openrouterApiKey, minimaxApiKey, zaiApiKey,
   } = useSettingsStore.getState().claude;
   const isAnthropic = provider === 'anthropic';
-  const isVercel = ['openai', 'google', 'openrouter'].includes(provider);
+  const isVercel = ['openai', 'google', 'openrouter', 'minimax', 'zai'].includes(provider);
 
   // Resolve API key based on provider type
   const resolveApiKey = (): string | undefined => {
     if (provider === 'openai') return openaiApiKey || undefined;
     if (provider === 'google') return googleApiKey || undefined;
     if (provider === 'openrouter') return openrouterApiKey || undefined;
+    if (provider === 'minimax') return minimaxApiKey || undefined;
+    if (provider === 'zai') return zaiApiKey || undefined;
     if (provider === 'custom') return providerApiKey || undefined;
     return undefined;
   };

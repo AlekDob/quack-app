@@ -198,6 +198,8 @@ export default function ChatSettingsMenu({
                 { value: 'openai' as LLMProviderType, label: 'OpenAI' },
                 { value: 'google' as LLMProviderType, label: 'Gemini' },
                 { value: 'openrouter' as LLMProviderType, label: 'Router' },
+                { value: 'minimax' as LLMProviderType, label: 'MiniMax' },
+                { value: 'zai' as LLMProviderType, label: 'GLM' },
                 { value: 'ollama' as LLMProviderType, label: 'Ollama' },
               ]).map(tab => (
                 <button
@@ -292,7 +294,7 @@ export default function ChatSettingsMenu({
                     </button>
                   )}
                 </div>
-              ) : ['openai', 'google', 'openrouter'].includes(provider) ? (
+              ) : ['openai', 'google', 'openrouter', 'minimax', 'zai'].includes(provider) ? (
                 <select
                   value={ollamaModel}
                   onChange={(e) => updateClaude({ ollamaModel: e.target.value })}
@@ -334,6 +336,20 @@ export default function ChatSettingsMenu({
                       <option value="minimax/MiniMax-M2.5-highspeed">MiniMax M2.5 HS (OpenRouter)</option>
                       <option value="z-ai/glm-4.7-flash">GLM 4.7 Flash (OpenRouter)</option>
                       <option value="z-ai/glm-4.7">GLM 4.7 (OpenRouter)</option>
+                    </>
+                  )}
+                  {provider === 'minimax' && (
+                    <>
+                      <option value="MiniMax-M2.5">MiniMax M2.5</option>
+                      <option value="MiniMax-M2.5-highspeed">MiniMax M2.5 HighSpeed</option>
+                      <option value="MiniMax-M2.1">MiniMax M2.1</option>
+                    </>
+                  )}
+                  {provider === 'zai' && (
+                    <>
+                      <option value="glm-5">GLM 5</option>
+                      <option value="glm-4.7">GLM 4.7</option>
+                      <option value="glm-4.7-flash">GLM 4.7 Flash</option>
                     </>
                   )}
                 </select>

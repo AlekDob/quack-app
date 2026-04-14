@@ -19,7 +19,7 @@ export default function ClaudeCodeSettings() {
   const [loading, setLoading] = useState(true);
 
   // LLM Provider state
-  const { provider, providerBaseUrl, providerApiKey, ollamaModel, btwModel, bedrockModelOverride, openaiApiKey, googleApiKey, openrouterApiKey } = useSettingsStore(s => s.claude);
+  const { provider, providerBaseUrl, providerApiKey, ollamaModel, btwModel, bedrockModelOverride, openaiApiKey, googleApiKey, openrouterApiKey, minimaxApiKey, zaiApiKey } = useSettingsStore(s => s.claude);
   const updateClaude = useSettingsStore(s => s.updateClaudeSettings);
   const [ollamaOnline, setOllamaOnline] = useState<boolean | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
@@ -316,7 +316,39 @@ export default function ClaudeCodeSettings() {
           />
         )}
 
-        {(provider === 'openai' || provider === 'google' || provider === 'openrouter') && (
+        {provider === 'minimax' && (
+          <SettingsRow
+            label="API Key"
+            description="Your MiniMax API key for M2.5 models"
+            control={
+              <input
+                className="settings-input"
+                type="password"
+                value={minimaxApiKey}
+                onChange={(e) => updateClaude({ minimaxApiKey: e.target.value })}
+                placeholder="eyJ..."
+              />
+            }
+          />
+        )}
+
+        {provider === 'zai' && (
+          <SettingsRow
+            label="API Key"
+            description="Your ZAI API key for GLM models"
+            control={
+              <input
+                className="settings-input"
+                type="password"
+                value={zaiApiKey}
+                onChange={(e) => updateClaude({ zaiApiKey: e.target.value })}
+                placeholder="..."
+              />
+            }
+          />
+        )}
+
+        {(provider === 'openai' || provider === 'google' || provider === 'openrouter' || provider === 'minimax' || provider === 'zai') && (
           <SettingsRow
             label="Model"
             description="Model ID (e.g. gpt-4o, gemini-2.5-flash, meta-llama/llama-4-maverick)"
