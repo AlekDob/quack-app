@@ -10,11 +10,16 @@ import { z } from 'zod';
 import { resolve, normalize, relative, join } from 'path';
 import { readFile, writeFile, readdir, stat, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
+import { exec } from 'child_process';
 
 // === CONSTANTS ===
 const MAX_FILE_SIZE = 512_000; // 512KB read limit
 const MAX_SEARCH_RESULTS = 30;
 const MAX_DIR_ENTRIES = 200;
+const BASH_TIMEOUT = 30_000; // 30s per command
+const MAX_BASH_OUTPUT = 100_000; // 100KB output cap
+const MAX_FETCH_SIZE = 512_000; // 512KB fetch limit
+const FETCH_TIMEOUT = 15_000; // 15s fetch timeout
 
 // === SECURITY: PATH VALIDATION ===
 
@@ -130,7 +135,125 @@ export function buildVercelTools(projectRoot) {
     },
   });
 
-  return { fileRead, listDirectory, searchFiles, fileWrite };
+  // --- bash ---
+  const bash = tool({
+    description:
+      'Execute a shell command in the project directory. ' +
+      'Use for running tests, installing packages, git operations, builds, linters. ' +
+      'Timeout: 30s. Output capped at 100KB.',
+    inputSchema: z.object({
+      command: z.string().describe('Shell command to execute'),
+      timeout: z.number().optional().describe('Timeout in ms (default 30000, max 60000)'),
+    }),
+    execute: async ({ command, timeout }) => {
+      const ms = Math.min(timeout || BASH_TIMEOUT, 60_000);
+      return new Promise((resolve) => {
+        exec(command, { cwd: root, timeout: ms, maxBuffer: MAX_BASH_OUTPUT }, (err, stdout, stderr) => {
+          const out = (stdout || '').slice(0, MAX_BASH_OUTPUT);
+          const errOut = (stderr || '').slice(0, MAX_BASH_OUTPUT);
+          resolve({
+            exitCode: err?.code ?? 0,
+            stdout: out,
+            stderr: errOut,
+            ...(err?.killed ? { killed: true, reason: 'timeout' } : {}),
+          });
+        });
+      });
+    },
+  });
+
+  // --- edit (surgical find & replace) ---
+  const fileEdit = tool({
+    description:
+      'Make a surgical edit to a file: find old_string and replace with new_string. ' +
+      'More efficient than rewriting entire files. old_string must be an exact, unique match.',
+    inputSchema: z.object({
+      path: z.string().describe('Relative path from project root'),
+      old_string: z.string().describe('Exact text to find (must be unique in file)'),
+      new_string: z.string().describe('Replacement text'),
+    }),
+    execute: async ({ path, old_string, new_string }) => {
+      try {
+        const full = safePath(root, path);
+        const content = await readFile(full, 'utf-8');
+        const count = content.split(old_string).length - 1;
+        if (count === 0) {
+          return { success: false, error: 'old_string not found in file' };
+        }
+        if (count > 1) {
+          return { success: false, error: `old_string found ${count} times — must be unique. Add more context.` };
+        }
+        const updated = content.replace(old_string, new_string);
+        await writeFile(full, updated, 'utf-8');
+        return { success: true, path, replacements: 1 };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    },
+  });
+
+  // --- webFetch ---
+  const webFetch = tool({
+    description:
+      'Fetch a URL and return its text content. ' +
+      'Use for reading documentation, API references, web pages. ' +
+      'Returns plain text (HTML tags stripped). Max 512KB.',
+    inputSchema: z.object({
+      url: z.string().describe('URL to fetch'),
+    }),
+    execute: async ({ url }) => {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: { 'User-Agent': 'Quack/1.0 (AI coding assistant)' },
+        });
+        clearTimeout(timer);
+        if (!res.ok) {
+          return { success: false, status: res.status, error: res.statusText };
+        }
+        let text = await res.text();
+        if (text.length > MAX_FETCH_SIZE) {
+          text = text.slice(0, MAX_FETCH_SIZE) + '\n[...truncated]';
+        }
+        // Strip HTML tags for cleaner output
+        if (text.includes('<html') || text.includes('<body')) {
+          text = stripHtml(text);
+        }
+        return { success: true, url, length: text.length, content: text };
+      } catch (err) {
+        return { success: false, url, error: err.message };
+      }
+    },
+  });
+
+  // --- patch (unified diff) ---
+  const patch = tool({
+    description:
+      'Apply a unified diff patch to a file. More powerful than edit for multi-block changes. ' +
+      'Provide the patch in unified diff format (lines starting with +/- and context lines).',
+    inputSchema: z.object({
+      path: z.string().describe('Relative path from project root'),
+      patch: z.string().describe('Unified diff content (--- a/file, +++ b/file, @@ hunks)'),
+    }),
+    execute: async ({ path: filePath, patch: patchText }) => {
+      try {
+        const full = safePath(root, filePath);
+        const original = await readFile(full, 'utf-8');
+        const patched = applyUnifiedPatch(original, patchText);
+        await writeFile(full, patched, 'utf-8');
+        return { success: true, path: filePath };
+      } catch (err) {
+        return { success: false, path: filePath, error: err.message };
+      }
+    },
+  });
+
+  return {
+    fileRead, listDirectory, searchFiles, fileWrite,
+    bash, fileEdit, webFetch, patch,
+  };
 }
 
 // === GREP IMPLEMENTATION ===
@@ -229,4 +352,67 @@ function matchGlob(relPath, pattern) {
     return parts.every(part => relPath.includes(part));
   }
   return relPath.includes(pattern.replace(/\*/g, ''));
+}
+
+// === HTML STRIPPING ===
+
+/** Strip HTML tags and decode common entities for cleaner LLM consumption */
+function stripHtml(html) {
+  // Remove script/style blocks entirely
+  let text = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  text = text.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  // Convert block elements to newlines
+  text = text.replace(/<\/(p|div|h[1-6]|li|tr|br\s*\/?)>/gi, '\n');
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+  // Strip remaining tags
+  text = text.replace(/<[^>]+>/g, '');
+  // Decode entities
+  text = text.replace(/&amp;/g, '&').replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+  // Collapse whitespace
+  text = text.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  return text;
+}
+
+// === UNIFIED PATCH APPLICATION ===
+
+/**
+ * Apply a unified diff patch to file content.
+ * Parses @@ hunks and applies +/- lines.
+ */
+function applyUnifiedPatch(original, patchText) {
+  const lines = original.split('\n');
+  const patchLines = patchText.split('\n');
+  const result = [...lines];
+  let offset = 0;
+
+  for (let i = 0; i < patchLines.length; i++) {
+    const hunkMatch = patchLines[i].match(/^@@\s*-(\d+)(?:,\d+)?\s*\+\d+(?:,\d+)?\s*@@/);
+    if (!hunkMatch) continue;
+
+    let lineIdx = parseInt(hunkMatch[1], 10) - 1 + offset;
+
+    for (let j = i + 1; j < patchLines.length; j++) {
+      const pl = patchLines[j];
+      if (pl.startsWith('@@') || pl.startsWith('diff ') || pl.startsWith('---') || pl.startsWith('+++')) {
+        i = j - 1;
+        break;
+      }
+      if (pl.startsWith('-')) {
+        result.splice(lineIdx, 1);
+        offset--;
+      } else if (pl.startsWith('+')) {
+        result.splice(lineIdx, 0, pl.slice(1));
+        lineIdx++;
+        offset++;
+      } else {
+        // Context line (space prefix or no prefix)
+        lineIdx++;
+      }
+      if (j === patchLines.length - 1) i = j;
+    }
+  }
+
+  return result.join('\n');
 }

@@ -15,6 +15,7 @@ tags: [vercel-ai-sdk, multi-provider, openai, google, openrouter, streaming]
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Service | `src-tauri/node-sdk/stream-vercel.js` | `streamVercelQuery()` — streams non-Anthropic queries, emits Claude-compatible events |
+| Service | `src-tauri/node-sdk/vercel-mcp.js` | `loadMCPTools()` — bridges user MCP servers to Vercel AI SDK tools |
 | Service | `src-tauri/node-sdk/model-registry.js` | `detectApiKeys()`, `getAvailableModels()`, `pickBestModel()`, `findModel()`, `createModel()`, `getRegistry()` — model catalog + SDK instantiation |
 | Service | `src-tauri/node-sdk/stream-daemon.js` | Entry point; routes queries to `streamVercelQuery` when provider is openai/google/openrouter |
 | Repository/API | `src-tauri/src/claude_cli.rs` | `get_vercel_models()`, `vercel_model_registry()`, `VercelModelEntry` — Rust-side static registry mirror for UI discovery |
@@ -58,10 +59,12 @@ tags: [vercel-ai-sdk, multi-provider, openai, google, openrouter, streaming]
 - `ollamaModel`: string — selected model ID for non-Anthropic providers (global)
 
 ### External Dependencies
-- `ai` (^6.0.156): Vercel AI SDK core — `streamText()`
+- `ai` (^6.0.156): Vercel AI SDK core — `streamText()`, `generateText()`
 - `@ai-sdk/openai` (^3.0.52): OpenAI + OpenRouter provider adapter
 - `@ai-sdk/google` (^3.0.61): Google Generative AI provider adapter
 - `@ai-sdk/anthropic` (^3.0.68): Anthropic provider adapter (for Vercel path)
+- `@ai-sdk/mcp`: MCP client bridge — `createMCPClient()` for user-configured MCP servers
+- `@modelcontextprotocol/sdk` (^1.12.1): `StdioClientTransport` for stdio-based MCP servers
 
 ### Config
 - `OPENAI_API_KEY`: env var fallback for OpenAI (detected by `detectApiKeys`)
@@ -88,18 +91,43 @@ Models with `toolUse: true` in the registry automatically get filesystem tools w
 
 **Activation logic:**
 ```
-if (registryEntry.toolUse === true && cwd)  -> runAgenticQuery() (generateText + tools)
-else                                         -> runChatQuery()   (streamText, no tools)
+if (toolUse && cwd)                           -> runAgenticQuery() (fs tools + MCP tools)
+else if (mcpTools.length > 0)                 -> runAgenticQuery() (MCP tools only)
+else                                          -> runChatQuery()   (streamText, no tools)
 ```
 
 **Available tools** (defined in `src-tauri/node-sdk/vercel-tools.js`):
 
-| Tool | Description | Limits |
-|------|-------------|--------|
-| `fileRead` | Read file contents | Max 512KB |
-| `listDirectory` | List directory entries | Max 200 entries, ignores node_modules/.git |
-| `searchFiles` | Recursive grep with glob filter | Max 30 results, regex pattern |
-| `fileWrite` | Write content to file | Creates dirs if needed |
+| Tool | Frontend Name | Description | Limits |
+|------|---------------|-------------|--------|
+| `fileRead` | Read | Read file contents | Max 512KB |
+| `fileWrite` | Write | Write content to file | Creates dirs if needed |
+| `fileEdit` | Edit | Surgical find & replace | old_string must be unique |
+| `listDirectory` | Glob | List directory entries | Max 200 entries, ignores node_modules/.git |
+| `searchFiles` | Grep | Recursive grep with glob filter | Max 30 results, regex pattern |
+| `bash` | Bash | Execute shell commands (npm, git, tests, builds) | 30s timeout, 100KB output cap |
+| `webFetch` | WebFetch | Fetch URL content (docs, API refs) | 15s timeout, 512KB, HTML stripped |
+| `patch` | Patch | Apply unified diff patches | Multi-hunk support |
+
+### MCP Tool Integration
+
+User-configured MCP servers (from `.mcp.json` global + project) are loaded for the Vercel path via `@ai-sdk/mcp`. MCP tools are merged with filesystem tools and passed to `generateText()`.
+
+**Module:** `src-tauri/node-sdk/vercel-mcp.js`
+
+**Transport support:**
+| Type | Config | Notes |
+|------|--------|-------|
+| stdio | `{ command, args, env }` | Most common; uses `StdioClientTransport` from `@modelcontextprotocol/sdk` |
+| SSE | `{ type: 'sse', url, headers }` | Remote servers |
+| HTTP | `{ type: 'http', url, headers }` | Remote servers |
+
+**Key behaviors:**
+- Servers connect in parallel (10s timeout each — Brain: gotcha-mcp-server-timeout-slow-startup)
+- Failed servers are skipped (non-blocking — query always proceeds)
+- Tool names prefixed with server name: `mcp_{server}__{tool}` (avoids collisions)
+- MCP clients cleaned up in `finally` block after query completes
+- If model has no `toolUse` flag but MCP tools are available, agentic mode activates anyway
 
 **MAX_AGENTIC_STEPS = 10** — via `maxSteps: 10` (NOT `stopWhen` which is incompatible with some providers).
 

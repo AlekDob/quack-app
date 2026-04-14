@@ -15,6 +15,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { findModel, createModel, detectApiKeys } from './model-registry.js';
 import { buildVercelTools } from './vercel-tools.js';
+import { loadMCPTools } from './vercel-mcp.js';
 
 // === CONSTANTS ===
 const MAX_AGENTIC_STEPS = 10;
@@ -64,6 +65,10 @@ function mapToolName(vercelName) {
     fileRead: 'Read',
     listDirectory: 'Glob',
     searchFiles: 'Grep',
+    bash: 'Bash',
+    fileEdit: 'Edit',
+    webFetch: 'WebFetch',
+    patch: 'Patch',
   };
   return MAP[vercelName] || vercelName;
 }
@@ -75,6 +80,12 @@ function mapToolInput(vercelName, args) {
   }
   if (vercelName === 'fileRead') {
     return { file_path: args.path };
+  }
+  if (vercelName === 'fileEdit') {
+    return { file_path: args.path, old_string: args.old_string, new_string: args.new_string };
+  }
+  if (vercelName === 'bash') {
+    return { command: args.command };
   }
   return args;
 }
@@ -393,6 +404,7 @@ function emitResultEvent({
  * @param {Array} params.messages — conversation history
  * @param {string} [params.systemPrompt] — system prompt text
  * @param {string} [params.cwd] — project root for tool scoping
+ * @param {Record<string, object>} [params.mcpServers] — user MCP servers from .mcp.json
  * @param {AbortController} [params.abortController]
  * @param {(event: object) => void} params.onEvent — event callback
  * @param {(msg: string) => void} [params.log] — logger
@@ -404,6 +416,7 @@ export async function streamVercelQuery({
   messages,
   systemPrompt,
   cwd,
+  mcpServers,
   abortController,
   onEvent,
   log = () => {},
@@ -445,12 +458,52 @@ export async function streamVercelQuery({
   const normalizedMessages = normalizeMessages(messages);
   const useTools = entry?.toolUse && cwd;
 
+  // Load user MCP tools (from .mcp.json) — parallel with query setup
+  // Brain: gotcha-mcp-server-timeout-slow-startup (10s timeout per server)
+  let mcpResult = { tools: {}, cleanup: async () => {} };
+  const hasMcpServers = mcpServers && Object.keys(mcpServers).length > 0;
+  if (hasMcpServers) {
+    try {
+      mcpResult = await loadMCPTools(mcpServers, log);
+    } catch (err) {
+      log(`[vercel] MCP load failed (non-blocking): ${err.message}`);
+    }
+  }
+
+  // Emit system/init event so the frontend shows "System Initialized" widget
+  // with the list of available tools — same format as Claude SDK path.
+  const allToolNames = [];
+  if (useTools) {
+    allToolNames.push('Read', 'Write', 'Edit', 'Glob', 'Grep', 'Bash', 'WebFetch', 'Patch');
+  }
+  allToolNames.push(...Object.keys(mcpResult.tools));
+  const mcpServerNames = hasMcpServers ? Object.keys(mcpServers) : [];
+
+  onEvent({
+    type: 'system',
+    subtype: 'init',
+    session_id: generateMessageId(),
+    model: modelId,
+    cwd: cwd || undefined,
+    tools: allToolNames,
+    mcp_servers: mcpServerNames,
+  });
+
   try {
     if (useTools) {
-      const tools = buildVercelTools(cwd);
+      const fsTools = buildVercelTools(cwd);
+      const tools = { ...fsTools, ...mcpResult.tools };
+      log(`[vercel] Tools: ${Object.keys(fsTools).length} filesystem + ${Object.keys(mcpResult.tools).length} MCP = ${Object.keys(tools).length} total`);
       await runAgenticQuery({
         model, modelId, entry, normalizedMessages,
         systemPrompt, tools, abortController, onEvent, log,
+      });
+    } else if (hasMcpServers && Object.keys(mcpResult.tools).length > 0) {
+      // Model has no toolUse flag, but user has MCP tools — use agentic mode anyway
+      log(`[vercel] No toolUse flag but ${Object.keys(mcpResult.tools).length} MCP tools available — using agentic mode`);
+      await runAgenticQuery({
+        model, modelId, entry, normalizedMessages,
+        systemPrompt, tools: mcpResult.tools, abortController, onEvent, log,
       });
     } else {
       await runChatQuery({
@@ -482,6 +535,9 @@ export async function streamVercelQuery({
         model: modelId,
       },
     });
+  } finally {
+    // Cleanup MCP clients (close stdio processes, SSE connections)
+    await mcpResult.cleanup();
   }
 }
 

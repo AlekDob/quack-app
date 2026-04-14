@@ -900,6 +900,16 @@ async function handleQuery(cmd) {
       // Save user message to history
       appendVercelHistory(sessionKey, 'user', prompt);
 
+      // Load user MCP servers for Vercel path (same .mcp.json as Claude path)
+      let vercelMcpServers = passedMcpServers;
+      if (!vercelMcpServers && cwd) {
+        vercelMcpServers = loadMCPServersFromFile(cwd);
+      } else if (!vercelMcpServers) {
+        vercelMcpServers = loadGlobalMCPServers();
+      }
+      const vercelMcpCount = vercelMcpServers ? Object.keys(vercelMcpServers).length : 0;
+      vlog(`MCP servers for Vercel path: ${vercelMcpCount} [${Object.keys(vercelMcpServers || {}).join(', ')}]`);
+
       await streamVercelQuery({
         modelId: model,
         provider,
@@ -908,6 +918,7 @@ async function handleQuery(cmd) {
         systemPrompt: vercelSystemPrompt,
         // Brain: pattern-vercel-agentic-tools
         cwd: cwd || undefined,
+        mcpServers: vercelMcpServers || undefined,
         abortController,
         onEvent: (event) => {
           vlog(`Event: type=${event.type} queryId=${queryId}`);
