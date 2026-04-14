@@ -218,6 +218,19 @@ const defaultAgentModePresets: AgentModePresets = {
   },
 };
 
+/** Return providers that have a non-empty API key configured */
+export function getValidatedProviders(): LLMProviderType[] {
+  const c = useSettingsStore.getState().claude;
+  const validated: LLMProviderType[] = ['anthropic']; // always available (OAuth)
+  if (c.openaiApiKey?.trim()) validated.push('openai');
+  if (c.googleApiKey?.trim()) validated.push('google');
+  if (c.openrouterApiKey?.trim()) validated.push('openrouter');
+  if (c.minimaxApiKey?.trim()) validated.push('minimax');
+  if (c.zaiApiKey?.trim()) validated.push('zai');
+  validated.push('ollama'); // always available (local, no key needed)
+  return validated;
+}
+
 export const useSettingsStore = create<SettingsState>()(
   devtools(
     persist(

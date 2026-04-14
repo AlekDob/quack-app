@@ -4,7 +4,7 @@ import type { EffortLevel, LLMProviderType } from '../types';
 import type { ModelConfig } from '../services/modelService';
 import { getModelOptions, getModelLabel } from '../services/modelService';
 import { useModelsConfig } from '../hooks/useAppConfig';
-import { useSettingsStore } from '../stores/settingsStore';
+import { useSettingsStore, getValidatedProviders } from '../stores/settingsStore';
 import { fetchOllamaModels, getOllamaModelOptions } from '../services/ollamaService';
 import './ChatSettingsMenu.css';
 
@@ -201,7 +201,7 @@ export default function ChatSettingsMenu({
                 { value: 'minimax' as LLMProviderType, label: 'MiniMax' },
                 { value: 'zai' as LLMProviderType, label: 'GLM' },
                 { value: 'ollama' as LLMProviderType, label: 'Ollama' },
-              ]).map(tab => (
+              ] as const).filter(tab => getValidatedProviders().includes(tab.value)).map(tab => (
                 <button
                   key={tab.value}
                   type="button"
