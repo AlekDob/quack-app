@@ -51,6 +51,35 @@ const S = {
     fontSize: 11, color: 'var(--text-secondary)', opacity: 0.7, marginTop: 6,
     lineHeight: 1.5,
   },
+  modelRow: {
+    display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0',
+    fontSize: 12, color: 'var(--text-secondary)',
+  },
+  checkbox: {
+    width: 14, height: 14, accentColor: 'var(--accent-color)', cursor: 'pointer',
+    margin: 0, flexShrink: 0,
+  },
+  modelLabel: (disabled: boolean): React.CSSProperties => ({
+    opacity: disabled ? 0.4 : 0.9, textDecoration: disabled ? 'line-through' : 'none',
+    cursor: 'pointer', userSelect: 'none' as const,
+  }),
+  addModelRow: {
+    display: 'flex', gap: 6, alignItems: 'center', marginTop: 4,
+  },
+  addInput: {
+    flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(128,132,150,0.2)',
+    borderRadius: 5, padding: '4px 8px', fontSize: 11, color: 'var(--text-primary)',
+    outline: 'none', boxSizing: 'border-box' as const,
+  },
+  addBtn: {
+    padding: '4px 8px', fontSize: 11, borderRadius: 5, cursor: 'pointer',
+    background: 'rgba(var(--accent-rgb), 0.15)', border: '1px solid rgba(var(--accent-rgb), 0.3)',
+    color: 'var(--accent-color)', fontWeight: 600, flexShrink: 0,
+  },
+  removeBtn: {
+    fontSize: 10, color: '#ef4444', cursor: 'pointer', opacity: 0.6,
+    background: 'none', border: 'none', padding: '0 2px', flexShrink: 0,
+  },
   spinner: {
     display: 'inline-block', width: 10, height: 10, border: '2px solid rgba(255,255,255,0.2)',
     borderTopColor: '#fff', borderRadius: '50%',
@@ -67,15 +96,25 @@ const IDLE: TestState = { loading: false };
 
 function ProviderCard({
   name, providerId, apiKey, onKeyChange, models, accentColor,
+  disabledModels, onToggleModel, customModels, onAddCustom, onRemoveCustom,
   isSpecial, statusOverride, children,
 }: {
   name: string; providerId: string; apiKey: string;
-  onKeyChange: (k: string) => void; models: string[];
-  accentColor: string; isSpecial?: boolean;
-  statusOverride?: 'active' | 'unconfigured'; children?: React.ReactNode;
+  onKeyChange: (k: string) => void;
+  models: { id: string; label: string }[];
+  accentColor: string;
+  disabledModels: string[];
+  onToggleModel: (id: string) => void;
+  customModels: string[];
+  onAddCustom: (id: string) => void;
+  onRemoveCustom: (id: string) => void;
+  isSpecial?: boolean;
+  statusOverride?: 'active' | 'unconfigured';
+  children?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [test, setTest] = useState<TestState>(IDLE);
+  const [newModelId, setNewModelId] = useState('');
 
   const dotColor = statusOverride === 'active' || (!isSpecial && apiKey.length > 0)
     ? '#22c55e' : 'rgba(128,132,150,0.4)';
@@ -88,6 +127,14 @@ function ProviderCard({
     const msg = result.ok ? 'Connected' : (result.error ?? 'Failed').slice(0, 80);
     setTest({ loading: false, ok: result.ok, message: msg });
   }, [providerId, apiKey]);
+
+  const handleAddModel = () => {
+    const id = newModelId.trim();
+    if (id && !models.some(m => m.id === id) && !customModels.includes(id)) {
+      onAddCustom(id);
+      setNewModelId('');
+    }
+  };
 
   return (
     <div style={S.card(accentColor)}>
@@ -103,30 +150,61 @@ function ProviderCard({
         <div style={S.body}>
           {children}
           {!isSpecial && (
-            <>
-              <div>
-                <div style={S.label}>API Key</div>
-                <div style={S.row}>
-                  <input
-                    type="password" value={apiKey} onChange={e => handleKeyChange(e.target.value)}
-                    placeholder="sk-..." style={S.input} autoComplete="off"
-                  />
-                  <button style={S.testBtn} onClick={runTest} disabled={test.loading}>
-                    {test.loading && <span style={S.spinner} />}
-                    Test
-                  </button>
-                </div>
-                {test.message && (
-                  <div style={S.feedback(!!test.ok)}>
-                    {test.ok ? 'Connected' : test.message}
-                  </div>
-                )}
+            <div>
+              <div style={S.label}>API Key</div>
+              <div style={S.row}>
+                <input
+                  type="password" value={apiKey} onChange={e => handleKeyChange(e.target.value)}
+                  placeholder="sk-..." style={S.input} autoComplete="off"
+                />
+                <button style={S.testBtn} onClick={runTest} disabled={test.loading}>
+                  {test.loading && <span style={S.spinner} />}
+                  Test
+                </button>
               </div>
-            </>
+              {test.message && (
+                <div style={S.feedback(!!test.ok)}>
+                  {test.ok ? 'Connected' : test.message}
+                </div>
+              )}
+            </div>
           )}
+
+          {/* Model checkboxes */}
           {models.length > 0 && (
-            <div style={S.modelList}>
-              Models: {models.join(', ')}
+            <div style={{ marginTop: 6 }}>
+              <div style={S.label}>Models (uncheck to hide from dropdown)</div>
+              {models.map(m => {
+                const disabled = disabledModels.includes(m.id);
+                return (
+                  <div key={m.id} style={S.modelRow}>
+                    <input type="checkbox" checked={!disabled}
+                      onChange={() => onToggleModel(m.id)} style={S.checkbox} />
+                    <span style={S.modelLabel(disabled)} onClick={() => onToggleModel(m.id)}>
+                      {m.label}
+                    </span>
+                  </div>
+                );
+              })}
+              {customModels.map(id => (
+                <div key={id} style={S.modelRow}>
+                  <input type="checkbox" checked={!disabledModels.includes(id)}
+                    onChange={() => onToggleModel(id)} style={S.checkbox} />
+                  <span style={{ ...S.modelLabel(disabledModels.includes(id)), color: 'var(--accent-color)' }}
+                    onClick={() => onToggleModel(id)}>
+                    {id}
+                  </span>
+                  <button style={S.removeBtn} onClick={() => onRemoveCustom(id)} title="Remove custom model">x</button>
+                </div>
+              ))}
+              <div style={S.addModelRow}>
+                <input value={newModelId} onChange={e => setNewModelId(e.target.value)}
+                  placeholder="Add custom model ID..." style={S.addInput}
+                  onKeyDown={e => e.key === 'Enter' && handleAddModel()} />
+                <button style={S.addBtn} onClick={handleAddModel} disabled={!newModelId.trim()}>
+                  + Add
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -246,22 +324,108 @@ function CustomCard({ baseUrl, apiKey, onBaseUrlChange, onKeyChange }: {
 
 // ── ModelsSettings ────────────────────────────────────────────────────────────
 
+// === Model definitions per provider ===
+const PROVIDER_MODELS: Record<string, { id: string; label: string }[]> = {
+  openai: [
+    { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
+    { id: 'gpt-5.3-codex-spark', label: 'GPT-5.3 Codex Spark' },
+    { id: 'gpt-4.1', label: 'GPT-4.1' },
+    { id: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
+    { id: 'gpt-4.1-nano', label: 'GPT-4.1 Nano' },
+    { id: 'gpt-4o', label: 'GPT-4o' },
+    { id: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+    { id: 'o3', label: 'o3' },
+    { id: 'o3-pro', label: 'o3 Pro' },
+    { id: 'o4-mini', label: 'o4 Mini' },
+    { id: 'codex-mini-latest', label: 'Codex Mini' },
+  ],
+  google: [
+    { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
+  ],
+  openrouter: [
+    { id: 'openai/gpt-4o', label: 'GPT-4o' },
+    { id: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
+    { id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { id: 'meta-llama/llama-4-maverick', label: 'Llama 4 Maverick' },
+    { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1' },
+    { id: 'qwen/qwen3-coder', label: 'Qwen3 Coder' },
+    { id: 'minimax/MiniMax-M2.5', label: 'MiniMax M2.5' },
+    { id: 'z-ai/glm-4.7-flash', label: 'GLM 4.7 Flash' },
+  ],
+  minimax: [
+    { id: 'MiniMax-M2.5', label: 'MiniMax M2.5' },
+    { id: 'MiniMax-M2.5-highspeed', label: 'MiniMax M2.5 HighSpeed' },
+    { id: 'MiniMax-M2.1', label: 'MiniMax M2.1' },
+  ],
+  zai: [
+    { id: 'glm-5', label: 'GLM 5' },
+    { id: 'glm-4.7', label: 'GLM 4.7' },
+    { id: 'glm-4.7-flash', label: 'GLM 4.7 Flash' },
+  ],
+};
+
 export default function ModelsSettings() {
   const { providerBaseUrl, providerApiKey, openaiApiKey, googleApiKey,
-    openrouterApiKey, minimaxApiKey, zaiApiKey } = useSettingsStore(s => s.claude);
+    openrouterApiKey, minimaxApiKey, zaiApiKey,
+    disabledModels = [], customModels = {},
+  } = useSettingsStore(s => s.claude);
   const updateClaude = useSettingsStore(s => s.updateClaudeSettings);
+
+  const toggleModel = useCallback((modelId: string) => {
+    const current = disabledModels || [];
+    const next = current.includes(modelId)
+      ? current.filter(id => id !== modelId)
+      : [...current, modelId];
+    updateClaude({ disabledModels: next });
+  }, [disabledModels, updateClaude]);
+
+  const addCustomModel = useCallback((provider: string, modelId: string) => {
+    const current = { ...(customModels || {}) };
+    current[provider] = [...(current[provider] || []), modelId];
+    updateClaude({ customModels: current });
+  }, [customModels, updateClaude]);
+
+  const removeCustomModel = useCallback((provider: string, modelId: string) => {
+    const current = { ...(customModels || {}) };
+    current[provider] = (current[provider] || []).filter(id => id !== modelId);
+    // Also remove from disabled if it was disabled
+    const nextDisabled = (disabledModels || []).filter(id => id !== modelId);
+    updateClaude({ customModels: current, disabledModels: nextDisabled });
+  }, [customModels, disabledModels, updateClaude]);
+
+  const cardProps = (providerId: string, apiKey: string, onKeyChange: (v: string) => void) => ({
+    disabledModels: disabledModels || [],
+    onToggleModel: toggleModel,
+    customModels: (customModels || {})[providerId] || [],
+    onAddCustom: (id: string) => addCustomModel(providerId, id),
+    onRemoveCustom: (id: string) => removeCustomModel(providerId, id),
+    apiKey, onKeyChange,
+  });
 
   return (
     <div>
       <style>{`@keyframes quack-spin { to { transform: rotate(360deg); } }`}</style>
-      <SectionHeader title="LLM Providers" description="Configure API keys for each provider. Keys are stored locally." />
+      <SectionHeader title="LLM Providers" description="Configure API keys and select which models appear in the chat dropdown." />
       <div style={S.container}>
         <AnthropicCard />
-        <ProviderCard name="OpenAI" providerId="openai" apiKey={openaiApiKey ?? ''} accentColor="#10a37f" onKeyChange={v => updateClaude({ openaiApiKey: v })} models={['GPT-5.3 Codex', 'GPT-4.1', 'GPT-4o', 'o3', 'o4-mini', 'Codex Mini']} />
-        <ProviderCard name="Google" providerId="google" apiKey={googleApiKey ?? ''} accentColor="#4285f4" onKeyChange={v => updateClaude({ googleApiKey: v })} models={['Gemini 2.5 Pro', 'Gemini 2.5 Flash', 'Gemini 2.5 Flash Lite']} />
-        <ProviderCard name="OpenRouter" providerId="openrouter" apiKey={openrouterApiKey ?? ''} accentColor="#6366f1" onKeyChange={v => updateClaude({ openrouterApiKey: v })} models={['100+ aggregated models']} />
-        <ProviderCard name="MiniMax" providerId="minimax" apiKey={minimaxApiKey ?? ''} accentColor="#f59e0b" onKeyChange={v => updateClaude({ minimaxApiKey: v })} models={['MiniMax M2.5', 'MiniMax M2.5 HighSpeed', 'MiniMax M2.1']} />
-        <ProviderCard name="GLM / ZAI" providerId="zai" apiKey={zaiApiKey ?? ''} accentColor="#06b6d4" onKeyChange={v => updateClaude({ zaiApiKey: v })} models={['GLM-5', 'GLM-4.7', 'GLM-4.7 Flash']} />
+        <ProviderCard name="OpenAI" providerId="openai" accentColor="#10a37f"
+          models={PROVIDER_MODELS.openai}
+          {...cardProps('openai', openaiApiKey ?? '', v => updateClaude({ openaiApiKey: v }))} />
+        <ProviderCard name="Google" providerId="google" accentColor="#4285f4"
+          models={PROVIDER_MODELS.google}
+          {...cardProps('google', googleApiKey ?? '', v => updateClaude({ googleApiKey: v }))} />
+        <ProviderCard name="OpenRouter" providerId="openrouter" accentColor="#6366f1"
+          models={PROVIDER_MODELS.openrouter}
+          {...cardProps('openrouter', openrouterApiKey ?? '', v => updateClaude({ openrouterApiKey: v }))} />
+        <ProviderCard name="MiniMax" providerId="minimax" accentColor="#f59e0b"
+          models={PROVIDER_MODELS.minimax}
+          {...cardProps('minimax', minimaxApiKey ?? '', v => updateClaude({ minimaxApiKey: v }))} />
+        <ProviderCard name="GLM / ZAI" providerId="zai" accentColor="#06b6d4"
+          models={PROVIDER_MODELS.zai}
+          {...cardProps('zai', zaiApiKey ?? '', v => updateClaude({ zaiApiKey: v }))} />
         <OllamaCard baseUrl={providerBaseUrl ?? 'http://localhost:11434'}
           onBaseUrlChange={v => updateClaude({ providerBaseUrl: v })} />
         <CustomCard baseUrl={providerBaseUrl ?? ''} apiKey={providerApiKey ?? ''}

@@ -39,6 +39,9 @@ interface ClaudeSettings {
   openrouterApiKey: string; // OpenRouter API key (aggregator for 100+ models)
   minimaxApiKey: string;    // MiniMax API key (for M2.5 models)
   zaiApiKey: string;        // ZAI/GLM API key (for GLM 4.7/5 models)
+  // Model visibility — disabled models are hidden from ChatSettingsMenu dropdown
+  disabledModels: string[];  // Model IDs that user has unchecked (hidden from dropdown)
+  customModels: Record<string, string[]>; // Provider -> custom model IDs added by user
   // BTW Side-Chain Chat settings
   btwModel: string;         // Model for BTW quick queries (default: haiku45)
   // Bedrock/Vertex model override — when set, bypasses normal model resolution
@@ -183,6 +186,8 @@ const defaultClaudeSettings: ClaudeSettings = {
   openrouterApiKey: '',
   minimaxApiKey: '',
   zaiApiKey: '',
+  disabledModels: [],
+  customModels: {},
   btwModel: 'haiku45', // BTW Side-Chain: fast & cheap by default
   bedrockModelOverride: '', // Empty = use normal model resolution
 };

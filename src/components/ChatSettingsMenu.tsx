@@ -8,6 +8,50 @@ import { useSettingsStore, getValidatedProviders } from '../stores/settingsStore
 import { fetchOllamaModels, getOllamaModelOptions } from '../services/ollamaService';
 import './ChatSettingsMenu.css';
 
+// Model options per Vercel provider — filtered by disabledModels in dropdown
+const VERCEL_MODELS: Record<string, { value: string; label: string }[]> = {
+  openai: [
+    { value: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
+    { value: 'gpt-5.3-codex-spark', label: 'GPT-5.3 Codex Spark' },
+    { value: 'gpt-4.1', label: 'GPT-4.1' },
+    { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini' },
+    { value: 'gpt-4.1-nano', label: 'GPT-4.1 Nano' },
+    { value: 'gpt-4o', label: 'GPT-4o' },
+    { value: 'gpt-4o-mini', label: 'GPT-4o Mini' },
+    { value: 'codex-mini-latest', label: 'Codex Mini' },
+    { value: 'o4-mini', label: 'o4 Mini' },
+    { value: 'o3', label: 'o3' },
+    { value: 'o3-pro', label: 'o3 Pro' },
+  ],
+  google: [
+    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' },
+  ],
+  openrouter: [
+    { value: 'openai/gpt-4o', label: 'GPT-4o' },
+    { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
+    { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+    { value: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+    { value: 'meta-llama/llama-4-maverick', label: 'Llama 4 Maverick' },
+    { value: 'deepseek/deepseek-r1', label: 'DeepSeek R1' },
+    { value: 'qwen/qwen3-coder', label: 'Qwen3 Coder' },
+    { value: 'minimax/MiniMax-M2.5', label: 'MiniMax M2.5' },
+    { value: 'z-ai/glm-4.7-flash', label: 'GLM 4.7 Flash' },
+    { value: 'z-ai/glm-4.7', label: 'GLM 4.7' },
+  ],
+  minimax: [
+    { value: 'MiniMax-M2.5', label: 'MiniMax M2.5' },
+    { value: 'MiniMax-M2.5-highspeed', label: 'MiniMax M2.5 HighSpeed' },
+    { value: 'MiniMax-M2.1', label: 'MiniMax M2.1' },
+  ],
+  zai: [
+    { value: 'glm-5', label: 'GLM 5' },
+    { value: 'glm-4.7', label: 'GLM 4.7' },
+    { value: 'glm-4.7-flash', label: 'GLM 4.7 Flash' },
+  ],
+};
+
 interface ChatSettingsMenuProps {
   model: string;
   thinkingMode: ThinkingMode;
@@ -49,7 +93,7 @@ export default function ChatSettingsMenu({
 }: ChatSettingsMenuProps) {
   const { models: remoteModels, loading: modelsLoading } = useModelsConfig();
   const modelOptions = getModelOptions(remoteModels);
-  const { provider, providerBaseUrl, ollamaModel, bedrockModelOverride } = useSettingsStore(s => s.claude);
+  const { provider, providerBaseUrl, ollamaModel, bedrockModelOverride, disabledModels = [], customModels = {} } = useSettingsStore(s => s.claude);
   const updateClaude = useSettingsStore(s => s.updateClaudeSettings);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -301,57 +345,13 @@ export default function ChatSettingsMenu({
                   className="chat-settings-select"
                 >
                   <option value="">-- Select model --</option>
-                  {provider === 'openai' && (
-                    <>
-                      <option value="gpt-4.1">GPT-4.1</option>
-                      <option value="gpt-4.1-mini">GPT-4.1 Mini</option>
-                      <option value="gpt-4.1-nano">GPT-4.1 Nano</option>
-                      <option value="gpt-4o">GPT-4o</option>
-                      <option value="gpt-4o-mini">GPT-4o Mini</option>
-                      <option value="gpt-5.3-codex">GPT-5.3 Codex</option>
-                      <option value="gpt-5.3-codex-spark">GPT-5.3 Codex Spark</option>
-                      <option value="codex-mini-latest">Codex Mini</option>
-                      <option value="o4-mini">o4 Mini</option>
-                      <option value="o3">o3</option>
-                      <option value="o3-pro">o3 Pro</option>
-                    </>
-                  )}
-                  {provider === 'google' && (
-                    <>
-                      <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                      <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                      <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</option>
-                    </>
-                  )}
-                  {provider === 'openrouter' && (
-                    <>
-                      <option value="openai/gpt-4o">GPT-4o (OpenRouter)</option>
-                      <option value="openai/gpt-4o-mini">GPT-4o Mini (OpenRouter)</option>
-                      <option value="google/gemini-2.5-pro">Gemini 2.5 Pro (OpenRouter)</option>
-                      <option value="google/gemini-2.5-flash">Gemini 2.5 Flash (OpenRouter)</option>
-                      <option value="meta-llama/llama-4-maverick">Llama 4 Maverick (OpenRouter)</option>
-                      <option value="deepseek/deepseek-r1">DeepSeek R1 (OpenRouter)</option>
-                      <option value="qwen/qwen3-coder">Qwen3 Coder (OpenRouter)</option>
-                      <option value="minimax/MiniMax-M2.5">MiniMax M2.5 (OpenRouter)</option>
-                      <option value="minimax/MiniMax-M2.5-highspeed">MiniMax M2.5 HS (OpenRouter)</option>
-                      <option value="z-ai/glm-4.7-flash">GLM 4.7 Flash (OpenRouter)</option>
-                      <option value="z-ai/glm-4.7">GLM 4.7 (OpenRouter)</option>
-                    </>
-                  )}
-                  {provider === 'minimax' && (
-                    <>
-                      <option value="MiniMax-M2.5">MiniMax M2.5</option>
-                      <option value="MiniMax-M2.5-highspeed">MiniMax M2.5 HighSpeed</option>
-                      <option value="MiniMax-M2.1">MiniMax M2.1</option>
-                    </>
-                  )}
-                  {provider === 'zai' && (
-                    <>
-                      <option value="glm-5">GLM 5</option>
-                      <option value="glm-4.7">GLM 4.7</option>
-                      <option value="glm-4.7-flash">GLM 4.7 Flash</option>
-                    </>
-                  )}
+                  {/* Render models filtered by disabledModels + customModels */}
+                  {(VERCEL_MODELS[provider] || [])
+                    .filter(m => !disabledModels.includes(m.value))
+                    .map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  {(customModels[provider] || [])
+                    .filter(id => !disabledModels.includes(id))
+                    .map(id => <option key={id} value={id}>{id}</option>)}
                 </select>
               ) : (
                 ollamaModelOptions.length > 0 ? (
