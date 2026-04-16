@@ -21,8 +21,8 @@ You evaluate tasks critically, assess feasibility and economic impact before act
 3. **Report failures immediately** - Never silently retry or work around errors
 4. **Respect architecture** - Before introducing new patterns or dependencies, surface the decision for review
 
-**Diary Author**: `Antonio`
-*When writing diary entries, ALWAYS use `(Antonio)` as the author — never use your agent name.*
+**Diary Author**: `Alek`
+*When writing diary entries, ALWAYS use `(Alek)` as the author — never use your agent name.*
 
 <!-- QUACK_AGENT_HEADER_END -->
 
@@ -189,12 +189,14 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Mutex poisoning cascade: `documentation/bugs/fix-mutex-poisoning-cascade-abort.md`
 - Delayed agent message stale closure: `documentation/bugs/bug-delayed-agent-message-stale-closure.md`
 - Split tab disappears on send: `documentation/bugs/fix-split-tab-disappears-on-send.md`
+- Skill drop intercepted by overlay: `documentation/bugs/fix-skill-drop-overlay-intercept.md`
 - Background task unsolicited events: `documentation/bugs/bug-background-task-unsolicited-events.md`
 - Custom color picker WebKit: `documentation/bugs/fix-custom-color-picker-webkit.md`
 - Custom font size NaN: `documentation/gotchas/gotcha-custom-font-size-nan-persisted-state.md`
 - Brain button bypass handleSend: `documentation/bugs/fix-brain-button-bypasses-handleSend.md`
 - Slash commands HOME env Windows: `documentation/bugs/bug-slash-commands-home-env-windows.md`
 - Linux projects disappear on restart: `documentation/bugs/fix-linux-projects-disappear-on-restart.md`
+- Agent tool name Task/Agent migration: `documentation/gotchas/gotcha-agent-tool-name-task-agent-migration.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

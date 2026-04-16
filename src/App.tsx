@@ -4858,6 +4858,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const [pendingAgentMention, setPendingAgentMention] = useState<AgentInfo | null>(null); // Agent to insert as @mention in input
   const [pendingFileMention, setPendingFileMention] = useState<{ name: string; path: string; relativePath: string; isDirectory: boolean } | null>(null); // File/folder to insert as @mention
   const [pendingSlashCommand, setPendingSlashCommand] = useState<{ name: string; description: string } | null>(null); // Slash command to insert in input
+  const [pendingSkillMention, setPendingSkillMention] = useState<{ name: string } | null>(null); // Skill to insert as @skill:name mention
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [agentsInitialized, setAgentsInitialized] = useState(false); // True after first load completes
   const [agentsError, setAgentsError] = useState<string | null>(null);
@@ -11094,14 +11095,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, []);
 
-  // Handle file drop into chat zone (inserts @file mention)
+  // Handle sidebar drop into chat zone (inserts @file or @skill mention)
+  // Brain: fix-skill-drop-overlay-intercept
   const handleChatDrop = useCallback((data: SidebarDropData) => {
-    if (data.mimeType !== 'application/quack-file') return;
-    try {
-      const fileData = JSON.parse(data.payload) as { name: string; path: string; isDir?: boolean };
-      handleMentionFile(fileData.path, fileData.name, fileData.isDir ?? false);
-    } catch { /* ignore parse errors */ }
-    setIsDraggingSidebar(false);
+    setIsDraggingSidebar(false); // Always clear overlay — was after early return causing frozen UI
+    if (data.mimeType === 'application/quack-file') {
+      try {
+        const fileData = JSON.parse(data.payload) as { name: string; path: string; isDir?: boolean };
+        handleMentionFile(fileData.path, fileData.name, fileData.isDir ?? false);
+      } catch { /* ignore parse errors */ }
+    } else if (data.mimeType === 'application/quack-skill') {
+      try {
+        const skillData = JSON.parse(data.payload) as { type: string; name: string };
+        if (skillData.name) {
+          setPendingSkillMention({ name: skillData.name });
+        }
+      } catch { /* ignore parse errors */ }
+    }
   }, [handleMentionFile]);
 
   // Handle tab popout - drag tab outside tab bar to create floating window
@@ -13118,6 +13128,8 @@ You have access to all Bash tools to execute git commands like:
                     onFileMentionInserted={() => setPendingFileMention(null)}
                     pendingSlashCommand={pendingSlashCommand}
                     onCommandInserted={() => setPendingSlashCommand(null)}
+                    pendingSkillMention={pendingSkillMention}
+                    onSkillMentionInserted={() => setPendingSkillMention(null)}
                     basePath={isTaskChat ? (activeTaskSession?.projectPath || explorerRoot || explorerPath) : (explorerRoot ?? explorerPath)}
                     inputDraft={isTaskChat
                       ? (taskInputDrafts.get(activeTaskId!) || (taskMessages.length === 0 ? '' : ''))
@@ -13304,6 +13316,8 @@ You have access to all Bash tools to execute git commands like:
                     onFileMentionInserted={() => setPendingFileMention(null)}
                     pendingSlashCommand={pendingSlashCommand}
                     onCommandInserted={() => setPendingSlashCommand(null)}
+                    pendingSkillMention={pendingSkillMention}
+                    onSkillMentionInserted={() => setPendingSkillMention(null)}
                     basePath={activeSession.projectPath || explorerRoot || explorerPath}
                     inputDraft={taskInputDrafts.get(taskSessionId) || (taskMessages.length === 0 ? '' : '')}
                     onInputDraftChange={(draft) => {

@@ -64,6 +64,8 @@ interface ChatInputProps {
   onFileMentionInserted?: () => void;
   pendingSlashCommand?: { name: string; description: string } | null;
   onCommandInserted?: () => void;
+  pendingSkillMention?: { name: string } | null;
+  onSkillMentionInserted?: () => void;
   basePath?: string;
   // Controlled input value
   inputValue?: string;
@@ -111,6 +113,8 @@ export default function ChatInput({
   onFileMentionInserted,
   pendingSlashCommand,
   onCommandInserted,
+  pendingSkillMention,
+  onSkillMentionInserted,
   basePath,
   inputValue: controlledInputValue,
   onInputChange: controlledOnInputChange,
@@ -822,6 +826,35 @@ export default function ChatInput({
       onCommandInserted();
     }
   }, [pendingSlashCommand, onCommandInserted, input, setInput]);
+
+  // Insert skill mention when requested from sidebar drop
+  // Brain: fix-skill-drop-overlay-intercept
+  useEffect(() => {
+    if (!pendingSkillMention || !textareaRef.current) return;
+
+    const cursorPos = textareaRef.current.selectionStart;
+    const beforeCursor = input.substring(0, cursorPos);
+    const afterCursor = input.substring(cursorPos);
+
+    const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(' ') && !beforeCursor.endsWith('\n');
+    const prefix = needsSpaceBefore ? ' ' : '';
+    const mention = `${prefix}@skill:${pendingSkillMention.name} `;
+    const newInput = beforeCursor + mention + afterCursor;
+
+    setInput(newInput);
+
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        const newCursorPos = beforeCursor.length + mention.length;
+        textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    }, 0);
+
+    if (onSkillMentionInserted) {
+      onSkillMentionInserted();
+    }
+  }, [pendingSkillMention, onSkillMentionInserted, input, setInput]);
 
   // Auto-update XML closing tag when editing opening tag
   useEffect(() => {

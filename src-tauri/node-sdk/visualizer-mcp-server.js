@@ -27,15 +27,16 @@ import {
 const TOOLS = [
   {
     name: 'visualize_html',
-    description: `Render interactive HTML/CSS visualization inline in the chat. Use this tool when you want to display:
-- Charts and graphs (use pure SVG — NO JavaScript libraries)
+    description: `Render interactive HTML/CSS/JS visualization inline in the chat. Use this tool when you want to display:
+- Charts and graphs (inline SVG preferred; JS for dynamic charts is OK if bundled inline)
 - Data tables with sorting/filtering
 - Diagrams, flowcharts, timelines
 - Scorecards, dashboards, KPI cards
+- Interactive elements (tabs, accordions, counters, animations)
 - Any visual representation that helps the user understand data
 
 CRITICAL RULES:
-1. NO JavaScript — the sandbox blocks script execution. Use only HTML + CSS + inline SVG.
+1. JavaScript IS allowed — the iframe uses sandbox="allow-scripts". Inline <script> tags run correctly (animations, counters, tab switching, etc.). External CDN scripts are BLOCKED by CSP — bundle everything inline. No fetch, no same-origin requests.
 2. Background: always use #000 (pure black). Text: rgba(255,255,255,0.85).
 3. Font sizes: use 12-14px for body text, 10-11px for labels/captions, 16-20px for headings, 22-28px for KPI numbers. Never go below 10px.
 4. Layout: use CSS flexbox/grid. Design for ~600px width. Use vertical stacking (single column) for complex dashboards to avoid horizontal overflow.

@@ -71,6 +71,8 @@ interface ChatViewProps {
   onFileMentionInserted?: () => void;
   pendingSlashCommand?: { name: string; description: string } | null;
   onCommandInserted?: () => void;
+  pendingSkillMention?: { name: string } | null;
+  onSkillMentionInserted?: () => void;
   basePath?: string;
   // Agent Chat Settings - controlled from parent
   inputDraft?: string;
@@ -178,6 +180,8 @@ export default function ChatView({
   onFileMentionInserted,
   pendingSlashCommand,
   onCommandInserted,
+  pendingSkillMention,
+  onSkillMentionInserted,
   basePath,
   // Agent Chat Settings - controlled from parent
   inputDraft = '',
@@ -1005,6 +1009,8 @@ export default function ChatView({
           onFileMentionInserted={onFileMentionInserted}
           pendingSlashCommand={pendingSlashCommand}
           onCommandInserted={onCommandInserted}
+          pendingSkillMention={pendingSkillMention}
+          onSkillMentionInserted={onSkillMentionInserted}
           basePath={basePath}
           // Controlled input draft
           inputValue={inputDraft}

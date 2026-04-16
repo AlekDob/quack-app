@@ -753,7 +753,10 @@ fn summarize_tool_use(name: &str, input: &Value) -> String {
             .unwrap_or("")
             .to_string(),
         "TodoWrite" | "TodoRead" => String::new(),
-        "Task" => input["description"].as_str()
+        // Brain: gotcha-agent-tool-name-task-agent-migration
+        // agent-sdk 0.2.x emits "Task" as tool name; next minor release will migrate to "Agent".
+        // Matching both keeps us forward-compatible across the rename.
+        "Task" | "Agent" => input["description"].as_str()
             .unwrap_or("")
             .to_string(),
         _ => {
