@@ -24,10 +24,10 @@ export interface ModelConfig {
  * Uses Sonnet as a safe, cost-effective default.
  */
 const EMERGENCY_FALLBACK: ModelConfig[] = [
-  { id: 'opus46-1m', modelId: 'claude-opus-4-6[1m]', label: 'Opus 4.6 (1M)', isDefault: true, isActive: true, sortOrder: 0 },
-  { id: 'opus46', modelId: 'claude-opus-4-6', label: 'Opus 4.6', isDefault: false, isActive: true, sortOrder: 1 },
-  { id: 'sonnet46', modelId: 'claude-sonnet-4-6', label: 'Sonnet 4.6', isDefault: false, isActive: true, sortOrder: 2 },
-  { id: 'sonnet45', modelId: 'claude-sonnet-4-5-20250929', label: 'Sonnet 4.5', isDefault: false, isActive: true, sortOrder: 3 },
+  { id: 'opus47', modelId: 'claude-opus-4-7', label: 'Opus 4.7', isDefault: true, isActive: true, sortOrder: 0 },
+  { id: 'opus46-1m', modelId: 'claude-opus-4-6[1m]', label: 'Opus 4.6 (1M)', isDefault: false, isActive: true, sortOrder: 1 },
+  { id: 'opus46', modelId: 'claude-opus-4-6', label: 'Opus 4.6', isDefault: false, isActive: true, sortOrder: 2 },
+  { id: 'sonnet46', modelId: 'claude-sonnet-4-6', label: 'Sonnet 4.6', isDefault: false, isActive: true, sortOrder: 3 },
   { id: 'haiku45', modelId: 'claude-haiku-4-5', label: 'Haiku 4.5', isDefault: false, isActive: true, sortOrder: 4 },
 ];
 
@@ -40,7 +40,8 @@ const LEGACY_ID_MAP: Record<string, string> = {
   'sonnet': 'sonnet46',
   'sonnet45': 'sonnet46', // Sonnet 4.5 deprecated, upgrade to 4.6
   'haiku': 'haiku45',
-  'opus': 'opus46',
+  'opus': 'opus47',
+  'opus46': 'opus47', // Opus 4.6 deprecated, upgrade to 4.7
 };
 
 /**
