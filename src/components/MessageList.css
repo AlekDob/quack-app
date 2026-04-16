@@ -1,9 +1,19 @@
+.message-list-wrapper {
+  flex: 1;
+  display: flex;
+  position: relative;
+  min-height: 0;
+  min-width: 0;
+}
+
 .message-list {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   scroll-behavior: smooth;
   position: relative;
+  min-height: 0;
+  min-width: 0;
 }
 
 .message-list-content {

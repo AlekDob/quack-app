@@ -1,0 +1,66 @@
+/* Brain: pattern-session-scroll-memory */
+
+.anchor-indicator {
+  position: absolute;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 20;
+  transition: background-color 0.15s ease, opacity 0.15s ease, transform 0.15s ease;
+  user-select: none;
+  pointer-events: auto;
+}
+
+/* Following the scrollbar thumb — always visible, subtle by default */
+.anchor-indicator.following {
+  color: var(--text-secondary, #888);
+  opacity: 0.45;
+  background: transparent;
+}
+
+.anchor-indicator.following:hover {
+  opacity: 1;
+  color: var(--accent, #FF6B35);
+  background: var(--bg-elevated, rgba(255, 255, 255, 0.08));
+  transform: scale(1.1);
+}
+
+/* Anchored — always visible, uses accent color */
+.anchor-indicator.anchored {
+  color: var(--accent, #FF6B35);
+  background: var(--bg-elevated, rgba(255, 107, 53, 0.12));
+  opacity: 1;
+  box-shadow: 0 0 0 1px var(--accent, #FF6B35);
+}
+
+.anchor-indicator.anchored:hover {
+  transform: scale(1.1);
+}
+
+/* X remove button that appears on hover when anchored */
+.anchor-indicator-remove {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--danger, #E74C3C);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.anchor-indicator-remove:hover {
+  transform: scale(1.15);
+}

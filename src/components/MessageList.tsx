@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
 import DuckAnimation from './DuckAnimation';
+import AnchorIndicator from './AnchorIndicator';
 import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
-import { saveSessionScroll, getSessionScroll } from '../utils/sessionScrollMemory';
+import { getSessionAnchor, setSessionAnchor, clearSessionAnchor } from '../utils/sessionScrollMemory';
 import './MessageList.css';
 
 interface MessageListProps {
@@ -150,52 +151,127 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
   }, [messages]);
 
   // Brain: pattern-session-scroll-memory
-  // Restore scroll position when component mounts:
-  // - If user was NOT at bottom on previous exit → restore exact scrollTop
-  // - Otherwise → scroll to bottom
-  // Uses a ResizeObserver to keep the target aligned while late content (markdown,
+  // Anchor-based scroll restore:
+  // - If the session has an anchor (user clicked the anchor icon on a previous
+  //   visit) → scroll to that message's DOM element.
+  // - Otherwise → always scroll to bottom.
+  // A ResizeObserver keeps the target aligned while late content (markdown,
   // code blocks, images) finishes mounting and grows the scrollHeight.
+  const [anchoredMessageId, setAnchoredMessageId] = useState<string | null>(() =>
+    currentSessionId ? getSessionAnchor(currentSessionId)?.messageId ?? null : null,
+  );
+
+  useEffect(() => {
+    setAnchoredMessageId(
+      currentSessionId ? getSessionAnchor(currentSessionId)?.messageId ?? null : null,
+    );
+  }, [currentSessionId]);
+
+  // Track whether we've already applied the initial scroll for this session.
+  // Messages load async; we need to re-apply once they arrive.
+  const appliedInitialScrollForSessionRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // Reset the flag when switching sessions so the next batch of messages triggers scroll
+    appliedInitialScrollForSessionRef.current = null;
+  }, [currentSessionId]);
+
+  // Scroll lock: true until user scrolls manually. While true, every content
+  // resize re-forces scrollToBottom. This handles streaming batches and
+  // messages that arrive after the initial mount.
+  const scrollLockedRef = useRef(true);
+
+  useEffect(() => {
+    // Reset lock on session switch
+    scrollLockedRef.current = true;
+  }, [currentSessionId]);
+
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || messages.length === 0) return;
+    if (!el) return;
+    if (messages.length === 0) return;
+    if (appliedInitialScrollForSessionRef.current === currentSessionId) return;
+    appliedInitialScrollForSessionRef.current = currentSessionId ?? null;
 
-    const saved = currentSessionId ? getSessionScroll(currentSessionId) : undefined;
-    const restoreToSavedPosition = saved && !saved.wasAtBottom;
+    const anchor = currentSessionId ? getSessionAnchor(currentSessionId) : undefined;
 
     const applyTarget = () => {
       if (!scrollRef.current) return;
-      if (restoreToSavedPosition) {
-        scrollRef.current.scrollTop = Math.min(
-          saved!.scrollTop,
-          scrollRef.current.scrollHeight - scrollRef.current.clientHeight,
-        );
-      } else {
-        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      if (!scrollLockedRef.current) return;
+      const el = scrollRef.current;
+      if (anchor) {
+        const target = el.querySelector<HTMLElement>(`[data-message-id="${CSS.escape(anchor.messageId)}"]`);
+        if (target) {
+          el.scrollTop = target.offsetTop - el.offsetTop;
+          return;
+        }
       }
+      el.scrollTop = el.scrollHeight;
+      handleScroll();
     };
 
-    // Apply immediately, then re-apply while layout stabilizes
     applyTarget();
+
+    const content = el.querySelector<HTMLElement>('.message-list-content');
+
+    // Detect manual user scroll via wheel/touch to release lock
+    const releaseLock = () => {
+      if (scrollLockedRef.current) scrollLockedRef.current = false;
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (['PageUp', 'PageDown', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) releaseLock();
+    };
+    el.addEventListener('wheel', releaseLock, { passive: true });
+    el.addEventListener('touchmove', releaseLock, { passive: true });
+    window.addEventListener('keydown', onKeyDown);
+
     const observer = new ResizeObserver(() => applyTarget());
     observer.observe(el);
-    const stopId = window.setTimeout(() => observer.disconnect(), 500);
+    if (content) observer.observe(content);
 
-    prevFirstMessageIdRef.current = messages[0]?.id ?? null;
-    prevMessagesLengthRef.current = messages.length;
+    let frame = 0;
+    let rafId = 0;
+    const rafLoop = () => {
+      applyTarget();
+      if (++frame < 12 && scrollLockedRef.current) rafId = requestAnimationFrame(rafLoop);
+    };
+    rafId = requestAnimationFrame(rafLoop);
 
     return () => {
-      window.clearTimeout(stopId);
+      cancelAnimationFrame(rafId);
       observer.disconnect();
-      // Save scroll position on unmount so we can restore it next time
-      if (scrollRef.current && currentSessionId) {
-        saveSessionScroll(currentSessionId, {
-          scrollTop: scrollRef.current.scrollTop,
-          wasAtBottom: checkIfAtBottom(),
-        });
-      }
+      el.removeEventListener('wheel', releaseLock);
+      el.removeEventListener('touchmove', releaseLock);
+      window.removeEventListener('keydown', onKeyDown);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSessionId, messages.length > 0]);
+
+  // Anchor handlers
+  const handleAnchor = useCallback((messageId: string) => {
+    if (!currentSessionId) return;
+    setSessionAnchor(currentSessionId, messageId);
+    setAnchoredMessageId(messageId);
   }, [currentSessionId]);
+
+  const handleRemoveAnchor = useCallback(() => {
+    if (!currentSessionId) return;
+    clearSessionAnchor(currentSessionId);
+    setAnchoredMessageId(null);
+  }, [currentSessionId]);
+
+  const handleJumpToAnchor = useCallback(() => {
+    if (!scrollRef.current || !anchoredMessageId) return;
+    const target = scrollRef.current.querySelector<HTMLElement>(
+      `[data-message-id="${CSS.escape(anchoredMessageId)}"]`,
+    );
+    if (target) {
+      scrollRef.current.scrollTo({
+        top: target.offsetTop - scrollRef.current.offsetTop,
+        behavior: 'smooth',
+      });
+    }
+  }, [anchoredMessageId]);
 
   // Auto-scroll to bottom when new messages arrive or during streaming
   useEffect(() => {
@@ -266,13 +342,14 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
   }
 
   return (
+    <div className="message-list-wrapper">
     <div className="message-list" ref={scrollRef} onScroll={handleScroll}>
       <div className="message-list-content">
         {messages.map((message, index) => {
           const prevMessage = index > 0 ? messages[index - 1] : null;
           const showHeader = message.role === 'user' || !prevMessage || prevMessage.role !== 'assistant';
           return (
-            <div key={message.id} className="message-wrapper">
+            <div key={message.id} className="message-wrapper" data-message-id={message.id}>
               <ChatMessage
                 message={message}
                 onFilePathClick={onFilePathClick}
@@ -302,6 +379,15 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
         })}
         {loading && <SkeletonMessage />}
       </div>
+    </div>
+      <AnchorIndicator
+        scrollRef={scrollRef}
+        sessionId={currentSessionId}
+        anchoredMessageId={anchoredMessageId}
+        onAnchor={handleAnchor}
+        onRemove={handleRemoveAnchor}
+        onJumpToAnchor={handleJumpToAnchor}
+      />
       {showScrollButton && (
         <button
           className="scroll-to-bottom-button"
@@ -317,27 +403,6 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
           >
             <path
               d="M10 14L5 9L6.5 7.5L10 11L13.5 7.5L15 9L10 14Z"
-              fill="currentColor"
-            />
-          </svg>
-        </button>
-      )}
-      {showScrollToTopButton && (
-        <button
-          className="scroll-to-top-button"
-          onClick={scrollToPreviousUserMessage}
-          aria-label="Previous user message"
-          title="Jump to previous 'You' message"
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M10 6L5 11L6.5 12.5L10 9L13.5 12.5L15 11L10 6Z"
               fill="currentColor"
             />
           </svg>

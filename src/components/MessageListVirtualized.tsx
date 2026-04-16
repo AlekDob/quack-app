@@ -6,7 +6,6 @@ import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
 import DuckAnimation from './DuckAnimation';
 import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
-import { saveSessionScroll, getSessionScroll } from '../utils/sessionScrollMemory';
 import './MessageList.css';
 
 // Brain: 005-performance-critical-refactor
@@ -242,45 +241,87 @@ function MessageListVirtualized({
   }, [listRef, messages]);
 
   // Brain: pattern-session-scroll-memory
-  // Restore scroll position on mount (same behavior as MessageList).
+  // Virtualized path: always scroll to bottom on session switch. Anchor UX is
+  // provided by the non-virtualized MessageList (sessions <=100 messages).
+  // Scroll-lock pattern: force scroll-to-bottom every frame/RO tick until the
+  // user manually scrolls (wheel/touch/keyboard). Needed because
+  // `useDynamicRowHeight` measures row heights as they render — initial
+  // `scrollToRow` lands too high, then rows expand and push the target down.
+  const appliedInitialScrollForSessionRef = useRef<string | null>(null);
+  const scrollLockedRef = useRef(true);
   useEffect(() => {
-    if (!listRef.current || messages.length === 0) return;
+    appliedInitialScrollForSessionRef.current = null;
+    scrollLockedRef.current = true;
+  }, [currentSessionId]);
 
-    const saved = currentSessionId ? getSessionScroll(currentSessionId) : undefined;
-    const restoreToSavedPosition = saved && !saved.wasAtBottom;
+  useEffect(() => {
+    if (messages.length === 0) return;
+    if (appliedInitialScrollForSessionRef.current === currentSessionId) return;
 
-    const applyTarget = () => {
-      const el = listRef.current?.element;
-      if (!el) return;
-      if (restoreToSavedPosition) {
-        el.scrollTop = Math.min(saved!.scrollTop, el.scrollHeight - el.clientHeight);
-      } else {
-        scrollToBottom();
-      }
+    let observer: ResizeObserver | null = null;
+    let attachedEl: HTMLElement | null = null;
+    const releaseLock = () => {
+      if (scrollLockedRef.current) scrollLockedRef.current = false;
     };
 
-    // Apply immediately + re-apply as virtualized rows measure
-    applyTarget();
-    const el = listRef.current.element;
-    const observer = el ? new ResizeObserver(() => applyTarget()) : null;
-    if (el && observer) observer.observe(el);
-    const stopId = window.setTimeout(() => observer?.disconnect(), 500);
+    const apply = () => {
+      if (!scrollLockedRef.current) return false;
+      const list = listRef.current;
+      if (!list) return false;
+      const rowCount = loading ? messages.length + 1 : messages.length;
+      if (rowCount > 0) {
+        list.scrollToRow({ index: rowCount - 1, align: 'end' });
+      }
+      // Also force scrollTop = scrollHeight as belt-and-suspenders
+      const el = list.element;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+        // Attach RO + user-input listeners once the element is live
+        if (attachedEl !== el) {
+          observer?.disconnect();
+          observer = new ResizeObserver(() => apply());
+          observer.observe(el);
+          const content = el.querySelector<HTMLElement>('[style*="height"]');
+          if (content) observer.observe(content);
+          el.addEventListener('wheel', releaseLock, { passive: true });
+          el.addEventListener('touchstart', releaseLock, { passive: true });
+          el.addEventListener('keydown', releaseLock);
+          el.addEventListener('scroll', handleScroll, { passive: true });
+          attachedEl = el;
+        }
+      }
+      handleScroll();
+      appliedInitialScrollForSessionRef.current = currentSessionId ?? null;
+      return true;
+    };
 
+    apply();
+
+    let frame = 0;
+    let rafId = 0;
+    const rafLoop = () => {
+      apply();
+      if (++frame < 60 && scrollLockedRef.current) rafId = requestAnimationFrame(rafLoop);
+    };
+    rafId = requestAnimationFrame(rafLoop);
+
+    const stopId = window.setTimeout(() => {
+      scrollLockedRef.current = false;
+    }, 2000);
     prevMessagesLengthRef.current = messages.length;
-
     return () => {
       window.clearTimeout(stopId);
+      cancelAnimationFrame(rafId);
       observer?.disconnect();
-      const current = listRef.current?.element;
-      if (current && currentSessionId) {
-        saveSessionScroll(currentSessionId, {
-          scrollTop: current.scrollTop,
-          wasAtBottom: checkIfAtBottom(),
-        });
+      if (attachedEl) {
+        attachedEl.removeEventListener('wheel', releaseLock);
+        attachedEl.removeEventListener('touchstart', releaseLock);
+        attachedEl.removeEventListener('keydown', releaseLock);
+        attachedEl.removeEventListener('scroll', handleScroll);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSessionId]);
+  }, [currentSessionId, messages.length > 0]);
 
   // Auto-scroll for new messages
   useEffect(() => {
@@ -300,13 +341,8 @@ function MessageListVirtualized({
     prevMessagesLengthRef.current = messages.length;
   }, [messages, loading, checkIfAtBottom, scrollToBottom]);
 
-  // Attach scroll listener to list element for button visibility
-  useEffect(() => {
-    const el = listRef.current?.element;
-    if (!el) return;
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => el.removeEventListener('scroll', handleScroll);
-  }, [listRef, handleScroll]);
+  // Scroll listener for button visibility is attached inside the main
+  // scroll-lock effect once listRef.current.element is live — see `apply()`.
 
   // Handle empty state
   if (messages.length === 0 && !loading) {
@@ -378,18 +414,6 @@ function MessageListVirtualized({
         </button>
       )}
 
-      {showScrollToTopButton && (
-        <button
-          className="scroll-to-top-button"
-          onClick={scrollToPreviousUserMessage}
-          aria-label="Previous user message"
-          title="Jump to previous 'You' message"
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 6L5 11L6.5 12.5L10 9L13.5 12.5L15 11L10 6Z" fill="currentColor" />
-          </svg>
-        </button>
-      )}
     </div>
   );
 }

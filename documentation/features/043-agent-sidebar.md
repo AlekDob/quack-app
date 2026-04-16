@@ -25,7 +25,9 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 | Component | `src/components/DragHandle.tsx` | Reusable grip icon for drag-and-drop handles |
 | Store/State | `src/stores/groupStore.ts` | Zustand store for project groups CRUD via Tauri invoke |
 | Store/State | `src/stores/uiStore.ts` | `sidebarView` state (`'projects' \| 'taskhub'`) |
-| Util | `src/utils/sessionScrollMemory.ts` | Module-level Map singleton: per-session `{scrollTop, wasAtBottom}` for scroll restore on session switch |
+| Util | `src/utils/sessionScrollMemory.ts` | Module-level Map singleton: per-session `{messageId}` anchor storage |
+| Component | `src/components/AnchorIndicator.tsx` | Floating anchor icon aligned with the scrollbar rail (set/remove/jump-to anchor) |
+| Config | `src/components/AnchorIndicator.css` | Anchor indicator styling + hover X button |
 | Config | `.quack-repo-order.dat` | Tauri Store file persisting project order, colors, and favorites |
 | Config | `src/App.css` | `.sidebar`, `.sidebar-header`, `.sidebar-list`, `.sortable-repository-group`, `.repository-group` classes |
 | Config | `src/components/AgentSelector.css` | Agent selector card grid, editing form, marketplace section |
@@ -92,12 +94,16 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 ### UX: Auto-Focus on Session Select
 When a session is clicked (or a new session is created), `ChatView` remounts because its React `key` includes `activeSessionId`. This triggers `ChatInput`'s mount `useEffect` which auto-focuses `textarea.chat-input-field` with a 100ms delay (ensures DOM readiness). This replaces a previous custom-event approach (`quack:focus-chat-input`) that failed due to the unmount/remount cycle.
 
-### UX: Scroll Restore on Session Switch
-Same remount triggers `MessageList` / `MessageListVirtualized` to restore the previous scroll position via the **Session Scroll Memory** pattern (`src/utils/sessionScrollMemory.ts`):
-- If user was NOT at the bottom when leaving → restore exact `scrollTop`.
-- If user was at the bottom (or the session was auto-scrolling during streaming) → scroll to bottom.
-- A `ResizeObserver` (500ms cap) keeps the target aligned while markdown/code/images finish mounting.
-- Zero store/subscription cost: Map singleton at module level, ~40 bytes per session, cleared on reload.
+### UX: Scroll Behavior on Session Switch (Anchor-based)
+On session open, the chat always scrolls to the bottom — unless the user has set an **anchor**. The `AnchorIndicator` component renders a small anchor icon aligned with the scrollbar rail:
+- **Click (not anchored)** → anchors the message currently centered in the viewport; `messageId` saved in a module-level Map per session.
+- **Click (anchored)** → smooth-scrolls to the anchored message.
+- **Hover anchored icon** → reveals an "X" → click to clear.
+- **Next session open** → if an anchor exists, chat jumps to the anchored message; otherwise scrolls to the bottom.
+- `ResizeObserver` (500ms cap) keeps the target aligned while markdown/code/images finish mounting.
+- Zero store/subscription cost: Map singleton at module level, cleared on reload.
+- The scroll-to-bottom pill button (`showScrollButton`) is still shown when the user is not at the bottom.
+- Virtualized list (>100 messages) keeps always-scroll-to-bottom without anchor UX.
 - See `patterns/pattern-session-scroll-memory.md`.
 
 ### Cross-Feature: @ Mention Popup (→ 025-team-delegation-footer)
