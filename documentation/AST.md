@@ -417,6 +417,9 @@ Exported symbols per file. Generated 2026-03-13.
 ### utils/performance.ts
 - `debounce()`, `throttle()`, `rafThrottle()`, `memoize()`, `batchUpdates()`, `shallowEqual()`, `deepEqual()`
 
+### utils/sessionScrollMemory.ts
+- `SessionScrollState`, `saveSessionScroll()`, `getSessionScroll()`, `clearSessionScroll()` — Map singleton for per-session scroll restore (see `pattern-session-scroll-memory.md`)
+
 ### utils/platform.ts
 - `getPlatform()`, `isMacOS()`, `isWindows()`, `isLinux()`, `getModifierKey()`, `formatShortcut()`, `cleanPath()`, `normalizePath()`, `normalizeToForwardSlash()`
 

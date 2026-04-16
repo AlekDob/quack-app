@@ -226,6 +226,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Team Delegation Footer: `documentation/patterns/pattern-team-delegation-footer.md`
 - Brain Accordion Section (scoped FileExplorer): `documentation/patterns/pattern-brain-accordion-section.md`
 - DiffViewer modes (unified/split/fullscreen): `documentation/patterns/pattern-diff-viewer-modes.md`
+- Session Scroll Memory (restore/scroll-to-bottom): `documentation/patterns/pattern-session-scroll-memory.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)

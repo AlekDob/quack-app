@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React 18)
 created: 2026-04-05
-last_verified: 2026-04-06
+last_verified: 2026-04-16
 tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sessions]
 ---
 
@@ -25,6 +25,7 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 | Component | `src/components/DragHandle.tsx` | Reusable grip icon for drag-and-drop handles |
 | Store/State | `src/stores/groupStore.ts` | Zustand store for project groups CRUD via Tauri invoke |
 | Store/State | `src/stores/uiStore.ts` | `sidebarView` state (`'projects' \| 'taskhub'`) |
+| Util | `src/utils/sessionScrollMemory.ts` | Module-level Map singleton: per-session `{scrollTop, wasAtBottom}` for scroll restore on session switch |
 | Config | `.quack-repo-order.dat` | Tauri Store file persisting project order, colors, and favorites |
 | Config | `src/App.css` | `.sidebar`, `.sidebar-header`, `.sidebar-list`, `.sortable-repository-group`, `.repository-group` classes |
 | Config | `src/components/AgentSelector.css` | Agent selector card grid, editing form, marketplace section |
@@ -90,6 +91,14 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 
 ### UX: Auto-Focus on Session Select
 When a session is clicked (or a new session is created), `ChatView` remounts because its React `key` includes `activeSessionId`. This triggers `ChatInput`'s mount `useEffect` which auto-focuses `textarea.chat-input-field` with a 100ms delay (ensures DOM readiness). This replaces a previous custom-event approach (`quack:focus-chat-input`) that failed due to the unmount/remount cycle.
+
+### UX: Scroll Restore on Session Switch
+Same remount triggers `MessageList` / `MessageListVirtualized` to restore the previous scroll position via the **Session Scroll Memory** pattern (`src/utils/sessionScrollMemory.ts`):
+- If user was NOT at the bottom when leaving → restore exact `scrollTop`.
+- If user was at the bottom (or the session was auto-scrolling during streaming) → scroll to bottom.
+- A `ResizeObserver` (500ms cap) keeps the target aligned while markdown/code/images finish mounting.
+- Zero store/subscription cost: Map singleton at module level, ~40 bytes per session, cleared on reload.
+- See `patterns/pattern-session-scroll-memory.md`.
 
 ### Cross-Feature: @ Mention Popup (→ 025-team-delegation-footer)
 The sidebar `terminals` (agents grouped by project) are the same data source used for the `@` mention popup's "Team" section. App.tsx filters `terminals` by matching `cwd` (excluding the active agent) and passes them as `projectTerminals` prop to `ChatView` → `ChatInput`. This means every agent visible in the sidebar under the same project is also citeable via `@` in the chat input. See `025-team-delegation-footer.md` for delegation flow details.

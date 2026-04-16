@@ -3,6 +3,7 @@ import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
 import DuckAnimation from './DuckAnimation';
 import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
+import { saveSessionScroll, getSessionScroll } from '../utils/sessionScrollMemory';
 import './MessageList.css';
 
 interface MessageListProps {
@@ -148,34 +149,53 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
     }
   }, [messages]);
 
-  // Scroll to bottom when component first mounts (when switching chat)
-  // This is triggered when ChatView's key changes and creates a new MessageList instance
+  // Brain: pattern-session-scroll-memory
+  // Restore scroll position when component mounts:
+  // - If user was NOT at bottom on previous exit → restore exact scrollTop
+  // - Otherwise → scroll to bottom
+  // Uses a ResizeObserver to keep the target aligned while late content (markdown,
+  // code blocks, images) finishes mounting and grows the scrollHeight.
   useEffect(() => {
-    if (!scrollRef.current || messages.length === 0) return;
+    const el = scrollRef.current;
+    if (!el || messages.length === 0) return;
 
-    // Wait for DOM to finish rendering, then scroll to bottom
-    // Using 100ms delay to ensure all messages are mounted
-    const timeoutId = setTimeout(() => {
-      if (scrollRef.current) {
-        const scrollHeight = scrollRef.current.scrollHeight;
-        const clientHeight = scrollRef.current.clientHeight;
+    const saved = currentSessionId ? getSessionScroll(currentSessionId) : undefined;
+    const restoreToSavedPosition = saved && !saved.wasAtBottom;
 
-        scrollRef.current.scrollTo({
-          top: scrollHeight,
-          behavior: 'smooth' // Smooth scroll animation when switching chats
-        });
-
-        // console.log('[MessageList] Component mounted - scrollHeight:', scrollHeight, 'clientHeight:', clientHeight, 'scrolling to:', scrollHeight); // Performance: Disabled
+    const applyTarget = () => {
+      if (!scrollRef.current) return;
+      if (restoreToSavedPosition) {
+        scrollRef.current.scrollTop = Math.min(
+          saved!.scrollTop,
+          scrollRef.current.scrollHeight - scrollRef.current.clientHeight,
+        );
+      } else {
+        scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
       }
-    }, 100);
+    };
 
-    // Initialize refs
+    // Apply immediately, then re-apply while layout stabilizes
+    applyTarget();
+    const observer = new ResizeObserver(() => applyTarget());
+    observer.observe(el);
+    const stopId = window.setTimeout(() => observer.disconnect(), 500);
+
     prevFirstMessageIdRef.current = messages[0]?.id ?? null;
     prevMessagesLengthRef.current = messages.length;
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      window.clearTimeout(stopId);
+      observer.disconnect();
+      // Save scroll position on unmount so we can restore it next time
+      if (scrollRef.current && currentSessionId) {
+        saveSessionScroll(currentSessionId, {
+          scrollTop: scrollRef.current.scrollTop,
+          wasAtBottom: checkIfAtBottom(),
+        });
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array = run only once on mount
+  }, [currentSessionId]);
 
   // Auto-scroll to bottom when new messages arrive or during streaming
   useEffect(() => {

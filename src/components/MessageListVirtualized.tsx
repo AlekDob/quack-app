@@ -6,6 +6,7 @@ import ChatMessage from './ChatMessage';
 import SkeletonMessage from './SkeletonMessage';
 import DuckAnimation from './DuckAnimation';
 import type { ChatMessage as ChatMessageType, AskUserQuestionAnswers } from '../types';
+import { saveSessionScroll, getSessionScroll } from '../utils/sessionScrollMemory';
 import './MessageList.css';
 
 // Brain: 005-performance-critical-refactor
@@ -240,14 +241,46 @@ function MessageListVirtualized({
     listRef.current.scrollToRow({ index: targetIndex, align: 'start' });
   }, [listRef, messages]);
 
-  // Auto-scroll on mount
+  // Brain: pattern-session-scroll-memory
+  // Restore scroll position on mount (same behavior as MessageList).
   useEffect(() => {
     if (!listRef.current || messages.length === 0) return;
-    const timeoutId = setTimeout(() => scrollToBottom(), 100);
+
+    const saved = currentSessionId ? getSessionScroll(currentSessionId) : undefined;
+    const restoreToSavedPosition = saved && !saved.wasAtBottom;
+
+    const applyTarget = () => {
+      const el = listRef.current?.element;
+      if (!el) return;
+      if (restoreToSavedPosition) {
+        el.scrollTop = Math.min(saved!.scrollTop, el.scrollHeight - el.clientHeight);
+      } else {
+        scrollToBottom();
+      }
+    };
+
+    // Apply immediately + re-apply as virtualized rows measure
+    applyTarget();
+    const el = listRef.current.element;
+    const observer = el ? new ResizeObserver(() => applyTarget()) : null;
+    if (el && observer) observer.observe(el);
+    const stopId = window.setTimeout(() => observer?.disconnect(), 500);
+
     prevMessagesLengthRef.current = messages.length;
-    return () => clearTimeout(timeoutId);
+
+    return () => {
+      window.clearTimeout(stopId);
+      observer?.disconnect();
+      const current = listRef.current?.element;
+      if (current && currentSessionId) {
+        saveSessionScroll(currentSessionId, {
+          scrollTop: current.scrollTop,
+          wasAtBottom: checkIfAtBottom(),
+        });
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentSessionId]);
 
   // Auto-scroll for new messages
   useEffect(() => {
