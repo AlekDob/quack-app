@@ -47,19 +47,37 @@ export function validatePrompt(prompt: string): { valid: boolean; reason?: strin
 
 /**
  * Save session backup to localStorage
- * Used as fallback when SDK session fails
+ * Used as fallback when SDK session fails.
+ * Truncates to last 200 messages (backup is a safety net, .jsonl is primary store).
+ * Suppresses retries for 60s after QuotaExceededError to avoid log spam.
  */
+const MAX_BACKUP_MESSAGES = 200;
+const FALLBACK_BACKUP_MESSAGES = 50;
+let backupSuppressedUntil = 0;
+
 export function saveSessionBackup(sessionId: string, messages: ChatMessage[]): void {
+  if (Date.now() < backupSuppressedUntil) return;
+
+  const trimmed = messages.length > MAX_BACKUP_MESSAGES
+    ? messages.slice(-MAX_BACKUP_MESSAGES)
+    : messages;
+
   try {
-    const backup = {
-      sessionId,
-      messages,
-      timestamp: Date.now(),
-    };
+    const backup = { sessionId, messages: trimmed, timestamp: Date.now() };
     localStorage.setItem(`session_backup_${sessionId}`, JSON.stringify(backup));
-    console.log(`[SessionRecovery] Backup saved for session ${sessionId}`);
   } catch (error) {
-    console.error('[SessionRecovery] Failed to save backup:', error);
+    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+      // Retry with minimal backup
+      try {
+        const minimal = { sessionId, messages: messages.slice(-FALLBACK_BACKUP_MESSAGES), timestamp: Date.now() };
+        localStorage.setItem(`session_backup_${sessionId}`, JSON.stringify(minimal));
+      } catch {
+        console.warn('[SessionRecovery] Quota exceeded, suppressing backups for 60s');
+        backupSuppressedUntil = Date.now() + 60_000;
+      }
+    } else {
+      console.error('[SessionRecovery] Failed to save backup:', error);
+    }
   }
 }
 

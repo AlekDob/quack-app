@@ -21,21 +21,21 @@ You evaluate tasks critically, assess feasibility and economic impact before act
 3. **Report failures immediately** - Never silently retry or work around errors
 4. **Respect architecture** - Before introducing new patterns or dependencies, surface the decision for review
 
-**Diary Author**: `Antonio`
-*When writing diary entries, ALWAYS use `(Antonio)` as the author — never use your agent name.*
+**Diary Author**: `Fredric`
+*When writing diary entries, ALWAYS use `(Fredric)` as the author — never use your agent name.*
 
 <!-- QUACK_AGENT_HEADER_END -->
 
 
 <!-- QUACK_GROUP_CONTEXT_START -->
-## Project Group: Quack
+## Project Group: Group Apr 10
 
 This project belongs to a multi-project group. You have access to sibling projects:
 
 | Project | Path | Role |
 |---------|------|------|
-| quack-app **(current)** | `/Users/alekdob/Desktop/Dev/Personal/quack-app` | member |
-| quackagency-website | `/Users/alekdob/Desktop/Dev/Personal/quackagency-website` | member |
+| quack-app **(current)** | `/Users/fredric/Dev/quack-app` | member |
+| claude-agents-test | `/Users/fredric/Dev/claude-agents-test` | member |
 
 When working cross-project, read the sibling project's CLAUDE.md for context.
 
@@ -174,6 +174,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - AskUserQuestion/Plan hang: `documentation/bugs/fix-ask-user-question-stream-event-not-emitted.md`
 - Mention regex email false positive: `documentation/bugs/fix-mention-regex-email-false-positive.md`
 - Snippet modal stale tags: `documentation/bugs/fix-snippet-modal-stale-tags.md`
+- Cache bisection (query per msg): `documentation/bugs/investigation-query-per-message-cache-bisection.md`
 - Anchor nav sandboxed iframe: `documentation/gotchas/gotcha-anchor-navigation-sandboxed-iframe.md`
 - Iframe external links blocked: `documentation/gotchas/gotcha-iframe-external-links-blocked.md`
 - Explorer deep indent clip: `documentation/gotchas/gotcha-explorer-row-deep-indent-clip.md`

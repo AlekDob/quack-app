@@ -6,30 +6,27 @@ Symbol.dispose ??= Symbol('Symbol.dispose');
 Symbol.asyncDispose ??= Symbol('Symbol.asyncDispose');
 
 /**
- * Persistent Node.js daemon for Claude Agent SDK.
+ * Node.js daemon for Claude Agent SDK.
  *
- * Instead of spawning a new process per message (20+ second startup),
- * this daemon stays alive and handles multiple queries via stdin/stdout IPC.
+ * Stays alive to handle multiple queries via stdin/stdout IPC.
+ * Each query uses the SDK's query() function which spawns and manages
+ * its own CLI subprocess. Session continuity is handled via options.resume.
  *
  * Protocol:
  *   stdin  (Rust → Node): JSON line commands (query, abort, response, ping, shutdown)
  *   stdout (Node → Rust): JSON line events (daemon_ready, event, query_complete, pong)
  *   stderr: Debug logging only
- *
- * Brain: persistent-daemon-architecture
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import Anthropic from '@anthropic-ai/sdk';
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { readFileSync, existsSync, readdirSync, appendFileSync } from 'fs';
 import { extname, join, dirname } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
-import { randomUUID, createHash } from 'crypto';
-import { execSync, spawn } from 'child_process';
-import { appendFileSync } from 'fs';
-
+import { randomUUID } from 'crypto';
+import { execSync } from 'child_process';
 // 🐛 DIAG: Write diagnostics to a file that's easy to check
 const DIAG_FILE = join(homedir(), '.quack', 'daemon-diag.log');
 function diag(msg) {
@@ -40,7 +37,6 @@ function diag(msg) {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const CLI_JS_PATH = join(__dirname, 'node_modules', '@anthropic-ai', 'claude-agent-sdk', 'cli.js');
 
 // =============================================================================
 // SKILL LOADER — reads bundled skill files for system prompt injection
@@ -162,12 +158,6 @@ async function countPromptTokens(modelId, promptContent) {
  * Each query has its own AbortController for independent cancellation.
  */
 const activeQueries = new Map();
-
-/**
- * Sessions whose persistent subprocess was tainted by Stop/overlap handling.
- * The next query for that session must log diagnostics and spawn a fresh subprocess.
- */
-const taintedSessions = new Map();
 
 /**
  * Global pending requests map (keyed by requestId).
@@ -317,421 +307,6 @@ function buildTeamPromptAugmentation(tc) {
 }
 
 // =============================================================================
-// PERSISTENT SESSION SUBPROCESS
-// Brain: bug-post-fix-cache-breakage-investigation
-//
-// Each query() call spawns a fresh CLI subprocess, destroying in-memory state
-// (skills, cache markers, message decorations) and causing ~28-33k tokens of
-// cache re-creation per turn. Keeping the subprocess alive across turns reduces
-// this to ~230 tokens — a 120x improvement.
-// =============================================================================
-
-const sessionProcesses = new Map(); // claudeSessionId → SessionProcess
-
-/**
- * Build CLI args for spawning the Claude Code subprocess.
- * Mirrors the arg-building logic in the SDK's ProcessTransport.initialize().
- */
-function buildCliArgs(opts) {
-  const args = [
-    '--output-format', 'stream-json',
-    '--input-format', 'stream-json',
-    '--verbose',
-  ];
-
-  if (opts.model) args.push('--model', opts.model);
-  if (opts.resume) args.push('--resume', opts.resume);
-  if (opts.permissionMode) args.push('--permission-mode', opts.permissionMode);
-  if (opts.canUseTool) args.push('--permission-prompt-tool', 'stdio');
-  if (opts.settingSources !== undefined) args.push('--setting-sources', opts.settingSources.join(','));
-  if (opts.betas?.length) args.push('--betas', opts.betas.join(','));
-  if (opts.allowedTools?.length) args.push('--allowedTools', opts.allowedTools.join(','));
-  if (opts.disallowedTools?.length) args.push('--disallowedTools', opts.disallowedTools.join(','));
-
-  if (opts.tools !== undefined) {
-    if (Array.isArray(opts.tools)) {
-      args.push('--tools', opts.tools.length === 0 ? '' : opts.tools.join(','));
-    } else if (typeof opts.tools === 'object' && opts.tools.type === 'preset') {
-      args.push('--tools', 'default');
-    }
-  }
-
-  if (opts.thinking) {
-    switch (opts.thinking.type) {
-      case 'enabled': args.push('--max-thinking-tokens', (opts.thinking.budgetTokens ?? 0).toString()); break;
-      case 'disabled': args.push('--thinking', 'disabled'); break;
-      case 'adaptive': args.push('--thinking', 'adaptive'); break;
-    }
-  }
-  if (opts.effort) args.push('--effort', opts.effort);
-
-  if (opts.mcpServers && Object.keys(opts.mcpServers).length > 0) {
-    args.push('--mcp-config', JSON.stringify({ mcpServers: opts.mcpServers }));
-  }
-
-  if (opts.debugFile) args.push('--debug-file', opts.debugFile);
-
-  if (opts.agents?.length) {
-    for (const agent of opts.agents) {
-      args.push('--agent', agent.path || agent.name);
-    }
-  }
-
-  return args;
-}
-
-/**
- * Compute a fingerprint of options that are immutable once the subprocess starts.
- * If any of these change between turns, we must restart the subprocess.
- */
-function getSessionFingerprint(opts) {
-  const parts = [
-    opts.model || '',
-    opts.resume || '',
-    opts.permissionMode || '',
-    JSON.stringify(opts.settingSources || []),
-    JSON.stringify(opts.betas || []),
-    JSON.stringify(opts.tools || ''),
-    JSON.stringify(opts.allowedTools || []),
-    JSON.stringify(opts.mcpServers || {}),
-    opts.cwd || '',
-  ];
-  return createHash('sha256').update(parts.join('|')).digest('hex').slice(0, 16);
-}
-
-/**
- * Persistent CLI subprocess for a Claude session.
- * Kept alive across turns to preserve in-memory state and prompt cache.
- */
-class SessionProcess {
-  constructor(sessionId, fingerprint) {
-    this.sessionId = sessionId;
-    this.fingerprint = fingerprint;
-    this.child = null;
-    this.rl = null;
-    this.alive = false;
-    this.initialized = false;
-
-    this.currentQueryId = null;
-    this.canUseToolFn = null;
-    this.tainted = false;
-    this.retireAfterQueryId = null;
-    this.taintReason = null;
-    this.taintedAt = null;
-
-    this.eventQueue = [];
-    this.eventResolve = null;
-    this.pendingControlRequests = new Map();
-    this._postQueryCallback = null; // Brain: bug-background-task-unsolicited-events
-  }
-
-  spawn(args, cwd, env) {
-    this.child = spawn('node', [CLI_JS_PATH, ...args], {
-      cwd,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...env, CLAUDE_CODE_ENTRYPOINT: 'sdk-ts' },
-    });
-
-    this.alive = true;
-
-    this.rl = createInterface({ input: this.child.stdout });
-    this.rl.on('line', (line) => this._handleStdoutLine(line));
-
-    this.child.stderr.on('data', (data) => {
-      const text = data.toString().trim();
-      if (text) diag(`[SessionProcess ${this.sessionId}] stderr: ${text}`);
-    });
-
-    this.child.on('exit', (code, signal) => {
-      this.alive = false;
-      if (this.rl) { try { this.rl.close(); } catch { /* ignore */ } }
-      diag(`[SessionProcess ${this.sessionId}] exited code=${code} signal=${signal}`);
-      for (const [, pending] of this.pendingControlRequests) {
-        pending.reject(new Error('Process exited'));
-      }
-      this.pendingControlRequests.clear();
-      const exitEvent = { type: 'result', subtype: 'error_process_exit', is_error: true, errors: ['Process exited unexpectedly'] };
-      if (this.eventResolve) {
-        const r = this.eventResolve;
-        this.eventResolve = null;
-        r(exitEvent);
-      } else {
-        this.eventQueue.push(exitEvent);
-      }
-    });
-
-    log('SESSION_PROCESS', `Spawned subprocess for session=${this.sessionId} pid=${this.child.pid}`);
-  }
-
-  async initialize(initConfig) {
-    if (this.initialized) return;
-    const response = await this._sendControlRequest({
-      subtype: 'initialize',
-      systemPrompt: initConfig.systemPrompt || '',
-      appendSystemPrompt: initConfig.appendSystemPrompt || undefined,
-      agents: initConfig.agents || undefined,
-      hooks: undefined,
-      sdkMcpServers: undefined,
-      jsonSchema: undefined,
-      promptSuggestions: undefined,
-      agentProgressSummaries: undefined,
-    });
-    this.initialized = true;
-    return response;
-  }
-
-  startQuery(queryId, canUseToolFn) {
-    // Brain: bug-background-task-unsolicited-events
-    // Stop any active post-query monitor when a new query starts.
-    // Events already in the queue will be consumed by the new query's events() generator.
-    this._postQueryCallback = null;
-    this.currentQueryId = queryId;
-    this.canUseToolFn = canUseToolFn;
-  }
-
-  markTaintedAfterAbort(queryId, reason) {
-    this.tainted = true;
-    this.retireAfterQueryId = queryId;
-    this.taintReason = reason;
-    this.taintedAt = Date.now();
-    log('SESSION_PROCESS', `Marked subprocess tainted for session=${this.sessionId} query=${queryId} reason=${reason}`);
-    diag(`[SessionProcess ${this.sessionId}] tainted query=${queryId} reason=${reason}`);
-  }
-
-  async interruptCurrentQuery() {
-    if (!this.alive) {
-      throw new Error(`Session process ${this.sessionId} is not alive`);
-    }
-
-    if (!this.currentQueryId) {
-      log('SESSION_PROCESS', `Interrupt requested for session=${this.sessionId} with no active query`);
-      return;
-    }
-
-    log('SESSION_PROCESS', `Interrupting subprocess for session=${this.sessionId} query=${this.currentQueryId}`);
-    await this._sendControlRequest({ subtype: 'interrupt' });
-  }
-
-  clearQueryContext(queryId) {
-    if (!queryId || this.currentQueryId === queryId) {
-      this.currentQueryId = null;
-      this.canUseToolFn = null;
-    }
-  }
-
-  finishQuery(queryId) {
-    this.clearQueryContext(queryId);
-
-    if (this.retireAfterQueryId && this.retireAfterQueryId === queryId) {
-      log(
-        'SESSION_PROCESS',
-        `Retiring tainted subprocess for session=${this.sessionId} query=${queryId} reason=${this.taintReason || 'unknown'}`
-      );
-      diag(
-        `[SessionProcess ${this.sessionId}] retiring tainted subprocess query=${queryId} reason=${this.taintReason || 'unknown'}`
-      );
-      this.kill();
-      return true;
-    }
-
-    // Brain: bug-background-task-unsolicited-events
-    // After the query ends, the subprocess may still produce events from background
-    // tasks (run_in_background: true). Set up a callback that re-emits these events
-    // to Rust using the original queryId so they can be routed to the correct session.
-    const capturedQueryId = queryId;
-    this._postQueryCallback = (event) => {
-      emit({ type: 'event', queryId: capturedQueryId, event, unsolicited: true });
-      if (event.type === 'result') {
-        // Background task turn completed — emit query_complete so Rust can clean up
-        emit({ type: 'query_complete', queryId: capturedQueryId, unsolicited: true });
-        this._postQueryCallback = null;
-      }
-    };
-
-    // Drain any already-queued events from the subprocess (background task might
-    // have finished while the main query was still running its completion path)
-    while (this.eventQueue.length > 0 && this._postQueryCallback) {
-      const event = this.eventQueue.shift();
-      this._postQueryCallback(event);
-    }
-
-    return false;
-  }
-
-  sendMessage(text, attachments) {
-    const content = createMessageContent(text, attachments);
-    this._writeStdin({
-      type: 'user',
-      session_id: '',
-      message: { role: 'user', content },
-      parent_tool_use_id: null,
-    });
-  }
-
-  async *events() {
-    while (this.alive) {
-      const event = await this._nextEvent();
-      yield event;
-      if (event.type === 'result') break;
-    }
-  }
-
-  async setModel(model) {
-    return this._sendControlRequest({ subtype: 'set_model', model });
-  }
-
-  async setPermissionMode(mode) {
-    return this._sendControlRequest({ subtype: 'set_permission_mode', mode });
-  }
-
-  // Brain: sdk-get-context-usage-breakdown
-  async getContextUsage() {
-    return this._sendControlRequest({ subtype: 'get_context_usage' });
-  }
-
-  kill() {
-    if (!this.child || this.child.killed) return;
-    this.alive = false;
-    this._postQueryCallback = null; // Brain: bug-background-task-unsolicited-events — prevent emit after death
-    this.currentQueryId = null;
-    this.canUseToolFn = null;
-    try {
-      this.child.stdin.end();
-    } catch { /* ignore */ }
-    const killTimer = setTimeout(() => {
-      try {
-        if (!this.child.killed) this.child.kill('SIGTERM');
-      } catch { /* ignore */ }
-    }, 2000);
-    this.child.once('exit', () => clearTimeout(killTimer));
-    log('SESSION_PROCESS', `Killing subprocess for session=${this.sessionId}`);
-  }
-
-  _handleStdoutLine(line) {
-    if (!line.trim()) return;
-    let event;
-    try { event = JSON.parse(line); } catch { return; }
-
-    if (event.type === 'control_response') {
-      const pending = this.pendingControlRequests.get(event.response?.request_id);
-      if (pending) {
-        this.pendingControlRequests.delete(event.response.request_id);
-        if (event.response.subtype === 'success') pending.resolve(event.response);
-        else pending.reject(new Error(event.response.error || 'Control request failed'));
-      }
-      return;
-    }
-
-    if (event.type === 'control_request') {
-      this._handleSubprocessControlRequest(event).catch(err => {
-        diag(`[SessionProcess] control_request error: ${err.message}`);
-      });
-      return;
-    }
-
-    if (event.type === 'control_cancel_request' || event.type === 'keep_alive' ||
-        event.type === 'streamlined_text' || event.type === 'streamlined_tool_use_summary') {
-      return;
-    }
-
-    // Cache the system/init event so it can be re-emitted on subsequent queries
-    if (event.type === 'system' && event.subtype === 'init') {
-      this.cachedInitEvent = event;
-      diag(`[SessionProcess ${this.sessionId}] captured system/init: tools=${event.tools?.length || 0}, mcp=${event.mcp_servers?.length || 0}`);
-    }
-
-    // Brain: bug-background-task-unsolicited-events
-    // If a post-query monitor is active (background task running after query ended),
-    // emit the event directly to Rust instead of queueing it for the next query.
-    if (this._postQueryCallback && !this.currentQueryId) {
-      this._postQueryCallback(event);
-      return;
-    }
-
-    if (this.eventResolve) {
-      const r = this.eventResolve;
-      this.eventResolve = null;
-      r(event);
-    } else {
-      this.eventQueue.push(event);
-    }
-  }
-
-  async _handleSubprocessControlRequest(event) {
-    const request = event.request;
-    const requestId = event.request_id;
-
-    if (request.subtype === 'can_use_tool' && this.canUseToolFn) {
-      try {
-        const result = await this.canUseToolFn(request.tool_name, request.input, {
-          suggestions: request.permission_suggestions,
-          blockedPath: request.blocked_path,
-          title: request.title,
-          displayName: request.display_name,
-          description: request.description,
-        });
-        this._writeStdin({
-          type: 'control_response',
-          response: {
-            subtype: 'success',
-            request_id: requestId,
-            response: { ...result, toolUseID: request.tool_use_id },
-          },
-        });
-      } catch (err) {
-        this._writeStdin({
-          type: 'control_response',
-          response: {
-            subtype: 'error',
-            request_id: requestId,
-            error: err.message,
-          },
-        });
-      }
-    } else {
-      this._writeStdin({
-        type: 'control_response',
-        response: {
-          subtype: 'error',
-          request_id: requestId,
-          error: `Unsupported control request: ${request.subtype}`,
-        },
-      });
-    }
-  }
-
-  _sendControlRequest(request) {
-    const requestId = randomUUID();
-    return new Promise((resolve, reject) => {
-      this.pendingControlRequests.set(requestId, { resolve, reject });
-      this._writeStdin({
-        request_id: requestId,
-        type: 'control_request',
-        request,
-      });
-    });
-  }
-
-  _nextEvent() {
-    if (this.eventQueue.length > 0) return Promise.resolve(this.eventQueue.shift());
-    if (!this.alive) return Promise.resolve({
-      type: 'result', subtype: 'error_process_exit', is_error: true,
-      errors: ['Process exited'],
-    });
-    return new Promise((resolve) => { this.eventResolve = resolve; });
-  }
-
-  _writeStdin(obj) {
-    if (!this.child || !this.alive) return;
-    try {
-      this.child.stdin.write(JSON.stringify(obj) + '\n');
-    } catch (err) {
-      diag(`[SessionProcess] stdin write error: ${err.message}`);
-    }
-  }
-}
-
-// =============================================================================
 // QUERY HANDLER — Core logic for handling a "query" command
 // =============================================================================
 
@@ -746,11 +321,8 @@ async function handleQuery(cmd) {
   const abortController = new AbortController();
   const queryState = {
     abortController,
-    mode: 'starting',
     status: 'active',
     queryHandle: null,
-    sessionProcess: null,
-    sessionId: sessionId || null,
   };
 
   // Track plan approval state per query (Brain: fix-duplicate-plan-approval)
@@ -1072,13 +644,14 @@ ${hintsBlock}
     }
 
     // Brain: fix-compact-not-triggering-sdk-native
-    // Detect /compact early — it needs special handling throughout the query pipeline.
-    const isCompactCommand = /^\s*\/compact\b/.test(prompt);
+    // Detect SDK slash commands early — they need to be sent as-is without any
+    // context prefix, otherwise the SDK's parser won't recognize them.
+    const isSdkSlashCommand = /^\s*\/(compact|context)\b/.test(prompt);
 
     // Build the final prompt with context prefix
-    // /compact must be sent as-is — appending system-reminder context would prevent
-    // the SDK's slash command parser from recognizing it as a command.
-    const finalPrompt = isCompactCommand
+    // SDK slash commands must be sent as-is — appending system-reminder context
+    // would prevent the SDK's slash command parser from recognizing them.
+    const finalPrompt = isSdkSlashCommand
       ? prompt
       : (contextPrefix ? `${prompt}\n\n<system-reminder>\n${contextPrefix}\n</system-reminder>` : prompt);
 
@@ -1103,207 +676,17 @@ ${hintsBlock}
       countTokensPromise = countPromptTokens(modelId, promptContent);
     }
 
-    // Build the canUseTool callback for this query (used by persistent subprocess path)
-    const canUseToolForQuery = async (toolName, input, toolOptions) => {
-      if (toolName === 'AskUserQuestion') {
-        diag(`canUseTool AskUserQuestion triggered for query=${queryId}`);
-        try {
-          const response = await requestFromFrontend(queryId, 'ask_user_question', {
-            questions: input.questions,
-          });
-          return {
-            behavior: 'allow',
-            updatedInput: { questions: input.questions, answers: response.answers },
-          };
-        } catch (error) {
-          return { behavior: 'deny', message: `Failed to get user answers: ${error.message}` };
-        }
-      }
-      if (toolName === 'ExitPlanMode') {
-        if (planAlreadyApproved) {
-          return { behavior: 'allow', updatedInput: input };
-        }
-        diag(`canUseTool ExitPlanMode triggered for query=${queryId}`);
-        try {
-          const response = await requestFromFrontend(queryId, 'plan_approval_request', { plan: input });
-          const answers = response.answers || response;
-          const isApproved = answers.approved === 'true' || answers.approved === true;
-          if (isApproved) {
-            planAlreadyApproved = true;
-            return { behavior: 'allow', updatedInput: input };
-          } else {
-            return { behavior: 'deny', message: answers.feedback || 'User rejected the plan' };
-          }
-        } catch (error) {
-          return { behavior: 'deny', message: `Failed to get plan approval: ${error.message}` };
-        }
-      }
-      // 🛡️ Ask mode: prompt user before allowing tool execution
-      // Brain: pattern-permission-modes (Ask = default + no skill injection)
-      if (askMode) {
-        diag(`canUseTool ASK MODE (subprocess): tool=${toolName} for query=${queryId}`);
-        try {
-          const response = await requestFromFrontend(queryId, 'tool_permission_request', {
-            toolName,
-            input,
-          });
-          const answers = response.answers || response;
-          const isApproved = answers.approved === 'true' || answers.approved === true;
-          if (isApproved) {
-            log('INTERACT', `[INFO] Tool ${toolName} APPROVED by user for query=${queryId}`);
-            return { behavior: 'allow', updatedInput: input };
-          } else {
-            log('INTERACT', `[INFO] Tool ${toolName} DENIED by user for query=${queryId}`);
-            return { behavior: 'deny', message: answers.feedback || `User denied ${toolName}` };
-          }
-        } catch (error) {
-          log('INTERACT', `[WARN] Tool permission request FAILED for query=${queryId}: ${error.message}`);
-          return { behavior: 'deny', message: `Failed to get tool permission: ${error.message}` };
-        }
-      }
-
-      // Default: allow (Build mode, Chat mode uses prompt-level enforcement)
-      return { behavior: 'allow', updatedInput: input };
-    };
-
-    // --- Persistent subprocess for resumed sessions ---
-    // Brain: bug-post-fix-cache-breakage-investigation
-    // New sessions use query() since there's no session to keep alive.
-    // Resumed sessions use a persistent subprocess to preserve cache state.
-    //
     // Brain: fix-compact-not-triggering-sdk-native
-    // /compact must bypass the persistent subprocess — slash commands are only parsed
-    // by the SDK's query() API, not by the streaming stdin protocol. When we detect
-    // /compact, we kill the persistent subprocess and force the query() path.
-    // After compaction, the next message creates a fresh subprocess with compacted state.
-    if (isCompactCommand && sessionId) {
-      const proc = sessionProcesses.get(sessionId);
-      if (proc) {
-        log('COMPACT', `Killing persistent subprocess for session=${sessionId} to allow SDK-native /compact`);
-        proc.kill();
-        sessionProcesses.delete(sessionId);
-      }
-    }
-    const usePersistentProcess = sessionId && isAnthropicProvider && !isCompactCommand;
-    let eventSource;
-
-    if (usePersistentProcess) {
-      const overlappingQueries = Array.from(activeQueries.entries())
-        .filter(([otherQueryId, otherState]) => otherQueryId !== queryId && otherState.sessionId === sessionId);
-      if (overlappingQueries.length > 0) {
-        log(
-          'ABORT',
-          `query=${queryId} detected ${overlappingQueries.length} overlapping query(s) for session=${sessionId}; forcing fresh subprocess`
-        );
-        diag(
-          `OVERLAP_DETECTED: newQuery=${queryId}, session=${sessionId}, overlaps=[${overlappingQueries
-            .map(([otherQueryId, otherState]) => `${otherQueryId}:${otherState.status}`)
-            .join(',')}]`
-        );
-
-        for (const [otherQueryId, otherState] of overlappingQueries) {
-          otherState.status = 'aborted';
-          otherState.abortController.abort();
-          if (otherState.sessionProcess) {
-            otherState.sessionProcess.markTaintedAfterAbort(otherQueryId, 'overlap-prevention');
-            otherState.sessionProcess.kill();
-          }
-          taintedSessions.set(sessionId, {
-            queryId: otherQueryId,
-            reason: 'overlap-prevention',
-            taintedAt: Date.now(),
-            postStopEventCount: 0,
-            resultAfterInterrupt: false,
-          });
-        }
-      }
-
-      const spawnOpts = {
-        model: modelId,
-        resume: sessionId,
-        permissionMode: options.permissionMode,
-        canUseTool: true,
-        settingSources: options.settingSources || ['project', 'user', 'local'],
-        betas: options.betas,
-        allowedTools: resolvedAllowedTools,
-        tools: options.tools,
-        thinking: options.thinking,
-        effort: options.effort,
-        mcpServers: options.mcpServers,
-        agents: options.agents,
-        cwd,
-      };
-      const fingerprint = getSessionFingerprint(spawnOpts);
-
-      let proc = sessionProcesses.get(sessionId);
-      const taintInfo = taintedSessions.get(sessionId);
-      if (taintInfo) {
-        const stillDraining = Boolean(proc?.currentQueryId || proc?.retireAfterQueryId);
-        log(
-          'ABORT',
-          `Starting query=${queryId} on tainted session=${sessionId}; previousQuery=${taintInfo.queryId} reason=${taintInfo.reason} postStopEvents=${taintInfo.postStopEventCount} resultAfterInterrupt=${taintInfo.resultAfterInterrupt} stillDraining=${stillDraining}`
-        );
-        diag(
-          `TAINTED_SESSION_RESTART: newQuery=${queryId}, session=${sessionId}, previousQuery=${taintInfo.queryId}, reason=${taintInfo.reason}, postStopEvents=${taintInfo.postStopEventCount}, resultAfterInterrupt=${taintInfo.resultAfterInterrupt}, stillDraining=${stillDraining}`
-        );
-      }
-
-      if (proc && (taintInfo || proc.tainted || !proc.alive || proc.fingerprint !== fingerprint)) {
-        log(
-          'SESSION_PROCESS',
-          `Restarting subprocess for session=${sessionId} (tainted=${Boolean(taintInfo || proc.tainted)}, alive=${proc.alive}, fp_changed=${proc.fingerprint !== fingerprint})`
-        );
-        proc.kill();
-        sessionProcesses.delete(sessionId);
-        proc = null;
-      }
-      if (taintInfo) taintedSessions.delete(sessionId);
-
-      if (!proc) {
-        proc = new SessionProcess(sessionId, fingerprint);
-        proc.spawn(buildCliArgs(spawnOpts), cwd, { ...process.env });
-
-        const appendPart = options.systemPrompt?.append || '';
-        try {
-          await proc.initialize({
-            systemPrompt: '',
-            appendSystemPrompt: appendPart || undefined,
-            agents: options.agents,
-          });
-        } catch (initErr) {
-          log('SESSION_PROCESS', `Init failed for session=${sessionId}: ${initErr.message}, falling back to query()`);
-          proc.kill();
-          proc = null;
-        }
-
-        if (proc) sessionProcesses.set(sessionId, proc);
-      }
-
-      if (proc) {
-        queryState.mode = 'persistent';
-        queryState.sessionProcess = proc;
-        proc.startQuery(queryId, canUseToolForQuery);
-        proc.sendMessage(finalPrompt, attachments);
-        eventSource = proc.events();
-        log('QUERY', `query=${queryId} using persistent subprocess pid=${proc.child?.pid}`);
-      }
-    }
-
-    // Fallback: use SDK query() for new sessions or when persistent subprocess is unavailable
-    if (!eventSource) {
-      queryState.mode = 'query';
-      // Brain: fix-compact-not-triggering-sdk-native
-      // /compact must be sent as a string prompt (not AsyncIterable) so the SDK's
-      // slash command parser recognizes it. AsyncIterable prompts go through streamInput
-      // which bypasses slash command parsing.
-      const queryPrompt = isCompactCommand ? finalPrompt : generateMessages();
-      log('QUERY', `query=${queryId} calling SDK query() (${isCompactCommand ? 'compact string prompt' : 'streamingInput=true'})`);
-      queryState.queryHandle = query({
-        prompt: queryPrompt,
-        options,
-      });
-      eventSource = queryState.queryHandle;
-    }
+    // SDK slash commands must be sent as a string prompt (not AsyncIterable) so the
+    // SDK's slash command parser recognizes them. AsyncIterable prompts go through
+    // streamInput which bypasses slash command parsing.
+    const queryPrompt = isSdkSlashCommand ? finalPrompt : generateMessages();
+    log('QUERY', `query=${queryId} calling SDK query() (${isSdkSlashCommand ? 'SDK slash command string prompt' : 'streamingInput=true'}) resume=${sessionId || 'none'}`);
+    queryState.queryHandle = query({
+      prompt: queryPrompt,
+      options,
+    });
+    const eventSource = queryState.queryHandle;
 
     let eventCount = 0;
     let promptTokensEmitted = false;
@@ -1312,17 +695,7 @@ ${hintsBlock}
       if (eventCount <= 5) diag(`EVENT[${eventCount}]: type=${event.type}, subtype=${event.subtype || '-'}`);
 
       const latestQueryState = activeQueries.get(queryId);
-      const suppressEvent = latestQueryState && latestQueryState.status !== 'active';
-      if (suppressEvent) {
-        if (queryState.sessionId && taintedSessions.has(queryState.sessionId)) {
-          const taintInfo = taintedSessions.get(queryState.sessionId);
-          taintInfo.postStopEventCount += 1;
-          if (event.type === 'result') {
-            taintInfo.resultAfterInterrupt = true;
-            log('ABORT', `Result arrived after interrupt for query=${queryId} session=${queryState.sessionId}`);
-            diag(`RESULT_AFTER_INTERRUPT: query=${queryId}, session=${queryState.sessionId}`);
-          }
-        }
+      if (latestQueryState && latestQueryState.status !== 'active') {
         log('ABORT', `Suppressing post-stop event for query=${queryId}: type=${event.type}`);
         continue;
       }
@@ -1344,8 +717,10 @@ ${hintsBlock}
         if (u) {
           const cRead = u.cache_read_input_tokens || 0;
           const cCreate = u.cache_creation_input_tokens || 0;
-          log('CACHE', `query=${queryId} cacheRead=${cRead} cacheCreation=${cCreate} input=${u.input_tokens || 0} effective=${cRead + cCreate + (u.input_tokens || 0)}`);
-          diag(`CACHE: cacheRead=${cRead} cacheCreation=${cCreate} effective=${cRead + cCreate + (u.input_tokens || 0)}`);
+          const total = cRead + cCreate + (u.input_tokens || 0);
+          const hitPct = total > 0 ? ((cRead / total) * 100).toFixed(1) : '0.0';
+          log('CACHE', `query=${queryId} cacheRead=${cRead} cacheCreation=${cCreate} input=${u.input_tokens || 0} hit=${hitPct}%`);
+          diag(`CACHE: cacheRead=${cRead} cacheCreation=${cCreate} effective=${total}`);
         }
         const mu = event.modelUsage || event.model_usage;
         if (mu) {
@@ -1360,16 +735,19 @@ ${hintsBlock}
         // Must await getContextUsage() before the for-await loop ends, because
         // the result event is the last event — after iteration the query handle
         // closes and control requests fail with "Query closed before response".
-        // In query mode, queryHandle.getContextUsage() fails because the generator
-        // closes after the result event. Prefer sessionProcess (persistent subprocess)
-        // which stays alive across queries. Fall back to queryHandle for non-persistent.
-        const ctxSource = queryState.sessionProcess || queryState.queryHandle;
+        const ctxSource = queryState.queryHandle;
         if (ctxSource && typeof ctxSource.getContextUsage === 'function') {
           try {
-            const rawResult = await ctxSource.getContextUsage();
-            // SessionProcess._sendControlRequest resolves with the control_response
-            // envelope: { subtype: 'success', request_id, response: { ...data } }.
-            // SDK Query handle resolves with the data directly.
+            // Timeout getContextUsage() to prevent hanging the entire query completion.
+            // If the SDK subprocess is in a bad state, this call can hang indefinitely,
+            // blocking query_complete emission and leaving the frontend stuck with loading dots.
+            let timeoutId;
+            const rawResult = await Promise.race([
+              ctxSource.getContextUsage(),
+              new Promise((_, reject) => {
+                timeoutId = setTimeout(() => reject(new Error('getContextUsage timeout (5s)')), 5000);
+              }),
+            ]).finally(() => clearTimeout(timeoutId));
             const ctxUsage = rawResult?.response || rawResult;
             if (ctxUsage && (ctxUsage.totalTokens > 0 || ctxUsage.categories?.length > 0)) {
               log('CONTEXT', `query=${queryId} contextUsage: total=${ctxUsage.totalTokens}/${ctxUsage.maxTokens} (${ctxUsage.percentage?.toFixed(1) || 0}%) categories=${ctxUsage.categories?.length || 0}`);
@@ -1471,13 +849,6 @@ ${hintsBlock}
       else delete process.env.ANTHROPIC_AUTH_TOKEN;
     }
 
-    if (queryState.sessionProcess) {
-      const retiredProcess = queryState.sessionProcess.finishQuery(queryId);
-      if (retiredProcess && queryState.sessionId && sessionProcesses.get(queryState.sessionId) === queryState.sessionProcess) {
-        sessionProcesses.delete(queryState.sessionId);
-      }
-    }
-
     // Clean up pending requests for this query
     let cleanedRequests = 0;
     for (const [reqId, req] of pendingRequests.entries()) {
@@ -1567,34 +938,7 @@ async function handleAbort(cmd) {
     queryState.status = 'aborted';
   };
 
-  if (queryState.mode === 'persistent' && queryState.sessionProcess) {
-    const sessionId = queryState.sessionProcess.sessionId;
-    const taintInfo = {
-      queryId,
-      reason: 'user-stop',
-      taintedAt: Date.now(),
-      postStopEventCount: 0,
-      resultAfterInterrupt: false,
-    };
-    taintedSessions.set(sessionId, taintInfo);
-    queryState.sessionProcess.markTaintedAfterAbort(queryId, 'user-stop');
-
-    try {
-      await withTimeout(queryState.sessionProcess.interruptCurrentQuery(), interruptTimeoutMs);
-      finalizeAbort();
-      log('ABORT', `query=${queryId} interrupted successfully via persistent subprocess`);
-    } catch (err) {
-      log('ABORT', `query=${queryId} interrupt failed (${err.message}) — killing subprocess`);
-      queryState.sessionProcess.kill();
-      if (sessionProcesses.get(sessionId) === queryState.sessionProcess) {
-        sessionProcesses.delete(sessionId);
-      }
-      finalizeAbort();
-    }
-    return;
-  }
-
-  if (queryState.mode === 'query' && queryState.queryHandle && typeof queryState.queryHandle.interrupt === 'function') {
+  if (queryState.queryHandle && typeof queryState.queryHandle.interrupt === 'function') {
     try {
       await withTimeout(queryState.queryHandle.interrupt(), interruptTimeoutMs);
       finalizeAbort();
@@ -1631,16 +975,11 @@ function handleMcpReload(cmd) {
 }
 
 async function handleShutdown() {
-  log('LIFECYCLE', `Shutdown requested — closing ${activeQueries.size} active queries, ${sessionProcesses.size} session processes`);
+  log('LIFECYCLE', `Shutdown requested — closing ${activeQueries.size} active queries`);
   for (const [queryId, state] of activeQueries.entries()) {
     state.abortController.abort();
     log('LIFECYCLE', `Aborted query=${queryId} during shutdown`);
   }
-  for (const [sid, proc] of sessionProcesses.entries()) {
-    proc.kill();
-    log('LIFECYCLE', `Killed session process=${sid} during shutdown`);
-  }
-  sessionProcesses.clear();
   await new Promise(resolve => setTimeout(resolve, 1000));
   log('LIFECYCLE', 'Daemon shutting down');
   process.exit(0);
@@ -1651,7 +990,7 @@ async function handleShutdown() {
 // =============================================================================
 
 async function main() {
-  log('LIFECYCLE', `Starting persistent daemon (pid=${process.pid}, node=${process.version})`);
+  log('LIFECYCLE', `Starting daemon (pid=${process.pid}, node=${process.version})`);
 
   const stdinReader = createInterface({
     input: process.stdin,

@@ -37,9 +37,11 @@ interface MessageListProps {
   onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
   // Teammate stream drill-down
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
+  // Show per-turn token/cache stats below completed responses
+  showTurnTokenStats?: boolean;
 }
 
-export default function MessageList({ messages, loading, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, onOpenPersonality, pendingPlanApprovalIds, onPlanApprovalResponse, onTeammateDrillDown }: MessageListProps) {
+export default function MessageList({ messages, loading, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName, agentAvatar, projectName, gitBranch, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, onOpenPersonality, pendingPlanApprovalIds, onPlanApprovalResponse, onTeammateDrillDown, showTurnTokenStats = false }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevMessagesLengthRef = useRef(messages.length);
   const prevFirstMessageIdRef = useRef<string | null>(messages[0]?.id ?? null);
@@ -276,6 +278,7 @@ export default function MessageList({ messages, loading, onFilePathClick, onOpen
                 onPlanApprovalResponse={onPlanApprovalResponse}
                 onTeammateDrillDown={onTeammateDrillDown}
                 showHeader={showHeader}
+                showTurnTokenStats={showTurnTokenStats}
               />
             </div>
           );

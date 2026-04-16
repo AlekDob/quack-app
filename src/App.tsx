@@ -1193,34 +1193,6 @@ function AppContent() {
     });
   }, [chatSessions]);
 
-  // Brain: bug-background-task-unsolicited-events
-  // On mount, auto-complete any background task placeholders that were persisted mid-flight.
-  // These can occur if the app was closed while a background task was still streaming.
-  useEffect(() => {
-    setChatSessions(prev => {
-      let hasStuck = false;
-      for (const [, messages] of prev) {
-        if (messages.some(m => m.role === 'assistant' && m.status === 'streaming' && m.metadata?.isBackgroundTask)) {
-          hasStuck = true;
-          break;
-        }
-      }
-      if (!hasStuck) return prev;
-      const fixed = new Map(prev);
-      for (const [key, messages] of fixed) {
-        const fixedMsgs = messages.map(m =>
-          m.role === 'assistant' && m.status === 'streaming' && m.metadata?.isBackgroundTask
-            ? { ...m, status: 'complete' as const, content: m.content || '(Background task interrupted)' }
-            : m
-        );
-        if (fixedMsgs !== messages) fixed.set(key, fixedMsgs);
-      }
-      console.log('🦆 [mount] Auto-completed stuck background task placeholders');
-      return fixed;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Keep chatSessionsRef in sync for synchronous access in beforeunload and result-event handlers
   useEffect(() => {
     chatSessionsRef.current = chatSessions;
@@ -1472,7 +1444,6 @@ function AppContent() {
     source: string, // For debugging: 'Multi-Listener', 'Pre-warm', 'ensureListenerReady'
     sessionKey?: string, // 🦆 SESSION-FIRST: sessionKey from Rust event wrapper
     turnId?: string, // Frontend-generated turn ID echoed back from Rust for per-turn isolation
-    unsolicited?: boolean // Brain: bug-background-task-unsolicited-events — post-query background task event
   ) => {
     const evt = claudeEvent as any;
 
@@ -1626,36 +1597,6 @@ function AppContent() {
             lastAgentResponseRef.current.set(messageKey, existingText + textContent);
           }
         }
-      } else if (unsolicited && !activeStreamsRef.current.has(messageKey)) {
-        // Brain: bug-background-task-unsolicited-events
-        // This is a post-query event from a background task (run_in_background).
-        // No active stream exists, so we auto-create a streaming placeholder and
-        // route the event to it. This makes the agent's response visible immediately
-        // instead of waiting for the user to send a new message.
-        //
-        // Event mixing is prevented by the `!activeStreamsRef.current.has(messageKey)`
-        // guard: once a new user query starts (creating a stream), unsolicited events
-        // fall through to the normal buffer path and get discarded on next turn setup.
-        console.log(`🦆 [${source}] UNSOLICITED event for messageKey=${messageKey} — auto-creating placeholder`);
-
-        const placeholderId = `msg-${Date.now()}-assistant-bg-${Math.random().toString(36).substring(2, 11)}`;
-        const placeholder: ChatMessage = {
-          id: placeholderId,
-          role: 'assistant',
-          content: '',
-          timestamp: Date.now(),
-          status: 'streaming' as const,
-          events: [claudeEvent],
-          metadata: { isBackgroundTask: true },
-        };
-        const updatedMessages = [...sessionMessages, placeholder];
-        newSessions.set(messageKey, updatedMessages);
-
-        // Clear any stale buffer — the placeholder will receive future events
-        eventBufferRef.current.delete(messageKey);
-
-        // Clear activeQueryIdRef so future unsolicited events (no turnId) pass through
-        activeQueryIdRef.current.delete(messageKey);
       } else {
         // 🦆 BUFFER: No streaming message yet - buffer the event for later
         // 🦆 SESSION-FIRST: Use messageKey for buffer (parallel sessions need separate buffers)
@@ -1665,32 +1606,6 @@ function AppContent() {
       return newSessions;
     });
 
-    // Brain: bug-background-task-unsolicited-events
-    // Set loading state when unsolicited events arrive, clear it on result
-    if (unsolicited) {
-      if (claudeEvent.type === 'result') {
-        // Background task turn completed — mark as done
-        useChatStore.getState().setLoading(messageKey, false);
-        // Mark the last assistant message as complete
-        setChatSessions((prev) => {
-          const newSessions = new Map(prev);
-          const messages = newSessions.get(messageKey) ?? [];
-          const lastMsg = messages[messages.length - 1];
-          if (lastMsg?.role === 'assistant' && lastMsg.status === 'streaming') {
-            const resultEvt = claudeEvent as any;
-            newSessions.set(messageKey, messages.map((msg, i) =>
-              i === messages.length - 1
-                ? { ...msg, content: resultEvt.result || msg.content, status: 'complete' as const }
-                : msg
-            ));
-          }
-          return newSessions;
-        });
-        console.log(`🦆 [${source}] UNSOLICITED result for messageKey=${messageKey} — background task complete`);
-      } else {
-        useChatStore.getState().setLoading(messageKey, true);
-      }
-    }
 
     // 🦆 CONTEXT FILL FIX: Track usage from ASSISTANT events (per-step, real context fill)
     // Assistant message usage is per-API-call, so input_tokens + cache_read + cache_creation
@@ -1822,15 +1737,12 @@ function AppContent() {
 
       // 🦆 SESSION BACKUP: Persist messages to localStorage at end of turn
       // Same frequency as token persistence above — once per turn, no excessive writes.
-      // Uses functional updater to read the latest flushed state (chatSessionsRef may
-      // be one render behind since its sync effect runs after paint).
-      setChatSessions(current => {
-        const msgs = current.get(messageKey);
-        if (msgs && msgs.length > 0) {
-          saveSessionBackup(messageKey, msgs);
-        }
-        return current; // no mutation — React bails out
-      });
+      // Read from ref (synced at line ~1197) — avoids a no-op setChatSessions updater
+      // that was causing spurious React state update cycles and QuotaExceededError spam.
+      const backupMsgs = chatSessionsRef.current.get(messageKey);
+      if (backupMsgs && backupMsgs.length > 0) {
+        saveSessionBackup(messageKey, backupMsgs);
+      }
 
       // Brain: fix-memory-leak-14gb-ram
       // Session-end cleanup: free temporary buffers that are no longer needed
@@ -2442,13 +2354,12 @@ function AppContent() {
       try {
         // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey + turnId
         // Payload structure: { sessionKey: string, turnId: string, event: ClaudeEvent }
-        // Brain: bug-background-task-unsolicited-events
-        const unlisten = await listen<{ sessionKey: string; turnId?: string; event: ClaudeEvent; unsolicited?: boolean }>(eventName, (event) => {
-          const { sessionKey, turnId, event: claudeEvent, unsolicited } = event.payload;
+        const unlisten = await listen<{ sessionKey: string; turnId?: string; event: ClaudeEvent }>(eventName, (event) => {
+          const { sessionKey, turnId, event: claudeEvent } = event.payload;
 
           // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
           // 🦆 SESSION-FIRST: Pass sessionKey so events go to the correct chat session
-          handleClaudeEvent(agentId, claudeEvent, 'Multi-Listener', sessionKey, turnId, unsolicited);
+          handleClaudeEvent(agentId, claudeEvent, 'Multi-Listener', sessionKey, turnId);
 
           // Auto-refresh FileExplorer when files are created/modified
           if (claudeEvent.type === 'result') {
@@ -2966,16 +2877,7 @@ function AppContent() {
         eventBufferRef.current.delete(messageKey);
       }
 
-      // Brain: bug-background-task-unsolicited-events
-      // Auto-complete any stuck background task placeholder before adding a new one.
-      // This prevents the null-turnId fallback path from routing unsolicited events
-      // to the new query's placeholder (event mixing).
-      const fixedMessages = sessionMessages.map((msg) =>
-        msg.role === 'assistant' && msg.status === 'streaming' && msg.metadata?.isBackgroundTask
-          ? { ...msg, status: 'complete' as const }
-          : msg
-      );
-      newSessions.set(messageKey, [...fixedMessages, assistantMessage]);
+      newSessions.set(messageKey, [...sessionMessages, assistantMessage]);
 
       return newSessions;
     });
@@ -3106,6 +3008,18 @@ function AppContent() {
                   ...msg,
                   content: response.result,
                   status: 'complete' as const,
+                  metadata: {
+                    ...msg.metadata,
+                    ...(response.usage ? {
+                      turnUsage: {
+                        input_tokens: response.usage.input_tokens || 0,
+                        output_tokens: response.usage.output_tokens || 0,
+                        cache_read_input_tokens: response.usage.cache_read_input_tokens || 0,
+                        cache_creation_input_tokens: response.usage.cache_creation_input_tokens || 0,
+                      },
+                    } : {}),
+                    turnCost: response.total_cost_usd,
+                  },
                 }
               : msg
           )
@@ -3237,7 +3151,10 @@ function AppContent() {
               msg.id === assistantMessageId
                 ? {
                     ...msg,
-                    content: 'Stream stopped by user',
+                    // Preserve already-streamed content instead of replacing it
+                    content: msg.content && msg.content.length > 0
+                      ? msg.content
+                      : 'Stream stopped by user',
                     status: 'error' as const,
                     error: 'Aborted',
                   }
@@ -3287,7 +3204,10 @@ function AppContent() {
               msg.id === assistantMessageId
                 ? {
                     ...msg,
-                    content: displayMessage,
+                    // Preserve already-streamed content; error details are in .error field
+                    content: msg.content && msg.content.length > 0
+                      ? msg.content
+                      : displayMessage,
                     status: 'error' as const,
                     error: errorMessage,
                   }
@@ -3794,6 +3714,18 @@ function AppContent() {
                   ...msg,
                   content: response.result,
                   status: 'complete' as const,
+                  metadata: {
+                    ...msg.metadata,
+                    ...(response.usage ? {
+                      turnUsage: {
+                        input_tokens: response.usage.input_tokens || 0,
+                        output_tokens: response.usage.output_tokens || 0,
+                        cache_read_input_tokens: response.usage.cache_read_input_tokens || 0,
+                        cache_creation_input_tokens: response.usage.cache_creation_input_tokens || 0,
+                      },
+                    } : {}),
+                    turnCost: response.total_cost_usd,
+                  },
                 }
               : msg
           )
