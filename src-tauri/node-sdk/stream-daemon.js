@@ -1006,10 +1006,16 @@ ${hintsBlock}
       }
     }
 
-    // Brain: fix-daemon-missing-1m-context-betas
-    // Enable 1M context window for supported models (Opus 4.6, Sonnet 4.6)
-    // Without this, the SDK operates at 200k and auto-compacts at ~155k tokens.
-    options.betas = ['context-1m-2025-08-07'];
+    // Brain: fix-daemon-missing-1m-context-betas + fix-oauth-betas-rejection
+    // Enable 1M context window for supported models. Only set for API key users —
+    // OAuth subscriptions (Claude Max/Team/Enterprise) get 1M automatically and
+    // REJECT custom betas with "Warning: Custom betas are only available for API
+    // key users. Ignoring provided betas." — that rejection also disables the
+    // server-side Max 1M auto-flag, forcing a fallback to 200k.
+    const hasApiKey = !!(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY);
+    if (hasApiKey) {
+      options.betas = ['context-1m-2025-08-07'];
+    }
 
     if (cwd) options.cwd = cwd;
     if (sessionId) options.resume = sessionId;
