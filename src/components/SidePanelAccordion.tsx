@@ -483,7 +483,10 @@ export default function SidePanelAccordion({
           setBrainLoaded(true);
           setBrainLoading(false);
         })
-        .catch(() => setBrainLoading(false));
+        .catch(() => {
+          setBrainLoaded(true);
+          setBrainLoading(false);
+        });
       invoke<SearchResult[]>('search_files_recursive', {
         path: brainRootPath, query: '.md', maxResults: 500, maxDepth: 5,
       })

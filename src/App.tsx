@@ -6313,9 +6313,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const fetchDirectoryChildren = useCallback(
     async (path: string) => {
       if (!tauriAvailable) {
-        setExplorerError(
-          "Launch the Tauri desktop app to use the file explorer."
-        );
         return [];
       }
       try {
@@ -6327,9 +6324,12 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           [listing.path]: listing.entries,
         }));
         return listing.entries;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        setExplorerError(message);
+      } catch {
+        // Don't set global explorerError here — this callback is used by
+        // multiple consumers (main explorer, Brain section, etc.) and a
+        // failure in one (e.g. missing documentation/ dir) should not
+        // pollute the error display of another.  The initial root load
+        // in loadDirectory() already handles its own error state.
         return [];
       }
     },
