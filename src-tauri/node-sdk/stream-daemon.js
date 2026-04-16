@@ -817,9 +817,9 @@ async function handleQuery(cmd) {
       model: modelId,
       // Brain: 1m-context-window-support
       // The [1m] suffix in modelId is enough — the CLI handles it natively.
-      // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
-      // 🐛 DEBUG: Disabled native CLI to test AskUserQuestion hang regression
-      // ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
+      // Opus 4.6 has 1M automatically; Opus 4.7 has 1M natively; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
+      // Re-enabled after AskUserQuestion regression fix (fix-ask-user-question-stream-event-not-emitted, 2026-03-24)
+      ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
       settingSources: ['project', 'user', 'local'],
       tools: { type: 'preset', preset: 'claude_code' },
       allowedTools: resolvedAllowedTools,

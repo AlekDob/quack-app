@@ -68,6 +68,9 @@ The "Update Brain" action in SessionPopover sends `/brain` — a **Quack built-i
 ### mouseDown Prevention
 The `.unified-action-bar` uses `onMouseDown={(e) => { ... e.preventDefault() }}` to keep textarea focus, but **skips** `preventDefault` when the click target is inside `.uab-popover` or `.chat-settings-menu` — otherwise native `<select>` dropdowns in ChatSettingsMenu would be blocked.
 
+### Skill Drop via SplitDropZone
+When a skill is dragged from the sidebar, the `SplitDropZone` overlay intercepts the drop and routes it to `handleChatDrop` in App.tsx. This sets `pendingSkillMention` state, which is prop-drilled through ChatView to ChatInput. A `useEffect` in ChatInput inserts `@skill:{name}` at cursor position. Direct drops (no overlay) are handled by `handleDrop` in ChatInput.tsx via `application/quack-skill` MIME type.
+
 ### CSS Architecture
 - `.unified-action-bar` -- flex row container with left/spacer/right layout
 - `.uab-btn` -- 28px icon buttons, transparent bg, hover/active states
