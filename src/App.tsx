@@ -10212,7 +10212,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       try {
         const result = await findDefinition(symbol, explorerRoot);
         if (result.definitions.length === 0) {
-          toast.error(`Definizione non trovata per \`${symbol}\``);
+          toast.error(`Definition not found for \`${symbol}\``);
           return;
         }
         const def = result.definitions[0];
@@ -10221,7 +10221,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         useEditorStore.getState().setPendingNavigationLine(def.line);
         handleOpenCodeEditorTab(def.file);
       } catch {
-        toast.error(`Definizione non trovata per \`${symbol}\``);
+        toast.error(`Definition not found for \`${symbol}\``);
       } finally {
         inFlight = false;
       }

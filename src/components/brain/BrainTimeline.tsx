@@ -230,7 +230,7 @@ export default function BrainTimeline({ projectPath, isGlobal, onSelectEntry }: 
             <Search size={14} />
             <input
               type="text"
-              placeholder="Cerca nei contenuti..."
+              placeholder="Search content..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />

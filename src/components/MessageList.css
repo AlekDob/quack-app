@@ -111,11 +111,11 @@
 
 /* Scroll to bottom button */
 .scroll-to-bottom-button {
-  position: fixed;
-  bottom: 100px;
-  right: 40px;
-  width: 40px;
-  height: 40px;
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: rgba(77, 212, 179, 0.9);
   border: none;
@@ -126,7 +126,7 @@
   justify-content: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   transition: all 0.2s ease;
-  z-index: 1000;
+  z-index: 100000;
   animation: scrollButtonFadeIn 0.2s ease;
 }
 
