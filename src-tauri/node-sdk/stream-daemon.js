@@ -259,6 +259,17 @@ function getModelId(model) {
   };
 
   const resolved = fallbackMap[baseModel] || baseModel;
+
+  // Brain: gotcha-oauth-betas-rejection + anthropic/claude-code#45449
+  // Client-side gate in cli.js (isOneMContextBlocked) reads stale cache in
+  // ~/.claude.json and blocks the implicit [1m] auto-upgrade for new Opus
+  // models (e.g. opus-4-7). On Max subscriptions the server accepts [1m]
+  // fine — only the slash-command path is broken. Forcing the suffix
+  // explicitly bypasses the gate and restores 1M.
+  const isOpus = /claude-opus-4-[6-9]/.test(resolved);
+  if (isOpus && !has1MSuffix) {
+    return `${resolved}[1m]`;
+  }
   // Re-append [1m] suffix if present — SDK strips it before sending to API
   return has1MSuffix ? `${resolved}[1m]` : resolved;
 }
@@ -1356,10 +1367,16 @@ ${hintsBlock}
         const mu = event.modelUsage || event.model_usage;
         if (mu) {
           for (const [modelName, usage] of Object.entries(mu)) {
+            // Brain: gotcha-oauth-betas-rejection — aggressive diag to see full usage shape
+            diag(`MODEL_USAGE[${modelName}]: ${JSON.stringify(usage)}`);
             if (usage?.contextWindow) {
               log('QUERY', `contextWindow for ${modelName}: ${usage.contextWindow} (${usage.contextWindow >= 1_000_000 ? '1M' : '200k'})`);
+            } else {
+              log('QUERY', `contextWindow MISSING for ${modelName} — keys=${Object.keys(usage || {}).join(',')}`);
             }
           }
+        } else {
+          diag(`MODEL_USAGE absent on result event — keys=${Object.keys(event || {}).join(',')}`);
         }
 
         // Brain: sdk-get-context-usage-breakdown

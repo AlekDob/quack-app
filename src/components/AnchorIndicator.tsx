@@ -120,7 +120,8 @@ export default function AnchorIndicator({
         best = { id: item.dataset.messageId || '', dist };
       }
     });
-    return best && best.id ? best.id : null;
+    const result = best as { id: string; dist: number } | null;
+    return result && result.id ? result.id : null;
   }, [scrollRef]);
 
   const handleClick = useCallback(() => {
