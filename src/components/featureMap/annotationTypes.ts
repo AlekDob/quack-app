@@ -2,7 +2,7 @@
  * Feature Map — Annotation types (post-its, group rectangles, images)
  */
 
-export type AnnotationMode = 'select' | 'lasso' | 'postit' | 'group' | 'image';
+export type AnnotationMode = 'select' | 'lasso' | 'postit' | 'group' | 'image' | 'mdcard';
 
 export interface PostIt {
   id: string;
@@ -35,6 +35,29 @@ export interface CanvasImage {
   parentComponentId?: string;
 }
 
+/**
+ * Markdown Preview Card — renders rich markdown content inline on the canvas.
+ * Supports inline markdown (content) OR file reference (filePath).
+ * If filePath ends with .mmd, the file is rendered as a Mermaid diagram.
+ * Heptabase-style: first-class whiteboard element, not a fat post-it.
+ */
+export interface MdCard {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Inline markdown content (mutually exclusive with filePath) */
+  content?: string;
+  /** Relative path to .md or .mmd file from project root (mutually exclusive with content) */
+  filePath?: string;
+  /** Optional title override. If omitted, falls back to first H1 or file name */
+  title?: string;
+  /** Collapsed state — shows only title bar */
+  collapsed?: boolean;
+  parentComponentId?: string;
+}
+
 /** Navigation state for nested components (ephemeral, not persisted) */
 export interface ComponentNavigation {
   currentComponentId: string | null;
@@ -53,6 +76,7 @@ export interface CanvasAnnotations {
   postIts: PostIt[];
   groups: GroupRect[];
   images: CanvasImage[];
+  mdCards: MdCard[];
 }
 
 /** File-based whiteboard state (replaces localStorage) */
@@ -73,3 +97,8 @@ export const GROUP_MIN_W = 100;
 export const GROUP_MIN_H = 80;
 export const IMAGE_DEFAULT_W = 240;
 export const IMAGE_DEFAULT_H = 160;
+export const MD_CARD_DEFAULT_W = 400;
+export const MD_CARD_DEFAULT_H = 300;
+export const MD_CARD_MIN_W = 200;
+export const MD_CARD_MIN_H = 120;
+export const MD_CARD_COLLAPSED_H = 36;

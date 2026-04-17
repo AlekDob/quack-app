@@ -217,7 +217,12 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
     [safeGraph.nodes, selectedNodeId],
   );
 
-  const MODES: AnnotationMode[] = ['select', 'lasso', 'postit', 'group', 'image'];
+  const MODES: AnnotationMode[] = ['select', 'lasso', 'postit', 'group', 'image', 'mdcard'];
+
+  const handleOpenMdCardFile = useCallback((relPath: string) => {
+    const base = projectPath ? normalizeToForwardSlash(projectPath) : '';
+    onOpenFileInEditor?.(base ? `${base}/${relPath.replace(/^\//, '')}` : relPath);
+  }, [onOpenFileInEditor, projectPath]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -326,6 +331,10 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
             onImageRemove={wb.removeImage}
             onImageFilePick={handleImageFilePick}
             onImageDrop={handleImageDrop}
+            onMdCardAdd={wb.addMdCard}
+            onMdCardUpdate={wb.updateMdCard}
+            onMdCardRemove={wb.removeMdCard}
+            onOpenMdCardFile={handleOpenMdCardFile}
             projectPath={projectPath ?? ''}
             onResetMode={handleResetMode}
             searchQuery={searchQuery}

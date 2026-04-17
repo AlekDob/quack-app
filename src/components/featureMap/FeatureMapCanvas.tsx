@@ -7,11 +7,12 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { calculateLayeredLayout, classifyNode, LAYERS, LEFT_MARGIN, LEGEND_H } from './featureMapLayout';
 import type { FeatureGraph, NodePosition } from './featureMapTypes';
-import type { CanvasAnnotations, AnnotationMode, PostIt, GroupRect, CanvasImage as CanvasImageType, LassoRect } from './annotationTypes';
+import type { CanvasAnnotations, AnnotationMode, PostIt, GroupRect, CanvasImage as CanvasImageType, MdCard, LassoRect } from './annotationTypes';
 import { GROUP_MIN_W, GROUP_MIN_H } from './annotationTypes';
 import CanvasPostIt from './CanvasPostIt';
 import CanvasGroupRect from './CanvasGroupRect';
 import CanvasImage from './CanvasImage';
+import CanvasMdCard from './CanvasMdCard';
 import FeatureMapMinimap from './FeatureMapMinimap';
 
 const BG = 'var(--bg-base, #0f1115)';
@@ -59,6 +60,11 @@ interface Props {
   onImageRemove: (id: string) => void;
   onImageFilePick: (x: number, y: number) => void;
   onImageDrop: (file: File, x: number, y: number) => void;
+  // MD Preview Cards
+  onMdCardAdd: (x: number, y: number, init?: Partial<MdCard>) => string;
+  onMdCardUpdate: (id: string, p: Partial<MdCard>) => void;
+  onMdCardRemove: (id: string) => void;
+  onOpenMdCardFile?: (filePath: string) => void;
   projectPath: string;
   onResetMode: () => void;
   searchQuery: string;
@@ -92,6 +98,7 @@ export default function FeatureMapCanvas(props: Props) {
     onPostItAdd, onPostItUpdate, onPostItRemove,
     onGroupAdd, onGroupUpdate, onGroupRemove,
     onImageUpdate, onImageRemove, onImageFilePick, onImageDrop,
+    onMdCardAdd, onMdCardUpdate, onMdCardRemove, onOpenMdCardFile,
     projectPath, onResetMode, searchQuery,
     multiSelectedIds, lassoRect: lassoRectProp,
     onLassoStart, onLassoUpdate, onLassoSelect, onLassoReset, onMultiToggle, onMultiClear, onBeginDrag, onEndDrag,
@@ -238,6 +245,12 @@ export default function FeatureMapCanvas(props: Props) {
       // Reset happens in FeatureMapView after file pick completes/cancels
       return;
     }
+    if (annotationMode === 'mdcard') {
+      const svg = toSvg(e.clientX, e.clientY);
+      onMdCardAdd(svg.x, svg.y);
+      onResetMode();
+      return;
+    }
     if (annotationMode === 'group') {
       const svg = toSvg(e.clientX, e.clientY);
       groupDrawRef.current = { sx: e.clientX, sy: e.clientY, svgSx: svg.x, svgSy: svg.y };
@@ -283,6 +296,8 @@ export default function FeatureMapCanvas(props: Props) {
       if (g) { origins.set(id, { x: g.x, y: g.y }); continue; }
       const img = annotations.images.find(ii => ii.id === id);
       if (img) { origins.set(id, { x: img.x, y: img.y }); continue; }
+      const mc = (annotations.mdCards ?? []).find(ci => ci.id === id);
+      if (mc) { origins.set(id, { x: mc.x, y: mc.y }); continue; }
     }
     onBeginDrag();
     multiDragRef.current = { startX: clientX, startY: clientY, didDrag: false, origins };
@@ -314,8 +329,9 @@ export default function FeatureMapCanvas(props: Props) {
       if (annotations.postIts.some(p => p.id === id)) onPostItUpdate(id, np);
       else if (annotations.groups.some(g => g.id === id)) onGroupUpdate(id, np);
       else if (annotations.images.some(i => i.id === id)) onImageUpdate(id, np);
+      else if ((annotations.mdCards ?? []).some(c => c.id === id)) onMdCardUpdate(id, np);
     }
-  }, [annotations, graph.nodes, onNodeDrag, onPostItUpdate, onGroupUpdate, onImageUpdate]);
+  }, [annotations, graph.nodes, onNodeDrag, onPostItUpdate, onGroupUpdate, onImageUpdate, onMdCardUpdate]);
 
   /** Check if target is a valid drop destination (prevents circular nesting) */
   const canDropOnTarget = useCallback((dragId: string, targetId: string): boolean => {
@@ -480,6 +496,10 @@ export default function FeatureMapCanvas(props: Props) {
           const cx = img.x + img.w / 2; const cy = img.y + img.h / 2;
           if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) hits.add(img.id);
         }
+        for (const c of (annotations.mdCards ?? [])) {
+          const cx = c.x + c.w / 2; const cy = c.y + c.h / 2;
+          if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) hits.add(c.id);
+        }
         onLassoSelect(hits);
       }
       onLassoReset();
@@ -548,7 +568,7 @@ export default function FeatureMapCanvas(props: Props) {
   const cursor = draggingId || multiDragRef.current ? 'grabbing'
     : spaceHeld ? 'grab'
     : annotationMode === 'lasso' ? 'crosshair'
-    : annotationMode === 'postit' || annotationMode === 'group' || annotationMode === 'image' ? 'crosshair'
+    : annotationMode === 'postit' || annotationMode === 'group' || annotationMode === 'image' || annotationMode === 'mdcard' ? 'crosshair'
     : 'grab';
 
   return (
@@ -753,6 +773,34 @@ export default function FeatureMapCanvas(props: Props) {
           </g>
         </svg>
       )}
+      {/* HTML overlay layer for MD Preview Cards — avoids WebKit foreignObject bug.
+          Applies the same pan/zoom transform as the SVG `<g>` so cards stay aligned
+          with post-its/groups. pointer-events: none on wrapper, auto on each card. */}
+      <div className="fm-html-overlay" style={{
+        position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none',
+      }}>
+        <div style={{
+          position: 'absolute', top: 0, left: 0, width: 0, height: 0,
+          transform: `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom})`,
+          transformOrigin: '0 0',
+        }}>
+          {(annotations.mdCards ?? []).map(c => (
+            <CanvasMdCard key={c.id} card={c} zoom={viewport.zoom}
+              projectPath={projectPath}
+              isSelected={selectedAnnotationId === c.id}
+              isMultiSelected={multiSelectedIds.has(c.id)}
+              onUpdate={onMdCardUpdate} onRemove={onMdCardRemove}
+              onSelect={onAnnotationSelect} onMultiToggle={onMultiToggle}
+              onGroupDragStart={handleGroupDragStart}
+              onBeginDrag={onBeginDrag}
+              onEndDrag={onEndDrag}
+              onOpenFile={onOpenMdCardFile}
+              onAnnotationDragStart={(id) => { dragAnnotationRef.current = id; }}
+              onAnnotationDragEnd={handleAnnotationDragEnd} />
+          ))}
+        </div>
+      </div>
+
       <FeatureMapMinimap
         graph={graph} layout={layout}
         customPositions={customPositions} viewport={viewport}

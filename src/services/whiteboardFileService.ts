@@ -17,7 +17,7 @@ function filePath(projectPath: string): string {
 }
 
 function emptyFile(): WhiteboardFile {
-  return { version: 1, annotations: { postIts: [], groups: [], images: [] }, positions: {}, nodeAssignments: {} };
+  return { version: 1, annotations: { postIts: [], groups: [], images: [], mdCards: [] }, positions: {}, nodeAssignments: {} };
 }
 
 export async function readWhiteboardFile(projectPath: string): Promise<WhiteboardFile | null> {
@@ -25,8 +25,9 @@ export async function readWhiteboardFile(projectPath: string): Promise<Whiteboar
     const raw = await invoke<string>('read_file_content', { path: filePath(projectPath) });
     const parsed = JSON.parse(raw) as WhiteboardFile;
     // Migration: ensure all fields exist
-    if (!parsed.annotations) parsed.annotations = { postIts: [], groups: [], images: [] };
+    if (!parsed.annotations) parsed.annotations = { postIts: [], groups: [], images: [], mdCards: [] };
     if (!parsed.annotations.images) parsed.annotations.images = [];
+    if (!parsed.annotations.mdCards) parsed.annotations.mdCards = [];
     if (!parsed.positions) parsed.positions = {};
     if (!parsed.nodeAssignments) parsed.nodeAssignments = {};
     return parsed;
@@ -55,6 +56,7 @@ export function migrateFromLocalStorage(projectPath: string): WhiteboardFile | n
       const ann = JSON.parse(annRaw) as CanvasAnnotations;
       file.annotations = { ...file.annotations, ...ann };
       if (!file.annotations.images) file.annotations.images = [];
+      if (!file.annotations.mdCards) file.annotations.mdCards = [];
     } catch { /* skip corrupt data */ }
   }
 
