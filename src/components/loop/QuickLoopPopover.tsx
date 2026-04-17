@@ -213,7 +213,14 @@ export function QuickLoopPopover({
   };
 
   return (
-    <div ref={containerRef} style={popoverStyle} role="dialog" aria-label="Quick Loop configuration">
+    <div
+      ref={containerRef}
+      className="uab-popover"
+      style={popoverStyle}
+      role="dialog"
+      aria-label="Quick Loop configuration"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       <style>{`
         @keyframes quickloop-pulse {
           0%, 100% { opacity: 1; }
