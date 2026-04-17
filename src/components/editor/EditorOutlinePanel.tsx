@@ -130,13 +130,13 @@ function EditorOutlinePanel({ onNavigateToLine }: EditorOutlinePanelProps) {
       </div>
       <div className="outline-list">
         {loading && (
-          <div className="outline-status">Caricamento...</div>
+          <div className="outline-status">Loading...</div>
         )}
         {error && (
           <div className="outline-status outline-error">{error}</div>
         )}
         {!loading && !error && symbols.length === 0 && (
-          <div className="outline-status">Nessun simbolo</div>
+          <div className="outline-status">No symbols</div>
         )}
         {symbols.map(sym => (
           <SymbolRow

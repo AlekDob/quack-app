@@ -259,6 +259,17 @@ function getModelId(model) {
   };
 
   const resolved = fallbackMap[baseModel] || baseModel;
+
+  // Brain: gotcha-oauth-betas-rejection + anthropic/claude-code#45449
+  // Client-side gate in cli.js (isOneMContextBlocked) reads stale cache in
+  // ~/.claude.json and blocks the implicit [1m] auto-upgrade for new Opus
+  // models (e.g. opus-4-7). On Max subscriptions the server accepts [1m]
+  // fine — only the slash-command path is broken. Forcing the suffix
+  // explicitly bypasses the gate and restores 1M.
+  const isOpus = /claude-opus-4-[6-9]/.test(resolved);
+  if (isOpus && !has1MSuffix) {
+    return `${resolved}[1m]`;
+  }
   // Re-append [1m] suffix if present — SDK strips it before sending to API
   return has1MSuffix ? `${resolved}[1m]` : resolved;
 }

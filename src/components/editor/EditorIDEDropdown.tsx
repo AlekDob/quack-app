@@ -107,7 +107,7 @@ function EditorIDEDropdown({ filePath }: EditorIDEDropdownProps) {
         className="editor-btn editor-btn-ide"
         onClick={() => handleOpenInIDE()}
         disabled={!preferredIDE}
-        title={`Apri in ${preferredName}`}
+        title={`Open in ${preferredName}`}
       >
         {shortName}
       </button>
@@ -117,7 +117,7 @@ function EditorIDEDropdown({ filePath }: EditorIDEDropdownProps) {
           type="button"
           className="editor-btn editor-btn-ide-chevron"
           onClick={() => setIsOpen(!isOpen)}
-          title="Scegli IDE"
+          title="Choose IDE"
         >
           <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
             <polyline points={isOpen ? '18 15 12 9 6 15' : '6 9 12 15 18 9'} />
@@ -155,7 +155,7 @@ function EditorIDEDropdown({ filePath }: EditorIDEDropdownProps) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
             </svg>
-            <span>Mostra in {fileManagerName}</span>
+            <span>Show in {fileManagerName}</span>
           </button>
         </div>
       )}
