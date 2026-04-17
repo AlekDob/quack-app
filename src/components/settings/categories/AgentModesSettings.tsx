@@ -1,14 +1,18 @@
 import { useSettingsStore } from '../../../stores/settingsStore';
 import type { EffortLevel } from '../../../types';
-import { getModelOptions } from '../../../services/modelService';
+import { getModelOptions, defaultEffortForModel } from '../../../services/modelService';
 import { useModelsConfig } from '../../../hooks/useAppConfig';
 import SectionHeader from '../controls/SectionHeader';
 import './AgentModesSettings.css';
 
+// Ordered low → max. Opus 4.7 supports all five; older models fall back to
+// the highest supported level at or below the chosen one (per Anthropic docs).
 const effortOptions = [
-  { value: 'low' as EffortLevel, label: 'Fast', desc: 'Quick responses, lower cost', icon: '>' },
-  { value: 'medium' as EffortLevel, label: 'Balanced', desc: 'Default quality', icon: '>>' },
-  { value: 'high' as EffortLevel, label: 'Quality', desc: 'Thorough responses', icon: '>>>' },
+  { value: 'low' as EffortLevel, label: 'Fast', desc: 'Latency-first, not intelligence-sensitive', icon: '>' },
+  { value: 'medium' as EffortLevel, label: 'Balanced', desc: 'Lower cost, some intelligence trade-off', icon: '>>' },
+  { value: 'high' as EffortLevel, label: 'Smart', desc: 'Minimum for intelligence-sensitive work', icon: '>>>' },
+  { value: 'xhigh' as EffortLevel, label: 'Deep', desc: 'Recommended default on Opus 4.7', icon: '>>>>' },
+  { value: 'max' as EffortLevel, label: 'Max', desc: 'Deepest reasoning, no budget cap (session only)', icon: 'MAX' },
 ];
 
 interface ModePresetCardProps {
@@ -23,7 +27,12 @@ function ModePresetCard({ mode, title, description, color, icon }: ModePresetCar
   const { agentModePresets, updateModePreset } = useSettingsStore();
   const { models: remoteModels } = useModelsConfig();
   const modelOptions = getModelOptions(remoteModels);
-  const preset = agentModePresets[mode] ?? { model: 'opus46', thinkingMode: 'auto' as const, effort: 'medium' as const };
+  const fallbackModel = 'opus47';
+  const preset = agentModePresets[mode] ?? {
+    model: fallbackModel,
+    thinkingMode: 'auto' as const,
+    effort: defaultEffortForModel(fallbackModel),
+  };
 
   return (
     <div className="mode-preset-card" style={{ borderLeftColor: color }}>
@@ -72,7 +81,7 @@ export default function AgentModesSettings() {
   const { resetModePresets } = useSettingsStore();
 
   const handleReset = () => {
-    if (window.confirm('Reset to Anthropic recommended defaults?\n\nBuild: Opus 4.6\nPlan: Opus 4.6\nAsk: Opus 4.6\nDebug: Opus 4.6 (high effort)\nChat: Sonnet 4.5 (low effort)')) {
+    if (window.confirm('Reset to Anthropic recommended defaults?\n\nBuild: Opus 4.7 (Deep / xhigh)\nPlan: Opus 4.7 (Deep / xhigh)\nAsk: Opus 4.7 (Deep / xhigh)\nDebug: Opus 4.7 (Max)\nChat: Sonnet 4.6 (Fast / low)')) {
       resetModePresets();
     }
   };
@@ -127,7 +136,7 @@ export default function AgentModesSettings() {
           Reset to Anthropic Defaults
         </button>
         <div className="mode-presets-hint">
-          Defaults: Build = Opus, Plan = Opus, Ask = Opus, Debug = Opus (high effort), Chat = Sonnet (low effort)
+          Defaults: Build/Plan/Ask = Opus 4.7 (Deep), Debug = Opus 4.7 (Max), Chat = Sonnet 4.6 (Fast). Older models fall back to the highest supported level.
         </div>
       </div>
 

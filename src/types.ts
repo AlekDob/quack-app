@@ -585,8 +585,9 @@ export interface StructuredOutputFormat {
 }
 
 // Effort parameter for controlling response quality vs speed/cost tradeoff
-// SDK 0.2.48+: 'max' available for Opus 4.6 only
-export type EffortLevel = 'low' | 'medium' | 'high' | 'max';
+// Opus 4.7: low, medium, high, xhigh, max (default: xhigh)
+// Opus 4.6 / Sonnet 4.6: low, medium, high, max (xhigh falls back to high on those models)
+export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 // Thinking mode for controlling reasoning depth
 // 'disabled' = no extended thinking (SDK thinking: { type: 'disabled' })

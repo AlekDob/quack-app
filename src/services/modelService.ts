@@ -44,6 +44,7 @@ const LEGACY_ID_MAP: Record<string, string> = {
   'opus46': 'opus47', // Opus 4.6 deprecated, upgrade to 4.7
 };
 
+
 /**
  * Get active models sorted by sortOrder.
  * Prioritizes remote config from Supabase.
@@ -116,6 +117,20 @@ export function getModelOptions(
     value: m.id,
     label: m.label,
   }));
+}
+
+/**
+ * Return the Anthropic-recommended default effort for a given Quack model ID.
+ * - Opus 4.7 → 'xhigh' (recommended default, per code.claude.com/docs/en/model-config)
+ * - Opus 4.6 / Sonnet 4.6 → 'high'
+ * - Everything else (Sonnet 4.5, Haiku, Ollama/custom) → 'medium'
+ *   (models without native effort support ignore the field SDK-side)
+ */
+export function defaultEffortForModel(modelId: string): 'low' | 'medium' | 'high' | 'xhigh' | 'max' {
+  const base = modelId.replace('[1m]', '');
+  if (base === 'opus47' || base === 'opus') return 'xhigh';
+  if (base === 'opus46' || base === 'sonnet46') return 'high';
+  return 'medium';
 }
 
 /**

@@ -4,6 +4,7 @@ import type { EffortLevel, ModePreset, AgentModePresets, LLMProviderType } from 
 import { applyTypography, DEFAULT_TYPOGRAPHY, DEFAULT_CUSTOM_FONT_SIZE, safeCustomSize } from '../constants/typography';
 import type { TypographySettings, FontSizePreset } from '../constants/typography';
 import { applyAccentColor, DEFAULT_ACCENT } from '../utils/accentColor';
+import { defaultEffortForModel } from '../services/modelService';
 
 /**
  * Normalize legacy model short names to Supabase IDs.
@@ -165,11 +166,11 @@ const defaultGeneralSettings: GeneralSettings = {
 
 const defaultClaudeSettings: ClaudeSettings = {
   apiKey: null,
-  model: 'opus46', // Use Supabase IDs: 'sonnet45' | 'opus46' | 'haiku45' (mapped in modelService.ts)
+  model: 'opus47', // Supabase ID; see modelService.ts
   permissionMode: 'act',
   maxTokens: 4096,
   temperature: 0.7,
-  effort: 'medium', // SDK 0.1.54+ - Default balanced effort
+  effort: 'xhigh', // Opus 4.7 recommended default (fallbacks to 'high' on older models)
   provider: 'anthropic',
   providerBaseUrl: '',
   providerApiKey: '',
@@ -183,24 +184,24 @@ const defaultClaudeSettings: ClaudeSettings = {
 // Legacy short names don't match <select> option values, causing a visual mismatch bug
 const defaultAgentModePresets: AgentModePresets = {
   bypass: {
-    model: 'opus46',
+    model: 'opus47',
     thinkingMode: 'auto',
-    effort: 'medium',
+    effort: 'xhigh', // Opus 4.7 recommended default
   },
   plan: {
-    model: 'opus46',
+    model: 'opus47',
     thinkingMode: 'auto',
-    effort: 'medium',
+    effort: 'xhigh',
   },
   debug: {
-    model: 'opus46',
+    model: 'opus47',
     thinkingMode: 'hard', // Forces extended thinking for root cause analysis
-    effort: 'high',
+    effort: 'max', // Deepest reasoning for bug hunting
   },
   ask: {
-    model: 'opus46',
+    model: 'opus47',
     thinkingMode: 'auto',
-    effort: 'medium',
+    effort: 'xhigh',
   },
   chat: {
     model: 'sonnet46',
@@ -378,7 +379,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
-        version: 10,
+        version: 11,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
@@ -468,6 +469,28 @@ export const useSettingsStore = create<SettingsState>()(
             if (persisted.typography) {
               if (!persisted.typography.customFontSize || Number.isNaN(persisted.typography.customFontSize)) {
                 persisted.typography.customFontSize = DEFAULT_CUSTOM_FONT_SIZE;
+              }
+            }
+          }
+          // v11: Opus 4.7 default effort = 'xhigh'. Bump opus46/opus47 presets whose
+          // effort is still at the legacy 'medium' default so upgraders see the
+          // Anthropic-recommended level. Explicit user overrides to low/high/max
+          // are preserved; only the default-looking 'medium' gets rewritten.
+          if (version < 11) {
+            if (persisted.claude?.model === 'opus46') {
+              persisted.claude.model = 'opus47';
+            }
+            if (persisted.claude && persisted.claude.effort === 'medium' && persisted.claude.model) {
+              persisted.claude.effort = defaultEffortForModel(persisted.claude.model);
+            }
+            if (persisted.agentModePresets) {
+              for (const mode of ['bypass', 'plan', 'ask', 'debug', 'chat'] as const) {
+                const p = persisted.agentModePresets[mode];
+                if (!p) continue;
+                if (p.model === 'opus46') p.model = 'opus47';
+                if (p.effort === 'medium') {
+                  p.effort = defaultEffortForModel(p.model);
+                }
               }
             }
           }

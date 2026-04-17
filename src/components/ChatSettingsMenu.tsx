@@ -31,9 +31,11 @@ const permissionModeOptions = [
 ];
 
 const effortOptions = [
-  { value: 'low' as EffortLevel, label: 'Fast · Quick responses, lower cost', icon: '' },
-  { value: 'medium' as EffortLevel, label: 'Balanced · Default quality', icon: '' },
-  { value: 'high' as EffortLevel, label: 'Quality · Thorough responses', icon: '' },
+  { value: 'low' as EffortLevel, label: 'Fast · Latency-first, not intelligence-sensitive', icon: '>' },
+  { value: 'medium' as EffortLevel, label: 'Balanced · Lower cost, some intelligence trade-off', icon: '>>' },
+  { value: 'high' as EffortLevel, label: 'Smart · Minimum for intelligence-sensitive work', icon: '>>>' },
+  { value: 'xhigh' as EffortLevel, label: 'Deep · Recommended default on Opus 4.7', icon: '>>>>' },
+  { value: 'max' as EffortLevel, label: 'Max · Deepest reasoning, no budget cap (session only)', icon: 'MAX' },
 ];
 
 export default function ChatSettingsMenu({
@@ -155,7 +157,8 @@ export default function ChatSettingsMenu({
     const colors: Record<EffortLevel, string> = {
       low: '#22c55e',     // Green - fast/cheap
       medium: '#eab308',  // Yellow - balanced
-      high: '#a855f7',    // Purple - quality
+      high: '#a855f7',    // Smart
+      xhigh: '#c084fc',   // Deep - Opus 4.7 default
       max: '#ef4444',     // Red - maximum effort
     };
     return colors[effort] || '#eab308';
