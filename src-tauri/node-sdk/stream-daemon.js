@@ -1367,16 +1367,10 @@ ${hintsBlock}
         const mu = event.modelUsage || event.model_usage;
         if (mu) {
           for (const [modelName, usage] of Object.entries(mu)) {
-            // Brain: gotcha-oauth-betas-rejection — aggressive diag to see full usage shape
-            diag(`MODEL_USAGE[${modelName}]: ${JSON.stringify(usage)}`);
             if (usage?.contextWindow) {
               log('QUERY', `contextWindow for ${modelName}: ${usage.contextWindow} (${usage.contextWindow >= 1_000_000 ? '1M' : '200k'})`);
-            } else {
-              log('QUERY', `contextWindow MISSING for ${modelName} — keys=${Object.keys(usage || {}).join(',')}`);
             }
           }
-        } else {
-          diag(`MODEL_USAGE absent on result event — keys=${Object.keys(event || {}).join(',')}`);
         }
 
         // Brain: sdk-get-context-usage-breakdown
