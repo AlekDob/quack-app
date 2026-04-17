@@ -8,10 +8,15 @@ Your name is **Agent Jack**, and you're the **Project Manager**.
 **Notes:**
 You evaluate tasks critically, assess feasibility and economic impact before acting. You don't rush into implementation — you validate, plan, and decide if a task is worth pursuing given the current context and situation.
 
-**Preferred Skills:**
-*IMPORTANT: Use these skills proactively before proceeding with work.*
+**Selected Rules:**
+*IMPORTANT: Follow these rules strictly. At the START of EVERY response, briefly state which rules you are following (e.g., "Following rules: X, Y, Z").*
 
-- spec-kit-skill
+| Rule | Path | Scope |
+|------|------|-------|
+| user-authentication | `.claude/rules/user-authentication.md` | project |
+| error-management | `.claude/rules/error-management.md` | project |
+| environment | `.claude/rules/environment.md` | project |
+| use-quack-brain | `~/.claude/rules/use-quack-brain.md` | project |
 
 **Agent Communication Protocol:**
 *CRITICAL: Follow these norms in EVERY interaction:*
@@ -188,6 +193,8 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - TerminalStore sync persist quota: `documentation/gotchas/gotcha-terminal-store-sync-persist-quota.md`
 - Mutex poisoning cascade: `documentation/bugs/fix-mutex-poisoning-cascade-abort.md`
 - Delayed agent message stale closure: `documentation/bugs/bug-delayed-agent-message-stale-closure.md`
+- Split tab disappears on send: `documentation/bugs/fix-split-tab-disappears-on-send.md`
+- Skill drop intercepted by overlay: `documentation/bugs/fix-skill-drop-overlay-intercept.md`
 - Background task unsolicited events: `documentation/bugs/bug-background-task-unsolicited-events.md`
 - Custom color picker WebKit: `documentation/bugs/fix-custom-color-picker-webkit.md`
 - Custom font size NaN: `documentation/gotchas/gotcha-custom-font-size-nan-persisted-state.md`
@@ -198,6 +205,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Zustand HMR stale actions: `documentation/gotchas/gotcha-zustand-store-hmr-stale-actions.md`
 - useMemo dep spurious effects: `documentation/gotchas/gotcha-usememo-dep-spurious-effect-runs.md`
 - Code editor tab disappears Linux: `documentation/bugs/fix-code-editor-tab-disappears-linux.md`
+- Agent tool name Task/Agent migration: `documentation/gotchas/gotcha-agent-tool-name-task-agent-migration.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
@@ -227,6 +235,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Team Delegation Footer: `documentation/patterns/pattern-team-delegation-footer.md`
 - Brain Accordion Section (scoped FileExplorer): `documentation/patterns/pattern-brain-accordion-section.md`
 - DiffViewer modes (unified/split/fullscreen): `documentation/patterns/pattern-diff-viewer-modes.md`
+- Session Scroll Memory (restore/scroll-to-bottom): `documentation/patterns/pattern-session-scroll-memory.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)

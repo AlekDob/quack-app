@@ -27,8 +27,9 @@ tags: [pip, picture-in-picture, agents, multi-window, always-on-top]
 
 ### Data Flow
 ```
-agentSessions (sessionStore) → App.tsx useEffect → maps to PipAgentState[] → updatePipAgents() → Tauri emit('pip-agents-update') → PipWindow listen → setAgents → groupedAgents (priority sort) → PipAgentCard[]
-PipAgentCard onClick → emit('pip-agent-clicked') → App.tsx listen → focus agent tab + session
+agentSessions (sessionStore) → App.tsx useEffect → maps to PipAgentState[] → updatePipAgents() → Tauri emit('pip-agents-update') → PipWindow listen → setAgents → groupedAgents (priority sort, lastActivity DESC) → PipAgentCard[]
+PipAgentCard onClick → emit('pip-agent-clicked', {agentId, sessionId}) → App.tsx listen → handleSessionClick(sessionId) → session activation + chat focus + personality inject + main window focus
+PipAgentCard contextMenu → PipWindow context menu → emit('pip-session-mark-done' | 'pip-session-delete' | 'pip-session-rename') → App.tsx listen → sessionStore action
 PipWindow beforeunload → emit('pip-window-closing') → usePipWindow listen → Store.save(geometry)
 Settings toggle → CustomEvent('pip-setting-changed') → App.tsx listener → open/closePipWindow
 Tray menu → Tauri event('open-pip-window') → App.tsx listener → togglePipWindow
@@ -44,7 +45,12 @@ PiP is always closed on startup — user opens manually via sidebar button or Se
 - `resolveAvatarUrl(avatar?: string) → string` — resolves duck avatar filename via `convertFileSrc`; falls back to `duck15.jpeg` for custom UUIDs
 - `getStatusColor(status: PipAgentStatus) → string` — maps agent status to hex color for dot indicator
 - `formatTime(timestamp?: number) → string` — relative time display (seconds/minutes/hours)
-- `groupedAgents (useMemo)` — groups agents by status: Working (streaming/executing/thinking/error), Completed, Idle. Working group shown first.
+- `groupedAgents (useMemo)` — groups agents by status: Working (streaming/executing/thinking/error), Completed, Idle. Working group shown first. Within each group, sorted by `lastActivity` descending (most recent first).
+- `handleCardContextMenu(e, agent) → void` — opens right-click context menu on agent card (Mark as Done, Rename, Delete)
+- `handleMarkDone() → void` — emits `pip-session-mark-done` Tauri event to main app
+- `handleDelete() → void` — emits `pip-session-delete` Tauri event to main app
+- `handleRenameRequest() → void` — opens inline rename dialog in PiP window
+- `handleRenameConfirm() → void` — emits `pip-session-rename` Tauri event with new title to main app
 
 ### State
 - `agents`: PipAgentState[] — current agent list displayed in PiP (component, PipWindow)
@@ -54,10 +60,13 @@ PiP is always closed on startup — user opens manually via sidebar button or Se
 - `pip-window-state`: PipWindowState — persisted position/size geometry (session, tauri-plugin-store `pip-settings.json`)
 - `pip-enabled`: boolean — Settings toggle state only, no longer auto-opens on startup (session, `.quack-ui-prefs.dat`)
 - `isLoading`: boolean — true until first `pip-agents-update` received (component, PipWindow)
+- `contextMenu`: `{ x, y, agent } | null` — active context menu position and target agent (component, PipWindow)
+- `renameDialog`: `{ agentId, sessionId, currentTitle } | null` — active rename dialog state (component, PipWindow)
+- `renameValue`: string — controlled input for rename (component, PipWindow)
 
 ### External Dependencies
 - `@tauri-apps/api/webviewWindow`: WebviewWindow creation, getAll(), label-based deduplication
-- `@tauri-apps/api/event`: cross-window event emit/listen (`pip-agents-update`, `pip-agent-clicked`, `pip-window-closing`, `pip-window-ready`, `open-pip-window`)
+- `@tauri-apps/api/event`: cross-window event emit/listen (`pip-agents-update`, `pip-agent-clicked`, `pip-window-closing`, `pip-window-ready`, `open-pip-window`, `pip-session-mark-done`, `pip-session-delete`, `pip-session-rename`)
 - `@tauri-apps/plugin-store`: geometry persistence across restarts (`pip-settings.json`)
 - `@tauri-apps/api/core`: `convertFileSrc` for duck avatar asset URLs
 - `@tauri-apps/api/window`: `getCurrentWindow` for drag, minimize, close, position/size read
@@ -70,6 +79,10 @@ PiP is always closed on startup — user opens manually via sidebar button or Se
 - Accent color: title and badge use `var(--accent-color)`, scrollbar uses `var(--accent-border)`. Applied in pip.tsx from localStorage `settings-storage`.
 - No border radius on PiP window (borderRadius: 0)
 - No emojis in PiP UI
+
+### Cross-References
+- **043-agent-sidebar** — PiP click-to-focus triggers `handleSessionClick()` which sets `activeSessionId`; `AgentSessionItem` auto-scrolls into view via `scrollIntoView({ behavior: 'smooth', block: 'center' })` when `isActive` becomes true from external activation (PiP, Kanban, etc.)
+- **054-task-hub-view** — PiP context menu (Mark Done, Rename, Delete) uses the same Tauri event pattern; both views share the same mental model for session management
 
 ### Types
 - `PipAgentStatus`: `'idle' | 'thinking' | 'streaming' | 'executing' | 'completed' | 'error'`

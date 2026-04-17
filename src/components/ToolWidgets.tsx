@@ -51,6 +51,18 @@ export const getToolColor = (toolName: string): string => {
   if (name === 'croncreate' || name === 'crondelete' || name === 'cronlist') return '#14b8a6';
   // Worktree - green
   if (name === 'enterworktree' || name === 'exitworktree') return '#22c55e';
+  // AskUserQuestion - sky blue
+  if (name === 'askuserquestion') return '#38bdf8';
+  // LSP - indigo (code intelligence)
+  if (name === 'lsp') return '#818cf8';
+  // Monitor - slate (observability)
+  if (name === 'monitor') return '#94a3b8';
+  // PushNotification - pink/rose (alerts)
+  if (name === 'pushnotification') return '#f472b6';
+  // RemoteTrigger - yellow (lightning/remote)
+  if (name === 'remotetrigger') return '#eab308';
+  // ScheduleWakeup - teal (alarm)
+  if (name === 'schedulewakeup') return '#2dd4bf';
   // --- Core SDK tools (unified green) ---
   return '#22c55e';
 };
@@ -275,6 +287,72 @@ export const ToolIcon: React.FC<{ name: string }> = ({ name }) => {
         <circle cx="18" cy="6" r="3"/>
         <circle cx="6" cy="18" r="3"/>
         <path d="M18 9a9 9 0 0 1-9 9"/>
+      </svg>
+    );
+  }
+
+  // AskUserQuestion - question mark in circle (sky blue)
+  if (toolName === 'askuserquestion') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+    );
+  }
+
+  // LSP - code brackets with cursor (indigo)
+  if (toolName === 'lsp') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="16 18 22 12 16 6"/>
+        <polyline points="8 6 2 12 8 18"/>
+      </svg>
+    );
+  }
+
+  // Monitor - screen with pulse (slate)
+  if (toolName === 'monitor') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+        <line x1="8" y1="21" x2="16" y2="21"/>
+        <line x1="12" y1="17" x2="12" y2="21"/>
+        <polyline points="6 10 9 10 10 8 12 12 13 10 16 10" opacity="0.8"/>
+      </svg>
+    );
+  }
+
+  // PushNotification - bell (pink/rose)
+  if (toolName === 'pushnotification') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+      </svg>
+    );
+  }
+
+  // RemoteTrigger - lightning bolt (yellow)
+  if (toolName === 'remotetrigger') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill={iconColor} stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+      </svg>
+    );
+  }
+
+  // ScheduleWakeup - alarm clock (teal)
+  if (toolName === 'schedulewakeup') {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={iconColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="13" r="8"/>
+        <path d="M12 9v4l2 2"/>
+        <path d="M5 3 2 6"/>
+        <path d="m22 6-3-3"/>
+        <path d="M6.38 18.7 4 21"/>
+        <path d="M17.64 18.67 20 21"/>
       </svg>
     );
   }

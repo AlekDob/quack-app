@@ -996,6 +996,7 @@ function AppContent() {
     new Map()
   );
   const terminalsRef = useRef<TerminalInfo[]>([]);
+  const handleSessionClickRef = useRef<((sessionId: string) => void) | null>(null);
   const IDLE_TIMEOUT_MS = 5000; // 5s - for activity bar (fast response)
   const NOTIFICATION_TIMEOUT_MS = 60000; // 1 minute - for notifications only
   const VISUAL_IDLE_DELAY_MS = 400; // Delay before showing idle status (prevents flickering)
@@ -4859,6 +4860,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   const [pendingAgentMention, setPendingAgentMention] = useState<AgentInfo | null>(null); // Agent to insert as @mention in input
   const [pendingFileMention, setPendingFileMention] = useState<{ name: string; path: string; relativePath: string; isDirectory: boolean } | null>(null); // File/folder to insert as @mention
   const [pendingSlashCommand, setPendingSlashCommand] = useState<{ name: string; description: string } | null>(null); // Slash command to insert in input
+  const [pendingSkillMention, setPendingSkillMention] = useState<{ name: string } | null>(null); // Skill to insert as @skill:name mention
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [agentsInitialized, setAgentsInitialized] = useState(false); // True after first load completes
   const [agentsError, setAgentsError] = useState<string | null>(null);
@@ -5064,21 +5066,55 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     if (!tauriAvailable) return;
 
     const unlisten = listen<{ agentId: string; sessionId?: string }>('pip-agent-clicked', async (event) => {
-      const { agentId } = event.payload;
-      console.log('🦆 PiP agent clicked, focusing on agent:', agentId);
+      const { agentId, sessionId } = event.payload;
+      console.log('🦆 PiP agent clicked, focusing on agent:', agentId, 'session:', sessionId);
 
-      // Use ref to get current terminals without re-registering listener
+      // If we have a sessionId, use handleSessionClick for full activation
+      // (selects session, switches tab, focuses chat, injects personality)
+      if (sessionId && handleSessionClickRef.current) {
+        handleSessionClickRef.current(sessionId);
+        const w = getCurrentWindow();
+        await w.setFocus();
+        return;
+      }
+
+      // Fallback: just switch active terminal
       const terminal = terminalsRef.current.find((t) => t.id === agentId);
       if (terminal) {
         setActiveId(terminal.id);
-
-        const window = getCurrentWindow();
-        await window.setFocus();
+        const w = getCurrentWindow();
+        await w.setFocus();
       }
     });
 
     return () => {
       unlisten.then((fn) => fn()).catch(() => undefined);
+    };
+  }, [tauriAvailable]);
+
+  // PiP context menu actions: Mark Done, Delete, Rename
+  useEffect(() => {
+    if (!tauriAvailable) return;
+
+    const unlistenDone = listen<{ sessionId: string }>('pip-session-mark-done', (event) => {
+      const { sessionId } = event.payload;
+      useSessionStore.getState().markDone(sessionId);
+    });
+
+    const unlistenDelete = listen<{ sessionId: string }>('pip-session-delete', (event) => {
+      const { sessionId } = event.payload;
+      useSessionStore.getState().deleteSession(sessionId);
+    });
+
+    const unlistenRename = listen<{ sessionId: string; newTitle: string }>('pip-session-rename', (event) => {
+      const { sessionId, newTitle } = event.payload;
+      useSessionStore.getState().updateSession(sessionId, { title: newTitle });
+    });
+
+    return () => {
+      unlistenDone.then((fn) => fn()).catch(() => undefined);
+      unlistenDelete.then((fn) => fn()).catch(() => undefined);
+      unlistenRename.then((fn) => fn()).catch(() => undefined);
     };
   }, [tauriAvailable]);
 
@@ -8221,6 +8257,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       void loadDirectory(session.projectPath);
     }
   }, [selectSession, terminals, loadDirectory, setActiveSessionIdExclusive, tauriAvailable]);
+  handleSessionClickRef.current = handleSessionClick;
 
   const handleUpdateWorkingOn = useCallback(async (terminalId: string, workingOn: string) => {
     // Update terminal workingOn field
@@ -11060,14 +11097,23 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, []);
 
-  // Handle file drop into chat zone (inserts @file mention)
+  // Handle sidebar drop into chat zone (inserts @file or @skill mention)
+  // Brain: fix-skill-drop-overlay-intercept
   const handleChatDrop = useCallback((data: SidebarDropData) => {
-    if (data.mimeType !== 'application/quack-file') return;
-    try {
-      const fileData = JSON.parse(data.payload) as { name: string; path: string; isDir?: boolean };
-      handleMentionFile(fileData.path, fileData.name, fileData.isDir ?? false);
-    } catch { /* ignore parse errors */ }
-    setIsDraggingSidebar(false);
+    setIsDraggingSidebar(false); // Always clear overlay — was after early return causing frozen UI
+    if (data.mimeType === 'application/quack-file') {
+      try {
+        const fileData = JSON.parse(data.payload) as { name: string; path: string; isDir?: boolean };
+        handleMentionFile(fileData.path, fileData.name, fileData.isDir ?? false);
+      } catch { /* ignore parse errors */ }
+    } else if (data.mimeType === 'application/quack-skill') {
+      try {
+        const skillData = JSON.parse(data.payload) as { type: string; name: string };
+        if (skillData.name) {
+          setPendingSkillMention({ name: skillData.name });
+        }
+      } catch { /* ignore parse errors */ }
+    }
   }, [handleMentionFile]);
 
   // Handle tab popout - drag tab outside tab bar to create floating window
@@ -11174,52 +11220,55 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [activeTerminal]);
 
   // Switch tabs when active terminal (agent) changes
+  // Brain: fix-split-tab-disappears-on-send
   // Brain: fix-code-editor-tab-disappears-linux
-  // IMPORTANT: Use a ref to track activeId changes. Previously this effect depended
-  // on [activeId, activeTerminal], but activeTerminal recomputes on ANY terminals
-  // array change (status update, personality change, auto-save). This caused the
-  // effect to run spuriously, replacing all tabs and removing code-editor tabs.
-  // Now: tab replacement logic only runs when activeId actually changes.
-  // Chat tab label/color sync is handled separately below.
-  const prevSwitchIdRef = useRef<string | null>(null);
-  // Brain: fix-code-editor-tab-disappears-linux
-  // Only run tab-replacement logic when activeId actually changes.
-  // activeTerminal is intentionally excluded from deps — it recomputes on every
-  // terminals mutation (status tick, personality load, auto-save) and would cause
-  // spurious runs that blow away open code-editor tabs. Inside the body,
-  // activeTerminal is read from closure which is fine since activeId just changed.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // This effect handles TWO concerns:
+  // 1. Tab save/restore when SWITCHING agents (activeId changes)
+  // 2. Chat tab label/color update when terminal properties change (activeTerminal changes)
+  //
+  // CRITICAL: The full tab rebuild (setTabs with merged array) must ONLY run when
+  // activeId changes. Previously it ran on every activeTerminal change, which happens
+  // whenever terminal status updates (idle→busy on message send). This caused non-special
+  // tabs (code-editor, file, image, feature-map) to be dropped from the tabs array,
+  // breaking split view.
   useEffect(() => {
     if (!activeId) return;
 
-    const isActualSwitch = prevSwitchIdRef.current !== null && prevSwitchIdRef.current !== activeId;
+    const previousId = previousActiveIdRef.current;
+    const isAgentSwitch = previousId !== activeId;
 
-    // Save current tabs for the PREVIOUS terminal (if any)
-    if (isActualSwitch) {
-      const previousId = prevSwitchIdRef.current!;
+    if (isAgentSwitch) {
+      console.log('[Tab Switch] Active terminal changed to:', activeId, activeTerminal?.label);
 
-      // Hoist fileTabs outside the updater to avoid stale closure inside setTabsByTerminal
-      const fileTabs = tabs.filter(t => t.type === 'file');
+      // Save current tabs for the PREVIOUS terminal (if any)
+      if (previousId) {
+        setTabsByTerminal((prev) => {
+          const updated = new Map(prev);
 
-      setTabsByTerminal((prev) => {
-        const updated = new Map(prev);
+          // Find file tabs (exclude chat tab)
+          const fileTabs = tabs.filter(t => t.type === 'file');
 
-        // Store tabs for the PREVIOUS terminal ID
-        if (fileTabs.length > 0) {
-          const previousTerminalTabs = prev.get(previousId) || [];
-          if (fileTabs.length !== previousTerminalTabs.length ||
-              !fileTabs.every((tab, i) => tab.id === previousTerminalTabs[i]?.id)) {
-            updated.set(previousId, fileTabs);
+          // Store tabs for the PREVIOUS terminal ID
+          if (fileTabs.length > 0) {
+            const previousTerminalTabs = prev.get(previousId) || [];
+            if (fileTabs.length !== previousTerminalTabs.length ||
+                !fileTabs.every((tab, i) => tab.id === previousTerminalTabs[i]?.id)) {
+              updated.set(previousId, fileTabs);
+              console.log('[Tab Switch] Saved', fileTabs.length, 'tabs for PREVIOUS terminal:', previousId);
+            }
+          } else if (prev.has(previousId)) {
+            // If no file tabs, remove the entry for the previous terminal
+            updated.delete(previousId);
+            console.log('[Tab Switch] Removed tabs for PREVIOUS terminal (no file tabs):', previousId);
           }
-        } else if (prev.has(previousId)) {
-          updated.delete(previousId);
-        }
 
-        return updated;
-      });
+          return updated;
+        });
+      }
 
       // Load tabs for the NEW active terminal
       const terminalTabs = tabsByTerminal.get(activeId) || [];
+      console.log('[Tab Switch] Loading', terminalTabs.length, 'tabs for NEW terminal:', activeId);
 
       // Always include the chat tab with updated name and color, plus any file tabs for this terminal
       const chatTab: Tab = {
@@ -11257,10 +11306,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // 🦆 FIX: Don't change activeTabId if user is viewing a special tab
       // This prevents the "tab closes immediately" bug when opening Kanban
       // Brain: fix-code-editor-tab-disappears-linux — code-editor is now special
-      const activeTab = tabs.find(t => t.id === activeTabId);
-      const isSpecialTabActive = activeTab
-        ? specialTabTypes.includes(activeTab.type)
-        : activeTabId === 'kanban-board';
+      const isSpecialTabActive = specialTabTypes.some(type =>
+        activeTabId.includes(type) || activeTabId === 'kanban-board'
+      );
 
       if (!isSpecialTabActive) {
         // If we have file tabs, keep the current active tab if it exists, otherwise activate first file tab
@@ -11274,11 +11322,18 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           setActiveTabId('chat');
         }
       }
-      // Note: previousActiveIdRef is owned by Effect 1 (line ~2208) — no dual write
-    }
 
-    prevSwitchIdRef.current = activeId;
-  }, [activeId]);
+      // Update the ref to track this terminal as the "previous" for next switch
+      previousActiveIdRef.current = activeId;
+    } else {
+      // NOT an agent switch — only update chat tab label/color (terminal renamed, etc.)
+      setTabs(prevTabs => prevTabs.map(t =>
+        t.id === 'chat'
+          ? { ...t, label: activeTerminal?.label || 'Chat', color: activeTerminal?.color }
+          : t
+      ));
+    }
+  }, [activeId, activeTerminal]);
 
   const handleRefreshPreview = useCallback(async () => {
     if (!tauriAvailable || !previewFile) {
@@ -13078,6 +13133,8 @@ You have access to all Bash tools to execute git commands like:
                     onFileMentionInserted={() => setPendingFileMention(null)}
                     pendingSlashCommand={pendingSlashCommand}
                     onCommandInserted={() => setPendingSlashCommand(null)}
+                    pendingSkillMention={pendingSkillMention}
+                    onSkillMentionInserted={() => setPendingSkillMention(null)}
                     basePath={isTaskChat ? (activeTaskSession?.projectPath || explorerRoot || explorerPath) : (explorerRoot ?? explorerPath)}
                     inputDraft={isTaskChat
                       ? (taskInputDrafts.get(activeTaskId!) || (taskMessages.length === 0 ? '' : ''))
@@ -13264,6 +13321,8 @@ You have access to all Bash tools to execute git commands like:
                     onFileMentionInserted={() => setPendingFileMention(null)}
                     pendingSlashCommand={pendingSlashCommand}
                     onCommandInserted={() => setPendingSlashCommand(null)}
+                    pendingSkillMention={pendingSkillMention}
+                    onSkillMentionInserted={() => setPendingSkillMention(null)}
                     basePath={activeSession.projectPath || explorerRoot || explorerPath}
                     inputDraft={taskInputDrafts.get(taskSessionId) || (taskMessages.length === 0 ? '' : '')}
                     onInputDraftChange={(draft) => {
