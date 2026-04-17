@@ -162,6 +162,7 @@ import { showProjectToast } from "./components/ProjectToast";
 import { loadAvailableDroids } from "./utils/skillsAndDroidsLoader";
 import { loadProjectColors, getProjectColor, DEFAULT_PROJECT_COLORS } from "./utils/projectColors";
 import { cleanupOldSessions } from "./utils/sessionCleanup";
+import { injectAgentPersonality } from "./utils/agentPersonality";
 import { notifyLeadAgent } from "./services/remoteApi";
 import type { DroidMetadata, ActiveProject } from "./components/modal-steps/types";
 // TEMPORARILY DISABLED: MaxPlanProvider causing TDZ error - will fix separately
@@ -5789,6 +5790,13 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
 
       try {
+        // Inject the TARGET agent's personality into CLAUDE.md of the target
+        // project BEFORE the daemon spawns. Without this the teammate daemon
+        // reads the lead agent's persona still present in CLAUDE.md and
+        // identifies itself as the lead (bug: Leo answering as Jack).
+        // Brain: 025-team-delegation-footer
+        await injectAgentPersonality(agent, projectPath);
+
         // Create a new session
         // Use the session ID from Rust so mobile can poll with the correct ID
         // Brain: 025-team-delegation-footer
@@ -10243,14 +10251,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
 
     try {
-      // 0. Inject agent personality into CLAUDE.md before firing
-      if (agent.personality) {
-        const projectPath = job.projectPath || agent.cwd;
-        await invoke('inject_personality_to_claude_md', {
-          projectPath,
-          personality: agent.personality,
-        });
-      }
+      // 0. Inject agent personality into CLAUDE.md before firing.
+      // Brain: 025-team-delegation-footer (shared injectAgentPersonality helper)
+      await injectAgentPersonality(agent, job.projectPath);
 
       // 1. Create a new AgentSession for this automation run
       const sessionTitle = `[Auto] ${job.name || 'Unnamed Job'}`;
@@ -10341,17 +10344,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
               return;
             }
 
-            // Inject agent personality into CLAUDE.md before firing
-            if (agent.personality) {
-              try {
-                await invoke('inject_personality_to_claude_md', {
-                  projectPath: job.projectPath || agent.cwd,
-                  personality: agent.personality,
-                });
-              } catch (err) {
-                console.warn('[Automation] Failed to inject personality:', err);
-              }
-            }
+            // Inject agent personality into CLAUDE.md before firing.
+            // Brain: 025-team-delegation-footer (shared injectAgentPersonality helper)
+            await injectAgentPersonality(agent, job.projectPath);
 
             const autoTitle = `[Auto] ${job.name || 'Unnamed Job'}`;
             const newSession = await createSession({
