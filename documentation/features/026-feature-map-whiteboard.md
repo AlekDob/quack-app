@@ -3,9 +3,9 @@ type: feature-doc
 project: quack-app
 stack: TypeScript strict (React 18 frontend), Tauri v2 invoke API (list_directory, read_file_content, read_binary_file, write_binary_file, create_directory)
 created: 2026-04-03
-last_verified: 2026-04-04
+last_verified: 2026-04-17
 shortcut: Cmd+Shift+W (Meta+Shift+W)
-tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, mention, autocomplete, image, agent-bridge, skill, nested-components, matryoshka, drag-assign, drag-eject]
+tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, mention, autocomplete, image, agent-bridge, skill, nested-components, matryoshka, drag-assign, drag-eject, md-card, markdown, mermaid]
 image: images/026-whiteboard-overview.png
 ---
 
@@ -26,10 +26,11 @@ image: images/026-whiteboard-overview.png
 | Component | `src/components/featureMap/CanvasPostIt.tsx` | SVG post-it note — draggable, editable text, color cycling, delete on hover |
 | Component | `src/components/featureMap/CanvasGroupRect.tsx` | SVG group rectangle — draggable, resizable (4 corner handles), editable label, color cycling |
 | Component | `src/components/featureMap/CanvasImage.tsx` | SVG canvas image annotation — draggable, aspect-ratio resize (corner handle), delete on hover, blob URL loading from filesystem |
-| Component | `src/components/featureMap/AnnotationToolbar.tsx` | Floating HTML toolbar for Select/Lasso/Post-it/Group/Image mode toggle + selection count badge + Create Component button |
+| Component | `src/components/featureMap/CanvasMdCard.tsx` | HTML-overlay MD Preview Card (NOT SVG foreignObject — avoids WebKit clipping bug) — renders inline markdown or referenced `.md`/`.mmd` file (with Mermaid diagrams), edit-first UX (textarea auto-focus on new cards), preview/edit toggle, draggable header, resize handle, collapse toggle, file hot-reload (2s polling), double-click to open source file in editor. Positioned via CSS transform mirroring canvas pan/zoom. |
+| Component | `src/components/featureMap/AnnotationToolbar.tsx` | Floating HTML toolbar for Select/Lasso/Post-it/Group/Image/MD Card mode toggle + selection count badge + Create Component button |
 | Component | `src/components/featureMap/FeatureMapMinimap.tsx` | Minimap overview panel — node dots + viewport rect + click-to-navigate |
 | Component | `src/components/featureMap/WhiteboardBreadcrumb.tsx` | Navigation breadcrumb for nested components — Root > Parent > Current |
-| Model/Type | `src/components/featureMap/annotationTypes.ts` | PostIt, GroupRect, CanvasImage, CanvasAnnotations, WhiteboardFile, AnnotationMode (incl. 'lasso'), ComponentNavigation, LassoRect types + color/dimension constants |
+| Model/Type | `src/components/featureMap/annotationTypes.ts` | PostIt, GroupRect, CanvasImage, MdCard, CanvasAnnotations, WhiteboardFile, AnnotationMode (incl. 'lasso', 'mdcard'), ComponentNavigation, LassoRect types + color/dimension constants |
 | Store/State | `src/hooks/useCanvasSelection.ts` | Multi-selection hook — lasso rect state, selectedIds Set, startLasso/updateLasso/resetLasso/setSelection/toggleSelect/clearSelection |
 | Service | `src/services/whiteboardFileService.ts` | File-based I/O for `.whiteboard.json` — readWhiteboardFile, writeWhiteboardFile, migrateFromLocalStorage (Tauri read_file_content + write_file_content) |
 | Store/State | `src/hooks/useWhiteboardFile.ts` | Unified annotation + position CRUD hook with file-based persistence + 2s polling for external changes (agent bridge) |
@@ -117,13 +118,15 @@ image: images/026-whiteboard-overview.png
   - **Node click**: mousedown on node → no movement → release → open popover
   - **Node drag**: mousedown on node → movement past threshold → reposition node
 
-### Annotations (Post-its + Group Rectangles + Images)
+### Annotations (Post-its + Group Rectangles + Images + MD Preview Cards)
 - **Post-it notes**: click canvas in Post-it mode to create; drag to move; click to edit text; hover for delete/color buttons; 6 preset colors cycling
 - **Group rectangles**: click-drag canvas in Group mode to draw; resizable via 4 corner handles; editable label (click); dashed border when unselected. Drag/resize uses window-level listeners with stable `propsRef` pattern (see Brain: fix-group-resize-mouse-escape)
 - **Images**: drag & drop from OS or Image mode + file picker; draggable; aspect-ratio resize; saved to filesystem (see Canvas Images section). Same stable window-listener pattern as group rects
+- **MD Preview Cards**: click canvas in MD Card mode to create; renders markdown inline (headings, tables, code, images, mermaid); supports inline `content` OR `filePath` reference to `.md`/`.mmd` files; 2s file polling for hot reload; double-click opens source file in Code Editor (file-backed) or enters edit mode (inline); collapse toggle; resize corner (see MD Preview Cards section)
 - Annotations + node positions stored in `documentation/features/.whiteboard.json` (file-based, replaces localStorage)
-- Z-order (bottom→top): group rects → **images** → layer backgrounds → links → feature nodes → post-its
-- Toolbar (floating, bottom-center): Select / Lasso / Post-it / Group / Image mode toggle + selection count badge
+- Z-order (bottom→top): group rects → **images** → layer backgrounds → links → feature nodes → link pills → **md-cards** → post-its
+- Toolbar (floating, bottom-center): Select / Lasso / Post-it / Group / Image / MD Card mode toggle + selection count badge
+- Keyboard shortcuts for toolbar: `1` Select, `2` Lasso, `3` Post-it, `4` Group, `5` Image, `6` MD Card. `Ctrl` cycles modes.
 - Escape key resets to Select mode and clears multi-selection
 - `useWhiteboardFile` hook: unified CRUD for annotations + positions with file persistence + 2s external change polling
 
@@ -138,6 +141,35 @@ image: images/026-whiteboard-overview.png
 - Z-order: rendered between group rects and layer backgrounds (Z1.5)
 - Annotations stored in `.whiteboard.json` (same `CanvasAnnotations` structure, `images: CanvasImage[]` array)
 - Migration: existing localStorage data auto-migrated to file on first load; missing `images` field gets empty array fallback
+
+### MD Preview Cards (Heptabase-style rich markdown on canvas)
+- **Purpose**: first-class whiteboard element for rich doc embedding — not a fat post-it. Document ADRs, architecture diagrams, and flows inline without spreading across many post-its.
+- **Insert**: select MD Card mode in toolbar (shortcut `6`) + click canvas → card spawns with starter markdown at click point. Default size `400x300` (`MD_CARD_DEFAULT_W/H`), min `200x120` (`MD_CARD_MIN_W/H`).
+- **Two sources** (mutually exclusive):
+  - `content: string` — inline markdown stored in `.whiteboard.json`
+  - `filePath: string` — relative path to a `.md` or `.mmd` file in the project (e.g. `documentation/features/004-chat.md`). Loaded via Tauri `read_file_content`, polled every 2s for external changes (`FILE_POLL_MS`). Missing file shows inline error state.
+- **Mermaid support**:
+  - When `filePath` ends with `.mmd`, the file content is wrapped in a ```mermaid fenced block and rendered as SVG via `MermaidDiagram` (lazy-loaded).
+  - Mermaid code blocks inside `.md` files are rendered inline by the existing `MarkdownText` renderer (zero new deps).
+- **Rendering**: HTML overlay (absolute-positioned div above the SVG canvas, NOT inside a foreignObject). The overlay wrapper applies the same `translate(panX,panY) scale(zoom)` transform as the SVG `<g>`, so cards stay pixel-aligned with SVG post-its/groups. Uses the existing `MarkdownText` component for rich rendering. Supports headings (H1-H6), ordered/unordered lists, tables, code blocks with syntax hints, blockquotes, horizontal rules, inline code, file-path chips, bold/italic, links.
+- **Why HTML overlay instead of `<foreignObject>`?** WebKit has a known bug (bugs.webkit.org/show_bug.cgi?id=23113 and related) where HTML content inside a `<foreignObject>` under a `<g transform="scale(...)">` is not clipped correctly to the foreignObject's bounds — the content bleeds out and renders at unrelated viewport coordinates. Excalidraw and React Flow use the same HTML-overlay-with-transform pattern for this exact reason.
+- **Interaction**:
+  - **Edit-first UX**: new inline cards open in EDIT mode by default (textarea visible with auto-focus) — no need to discover double-click. Toggle preview/edit via pencil/eye button in header.
+  - Drag card header to move; body scrolls independently (wheel events `stopPropagation` so canvas pan/zoom doesn't hijack scroll)
+  - Resize handle bottom-right (visible when selected/hovered; hidden when collapsed)
+  - Collapse toggle in header (chevron icon) — reduces card to title bar only (`MD_CARD_COLLAPSED_H = 36px`)
+  - Double-click on preview: if `filePath` present → opens source in Code Editor tab; if inline → enters textarea edit mode
+  - Delete button (X icon) always visible in header
+  - File cards: "open in editor" button in header (external-link icon)
+  - Shift+click on card body participates in multi-selection; participates in lasso, group-drag, drag-assign to components, drag-eject
+- **Title display logic**: `title` field override → else first H1 in content/file → else first non-empty line → else filename → else `Untitled`
+- **Data shape** (`MdCard`):
+  ```ts
+  { id, x, y, w, h, content?, filePath?, title?, collapsed?, parentComponentId? }
+  ```
+- **Z-order**: rendered as HTML overlay *above the entire SVG* — this means MD cards visually sit above post-its too. The overlay has `pointer-events: none` on the wrapper and `pointer-events: auto` on each card so the SVG underneath still receives pan/zoom events in empty areas.
+- **Persistence**: stored in `annotations.mdCards[]` array inside `.whiteboard.json`. Migration: missing array gets `[]` fallback on file load.
+- **Performance note**: rendering is per-card React; for many cards the foreignObject approach is fine up to ~20-30 cards. Beyond that, viewport culling would be needed.
 
 ### Feature Image (Frontmatter)
 - Add `image: images/screenshot.png` to feature doc YAML frontmatter

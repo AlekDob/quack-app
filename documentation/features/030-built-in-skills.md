@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React)
 created: 2026-04-03
-last_verified: 2026-04-03
-tags: [skills, built-in-skills, bundled-skills, marketplace, droid-factory]
+last_verified: 2026-04-17
+tags: [skills, built-in-skills, bundled-skills, marketplace, droid-factory, whiteboard, mermaid, md-card]
 ---
 
 ## Built-in Skills
@@ -17,7 +17,7 @@ tags: [skills, built-in-skills, bundled-skills, marketplace, droid-factory]
 | Service | src-tauri/src/skills.rs | `list_skills`, `get_skill_details`, `check_skills_directory`, `install_bundled_skills` -- Rust backend for skill discovery, detail loading, and bundled skill installation |
 | Config | src-tauri/templates/skills/feature-creator.md | Bundled skill template embedded at compile time via `include_str!` |
 | Config | src-tauri/templates/skills/quack-brain.md | Bundled skill template embedded at compile time via `include_str!` |
-| Config | src-tauri/templates/skills/whiteboard.md | Bundled skill template — whiteboard interaction (post-its, groups, organize) |
+| Config | src-tauri/templates/skills/whiteboard.md | Bundled skill template — whiteboard interaction (post-its, groups, images, **md-cards with Mermaid support**, auto-organize, nested components). Current version: `1.2.0` |
 | Config | src-tauri/templates/skills/quack-remote.md | Bundled skill template — Remote API control (agents, sessions, jobs, teams) |
 | Config | src-tauri/src/lib.rs (line ~698) | Calls `install_bundled_skills()` during Tauri app setup |
 | Model/Type | src/types.ts (SkillInfo, SkillDetails) | TypeScript interfaces mirroring Rust structs |
@@ -81,6 +81,14 @@ tags: [skills, built-in-skills, bundled-skills, marketplace, droid-factory]
 - GitHub API: `api.github.com/repos/AlekDob/quack-marketplace/contents` for marketplace skill listing
 - GitHub Raw: `raw.githubusercontent.com` for downloading skill files
 - `dirs::home_dir()` (Rust crate): resolve ~/.claude/skills/ path
+
+### Bundled Skill Versions
+| Skill | Current version | Notes |
+|-------|-----------------|-------|
+| feature-creator | see template | Auto-numbered feature doc generation |
+| quack-brain | see template | Two-level Second Brain read/write/search |
+| whiteboard | **1.2.0** | Bumped from 1.1.0 to document md-cards + Mermaid (2026-04-17). Semver check in `install_bundled_skills()` auto-updates users' `~/.claude/skills/whiteboard.md` on next app start. |
+| quack-remote | see template | Remote API control |
 
 ### Config
 - Bundled skills: `BUNDLED_SKILLS` const array in skills.rs (feature-creator, quack-brain, whiteboard, quack-remote)
