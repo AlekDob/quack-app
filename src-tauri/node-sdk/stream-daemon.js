@@ -249,6 +249,17 @@ function getModelId(model) {
   };
 
   const resolved = fallbackMap[baseModel] || baseModel;
+
+  // Brain: gotcha-oauth-betas-rejection + anthropic/claude-code#45449
+  // Client-side gate in cli.js (isOneMContextBlocked) reads stale cache in
+  // ~/.claude.json and blocks the implicit [1m] auto-upgrade for new Opus
+  // models (e.g. opus-4-7). On Max subscriptions the server accepts [1m]
+  // fine — only the slash-command path is broken. Forcing the suffix
+  // explicitly bypasses the gate and restores 1M.
+  const isOpus = /claude-opus-4-[6-9]/.test(resolved);
+  if (isOpus && !has1MSuffix) {
+    return `${resolved}[1m]`;
+  }
   // Re-append [1m] suffix if present — SDK strips it before sending to API
   return has1MSuffix ? `${resolved}[1m]` : resolved;
 }
@@ -389,9 +400,9 @@ async function handleQuery(cmd) {
       model: modelId,
       // Brain: 1m-context-window-support
       // The [1m] suffix in modelId is enough — the CLI handles it natively.
-      // Opus 4.6 has 1M automatically; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
-      // 🐛 DEBUG: Disabled native CLI to test AskUserQuestion hang regression
-      // ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
+      // Opus 4.6 has 1M automatically; Opus 4.7 has 1M natively; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
+      // Re-enabled after AskUserQuestion regression fix (fix-ask-user-question-stream-event-not-emitted, 2026-03-24)
+      ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
       settingSources: ['project', 'user', 'local'],
       tools: { type: 'preset', preset: 'claude_code' },
       allowedTools: resolvedAllowedTools,
@@ -578,10 +589,16 @@ ${hintsBlock}
       }
     }
 
-    // Brain: fix-daemon-missing-1m-context-betas
-    // Enable 1M context window for supported models (Opus 4.6, Sonnet 4.6)
-    // Without this, the SDK operates at 200k and auto-compacts at ~155k tokens.
-    options.betas = ['context-1m-2025-08-07'];
+    // Brain: fix-daemon-missing-1m-context-betas + fix-oauth-betas-rejection
+    // Enable 1M context window for supported models. Only set for API key users —
+    // OAuth subscriptions (Claude Max/Team/Enterprise) get 1M automatically and
+    // REJECT custom betas with "Warning: Custom betas are only available for API
+    // key users. Ignoring provided betas." — that rejection also disables the
+    // server-side Max 1M auto-flag, forcing a fallback to 200k.
+    const hasApiKey = !!(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY);
+    if (hasApiKey) {
+      options.betas = ['context-1m-2025-08-07'];
+    }
 
     if (cwd) options.cwd = cwd;
     if (sessionId) options.resume = sessionId;

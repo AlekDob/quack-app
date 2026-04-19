@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-app
 stack: Tauri v2 (Rust) + React 18 (TypeScript)
 created: 2026-04-03
-last_verified: 2026-04-06
+last_verified: 2026-04-17
 tags: [025-team-delegation-footer, team, delegation, remote-api, mention]
 ---
 
@@ -23,6 +23,7 @@ tags: [025-team-delegation-footer, team, delegation, remote-api, mention]
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
+| Util | `src/utils/agentPersonality.ts` | `injectAgentPersonality(agent, projectPath)` — shared helper that rewrites CLAUDE.md persona block before daemon spawn (sidebar click / automation / remote-execute) |
 | Component | `src/components/ChatView.tsx` | Team icon button in footer → inserts `@team ` via `onInsertAtCursor` |
 | Component | `src/components/ChatInput.tsx` | `@team` in mention dropdown via `projectTerminals` prop, `selectTeammate()`, teammate mention chips |
 | Service | `src/services/remoteApi.ts` | `notifyLeadAgent()`, `executeRemoteTask()`, `fetchRemoteAgents()` |
@@ -73,6 +74,9 @@ Title prefixes `[Team]` vs `[Remote]` are COSMETIC ONLY — never checked in log
 
 ### Teammate Source Change (2026-04-06)
 Previously, team members were sourced from `useTeamStore` (remote team config). Now they come from `projectTerminals` — sibling terminals in the same working directory. This means delegation targets are always the actual running agents in the same project, not a static team config. The `useTeamStore` import was removed from ChatInput.tsx.
+
+### Persona Injection on Delegation (2026-04-17)
+Before this fix, the teammate's daemon spawned in the target `cwd` and read a `CLAUDE.md` that still contained the LEAD agent's persona block (last injected when the lead activated). Result: the teammate identified itself as the lead ("Leo" answering as "Jack"). Fix: the `remote-execute` listener now calls `injectAgentPersonality(agent, projectPath)` BEFORE `createSession`, rewriting the CLAUDE.md identity block to match the TARGET agent. The 800ms `setTimeout` before daemon spawn guarantees the file write completes before the daemon reads it. The helper is shared with `handleSelectTerminal` (sidebar click), `handleAutomationFireJob` (manual fire), and the automation scheduler tick — single source of truth for "persona must match daemon".
 
 ### Known Limitation
 The `remote-execute` listener uses `setActiveId()` + `pendingAutoStartRef` to auto-start teammate sessions. When the lead agent triggers delegation mid-stream, this can race with the active stream. The session IS created, but the daemon may not start automatically. Workaround: user can click on the teammate's session in the sidebar to activate it.

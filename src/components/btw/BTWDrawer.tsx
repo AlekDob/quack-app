@@ -87,9 +87,9 @@ function BTWResponseArea({
     <div className="btw-response-area" ref={scrollRef}>
       {isEmpty && (
         <p className="btw-placeholder">
-          Domanda veloce senza interrompere l'agente.
+          Quick question without interrupting the agent.
           <br />
-          <span style={{ opacity: 0.5, fontSize: 11 }}>Enter per inviare</span>
+          <span style={{ opacity: 0.5, fontSize: 11 }}>Press Enter to send</span>
         </p>
       )}
 
@@ -166,7 +166,7 @@ function BTWInput({
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Chiedi qualcosa..."
+        placeholder="Ask something..."
         rows={1}
         disabled={isLoading}
         aria-label="BTW question input"

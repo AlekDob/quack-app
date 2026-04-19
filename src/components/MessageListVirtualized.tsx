@@ -33,7 +33,6 @@ interface MessageListProps {
   pendingPlanApprovalIds?: Set<string>;
   onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
-  showTurnTokenStats?: boolean;
 }
 
 // Row props passed via List's rowProps
@@ -61,7 +60,6 @@ interface MessageRowProps {
   pendingPlanApprovalIds?: Set<string>;
   onPlanApprovalResponse?: (requestId: string, approved: boolean, feedback?: string) => void;
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
-  showTurnTokenStats?: boolean;
 }
 
 const DEFAULT_MESSAGE_HEIGHT = 120;
@@ -92,7 +90,6 @@ function MessageRow({
   pendingPlanApprovalIds,
   onPlanApprovalResponse,
   onTeammateDrillDown,
-  showTurnTokenStats,
 }: {
   index: number;
   style: CSSProperties;
@@ -140,7 +137,6 @@ function MessageRow({
         pendingPlanApprovalIds={pendingPlanApprovalIds}
         onPlanApprovalResponse={onPlanApprovalResponse}
         onTeammateDrillDown={onTeammateDrillDown}
-        showTurnTokenStats={showTurnTokenStats}
       />
     </div>
   );
@@ -169,7 +165,6 @@ function MessageListVirtualized({
   pendingPlanApprovalIds,
   onPlanApprovalResponse,
   onTeammateDrillDown,
-  showTurnTokenStats = false,
 }: MessageListProps) {
   const listRef = useListRef(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -245,27 +240,88 @@ function MessageListVirtualized({
     listRef.current.scrollToRow({ index: targetIndex, align: 'start' });
   }, [listRef, messages]);
 
-  // Auto-scroll on mount — retry until listRef is available (AutoSizer may not
-  // have measured yet on first render, so listRef.current is initially null)
+  // Brain: pattern-session-scroll-memory
+  // Virtualized path: always scroll to bottom on session switch. Anchor UX is
+  // provided by the non-virtualized MessageList (sessions <=100 messages).
+  // Scroll-lock pattern: force scroll-to-bottom every frame/RO tick until the
+  // user manually scrolls (wheel/touch/keyboard). Needed because
+  // `useDynamicRowHeight` measures row heights as they render — initial
+  // `scrollToRow` lands too high, then rows expand and push the target down.
+  const appliedInitialScrollForSessionRef = useRef<string | null>(null);
+  const scrollLockedRef = useRef(true);
+  useEffect(() => {
+    appliedInitialScrollForSessionRef.current = null;
+    scrollLockedRef.current = true;
+  }, [currentSessionId]);
+
   useEffect(() => {
     if (messages.length === 0) return;
+    if (appliedInitialScrollForSessionRef.current === currentSessionId) return;
 
-    let cancelled = false;
-    const tryScroll = () => {
-      if (cancelled) return;
-      if (listRef.current) {
-        scrollToBottom();
-      } else {
-        requestAnimationFrame(tryScroll);
-      }
+    let observer: ResizeObserver | null = null;
+    let attachedEl: HTMLElement | null = null;
+    const releaseLock = () => {
+      if (scrollLockedRef.current) scrollLockedRef.current = false;
     };
 
-    // Small delay to let AutoSizer + List mount, then retry via rAF if needed
-    const timeoutId = setTimeout(tryScroll, 50);
+    const apply = () => {
+      if (!scrollLockedRef.current) return false;
+      const list = listRef.current;
+      if (!list) return false;
+      const rowCount = loading ? messages.length + 1 : messages.length;
+      if (rowCount > 0) {
+        list.scrollToRow({ index: rowCount - 1, align: 'end' });
+      }
+      // Also force scrollTop = scrollHeight as belt-and-suspenders
+      const el = list.element;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+        // Attach RO + user-input listeners once the element is live
+        if (attachedEl !== el) {
+          observer?.disconnect();
+          observer = new ResizeObserver(() => apply());
+          observer.observe(el);
+          const content = el.querySelector<HTMLElement>('[style*="height"]');
+          if (content) observer.observe(content);
+          el.addEventListener('wheel', releaseLock, { passive: true });
+          el.addEventListener('touchstart', releaseLock, { passive: true });
+          el.addEventListener('keydown', releaseLock);
+          el.addEventListener('scroll', handleScroll, { passive: true });
+          attachedEl = el;
+        }
+      }
+      handleScroll();
+      appliedInitialScrollForSessionRef.current = currentSessionId ?? null;
+      return true;
+    };
+
+    apply();
+
+    let frame = 0;
+    let rafId = 0;
+    const rafLoop = () => {
+      apply();
+      if (++frame < 60 && scrollLockedRef.current) rafId = requestAnimationFrame(rafLoop);
+    };
+    rafId = requestAnimationFrame(rafLoop);
+
+    const stopId = window.setTimeout(() => {
+      scrollLockedRef.current = false;
+    }, 2000);
     prevMessagesLengthRef.current = messages.length;
-    return () => { cancelled = true; clearTimeout(timeoutId); };
+    return () => {
+      window.clearTimeout(stopId);
+      cancelAnimationFrame(rafId);
+      observer?.disconnect();
+      if (attachedEl) {
+        attachedEl.removeEventListener('wheel', releaseLock);
+        attachedEl.removeEventListener('touchstart', releaseLock);
+        attachedEl.removeEventListener('keydown', releaseLock);
+        attachedEl.removeEventListener('scroll', handleScroll);
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentSessionId, messages.length > 0]);
 
   // Auto-scroll for new messages
   useEffect(() => {
@@ -274,14 +330,8 @@ function MessageListVirtualized({
     const hasNewMessage = messages.length > prevMessagesLengthRef.current;
     const lastMessage = messages[messages.length - 1];
 
-    // Detect lazy hydration: messages jumped from 0 to many (session loaded)
-    const isLazyHydration = prevMessagesLengthRef.current === 0 && messages.length > 1;
-
     let shouldAutoScroll = false;
-    if (isLazyHydration) {
-      // Always scroll to bottom when session is hydrated (loaded from disk)
-      shouldAutoScroll = true;
-    } else if (hasNewMessage) {
+    if (hasNewMessage) {
       shouldAutoScroll = lastMessage?.role === 'user' || isAtBottom;
     } else if (loading) {
       shouldAutoScroll = true;
@@ -291,13 +341,8 @@ function MessageListVirtualized({
     prevMessagesLengthRef.current = messages.length;
   }, [messages, loading, checkIfAtBottom, scrollToBottom]);
 
-  // Attach scroll listener to list element for button visibility
-  useEffect(() => {
-    const el = listRef.current?.element;
-    if (!el) return;
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => el.removeEventListener('scroll', handleScroll);
-  }, [listRef, handleScroll]);
+  // Scroll listener for button visibility is attached inside the main
+  // scroll-lock effect once listRef.current.element is live — see `apply()`.
 
   // Handle empty state
   if (messages.length === 0 && !loading) {
@@ -336,7 +381,6 @@ function MessageListVirtualized({
     pendingPlanApprovalIds,
     onPlanApprovalResponse,
     onTeammateDrillDown,
-    showTurnTokenStats,
   };
 
   return (
@@ -370,18 +414,6 @@ function MessageListVirtualized({
         </button>
       )}
 
-      {showScrollToTopButton && (
-        <button
-          className="scroll-to-top-button"
-          onClick={scrollToPreviousUserMessage}
-          aria-label="Previous user message"
-          title="Jump to previous 'You' message"
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 6L5 11L6.5 12.5L10 9L13.5 12.5L15 11L10 6Z" fill="currentColor" />
-          </svg>
-        </button>
-      )}
     </div>
   );
 }
@@ -395,7 +427,6 @@ export default memo(MessageListVirtualized, (prevProps, nextProps) => {
   const nextLast = nextProps.messages[nextProps.messages.length - 1];
   if (prevLast?.id !== nextLast?.id) return false;
   if (prevLast?.content !== nextLast?.content) return false;
-  if (prevLast?.status !== nextLast?.status) return false;
 
   return true;
 });

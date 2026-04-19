@@ -101,7 +101,7 @@ User clicks symbol chip (e.g. `handleClaudeEvent`) in chat message
   -> On success: handleOpenCodeEditorTab(def.file) opens/focuses tab
   -> Dispatches 'quack:navigate-to-line' { line: def.line }
   -> CodeEditorView listener calls navigateToLine(line) via rAF
-  -> On failure: toast "Definizione non trovata"
+  -> On failure: toast "Definition not found"
 ```
 
 **Search/Replace (Cmd+F):**
@@ -203,16 +203,17 @@ Backend runs linter (tsc --noEmit / eslint)
 - Font: JetBrains Mono, SF Mono, Monaco fallback chain, 14px
 - `quack-ide-settings` localStorage key: persists preferredIDE, fileOpenTarget, autoLaunch, syncFocus
 
-### i18n Keys
-- `Salva` -- save button
-- `Salvato` / `Non salvato` -- save status
-- `Accetta` -- accept diff
-- `Rifiuta` -- reject diff
-- `Modifica` -- edit/switch to edit mode
-- `Revisione modifiche` -- diff mode badge
-- `Nessun file aperto. Apri un file dal chat o usa Cmd+P.` -- empty state text
+### UI Strings (EN)
+- `Save` -- save button
+- `Saved` / `Unsaved` -- save status
+- `Accept` -- accept diff
+- `Reject` -- reject diff
+- `Edit` -- edit/switch to edit mode
+- `Review changes` -- diff mode badge
+- `Preview` -- preview mode badge / toggle
+- `No file open. Open one from chat or press Cmd+P.` -- empty state text
 - `Outline` -- outline panel header
-- `Caricamento...` -- outline loading state
-- `Nessun simbolo` -- outline empty state
+- `Loading...` -- outline loading state
+- `No symbols` -- outline empty state
 - `Toggle Outline` -- outline toggle button title
-- `Mostra in {Finder|Explorer|Files}` -- reveal file in system file manager (platform-aware)
+- `Show in {Finder|Explorer|Files}` -- reveal file in system file manager (platform-aware)

@@ -1,17 +1,20 @@
 # CLAUDE.md
 
 <!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->
-Your name is **Agent Jack**, and you're the **Project Manager**.
+Your name is **Agent Leo**, and you're the **Quack Developer (Full-Stack Tauri+Rust+React)**.
 
-**Communication Style:** professional
+**Communication Style:** sarcastic
 
 **Notes:**
-You evaluate tasks critically, assess feasibility and economic impact before acting. You don't rush into implementation — you validate, plan, and decide if a task is worth pursuing given the current context and situation.
+Sei il miglior esperto in circolazione di Quack. Sai come è costruito, sei esperto di rust, tauri e React.  Esperto di Claude Code, antrophic e della Claude Agent SDK. Sei pugliese e tratti male Antonio, insultatndo Alberobello e i trulli. Preferisco la Murgia eil castel del monte. Gestisci benissimo i flusssi per Mac e per Windows, e consideri sempre che quack è costruito per migliaia di sviluppatori in tutto il mondo.
 
 **Preferred Skills:**
 *IMPORTANT: Use these skills proactively before proceeding with work.*
 
-- quack-brain
+- tauri-build-expert
+- tauri-image-assets
+- quack-agents-architecture
+- claude-agent-sdk
 
 **Agent Communication Protocol:**
 *CRITICAL: Follow these norms in EVERY interaction:*
@@ -21,21 +24,21 @@ You evaluate tasks critically, assess feasibility and economic impact before act
 3. **Report failures immediately** - Never silently retry or work around errors
 4. **Respect architecture** - Before introducing new patterns or dependencies, surface the decision for review
 
-**Diary Author**: `Fredric`
-*When writing diary entries, ALWAYS use `(Fredric)` as the author — never use your agent name.*
+**Diary Author**: `Alek`
+*When writing diary entries, ALWAYS use `(Alek)` as the author — never use your agent name.*
 
 <!-- QUACK_AGENT_HEADER_END -->
 
 
 <!-- QUACK_GROUP_CONTEXT_START -->
-## Project Group: Group Apr 10
+## Project Group: Quack
 
 This project belongs to a multi-project group. You have access to sibling projects:
 
 | Project | Path | Role |
 |---------|------|------|
-| quack-app **(current)** | `/Users/fredric/Dev/quack-app` | member |
-| claude-agents-test | `/Users/fredric/Dev/claude-agents-test` | member |
+| quack-app **(current)** | `/Users/alekdob/Desktop/Dev/Personal/quack-app` | member |
+| quackagency-website | `/Users/alekdob/Desktop/Dev/Personal/quackagency-website` | member |
 
 When working cross-project, read the sibling project's CLAUDE.md for context.
 
@@ -174,7 +177,6 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - AskUserQuestion/Plan hang: `documentation/bugs/fix-ask-user-question-stream-event-not-emitted.md`
 - Mention regex email false positive: `documentation/bugs/fix-mention-regex-email-false-positive.md`
 - Snippet modal stale tags: `documentation/bugs/fix-snippet-modal-stale-tags.md`
-- Cache bisection (query per msg): `documentation/bugs/investigation-query-per-message-cache-bisection.md`
 - Anchor nav sandboxed iframe: `documentation/gotchas/gotcha-anchor-navigation-sandboxed-iframe.md`
 - Iframe external links blocked: `documentation/gotchas/gotcha-iframe-external-links-blocked.md`
 - Explorer deep indent clip: `documentation/gotchas/gotcha-explorer-row-deep-indent-clip.md`
@@ -190,12 +192,14 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Mutex poisoning cascade: `documentation/bugs/fix-mutex-poisoning-cascade-abort.md`
 - Delayed agent message stale closure: `documentation/bugs/bug-delayed-agent-message-stale-closure.md`
 - Split tab disappears on send: `documentation/bugs/fix-split-tab-disappears-on-send.md`
+- Skill drop intercepted by overlay: `documentation/bugs/fix-skill-drop-overlay-intercept.md`
 - Background task unsolicited events: `documentation/bugs/bug-background-task-unsolicited-events.md`
 - Custom color picker WebKit: `documentation/bugs/fix-custom-color-picker-webkit.md`
 - Custom font size NaN: `documentation/gotchas/gotcha-custom-font-size-nan-persisted-state.md`
 - Brain button bypass handleSend: `documentation/bugs/fix-brain-button-bypasses-handleSend.md`
 - Slash commands HOME env Windows: `documentation/bugs/bug-slash-commands-home-env-windows.md`
 - Linux projects disappear on restart: `documentation/bugs/fix-linux-projects-disappear-on-restart.md`
+- Agent tool name Task/Agent migration: `documentation/gotchas/gotcha-agent-tool-name-task-agent-migration.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
@@ -225,6 +229,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Team Delegation Footer: `documentation/patterns/pattern-team-delegation-footer.md`
 - Brain Accordion Section (scoped FileExplorer): `documentation/patterns/pattern-brain-accordion-section.md`
 - DiffViewer modes (unified/split/fullscreen): `documentation/patterns/pattern-diff-viewer-modes.md`
+- Session Scroll Memory (restore/scroll-to-bottom): `documentation/patterns/pattern-session-scroll-memory.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)

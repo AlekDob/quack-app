@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React 18)
 created: 2026-04-05
-last_verified: 2026-04-06
+last_verified: 2026-04-16
 tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sessions]
 ---
 
@@ -25,6 +25,9 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 | Component | `src/components/DragHandle.tsx` | Reusable grip icon for drag-and-drop handles |
 | Store/State | `src/stores/groupStore.ts` | Zustand store for project groups CRUD via Tauri invoke |
 | Store/State | `src/stores/uiStore.ts` | `sidebarView` state (`'projects' \| 'taskhub'`) |
+| Util | `src/utils/sessionScrollMemory.ts` | Module-level Map singleton: per-session `{messageId}` anchor storage |
+| Component | `src/components/AnchorIndicator.tsx` | Floating anchor icon aligned with the scrollbar rail (set/remove/jump-to anchor) |
+| Config | `src/components/AnchorIndicator.css` | Anchor indicator styling + hover X button |
 | Config | `.quack-repo-order.dat` | Tauri Store file persisting project order, colors, and favorites |
 | Config | `src/App.css` | `.sidebar`, `.sidebar-header`, `.sidebar-list`, `.sortable-repository-group`, `.repository-group` classes |
 | Config | `src/components/AgentSelector.css` | Agent selector card grid, editing form, marketplace section |
@@ -90,6 +93,18 @@ tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sess
 
 ### UX: Auto-Focus on Session Select
 When a session is clicked (or a new session is created), `ChatView` remounts because its React `key` includes `activeSessionId`. This triggers `ChatInput`'s mount `useEffect` which auto-focuses `textarea.chat-input-field` with a 100ms delay (ensures DOM readiness). This replaces a previous custom-event approach (`quack:focus-chat-input`) that failed due to the unmount/remount cycle.
+
+### UX: Scroll Behavior on Session Switch (Anchor-based)
+On session open, the chat always scrolls to the bottom — unless the user has set an **anchor**. The `AnchorIndicator` component renders a small anchor icon aligned with the scrollbar rail:
+- **Click (not anchored)** → anchors the message currently centered in the viewport; `messageId` saved in a module-level Map per session.
+- **Click (anchored)** → smooth-scrolls to the anchored message.
+- **Hover anchored icon** → reveals an "X" → click to clear.
+- **Next session open** → if an anchor exists, chat jumps to the anchored message; otherwise scrolls to the bottom.
+- `ResizeObserver` (500ms cap) keeps the target aligned while markdown/code/images finish mounting.
+- Zero store/subscription cost: Map singleton at module level, cleared on reload.
+- The scroll-to-bottom pill button (`showScrollButton`) is still shown when the user is not at the bottom.
+- Virtualized list (>100 messages) keeps always-scroll-to-bottom without anchor UX.
+- See `patterns/pattern-session-scroll-memory.md`.
 
 ### Cross-Feature: @ Mention Popup (→ 025-team-delegation-footer)
 The sidebar `terminals` (agents grouped by project) are the same data source used for the `@` mention popup's "Team" section. App.tsx filters `terminals` by matching `cwd` (excluding the active agent) and passes them as `projectTerminals` prop to `ChatView` → `ChatInput`. This means every agent visible in the sidebar under the same project is also citeable via `@` in the chat input. See `025-team-delegation-footer.md` for delegation flow details.

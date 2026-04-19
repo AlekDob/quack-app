@@ -30,7 +30,7 @@ function EditorStatusBar() {
         UTF-8
       </span>
       <span className={`editor-status-item ${isDirty ? 'editor-status-unsaved' : ''}`}>
-        {isDirty ? 'Non salvato' : 'Salvato'}
+        {isDirty ? 'Unsaved' : 'Saved'}
       </span>
     </div>
   );

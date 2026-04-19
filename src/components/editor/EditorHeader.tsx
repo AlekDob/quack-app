@@ -58,9 +58,9 @@ function EditorHeader({ outlineOpen, onToggleOutline, isMarkdown, previewOpen, o
             </span>
           ))}
         </div>
-        {isDirty && <span className="editor-dirty-dot" title="Non salvato" />}
+        {isDirty && <span className="editor-dirty-dot" title="Unsaved" />}
         <span className={`editor-mode-badge ${isDiffMode ? 'diff' : previewOpen ? 'preview' : ''}`}>
-          {isDiffMode ? 'Revisione modifiche' : previewOpen ? 'Anteprima' : 'Modifica'}
+          {isDiffMode ? 'Review changes' : previewOpen ? 'Preview' : 'Edit'}
         </span>
       </div>
       <div className="editor-header-right">
@@ -92,14 +92,14 @@ function EditorHeader({ outlineOpen, onToggleOutline, isMarkdown, previewOpen, o
                 </button>
               </KeyboardShortcutTooltip>
             )}
-            <KeyboardShortcutTooltip label="Salva" shortcut={saveShortcut} position="bottom">
+            <KeyboardShortcutTooltip label="Save" shortcut={saveShortcut} position="bottom">
               <button
                 type="button"
                 className="editor-btn editor-btn-save"
                 onClick={() => save()}
                 disabled={!isDirty}
               >
-                Salva
+                Save
               </button>
             </KeyboardShortcutTooltip>
             <EditorIDEDropdown filePath={filePath} />
@@ -112,21 +112,21 @@ function EditorHeader({ outlineOpen, onToggleOutline, isMarkdown, previewOpen, o
               className="editor-btn editor-btn-accept"
               onClick={() => resolveEdit('accept')}
             >
-              Accetta
+              Accept
             </button>
             <button
               type="button"
               className="editor-btn editor-btn-reject"
               onClick={() => resolveEdit('reject')}
             >
-              Rifiuta
+              Reject
             </button>
             <button
               type="button"
               className="editor-btn editor-btn-edit"
               onClick={() => resolveEdit('edit')}
             >
-              Modifica
+              Edit
             </button>
           </>
         )}

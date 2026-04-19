@@ -19,7 +19,7 @@ function EditorEmptyState() {
         </svg>
       </div>
       <p className="editor-empty-state-text">
-        Nessun file aperto. Apri un file dal chat o usa {MOD_KEY}+P.
+        No file open. Open one from chat or press {MOD_KEY}+P.
       </p>
     </div>
   );

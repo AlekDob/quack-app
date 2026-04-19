@@ -71,16 +71,29 @@ function ImageIcon() {
   );
 }
 
+function MdCardIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      {/* Document card with markdown "M" bars */}
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M7 9v6M7 9l2.5 3L12 9v6" />
+      <path d="M15 9v6M15 13l2 2 2-2" />
+    </svg>
+  );
+}
+
 const BUTTONS: { mode: AnnotationMode; label: string; shortcut: string; Icon: () => React.JSX.Element }[] = [
   { mode: 'select', label: 'Select', shortcut: '1', Icon: SelectIcon },
   { mode: 'lasso', label: 'Lasso Select', shortcut: '2', Icon: LassoIcon },
   { mode: 'postit', label: 'Post-it', shortcut: '3', Icon: PostItIcon },
   { mode: 'group', label: 'Group', shortcut: '4', Icon: GroupIcon },
   { mode: 'image', label: 'Image', shortcut: '5', Icon: ImageIcon },
+  { mode: 'mdcard', label: 'MD Preview Card', shortcut: '6', Icon: MdCardIcon },
 ];
 
 const SHORTCUT_MAP: Record<string, AnnotationMode> = {
-  '1': 'select', '2': 'lasso', '3': 'postit', '4': 'group', '5': 'image',
+  '1': 'select', '2': 'lasso', '3': 'postit', '4': 'group', '5': 'image', '6': 'mdcard',
 };
 
 export default function AnnotationToolbar({ mode, onModeChange, selectionCount = 0, onCreateComponent, canCreateComponent = true }: Props) {
