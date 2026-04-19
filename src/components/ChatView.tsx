@@ -893,10 +893,10 @@ export default function ChatView({
         />
       )}
       {/* Brain: 005-performance-critical-refactor
-          Use virtualized list for sessions with 100+ messages to avoid DOM bloat.
-          Threshold at 100 (not 50) to avoid mid-session component swap during streaming.
+          Use virtualized list for sessions with 500+ messages to avoid DOM bloat.
+          Threshold at 500 to avoid mid-session component swap during streaming.
           Once virtualized kicks in, the session stays virtualized (no swap back). */}
-      {messages.length > 100 ? (
+      {messages.length > 500 ? (
         <Suspense fallback={<div style={{ flex: 1 }} />}>
         <MessageListVirtualized
           messages={messages}
