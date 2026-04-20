@@ -44,6 +44,21 @@ const LEGACY_ID_MAP: Record<string, string> = {
   'opus46': 'opus47', // Opus 4.6 deprecated, upgrade to 4.7
 };
 
+// Brain: fix-session-backup-quota-cascade
+/**
+ * Module-scoped flag: the fallback warning is called from many hot render paths
+ * (every select dropdown, every settings read). Without dedup it spams the
+ * console into oblivion when Supabase is unreachable. Log once per session.
+ */
+let emergencyFallbackWarned = false;
+
+/**
+ * Reset the fallback warning dedup flag. Call after a successful remote
+ * models fetch so a later disconnect gets logged again.
+ */
+export function resetEmergencyFallbackWarning(): void {
+  emergencyFallbackWarned = false;
+}
 
 /**
  * Get active models sorted by sortOrder.
@@ -56,8 +71,12 @@ export function getModels(remoteModels?: ModelConfig[]): ModelConfig[] {
     const sorted = [...models].sort((a, b) => a.sortOrder - b.sortOrder);
     return sorted;
   }
-  // Emergency fallback - Supabase unreachable
-  console.warn('[ModelService] Using emergency fallback - Supabase models not available');
+  // Emergency fallback - Supabase unreachable. Warn once per session to avoid
+  // flooding the console from hot render paths.
+  if (!emergencyFallbackWarned) {
+    emergencyFallbackWarned = true;
+    console.warn('[ModelService] Using emergency fallback - Supabase models not available');
+  }
   return EMERGENCY_FALLBACK;
 }
 
@@ -142,8 +161,8 @@ export function getModelLabel(
   remoteModels?: ModelConfig[]
 ): string {
   // Handle [1m] suffix for 1M context window
-  const has1MSuffix = friendlyName.endsWith('[1m]');
-  const baseName = has1MSuffix ? friendlyName.replace('[1m]', '') : friendlyName;
+  const has1MySuffix = friendlyName.endsWith('[1m]');
+  const baseName = has1MySuffix ? friendlyName.replace('[1m]', '') : friendlyName;
 
   const models = getModels(remoteModels);
 
@@ -156,5 +175,5 @@ export function getModelLabel(
   }
 
   const label = found?.label ?? baseName;
-  return has1MSuffix ? `${label} (1M)` : label;
+  return has1MySuffix ? `${label} (1M)` : label;
 }
