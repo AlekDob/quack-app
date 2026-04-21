@@ -602,7 +602,19 @@ ${hintsBlock}
 
     if (cwd) options.cwd = cwd;
     if (sessionId) options.resume = sessionId;
-    if (effort) options.effort = effort;
+    if (effort) {
+      // Brain: task-effort-model-aware-refactor
+      // xhigh is Opus 4.7 exclusive — silently degrade on older models so we don't
+      // send invalid effort levels to the API (previously passed through untouched,
+      // making the "falls back to high" comment in types.ts a lie).
+      const isOpus47 = typeof model === 'string' && model.includes('opus-4-7');
+      if (effort === 'xhigh' && !isOpus47) {
+        console.warn(`[daemon] effort=xhigh not supported on ${model}, degrading to 'high'`);
+        options.effort = 'high';
+      } else {
+        options.effort = effort;
+      }
+    }
 
     if (agents && Array.isArray(agents) && agents.length > 0) {
       options.agents = agents.map(agent => ({

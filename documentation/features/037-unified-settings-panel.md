@@ -111,8 +111,9 @@ tags: [settings, unified-settings, preferences, configuration]
 - `settings-storage` version: 11 (migration chain v0-v11 handling legacy model IDs, debug mode, BTW, chat mode, ask mode, typography, accent color, sonnet45 deprecation, custom font size, Opus 4.6→4.7 + effort `medium`→`xhigh` bump)
 - Default model: `opus47` (Supabase ID format)
 - Default BTW model: `haiku45`
-- Default effort: model-dependent via `defaultEffortForModel()` in `src/services/modelService.ts` — `xhigh` for Opus 4.7, `high` for Opus 4.6 / Sonnet 4.6, `medium` for everything else
-- Effort levels exposed in UI: `low` (Fast), `medium` (Balanced), `high` (Smart), `xhigh` (Deep, Opus 4.7 only — older models fall back to `high`), `max` (Max)
+- Default effort: model-dependent via `defaultEffortForModel()` in `src/services/modelService.ts` — `xhigh` for Opus 4.7, `high` for Opus 4.6 / Sonnet 4.6, `medium` for everything else. Used as fallback in all `App.tsx` call sites (no more hardcoded `'medium'` — since 0.9.3)
+- Effort levels exposed in UI (aligned 1:1 with Anthropic official since 0.9.3): `low`, `medium`, `high`, `xhigh` (Opus 4.7 only), `max`
+- Daemon clamp: `stream-daemon.js` degrades `xhigh` → `high` when model is not Opus 4.7 (with warning log), enforcing what the `EffortLevel` type comment describes
 - Default shell: `/bin/zsh`
 - Default font size preset: `M` (Medium, 13px body)
 - Custom font size range: 10-22px (via 'C' preset with +/- stepper)

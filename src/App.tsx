@@ -126,7 +126,7 @@ import { useExternalIdeContext } from "./hooks/useExternalIdeContext";
 import type { ChatSendOptions, PermissionMode } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useModelsConfig } from "./hooks/useAppConfig";
-import { getModelId } from "./services/modelService";
+import { getModelId, defaultEffortForModel } from "./services/modelService";
 import { findDefinition } from "./services/codeIntelService";
 import { getProviderRequestFields, getActiveModelName } from "./services/claudeSDK";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
@@ -2843,7 +2843,8 @@ function AppContent() {
       // Store settings used for this message (for UI display)
       settings: {
         model: getActiveModelName(options?.model),
-        effort: options?.effort || 'medium',
+        // Brain: task-effort-model-aware-refactor — use model-aware default instead of hardcoded 'medium'
+        effort: options?.effort || defaultEffortForModel(options?.model || ''),
         thinkingMode: options?.thinkingMode || 'auto',
       },
       // Hide header + init widget on resumed sessions (known at message creation time)
@@ -3612,7 +3613,8 @@ function AppContent() {
       status: 'streaming',
       settings: {
         model: getActiveModelName(options?.model),
-        effort: options?.effort || 'medium',
+        // Brain: task-effort-model-aware-refactor
+        effort: options?.effort || defaultEffortForModel(options?.model || ''),
         thinkingMode: options?.thinkingMode || 'auto',
       },
       metadata: { turnId },
@@ -3813,8 +3815,9 @@ function AppContent() {
         timestamp: Date.now(),
         status: 'complete' as const,
         settings: {
-          model: options?.model || 'opus46',
-          effort: options?.effort || 'medium',
+          model: options?.model || 'opus47',
+          // Brain: task-effort-model-aware-refactor
+          effort: options?.effort || defaultEffortForModel(options?.model || ''),
           thinkingMode: options?.thinkingMode || 'auto',
         },
         metadata: { turnId },
@@ -4568,12 +4571,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const presets = useSettingsStore.getState().agentModePresets;
       const bypassPreset = presets.bypass;
 
+      const fallbackModel = normalizeModelName(bypassPreset?.model || 'opus47');
       const current = newMap.get(key) ?? {
         inputDraft: '',
-        model: normalizeModelName(bypassPreset?.model || 'opus46'),
+        model: fallbackModel,
         thinkingMode: bypassPreset?.thinkingMode || 'auto',
         permissionMode: 'bypass',
-        effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
+        // Brain: task-effort-model-aware-refactor — preset effort first, then model-aware default
+        effort: bypassPreset?.effort || defaultEffortForModel(fallbackModel),
       };
 
       // Auto-switch settings based on permission mode using presets from settings
@@ -5093,36 +5098,42 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Default settings when no session/agent is active - use presets from settings
       const presets = useSettingsStore.getState().agentModePresets;
       const bypassPreset = presets.bypass;
+      const fallbackModel = normalizeModelName(bypassPreset?.model || 'opus47');
 
       return {
         inputDraft: '',
-        model: normalizeModelName(bypassPreset?.model || 'opus46'),
+        model: fallbackModel,
         thinkingMode: bypassPreset?.thinkingMode || 'auto',
         permissionMode: 'bypass',
-        effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
+        // Brain: task-effort-model-aware-refactor
+        effort: bypassPreset?.effort || defaultEffortForModel(fallbackModel),
       };
     }
 
     const existing = agentChatSettings.get(settingsKey);
     if (existing) {
       // Normalize the model name in case it's a legacy ID
+      const normalizedModel = normalizeModelName(existing.model);
       return {
         ...existing,
-        model: normalizeModelName(existing.model),
-        effort: existing.effort || 'medium', // Ensure default if not set
+        model: normalizedModel,
+        // Brain: task-effort-model-aware-refactor — default based on actual model, not hardcoded
+        effort: existing.effort || defaultEffortForModel(normalizedModel),
       };
     }
 
     // Initialize default settings for new session using presets from settings
     const presets = useSettingsStore.getState().agentModePresets;
     const bypassPreset = presets.bypass;
+    const fallbackModel = normalizeModelName(bypassPreset?.model || 'opus47');
 
     const defaultSettings: AgentChatSettings = {
       inputDraft: '',
-      model: normalizeModelName(bypassPreset?.model || 'opus46'),
+      model: fallbackModel,
       thinkingMode: bypassPreset?.thinkingMode || 'auto',
       permissionMode: 'bypass',
-      effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
+      // Brain: task-effort-model-aware-refactor
+      effort: bypassPreset?.effort || defaultEffortForModel(fallbackModel),
     };
 
     setAgentChatSettings((prev) => {
