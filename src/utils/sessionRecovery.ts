@@ -55,7 +55,10 @@ const MAX_BACKUP_MESSAGES = 200;
 const FALLBACK_BACKUP_MESSAGES = 50;
 let backupSuppressedUntil = 0;
 
+export const SESSION_BACKUPS_ENABLED = false;
+
 export function saveSessionBackup(sessionId: string, messages: ChatMessage[]): void {
+  if (!SESSION_BACKUPS_ENABLED) return;
   if (Date.now() < backupSuppressedUntil) return;
 
   const trimmed = messages.length > MAX_BACKUP_MESSAGES
@@ -86,6 +89,7 @@ export function saveSessionBackup(sessionId: string, messages: ChatMessage[]): v
  * Returns null if no backup exists or backup is corrupted
  */
 export function loadSessionBackup(sessionId: string): { messages: ChatMessage[]; timestamp: number } | null {
+  if (!SESSION_BACKUPS_ENABLED) return null;
   try {
     const backupJson = localStorage.getItem(`session_backup_${sessionId}`);
     if (!backupJson) return null;
