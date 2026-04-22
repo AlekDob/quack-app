@@ -12,7 +12,7 @@ import { OfficeCustomGroup } from './OfficeCustomGroup';
 import { OfficeSticker } from './OfficeSticker';
 import { useOfficeDrag } from './useOfficeDrag';
 import { projectNameFromPath } from './officeLayout';
-import { GROUP_MIN_W, GROUP_MIN_H, POSTIT_DEFAULT_W, POSTIT_DEFAULT_H, POSTIT_COLORS, GROUP_DEFAULT_COLOR, STICKER_MIN_SIZE } from './officeConstants';
+import { GROUP_MIN_W, GROUP_MIN_H, POSTIT_DEFAULT_W, POSTIT_DEFAULT_H, POSTIT_COLORS, GROUP_DEFAULT_COLOR, STICKER_MIN_SIZE, CARD_DEFAULT_W, CARD_DEFAULT_H } from './officeConstants';
 import { getStickerDef } from './officeStickerCatalog';
 import type { TerminalInfo } from '../../../types';
 import type { DuckViewModel } from './OfficeRoomCard';
@@ -91,6 +91,7 @@ function OfficeCanvasImpl(props: Props) {
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const annotRef = useRef<AnnotationInteraction | null>(null);
+  const hasAutoFitRef = useRef(false);
 
   const cardDrag = useOfficeDrag(viewport, {
     onCardMove: (projectPath, x, y) => props.onRoomMoved(projectPath, x, y),
@@ -263,11 +264,61 @@ function OfficeCanvasImpl(props: Props) {
     props.onEndDrag();
   }, [panning, groupCreation, cardDrag, props]);
 
+  const fitToContent = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (const r of layout.rooms) {
+      xs.push(r.x, r.x + (r.w ?? CARD_DEFAULT_W));
+      ys.push(r.y, r.y + (r.h ?? CARD_DEFAULT_H));
+    }
+    for (const g of layout.customGroups) {
+      xs.push(g.x, g.x + g.w);
+      ys.push(g.y, g.y + g.h);
+    }
+    for (const s of layout.stickers) {
+      xs.push(s.x, s.x + s.w);
+      ys.push(s.y, s.y + s.h);
+    }
+    for (const p of layout.postIts) {
+      xs.push(p.x, p.x + p.w);
+      ys.push(p.y, p.y + p.h);
+    }
+    if (xs.length === 0) return;
+
+    const minX = Math.min(...xs);
+    const minY = Math.min(...ys);
+    const maxX = Math.max(...xs);
+    const maxY = Math.max(...ys);
+    const contentW = Math.max(maxX - minX, 1);
+    const contentH = Math.max(maxY - minY, 1);
+    const padding = 40;
+    const zoomX = (rect.width - padding * 2) / contentW;
+    const zoomY = (rect.height - padding * 2) / contentH;
+    const zoom = Math.min(1, Math.max(MIN_ZOOM, Math.min(zoomX, zoomY)));
+    const panX = padding - minX * zoom + (rect.width - padding * 2 - contentW * zoom) / 2;
+    const panY = padding - minY * zoom + (rect.height - padding * 2 - contentH * zoom) / 2;
+    setViewport({ zoom, panX, panY });
+  }, [layout.rooms, layout.customGroups, layout.stickers, layout.postIts]);
+
+  useEffect(() => {
+    if (hasAutoFitRef.current) return;
+    if (layout.rooms.length === 0 && layout.customGroups.length === 0 && layout.stickers.length === 0 && layout.postIts.length === 0) return;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+    fitToContent();
+    hasAutoFitRef.current = true;
+  }, [layout.rooms.length, layout.customGroups.length, layout.stickers.length, layout.postIts.length, fitToContent]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === '1') {
         e.preventDefault();
-        setViewport({ zoom: 0.8, panX: 50, panY: 50 });
+        fitToContent();
       }
       if ((e.metaKey || e.ctrlKey) && e.key === '0') {
         e.preventDefault();
@@ -276,7 +327,7 @@ function OfficeCanvasImpl(props: Props) {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [fitToContent]);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
