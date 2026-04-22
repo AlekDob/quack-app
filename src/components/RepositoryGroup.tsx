@@ -1826,11 +1826,27 @@ export default function RepositoryGroup({
   ]);
 
   // Group and sort agents by branch - Memoized for performance
+  // 🦆 Split agents into active (with non-done sessions) vs dormant
+  // Active = full render (avatar, sessions, DnD). Dormant = compact chip row.
+  // Benefits: fewer store subscriptions, fewer avatar loads, less DOM, still anti-duplicate.
+  const { activeAgentIds, dormantAgents } = useMemo(() => {
+    const activeIds = new Set(
+      allSessionsForRepo
+        .filter((s) => s.status !== "done")
+        .map((s) => s.agentId),
+    );
+    return {
+      activeAgentIds: activeIds,
+      dormantAgents: mainAgents.filter((a) => !activeIds.has(a.id)),
+    };
+  }, [mainAgents, allSessionsForRepo]);
+
   const sortedBranches = useMemo(() => {
     const agentsByBranch = new Map<string, TerminalInfo[]>();
 
-    // Process main repository agents
+    // Process main repository agents (active only — dormant rendered in compact row)
     mainAgents.forEach((agent) => {
+      if (!activeAgentIds.has(agent.id)) return;
       const branchName = agent.branch || "main";
       if (!agentsByBranch.has(branchName)) {
         agentsByBranch.set(branchName, []);
@@ -1844,7 +1860,7 @@ export default function RepositoryGroup({
       if (b === "main") return 1;
       return a.localeCompare(b);
     });
-  }, [mainAgents]);
+  }, [mainAgents, activeAgentIds]);
 
   return (
     <div className="repository-group">
@@ -1931,7 +1947,7 @@ export default function RepositoryGroup({
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-                New Agent
+                Add Agent
               </button>
             )}
           </div>
@@ -2375,6 +2391,80 @@ export default function RepositoryGroup({
               {activeAgentId ? <div style={{ opacity: 0 }} /> : null}
             </DragOverlay>
           </DndContext>
+
+          {/* 🦆 Dormant agents — compact chip row (click to start new session, anti-duplicate) */}
+          {dormantAgents.length > 0 && (
+            <div
+              className="dormant-agents-row"
+              style={{
+                marginTop: "8px",
+                marginLeft: "32px",
+                marginBottom: "12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "6px",
+                fontSize: "11px",
+              }}
+            >
+              <span
+                style={{
+                  color: "rgba(255,255,255,0.35)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                  fontSize: "10px",
+                }}
+              >
+                Dormant · {dormantAgents.length}
+              </span>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "6px",
+                }}
+              >
+              {dormantAgents.map((agent) => {
+                const role = agent.personality?.role?.trim();
+                const tooltipLabel = role
+                  ? `${role} · Start new session`
+                  : `Start new session with ${agent.label}`;
+                return (
+                  <KeyboardShortcutTooltip key={agent.id} label={tooltipLabel}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNewSessionModalAgentId(agent.id);
+                      }}
+                      style={{
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "rgba(255,255,255,0.55)",
+                        borderRadius: "10px",
+                        padding: "2px 8px",
+                        fontSize: "11px",
+                        cursor: "pointer",
+                        transition: "background 0.15s ease, color 0.15s ease, border-color 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+                        e.currentTarget.style.color = "rgba(255,255,255,0.9)";
+                        e.currentTarget.style.borderColor = agent.color || "rgba(255,255,255,0.2)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "rgba(255,255,255,0.04)";
+                        e.currentTarget.style.color = "rgba(255,255,255,0.55)";
+                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+                      }}
+                    >
+                      {agent.label}
+                    </button>
+                  </KeyboardShortcutTooltip>
+                );
+              })}
+              </div>
+            </div>
+          )}
 
           {/* Portal-based drag overlay - escapes sidebar overflow:hidden */}
           {activeAgentId && dragPointer && createPortal(
