@@ -29,7 +29,8 @@ tags: [office, office-v2, whiteboard, annotations, post-it, sticker, custom-grou
 | Component | `src/components/office/v2/OfficePostIt.tsx` | HTML overlay post-it: draggable header, double-click to edit, Cmd+Enter commit, Esc cancel, 6-color cycle, delete on hover |
 | Component | `src/components/office/v2/OfficeCustomGroup.tsx` | SVG rect with dashed border, editable label, drag body, 4-corner resize, delete-on-hover |
 | Component | `src/components/office/v2/OfficeSticker.tsx` | SVG sticker with drag/resize(aspect-lock)/rotate handles (hover-visible); renders via catalog lookup |
-| Component | `src/components/office/v2/OfficeTagFilter.tsx` | Tag pills (dim filter) + Reset layout button |
+| Component | `src/components/office/v2/OfficeTagFilter.tsx` | Tag pills (dim filter) + "+" create new tag + "×" delete tag on hover + Reset layout button |
+| Component | `src/components/office/v2/OfficeRoomContextMenu.tsx` | Portal-based right-click menu for rooms: toggle tag assignment + inline "new tag" create |
 | Component | `src/components/office/v2/OfficeActionMenu.tsx` | Ported from v1 — portal menu near clicked duck listing active sessions; goto chat / session click |
 | Component | `src/components/office/v2/OfficeView.css` | All CSS for v2 components |
 | Hook | `src/components/office/v2/useOfficeLayout.ts` | Layout state + debounced write + CRUD (rooms/postIts/customGroups/stickers) + undo/redo with drag-coalescing |
@@ -98,6 +99,14 @@ bottom → top:
 ### Tag Filter (Dim, not Hide)
 - `activeTagIds: string[]` — when non-empty, rooms that do not include any active tag render with `opacity: 0.3` (class `office-room-card--dimmed`).
 - Tags auto-populated on bootstrap from projects' inferred tag (`Personal` / `C&C` / `Consulting` / `Other` from `inferTagFromPath`); never displayed as "zones" (v1 auto-zones removed in v2).
+- **User-created tags**: `+` button in the filter bar opens an inline form (name + 10-color palette). New tags get `source: 'manual'`. Hover on any pill to reveal `×` for deletion — removes the tag from all rooms and from `activeTagIds` in one atomic undo step.
+- **Right-click on a room** opens `OfficeRoomContextMenu` (portal on `document.body`): lists all tags with checkboxes to toggle assign/unassign, plus an inline "New tag" form that creates the tag and assigns it to the clicked room.
+
+### Group drag carries contained elements
+- On `startGroupDrag`, the canvas hit-tests all rooms/postIts/stickers/other-groups by center-point against the group rect, snapshots their starting `x/y` into the `annotRef.children` array.
+- `pointermove` applies the same `(dx, dy)` delta to the group AND each snapshotted child.
+- Children set is frozen at drag-start — elements moved into the group mid-drag won't follow.
+- Room moves inside a group drag go through `onRoomMoved` for history consistency (single undo step covers everything).
 
 ### Persistence
 - Single file `~/.quack/office-layout.json` (schema v2). Written on debounce 500ms after any change.
