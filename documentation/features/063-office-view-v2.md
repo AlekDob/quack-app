@@ -62,11 +62,19 @@ OfficeLayout {
 | Mode | Shortcut | Behaviour |
 |------|----------|-----------|
 | Select | `1` | Default — drag card plates, click ducks, drag/resize/rotate existing annotations |
-| Post-it | `2` | Click canvas → create 160x120 post-it at point → auto-exit to select |
-| Group | `3` | Click-drag canvas → preview rect → release creates custom group (min 160x120) → auto-exit to select |
-| Sticker | `4` | Open sub-picker (10 kinds in 5-col grid) → click canvas places sticker, stays in mode for multi-placement → Esc to exit |
+| Lasso | `2` | Click-drag canvas → blue dashed rect → release selects all elements whose center is inside; auto-exits to Select |
+| Post-it | `3` | Click canvas → create 160x120 post-it at point → auto-exit to select |
+| Group | `4` | Click-drag canvas → preview rect → release creates custom group (min 160x120) → auto-exit to select |
+| Sticker | `5` | Open sub-picker (10 kinds in 5-col grid) → click canvas places sticker, stays in mode for multi-placement → Esc to exit |
 | Undo | `Cmd+Z` | Revert last action |
 | Redo | `Cmd+Shift+Z` | Re-apply |
+
+### Lasso Multi-Select
+- `selectedIds: Set<string>` in `OfficeView` state (ephemeral, not persisted). IDs use `"{kind}:{id}"` format where kind = `room|postit|sticker|group`.
+- Blue outline / dashed rect render on every selected element. Toolbar shows a pill badge with the count.
+- **Esc** clears selection.
+- **Multi-element drag**: when a selected element is dragged in Select mode, the canvas snapshots positions of ALL other selected elements into `annotRef.siblings` (tagged union extended from single-element drag). During pointermove the same `(dx, dy)` is applied to every sibling → a single undo step covers the whole multi-move.
+- Group drag (task 063 — move contained elements) and lasso drag (move explicitly selected) layer: the `children` set of a group-move is merged with the `siblings` set if the group itself is part of the selection.
 
 ### Undo / Redo
 - Past/future stacks held in refs inside `useOfficeLayout`; `historyVersion` state forces re-render of `canUndo`/`canRedo` booleans.
@@ -129,7 +137,7 @@ bottom → top:
 - `officeStorage.test.ts` — round-trip read/write, v1 migration on read, corrupt-file rename.
 
 ### Known Limitations / Follow-ups
-- No lasso multi-select (out of scope for this iteration).
+- No Shift+click to toggle a single element in/out of selection — only lasso or Esc.
 - No `.whiteboard.json`-style agent bridge / polling — file is user-only (no external writers).
 - Sticker rotate during very large pan offsets uses canvas-space angle math that may feel slightly off at extreme zoom levels; acceptable for now.
 
@@ -142,7 +150,7 @@ bottom → top:
 ### Keyboard Shortcuts (complete)
 | Shortcut | Action |
 |---|---|
-| `1` / `2` / `3` / `4` | Toolbar mode: Select / Post-it / Group / Sticker |
+| `1` / `2` / `3` / `4` / `5` | Toolbar mode: Select / Lasso / Post-it / Group / Sticker |
 | `Esc` | Back to Select mode |
 | `Cmd+Z` / `Cmd+Shift+Z` | Undo / Redo |
 | `Cmd+1` | Fit viewport to content |
