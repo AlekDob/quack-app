@@ -65,9 +65,15 @@ function genId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 }
 
+type GroupChild =
+  | { kind: 'room'; projectPath: string; startX: number; startY: number }
+  | { kind: 'postit'; id: string; startX: number; startY: number }
+  | { kind: 'sticker'; id: string; startX: number; startY: number }
+  | { kind: 'group'; id: string; startX: number; startY: number };
+
 type AnnotationInteraction =
   | { kind: 'postit-move'; id: string; startX: number; startY: number; startPX: number; startPY: number }
-  | { kind: 'group-move'; id: string; startX: number; startY: number; startPX: number; startPY: number }
+  | { kind: 'group-move'; id: string; startX: number; startY: number; startPX: number; startPY: number; children: GroupChild[] }
   | { kind: 'group-resize'; id: string; corner: 'nw' | 'ne' | 'sw' | 'se'; startX: number; startY: number; startW: number; startH: number; startPX: number; startPY: number }
   | { kind: 'sticker-move'; id: string; startX: number; startY: number; startPX: number; startPY: number }
   | { kind: 'sticker-resize'; id: string; startW: number; startH: number; startPX: number; startPY: number }
@@ -192,9 +198,19 @@ function OfficeCanvasImpl(props: Props) {
       if (a.kind === 'postit-move' || a.kind === 'group-move' || a.kind === 'sticker-move') {
         const dx = (e.clientX - a.startPX) / viewport.zoom;
         const dy = (e.clientY - a.startPY) / viewport.zoom;
-        if (a.kind === 'postit-move') props.onUpdatePostIt(a.id, { x: a.startX + dx, y: a.startY + dy });
-        else if (a.kind === 'group-move') props.onUpdateGroup(a.id, { x: a.startX + dx, y: a.startY + dy });
-        else if (a.kind === 'sticker-move') props.onUpdateSticker(a.id, { x: a.startX + dx, y: a.startY + dy });
+        if (a.kind === 'postit-move') {
+          props.onUpdatePostIt(a.id, { x: a.startX + dx, y: a.startY + dy });
+        } else if (a.kind === 'group-move') {
+          props.onUpdateGroup(a.id, { x: a.startX + dx, y: a.startY + dy });
+          for (const c of a.children) {
+            if (c.kind === 'room') props.onRoomMoved(c.projectPath, c.startX + dx, c.startY + dy);
+            else if (c.kind === 'postit') props.onUpdatePostIt(c.id, { x: c.startX + dx, y: c.startY + dy });
+            else if (c.kind === 'sticker') props.onUpdateSticker(c.id, { x: c.startX + dx, y: c.startY + dy });
+            else if (c.kind === 'group') props.onUpdateGroup(c.id, { x: c.startX + dx, y: c.startY + dy });
+          }
+        } else if (a.kind === 'sticker-move') {
+          props.onUpdateSticker(a.id, { x: a.startX + dx, y: a.startY + dy });
+        }
       } else if (a.kind === 'group-resize') {
         const dx = (e.clientX - a.startPX) / viewport.zoom;
         const dy = (e.clientY - a.startPY) / viewport.zoom;
@@ -363,10 +379,39 @@ function OfficeCanvasImpl(props: Props) {
   const startGroupDrag = useCallback((id: string, e: React.PointerEvent) => {
     const g = layout.customGroups.find(x => x.id === id);
     if (!g) return;
+
+    const inside = (cx: number, cy: number) =>
+      cx >= g.x && cx <= g.x + g.w && cy >= g.y && cy <= g.y + g.h;
+
+    const children: GroupChild[] = [];
+    for (const r of layout.rooms) {
+      const w = r.w ?? CARD_DEFAULT_W;
+      const h = r.h ?? CARD_DEFAULT_H;
+      if (inside(r.x + w / 2, r.y + h / 2)) {
+        children.push({ kind: 'room', projectPath: r.projectPath, startX: r.x, startY: r.y });
+      }
+    }
+    for (const p of layout.postIts) {
+      if (inside(p.x + p.w / 2, p.y + p.h / 2)) {
+        children.push({ kind: 'postit', id: p.id, startX: p.x, startY: p.y });
+      }
+    }
+    for (const s of layout.stickers) {
+      if (inside(s.x + s.w / 2, s.y + s.h / 2)) {
+        children.push({ kind: 'sticker', id: s.id, startX: s.x, startY: s.y });
+      }
+    }
+    for (const other of layout.customGroups) {
+      if (other.id === id) continue;
+      if (inside(other.x + other.w / 2, other.y + other.h / 2)) {
+        children.push({ kind: 'group', id: other.id, startX: other.x, startY: other.y });
+      }
+    }
+
     props.onBeginDrag();
-    annotRef.current = { kind: 'group-move', id, startX: g.x, startY: g.y, startPX: e.clientX, startPY: e.clientY };
+    annotRef.current = { kind: 'group-move', id, startX: g.x, startY: g.y, startPX: e.clientX, startPY: e.clientY, children };
     (e.target as Element).setPointerCapture?.(e.pointerId);
-  }, [layout.customGroups, props]);
+  }, [layout.customGroups, layout.rooms, layout.postIts, layout.stickers, props]);
 
   const startGroupResize = useCallback((id: string, corner: 'nw' | 'ne' | 'sw' | 'se', e: React.PointerEvent) => {
     const g = layout.customGroups.find(x => x.id === id);
