@@ -13,6 +13,7 @@ interface UseOfficeLayoutResult {
   setZoneSize: (zoneId: string, w: number, h: number) => void;
   toggleTag: (tagId: string) => void;
   setBreakRoomPosition: (x: number, y: number) => void;
+  resetLayout: () => void;
   ready: boolean;
 }
 
@@ -109,5 +110,10 @@ export function useOfficeLayout(terminals: TerminalInfo[]): UseOfficeLayoutResul
     setLayout(prev => prev ? { ...prev, breakRoom: { x, y } } : prev);
   }, []);
 
-  return { layout, setRoomPosition, setZonePosition, setZoneSize, toggleTag, setBreakRoomPosition, ready };
+  const resetLayout = useCallback(() => {
+    const fresh = bootstrapLayoutFromTerminals(terminals);
+    setLayout(fresh);
+  }, [terminals]);
+
+  return { layout, setRoomPosition, setZonePosition, setZoneSize, toggleTag, setBreakRoomPosition, resetLayout, ready };
 }

@@ -4,6 +4,7 @@ import { buildViewModels } from './officeViewModels';
 import { OfficeCanvas } from './OfficeCanvas';
 import { OfficeTagFilter } from './OfficeTagFilter';
 import OfficeActionMenu from './OfficeActionMenu';
+import { ConfirmModal } from '../../ConfirmModal';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { useChatStore } from '../../../stores/chatStore';
 import type { TerminalInfo } from '../../../types';
@@ -17,7 +18,7 @@ interface Props {
 }
 
 function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Props) {
-  const { layout, setRoomPosition, setZonePosition, setBreakRoomPosition, toggleTag, ready } = useOfficeLayout(terminals);
+  const { layout, setRoomPosition, setZonePosition, setBreakRoomPosition, toggleTag, resetLayout, ready } = useOfficeLayout(terminals);
   const sessions = useSessionStore(s => s.sessions);
   const chatLoadingMap = useChatStore(s => s.chatLoadingMap);
   const pendingQuestionsMap = useChatStore(s => s.pendingQuestionsMap);
@@ -29,6 +30,7 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
   );
 
   const [actionMenu, setActionMenu] = useState<{ agentId: string; x: number; y: number } | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   if (!ready || !layout) {
     return <div className="office-view office-view--loading">Loading…</div>;
@@ -36,7 +38,12 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
 
   return (
     <div className="office-view" data-active={isActive}>
-      <OfficeTagFilter tags={layout.tags} activeTagIds={layout.activeTagIds} onToggle={toggleTag} />
+      <OfficeTagFilter
+        tags={layout.tags}
+        activeTagIds={layout.activeTagIds}
+        onToggle={toggleTag}
+        onReset={() => setConfirmReset(true)}
+      />
 
       <OfficeCanvas
         layout={layout}
@@ -69,6 +76,18 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
           onClose={() => setActionMenu(null)}
         />
       )}
+
+      <ConfirmModal
+        isOpen={confirmReset}
+        title="Reset office layout?"
+        message="All custom card/zone positions will be lost and projects will be re-packed into their matching zones."
+        confirmLabel="Reset"
+        onConfirm={() => {
+          resetLayout();
+          setConfirmReset(false);
+        }}
+        onCancel={() => setConfirmReset(false)}
+      />
     </div>
   );
 }
