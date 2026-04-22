@@ -1,7 +1,7 @@
-// src/components/office/v2/officeStorage.ts
 import { invoke } from '@tauri-apps/api/core';
 import { normalizeToForwardSlash } from '../../../utils/platform';
 import { LAYOUT_FILE_NAME } from './officeConstants';
+import { normaliseLayout } from './officeMigration';
 import type { OfficeLayout } from './officeTypes';
 
 async function resolveLayoutPath(): Promise<string> {
@@ -31,9 +31,8 @@ export async function readOfficeLayout(): Promise<OfficeLayout | null> {
   }
 
   try {
-    const parsed = JSON.parse(raw) as OfficeLayout;
-    if (parsed.version !== 1) return null;
-    return parsed;
+    const parsed = JSON.parse(raw);
+    return normaliseLayout(parsed);
   } catch {
     await quarantineCorruptFile(path);
     return null;

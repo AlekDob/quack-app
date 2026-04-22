@@ -1,19 +1,24 @@
-// src/components/office/v2/useOfficeLayout.ts
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { readOfficeLayout, writeOfficeLayout } from './officeStorage';
 import { bootstrapLayoutFromTerminals, reconcileLayoutWithTerminals } from './officeMigration';
 import { WRITE_DEBOUNCE_MS } from './officeConstants';
-import type { OfficeLayout } from './officeTypes';
+import type { OfficeLayout, OfficeCustomGroup, OfficePostIt, OfficeSticker } from './officeTypes';
 import type { TerminalInfo } from '../../../types';
 
 interface UseOfficeLayoutResult {
   layout: OfficeLayout | null;
-  setRoomPosition: (projectPath: string, x: number, y: number, zoneId?: string) => void;
-  setZonePosition: (zoneId: string, x: number, y: number) => void;
-  setZoneSize: (zoneId: string, w: number, h: number) => void;
+  setRoomPosition: (projectPath: string, x: number, y: number) => void;
   toggleTag: (tagId: string) => void;
-  setBreakRoomPosition: (x: number, y: number) => void;
   resetLayout: () => void;
+  addPostIt: (postIt: OfficePostIt) => void;
+  updatePostIt: (id: string, patch: Partial<Omit<OfficePostIt, 'id'>>) => void;
+  deletePostIt: (id: string) => void;
+  addCustomGroup: (group: OfficeCustomGroup) => void;
+  updateCustomGroup: (id: string, patch: Partial<Omit<OfficeCustomGroup, 'id'>>) => void;
+  deleteCustomGroup: (id: string) => void;
+  addSticker: (sticker: OfficeSticker) => void;
+  updateSticker: (id: string, patch: Partial<Omit<OfficeSticker, 'id'>>) => void;
+  deleteSticker: (id: string) => void;
   ready: boolean;
 }
 
@@ -22,7 +27,6 @@ export function useOfficeLayout(terminals: TerminalInfo[]): UseOfficeLayoutResul
   const [ready, setReady] = useState(false);
   const writeTimerRef = useRef<number | null>(null);
 
-  // Initial load — once only.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -33,15 +37,13 @@ export function useOfficeLayout(terminals: TerminalInfo[]): UseOfficeLayoutResul
       setLayout(reconciled);
       setReady(true);
       if (!persisted) {
-        // first-run: persist the bootstrap
         await writeOfficeLayout(reconciled);
       }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally once
+  }, []);
 
-  // Reconcile when terminals change (after first load)
   useEffect(() => {
     if (!ready || !layout) return;
     const reconciled = reconcileLayoutWithTerminals(layout, terminals);
@@ -51,7 +53,6 @@ export function useOfficeLayout(terminals: TerminalInfo[]): UseOfficeLayoutResul
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [terminals, ready]);
 
-  // Debounced write
   useEffect(() => {
     if (!ready || !layout) return;
     if (writeTimerRef.current) window.clearTimeout(writeTimerRef.current);
@@ -63,37 +64,12 @@ export function useOfficeLayout(terminals: TerminalInfo[]): UseOfficeLayoutResul
     };
   }, [layout, ready]);
 
-  const setRoomPosition = useCallback((projectPath: string, x: number, y: number, zoneId?: string) => {
-    setLayout(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        rooms: prev.rooms.map(r =>
-          r.projectPath === projectPath ? { ...r, x, y, zoneId } : r
-        ),
-      };
-    });
-  }, []);
-
-  const setZonePosition = useCallback((zoneId: string, x: number, y: number) => {
-    setLayout(prev => {
-      if (!prev) return prev;
-      const zone = prev.zones.find(z => z.id === zoneId);
-      if (!zone) return prev;
-      const dx = x - zone.x;
-      const dy = y - zone.y;
-      return {
-        ...prev,
-        zones: prev.zones.map(z => z.id === zoneId ? { ...z, x, y } : z),
-        rooms: prev.rooms.map(r => r.zoneId === zoneId ? { ...r, x: r.x + dx, y: r.y + dy } : r),
-      };
-    });
-  }, []);
-
-  const setZoneSize = useCallback((zoneId: string, w: number, h: number) => {
+  const setRoomPosition = useCallback((projectPath: string, x: number, y: number) => {
     setLayout(prev => prev ? {
       ...prev,
-      zones: prev.zones.map(z => z.id === zoneId ? { ...z, w, h } : z),
+      rooms: prev.rooms.map(r =>
+        r.projectPath === projectPath ? { ...r, x, y } : r
+      ),
     } : prev);
   }, []);
 
@@ -106,14 +82,70 @@ export function useOfficeLayout(terminals: TerminalInfo[]): UseOfficeLayoutResul
     });
   }, []);
 
-  const setBreakRoomPosition = useCallback((x: number, y: number) => {
-    setLayout(prev => prev ? { ...prev, breakRoom: { x, y } } : prev);
-  }, []);
-
   const resetLayout = useCallback(() => {
     const fresh = bootstrapLayoutFromTerminals(terminals);
     setLayout(fresh);
   }, [terminals]);
 
-  return { layout, setRoomPosition, setZonePosition, setZoneSize, toggleTag, setBreakRoomPosition, resetLayout, ready };
+  const addPostIt = useCallback((postIt: OfficePostIt) => {
+    setLayout(prev => prev ? { ...prev, postIts: [...prev.postIts, postIt] } : prev);
+  }, []);
+
+  const updatePostIt = useCallback((id: string, patch: Partial<Omit<OfficePostIt, 'id'>>) => {
+    setLayout(prev => prev ? {
+      ...prev,
+      postIts: prev.postIts.map(p => p.id === id ? { ...p, ...patch } : p),
+    } : prev);
+  }, []);
+
+  const deletePostIt = useCallback((id: string) => {
+    setLayout(prev => prev ? { ...prev, postIts: prev.postIts.filter(p => p.id !== id) } : prev);
+  }, []);
+
+  const addCustomGroup = useCallback((group: OfficeCustomGroup) => {
+    setLayout(prev => prev ? { ...prev, customGroups: [...prev.customGroups, group] } : prev);
+  }, []);
+
+  const updateCustomGroup = useCallback((id: string, patch: Partial<Omit<OfficeCustomGroup, 'id'>>) => {
+    setLayout(prev => prev ? {
+      ...prev,
+      customGroups: prev.customGroups.map(g => g.id === id ? { ...g, ...patch } : g),
+    } : prev);
+  }, []);
+
+  const deleteCustomGroup = useCallback((id: string) => {
+    setLayout(prev => prev ? { ...prev, customGroups: prev.customGroups.filter(g => g.id !== id) } : prev);
+  }, []);
+
+  const addSticker = useCallback((sticker: OfficeSticker) => {
+    setLayout(prev => prev ? { ...prev, stickers: [...prev.stickers, sticker] } : prev);
+  }, []);
+
+  const updateSticker = useCallback((id: string, patch: Partial<Omit<OfficeSticker, 'id'>>) => {
+    setLayout(prev => prev ? {
+      ...prev,
+      stickers: prev.stickers.map(s => s.id === id ? { ...s, ...patch } : s),
+    } : prev);
+  }, []);
+
+  const deleteSticker = useCallback((id: string) => {
+    setLayout(prev => prev ? { ...prev, stickers: prev.stickers.filter(s => s.id !== id) } : prev);
+  }, []);
+
+  return {
+    layout,
+    setRoomPosition,
+    toggleTag,
+    resetLayout,
+    addPostIt,
+    updatePostIt,
+    deletePostIt,
+    addCustomGroup,
+    updateCustomGroup,
+    deleteCustomGroup,
+    addSticker,
+    updateSticker,
+    deleteSticker,
+    ready,
+  };
 }

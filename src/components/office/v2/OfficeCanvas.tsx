@@ -1,7 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { OfficeLayout, Viewport } from './officeTypes';
-import { OfficeZone } from './OfficeZone';
-import { OfficeBreakRoom } from './OfficeBreakRoom';
 import { OfficeRoomCard } from './OfficeRoomCard';
 import { useOfficeDrag } from './useOfficeDrag';
 import { projectNameFromPath } from './officeLayout';
@@ -15,9 +13,7 @@ interface Props {
   doorPlateColorByProject: Map<string, string>;
   busyRatioByProject: Map<string, number>;
   countsByProject: Map<string, { busy: number; idle: number; dormant: number }>;
-  onRoomMoved: (projectPath: string, x: number, y: number, zoneId: string | undefined) => void;
-  onZoneMoved: (zoneId: string, x: number, y: number) => void;
-  onBreakRoomMoved: (x: number, y: number) => void;
+  onRoomMoved: (projectPath: string, x: number, y: number) => void;
   onDuckClick: (agentId: string, e: React.MouseEvent) => void;
   onCardDoubleClick: (projectPath: string) => void;
 }
@@ -39,12 +35,9 @@ function OfficeCanvasImpl(props: Props) {
   const [spaceHeld, setSpaceHeld] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
 
-  const drag = useOfficeDrag(viewport, layout.zones, {
-    onCardMove: (projectPath, x, y) => {
-      props.onRoomMoved(projectPath, x, y, undefined);
-    },
-    onZoneMove: (zoneId, x, y) => props.onZoneMoved(zoneId, x, y),
-    onCardDrop: (projectPath, x, y, zoneId) => props.onRoomMoved(projectPath, x, y, zoneId),
+  const drag = useOfficeDrag(viewport, {
+    onCardMove: (projectPath, x, y) => props.onRoomMoved(projectPath, x, y),
+    onCardDrop: (projectPath, x, y) => props.onRoomMoved(projectPath, x, y),
   });
 
   const onWheel = useCallback((e: React.WheelEvent) => {
@@ -117,7 +110,6 @@ function OfficeCanvasImpl(props: Props) {
   }, []);
 
   const activeTagIds = layout.activeTagIds;
-  const hoverZoneId = drag.drag?.kind === 'card' ? drag.drag.hoverZoneId : undefined;
 
   const terminalsByPath = useMemo(() => {
     const map = new Map<string, TerminalInfo[]>();
@@ -140,15 +132,7 @@ function OfficeCanvasImpl(props: Props) {
     >
       <svg className="office-canvas__svg">
         <g transform={`translate(${viewport.panX}, ${viewport.panY}) scale(${viewport.zoom})`}>
-          {layout.zones.map(z => (
-            <OfficeZone
-              key={z.id}
-              zone={z}
-              hoverTarget={hoverZoneId === z.id}
-              onLabelPointerDown={(zoneId, e) => drag.startZoneDrag(zoneId, z.x, z.y, e)}
-            />
-          ))}
-          <OfficeBreakRoom x={layout.breakRoom.x} y={layout.breakRoom.y} />
+          {/* placeholder: stickers + custom groups renderizzati qui in Task 5-6 */}
         </g>
       </svg>
 

@@ -18,7 +18,7 @@ interface Props {
 }
 
 function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Props) {
-  const { layout, setRoomPosition, setZonePosition, setBreakRoomPosition, toggleTag, resetLayout, ready } = useOfficeLayout(terminals);
+  const { layout, setRoomPosition, toggleTag, resetLayout, ready } = useOfficeLayout(terminals);
   const sessions = useSessionStore(s => s.sessions);
   const chatLoadingMap = useChatStore(s => s.chatLoadingMap);
   const pendingQuestionsMap = useChatStore(s => s.pendingQuestionsMap);
@@ -52,9 +52,7 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
         doorPlateColorByProject={viewModels.doorPlateByProject}
         busyRatioByProject={viewModels.busyRatioByProject}
         countsByProject={viewModels.countsByProject}
-        onRoomMoved={setRoomPosition}
-        onZoneMoved={setZonePosition}
-        onBreakRoomMoved={setBreakRoomPosition}
+        onRoomMoved={(projectPath, x, y) => setRoomPosition(projectPath, x, y)}
         onDuckClick={(agentId, e) => setActionMenu({ agentId, x: e.clientX, y: e.clientY })}
         onCardDoubleClick={() => {
           console.info('[office-v2] Floor plan overlay coming in v0.9.5');

@@ -1,4 +1,3 @@
-// src/components/office/v2/officeTypes.ts
 export type TagSource = 'auto' | 'manual';
 
 export interface OfficeTag {
@@ -8,34 +7,53 @@ export interface OfficeTag {
   source: TagSource;
 }
 
-export interface OfficeZone {
-  id: string;
-  label: string;
-  color: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  tagId?: string;
-}
-
 export interface OfficeRoomCard {
   projectPath: string;
   x: number;
   y: number;
   w?: number;
   h?: number;
-  zoneId?: string;
   tagIds: string[];
 }
 
+export interface OfficeCustomGroup {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label: string;
+  color: string;
+}
+
+export interface OfficePostIt {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text: string;
+  color: string;
+}
+
+export interface OfficeSticker {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rot: number;
+  kind: string;
+}
+
 export interface OfficeLayout {
-  version: 1;
-  zones: OfficeZone[];
-  rooms: OfficeRoomCard[];  // one per project currently in terminals (reconciled on every mount)
+  version: 2;
+  rooms: OfficeRoomCard[];
   tags: OfficeTag[];
   activeTagIds: string[];
-  breakRoom: { x: number; y: number };
+  customGroups: OfficeCustomGroup[];
+  postIts: OfficePostIt[];
+  stickers: OfficeSticker[];
 }
 
 export interface Viewport {

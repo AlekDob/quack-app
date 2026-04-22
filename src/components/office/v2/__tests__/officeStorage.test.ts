@@ -7,7 +7,6 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: unknown[]) => mockInvoke(...args),
 }));
 
-// Dynamic import AFTER mocks are installed
 const { readOfficeLayout, writeOfficeLayout } = await import('../officeStorage');
 
 beforeEach(() => {
@@ -15,12 +14,13 @@ beforeEach(() => {
 });
 
 const sampleLayout: OfficeLayout = {
-  version: 1,
-  zones: [],
+  version: 2,
   rooms: [],
   tags: [],
   activeTagIds: [],
-  breakRoom: { x: 0, y: 0 },
+  customGroups: [],
+  postIts: [],
+  stickers: [],
 };
 
 describe('readOfficeLayout', () => {
@@ -35,7 +35,7 @@ describe('readOfficeLayout', () => {
     expect(result).toBeNull();
   });
 
-  it('parses a valid version-1 layout', async () => {
+  it('parses a valid v2 layout', async () => {
     mockInvoke.mockImplementation((cmd: string) => {
       if (cmd === 'get_home_directory') return Promise.resolve('/Users/alek');
       if (cmd === 'read_file_content') return Promise.resolve(JSON.stringify(sampleLayout));
@@ -44,6 +44,29 @@ describe('readOfficeLayout', () => {
 
     const result = await readOfficeLayout();
     expect(result).toEqual(sampleLayout);
+  });
+
+  it('migrates a v1 layout on read, dropping zones and breakRoom', async () => {
+    const v1 = {
+      version: 1,
+      zones: [{ id: 'z', label: 'Z', color: '#fff', x: 0, y: 0, w: 10, h: 10 }],
+      rooms: [{ projectPath: '/a', x: 1, y: 2, tagIds: ['personal'], zoneId: 'z' }],
+      tags: [{ id: 'personal', label: 'Personal', color: '#c084fc', source: 'auto' }],
+      activeTagIds: [],
+      breakRoom: { x: 0, y: 0 },
+    };
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === 'get_home_directory') return Promise.resolve('/Users/alek');
+      if (cmd === 'read_file_content') return Promise.resolve(JSON.stringify(v1));
+      throw new Error('unexpected cmd: ' + cmd);
+    });
+
+    const result = await readOfficeLayout();
+    expect(result).not.toBeNull();
+    expect(result!.version).toBe(2);
+    expect(result!.rooms[0].projectPath).toBe('/a');
+    expect((result as unknown as Record<string, unknown>).zones).toBeUndefined();
+    expect((result as unknown as Record<string, unknown>).breakRoom).toBeUndefined();
   });
 
   it('returns null and renames corrupt file', async () => {
