@@ -218,3 +218,11 @@
 .office-zone__handle:hover { fill: rgba(255, 255, 255, 0.5); }
 .office-zone__handle--nw, .office-zone__handle--se { cursor: nwse-resize; }
 .office-zone__handle--ne, .office-zone__handle--sw { cursor: nesw-resize; }
+
+.office-break-room__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: grab;
+  user-select: none;
+}
