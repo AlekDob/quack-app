@@ -297,10 +297,8 @@
 }
 
 .office-canvas {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  width: 100%;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
   background: #0f0f1a;
 }
