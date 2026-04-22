@@ -124,5 +124,23 @@ bottom → top:
 - No `.whiteboard.json`-style agent bridge / polling — file is user-only (no external writers).
 - Sticker rotate during very large pan offsets uses canvas-space angle math that may feel slightly off at extreme zoom levels; acceptable for now.
 
+### Gotchas & Fixes (2026-04-22)
+- **Canvas collapsed to 0px**: `.office-canvas` with `flex: 1` didn't expand because its wrap (`.office-view__canvas-wrap`) wasn't `display: flex`. Result: `getBoundingClientRect()` returned height 0, fit-to-content bailed, rooms never rendered. Fix: canvas uses `position: absolute; inset: 0` inside the relative wrap — no flex dependency. See `gotcha-css-flex-chain-broken.md`.
+- **Empty canvas after v1→v2 migration**: rooms inherited `x/y` from v1 auto-zones (e.g. x ~ 1000-1900), default viewport `zoom 1 pan 0,0` missed them. Fix: auto fit-to-content on first mount (with `hasAutoFitRef` guard), `Cmd+1` re-fits.
+- **Orphan rooms hidden**: `projectTerminals.length === 0` guard dropped any room whose cwd didn't match a live terminal. Now rooms always render (ducks/branch just empty). Prevents "invisible cards" when terminals arrive late or paths shift.
+- **Empty-state CTA**: when `layout.rooms.length === 0`, a centered panel offers "Populate office" → re-bootstraps from current terminals. Useful if user reset layout while terminals were still loading.
+
+### Keyboard Shortcuts (complete)
+| Shortcut | Action |
+|---|---|
+| `1` / `2` / `3` / `4` | Toolbar mode: Select / Post-it / Group / Sticker |
+| `Esc` | Back to Select mode |
+| `Cmd+Z` / `Cmd+Shift+Z` | Undo / Redo |
+| `Cmd+1` | Fit viewport to content |
+| `Cmd+0` | Reset viewport (zoom 1, pan 0,0) |
+| `Space + left-drag` | Pan canvas |
+| Middle-click drag | Pan canvas |
+| Wheel | Zoom (0.3–2.0) |
+
 ### UI Language
 All user-facing strings in English.

@@ -201,6 +201,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Slash commands HOME env Windows: `documentation/bugs/bug-slash-commands-home-env-windows.md`
 - Linux projects disappear on restart: `documentation/bugs/fix-linux-projects-disappear-on-restart.md`
 - Agent tool name Task/Agent migration: `documentation/gotchas/gotcha-agent-tool-name-task-agent-migration.md`
+- CSS flex chain broken (canvas collapses to 0px): `documentation/gotchas/gotcha-css-flex-chain-broken.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

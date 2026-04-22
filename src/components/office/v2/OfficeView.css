@@ -296,6 +296,10 @@
   min-height: 0;
 }
 
+/* Brain: gotcha-css-flex-chain-broken
+   Canvas must use absolute fill because .office-view__canvas-wrap is
+   `position: relative` but NOT `display: flex` — a child's `flex: 1`
+   silently no-ops without a flex parent and collapses to 0 height. */
 .office-canvas {
   position: absolute;
   inset: 0;
