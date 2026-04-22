@@ -52,6 +52,11 @@ export function defaultZonePositions(tagIds: string[]): OfficeZone[] {
   });
 }
 
+export function projectNameFromPath(p: string): string {
+  const parts = p.split(/[\\/]/).filter(Boolean);
+  return parts[parts.length - 1] ?? p;
+}
+
 export function sessionDotColor(flags: { awaiting: boolean; working: boolean; ready: boolean }): string {
   if (flags.awaiting) return '#a855f7';
   if (flags.working) return '#f59e0b';

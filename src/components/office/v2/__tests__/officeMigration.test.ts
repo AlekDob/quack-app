@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { bootstrapLayoutFromTerminals, reconcileLayoutWithTerminals } from '../officeMigration';
 import type { TerminalInfo } from '../../../../types';
 
-const terminal = (cwd: string): TerminalInfo => ({
-  id: cwd,
+let agentCounter = 0;
+const terminal = (cwd: string, id?: string): TerminalInfo => ({
+  id: id ?? `agent-${++agentCounter}`,
   label: cwd.split('/').pop() ?? cwd,
   cwd,
   color: '#ff6b35',
@@ -24,7 +25,7 @@ describe('bootstrapLayoutFromTerminals', () => {
     expect(zoneTagIds).toContain('cc');
   });
 
-  it('creates one room per terminal assigned to the matching zone', () => {
+  it('creates one room per distinct project assigned to the matching zone', () => {
     const terminals = [
       terminal('/Users/a/Desktop/Dev/Personal/quack-app'),
       terminal('/Users/a/Desktop/Dev/flow-app'),
@@ -34,6 +35,14 @@ describe('bootstrapLayoutFromTerminals', () => {
     const personalZoneId = layout.zones.find(z => z.tagId === 'personal')?.id;
     const personalRoom = layout.rooms.find(r => r.projectPath.includes('Personal'));
     expect(personalRoom?.zoneId).toBe(personalZoneId);
+  });
+
+  it('deduplicates N terminals on the same cwd into one room', () => {
+    const cwd = '/Users/a/Desktop/Dev/Personal/quack-app';
+    const terminals = [terminal(cwd, 'alex'), terminal(cwd, 'jack'), terminal(cwd, 'sophie')];
+    const layout = bootstrapLayoutFromTerminals(terminals);
+    const matches = layout.rooms.filter(r => r.projectPath === cwd);
+    expect(matches).toHaveLength(1);
   });
 
   it('is idempotent (running twice yields equivalent shape)', () => {
@@ -68,5 +77,31 @@ describe('reconcileLayoutWithTerminals', () => {
     const existing = bootstrapLayoutFromTerminals([terminal('/Users/a/Desktop/Dev/Personal/quack-app')]);
     const empty = reconcileLayoutWithTerminals(existing, []);
     expect(empty.rooms).toHaveLength(1);
+  });
+
+  it('dedups multiple terminals on same cwd into a single new room', () => {
+    const existing = bootstrapLayoutFromTerminals([terminal('/Users/a/Desktop/Dev/Personal/quack-app')]);
+    const cwd = '/Users/a/Desktop/Dev/Personal/new-project';
+    const merged = reconcileLayoutWithTerminals(existing, [
+      terminal('/Users/a/Desktop/Dev/Personal/quack-app'),
+      terminal(cwd, 'alex'),
+      terminal(cwd, 'jack'),
+      terminal(cwd, 'sophie'),
+    ]);
+    expect(merged.rooms.filter(r => r.projectPath === cwd)).toHaveLength(1);
+  });
+
+  it('retroactively dedups a persisted layout with duplicate rooms', () => {
+    const existing = bootstrapLayoutFromTerminals([terminal('/Users/a/Desktop/Dev/Personal/quack-app')]);
+    // Simulate a corrupted persisted layout: 3 rooms with same projectPath
+    existing.rooms = [
+      { ...existing.rooms[0] },
+      { ...existing.rooms[0], x: 100 },
+      { ...existing.rooms[0], x: 200 },
+    ];
+    const reconciled = reconcileLayoutWithTerminals(existing, [
+      terminal('/Users/a/Desktop/Dev/Personal/quack-app'),
+    ]);
+    expect(reconciled.rooms).toHaveLength(1);
   });
 });

@@ -4,6 +4,7 @@ import { OfficeZone } from './OfficeZone';
 import { OfficeBreakRoom } from './OfficeBreakRoom';
 import { OfficeRoomCard } from './OfficeRoomCard';
 import { useOfficeDrag } from './useOfficeDrag';
+import { projectNameFromPath } from './officeLayout';
 import type { TerminalInfo } from '../../../types';
 import type { DuckViewModel } from './OfficeRoomCard';
 
@@ -86,7 +87,16 @@ function OfficeCanvasImpl(props: Props) {
 
   const activeTagIds = layout.activeTagIds;
   const hoverZoneId = drag.drag?.kind === 'card' ? drag.drag.hoverZoneId : undefined;
-  const terminalByPath = useMemo(() => new Map(terminals.map(t => [t.cwd, t])), [terminals]);
+
+  const terminalsByPath = useMemo(() => {
+    const map = new Map<string, TerminalInfo[]>();
+    for (const t of terminals) {
+      const arr = map.get(t.cwd) ?? [];
+      arr.push(t);
+      map.set(t.cwd, arr);
+    }
+    return map;
+  }, [terminals]);
 
   return (
     <div
@@ -116,15 +126,17 @@ function OfficeCanvasImpl(props: Props) {
         style={{ transform: `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom})`, transformOrigin: '0 0' }}
       >
         {layout.rooms.map(card => {
-          const terminal = terminalByPath.get(card.projectPath);
-          if (!terminal) return null;
+          const projectTerminals = terminalsByPath.get(card.projectPath) ?? [];
+          if (projectTerminals.length === 0) return null;
           const ducks = ducksByProject.get(card.projectPath) ?? [];
           const dimmed = activeTagIds.length > 0 && !card.tagIds.some(id => activeTagIds.includes(id));
+          const branch = projectTerminals.find(t => t.branch)?.branch;
           return (
             <OfficeRoomCard
               key={card.projectPath}
               card={card}
-              terminal={terminal}
+              projectName={projectNameFromPath(card.projectPath)}
+              branch={branch}
               ducks={ducks}
               doorPlateColor={doorPlateColorByProject.get(card.projectPath) ?? '#6b7280'}
               busyRatio={busyRatioByProject.get(card.projectPath) ?? 0}

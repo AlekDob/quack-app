@@ -4,10 +4,21 @@ import { inferTagFromPath, defaultZonePositions, packRoomsInZone } from './offic
 import { DEFAULT_TAGS } from './officeConstants';
 import type { TerminalInfo } from '../../../types';
 
+function uniqueProjectPaths(terminals: TerminalInfo[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const t of terminals) {
+    if (seen.has(t.cwd)) continue;
+    seen.add(t.cwd);
+    out.push(t.cwd);
+  }
+  return out;
+}
+
 function buildRoomsForZone(zone: OfficeZone, terminals: TerminalInfo[], tagByProject: Map<string, string>): OfficeRoomCard[] {
-  const projectsInZone = terminals.filter(t => tagByProject.get(t.cwd) === zone.tagId);
-  const unpacked = projectsInZone.map<OfficeRoomCard>(t => ({
-    projectPath: t.cwd,
+  const projectPaths = uniqueProjectPaths(terminals).filter(cwd => tagByProject.get(cwd) === zone.tagId);
+  const unpacked = projectPaths.map<OfficeRoomCard>(cwd => ({
+    projectPath: cwd,
     x: 0,
     y: 0,
     zoneId: zone.id,
@@ -54,16 +65,26 @@ export function bootstrapLayoutFromTerminals(terminals: TerminalInfo[]): OfficeL
 }
 
 export function reconcileLayoutWithTerminals(layout: OfficeLayout, terminals: TerminalInfo[]): OfficeLayout {
-  const existingPaths = new Set(layout.rooms.map(r => r.projectPath));
-  const newRooms: OfficeRoomCard[] = [...layout.rooms];
+  const dedupedExisting: OfficeRoomCard[] = [];
+  const seenExisting = new Set<string>();
+  for (const r of layout.rooms) {
+    if (seenExisting.has(r.projectPath)) continue;
+    seenExisting.add(r.projectPath);
+    dedupedExisting.push(r);
+  }
 
-  for (const t of terminals) {
-    if (existingPaths.has(t.cwd)) continue;
+  const existingPaths = new Set(dedupedExisting.map(r => r.projectPath));
+  const newRooms: OfficeRoomCard[] = [...dedupedExisting];
+  const addedPaths = new Set<string>();
 
-    const tag = inferTagFromPath(t.cwd);
+  for (const cwd of uniqueProjectPaths(terminals)) {
+    if (existingPaths.has(cwd) || addedPaths.has(cwd)) continue;
+    addedPaths.add(cwd);
+
+    const tag = inferTagFromPath(cwd);
     const zone = layout.zones.find(z => z.tagId === tag);
     const card: OfficeRoomCard = {
-      projectPath: t.cwd,
+      projectPath: cwd,
       x: 0,
       y: 0,
       zoneId: zone?.id,

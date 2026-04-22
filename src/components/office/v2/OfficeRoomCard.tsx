@@ -2,7 +2,6 @@ import { memo } from 'react';
 import type { OfficeRoomCard as RoomCardData, OfficeTag } from './officeTypes';
 import { CARD_DEFAULT_W, CARD_DEFAULT_H } from './officeConstants';
 import { OfficeDuckAvatar, type DuckStatus } from './OfficeDuckAvatar';
-import type { TerminalInfo } from '../../../types';
 
 export interface DuckViewModel {
   agentId: string;
@@ -15,7 +14,8 @@ export interface DuckViewModel {
 
 interface Props {
   card: RoomCardData;
-  terminal: TerminalInfo;
+  projectName: string;
+  branch?: string;
   ducks: DuckViewModel[];
   doorPlateColor: string;
   busyRatio: number;
@@ -30,7 +30,7 @@ interface Props {
 const MAX_VISIBLE = 5;
 
 function OfficeRoomCardImpl({
-  card, terminal, ducks, doorPlateColor, busyRatio, counts, tags, dimmed,
+  card, projectName, branch, ducks, doorPlateColor, busyRatio, counts, tags, dimmed,
   onDragStart, onDoubleClick, onDuckClick,
 }: Props) {
   const w = card.w ?? CARD_DEFAULT_W;
@@ -54,7 +54,7 @@ function OfficeRoomCardImpl({
         onPointerDown={(e) => onDragStart?.(card.projectPath, e)}
       >
         <span className="office-room-card__status-dot" style={{ background: doorPlateColor }} />
-        <span className="office-room-card__name">{terminal.label}</span>
+        <span className="office-room-card__name">{projectName}</span>
       </div>
 
       <div className="office-room-card__body">
@@ -62,7 +62,7 @@ function OfficeRoomCardImpl({
           {relevantTags.map(t => (
             <span key={t.id} className="office-room-card__tag" style={{ background: t.color }}>{t.label}</span>
           ))}
-          <span className="office-room-card__branch">{terminal.branch ?? 'main'}</span>
+          <span className="office-room-card__branch">{branch ?? 'main'}</span>
         </div>
 
         <div className="office-room-card__ducks">
