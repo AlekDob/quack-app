@@ -97,6 +97,16 @@
 
 .office-room-card--dimmed { opacity: 0.3; }
 
+.office-room-card--selected {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.office-postit--selected {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
 .office-room-card__plate {
   position: absolute;
   top: -12px;
@@ -810,6 +820,21 @@
   width: 1px;
   background: rgba(255, 255, 255, 0.1);
   margin: 2px 4px;
+}
+
+.office-toolbar__badge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
 }
 
 /* Sticker picker */

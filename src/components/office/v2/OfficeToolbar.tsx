@@ -1,7 +1,7 @@
 import { memo, useEffect, useState } from 'react';
 import { STICKER_CATALOG } from './officeStickerCatalog';
 
-export type OfficeMode = 'select' | 'postit' | 'group' | 'sticker';
+export type OfficeMode = 'select' | 'lasso' | 'postit' | 'group' | 'sticker';
 
 interface Props {
   mode: OfficeMode;
@@ -12,19 +12,32 @@ interface Props {
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
+  selectionCount?: number;
 }
 
 const MODE_SHORTCUTS: Record<string, OfficeMode> = {
   '1': 'select',
-  '2': 'postit',
-  '3': 'group',
-  '4': 'sticker',
+  '2': 'lasso',
+  '3': 'postit',
+  '4': 'group',
+  '5': 'sticker',
 };
 
 function SelectIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
       <path d="M4 4l7.07 17 2.51-7.39L21 11.1 4 4z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function LassoIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 8V5a2 2 0 012-2h3" />
+      <path d="M16 3h3a2 2 0 012 2v3" />
+      <path d="M21 16v3a2 2 0 01-2 2h-3" />
+      <path d="M8 21H5a2 2 0 01-2-2v-3" />
     </svg>
   );
 }
@@ -80,7 +93,7 @@ function RedoIcon() {
   );
 }
 
-function OfficeToolbarImpl({ mode, onModeChange, activeSticker, onStickerChange, canUndo, canRedo, onUndo, onRedo }: Props) {
+function OfficeToolbarImpl({ mode, onModeChange, activeSticker, onStickerChange, canUndo, canRedo, onUndo, onRedo, selectionCount = 0 }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
@@ -145,9 +158,13 @@ function OfficeToolbarImpl({ mode, onModeChange, activeSticker, onStickerChange,
 
       <div className="office-toolbar">
         {btn('select', SelectIcon, '1')}
-        {btn('postit', PostItIcon, '2')}
-        {btn('group', GroupIcon, '3')}
-        {btn('sticker', StickerIcon, '4', () => setPickerOpen(p => !p))}
+        {btn('lasso', LassoIcon, '2')}
+        {btn('postit', PostItIcon, '3')}
+        {btn('group', GroupIcon, '4')}
+        {btn('sticker', StickerIcon, '5', () => setPickerOpen(p => !p))}
+        {selectionCount > 0 && (
+          <span className="office-toolbar__badge" title={`${selectionCount} selected`}>{selectionCount}</span>
+        )}
         <div className="office-toolbar__divider" />
         <button
           type="button"

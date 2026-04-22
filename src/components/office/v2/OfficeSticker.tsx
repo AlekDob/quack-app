@@ -4,13 +4,14 @@ import { getStickerDef } from './officeStickerCatalog';
 
 interface Props {
   sticker: StickerData;
+  selected?: boolean;
   onDragStart: (id: string, e: React.PointerEvent) => void;
   onResizeStart: (id: string, e: React.PointerEvent) => void;
   onRotateStart: (id: string, e: React.PointerEvent) => void;
   onDelete: () => void;
 }
 
-function OfficeStickerImpl({ sticker, onDragStart, onResizeStart, onRotateStart, onDelete }: Props) {
+function OfficeStickerImpl({ sticker, selected, onDragStart, onResizeStart, onRotateStart, onDelete }: Props) {
   const def = getStickerDef(sticker.kind);
   const [hovered, setHovered] = useState(false);
   if (!def) return null;
@@ -23,11 +24,25 @@ function OfficeStickerImpl({ sticker, onDragStart, onResizeStart, onRotateStart,
 
   return (
     <g
-      className="office-sticker"
+      className={`office-sticker ${selected ? 'office-sticker--selected' : ''}`}
       transform={`translate(${cx}, ${cy}) rotate(${sticker.rot})`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      {selected && (
+        <rect
+          x={-sticker.w / 2 - 3}
+          y={-sticker.h / 2 - 3}
+          width={sticker.w + 6}
+          height={sticker.h + 6}
+          fill="none"
+          stroke="#3b82f6"
+          strokeWidth={1.5}
+          strokeDasharray="4 3"
+          rx={3}
+          pointerEvents="none"
+        />
+      )}
       <rect
         x={-sticker.w / 2}
         y={-sticker.h / 2}

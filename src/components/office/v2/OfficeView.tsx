@@ -49,6 +49,7 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
   const [mode, setMode] = useState<OfficeMode>('select');
   const [activeSticker, setActiveSticker] = useState<string | null>(null);
   const [roomContext, setRoomContext] = useState<RoomContextTarget | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const handleModeReset = useCallback(() => {
     setMode('select');
@@ -64,10 +65,13 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
         e.preventDefault();
         if (e.shiftKey) redo(); else undo();
       }
+      if (e.key === 'Escape') {
+        if (selectedIds.size > 0) setSelectedIds(new Set());
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isActive, undo, redo]);
+  }, [isActive, undo, redo, selectedIds]);
 
   if (!ready || !layout) {
     return <div className="office-view office-view--loading">Loading…</div>;
@@ -113,6 +117,8 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
           onDeleteSticker={deleteSticker}
           onBeginDrag={beginDrag}
           onEndDrag={endDrag}
+          selectedIds={selectedIds}
+          onSelectedIds={setSelectedIds}
         />
 
         <OfficeToolbar
@@ -124,6 +130,7 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
           canRedo={canRedo}
           onUndo={undo}
           onRedo={redo}
+          selectionCount={selectedIds.size}
         />
       </div>
 

@@ -10,7 +10,6 @@ import { OfficeRoomCard } from './OfficeRoomCard';
 import { OfficePostIt } from './OfficePostIt';
 import { OfficeCustomGroup } from './OfficeCustomGroup';
 import { OfficeSticker } from './OfficeSticker';
-import { useOfficeDrag } from './useOfficeDrag';
 import { projectNameFromPath } from './officeLayout';
 import { GROUP_MIN_W, GROUP_MIN_H, POSTIT_DEFAULT_W, POSTIT_DEFAULT_H, POSTIT_COLORS, GROUP_DEFAULT_COLOR, STICKER_MIN_SIZE, CARD_DEFAULT_W, CARD_DEFAULT_H } from './officeConstants';
 import { getStickerDef } from './officeStickerCatalog';
@@ -30,6 +29,9 @@ interface Props {
   activeSticker: string | null;
   onModeReset: () => void;
   onPopulate: () => void;
+
+  selectedIds: Set<string>;
+  onSelectedIds: (next: Set<string>) => void;
 
   onRoomMoved: (projectPath: string, x: number, y: number) => void;
   onDuckClick: (agentId: string, e: React.MouseEvent) => void;
@@ -73,12 +75,24 @@ type GroupChild =
   | { kind: 'group'; id: string; startX: number; startY: number };
 
 type AnnotationInteraction =
-  | { kind: 'postit-move'; id: string; startX: number; startY: number; startPX: number; startPY: number }
+  | { kind: 'room-move'; projectPath: string; startX: number; startY: number; startPX: number; startPY: number; siblings: GroupChild[] }
+  | { kind: 'postit-move'; id: string; startX: number; startY: number; startPX: number; startPY: number; siblings: GroupChild[] }
   | { kind: 'group-move'; id: string; startX: number; startY: number; startPX: number; startPY: number; children: GroupChild[] }
   | { kind: 'group-resize'; id: string; corner: 'nw' | 'ne' | 'sw' | 'se'; startX: number; startY: number; startW: number; startH: number; startPX: number; startPY: number }
-  | { kind: 'sticker-move'; id: string; startX: number; startY: number; startPX: number; startPY: number }
+  | { kind: 'sticker-move'; id: string; startX: number; startY: number; startPX: number; startPY: number; siblings: GroupChild[] }
   | { kind: 'sticker-resize'; id: string; startW: number; startH: number; startPX: number; startPY: number }
   | { kind: 'sticker-rotate'; id: string; centerX: number; centerY: number; startRot: number; startAngle: number };
+
+type LassoState = {
+  startCanvasX: number;
+  startCanvasY: number;
+  currentCanvasX: number;
+  currentCanvasY: number;
+};
+
+export function selectionKey(kind: 'room' | 'postit' | 'sticker' | 'group', id: string): string {
+  return `${kind}:${id}`;
+}
 
 type GroupCreationState = {
   startCanvasX: number;
@@ -94,16 +108,12 @@ function OfficeCanvasImpl(props: Props) {
   const [panning, setPanning] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [groupCreation, setGroupCreation] = useState<GroupCreationState | null>(null);
+  const [lasso, setLasso] = useState<LassoState | null>(null);
 
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const annotRef = useRef<AnnotationInteraction | null>(null);
   const hasAutoFitRef = useRef(false);
-
-  const cardDrag = useOfficeDrag(viewport, {
-    onCardMove: (projectPath, x, y) => props.onRoomMoved(projectPath, x, y),
-    onCardDrop: (projectPath, x, y) => props.onRoomMoved(projectPath, x, y),
-  });
 
   const screenToCanvas = useCallback((clientX: number, clientY: number) => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -175,6 +185,12 @@ function OfficeCanvasImpl(props: Props) {
       e.preventDefault();
       return;
     }
+
+    if (mode === 'lasso') {
+      setLasso({ startCanvasX: pt.x, startCanvasY: pt.y, currentCanvasX: pt.x, currentCanvasY: pt.y });
+      e.preventDefault();
+      return;
+    }
   }, [spaceHeld, viewport.panX, viewport.panY, mode, activeSticker, screenToCanvas, props]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
@@ -193,24 +209,34 @@ function OfficeCanvasImpl(props: Props) {
       return;
     }
 
+    if (lasso) {
+      const pt = screenToCanvas(e.clientX, e.clientY);
+      setLasso({ ...lasso, currentCanvasX: pt.x, currentCanvasY: pt.y });
+      return;
+    }
+
     // Annotation interaction
     const a = annotRef.current;
     if (a) {
-      if (a.kind === 'postit-move' || a.kind === 'group-move' || a.kind === 'sticker-move') {
+      if (a.kind === 'room-move' || a.kind === 'postit-move' || a.kind === 'group-move' || a.kind === 'sticker-move') {
         const dx = (e.clientX - a.startPX) / viewport.zoom;
         const dy = (e.clientY - a.startPY) / viewport.zoom;
-        if (a.kind === 'postit-move') {
+        if (a.kind === 'room-move') {
+          props.onRoomMoved(a.projectPath, a.startX + dx, a.startY + dy);
+        } else if (a.kind === 'postit-move') {
           props.onUpdatePostIt(a.id, { x: a.startX + dx, y: a.startY + dy });
         } else if (a.kind === 'group-move') {
           props.onUpdateGroup(a.id, { x: a.startX + dx, y: a.startY + dy });
-          for (const c of a.children) {
-            if (c.kind === 'room') props.onRoomMoved(c.projectPath, c.startX + dx, c.startY + dy);
-            else if (c.kind === 'postit') props.onUpdatePostIt(c.id, { x: c.startX + dx, y: c.startY + dy });
-            else if (c.kind === 'sticker') props.onUpdateSticker(c.id, { x: c.startX + dx, y: c.startY + dy });
-            else if (c.kind === 'group') props.onUpdateGroup(c.id, { x: c.startX + dx, y: c.startY + dy });
-          }
         } else if (a.kind === 'sticker-move') {
           props.onUpdateSticker(a.id, { x: a.startX + dx, y: a.startY + dy });
+        }
+
+        const extras = a.kind === 'group-move' ? a.children : a.siblings;
+        for (const c of extras) {
+          if (c.kind === 'room') props.onRoomMoved(c.projectPath, c.startX + dx, c.startY + dy);
+          else if (c.kind === 'postit') props.onUpdatePostIt(c.id, { x: c.startX + dx, y: c.startY + dy });
+          else if (c.kind === 'sticker') props.onUpdateSticker(c.id, { x: c.startX + dx, y: c.startY + dy });
+          else if (c.kind === 'group') props.onUpdateGroup(c.id, { x: c.startX + dx, y: c.startY + dy });
         }
       } else if (a.kind === 'group-resize') {
         const dx = (e.clientX - a.startPX) / viewport.zoom;
@@ -238,10 +264,7 @@ function OfficeCanvasImpl(props: Props) {
       }
       return;
     }
-
-    // Fallback: card drag (existing behaviour)
-    cardDrag.onPointerMove(e);
-  }, [panning, groupCreation, screenToCanvas, viewport.zoom, cardDrag, props]);
+  }, [panning, groupCreation, screenToCanvas, viewport.zoom, props]);
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     if (panning) {
@@ -271,15 +294,75 @@ function OfficeCanvasImpl(props: Props) {
       return;
     }
 
+    if (lasso) {
+      const x0 = Math.min(lasso.startCanvasX, lasso.currentCanvasX);
+      const y0 = Math.min(lasso.startCanvasY, lasso.currentCanvasY);
+      const x1 = Math.max(lasso.startCanvasX, lasso.currentCanvasX);
+      const y1 = Math.max(lasso.startCanvasY, lasso.currentCanvasY);
+      const inside = (cx: number, cy: number) => cx >= x0 && cx <= x1 && cy >= y0 && cy <= y1;
+
+      const next = new Set<string>();
+      for (const r of layout.rooms) {
+        const rw = r.w ?? CARD_DEFAULT_W;
+        const rh = r.h ?? CARD_DEFAULT_H;
+        if (inside(r.x + rw / 2, r.y + rh / 2)) next.add(selectionKey('room', r.projectPath));
+      }
+      for (const p of layout.postIts) {
+        if (inside(p.x + p.w / 2, p.y + p.h / 2)) next.add(selectionKey('postit', p.id));
+      }
+      for (const s of layout.stickers) {
+        if (inside(s.x + s.w / 2, s.y + s.h / 2)) next.add(selectionKey('sticker', s.id));
+      }
+      for (const g of layout.customGroups) {
+        if (inside(g.x + g.w / 2, g.y + g.h / 2)) next.add(selectionKey('group', g.id));
+      }
+
+      props.onSelectedIds(next);
+      setLasso(null);
+      props.onModeReset();
+      return;
+    }
+
     if (annotRef.current) {
       annotRef.current = null;
       props.onEndDrag();
       return;
     }
+  }, [panning, groupCreation, props]);
 
-    cardDrag.onPointerUp(e);
-    props.onEndDrag();
-  }, [panning, groupCreation, cardDrag, props]);
+  const buildSiblings = useCallback((excludeKind: 'room' | 'postit' | 'sticker' | 'group', excludeId: string): GroupChild[] => {
+    const sel = props.selectedIds;
+    if (sel.size === 0) return [];
+    const excludeKey = selectionKey(excludeKind, excludeId);
+    if (!sel.has(excludeKey)) return [];
+
+    const out: GroupChild[] = [];
+    for (const r of layout.rooms) {
+      if (excludeKind === 'room' && r.projectPath === excludeId) continue;
+      if (sel.has(selectionKey('room', r.projectPath))) {
+        out.push({ kind: 'room', projectPath: r.projectPath, startX: r.x, startY: r.y });
+      }
+    }
+    for (const p of layout.postIts) {
+      if (excludeKind === 'postit' && p.id === excludeId) continue;
+      if (sel.has(selectionKey('postit', p.id))) {
+        out.push({ kind: 'postit', id: p.id, startX: p.x, startY: p.y });
+      }
+    }
+    for (const s of layout.stickers) {
+      if (excludeKind === 'sticker' && s.id === excludeId) continue;
+      if (sel.has(selectionKey('sticker', s.id))) {
+        out.push({ kind: 'sticker', id: s.id, startX: s.x, startY: s.y });
+      }
+    }
+    for (const g of layout.customGroups) {
+      if (excludeKind === 'group' && g.id === excludeId) continue;
+      if (sel.has(selectionKey('group', g.id))) {
+        out.push({ kind: 'group', id: g.id, startX: g.x, startY: g.y });
+      }
+    }
+    return out;
+  }, [props.selectedIds, layout.rooms, layout.postIts, layout.stickers, layout.customGroups]);
 
   const fitToContent = useCallback(() => {
     const el = containerRef.current;
@@ -373,9 +456,9 @@ function OfficeCanvasImpl(props: Props) {
     const p = layout.postIts.find(x => x.id === id);
     if (!p) return;
     props.onBeginDrag();
-    annotRef.current = { kind: 'postit-move', id, startX: p.x, startY: p.y, startPX: e.clientX, startPY: e.clientY };
+    annotRef.current = { kind: 'postit-move', id, startX: p.x, startY: p.y, startPX: e.clientX, startPY: e.clientY, siblings: buildSiblings('postit', id) };
     (e.target as Element).setPointerCapture?.(e.pointerId);
-  }, [layout.postIts, props]);
+  }, [layout.postIts, props, buildSiblings]);
 
   const startGroupDrag = useCallback((id: string, e: React.PointerEvent) => {
     const g = layout.customGroups.find(x => x.id === id);
@@ -409,10 +492,22 @@ function OfficeCanvasImpl(props: Props) {
       }
     }
 
+    // If the group itself is part of a multi-selection, add the sibling
+    // snapshots so all selected elements follow the drag together.
+    const siblings = buildSiblings('group', id);
+    for (const s of siblings) {
+      // avoid double-move: skip elements already captured as children
+      const already = children.some(c =>
+        (c.kind === 'room' && s.kind === 'room' && c.projectPath === s.projectPath) ||
+        (c.kind !== 'room' && s.kind === c.kind && 'id' in c && 'id' in s && c.id === s.id)
+      );
+      if (!already) children.push(s);
+    }
+
     props.onBeginDrag();
     annotRef.current = { kind: 'group-move', id, startX: g.x, startY: g.y, startPX: e.clientX, startPY: e.clientY, children };
     (e.target as Element).setPointerCapture?.(e.pointerId);
-  }, [layout.customGroups, layout.rooms, layout.postIts, layout.stickers, props]);
+  }, [layout.customGroups, layout.rooms, layout.postIts, layout.stickers, props, buildSiblings]);
 
   const startGroupResize = useCallback((id: string, corner: 'nw' | 'ne' | 'sw' | 'se', e: React.PointerEvent) => {
     const g = layout.customGroups.find(x => x.id === id);
@@ -430,9 +525,9 @@ function OfficeCanvasImpl(props: Props) {
     const s = layout.stickers.find(x => x.id === id);
     if (!s) return;
     props.onBeginDrag();
-    annotRef.current = { kind: 'sticker-move', id, startX: s.x, startY: s.y, startPX: e.clientX, startPY: e.clientY };
+    annotRef.current = { kind: 'sticker-move', id, startX: s.x, startY: s.y, startPX: e.clientX, startPY: e.clientY, siblings: buildSiblings('sticker', id) };
     (e.target as Element).setPointerCapture?.(e.pointerId);
-  }, [layout.stickers, props]);
+  }, [layout.stickers, props, buildSiblings]);
 
   const startStickerResize = useCallback((id: string, e: React.PointerEvent) => {
     const s = layout.stickers.find(x => x.id === id);
@@ -474,6 +569,7 @@ function OfficeCanvasImpl(props: Props) {
       ? 'grab'
       : mode === 'postit' ? 'cell'
       : mode === 'group' ? 'crosshair'
+      : mode === 'lasso' ? 'crosshair'
       : mode === 'sticker' ? 'copy'
       : 'default';
 
@@ -493,6 +589,7 @@ function OfficeCanvasImpl(props: Props) {
             <OfficeCustomGroup
               key={g.id}
               group={g}
+              selected={props.selectedIds.has(selectionKey('group', g.id))}
               onUpdate={(patch) => props.onUpdateGroup(g.id, patch)}
               onDelete={() => props.onDeleteGroup(g.id)}
               onDragStart={startGroupDrag}
@@ -503,6 +600,7 @@ function OfficeCanvasImpl(props: Props) {
             <OfficeSticker
               key={s.id}
               sticker={s}
+              selected={props.selectedIds.has(selectionKey('sticker', s.id))}
               onDragStart={startStickerDrag}
               onResizeStart={startStickerResize}
               onRotateStart={startStickerRotate}
@@ -519,6 +617,19 @@ function OfficeCanvasImpl(props: Props) {
               stroke={GROUP_DEFAULT_COLOR}
               strokeWidth={1.5}
               strokeDasharray="6 4"
+              pointerEvents="none"
+            />
+          )}
+          {lasso && (
+            <rect
+              x={Math.min(lasso.startCanvasX, lasso.currentCanvasX)}
+              y={Math.min(lasso.startCanvasY, lasso.currentCanvasY)}
+              width={Math.abs(lasso.currentCanvasX - lasso.startCanvasX)}
+              height={Math.abs(lasso.currentCanvasY - lasso.startCanvasY)}
+              fill="rgba(59, 130, 246, 0.1)"
+              stroke="#3b82f6"
+              strokeWidth={1.5}
+              strokeDasharray="4 3"
               pointerEvents="none"
             />
           )}
@@ -562,7 +673,20 @@ function OfficeCanvasImpl(props: Props) {
               counts={countsByProject.get(card.projectPath) ?? { busy: 0, idle: 0, dormant: 0 }}
               tags={layout.tags}
               dimmed={dimmed}
-              onDragStart={(projectPath, e) => { props.onBeginDrag(); cardDrag.startCardDrag(projectPath, card.x, card.y, e); }}
+              selected={props.selectedIds.has(selectionKey('room', card.projectPath))}
+              onDragStart={(projectPath, e) => {
+                props.onBeginDrag();
+                annotRef.current = {
+                  kind: 'room-move',
+                  projectPath,
+                  startX: card.x,
+                  startY: card.y,
+                  startPX: e.clientX,
+                  startPY: e.clientY,
+                  siblings: buildSiblings('room', projectPath),
+                };
+                (e.target as Element).setPointerCapture?.(e.pointerId);
+              }}
               onDoubleClick={props.onCardDoubleClick}
               onDuckClick={props.onDuckClick}
               onContextMenu={props.onRoomContextMenu}
@@ -573,6 +697,7 @@ function OfficeCanvasImpl(props: Props) {
           <OfficePostIt
             key={p.id}
             postIt={p}
+            selected={props.selectedIds.has(selectionKey('postit', p.id))}
             onUpdate={(patch) => props.onUpdatePostIt(p.id, patch)}
             onDelete={() => props.onDeletePostIt(p.id)}
             onDragStart={startPostItDrag}

@@ -3,13 +3,14 @@ import type { OfficeCustomGroup as GroupData } from './officeTypes';
 
 interface Props {
   group: GroupData;
+  selected?: boolean;
   onUpdate: (patch: Partial<Omit<GroupData, 'id'>>) => void;
   onDelete: () => void;
   onDragStart: (id: string, e: React.PointerEvent) => void;
   onResizeStart: (id: string, corner: 'nw' | 'ne' | 'sw' | 'se', e: React.PointerEvent) => void;
 }
 
-function OfficeCustomGroupImpl({ group, onUpdate, onDelete, onDragStart, onResizeStart }: Props) {
+function OfficeCustomGroupImpl({ group, selected, onUpdate, onDelete, onDragStart, onResizeStart }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(group.label);
   const inputRef = useRef<SVGForeignObjectElement>(null);
@@ -38,8 +39,8 @@ function OfficeCustomGroupImpl({ group, onUpdate, onDelete, onDragStart, onResiz
         width={group.w}
         height={group.h}
         fill={`${group.color}14`}
-        stroke={group.color}
-        strokeWidth={1.5}
+        stroke={selected ? '#3b82f6' : group.color}
+        strokeWidth={selected ? 2 : 1.5}
         strokeDasharray="6 4"
         rx={8}
         onPointerDown={(e) => { if (!editing) onDragStart(group.id, e); }}

@@ -4,12 +4,13 @@ import type { OfficePostIt as PostItData } from './officeTypes';
 
 interface Props {
   postIt: PostItData;
+  selected?: boolean;
   onUpdate: (patch: Partial<Omit<PostItData, 'id'>>) => void;
   onDelete: () => void;
   onDragStart: (id: string, e: React.PointerEvent) => void;
 }
 
-function OfficePostItImpl({ postIt, onUpdate, onDelete, onDragStart }: Props) {
+function OfficePostItImpl({ postIt, selected, onUpdate, onDelete, onDragStart }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(postIt.text);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -35,7 +36,7 @@ function OfficePostItImpl({ postIt, onUpdate, onDelete, onDragStart }: Props) {
 
   return (
     <div
-      className="office-postit"
+      className={`office-postit ${selected ? 'office-postit--selected' : ''}`}
       style={{
         width: postIt.w,
         height: postIt.h,

@@ -22,6 +22,7 @@ interface Props {
   counts: { busy: number; idle: number; dormant: number };
   tags: OfficeTag[];
   dimmed: boolean;
+  selected?: boolean;
   onDragStart?: (projectPath: string, e: React.PointerEvent) => void;
   onDoubleClick?: (projectPath: string) => void;
   onDuckClick?: (agentId: string, e: React.MouseEvent) => void;
@@ -31,7 +32,7 @@ interface Props {
 const MAX_VISIBLE = 5;
 
 function OfficeRoomCardImpl({
-  card, projectName, branch, ducks, doorPlateColor, busyRatio, counts, tags, dimmed,
+  card, projectName, branch, ducks, doorPlateColor, busyRatio, counts, tags, dimmed, selected,
   onDragStart, onDoubleClick, onDuckClick, onContextMenu,
 }: Props) {
   const w = card.w ?? CARD_DEFAULT_W;
@@ -42,7 +43,7 @@ function OfficeRoomCardImpl({
 
   return (
     <div
-      className={`office-room-card ${dimmed ? 'office-room-card--dimmed' : ''}`}
+      className={`office-room-card ${dimmed ? 'office-room-card--dimmed' : ''} ${selected ? 'office-room-card--selected' : ''}`}
       style={{
         width: w,
         height: h,
