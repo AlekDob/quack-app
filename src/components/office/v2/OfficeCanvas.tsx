@@ -25,10 +25,18 @@ interface Props {
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 2;
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
 function OfficeCanvasImpl(props: Props) {
   const { layout, terminals, ducksByProject, doorPlateColorByProject, busyRatioByProject, countsByProject } = props;
   const [viewport, setViewport] = useState<Viewport>({ zoom: 1, panX: 0, panY: 0 });
   const [panning, setPanning] = useState(false);
+  const [spaceHeld, setSpaceHeld] = useState(false);
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
 
   const drag = useOfficeDrag(viewport, layout.zones, {
@@ -46,11 +54,12 @@ function OfficeCanvasImpl(props: Props) {
   }, []);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
-    if (e.button === 1) {
+    if (e.button === 1 || (spaceHeld && e.button === 0)) {
+      e.preventDefault();
       setPanning(true);
       panStartRef.current = { x: e.clientX, y: e.clientY, panX: viewport.panX, panY: viewport.panY };
     }
-  }, [viewport.panX, viewport.panY]);
+  }, [viewport.panX, viewport.panY, spaceHeld]);
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (panning && panStartRef.current) {
@@ -85,6 +94,28 @@ function OfficeCanvasImpl(props: Props) {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      if (isEditableTarget(e.target)) return;
+      e.preventDefault();
+      setSpaceHeld(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      setSpaceHeld(false);
+    };
+    const blur = () => setSpaceHeld(false);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', blur);
+    };
+  }, []);
+
   const activeTagIds = layout.activeTagIds;
   const hoverZoneId = drag.drag?.kind === 'card' ? drag.drag.hoverZoneId : undefined;
 
@@ -105,7 +136,7 @@ function OfficeCanvasImpl(props: Props) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      style={{ cursor: panning ? 'grabbing' : 'default' }}
+      style={{ cursor: panning ? 'grabbing' : spaceHeld ? 'grab' : 'default' }}
     >
       <svg className="office-canvas__svg">
         <g transform={`translate(${viewport.panX}, ${viewport.panY}) scale(${viewport.zoom})`}>
