@@ -39,6 +39,7 @@ export default function SkillsPanel({
   const [searchQuery, setSearchQuery] = useState('');
   const [globalExpanded, setGlobalExpanded] = useState(true);
   const [projectExpanded, setProjectExpanded] = useState(true);
+  const [pluginExpanded, setPluginExpanded] = useState(true);
 
   // Filter skills based on search query
   const filteredSkills = skills.filter(skill =>
@@ -291,6 +292,74 @@ export default function SkillsPanel({
                         </div>
                       </div>
                     ))}
+                </div>
+                )}
+              </div>
+            )}
+
+            {/* Plugin Skills Section */}
+            {filteredSkills.filter((s) => s.scope === "plugin").length > 0 && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setPluginExpanded(!pluginExpanded)}
+                  className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium text-white/70 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                >
+                  <span className={`transition-transform ${pluginExpanded ? 'rotate-90' : ''}`}>▶</span>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10V7a3 3 0 10-6 0v3H5a1 1 0 00-1 1v8a2 2 0 002 2h12a2 2 0 002-2v-8a1 1 0 00-1-1h-3m-6 0h6" />
+                  </svg>
+                  <span>Plugin Skills</span>
+                  <span className="ml-auto text-xs text-white/40">{filteredSkills.filter((s) => s.scope === "plugin").length}</span>
+                </button>
+                {pluginExpanded && (
+                <div className="space-y-1">
+                  {filteredSkills
+                    .filter((s) => s.scope === "plugin")
+                    .map((skill) => {
+                      const suffix = skill.name.includes(":")
+                        ? skill.name.slice(skill.name.indexOf(":") + 1)
+                        : skill.name;
+                      return (
+                        <div
+                          key={skill.name}
+                          className="group flex items-start gap-3 p-3 rounded-lg hover:bg-white/5 transition-all duration-200 cursor-grab active:cursor-grabbing"
+                          onClick={() => onSelectSkill(skill)}
+                          draggable
+                          onDragStart={(e) => handleSkillDragStart(e, skill)}
+                        >
+                          <div className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--accent-color), var(--accent-gradient-end))' }}>
+                            <svg className="w-4 h-4" viewBox="0 0 20 20" style={{ color: 'white' }}>
+                              <path d="M10 2l2.4 4.8 5.3.8-3.8 3.7.9 5.2L10 14l-4.8 2.5.9-5.2-3.8-3.7 5.3-.8L10 2z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="text-sm font-medium text-white/90 truncate">
+                                {suffix.replace(/-/g, " ")}
+                              </div>
+                              {skill.plugin && (
+                                <span
+                                  className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-mono"
+                                  style={{
+                                    background: "rgba(var(--accent-rgb), 0.12)",
+                                    color: "var(--accent-color)",
+                                  }}
+                                >
+                                  {skill.plugin}
+                                </span>
+                              )}
+                            </div>
+                            {skill.description && (
+                              <div className="text-xs text-white/50 truncate">
+                                {skill.description}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
                 )}
               </div>
