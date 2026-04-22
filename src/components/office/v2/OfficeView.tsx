@@ -90,6 +90,7 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
           mode={mode}
           activeSticker={activeSticker}
           onModeReset={handleModeReset}
+          onPopulate={resetLayout}
           onRoomMoved={(projectPath, x, y) => setRoomPosition(projectPath, x, y)}
           onDuckClick={(agentId, e) => setActionMenu({ agentId, x: e.clientX, y: e.clientY })}
           onCardDoubleClick={() => {

@@ -29,6 +29,7 @@ interface Props {
   mode: OfficeMode;
   activeSticker: string | null;
   onModeReset: () => void;
+  onPopulate: () => void;
 
   onRoomMoved: (projectPath: string, x: number, y: number) => void;
   onDuckClick: (agentId: string, e: React.MouseEvent) => void;
@@ -427,13 +428,28 @@ function OfficeCanvasImpl(props: Props) {
         </g>
       </svg>
 
+      {layout.rooms.length === 0 && (
+        <div className="office-canvas__empty">
+          <div className="office-canvas__empty-title">No project rooms yet</div>
+          <div className="office-canvas__empty-hint">
+            {terminals.length > 0
+              ? `Found ${terminals.length} active agent${terminals.length === 1 ? '' : 's'}. Populate the office to create one card per project.`
+              : 'Create an agent first — then come back here.'}
+          </div>
+          {terminals.length > 0 && (
+            <button type="button" className="office-canvas__empty-btn" onClick={props.onPopulate}>
+              Populate office
+            </button>
+          )}
+        </div>
+      )}
+
       <div
         className="office-canvas__cards"
         style={{ transform: `translate(${viewport.panX}px, ${viewport.panY}px) scale(${viewport.zoom})`, transformOrigin: '0 0' }}
       >
         {layout.rooms.map(card => {
           const projectTerminals = terminalsByPath.get(card.projectPath) ?? [];
-          if (projectTerminals.length === 0) return null;
           const ducks = ducksByProject.get(card.projectPath) ?? [];
           const dimmed = activeTagIds.length > 0 && !card.tagIds.some(id => activeTagIds.includes(id));
           const branch = projectTerminals.find(t => t.branch)?.branch;

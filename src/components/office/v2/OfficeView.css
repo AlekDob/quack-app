@@ -321,6 +321,54 @@
   pointer-events: auto;
 }
 
+.office-canvas__empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 32px;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+  max-width: 360px;
+  z-index: 5;
+}
+
+.office-canvas__empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.office-canvas__empty-hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.5;
+}
+
+.office-canvas__empty-btn {
+  margin-top: 4px;
+  padding: 6px 14px;
+  border: 1px solid #ff6b35;
+  background: rgba(255, 107, 53, 0.15);
+  color: #ff6b35;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.office-canvas__empty-btn:hover {
+  background: rgba(255, 107, 53, 0.3);
+}
+
 /* Post-it */
 .office-postit {
   position: absolute;
