@@ -45,6 +45,9 @@ interface Props {
   onAddSticker: (s: StickerData) => void;
   onUpdateSticker: (id: string, patch: Partial<Omit<StickerData, 'id'>>) => void;
   onDeleteSticker: (id: string) => void;
+
+  onBeginDrag: () => void;
+  onEndDrag: () => void;
 }
 
 const MIN_ZOOM = 0.3;
@@ -251,10 +254,12 @@ function OfficeCanvasImpl(props: Props) {
 
     if (annotRef.current) {
       annotRef.current = null;
+      props.onEndDrag();
       return;
     }
 
     cardDrag.onPointerUp(e);
+    props.onEndDrag();
   }, [panning, groupCreation, cardDrag, props]);
 
   useEffect(() => {
@@ -298,42 +303,47 @@ function OfficeCanvasImpl(props: Props) {
   const startPostItDrag = useCallback((id: string, e: React.PointerEvent) => {
     const p = layout.postIts.find(x => x.id === id);
     if (!p) return;
+    props.onBeginDrag();
     annotRef.current = { kind: 'postit-move', id, startX: p.x, startY: p.y, startPX: e.clientX, startPY: e.clientY };
     (e.target as Element).setPointerCapture?.(e.pointerId);
-  }, [layout.postIts]);
+  }, [layout.postIts, props]);
 
   const startGroupDrag = useCallback((id: string, e: React.PointerEvent) => {
     const g = layout.customGroups.find(x => x.id === id);
     if (!g) return;
+    props.onBeginDrag();
     annotRef.current = { kind: 'group-move', id, startX: g.x, startY: g.y, startPX: e.clientX, startPY: e.clientY };
     (e.target as Element).setPointerCapture?.(e.pointerId);
-  }, [layout.customGroups]);
+  }, [layout.customGroups, props]);
 
   const startGroupResize = useCallback((id: string, corner: 'nw' | 'ne' | 'sw' | 'se', e: React.PointerEvent) => {
     const g = layout.customGroups.find(x => x.id === id);
     if (!g) return;
+    props.onBeginDrag();
     annotRef.current = {
       kind: 'group-resize', id, corner,
       startX: g.x, startY: g.y, startW: g.w, startH: g.h,
       startPX: e.clientX, startPY: e.clientY,
     };
     (e.target as Element).setPointerCapture?.(e.pointerId);
-  }, [layout.customGroups]);
+  }, [layout.customGroups, props]);
 
   const startStickerDrag = useCallback((id: string, e: React.PointerEvent) => {
     const s = layout.stickers.find(x => x.id === id);
     if (!s) return;
+    props.onBeginDrag();
     annotRef.current = { kind: 'sticker-move', id, startX: s.x, startY: s.y, startPX: e.clientX, startPY: e.clientY };
     (e.target as Element).setPointerCapture?.(e.pointerId);
-  }, [layout.stickers]);
+  }, [layout.stickers, props]);
 
   const startStickerResize = useCallback((id: string, e: React.PointerEvent) => {
     const s = layout.stickers.find(x => x.id === id);
     if (!s) return;
+    props.onBeginDrag();
     annotRef.current = { kind: 'sticker-resize', id, startW: s.w, startH: s.h, startPX: e.clientX, startPY: e.clientY };
     (e.target as Element).setPointerCapture?.(e.pointerId);
     e.stopPropagation();
-  }, [layout.stickers]);
+  }, [layout.stickers, props]);
 
   const startStickerRotate = useCallback((id: string, e: React.PointerEvent) => {
     const s = layout.stickers.find(x => x.id === id);
@@ -342,10 +352,11 @@ function OfficeCanvasImpl(props: Props) {
     const centerY = s.y + s.h / 2;
     const pt = screenToCanvas(e.clientX, e.clientY);
     const startAngle = Math.atan2(pt.y - centerY, pt.x - centerX);
+    props.onBeginDrag();
     annotRef.current = { kind: 'sticker-rotate', id, centerX, centerY, startRot: s.rot, startAngle };
     (e.target as Element).setPointerCapture?.(e.pointerId);
     e.stopPropagation();
-  }, [layout.stickers, screenToCanvas]);
+  }, [layout.stickers, screenToCanvas, props]);
 
   const activeTagIds = layout.activeTagIds;
 
@@ -438,7 +449,7 @@ function OfficeCanvasImpl(props: Props) {
               counts={countsByProject.get(card.projectPath) ?? { busy: 0, idle: 0, dormant: 0 }}
               tags={layout.tags}
               dimmed={dimmed}
-              onDragStart={(projectPath, e) => cardDrag.startCardDrag(projectPath, card.x, card.y, e)}
+              onDragStart={(projectPath, e) => { props.onBeginDrag(); cardDrag.startCardDrag(projectPath, card.x, card.y, e); }}
               onDoubleClick={props.onCardDoubleClick}
               onDuckClick={props.onDuckClick}
             />

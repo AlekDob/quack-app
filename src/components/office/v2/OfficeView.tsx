@@ -1,4 +1,4 @@
-import { memo, useMemo, useState, useCallback } from 'react';
+import { memo, useMemo, useState, useCallback, useEffect } from 'react';
 import { useOfficeLayout } from './useOfficeLayout';
 import { buildViewModels } from './officeViewModels';
 import { OfficeCanvas } from './OfficeCanvas';
@@ -28,6 +28,8 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
     addPostIt, updatePostIt, deletePostIt,
     addCustomGroup, updateCustomGroup, deleteCustomGroup,
     addSticker, updateSticker, deleteSticker,
+    beginDrag, endDrag,
+    undo, redo, canUndo, canRedo,
   } = useOfficeLayout(terminals);
 
   const sessions = useSessionStore(s => s.sessions);
@@ -49,6 +51,20 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
     setMode('select');
     setActiveSticker(null);
   }, []);
+
+  useEffect(() => {
+    if (!isActive) return;
+    const handler = (e: KeyboardEvent) => {
+      const t = e.target;
+      if (t instanceof HTMLElement && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo(); else undo();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isActive, undo, redo]);
 
   if (!ready || !layout) {
     return <div className="office-view office-view--loading">Loading…</div>;
@@ -88,6 +104,8 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
           onAddSticker={addSticker}
           onUpdateSticker={updateSticker}
           onDeleteSticker={deleteSticker}
+          onBeginDrag={beginDrag}
+          onEndDrag={endDrag}
         />
 
         <OfficeToolbar
@@ -95,10 +113,10 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
           onModeChange={setMode}
           activeSticker={activeSticker}
           onStickerChange={setActiveSticker}
-          canUndo={false}
-          canRedo={false}
-          onUndo={() => { /* wired in next commit */ }}
-          onRedo={() => { /* wired in next commit */ }}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={undo}
+          onRedo={redo}
         />
       </div>
 
