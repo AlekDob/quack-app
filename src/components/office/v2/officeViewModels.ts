@@ -1,4 +1,5 @@
 import { sessionDotColor } from './officeLayout';
+import { getAvatarUrl } from '../../../utils/agentAvatars';
 import type { TerminalInfo, AgentSession, ChatMessage } from '../../../types';
 import type { DuckViewModel } from './OfficeRoomCard';
 
@@ -74,7 +75,7 @@ export function buildViewModels(inputs: Inputs) {
       ducks.push({
         agentId: agent.id,
         color: agent.color,
-        avatarUrl: agent.avatar,
+        avatarUrl: agent.avatar ? getAvatarUrl(agent.avatar) : undefined,
         initial: (agent.label?.[0] ?? '?').toUpperCase(),
         status,
         sessionDots,
