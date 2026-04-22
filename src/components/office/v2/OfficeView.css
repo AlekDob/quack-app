@@ -314,3 +314,239 @@
 .office-canvas__cards > * {
   pointer-events: auto;
 }
+
+/* Post-it */
+.office-postit {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 2px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  color: #1a1a2e;
+  display: flex;
+  flex-direction: column;
+  font-family: 'Inter', -apple-system, sans-serif;
+  will-change: transform;
+}
+
+.office-postit__drag {
+  height: 14px;
+  cursor: grab;
+  user-select: none;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.office-postit__drag:active { cursor: grabbing; }
+
+.office-postit__text,
+.office-postit__textarea {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  background: transparent;
+  border: 0;
+  outline: none;
+  resize: none;
+  color: inherit;
+  font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-y: auto;
+}
+
+.office-postit__placeholder {
+  color: rgba(26, 26, 46, 0.45);
+  font-style: italic;
+}
+
+.office-postit__actions {
+  position: absolute;
+  top: -10px;
+  right: 4px;
+  display: none;
+  gap: 4px;
+}
+
+.office-postit:hover .office-postit__actions { display: flex; }
+
+.office-postit__color,
+.office-postit__delete {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.office-postit__color {
+  background: linear-gradient(45deg, #fde68a 25%, #fca5a5 25% 50%, #a7f3d0 50% 75%, #bfdbfe 75%);
+}
+
+.office-postit__delete {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+/* Custom group */
+.office-cgroup__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: text;
+  user-select: none;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.office-cgroup__input {
+  width: 100%;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 3px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 6px;
+  outline: none;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.office-cgroup__handle {
+  fill: rgba(255, 255, 255, 0.2);
+  stroke: rgba(255, 255, 255, 0.4);
+  stroke-width: 1;
+}
+.office-cgroup__handle:hover { fill: rgba(255, 255, 255, 0.5); }
+.office-cgroup__handle--nw, .office-cgroup__handle--se { cursor: nwse-resize; }
+.office-cgroup__handle--ne, .office-cgroup__handle--sw { cursor: nesw-resize; }
+
+.office-cgroup__delete { cursor: pointer; }
+
+/* Sticker */
+.office-sticker__delete { cursor: pointer; }
+.office-sticker__resize {
+  fill: rgba(255, 255, 255, 0.3);
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 1;
+  cursor: nwse-resize;
+}
+.office-sticker__rotate {
+  fill: rgba(34, 197, 94, 0.4);
+  stroke: rgba(34, 197, 94, 0.8);
+  stroke-width: 1;
+  cursor: grab;
+}
+
+/* Toolbar */
+.office-toolbar {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(10, 10, 24, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+}
+
+.office-toolbar__btn {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.office-toolbar__btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.office-toolbar__btn.active {
+  background: rgba(255, 107, 53, 0.2);
+  color: #ff6b35;
+}
+
+.office-toolbar__divider {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 2px 4px;
+}
+
+.office-toolbar__undo {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Sticker picker */
+.office-sticker-picker {
+  position: absolute;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 10, 24, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  z-index: 11;
+}
+
+.office-sticker-picker__item {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 9px;
+  padding: 4px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.office-sticker-picker__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.office-sticker-picker__item.active {
+  border-color: #ff6b35;
+  background: rgba(255, 107, 53, 0.1);
+}
+
+.office-sticker-picker__preview {
+  width: 36px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
