@@ -42,3 +42,4 @@ src-tauri/binaries/
 /CLAUDE.md
 dist-linux
 .worktrees/
+.superpowers/
