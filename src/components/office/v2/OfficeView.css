@@ -290,6 +290,12 @@
   font-size: 13px;
 }
 
+.office-view__canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
 .office-canvas {
   position: relative;
   flex: 1;

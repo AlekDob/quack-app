@@ -1,8 +1,9 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useMemo, useState, useCallback } from 'react';
 import { useOfficeLayout } from './useOfficeLayout';
 import { buildViewModels } from './officeViewModels';
 import { OfficeCanvas } from './OfficeCanvas';
 import { OfficeTagFilter } from './OfficeTagFilter';
+import { OfficeToolbar, type OfficeMode } from './OfficeToolbar';
 import OfficeActionMenu from './OfficeActionMenu';
 import { ConfirmModal } from '../../ConfirmModal';
 import { useSessionStore } from '../../../stores/sessionStore';
@@ -18,7 +19,17 @@ interface Props {
 }
 
 function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Props) {
-  const { layout, setRoomPosition, toggleTag, resetLayout, ready } = useOfficeLayout(terminals);
+  const {
+    layout,
+    setRoomPosition,
+    toggleTag,
+    resetLayout,
+    ready,
+    addPostIt, updatePostIt, deletePostIt,
+    addCustomGroup, updateCustomGroup, deleteCustomGroup,
+    addSticker, updateSticker, deleteSticker,
+  } = useOfficeLayout(terminals);
+
   const sessions = useSessionStore(s => s.sessions);
   const chatLoadingMap = useChatStore(s => s.chatLoadingMap);
   const pendingQuestionsMap = useChatStore(s => s.pendingQuestionsMap);
@@ -31,6 +42,13 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
 
   const [actionMenu, setActionMenu] = useState<{ agentId: string; x: number; y: number } | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+  const [mode, setMode] = useState<OfficeMode>('select');
+  const [activeSticker, setActiveSticker] = useState<string | null>(null);
+
+  const handleModeReset = useCallback(() => {
+    setMode('select');
+    setActiveSticker(null);
+  }, []);
 
   if (!ready || !layout) {
     return <div className="office-view office-view--loading">Loading…</div>;
@@ -45,19 +63,44 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
         onReset={() => setConfirmReset(true)}
       />
 
-      <OfficeCanvas
-        layout={layout}
-        terminals={terminals}
-        ducksByProject={viewModels.ducksByProject}
-        doorPlateColorByProject={viewModels.doorPlateByProject}
-        busyRatioByProject={viewModels.busyRatioByProject}
-        countsByProject={viewModels.countsByProject}
-        onRoomMoved={(projectPath, x, y) => setRoomPosition(projectPath, x, y)}
-        onDuckClick={(agentId, e) => setActionMenu({ agentId, x: e.clientX, y: e.clientY })}
-        onCardDoubleClick={() => {
-          console.info('[office-v2] Floor plan overlay coming in v0.9.5');
-        }}
-      />
+      <div className="office-view__canvas-wrap">
+        <OfficeCanvas
+          layout={layout}
+          terminals={terminals}
+          ducksByProject={viewModels.ducksByProject}
+          doorPlateColorByProject={viewModels.doorPlateByProject}
+          busyRatioByProject={viewModels.busyRatioByProject}
+          countsByProject={viewModels.countsByProject}
+          mode={mode}
+          activeSticker={activeSticker}
+          onModeReset={handleModeReset}
+          onRoomMoved={(projectPath, x, y) => setRoomPosition(projectPath, x, y)}
+          onDuckClick={(agentId, e) => setActionMenu({ agentId, x: e.clientX, y: e.clientY })}
+          onCardDoubleClick={() => {
+            console.info('[office-v2] Floor plan overlay coming later');
+          }}
+          onAddPostIt={addPostIt}
+          onUpdatePostIt={updatePostIt}
+          onDeletePostIt={deletePostIt}
+          onAddGroup={addCustomGroup}
+          onUpdateGroup={updateCustomGroup}
+          onDeleteGroup={deleteCustomGroup}
+          onAddSticker={addSticker}
+          onUpdateSticker={updateSticker}
+          onDeleteSticker={deleteSticker}
+        />
+
+        <OfficeToolbar
+          mode={mode}
+          onModeChange={setMode}
+          activeSticker={activeSticker}
+          onStickerChange={setActiveSticker}
+          canUndo={false}
+          canRedo={false}
+          onUndo={() => { /* wired in next commit */ }}
+          onRedo={() => { /* wired in next commit */ }}
+        />
+      </div>
 
       {actionMenu && (
         <OfficeActionMenu
@@ -78,7 +121,7 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
       <ConfirmModal
         isOpen={confirmReset}
         title="Reset office layout?"
-        message="All custom card/zone positions will be lost and projects will be re-packed into their matching zones."
+        message="All cards return to the default grid and all post-its, groups and stickers are cleared."
         confirmLabel="Reset"
         onConfirm={() => {
           resetLayout();
