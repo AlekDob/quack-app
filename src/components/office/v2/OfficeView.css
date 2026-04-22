@@ -796,15 +796,20 @@
   color: #ff6b35;
 }
 
+.office-toolbar__btn:disabled {
+  color: rgba(255, 255, 255, 0.2);
+  cursor: not-allowed;
+}
+
+.office-toolbar__btn:disabled:hover {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.2);
+}
+
 .office-toolbar__divider {
   width: 1px;
   background: rgba(255, 255, 255, 0.1);
   margin: 2px 4px;
-}
-
-.office-toolbar__undo {
-  font-size: 12px;
-  font-weight: 600;
 }
 
 /* Sticker picker */
