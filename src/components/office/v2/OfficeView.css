@@ -251,3 +251,27 @@
   background: var(--tag-color);
   color: #0a0a18;
 }
+
+.office-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #0f0f1a;
+}
+
+.office-canvas__svg,
+.office-canvas__cards {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.office-canvas__cards {
+  pointer-events: none;
+}
+
+.office-canvas__cards > * {
+  pointer-events: auto;
+}
