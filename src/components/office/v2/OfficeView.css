@@ -198,3 +198,23 @@
 }
 .office-room-card__wall--bl { left: 3px; border-left: 2px solid #2a2a4a; border-bottom: 2px solid #2a2a4a; }
 .office-room-card__wall--br { right: 3px; border-right: 2px solid #2a2a4a; border-bottom: 2px solid #2a2a4a; }
+
+.office-zone__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: grab;
+  user-select: none;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.office-zone--dragging .office-zone__label { cursor: grabbing; }
+
+.office-zone__handle {
+  fill: rgba(255, 255, 255, 0.2);
+  stroke: rgba(255, 255, 255, 0.4);
+  stroke-width: 1;
+}
+.office-zone__handle:hover { fill: rgba(255, 255, 255, 0.5); }
+.office-zone__handle--nw, .office-zone__handle--se { cursor: nwse-resize; }
+.office-zone__handle--ne, .office-zone__handle--sw { cursor: nesw-resize; }
