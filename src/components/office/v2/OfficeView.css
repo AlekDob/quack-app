@@ -252,10 +252,25 @@
   color: #0a0a18;
 }
 
+.office-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.office-view--loading {
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+}
+
 .office-canvas {
   position: relative;
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  height: 100%;
   overflow: hidden;
   background: #0f0f1a;
 }
