@@ -339,11 +339,14 @@ export interface SavedAgent {
 }
 
 // Skills types (similar to Agents)
+export type SkillScope = "global" | "project" | "plugin";
+
 export interface SkillInfo {
   name: string;
   description: string;
   file_path: string;
-  scope: string; // "global" or "project"
+  scope: SkillScope;
+  plugin?: string; // set when scope === "plugin"
 }
 
 export interface SkillDetails extends SkillInfo {
