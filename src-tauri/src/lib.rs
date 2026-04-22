@@ -1088,6 +1088,7 @@ pub fn run() {
             fs::read_binary_file,
             fs::create_directory,
             fs::remove_file,
+            fs::rename_file,
             fs::remove_directory,
             fs::path_exists,
             fs::stat_file,
