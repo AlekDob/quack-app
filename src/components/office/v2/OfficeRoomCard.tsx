@@ -25,13 +25,14 @@ interface Props {
   onDragStart?: (projectPath: string, e: React.PointerEvent) => void;
   onDoubleClick?: (projectPath: string) => void;
   onDuckClick?: (agentId: string, e: React.MouseEvent) => void;
+  onContextMenu?: (projectPath: string, e: React.MouseEvent) => void;
 }
 
 const MAX_VISIBLE = 5;
 
 function OfficeRoomCardImpl({
   card, projectName, branch, ducks, doorPlateColor, busyRatio, counts, tags, dimmed,
-  onDragStart, onDoubleClick, onDuckClick,
+  onDragStart, onDoubleClick, onDuckClick, onContextMenu,
 }: Props) {
   const w = card.w ?? CARD_DEFAULT_W;
   const h = card.h ?? CARD_DEFAULT_H;
@@ -48,6 +49,12 @@ function OfficeRoomCardImpl({
         transform: `translate(${card.x}px, ${card.y}px)`,
       }}
       onDoubleClick={() => onDoubleClick?.(card.projectPath)}
+      onContextMenu={(e) => {
+        if (!onContextMenu) return;
+        e.preventDefault();
+        e.stopPropagation();
+        onContextMenu(card.projectPath, e);
+      }}
     >
       <div
         className="office-room-card__plate"

@@ -29,6 +29,19 @@ export const STICKER_MIN_SIZE = 32;
 
 export const UNDO_STACK_MAX = 50;
 
+export const TAG_PALETTE = [
+  '#c084fc', // purple
+  '#00D9FF', // cyan
+  '#F7931E', // orange
+  '#22c55e', // green
+  '#f59e0b', // amber
+  '#ef4444', // red
+  '#ec4899', // pink
+  '#3b82f6', // blue
+  '#14b8a6', // teal
+  '#94a3b8', // slate
+];
+
 export const DEFAULT_TAGS: Array<{ id: string; label: string; color: string }> = [
   { id: 'personal', label: 'Personal', color: '#c084fc' },
   { id: 'cc', label: 'C&C', color: '#00D9FF' },

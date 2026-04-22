@@ -5,6 +5,7 @@ import { OfficeCanvas } from './OfficeCanvas';
 import { OfficeTagFilter } from './OfficeTagFilter';
 import { OfficeToolbar, type OfficeMode } from './OfficeToolbar';
 import OfficeActionMenu from './OfficeActionMenu';
+import { OfficeRoomContextMenu, type RoomContextTarget } from './OfficeRoomContextMenu';
 import { ConfirmModal } from '../../ConfirmModal';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { useChatStore } from '../../../stores/chatStore';
@@ -28,6 +29,7 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
     addPostIt, updatePostIt, deletePostIt,
     addCustomGroup, updateCustomGroup, deleteCustomGroup,
     addSticker, updateSticker, deleteSticker,
+    addTag, deleteTag, toggleRoomTag,
     beginDrag, endDrag,
     undo, redo, canUndo, canRedo,
   } = useOfficeLayout(terminals);
@@ -46,6 +48,7 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
   const [confirmReset, setConfirmReset] = useState(false);
   const [mode, setMode] = useState<OfficeMode>('select');
   const [activeSticker, setActiveSticker] = useState<string | null>(null);
+  const [roomContext, setRoomContext] = useState<RoomContextTarget | null>(null);
 
   const handleModeReset = useCallback(() => {
     setMode('select');
@@ -77,6 +80,8 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
         activeTagIds={layout.activeTagIds}
         onToggle={toggleTag}
         onReset={() => setConfirmReset(true)}
+        onAddTag={addTag}
+        onDeleteTag={deleteTag}
       />
 
       <div className="office-view__canvas-wrap">
@@ -96,6 +101,7 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
           onCardDoubleClick={() => {
             console.info('[office-v2] Floor plan overlay coming later');
           }}
+          onRoomContextMenu={(projectPath, e) => setRoomContext({ projectPath, screenX: e.clientX, screenY: e.clientY })}
           onAddPostIt={addPostIt}
           onUpdatePostIt={updatePostIt}
           onDeletePostIt={deletePostIt}
@@ -136,6 +142,20 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
           onClose={() => setActionMenu(null)}
         />
       )}
+
+      {roomContext && (() => {
+        const room = layout.rooms.find(r => r.projectPath === roomContext.projectPath);
+        return (
+          <OfficeRoomContextMenu
+            target={roomContext}
+            tags={layout.tags}
+            assignedTagIds={room?.tagIds ?? []}
+            onToggleTag={(tagId) => toggleRoomTag(roomContext.projectPath, tagId)}
+            onCreateTag={addTag}
+            onClose={() => setRoomContext(null)}
+          />
+        );
+      })()}
 
       <ConfirmModal
         isOpen={confirmReset}

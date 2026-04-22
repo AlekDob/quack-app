@@ -34,6 +34,7 @@ interface Props {
   onRoomMoved: (projectPath: string, x: number, y: number) => void;
   onDuckClick: (agentId: string, e: React.MouseEvent) => void;
   onCardDoubleClick: (projectPath: string) => void;
+  onRoomContextMenu: (projectPath: string, e: React.MouseEvent) => void;
 
   onAddPostIt: (p: PostItData) => void;
   onUpdatePostIt: (id: string, patch: Partial<Omit<PostItData, 'id'>>) => void;
@@ -564,6 +565,7 @@ function OfficeCanvasImpl(props: Props) {
               onDragStart={(projectPath, e) => { props.onBeginDrag(); cardDrag.startCardDrag(projectPath, card.x, card.y, e); }}
               onDoubleClick={props.onCardDoubleClick}
               onDuckClick={props.onDuckClick}
+              onContextMenu={props.onRoomContextMenu}
             />
           );
         })}

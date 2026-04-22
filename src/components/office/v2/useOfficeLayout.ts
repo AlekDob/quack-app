@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { readOfficeLayout, writeOfficeLayout } from './officeStorage';
 import { bootstrapLayoutFromTerminals, reconcileLayoutWithTerminals } from './officeMigration';
 import { WRITE_DEBOUNCE_MS, UNDO_STACK_MAX } from './officeConstants';
-import type { OfficeLayout, OfficeCustomGroup, OfficePostIt, OfficeSticker } from './officeTypes';
+import type { OfficeLayout, OfficeCustomGroup, OfficePostIt, OfficeSticker, OfficeTag } from './officeTypes';
 import type { TerminalInfo } from '../../../types';
 
 interface UseOfficeLayoutResult {
@@ -22,6 +22,10 @@ interface UseOfficeLayoutResult {
   addSticker: (sticker: OfficeSticker) => void;
   updateSticker: (id: string, patch: Partial<Omit<OfficeSticker, 'id'>>) => void;
   deleteSticker: (id: string) => void;
+
+  addTag: (tag: OfficeTag) => void;
+  deleteTag: (tagId: string) => void;
+  toggleRoomTag: (projectPath: string, tagId: string) => void;
 
   beginDrag: () => void;
   endDrag: () => void;
@@ -196,6 +200,36 @@ export function useOfficeLayout(terminals: TerminalInfo[]): UseOfficeLayoutResul
     setWithHistory(prev => ({ ...prev, stickers: prev.stickers.filter(s => s.id !== id) }));
   }, [setWithHistory]);
 
+  const addTag = useCallback((tag: OfficeTag) => {
+    setWithHistory(prev => {
+      if (prev.tags.some(t => t.id === tag.id)) return prev;
+      return { ...prev, tags: [...prev.tags, tag] };
+    });
+  }, [setWithHistory]);
+
+  const deleteTag = useCallback((tagId: string) => {
+    setWithHistory(prev => ({
+      ...prev,
+      tags: prev.tags.filter(t => t.id !== tagId),
+      activeTagIds: prev.activeTagIds.filter(id => id !== tagId),
+      rooms: prev.rooms.map(r => ({ ...r, tagIds: r.tagIds.filter(id => id !== tagId) })),
+    }));
+  }, [setWithHistory]);
+
+  const toggleRoomTag = useCallback((projectPath: string, tagId: string) => {
+    setWithHistory(prev => ({
+      ...prev,
+      rooms: prev.rooms.map(r => {
+        if (r.projectPath !== projectPath) return r;
+        const has = r.tagIds.includes(tagId);
+        return {
+          ...r,
+          tagIds: has ? r.tagIds.filter(id => id !== tagId) : [...r.tagIds, tagId],
+        };
+      }),
+    }));
+  }, [setWithHistory]);
+
   // Reference historyVersion so useCallback consumers re-render on stack change
   void historyVersion;
 
@@ -207,6 +241,7 @@ export function useOfficeLayout(terminals: TerminalInfo[]): UseOfficeLayoutResul
     addPostIt, updatePostIt, deletePostIt,
     addCustomGroup, updateCustomGroup, deleteCustomGroup,
     addSticker, updateSticker, deleteSticker,
+    addTag, deleteTag, toggleRoomTag,
     beginDrag, endDrag,
     undo, redo,
     canUndo: pastRef.current.length > 0,

@@ -276,6 +276,260 @@
   color: #0a0a18;
 }
 
+.office-tag-filter__pill-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.office-tag-filter__remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.8);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 10px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.office-tag-filter__pill-wrap:hover .office-tag-filter__remove { display: flex; }
+
+.office-tag-filter__add {
+  width: 24px;
+  height: 20px;
+  border: 1px dashed rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  border-radius: 12px;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.office-tag-filter__add:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.office-tag-filter__create {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+}
+
+.office-tag-filter__input {
+  width: 110px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  padding: 2px 6px;
+  outline: none;
+}
+
+.office-tag-filter__palette {
+  display: flex;
+  gap: 3px;
+}
+
+.office-tag-filter__swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.office-tag-filter__swatch--active {
+  border-color: rgba(255, 255, 255, 0.85);
+}
+
+.office-tag-filter__confirm,
+.office-tag-filter__cancel {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 10px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.office-tag-filter__confirm:hover { border-color: #ff6b35; color: #ff6b35; }
+.office-tag-filter__cancel:hover { color: rgba(255, 255, 255, 0.95); }
+
+/* Room context menu */
+.office-room-context-menu {
+  position: fixed;
+  min-width: 220px;
+  max-width: 280px;
+  background: rgba(10, 10, 24, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px 0;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  z-index: 100;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+}
+
+.office-room-context-menu__header {
+  padding: 4px 12px 8px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.office-room-context-menu__empty {
+  padding: 6px 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+  font-size: 11px;
+}
+
+.office-room-context-menu__list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.office-room-context-menu__item {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: inherit;
+  font-size: 12px;
+  text-align: left;
+}
+
+.office-room-context-menu__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.office-room-context-menu__checkbox {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #22c55e;
+}
+
+.office-room-context-menu__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.office-room-context-menu__label {
+  flex: 1;
+}
+
+.office-room-context-menu__divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 6px 0;
+}
+
+.office-room-context-menu__create-btn {
+  width: calc(100% - 16px);
+  margin: 0 8px;
+  padding: 6px 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.office-room-context-menu__create-btn:hover {
+  border-color: #ff6b35;
+  color: #ff6b35;
+}
+
+.office-room-context-menu__create {
+  padding: 4px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.office-room-context-menu__input {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 11px;
+  padding: 4px 8px;
+  outline: none;
+}
+
+.office-room-context-menu__palette {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.office-room-context-menu__swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.office-room-context-menu__swatch--active {
+  border-color: rgba(255, 255, 255, 0.9);
+}
+
+.office-room-context-menu__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.office-room-context-menu__confirm,
+.office-room-context-menu__cancel {
+  flex: 1;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.office-room-context-menu__confirm:hover {
+  border-color: #ff6b35;
+  color: #ff6b35;
+}
+
 .office-view {
   height: 100%;
   display: flex;
