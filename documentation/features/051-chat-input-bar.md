@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React)
 created: 2026-04-07
-last_verified: 2026-04-09
+last_verified: 2026-04-22
 tags: [chat-input-bar, chat, ui, compose, session, popover, drag-drop, file-mention, mention-autocomplete, icons]
 ---
 
@@ -80,6 +80,19 @@ When a skill is dragged from the sidebar, the `SplitDropZone` overlay intercepts
 - `.uab-popover-badge` -- "ON" badge for toggleable items
 - `.uab-popover-shortcut` -- keyboard shortcut hint (right-aligned)
 - Responsive: buttons shrink to 26px below 768px
+
+### Keyboard Shortcuts (textarea)
+| Key | Context | Action |
+|-----|---------|--------|
+| Enter / Tab | Slash `/` autocomplete open | Select highlighted command |
+| Enter / Tab | `@` mention autocomplete open | Select highlighted team/skill/droid/feature/file |
+| Tab | Cursor after a snippet tag with matching snippet | Expand snippet |
+| Tab | No autocomplete, no snippet match | **Cycle effort forward** (low → medium → high → xhigh → max → low) |
+| Shift+Tab | No autocomplete, no snippet match | Cycle effort backward |
+| Cmd/Ctrl+Enter | Always | Send message |
+| Escape | Autocomplete open | Close autocomplete |
+
+Implemented in `ChatInput.tsx::handleKeyDown`. Effort cycle uses `unifiedBarProps.settingsProps.effort` + `onEffortChange`. Earlier handlers (autocomplete, snippet) `return` first, so Tab only changes effort when no other action is pending.
 
 ### @ Mention Autocomplete Icons
 

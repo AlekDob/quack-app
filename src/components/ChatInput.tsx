@@ -13,7 +13,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { parseAgentMentions, matchMentionsToAgents } from '../utils/agentMentions';
 import { AgentMentionChip } from './AgentMentionChip';
 import { AgentAvatar } from './AgentAvatar';
-import type { ChatAttachment, AgentInfo, SearchResult, TerminalInfo } from '../types';
+import type { ChatAttachment, AgentInfo, SearchResult, TerminalInfo, EffortLevel } from '../types';
 import type { ChatSendOptions } from '../hooks/useClaudeChat';
 import { useSlashCommands, type SlashCommand } from '../hooks/useSlashCommands';
 import { useMicRecorder } from '../hooks/useMicRecorder';
@@ -2053,7 +2053,21 @@ export default function ChatInput({
           }
         }
       }
-      // Note: If no snippet matched, Tab will work normally (don't prevent default)
+      // Note: If no snippet matched, Tab falls through to effort cycle below
+    }
+
+    // Tab (or Shift+Tab) cycles the effort level when no autocomplete/snippet intercepted it
+    if (e.key === 'Tab' && unifiedBarProps?.settingsProps) {
+      const levels: EffortLevel[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+      const current = unifiedBarProps.settingsProps.effort;
+      const idx = levels.indexOf(current);
+      const base = idx === -1 ? 0 : idx;
+      const next = e.shiftKey
+        ? levels[(base - 1 + levels.length) % levels.length]
+        : levels[(base + 1) % levels.length];
+      e.preventDefault();
+      unifiedBarProps.settingsProps.onEffortChange(next);
+      return;
     }
 
     // Normal behavior when autocomplete is not active
