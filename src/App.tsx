@@ -12782,23 +12782,7 @@ You have access to all Bash tools to execute git commands like:
               <ActionIcons
               projectPath={activeTerminal?.cwd ?? explorerPath}
               onGitClick={() => setShowGitDrawer(!showGitDrawer)}
-              onUsageClick={async () => {
-                try {
-                  const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
-                  // Open in Terminal Window (separate Tauri window) instead of tab
-                  const projects = activeProjects.map(project => ({
-                    path: project.path,
-                    name: project.name,
-                  }));
-                  await openTerminalWindow(projects, {
-                    projectPath: cwd,
-                    command: 'claude /usage',
-                    terminalLabel: 'Claude Plan Usage',
-                  });
-                } catch (error) {
-                  console.error("Failed to open claude usage:", error);
-                }
-              }}
+              onUsageClick={() => handleCreateTerminalWithCommand("Plan Usage", "claude /usage")}
               onTelegramClick={() => setShowTelegramSetup(true)}
               onTerminalClick={handleCreateAgentTerminal}
               onBrowserClick={handleOpenBrowserTab}
