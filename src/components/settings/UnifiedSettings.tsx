@@ -15,6 +15,7 @@ import RemoteApiSettings from './categories/RemoteApiSettings';
 import AppearanceSettings from './categories/AppearanceSettings';
 import TypographySettings from './categories/TypographySettings';
 import KeyboardShortcutsSettings from './categories/KeyboardShortcutsSettings';
+import TokenUsageSettings from './categories/TokenUsageSettings';
 import DebugSettings from './categories/DebugSettings';
 import AboutSettings from './categories/AboutSettings';
 import './UnifiedSettings.css';
@@ -72,6 +73,8 @@ export default function UnifiedSettings({
         return <TypographySettings />;
       case 'keyboard-shortcuts':
         return <KeyboardShortcutsSettings />;
+      case 'token-usage':
+        return <TokenUsageSettings />;
       case 'debug':
         return <DebugSettings />;
       case 'about':

@@ -14,6 +14,7 @@ export type SettingsCategory =
   | 'appearance'
   | 'typography'
   | 'keyboard-shortcuts'
+  | 'token-usage'
   | 'debug'
   | 'about';
 
@@ -41,6 +42,7 @@ const categories: CategoryItem[] = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'typography', label: 'Typography' },
   { id: 'keyboard-shortcuts', label: 'Keyboard' },
+  { id: 'token-usage', label: 'Token Usage' },
   { id: 'debug', label: 'Debug' },
   { id: 'about', label: 'About' },
 ];

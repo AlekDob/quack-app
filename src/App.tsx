@@ -98,6 +98,7 @@ import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
 import { useMarketplace } from "./hooks/useMarketplace";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
+import { useProjectStatsStore } from "./stores/projectStatsStore";
 import { applyTypography } from "./constants/typography";
 import { applyAccentColor } from "./utils/accentColor";
 import { useKanbanStore } from "./stores/kanbanStore";
@@ -1623,6 +1624,44 @@ function AppContent() {
           cache_creation_input_tokens: msgUsage.cache_creation_input_tokens || 0,
           cache_read_input_tokens: msgUsage.cache_read_input_tokens || 0,
         });
+
+        // 📊 Project stats: record per-step usage with full agent attribution.
+        // Idempotent on (sessionId, messageId) — Anthropic message ids are unique.
+        // IMPORTANT: handleClaudeEvent is memoized with `[handleTokenUpdate]` deps,
+        // so we can't read `terminals` / `agentSessions` from closure (stale).
+        // Use `terminalsRef.current` and `useSessionStore.getState()` for fresh state.
+        // Brain: decision-project-token-stats-sqlite
+        // Brain: gotcha-delayed-agent-message-stale-closure
+        const messageId = assistantEvt.message?.id;
+        const session = useSessionStore.getState().sessions.find((s) => s.id === messageKey);
+        const terminal = terminalsRef.current.find((t) => t.id === agentId);
+        const projectPath = session?.projectPath || terminal?.cwd || '';
+        if (projectPath && messageId) {
+          const sessionId =
+            session?.claudeSessionId || assistantEvt.session_id || messageKey;
+          const projectName =
+            session?.projectName ||
+            projectPath.replace(/\\/g, '/').replace(/\/+$/, '').split('/').filter(Boolean).pop() ||
+            'Unknown';
+          const agentName = terminal?.label || session?.title || 'Unknown agent';
+          const agentRole = (terminal?.personality as { role?: string } | undefined)?.role || null;
+          const provider = useSettingsStore.getState().claude.provider || 'anthropic';
+          void useProjectStatsStore.getState().recordUsage({
+            sessionId,
+            messageId,
+            projectPath,
+            projectName,
+            provider,
+            model: assistantEvt.message?.model || 'unknown',
+            inputTokens: msgUsage.input_tokens || 0,
+            outputTokens: msgUsage.output_tokens || 0,
+            cacheCreationTokens: msgUsage.cache_creation_input_tokens || 0,
+            cacheReadTokens: msgUsage.cache_read_input_tokens || 0,
+            agentId: agentId || null,
+            agentName,
+            agentRole,
+          });
+        }
       }
     }
 
@@ -1679,6 +1718,24 @@ function AppContent() {
     // agentic steps, while assistant message usage (above) is per-step and accurate for context fill.
     if (claudeEvent.type === 'result') {
       const resultEvt = claudeEvent as any;
+
+      // 📊 Project stats: turn ended → refresh per-agent breakdown so the
+      // accordion panel reflects the usage just recorded during this turn.
+      // Use refs / zustand getState to avoid stale closure (see deps at L1895).
+      // Brain: decision-project-token-stats-sqlite
+      {
+        const session = useSessionStore.getState().sessions.find((s) => s.id === messageKey);
+        const terminal = terminalsRef.current.find((t) => t.id === agentId);
+        const projectPath = session?.projectPath || terminal?.cwd || '';
+        if (projectPath) {
+          void useProjectStatsStore
+            .getState()
+            .refreshProjectAgents(projectPath)
+            .catch(() => {
+              /* non-fatal: UI stays on previous cache until next turn */
+            });
+        }
+      }
 
       // Extract context window size from modelUsage in result event.
       // Note: Rust serde serializes as "modelUsage" (camelCase) due to #[serde(rename = "modelUsage")]

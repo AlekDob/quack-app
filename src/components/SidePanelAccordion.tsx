@@ -11,6 +11,7 @@ import { CommandsPanel } from "./CommandsPanel";
 import { RulesPanel } from "./RulesPanel";
 import { SessionsPanel } from "./SessionsPanel";
 import FeaturesPanel from "./FeaturesPanel";
+import AgentTokenStatsPanel from "./AgentTokenStatsPanel";
 import { useRules } from "../hooks/useRules";
 import { useSlashCommands } from "../hooks/useSlashCommands";
 import { useMCPServers } from "../hooks/useMCPServers";
@@ -41,6 +42,7 @@ const CATEGORY_COLORS: Record<string, string> = {
   context: 'var(--accent-color)',     // Orange - file explorer
   'agent-context': 'var(--accent-color)', // Orange - personality
   'project-context': '#60a5fa', // Blue - project notes
+  'token-stats': '#22d3ee',      // Sky cyan - metrics / analytics
   default: 'var(--accent-color)',     // Orange fallback
 };
 
@@ -219,6 +221,12 @@ const icons = {
     <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
       <path d="M10 3c-2 0-3.5 1-4.2 2.5C4.3 6 3 7.5 3 9.5c0 1.5.8 2.8 2 3.5.2 1.8 1.8 3 4 3h2c2.2 0 3.8-1.2 4-3 1.2-.7 2-2 2-3.5 0-2-1.3-3.5-2.8-4C13.5 4 12 3 10 3z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
       <path d="M10 5v11M7.5 8c.8-.8 1.5-.8 2.5 0s1.7.8 2.5 0" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+    </svg>
+  ),
+  'token-stats': (
+    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+      <path d="M3 3v14h14" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M6 13l3-3 3 3 5-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
 };
@@ -508,7 +516,7 @@ export default function SidePanelAccordion({
   }, [focusedSection]);
 
   // Section IDs for reference (order is determined by DOM position, not dynamically)
-  const sectionIds = ['changes', 'context', 'brain', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions'];
+  const sectionIds = ['changes', 'context', 'brain', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions', 'token-stats'];
 
   // Handle forceExpandSection from parent
   useEffect(() => {
@@ -936,6 +944,23 @@ export default function SidePanelAccordion({
           <SessionsPanel
             onSelectSession={(session) => onSelectSession?.(session)}
           />
+        </AccordionSection>
+
+        {/* 📊 Token Stats — per-agent breakdown for the current project */}
+        {/* Brain: decision-project-token-stats-sqlite */}
+        <AccordionSection
+          id="token-stats"
+          title="Token Stats"
+          icon={icons['token-stats']}
+          isExpanded={focusedSection === "token-stats"}
+          isFocused={focusedSection === "token-stats"}
+          order={getOrder("token-stats")}
+          category="token-stats"
+          onToggle={() => toggleSection("token-stats")}
+          onHoverEnter={() => handleSectionHoverEnter("token-stats")}
+          onHoverLeave={handleSectionHoverLeave}
+        >
+          <AgentTokenStatsPanel projectPath={rootPath} />
         </AccordionSection>
       </div>
     </aside>

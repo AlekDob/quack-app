@@ -14,6 +14,7 @@ import type { AgentSession, AgentSessionStatus } from '../types';
 import { loadAgentSessions, saveAgentSessions } from '../services/unifiedAgentStorage';
 import { sessionWriteLock } from './sessionWriteLock';
 import { appendBrainDiaryOnDone } from '../services/brainSessionService';
+import { useProjectStatsStore } from './projectStatsStore';
 
 /**
  * Maximum messages allowed per session before archiving is recommended
@@ -85,6 +86,18 @@ export const useSessionStore = create<SessionState>()(
             const sessions = await loadAgentSessions();
             console.log(`[sessionStore] loadSessions: previous=${previousCount}, loaded=${sessions.length}`);
             set({ sessions, isLoading: false });
+
+            // 📊 Project stats: one-shot historical import on first boot
+            // after feature rollout. Non-blocking — never fail the session
+            // load if stats migration errors.
+            // Brain: decision-project-token-stats-sqlite
+            import('../services/projectStatsMigration')
+              .then(({ runProjectStatsMigrationIfNeeded }) =>
+                runProjectStatsMigrationIfNeeded(sessions)
+              )
+              .catch((err) =>
+                console.warn('[sessionStore] stats migration skipped:', err)
+              );
           } catch (error) {
             console.error('[sessionStore] Failed to load sessions:', error);
             if (!silent) {
@@ -163,9 +176,24 @@ export const useSessionStore = create<SessionState>()(
 
         // Delete a session
         deleteSession: async (id) => {
-          const { selectedSessionId } = get();
+          const { selectedSessionId, sessions: currentSessions } = get();
 
-          const sessions = get().sessions.filter((s) => s.id !== id);
+          // 📊 Project stats: flag token events as deleted BEFORE we drop the
+          // session record. We look up the Claude SDK session id (distinct
+          // from the AgentSession id) because token_events is keyed on it.
+          // Brain: decision-project-token-stats-sqlite
+          const target = currentSessions.find((s) => s.id === id);
+          const sdkSessionId = target?.claudeSessionId;
+          if (sdkSessionId) {
+            void useProjectStatsStore
+              .getState()
+              .markSessionDeleted(sdkSessionId)
+              .catch((err) =>
+                console.warn('[sessionStore] markSessionDeleted failed:', err)
+              );
+          }
+
+          const sessions = currentSessions.filter((s) => s.id !== id);
           set({
             sessions,
             selectedSessionId: selectedSessionId === id ? null : selectedSessionId,
