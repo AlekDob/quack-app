@@ -238,21 +238,24 @@ function AgentSessionList({
   const [renameDialogSession, setRenameDialogSession] = useState<{ id: string; title: string } | null>(null);
 
   // Get sessions from store
-  const { sessions: allSessions, isLoading, loadSessions, updateSession, deleteSession } = useSessionStore();
+  const { sessions: allSessions, isLoading, updateSession, deleteSession } = useSessionStore();
 
   // Filter sessions for this agent
   const sessions = allSessions.filter((s) => s.agentId === agentId);
-  
+
   // 🦆 SESSIONS-FIRST: Get chat data for activity indicators
   // Reading from chatStore directly to get real-time loading state updates
   const chatSessions = useChatStore((state) => state.chatSessions);
   const chatLoadingMap = useChatStore((state) => state.chatLoadingMap);
   const pendingQuestionsMap = useChatStore((state) => state.pendingQuestionsMap);
 
-  // Load sessions on mount
-  useEffect(() => {
-    loadSessions();
-  }, [loadSessions]);
+  // Brain: fix-session-create-race-load-overwrite
+  // No on-mount loadSessions here — sessions are already loaded at boot
+  // (App.tsx) and refreshed by `sessions-updated` listeners. A per-mount
+  // loadSessions caused a race with createSession: when an agent transitioned
+  // from dormant to active, a fresh AgentSessionList mounted mid-await of
+  // saveAgentSessions and overwrote the in-memory state with a stale disk read,
+  // making the just-created session invisible to handleSessionClick.
 
   // Handle marking session as done
   const handleMarkDone = useCallback((sessionId: string) => {

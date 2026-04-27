@@ -78,6 +78,20 @@ export const useSessionStore = create<SessionState>()(
         // Use { silent: true } for background polling to avoid showing loading indicator
         loadSessions: async (options) => {
           const silent = options?.silent ?? false;
+
+          // Brain: fix-session-create-race-load-overwrite
+          // Skip the entire reload if a write was just made. Without this,
+          // a concurrent loadSessions (e.g. from a remounting AgentSessionList)
+          // can overwrite the in-memory state with a stale disk read while
+          // createSession is still in flight, dropping the just-created session.
+          if (sessionWriteLock.shouldSkipReload()) {
+            console.log('[sessionStore] loadSessions skipped — recent write detected');
+            if (!silent) {
+              set({ isLoading: false });
+            }
+            return;
+          }
+
           if (!silent) {
             set({ isLoading: true });
           }
@@ -127,7 +141,12 @@ export const useSessionStore = create<SessionState>()(
           const sessions = [...get().sessions, newSession];
           set({ sessions });
 
-          // Persist to storage and mark write to prevent race condition with file watcher
+          // Brain: fix-session-create-race-load-overwrite
+          // Mark the write BEFORE awaiting save: a concurrent loadSessions
+          // triggered during the await must see shouldSkipReload=true,
+          // otherwise it would overwrite the in-memory state with a stale
+          // disk read and drop this just-created session.
+          sessionWriteLock.markWrite();
           await saveAgentSessions(sessions);
           sessionWriteLock.markWrite();
 
@@ -167,7 +186,8 @@ export const useSessionStore = create<SessionState>()(
           });
           set({ sessions });
 
-          // Persist to storage and mark write to prevent race condition
+          // Brain: fix-session-create-race-load-overwrite — mark before await
+          sessionWriteLock.markWrite();
           await saveAgentSessions(sessions);
           sessionWriteLock.markWrite();
 
@@ -199,7 +219,8 @@ export const useSessionStore = create<SessionState>()(
             selectedSessionId: selectedSessionId === id ? null : selectedSessionId,
           });
 
-          // Persist to storage and mark write to prevent race condition
+          // Brain: fix-session-create-race-load-overwrite — mark before await
+          sessionWriteLock.markWrite();
           await saveAgentSessions(sessions);
           sessionWriteLock.markWrite();
 
@@ -220,7 +241,8 @@ export const useSessionStore = create<SessionState>()(
           );
           set({ sessions });
 
-          // Persist to storage and mark write to prevent race condition
+          // Brain: fix-session-create-race-load-overwrite — mark before await
+          sessionWriteLock.markWrite();
           await saveAgentSessions(sessions);
           sessionWriteLock.markWrite();
 
