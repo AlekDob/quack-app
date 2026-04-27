@@ -195,10 +195,14 @@ function OfficeCanvasImpl(props: Props) {
 
   const onPointerMove = useCallback((e: React.PointerEvent) => {
     if (panning && panStartRef.current) {
+      // Brain: fix-office-canvas-pointermove-ref-race
+      const start = panStartRef.current;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
       setViewport(v => ({
         ...v,
-        panX: panStartRef.current!.panX + (e.clientX - panStartRef.current!.x),
-        panY: panStartRef.current!.panY + (e.clientY - panStartRef.current!.y),
+        panX: start.panX + dx,
+        panY: start.panY + dy,
       }));
       return;
     }

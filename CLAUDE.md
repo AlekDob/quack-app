@@ -203,6 +203,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Agent tool name Task/Agent migration: `documentation/gotchas/gotcha-agent-tool-name-task-agent-migration.md`
 - CSS flex chain broken (canvas collapses to 0px): `documentation/gotchas/gotcha-css-flex-chain-broken.md`
 - New session from dormant agent disappears (race condition): `documentation/bugs/fix-session-create-race-load-overwrite.md`
+- Office View v2 crash on pan (ref-in-setState-updater race): `documentation/bugs/fix-office-canvas-pointermove-ref-race.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
