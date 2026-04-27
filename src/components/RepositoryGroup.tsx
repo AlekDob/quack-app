@@ -2305,7 +2305,6 @@ export default function RepositoryGroup({
                 <div
                   key={branchName}
                   className="branch-group relative"
-                  style={{ marginBottom: "24px" }}
                 >
                   {/* Branch is now shown per-session, not per-agent group */}
 
@@ -2564,7 +2563,6 @@ export default function RepositoryGroup({
                     <div
                       key={`worktree-${branchName}`}
                       className="branch-group relative"
-                      style={{ marginBottom: "24px" }}
                     >
                       {/* Branch is now shown per-session, not per-agent group */}
 
