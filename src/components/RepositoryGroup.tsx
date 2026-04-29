@@ -36,6 +36,7 @@ import RevealInFinderButton from "./RevealInFinderButton";
 import AgentSessionList from "./AgentSessionList";
 import WorktreeAgentCard from "./WorktreeAgentCard";
 import NewSessionModal from "./NewSessionModal";
+import DormantAgentChip from "./DormantAgentChip";
 import {
   getCustomAvatarUrl,
   isCustomAvatar,
@@ -2429,35 +2430,13 @@ export default function RepositoryGroup({
                   : `Start new session with ${agent.label}`;
                 return (
                   <KeyboardShortcutTooltip key={agent.id} label={tooltipLabel}>
-                    <button
-                      type="button"
+                    <DormantAgentChip
+                      agent={agent}
                       onClick={(e) => {
                         e.stopPropagation();
                         setNewSessionModalAgentId(agent.id);
                       }}
-                      style={{
-                        background: "rgba(255,255,255,0.04)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        color: "rgba(255,255,255,0.55)",
-                        borderRadius: "10px",
-                        padding: "2px 8px",
-                        fontSize: "11px",
-                        cursor: "pointer",
-                        transition: "background 0.15s ease, color 0.15s ease, border-color 0.15s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-                        e.currentTarget.style.color = "rgba(255,255,255,0.9)";
-                        e.currentTarget.style.borderColor = agent.color || "rgba(255,255,255,0.2)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "rgba(255,255,255,0.04)";
-                        e.currentTarget.style.color = "rgba(255,255,255,0.55)";
-                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
-                      }}
-                    >
-                      {agent.label}
-                    </button>
+                    />
                   </KeyboardShortcutTooltip>
                 );
               })}
