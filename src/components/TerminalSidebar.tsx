@@ -1857,6 +1857,7 @@ export default function TerminalSidebar({
             </svg>
             <span>Discord</span>
           </button>
+
         </div>
 
         {/* Right side: Version Tag */}

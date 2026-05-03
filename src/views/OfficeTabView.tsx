@@ -1,6 +1,8 @@
 import { memo, useRef } from 'react';
 import type { Tab } from '../components/TabBar';
-import OfficeView from '../components/office/OfficeView';
+import OfficeViewV1 from '../components/office/OfficeView';
+import OfficeViewV2 from '../components/office/v2/OfficeView';
+import { isOfficeV2Enabled } from '../components/office/v2/featureFlag';
 import type { TerminalInfo } from '../types';
 
 interface OfficeTabViewProps {
@@ -39,8 +41,38 @@ function OfficeTabView({
   if (isActive) hasBeenActive.current = true;
 
   if (tab.type !== 'office') return null;
-  // Don't mount OfficeView until tab is first shown (needs correct dimensions)
   if (!hasBeenActive.current) return null;
+
+  const offscreen = !isActive
+    ? {
+        position: 'absolute' as const,
+        inset: 0,
+        opacity: 0,
+        zIndex: -1,
+        pointerEvents: 'none' as const,
+      }
+    : {};
+
+  if (isOfficeV2Enabled()) {
+    return (
+      <div
+        className="office-tab-view"
+        style={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          ...offscreen,
+        }}
+      >
+        <OfficeViewV2
+          terminals={terminals}
+          isActive={isActive}
+          onSessionClick={onSessionClick}
+          onGoToChat={onDuckClick}
+        />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -49,16 +81,10 @@ function OfficeTabView({
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        ...(!isActive ? {
-          position: 'absolute',
-          inset: 0,
-          opacity: 0,
-          zIndex: -1,
-          pointerEvents: 'none' as const,
-        } : {}),
+        ...offscreen,
       }}
     >
-      <OfficeView
+      <OfficeViewV1
         terminals={terminals}
         isActive={isActive}
         onRoomClick={onRoomClick}

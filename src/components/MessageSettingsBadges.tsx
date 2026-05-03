@@ -19,12 +19,16 @@ const effortIcons: Record<string, string> = {
   low: '>',
   medium: '>>',
   high: '>>>',
+  xhigh: '>>>>',
+  max: 'MAX',
 };
 
 const effortLabels: Record<string, string> = {
   low: 'Fast',
   medium: 'Balanced',
-  high: 'Quality',
+  high: 'Smart',
+  xhigh: 'Deep',
+  max: 'Max',
 };
 
 const thinkingIcons: Record<string, string> = {

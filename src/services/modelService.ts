@@ -44,23 +44,39 @@ const LEGACY_ID_MAP: Record<string, string> = {
   'opus46': 'opus47', // Opus 4.6 deprecated, upgrade to 4.7
 };
 
+// Brain: fix-session-backup-quota-cascade
+/**
+ * Module-scoped flag: the fallback warning is called from many hot render paths
+ * (every select dropdown, every settings read). Without dedup it spams the
+ * console into oblivion when Supabase is unreachable. Log once per session.
+ */
+let emergencyFallbackWarned = false;
+
+/**
+ * Reset the fallback warning dedup flag. Call after a successful remote
+ * models fetch so a later disconnect gets logged again.
+ */
+export function resetEmergencyFallbackWarning(): void {
+  emergencyFallbackWarned = false;
+}
+
 /**
  * Get active models sorted by sortOrder.
  * Prioritizes remote config from Supabase.
  * Emergency fallback only used when Supabase is unreachable.
  */
-let _fallbackWarned = false;
 export function getModels(remoteModels?: ModelConfig[]): ModelConfig[] {
   const models = remoteModels?.filter(m => m.isActive);
   if (models && models.length > 0) {
-    _fallbackWarned = false; // Reset so we warn again if models disappear later
+    emergencyFallbackWarned = false;
     const sorted = [...models].sort((a, b) => a.sortOrder - b.sortOrder);
     return sorted;
   }
-  // Emergency fallback - Supabase unreachable (warn once to avoid console flood)
-  if (!_fallbackWarned) {
+  // Emergency fallback - Supabase unreachable. Warn once per session to avoid
+  // flooding the console from hot render paths.
+  if (!emergencyFallbackWarned) {
+    emergencyFallbackWarned = true;
     console.warn('[ModelService] Using emergency fallback - Supabase models not available');
-    _fallbackWarned = true;
   }
   return EMERGENCY_FALLBACK;
 }
@@ -124,6 +140,20 @@ export function getModelOptions(
 }
 
 /**
+ * Return the Anthropic-recommended default effort for a given Quack model ID.
+ * - Opus 4.7 → 'xhigh' (recommended default, per code.claude.com/docs/en/model-config)
+ * - Opus 4.6 / Sonnet 4.6 → 'high'
+ * - Everything else (Sonnet 4.5, Haiku, Ollama/custom) → 'medium'
+ *   (models without native effort support ignore the field SDK-side)
+ */
+export function defaultEffortForModel(modelId: string): 'low' | 'medium' | 'high' | 'xhigh' | 'max' {
+  const base = modelId.replace('[1m]', '');
+  if (base === 'opus47' || base === 'opus') return 'xhigh';
+  if (base === 'opus46' || base === 'sonnet46') return 'high';
+  return 'medium';
+}
+
+/**
  * Get the display label for a model ID.
  * Supports legacy IDs via LEGACY_ID_MAP.
  */
@@ -132,8 +162,8 @@ export function getModelLabel(
   remoteModels?: ModelConfig[]
 ): string {
   // Handle [1m] suffix for 1M context window
-  const has1MSuffix = friendlyName.endsWith('[1m]');
-  const baseName = has1MSuffix ? friendlyName.replace('[1m]', '') : friendlyName;
+  const has1MySuffix = friendlyName.endsWith('[1m]');
+  const baseName = has1MySuffix ? friendlyName.replace('[1m]', '') : friendlyName;
 
   const models = getModels(remoteModels);
 
@@ -146,5 +176,5 @@ export function getModelLabel(
   }
 
   const label = found?.label ?? baseName;
-  return has1MSuffix ? `${label} (1M)` : label;
+  return has1MySuffix ? `${label} (1M)` : label;
 }

@@ -14,6 +14,7 @@ import type { AgentSession, AgentSessionStatus } from '../types';
 import { loadAgentSessions, saveAgentSessions } from '../services/unifiedAgentStorage';
 import { sessionWriteLock } from './sessionWriteLock';
 import { appendBrainDiaryOnDone } from '../services/brainSessionService';
+import { useProjectStatsStore } from './projectStatsStore';
 
 /**
  * Maximum messages allowed per session before archiving is recommended
@@ -77,6 +78,20 @@ export const useSessionStore = create<SessionState>()(
         // Use { silent: true } for background polling to avoid showing loading indicator
         loadSessions: async (options) => {
           const silent = options?.silent ?? false;
+
+          // Brain: fix-session-create-race-load-overwrite
+          // Skip the entire reload if a write was just made. Without this,
+          // a concurrent loadSessions (e.g. from a remounting AgentSessionList)
+          // can overwrite the in-memory state with a stale disk read while
+          // createSession is still in flight, dropping the just-created session.
+          if (sessionWriteLock.shouldSkipReload()) {
+            console.log('[sessionStore] loadSessions skipped — recent write detected');
+            if (!silent) {
+              set({ isLoading: false });
+            }
+            return;
+          }
+
           if (!silent) {
             set({ isLoading: true });
           }
@@ -85,6 +100,18 @@ export const useSessionStore = create<SessionState>()(
             const sessions = await loadAgentSessions();
             console.log(`[sessionStore] loadSessions: previous=${previousCount}, loaded=${sessions.length}`);
             set({ sessions, isLoading: false });
+
+            // 📊 Project stats: one-shot historical import on first boot
+            // after feature rollout. Non-blocking — never fail the session
+            // load if stats migration errors.
+            // Brain: decision-project-token-stats-sqlite
+            import('../services/projectStatsMigration')
+              .then(({ runProjectStatsMigrationIfNeeded }) =>
+                runProjectStatsMigrationIfNeeded(sessions)
+              )
+              .catch((err) =>
+                console.warn('[sessionStore] stats migration skipped:', err)
+              );
           } catch (error) {
             console.error('[sessionStore] Failed to load sessions:', error);
             if (!silent) {
@@ -114,7 +141,12 @@ export const useSessionStore = create<SessionState>()(
           const sessions = [...get().sessions, newSession];
           set({ sessions });
 
-          // Persist to storage and mark write to prevent race condition with file watcher
+          // Brain: fix-session-create-race-load-overwrite
+          // Mark the write BEFORE awaiting save: a concurrent loadSessions
+          // triggered during the await must see shouldSkipReload=true,
+          // otherwise it would overwrite the in-memory state with a stale
+          // disk read and drop this just-created session.
+          sessionWriteLock.markWrite();
           await saveAgentSessions(sessions);
           sessionWriteLock.markWrite();
 
@@ -154,7 +186,8 @@ export const useSessionStore = create<SessionState>()(
           });
           set({ sessions });
 
-          // Persist to storage and mark write to prevent race condition
+          // Brain: fix-session-create-race-load-overwrite — mark before await
+          sessionWriteLock.markWrite();
           await saveAgentSessions(sessions);
           sessionWriteLock.markWrite();
 
@@ -163,15 +196,31 @@ export const useSessionStore = create<SessionState>()(
 
         // Delete a session
         deleteSession: async (id) => {
-          const { selectedSessionId } = get();
+          const { selectedSessionId, sessions: currentSessions } = get();
 
-          const sessions = get().sessions.filter((s) => s.id !== id);
+          // 📊 Project stats: flag token events as deleted BEFORE we drop the
+          // session record. We look up the Claude SDK session id (distinct
+          // from the AgentSession id) because token_events is keyed on it.
+          // Brain: decision-project-token-stats-sqlite
+          const target = currentSessions.find((s) => s.id === id);
+          const sdkSessionId = target?.claudeSessionId;
+          if (sdkSessionId) {
+            void useProjectStatsStore
+              .getState()
+              .markSessionDeleted(sdkSessionId)
+              .catch((err) =>
+                console.warn('[sessionStore] markSessionDeleted failed:', err)
+              );
+          }
+
+          const sessions = currentSessions.filter((s) => s.id !== id);
           set({
             sessions,
             selectedSessionId: selectedSessionId === id ? null : selectedSessionId,
           });
 
-          // Persist to storage and mark write to prevent race condition
+          // Brain: fix-session-create-race-load-overwrite — mark before await
+          sessionWriteLock.markWrite();
           await saveAgentSessions(sessions);
           sessionWriteLock.markWrite();
 
@@ -192,7 +241,8 @@ export const useSessionStore = create<SessionState>()(
           );
           set({ sessions });
 
-          // Persist to storage and mark write to prevent race condition
+          // Brain: fix-session-create-race-load-overwrite — mark before await
+          sessionWriteLock.markWrite();
           await saveAgentSessions(sessions);
           sessionWriteLock.markWrite();
 

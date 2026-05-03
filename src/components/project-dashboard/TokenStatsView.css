@@ -1,0 +1,240 @@
+/**
+ * Token Stats View — shares dark-glass tokens with ProjectDashboard.
+ * Brand guidelines: var(--accent-*), var(--text-*), var(--border-*).
+ */
+
+.token-stats-root {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  padding: 4px 0;
+}
+
+/* --------------------------------- Hero -------------------------------- */
+
+.token-stats-hero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  padding: 20px;
+  background: linear-gradient(135deg,
+    rgba(var(--accent-rgb), 0.08) 0%,
+    rgba(var(--accent-rgb), 0.02) 100%);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+}
+
+.token-stats-hero-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 2px;
+}
+
+.token-stats-hero-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.token-stats-hero-value {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.token-stats-hero-stat--accent .token-stats-hero-value {
+  color: var(--accent-color);
+  font-size: 28px;
+}
+
+/* --------------------------------- Section ----------------------------- */
+
+.token-stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.token-stats-section-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.token-stats-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.token-stats-empty small {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* --------------------------- Breakdown rows ---------------------------- */
+
+.token-stats-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.token-stats-breakdown-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm);
+}
+
+.token-stats-breakdown-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.token-stats-breakdown-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.token-stats-breakdown-cells em {
+  font-style: normal;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  margin-right: 4px;
+}
+
+.token-stats-breakdown-count {
+  margin-left: auto;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* --------------------------- Grouped (provider/model) ------------------ */
+
+.token-stats-grouped-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.token-stats-grouped-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.token-stats-grouped-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+}
+
+.token-stats-grouped-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.token-stats-grouped-total {
+  font-size: 14px;
+  color: var(--accent-color);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.token-stats-bar-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.token-stats-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg,
+    rgba(var(--accent-rgb), 0.9) 0%,
+    rgba(var(--accent-rgb), 0.5) 100%);
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+
+.token-stats-grouped-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------- Footer ------------------------------ */
+
+.token-stats-footer {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-align: right;
+  opacity: 0.7;
+}
+
+/* --------------------------- Internal tab switcher --------------------- */
+
+.project-dashboard-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  width: fit-content;
+}
+
+.project-dashboard-tab {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.project-dashboard-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.project-dashboard-tab--active {
+  color: var(--accent-color);
+  background: rgba(var(--accent-rgb), 0.15);
+}

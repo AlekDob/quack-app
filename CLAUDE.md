@@ -186,6 +186,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - SDK allowedTools bypasses canUseTool: `documentation/gotchas/gotcha-sdk-allowedtools-bypasses-canuse.md`
 - EditSummaryBar cumulative regression: `documentation/bugs/fix-edit-summary-bar-cumulative-regression.md`
 - ChangesPanel CPU loop: `documentation/bugs/fix-changes-panel-cpu-loop.md`
+- Session backup quota cascade: `documentation/bugs/fix-session-backup-quota-cascade.md`
 - Windows path separators: `documentation/gotchas/gotcha-windows-path-separators.md`
 - Webview fetch CORS: `documentation/gotchas/gotcha-webview-fetch-cors-use-invoke.md`
 - TerminalStore sync persist quota: `documentation/gotchas/gotcha-terminal-store-sync-persist-quota.md`
@@ -207,6 +208,9 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Marketplace fetch storm on startup: `documentation/bugs/fix-marketplace-fetch-storm-on-startup.md`
 - ModelService emergency fallback spam: `documentation/bugs/fix-model-service-emergency-fallback-spam.md`
 - Chat tab label update loop: `documentation/bugs/fix-chat-tab-label-update-loop.md`
+- CSS flex chain broken (canvas collapses to 0px): `documentation/gotchas/gotcha-css-flex-chain-broken.md`
+- New session from dormant agent disappears (race condition): `documentation/bugs/fix-session-create-race-load-overwrite.md`
+- Office View v2 crash on pan (ref-in-setState-updater race): `documentation/bugs/fix-office-canvas-pointermove-ref-race.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

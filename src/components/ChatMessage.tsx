@@ -10,6 +10,7 @@ import MarkdownText from './MarkdownText';
 import { AgentMentionChip } from './AgentMentionChip';
 import { parseAgentMentions } from '../utils/agentMentions';
 import { useAgentAvatar } from '../hooks/useAgentAvatar';
+import TurnTokenStats from './TurnTokenStats';
 import humanoidAvatar from '../../images/humanoid.jpeg';
 import './ChatMessage.css';
 import './StreamMessage.css';
@@ -91,9 +92,11 @@ interface ChatMessageProps {
   onTeammateDrillDown?: (sessionId: string, name: string) => void;
   // Whether to show the agent header (avatar, name, timestamp) — used for grouping consecutive messages
   showHeader?: boolean;
+  // Show per-turn token/cache stats below completed responses
+  showTurnTokenStats?: boolean;
 }
 
-function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, pendingPlanApprovalIds, onPlanApprovalResponse, onTeammateDrillDown, showHeader = true }: ChatMessageProps) {
+function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSessionIdClick, agentName = 'Jack', agentAvatar, projectName, gitBranch, isLastUserMessage = false, workingDirectory, thinkingModeResetKey, onUserQuestionAnswer, pendingQuestionIds, answeredQuestions, currentSessionId, showThinkingBlocks = true, onRewindFiles, onOpenImageTab, pendingPlanApprovalIds, onPlanApprovalResponse, onTeammateDrillDown, showHeader = true, showTurnTokenStats = false }: ChatMessageProps) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const hasError = message.status === 'error';
@@ -516,10 +519,17 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
                 // must be skipped — they create non-nested groups that break consecutive
                 // droid grouping, causing each tool call to get its own DroidActivityBlock.
                 // Brain: fix-compact-not-triggering-sdk-native
+                // Skip the "Compacting context..." status if compaction already completed
+                // (compact_boundary exists later in the events array), so only the
+                // "Context compacted" indicator is shown instead of both.
+                const isCompactingStatus = event.type === 'system' && event.subtype === 'status' && event.status === 'compacting';
+                const hasCompactBoundary = isCompactingStatus && message.events!.some(
+                  (e: any) => e.type === 'system' && e.subtype === 'compact_boundary'
+                );
                 const isAllowedSystemEvent = event.type === 'system' && (
                   event.subtype === 'init' ||
                   event.subtype === 'compact_boundary' ||
-                  (event.subtype === 'status' && event.status === 'compacting')
+                  (isCompactingStatus && !hasCompactBoundary)
                 );
                 if (event.type !== 'assistant' && !isAllowedSystemEvent) return;
 
@@ -884,6 +894,12 @@ function ChatMessage({ message, onOpenFile, onFilePathClick, onOpenInIDE, onSess
               <ToolCallMinimal key={tool.id} tool={tool} onOpenFile={onFilePathClick || onOpenFile} />
             ))}
           </div>
+        )}
+        {!isUser && message.status === 'complete' && showTurnTokenStats && message.metadata?.turnUsage != null && (
+          <TurnTokenStats
+            turnUsage={message.metadata.turnUsage as { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number }}
+            turnCost={message.metadata.turnCost as number | undefined}
+          />
         )}
       </div>
     </div>

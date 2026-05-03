@@ -31,9 +31,11 @@ const permissionModeOptions = [
 ];
 
 const effortOptions = [
-  { value: 'low' as EffortLevel, label: 'Fast · Quick responses, lower cost', icon: '' },
-  { value: 'medium' as EffortLevel, label: 'Balanced · Default quality', icon: '' },
-  { value: 'high' as EffortLevel, label: 'Quality · Thorough responses', icon: '' },
+  { value: 'low' as EffortLevel, label: 'Fast', desc: 'Latency-first, not intelligence-sensitive' },
+  { value: 'medium' as EffortLevel, label: 'Balanced', desc: 'Lower cost, some intelligence trade-off' },
+  { value: 'high' as EffortLevel, label: 'Smart', desc: 'Minimum for intelligence-sensitive work' },
+  { value: 'xhigh' as EffortLevel, label: 'Deep', desc: 'Recommended default on Opus 4.7' },
+  { value: 'max' as EffortLevel, label: 'Max', desc: 'Deepest reasoning, no budget cap (session only)' },
 ];
 
 export default function ChatSettingsMenu({
@@ -148,14 +150,15 @@ export default function ChatSettingsMenu({
 
   const getEffortLabel = () => {
     const option = effortOptions.find(opt => opt.value === effort);
-    return option?.icon ?? '>>';
+    return option?.label ?? 'Balanced';
   };
 
   const getEffortColor = () => {
     const colors: Record<EffortLevel, string> = {
       low: '#22c55e',     // Green - fast/cheap
       medium: '#eab308',  // Yellow - balanced
-      high: '#a855f7',    // Purple - quality
+      high: '#a855f7',    // Smart
+      xhigh: '#c084fc',   // Deep - Opus 4.7 default
       max: '#ef4444',     // Red - maximum effort
     };
     return colors[effort] || '#eab308';
@@ -344,7 +347,7 @@ export default function ChatSettingsMenu({
               >
                 {effortOptions.map((option) => (
                   <option key={option.value} value={option.value}>
-                    {option.icon} {option.label}
+                    {option.label} — {option.desc}
                   </option>
                 ))}
               </select>

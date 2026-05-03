@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React 18)
 created: 2026-04-05
-last_verified: 2026-04-16
-tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sessions]
+last_verified: 2026-04-22
+tags: [agent-sidebar, sidebar, navigation, dnd-kit, project-groups, agents, sessions, dormant-agents]
 ---
 
 ## Agent Sidebar
@@ -105,6 +105,29 @@ On session open, the chat always scrolls to the bottom — unless the user has s
 - The scroll-to-bottom pill button (`showScrollButton`) is still shown when the user is not at the bottom.
 - Virtualized list (>100 messages) keeps always-scroll-to-bottom without anchor UX.
 - See `patterns/pattern-session-scroll-memory.md`.
+
+### Active vs Dormant Agents (performance + anti-duplicate)
+Agents within a project are split into two rendering tiers inside `RepositoryGroup.tsx`:
+
+- **Active agents** = at least one session with `status !== "done"`. Rendered full-size as `SortableAgent` cards (avatar, DnD, sessions metro-line, notification badges, 60s tick timer).
+- **Dormant agents** = no active sessions (only archived `done` sessions, or zero sessions). Rendered as a compact chip row under the branch groups: `DORMANT · N` header + `<button>` chips with agent label only. No avatar load, no per-agent `useSessionStore` subscription, no DnD.
+
+**Click on a dormant chip** → opens `NewSessionModal` pre-filled with `setNewSessionModalAgentId(agent.id)` → creates a **new session on the existing agent** (reuse, not duplicate). **Hover** → `KeyboardShortcutTooltip` shows `{role} · Start new session` (or `Start new session with {label}` if personality.role missing).
+
+Computation (single pass, memoized by `[mainAgents, allSessionsForRepo]`):
+```ts
+const activeIds = new Set(
+  allSessionsForRepo.filter(s => s.status !== "done").map(s => s.agentId)
+);
+const dormantAgents = mainAgents.filter(a => !activeIds.has(a.id));
+```
+
+**Rationale**:
+- **Performance**: project with 10 agents / 2 active previously instantiated 10 memoized cards + 10 store subscriptions + 10 avatar loads + 10 timers. Now only 2. Dormant are pure text chips.
+- **Anti-duplicate**: "Add Agent" (`handleOpenNewTerminalModal`) always creates a new `TerminalInfo` via `create_terminal` with no uniqueness check on label. Keeping dormant names visible prevents users from accidentally recreating an agent that already exists.
+- **Clutter**: active prominent, dormant still recoverable (not hidden completely).
+
+**Trade-off**: dormant chips bypass the per-agent notification logic (none needed — no active session by definition). Worktree agents are not split (always rendered in `WORKTREES` section).
 
 ### Cross-Feature: @ Mention Popup (→ 025-team-delegation-footer)
 The sidebar `terminals` (agents grouped by project) are the same data source used for the `@` mention popup's "Team" section. App.tsx filters `terminals` by matching `cwd` (excluding the active agent) and passes them as `projectTerminals` prop to `ChatView` → `ChatInput`. This means every agent visible in the sidebar under the same project is also citeable via `@` in the chat input. See `025-team-delegation-footer.md` for delegation flow details.

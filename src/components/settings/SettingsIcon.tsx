@@ -139,6 +139,18 @@ export default function SettingsIcon({ category, className = '' }: SettingsIconP
         </svg>
       );
 
+    case 'token-usage':
+      return (
+        <svg {...iconProps}>
+          <path d="M3 3v18h18"/>
+          <path d="M7 14l4-4 4 4 6-6"/>
+          <circle cx="7" cy="14" r="1"/>
+          <circle cx="11" cy="10" r="1"/>
+          <circle cx="15" cy="14" r="1"/>
+          <circle cx="21" cy="8" r="1"/>
+        </svg>
+      );
+
     case 'debug':
       return (
         <svg {...iconProps}>

@@ -14,6 +14,15 @@ import {
 } from '../services/conversationRecovery';
 import { useKanbanStore } from '../stores/kanbanStore';
 import { useChatStore } from '../stores/chatStore';
+import { useProjectStatsStore } from '../stores/projectStatsStore';
+
+// Extract a human-friendly project name from a filesystem path (cross-platform).
+// Brain: gotcha-windows-path-separators
+function projectNameFromPath(p: string): string {
+  const normalized = p.replace(/\\/g, '/').replace(/\/+$/, '');
+  const parts = normalized.split('/').filter(Boolean);
+  return parts[parts.length - 1] || 'Unknown';
+}
 
 // Map to track Task tool_use_id -> Kanban task_id for status updates
 const taskToolToKanbanMap = new Map<string, string>();
@@ -94,6 +103,11 @@ export interface ChatSendOptions {
   remoteModels?: import('../services/modelService').ModelConfig[]; // Remote models for ID mapping
   // Provider override (for automation jobs that specify a non-global provider)
   provider?: import('../types').LLMProviderType;
+  // 📊 Agent attribution for project stats aggregation
+  // Brain: decision-project-token-stats-sqlite
+  agentId?: string;
+  agentName?: string;
+  agentRole?: string;
 }
 
 export interface UseClaudeChatOptions {
@@ -560,6 +574,34 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
                 cacheCreationTokens: cacheCreation,
                 cacheReadTokens: cacheRead,
               });
+
+              // 📊 Project stats: record this per-step usage. Idempotent on
+              // (session_id, message_id) — Anthropic message IDs are globally
+              // unique, so even duplicate stream events can't double-count.
+              // Brain: decision-project-token-stats-sqlite
+              const projectPath = options?.workingDirectory || '';
+              const messageId = assistantEvt.message?.id;
+              if (projectPath && messageId) {
+                const sessionId =
+                  claudeSessionId.current ||
+                  (assistantEvt as any).session_id ||
+                  assistantMessageId;
+                void useProjectStatsStore.getState().recordUsage({
+                  sessionId,
+                  messageId,
+                  projectPath,
+                  projectName: projectNameFromPath(projectPath),
+                  provider: options?.provider || 'anthropic',
+                  model: assistantEvt.message?.model || options?.model || 'unknown',
+                  inputTokens: msgUsage.input_tokens || 0,
+                  outputTokens: msgUsage.output_tokens || 0,
+                  cacheCreationTokens: cacheCreation,
+                  cacheReadTokens: cacheRead,
+                  agentId: options?.agentId ?? null,
+                  agentName: options?.agentName ?? null,
+                  agentRole: options?.agentRole ?? null,
+                });
+              }
             }
           }
 
@@ -578,6 +620,34 @@ export function useClaudeChat(options?: UseClaudeChatOptions) {
                 cacheCreationTokens: cacheCreation,
                 cacheReadTokens: cacheRead,
               });
+
+              // 📊 Project stats fallback: record result usage only when no
+              // per-step assistant usage was received. messageId is synthesized
+              // from session + message anchor so repeated result events for the
+              // same turn remain idempotent.
+              const projectPath = options?.workingDirectory || '';
+              if (projectPath) {
+                const sessionId =
+                  claudeSessionId.current ||
+                  resultEvt.session_id ||
+                  assistantMessageId;
+                const messageId = `result-${sessionId}-${assistantMessageId}`;
+                void useProjectStatsStore.getState().recordUsage({
+                  sessionId,
+                  messageId,
+                  projectPath,
+                  projectName: projectNameFromPath(projectPath),
+                  provider: options?.provider || 'anthropic',
+                  model: options?.model || 'unknown',
+                  inputTokens: usage.input_tokens || 0,
+                  outputTokens: usage.output_tokens || 0,
+                  cacheCreationTokens: cacheCreation,
+                  cacheReadTokens: cacheRead,
+                  agentId: options?.agentId ?? null,
+                  agentName: options?.agentName ?? null,
+                  agentRole: options?.agentRole ?? null,
+                });
+              }
             }
           }
 

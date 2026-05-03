@@ -338,6 +338,16 @@ export async function deleteAgent(id: string): Promise<void> {
 
     await saveAgents(filtered);
     console.log(`[unifiedAgentStorage] Deleted agent: ${id}`);
+
+    // 📊 Project stats: flag token events for this agent as deleted so totals
+    // remain available in the "agenti licenziati" bucket.
+    // Brain: decision-project-token-stats-sqlite
+    try {
+      const { useProjectStatsStore } = await import('../stores/projectStatsStore');
+      await useProjectStatsStore.getState().markAgentDeleted(id);
+    } catch (err) {
+      console.warn('[unifiedAgentStorage] markAgentDeleted skipped:', err);
+    }
   } catch (error) {
     console.error(`[unifiedAgentStorage] Failed to delete agent ${id}:`, error);
     toast.error("Failed to delete agent");

@@ -339,11 +339,14 @@ export interface SavedAgent {
 }
 
 // Skills types (similar to Agents)
+export type SkillScope = "global" | "project" | "plugin";
+
 export interface SkillInfo {
   name: string;
   description: string;
   file_path: string;
-  scope: string; // "global" or "project"
+  scope: SkillScope;
+  plugin?: string; // set when scope === "plugin"
 }
 
 export interface SkillDetails extends SkillInfo {
@@ -584,9 +587,15 @@ export interface StructuredOutputFormat {
   schema: StructuredOutputSchema;
 }
 
-// Effort parameter for controlling response quality vs speed/cost tradeoff
-// SDK 0.2.48+: 'max' available for Opus 4.6 only
-export type EffortLevel = 'low' | 'medium' | 'high' | 'max';
+// Effort parameter for controlling response quality vs speed/cost tradeoff.
+// Aligned 1:1 with Anthropic's official levels (since 0.9.3).
+// - Opus 4.7: low, medium, high, xhigh, max (default: xhigh via defaultEffortForModel)
+// - Opus 4.6 / Sonnet 4.6: low, medium, high, max (default: high)
+// - Other models: low, medium, high, max (default: medium; effort ignored if unsupported)
+// xhigh is clamped to 'high' by stream-daemon.js for non-Opus-4.7 models.
+// See: src/services/modelService.ts#defaultEffortForModel
+// Brain: task-effort-model-aware-refactor
+export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 // Thinking mode for controlling reasoning depth
 // 'disabled' = no extended thinking (SDK thinking: { type: 'disabled' })

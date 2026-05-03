@@ -109,6 +109,11 @@ pub fn remove_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn rename_file(from: String, to: String) -> Result<(), String> {
+    std::fs::rename(&from, &to).map_err(|e| format!("Failed to rename file: {}", e))
+}
+
+#[tauri::command]
 pub fn remove_directory(path: String) -> Result<(), String> {
     std::fs::remove_dir_all(&path).map_err(|e| format!("Failed to remove directory: {}", e))
 }

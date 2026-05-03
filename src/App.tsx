@@ -98,6 +98,7 @@ import { useClaudeAssetsTab } from "./hooks/useClaudeAssetsTab";
 import { useMarketplace } from "./hooks/useMarketplace";
 import { useUIStore } from "./stores/uiStore";
 import { useSettingsStore } from "./stores/settingsStore";
+import { useProjectStatsStore } from "./stores/projectStatsStore";
 import { applyTypography } from "./constants/typography";
 import { applyAccentColor } from "./utils/accentColor";
 import { useKanbanStore } from "./stores/kanbanStore";
@@ -126,7 +127,7 @@ import { useExternalIdeContext } from "./hooks/useExternalIdeContext";
 import type { ChatSendOptions, PermissionMode } from "./hooks/useClaudeChat";
 import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useModelsConfig } from "./hooks/useAppConfig";
-import { getModelId } from "./services/modelService";
+import { getModelId, defaultEffortForModel } from "./services/modelService";
 import { findDefinition } from "./services/codeIntelService";
 import { getProviderRequestFields, getActiveModelName } from "./services/claudeSDK";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
@@ -1194,34 +1195,6 @@ function AppContent() {
     });
   }, [chatSessions]);
 
-  // Brain: bug-background-task-unsolicited-events
-  // On mount, auto-complete any background task placeholders that were persisted mid-flight.
-  // These can occur if the app was closed while a background task was still streaming.
-  useEffect(() => {
-    setChatSessions(prev => {
-      let hasStuck = false;
-      for (const [, messages] of prev) {
-        if (messages.some(m => m.role === 'assistant' && m.status === 'streaming' && m.metadata?.isBackgroundTask)) {
-          hasStuck = true;
-          break;
-        }
-      }
-      if (!hasStuck) return prev;
-      const fixed = new Map(prev);
-      for (const [key, messages] of fixed) {
-        const fixedMsgs = messages.map(m =>
-          m.role === 'assistant' && m.status === 'streaming' && m.metadata?.isBackgroundTask
-            ? { ...m, status: 'complete' as const, content: m.content || '(Background task interrupted)' }
-            : m
-        );
-        if (fixedMsgs !== messages) fixed.set(key, fixedMsgs);
-      }
-      console.log('🦆 [mount] Auto-completed stuck background task placeholders');
-      return fixed;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Keep chatSessionsRef in sync for synchronous access in beforeunload and result-event handlers
   useEffect(() => {
     chatSessionsRef.current = chatSessions;
@@ -1473,7 +1446,6 @@ function AppContent() {
     source: string, // For debugging: 'Multi-Listener', 'Pre-warm', 'ensureListenerReady'
     sessionKey?: string, // 🦆 SESSION-FIRST: sessionKey from Rust event wrapper
     turnId?: string, // Frontend-generated turn ID echoed back from Rust for per-turn isolation
-    unsolicited?: boolean // Brain: bug-background-task-unsolicited-events — post-query background task event
   ) => {
     const evt = claudeEvent as any;
 
@@ -1627,36 +1599,6 @@ function AppContent() {
             lastAgentResponseRef.current.set(messageKey, existingText + textContent);
           }
         }
-      } else if (unsolicited && !activeStreamsRef.current.has(messageKey)) {
-        // Brain: bug-background-task-unsolicited-events
-        // This is a post-query event from a background task (run_in_background).
-        // No active stream exists, so we auto-create a streaming placeholder and
-        // route the event to it. This makes the agent's response visible immediately
-        // instead of waiting for the user to send a new message.
-        //
-        // Event mixing is prevented by the `!activeStreamsRef.current.has(messageKey)`
-        // guard: once a new user query starts (creating a stream), unsolicited events
-        // fall through to the normal buffer path and get discarded on next turn setup.
-        console.log(`🦆 [${source}] UNSOLICITED event for messageKey=${messageKey} — auto-creating placeholder`);
-
-        const placeholderId = `msg-${Date.now()}-assistant-bg-${Math.random().toString(36).substring(2, 11)}`;
-        const placeholder: ChatMessage = {
-          id: placeholderId,
-          role: 'assistant',
-          content: '',
-          timestamp: Date.now(),
-          status: 'streaming' as const,
-          events: [claudeEvent],
-          metadata: { isBackgroundTask: true },
-        };
-        const updatedMessages = [...sessionMessages, placeholder];
-        newSessions.set(messageKey, updatedMessages);
-
-        // Clear any stale buffer — the placeholder will receive future events
-        eventBufferRef.current.delete(messageKey);
-
-        // Clear activeQueryIdRef so future unsolicited events (no turnId) pass through
-        activeQueryIdRef.current.delete(messageKey);
       } else {
         // 🦆 BUFFER: No streaming message yet - buffer the event for later
         // 🦆 SESSION-FIRST: Use messageKey for buffer (parallel sessions need separate buffers)
@@ -1666,32 +1608,6 @@ function AppContent() {
       return newSessions;
     });
 
-    // Brain: bug-background-task-unsolicited-events
-    // Set loading state when unsolicited events arrive, clear it on result
-    if (unsolicited) {
-      if (claudeEvent.type === 'result') {
-        // Background task turn completed — mark as done
-        useChatStore.getState().setLoading(messageKey, false);
-        // Mark the last assistant message as complete
-        setChatSessions((prev) => {
-          const newSessions = new Map(prev);
-          const messages = newSessions.get(messageKey) ?? [];
-          const lastMsg = messages[messages.length - 1];
-          if (lastMsg?.role === 'assistant' && lastMsg.status === 'streaming') {
-            const resultEvt = claudeEvent as any;
-            newSessions.set(messageKey, messages.map((msg, i) =>
-              i === messages.length - 1
-                ? { ...msg, content: resultEvt.result || msg.content, status: 'complete' as const }
-                : msg
-            ));
-          }
-          return newSessions;
-        });
-        console.log(`🦆 [${source}] UNSOLICITED result for messageKey=${messageKey} — background task complete`);
-      } else {
-        useChatStore.getState().setLoading(messageKey, true);
-      }
-    }
 
     // 🦆 CONTEXT FILL FIX: Track usage from ASSISTANT events (per-step, real context fill)
     // Assistant message usage is per-API-call, so input_tokens + cache_read + cache_creation
@@ -1708,6 +1624,44 @@ function AppContent() {
           cache_creation_input_tokens: msgUsage.cache_creation_input_tokens || 0,
           cache_read_input_tokens: msgUsage.cache_read_input_tokens || 0,
         });
+
+        // 📊 Project stats: record per-step usage with full agent attribution.
+        // Idempotent on (sessionId, messageId) — Anthropic message ids are unique.
+        // IMPORTANT: handleClaudeEvent is memoized with `[handleTokenUpdate]` deps,
+        // so we can't read `terminals` / `agentSessions` from closure (stale).
+        // Use `terminalsRef.current` and `useSessionStore.getState()` for fresh state.
+        // Brain: decision-project-token-stats-sqlite
+        // Brain: gotcha-delayed-agent-message-stale-closure
+        const messageId = assistantEvt.message?.id;
+        const session = useSessionStore.getState().sessions.find((s) => s.id === messageKey);
+        const terminal = terminalsRef.current.find((t) => t.id === agentId);
+        const projectPath = session?.projectPath || terminal?.cwd || '';
+        if (projectPath && messageId) {
+          const sessionId =
+            session?.claudeSessionId || assistantEvt.session_id || messageKey;
+          const projectName =
+            session?.projectName ||
+            projectPath.replace(/\\/g, '/').replace(/\/+$/, '').split('/').filter(Boolean).pop() ||
+            'Unknown';
+          const agentName = terminal?.label || session?.title || 'Unknown agent';
+          const agentRole = (terminal?.personality as { role?: string } | undefined)?.role || null;
+          const provider = useSettingsStore.getState().claude.provider || 'anthropic';
+          void useProjectStatsStore.getState().recordUsage({
+            sessionId,
+            messageId,
+            projectPath,
+            projectName,
+            provider,
+            model: assistantEvt.message?.model || 'unknown',
+            inputTokens: msgUsage.input_tokens || 0,
+            outputTokens: msgUsage.output_tokens || 0,
+            cacheCreationTokens: msgUsage.cache_creation_input_tokens || 0,
+            cacheReadTokens: msgUsage.cache_read_input_tokens || 0,
+            agentId: agentId || null,
+            agentName,
+            agentRole,
+          });
+        }
       }
     }
 
@@ -1764,6 +1718,24 @@ function AppContent() {
     // agentic steps, while assistant message usage (above) is per-step and accurate for context fill.
     if (claudeEvent.type === 'result') {
       const resultEvt = claudeEvent as any;
+
+      // 📊 Project stats: turn ended → refresh per-agent breakdown so the
+      // accordion panel reflects the usage just recorded during this turn.
+      // Use refs / zustand getState to avoid stale closure (see deps at L1895).
+      // Brain: decision-project-token-stats-sqlite
+      {
+        const session = useSessionStore.getState().sessions.find((s) => s.id === messageKey);
+        const terminal = terminalsRef.current.find((t) => t.id === agentId);
+        const projectPath = session?.projectPath || terminal?.cwd || '';
+        if (projectPath) {
+          void useProjectStatsStore
+            .getState()
+            .refreshProjectAgents(projectPath)
+            .catch(() => {
+              /* non-fatal: UI stays on previous cache until next turn */
+            });
+        }
+      }
 
       // Extract context window size from modelUsage in result event.
       // Note: Rust serde serializes as "modelUsage" (camelCase) due to #[serde(rename = "modelUsage")]
@@ -1823,15 +1795,12 @@ function AppContent() {
 
       // 🦆 SESSION BACKUP: Persist messages to localStorage at end of turn
       // Same frequency as token persistence above — once per turn, no excessive writes.
-      // Uses functional updater to read the latest flushed state (chatSessionsRef may
-      // be one render behind since its sync effect runs after paint).
-      setChatSessions(current => {
-        const msgs = current.get(messageKey);
-        if (msgs && msgs.length > 0) {
-          saveSessionBackup(messageKey, msgs);
-        }
-        return current; // no mutation — React bails out
-      });
+      // Read from ref (synced at line ~1197) — avoids a no-op setChatSessions updater
+      // that was causing spurious React state update cycles and QuotaExceededError spam.
+      const backupMsgs = chatSessionsRef.current.get(messageKey);
+      if (backupMsgs && backupMsgs.length > 0) {
+        saveSessionBackup(messageKey, backupMsgs);
+      }
 
       // Brain: fix-memory-leak-14gb-ram
       // Session-end cleanup: free temporary buffers that are no longer needed
@@ -2445,13 +2414,12 @@ function AppContent() {
       try {
         // 🦆 SESSION-FIRST: Events now come wrapped with sessionKey + turnId
         // Payload structure: { sessionKey: string, turnId: string, event: ClaudeEvent }
-        // Brain: bug-background-task-unsolicited-events
-        const unlisten = await listen<{ sessionKey: string; turnId?: string; event: ClaudeEvent; unsolicited?: boolean }>(eventName, (event) => {
-          const { sessionKey, turnId, event: claudeEvent, unsolicited } = event.payload;
+        const unlisten = await listen<{ sessionKey: string; turnId?: string; event: ClaudeEvent }>(eventName, (event) => {
+          const { sessionKey, turnId, event: claudeEvent } = event.payload;
 
           // 🦆 EVENT BUFFER FIX: Use centralized event handler with buffering support
           // 🦆 SESSION-FIRST: Pass sessionKey so events go to the correct chat session
-          handleClaudeEvent(agentId, claudeEvent, 'Multi-Listener', sessionKey, turnId, unsolicited);
+          handleClaudeEvent(agentId, claudeEvent, 'Multi-Listener', sessionKey, turnId);
 
           // Auto-refresh FileExplorer when files are created/modified
           if (claudeEvent.type === 'result') {
@@ -2934,7 +2902,8 @@ function AppContent() {
       // Store settings used for this message (for UI display)
       settings: {
         model: getActiveModelName(options?.model),
-        effort: options?.effort || 'medium',
+        // Brain: task-effort-model-aware-refactor — use model-aware default instead of hardcoded 'medium'
+        effort: options?.effort || defaultEffortForModel(options?.model || ''),
         thinkingMode: options?.thinkingMode || 'auto',
       },
       // Hide header + init widget on resumed sessions (known at message creation time)
@@ -2969,16 +2938,7 @@ function AppContent() {
         eventBufferRef.current.delete(messageKey);
       }
 
-      // Brain: bug-background-task-unsolicited-events
-      // Auto-complete any stuck background task placeholder before adding a new one.
-      // This prevents the null-turnId fallback path from routing unsolicited events
-      // to the new query's placeholder (event mixing).
-      const fixedMessages = sessionMessages.map((msg) =>
-        msg.role === 'assistant' && msg.status === 'streaming' && msg.metadata?.isBackgroundTask
-          ? { ...msg, status: 'complete' as const }
-          : msg
-      );
-      newSessions.set(messageKey, [...fixedMessages, assistantMessage]);
+      newSessions.set(messageKey, [...sessionMessages, assistantMessage]);
 
       return newSessions;
     });
@@ -3109,6 +3069,18 @@ function AppContent() {
                   ...msg,
                   content: response.result,
                   status: 'complete' as const,
+                  metadata: {
+                    ...msg.metadata,
+                    ...(response.usage ? {
+                      turnUsage: {
+                        input_tokens: response.usage.input_tokens || 0,
+                        output_tokens: response.usage.output_tokens || 0,
+                        cache_read_input_tokens: response.usage.cache_read_input_tokens || 0,
+                        cache_creation_input_tokens: response.usage.cache_creation_input_tokens || 0,
+                      },
+                    } : {}),
+                    turnCost: response.total_cost_usd,
+                  },
                 }
               : msg
           )
@@ -3240,7 +3212,10 @@ function AppContent() {
               msg.id === assistantMessageId
                 ? {
                     ...msg,
-                    content: 'Stream stopped by user',
+                    // Preserve already-streamed content instead of replacing it
+                    content: msg.content && msg.content.length > 0
+                      ? msg.content
+                      : 'Stream stopped by user',
                     status: 'error' as const,
                     error: 'Aborted',
                   }
@@ -3290,7 +3265,10 @@ function AppContent() {
               msg.id === assistantMessageId
                 ? {
                     ...msg,
-                    content: displayMessage,
+                    // Preserve already-streamed content; error details are in .error field
+                    content: msg.content && msg.content.length > 0
+                      ? msg.content
+                      : displayMessage,
                     status: 'error' as const,
                     error: errorMessage,
                   }
@@ -3694,7 +3672,8 @@ function AppContent() {
       status: 'streaming',
       settings: {
         model: getActiveModelName(options?.model),
-        effort: options?.effort || 'medium',
+        // Brain: task-effort-model-aware-refactor
+        effort: options?.effort || defaultEffortForModel(options?.model || ''),
         thinkingMode: options?.thinkingMode || 'auto',
       },
       metadata: { turnId },
@@ -3797,6 +3776,18 @@ function AppContent() {
                   ...msg,
                   content: response.result,
                   status: 'complete' as const,
+                  metadata: {
+                    ...msg.metadata,
+                    ...(response.usage ? {
+                      turnUsage: {
+                        input_tokens: response.usage.input_tokens || 0,
+                        output_tokens: response.usage.output_tokens || 0,
+                        cache_read_input_tokens: response.usage.cache_read_input_tokens || 0,
+                        cache_creation_input_tokens: response.usage.cache_creation_input_tokens || 0,
+                      },
+                    } : {}),
+                    turnCost: response.total_cost_usd,
+                  },
                 }
               : msg
           )
@@ -3883,8 +3874,9 @@ function AppContent() {
         timestamp: Date.now(),
         status: 'complete' as const,
         settings: {
-          model: options?.model || 'opus46',
-          effort: options?.effort || 'medium',
+          model: options?.model || 'opus47',
+          // Brain: task-effort-model-aware-refactor
+          effort: options?.effort || defaultEffortForModel(options?.model || ''),
           thinkingMode: options?.thinkingMode || 'auto',
         },
         metadata: { turnId },
@@ -4638,12 +4630,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       const presets = useSettingsStore.getState().agentModePresets;
       const bypassPreset = presets.bypass;
 
+      const fallbackModel = normalizeModelName(bypassPreset?.model || 'opus47');
       const current = newMap.get(key) ?? {
         inputDraft: '',
-        model: normalizeModelName(bypassPreset?.model || 'opus46'),
+        model: fallbackModel,
         thinkingMode: bypassPreset?.thinkingMode || 'auto',
         permissionMode: 'bypass',
-        effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
+        // Brain: task-effort-model-aware-refactor — preset effort first, then model-aware default
+        effort: bypassPreset?.effort || defaultEffortForModel(fallbackModel),
       };
 
       // Auto-switch settings based on permission mode using presets from settings
@@ -5163,36 +5157,42 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       // Default settings when no session/agent is active - use presets from settings
       const presets = useSettingsStore.getState().agentModePresets;
       const bypassPreset = presets.bypass;
+      const fallbackModel = normalizeModelName(bypassPreset?.model || 'opus47');
 
       return {
         inputDraft: '',
-        model: normalizeModelName(bypassPreset?.model || 'opus46'),
+        model: fallbackModel,
         thinkingMode: bypassPreset?.thinkingMode || 'auto',
         permissionMode: 'bypass',
-        effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
+        // Brain: task-effort-model-aware-refactor
+        effort: bypassPreset?.effort || defaultEffortForModel(fallbackModel),
       };
     }
 
     const existing = agentChatSettings.get(settingsKey);
     if (existing) {
       // Normalize the model name in case it's a legacy ID
+      const normalizedModel = normalizeModelName(existing.model);
       return {
         ...existing,
-        model: normalizeModelName(existing.model),
-        effort: existing.effort || 'medium', // Ensure default if not set
+        model: normalizedModel,
+        // Brain: task-effort-model-aware-refactor — default based on actual model, not hardcoded
+        effort: existing.effort || defaultEffortForModel(normalizedModel),
       };
     }
 
     // Initialize default settings for new session using presets from settings
     const presets = useSettingsStore.getState().agentModePresets;
     const bypassPreset = presets.bypass;
+    const fallbackModel = normalizeModelName(bypassPreset?.model || 'opus47');
 
     const defaultSettings: AgentChatSettings = {
       inputDraft: '',
-      model: normalizeModelName(bypassPreset?.model || 'opus46'),
+      model: fallbackModel,
       thinkingMode: bypassPreset?.thinkingMode || 'auto',
       permissionMode: 'bypass',
-      effort: bypassPreset?.effort || 'medium', // SDK 0.1.54+ - Default from preset
+      // Brain: task-effort-model-aware-refactor
+      effort: bypassPreset?.effort || defaultEffortForModel(fallbackModel),
     };
 
     setAgentChatSettings((prev) => {
@@ -12783,23 +12783,7 @@ You have access to all Bash tools to execute git commands like:
               <ActionIcons
               projectPath={activeTerminal?.cwd ?? explorerPath}
               onGitClick={() => setShowGitDrawer(!showGitDrawer)}
-              onUsageClick={async () => {
-                try {
-                  const cwd = activeTerminal?.cwd ?? explorerPath ?? process.env.HOME ?? "~";
-                  // Open in Terminal Window (separate Tauri window) instead of tab
-                  const projects = activeProjects.map(project => ({
-                    path: project.path,
-                    name: project.name,
-                  }));
-                  await openTerminalWindow(projects, {
-                    projectPath: cwd,
-                    command: 'claude /usage',
-                    terminalLabel: 'Claude Plan Usage',
-                  });
-                } catch (error) {
-                  console.error("Failed to open claude usage:", error);
-                }
-              }}
+              onUsageClick={() => handleCreateTerminalWithCommand("Plan Usage", "claude /usage")}
               onTelegramClick={() => setShowTelegramSetup(true)}
               onTerminalClick={handleCreateAgentTerminal}
               onBrowserClick={handleOpenBrowserTab}

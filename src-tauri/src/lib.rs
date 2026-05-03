@@ -77,6 +77,7 @@ mod remote_auth; // 🔐 Remote API Bearer token authentication
 mod remote_config; // ⚙️ Remote API configuration (enable/disable, token, port)
 mod remote_ws; // 📡 WebSocket real-time push for mobile clients
 mod remote_dashboard; // 📱 Mobile PWA dashboard served at /dashboard
+mod project_stats; // 📊 Per-project token aggregation (SQLite backed)
 
 // Global state for tracking Claude SDK session IDs per agent
 pub struct SessionState {
@@ -627,6 +628,14 @@ pub fn run() {
         .plugin(tauri_plugin_mic_recorder::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            // 📊 Initialize project stats SQLite database (per-project token aggregation)
+            // Brain: decision-project-token-stats-sqlite
+            if let Err(e) = project_stats::init(app.handle()) {
+                log::error!("Failed to initialize project stats DB: {}", e);
+                // Non-fatal: feature degrades gracefully; commands will fail
+                // until the app is restarted with a fixed DB path.
+            }
+
             // 💰 Load Gumroad and Supabase credentials (baked in at build time)
             // These are loaded from .env during compilation via build.rs
             let license_state: tauri::State<license::LicenseState> = app.state();
@@ -1088,6 +1097,7 @@ pub fn run() {
             fs::read_binary_file,
             fs::create_directory,
             fs::remove_file,
+            fs::rename_file,
             fs::remove_directory,
             fs::path_exists,
             fs::stat_file,
@@ -1382,6 +1392,16 @@ pub fn run() {
             remote_api::delegate_plan_to_agent,
             // BTW side-chain query
             btw::btw_query,
+            // 📊 Project token stats (SQLite)
+            project_stats::record_token_usage,
+            project_stats::get_project_stats,
+            project_stats::get_all_project_stats,
+            project_stats::get_project_agent_stats,
+            project_stats::mark_session_deleted,
+            project_stats::mark_agent_deleted,
+            project_stats::bulk_import_token_events,
+            project_stats::get_stats_migration_flag,
+            project_stats::set_stats_migration_flag,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

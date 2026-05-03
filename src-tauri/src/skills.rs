@@ -14,7 +14,9 @@ pub struct SkillInfo {
     pub name: String,
     pub description: String,
     pub file_path: String,
-    pub scope: String, // "global" or "project"
+    pub scope: String, // "global", "project", or "plugin"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -143,18 +145,159 @@ fn list_skills_impl(working_dir: Option<String>) -> Result<Vec<SkillInfo>> {
         }
     }
 
-    log::info!("Total skills found: {} (global + project)", skills.len());
-
-    // Sort skills: first by scope (global first), then by name
-    skills.sort_by(|a, b| {
-        match (a.scope.as_str(), b.scope.as_str()) {
-            ("global", "project") => std::cmp::Ordering::Less,
-            ("project", "global") => std::cmp::Ordering::Greater,
-            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+    // 3. Read PLUGIN skills from ~/.claude/plugins/installed_plugins.json
+    match list_plugin_skills() {
+        Ok(mut plugin_skills) => {
+            log::info!("Found {} plugin skills", plugin_skills.len());
+            skills.append(&mut plugin_skills);
         }
+        Err(e) => {
+            log::debug!("Skipping plugin skills: {}", e);
+        }
+    }
+
+    log::info!("Total skills found: {} (global + project + plugin)", skills.len());
+
+    // Sort: global -> project -> plugin, alphabetical within each group
+    skills.sort_by(|a, b| {
+        fn rank(scope: &str) -> u8 {
+            match scope {
+                "global" => 0,
+                "project" => 1,
+                "plugin" => 2,
+                _ => 3,
+            }
+        }
+        rank(a.scope.as_str())
+            .cmp(&rank(b.scope.as_str()))
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
     });
 
     Ok(skills)
+}
+
+/// Walk `~/.claude/plugins/installed_plugins.json` and return one `SkillInfo`
+/// per `{installPath}/skills/*/SKILL.md` found.
+/// Names are returned as `<plugin>:<skill-name>` to match the SDK's namespaced form.
+// Brain: gotcha-claude-plugin-skills-discovery
+fn list_plugin_skills() -> Result<Vec<SkillInfo>> {
+    let home = dirs::home_dir().ok_or_else(|| anyhow!("No home directory"))?;
+    let manifest_path = home.join(".claude").join("plugins").join("installed_plugins.json");
+    if !manifest_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let raw = fs::read_to_string(&manifest_path)
+        .with_context(|| format!("Unable to read {:?}", manifest_path))?;
+    let manifest: serde_json::Value = serde_json::from_str(&raw)
+        .with_context(|| format!("Invalid JSON in {:?}", manifest_path))?;
+
+    let plugins = match manifest.get("plugins").and_then(|v| v.as_object()) {
+        Some(obj) => obj,
+        None => return Ok(Vec::new()),
+    };
+
+    let mut skills = Vec::new();
+    for (key, entries) in plugins {
+        // Key format: "<plugin-name>@<marketplace>"
+        let plugin_name = key.split('@').next().unwrap_or(key);
+
+        let first = match entries.as_array().and_then(|a| a.first()) {
+            Some(v) => v,
+            None => continue,
+        };
+        let install_path = match first.get("installPath").and_then(|v| v.as_str()) {
+            Some(p) => PathBuf::from(normalize_path(p)),
+            None => continue,
+        };
+        let skills_dir = install_path.join("skills");
+        if !skills_dir.exists() {
+            continue;
+        }
+
+        let entries = match fs::read_dir(&skills_dir) {
+            Ok(e) => e,
+            Err(err) => {
+                log::warn!("Unable to read plugin skills dir {:?}: {}", skills_dir, err);
+                continue;
+            }
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let skill_md = path.join("SKILL.md");
+            if !skill_md.exists() {
+                continue;
+            }
+            let skill_dir_name = match path.file_name().and_then(|s| s.to_str()) {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            let content = match fs::read_to_string(&skill_md) {
+                Ok(c) => c,
+                Err(err) => {
+                    log::warn!("Unable to read {:?}: {}", skill_md, err);
+                    continue;
+                }
+            };
+            skills.push(SkillInfo {
+                name: format!("{}:{}", plugin_name, skill_dir_name),
+                description: extract_description(&content),
+                file_path: normalize_path(&skill_md.to_string_lossy()),
+                scope: "plugin".to_string(),
+                plugin: Some(plugin_name.to_string()),
+            });
+        }
+    }
+
+    Ok(skills)
+}
+
+/// Resolve a plugin skill name of the form `<plugin>:<skill>` to its SKILL.md path
+/// by consulting `installed_plugins.json`.
+fn resolve_plugin_skill_path(name: &str) -> Result<PathBuf> {
+    let (plugin_name, skill_name) = name
+        .split_once(':')
+        .ok_or_else(|| anyhow!("Plugin skill name must be 'plugin:skill', got: {}", name))?;
+
+    let home = dirs::home_dir().ok_or_else(|| anyhow!("No home directory"))?;
+    let manifest_path = home.join(".claude").join("plugins").join("installed_plugins.json");
+    if !manifest_path.exists() {
+        return Err(anyhow!("Plugin manifest no longer exists — skill may have been uninstalled"));
+    }
+    let raw = fs::read_to_string(&manifest_path)
+        .with_context(|| format!("Unable to read {:?}", manifest_path))?;
+    let manifest: serde_json::Value = serde_json::from_str(&raw)
+        .with_context(|| format!("Invalid JSON in {:?}", manifest_path))?;
+
+    let plugins = manifest
+        .get("plugins")
+        .and_then(|v| v.as_object())
+        .ok_or_else(|| anyhow!("No 'plugins' object in manifest"))?;
+
+    for (key, entries) in plugins {
+        if key.split('@').next().unwrap_or(key) != plugin_name {
+            continue;
+        }
+        let install_path = entries
+            .as_array()
+            .and_then(|a| a.first())
+            .and_then(|v| v.get("installPath"))
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("No installPath for plugin '{}'", plugin_name))?;
+        let skill_md = PathBuf::from(normalize_path(install_path))
+            .join("skills")
+            .join(skill_name)
+            .join("SKILL.md");
+        if skill_md.exists() {
+            return Ok(skill_md);
+        }
+        return Err(anyhow!("Skill file not found: {:?}", skill_md));
+    }
+
+    Err(anyhow!("Plugin '{}' not installed", plugin_name))
 }
 
 fn get_skill_details_impl(
@@ -162,6 +305,19 @@ fn get_skill_details_impl(
     working_dir: Option<String>,
     scope: Option<String>,
 ) -> Result<SkillDetails> {
+    // Plugin skills live outside the global/project trees — resolve via manifest.
+    if scope.as_deref() == Some("plugin") {
+        let skill_path = resolve_plugin_skill_path(&name)?;
+        let content = fs::read_to_string(&skill_path)
+            .with_context(|| format!("Unable to read skill file: {:?}", skill_path))?;
+        return Ok(SkillDetails {
+            name: name.clone(),
+            description: extract_description(&content),
+            file_path: normalize_path(&skill_path.to_string_lossy()),
+            content,
+        });
+    }
+
     // Determine which directory to use based on scope
     let skills_dir = match scope.as_deref() {
         Some("global") => {
@@ -234,18 +390,14 @@ fn parse_skill_file_with_scope(path: &PathBuf, scope: &str) -> Result<SkillInfo>
             .to_string()
     };
 
-    // Extract description from first line (if it starts with "# ")
-    let description = content
-        .lines()
-        .find(|line| line.starts_with("# "))
-        .map(|line| line.trim_start_matches("# ").to_string())
-        .unwrap_or_else(|| "No description".to_string());
+    let description = extract_description(&content);
 
     Ok(SkillInfo {
         name,
         description,
         file_path: normalize_path(&path.to_string_lossy()),
         scope: scope.to_string(),
+        plugin: None,
     })
 }
 
@@ -270,12 +422,7 @@ fn parse_skill_file_with_content(path: &PathBuf) -> Result<SkillDetails> {
             .to_string()
     };
 
-    // Extract description from first line (if it starts with "# ")
-    let description = content
-        .lines()
-        .find(|line| line.starts_with("# "))
-        .map(|line| line.trim_start_matches("# ").to_string())
-        .unwrap_or_else(|| "No description".to_string());
+    let description = extract_description(&content);
 
     Ok(SkillDetails {
         name,
@@ -283,6 +430,56 @@ fn parse_skill_file_with_content(path: &PathBuf) -> Result<SkillDetails> {
         file_path: normalize_path(&path.to_string_lossy()),
         content,
     })
+}
+
+/// Extract a skill's description from its markdown content.
+/// Prefers YAML frontmatter `description:`, falls back to the first `# ` heading,
+/// and finally to a "No description" placeholder.
+fn extract_description(content: &str) -> String {
+    if let Some(desc) = extract_frontmatter_field(content, "description") {
+        return desc;
+    }
+    content
+        .lines()
+        .find(|line| line.starts_with("# "))
+        .map(|line| line.trim_start_matches("# ").to_string())
+        .unwrap_or_else(|| "No description".to_string())
+}
+
+/// Pull a scalar field out of the leading YAML frontmatter block.
+/// Strips surrounding single/double quotes. Returns None if no frontmatter
+/// or the field is missing.
+///
+/// Only supports inline scalar values (`field: value` or `field: "value"`).
+/// Block scalars (`field: >-` / `field: |` with indented continuation lines)
+/// are NOT parsed — the field will return None and callers fall back to the
+/// `# Heading` description (or `"No description"`). In practice skill authors
+/// use inline descriptions; revisit if that assumption breaks.
+fn extract_frontmatter_field(content: &str, field: &str) -> Option<String> {
+    if !content.starts_with("---") {
+        return None;
+    }
+    let rest = &content[3..];
+    let end = rest.find("\n---")?;
+    let frontmatter = &rest[..end];
+
+    let prefix = format!("{}:", field);
+    for line in frontmatter.lines() {
+        let trimmed = line.trim_start();
+        if let Some(value) = trimmed.strip_prefix(&prefix) {
+            let value = value.trim();
+            let value = value
+                .strip_prefix('"')
+                .and_then(|v| v.strip_suffix('"'))
+                .or_else(|| value.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
+                .unwrap_or(value);
+            if value.is_empty() {
+                return None;
+            }
+            return Some(value.to_string());
+        }
+    }
+    None
 }
 
 /// Normalize path by removing \\?\ prefix added by fs::canonicalize on Windows
@@ -339,23 +536,7 @@ const BUNDLED_SKILLS: &[BundledSkill] = &[
 /// Extract `version: X.Y.Z` from YAML frontmatter in markdown content.
 /// Returns None if no frontmatter or no version field.
 fn extract_version(content: &str) -> Option<(u32, u32, u32)> {
-    // Check for frontmatter (starts with ---)
-    if !content.starts_with("---") {
-        return None;
-    }
-    // Find closing ---
-    let rest = &content[3..];
-    let end = rest.find("---")?;
-    let frontmatter = &rest[..end];
-
-    for line in frontmatter.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("version:") {
-            let ver_str = trimmed.trim_start_matches("version:").trim();
-            return parse_semver(ver_str);
-        }
-    }
-    None
+    extract_frontmatter_field(content, "version").as_deref().and_then(parse_semver)
 }
 
 /// Parse "1.2.3" into (1, 2, 3)

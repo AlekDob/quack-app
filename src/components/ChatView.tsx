@@ -7,6 +7,7 @@ import MessageList from './MessageList';
 // Lazy-load virtualized list to avoid bundling react-window upfront
 const MessageListVirtualized = lazy(() => import('./MessageListVirtualized'));
 import ChatInput from './ChatInput';
+import { useSettingsStore } from '../stores/settingsStore';
 import TokenUsageIndicator from './TokenUsageIndicator';
 import StaminaBarBorder from './StaminaBarBorder';
 import EditSummaryBar from './EditSummaryBar';
@@ -249,6 +250,9 @@ export default function ChatView({
   onTeammateDrillDown,
   onAgentCommitDetected,
 }: ChatViewProps) {
+  // Per-turn token stats toggle (from Settings → Chat Experience)
+  const showTurnTokenStats = useSettingsStore((s) => s.general?.showTurnTokenStats ?? false);
+
   // Counter to reset ThinkingBlocks when thinking mode changes via Tab key
   const [thinkingModeResetCounter, setThinkingModeResetCounter] = useState(0);
 
@@ -341,18 +345,16 @@ export default function ChatView({
         return;
       }
 
-      // INTERCEPT /context — show token usage from session data
+      // /context should flow through to the SDK as a regular message —
+      // the SDK handles it natively (like /compact).
       if (commandName === 'context') {
-        const total = sessionTokens.inputTokens + sessionTokens.outputTokens;
-        const ctxWindow = sessionTokens.contextWindow || 200_000;
-        const pct = ctxWindow > 0 ? ((total / ctxWindow) * 100).toFixed(1) : '0';
-        const fmt = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
-        toast.info(
-          `Context: ${fmt(total)} / ${fmt(ctxWindow)} tokens (${pct}%)\n` +
-          `Input: ${fmt(sessionTokens.inputTokens)} · Output: ${fmt(sessionTokens.outputTokens)}\n` +
-          `Cache read: ${fmt(sessionTokens.cacheReadTokens)} · Cache write: ${fmt(sessionTokens.cacheCreationTokens)}`,
-          { duration: 6000 }
-        );
+        await onSendMessage(trimmedContent, {
+          ...options,
+          model,
+          thinkingMode,
+          permissionMode,
+          effort,
+        });
         return;
       }
 
@@ -895,10 +897,10 @@ export default function ChatView({
         />
       )}
       {/* Brain: 005-performance-critical-refactor
-          Use virtualized list for sessions with 100+ messages to avoid DOM bloat.
-          Threshold at 100 (not 50) to avoid mid-session component swap during streaming.
+          Use virtualized list for sessions with 500+ messages to avoid DOM bloat.
+          Threshold at 500 to avoid mid-session component swap during streaming.
           Once virtualized kicks in, the session stays virtualized (no swap back). */}
-      {messages.length > 100 ? (
+      {messages.length > 500 ? (
         <Suspense fallback={<div style={{ flex: 1 }} />}>
         <MessageListVirtualized
           messages={messages}
@@ -922,6 +924,7 @@ export default function ChatView({
           pendingPlanApprovalIds={pendingPlanApprovalIds}
           onPlanApprovalResponse={onPlanApprovalResponse}
           onTeammateDrillDown={onTeammateDrillDown}
+          showTurnTokenStats={showTurnTokenStats}
         />
         </Suspense>
       ) : (
@@ -947,6 +950,7 @@ export default function ChatView({
           pendingPlanApprovalIds={pendingPlanApprovalIds}
           onPlanApprovalResponse={onPlanApprovalResponse}
           onTeammateDrillDown={onTeammateDrillDown}
+          showTurnTokenStats={showTurnTokenStats}
         />
       )}
       {(lastTurnFileEdits.length > 0 || lastTurnFileDeletes.length > 0) && (

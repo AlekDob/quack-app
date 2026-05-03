@@ -1,0 +1,226 @@
+.agent-stats-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.agent-stats-empty {
+  padding: 20px 12px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.agent-stats-empty small {
+  display: inline-block;
+  margin-top: 4px;
+  opacity: 0.7;
+}
+
+.agent-stats-error {
+  color: #ff6b6b;
+}
+
+/* Grand total header */
+.agent-stats-grand {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 12px;
+  background: linear-gradient(135deg,
+    rgba(34, 211, 238, 0.12) 0%,
+    rgba(34, 211, 238, 0.03) 100%);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  border-radius: var(--radius-sm);
+}
+
+.agent-stats-grand-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.agent-stats-grand-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: #22d3ee;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Section titles */
+.agent-stats-section-title {
+  margin: 4px 0 2px 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.agent-stats-section-title--deleted {
+  color: #f87171;
+  opacity: 0.85;
+}
+
+/* Agent list */
+.agent-stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-stats-row {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  transition: background 0.15s;
+}
+
+.agent-stats-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.agent-stats-row--expanded {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.agent-stats-row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.agent-stats-chevron {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  transition: transform 0.15s;
+}
+
+.agent-stats-chevron--open {
+  transform: rotate(90deg);
+}
+
+.agent-stats-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-stats-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-stats-role {
+  font-size: 10.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-stats-total {
+  font-size: 13px;
+  font-weight: 600;
+  color: #22d3ee;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* Expanded body */
+.agent-stats-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 10px 10px 28px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.agent-stats-lifetime {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.agent-stats-cells {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.agent-stats-cells em {
+  font-style: normal;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.6;
+  margin-right: 3px;
+}
+
+.agent-stats-msg-count {
+  font-size: 11px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.agent-stats-models-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.agent-stats-empty-inline {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.agent-stats-models-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-stats-model-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+}
+
+.agent-stats-model-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-primary);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
