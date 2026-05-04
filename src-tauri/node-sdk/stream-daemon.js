@@ -385,24 +385,16 @@ async function handleQuery(cmd) {
       ? allowedTools : defaultAllowedTools;
     const resolvedAllowedTools = askMode ? askModeAllowedTools : baseAllowedTools;
 
-    // Brain: gotcha-sdk-bundled-cli-200k-context-window
-    // The native Claude CLI binary handles prompt caching ~20x more efficiently
-    // than the SDK's bundled cli.js (300 vs 6200 uncached tokens/message).
-    // It also correctly resolves the 1M context window feature flag.
-    const isWindows = process.platform === 'win32';
-    const nativeClaudePath = isWindows
-      ? join(homedir(), '.claude', 'local', 'claude.exe')
-      : join(homedir(), '.local', 'bin', 'claude');
-    const hasNativeCli = existsSync(nativeClaudePath);
-    log('QUERY', `CLI: ${hasNativeCli ? 'native (' + nativeClaudePath + ')' : 'bundled cli.js'}`);
+    log('QUERY', 'CLI: bundled cli.js');
 
     const options = {
       model: modelId,
       // Brain: 1m-context-window-support
-      // The [1m] suffix in modelId is enough — the CLI handles it natively.
-      // Opus 4.6 has 1M automatically; Opus 4.7 has 1M natively; Sonnet 4.6 uses [1m] suffix for explicit opt-in.
-      // Re-enabled after AskUserQuestion regression fix (fix-ask-user-question-stream-event-not-emitted, 2026-03-24)
-      ...(hasNativeCli ? { pathToClaudeCodeExecutable: nativeClaudePath } : {}),
+      // The [1m] suffix in modelId is enough — the bundled cli.js correctly
+      // resolves Opus 4.7 to 1M context. (The earlier 200k workaround that
+      // routed via ~/.local/bin/claude was removed; that native-binary path
+      // also stripped off-schema fields like AskUserQuestion's `answers`,
+      // breaking question answering. Brain: gotcha-sdk-bundled-cli-200k-context-window — RESOLVED.)
       settingSources: ['project', 'user', 'local'],
       tools: { type: 'preset', preset: 'claude_code' },
       allowedTools: resolvedAllowedTools,
