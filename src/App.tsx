@@ -1803,11 +1803,13 @@ function AppContent() {
       }
 
       // Brain: fix-memory-leak-14gb-ram
-      // Session-end cleanup: free temporary buffers that are no longer needed
-      const agentId = activeMessageKeyRef.current.get(messageKey) || messageKey;
-      outputBuffersRef.current.delete(agentId);
+      // Session-end cleanup: free temporary buffers that are no longer needed.
+      // NOTE: name is `bufferKey` (not `agentId`) — a const named `agentId` here
+      // would shadow the outer parameter and TDZ-throw at the `.find` ~L1728.
+      const bufferKey = activeMessageKeyRef.current.get(messageKey) || messageKey;
+      outputBuffersRef.current.delete(bufferKey);
       outputBuffersRef.current.delete(messageKey);
-      activeMessageKeyRef.current.delete(agentId);
+      activeMessageKeyRef.current.delete(bufferKey);
     }
   }, [handleTokenUpdate]);
 
