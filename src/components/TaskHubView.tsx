@@ -222,6 +222,7 @@ export default function TaskHubView({
                 agentAvatar={terminal?.avatar}
                 agentColor={terminal?.color || '#8b5cf6'}
                 projectName={item.session.projectName}
+                projectPath={item.session.projectPath}
                 showProject={hasMultipleProjects}
                 chatMessages={messages}
                 isLoading={item.isLoading}

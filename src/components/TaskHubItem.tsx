@@ -4,6 +4,8 @@ import type { AgentSession, ChatMessage } from '../types';
 import { formatRelativeTime } from '../utils/timeFormat';
 import { getActivityDotColor, getTimeColor, getDotClassName } from '../utils/sessionStatus';
 import { useAgentAvatar } from '../hooks/useAgentAvatar';
+import { useProjectColor } from '../hooks/useProjectColor';
+import { DEFAULT_PROJECT_COLORS } from '../utils/projectColors';
 import './AgentSessionItem.css'; // Reuse dot animations + context menu styles
 
 export type SessionPriority = 1 | 2 | 3 | 4;
@@ -18,6 +20,7 @@ interface TaskHubItemProps {
   agentAvatar?: string;
   agentColor: string;
   projectName: string;
+  projectPath: string;
   showProject: boolean;
   chatMessages: ChatMessage[];
   isLoading: boolean;
@@ -25,6 +28,15 @@ interface TaskHubItemProps {
   onMarkDone?: (sessionId: string) => void;
   onDelete?: (sessionId: string) => void;
   onRename?: (sessionId: string) => void;
+}
+
+// Stable hash so projects without a custom color get distinct fallback hues
+function projectFallbackIndex(key: string): number {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = ((hash << 5) - hash + key.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash) % DEFAULT_PROJECT_COLORS.length;
 }
 
 const PRIORITY_ACCENT: Record<SessionPriority, string | null> = {
@@ -44,6 +56,7 @@ function TaskHubItem({
   agentAvatar,
   agentColor,
   projectName,
+  projectPath,
   showProject,
   chatMessages,
   isLoading,
@@ -56,6 +69,7 @@ function TaskHubItem({
   const relativeTime = formatRelativeTime(session.updatedAt);
   const timeColor = getTimeColor(session.updatedAt);
   const accent = PRIORITY_ACCENT[priority];
+  const projectColor = useProjectColor(projectPath, projectFallbackIndex(projectPath || projectName));
 
   // Context menu state
   const [showContextMenu, setShowContextMenu] = useState(false);
@@ -145,6 +159,32 @@ function TaskHubItem({
         />
       </div>
 
+      {/* Project tag — colored chip on the left, anchored to the project's color */}
+      {showProject && (
+        <span
+          title={projectName}
+          style={{
+            fontSize: '9px',
+            fontWeight: 600,
+            letterSpacing: '0.02em',
+            color: projectColor,
+            background: `${projectColor}1F`,
+            border: `1px solid ${projectColor}55`,
+            padding: '1px 6px',
+            borderRadius: '3px',
+            maxWidth: '90px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+            textTransform: 'lowercase',
+            lineHeight: 1.4,
+          }}
+        >
+          {projectName}
+        </span>
+      )}
+
       {/* Title */}
       <span
         style={{
@@ -174,24 +214,6 @@ function TaskHubItem({
           border: `1px solid ${agentColor}60`,
         }}
       />
-
-      {/* Project tag */}
-      {showProject && (
-        <span
-          style={{
-            fontSize: '8px',
-            fontFamily: 'monospace',
-            color: 'rgba(255, 255, 255, 0.35)',
-            maxWidth: '60px',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-          }}
-        >
-          {projectName}
-        </span>
-      )}
 
       {/* Relative time */}
       <span

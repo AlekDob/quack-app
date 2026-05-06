@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: React 18, TypeScript, Zustand
 created: 2026-04-09
-last_verified: 2026-04-09
-tags: [task-hub, sessions, priority, sidebar, pip-window]
+last_verified: 2026-05-06
+tags: [task-hub, sessions, priority, sidebar, pip-window, project-color]
 ---
 
 ## Task Hub View
@@ -15,7 +15,7 @@ tags: [task-hub, sessions, priority, sidebar, pip-window]
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Component | `src/components/TaskHubView.tsx` | Main container: priority grouping logic, sort, search filter, delete/rename dialogs |
-| Component | `src/components/TaskHubItem.tsx` | Single session row: status dot, title, agent avatar, project tag, relative time, context menu; exports `SessionPriority` type |
+| Component | `src/components/TaskHubItem.tsx` | Single session row: status dot, **colored project chip (left of title)**, title, agent avatar, relative time, context menu; exports `SessionPriority` type |
 | Component | `src/components/SidebarViewToggle.tsx` | Folder/list icon toggle switching `sidebarView` between `'projects'` and `'taskhub'` |
 | Config | `src/components/TaskHubView.css` | `.task-hub-list`, `.task-hub-group`, `.task-hub-section-header`, `.task-hub-section-count`, `.task-hub-empty` |
 
@@ -71,6 +71,7 @@ Within each priority group, sessions are sorted by `updatedAt` descending (most 
 - `../utils/timeFormat` (`formatRelativeTime`): relative time string for item rows
 - `../utils/sessionStatus` (`getActivityDotColor`, `getTimeColor`, `getDotClassName`): dot color/class logic shared with `AgentSessionItem`
 - `../hooks/useAgentAvatar`: resolves duck avatar URL from label/avatar string
+- `../hooks/useProjectColor` + `../utils/projectColors` (`DEFAULT_PROJECT_COLORS`): color of the project chip — pulls custom color from `.quack-repo-order.dat` storage, falls back to a deterministic palette index hashed from `projectPath`
 - `react-dom` (`createPortal`): context menu rendering at `document.body`
 
 ### Config
@@ -79,6 +80,8 @@ Within each priority group, sessions are sorted by `updatedAt` descending (most 
 - `SessionPriority` type — exported from `TaskHubItem.tsx`: `1 | 2 | 3 | 4`
 - Completed sessions (`status === 'done'`) are excluded — they belong in the Kanban/Projects view
 - P4 opacity fades: single item → `0.7`; multiple items → `Math.max(0.4, 0.75 - (idx / size) * 0.35)`
+- Project chip is rendered only when `hasMultipleProjects` (more than one distinct `projectName` across active sessions). Style: `9px / 600`, lowercase, `${projectColor}1F` background, `${projectColor}55` border, `${projectColor}` text, `maxWidth: 90px` ellipsis. Position: between status dot and title, replacing the previous tiny grey label that lived after the agent avatar.
+- `projectFallbackIndex(key)` (local helper in `TaskHubItem.tsx`): 32-bit string hash of the project path, modulo `DEFAULT_PROJECT_COLORS.length`. Ensures projects without a custom color in storage still get distinct, stable hues across sessions instead of all defaulting to `DEFAULT_PROJECT_COLORS[0]` (orange).
 
 ### Cross-References
 - **043-agent-sidebar** — parent sidebar feature; `SidebarViewToggle` lives in `TerminalSidebar.tsx`; `sidebarView` state in `uiStore` drives the conditional render between `TaskHubView` and the project tree
