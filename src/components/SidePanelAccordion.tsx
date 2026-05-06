@@ -960,7 +960,10 @@ export default function SidePanelAccordion({
           onHoverEnter={() => handleSectionHoverEnter("token-stats")}
           onHoverLeave={handleSectionHoverLeave}
         >
-          <AgentTokenStatsPanel projectPath={rootPath} />
+          <AgentTokenStatsPanel
+            projectPath={rootPath}
+            enabled={focusedSection === "token-stats"}
+          />
         </AccordionSection>
       </div>
     </aside>

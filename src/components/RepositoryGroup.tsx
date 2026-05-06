@@ -1831,14 +1831,27 @@ export default function RepositoryGroup({
   // Active = full render (avatar, sessions, DnD). Dormant = compact chip row.
   // Benefits: fewer store subscriptions, fewer avatar loads, less DOM, still anti-duplicate.
   const { activeAgentIds, dormantAgents } = useMemo(() => {
-    const activeIds = new Set(
-      allSessionsForRepo
-        .filter((s) => s.status !== "done")
-        .map((s) => s.agentId),
-    );
+    // Group sessions by agent so we can decide active/dormant per-agent.
+    const sessionsByAgent = new Map<string, typeof allSessionsForRepo>();
+    for (const s of allSessionsForRepo) {
+      const arr = sessionsByAgent.get(s.agentId);
+      if (arr) arr.push(s);
+      else sessionsByAgent.set(s.agentId, [s]);
+    }
+    // Dormant = HAS sessions AND every one is 'done' (fully archived).
+    // Newly created agents (zero sessions) stay ACTIVE so the user can
+    // interact with them immediately without going through the chip path.
+    const dormant = mainAgents.filter((a) => {
+      const sessions = sessionsByAgent.get(a.id);
+      if (!sessions || sessions.length === 0) return false;
+      return sessions.every((s) => s.status === "done");
+    });
+    const dormantIds = new Set(dormant.map((a) => a.id));
     return {
-      activeAgentIds: activeIds,
-      dormantAgents: mainAgents.filter((a) => !activeIds.has(a.id)),
+      activeAgentIds: new Set(
+        mainAgents.filter((a) => !dormantIds.has(a.id)).map((a) => a.id),
+      ),
+      dormantAgents: dormant,
     };
   }, [mainAgents, allSessionsForRepo]);
 

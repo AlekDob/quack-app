@@ -109,17 +109,19 @@ On session open, the chat always scrolls to the bottom — unless the user has s
 ### Active vs Dormant Agents (performance + anti-duplicate)
 Agents within a project are split into two rendering tiers inside `RepositoryGroup.tsx`:
 
-- **Active agents** = at least one session with `status !== "done"`. Rendered full-size as `SortableAgent` cards (avatar, DnD, sessions metro-line, notification badges, 60s tick timer).
-- **Dormant agents** = no active sessions (only archived `done` sessions, or zero sessions). Rendered as a compact chip row under the branch groups: `DORMANT · N` header + `<button>` chips with agent label only. No avatar load, no per-agent `useSessionStore` subscription, no DnD.
+- **Active agents** = zero sessions OR at least one session with `status !== "done"`. Rendered full-size as `SortableAgent` cards (avatar, DnD, sessions metro-line, notification badges, 60s tick timer). Newly created agents (no sessions yet) belong here so the user can interact with them immediately.
+- **Dormant agents** = HAS sessions AND every session is `done` (fully archived). Rendered as a compact chip row under the branch groups: `DORMANT · N` header + `<button>` chips with agent label only. No per-agent `useSessionStore` subscription, no DnD.
 
 **Click on a dormant chip** → opens `NewSessionModal` pre-filled with `setNewSessionModalAgentId(agent.id)` → creates a **new session on the existing agent** (reuse, not duplicate). **Hover** → `KeyboardShortcutTooltip` shows `{role} · Start new session` (or `Start new session with {label}` if personality.role missing).
 
 Computation (single pass, memoized by `[mainAgents, allSessionsForRepo]`):
 ```ts
-const activeIds = new Set(
-  allSessionsForRepo.filter(s => s.status !== "done").map(s => s.agentId)
-);
-const dormantAgents = mainAgents.filter(a => !activeIds.has(a.id));
+const sessionsByAgent = groupBy(allSessionsForRepo, s => s.agentId);
+const dormantAgents = mainAgents.filter(a => {
+  const sessions = sessionsByAgent.get(a.id);
+  if (!sessions || sessions.length === 0) return false; // newly created → active
+  return sessions.every(s => s.status === "done");      // all archived → dormant
+});
 ```
 
 **Rationale**:

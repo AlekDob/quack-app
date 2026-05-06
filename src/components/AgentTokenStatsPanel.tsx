@@ -20,6 +20,13 @@ import './AgentTokenStatsPanel.css';
 
 interface AgentTokenStatsPanelProps {
   projectPath: string | null;
+  /**
+   * Whether the panel is visible (accordion expanded). When false the
+   * component skips the SQLite refresh on projectPath change to avoid
+   * paying the query cost while the user can't see the result.
+   * Brain: fix-token-stats-panel-blocks-project-switch
+   */
+  enabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +136,7 @@ function AgentRow({ agent }: { agent: AgentStats }) {
 // Main panel
 // ---------------------------------------------------------------------------
 
-export default function AgentTokenStatsPanel({ projectPath }: AgentTokenStatsPanelProps) {
+export default function AgentTokenStatsPanel({ projectPath, enabled = true }: AgentTokenStatsPanelProps) {
   // Normalize once so lookup key matches what the store wrote from Rust.
   const normalizedPath = projectPath ? normalizeProjectPath(projectPath) : null;
   const agentStats = useProjectStatsStore((s) =>
@@ -139,11 +146,15 @@ export default function AgentTokenStatsPanel({ projectPath }: AgentTokenStatsPan
   const lastError = useProjectStatsStore((s) => s.lastError);
   const [loading, setLoading] = useState(false);
 
+  // Brain: fix-token-stats-panel-blocks-project-switch
+  // Gating on `enabled` so a closed accordion doesn't trigger
+  // get_project_agent_stats (which contends with recordUsage on the
+  // SQLite mutex and made cross-project switches slow).
   useEffect(() => {
-    if (!normalizedPath) return;
+    if (!normalizedPath || !enabled) return;
     setLoading(true);
     refreshProjectAgents(normalizedPath).finally(() => setLoading(false));
-  }, [normalizedPath, refreshProjectAgents]);
+  }, [normalizedPath, refreshProjectAgents, enabled]);
 
   // Grand total = active + deleted
   const grandTotal = useMemo(() => {
