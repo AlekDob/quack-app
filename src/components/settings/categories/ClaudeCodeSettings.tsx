@@ -19,7 +19,7 @@ export default function ClaudeCodeSettings() {
   const [loading, setLoading] = useState(true);
 
   // LLM Provider state
-  const { provider, providerBaseUrl, providerApiKey, ollamaModel, btwModel, bedrockModelOverride } = useSettingsStore(s => s.claude);
+  const { provider, providerBaseUrl, providerApiKey, ollamaModel, btwModel, bedrockModelOverride, toolSearchMode } = useSettingsStore(s => s.claude);
   const updateClaude = useSettingsStore(s => s.updateClaudeSettings);
   const [ollamaOnline, setOllamaOnline] = useState<boolean | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
@@ -391,6 +391,30 @@ export default function ClaudeCodeSettings() {
             )}
           </>
         )}
+      </div>
+
+      {/* Tool Deferral */}
+      <SectionHeader
+        title="Tool Deferral"
+        description="Defer tool schemas until first use to reduce upfront context"
+      />
+      <div className="settings-group">
+        <SettingsRow
+          label="Mode"
+          description="Aggressive saves the most context but adds a small first-call latency per tool. Note: HTTP-based MCP servers currently ignore this setting."
+          control={
+            <select
+              className="settings-select"
+              value={toolSearchMode ?? 'auto'}
+              onChange={(e) => updateClaude({ toolSearchMode: e.target.value as 'off' | 'auto' | 'aggressive' | 'always' })}
+            >
+              <option value="off">Off</option>
+              <option value="auto">Auto (default, ~10%)</option>
+              <option value="aggressive">Aggressive (~1%)</option>
+              <option value="always">Always defer</option>
+            </select>
+          }
+        />
       </div>
 
       {/* Memory */}

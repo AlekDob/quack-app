@@ -327,6 +327,7 @@ async function handleQuery(cmd) {
     cwd, sessionId, agents, attachments, outputFormat, effort,
     mcpServers: passedMcpServers, allowedTools, teamContext, ideContext,
     provider, providerBaseUrl, providerApiKey, debugMode, chatMode, askMode,
+    toolSearchMode,
   } = cmd;
 
   const abortController = new AbortController();
@@ -618,7 +619,11 @@ ${hintsBlock}
     if (outputFormat) options.outputFormat = outputFormat;
 
     // Environment (tool search + task list)
-    options.env = { ...process.env, ENABLE_TOOL_SEARCH: 'auto' };
+    // Map user-facing preset to the ENABLE_TOOL_SEARCH env-var format.
+    // off → disable, auto → 10% threshold (default), aggressive → ~1% threshold, always → force defer.
+    const TOOL_SEARCH_ENV = { off: 'false', auto: 'auto', aggressive: 'auto:1', always: 'true' };
+    const toolSearchEnv = TOOL_SEARCH_ENV[toolSearchMode] ?? 'auto';
+    options.env = { ...process.env, ENABLE_TOOL_SEARCH: toolSearchEnv };
     if (sessionId) {
       options.env.CLAUDE_CODE_TASK_LIST_ID = `quack-${sessionId}`;
     }

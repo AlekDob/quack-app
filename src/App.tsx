@@ -3039,6 +3039,7 @@ function AppContent() {
             provider: prf.provider,
             providerBaseUrl: prf.providerBaseUrl,
             providerApiKey: prf.providerApiKey,
+            toolSearchMode: useSettingsStore.getState().claude.toolSearchMode,
             // IDE context: injected into system prompt by Node.js, not into user message
             ideContext: ideContext || undefined,
           };
@@ -3756,6 +3757,7 @@ function AppContent() {
             provider: isJobProvider ? options.provider : prf.provider,
             providerBaseUrl: isJobProvider ? (globalBaseUrl || 'http://localhost:11434') : prf.providerBaseUrl,
             providerApiKey: isJobProvider && options.provider === 'custom' ? globalApiKey : prf.providerApiKey,
+            toolSearchMode: useSettingsStore.getState().claude.toolSearchMode,
             // IDE context: injected into system prompt by Node.js, not into user message
             ideContext: ideContext || undefined,
           };

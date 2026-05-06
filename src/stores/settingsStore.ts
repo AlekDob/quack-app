@@ -39,6 +39,8 @@ interface ClaudeSettings {
   // Bedrock/Vertex model override — when set, bypasses normal model resolution
   // Brain: fix-bedrock-model-override
   bedrockModelOverride: string;  // Full Bedrock ARN or model ID (e.g. us.anthropic.claude-sonnet-4-5-20250929-v1:0)
+  // Tool Search deferred-loading mode (ENABLE_TOOL_SEARCH). Maps to env var in stream-daemon.js.
+  toolSearchMode: 'off' | 'auto' | 'aggressive' | 'always';
 }
 
 interface TerminalSettings {
@@ -177,6 +179,7 @@ const defaultClaudeSettings: ClaudeSettings = {
   ollamaModel: '',
   btwModel: 'haiku45', // BTW Side-Chain: fast & cheap by default
   bedrockModelOverride: '', // Empty = use normal model resolution
+  toolSearchMode: 'auto', // Default: ENABLE_TOOL_SEARCH=auto (10% threshold)
 };
 
 // Anthropic recommended defaults for agent modes
@@ -379,7 +382,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
-        version: 11,
+        version: 12,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
@@ -492,6 +495,12 @@ export const useSettingsStore = create<SettingsState>()(
                   p.effort = defaultEffortForModel(p.model);
                 }
               }
+            }
+          }
+          // v12: Add toolSearchMode (ENABLE_TOOL_SEARCH preset). Default 'auto' matches prior hardcoded value.
+          if (version < 12) {
+            if (persisted.claude && !persisted.claude.toolSearchMode) {
+              persisted.claude.toolSearchMode = 'auto';
             }
           }
           return persisted;
