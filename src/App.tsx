@@ -7195,6 +7195,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // 🦆 FIX: Reload agents when project/working directory changes
   // This ensures @mention dropdown shows correct droids for the current project
+  //
+  // NOTE: `loadAgents` is intentionally NOT in deps. Its useCallback re-creates
+  // on every change of activeTerminal?.cwd OR explorerPath, which during a
+  // session click change in two cascading steps (setActiveId then loadDirectory)
+  // would re-trigger this effect twice — paying the Tauri round-trip
+  // (`check_agents_directory` + `list_agents`) on every cross-project session
+  // switch. Keying on `currentWorkingDir` alone coalesces both transitions
+  // into a single load. Same pattern as the loadSkills effect below.
+  // Brain: fix-token-stats-panel-blocks-project-switch (related slow-switch work)
   const currentWorkingDir = activeTerminal?.cwd ?? explorerPath;
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped || !currentWorkingDir) {
@@ -7202,7 +7211,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
     console.log('[Agents] Reloading agents for new working directory:', currentWorkingDir);
     void loadAgents();
-  }, [currentWorkingDir, tauriAvailable, hasBootstrapped, loadAgents]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWorkingDir, tauriAvailable, hasBootstrapped]);
 
   // Load Skills on startup only (not on every terminal switch!)
   useEffect(() => {
