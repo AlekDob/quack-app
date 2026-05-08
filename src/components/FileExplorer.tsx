@@ -851,20 +851,18 @@ function FileExplorer({
   );
 }
 
-// Performance: Memo per evitare re-render quando cambiano solo terminali/git status
+// Performance: Memo per evitare re-render quando cambiano solo terminali/git status.
+// Brain: fix-file-explorer-refresh-stale-cache
 export default memo(FileExplorer, (prevProps, nextProps) => {
-  // Re-render solo se tree, activePath o activeFilePath cambiano
   if (prevProps.rootPath !== nextProps.rootPath) return false
   if (prevProps.loading !== nextProps.loading) return false
   if (prevProps.error !== nextProps.error) return false
   if (prevProps.activePath !== nextProps.activePath) return false
   if (prevProps.activeFilePath !== nextProps.activeFilePath) return false
-
-  // Check tree shallow (keys changed?)
-  const prevKeys = Object.keys(prevProps.tree)
-  const nextKeys = Object.keys(nextProps.tree)
-  if (prevKeys.length !== nextKeys.length) return false
-
-  // Callbacks stabili da App.tsx
+  // Reference equality: setExplorerTree always returns a new object, so any
+  // entry update (including same-key replacements from the Refresh button)
+  // is detected here. Keys-length comparison missed those.
+  if (prevProps.tree !== nextProps.tree) return false
+  if (prevProps.modifiedFiles !== nextProps.modifiedFiles) return false
   return true
 })

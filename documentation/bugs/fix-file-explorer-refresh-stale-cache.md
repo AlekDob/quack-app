@@ -2,8 +2,8 @@
 type: bug_fix
 project: quack-app
 created: 2026-03-30
-last_verified: 2026-03-30
-tags: [file-explorer, cache, refresh, stale-data]
+last_verified: 2026-05-08
+tags: [file-explorer, cache, refresh, stale-data, memo]
 ---
 
 # Bug Fix: File Explorer non aggiorna su refresh (cache stale)
@@ -65,3 +65,44 @@ if (refreshExplorerTrigger > 0 && explorerRoot) {
 
 - `src/components/FileExplorer.tsx` — bottone refresh ora ricarica expanded set
 - `src/App.tsx` — trigger refresh svuota cache tree
+
+## Regression 2026-05-08: memo comparator swallowing prop updates
+
+Anche dopo i fix sopra, il bottone Refresh continuava a non aggiornare la UI nel side panel destro.
+
+### Causa
+
+Il `memo` comparator in `FileExplorer.tsx` controllava solo `Object.keys(tree).length`:
+
+```ts
+const prevKeys = Object.keys(prevProps.tree)
+const nextKeys = Object.keys(nextProps.tree)
+if (prevKeys.length !== nextKeys.length) return false
+return true
+```
+
+Quando il bottone Refresh ricarica path già nel tree (`fetchDirectoryChildren` fa `{...prev, [path]: newEntries}`), le **chiavi non cambiano** — cambiano solo gli array delle entries. Il comparator restituiva `true` (uguale) e React saltava il re-render → UI stale anche se `explorerTree` era aggiornato.
+
+Funzionava in altri casi solo perché:
+- **Cambio sessione**: nuovo `rootPath` → primo guard scatta.
+- **Auto-refresh trigger** (file modificati da Claude): `setExplorerTree({})` prima di `loadDirectory(root)` → `keys.length` 0 → 1.
+
+Solo il **bottone manuale** mutava chiavi esistenti senza variare il count.
+
+`modifiedFiles` non era nemmeno nel comparator (bug pre-esistente: i badge dei file modificati non avrebbero potuto re-renderizzare se solo quella prop fosse cambiata).
+
+### Fix 2026-05-08
+
+Confronto per reference: `setExplorerTree` produce sempre un nuovo oggetto, quindi qualsiasi aggiornamento del tree (incluso il replacement di chiavi esistenti) è rilevato.
+
+```ts
+if (prevProps.tree !== nextProps.tree) return false
+if (prevProps.modifiedFiles !== nextProps.modifiedFiles) return false
+return true
+```
+
+Goal originale ("non re-renderizzare per cambi a terminali/git status") preservato: `tree` e `modifiedFiles` cambiano reference solo quando i loro setter scattano, non a ogni render del parent.
+
+### File modificati
+
+- `src/components/FileExplorer.tsx` — comparator usa reference equality e include `modifiedFiles`
