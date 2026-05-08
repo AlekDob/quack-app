@@ -1,11 +1,22 @@
 ---
 slug: gotcha-sdk-bundled-cli-200k-context-window
-title: "SDK bundled CLI reports 200k context window for 1M models"
+title: "SDK bundled CLI reports 200k context window for 1M models (RESOLVED)"
 category: gotchas
-tags: [sdk, context-window, compaction, cli]
+tags: [sdk, context-window, compaction, cli, resolved]
 created: 2026-03-16
+resolved: 2026-05-04
 severity: high
 ---
+
+> **RESOLVED 2026-05-04** — Verified with `@anthropic-ai/claude-agent-sdk@0.2.111`:
+> bundled `cli.js` now reports `modelUsage.contextWindow: 1000000` for `claude-opus-4-7[1m]`
+> (also Opus 4.6 / Sonnet 4.6). The `pathToClaudeCodeExecutable` workaround was removed
+> from `stream-daemon.js`. Side benefit: AskUserQuestion answer-routing now works for
+> all users — the native-binary IPC layer was silently dropping off-schema fields like
+> `updatedInput.answers`, which broke the question→answer flow whenever the user happened
+> to have `~/.local/bin/claude` installed (the daemon's CLI selection). With bundled
+> `cli.js` running in the SDK's own JS context, no IPC stripping happens and answers reach
+> the AskUserQuestion tool's `call({questions, answers, ...})` correctly.
 
 # SDK bundled CLI reports 200k context window for 1M models
 

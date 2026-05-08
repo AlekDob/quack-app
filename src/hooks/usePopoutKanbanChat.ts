@@ -14,6 +14,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { ChatMessage, KanbanTask, ClaudeEvent } from '../types';
 import { getProviderRequestFields } from '../services/claudeSDK';
+import { useSettingsStore } from '../stores/settingsStore';
 import type { ChatSendOptions } from './useClaudeChat';
 import {
   appendMessagesToSession,
@@ -348,6 +349,7 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
           provider: prf.provider,
           providerBaseUrl: prf.providerBaseUrl,
           providerApiKey: prf.providerApiKey,
+          toolSearchMode: useSettingsStore.getState().claude.toolSearchMode,
         },
       });
 

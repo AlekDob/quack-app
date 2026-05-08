@@ -1022,6 +1022,9 @@ pub struct ClaudeCliRequest {
     // Frontend-generated turn ID echoed back in every emitted event so the frontend
     // can reject stale events from aborted/completed queries.
     pub turn_id: Option<String>,
+    // Tool Search deferral preset ('off' | 'auto' | 'aggressive' | 'always').
+    // Mapped to ENABLE_TOOL_SEARCH env var by stream-daemon.js.
+    pub tool_search_mode: Option<String>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -2076,6 +2079,9 @@ async fn send_message_via_daemon(
     }
     if let Some(ref key) = request.provider_api_key {
         query_cmd["providerApiKey"] = serde_json::Value::String(key.clone());
+    }
+    if let Some(ref mode) = request.tool_search_mode {
+        query_cmd["toolSearchMode"] = serde_json::Value::String(mode.clone());
     }
 
     // Send query to daemon

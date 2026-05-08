@@ -188,6 +188,7 @@ export function useBTW(options?: UseBTWOptions): UseBTWReturn {
             provider: prf.provider,
             providerBaseUrl: prf.providerBaseUrl,
             providerApiKey: prf.providerApiKey,
+            toolSearchMode: useSettingsStore.getState().claude.toolSearchMode,
           },
         });
 

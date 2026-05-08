@@ -1803,11 +1803,13 @@ function AppContent() {
       }
 
       // Brain: fix-memory-leak-14gb-ram
-      // Session-end cleanup: free temporary buffers that are no longer needed
-      const agentId = activeMessageKeyRef.current.get(messageKey) || messageKey;
-      outputBuffersRef.current.delete(agentId);
+      // Session-end cleanup: free temporary buffers that are no longer needed.
+      // NOTE: name is `bufferKey` (not `agentId`) — a const named `agentId` here
+      // would shadow the outer parameter and TDZ-throw at the `.find` ~L1728.
+      const bufferKey = activeMessageKeyRef.current.get(messageKey) || messageKey;
+      outputBuffersRef.current.delete(bufferKey);
       outputBuffersRef.current.delete(messageKey);
-      activeMessageKeyRef.current.delete(agentId);
+      activeMessageKeyRef.current.delete(bufferKey);
     }
   }, [handleTokenUpdate]);
 
@@ -3039,6 +3041,7 @@ function AppContent() {
             provider: prf.provider,
             providerBaseUrl: prf.providerBaseUrl,
             providerApiKey: prf.providerApiKey,
+            toolSearchMode: useSettingsStore.getState().claude.toolSearchMode,
             // IDE context: injected into system prompt by Node.js, not into user message
             ideContext: ideContext || undefined,
           };
@@ -3756,6 +3759,7 @@ function AppContent() {
             provider: isJobProvider ? options.provider : prf.provider,
             providerBaseUrl: isJobProvider ? (globalBaseUrl || 'http://localhost:11434') : prf.providerBaseUrl,
             providerApiKey: isJobProvider && options.provider === 'custom' ? globalApiKey : prf.providerApiKey,
+            toolSearchMode: useSettingsStore.getState().claude.toolSearchMode,
             // IDE context: injected into system prompt by Node.js, not into user message
             ideContext: ideContext || undefined,
           };
@@ -7193,6 +7197,15 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // 🦆 FIX: Reload agents when project/working directory changes
   // This ensures @mention dropdown shows correct droids for the current project
+  //
+  // NOTE: `loadAgents` is intentionally NOT in deps. Its useCallback re-creates
+  // on every change of activeTerminal?.cwd OR explorerPath, which during a
+  // session click change in two cascading steps (setActiveId then loadDirectory)
+  // would re-trigger this effect twice — paying the Tauri round-trip
+  // (`check_agents_directory` + `list_agents`) on every cross-project session
+  // switch. Keying on `currentWorkingDir` alone coalesces both transitions
+  // into a single load. Same pattern as the loadSkills effect below.
+  // Brain: fix-token-stats-panel-blocks-project-switch (related slow-switch work)
   const currentWorkingDir = activeTerminal?.cwd ?? explorerPath;
   useEffect(() => {
     if (!tauriAvailable || !hasBootstrapped || !currentWorkingDir) {
@@ -7200,7 +7213,8 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
     console.log('[Agents] Reloading agents for new working directory:', currentWorkingDir);
     void loadAgents();
-  }, [currentWorkingDir, tauriAvailable, hasBootstrapped, loadAgents]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentWorkingDir, tauriAvailable, hasBootstrapped]);
 
   // Load Skills on startup only (not on every terminal switch!)
   useEffect(() => {
