@@ -588,13 +588,17 @@ export interface StructuredOutputFormat {
 }
 
 // Effort parameter for controlling response quality vs speed/cost tradeoff.
-// Aligned 1:1 with Anthropic's official levels (since 0.9.3).
+// Aligned 1:1 with Anthropic's official levels.
 // - Opus 4.7: low, medium, high, xhigh, max (default: xhigh via defaultEffortForModel)
 // - Opus 4.6 / Sonnet 4.6: low, medium, high, max (default: high)
 // - Other models: low, medium, high, max (default: medium; effort ignored if unsupported)
-// xhigh is clamped to 'high' by stream-daemon.js for non-Opus-4.7 models.
+// xhigh is the Anthropic-recommended default for Opus 4.7 (announced with Opus 4.7
+// in https://www.anthropic.com/news/claude-opus-4-7). It requires Claude CLI ≥ 2.1.x
+// (the version that introduced --effort xhigh). The stream-daemon auto-detects the
+// CLI's supported levels at startup and silently degrades xhigh→high on older CLIs
+// to avoid the "subagent process crashed" error (CLI exit code 1).
 // See: src/services/modelService.ts#defaultEffortForModel
-// Brain: task-effort-model-aware-refactor
+// Brain: fix-effort-xhigh-cli-crash + task-effort-model-aware-refactor
 export type EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 // Thinking mode for controlling reasoning depth

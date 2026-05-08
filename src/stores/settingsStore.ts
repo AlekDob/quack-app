@@ -170,7 +170,7 @@ const defaultClaudeSettings: ClaudeSettings = {
   permissionMode: 'act',
   maxTokens: 4096,
   temperature: 0.7,
-  effort: 'xhigh', // Opus 4.7 recommended default (fallbacks to 'high' on older models)
+  effort: 'xhigh', // Opus 4.7 recommended default (auto-degraded to 'high' on older CLIs by stream-daemon — Brain: fix-effort-xhigh-cli-crash)
   provider: 'anthropic',
   providerBaseUrl: '',
   providerApiKey: '',

@@ -7,6 +7,9 @@ import './AgentModesSettings.css';
 
 // Ordered low → max. Opus 4.7 supports all five; older models fall back to
 // the highest supported level at or below the chosen one (per Anthropic docs).
+// xhigh requires Claude CLI ≥ 2.1.x (the version that introduced xhigh). On
+// older CLIs the daemon auto-detects the supported set and degrades xhigh→high.
+// Brain: fix-effort-xhigh-cli-crash
 const effortOptions = [
   { value: 'low' as EffortLevel, label: 'Fast', desc: 'Latency-first, not intelligence-sensitive' },
   { value: 'medium' as EffortLevel, label: 'Balanced', desc: 'Lower cost, some intelligence trade-off' },

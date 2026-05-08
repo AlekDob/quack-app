@@ -141,7 +141,9 @@ export function getModelOptions(
 
 /**
  * Return the Anthropic-recommended default effort for a given Quack model ID.
- * - Opus 4.7 → 'xhigh' (recommended default, per code.claude.com/docs/en/model-config)
+ * - Opus 4.7 → 'xhigh' (recommended default, announced with Opus 4.7
+ *   in https://www.anthropic.com/news/claude-opus-4-7 — requires Claude CLI ≥ 2.1.x;
+ *   on older CLIs the daemon auto-degrades xhigh→high. Brain: fix-effort-xhigh-cli-crash)
  * - Opus 4.6 / Sonnet 4.6 → 'high'
  * - Everything else (Sonnet 4.5, Haiku, Ollama/custom) → 'medium'
  *   (models without native effort support ignore the field SDK-side)

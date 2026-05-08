@@ -223,6 +223,62 @@ function loadMCPServersFromFile(workingDir) {
 }
 
 // =============================================================================
+// CLI CAPABILITY DETECTION
+// =============================================================================
+
+// Brain: fix-effort-xhigh-cli-crash
+// xhigh was added to Claude Code CLI in 2.1.x (alongside Opus 4.7). Older CLIs
+// (e.g. 2.1.108) reject `--effort xhigh` with exit code 1, surfacing as
+// "subagent process crashed unexpectedly". Detect supported levels by parsing
+// `claude --help` once per CLI path and cache the result.
+const _effortLevelsCache = new Map(); // cliPath -> Set<string>
+const _effortLevelsLogged = new Set(); // cliPath set, prevents log spam
+
+function getSupportedEffortLevels(cliPath) {
+  if (!cliPath) cliPath = 'claude';
+  const cached = _effortLevelsCache.get(cliPath);
+  if (cached) return cached;
+
+  const fallback = new Set(['low', 'medium', 'high', 'max']);
+  let levels = fallback;
+  try {
+    const help = execSync(`"${cliPath}" --help`, {
+      encoding: 'utf8',
+      timeout: 5000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    // Match the line: --effort <level>   ... low, medium, high, xhigh, max)
+    const m = help.match(/--effort\s+<level>[^\n]*\(([^)]+)\)/);
+    if (m && m[1]) {
+      const parsed = m[1].split(',').map(s => s.trim()).filter(Boolean);
+      if (parsed.length > 0) levels = new Set(parsed);
+    }
+  } catch (err) {
+    log('CLI_CAP', `Failed to detect effort levels from ${cliPath}: ${err.message} — using fallback ${[...fallback].join('|')}`);
+  }
+
+  _effortLevelsCache.set(cliPath, levels);
+  if (!_effortLevelsLogged.has(cliPath)) {
+    _effortLevelsLogged.add(cliPath);
+    log('CLI_CAP', `Effort levels for ${cliPath}: ${[...levels].join(', ')}`);
+  }
+  return levels;
+}
+
+// Pick the strongest level the CLI supports that is ≤ the requested one,
+// using the canonical order low < medium < high < xhigh < max.
+function clampEffortToSupported(requested, supportedSet) {
+  if (supportedSet.has(requested)) return requested;
+  const order = ['low', 'medium', 'high', 'xhigh', 'max'];
+  const idx = order.indexOf(requested);
+  if (idx === -1) return requested; // unknown level, let SDK reject
+  for (let i = idx - 1; i >= 0; i--) {
+    if (supportedSet.has(order[i])) return order[i];
+  }
+  return 'medium'; // last-resort fallback
+}
+
+// =============================================================================
 // MODEL MAPPING
 // =============================================================================
 
@@ -603,14 +659,20 @@ ${hintsBlock}
     if (cwd) options.cwd = cwd;
     if (sessionId) options.resume = sessionId;
     if (effort) {
-      // Brain: task-effort-model-aware-refactor
-      // xhigh is Opus 4.7 exclusive — silently degrade on older models so we don't
-      // send invalid effort levels to the API (previously passed through untouched,
-      // making the "falls back to high" comment in types.ts a lie).
-      const isOpus47 = typeof model === 'string' && model.includes('opus-4-7');
-      if (effort === 'xhigh' && !isOpus47) {
-        console.warn(`[daemon] effort=xhigh not supported on ${model}, degrading to 'high'`);
-        options.effort = 'high';
+      // Brain: fix-effort-xhigh-cli-crash
+      // Claude Code CLI introduced `xhigh` in 2.1.x (Opus 4.7 release). Older CLIs
+      // reject it with exit code 1, surfacing as "subagent process crashed".
+      // We auto-detect what the *currently installed* CLI accepts and clamp.
+      // This is robust across CLI upgrades/downgrades and avoids hardcoded
+      // version checks. Falls back to a conservative low|medium|high|max set
+      // if `claude --help` cannot be parsed.
+      const cliForCap = hasNativeCli ? nativeClaudePath : null;
+      const supported = cliForCap ? getSupportedEffortLevels(cliForCap) : null;
+      if (supported && !supported.has(effort)) {
+        const clamped = clampEffortToSupported(effort, supported);
+        console.warn(`[daemon] effort=${effort} not supported by installed CLI; degraded to '${clamped}' (model=${model})`);
+        diag(`EFFORT_CLAMP: requested=${effort} clamped=${clamped} cli=${nativeClaudePath} supported=[${[...supported].join(',')}]`);
+        options.effort = clamped;
       } else {
         options.effort = effort;
       }
@@ -849,6 +911,16 @@ ${hintsBlock}
 
       if (isSubagentCrash) {
         log('QUERY', `query=${queryId} subagent crash: ${errorMsg}`);
+        // Brain: opus47-deep-crash-investigation
+        // Mirror the crash details to the diag log so post-mortem analysis works
+        // without access to the parent Tauri process's stderr. The user-facing
+        // message stays friendly; the raw errorMsg/stack go to ~/.quack/daemon-diag.log.
+        diag(`SUBAGENT_CRASH: query=${queryId} errorMsg=${errorMsg}`);
+        if (errorStack) {
+          diag(`SUBAGENT_CRASH_STACK: query=${queryId} ${String(errorStack).slice(0, 500)}`);
+        }
+        const friendlyText =
+          `\n\n> **Error:** A subagent process crashed unexpectedly. This can happen due to rate limits, timeout, or temporary issues. Please try again.\n>\n> _Details: ${String(errorMsg).slice(0, 300)}_\n\n`;
         emit({
           type: 'event', queryId,
           event: {
@@ -856,7 +928,7 @@ ${hintsBlock}
             message: {
               content: [{
                 type: 'text',
-                text: `\n\n> **Error:** A subagent process crashed unexpectedly. This can happen due to rate limits, timeout, or temporary issues. Please try again.\n\n`,
+                text: friendlyText,
               }],
             },
           },
