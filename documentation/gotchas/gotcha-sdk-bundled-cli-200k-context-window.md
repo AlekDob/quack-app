@@ -5,6 +5,7 @@ category: gotchas
 tags: [sdk, context-window, compaction, cli, resolved]
 created: 2026-03-16
 resolved: 2026-05-04
+last_verified: 2026-05-11
 severity: high
 ---
 
@@ -17,6 +18,10 @@ severity: high
 > to have `~/.local/bin/claude` installed (the daemon's CLI selection). With bundled
 > `cli.js` running in the SDK's own JS context, no IPC stripping happens and answers reach
 > the AskUserQuestion tool's `call({questions, answers, ...})` correctly.
+>
+> **Re-verified 2026-05-11** with `@anthropic-ai/claude-agent-sdk@0.2.138` — still resolved.
+> Regression suite identical (1179/86), daemon smoke-loads `OK`. See `pattern-sdk-version-upgrade.md`
+> for the upgrade workflow.
 
 # SDK bundled CLI reports 200k context window for 1M models
 

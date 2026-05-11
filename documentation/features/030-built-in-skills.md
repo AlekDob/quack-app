@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React)
 created: 2026-04-03
-last_verified: 2026-04-17
-tags: [skills, built-in-skills, bundled-skills, marketplace, droid-factory, whiteboard, mermaid, md-card]
+last_verified: 2026-05-11
+tags: [skills, built-in-skills, bundled-skills, marketplace, droid-factory, whiteboard, mermaid, md-card, sdk-skills-option]
 ---
 
 ## Built-in Skills
@@ -97,3 +97,18 @@ tags: [skills, built-in-skills, bundled-skills, marketplace, droid-factory, whit
 - Sort order: global first, then alphabetical by name
 - Skill templates: 5 presets in `SKILL_TEMPLATES` (api-client, data-processor, report-generator, workflow-automation, domain-expert)
 - Skill categories: workflow, tool-integration, domain-expertise, bundled-resources
+
+### SDK Wiring (stream-daemon.js)
+
+Skills surfaced to Quack are loaded into the agent session via the Claude Agent SDK `skills` option (introduced v0.2.120, replaces the deprecated `'Skill'` entry in `allowedTools` as of v0.2.133):
+
+```js
+// src-tauri/node-sdk/stream-daemon.js
+const options = {
+  // ...
+  allowedTools: resolvedAllowedTools,   // no longer includes 'Skill'
+  skills: 'all',                        // string[] | 'all'
+};
+```
+
+`'all'` loads every skill discovered by the SDK from its setting sources (project + user + local), matching the scopes the Rust `list_skills` already walks. To restrict, pass an array of skill names. See `pattern-sdk-version-upgrade.md` for the migration history.

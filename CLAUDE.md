@@ -221,6 +221,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Permission Modes (Build/Plan/Debug): `documentation/patterns/pattern-permission-modes.md`
 - Tool Search lazy loading: `documentation/patterns/pattern-tool-search-lazy-loading.md`
 - Code-intel language extension: `documentation/patterns/pattern-code-intel-language-extension.md`
+- Claude Agent SDK upgrade workflow: `documentation/patterns/pattern-sdk-version-upgrade.md`
 - Marketplace versioning: `documentation/patterns/pattern-marketplace-versioning.md`
 - Changes Panel (Codex diffs): `documentation/patterns/pattern-changes-panel.md`
 - Changes Panel all-messages fix: `documentation/bugs/fix-changes-panel-all-messages.md`
