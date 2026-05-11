@@ -38,7 +38,7 @@ const IDE_CONTEXTS = [
 const ASK_USER_APPEND = `\n## Interactive Questions (AskUserQuestion Tool)\nYou have access to the AskUserQuestion tool. USE IT when you need user input to make a decision instead of asking in plain text.\n**ALWAYS use AskUserQuestion when:**\n- User must choose between 2-4 implementation approaches\n- Selecting technologies, libraries, or patterns\n- Confirming potentially destructive actions\n- Getting preferences for ambiguous requirements\n- The user asks you to help them choose something\n**Do NOT use it for:**\n- Open-ended questions needing detailed text responses\n- Questions with more than 4 options\n- Simple confirmations inferrable from context\nIMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool to present interactive choices.`;
 
 const ALLOWED_TOOLS = [
-  'Skill', 'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
+  'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
   'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
   'BashOutput', 'KillShell', 'ExitPlanMode', 'AskUserQuestion',
 ];

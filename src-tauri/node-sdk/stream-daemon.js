@@ -371,16 +371,20 @@ async function handleQuery(cmd) {
     const is1MContext = modelId.endsWith('[1m]');
     log('QUERY', `Model mapping: "${model}" → "${modelId}" (1M context: ${is1MContext})`);
 
+    // SDK v0.2.133+: 'Skill' in allowedTools deprecated → use `skills: 'all'` below.
+    // SDK v0.2.136+: 'TodoWrite' deprecated → kept for FE renderer compat; added Task tools forward-compat.
     const defaultAllowedTools = [
-      'Skill', 'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
+      'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
       'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
       'BashOutput', 'KillShell', 'ExitPlanMode', 'AskUserQuestion',
+      'TaskCreate', 'TaskGet', 'TaskUpdate', 'TaskList',
     ];
     // 🛡️ Ask mode: only auto-approve read-only tools + AskUserQuestion.
     // Write/Edit/Bash/etc. must fall through to canUseTool for user approval.
     // Brain: pattern-permission-modes (Ask mode — SDK allowedTools gate)
     const askModeAllowedTools = [
       'Read', 'Glob', 'Grep', 'AskUserQuestion', 'ExitPlanMode', 'TodoWrite',
+      'TaskGet', 'TaskList',
     ];
     const baseAllowedTools = allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0
       ? allowedTools : defaultAllowedTools;
@@ -399,6 +403,8 @@ async function handleQuery(cmd) {
       settingSources: ['project', 'user', 'local'],
       tools: { type: 'preset', preset: 'claude_code' },
       allowedTools: resolvedAllowedTools,
+      // SDK v0.2.120+: replaces deprecated 'Skill' in allowedTools (deprecated v0.2.133).
+      skills: 'all',
       abortController,
       systemPrompt: {
         type: 'preset',

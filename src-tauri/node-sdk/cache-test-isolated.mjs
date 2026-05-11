@@ -36,7 +36,7 @@ const IDE_CONTEXTS = [
 const ASK_USER_APPEND = `\n## Interactive Questions (AskUserQuestion Tool)\nYou have access to the AskUserQuestion tool. USE IT when you need user input.\nIMPORTANT: Do NOT list options in plain text. Use the AskUserQuestion tool.`;
 
 const ALLOWED_TOOLS = [
-  'Skill', 'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
+  'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
   'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
   'BashOutput', 'KillShell', 'ExitPlanMode', 'AskUserQuestion',
 ];

@@ -14,7 +14,7 @@
     "test:embeddings": "node lib/embeddings.test.js"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.111",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.138",
     "@anthropic-ai/sdk": "^0.90.0",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "discord.js": "^14.14.1",
