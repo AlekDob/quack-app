@@ -67,7 +67,10 @@ function fixOrphans(a: CanvasAnnotations, nodeAssignments?: Record<string, strin
 function filterByParent(a: CanvasAnnotations, componentId: string | null): CanvasAnnotations {
   const match = <T extends { parentComponentId?: string }>(items: T[]): T[] =>
     items.filter(item => (item.parentComponentId ?? null) === componentId);
-  return { postIts: match(a.postIts), groups: match(a.groups), images: match(a.images), mdCards: match(a.mdCards ?? []) };
+  // Brain: fix-whiteboard-texts-stripped-by-filterbyparent
+  // `texts` deve essere incluso nel filtro: altrimenti i titoletti creati con il tool Title
+  // vengono salvati nel file ma strippati da `visibleAnnotations`, sparendo dal canvas.
+  return { postIts: match(a.postIts), groups: match(a.groups), images: match(a.images), mdCards: match(a.mdCards ?? []), texts: match(a.texts ?? []) };
 }
 
 /** Calculate nesting depth of a component by walking parentComponentId chain */

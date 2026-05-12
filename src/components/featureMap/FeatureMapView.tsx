@@ -217,7 +217,7 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
     [safeGraph.nodes, selectedNodeId],
   );
 
-  const MODES: AnnotationMode[] = ['select', 'lasso', 'postit', 'group', 'image', 'mdcard'];
+  const MODES: AnnotationMode[] = ['select', 'lasso', 'postit', 'group', 'image', 'mdcard', 'text'];
 
   const handleOpenMdCardFile = useCallback((relPath: string) => {
     const base = projectPath ? normalizeToForwardSlash(projectPath) : '';

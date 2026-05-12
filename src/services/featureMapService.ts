@@ -25,6 +25,16 @@ function parseFrontmatter(raw: string): Record<string, string> {
   return fields;
 }
 
+/** Convert kebab/snake slug to Title Case ("case-studies-section" → "Case Studies Section") */
+function humanizeSlug(slug: string): string {
+  return slug
+    .replace(/[-_]+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 /** Parse tags array from frontmatter string like "[tag1, tag2]" */
 function parseTags(raw: string): string[] {
   if (!raw) return [];
@@ -66,12 +76,19 @@ export function parseFeatureDoc(
   const bodyMatch = normalized.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
   const body = bodyMatch ? bodyMatch[1] : normalized;
 
-  // Title from first H2 heading, strip leading "NNN - " or "NNN " prefix
-  const h2Match = body.match(/^##\s+(.+)$/m);
   // Brain: gotcha-windows-path-separators
-  // Fallback title from filename
   const filename = filePath.split(/[\\/]/).pop()?.replace('.md', '') ?? 'unknown';
-  const rawTitle = h2Match ? h2Match[1].trim() : filename;
+
+  // Title resolution order:
+  //   1. frontmatter `feature:` slug (humanized) — most reliable, e.g. studio-futuro convention
+  //   2. first H1 or H2 heading in body — fallback for docs without `feature:` field
+  //   3. filename (stripped of NNN- prefix)
+  // Some projects (studio-futuro) use `# Title` + `## Location` sections, so picking only `##`
+  // returned "Location" for every card. Prefer frontmatter to avoid heading-order ambiguity.
+  const headingMatch = body.match(/^#{1,2}\s+(.+)$/m);
+  const rawTitle = fm.feature
+    ? humanizeSlug(fm.feature)
+    : (headingMatch ? headingMatch[1].trim() : filename);
   const title = rawTitle.replace(/^\d{2,4}\s*[-–—]\s*/, '').replace(/^\d{2,4}\s+/, '');
 
   // Purpose: line starting with **Purpose:**

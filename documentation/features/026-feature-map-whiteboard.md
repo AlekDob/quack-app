@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-app
 stack: TypeScript strict (React 18 frontend), Tauri v2 invoke API (list_directory, read_file_content, read_binary_file, write_binary_file, create_directory)
 created: 2026-04-03
-last_verified: 2026-05-11
+last_verified: 2026-05-12
 shortcut: Cmd+Shift+W (Meta+Shift+W)
 tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, mention, autocomplete, image, agent-bridge, skill, nested-components, matryoshka, drag-assign, drag-eject, md-card, markdown, mermaid]
 image: images/026-whiteboard-overview.png
@@ -344,6 +344,9 @@ Components are nestable group rects that act as sub-whiteboards. Select 2+ annot
 - Columns: 1 if <= 3 nodes, else 2 (`DEFAULT_COLS`)
 - Minimap: 160x100px (`MM_W`/`MM_H`), dot radius 3px, padding 6px
 - Auto-fit zoom range: 0.4-1.0, manual zoom range: 0.3-2.5
+
+### Fix: Title tool non creava titoletti (2026-05-12)
+Il tool "Title" (tasto `7`, bottone T nella toolbar) sembrava resettarsi a Select senza creare nulla. Causa: `filterByParent` in `useWhiteboardFile.ts:67-71` ricostruiva `CanvasAnnotations` senza il campo `texts` — `CanvasText[]` veniva strippato silenziosamente da `visibleAnnotations` perché il campo è opzionale (TypeScript non urlava). I titoletti venivano persistiti nel `.whiteboard.json` ma non renderizzati al re-render. Fix: aggiunto `texts: match(a.texts ?? [])` al return. Inoltre `MODES` in `FeatureMapView.tsx:220` non includeva `'text'`, quindi il Ctrl-cycling saltava il Title (Ctrl con mode `text` → `'select'`); aggiunto `'text'` all'array. Brain: `documentation/bugs/fix-whiteboard-texts-stripped-by-filterbyparent.md`. **Regola generale**: ogni nuovo campo collezione in `CanvasAnnotations` va aggiunto a `filterByParent`, `duplicateAnnotations`, `MODES`, `BUTTONS` toolbar, branch `handleMouseDown` canvas, render block canvas.
 
 ### UI Language
 - All user-facing strings in English (international audience)
