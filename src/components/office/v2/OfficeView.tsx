@@ -1,10 +1,9 @@
-import { memo, useMemo, useState, useCallback, useEffect } from 'react';
+import { memo, useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useOfficeLayout } from './useOfficeLayout';
 import { buildViewModels } from './officeViewModels';
 import { OfficeCanvas } from './OfficeCanvas';
 import { OfficeTagFilter } from './OfficeTagFilter';
 import { OfficeToolbar, type OfficeMode } from './OfficeToolbar';
-import OfficeActionMenu from './OfficeActionMenu';
 import { OfficeRoomContextMenu, type RoomContextTarget } from './OfficeRoomContextMenu';
 import { ConfirmModal } from '../../ConfirmModal';
 import { useSessionStore } from '../../../stores/sessionStore';
@@ -15,11 +14,11 @@ import './OfficeView.css';
 interface Props {
   terminals: TerminalInfo[];
   isActive: boolean;
-  onSessionClick?: (sessionId: string) => void;
   onGoToChat?: (agentId: string) => void;
+  onOpenWhiteboard?: (projectPath: string) => void;
 }
 
-function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Props) {
+function OfficeViewImpl({ terminals, isActive, onGoToChat, onOpenWhiteboard }: Props) {
   const {
     layout,
     setRoomPosition,
@@ -29,6 +28,8 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
     addPostIt, updatePostIt, deletePostIt,
     addCustomGroup, updateCustomGroup, deleteCustomGroup,
     addSticker, updateSticker, deleteSticker,
+    addText, updateText, deleteText,
+    duplicateItems,
     addTag, deleteTag, toggleRoomTag,
     beginDrag, endDrag,
     undo, redo, canUndo, canRedo,
@@ -44,7 +45,6 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
     [terminals, sessions, chatLoadingMap, pendingQuestionsMap, chatSessions]
   );
 
-  const [actionMenu, setActionMenu] = useState<{ agentId: string; x: number; y: number } | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [mode, setMode] = useState<OfficeMode>('select');
   const [activeSticker, setActiveSticker] = useState<string | null>(null);
@@ -56,6 +56,10 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
     setActiveSticker(null);
   }, []);
 
+  // Cmd+C / Cmd+V clipboard (office-internal). Holds selection keys ("postit:abc", "text:xyz", …).
+  const clipboardKeysRef = useRef<string[]>([]);
+  const pasteOffsetRef = useRef<number>(0);
+
   useEffect(() => {
     if (!isActive) return;
     const handler = (e: KeyboardEvent) => {
@@ -64,14 +68,53 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) redo(); else undo();
+        return;
       }
       if (e.key === 'Escape') {
         if (selectedIds.size > 0) setSelectedIds(new Set());
+        return;
+      }
+
+      // Copy / Paste / Duplicate — operate on annotations only (rooms excluded by duplicateItems)
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      const key = e.key.toLowerCase();
+
+      if (key === 'c') {
+        const keys = Array.from(selectedIds).filter(k => !k.startsWith('room:'));
+        if (keys.length === 0) return;
+        e.preventDefault();
+        clipboardKeysRef.current = keys;
+        pasteOffsetRef.current = 0;
+        return;
+      }
+
+      if (key === 'v') {
+        const keys = clipboardKeysRef.current;
+        if (keys.length === 0) return;
+        e.preventDefault();
+        pasteOffsetRef.current += 24;
+        const off = pasteOffsetRef.current;
+        const newKeys = duplicateItems(keys, off, off);
+        if (newKeys.length > 0) {
+          setSelectedIds(new Set(newKeys));
+          clipboardKeysRef.current = newKeys;
+        }
+        return;
+      }
+
+      if (key === 'd') {
+        const keys = Array.from(selectedIds).filter(k => !k.startsWith('room:'));
+        if (keys.length === 0) return;
+        e.preventDefault();
+        const newKeys = duplicateItems(keys, 24, 24);
+        if (newKeys.length > 0) setSelectedIds(new Set(newKeys));
+        return;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [isActive, undo, redo, selectedIds]);
+  }, [isActive, undo, redo, selectedIds, duplicateItems]);
 
   if (!ready || !layout) {
     return <div className="office-view office-view--loading">Loading…</div>;
@@ -101,10 +144,9 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
           onModeReset={handleModeReset}
           onPopulate={resetLayout}
           onRoomMoved={(projectPath, x, y) => setRoomPosition(projectPath, x, y)}
-          onDuckClick={(agentId, e) => setActionMenu({ agentId, x: e.clientX, y: e.clientY })}
-          onCardDoubleClick={() => {
-            console.info('[office-v2] Floor plan overlay coming later');
-          }}
+          onDuckClick={(agentId) => onGoToChat?.(agentId)}
+          onCardClick={(projectPath) => onOpenWhiteboard?.(projectPath)}
+          onCardDoubleClick={(projectPath) => onOpenWhiteboard?.(projectPath)}
           onRoomContextMenu={(projectPath, e) => setRoomContext({ projectPath, screenX: e.clientX, screenY: e.clientY })}
           onAddPostIt={addPostIt}
           onUpdatePostIt={updatePostIt}
@@ -115,6 +157,10 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
           onAddSticker={addSticker}
           onUpdateSticker={updateSticker}
           onDeleteSticker={deleteSticker}
+          onAddText={addText}
+          onUpdateText={updateText}
+          onDeleteText={deleteText}
+          onDuplicateItems={duplicateItems}
           onBeginDrag={beginDrag}
           onEndDrag={endDrag}
           selectedIds={selectedIds}
@@ -133,22 +179,6 @@ function OfficeViewImpl({ terminals, isActive, onSessionClick, onGoToChat }: Pro
           selectionCount={selectedIds.size}
         />
       </div>
-
-      {actionMenu && (
-        <OfficeActionMenu
-          data={{ agentId: actionMenu.agentId, screenX: actionMenu.x, screenY: actionMenu.y }}
-          terminals={terminals}
-          onGoToChat={(agentId) => {
-            setActionMenu(null);
-            onGoToChat?.(agentId);
-          }}
-          onSessionClick={(sid) => {
-            setActionMenu(null);
-            onSessionClick?.(sid);
-          }}
-          onClose={() => setActionMenu(null)}
-        />
-      )}
 
       {roomContext && (() => {
         const room = layout.rooms.find(r => r.projectPath === roomContext.projectPath);

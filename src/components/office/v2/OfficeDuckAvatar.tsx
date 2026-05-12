@@ -23,7 +23,10 @@ function OfficeDuckAvatarImpl({ agentId, color, avatarUrl, initial, status, sess
       type="button"
       className={`office-duck office-duck--${status}`}
       style={{ '--duck-color': color } as React.CSSProperties}
-      onClick={(e) => onClick?.(agentId, e)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.(agentId, e);
+      }}
       aria-label={`Agent ${initial}`}
     >
       <span className="office-duck__avatar">

@@ -12,6 +12,7 @@ interface OfficeTabViewProps {
   onRoomClick?: (projectPath: string) => void;
   onDuckClick?: (agentId: string) => void;
   onSessionClick?: (sessionId: string) => void;
+  onOpenWhiteboard?: (projectPath: string) => void;
   onExitOffice?: () => void;
 }
 
@@ -35,6 +36,7 @@ function OfficeTabView({
   onRoomClick,
   onDuckClick,
   onSessionClick,
+  onOpenWhiteboard,
   onExitOffice,
 }: OfficeTabViewProps) {
   const hasBeenActive = useRef(false);
@@ -67,8 +69,8 @@ function OfficeTabView({
         <OfficeViewV2
           terminals={terminals}
           isActive={isActive}
-          onSessionClick={onSessionClick}
           onGoToChat={onDuckClick}
+          onOpenWhiteboard={onOpenWhiteboard}
         />
       </div>
     );

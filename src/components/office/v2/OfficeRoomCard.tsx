@@ -25,6 +25,7 @@ interface Props {
   selected?: boolean;
   onDragStart?: (projectPath: string, e: React.PointerEvent) => void;
   onDoubleClick?: (projectPath: string) => void;
+  onCardClick?: (projectPath: string) => void;
   onDuckClick?: (agentId: string, e: React.MouseEvent) => void;
   onContextMenu?: (projectPath: string, e: React.MouseEvent) => void;
 }
@@ -33,7 +34,7 @@ const MAX_VISIBLE = 5;
 
 function OfficeRoomCardImpl({
   card, projectName, branch, ducks, doorPlateColor, busyRatio, counts, tags, dimmed, selected,
-  onDragStart, onDoubleClick, onDuckClick, onContextMenu,
+  onDragStart, onDoubleClick, onCardClick, onDuckClick, onContextMenu,
 }: Props) {
   const w = card.w ?? CARD_DEFAULT_W;
   const h = card.h ?? CARD_DEFAULT_H;
@@ -49,6 +50,7 @@ function OfficeRoomCardImpl({
         height: h,
         transform: `translate(${card.x}px, ${card.y}px)`,
       }}
+      onClick={() => onCardClick?.(card.projectPath)}
       onDoubleClick={() => onDoubleClick?.(card.projectPath)}
       onContextMenu={(e) => {
         if (!onContextMenu) return;
@@ -59,6 +61,7 @@ function OfficeRoomCardImpl({
     >
       <div
         className="office-room-card__plate"
+        onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => onDragStart?.(card.projectPath, e)}
       >
         <span className="office-room-card__status-dot" style={{ background: doorPlateColor }} />

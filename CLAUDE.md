@@ -204,6 +204,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Office View v2 crash on pan (ref-in-setState-updater race): `documentation/bugs/fix-office-canvas-pointermove-ref-race.md`
 - Token Stats panel blocks cross-project switch (~2-3s): `documentation/bugs/fix-token-stats-panel-blocks-project-switch.md`
 - Double `loadAgents` on session switch (deps cascade): `documentation/bugs/fix-double-loadagents-cross-project-session.md`
+- Stale closure in onPointerUp (lasso Office V2): `documentation/bugs/fix-stale-closure-pointerup-lasso.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

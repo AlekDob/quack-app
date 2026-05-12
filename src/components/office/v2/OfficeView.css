@@ -91,8 +91,14 @@
   border-radius: 6px;
   padding: 14px 14px 12px;
   color: rgba(255, 255, 255, 0.85);
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   will-change: transform;
+  cursor: pointer;
+}
+
+.office-room-card:hover {
+  border-color: #3a3a6a;
+  box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.25), 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .office-room-card--dimmed { opacity: 0.3; }
@@ -889,4 +895,98 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* =========================
+ * Office Text (titoletti)
+ * ========================= */
+.office-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: rgba(255, 255, 255, 0.95);
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  line-height: 1.2;
+  cursor: grab;
+  white-space: pre;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+}
+
+.office-text:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+
+.office-text:active { cursor: grabbing; }
+
+.office-text--selected {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.office-text__label {
+  pointer-events: none;
+}
+
+.office-text__input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  resize: none;
+  padding: 0;
+  margin: 0;
+  width: max-content;
+  min-width: 80px;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.office-text__actions {
+  position: absolute;
+  top: -28px;
+  right: 0;
+  display: none;
+  gap: 4px;
+  background: rgba(11, 15, 26, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 6px;
+  padding: 3px 4px;
+  z-index: 2;
+}
+.office-text:hover .office-text__actions,
+.office-text--selected .office-text__actions {
+  display: flex;
+}
+
+.office-text__btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.office-text__btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.office-text__btn--delete:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
 }

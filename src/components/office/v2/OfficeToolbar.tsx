@@ -1,7 +1,7 @@
 import { memo, useEffect, useState } from 'react';
 import { STICKER_CATALOG } from './officeStickerCatalog';
 
-export type OfficeMode = 'select' | 'lasso' | 'postit' | 'group' | 'sticker';
+export type OfficeMode = 'select' | 'lasso' | 'postit' | 'group' | 'sticker' | 'text';
 
 interface Props {
   mode: OfficeMode;
@@ -21,6 +21,7 @@ const MODE_SHORTCUTS: Record<string, OfficeMode> = {
   '3': 'postit',
   '4': 'group',
   '5': 'sticker',
+  '6': 'text',
 };
 
 function SelectIcon() {
@@ -71,6 +72,16 @@ function StickerIcon() {
       <path d="M3 11a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
       <line x1="7" y1="17" x2="7" y2="20" />
       <line x1="17" y1="17" x2="17" y2="20" />
+    </svg>
+  );
+}
+
+function TextIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7V5h16v2" />
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="9" y1="19" x2="15" y2="19" />
     </svg>
   );
 }
@@ -162,6 +173,7 @@ function OfficeToolbarImpl({ mode, onModeChange, activeSticker, onStickerChange,
         {btn('postit', PostItIcon, '3')}
         {btn('group', GroupIcon, '4')}
         {btn('sticker', StickerIcon, '5', () => setPickerOpen(p => !p))}
+        {btn('text', TextIcon, '6')}
         {selectionCount > 0 && (
           <span className="office-toolbar__badge" title={`${selectionCount} selected`}>{selectionCount}</span>
         )}

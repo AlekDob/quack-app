@@ -21,6 +21,7 @@ const sampleLayout: OfficeLayout = {
   customGroups: [],
   postIts: [],
   stickers: [],
+  texts: [],
 };
 
 describe('readOfficeLayout', () => {

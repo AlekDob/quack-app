@@ -46,6 +46,15 @@ export interface OfficeSticker {
   kind: string;
 }
 
+/** Free-form title/heading annotation on the office canvas */
+export interface OfficeText {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  fontSize?: number; // px, defaults to TEXT_DEFAULT_FONT
+}
+
 export interface OfficeLayout {
   version: 2;
   rooms: OfficeRoomCard[];
@@ -54,6 +63,7 @@ export interface OfficeLayout {
   customGroups: OfficeCustomGroup[];
   postIts: OfficePostIt[];
   stickers: OfficeSticker[];
+  texts: OfficeText[];
 }
 
 export interface Viewport {

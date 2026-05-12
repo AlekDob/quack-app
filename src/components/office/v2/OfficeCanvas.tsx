@@ -5,13 +5,15 @@ import type {
   OfficeCustomGroup as GroupData,
   OfficePostIt as PostItData,
   OfficeSticker as StickerData,
+  OfficeText as TextData,
 } from './officeTypes';
 import { OfficeRoomCard } from './OfficeRoomCard';
 import { OfficePostIt } from './OfficePostIt';
 import { OfficeCustomGroup } from './OfficeCustomGroup';
 import { OfficeSticker } from './OfficeSticker';
+import { OfficeText } from './OfficeText';
 import { projectNameFromPath } from './officeLayout';
-import { GROUP_MIN_W, GROUP_MIN_H, POSTIT_DEFAULT_W, POSTIT_DEFAULT_H, POSTIT_COLORS, GROUP_DEFAULT_COLOR, STICKER_MIN_SIZE, CARD_DEFAULT_W, CARD_DEFAULT_H } from './officeConstants';
+import { GROUP_MIN_W, GROUP_MIN_H, POSTIT_DEFAULT_W, POSTIT_DEFAULT_H, POSTIT_COLORS, GROUP_DEFAULT_COLOR, STICKER_MIN_SIZE, CARD_DEFAULT_W, CARD_DEFAULT_H, TEXT_DEFAULT_TEXT, TEXT_DEFAULT_FONT } from './officeConstants';
 import { getStickerDef } from './officeStickerCatalog';
 import type { TerminalInfo } from '../../../types';
 import type { DuckViewModel } from './OfficeRoomCard';
@@ -35,6 +37,7 @@ interface Props {
 
   onRoomMoved: (projectPath: string, x: number, y: number) => void;
   onDuckClick: (agentId: string, e: React.MouseEvent) => void;
+  onCardClick?: (projectPath: string) => void;
   onCardDoubleClick: (projectPath: string) => void;
   onRoomContextMenu: (projectPath: string, e: React.MouseEvent) => void;
 
@@ -49,6 +52,13 @@ interface Props {
   onAddSticker: (s: StickerData) => void;
   onUpdateSticker: (id: string, patch: Partial<Omit<StickerData, 'id'>>) => void;
   onDeleteSticker: (id: string) => void;
+
+  onAddText: (t: TextData) => void;
+  onUpdateText: (id: string, patch: Partial<Omit<TextData, 'id'>>) => void;
+  onDeleteText: (id: string) => void;
+
+  /** Clone selection-keys with offset; used for Alt-drag duplicate-while-dragging */
+  onDuplicateItems: (selectionKeys: string[], offsetX?: number, offsetY?: number) => string[];
 
   onBeginDrag: () => void;
   onEndDrag: () => void;
@@ -81,7 +91,8 @@ type AnnotationInteraction =
   | { kind: 'group-resize'; id: string; corner: 'nw' | 'ne' | 'sw' | 'se'; startX: number; startY: number; startW: number; startH: number; startPX: number; startPY: number }
   | { kind: 'sticker-move'; id: string; startX: number; startY: number; startPX: number; startPY: number; siblings: GroupChild[] }
   | { kind: 'sticker-resize'; id: string; startW: number; startH: number; startPX: number; startPY: number }
-  | { kind: 'sticker-rotate'; id: string; centerX: number; centerY: number; startRot: number; startAngle: number };
+  | { kind: 'sticker-rotate'; id: string; centerX: number; centerY: number; startRot: number; startAngle: number }
+  | { kind: 'text-move'; id: string; startX: number; startY: number; startPX: number; startPY: number; siblings: GroupChild[] };
 
 type LassoState = {
   startCanvasX: number;
@@ -90,7 +101,7 @@ type LassoState = {
   currentCanvasY: number;
 };
 
-export function selectionKey(kind: 'room' | 'postit' | 'sticker' | 'group', id: string): string {
+export function selectionKey(kind: 'room' | 'postit' | 'sticker' | 'group' | 'text', id: string): string {
   return `${kind}:${id}`;
 }
 
@@ -109,11 +120,22 @@ function OfficeCanvasImpl(props: Props) {
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [groupCreation, setGroupCreation] = useState<GroupCreationState | null>(null);
   const [lasso, setLasso] = useState<LassoState | null>(null);
+  const [autoEditTextId, setAutoEditTextId] = useState<string | null>(null);
 
   const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const annotRef = useRef<AnnotationInteraction | null>(null);
   const hasAutoFitRef = useRef(false);
+  // Refs mirroring state used inside event handlers — eliminates stale-closure bugs.
+  // useCallback's dependency array couldn't keep these handlers fresh without re-creating
+  // them on every move; refs let the handlers read the latest value via .current.
+  // Brain: fix-stale-closure-pointerup-lasso
+  const lassoRef = useRef<LassoState | null>(null);
+  const groupCreationRef = useRef<GroupCreationState | null>(null);
+  // Tracks a potential "click on empty canvas" so that a simple click (no drag,
+  // no shift) in select mode clears the current selection. Set on pointerdown,
+  // verified vs current pointer position on pointerup (must be within drag threshold).
+  const emptyClickRef = useRef<{ x: number; y: number } | null>(null);
 
   const screenToCanvas = useCallback((clientX: number, clientY: number) => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -180,16 +202,42 @@ function OfficeCanvasImpl(props: Props) {
       return;
     }
 
+    if (mode === 'text') {
+      const id = genId('t');
+      props.onAddText({
+        id,
+        x: pt.x,
+        y: pt.y - TEXT_DEFAULT_FONT / 2,
+        text: TEXT_DEFAULT_TEXT,
+        fontSize: TEXT_DEFAULT_FONT,
+      });
+      setAutoEditTextId(id);
+      props.onModeReset();
+      return;
+    }
+
     if (mode === 'group') {
       setGroupCreation({ startCanvasX: pt.x, startCanvasY: pt.y, currentCanvasX: pt.x, currentCanvasY: pt.y });
+      // Brain: pointer-capture-keeps-events-flowing — WebKit drops pointermove if pointer
+      // exits the original element without capture, causing scattered/laggy lasso updates.
+      (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
       e.preventDefault();
       return;
     }
 
-    if (mode === 'lasso') {
+    // Lasso multi-select: explicit 'lasso' mode OR Shift+drag in 'select' mode.
+    // `clickedCanvasBackground` was already checked above — only fires when the user did
+    // NOT press on a room/postit/sticker/group/text.
+    if (mode === 'lasso' || (mode === 'select' && e.shiftKey)) {
       setLasso({ startCanvasX: pt.x, startCanvasY: pt.y, currentCanvasX: pt.x, currentCanvasY: pt.y });
+      (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
       e.preventDefault();
       return;
+    }
+
+    // Plain click on empty canvas in select mode → potential deselect (verified on pointerup).
+    if (mode === 'select' && !e.shiftKey) {
+      emptyClickRef.current = { x: e.clientX, y: e.clientY };
     }
   }, [spaceHeld, viewport.panX, viewport.panY, mode, activeSticker, screenToCanvas, props]);
 
@@ -207,22 +255,23 @@ function OfficeCanvasImpl(props: Props) {
       return;
     }
 
-    if (groupCreation) {
+    // Read from refs so we never observe a stale closure value
+    if (groupCreationRef.current) {
       const pt = screenToCanvas(e.clientX, e.clientY);
-      setGroupCreation({ ...groupCreation, currentCanvasX: pt.x, currentCanvasY: pt.y });
+      setGroupCreation(prev => prev ? { ...prev, currentCanvasX: pt.x, currentCanvasY: pt.y } : prev);
       return;
     }
 
-    if (lasso) {
+    if (lassoRef.current) {
       const pt = screenToCanvas(e.clientX, e.clientY);
-      setLasso({ ...lasso, currentCanvasX: pt.x, currentCanvasY: pt.y });
+      setLasso(prev => prev ? { ...prev, currentCanvasX: pt.x, currentCanvasY: pt.y } : prev);
       return;
     }
 
     // Annotation interaction
     const a = annotRef.current;
     if (a) {
-      if (a.kind === 'room-move' || a.kind === 'postit-move' || a.kind === 'group-move' || a.kind === 'sticker-move') {
+      if (a.kind === 'room-move' || a.kind === 'postit-move' || a.kind === 'group-move' || a.kind === 'sticker-move' || a.kind === 'text-move') {
         const dx = (e.clientX - a.startPX) / viewport.zoom;
         const dy = (e.clientY - a.startPY) / viewport.zoom;
         if (a.kind === 'room-move') {
@@ -233,6 +282,8 @@ function OfficeCanvasImpl(props: Props) {
           props.onUpdateGroup(a.id, { x: a.startX + dx, y: a.startY + dy });
         } else if (a.kind === 'sticker-move') {
           props.onUpdateSticker(a.id, { x: a.startX + dx, y: a.startY + dy });
+        } else if (a.kind === 'text-move') {
+          props.onUpdateText(a.id, { x: a.startX + dx, y: a.startY + dy });
         }
 
         const extras = a.kind === 'group-move' ? a.children : a.siblings;
@@ -277,6 +328,11 @@ function OfficeCanvasImpl(props: Props) {
       return;
     }
 
+    // Read from refs to avoid stale-closure bugs (state may have been updated
+    // by rAF/state setters between the user gesture and this handler running).
+    const groupCreation = groupCreationRef.current;
+    const lasso = lassoRef.current;
+
     if (groupCreation) {
       const x = Math.min(groupCreation.startCanvasX, groupCreation.currentCanvasX);
       const y = Math.min(groupCreation.startCanvasY, groupCreation.currentCanvasY);
@@ -320,6 +376,13 @@ function OfficeCanvasImpl(props: Props) {
       for (const g of layout.customGroups) {
         if (inside(g.x + g.w / 2, g.y + g.h / 2)) next.add(selectionKey('group', g.id));
       }
+      // Texts use the (x,y) as the top-left of the rendered label; pick a single
+      // hit point near the label center using a conservative inflation.
+      for (const t of (layout.texts ?? [])) {
+        const cx = t.x + 40; // approx half-width of a short title
+        const cy = t.y + (t.fontSize ?? 22) / 2;
+        if (inside(cx, cy)) next.add(selectionKey('text', t.id));
+      }
 
       props.onSelectedIds(next);
       setLasso(null);
@@ -330,9 +393,23 @@ function OfficeCanvasImpl(props: Props) {
     if (annotRef.current) {
       annotRef.current = null;
       props.onEndDrag();
+      emptyClickRef.current = null; // a drag is not an empty click
       return;
     }
-  }, [panning, groupCreation, props]);
+
+    // Empty click on canvas background → deselect (if pointer hasn't moved more than threshold)
+    const downAt = emptyClickRef.current;
+    emptyClickRef.current = null;
+    if (downAt) {
+      const dx = Math.abs(e.clientX - downAt.x);
+      const dy = Math.abs(e.clientY - downAt.y);
+      if (dx < 4 && dy < 4 && props.selectedIds.size > 0) {
+        props.onSelectedIds(new Set());
+      }
+    }
+    // `layout` is in the deps because the hit-test loops read the current room/text/sticker
+    // positions. `lasso` and `groupCreation` are read via refs (no stale-closure issue).
+  }, [panning, layout, props]);
 
   const buildSiblings = useCallback((excludeKind: 'room' | 'postit' | 'sticker' | 'group', excludeId: string): GroupChild[] => {
     const sel = props.selectedIds;
@@ -433,6 +510,10 @@ function OfficeCanvasImpl(props: Props) {
     return () => window.removeEventListener('keydown', handler);
   }, [fitToContent]);
 
+  // Keep refs synced with state so event handlers always read the latest values
+  useEffect(() => { lassoRef.current = lasso; }, [lasso]);
+  useEffect(() => { groupCreationRef.current = groupCreation; }, [groupCreation]);
+
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code !== 'Space') return;
@@ -457,59 +538,79 @@ function OfficeCanvasImpl(props: Props) {
 
   // Annotation drag starters (passed to children)
   const startPostItDrag = useCallback((id: string, e: React.PointerEvent) => {
-    const p = layout.postIts.find(x => x.id === id);
+    let actualId = id;
+    // Alt/Option-drag = duplicate while dragging (Figma-style).
+    // We clone in-place at the same x/y; the drag below moves the clone, the original stays put.
+    if (e.altKey) {
+      const newKeys = props.onDuplicateItems([selectionKey('postit', id)], 0, 0);
+      if (newKeys[0]?.startsWith('postit:')) {
+        actualId = newKeys[0].slice('postit:'.length);
+        props.onSelectedIds(new Set([newKeys[0]]));
+      }
+    }
+    const p = layout.postIts.find(x => x.id === actualId);
     if (!p) return;
     props.onBeginDrag();
-    annotRef.current = { kind: 'postit-move', id, startX: p.x, startY: p.y, startPX: e.clientX, startPY: e.clientY, siblings: buildSiblings('postit', id) };
+    annotRef.current = { kind: 'postit-move', id: actualId, startX: p.x, startY: p.y, startPX: e.clientX, startPY: e.clientY, siblings: e.altKey ? [] : buildSiblings('postit', actualId) };
     (e.target as Element).setPointerCapture?.(e.pointerId);
   }, [layout.postIts, props, buildSiblings]);
 
   const startGroupDrag = useCallback((id: string, e: React.PointerEvent) => {
-    const g = layout.customGroups.find(x => x.id === id);
+    let actualId = id;
+    if (e.altKey) {
+      const newKeys = props.onDuplicateItems([selectionKey('group', id)], 0, 0);
+      if (newKeys[0]?.startsWith('group:')) {
+        actualId = newKeys[0].slice('group:'.length);
+        props.onSelectedIds(new Set([newKeys[0]]));
+      }
+    }
+    const g = layout.customGroups.find(x => x.id === actualId);
     if (!g) return;
 
     const inside = (cx: number, cy: number) =>
       cx >= g.x && cx <= g.x + g.w && cy >= g.y && cy <= g.y + g.h;
 
     const children: GroupChild[] = [];
-    for (const r of layout.rooms) {
-      const w = r.w ?? CARD_DEFAULT_W;
-      const h = r.h ?? CARD_DEFAULT_H;
-      if (inside(r.x + w / 2, r.y + h / 2)) {
-        children.push({ kind: 'room', projectPath: r.projectPath, startX: r.x, startY: r.y });
+    // On Alt-drag we drag only the freshly-created clone — no children, no siblings.
+    if (!e.altKey) {
+      for (const r of layout.rooms) {
+        const w = r.w ?? CARD_DEFAULT_W;
+        const h = r.h ?? CARD_DEFAULT_H;
+        if (inside(r.x + w / 2, r.y + h / 2)) {
+          children.push({ kind: 'room', projectPath: r.projectPath, startX: r.x, startY: r.y });
+        }
       }
-    }
-    for (const p of layout.postIts) {
-      if (inside(p.x + p.w / 2, p.y + p.h / 2)) {
-        children.push({ kind: 'postit', id: p.id, startX: p.x, startY: p.y });
+      for (const p of layout.postIts) {
+        if (inside(p.x + p.w / 2, p.y + p.h / 2)) {
+          children.push({ kind: 'postit', id: p.id, startX: p.x, startY: p.y });
+        }
       }
-    }
-    for (const s of layout.stickers) {
-      if (inside(s.x + s.w / 2, s.y + s.h / 2)) {
-        children.push({ kind: 'sticker', id: s.id, startX: s.x, startY: s.y });
+      for (const s of layout.stickers) {
+        if (inside(s.x + s.w / 2, s.y + s.h / 2)) {
+          children.push({ kind: 'sticker', id: s.id, startX: s.x, startY: s.y });
+        }
       }
-    }
-    for (const other of layout.customGroups) {
-      if (other.id === id) continue;
-      if (inside(other.x + other.w / 2, other.y + other.h / 2)) {
-        children.push({ kind: 'group', id: other.id, startX: other.x, startY: other.y });
+      for (const other of layout.customGroups) {
+        if (other.id === actualId) continue;
+        if (inside(other.x + other.w / 2, other.y + other.h / 2)) {
+          children.push({ kind: 'group', id: other.id, startX: other.x, startY: other.y });
+        }
       }
-    }
 
-    // If the group itself is part of a multi-selection, add the sibling
-    // snapshots so all selected elements follow the drag together.
-    const siblings = buildSiblings('group', id);
-    for (const s of siblings) {
-      // avoid double-move: skip elements already captured as children
-      const already = children.some(c =>
-        (c.kind === 'room' && s.kind === 'room' && c.projectPath === s.projectPath) ||
-        (c.kind !== 'room' && s.kind === c.kind && 'id' in c && 'id' in s && c.id === s.id)
-      );
-      if (!already) children.push(s);
+      // If the group itself is part of a multi-selection, add the sibling
+      // snapshots so all selected elements follow the drag together.
+      const siblings = buildSiblings('group', actualId);
+      for (const s of siblings) {
+        const already = children.some(c =>
+          (c.kind === 'room' && s.kind === 'room' && c.projectPath === s.projectPath) ||
+          (c.kind !== 'room' && s.kind === c.kind && 'id' in c && 'id' in s && c.id === s.id)
+        );
+        if (!already) children.push(s);
+      }
     }
 
     props.onBeginDrag();
-    annotRef.current = { kind: 'group-move', id, startX: g.x, startY: g.y, startPX: e.clientX, startPY: e.clientY, children };
+    annotRef.current = { kind: 'group-move', id: actualId, startX: g.x, startY: g.y, startPX: e.clientX, startPY: e.clientY, children };
     (e.target as Element).setPointerCapture?.(e.pointerId);
   }, [layout.customGroups, layout.rooms, layout.postIts, layout.stickers, props, buildSiblings]);
 
@@ -526,12 +627,36 @@ function OfficeCanvasImpl(props: Props) {
   }, [layout.customGroups, props]);
 
   const startStickerDrag = useCallback((id: string, e: React.PointerEvent) => {
-    const s = layout.stickers.find(x => x.id === id);
+    let actualId = id;
+    if (e.altKey) {
+      const newKeys = props.onDuplicateItems([selectionKey('sticker', id)], 0, 0);
+      if (newKeys[0]?.startsWith('sticker:')) {
+        actualId = newKeys[0].slice('sticker:'.length);
+        props.onSelectedIds(new Set([newKeys[0]]));
+      }
+    }
+    const s = layout.stickers.find(x => x.id === actualId);
     if (!s) return;
     props.onBeginDrag();
-    annotRef.current = { kind: 'sticker-move', id, startX: s.x, startY: s.y, startPX: e.clientX, startPY: e.clientY, siblings: buildSiblings('sticker', id) };
+    annotRef.current = { kind: 'sticker-move', id: actualId, startX: s.x, startY: s.y, startPX: e.clientX, startPY: e.clientY, siblings: e.altKey ? [] : buildSiblings('sticker', actualId) };
     (e.target as Element).setPointerCapture?.(e.pointerId);
   }, [layout.stickers, props, buildSiblings]);
+
+  const startTextDrag = useCallback((id: string, e: React.PointerEvent) => {
+    let actualId = id;
+    if (e.altKey) {
+      const newKeys = props.onDuplicateItems([selectionKey('text', id)], 0, 0);
+      if (newKeys[0]?.startsWith('text:')) {
+        actualId = newKeys[0].slice('text:'.length);
+        props.onSelectedIds(new Set([newKeys[0]]));
+      }
+    }
+    const t = (layout.texts ?? []).find(x => x.id === actualId);
+    if (!t) return;
+    props.onBeginDrag();
+    annotRef.current = { kind: 'text-move', id: actualId, startX: t.x, startY: t.y, startPX: e.clientX, startPY: e.clientY, siblings: [] };
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+  }, [layout.texts, props]);
 
   const startStickerResize = useCallback((id: string, e: React.PointerEvent) => {
     const s = layout.stickers.find(x => x.id === id);
@@ -575,6 +700,7 @@ function OfficeCanvasImpl(props: Props) {
       : mode === 'group' ? 'crosshair'
       : mode === 'lasso' ? 'crosshair'
       : mode === 'sticker' ? 'copy'
+      : mode === 'text' ? 'text'
       : 'default';
 
   return (
@@ -692,6 +818,7 @@ function OfficeCanvasImpl(props: Props) {
                 (e.target as Element).setPointerCapture?.(e.pointerId);
               }}
               onDoubleClick={props.onCardDoubleClick}
+              onCardClick={props.onCardClick}
               onDuckClick={props.onDuckClick}
               onContextMenu={props.onRoomContextMenu}
             />
@@ -705,6 +832,34 @@ function OfficeCanvasImpl(props: Props) {
             onUpdate={(patch) => props.onUpdatePostIt(p.id, patch)}
             onDelete={() => props.onDeletePostIt(p.id)}
             onDragStart={startPostItDrag}
+          />
+        ))}
+        {(layout.texts ?? []).map(t => (
+          <OfficeText
+            key={t.id}
+            text={t}
+            selected={props.selectedIds.has(selectionKey('text', t.id))}
+            autoEditOnMount={t.id === autoEditTextId}
+            onUpdate={(patch) => {
+              props.onUpdateText(t.id, patch);
+              if (t.id === autoEditTextId) setAutoEditTextId(null);
+            }}
+            onDelete={() => {
+              props.onDeleteText(t.id);
+              if (t.id === autoEditTextId) setAutoEditTextId(null);
+            }}
+            onDragStart={startTextDrag}
+            onSelect={(id, additive) => {
+              const k = selectionKey('text', id);
+              const next = new Set<string>();
+              if (additive) {
+                for (const s of props.selectedIds) next.add(s);
+                if (next.has(k)) next.delete(k); else next.add(k);
+              } else {
+                next.add(k);
+              }
+              props.onSelectedIds(next);
+            }}
           />
         ))}
       </div>

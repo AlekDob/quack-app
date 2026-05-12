@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: TypeScript strict (React 18 frontend), Tauri v2 invoke API (read_file_content, write_file_content, get_home_directory, rename_file)
 created: 2026-04-22
-last_verified: 2026-04-22
-tags: [office, office-v2, whiteboard, annotations, post-it, sticker, custom-group, undo-redo, toolbar, svg, layout]
+last_verified: 2026-05-11
+tags: [office, office-v2, whiteboard, annotations, post-it, sticker, custom-group, undo-redo, toolbar, svg, layout, room-click, flip-transition]
 ---
 
 ## Office View v2
@@ -29,9 +29,10 @@ tags: [office, office-v2, whiteboard, annotations, post-it, sticker, custom-grou
 | Component | `src/components/office/v2/OfficePostIt.tsx` | HTML overlay post-it: draggable header, double-click to edit, Cmd+Enter commit, Esc cancel, 6-color cycle, delete on hover |
 | Component | `src/components/office/v2/OfficeCustomGroup.tsx` | SVG rect with dashed border, editable label, drag body, 4-corner resize, delete-on-hover |
 | Component | `src/components/office/v2/OfficeSticker.tsx` | SVG sticker with drag/resize(aspect-lock)/rotate handles (hover-visible); renders via catalog lookup |
+| Component | `src/components/office/v2/OfficeText.tsx` | HTML overlay "titoletto" — draggable, edit-on-double-click (auto-focus on spawn), A−/A+ to resize font, × to delete |
 | Component | `src/components/office/v2/OfficeTagFilter.tsx` | Tag pills (dim filter) + "+" create new tag + "×" delete tag on hover + Reset layout button |
 | Component | `src/components/office/v2/OfficeRoomContextMenu.tsx` | Portal-based right-click menu for rooms: toggle tag assignment + inline "new tag" create |
-| Component | `src/components/office/v2/OfficeActionMenu.tsx` | Ported from v1 — portal menu near clicked duck listing active sessions; goto chat / session click |
+| Component | `src/components/office/v2/OfficeActionMenu.tsx` | **DISMESSO in v2 (2026-05-11)** — file conservato per fallback v1. Duck click ora va dritto a `onGoToChat(agentId)` senza menu intermedio. |
 | Component | `src/components/office/v2/OfficeView.css` | All CSS for v2 components |
 | Hook | `src/components/office/v2/useOfficeLayout.ts` | Layout state + debounced write + CRUD (rooms/postIts/customGroups/stickers) + undo/redo with drag-coalescing |
 | Hook | `src/components/office/v2/useOfficeDrag.ts` | Room-card drag with threshold (canvas-to-screen coords via viewport) |
@@ -51,6 +52,7 @@ OfficeLayout {
   customGroups: OfficeCustomGroup[],
   postIts: OfficePostIt[],
   stickers: OfficeSticker[],     // { kind: catalog id, rot: degrees }
+  texts: OfficeText[],           // { id, x, y, text, fontSize? } — titoletti
 }
 ```
 
@@ -62,10 +64,11 @@ OfficeLayout {
 | Mode | Shortcut | Behaviour |
 |------|----------|-----------|
 | Select | `1` | Default — drag card plates, click ducks, drag/resize/rotate existing annotations |
-| Lasso | `2` | Click-drag canvas → blue dashed rect → release selects all elements whose center is inside; auto-exits to Select |
+| Lasso | `2` | Click-drag canvas → blue dashed rect → release selects all elements whose center is inside; auto-exits to Select. **Shortcut alternativa (2026-05-11)**: in `select` mode tieni premuto **Shift** e trascina su area vuota per disegnare il lasso senza cambiare tool. |
 | Post-it | `3` | Click canvas → create 160x120 post-it at point → auto-exit to select |
 | Group | `4` | Click-drag canvas → preview rect → release creates custom group (min 160x120) → auto-exit to select |
 | Sticker | `5` | Open sub-picker (10 kinds in 5-col grid) → click canvas places sticker, stays in mode for multi-placement → Esc to exit |
+| Text (titoletti) | `6` | Click canvas → spawn "Title" text at point with editor auto-focused → Enter to commit, Esc to cancel → auto-exit to select. Double-click to re-edit. A−/A+ buttons resize font (10-64px). |
 | Undo | `Cmd+Z` | Revert last action |
 | Redo | `Cmd+Shift+Z` | Re-apply |
 
@@ -135,6 +138,59 @@ bottom → top:
 - `officeLayout.test.ts` — tag inference, grid packing, projectName helper, sessionDotColor priority.
 - `officeMigration.test.ts` — bootstrap dedup, reconcile add/preserve/dedup/retroactive-dedup, normaliseLayout v1→v2.
 - `officeStorage.test.ts` — round-trip read/write, v1 migration on read, corrupt-file rename.
+
+### Room Click → Whiteboard (2026-05-11)
+**UX nuova:** la stanza è un entry-point di primo livello per la Whiteboard del progetto.
+
+- **Single click sul corpo della room-card** (qualsiasi punto NON sull'header `__plate` e NON su un duck) → apre la Whiteboard del progetto della stanza (switch tab secco, nessuna animazione).
+- **Click sul plate** (header) → invariato (avvia drag della card, `e.stopPropagation()` sopprime il click bubble).
+- **Click su un duck** → naviga alla chat dell'agente (`onGoToChat(agentId)`), saltando il vecchio `OfficeActionMenu`. `e.stopPropagation()` nel duck button impedisce di triggerare anche l'apertura whiteboard.
+- **Double-click sulla card** → identico al single click. Mantenuto per compatibilità con la prop `onCardDoubleClick` ereditata.
+- **Right-click** → invariato (apre `OfficeRoomContextMenu` per gestione tag).
+
+**Wiring:**
+1. `OfficeRoomCard.onClick` → chiama `onCardClick(projectPath)`.
+2. `OfficeCanvas` passa `onCardClick` come prop a ogni card.
+3. `OfficeView.onOpenWhiteboard(projectPath)` viene chiamato dal canvas.
+4. `OfficeTabView` propaga la prop ad App.
+5. `App.handleOpenWhiteboardForProject(projectPath)` garantisce che il tab `feature-map` esista con `initialProjectPath = projectPath` (aggiorna se diverso) e attiva il tab.
+
+**Gotcha fix correlato:** `FeatureMapTabView` ora riceve `projectPath = fmTab.initialProjectPath ?? activeTerminal?.cwd` (in `App.tsx`). Prima usava solo `activeTerminal?.cwd`, mostrando il progetto sbagliato quando si entrava nella whiteboard dalla stanza di un progetto inattivo.
+
+### Copy / Paste / Duplicate (2026-05-11)
+Shortcuts cross-platform (Mac/Windows: `metaKey || ctrlKey`) gestiti nel `useEffect` keydown di `OfficeView.tsx`. Operano sui 4 tipi annotation (postIts, customGroups, stickers, texts). Le rooms sono escluse — sono auto-managed.
+
+| Shortcut | Azione |
+|---|---|
+| **Cmd+C** / Ctrl+C | Snapshot dei selection-keys correnti (filtrati per escludere `room:`). Resetta paste-offset. |
+| **Cmd+V** / Ctrl+V | Clona via `duplicateItems(keys, off, off)` con offset crescente (no overlap su multi-paste). Seleziona i nuovi. Il clipboard avanza ai nuovi keys. |
+| **Cmd+D** / Ctrl+D | Duplica direttamente i selezionati con offset +24/+24 senza toccare il clipboard. |
+
+**Selezione di un titolo (`OfficeText`)**: click sul body del titolo lo seleziona (single replace); shift+click toggla in modalità additiva. Lasso multi-selezione include i texts (hit-test su center-point a `(x+40, y+fontSize/2)`).
+
+**Alt-drag (Option+drag su Mac) per duplicare** stile Figma. Premere Alt durante un `pointerdown` su un post-it / custom group / sticker / titolo → l'elemento viene clonato in-place (offset 0,0), il drag che segue muove il clone (l'originale resta fermo). I 4 drag-starters in `OfficeCanvas` controllano `e.altKey` e chiamano `onDuplicateItems([key], 0, 0)` (cablato da `OfficeView`). Per il `group-move` con alt, i children/siblings non vengono trascinati (il clone è vuoto). Le rooms sono escluse.
+
+**Implementazione**:
+- `useOfficeLayout.duplicateItems(keys, offsetX, offsetY): string[]` clona i 4 tipi in un singolo `setWithHistory` (1 solo undo step). Parsa il formato `${kind}:${id}`, salta `room:`, ritorna i nuovi selection-keys.
+- `OfficeText`: nuovo prop `onSelect(id, additive)` chiamato in `onPointerDown` (prima dello `onDragStart`).
+- Filtro `INPUT/TEXTAREA/contentEditable` per non rubare la copia di testo quando si edita un titolo/post-it.
+
+### Multi-select gestures (2026-05-12, finale)
+
+| Gesto | Cosa fa |
+|---|---|
+| **Shift + drag su canvas vuoto** (mode `select`) | Disegna lasso → seleziona tutti gli elementi (rooms, postit, sticker, group, text) il cui center è dentro il rect |
+| **Drag normale su canvas vuoto** (mode `select`) | Niente (no pan, no lasso). Per pan: middle-click o Space+drag |
+| **Click semplice su canvas vuoto** | Deseleziona tutto (se c'è una selezione attiva). Verificato con drag-threshold `<4px` per non confondersi con un drag accidentale |
+| **Mode `lasso` esplicita (tasto `2`)** | Lasso permanente — drag su canvas vuoto disegna lasso. Auto-exit a select dopo finalize |
+| **Click su un elemento** | Drag = sposta l'elemento. Alt+drag = duplica-while-dragging (clone segue il cursore, originale resta fermo) |
+| **Shift+click su un elemento** | Toggle additivo nella multi-selezione |
+
+**Implementazione note**:
+- Lasso state usa il **pattern useRef sincronizzato** (`lassoRef.current`) per evitare stale closure in `onPointerUp`. Vedi `documentation/bugs/fix-stale-closure-pointerup-lasso.md`. Brain breadcrumb in codice: `// Brain: fix-stale-closure-pointerup-lasso`.
+- `emptyClickRef` salva la posizione del pointerdown su canvas vuoto in select mode. Al pointerup, se distanza `<4px` e selezione non vuota, deseleziona.
+- `setPointerCapture` chiamato al pointerdown sul `currentTarget` (container div) per non perdere eventi se il cursore esce dal bounds dell'SVG.
+- Hit-test del lasso usa il **center-point** di ogni elemento (più restrittivo del rect-intersect, ma più predictable per l'utente).
 
 ### Known Limitations / Follow-ups
 - No Shift+click to toggle a single element in/out of selection — only lasso or Esc.

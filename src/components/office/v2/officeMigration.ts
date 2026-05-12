@@ -39,6 +39,7 @@ export function bootstrapLayoutFromTerminals(terminals: TerminalInfo[]): OfficeL
     customGroups: [],
     postIts: [],
     stickers: [],
+    texts: [],
   };
 }
 
@@ -81,6 +82,7 @@ export function normaliseLayout(raw: unknown): OfficeLayout | null {
   const customGroups = Array.isArray(r.customGroups) ? r.customGroups as OfficeLayout['customGroups'] : [];
   const postIts = Array.isArray(r.postIts) ? r.postIts as OfficeLayout['postIts'] : [];
   const stickers = Array.isArray(r.stickers) ? r.stickers as OfficeLayout['stickers'] : [];
+  const texts = Array.isArray(r.texts) ? r.texts as OfficeLayout['texts'] : [];
 
   return {
     version: 2,
@@ -90,6 +92,7 @@ export function normaliseLayout(raw: unknown): OfficeLayout | null {
     customGroups,
     postIts,
     stickers,
+    texts,
   };
 }
 

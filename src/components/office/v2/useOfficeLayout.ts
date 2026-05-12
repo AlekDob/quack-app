@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { readOfficeLayout, writeOfficeLayout } from './officeStorage';
 import { bootstrapLayoutFromTerminals, reconcileLayoutWithTerminals } from './officeMigration';
 import { WRITE_DEBOUNCE_MS, UNDO_STACK_MAX } from './officeConstants';
-import type { OfficeLayout, OfficeCustomGroup, OfficePostIt, OfficeSticker, OfficeTag } from './officeTypes';
+import type { OfficeLayout, OfficeCustomGroup, OfficePostIt, OfficeSticker, OfficeTag, OfficeText } from './officeTypes';
 import type { TerminalInfo } from '../../../types';
 
 interface UseOfficeLayoutResult {
@@ -22,6 +22,15 @@ interface UseOfficeLayoutResult {
   addSticker: (sticker: OfficeSticker) => void;
   updateSticker: (id: string, patch: Partial<Omit<OfficeSticker, 'id'>>) => void;
   deleteSticker: (id: string) => void;
+
+  addText: (text: OfficeText) => void;
+  updateText: (id: string, patch: Partial<Omit<OfficeText, 'id'>>) => void;
+  deleteText: (id: string) => void;
+
+  /** Clone post-its/custom-groups/stickers/texts (NOT rooms) with x/y offset.
+   *  ids use the selection-key format `${kind}:${id}` (kind = postit|group|sticker|text).
+   *  Returns the new ids in the same selection-key format. */
+  duplicateItems: (selectionKeys: string[], offsetX?: number, offsetY?: number) => string[];
 
   addTag: (tag: OfficeTag) => void;
   deleteTag: (tagId: string) => void;
@@ -200,6 +209,76 @@ export function useOfficeLayout(terminals: TerminalInfo[]): UseOfficeLayoutResul
     setWithHistory(prev => ({ ...prev, stickers: prev.stickers.filter(s => s.id !== id) }));
   }, [setWithHistory]);
 
+  const addText = useCallback((text: OfficeText) => {
+    setWithHistory(prev => ({ ...prev, texts: [...(prev.texts ?? []), text] }));
+  }, [setWithHistory]);
+
+  const updateText = useCallback((id: string, patch: Partial<Omit<OfficeText, 'id'>>) => {
+    setWithHistory(prev => ({
+      ...prev,
+      texts: (prev.texts ?? []).map(t => t.id === id ? { ...t, ...patch } : t),
+    }));
+  }, [setWithHistory]);
+
+  const deleteText = useCallback((id: string) => {
+    setWithHistory(prev => ({ ...prev, texts: (prev.texts ?? []).filter(t => t.id !== id) }));
+  }, [setWithHistory]);
+
+  const duplicateItems = useCallback((selectionKeys: string[], offsetX = 24, offsetY = 24): string[] => {
+    if (selectionKeys.length === 0) return [];
+    const newKeys: string[] = [];
+    const nid = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
+    setWithHistory(prev => {
+      const newPostIts: OfficePostIt[] = [...prev.postIts];
+      const newGroups: OfficeCustomGroup[] = [...prev.customGroups];
+      const newStickers: OfficeSticker[] = [...prev.stickers];
+      const newTexts: OfficeText[] = [...(prev.texts ?? [])];
+
+      for (const key of selectionKeys) {
+        const colonIdx = key.indexOf(':');
+        if (colonIdx === -1) continue;
+        const kind = key.slice(0, colonIdx);
+        const id = key.slice(colonIdx + 1);
+
+        if (kind === 'postit') {
+          const src = prev.postIts.find(p => p.id === id);
+          if (!src) continue;
+          const clone: OfficePostIt = { ...src, id: nid('p'), x: src.x + offsetX, y: src.y + offsetY };
+          newPostIts.push(clone);
+          newKeys.push(`postit:${clone.id}`);
+        } else if (kind === 'group') {
+          const src = prev.customGroups.find(g => g.id === id);
+          if (!src) continue;
+          const clone: OfficeCustomGroup = { ...src, id: nid('g'), x: src.x + offsetX, y: src.y + offsetY };
+          newGroups.push(clone);
+          newKeys.push(`group:${clone.id}`);
+        } else if (kind === 'sticker') {
+          const src = prev.stickers.find(s => s.id === id);
+          if (!src) continue;
+          const clone: OfficeSticker = { ...src, id: nid('s'), x: src.x + offsetX, y: src.y + offsetY };
+          newStickers.push(clone);
+          newKeys.push(`sticker:${clone.id}`);
+        } else if (kind === 'text') {
+          const src = (prev.texts ?? []).find(t => t.id === id);
+          if (!src) continue;
+          const clone: OfficeText = { ...src, id: nid('t'), x: src.x + offsetX, y: src.y + offsetY };
+          newTexts.push(clone);
+          newKeys.push(`text:${clone.id}`);
+        }
+        // 'room' keys are intentionally skipped — rooms are auto-managed.
+      }
+
+      return {
+        ...prev,
+        postIts: newPostIts,
+        customGroups: newGroups,
+        stickers: newStickers,
+        texts: newTexts,
+      };
+    });
+    return newKeys;
+  }, [setWithHistory]);
+
   const addTag = useCallback((tag: OfficeTag) => {
     setWithHistory(prev => {
       if (prev.tags.some(t => t.id === tag.id)) return prev;
@@ -241,6 +320,8 @@ export function useOfficeLayout(terminals: TerminalInfo[]): UseOfficeLayoutResul
     addPostIt, updatePostIt, deletePostIt,
     addCustomGroup, updateCustomGroup, deleteCustomGroup,
     addSticker, updateSticker, deleteSticker,
+    addText, updateText, deleteText,
+    duplicateItems,
     addTag, deleteTag, toggleRoomTag,
     beginDrag, endDrag,
     undo, redo,

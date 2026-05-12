@@ -27,6 +27,11 @@ export const GROUP_MIN_H = 120;
 
 export const STICKER_MIN_SIZE = 32;
 
+export const TEXT_DEFAULT_FONT = 22;
+export const TEXT_DEFAULT_TEXT = 'Title';
+export const TEXT_MIN_FONT = 10;
+export const TEXT_MAX_FONT = 64;
+
 export const UNDO_STACK_MAX = 50;
 
 export const TAG_PALETTE = [
