@@ -224,7 +224,21 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
     onOpenFileInEditor?.(base ? `${base}/${relPath.replace(/^\//, '')}` : relPath);
   }, [onOpenFileInEditor, projectPath]);
 
+  // Clipboard for Cmd+C / Cmd+V (whiteboard-internal — does NOT use the system clipboard).
+  // Holds the IDs that were "copied"; paste re-resolves them against the current annotations
+  // and clones via `duplicateAnnotations`. Offset grows on consecutive pastes so the user
+  // can press Cmd+V multiple times in a row without overlapping.
+  const clipboardIdsRef = useRef<string[]>([]);
+  const pasteOffsetRef = useRef<number>(0);
+
   useEffect(() => {
+    const isEditableTarget = (t: EventTarget | null): boolean => {
+      if (!(t instanceof HTMLElement)) return false;
+      if (t.isContentEditable) return true;
+      const tag = t.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    };
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (navigation.currentComponentId) { exitUp(); } // inside component: go up
@@ -243,10 +257,50 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
         e.preventDefault();
         if (e.shiftKey) { wb.redo(); } else { wb.undo(); }
       }
+
+      // Copy / Paste / Duplicate — operate on annotations only (feature nodes are auto-generated)
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      if (isEditableTarget(e.target)) return; // never hijack edits inside textareas
+
+      const key = e.key.toLowerCase();
+
+      if (key === 'c') {
+        const ids = Array.from(selection.selectedIds);
+        if (ids.length === 0) return;
+        e.preventDefault();
+        clipboardIdsRef.current = ids;
+        pasteOffsetRef.current = 0;
+        return;
+      }
+
+      if (key === 'v') {
+        const ids = clipboardIdsRef.current;
+        if (ids.length === 0) return;
+        e.preventDefault();
+        pasteOffsetRef.current += 24;
+        const off = pasteOffsetRef.current;
+        const newIds = wb.duplicateAnnotations(ids, off, off);
+        if (newIds.length > 0) {
+          selection.setSelection(new Set(newIds));
+          // Move the "clipboard cursor" forward so the next Cmd+V keeps stacking outward
+          clipboardIdsRef.current = newIds;
+        }
+        return;
+      }
+
+      if (key === 'd') {
+        const ids = Array.from(selection.selectedIds);
+        if (ids.length === 0) return;
+        e.preventDefault();
+        const newIds = wb.duplicateAnnotations(ids, 24, 24);
+        if (newIds.length > 0) selection.setSelection(new Set(newIds));
+        return;
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [wb, navigation.currentComponentId, exitUp]);
+  }, [wb, navigation.currentComponentId, exitUp, selection]);
 
   if (loading) return (
     <div className="fm-container"><div className="fm-loading">
@@ -335,6 +389,10 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
             onMdCardUpdate={wb.updateMdCard}
             onMdCardRemove={wb.removeMdCard}
             onOpenMdCardFile={handleOpenMdCardFile}
+            onTextAdd={wb.addText}
+            onTextUpdate={wb.updateText}
+            onTextRemove={wb.removeText}
+            onDuplicateAnnotations={wb.duplicateAnnotations}
             projectPath={projectPath ?? ''}
             onResetMode={handleResetMode}
             searchQuery={searchQuery}

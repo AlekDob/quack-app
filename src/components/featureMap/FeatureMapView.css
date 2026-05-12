@@ -819,3 +819,85 @@
   color: #e2e8f0;
   background: rgba(255,255,255,0.08);
 }
+
+/* =========================
+ * Canvas Text (titoletti)
+ * ========================= */
+.canvas-text {
+  color: rgba(255, 255, 255, 0.96);
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  line-height: 1.2;
+  cursor: grab;
+  white-space: pre;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  user-select: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  pointer-events: auto;
+}
+.canvas-text:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.10);
+}
+.canvas-text:active { cursor: grabbing; }
+.canvas-text--selected {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+.canvas-text__label { pointer-events: none; }
+.canvas-text__input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  resize: none;
+  padding: 0;
+  margin: 0;
+  width: max-content;
+  min-width: 80px;
+  white-space: pre;
+  overflow: hidden;
+}
+.canvas-text__actions {
+  position: absolute;
+  top: -28px;
+  right: 0;
+  display: none;
+  gap: 4px;
+  background: rgba(11, 15, 26, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 6px;
+  padding: 3px 4px;
+  z-index: 2;
+}
+.canvas-text:hover .canvas-text__actions,
+.canvas-text--selected .canvas-text__actions {
+  display: flex;
+}
+.canvas-text__btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.canvas-text__btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.canvas-text__btn--delete:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+}

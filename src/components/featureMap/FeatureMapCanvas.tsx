@@ -7,12 +7,13 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { calculateLayeredLayout, classifyNode, LAYERS, LEFT_MARGIN, LEGEND_H } from './featureMapLayout';
 import type { FeatureGraph, NodePosition } from './featureMapTypes';
-import type { CanvasAnnotations, AnnotationMode, PostIt, GroupRect, CanvasImage as CanvasImageType, MdCard, LassoRect } from './annotationTypes';
+import type { CanvasAnnotations, AnnotationMode, PostIt, GroupRect, CanvasImage as CanvasImageType, MdCard, CanvasText as CanvasTextType, LassoRect } from './annotationTypes';
 import { GROUP_MIN_W, GROUP_MIN_H } from './annotationTypes';
 import CanvasPostIt from './CanvasPostIt';
 import CanvasGroupRect from './CanvasGroupRect';
 import CanvasImage from './CanvasImage';
 import CanvasMdCard from './CanvasMdCard';
+import { CanvasText } from './CanvasText';
 import FeatureMapMinimap from './FeatureMapMinimap';
 
 const BG = 'var(--bg-base, #0f1115)';
@@ -65,6 +66,12 @@ interface Props {
   onMdCardUpdate: (id: string, p: Partial<MdCard>) => void;
   onMdCardRemove: (id: string) => void;
   onOpenMdCardFile?: (filePath: string) => void;
+  // Titoletti
+  onTextAdd: (x: number, y: number, init?: Partial<CanvasTextType>) => string;
+  onTextUpdate: (id: string, p: Partial<CanvasTextType>) => void;
+  onTextRemove: (id: string) => void;
+  /** Alt-drag duplication; clones the given annotation ids, returns new ids. */
+  onDuplicateAnnotations: (ids: string[], offsetX?: number, offsetY?: number) => string[];
   projectPath: string;
   onResetMode: () => void;
   searchQuery: string;
@@ -99,6 +106,8 @@ export default function FeatureMapCanvas(props: Props) {
     onGroupAdd, onGroupUpdate, onGroupRemove,
     onImageUpdate, onImageRemove, onImageFilePick, onImageDrop,
     onMdCardAdd, onMdCardUpdate, onMdCardRemove, onOpenMdCardFile,
+    onTextAdd, onTextUpdate, onTextRemove,
+    onDuplicateAnnotations,
     projectPath, onResetMode, searchQuery,
     multiSelectedIds, lassoRect: lassoRectProp,
     onLassoStart, onLassoUpdate, onLassoSelect, onLassoReset, onMultiToggle, onMultiClear, onBeginDrag, onEndDrag,
@@ -115,6 +124,8 @@ export default function FeatureMapCanvas(props: Props) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [drawingRect, setDrawingRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [autoEditTextId, setAutoEditTextId] = useState<string | null>(null);
+  const textDragRef = useRef<{ id: string; startX: number; startY: number; startCX: number; startCY: number } | null>(null);
 
   const panRef = useRef({ active: false, x: 0, y: 0, panX: 0, panY: 0, didDrag: false });
   const nodeDragRef = useRef<{ nodeId: string; startX: number; startY: number; origX: number; origY: number; didDrag: boolean } | null>(null);
@@ -251,19 +262,27 @@ export default function FeatureMapCanvas(props: Props) {
       onResetMode();
       return;
     }
+    if (annotationMode === 'text') {
+      const svg = toSvg(e.clientX, e.clientY);
+      const id = onTextAdd(svg.x, svg.y);
+      setAutoEditTextId(id);
+      onResetMode();
+      return;
+    }
     if (annotationMode === 'group') {
       const svg = toSvg(e.clientX, e.clientY);
       groupDrawRef.current = { sx: e.clientX, sy: e.clientY, svgSx: svg.x, svgSy: svg.y };
       setDrawingRect({ x: svg.x, y: svg.y, w: 0, h: 0 });
       return;
     }
-    // Lasso mode: draw selection rectangle
-    if (annotationMode === 'lasso') {
+    // Lasso multi-select: explicit 'lasso' mode OR Shift+drag in 'select' mode.
+    // Pan is reserved to middle-click, Space+drag, and plain drag in select mode.
+    if (annotationMode === 'lasso' || (annotationMode === 'select' && e.shiftKey)) {
       const svg = toSvg(e.clientX, e.clientY);
       onLassoStart(svg.x, svg.y);
       return;
     }
-    // Select mode (and fallback): pan canvas
+    // Select mode (plain drag, no shift) or fallback: pan canvas
     panRef.current = { active: true, x: e.clientX, y: e.clientY, panX: viewport.panX, panY: viewport.panY, didDrag: false };
   }, [annotationMode, viewport.panX, viewport.panY, toSvg, onPostItAdd, onImageFilePick, onLassoStart]);
 
@@ -386,8 +405,8 @@ export default function FeatureMapCanvas(props: Props) {
       if (md.didDrag) applyMultiDragDelta(dx / viewport.zoom, dy / viewport.zoom, md.origins);
       return;
     }
-    // Lasso selection (only in lasso mode)
-    if (lassoRectProp && annotationMode === 'lasso') {
+    // Lasso selection — active both in explicit 'lasso' mode and in 'select' mode
+    if (lassoRectProp && (annotationMode === 'lasso' || annotationMode === 'select')) {
       const svg = toSvg(e.clientX, e.clientY);
       onLassoUpdate(svg.x, svg.y);
       return;
@@ -471,7 +490,7 @@ export default function FeatureMapCanvas(props: Props) {
       return;
     }
     // Lasso finalize — hit-test all elements (feature nodes + annotations) directly
-    if (lassoRectProp && annotationMode === 'lasso') {
+    if (lassoRectProp && (annotationMode === 'lasso' || annotationMode === 'select')) {
       const r = lassoRectProp;
       if (r.w > 5 && r.h > 5) {
         const hits = new Set<string>();
@@ -500,6 +519,7 @@ export default function FeatureMapCanvas(props: Props) {
           const cx = c.x + c.w / 2; const cy = c.y + c.h / 2;
           if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) hits.add(c.id);
         }
+        console.log('[lasso-whiteboard] hits', { count: hits.size, ids: Array.from(hits) });
         onLassoSelect(hits);
       }
       onLassoReset();
@@ -797,6 +817,56 @@ export default function FeatureMapCanvas(props: Props) {
               onOpenFile={onOpenMdCardFile}
               onAnnotationDragStart={(id) => { dragAnnotationRef.current = id; }}
               onAnnotationDragEnd={handleAnnotationDragEnd} />
+          ))}
+          {(annotations.texts ?? []).map(t => (
+            <CanvasText
+              key={t.id}
+              text={t}
+              autoEditOnMount={t.id === autoEditTextId}
+              selected={selectedAnnotationId === t.id || multiSelectedIds.has(t.id)}
+              onUpdate={(patch) => {
+                onTextUpdate(t.id, patch);
+                if (t.id === autoEditTextId) setAutoEditTextId(null);
+              }}
+              onDelete={() => {
+                onTextRemove(t.id);
+                if (t.id === autoEditTextId) setAutoEditTextId(null);
+              }}
+              onDragStart={(id, e) => {
+                let actualId = id;
+                let startX = t.x;
+                let startY = t.y;
+                // Alt/Option-drag = duplicate while dragging
+                if (e.altKey) {
+                  const newIds = onDuplicateAnnotations([id], 0, 0);
+                  if (newIds.length > 0) {
+                    actualId = newIds[0];
+                    // startX/startY stay at the original position so the clone tracks the cursor
+                  }
+                }
+                onAnnotationSelect(actualId);
+                textDragRef.current = {
+                  id: actualId, startX, startY,
+                  startCX: e.clientX, startCY: e.clientY,
+                };
+                onBeginDrag();
+                const onMove = (ev: PointerEvent) => {
+                  const d = textDragRef.current;
+                  if (!d) return;
+                  const dx = (ev.clientX - d.startCX) / viewport.zoom;
+                  const dy = (ev.clientY - d.startCY) / viewport.zoom;
+                  onTextUpdate(d.id, { x: d.startX + dx, y: d.startY + dy });
+                };
+                const onUp = () => {
+                  textDragRef.current = null;
+                  onEndDrag();
+                  window.removeEventListener('pointermove', onMove);
+                  window.removeEventListener('pointerup', onUp);
+                };
+                window.addEventListener('pointermove', onMove);
+                window.addEventListener('pointerup', onUp);
+              }}
+            />
           ))}
         </div>
       </div>

@@ -2,7 +2,7 @@
  * Feature Map — Annotation types (post-its, group rectangles, images)
  */
 
-export type AnnotationMode = 'select' | 'lasso' | 'postit' | 'group' | 'image' | 'mdcard';
+export type AnnotationMode = 'select' | 'lasso' | 'postit' | 'group' | 'image' | 'mdcard' | 'text';
 
 export interface PostIt {
   id: string;
@@ -58,6 +58,16 @@ export interface MdCard {
   parentComponentId?: string;
 }
 
+/** Free-form title/heading text on the whiteboard canvas */
+export interface CanvasText {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  fontSize?: number;
+  parentComponentId?: string;
+}
+
 /** Navigation state for nested components (ephemeral, not persisted) */
 export interface ComponentNavigation {
   currentComponentId: string | null;
@@ -77,6 +87,7 @@ export interface CanvasAnnotations {
   groups: GroupRect[];
   images: CanvasImage[];
   mdCards: MdCard[];
+  texts?: CanvasText[];
 }
 
 /** File-based whiteboard state (replaces localStorage) */
@@ -102,3 +113,8 @@ export const MD_CARD_DEFAULT_H = 300;
 export const MD_CARD_MIN_W = 200;
 export const MD_CARD_MIN_H = 120;
 export const MD_CARD_COLLAPSED_H = 36;
+
+export const TEXT_DEFAULT_FONT = 24;
+export const TEXT_DEFAULT_TEXT = 'Title';
+export const TEXT_MIN_FONT = 10;
+export const TEXT_MAX_FONT = 72;

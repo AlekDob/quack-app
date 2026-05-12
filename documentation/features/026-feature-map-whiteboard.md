@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-app
 stack: TypeScript strict (React 18 frontend), Tauri v2 invoke API (list_directory, read_file_content, read_binary_file, write_binary_file, create_directory)
 created: 2026-04-03
-last_verified: 2026-04-17
+last_verified: 2026-05-11
 shortcut: Cmd+Shift+W (Meta+Shift+W)
 tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, mention, autocomplete, image, agent-bridge, skill, nested-components, matryoshka, drag-assign, drag-eject, md-card, markdown, mermaid]
 image: images/026-whiteboard-overview.png
@@ -27,10 +27,11 @@ image: images/026-whiteboard-overview.png
 | Component | `src/components/featureMap/CanvasGroupRect.tsx` | SVG group rectangle — draggable, resizable (4 corner handles), editable label, color cycling |
 | Component | `src/components/featureMap/CanvasImage.tsx` | SVG canvas image annotation — draggable, aspect-ratio resize (corner handle), delete on hover, blob URL loading from filesystem |
 | Component | `src/components/featureMap/CanvasMdCard.tsx` | HTML-overlay MD Preview Card (NOT SVG foreignObject — avoids WebKit clipping bug) — renders inline markdown or referenced `.md`/`.mmd` file (with Mermaid diagrams), edit-first UX (textarea auto-focus on new cards), preview/edit toggle, draggable header, resize handle, collapse toggle, file hot-reload (2s polling), double-click to open source file in editor. Positioned via CSS transform mirroring canvas pan/zoom. |
+| Component | `src/components/featureMap/CanvasText.tsx` | HTML-overlay "titoletto" — draggable, edit-on-double-click (auto-focus on spawn), A−/A+ to resize font (10-72px), × to delete. Same pan/zoom transform pattern as MdCard. |
 | Component | `src/components/featureMap/AnnotationToolbar.tsx` | Floating HTML toolbar for Select/Lasso/Post-it/Group/Image/MD Card mode toggle + selection count badge + Create Component button |
 | Component | `src/components/featureMap/FeatureMapMinimap.tsx` | Minimap overview panel — node dots + viewport rect + click-to-navigate |
 | Component | `src/components/featureMap/WhiteboardBreadcrumb.tsx` | Navigation breadcrumb for nested components — Root > Parent > Current |
-| Model/Type | `src/components/featureMap/annotationTypes.ts` | PostIt, GroupRect, CanvasImage, MdCard, CanvasAnnotations, WhiteboardFile, AnnotationMode (incl. 'lasso', 'mdcard'), ComponentNavigation, LassoRect types + color/dimension constants |
+| Model/Type | `src/components/featureMap/annotationTypes.ts` | PostIt, GroupRect, CanvasImage, MdCard, CanvasText, CanvasAnnotations, WhiteboardFile, AnnotationMode (incl. 'lasso', 'mdcard', 'text'), ComponentNavigation, LassoRect types + color/dimension constants |
 | Store/State | `src/hooks/useCanvasSelection.ts` | Multi-selection hook — lasso rect state, selectedIds Set, startLasso/updateLasso/resetLasso/setSelection/toggleSelect/clearSelection |
 | Service | `src/services/whiteboardFileService.ts` | File-based I/O for `.whiteboard.json` — readWhiteboardFile, writeWhiteboardFile, migrateFromLocalStorage (Tauri read_file_content + write_file_content) |
 | Store/State | `src/hooks/useWhiteboardFile.ts` | Unified annotation + position CRUD hook with file-based persistence + 2s polling for external changes (agent bridge) |
@@ -125,8 +126,8 @@ image: images/026-whiteboard-overview.png
 - **MD Preview Cards**: click canvas in MD Card mode to create; renders markdown inline (headings, tables, code, images, mermaid); supports inline `content` OR `filePath` reference to `.md`/`.mmd` files; 2s file polling for hot reload; double-click opens source file in Code Editor (file-backed) or enters edit mode (inline); collapse toggle; resize corner (see MD Preview Cards section)
 - Annotations + node positions stored in `documentation/features/.whiteboard.json` (file-based, replaces localStorage)
 - Z-order (bottom→top): group rects → **images** → layer backgrounds → links → feature nodes → link pills → **md-cards** → post-its
-- Toolbar (floating, bottom-center): Select / Lasso / Post-it / Group / Image / MD Card mode toggle + selection count badge
-- Keyboard shortcuts for toolbar: `1` Select, `2` Lasso, `3` Post-it, `4` Group, `5` Image, `6` MD Card. `Ctrl` cycles modes.
+- Toolbar (floating, bottom-center): Select / Lasso / Post-it / Group / Image / MD Card / Title (titoletti) mode toggle + selection count badge
+- Keyboard shortcuts for toolbar: `1` Select, `2` Lasso, `3` Post-it, `4` Group, `5` Image, `6` MD Card, `7` Title. `Ctrl` cycles modes.
 - Escape key resets to Select mode and clears multi-selection
 - `useWhiteboardFile` hook: unified CRUD for annotations + positions with file persistence + 2s external change polling
 
@@ -194,6 +195,14 @@ image: images/026-whiteboard-overview.png
 - Feature chip rendered above textarea: gold pill with graph icon + human-readable feature name
 - `@file:` mentions excluded from agent matching (prevents false-positive `@file-opener` chip)
 
+### Entry Points
+1. **Cmd+Shift+W** (toggle) — apertura globale; usa `activeTerminal?.cwd` come `projectPath`.
+2. **Bottone Whiteboard nell'ActionIcons** — stesso handler `handleOpenFeatureMapTab` di Cmd+Shift+W.
+3. **Click su una stanza in Office View v2** (2026-05-11) — `App.handleOpenWhiteboardForProject(projectPath)` apre/aggiorna il tab `feature-map` con `initialProjectPath: projectPath`. Vedi feature 063.
+4. **Mention `@file:.../documentation/features/...`** — non apre la whiteboard, ma inserisce un chip che linka al doc.
+
+**Source-of-truth del `projectPath`:** `FeatureMapTabView` riceve `projectPath = fmTab.initialProjectPath ?? activeTerminal?.cwd` in `App.tsx`. Questo significa che il path del tab è "sticky" dopo un'apertura esplicita (es. dall'Office), e fa fallback all'agente attivo solo se il tab non ha un `initialProjectPath` proprio.
+
 ### Click-to-Open-in-Editor
 - **Popover title**: clicking feature title in popover opens the `.md` doc in Code Editor (via `onOpenDoc` prop)
 - **Sidebar panel**: clicking feature item in FeaturesPanel opens doc in Code Editor (via `onOpenInEditor` prop)
@@ -227,7 +236,7 @@ image: images/026-whiteboard-overview.png
 - Embeds layer classification keywords and layout constants for accurate positioning
 
 ### Multi-Select (Lasso + Shift+click)
-- **Lasso mode**: dedicated toolbar button (dashed rectangle icon); click-drag on canvas draws selection rectangle; on release, hit-tests all feature nodes + annotations whose center is inside
+- **Lasso mode**: dedicated toolbar button (dashed rectangle icon); click-drag on canvas draws selection rectangle; on release, hit-tests all feature nodes + annotations whose center is inside. **Shortcut alternativa (2026-05-11)**: in `select` mode tieni premuto **Shift** e trascina su area vuota per disegnare il lasso senza cambiare tool. Drag senza shift in select mode = pan canvas (comportamento storico). Nota: la whiteboard usa `onMouseDown` (MouseEvent), no `setPointerCapture` né stale-closure bug come l'Office — il pattern del lasso qui è guidato da `lassoRectProp` esterno (`useCanvasSelection`) e non da un useState locale, quindi non c'è il rischio dello stesso bug.
 - **Shift+click**: on any feature node, post-it, group rect, or image to toggle in/out of multi-selection
 - **Visual feedback**: blue border (#3b82f6) on all multi-selected elements (nodes + annotations); badge in toolbar shows count
 - **Group drag**: clicking and dragging any multi-selected element moves ALL selected elements together
@@ -236,6 +245,25 @@ image: images/026-whiteboard-overview.png
 - **Trackpad**: two-finger scroll = pan, pinch = zoom (ctrlKey detection)
 - Selection state is ephemeral (not persisted)
 - Hook: `useCanvasSelection.ts` manages selectedIds Set + lasso rect; Canvas does hit-test locally (has access to getPos + graph.nodes + annotations)
+
+### Copy / Paste / Duplicate (2026-05-11)
+Cross-platform shortcut a livello window, gestite da `FeatureMapView.tsx`. Operano solo sulle annotation user-created (post-it, group, image, mdCard, text — NON sui feature nodes che sono auto-generated).
+
+| Shortcut | Azione |
+|---|---|
+| **Cmd+C** / Ctrl+C | Snapshot dei `selectedIds` correnti nel `clipboardIdsRef`. Resetta `pasteOffsetRef = 0`. |
+| **Cmd+V** / Ctrl+V | Clona gli id in clipboard via `wb.duplicateAnnotations(ids, off, off)` dove `off` cresce di +24 a ogni paste consecutivo (no overlap su multi-paste). Seleziona i nuovi. Il clipboard avanza ai nuovi id, così Cmd+V ripetuti stackano outward. |
+| **Cmd+D** / Ctrl+D | Duplica direttamente i `selectedIds` con offset +24/+24 senza toccare il clipboard. Seleziona i nuovi. |
+
+**Implementazione**:
+- `useWhiteboardFile.duplicateAnnotations(ids, offsetX=24, offsetY=24): string[]` — clona i 5 tipi di annotation in un singolo `updateAnnotations` (un solo undo step). Ritorna lista nuovi id nella stessa ordine di input.
+- `clipboardIdsRef` + `pasteOffsetRef` in `FeatureMapView.tsx`.
+- Filtro `isEditableTarget` esclude `INPUT/TEXTAREA/contentEditable` — non ruba la copia di testo quando l'utente sta editando un post-it/md-card.
+- Feature nodes esclusi: `duplicateAnnotations` ignora ids che non matchano nessuno dei 5 tipi annotation.
+
+**Alt-drag (Option+drag su Mac) per duplicare** stile Figma — implementato per `CanvasText` (2026-05-11). Premere Alt durante il `pointerdown` su un titolo → l'elemento viene clonato in-place, il drag che segue muove il clone. `FeatureMapCanvas` riceve `onDuplicateAnnotations` (cablato da `FeatureMapView` con `wb.duplicateAnnotations`); il `CanvasText.onDragStart` controlla `e.altKey` e clona prima del drag.
+
+**Follow-up**: estendere alt-drag a postit/group/image/mdcard. Drag-handlers vivono nei sub-component e non sono ancora centralizzati — richiede pattern simile (prop `onDuplicateAnnotations` propagata a ogni sub-component + check `e.altKey` nei rispettivi onDragStart/onPointerDown).
 
 ### Undo / Redo
 - **Cmd+Z** (macOS) / **Ctrl+Z** (Windows): undo last whiteboard action
