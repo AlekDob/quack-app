@@ -414,7 +414,7 @@
 /* Per-turn token/cache stats */
 .turn-token-stats {
   margin-top: 6px;
-  padding: 4px 0;
+  padding: 4px 0 4px 40px;
   font-size: 11px;
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   color: var(--text-tertiary, rgba(255, 255, 255, 0.35));
