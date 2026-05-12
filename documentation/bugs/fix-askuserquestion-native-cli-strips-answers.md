@@ -3,8 +3,12 @@ type: bug_fix
 project: quack-app
 created: 2026-05-04
 last_verified: 2026-05-04
+status: superseded
+superseded_by: fix-askuserquestion-sdk-0.2.138-pretool-posttool-hook.md
 tags: [sdk, ask-user-question, native-cli, ipc, can-use-tool, daemon, stream-daemon]
 ---
+
+> **STATUS: SUPERSEDED (2026-05-12)** — the same class of bug returned in SDK `0.2.138` (commit `3d84a9e` upgrade), but the workaround documented here (force the bundled `cli.js` by removing `pathToClaudeCodeExecutable`) **no longer applies**. SDK `v0.2.113` removed the bundled `cli.js` entirely and always spawns the native binary. See `fix-askuserquestion-sdk-0.2.138-pretool-posttool-hook.md` for the current fix (PreToolUse + PostToolUse `additionalContext` hooks). This entry is kept for historical context only.
 
 # Fix: AskUserQuestion answers silently dropped when daemon used native CLI binary
 

@@ -172,6 +172,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Git.rs English errors: `documentation/gotchas/gotcha-git-rs-error-messages-english.md`
 - Subagent tools invisible: `documentation/gotchas/gotcha-subagent-tools-invisible-to-parent.md`
 - AskUserQuestion/Plan hang: `documentation/bugs/fix-ask-user-question-stream-event-not-emitted.md`
+- AskUserQuestion empty answers (SDK 0.2.138 native binary): `documentation/bugs/fix-askuserquestion-sdk-0.2.138-pretool-posttool-hook.md`
 - Mention regex email false positive: `documentation/bugs/fix-mention-regex-email-false-positive.md`
 - Snippet modal stale tags: `documentation/bugs/fix-snippet-modal-stale-tags.md`
 - Anchor nav sandboxed iframe: `documentation/gotchas/gotcha-anchor-navigation-sandboxed-iframe.md`

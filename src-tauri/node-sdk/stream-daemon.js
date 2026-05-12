@@ -165,6 +165,17 @@ const activeQueries = new Map();
  */
 const pendingRequests = new Map();
 
+/**
+ * AskUserQuestion answers staged by PreToolUse hook, consumed by PostToolUse hook.
+ * Keyed by tool_use_id (the SDK guarantees the same id across PreToolUse → tool exec → PostToolUse).
+ *
+ * Why this exists: SDK v0.2.113+ spawns the native binary which strips off-schema fields
+ * from canUseTool's `updatedInput.answers` (AskUserQuestionInput schema only declares `questions`).
+ * Workaround: collect answers in PreToolUse, then replace the tool's empty output via PostToolUse
+ * `updatedToolOutput` (added in SDK v0.2.121). Brain: fix-askuserquestion-native-cli-strips-answers.
+ */
+const pendingAskAnswers = new Map();
+
 // =============================================================================
 // MCP SERVER LOADING
 // =============================================================================
@@ -497,24 +508,15 @@ ${hintsBlock}
         // Instead, ideContext is prepended to the user prompt. See contextPrefix below.
       },
       canUseTool: async (toolName, input, toolOptions) => {
-        // AskUserQuestion — forward to frontend
+        // AskUserQuestion: PreToolUse hook already collected answers and staged them
+        // in `pendingAskAnswers`. canUseTool is still invoked because AskUserQuestion has
+        // requiresUserInteraction=true (overrides the PreToolUse `allow` decision in
+        // SDK v0.2.138). Do NOT re-prompt the frontend — just allow. PostToolUse hook
+        // will replace the empty tool output via `updatedToolOutput`.
+        // Brain: fix-askuserquestion-native-cli-strips-answers
         if (toolName === 'AskUserQuestion') {
-          diag(`canUseTool AskUserQuestion triggered for query=${queryId}`);
-          try {
-            const response = await requestFromFrontend(queryId, 'ask_user_question', {
-              questions: input.questions,
-            });
-            diag(`canUseTool AskUserQuestion RESOLVED for query=${queryId}: ${JSON.stringify(response.answers).slice(0, 200)}`);
-            const result = {
-              behavior: 'allow',
-              updatedInput: { questions: input.questions, answers: response.answers },
-            };
-            log('INTERACT', `[INFO] AskUserQuestion returning to SDK: ${JSON.stringify(result).slice(0, 300)}`);
-            return result;
-          } catch (error) {
-            log('INTERACT', `[WARN] AskUserQuestion FAILED for query=${queryId}: ${error.message}`);
-            return { behavior: 'deny', message: `Failed to get user answers: ${error.message}` };
-          }
+          diag(`canUseTool AskUserQuestion bypassed (PreToolUse hook handled it) for query=${queryId}`);
+          return { behavior: 'allow', updatedInput: input };
         }
 
         // ExitPlanMode — forward to frontend (Brain: fix-duplicate-plan-approval)
@@ -569,6 +571,79 @@ ${hintsBlock}
 
         // Default: allow (Build mode, Chat mode uses prompt-level enforcement)
         return { behavior: 'allow', updatedInput: input };
+      },
+      // ─────────────────────────────────────────────────────────────────────────
+      // AskUserQuestion answer-routing hooks (SDK v0.2.113+ workaround)
+      //
+      // The native binary spawned since v0.2.113 zod-validates `updatedInput` from
+      // canUseTool against the tool's input schema. AskUserQuestionInput declares
+      // only `questions`, so the `answers` field we add gets stripped → the model
+      // sees an empty answer and replies "I didn't receive any answers".
+      //
+      // Workaround: collect answers in PreToolUse (auto-allows so canUseTool is
+      // skipped), stage them in `pendingAskAnswers` keyed by tool_use_id, then
+      // replace the empty tool output via PostToolUse `updatedToolOutput`.
+      // Brain: fix-askuserquestion-native-cli-strips-answers (regression on 0.2.138)
+      // ─────────────────────────────────────────────────────────────────────────
+      hooks: {
+        PreToolUse: [{
+          matcher: 'AskUserQuestion',
+          hooks: [async (input, toolUseId, _hookCtx) => {
+            diag(`PreToolUse AskUserQuestion fired for query=${queryId} toolUseId=${toolUseId}`);
+            try {
+              const response = await requestFromFrontend(queryId, 'ask_user_question', {
+                questions: input.tool_input.questions,
+              });
+              pendingAskAnswers.set(toolUseId, response.answers);
+              diag(`PreToolUse staged answers for toolUseId=${toolUseId}: ${JSON.stringify(response.answers).slice(0, 200)}`);
+              // Auto-allow so the SDK skips canUseTool. The tool will execute with
+              // the original input (no `answers`) — PostToolUse fixes the output.
+              return {
+                hookSpecificOutput: {
+                  hookEventName: 'PreToolUse',
+                  permissionDecision: 'allow',
+                  permissionDecisionReason: 'AskUserQuestion answers collected via PreToolUse hook',
+                },
+              };
+            } catch (error) {
+              diag(`PreToolUse AskUserQuestion FAILED for toolUseId=${toolUseId}: ${error.message}`);
+              return {
+                hookSpecificOutput: {
+                  hookEventName: 'PreToolUse',
+                  permissionDecision: 'deny',
+                  permissionDecisionReason: `Failed to collect answers: ${error.message}`,
+                },
+              };
+            }
+          }],
+        }],
+        PostToolUse: [{
+          matcher: 'AskUserQuestion',
+          hooks: [async (input, toolUseId, _hookCtx) => {
+            const answers = pendingAskAnswers.get(toolUseId);
+            if (!answers) {
+              diag(`PostToolUse AskUserQuestion: no staged answers for toolUseId=${toolUseId} (skipping)`);
+              return {};
+            }
+            pendingAskAnswers.delete(toolUseId);
+            // Render answers as plain markdown the model can parse without ambiguity.
+            // `additionalContext` is APPENDED to the tool's (empty) output, not replaced —
+            // safer than `updatedToolOutput` which is subject to output-schema validation.
+            const lines = ['User answered the following questions:'];
+            for (const [header, value] of Object.entries(answers)) {
+              const display = Array.isArray(value) ? value.join(', ') : String(value);
+              lines.push(`- ${header}: ${display}`);
+            }
+            const additionalContext = lines.join('\n');
+            diag(`PostToolUse AskUserQuestion appending context for toolUseId=${toolUseId}: ${JSON.stringify(answers).slice(0, 200)}`);
+            return {
+              hookSpecificOutput: {
+                hookEventName: 'PostToolUse',
+                additionalContext,
+              },
+            };
+          }],
+        }],
       },
     };
 
@@ -988,6 +1063,8 @@ async function handleAbort(cmd) {
 
 function handleResponse(cmd) {
   const { requestId, answers } = cmd;
+  // [ASKQ-DIAG] Raw payload that landed via stdin from Rust. Confirms what crossed the Tauri channel.
+  log('INTERACT', `[ASKQ-DIAG] 2/3 daemon stdin received requestId=${requestId} answers=${JSON.stringify(answers)}`);
   diag(`handleResponse: requestId=${requestId}, found=${pendingRequests.has(requestId)}, pendingKeys=[${Array.from(pendingRequests.keys()).join(',')}]`);
   if (pendingRequests.has(requestId)) {
     const { resolve, timeout } = pendingRequests.get(requestId);
