@@ -35,10 +35,6 @@ interface UIState {
   terminalFontSize: number;
   terminalFontFamily: string;
 
-  // Sidebar view
-  sidebarView: 'projects' | 'taskhub';
-  setSidebarView: (view: 'projects' | 'taskhub') => void;
-
   // Actions - Modals
   openModal: (modal: keyof UIState) => void;
   closeModal: (modal: keyof UIState) => void;
@@ -138,10 +134,6 @@ export const useUIStore = create<UIState>()(
         theme: 'dark',
         terminalFontSize: 14,
         terminalFontFamily: 'monospace',
-
-        // Sidebar view
-        sidebarView: 'projects',
-        setSidebarView: (view) => set({ sidebarView: view }),
 
         // Modal actions
         openModal: (modal) => {
@@ -278,7 +270,6 @@ export const useUIStore = create<UIState>()(
           // Persist tab state for wake-from-standby resilience
           activeTabId: state.activeTabId,
           tabs: state.tabs,
-          sidebarView: state.sidebarView,
         }),
       }
     ),

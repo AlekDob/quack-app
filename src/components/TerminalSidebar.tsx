@@ -34,8 +34,6 @@ import type { TerminalInfo, AgentChat, ChatMessage, GitPullResult, AgentInfo, Pr
 import { useGroupStore } from "../stores/groupStore";
 import { useUIStore } from "../stores/uiStore";
 import GroupCreationModal from "./GroupCreationModal";
-import SidebarViewToggle from "./SidebarViewToggle";
-import TaskHubView from "./TaskHubView";
 
 // Storage format for project order, colors, and favorites
 interface ProjectStorageData {
@@ -100,15 +98,22 @@ interface SortableRepositoryGroupProps {
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
   onProjectColorChange?: (color: string) => void;
+  isCurrentProject?: boolean;
 }
 
 function SortableRepositoryGroup({
   repoKey,
   projectColor,
   insideGroup,
+  isCurrentProject = false,
   ...props
 }: SortableRepositoryGroupProps) {
   const [isHovered, setIsHovered] = useState(false);
+  // One-shot glow flash on transition false→true. Persistent highlight is driven
+  // by `isCurrentProject` directly via CSS data-attribute.
+  const [justFocused, setJustFocused] = useState(false);
+  const wasCurrentRef = useRef(isCurrentProject);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   const {
     attributes,
@@ -119,26 +124,60 @@ function SortableRepositoryGroup({
     isDragging,
   } = useSortable({ id: repoKey });
 
-  const style = {
+  // Merged ref so dnd-kit's setNodeRef and our wrapperRef both receive the node.
+  const setRef = useCallback((node: HTMLDivElement | null) => {
+    wrapperRef.current = node;
+    setNodeRef(node);
+  }, [setNodeRef]);
+
+  // Autoscroll into view + glow flash when this project becomes current
+  useEffect(() => {
+    if (isCurrentProject && !wasCurrentRef.current) {
+      const el = wrapperRef.current;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const scroller = el.closest('.sidebar-list') as HTMLElement | null;
+        const sRect = scroller?.getBoundingClientRect();
+        const outOfView = sRect ? rect.top < sRect.top || rect.bottom > sRect.bottom : false;
+        if (outOfView) {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+      }
+      setJustFocused(true);
+      const t = window.setTimeout(() => setJustFocused(false), 540);
+      wasCurrentRef.current = isCurrentProject;
+      return () => window.clearTimeout(t);
+    }
+    wasCurrentRef.current = isCurrentProject;
+  }, [isCurrentProject]);
+
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition: isDragging ? 'none' : transition,
     opacity: isDragging ? 0.5 : 1,
     willChange: isDragging ? 'transform' : 'auto',
-    // No background — border-left + subtle bottom separator
-    // Inside a group: skip project borders — the group's dashed border is enough
     background: 'transparent',
+    // Colored project borders are applied to every project (project identity).
+    // The current-project highlight is delivered ONLY by filling the
+    // `.repository-header` with the project color (in RepositoryGroup.tsx).
     borderLeft: insideGroup ? 'none' : (projectColor ? `2px solid ${projectColor}` : undefined),
-    borderBottom: insideGroup ? 'none' : (projectColor ? `2px solid ${projectColor}30` : '2px solid rgba(255,255,255,0.04)'),
+    borderBottom: insideGroup
+      ? 'none'
+      : (projectColor ? `2px solid ${projectColor}30` : '2px solid rgba(255,255,255,0.04)'),
     borderRadius: '0',
     marginBottom: '0',
     padding: '4px',
+    // Expose the per-project accent as a CSS variable for the highlight rules in App.css
+    ...(projectColor ? ({ ['--repo-accent' as string]: projectColor } as React.CSSProperties) : {}),
   };
 
   return (
     <div
-      ref={setNodeRef}
+      ref={setRef}
       style={style}
       className="sortable-repository-group group relative"
+      data-current={isCurrentProject ? 'true' : 'false'}
+      data-just-focused={justFocused ? 'true' : 'false'}
     >
       {/* 🦆 Drag Handle for Repository Groups - ENABLED (important for project organization) */}
       <div
@@ -163,7 +202,7 @@ function SortableRepositoryGroup({
         onMouseEnter={() => !isDragging && setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <RepositoryGroup {...props} projectColor={projectColor} />
+        <RepositoryGroup {...props} projectColor={projectColor} isCurrentProject={isCurrentProject} />
       </div>
     </div>
   );
@@ -282,6 +321,8 @@ interface TerminalSidebarProps {
   // Saved Commands
   onOpenSavedCommands?: () => void; // Global (footer button)
   onOpenProjectSavedCommands?: (projectPath: string) => void; // Per-project (repo action row)
+  // Current project highlight (sidebar focus / autoscroll / glow flash on change)
+  currentProjectPath?: string | null;
 }
 
 export default function TerminalSidebar({
@@ -336,6 +377,7 @@ export default function TerminalSidebar({
   onOpenPersonality,
   onOpenSavedCommands,
   onOpenProjectSavedCommands,
+  currentProjectPath,
 }: TerminalSidebarProps) {
   void _onColorChange;
   void _onDeleteAgentChat; // Will be used in context menu (Phase 4)
@@ -344,10 +386,6 @@ export default function TerminalSidebar({
   void onAdd; // Used by "+" button in toolbar (kept for future use)
   const [query, setQuery] = useState("");
   const [appVersion, setAppVersion] = useState('v0.0.0');
-
-  // Sidebar view toggle (projects vs task hub)
-  const sidebarView = useUIStore((s) => s.sidebarView);
-  const setSidebarView = useUIStore((s) => s.setSidebarView);
 
   // Fetch app version on mount
   useEffect(() => {
@@ -1106,8 +1144,6 @@ export default function TerminalSidebar({
           </KeyboardShortcutTooltip>
         )}
 
-        <SidebarViewToggle activeView={sidebarView} onChange={setSidebarView} />
-
         {/* Favorites filter toggle */}
         {favorites.size > 0 && (
           <KeyboardShortcutTooltip label={showFavoritesOnly ? "Show all" : "Favorites"}>
@@ -1186,28 +1222,18 @@ export default function TerminalSidebar({
           type="text"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder={sidebarView === 'taskhub' ? "Search tasks" : "Search projects"}
+          placeholder="Search projects"
         />
       </div>
 
       {/* Agent List - no label, directly the list */}
-      <div className="sidebar-list" style={{ marginTop: '4px' }}>
-        {/* Task Hub: flat priority-sorted session list */}
-        {sidebarView === 'taskhub' && (
-          <TaskHubView
-            terminals={terminals}
-            onSessionClick={onSessionClick}
-            activeSessionId={activeSessionId}
-            onActiveSessionDone={onActiveSessionDone}
-            chatSessions={chatSessions}
-            lastReadTimestamps={lastReadTimestamps}
-            searchQuery={query}
-          />
-        )}
-
+      <div
+        className="sidebar-list"
+        style={{ marginTop: '4px' }}
+        data-has-current={currentProjectPath ? 'true' : 'false'}
+      >
         {/* Projects view: metro-style repository groups */}
-        {sidebarView === 'projects' && (
-            <DndContext
+        <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragStart={handleRepoDragStart}
@@ -1232,6 +1258,7 @@ export default function TerminalSidebar({
                       isCollapsed={collapsedGroups.has(repoKey)}
                       activeId={activeId}
                       projectColor={projectColors[repoKey]}
+                      isCurrentProject={!!currentProjectPath && currentProjectPath === repoData.repoPath}
                       chatSessions={chatSessions}
                       lastReadTimestamps={lastReadTimestamps}
                       onToggle={() => onToggleGroup(repoKey)}
@@ -1424,6 +1451,7 @@ export default function TerminalSidebar({
                           isCollapsed={collapsedGroups.has(repoKey)}
                           activeId={activeId}
                           projectColor={projectColors[repoKey]}
+                          isCurrentProject={!!currentProjectPath && currentProjectPath === repoData.repoPath}
                           chatSessions={chatSessions}
                           lastReadTimestamps={lastReadTimestamps}
                           onToggle={() => onToggleGroup(repoKey)}
@@ -1517,7 +1545,6 @@ export default function TerminalSidebar({
               })() : null}
             </DragOverlay>
           </DndContext>
-        )}
 
         {/* Empty state - Onboarding CTA (only when no projects at all) */}
         {terminals.length === 0 && (!persistedProjects || persistedProjects.size === 0) && (

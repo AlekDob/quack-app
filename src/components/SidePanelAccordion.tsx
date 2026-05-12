@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { normalizeToForwardSlash } from "../utils/platform";
 import ChangesPanel from "./ChangesPanel";
@@ -17,6 +17,9 @@ import { useSlashCommands } from "../hooks/useSlashCommands";
 import { useMCPServers } from "../hooks/useMCPServers";
 import AgentContextPanel from "./AgentContextPanel";
 import ProjectContextPanel from "./ProjectContextPanel";
+import TaskHubView, { computeTaskHubBadge } from "./TaskHubView";
+import { useSessionStore } from "../stores/sessionStore";
+import { useChatStore } from "../stores/chatStore";
 import type { DirectoryEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionInfo, AgentPersonality, HookConfig, ChatMessage, SearchResult } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 import "./SidePanelAccordion.css";
@@ -28,6 +31,7 @@ import "./SidePanelAccordion.css";
 
 // Category-specific colors matching Quack Store
 const CATEGORY_COLORS: Record<string, string> = {
+  taskhub: '#a855f7',     // Purple - matches P1 'Needs attention' accent
   changes: '#34d399',     // Green - git changes
   skills: 'var(--accent-color)',      // Orange - main accent
   agents: 'var(--accent-color)',      // Orange - personas
@@ -229,6 +233,16 @@ const icons = {
       <path d="M6 13l3-3 3 3 5-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  taskhub: (
+    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+      <line x1="7" y1="5" x2="17" y2="5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <line x1="7" y1="10" x2="17" y2="10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <line x1="7" y1="15" x2="17" y2="15" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="3.5" cy="5" r="1.1" fill="currentColor" />
+      <circle cx="3.5" cy="10" r="1.1" fill="currentColor" />
+      <circle cx="3.5" cy="15" r="1.1" fill="currentColor" />
+    </svg>
+  ),
 };
 
 interface SidePanelAccordionProps {
@@ -283,6 +297,11 @@ interface SidePanelAccordionProps {
   // Context props
   tauriAvailable: boolean;
   onOpenContextDrawer: (scope: string) => void;
+
+  // Task Hub props
+  terminals?: TerminalInfo[];
+  onActiveSessionDone?: () => void;
+  chatSessions?: Map<string, ChatMessage[]>;
 
   // Agent Context props
   activeAgentId?: string | null;
@@ -383,6 +402,11 @@ export default function SidePanelAccordion({
   tauriAvailable,
   onOpenContextDrawer,
 
+  // Task Hub
+  terminals = [],
+  onActiveSessionDone,
+  chatSessions,
+
   // Agent Context
   activeAgentId,
   activeAgentName,
@@ -443,6 +467,14 @@ export default function SidePanelAccordion({
 
   // Hover-to-open debounce for accordion sections
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Task Hub badge — count of P1 (pending question) + P3 (agent done) sessions
+  const taskHubSessions = useSessionStore((s) => s.sessions);
+  const pendingQuestionsMap = useChatStore((s) => s.pendingQuestionsMap);
+  const taskHubBadge = useMemo(
+    () => computeTaskHubBadge(taskHubSessions, chatSessions, pendingQuestionsMap),
+    [taskHubSessions, chatSessions, pendingQuestionsMap],
+  );
 
   // Load rules for badge counter
   const { rules } = useRules(rootPath || '');
@@ -516,7 +548,7 @@ export default function SidePanelAccordion({
   }, [focusedSection]);
 
   // Section IDs for reference (order is determined by DOM position, not dynamically)
-  const sectionIds = ['changes', 'context', 'brain', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions', 'token-stats'];
+  const sectionIds = ['taskhub', 'changes', 'context', 'brain', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions', 'token-stats'];
 
   // Handle forceExpandSection from parent
   useEffect(() => {
@@ -638,6 +670,29 @@ export default function SidePanelAccordion({
         onMouseEnter={handlePeekEnter}
         onMouseLeave={handlePeekLeave}
       >
+        {/* Task Hub — priority-grouped session triage (always available, badge surfaces P1+P3) */}
+        <AccordionSection
+          id="taskhub"
+          title="Task Hub"
+          icon={icons.taskhub}
+          badge={taskHubBadge || undefined}
+          isExpanded={focusedSection === "taskhub"}
+          isFocused={focusedSection === "taskhub"}
+          order={getOrder("taskhub")}
+          category="taskhub"
+          onToggle={() => toggleSection("taskhub")}
+          onHoverEnter={() => handleSectionHoverEnter("taskhub")}
+          onHoverLeave={handleSectionHoverLeave}
+        >
+          <TaskHubView
+            terminals={terminals}
+            onSessionClick={onSessionClick}
+            activeSessionId={activeSessionId}
+            onActiveSessionDone={onActiveSessionDone}
+            chatSessions={chatSessions}
+          />
+        </AccordionSection>
+
         {/* Changes - Codex-style diff panel (always visible, shows branch/history even without changes) */}
         <AccordionSection
           id="changes"

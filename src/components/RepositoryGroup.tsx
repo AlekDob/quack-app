@@ -89,6 +89,8 @@ interface RepositoryGroupProps {
   onToggleFavorite?: () => void;
   projectColor?: string;
   onProjectColorChange?: (color: string) => void;
+  /** True when this project is the "current" one (drives highlight + autoscroll + glow flash) */
+  isCurrentProject?: boolean;
 }
 
 // Helper function to get avatar image URL (works in both dev and production)
@@ -1140,6 +1142,7 @@ export default function RepositoryGroup({
   onToggleFavorite,
   projectColor,
   onProjectColorChange,
+  isCurrentProject = false,
 }: RepositoryGroupProps) {
   const [hoveredAgentId, setHoveredAgentId] = useState<string | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -1877,22 +1880,27 @@ export default function RepositoryGroup({
   }, [mainAgents, activeAgentIds]);
 
   return (
-    <div className="repository-group">
-      {/* Repository Header - Minimal and clean */}
+    <div className="repository-group" data-current={isCurrentProject ? 'true' : 'false'}>
+      {/* Repository Header — colored fill ONLY on the current project.
+       *  Non-current: neutral dark background (inline). Current: project color at ~40%
+       *  alpha BREATHING via CSS animation `repo-header-breathe` (App.css). No inline
+       *  background when current, so the animation isn't overridden. */}
       <div
         className="repository-header"
         style={{
           padding: "10px 12px",
           marginBottom: "8px",
-          background: projectColor ? `${projectColor}40` : "rgba(255, 255, 255, 0.04)",
+          background: isCurrentProject ? undefined : "rgba(255, 255, 255, 0.04)",
           borderRadius: "6px",
-          transition: "background 0.2s ease",
+          transition: "background 240ms cubic-bezier(0.23, 1, 0.32, 1)",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = projectColor ? `${projectColor}55` : "rgba(255, 255, 255, 0.08)";
+          if (isCurrentProject) return; // CSS animation drives the current header
+          e.currentTarget.style.background = "rgba(255, 255, 255, 0.08)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = projectColor ? `${projectColor}40` : "rgba(255, 255, 255, 0.04)";
+          if (isCurrentProject) return;
+          e.currentTarget.style.background = "rgba(255, 255, 255, 0.04)";
         }}
       >
         <div className="flex w-full flex-col gap-1">
@@ -1941,12 +1949,25 @@ export default function RepositoryGroup({
                   onToggle();
                 }
               }}
-              style={{ cursor: "pointer" }}
-              className="font-semibold text-sm text-white/90 hover:text-orange-400 transition-colors"
+              style={{
+                cursor: "pointer",
+                color: isCurrentProject ? '#fff' : undefined,
+                transition: 'color 220ms ease',
+              }}
+              className={`font-semibold text-sm transition-colors ${
+                isCurrentProject ? 'hover:text-white' : 'text-white/90 hover:text-orange-400'
+              }`}
               title="Open Project Assets"
             >
               {displayName}
             </span>
+            {isCurrentProject && (
+              <span
+                className="repository-group__active-dot"
+                role="status"
+                aria-label="Currently active project"
+              />
+            )}
             {onCreateAgent && (
               <button
                 type="button"

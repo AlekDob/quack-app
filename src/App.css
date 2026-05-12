@@ -11514,3 +11514,69 @@ button.directory-chooser:disabled {
   font-size: 10px !important;
   letter-spacing: 0.12em !important;
 }
+
+/* ============================================================
+ * Current project highlight (sidebar)
+ * Feature 043 — COLORED HEADER WITH BREATHING ANIMATION ON CURRENT.
+ *
+ * Border (left + bottom) stays colored on every project — that's
+ * project identity. The current project is signaled by filling
+ * `.repository-header` with the project color and gently
+ * BREATHING the alpha between 30% and 55% on a 3s loop. Since
+ * there's only ONE current project at a time, the animation can
+ * be slightly more present without becoming noise.
+ *
+ * One-shot glow on the wrapper on transition (false → true).
+ * Small white pulsing dot next to the project name.
+ * ============================================================ */
+
+.sortable-repository-group {
+  --repo-accent: rgba(255, 107, 53, 0.9);
+  transition: box-shadow 500ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Breathing colored fill on the current project's header. The CSS variable
+ * --repo-accent is inherited from the parent `.sortable-repository-group`. */
+.repository-group[data-current="true"] .repository-header {
+  animation: repo-header-breathe 3s ease-in-out infinite;
+}
+
+@keyframes repo-header-breathe {
+  0%, 100% { background-color: color-mix(in srgb, var(--repo-accent) 30%, transparent); }
+  50%      { background-color: color-mix(in srgb, var(--repo-accent) 55%, transparent); }
+}
+
+/* One-shot glow on transition into current — pulls the eye to the project */
+.sortable-repository-group[data-just-focused="true"] {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--repo-accent) 35%, transparent),
+    0 6px 24px color-mix(in srgb, var(--repo-accent) 30%, transparent);
+}
+
+/* Small pulsing dot next to the project name — the only inline cue */
+.repository-group__active-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  margin-left: 6px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.6);
+  animation: repo-active-pulse 1.8s ease-out infinite;
+}
+
+@keyframes repo-active-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+  70%  { box-shadow: 0 0 0 7px rgba(255, 255, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sortable-repository-group { transition: none; }
+  .sortable-repository-group[data-just-focused="true"] { box-shadow: none; }
+  .repository-group[data-current="true"] .repository-header {
+    animation: none;
+    background-color: color-mix(in srgb, var(--repo-accent) 42%, transparent);
+  }
+  .repository-group__active-dot { animation: none; }
+}

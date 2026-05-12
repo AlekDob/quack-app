@@ -3,18 +3,19 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React 18)
 created: 2026-04-04
-last_verified: 2026-04-08
-tags: [accordion, side-panel, ui, layout, navigation, brain, documentation-explorer]
+last_verified: 2026-05-12
+tags: [accordion, side-panel, ui, layout, navigation, brain, documentation-explorer, task-hub]
 ---
 
 ## Side Panel Accordion
-**Purpose:** Collapsible side panel with 13 sections (focus-one-at-a-time pattern), compact icon-strip mode with peek-on-hover overlay, each section hosting a dedicated content panel for workspace management.
+**Purpose:** Collapsible side panel with 15 sections (focus-one-at-a-time pattern), compact icon-strip mode with peek-on-hover overlay, each section hosting a dedicated content panel for workspace management. Task Hub lives at slot #0 with a badge surfacing sessions that need user action.
 **Stack:** React 18, TypeScript strict, CSS (glassmorphism)
 
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Component | `src/components/SidePanelAccordion.tsx` | Main accordion container with AccordionSection sub-component, CATEGORY_COLORS map, SVG icons |
+| Component | `src/components/TaskHubView.tsx` | Task Hub view: priority-grouped session triage with internal search (slot #0) |
 | Component | `src/components/ChangesPanel.tsx` | Git diff panel (branch, modified files, commit history) |
 | Component | `src/components/FileExplorer.tsx` | File tree browser with lazy-load children |
 | Component | `src/components/FeaturesPanel.tsx` | Feature map entries viewer |
@@ -84,25 +85,27 @@ tags: [accordion, side-panel, ui, layout, navigation, brain, documentation-explo
 - Hydration flow: localStorage → `ui-storage` JSON parse → `sidePanelCollapsed` boolean → App.tsx `useEffect` sets Zustand store on mount
 
 ### Config
-- `CATEGORY_COLORS`: per-section color map (changes=#34d399, brain=#e879f9, skills=#f28c52, agents=#f28c52, droids=#4ecdc4, rules=#60a5fa, hooks=#a78bfa, features=#FFD700, sessions=#00d9ff, mcp=#34d399, commands=#f472b6, context=#f28c52, project-context=#60a5fa)
-- `sectionIds`: fixed order array -- `['changes', 'context', 'brain', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions']`
+- `CATEGORY_COLORS`: per-section color map (taskhub=#a855f7, changes=#34d399, brain=#e879f9, skills=#f28c52, agents=#f28c52, droids=#4ecdc4, rules=#60a5fa, hooks=#a78bfa, features=#FFD700, sessions=#00d9ff, mcp=#34d399, commands=#f472b6, context=#f28c52, project-context=#60a5fa, token-stats=#22d3ee)
+- `sectionIds`: fixed order array -- `['taskhub', 'changes', 'context', 'brain', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions', 'token-stats']`
 
-### Sections (13 total, 1 hidden)
+### Sections (15 total, 1 hidden)
 | # | ID | Title | Content Panel | Badge Source |
 |---|-----|-------|---------------|-------------|
-| 0 | changes | Changes | ChangesPanel | modifiedFiles.size |
-| 1 | context | File Explorer | FileExplorer | -- |
-| 2 | brain | Brain | FileExplorer (rooted at documentation/, sortBy=modified) | .md + .mmd file count |
-| 3 | features | Features | FeaturesPanel | -- |
-| 4 | agent-context | Agent Personality | AgentContextPanel | -- |
-| 5 | project-context | Context | ProjectContextPanel | -- |
-| 6 | rules | Agent Rules | RulesPanel | rulesCount (project + global) |
-| 7 | agents | Droids | AgentsPanel | agents.length |
-| 8 | skills | Skills | SkillsPanel | skills.length |
-| 9 | commands | Commands | CommandsPanel | commandsCount (hidden) |
-| 10 | mcp | MCP Servers | MCPPanel | mcpCount |
-| 11 | hooks | Hooks | HooksPanel | hooks.filter(enabled).length |
-| 12 | sessions | Sessions | SessionsPanel | -- |
+| 0 | taskhub | Task Hub | TaskHubView | `computeTaskHubBadge(...)` = P1 (Needs attention) + P3 (Agent done) |
+| 1 | changes | Changes | ChangesPanel | modifiedFiles.size |
+| 2 | context | File Explorer | FileExplorer | -- |
+| 3 | brain | Brain | FileExplorer (rooted at documentation/, sortBy=modified) | .md + .mmd file count |
+| 4 | features | Features | FeaturesPanel | -- |
+| 5 | agent-context | Agent Personality | AgentContextPanel | -- |
+| 6 | project-context | Context | ProjectContextPanel | -- |
+| 7 | rules | Agent Rules | RulesPanel | rulesCount (project + global) |
+| 8 | agents | Droids | AgentsPanel | agents.length |
+| 9 | skills | Skills | SkillsPanel | skills.length |
+| 10 | commands | Commands | CommandsPanel | commandsCount (hidden) |
+| 11 | mcp | MCP Servers | MCPPanel | mcpCount |
+| 12 | hooks | Hooks | HooksPanel | hooks.filter(enabled).length |
+| 13 | sessions | Sessions | SessionsPanel | -- |
+| 14 | token-stats | Token Stats | AgentTokenStatsPanel | -- |
 
 ### CSS Architecture
 - **Glassmorphism base**: `rgba(15,17,21,0.96)` + `backdrop-filter: blur(var(--blur-heavy)) saturate(150%)` (near-opaque for readability)
