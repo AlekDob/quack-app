@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: TypeScript strict (React 18 frontend), Tauri v2 invoke API (read_file_content, write_file_content, get_home_directory, rename_file)
 created: 2026-04-22
-last_verified: 2026-05-11
-tags: [office, office-v2, whiteboard, annotations, post-it, sticker, custom-group, undo-redo, toolbar, svg, layout, room-click, flip-transition]
+last_verified: 2026-05-12
+tags: [office, office-v2, whiteboard, annotations, post-it, sticker, custom-group, undo-redo, toolbar, svg, layout, room-click, flip-transition, working-pulse]
 ---
 
 ## Office View v2
@@ -214,6 +214,20 @@ Shortcuts cross-platform (Mac/Windows: `metaKey || ctrlKey`) gestiti nel `useEff
 | `Space + left-drag` | Pan canvas |
 | Middle-click drag | Pan canvas |
 | Wheel | Zoom (0.3–2.0) |
+
+### Working pulse on room cards (2026-05-12)
+Quando almeno un agente della stanza è in stato "Working" (P2 del Task Hub — `chatLoadingMap.get(sessionId) === true` OR ultimo messaggio `status === 'streaming'`), la `office-room-card` riceve la classe `office-room-card--working` e mostra uno sfondo gradient arancione (`#FF6B35` ~5-22% alpha) animato in loop a 6s (`@keyframes office-card-working-sweep`). Border arancione `rgba(255, 107, 53, 0.45)`.
+
+**Wiring**:
+- `OfficeRoomCard.tsx`: classe condizionale su `counts.busy > 0`. Il prop `counts` arriva già dal viewmodel `officeViewModels.ts:90` (`countsByProject`).
+- `OfficeView.css`: keyframe + selettore `.office-room-card--working`.
+
+**Comportamenti**:
+- "Working batte dim": `.office-room-card--dimmed.office-room-card--working { opacity: 1; }` — l'animazione resta visibile a piena intensità anche se la card è fuori dal tag filter. Le card dimmed non-working restano a `opacity: 0.3` come prima.
+- `prefers-reduced-motion: reduce` ferma l'animazione mantenendo il gradient statico (segnale visivo conservato senza oscillazione).
+- Si compone con `--selected` (outline blu) senza conflitti.
+
+**Source-of-truth unificata col Task Hub**: la stessa condizione di "Working" è valutata in `TaskHubView.tsx:156-157` per la priority P2 e in `officeViewModels.ts:20-37` per `sessionDots[i].working`. Card animata ⇔ sessione nel gruppo "Working" del Task Hub.
 
 ### UI Language
 All user-facing strings in English.

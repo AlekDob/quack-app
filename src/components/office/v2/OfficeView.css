@@ -108,6 +108,35 @@
   outline-offset: 2px;
 }
 
+/* Brain: feature-063-office-v2 — card working pulse mirrors TaskHub P2 (counts.busy > 0) */
+@keyframes office-card-working-sweep {
+  0%   { background-position:   0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position:   0% 50%; }
+}
+
+.office-room-card--working {
+  background:
+    linear-gradient(
+      120deg,
+      rgba(255, 107, 53, 0.22) 0%,
+      rgba(255, 107, 53, 0.05) 30%,
+      #14142a                  55%,
+      rgba(255, 107, 53, 0.18) 100%
+    );
+  background-size: 220% 220%;
+  animation: office-card-working-sweep 6s ease-in-out infinite;
+  border-color: rgba(255, 107, 53, 0.45);
+}
+
+.office-room-card--dimmed.office-room-card--working {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .office-room-card--working { animation: none; }
+}
+
 .office-postit--selected {
   outline: 2px solid #3b82f6;
   outline-offset: 2px;

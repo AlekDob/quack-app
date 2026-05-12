@@ -44,7 +44,7 @@ function OfficeRoomCardImpl({
 
   return (
     <div
-      className={`office-room-card ${dimmed ? 'office-room-card--dimmed' : ''} ${selected ? 'office-room-card--selected' : ''}`}
+      className={`office-room-card ${dimmed ? 'office-room-card--dimmed' : ''} ${selected ? 'office-room-card--selected' : ''} ${counts.busy > 0 ? 'office-room-card--working' : ''}`}
       style={{
         width: w,
         height: h,
