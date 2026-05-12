@@ -8236,8 +8236,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // Handle session click from AgentSessionList
   const handleSessionClick = useCallback((sessionId: string) => {
-    console.log('[App] Session clicked:', sessionId);
-
     // Find the session in sessionStore
     const sessionStore = useSessionStore.getState();
     const session = sessionStore.sessions.find(s => s.id === sessionId);

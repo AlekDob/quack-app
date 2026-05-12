@@ -87,7 +87,22 @@ Within each priority group, sessions are sorted by `updatedAt` descending (most 
 - Project chip is rendered only when `hasMultipleProjects` (more than one distinct `projectName` across active sessions). Style: `9px / 600`, lowercase, `${projectColor}1F` background, `${projectColor}55` border, `${projectColor}` text, `maxWidth: 90px` ellipsis. Position: between status dot and title, replacing the previous tiny grey label that lived after the agent avatar.
 - `projectFallbackIndex(key)` (local helper in `TaskHubItem.tsx`): 32-bit string hash of the project path, modulo `DEFAULT_PROJECT_COLORS.length`. Ensures projects without a custom color in storage still get distinct, stable hues across sessions instead of all defaulting to `DEFAULT_PROJECT_COLORS[0]` (orange).
 
+### Cross-project switch UX
+Clicking a Task Hub row whose `session.projectPath` differs from the active project triggers the cross-project switch path in `handleSessionClick` (`App.tsx`):
+
+1. `flushSync(setProjectSwitchTarget({ projectName, projectPath }))` forces an immediate paint of the `.fullscreen-loader-overlay` (purple spinner + "Switching to <project>…") BEFORE the heavy work blocks the main thread.
+2. State updates (`setActiveTabId`, `setActiveSessionIdExclusive`, `selectSession`, `setActiveId`) are deferred with `setTimeout(0)` and wrapped in React 18 `startTransition` so React can interrupt the commit for paint/input.
+3. Heavy Tauri invokes (`load_agent_personality` + `inject_personality_to_claude_md` + `loadDirectory`) are deferred with `setTimeout(50)` so they start AFTER the loader has painted.
+4. The loader is auto-cleared by an effect when `currentProjectPath === projectSwitchTarget.projectPath`; a 3.5s safety timeout guards against the effect not firing (race / error).
+5. `updateSession({ initialPromptConsumed: true })` is also deferred (`setTimeout(0)`) to avoid piling a disk write onto the cascade.
+
+Same-project switches run synchronously (the cascade is cheap and deferring would flash the loader).
+
+Skills load deduplication: `loadAvailableSkills` (in `src/utils/skillsAndDroidsLoader.ts`) is now memoized with an in-flight Promise map + 2s TTL cache. The 3+ concurrent calls from `ChatInput`/`SkillSelector` during a switch share a single Tauri round-trip.
+
 ### Cross-References
 - **035-side-panel-accordion** — host of the Task Hub section (first slot, `sectionIds[0]`). Section badge fed by `computeTaskHubBadge(...)` exported from `TaskHubView`. Color `#a855f7` (purple).
 - **043-agent-sidebar** — parent left sidebar; no longer renders Task Hub. The view toggle (`SidebarViewToggle`) was removed on 2026-05-12.
 - **053-pip-window** — the PiP floating window uses the same 4-level priority grouping (1=Needs attention, 2=Working, 3=Agent done, 4=Other) and identical section labels; both views share the same mental model for session status triage
+- **`documentation/bugs/fix-token-stats-panel-blocks-project-switch.md`** — sibling fix for the cross-project freeze (token-stats gated on `enabled`)
+- **`documentation/bugs/fix-double-loadagents-cross-project-session.md`** — sibling fix for `loadAgents` cascade; outstanding items in that entry (skills load x3, save x3, tab cascade) are partially mitigated by the loader + skills cache landed on 2026-05-12
