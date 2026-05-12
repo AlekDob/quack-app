@@ -6,11 +6,12 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type {
-  CanvasAnnotations, PostIt, GroupRect, CanvasImage, MdCard, WhiteboardFile,
+  CanvasAnnotations, PostIt, GroupRect, CanvasImage, MdCard, CanvasText, WhiteboardFile,
 } from '../components/featureMap/annotationTypes';
 import {
   POST_IT_COLORS, GROUP_COLORS, IMAGE_DEFAULT_W, IMAGE_DEFAULT_H,
   MD_CARD_DEFAULT_W, MD_CARD_DEFAULT_H,
+  TEXT_DEFAULT_FONT, TEXT_DEFAULT_TEXT,
 } from '../components/featureMap/annotationTypes';
 import type { NodePosition } from '../components/featureMap/featureMapTypes';
 import {
@@ -355,6 +356,98 @@ export function useWhiteboardFile(projectPath?: string) {
     updateAnnotations(a => ({ ...a, mdCards: (a.mdCards ?? []).filter(c => c.id !== id) }));
   }, [updateAnnotations]);
 
+  // --- CanvasText (titoletti) CRUD ---
+  const addText = useCallback((x: number, y: number, init?: Partial<CanvasText>) => {
+    const text: CanvasText = {
+      id: uid(),
+      x, y,
+      text: init?.text ?? TEXT_DEFAULT_TEXT,
+      fontSize: init?.fontSize ?? TEXT_DEFAULT_FONT,
+    };
+    updateAnnotations(a => ({ ...a, texts: [...(a.texts ?? []), text] }));
+    return text.id;
+  }, [updateAnnotations]);
+
+  const updateText = useCallback((id: string, partial: Partial<CanvasText>) => {
+    updateAnnotations(a => ({
+      ...a, texts: (a.texts ?? []).map(t => t.id === id ? { ...t, ...partial } : t),
+    }));
+  }, [updateAnnotations]);
+
+  const removeText = useCallback((id: string) => {
+    updateAnnotations(a => ({ ...a, texts: (a.texts ?? []).filter(t => t.id !== id) }));
+  }, [updateAnnotations]);
+
+  /**
+   * Clone a set of annotations (by id) across all 5 types with an x/y offset.
+   * Returns the list of new IDs in the same order as input.
+   * Used by Cmd+C/Cmd+V/Cmd+D shortcuts in FeatureMapView.
+   */
+  const duplicateAnnotations = useCallback(
+    (ids: string[], offsetX = 24, offsetY = 24): string[] => {
+      if (ids.length === 0) return [];
+      const idSet = new Set(ids);
+      const newIds: string[] = [];
+      updateAnnotations(a => {
+        const newPostIts: PostIt[] = [...a.postIts];
+        const newGroups: GroupRect[] = [...a.groups];
+        const newImages: CanvasImage[] = [...a.images];
+        const newMdCards: MdCard[] = [...(a.mdCards ?? [])];
+        const newTexts: CanvasText[] = [...(a.texts ?? [])];
+
+        for (const id of ids) {
+          const pi = a.postIts.find(p => p.id === id);
+          if (pi) {
+            const clone: PostIt = { ...pi, id: uid(), x: pi.x + offsetX, y: pi.y + offsetY };
+            newPostIts.push(clone);
+            newIds.push(clone.id);
+            continue;
+          }
+          const gr = a.groups.find(g => g.id === id);
+          if (gr) {
+            const clone: GroupRect = { ...gr, id: uid(), x: gr.x + offsetX, y: gr.y + offsetY };
+            newGroups.push(clone);
+            newIds.push(clone.id);
+            continue;
+          }
+          const im = a.images.find(i => i.id === id);
+          if (im) {
+            const clone: CanvasImage = { ...im, id: uid(), x: im.x + offsetX, y: im.y + offsetY };
+            newImages.push(clone);
+            newIds.push(clone.id);
+            continue;
+          }
+          const mc = (a.mdCards ?? []).find(c => c.id === id);
+          if (mc) {
+            const clone: MdCard = { ...mc, id: uid(), x: mc.x + offsetX, y: mc.y + offsetY };
+            newMdCards.push(clone);
+            newIds.push(clone.id);
+            continue;
+          }
+          const tx = (a.texts ?? []).find(t => t.id === id);
+          if (tx) {
+            const clone: CanvasText = { ...tx, id: uid(), x: tx.x + offsetX, y: tx.y + offsetY };
+            newTexts.push(clone);
+            newIds.push(clone.id);
+            continue;
+          }
+        }
+
+        void idSet; // silence unused if no input matches
+        return {
+          ...a,
+          postIts: newPostIts,
+          groups: newGroups,
+          images: newImages,
+          mdCards: newMdCards,
+          texts: newTexts,
+        };
+      });
+      return newIds;
+    },
+    [updateAnnotations]
+  );
+
   // --- Node positions ---
   const customPositions = useMemo(
     () => new Map(Object.entries(file.positions)) as Map<string, NodePosition>,
@@ -592,8 +685,8 @@ export function useWhiteboardFile(projectPath?: string) {
     return getNestingDepth(currentParentId, file.annotations.groups) < MAX_NESTING;
   }, [file.annotations.groups]);
 
-  const { postIts, groups, images, mdCards } = file.annotations;
-  const hasAnnotations = postIts.length > 0 || groups.length > 0 || images.length > 0 || (mdCards?.length ?? 0) > 0;
+  const { postIts, groups, images, mdCards, texts } = file.annotations;
+  const hasAnnotations = postIts.length > 0 || groups.length > 0 || images.length > 0 || (mdCards?.length ?? 0) > 0 || (texts?.length ?? 0) > 0;
   const hasCustomPositions = Object.keys(file.positions).length > 0;
 
   return {
@@ -605,6 +698,8 @@ export function useWhiteboardFile(projectPath?: string) {
     addGroup, updateGroup, removeGroup,
     addImage, updateImage, removeImage,
     addMdCard, updateMdCard, removeMdCard,
+    addText, updateText, removeText,
+    duplicateAnnotations,
     setNodePosition,
     clearAll,
     undo, redo, canUndo, canRedo,

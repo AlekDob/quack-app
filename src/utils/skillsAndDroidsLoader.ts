@@ -30,37 +30,66 @@ function parseFrontmatter(content: string): Record<string, string> {
   return frontmatter;
 }
 
+// In-flight + TTL cache: dedupes the 3+ concurrent loadAvailableSkills calls
+// triggered by ChatInput/SkillSelector remounts during a cross-project switch.
+// TTL is short so explicit user actions (refresh) still see fresh data.
+const SKILLS_CACHE_TTL_MS = 2000;
+const skillsCache = new Map<string, { data: SkillMetadata[]; expires: number }>();
+const skillsInflight = new Map<string, Promise<SkillMetadata[]>>();
+
 /**
- * Load all available skills from project and global directories
- * Uses the same Tauri command as the Skills tab for consistency
+ * Load all available skills from project and global directories.
+ * Uses the same Tauri command as the Skills tab.
+ * Deduped: concurrent calls with the same projectPath share one in-flight request.
  */
 export async function loadAvailableSkills(projectPath: string): Promise<SkillMetadata[]> {
-  try {
-    console.log('[loadAvailableSkills] Loading skills for path:', projectPath);
+  const now = Date.now();
+  const cached = skillsCache.get(projectPath);
+  if (cached && cached.expires > now) {
+    return cached.data;
+  }
+  const inflight = skillsInflight.get(projectPath);
+  if (inflight) return inflight;
 
-    // Use the same command as the Skills tab
-    const skillsList = await invoke<SkillInfo[]>('list_skills', {
-      workingDir: projectPath
-    });
+  const request = (async (): Promise<SkillMetadata[]> => {
+    try {
+      const skillsList = await invoke<SkillInfo[]>('list_skills', {
+        workingDir: projectPath
+      });
 
-    console.log('[loadAvailableSkills] Raw skills from Tauri:', skillsList);
+      const skills: SkillMetadata[] = skillsList.map((skill) => ({
+        id: `${skill.scope}-${skill.name}`,
+        name: skill.name,
+        displayName: skill.name.replace(/-/g, ' '),
+        description: skill.description || 'No description available',
+        path: skill.file_path,
+        isGlobal: skill.scope === 'global'
+      }));
 
-    // Convert SkillInfo to SkillMetadata format
-    const skills: SkillMetadata[] = skillsList.map((skill) => ({
-      id: `${skill.scope}-${skill.name}`,
-      name: skill.name,                        // Keep original name with hyphens for matching
-      displayName: skill.name.replace(/-/g, ' '), // Format name nicely for display
-      description: skill.description || 'No description available',
-      path: skill.file_path, // SkillInfo uses file_path, not path
-      isGlobal: skill.scope === 'global'
-    }));
+      skillsCache.set(projectPath, { data: skills, expires: Date.now() + SKILLS_CACHE_TTL_MS });
+      return skills;
+    } catch (err) {
+      console.error('[loadAvailableSkills] Failed to load skills:', err);
+      return [];
+    } finally {
+      skillsInflight.delete(projectPath);
+    }
+  })();
 
-    console.log('[loadAvailableSkills] Converted skills:', skills);
+  skillsInflight.set(projectPath, request);
+  return request;
+}
 
-    return skills;
-  } catch (err) {
-    console.error('[loadAvailableSkills] Failed to load skills:', err);
-    return [];
+/**
+ * Invalidate the skills cache. Call after user-initiated refresh or skill install/uninstall.
+ */
+export function invalidateSkillsCache(projectPath?: string): void {
+  if (projectPath) {
+    skillsCache.delete(projectPath);
+    skillsInflight.delete(projectPath);
+  } else {
+    skillsCache.clear();
+    skillsInflight.clear();
   }
 }
 

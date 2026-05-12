@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, startTransition } from "react";
+import { flushSync } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import posthog from "posthog-js";
 import { invokeWithTimeout, fireAndForget } from "./utils/invokeWithTimeout";
@@ -832,6 +833,16 @@ function AppContent() {
 
   // Force expand a specific section in the side panel accordion
   const [forceExpandSection, setForceExpandSection] = useState<string | null>(null);
+  // Cross-project switch loader — covers the freeze window when changing projects via Task Hub / sidebar
+  const [projectSwitchTarget, setProjectSwitchTarget] = useState<{ projectName: string; projectPath: string } | null>(null);
+  const projectSwitchSafetyRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup any pending safety timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (projectSwitchSafetyRef.current) clearTimeout(projectSwitchSafetyRef.current);
+    };
+  }, []);
   // Chat fullscreen mode - hides side panel and expands chat
   const [isChatFullscreen, setIsChatFullscreen] = useState(false);
   // Track sidebar state before Kanban view to restore it on exit
@@ -883,12 +894,54 @@ function AppContent() {
     return 'chat';
   });
 
+  // Current project path — single source of truth for the sidebar highlight.
+  // Priority chain: active tab's project (if tab is project-scoped) > active terminal's cwd > null.
+  // Drives the "Active" pill, rail, background fill, glow flash, and autoscroll
+  // inside the sidebar (see RepositoryGroup `isCurrentProject` prop).
+  const currentProjectPath = useMemo<string | null>(() => {
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    if (activeTab) {
+      if (activeTab.type === 'feature-map') {
+        return activeTab.initialProjectPath ?? activeTerminal?.cwd ?? null;
+      }
+      if (activeTab.type === 'project-dashboard') {
+        return activeTab.filePath ?? null;
+      }
+      if (activeTab.type === 'claude-assets') {
+        return activeTab.initialProjectPath ?? null;
+      }
+      if (activeTab.type === 'code-editor' && activeTab.editorFilePath) {
+        const file = activeTab.editorFilePath;
+        const match = terminals
+          .map(t => t.cwd)
+          .filter((cwd): cwd is string => Boolean(cwd) && file.startsWith(cwd))
+          .sort((a, b) => b.length - a.length)[0];
+        if (match) return match;
+      }
+    }
+    return activeTerminal?.cwd ?? null;
+  }, [tabs, activeTabId, activeTerminal?.cwd, terminals]);
+
+  // Clear the cross-project switch loader once currentProjectPath has caught up
+  // with the target (or if the target was reset externally).
+  useEffect(() => {
+    if (!projectSwitchTarget) return;
+    if (currentProjectPath === projectSwitchTarget.projectPath) {
+      if (projectSwitchSafetyRef.current) {
+        clearTimeout(projectSwitchSafetyRef.current);
+        projectSwitchSafetyRef.current = null;
+      }
+      setProjectSwitchTarget(null);
+    }
+  }, [currentProjectPath, projectSwitchTarget]);
+
   // Split View state
   const [splitTabId, setSplitTabId] = useState<string | null>(null);
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [isDraggingTab, setIsDraggingTab] = useState(false);
   const [isDraggingSidebar, setIsDraggingSidebar] = useState(false);
   const splitContainerRef = useRef<HTMLDivElement>(null);
+
 
   // Save/restore split view per agent (persisted in ref, no re-renders)
   const splitByAgentRef = useRef<Map<string, string>>(new Map());
@@ -8193,90 +8246,100 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       return;
     }
 
+    // Cross-project switch detection: show fullscreen loader to cover the
+    // ~2-3s freeze window caused by loadDirectory + cascade effects.
+    // Use flushSync to force the loader to paint BEFORE the heavy sync work.
+    const isCrossProject = !!session.projectPath && session.projectPath !== currentProjectPath;
+    if (isCrossProject) {
+      flushSync(() => {
+        setProjectSwitchTarget({
+          projectName: session.projectName || 'project',
+          projectPath: session.projectPath,
+        });
+      });
+      // Safety net: never let the loader stay up more than 3.5s — if the effect
+      // that clears it on rootPath match doesn't fire (race / error), this fires.
+      if (projectSwitchSafetyRef.current) clearTimeout(projectSwitchSafetyRef.current);
+      projectSwitchSafetyRef.current = setTimeout(() => setProjectSwitchTarget(null), 3500);
+    }
+
     // Pre-populate ChatInput with initial prompt and attachments (only if not consumed yet)
     if (!session.initialPromptConsumed) {
-      // Pre-populate input draft with initial prompt
       if (session.initialPrompt) {
-        console.log('[App] Pre-populating input with initial prompt:', session.initialPrompt.substring(0, 50) + '...');
         setTaskInputDrafts(prev => {
           const newMap = new Map(prev);
           newMap.set(sessionId, session.initialPrompt!);
           return newMap;
         });
       }
-
-      // Pre-populate attachments in chatStore
       if (session.initialAttachments?.length) {
-        console.log('[App] Pre-populating attachments:', session.initialAttachments.length);
         useChatStore.getState().setAttachments(sessionId, session.initialAttachments);
       }
-
-      // Mark initial prompt as consumed to avoid re-population on re-open
-      sessionStore.updateSession(sessionId, { initialPromptConsumed: true });
+      // Defer the disk write so it doesn't pile onto the switch cascade
+      setTimeout(() => sessionStore.updateSession(sessionId, { initialPromptConsumed: true }), 0);
     }
 
-    // Close Kanban view if open - show the chat instead
     const { isKanbanViewActive, setKanbanViewActive } = useKanbanStore.getState();
     if (isKanbanViewActive) {
       setKanbanViewActive(false);
     }
 
-    // Switch to chat tab (exit Kanban tab if active)
-    setActiveTabId('chat');
+    // Heavy work runner — wrapped so we can defer it for cross-project switches
+    // (gives the loader a chance to paint before React unmounts ChatView and
+    // triggers the cascade of useEffects). For same-project switches we run it
+    // synchronously: the work is cheap and deferring would cause a flash.
+    const runStateUpdates = () => {
+      // startTransition tells React 18 these updates are non-urgent.
+      // The fullscreen-loader-overlay (already painted via flushSync) stays
+      // visible while React commits this in interruptible chunks.
+      startTransition(() => {
+        setActiveTabId('chat');
+        setActiveSessionIdExclusive(sessionId);
+        selectSession(sessionId);
+        if (session.agentId) {
+          setActiveId(session.agentId);
+        }
+      });
+    };
 
-    // Set active session in local state
-    // 🦆 FIX SESSION MIXING: Use exclusive setter to clear activeTaskId
-    setActiveSessionIdExclusive(sessionId);
-
-    // Select the session in the store
-    selectSession(sessionId);
-
-    // If session has an associated agent, select that agent
-    // 🦆 FIX: Always set activeId to session.agentId, even if agent is not in terminals
-    // This prevents the bug where activeId stays on the previous agent, causing
-    // messages to be sent with the wrong agentId
-    if (session.agentId) {
-      const agentTerminal = terminals.find(t => t.id === session.agentId);
-      if (agentTerminal) {
-        console.log('[App] Selecting agent for session:', agentTerminal.label);
-
-        // 🦆 FIX: Inject agent personality into CLAUDE.md when clicking session
-        // This ensures the CLAUDE.md reflects the agent's personality, same as clicking agent-card
-        if (tauriAvailable) {
+    const runHeavySideEffects = () => {
+      if (session.agentId) {
+        const agentTerminal = terminals.find(t => t.id === session.agentId);
+        if (agentTerminal && tauriAvailable) {
+          // Fire-and-forget personality injection (writes CLAUDE.md on disk).
+          // No need to await — UI doesn't depend on this completing.
           (async () => {
             try {
-              console.log(`[handleSessionClick] Loading personality for "${agentTerminal.label}" (ID: ${agentTerminal.id})`);
               const personality = await invoke<AgentPersonality>('load_agent_personality', {
                 projectPath: agentTerminal.cwd,
                 personalityId: agentTerminal.id,
               });
-
-              // Inject into CLAUDE.md
               await invoke('inject_personality_to_claude_md', {
                 projectPath: agentTerminal.cwd,
                 personality,
               });
-
-              console.log(`[handleSessionClick] ✅ Injected personality for "${agentTerminal.label}" into CLAUDE.md`);
             } catch (error) {
-              // No personality found or injection failed - not critical
-              console.warn(`[handleSessionClick] Failed to inject personality:`, error);
+              console.warn('[handleSessionClick] personality inject failed:', error);
             }
           })();
         }
-      } else {
-        console.warn('[App] Agent not found in terminals for session:', session.agentId);
       }
-      // Always set activeId to the session's agent, even if terminal not found
-      setActiveId(session.agentId);
-    }
+      if (session.projectPath) {
+        void loadDirectory(session.projectPath);
+      }
+    };
 
-    // 🦆 FIX: Sync File Explorer with session's project path
-    if (session.projectPath) {
-      console.log('[App] Syncing File Explorer to session projectPath:', session.projectPath);
-      void loadDirectory(session.projectPath);
+    if (isCrossProject) {
+      // Two stages of deferral: first state updates (so ChatView remount happens
+      // after the loader is on screen), then heavy I/O (so Rust calls don't
+      // start until both repaints are done). 50ms is enough for one frame.
+      setTimeout(runStateUpdates, 0);
+      setTimeout(runHeavySideEffects, 50);
+    } else {
+      runStateUpdates();
+      runHeavySideEffects();
     }
-  }, [selectSession, terminals, loadDirectory, setActiveSessionIdExclusive, tauriAvailable]);
+  }, [selectSession, terminals, loadDirectory, setActiveSessionIdExclusive, tauriAvailable, currentProjectPath]);
   handleSessionClickRef.current = handleSessionClick;
 
   const handleUpdateWorkingOn = useCallback(async (terminalId: string, workingOn: string) => {
@@ -10155,6 +10218,24 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     }
   }, [openFeatureMapTab, activeTabId, tabs, activeTerminal?.cwd]);
 
+  // Force-open whiteboard for a specific project. Used by Office View v2 room click.
+  const handleOpenWhiteboardForProject = useCallback(
+    (projectPath: string) => {
+      const existingTab = tabs.find(t => t.type === 'feature-map');
+      if (existingTab) {
+        if (existingTab.initialProjectPath !== projectPath) {
+          setTabs(prev => prev.map(t =>
+            t.id === existingTab.id ? { ...t, initialProjectPath: projectPath } : t
+          ));
+        }
+      } else {
+        setTabs(prevTabs => [...prevTabs, openFeatureMapTab(projectPath)]);
+      }
+      setActiveTabId('feature-map');
+    },
+    [openFeatureMapTab, tabs]
+  );
+
   // Handler for opening/focusing Code Editor tab (toggle with Cmd+E, per-file tabs)
   // Brain: pattern-code-editor-tab
   const handleOpenCodeEditorTab = useCallback((filePath?: string) => {
@@ -10816,9 +10897,6 @@ Please respond ONLY with the summary, no preamble or explanations.`;
   }, [terminals, chatSessions, loadDirectory, setActiveTaskIdExclusive]);
 
   // Global keyboard shortcuts
-  const sidebarView = useUIStore((s) => s.sidebarView);
-  const setSidebarView = useUIStore((s) => s.setSidebarView);
-
   useGlobalKeyboardShortcuts({
     toggleKanban: handleOpenKanbanTab,
     toggleAutomation: handleOpenAutomationTab,
@@ -10845,8 +10923,14 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
     }, [activeTabId, requestNewTaskModal]),
     toggleSidebarView: useCallback(() => {
-      setSidebarView(sidebarView === 'projects' ? 'taskhub' : 'projects');
-    }, [sidebarView, setSidebarView]),
+      // Focus the Task Hub section in the right-side accordion
+      if (sidePanelCollapsed) {
+        setSidePanelCollapsed(false);
+        setTimeout(() => setForceExpandSection('taskhub'), 50);
+      } else {
+        setForceExpandSection('taskhub');
+      }
+    }, [sidePanelCollapsed]),
   });
 
   // Tab management handlers
@@ -12540,6 +12624,7 @@ You have access to all Bash tools to execute git commands like:
             setSavedCommandsFilterProject(projectPath);
             setSavedCommandsDrawerOpen(true);
           }}
+          currentProjectPath={currentProjectPath}
         />}
 
         {/* Terminal pane - show video background when no terminals, otherwise show chat */}
@@ -13002,6 +13087,7 @@ You have access to all Bash tools to execute git commands like:
                       setActiveTabId('chat');
                     }}
                     onSessionClick={handleSessionClick}
+                    onOpenWhiteboard={handleOpenWhiteboardForProject}
                     onExitOffice={() => setActiveTabId('chat')}
                   />
                 );
@@ -13015,7 +13101,7 @@ You have access to all Bash tools to execute git commands like:
                   <FeatureMapTabView
                     tab={fmTab}
                     isActive={isFeatureMapTabActive}
-                    projectPath={activeTerminal?.cwd}
+                    projectPath={fmTab.initialProjectPath ?? activeTerminal?.cwd}
                     onOpenFileInEditor={handleOpenCodeEditorTab}
                   />
                 );
@@ -13965,6 +14051,13 @@ You have access to all Bash tools to execute git commands like:
           gitHistory={commitHistory}
           gitHistoryLoading={loadingGit}
           lastRefreshTs={agentCommitTs}
+          // Task Hub props
+          terminals={terminals}
+          chatSessions={chatSessions}
+          onActiveSessionDone={() => {
+            setActiveSessionId(null);
+            setActiveTaskId(null);
+          }}
           // Force expand section
           forceExpandSection={forceExpandSection}
           onForceExpandHandled={() => setForceExpandSection(null)}
@@ -14224,6 +14317,16 @@ You have access to all Bash tools to execute git commands like:
             <div className="fullscreen-loader-content">
               <div className="fullscreen-loader-spinner" />
               <p>{loadingDashboard ? 'Loading project dashboard...' : 'Loading Git status...'}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Cross-project switch loader — covers the ~2s freeze from cascade effects */}
+        {projectSwitchTarget && (
+          <div className="fullscreen-loader-overlay">
+            <div className="fullscreen-loader-content">
+              <div className="fullscreen-loader-spinner" />
+              <p>Switching to <strong>{projectSwitchTarget.projectName}</strong>…</p>
             </div>
           </div>
         )}

@@ -17,7 +17,7 @@ function filePath(projectPath: string): string {
 }
 
 function emptyFile(): WhiteboardFile {
-  return { version: 1, annotations: { postIts: [], groups: [], images: [], mdCards: [] }, positions: {}, nodeAssignments: {} };
+  return { version: 1, annotations: { postIts: [], groups: [], images: [], mdCards: [], texts: [] }, positions: {}, nodeAssignments: {} };
 }
 
 export async function readWhiteboardFile(projectPath: string): Promise<WhiteboardFile | null> {
@@ -25,9 +25,10 @@ export async function readWhiteboardFile(projectPath: string): Promise<Whiteboar
     const raw = await invoke<string>('read_file_content', { path: filePath(projectPath) });
     const parsed = JSON.parse(raw) as WhiteboardFile;
     // Migration: ensure all fields exist
-    if (!parsed.annotations) parsed.annotations = { postIts: [], groups: [], images: [], mdCards: [] };
+    if (!parsed.annotations) parsed.annotations = { postIts: [], groups: [], images: [], mdCards: [], texts: [] };
     if (!parsed.annotations.images) parsed.annotations.images = [];
     if (!parsed.annotations.mdCards) parsed.annotations.mdCards = [];
+    if (!parsed.annotations.texts) parsed.annotations.texts = [];
     if (!parsed.positions) parsed.positions = {};
     if (!parsed.nodeAssignments) parsed.nodeAssignments = {};
     return parsed;
