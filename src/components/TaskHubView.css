@@ -1,5 +1,39 @@
 /* Task Hub View - flat session list with priority sections */
 
+.task-hub-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.task-hub-search {
+  padding: 6px 8px 4px;
+  flex-shrink: 0;
+}
+
+.task-hub-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.task-hub-search input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.task-hub-search input:focus {
+  border-color: var(--category-color, var(--accent-color));
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .task-hub-list {
   display: flex;
   flex-direction: column;

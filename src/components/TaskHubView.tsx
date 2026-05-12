@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
-import type { TerminalInfo, ChatMessage } from '../types';
+import type { TerminalInfo, ChatMessage, AgentSession } from '../types';
 import { useSessionStore } from '../stores/sessionStore';
 import { useChatStore } from '../stores/chatStore';
 import TaskHubItem, { type SessionPriority } from './TaskHubItem';
@@ -11,8 +11,6 @@ interface TaskHubViewProps {
   activeSessionId?: string;
   onActiveSessionDone?: () => void;
   chatSessions?: Map<string, ChatMessage[]>;
-  lastReadTimestamps?: Map<string, number>;
-  searchQuery?: string;
 }
 
 const SECTION_LABELS: Record<SessionPriority, string> = {
@@ -24,7 +22,6 @@ const SECTION_LABELS: Record<SessionPriority, string> = {
 
 function getItemOpacity(priority: SessionPriority, indexInGroup: number, groupSize: number): number {
   if (priority <= 3) return 1.0;
-  // P4: fade from 0.75 to 0.4 based on position
   if (groupSize <= 1) return 0.7;
   return Math.max(0.4, 0.75 - (indexInGroup / groupSize) * 0.35);
 }
@@ -33,11 +30,36 @@ function getItemOpacity(priority: SessionPriority, indexInGroup: number, groupSi
  * Check if the agent has finished responding in a session
  * (last message is a complete assistant message)
  */
-function isAgentDone(messages: ChatMessage[]): boolean {
+export function isAgentDone(messages: ChatMessage[]): boolean {
   if (messages.length === 0) return false;
   const last = messages[messages.length - 1];
   if (last.role !== 'assistant') return false;
   return last.status === 'complete' || last.status === undefined;
+}
+
+/**
+ * Count of sessions that need user attention: P1 (pending question) + P3 (agent done).
+ * Used by the accordion section badge.
+ */
+export function computeTaskHubBadge(
+  sessions: AgentSession[],
+  chatSessions: Map<string, ChatMessage[]> | undefined,
+  pendingQuestionsMap: Map<string, Set<string>>,
+): number {
+  let count = 0;
+  for (const session of sessions) {
+    if (session.status === 'done') continue;
+    const pending = pendingQuestionsMap.get(session.id);
+    if (pending && pending.size > 0) {
+      count++;
+      continue;
+    }
+    const messages = chatSessions?.get(session.id) ?? [];
+    if (isAgentDone(messages)) {
+      count++;
+    }
+  }
+  return count;
 }
 
 export default function TaskHubView({
@@ -46,7 +68,6 @@ export default function TaskHubView({
   activeSessionId,
   onActiveSessionDone,
   chatSessions,
-  searchQuery = '',
 }: TaskHubViewProps) {
   const sessions = useSessionStore((s) => s.sessions);
   const updateSession = useSessionStore((s) => s.updateSession);
@@ -54,12 +75,11 @@ export default function TaskHubView({
   const chatLoadingMap = useChatStore((s) => s.chatLoadingMap);
   const pendingQuestionsMap = useChatStore((s) => s.pendingQuestionsMap);
 
-  // Confirmation dialog state
+  const [searchQuery, setSearchQuery] = useState('');
   const [deleteDialog, setDeleteDialog] = useState<{ id: string; title: string } | null>(null);
   const [renameDialog, setRenameDialog] = useState<{ id: string; title: string } | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
-  // Session actions
   const handleMarkDone = useCallback((sessionId: string) => {
     updateSession(sessionId, { status: 'done', completedAt: Date.now() });
     if (sessionId === activeSessionId && onActiveSessionDone) {
@@ -100,7 +120,6 @@ export default function TaskHubView({
     }
   }, [renameDialog, renameValue, updateSession]);
 
-  // Build terminal lookup map
   const terminalMap = useMemo(() => {
     const map = new Map<string, TerminalInfo>();
     for (const t of terminals) {
@@ -109,18 +128,14 @@ export default function TaskHubView({
     return map;
   }, [terminals]);
 
-  // Check if multiple projects exist (to show project tags)
   const hasMultipleProjects = useMemo(() => {
     const projects = new Set(sessions.map((s) => s.projectName));
     return projects.size > 1;
   }, [sessions]);
 
-  // Compute priority for each session and sort
   const sortedSessions = useMemo(() => {
-    // Exclude completed sessions — they belong in the Kanban/Projects view
     let activeSessions = sessions.filter((s) => s.status !== 'done');
 
-    // Filter by search query (matches title, agent name, or project name)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       activeSessions = activeSessions.filter((s) => {
@@ -137,7 +152,6 @@ export default function TaskHubView({
       const pendingSet = pendingQuestionsMap.get(session.id);
       const hasPending = pendingSet ? pendingSet.size > 0 : false;
       const messages = chatSessions?.get(session.id) || [];
-      // Check both chatLoadingMap AND last message streaming status
       const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
       const isLoading = (chatLoadingMap.get(session.id) ?? false)
         || (lastMsg?.role === 'assistant' && lastMsg.status === 'streaming');
@@ -164,7 +178,6 @@ export default function TaskHubView({
     return withPriority;
   }, [sessions, chatLoadingMap, pendingQuestionsMap, chatSessions, searchQuery, terminalMap]);
 
-  // Group by priority for section headers
   const groups = useMemo(() => {
     const result: { priority: SessionPriority; items: typeof sortedSessions }[] = [];
     let currentPriority: SessionPriority | null = null;
@@ -188,55 +201,64 @@ export default function TaskHubView({
     return result;
   }, [sortedSessions]);
 
-  if (sortedSessions.length === 0) {
-    return (
-      <div className="task-hub-empty">
-        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
-          No active tasks
-        </span>
-      </div>
-    );
-  }
-
   return (
-    <div className="task-hub-list">
-      {groups.map((group) => (
-        <div key={group.priority} className="task-hub-group">
-          <div className="task-hub-section-header">
-            {SECTION_LABELS[group.priority]}
-            <span className="task-hub-section-count">{group.items.length}</span>
-          </div>
-          {group.items.map((item, idx) => {
-            const terminal = terminalMap.get(item.session.agentId);
-            const messages = chatSessions?.get(item.session.id) || [];
+    <div className="task-hub-container">
+      <div className="task-hub-search">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search tasks"
+          aria-label="Search tasks"
+        />
+      </div>
 
-            return (
-              <TaskHubItem
-                key={item.session.id}
-                session={item.session}
-                priority={item.priority}
-                opacity={getItemOpacity(item.priority, idx, group.items.length)}
-                onClick={(id) => onSessionClick?.(id)}
-                isActive={item.session.id === activeSessionId}
-                agentLabel={terminal?.label || 'Unknown'}
-                agentAvatar={terminal?.avatar}
-                agentColor={terminal?.color || '#8b5cf6'}
-                projectName={item.session.projectName}
-                projectPath={item.session.projectPath}
-                showProject={hasMultipleProjects}
-                chatMessages={messages}
-                isLoading={item.isLoading}
-                hasPendingQuestion={item.hasPending}
-                onMarkDone={handleMarkDone}
-                onDelete={handleDeleteRequest}
-                onRename={handleRenameRequest}
-              />
-            );
-          })}
+      {sortedSessions.length === 0 ? (
+        <div className="task-hub-empty">
+          <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>
+            {searchQuery.trim() ? 'No matching tasks' : 'No active tasks'}
+          </span>
         </div>
-      ))}
+      ) : (
+        <div className="task-hub-list">
+          {groups.map((group) => (
+            <div key={group.priority} className="task-hub-group">
+              <div className="task-hub-section-header">
+                {SECTION_LABELS[group.priority]}
+                <span className="task-hub-section-count">{group.items.length}</span>
+              </div>
+              {group.items.map((item, idx) => {
+                const terminal = terminalMap.get(item.session.agentId);
+                const messages = chatSessions?.get(item.session.id) || [];
 
-      {/* Delete confirmation dialog */}
+                return (
+                  <TaskHubItem
+                    key={item.session.id}
+                    session={item.session}
+                    priority={item.priority}
+                    opacity={getItemOpacity(item.priority, idx, group.items.length)}
+                    onClick={(id) => onSessionClick?.(id)}
+                    isActive={item.session.id === activeSessionId}
+                    agentLabel={terminal?.label || 'Unknown'}
+                    agentAvatar={terminal?.avatar}
+                    agentColor={terminal?.color || '#8b5cf6'}
+                    projectName={item.session.projectName}
+                    projectPath={item.session.projectPath}
+                    showProject={hasMultipleProjects}
+                    chatMessages={messages}
+                    isLoading={item.isLoading}
+                    hasPendingQuestion={item.hasPending}
+                    onMarkDone={handleMarkDone}
+                    onDelete={handleDeleteRequest}
+                    onRename={handleRenameRequest}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
       {deleteDialog && (
         <div
           style={{
@@ -281,7 +303,6 @@ export default function TaskHubView({
         </div>
       )}
 
-      {/* Rename dialog */}
       {renameDialog && (
         <div
           style={{
