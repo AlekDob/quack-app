@@ -207,6 +207,8 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Token Stats panel blocks cross-project switch (~2-3s): `documentation/bugs/fix-token-stats-panel-blocks-project-switch.md`
 - Double `loadAgents` on session switch (deps cascade): `documentation/bugs/fix-double-loadagents-cross-project-session.md`
 - Stale closure in onPointerUp (lasso Office V2): `documentation/bugs/fix-stale-closure-pointerup-lasso.md`
+- Build EACCES su dist/ o src-tauri/target/ (file owned da root): `documentation/gotchas/gotcha-build-eacces-root-owned-artifacts.md`
+- Whiteboard Title tool — `texts` strippati da `filterByParent`: `documentation/bugs/fix-whiteboard-texts-stripped-by-filterbyparent.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
