@@ -11,7 +11,7 @@ tags: [providers, sdk, daemon, settings, brain-037, z.ai, minimax]
 ## When to apply
 
 When adding support for a new LLM provider that exposes an Anthropic-compatible
-endpoint (Z.AI, MiniMax, Kimi, Qwen, DeepSeek, custom company proxy, etc.) — or
+endpoint (Z.AI, MiniMax, Kimi, custom company proxy, etc.) — or
 when changing how Quack routes Claude Agent SDK calls to different providers.
 
 ## Key decisions
@@ -70,7 +70,7 @@ once. The radio in the settings UI just maps to setting this state.
 When a custom provider is active, the bundled `cli.js` SDK reports its OWN
 context window (200k), not the provider's. `ChatView` overrides
 `sessionTokens.contextWindow` with `provider.contextWindow` (1M for MiniMax,
-256k for Kimi/Qwen, 128k for DeepSeek) before passing to `StaminaBarBorder`.
+256k for Kimi, 200k for Z.AI) before passing to `StaminaBarBorder`.
 
 ## File touchpoints when adding a new provider
 
@@ -87,10 +87,37 @@ runtime via the Add Provider modal.
 - **Don't** set `ANTHROPIC_BASE_URL` at daemon spawn — breaks per-session overrides.
 - **Don't** keep `ANTHROPIC_API_KEY` set alongside `ANTHROPIC_AUTH_TOKEN` — providers
   reject it. The daemon explicitly `delete`s it inside the override block.
+- **Don't** forget to also clear `CLAUDE_CODE_OAUTH_TOKEN` — Anthropic Pro/Max
+  OAuth env wins over `AUTH_TOKEN`+`BASE_URL` and silently routes the request to
+  `api.anthropic.com`. The daemon clears+restores it inside the override block.
 - **Don't** extend `save_api_key` to add a name parameter — too invasive. Use the
   new namespaced commands.
 - **Don't** persist per-session overrides — they're meant to be ephemeral and
   cleared when the app reloads.
+- **Don't** send a custom model name (e.g. `MiniMax-M2.5`) directly to the SDK
+  — the binary's `ANTHROPIC_DEFAULT_*_MODEL` env override fires only when the
+  outgoing model string contains `"sonnet"` or `"haiku"`. Store the user's pick
+  in `activeProvider.activeModel` and force the friendly id to `sonnet46`; let
+  `buildProviderConfig` route all three tier vars to the picked model.
+- **Don't** trust the chat answer "I am Claude" as proof of routing. Anthropic-
+  compatible clones are trained on Claude transcripts and adopt the persona by
+  default. Verify via the JSONL session file (`"model":"MiniMax-M2.7"`) or via
+  the daemon's `PROVIDER_CONFIG_APPLIED:` diag line — see
+  `documentation/gotchas/gotcha-anthropic-compatible-identity-hallucination.md`.
+- **Don't** interpolate the result of `providerConfig && providerConfig.baseUrl
+  && providerConfig.authToken` into a log string. In JS, `a && b && c` returns
+  the last truthy operand — that's the API key. Cast to boolean (`!!x`) first.
+  See `documentation/gotchas/gotcha-js-template-literal-secret-leak.md`.
+
+## Diagnostics
+
+`~/.quack/daemon-diag.log` records two lines per query:
+
+- `PROVIDER_CONFIG: present=<bool> baseUrl=<url> sonnet=<id> usingProviderConfig=<bool>` (always)
+- `PROVIDER_CONFIG_APPLIED: baseUrl=<url> sonnetModel=<id> haikuModel=<id> oauthCleared=<bool>` (only when override fires)
+
+Useful when the chat answer disagrees with the configured provider — proves
+whether the override actually reached the daemon.
 
 ## Related Brain entries
 

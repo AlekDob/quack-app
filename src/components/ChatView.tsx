@@ -285,8 +285,8 @@ export default function ChatView({
   // Brain: 037-anthropic-compatible-providers
   // Resolve the effective contextWindow for the stamina bar / token usage modal.
   // Custom Anthropic-compatible providers may have non-200k context (e.g. MiniMax 1M,
-  // Kimi/Qwen 256k, DeepSeek 128k). Provider's value wins over the SDK-reported value
-  // since SDK reports the bundled CLI's window, not the provider's true limit.
+  // Kimi 256k). Provider's value wins over the SDK-reported value since SDK reports
+  // the bundled CLI's window, not the provider's true limit.
   const providerOverrideId = useSessionProviderOverride(internalSessionId);
   const activeProviderState = useSettingsStore(s => s.claude.activeProvider);
   const customProviders = useSettingsStore(s => s.claude.customProviders);

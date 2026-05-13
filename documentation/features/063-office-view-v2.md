@@ -86,10 +86,14 @@ OfficeLayout {
 - Stack capped at `UNDO_STACK_MAX = 50`.
 
 ### Canvas Pan / Zoom
+- **Plain left-drag su canvas vuoto in mode `select`** = pan (no Space necessario, Whiteboard-style, 2026-05-13)
 - Middle-click drag = pan
-- `Space + left-drag` = pan (cursor: grab/grabbing)
-- Wheel = zoom (MIN 0.3, MAX 2.0)
+- `Space + left-drag` = pan (cursor: grab/grabbing) — preservato per chi è abituato a Figma
+- **Wheel senza modifier** = pan (trackpad two-finger scroll o rotella, 2026-05-13)
+- **Cmd/Ctrl + wheel** o **pinch trackpad** (ctrlKey) = zoom (MIN 0.3, MAX 2.0)
 - Cmd+0 = reset viewport; Cmd+1 = zoom 0.8 / pan 50,50
+
+**Click vs drag disambiguation**: il plain-click su canvas vuoto setta sia `emptyClickRef` sia `panStartRef`. Su `pointermove` con delta >2px, `panStartRef.didDrag = true` e il pan diventa attivo; su `pointerup`, se `didDrag` è ancora `false`, scatta la logica di deselezione (threshold 4px). Stesso pattern di `FeatureMapCanvas` (Whiteboard).
 
 ### Notebook-Paper Grid Background (2026-05-12)
 Lo sfondo del canvas (`.office-canvas`) ospita un layer `.office-canvas__grid` con un pattern di quadretti tipo pagina di quaderno. Il layer è posizionato `absolute; inset: 0; pointer-events: none` e renderizzato come primo figlio del container, **sotto** SVG e cards (z-ordering naturale via source order).
@@ -195,7 +199,7 @@ Shortcuts cross-platform (Mac/Windows: `metaKey || ctrlKey`) gestiti nel `useEff
 | Gesto | Cosa fa |
 |---|---|
 | **Shift + drag su canvas vuoto** (mode `select`) | Disegna lasso → seleziona tutti gli elementi (rooms, postit, sticker, group, text) il cui center è dentro il rect |
-| **Drag normale su canvas vuoto** (mode `select`) | Niente (no pan, no lasso). Per pan: middle-click o Space+drag |
+| **Drag normale su canvas vuoto** (mode `select`) | **Pan canvas** (no Space necessario, 2026-05-13). Threshold 2px per distinguere da plain click. |
 | **Click semplice su canvas vuoto** | Deseleziona tutto (se c'è una selezione attiva). Verificato con drag-threshold `<4px` per non confondersi con un drag accidentale |
 | **Mode `lasso` esplicita (tasto `2`)** | Lasso permanente — drag su canvas vuoto disegna lasso. Auto-exit a select dopo finalize |
 | **Click su un elemento** | Drag = sposta l'elemento. Alt+drag = duplica-while-dragging (clone segue il cursore, originale resta fermo) |
@@ -226,9 +230,11 @@ Shortcuts cross-platform (Mac/Windows: `metaKey || ctrlKey`) gestiti nel `useEff
 | `Cmd+Z` / `Cmd+Shift+Z` | Undo / Redo |
 | `Cmd+1` | Fit viewport to content |
 | `Cmd+0` | Reset viewport (zoom 1, pan 0,0) |
-| `Space + left-drag` | Pan canvas |
+| Left-drag canvas vuoto (mode `select`) | Pan canvas (no Space necessario) |
+| `Space + left-drag` | Pan canvas (preservato, Figma-style) |
 | Middle-click drag | Pan canvas |
-| Wheel | Zoom (0.3–2.0) |
+| Wheel (no modifier) | Pan canvas (trackpad two-finger / rotella) |
+| `Cmd/Ctrl + Wheel` o pinch trackpad | Zoom (0.3–2.0) |
 
 ### Working pulse on room cards (2026-05-12)
 Quando almeno un agente della stanza è in stato "Working" (P2 del Task Hub — `chatLoadingMap.get(sessionId) === true` OR ultimo messaggio `status === 'streaming'`), la `office-room-card` riceve la classe `office-room-card--working` e mostra uno sfondo gradient arancione (`#FF6B35` ~5-22% alpha) animato in loop a 6s (`@keyframes office-card-working-sweep`). Border arancione `rgba(255, 107, 53, 0.45)`.

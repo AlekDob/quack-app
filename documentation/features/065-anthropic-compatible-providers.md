@@ -4,16 +4,16 @@ project: quack-app
 slug: anthropic-compatible-providers
 created: 2026-05-13
 last_verified: 2026-05-13
-tags: [providers, sdk, z.ai, minimax, kimi, qwen, deepseek, daemon, settings, brain-037]
+tags: [providers, sdk, z.ai, minimax, kimi, daemon, settings, brain-037]
 ---
 
 # 065 — Anthropic-compatible Providers
 
 Multi-provider system that routes Claude Agent SDK sessions through any
-Anthropic-compatible endpoint (z.ai/GLM, MiniMax M2, Kimi, Qwen DashScope,
-DeepSeek/SiliconFlow, or any custom proxy). Provider is per-session with a
-global default; API keys are namespaced; per-query env injection into the
-persistent daemon — no env-at-spawn (deviation from the original spec).
+Anthropic-compatible endpoint (z.ai/GLM, MiniMax M2, Kimi, or any custom
+proxy). Provider is per-session with a global default; API keys are
+namespaced; per-query env injection into the persistent daemon — no
+env-at-spawn (deviation from the original spec).
 
 ## Status
 
@@ -31,13 +31,13 @@ persistent daemon — no env-at-spawn (deviation from the original spec).
 | File | Role |
 |---|---|
 | `src/types/providers.ts` | Type definitions: `ProviderPreset`, `CustomProvider`, `ActiveProviderState`, `QuackProviderConfig`, `TestConnectionResult`. |
-| `src/constants/providerPresets.ts` | 6 built-in presets (Anthropic, Z.AI, MiniMax, Kimi, Qwen, DeepSeek) + `findPresetById`. |
+| `src/constants/providerPresets.ts` | 4 built-in presets (Anthropic, Z.AI, MiniMax, Kimi) + `findPresetById`. Qwen/DeepSeek removed — users add them as custom providers and refresh `/v1/models`. |
 | `src/services/providerService.ts` | CRUD: `listAllProviders`, `addCustomProvider`, `updateCustomProvider`, `deleteCustomProvider`, `saveProviderToken`, `getProviderToken`, `testConnection`. Delete-active fallback → `{kind:'anthropic'}`. |
 | `src/services/providerEnvBuilder.ts` | `buildProviderConfig(activeProvider, sessionOverride?) → QuackProviderConfig | null`. Override > default; Anthropic preset returns null. |
 | `src/services/sessionProviderOverrides.ts` | In-memory `Map<sessionId, providerId>` for per-session overrides (NOT persisted). `useSessionProviderOverride` hook via `useSyncExternalStore`. |
 | `src/services/claudeSDK.ts` | `getActiveProviderConfig(sessionId?)` — entry point used by every invoke site to resolve the config (override > default). |
 | `src/stores/settingsStore.ts` | `ClaudeSettings.activeProvider`, `ClaudeSettings.customProviders`. v12→v13 migration preserves legacy `provider="custom"` as `customProviders[0]` with id `legacy-custom`. |
-| `src-tauri/src/providers.rs` | `test_provider_connection` command: POST `/v1/messages` with `max_tokens=1`, Bearer auth, 5s timeout. |
+| `src-tauri/src/providers.rs` | `test_provider_connection` command (POST `/v1/messages` with `max_tokens=1`, Bearer auth, 5s timeout) **and** `fetch_provider_models` (GET `/v1/models`, dual auth headers, parses `data[].id` from both Anthropic and OpenAI response shapes). |
 | `src-tauri/src/preferences.rs` | New commands `save_provider_api_key` / `get_provider_api_key` (namespaced, base64). Additive — leaves `openai_api_key` schema unchanged. |
 | `src-tauri/src/claude_cli.rs` | `ClaudeCliRequest.provider_config: Option<serde_json::Value>`. Injected into the daemon query JSON. |
 | `src-tauri/node-sdk/stream-daemon.js` | `handleQuery` extends env-override block: when `providerConfig` is present, sets `ANTHROPIC_BASE_URL` / `AUTH_TOKEN` / `DEFAULT_SONNET_MODEL` / `DEFAULT_HAIKU_MODEL` / `MODEL`, clears `ANTHROPIC_API_KEY` (Bearer wins), restores in `finally`. |
@@ -67,6 +67,81 @@ persistent daemon — no env-at-spawn (deviation from the original spec).
 | 10 | Rust `send_message_via_daemon` | embeds `providerConfig` into the daemon query JSON. |
 | 11 | `stream-daemon.js handleQuery` | saves originals, sets `ANTHROPIC_BASE_URL` / `AUTH_TOKEN` / `DEFAULT_*_MODEL`, deletes `ANTHROPIC_API_KEY`, runs SDK query, restores originals in `finally`. |
 | 12 | UI | StaminaBar uses provider's `contextWindow` (e.g. 1M for MiniMax). Badge shows provider + model. |
+
+## Live model list (`/v1/models`)
+
+The bundled `sonnetModel` / `haikuModel` / `defaultModel` on each preset is just
+a bootstrap — the **real** model list is fetched on-demand from the provider's
+own `/v1/models` endpoint and cached locally. The user picks any model from
+that list and the daemon routes the request to it.
+
+| # | Component | Action |
+|---|---|---|
+| 1 | user | Settings → provider card → "Refresh models" (only enabled if an API key is saved). |
+| 2 | `providerService.fetchProviderModels` | invokes Rust `fetch_provider_models(baseUrl, token)`. |
+| 3 | Rust | `GET {baseUrl}/v1/models` with **both** `Authorization: Bearer <token>` and `x-api-key: <token>` headers (covers Anthropic-shape and OpenAI-shape clones in a single call). Parses `data[].id` from the response. 10s timeout. |
+| 4 | `providerService` | writes `claude.providerModelCache[providerId] = { models, fetchedAt }` on the settings store. |
+| 5 | `ProviderCard` | re-renders with model chips + count + last-refresh timestamp. |
+| 6 | `ChatSettingsMenu` Model dropdown | when active provider is custom AND `providerModelCache[id]` is non-empty, replaces the bundled tier dropdown with the full live list. Selection writes to `activeProvider.activeModel`. |
+| 7 | user | sends a prompt. |
+| 8 | `providerEnvBuilder.buildProviderConfig` | if `activeModel` is set, routes **all three** tier env vars (`SONNET`/`HAIKU`/`MODEL`) to it. The friendly id sent by the app is forced to `sonnet46` (so the request body's `model` contains "sonnet" — required to trigger `ANTHROPIC_DEFAULT_SONNET_MODEL` env override on the binary). |
+
+### Why both auth headers in `fetch_provider_models`
+
+Anthropic-compatible endpoints split into two camps:
+
+- **Anthropic-shape**: `Authorization: Bearer <token>` + `anthropic-version` header. Returns `{data:[{id, display_name, type:"model"}], has_more, first_id, last_id}`.
+- **OpenAI-shape clones**: `x-api-key: <token>` or `Authorization: Bearer <token>`. Returns `{object:"list", data:[{id, object:"model"}]}`.
+
+Both expose `data[].id`, so a single JSON path works. Sending both headers
+avoids per-provider branching.
+
+### Why `activeModel` and not the bundled slots
+
+The SDK env override fires only if the **outgoing model name contains the
+substring "sonnet" or "haiku"**. So when the user picks e.g. `MiniMax-M2.5`
+from the live list, we cannot just send `MiniMax-M2.5` as the model — the
+binary wouldn't know to substitute. Instead:
+
+1. UI saves the choice to `activeProvider.activeModel = "MiniMax-M2.5"`.
+2. UI **also** forces the friendly id back to `sonnet46`.
+3. `buildProviderConfig` reads `activeModel` and writes it to **all** three
+   tier env vars (`SONNET`/`HAIKU`/`MODEL`).
+4. Daemon spawns the binary with those env vars. The binary sends
+   `"model":"claude-sonnet-4-6"` (which matches "sonnet"), the binary's env
+   override rewrites it to `MiniMax-M2.5`, and the request goes to the
+   provider with the right model.
+
+## Identity hallucination caveat
+
+Anthropic-compatible clones (MiniMax, Z.AI/GLM, Kimi) routinely answer
+"I am Claude Sonnet 4.6" or similar when asked their identity. They are
+trained on Claude transcripts and adopt the persona by default. **Do not
+debug this as a routing bug** — verify provider routing through the JSONL
+session file (`~/.claude/projects/.../<sessionId>.jsonl`) whose `model`
+field is the provider's own echo (e.g. `"model":"MiniMax-M2.7"`), or
+through the daemon diag log (`PROVIDER_CONFIG_APPLIED: baseUrl=...`).
+See `documentation/gotchas/gotcha-anthropic-compatible-identity-hallucination.md`.
+
+## Diag logging
+
+Every query writes two lines to `~/.quack/daemon-diag.log`:
+
+```
+PROVIDER_CONFIG: present=true|false baseUrl=... sonnet=... usingProviderConfig=true|false
+PROVIDER_CONFIG_APPLIED: baseUrl=... sonnetModel=... haikuModel=... oauthCleared=true|false
+```
+
+`PROVIDER_CONFIG_APPLIED` only appears when the override actually fires.
+`oauthCleared=true` means `CLAUDE_CODE_OAUTH_TOKEN` was present at query
+start and the daemon cleared it for the duration of this query
+(Anthropic Pro/Max OAuth would otherwise silently win over `BASE_URL` +
+`AUTH_TOKEN`).
+
+⚠️ **Never interpolate `usingProviderConfig` (or any short-circuit `&&` result)
+directly into a log string** — `a && b && c` returns the last truthy operand
+(here, the API key), not a boolean. Always `!!cast` first. See
+`documentation/gotchas/gotcha-js-template-literal-secret-leak.md`.
 
 ## Architectural deviation from spec
 
@@ -106,9 +181,17 @@ are preserved (NOT deleted) for rollback safety.
 `// Brain: 037-anthropic-compatible-providers` appears above:
 - `buildProviderConfig` in `providerEnvBuilder.ts`
 - the `providerConfig` block in `stream-daemon.js handleQuery`
-- v12→v13 migration in `settingsStore.ts`
+- v12→v13 migration + `providerModelCache` idempotent init in `settingsStore.ts`
 - `ClaudeCliRequest.provider_config` in `claude_cli.rs`
 - 4 invoke sites in `App.tsx` + 1 in `usePopoutKanbanChat.ts`
 - the new section in `ClaudeCodeSettings.tsx`
 - all UI components under `src/components/settings/categories/providers/`
-- all session-scoped chat components under `src/components/chat/`
+- `fetch_provider_models` + `test_provider_connection` in `providers.rs`
+- `getActiveModelDisplayName` in `claudeSDK.ts`
+- the Custom Model + Model dropdown blocks in `ChatSettingsMenu.tsx`
+
+## Visual flow
+
+See `pattern-anthropic-compatible-providers.mmd` for the full sequence
+diagram (UI → Refresh → /v1/models → cache → ChatSettings → activeModel
+→ daemon env override → provider).

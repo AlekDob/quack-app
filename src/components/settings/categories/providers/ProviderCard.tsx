@@ -287,11 +287,6 @@ export default function ProviderCard({ provider, isActive, onSetDefault, onDelet
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 14, fontSize: 10, color: 'var(--text-secondary)', opacity: 0.6 }}>
-        {provider.sonnetModel && <span>sonnet: {provider.sonnetModel}</span>}
-        {provider.haikuModel && <span>haiku: {provider.haikuModel}</span>}
-        <span>context: {(provider.contextWindow / 1000).toFixed(0)}k</span>
-      </div>
     </div>
   );
 }

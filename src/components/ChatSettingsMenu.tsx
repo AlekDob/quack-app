@@ -322,7 +322,7 @@ export default function ChatSettingsMenu({
                     fontSize: 10, color: 'var(--text-secondary)', opacity: 0.7,
                     padding: '4px 0 0', lineHeight: 1.4,
                   }}>
-                    Configure a custom provider in Settings → Claude Code to add z.ai, MiniMax, Kimi, Qwen or DeepSeek.
+                    Configure a custom provider in Settings → Claude Code to add z.ai, MiniMax, Kimi or any other Anthropic-compatible endpoint.
                   </div>
                 )}
                 {activeProviderId !== 'anthropic' && activeProviderObj && (

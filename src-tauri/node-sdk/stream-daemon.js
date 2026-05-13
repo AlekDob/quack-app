@@ -375,7 +375,11 @@ async function handleQuery(cmd) {
   // Anthropic-compatible provider (z.ai, MiniMax, Kimi, Qwen, DeepSeek, custom proxy).
   // providerConfig wins over the legacy provider/providerBaseUrl path.
   const usingProviderConfig = providerConfig && providerConfig.baseUrl && providerConfig.authToken;
-  diag(`PROVIDER_CONFIG: present=${!!providerConfig} baseUrl=${providerConfig?.baseUrl || '-'} sonnet=${providerConfig?.sonnetModel || '-'} usingProviderConfig=${usingProviderConfig}`);
+  // Brain: gotcha-js-template-literal-secret-leak
+  // `usingProviderConfig` is the result of `a && b && c` — in JS that returns the
+  // last truthy operand, NOT a boolean. If we interpolate it directly the API key
+  // (the third operand) is written to disk in plaintext. ALWAYS cast to boolean.
+  diag(`PROVIDER_CONFIG: present=${!!providerConfig} baseUrl=${providerConfig?.baseUrl || '-'} sonnet=${providerConfig?.sonnetModel || '-'} usingProviderConfig=${!!usingProviderConfig}`);
   if (usingProviderConfig) {
     process.env.ANTHROPIC_BASE_URL = providerConfig.baseUrl;
     process.env.ANTHROPIC_AUTH_TOKEN = providerConfig.authToken;

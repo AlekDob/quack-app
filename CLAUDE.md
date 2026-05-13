@@ -209,6 +209,8 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Stale closure in onPointerUp (lasso Office V2): `documentation/bugs/fix-stale-closure-pointerup-lasso.md`
 - Build EACCES su dist/ o src-tauri/target/ (file owned da root): `documentation/gotchas/gotcha-build-eacces-root-owned-artifacts.md`
 - Whiteboard Title tool — `texts` strippati da `filterByParent`: `documentation/bugs/fix-whiteboard-texts-stripped-by-filterbyparent.md`
+- Anthropic-compatible clones — identity hallucination ("I am Claude"): `documentation/gotchas/gotcha-anthropic-compatible-identity-hallucination.md`
+- JS `a && b && c` interpolato in template literal — secret leak: `documentation/gotchas/gotcha-js-template-literal-secret-leak.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
@@ -219,7 +221,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 
 **Key patterns**: `documentation/patterns/` — search by name before implementing similar features.
 - Multi-provider LLM: `documentation/patterns/pattern-multi-provider-llm.md`
-- Anthropic-compatible providers (z.ai/MiniMax/Kimi/Qwen/DeepSeek): `documentation/patterns/pattern-anthropic-compatible-providers.md`
+- Anthropic-compatible providers (z.ai/MiniMax/Kimi): `documentation/patterns/pattern-anthropic-compatible-providers.md` + `.mmd` (sequence diagram)
 - Automation layer: `documentation/patterns/pattern-automation-layer.md`
 - Tab system: `documentation/patterns/pattern-tab-system-singleton.md`
 - Dark theme CSS + accent tokens: `documentation/patterns/pattern-dark-theme-css-values.md`

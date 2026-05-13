@@ -117,11 +117,6 @@ export async function fetchProviderModels(providerId: string): Promise<FetchMode
   return result;
 }
 
-export function getCachedProviderModels(providerId: string): string[] {
-  const cache = useSettingsStore.getState().claude.providerModelCache ?? {};
-  return cache[providerId]?.models ?? [];
-}
-
 export function deleteCustomProvider(id: string): void {
   const store = useSettingsStore.getState();
   const existing = store.claude.customProviders ?? [];

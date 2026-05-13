@@ -4,7 +4,7 @@ project: quack-app
 stack: Tauri (Rust + React)
 created: 2026-04-04
 last_verified: 2026-04-04
-tags: [settings, unified-settings, preferences, configuration]
+tags: [settings, unified-settings, preferences, configuration, providers]
 ---
 
 ## Unified Settings Panel
@@ -19,7 +19,11 @@ tags: [settings, unified-settings, preferences, configuration]
 | Component | src/components/settings/SettingsContent.tsx | `SettingsContent` -- scrollable content wrapper for active category |
 | Component | src/components/settings/SettingsIcon.tsx | `SettingsIcon` -- SVG icon per category |
 | Component | src/components/settings/categories/GeneralSettings.tsx | `GeneralSettings` -- profile name, GIF reactions, PiP, quack sound |
-| Component | src/components/settings/categories/ClaudeCodeSettings.tsx | `ClaudeCodeSettings` -- LLM provider, auth, BTW model, Bedrock, memory, agent teams |
+| Component | src/components/settings/categories/ClaudeCodeSettings.tsx | `ClaudeCodeSettings` -- LLM provider, auth, BTW model, Bedrock, memory, agent teams, Anthropic-compatible providers section |
+| Component | src/components/settings/categories/providers/ProviderManager.tsx | `ProviderManager` -- list of built-in + custom Anthropic-compatible providers with add/edit/delete |
+| Component | src/components/settings/categories/providers/ProviderCard.tsx | `ProviderCard` -- per-provider card: API key field, Set as default, Test connection, Refresh models, cached model chips |
+| Component | src/components/settings/categories/providers/ProviderTestButton.tsx | `ProviderTestButton` -- one-shot POST /v1/messages probe with latency + status display |
+| Component | src/components/settings/categories/providers/ProviderAddModal.tsx | `ProviderAddModal` -- form for adding/duplicating a custom provider (baseUrl + context window validation) |
 | Component | src/components/settings/categories/AIAssistantSettings.tsx | `AIAssistantSettings` -- OpenAI API key, model selection (GPT-4o-mini/4o/3.5), image model |
 | Component | src/components/settings/categories/AgentModesSettings.tsx | `AgentModesSettings`, `ModePresetCard` -- per-mode model/effort configuration for 5 modes |
 | Component | src/components/settings/categories/SecondBrainSettings.tsx | `SecondBrainSettings` -- brain path, open in Finder/Obsidian |
@@ -46,6 +50,10 @@ tags: [settings, unified-settings, preferences, configuration]
 | Config | src/constants/typography.ts | `FONT_SIZE_PRESETS`, `UI_FONT_OPTIONS`, `MONO_FONT_OPTIONS`, `DEFAULT_TYPOGRAPHY`, `applyTypography()`, `buildCustomScale()`, `resolveScale()`, `DEFAULT_CUSTOM_FONT_SIZE`, `MIN_CUSTOM_FONT_SIZE`, `MAX_CUSTOM_FONT_SIZE` |
 | Config | src/config/features.ts | `getLicenseData()`, `clearLicenseData()` -- license data persistence |
 | Service | src/services/ollamaService.ts | `checkOllamaRunning()`, `fetchOllamaModels()`, `getOllamaModelOptions()` |
+| Service | src/services/providerService.ts | `listAllProviders()`, `getProviderById()`, `saveProviderToken()`, `getProviderToken()`, `testConnection()`, `fetchProviderModels()`, `getCachedProviderModels()`, `addCustomProvider()`, `updateCustomProvider()`, `deleteCustomProvider()` |
+| Service | src/services/providerEnvBuilder.ts | `buildProviderConfig()` -- resolves active provider + session override into `QuackProviderConfig` (baseUrl/authToken/models/contextWindow) |
+| Service | src/services/sessionProviderOverrides.ts | `setSessionProviderOverride()`, `getSessionProviderOverride()`, `clearSessionProviderOverride()`, `useSessionProviderOverride()` -- in-memory per-session provider switch (not persisted) |
+| Config | src/constants/providerPresets.ts | `BUILTIN_PRESETS` (Anthropic, Z.AI, MiniMax, Kimi), `ANTHROPIC_PRESET_ID`, `findPresetById()` |
 | Service | src/services/brainFileService.ts | `getBrainRootPath()`, `setBrainCustomPath()`, `getCustomBrainPath()`, `initBrainStructure()`, `openBrainFolder()` |
 | Service | src/services/modelService.ts | `getModelOptions()`, `getModelId()`, `getDefaultModel()` |
 | Service | src/services/githubReleases.ts | `fetchLatestRelease()`, `getTimeSinceLastCheck()` |
@@ -85,7 +93,7 @@ tags: [settings, unified-settings, preferences, configuration]
 - `normalizeModelId(model: string) -> string` -- migrates legacy model names (sonnet -> sonnet45)
 
 ### State
-- `claude`: ClaudeSettings -- API key, model, provider, effort, BTW model, Bedrock override (global)
+- `claude`: ClaudeSettings -- API key, model, provider, effort, BTW model, Bedrock override, `activeProvider` (Anthropic | Bedrock | Custom), `customProviders[]`, `providerModelCache` (per-provider `/v1/models` cache) (global)
 - `terminal`: TerminalSettings -- shell, font, cursor, scrollback (global)
 - `general`: GeneralSettings -- userName, autoSave, notifications, sounds, GIF reactions, Giphy key (global)
 - `agentModePresets`: AgentModePresets -- per-mode model/effort/thinking config for bypass/plan/ask/debug/chat (global)
@@ -97,18 +105,18 @@ tags: [settings, unified-settings, preferences, configuration]
 - `shortcuts`: Record<ShortcutActionId, Shortcut> -- customizable keyboard bindings (global, shortcutsStore)
 
 ### External Dependencies
-- Tauri invoke commands: `get_claude_env_vars`, `set_claude_env_var`, `get_claude_settings_flag`, `set_claude_settings_flag`, `get_ai_api_key`, `save_api_key`, `test_api_connection`, `list_available_shells`, `set_default_shell`, `get_background_image`, `set_background_image`, `get_remote_config`, `set_remote_enabled`, `regenerate_remote_token`, `get_mobile_notifications_enabled`, `set_mobile_notifications_enabled`, `get_telegram_config`, `set_telegram_config`, `send_telegram_test`, `deactivate_license`, `get_home_directory`, `read_file_content`, `write_file_content`, `get_local_ip`, `get_local_hostname`, `get_ai_model`, `set_ai_model`, `get_image_model`, `set_image_model`
+- Tauri invoke commands: `get_claude_env_vars`, `set_claude_env_var`, `get_claude_settings_flag`, `set_claude_settings_flag`, `get_ai_api_key`, `save_api_key`, `test_api_connection`, `save_provider_api_key`, `get_provider_api_key`, `test_provider_connection`, `fetch_provider_models`, `list_available_shells`, `set_default_shell`, `get_background_image`, `set_background_image`, `get_remote_config`, `set_remote_enabled`, `regenerate_remote_token`, `get_mobile_notifications_enabled`, `set_mobile_notifications_enabled`, `get_telegram_config`, `set_telegram_config`, `send_telegram_test`, `deactivate_license`, `get_home_directory`, `read_file_content`, `write_file_content`, `get_local_ip`, `get_local_hostname`, `get_ai_model`, `set_ai_model`, `get_image_model`, `set_image_model`
 - Tauri Store plugin: `.quack-ui-prefs.dat` for PiP and sound preferences
 - Tauri Dialog plugin: directory picker for Brain custom path
 - Tauri Shell plugin: open external URLs (Gumroad, GitHub, Discord, docs)
-- Zustand persist middleware: `settings-storage` (localStorage), version 7 with migration chain
+- Zustand persist middleware: `settings-storage` (localStorage), version 13 with idempotent migration chain
 
 ### UX Notes
 - **Remote API > Enable Remote Access**: changing this toggle requires a Quack restart to apply the new network binding
 - **Remote API > Port**: changing the port requires a Quack restart — the HTTP server binds at launch time and cannot rebind at runtime
 
 ### Config
-- `settings-storage` version: 11 (migration chain v0-v11 handling legacy model IDs, debug mode, BTW, chat mode, ask mode, typography, accent color, sonnet45 deprecation, custom font size, Opus 4.6→4.7 + effort `medium`→`xhigh` bump)
+- `settings-storage` version: 13 (migration chain v0-v13 — legacy model IDs, debug mode, BTW, chat mode, ask mode, typography, accent color, sonnet45 deprecation, custom font size, Opus 4.6→4.7 + effort `medium`→`xhigh` bump, toolSearchMode, Anthropic-compatible `activeProvider`+`customProviders`+`providerModelCache` idempotent init)
 - Default model: `opus47` (Supabase ID format)
 - Default BTW model: `haiku45`
 - Default effort: model-dependent via `defaultEffortForModel()` in `src/services/modelService.ts` — `xhigh` for Opus 4.7, `high` for Opus 4.6 / Sonnet 4.6, `medium` for everything else. Used as fallback in all `App.tsx` call sites (no more hardcoded `'medium'` — since 0.9.3)

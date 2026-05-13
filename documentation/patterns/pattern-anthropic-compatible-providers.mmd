@@ -1,0 +1,55 @@
+%% Provider live-model flow — feature 037 / 065
+%% Brain: 037-anthropic-compatible-providers
+sequenceDiagram
+    autonumber
+    actor User
+    participant UI as ProviderCard
+    participant Svc as providerService
+    participant Rust as Tauri (providers.rs)
+    participant Provider as Provider API<br/>(z.ai / MiniMax / Kimi)
+    participant Store as settingsStore<br/>(zustand persist)
+    participant Chat as ChatSettingsMenu
+    participant Env as providerEnvBuilder
+    participant App as App.tsx<br/>send_message
+    participant Daemon as stream-daemon.js
+    participant SDK as claude-agent-sdk<br/>+ claude binary
+
+    Note over User,UI: Phase 1 — Refresh model list
+    User->>UI: click "Refresh models"
+    UI->>Svc: fetchProviderModels(providerId)
+    Svc->>Rust: invoke fetch_provider_models(baseUrl, token)
+    Rust->>Provider: GET /v1/models<br/>Authorization: Bearer + x-api-key
+    Provider-->>Rust: { data: [{ id, ... }, ...] }
+    Rust-->>Svc: { ok, models: [...] }
+    Svc->>Store: providerModelCache[id] = { models, fetchedAt }
+    Store-->>UI: re-render with model chips
+
+    Note over User,Chat: Phase 2 — Pick a model in chat
+    User->>Chat: open ChatSettingsMenu
+    Chat->>Store: read providerModelCache[activeId]
+    Chat-->>User: Model dropdown shows live list
+    User->>Chat: select e.g. "MiniMax-M2.5"
+    Chat->>Store: activeProvider.activeModel = "MiniMax-M2.5"
+    Chat->>Store: model = "sonnet46"<br/>(forced — must contain "sonnet")
+
+    Note over User,Daemon: Phase 3 — Send a prompt
+    User->>App: send message
+    App->>Env: getActiveProviderConfig(sessionId)
+    Env->>Store: read activeProvider + session override
+    Env-->>App: QuackProviderConfig {<br/>  baseUrl, authToken,<br/>  sonnetModel = "MiniMax-M2.5",<br/>  haikuModel = "MiniMax-M2.5",<br/>  defaultModel = "MiniMax-M2.5",<br/>  contextWindow: 1_000_000<br/>}
+    App->>Daemon: invoke send_message_via_sdk_streaming<br/>{ ..., model: "sonnet46", providerConfig }
+    Daemon->>Daemon: save env originals<br/>(BASE_URL, AUTH_TOKEN, API_KEY,<br/>DEFAULT_SONNET, DEFAULT_HAIKU,<br/>MODEL, OAUTH_TOKEN)
+    Daemon->>Daemon: set ANTHROPIC_BASE_URL,<br/>AUTH_TOKEN, DEFAULT_SONNET_MODEL,<br/>DEFAULT_HAIKU_MODEL, MODEL<br/>delete API_KEY + OAUTH_TOKEN
+    Daemon->>Daemon: diag log:<br/>PROVIDER_CONFIG_APPLIED:<br/>baseUrl=... sonnetModel=...<br/>oauthCleared=false
+
+    Daemon->>SDK: query({ model: "claude-sonnet-4-6", ... })
+    SDK->>SDK: env override:<br/>model contains "sonnet" →<br/>swap to MiniMax-M2.5
+    SDK->>Provider: POST /v1/messages<br/>{ model: "MiniMax-M2.5", ... }<br/>Authorization: Bearer <token>
+    Provider-->>SDK: stream of events<br/>(echoes "model":"MiniMax-M2.5")
+    SDK-->>Daemon: events
+    Daemon-->>App: events with usage.model = "MiniMax-M2.5"
+    App->>Store: settings.modelDisplayName = "MiniMax-M2.5"
+    App-->>User: badge + chip show real model
+
+    Note over Daemon: finally block — restore originals
+    Daemon->>Daemon: restore all env vars<br/>(persistent daemon, next query starts clean)

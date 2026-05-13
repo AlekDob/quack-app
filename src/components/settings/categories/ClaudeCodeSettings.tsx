@@ -285,7 +285,7 @@ export default function ClaudeCodeSettings() {
       {/* Anthropic-compatible Providers — Brain: 037-anthropic-compatible-providers */}
       <SectionHeader
         title="Anthropic-compatible Providers"
-        description="Route Claude Agent SDK sessions through z.ai, MiniMax, Kimi, Qwen and other Anthropic-compatible endpoints."
+        description="Route Claude Agent SDK sessions through z.ai, MiniMax, Kimi or any other Anthropic-compatible endpoint."
       />
       <div className="settings-group">
         <ProviderManager />
