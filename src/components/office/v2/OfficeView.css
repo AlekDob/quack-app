@@ -606,6 +606,18 @@
   background: #0f0f1a;
 }
 
+/* Notebook-paper grid: translates with pan, scales with zoom.
+   Inline style on the element supplies background-size / position. */
+.office-canvas__grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-repeat: repeat;
+}
+
 .office-canvas__svg,
 .office-canvas__cards {
   position: absolute;

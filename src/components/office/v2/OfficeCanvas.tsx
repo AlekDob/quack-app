@@ -66,6 +66,7 @@ interface Props {
 
 const MIN_ZOOM = 0.3;
 const MAX_ZOOM = 2;
+const GRID_BASE_PX = 40;
 
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -122,7 +123,7 @@ function OfficeCanvasImpl(props: Props) {
   const [lasso, setLasso] = useState<LassoState | null>(null);
   const [autoEditTextId, setAutoEditTextId] = useState<string | null>(null);
 
-  const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number; didDrag: boolean } | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const annotRef = useRef<AnnotationInteraction | null>(null);
   const hasAutoFitRef = useRef(false);
@@ -149,8 +150,13 @@ function OfficeCanvasImpl(props: Props) {
 
   const onWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
-    const delta = -e.deltaY * 0.001;
-    setViewport(v => ({ ...v, zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.zoom + delta)) }));
+    // Pinch-zoom: ctrlKey is set by trackpad pinch gesture (also Cmd/Ctrl + wheel)
+    if (e.ctrlKey || e.metaKey) {
+      setViewport(v => ({ ...v, zoom: Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.zoom - e.deltaY * 0.002)) }));
+    } else {
+      // Trackpad two-finger scroll OR mouse wheel: pan
+      setViewport(v => ({ ...v, panX: v.panX - e.deltaX, panY: v.panY - e.deltaY }));
+    }
   }, []);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
@@ -158,7 +164,7 @@ function OfficeCanvasImpl(props: Props) {
     if (e.button === 1 || (spaceHeld && e.button === 0)) {
       e.preventDefault();
       setPanning(true);
-      panStartRef.current = { x: e.clientX, y: e.clientY, panX: viewport.panX, panY: viewport.panY };
+      panStartRef.current = { x: e.clientX, y: e.clientY, panX: viewport.panX, panY: viewport.panY, didDrag: false };
       return;
     }
 
@@ -235,9 +241,12 @@ function OfficeCanvasImpl(props: Props) {
       return;
     }
 
-    // Plain click on empty canvas in select mode → potential deselect (verified on pointerup).
+    // Plain click on empty canvas in select mode → start pan, and remember pointerdown
+    // position so a no-drag release deselects (Whiteboard-style: pan without holding Space).
     if (mode === 'select' && !e.shiftKey) {
       emptyClickRef.current = { x: e.clientX, y: e.clientY };
+      setPanning(true);
+      panStartRef.current = { x: e.clientX, y: e.clientY, panX: viewport.panX, panY: viewport.panY, didDrag: false };
     }
   }, [spaceHeld, viewport.panX, viewport.panY, mode, activeSticker, screenToCanvas, props]);
 
@@ -247,6 +256,9 @@ function OfficeCanvasImpl(props: Props) {
       const start = panStartRef.current;
       const dx = e.clientX - start.x;
       const dy = e.clientY - start.y;
+      if (!start.didDrag && (Math.abs(dx) > 2 || Math.abs(dy) > 2)) {
+        start.didDrag = true;
+      }
       setViewport(v => ({
         ...v,
         panX: start.panX + dx,
@@ -323,9 +335,14 @@ function OfficeCanvasImpl(props: Props) {
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     if (panning) {
+      const didDrag = panStartRef.current?.didDrag ?? false;
       setPanning(false);
       panStartRef.current = null;
-      return;
+      // If we never actually moved, treat this as a plain click (deselect path below).
+      if (didDrag) {
+        emptyClickRef.current = null;
+        return;
+      }
     }
 
     // Read from refs to avoid stale-closure bugs (state may have been updated
@@ -703,6 +720,16 @@ function OfficeCanvasImpl(props: Props) {
       : mode === 'text' ? 'text'
       : 'default';
 
+  // Screen-space grid: cell size is constant in CSS pixels (no zoom scaling),
+  // pan only shifts the pattern modulo cell size. Avoids sub-pixel blur/moire
+  // that you get when backgroundSize is a non-integer (zoom * 40 = 29.2px etc.).
+  const gridOffsetX = ((viewport.panX % GRID_BASE_PX) + GRID_BASE_PX) % GRID_BASE_PX;
+  const gridOffsetY = ((viewport.panY % GRID_BASE_PX) + GRID_BASE_PX) % GRID_BASE_PX;
+  const gridStyle: React.CSSProperties = {
+    backgroundSize: `${GRID_BASE_PX}px ${GRID_BASE_PX}px`,
+    backgroundPosition: `${gridOffsetX}px ${gridOffsetY}px`,
+  };
+
   return (
     <div
       ref={containerRef}
@@ -713,6 +740,8 @@ function OfficeCanvasImpl(props: Props) {
       onPointerUp={onPointerUp}
       style={{ cursor: cursorStyle }}
     >
+      <div className="office-canvas__grid" style={gridStyle} />
+
       <svg className="office-canvas__svg">
         <g transform={`translate(${viewport.panX}, ${viewport.panY}) scale(${viewport.zoom})`}>
           {layout.customGroups.map(g => (
