@@ -26,6 +26,9 @@ import { useAgentRules } from '../hooks/useAgentRules';
 import { RemoteTeamWidget } from './RemoteTeamWidget';
 import { useTeamStore } from '../stores/teamStore';
 import { useSessionStore } from '../stores/sessionStore';
+// Brain: 037-anthropic-compatible-providers
+import { useSessionProviderOverride } from '../services/sessionProviderOverrides';
+import { BUILTIN_PRESETS } from '../constants/providerPresets';
 import type { ChatMessage, AgentInfo, ChatAttachment, AskUserQuestionAnswers, TerminalInfo } from '../types';
 import type {
   ChatSendOptions,
@@ -278,6 +281,28 @@ export default function ChatView({
     if (!internalSessionId) return undefined;
     return s.sessions.find(sess => sess.id === internalSessionId)?.title;
   });
+
+  // Brain: 037-anthropic-compatible-providers
+  // Resolve the effective contextWindow for the stamina bar / token usage modal.
+  // Custom Anthropic-compatible providers may have non-200k context (e.g. MiniMax 1M,
+  // Kimi 256k). Provider's value wins over the SDK-reported value since SDK reports
+  // the bundled CLI's window, not the provider's true limit.
+  const providerOverrideId = useSessionProviderOverride(internalSessionId);
+  const activeProviderState = useSettingsStore(s => s.claude.activeProvider);
+  const customProviders = useSettingsStore(s => s.claude.customProviders);
+  const effectiveProviderContextWindow = useMemo(() => {
+    // Defensive: persisted state from older builds may lack `activeProvider`.
+    const ap = activeProviderState ?? { kind: 'anthropic' as const };
+    const id =
+      providerOverrideId ??
+      (ap.kind === 'custom' ? ap.providerId : null);
+    if (!id || id === 'anthropic') return undefined;
+    const list = customProviders ?? [];
+    const provider =
+      BUILTIN_PRESETS.find(p => p.id === id) ??
+      list.find(p => p.id === id);
+    return provider?.contextWindow;
+  }, [providerOverrideId, activeProviderState, customProviders]);
 
   // Quick Loop - recurring prompts
   // showLoopPopover moved to UnifiedActionBar
@@ -978,7 +1003,7 @@ export default function ChatView({
           cacheCreationTokens={sessionTokens.cacheCreationTokens}
           cacheReadTokens={sessionTokens.cacheReadTokens}
           totalCost={sessionTokens.totalCost}
-          maxTokens={sessionTokens.contextWindow}
+          maxTokens={effectiveProviderContextWindow ?? sessionTokens.contextWindow}
           overhead={sessionTokens.overhead}
           model={model}
           onCompact={() => onSendMessage('/compact')}

@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_store::StoreExt;
 
@@ -36,6 +37,12 @@ pub struct AppPreferences {
     // Brain: fix-shell-env-gui-launch
     #[serde(default)]
     pub default_shell: Option<String>,
+    // Brain: 037-anthropic-compatible-providers
+    // Namespaced API keys for Anthropic-compatible providers (z.ai, MiniMax, etc.).
+    // Map key = provider id (e.g. "zai"), value = base64-encoded token.
+    // Additive: does NOT replace `openai_api_key` / `claude_api_key`.
+    #[serde(default)]
+    pub provider_api_keys: HashMap<String, String>,
 }
 
 fn default_ai_model() -> String {
@@ -67,6 +74,7 @@ impl Default for AppPreferences {
             telegram_linked_chat_id: None,
             telegram_mute_notifications: false,
             default_shell: None,
+            provider_api_keys: HashMap::new(),
         }
     }
 }
@@ -182,6 +190,61 @@ pub async fn set_ai_api_key(app: AppHandle, key: String) -> Result<(), String> {
 pub async fn get_ai_api_key(app: AppHandle) -> Result<Option<String>, String> {
     let prefs = get_preferences(app).await?;
     Ok(prefs.openai_api_key)
+}
+
+// Brain: 037-anthropic-compatible-providers
+// Namespaced provider API key storage. Stores base64-encoded tokens
+// per provider id. Does NOT touch the legacy `openai_api_key` field.
+#[tauri::command]
+pub async fn save_provider_api_key(
+    app: AppHandle,
+    provider_id: String,
+    token: String,
+) -> Result<(), String> {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+
+    let store = app
+        .store(PREFERENCES_STORE)
+        .map_err(|e| format!("Failed to load preferences store: {}", e))?;
+
+    let mut prefs = store
+        .get(PREFERENCES_KEY)
+        .and_then(|v| serde_json::from_value::<AppPreferences>(v.clone()).ok())
+        .unwrap_or_default();
+
+    if token.is_empty() {
+        prefs.provider_api_keys.remove(&provider_id);
+    } else {
+        let encoded = STANDARD.encode(token.as_bytes());
+        prefs.provider_api_keys.insert(provider_id, encoded);
+    }
+
+    store.set(
+        PREFERENCES_KEY.to_string(),
+        serde_json::to_value(&prefs).map_err(|e| e.to_string())?,
+    );
+    store.save().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_provider_api_key(
+    app: AppHandle,
+    provider_id: String,
+) -> Result<Option<String>, String> {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+
+    let prefs = get_preferences(app).await?;
+    let encoded = match prefs.provider_api_keys.get(&provider_id) {
+        Some(v) => v.clone(),
+        None => return Ok(None),
+    };
+    let bytes = STANDARD
+        .decode(encoded)
+        .map_err(|e| format!("Failed to decode provider token: {}", e))?;
+    let token = String::from_utf8(bytes)
+        .map_err(|e| format!("Invalid UTF-8 in provider token: {}", e))?;
+    Ok(Some(token))
 }
 
 #[tauri::command]

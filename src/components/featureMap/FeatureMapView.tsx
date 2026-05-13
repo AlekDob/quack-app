@@ -16,6 +16,7 @@ import type { NodeClickInfo } from './FeatureMapCanvas';
 import FeatureMapPopover from './FeatureMapPopover';
 import AnnotationToolbar from './AnnotationToolbar';
 import WhiteboardBreadcrumb from './WhiteboardBreadcrumb';
+import BrainNodeExplorer from './BrainNodeExplorer';
 import { normalizeToForwardSlash } from '../../utils/platform';
 import './FeatureMapView.css';
 
@@ -217,12 +218,43 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
     [safeGraph.nodes, selectedNodeId],
   );
 
-  const MODES: AnnotationMode[] = ['select', 'lasso', 'postit', 'group', 'image', 'mdcard', 'text'];
+  const MODES: AnnotationMode[] = ['select', 'lasso', 'postit', 'group', 'image', 'mdcard', 'text', 'brain'];
 
   const handleOpenMdCardFile = useCallback((relPath: string) => {
     const base = projectPath ? normalizeToForwardSlash(projectPath) : '';
     onOpenFileInEditor?.(base ? `${base}/${relPath.replace(/^\//, '')}` : relPath);
   }, [onOpenFileInEditor, projectPath]);
+
+  // --- BrainNode (Knowledge Graph) integration ---
+  // The BrainNode reuses the ComponentNavigation breadcrumb to "enter" the Explorer.
+  // currentComponentId === brainNode.id  →  render <BrainNodeExplorer/> as overlay.
+  const activeBrainNodeId = useMemo(() => {
+    const id = navigation.currentComponentId;
+    if (!id) return null;
+    return (wb.annotations.brainNodes ?? []).some(b => b.id === id) ? id : null;
+  }, [navigation.currentComponentId, wb.annotations.brainNodes]);
+
+  const handleEnterBrain = useCallback((id: string, label: string) => {
+    enterComponent(id, label);
+  }, [enterComponent]);
+
+  /**
+   * Drop a documentation file from the BrainNode Explorer onto the whiteboard
+   * as a live mdCard. We exit the Explorer first and spawn the card at a small
+   * offset from the BrainNode that owns the Explorer, so the user sees the new
+   * card next to where they were exploring.
+   */
+  const spawnPasteOffsetRef = useRef(0);
+  const handleSpawnMdCardFromBrain = useCallback((relPath: string) => {
+    if (!activeBrainNodeId) return;
+    const owner = (wb.annotations.brainNodes ?? []).find(b => b.id === activeBrainNodeId);
+    spawnPasteOffsetRef.current = (spawnPasteOffsetRef.current + 28) % 200;
+    const baseX = (owner?.x ?? 120) + (owner?.w ?? 280) + 32;
+    const baseY = (owner?.y ?? 120) + spawnPasteOffsetRef.current;
+    const parent = owner?.parentComponentId; // spawn at the same nesting level as the BrainNode
+    wb.spawnMdCardFromBrain(relPath, baseX, baseY, { parentComponentId: parent });
+    exitUp();
+  }, [activeBrainNodeId, wb, exitUp]);
 
   // Clipboard for Cmd+C / Cmd+V (whiteboard-internal — does NOT use the system clipboard).
   // Holds the IDs that were "copied"; paste re-resolves them against the current annotations
@@ -392,6 +424,10 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
             onTextAdd={wb.addText}
             onTextUpdate={wb.updateText}
             onTextRemove={wb.removeText}
+            onBrainNodeAdd={wb.addBrainNode}
+            onBrainNodeUpdate={wb.updateBrainNode}
+            onBrainNodeRemove={wb.removeBrainNode}
+            onEnterBrain={handleEnterBrain}
             onDuplicateAnnotations={wb.duplicateAnnotations}
             projectPath={projectPath ?? ''}
             onResetMode={handleResetMode}
@@ -426,6 +462,15 @@ export default function FeatureMapView({ projectPath, onOpenFileInEditor }: Prop
       {/* Hidden file input for image picker */}
       <input ref={fileInputRef} type="file" accept="image/*"
         style={{ display: 'none' }} onChange={handleFileInputChange} />
+
+      {activeBrainNodeId && (
+        <BrainNodeExplorer
+          projectPath={projectPath ?? ''}
+          onSpawnMdCard={handleSpawnMdCardFromBrain}
+          onOpenInEditor={onOpenFileInEditor}
+          onExit={exitUp}
+        />
+      )}
 
       {selectedNode && clickInfo && (
         <FeatureMapPopover

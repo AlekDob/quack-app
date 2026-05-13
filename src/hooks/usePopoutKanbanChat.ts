@@ -13,7 +13,7 @@ import { Store } from '@tauri-apps/plugin-store';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { ChatMessage, KanbanTask, ClaudeEvent } from '../types';
-import { getProviderRequestFields } from '../services/claudeSDK';
+import { getProviderRequestFields, getActiveProviderConfig } from '../services/claudeSDK';
 import { useSettingsStore } from '../stores/settingsStore';
 import type { ChatSendOptions } from './useClaudeChat';
 import {
@@ -331,6 +331,8 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
       // Call Tauri backend to start streaming with correct parameters
       console.log(`[usePopoutKanbanChat] Invoking send_message_via_sdk_streaming for taskId: ${taskId}`);
       const prf = getProviderRequestFields();
+      // Brain: 037-anthropic-compatible-providers
+      const providerConfig = await getActiveProviderConfig(taskId);
       await invoke('send_message_via_sdk_streaming', {
         agentId: taskId,
         request: {
@@ -349,6 +351,7 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
           provider: prf.provider,
           providerBaseUrl: prf.providerBaseUrl,
           providerApiKey: prf.providerApiKey,
+          providerConfig,
           toolSearchMode: useSettingsStore.getState().claude.toolSearchMode,
         },
       });

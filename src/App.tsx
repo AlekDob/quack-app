@@ -130,7 +130,7 @@ import type { SlashCommand } from "./hooks/useSlashCommands";
 import { useModelsConfig } from "./hooks/useAppConfig";
 import { getModelId, defaultEffortForModel } from "./services/modelService";
 import { findDefinition } from "./services/codeIntelService";
-import { getProviderRequestFields, getActiveModelName } from "./services/claudeSDK";
+import { getProviderRequestFields, getActiveModelName, getActiveModelDisplayName, getActiveProviderConfig } from "./services/claudeSDK";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
 import { useSystemWakeHandler } from "./hooks/useSystemWakeHandler";
@@ -2958,6 +2958,7 @@ function AppContent() {
         // Brain: task-effort-model-aware-refactor — use model-aware default instead of hardcoded 'medium'
         effort: options?.effort || defaultEffortForModel(options?.model || ''),
         thinkingMode: options?.thinkingMode || 'auto',
+        modelDisplayName: getActiveModelDisplayName(options?.model) || undefined,
       },
       // Hide header + init widget on resumed sessions (known at message creation time)
       metadata: {
@@ -3034,8 +3035,12 @@ function AppContent() {
       }>('send_message_via_sdk_streaming', {
           // 🦆 RACE CONDITION FIX: Use capturedAgentId
           agentId: capturedAgentId,
-          request: (() => {
+          // Brain: 037-anthropic-compatible-providers
+          // Resolve active Anthropic-compatible provider (z.ai, MiniMax, etc.) before invoke.
+          // null when default Anthropic / Bedrock — daemon uses OAuth / standard env.
+          request: await (async () => {
             const prf = getProviderRequestFields(remoteModels);
+            const providerConfig = await getActiveProviderConfig(capturedAgentId);
           return {
             prompt,
             // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
@@ -3092,6 +3097,8 @@ function AppContent() {
             provider: prf.provider,
             providerBaseUrl: prf.providerBaseUrl,
             providerApiKey: prf.providerApiKey,
+            // Brain: 037-anthropic-compatible-providers
+            providerConfig,
             toolSearchMode: useSettingsStore.getState().claude.toolSearchMode,
             // IDE context: injected into system prompt by Node.js, not into user message
             ideContext: ideContext || undefined,
@@ -3729,6 +3736,7 @@ function AppContent() {
         // Brain: task-effort-model-aware-refactor
         effort: options?.effort || defaultEffortForModel(options?.model || ''),
         thinkingMode: options?.thinkingMode || 'auto',
+        modelDisplayName: getActiveModelDisplayName(options?.model) || undefined,
       },
       metadata: { turnId },
     };
@@ -3781,8 +3789,10 @@ function AppContent() {
           usage: UsageStats;
         }>('send_message_via_sdk_streaming', {
           agentId: targetAgentId,
-          request: (() => {
+          // Brain: 037-anthropic-compatible-providers
+          request: await (async () => {
             const prf = getProviderRequestFields(remoteModels, options?.model);
+            const providerConfig = await getActiveProviderConfig(targetAgentId);
             // 🦆 AUTOMATION FIX: If a non-anthropic provider is specified in options,
             // override provider fields so Ollama/custom models resolve correctly
             const isJobProvider = options?.provider && options.provider !== 'anthropic';
@@ -3810,6 +3820,8 @@ function AppContent() {
             provider: isJobProvider ? options.provider : prf.provider,
             providerBaseUrl: isJobProvider ? (globalBaseUrl || 'http://localhost:11434') : prf.providerBaseUrl,
             providerApiKey: isJobProvider && options.provider === 'custom' ? globalApiKey : prf.providerApiKey,
+            // Brain: 037-anthropic-compatible-providers
+            providerConfig,
             toolSearchMode: useSettingsStore.getState().claude.toolSearchMode,
             // IDE context: injected into system prompt by Node.js, not into user message
             ideContext: ideContext || undefined,
@@ -3933,6 +3945,7 @@ function AppContent() {
           // Brain: task-effort-model-aware-refactor
           effort: options?.effort || defaultEffortForModel(options?.model || ''),
           thinkingMode: options?.thinkingMode || 'auto',
+          modelDisplayName: getActiveModelDisplayName(options?.model) || undefined,
         },
         metadata: { turnId },
       };
@@ -4105,8 +4118,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         usage: UsageStats;
       }>('send_message_via_sdk_streaming', {
         agentId: targetAgentId,
-        request: (() => {
+        // Brain: 037-anthropic-compatible-providers
+        request: await (async () => {
           const prf = getProviderRequestFields(remoteModels);
+          const providerConfig = await getActiveProviderConfig(targetAgentId);
           return {
           prompt: compactPrompt,
           model: prf.resolveModel('haiku'),
@@ -4121,6 +4136,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           provider: prf.provider,
           providerBaseUrl: prf.providerBaseUrl,
           providerApiKey: prf.providerApiKey,
+          providerConfig,
         };
         })(),
       });
@@ -4258,8 +4274,10 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         usage: UsageStats;
       }>('send_message_via_sdk_streaming', {
         agentId: activeId,
-        request: (() => {
+        // Brain: 037-anthropic-compatible-providers
+        request: await (async () => {
           const prf = getProviderRequestFields(remoteModels);
+          const providerConfig = await getActiveProviderConfig(activeId);
           return {
           prompt: compactPrompt,
           model: prf.resolveModel('haiku'),
@@ -4274,6 +4292,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           provider: prf.provider,
           providerBaseUrl: prf.providerBaseUrl,
           providerApiKey: prf.providerApiKey,
+          providerConfig,
         };
         })(),
       });

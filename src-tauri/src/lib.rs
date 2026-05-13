@@ -48,6 +48,8 @@ mod teams; // 🦆 Agent Teams management (roster injection, team CRUD)
 mod groups; // 📂 Project Grouping (multi-project awareness, cross-project CLAUDE.md)
 mod preferences;
 mod preview;
+// Brain: 037-anthropic-compatible-providers
+mod providers;
 mod proxy;
 mod reveal;
 mod rules; // 📜 Claude Code rules management (.claude/rules/)
@@ -1054,6 +1056,8 @@ pub fn run() {
             agency::check_agents_directory,
             agency::create_agents_directory,
             agency_setup::setup_quack_agency_full,
+            providers::test_provider_connection,
+            providers::fetch_provider_models,
             skills::list_skills,
             skills::get_skill_details,
             skills::check_skills_directory,
@@ -1201,6 +1205,8 @@ pub fn run() {
             preferences::toggle_performance_monitor,
             preferences::set_ai_api_key,
             preferences::get_ai_api_key,
+            preferences::save_provider_api_key,
+            preferences::get_provider_api_key,
             preferences::set_claude_api_key,
             preferences::get_claude_api_key,
             preferences::set_ai_model,

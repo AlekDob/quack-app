@@ -417,6 +417,10 @@ export interface MessageSettingsMetadata {
   effort?: EffortLevel;
   thinkingMode?: string; // 'auto' | 'think' | 'hard' | 'harder' | 'ultra'
   hasThinkingBlocks?: boolean; // True if response contained thinking blocks
+  // Brain: 037-anthropic-compatible-providers
+  // Display name for the model actually served (e.g. "MiniMax-M2" when routed via
+  // a custom Anthropic-compatible provider). Falls back to `model` if absent.
+  modelDisplayName?: string;
 }
 
 export interface ChatMessage {

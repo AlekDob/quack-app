@@ -348,6 +348,50 @@ function ActionIcons({
         </KeyboardShortcutTooltip>
       )}
 
+      {/* Office Icon */}
+      {onOfficeClick && (
+        <KeyboardShortcutTooltip label="Office" shortcut="⌘O">
+          <button
+            type="button"
+            className={`action-icon ${isOfficeActive ? 'active' : ''}`}
+            onClick={onOfficeClick}
+            aria-label="Open Office View"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+              <line x1="9" y1="6" x2="15" y2="6" />
+              <line x1="9" y1="10" x2="15" y2="10" />
+              <line x1="9" y1="14" x2="15" y2="14" />
+              <line x1="9" y1="18" x2="12" y2="18" />
+            </svg>
+          </button>
+        </KeyboardShortcutTooltip>
+      )}
+
+      {/* Whiteboard Icon */}
+      {onFeatureMapClick && (
+        <KeyboardShortcutTooltip label="Whiteboard" shortcut={formatShortcut("⇧⌘W")}>
+          <button
+            type="button"
+            className={`action-icon ${isFeatureMapActive ? 'active' : ''}`}
+            onClick={onFeatureMapClick}
+            aria-label="Open Whiteboard"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <circle cx="5" cy="6" r="2" />
+              <circle cx="19" cy="6" r="2" />
+              <circle cx="5" cy="18" r="2" />
+              <circle cx="19" cy="18" r="2" />
+              <line x1="9.5" y1="10.5" x2="6.5" y2="7.5" />
+              <line x1="14.5" y1="10.5" x2="17.5" y2="7.5" />
+              <line x1="9.5" y1="13.5" x2="6.5" y2="16.5" />
+              <line x1="14.5" y1="13.5" x2="17.5" y2="16.5" />
+            </svg>
+          </button>
+        </KeyboardShortcutTooltip>
+      )}
+
       {/* Automation Icon */}
       {onAutomationClick && (
         <KeyboardShortcutTooltip label="Automation" shortcut={formatShortcut("⌘J")}>
@@ -386,26 +430,6 @@ function ActionIcons({
         </KeyboardShortcutTooltip>
       )}
 
-      {/* Office Icon */}
-      {onOfficeClick && (
-        <KeyboardShortcutTooltip label="Office" shortcut="⌘O">
-          <button
-            type="button"
-            className={`action-icon ${isOfficeActive ? 'active' : ''}`}
-            onClick={onOfficeClick}
-            aria-label="Open Office View"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
-              <line x1="9" y1="6" x2="15" y2="6" />
-              <line x1="9" y1="10" x2="15" y2="10" />
-              <line x1="9" y1="14" x2="15" y2="14" />
-              <line x1="9" y1="18" x2="12" y2="18" />
-            </svg>
-          </button>
-        </KeyboardShortcutTooltip>
-      )}
-
       {/* Usage Icon - Plan quota */}
       <KeyboardShortcutTooltip label="Plan Usage">
         <button
@@ -420,30 +444,6 @@ function ActionIcons({
           </svg>
         </button>
       </KeyboardShortcutTooltip>
-
-      {/* Whiteboard Icon */}
-      {onFeatureMapClick && (
-        <KeyboardShortcutTooltip label="Whiteboard" shortcut={formatShortcut("⇧⌘W")}>
-          <button
-            type="button"
-            className={`action-icon ${isFeatureMapActive ? 'active' : ''}`}
-            onClick={onFeatureMapClick}
-            aria-label="Open Whiteboard"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <circle cx="5" cy="6" r="2" />
-              <circle cx="19" cy="6" r="2" />
-              <circle cx="5" cy="18" r="2" />
-              <circle cx="19" cy="18" r="2" />
-              <line x1="9.5" y1="10.5" x2="6.5" y2="7.5" />
-              <line x1="14.5" y1="10.5" x2="17.5" y2="7.5" />
-              <line x1="9.5" y1="13.5" x2="6.5" y2="16.5" />
-              <line x1="14.5" y1="13.5" x2="17.5" y2="16.5" />
-            </svg>
-          </button>
-        </KeyboardShortcutTooltip>
-      )}
 
       {/* Git Icon */}
       <KeyboardShortcutTooltip label="Git Panel">

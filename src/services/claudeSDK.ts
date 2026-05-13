@@ -4,12 +4,58 @@ import { invoke } from '@tauri-apps/api/core';
 import type { ClaudeEvent, MCPServer, StructuredOutputFormat, EffortLevel, LLMProviderType } from '../types';
 import { getModelId, type ModelConfig } from './modelService';
 import { useSettingsStore } from '../stores/settingsStore';
+// Brain: 037-anthropic-compatible-providers
+import { buildProviderConfig } from './providerEnvBuilder';
+import { getSessionProviderOverride } from './sessionProviderOverrides';
+import { BUILTIN_PRESETS } from '../constants/providerPresets';
+import type { QuackProviderConfig } from '../types/providers';
 
 /** Get the display-friendly model name for the active provider */
 export function getActiveModelName(fallback?: string): string {
   const { provider, ollamaModel } = useSettingsStore.getState().claude;
   if (provider !== 'anthropic') return ollamaModel || provider;
   return fallback || 'opus46';
+}
+
+/**
+ * Brain: 037-anthropic-compatible-providers
+ * When a custom Anthropic-compatible provider is active, returns the provider's
+ * real model name for the given friendly tier (sonnet → sonnetModel, etc.).
+ * Returns null when the default Anthropic provider is active — callers should
+ * then fall back to the standard friendly label.
+ */
+export function getActiveModelDisplayName(friendly?: string): string | null {
+  const state = useSettingsStore.getState().claude;
+  const active = state.activeProvider;
+  if (!active || active.kind !== 'custom') return null;
+  // User picked from /v1/models — that always wins.
+  if (active.activeModel) return active.activeModel;
+  const id = active.providerId;
+  const ap =
+    BUILTIN_PRESETS.find((p) => p.id === id) ??
+    (state.customProviders ?? []).find((p) => p.id === id);
+  if (!ap) return null;
+  const base = (friendly ?? '').replace('[1m]', '');
+  if (base.startsWith('haiku') && ap.haikuModel) return ap.haikuModel;
+  if (base.startsWith('opus') && ap.defaultModel) return ap.defaultModel;
+  return ap.sonnetModel || ap.haikuModel || ap.defaultModel || ap.name;
+}
+
+/**
+ * Resolve the active provider config (Anthropic-compatible custom providers).
+ * Returns null when the active provider is Anthropic or Bedrock — the daemon
+ * then uses its default env (OAuth / ANTHROPIC_API_KEY / Bedrock).
+ * Per-session override (if any) wins over the global default.
+ * Brain: 037-anthropic-compatible-providers
+ */
+export async function getActiveProviderConfig(
+  sessionId?: string | null,
+): Promise<QuackProviderConfig | null> {
+  const activeProvider = useSettingsStore.getState().claude.activeProvider;
+  if (!activeProvider) return null;
+  const overrideId = getSessionProviderOverride(sessionId ?? null);
+  const sessionOverride = overrideId ? { providerId: overrideId } : undefined;
+  return buildProviderConfig(activeProvider, sessionOverride);
 }
 
 /** Get provider fields for SDK invoke calls */
