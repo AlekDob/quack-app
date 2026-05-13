@@ -6,12 +6,13 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type {
-  CanvasAnnotations, PostIt, GroupRect, CanvasImage, MdCard, CanvasText, WhiteboardFile,
+  CanvasAnnotations, PostIt, GroupRect, CanvasImage, MdCard, CanvasText, BrainNode, WhiteboardFile,
 } from '../components/featureMap/annotationTypes';
 import {
   POST_IT_COLORS, GROUP_COLORS, IMAGE_DEFAULT_W, IMAGE_DEFAULT_H,
   MD_CARD_DEFAULT_W, MD_CARD_DEFAULT_H,
   TEXT_DEFAULT_FONT, TEXT_DEFAULT_TEXT,
+  BRAIN_NODE_DEFAULT_W, BRAIN_NODE_DEFAULT_H,
 } from '../components/featureMap/annotationTypes';
 import type { NodePosition } from '../components/featureMap/featureMapTypes';
 import {
@@ -52,7 +53,27 @@ function fixOrphans(a: CanvasAnnotations, nodeAssignments?: Record<string, strin
   const fix = <T extends { parentComponentId?: string }>(items: T[]): T[] =>
     items.map(item => item.parentComponentId && !componentIds.has(item.parentComponentId)
       ? { ...item, parentComponentId: undefined } : item);
-  const fixedAnnotations = { postIts: fix(a.postIts), groups: fix(a.groups), images: fix(a.images), mdCards: fix(a.mdCards ?? []) };
+  // Dedup by id — defensive: legacy files may contain duplicate entries that
+  // would otherwise break React keys + per-id update handlers (which would
+  // mutate every clone simultaneously, leaving the card un-interactable).
+  const dedup = <T extends { id: string }>(items: T[]): T[] => {
+    const seen = new Set<string>();
+    const out: T[] = [];
+    for (const it of items) {
+      if (seen.has(it.id)) continue;
+      seen.add(it.id);
+      out.push(it);
+    }
+    return out;
+  };
+  const fixedAnnotations = {
+    postIts: dedup(fix(a.postIts)),
+    groups: dedup(fix(a.groups)),
+    images: dedup(fix(a.images)),
+    mdCards: dedup(fix(a.mdCards ?? [])),
+    texts: dedup(fix(a.texts ?? [])),
+    brainNodes: dedup(fix(a.brainNodes ?? [])),
+  };
   // Clean orphaned node assignments
   const fixedNA: Record<string, string> = {};
   if (nodeAssignments) {
@@ -68,9 +89,16 @@ function filterByParent(a: CanvasAnnotations, componentId: string | null): Canva
   const match = <T extends { parentComponentId?: string }>(items: T[]): T[] =>
     items.filter(item => (item.parentComponentId ?? null) === componentId);
   // Brain: fix-whiteboard-texts-stripped-by-filterbyparent
-  // `texts` deve essere incluso nel filtro: altrimenti i titoletti creati con il tool Title
-  // vengono salvati nel file ma strippati da `visibleAnnotations`, sparendo dal canvas.
-  return { postIts: match(a.postIts), groups: match(a.groups), images: match(a.images), mdCards: match(a.mdCards ?? []), texts: match(a.texts ?? []) };
+  // Ogni campo collezione di CanvasAnnotations DEVE essere incluso qui, altrimenti
+  // viene strippato silenziosamente dal viewport (i tipi opzionali non urlano).
+  return {
+    postIts: match(a.postIts),
+    groups: match(a.groups),
+    images: match(a.images),
+    mdCards: match(a.mdCards ?? []),
+    texts: match(a.texts ?? []),
+    brainNodes: match(a.brainNodes ?? []),
+  };
 }
 
 /** Calculate nesting depth of a component by walking parentComponentId chain */
@@ -118,6 +146,11 @@ function computeBoundingBox(
     if (!ids.has(c.id)) continue;
     minX = Math.min(minX, c.x); minY = Math.min(minY, c.y);
     maxX = Math.max(maxX, c.x + c.w); maxY = Math.max(maxY, c.y + c.h);
+  }
+  for (const b of a.brainNodes ?? []) {
+    if (!ids.has(b.id)) continue;
+    minX = Math.min(minX, b.x); minY = Math.min(minY, b.y);
+    maxX = Math.max(maxX, b.x + b.w); maxY = Math.max(maxY, b.y + b.h);
   }
   // Feature nodes (center-based, so expand by half NW/NH)
   for (const [nodeId, pos] of Object.entries(positions)) {
@@ -300,6 +333,8 @@ export function useWhiteboardFile(projectPath?: string) {
         groups: promote(a.groups).filter(g => g.id !== id),
         images: promote(a.images),
         mdCards: promote(a.mdCards ?? []),
+        texts: promote(a.texts ?? []),
+        brainNodes: promote(a.brainNodes ?? []),
       };
       // Promote node children
       const nextNodeAssignments = { ...(prev.nodeAssignments ?? {}) };
@@ -381,6 +416,58 @@ export function useWhiteboardFile(projectPath?: string) {
     updateAnnotations(a => ({ ...a, texts: (a.texts ?? []).filter(t => t.id !== id) }));
   }, [updateAnnotations]);
 
+  // --- BrainNode (Knowledge Graph component) CRUD ---
+  const addBrainNode = useCallback((x: number, y: number, init?: Partial<BrainNode>) => {
+    const node: BrainNode = {
+      id: uid(),
+      x, y,
+      w: init?.w ?? BRAIN_NODE_DEFAULT_W,
+      h: init?.h ?? BRAIN_NODE_DEFAULT_H,
+      title: init?.title,
+    };
+    // Idempotent: if React StrictMode (or any other path) re-invokes the
+    // reducer with the same node closure, skip the duplicate insertion.
+    updateAnnotations(a => {
+      const existing = a.brainNodes ?? [];
+      if (existing.some(b => b.id === node.id)) return a;
+      return { ...a, brainNodes: [...existing, node] };
+    });
+    return node.id;
+  }, [updateAnnotations]);
+
+  const updateBrainNode = useCallback((id: string, partial: Partial<BrainNode>) => {
+    updateAnnotations(a => ({
+      ...a, brainNodes: (a.brainNodes ?? []).map(b => b.id === id ? { ...b, ...partial } : b),
+    }));
+  }, [updateAnnotations]);
+
+  const removeBrainNode = useCallback((id: string) => {
+    updateAnnotations(a => ({ ...a, brainNodes: (a.brainNodes ?? []).filter(b => b.id !== id) }));
+  }, [updateAnnotations]);
+
+  /**
+   * Spawn a `mdCard` referencing a documentation file picked from the BrainNode Explorer.
+   * Used by the "Drop on canvas" action: drag a node from the knowledge graph and the
+   * corresponding mdCard appears at (x,y) with hot-reload polling active.
+   */
+  const spawnMdCardFromBrain = useCallback(
+    (filePath: string, x: number, y: number, init?: Partial<MdCard>): string => {
+      const card: MdCard = {
+        id: uid(),
+        x, y,
+        w: init?.w ?? MD_CARD_DEFAULT_W,
+        h: init?.h ?? MD_CARD_DEFAULT_H,
+        filePath,
+        title: init?.title,
+        collapsed: init?.collapsed,
+        parentComponentId: init?.parentComponentId,
+      };
+      updateAnnotations(a => ({ ...a, mdCards: [...(a.mdCards ?? []), card] }));
+      return card.id;
+    },
+    [updateAnnotations],
+  );
+
   /**
    * Clone a set of annotations (by id) across all 5 types with an x/y offset.
    * Returns the list of new IDs in the same order as input.
@@ -397,6 +484,7 @@ export function useWhiteboardFile(projectPath?: string) {
         const newImages: CanvasImage[] = [...a.images];
         const newMdCards: MdCard[] = [...(a.mdCards ?? [])];
         const newTexts: CanvasText[] = [...(a.texts ?? [])];
+        const newBrainNodes: BrainNode[] = [...(a.brainNodes ?? [])];
 
         for (const id of ids) {
           const pi = a.postIts.find(p => p.id === id);
@@ -434,6 +522,13 @@ export function useWhiteboardFile(projectPath?: string) {
             newIds.push(clone.id);
             continue;
           }
+          const bn = (a.brainNodes ?? []).find(b => b.id === id);
+          if (bn) {
+            const clone: BrainNode = { ...bn, id: uid(), x: bn.x + offsetX, y: bn.y + offsetY };
+            newBrainNodes.push(clone);
+            newIds.push(clone.id);
+            continue;
+          }
         }
 
         void idSet; // silence unused if no input matches
@@ -444,6 +539,7 @@ export function useWhiteboardFile(projectPath?: string) {
           images: newImages,
           mdCards: newMdCards,
           texts: newTexts,
+          brainNodes: newBrainNodes,
         };
       });
       return newIds;
@@ -530,6 +626,8 @@ export function useWhiteboardFile(projectPath?: string) {
         groups: [...assign(a.groups), comp],
         images: assign(a.images),
         mdCards: assign(a.mdCards ?? []),
+        texts: assign(a.texts ?? []),
+        brainNodes: assign(a.brainNodes ?? []),
       };
       // Assign node children to component
       const nextNodeAssignments = { ...(prev.nodeAssignments ?? {}) };
@@ -538,7 +636,9 @@ export function useWhiteboardFile(projectPath?: string) {
         const isAnnotation = a.postIts.some(p => p.id === childId) ||
           a.groups.some(g => g.id === childId) ||
           a.images.some(i => i.id === childId) ||
-          (a.mdCards ?? []).some(c => c.id === childId);
+          (a.mdCards ?? []).some(c => c.id === childId) ||
+          (a.texts ?? []).some(t => t.id === childId) ||
+          (a.brainNodes ?? []).some(b => b.id === childId);
         if (!isAnnotation) nextNodeAssignments[childId] = id;
       }
       const next = { ...prev, annotations: nextAnnotations, nodeAssignments: nextNodeAssignments };
@@ -564,6 +664,8 @@ export function useWhiteboardFile(projectPath?: string) {
         groups: promote(a.groups).filter(g => g.id !== componentId),
         images: promote(a.images),
         mdCards: promote(a.mdCards ?? []),
+        texts: promote(a.texts ?? []),
+        brainNodes: promote(a.brainNodes ?? []),
       };
       // Promote node children: reassign to parent or remove assignment
       const nextNodeAssignments = { ...(prev.nodeAssignments ?? {}) };
@@ -586,11 +688,20 @@ export function useWhiteboardFile(projectPath?: string) {
       const isAnnotation = a.postIts.some(p => p.id === itemId) ||
         a.groups.some(g => g.id === itemId) ||
         a.images.some(i => i.id === itemId) ||
-        (a.mdCards ?? []).some(c => c.id === itemId);
+        (a.mdCards ?? []).some(c => c.id === itemId) ||
+        (a.texts ?? []).some(t => t.id === itemId) ||
+        (a.brainNodes ?? []).some(b => b.id === itemId);
       if (isAnnotation) {
         const set = <T extends { id: string; parentComponentId?: string }>(items: T[]): T[] =>
           items.map(item => item.id === itemId ? { ...item, parentComponentId: componentId } : item);
-        const nextAnnotations = { postIts: set(a.postIts), groups: set(a.groups), images: set(a.images), mdCards: set(a.mdCards ?? []) };
+        const nextAnnotations = {
+          postIts: set(a.postIts),
+          groups: set(a.groups),
+          images: set(a.images),
+          mdCards: set(a.mdCards ?? []),
+          texts: set(a.texts ?? []),
+          brainNodes: set(a.brainNodes ?? []),
+        };
         const next = { ...prev, annotations: nextAnnotations };
         persist(next, prev);
         return next;
@@ -629,7 +740,11 @@ export function useWhiteboardFile(projectPath?: string) {
         const img = a.images.find(ii => ii.id === itemId);
         if (img) return img.parentComponentId;
         const c = (a.mdCards ?? []).find(ci => ci.id === itemId);
-        return c?.parentComponentId;
+        if (c) return c.parentComponentId;
+        const t = (a.texts ?? []).find(ti => ti.id === itemId);
+        if (t) return t.parentComponentId;
+        const b = (a.brainNodes ?? []).find(bi => bi.id === itemId);
+        return b?.parentComponentId;
       };
       const currentParent = findParent();
       if (!currentParent) return prev;
@@ -637,7 +752,14 @@ export function useWhiteboardFile(projectPath?: string) {
       const grandParent = parentComp?.parentComponentId;
       const set = <T extends { id: string; parentComponentId?: string }>(items: T[]): T[] =>
         items.map(item => item.id === itemId ? { ...item, parentComponentId: grandParent } : item);
-      const nextAnnotations = { postIts: set(a.postIts), groups: set(a.groups), images: set(a.images), mdCards: set(a.mdCards ?? []) };
+      const nextAnnotations = {
+        postIts: set(a.postIts),
+        groups: set(a.groups),
+        images: set(a.images),
+        mdCards: set(a.mdCards ?? []),
+        texts: set(a.texts ?? []),
+        brainNodes: set(a.brainNodes ?? []),
+      };
       const next = { ...prev, annotations: nextAnnotations };
       persist(next, prev);
       return next;
@@ -679,6 +801,8 @@ export function useWhiteboardFile(projectPath?: string) {
       + a.groups.filter(g => g.parentComponentId === componentId).length
       + a.images.filter(i => i.parentComponentId === componentId).length
       + (a.mdCards ?? []).filter(c => c.parentComponentId === componentId).length
+      + (a.texts ?? []).filter(t => t.parentComponentId === componentId).length
+      + (a.brainNodes ?? []).filter(b => b.parentComponentId === componentId).length
       + nodeCount;
   }, [file.annotations, file.nodeAssignments]);
 
@@ -688,8 +812,9 @@ export function useWhiteboardFile(projectPath?: string) {
     return getNestingDepth(currentParentId, file.annotations.groups) < MAX_NESTING;
   }, [file.annotations.groups]);
 
-  const { postIts, groups, images, mdCards, texts } = file.annotations;
-  const hasAnnotations = postIts.length > 0 || groups.length > 0 || images.length > 0 || (mdCards?.length ?? 0) > 0 || (texts?.length ?? 0) > 0;
+  const { postIts, groups, images, mdCards, texts, brainNodes } = file.annotations;
+  const hasAnnotations = postIts.length > 0 || groups.length > 0 || images.length > 0
+    || (mdCards?.length ?? 0) > 0 || (texts?.length ?? 0) > 0 || (brainNodes?.length ?? 0) > 0;
   const hasCustomPositions = Object.keys(file.positions).length > 0;
 
   return {
@@ -702,6 +827,8 @@ export function useWhiteboardFile(projectPath?: string) {
     addImage, updateImage, removeImage,
     addMdCard, updateMdCard, removeMdCard,
     addText, updateText, removeText,
+    addBrainNode, updateBrainNode, removeBrainNode,
+    spawnMdCardFromBrain,
     duplicateAnnotations,
     setNodePosition,
     clearAll,
