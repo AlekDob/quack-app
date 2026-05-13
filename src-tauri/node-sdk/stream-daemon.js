@@ -339,6 +339,8 @@ async function handleQuery(cmd) {
     mcpServers: passedMcpServers, allowedTools, teamContext, ideContext,
     provider, providerBaseUrl, providerApiKey, debugMode, chatMode, askMode,
     toolSearchMode,
+    // Brain: 037-anthropic-compatible-providers
+    providerConfig,
   } = cmd;
 
   const abortController = new AbortController();
@@ -360,8 +362,34 @@ async function handleQuery(cmd) {
   const savedBaseUrl = process.env.ANTHROPIC_BASE_URL;
   const savedApiKey = process.env.ANTHROPIC_API_KEY;
   const savedAuthToken = process.env.ANTHROPIC_AUTH_TOKEN;
+  const savedSonnet = process.env.ANTHROPIC_DEFAULT_SONNET_MODEL;
+  const savedHaiku = process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL;
+  const savedDefaultModel = process.env.ANTHROPIC_MODEL;
+  // Brain: 037-anthropic-compatible-providers
+  // OAuth Pro/Max credentials win over ANTHROPIC_AUTH_TOKEN/BASE_URL — we MUST
+  // clear them for the duration of a custom-provider query, otherwise the
+  // request silently routes to api.anthropic.com.
+  const savedOauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
 
-  if (provider === 'ollama') {
+  // Brain: 037-anthropic-compatible-providers
+  // Anthropic-compatible provider (z.ai, MiniMax, Kimi, Qwen, DeepSeek, custom proxy).
+  // providerConfig wins over the legacy provider/providerBaseUrl path.
+  const usingProviderConfig = providerConfig && providerConfig.baseUrl && providerConfig.authToken;
+  diag(`PROVIDER_CONFIG: present=${!!providerConfig} baseUrl=${providerConfig?.baseUrl || '-'} sonnet=${providerConfig?.sonnetModel || '-'} usingProviderConfig=${usingProviderConfig}`);
+  if (usingProviderConfig) {
+    process.env.ANTHROPIC_BASE_URL = providerConfig.baseUrl;
+    process.env.ANTHROPIC_AUTH_TOKEN = providerConfig.authToken;
+    if (providerConfig.sonnetModel) process.env.ANTHROPIC_DEFAULT_SONNET_MODEL = providerConfig.sonnetModel;
+    if (providerConfig.haikuModel) process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL = providerConfig.haikuModel;
+    if (providerConfig.defaultModel) process.env.ANTHROPIC_MODEL = providerConfig.defaultModel;
+    // Bearer wins: clear ANTHROPIC_API_KEY to avoid x-api-key being sent instead.
+    delete process.env.ANTHROPIC_API_KEY;
+    // OAuth (Claude Pro/Max subscription) takes precedence over env-based auth.
+    // Clearing the OAuth token for this query forces the SDK to use AUTH_TOKEN/BASE_URL.
+    delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    log('QUERY', `🔌 Provider config: ${providerConfig.baseUrl} (sonnet=${providerConfig.sonnetModel || '-'} haiku=${providerConfig.haikuModel || '-'})`);
+    diag(`PROVIDER_CONFIG_APPLIED: baseUrl=${providerConfig.baseUrl} sonnetModel=${providerConfig.sonnetModel} haikuModel=${providerConfig.haikuModel} oauthCleared=${savedOauthToken !== undefined}`);
+  } else if (provider === 'ollama') {
     process.env.ANTHROPIC_BASE_URL = providerBaseUrl || 'http://localhost:11434';
     process.env.ANTHROPIC_API_KEY = 'ollama';
     process.env.ANTHROPIC_AUTH_TOKEN = 'ollama';
@@ -588,6 +616,12 @@ ${hintsBlock}
       hooks: {
         PreToolUse: [{
           matcher: 'AskUserQuestion',
+          // SDK default hook timeout is 60s. AskUserQuestion can sit pending for many
+          // minutes (user reads carefully, switches context, etc.); if the hook times
+          // out the SDK proceeds without staged answers and the model sees an empty
+          // result. Bumped to 24h to effectively wait forever for the user.
+          // Brain: fix-askuserquestion-sdk-0.2.138-pretool-posttool-hook
+          timeout: 86400,
           hooks: [async (input, toolUseId, _hookCtx) => {
             diag(`PreToolUse AskUserQuestion fired for query=${queryId} toolUseId=${toolUseId}`);
             try {
@@ -947,13 +981,21 @@ ${hintsBlock}
     }
   } finally {
     // 🦆 Restore original env vars after query (daemon is persistent)
-    if (provider === 'ollama' || provider === 'custom') {
+    // Brain: 037-anthropic-compatible-providers
+    if (usingProviderConfig || provider === 'ollama' || provider === 'custom') {
       if (savedBaseUrl !== undefined) process.env.ANTHROPIC_BASE_URL = savedBaseUrl;
       else delete process.env.ANTHROPIC_BASE_URL;
       if (savedApiKey !== undefined) process.env.ANTHROPIC_API_KEY = savedApiKey;
       else delete process.env.ANTHROPIC_API_KEY;
       if (savedAuthToken !== undefined) process.env.ANTHROPIC_AUTH_TOKEN = savedAuthToken;
       else delete process.env.ANTHROPIC_AUTH_TOKEN;
+      if (savedSonnet !== undefined) process.env.ANTHROPIC_DEFAULT_SONNET_MODEL = savedSonnet;
+      else delete process.env.ANTHROPIC_DEFAULT_SONNET_MODEL;
+      if (savedHaiku !== undefined) process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL = savedHaiku;
+      else delete process.env.ANTHROPIC_DEFAULT_HAIKU_MODEL;
+      if (savedDefaultModel !== undefined) process.env.ANTHROPIC_MODEL = savedDefaultModel;
+      else delete process.env.ANTHROPIC_MODEL;
+      if (savedOauthToken !== undefined) process.env.CLAUDE_CODE_OAUTH_TOKEN = savedOauthToken;
     }
 
     // Clean up pending requests for this query

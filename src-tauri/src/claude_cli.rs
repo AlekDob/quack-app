@@ -1025,6 +1025,11 @@ pub struct ClaudeCliRequest {
     // Tool Search deferral preset ('off' | 'auto' | 'aggressive' | 'always').
     // Mapped to ENABLE_TOOL_SEARCH env var by stream-daemon.js.
     pub tool_search_mode: Option<String>,
+    // Brain: 037-anthropic-compatible-providers
+    // Resolved provider config for Anthropic-compatible providers (z.ai, MiniMax, etc.).
+    // When set, the daemon will override ANTHROPIC_BASE_URL / ANTHROPIC_AUTH_TOKEN /
+    // ANTHROPIC_DEFAULT_*_MODEL env vars for this query only.
+    pub provider_config: Option<serde_json::Value>,
 }
 
 const DEFAULT_MODEL: &str = "sonnet";
@@ -2082,6 +2087,10 @@ async fn send_message_via_daemon(
     }
     if let Some(ref mode) = request.tool_search_mode {
         query_cmd["toolSearchMode"] = serde_json::Value::String(mode.clone());
+    }
+    // Brain: 037-anthropic-compatible-providers
+    if let Some(ref cfg) = request.provider_config {
+        query_cmd["providerConfig"] = cfg.clone();
     }
 
     // Send query to daemon
