@@ -7,8 +7,8 @@
  * mirrors the SVG pan/zoom via a CSS transform on the parent wrapper — the
  * same pattern used by React Flow and Excalidraw.
  *
- * UX: inline cards open in EDIT mode by default (textarea visible). Toggle
- * edit/preview via header button. File-backed cards render preview-only;
+ * UX: cards open in PREVIEW mode by default. Toggle edit/preview via header
+ * button (inline cards only). File-backed cards render preview-only;
  * double-click opens the source file in the Code Editor tab.
  */
 
@@ -100,7 +100,7 @@ export default function CanvasMdCard({
   onAnnotationDragStart, onAnnotationDragEnd,
 }: Props) {
   const isInline = card.content !== undefined && !card.filePath;
-  const [editing, setEditing] = useState<boolean>(isInline);
+  const [editing, setEditing] = useState<boolean>(false);
   const dragRef = useRef<DragRef>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
