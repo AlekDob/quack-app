@@ -8,6 +8,8 @@ import IOSSwitch from '../controls/IOSSwitch';
 import { useSettingsStore } from '../../../stores/settingsStore';
 import { checkOllamaRunning, fetchOllamaModels, getOllamaModelOptions } from '../../../services/ollamaService';
 import type { LLMProviderType, OllamaModel } from '../../../types';
+// Brain: 037-anthropic-compatible-providers
+import ProviderManager from './providers/ProviderManager';
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434';
 
@@ -278,6 +280,15 @@ export default function ClaudeCodeSettings() {
             </span>
           </div>
         )}
+      </div>
+
+      {/* Anthropic-compatible Providers — Brain: 037-anthropic-compatible-providers */}
+      <SectionHeader
+        title="Anthropic-compatible Providers"
+        description="Route Claude Agent SDK sessions through z.ai, MiniMax, Kimi, Qwen and other Anthropic-compatible endpoints."
+      />
+      <div className="settings-group">
+        <ProviderManager />
       </div>
 
       {/* Claude Authentication (only for Anthropic) */}

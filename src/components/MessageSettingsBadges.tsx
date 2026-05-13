@@ -42,17 +42,22 @@ const thinkingIcons: Record<string, string> = {
 function MessageSettingsBadges({ settings }: MessageSettingsBadgesProps) {
   if (!settings) return null;
 
-  const { model, effort, thinkingMode, hasThinkingBlocks } = settings;
+  const { model, effort, thinkingMode, hasThinkingBlocks, modelDisplayName } = settings;
 
   // Only show if at least one setting is present
   if (!model && !effort && !thinkingMode) return null;
+
+  // Brain: 037-anthropic-compatible-providers
+  // Prefer the explicit display name (set when a custom provider was active)
+  // over the friendly tier id mapping.
+  const renderedLabel = modelDisplayName || (model ? (modelLabels[model] || model) : '');
 
   return (
     <div className="message-settings-badges">
       {/* Model Badge */}
       {model && (
-        <span className={`settings-badge model-badge model-${model}`} title={`Model: ${modelLabels[model] || model}`}>
-          {modelLabels[model] || model}
+        <span className={`settings-badge model-badge model-${model}`} title={`Model: ${renderedLabel}`}>
+          {renderedLabel}
         </span>
       )}
 
