@@ -2,7 +2,7 @@
  * Feature Map — Annotation types (post-its, group rectangles, images)
  */
 
-export type AnnotationMode = 'select' | 'lasso' | 'postit' | 'group' | 'image' | 'mdcard' | 'text';
+export type AnnotationMode = 'select' | 'lasso' | 'postit' | 'group' | 'image' | 'mdcard' | 'text' | 'brain';
 
 export interface PostIt {
   id: string;
@@ -68,6 +68,22 @@ export interface CanvasText {
   parentComponentId?: string;
 }
 
+/**
+ * Knowledge Graph node — auto-populates with every .md/.mmd in documentation/.
+ * Compact preview on the canvas; double-click enters an Explorer view that
+ * renders the full force-directed graph with per-document preview.
+ */
+export interface BrainNode {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Optional title override (default "Knowledge Graph"). */
+  title?: string;
+  parentComponentId?: string;
+}
+
 /** Navigation state for nested components (ephemeral, not persisted) */
 export interface ComponentNavigation {
   currentComponentId: string | null;
@@ -88,6 +104,7 @@ export interface CanvasAnnotations {
   images: CanvasImage[];
   mdCards: MdCard[];
   texts?: CanvasText[];
+  brainNodes?: BrainNode[];
 }
 
 /** File-based whiteboard state (replaces localStorage) */
@@ -118,3 +135,8 @@ export const TEXT_DEFAULT_FONT = 24;
 export const TEXT_DEFAULT_TEXT = 'Title';
 export const TEXT_MIN_FONT = 10;
 export const TEXT_MAX_FONT = 72;
+
+export const BRAIN_NODE_DEFAULT_W = 280;
+export const BRAIN_NODE_DEFAULT_H = 180;
+export const BRAIN_NODE_MIN_W = 220;
+export const BRAIN_NODE_MIN_H = 140;

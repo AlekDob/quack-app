@@ -7,16 +7,18 @@
 import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import { calculateLayeredLayout, classifyNode, LAYERS, LEFT_MARGIN, LEGEND_H } from './featureMapLayout';
 import type { FeatureGraph, NodePosition } from './featureMapTypes';
-import type { CanvasAnnotations, AnnotationMode, PostIt, GroupRect, CanvasImage as CanvasImageType, MdCard, CanvasText as CanvasTextType, LassoRect } from './annotationTypes';
+import type { CanvasAnnotations, AnnotationMode, PostIt, GroupRect, CanvasImage as CanvasImageType, MdCard, CanvasText as CanvasTextType, BrainNode as BrainNodeType, LassoRect } from './annotationTypes';
 import { GROUP_MIN_W, GROUP_MIN_H } from './annotationTypes';
 import CanvasPostIt from './CanvasPostIt';
 import CanvasGroupRect from './CanvasGroupRect';
 import CanvasImage from './CanvasImage';
 import CanvasMdCard from './CanvasMdCard';
 import { CanvasText } from './CanvasText';
+import CanvasBrainNode from './CanvasBrainNode';
 import FeatureMapMinimap from './FeatureMapMinimap';
 
 const BG = 'var(--bg-base, #0f1115)';
+const GRID_BASE_PX = 40;
 const BORDER_DEFAULT = '#1e293b';
 const BORDER_HOVER = '#00d9ff';
 // Brain: gotcha-pixi-csp-unsafe-eval — SVG/Canvas requires resolved hex values (no CSS variables)
@@ -70,6 +72,11 @@ interface Props {
   onTextAdd: (x: number, y: number, init?: Partial<CanvasTextType>) => string;
   onTextUpdate: (id: string, p: Partial<CanvasTextType>) => void;
   onTextRemove: (id: string) => void;
+  // BrainNode (Knowledge Graph)
+  onBrainNodeAdd: (x: number, y: number, init?: Partial<BrainNodeType>) => string;
+  onBrainNodeUpdate: (id: string, p: Partial<BrainNodeType>) => void;
+  onBrainNodeRemove: (id: string) => void;
+  onEnterBrain: (id: string, label: string) => void;
   /** Alt-drag duplication; clones the given annotation ids, returns new ids. */
   onDuplicateAnnotations: (ids: string[], offsetX?: number, offsetY?: number) => string[];
   projectPath: string;
@@ -107,6 +114,7 @@ export default function FeatureMapCanvas(props: Props) {
     onImageUpdate, onImageRemove, onImageFilePick, onImageDrop,
     onMdCardAdd, onMdCardUpdate, onMdCardRemove, onOpenMdCardFile,
     onTextAdd, onTextUpdate, onTextRemove,
+    onBrainNodeAdd, onBrainNodeUpdate, onBrainNodeRemove, onEnterBrain,
     onDuplicateAnnotations,
     projectPath, onResetMode, searchQuery,
     multiSelectedIds, lassoRect: lassoRectProp,
@@ -262,6 +270,12 @@ export default function FeatureMapCanvas(props: Props) {
       onResetMode();
       return;
     }
+    if (annotationMode === 'brain') {
+      const svg = toSvg(e.clientX, e.clientY);
+      onBrainNodeAdd(svg.x, svg.y);
+      onResetMode();
+      return;
+    }
     if (annotationMode === 'text') {
       const svg = toSvg(e.clientX, e.clientY);
       const id = onTextAdd(svg.x, svg.y);
@@ -317,6 +331,8 @@ export default function FeatureMapCanvas(props: Props) {
       if (img) { origins.set(id, { x: img.x, y: img.y }); continue; }
       const mc = (annotations.mdCards ?? []).find(ci => ci.id === id);
       if (mc) { origins.set(id, { x: mc.x, y: mc.y }); continue; }
+      const bn = (annotations.brainNodes ?? []).find(bi => bi.id === id);
+      if (bn) { origins.set(id, { x: bn.x, y: bn.y }); continue; }
     }
     onBeginDrag();
     multiDragRef.current = { startX: clientX, startY: clientY, didDrag: false, origins };
@@ -349,8 +365,9 @@ export default function FeatureMapCanvas(props: Props) {
       else if (annotations.groups.some(g => g.id === id)) onGroupUpdate(id, np);
       else if (annotations.images.some(i => i.id === id)) onImageUpdate(id, np);
       else if ((annotations.mdCards ?? []).some(c => c.id === id)) onMdCardUpdate(id, np);
+      else if ((annotations.brainNodes ?? []).some(b => b.id === id)) onBrainNodeUpdate(id, np);
     }
-  }, [annotations, graph.nodes, onNodeDrag, onPostItUpdate, onGroupUpdate, onImageUpdate, onMdCardUpdate]);
+  }, [annotations, graph.nodes, onNodeDrag, onPostItUpdate, onGroupUpdate, onImageUpdate, onMdCardUpdate, onBrainNodeUpdate]);
 
   /** Check if target is a valid drop destination (prevents circular nesting) */
   const canDropOnTarget = useCallback((dragId: string, targetId: string): boolean => {
@@ -519,6 +536,10 @@ export default function FeatureMapCanvas(props: Props) {
           const cx = c.x + c.w / 2; const cy = c.y + c.h / 2;
           if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) hits.add(c.id);
         }
+        for (const b of (annotations.brainNodes ?? [])) {
+          const cx = b.x + b.w / 2; const cy = b.y + b.h / 2;
+          if (cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h) hits.add(b.id);
+        }
         console.log('[lasso-whiteboard] hits', { count: hits.size, ids: Array.from(hits) });
         onLassoSelect(hits);
       }
@@ -588,8 +609,24 @@ export default function FeatureMapCanvas(props: Props) {
   const cursor = draggingId || multiDragRef.current ? 'grabbing'
     : spaceHeld ? 'grab'
     : annotationMode === 'lasso' ? 'crosshair'
-    : annotationMode === 'postit' || annotationMode === 'group' || annotationMode === 'image' || annotationMode === 'mdcard' ? 'crosshair'
+    : annotationMode === 'postit' || annotationMode === 'group' || annotationMode === 'image' || annotationMode === 'mdcard' || annotationMode === 'brain' ? 'crosshair'
     : 'grab';
+
+  // Brain: notebook-grid-screen-space — cell size constant in CSS pixels,
+  // pan shifts modulo cell. Eliminates sub-pixel blur at non-integer zoom.
+  const gridOffsetX = ((viewport.panX % GRID_BASE_PX) + GRID_BASE_PX) % GRID_BASE_PX;
+  const gridOffsetY = ((viewport.panY % GRID_BASE_PX) + GRID_BASE_PX) % GRID_BASE_PX;
+  const gridStyle: React.CSSProperties = {
+    position: 'absolute',
+    inset: 0,
+    pointerEvents: 'none',
+    backgroundImage:
+      'linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),' +
+      'linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px)',
+    backgroundRepeat: 'repeat',
+    backgroundSize: `${GRID_BASE_PX}px ${GRID_BASE_PX}px`,
+    backgroundPosition: `${gridOffsetX}px ${gridOffsetY}px`,
+  };
 
   return (
     <div ref={containerRef}
@@ -599,8 +636,9 @@ export default function FeatureMapCanvas(props: Props) {
       onWheel={handleWheel} onMouseDown={handleCanvasMouseDown}
       onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
       onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+      <div style={gridStyle} />
       {size.w > 0 && (
-        <svg width={size.w} height={size.h} style={{ display: 'block' }}>
+        <svg width={size.w} height={size.h} style={{ display: 'block', position: 'relative', zIndex: 1 }}>
           <rect width={size.w} height={size.h} fill="transparent" onClick={handleBgClick} />
           <g transform={`translate(${viewport.panX},${viewport.panY}) scale(${viewport.zoom})`}>
 
@@ -795,9 +833,12 @@ export default function FeatureMapCanvas(props: Props) {
       )}
       {/* HTML overlay layer for MD Preview Cards — avoids WebKit foreignObject bug.
           Applies the same pan/zoom transform as the SVG `<g>` so cards stay aligned
-          with post-its/groups. pointer-events: none on wrapper, auto on each card. */}
+          with post-its/groups. pointer-events: none on wrapper, auto on each card.
+          zIndex:2 puts this above the SVG (zIndex:1) so the bg <rect fill="transparent">
+          does not steal pointer events from the cards. */}
       <div className="fm-html-overlay" style={{
         position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none',
+        zIndex: 2,
       }}>
         <div style={{
           position: 'absolute', top: 0, left: 0, width: 0, height: 0,
@@ -817,6 +858,26 @@ export default function FeatureMapCanvas(props: Props) {
               onOpenFile={onOpenMdCardFile}
               onAnnotationDragStart={(id) => { dragAnnotationRef.current = id; }}
               onAnnotationDragEnd={handleAnnotationDragEnd} />
+          ))}
+          {(annotations.brainNodes ?? []).map(b => (
+            <CanvasBrainNode
+              key={b.id}
+              node={b}
+              zoom={viewport.zoom}
+              projectPath={projectPath}
+              isSelected={selectedAnnotationId === b.id}
+              isMultiSelected={multiSelectedIds.has(b.id)}
+              onUpdate={onBrainNodeUpdate}
+              onRemove={onBrainNodeRemove}
+              onSelect={onAnnotationSelect}
+              onEnter={onEnterBrain}
+              onMultiToggle={onMultiToggle}
+              onGroupDragStart={handleGroupDragStart}
+              onBeginDrag={onBeginDrag}
+              onEndDrag={onEndDrag}
+              onAnnotationDragStart={(id) => { dragAnnotationRef.current = id; }}
+              onAnnotationDragEnd={handleAnnotationDragEnd}
+            />
           ))}
           {(annotations.texts ?? []).map(t => (
             <CanvasText
