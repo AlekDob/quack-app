@@ -6,6 +6,9 @@ import { getModelOptions, getModelLabel } from '../services/modelService';
 import { useModelsConfig } from '../hooks/useAppConfig';
 import { useSettingsStore } from '../stores/settingsStore';
 import { fetchOllamaModels, getOllamaModelOptions } from '../services/ollamaService';
+// Brain: 037-anthropic-compatible-providers
+import { BUILTIN_PRESETS } from '../constants/providerPresets';
+import { getProviderToken } from '../services/providerService';
 import './ChatSettingsMenu.css';
 
 interface ChatSettingsMenuProps {
@@ -53,10 +56,18 @@ export default function ChatSettingsMenu({
   const modelOptions = getModelOptions(remoteModels);
   const { provider, providerBaseUrl, ollamaModel, bedrockModelOverride } = useSettingsStore(s => s.claude);
   const updateClaude = useSettingsStore(s => s.updateClaudeSettings);
+  // Brain: 037-anthropic-compatible-providers
+  const activeProvider = useSettingsStore(s => s.claude.activeProvider) ?? { kind: 'anthropic' as const };
+  const customProviders = useSettingsStore(s => s.claude.customProviders) ?? [];
+  const providerModelCache = useSettingsStore(s => s.claude.providerModelCache) ?? {};
+  const activeProviderId = activeProvider.kind === 'custom' ? activeProvider.providerId : 'anthropic';
 
   const [isOpen, setIsOpen] = useState(false);
   const [ollamaModelOptions, setOllamaModelOptions] = useState<{ value: string; label: string }[]>([]);
   const [providerSwitched, setProviderSwitched] = useState(false);
+  // Brain: 037-anthropic-compatible-providers
+  // Set of provider ids with a saved API key. Refreshed whenever the popover opens.
+  const [providersWithKey, setProvidersWithKey] = useState<Set<string>>(new Set());
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -72,6 +83,30 @@ export default function ChatSettingsMenu({
       refreshOllamaModels();
     }
   }, [isOpen, provider, refreshOllamaModels]);
+
+  // Brain: 037-anthropic-compatible-providers
+  // When the popover opens, probe all custom-compatible providers for a saved API key
+  // and filter the dropdown to only show usable ones (+ Anthropic Official as no-key default).
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    const probe = async () => {
+      const candidates = [...BUILTIN_PRESETS, ...customProviders]
+        .filter((p) => p.id !== 'anthropic');
+      const results = await Promise.all(
+        candidates.map(async (p) => {
+          const token = await getProviderToken(p.id);
+          return token ? p.id : null;
+        }),
+      );
+      if (cancelled) return;
+      setProvidersWithKey(new Set(results.filter((id): id is string => !!id)));
+    };
+    void probe();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, customProviders]);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -118,6 +153,20 @@ export default function ChatSettingsMenu({
 
   const getModelLabelText = () => {
     if (provider !== 'anthropic') return ollamaModel || provider;
+    // Brain: 037-anthropic-compatible-providers
+    // When a custom provider is active, show the provider's real model name
+    // (e.g. "MiniMax-M2", "glm-4.6") instead of the underlying Anthropic friendly tier.
+    if (activeProvider.kind === 'custom') {
+      // Live model from /v1/models always wins.
+      if (activeProvider.activeModel) return activeProvider.activeModel;
+      const ap = BUILTIN_PRESETS.find(p => p.id === activeProvider.providerId)
+        ?? customProviders.find(p => p.id === activeProvider.providerId);
+      if (ap) {
+        if (baseModel === 'haiku45' && ap.haikuModel) return ap.haikuModel;
+        if (baseModel === 'opus47' && ap.defaultModel) return ap.defaultModel;
+        return ap.sonnetModel || ap.haikuModel || ap.defaultModel || ap.name;
+      }
+    }
     // When Bedrock override is active, show the override model ID (truncated)
     if (hasBedrockOverride) {
       const override = bedrockModelOverride.trim();
@@ -235,6 +284,59 @@ export default function ChatSettingsMenu({
             </div>
           )}
 
+          {/* Brain: 037-anthropic-compatible-providers
+              Custom Model picker — visible only when "Claude" tab is active.
+              Lists Anthropic Official + only providers with a saved API key (configured in Settings). */}
+          {provider === 'anthropic' && (() => {
+            const allowed = [...BUILTIN_PRESETS, ...customProviders].filter(
+              (p) => p.id === 'anthropic' || providersWithKey.has(p.id),
+            );
+            const activeProviderObj =
+              BUILTIN_PRESETS.find(p => p.id === activeProviderId) ??
+              customProviders.find(p => p.id === activeProviderId);
+            return (
+              <div className="chat-settings-section">
+                <span className="chat-settings-label-text">Custom Model</span>
+                <select
+                  className="chat-settings-select"
+                  value={allowed.some(p => p.id === activeProviderId) ? activeProviderId : 'anthropic'}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    updateClaude({
+                      activeProvider: next === 'anthropic'
+                        ? { kind: 'anthropic' }
+                        : { kind: 'custom', providerId: next },
+                    });
+                  }}
+                  style={{ marginTop: 4, width: '100%' }}
+                >
+                  {allowed.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {p.sonnetModel ? ` · ${p.sonnetModel}` : ''}
+                    </option>
+                  ))}
+                </select>
+                {allowed.length === 1 && (
+                  <div style={{
+                    fontSize: 10, color: 'var(--text-secondary)', opacity: 0.7,
+                    padding: '4px 0 0', lineHeight: 1.4,
+                  }}>
+                    Configure a custom provider in Settings → Claude Code to add z.ai, MiniMax, Kimi, Qwen or DeepSeek.
+                  </div>
+                )}
+                {activeProviderId !== 'anthropic' && activeProviderObj && (
+                  <div style={{
+                    fontSize: 10, color: 'var(--text-secondary)', opacity: 0.7,
+                    padding: '4px 0 0',
+                  }}>
+                    Routing through {activeProviderObj.baseUrl}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Model dropdown - adapts to provider */}
           <div className="chat-settings-section">
             <label className="chat-settings-label">
@@ -251,7 +353,83 @@ export default function ChatSettingsMenu({
                   </span>
                 )}
               </span>
-              {provider === 'anthropic' ? (
+              {provider === 'anthropic' && activeProvider.kind === 'custom' ? (
+                // Brain: 037-anthropic-compatible-providers
+                // When a custom Anthropic-compatible provider is active, the Anthropic
+                // friendly model names (Opus/Sonnet/Haiku) don't apply — the request must
+                // carry "sonnet" or "haiku" in the model name for ANTHROPIC_DEFAULT_*_MODEL
+                // env overrides to fire. Show the provider's real models instead.
+                // If /v1/models was refreshed, show the full live list; otherwise fall
+                // back to the bundled sonnet/haiku/default tier slots.
+                (() => {
+                  const ap = BUILTIN_PRESETS.find(p => p.id === activeProvider.providerId)
+                    ?? customProviders.find(p => p.id === activeProvider.providerId);
+                  if (!ap) return null;
+                  const cached = providerModelCache[activeProvider.providerId]?.models ?? [];
+                  const useCached = cached.length > 0;
+                  const updateActiveModel = (id: string | undefined) => {
+                    const current = useSettingsStore.getState().claude.activeProvider;
+                    if (!current || current.kind !== 'custom') return;
+                    if ((current.activeModel ?? undefined) === id) return;
+                    useSettingsStore.getState().updateClaudeSettings({
+                      activeProvider: { ...current, activeModel: id },
+                    });
+                  };
+                  if (useCached) {
+                    const activeModel = activeProvider.activeModel ?? cached[0];
+                    if (activeModel !== activeProvider.activeModel) {
+                      queueMicrotask(() => updateActiveModel(activeModel));
+                    }
+                    // Friendly id must contain "sonnet" so the env override fires.
+                    if (baseModel !== 'sonnet46') {
+                      queueMicrotask(() => onModelChange('sonnet46'));
+                    }
+                    return (
+                      <select
+                        value={activeModel}
+                        onChange={(e) => {
+                          updateActiveModel(e.target.value);
+                          if (baseModel !== 'sonnet46') onModelChange('sonnet46');
+                        }}
+                        className="chat-settings-select"
+                        style={{ flex: 1 }}
+                      >
+                        {cached.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    );
+                  }
+                  // Clear any stale activeModel when falling back to bundled tiers.
+                  if (activeProvider.activeModel) {
+                    queueMicrotask(() => updateActiveModel(undefined));
+                  }
+                  const opts: { friendly: string; label: string }[] = [];
+                  opts.push({ friendly: 'sonnet46', label: ap.sonnetModel });
+                  if (ap.haikuModel && ap.haikuModel !== ap.sonnetModel) {
+                    opts.push({ friendly: 'haiku45', label: ap.haikuModel });
+                  }
+                  if (ap.defaultModel && ap.defaultModel !== ap.sonnetModel && ap.defaultModel !== ap.haikuModel) {
+                    opts.push({ friendly: 'opus47', label: ap.defaultModel });
+                  }
+                  const selected = opts.find(o => o.friendly === baseModel)?.friendly ?? opts[0].friendly;
+                  if (selected !== baseModel) {
+                    queueMicrotask(() => onModelChange(selected));
+                  }
+                  return (
+                    <select
+                      value={selected}
+                      onChange={(e) => onModelChange(e.target.value)}
+                      className="chat-settings-select"
+                      style={{ flex: 1 }}
+                    >
+                      {opts.map((o) => (
+                        <option key={o.friendly} value={o.friendly}>{o.label}</option>
+                      ))}
+                    </select>
+                  );
+                })()
+              ) : provider === 'anthropic' ? (
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <select
                     value={baseModel}

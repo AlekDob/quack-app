@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import type { EffortLevel, ModePreset, AgentModePresets, LLMProviderType } from '../types';
+// Brain: 037-anthropic-compatible-providers
+import type { ActiveProviderState, CustomProvider, ProviderModelCacheEntry } from '../types/providers';
 import { applyTypography, DEFAULT_TYPOGRAPHY, DEFAULT_CUSTOM_FONT_SIZE, safeCustomSize } from '../constants/typography';
 import type { TypographySettings, FontSizePreset } from '../constants/typography';
 import { applyAccentColor, DEFAULT_ACCENT } from '../utils/accentColor';
@@ -41,6 +43,13 @@ interface ClaudeSettings {
   bedrockModelOverride: string;  // Full Bedrock ARN or model ID (e.g. us.anthropic.claude-sonnet-4-5-20250929-v1:0)
   // Tool Search deferred-loading mode (ENABLE_TOOL_SEARCH). Maps to env var in stream-daemon.js.
   toolSearchMode: 'off' | 'auto' | 'aggressive' | 'always';
+  // Brain: 037-anthropic-compatible-providers
+  // Active provider for new sessions (default global). Per-session override lives in sessionStore.
+  activeProvider: ActiveProviderState;
+  customProviders: CustomProvider[];
+  // Brain: 037-anthropic-compatible-providers
+  // Cache of /v1/models per provider id. Populated by Refresh button on each card.
+  providerModelCache: Record<string, ProviderModelCacheEntry>;
 }
 
 interface TerminalSettings {
@@ -180,6 +189,9 @@ const defaultClaudeSettings: ClaudeSettings = {
   btwModel: 'haiku45', // BTW Side-Chain: fast & cheap by default
   bedrockModelOverride: '', // Empty = use normal model resolution
   toolSearchMode: 'auto', // Default: ENABLE_TOOL_SEARCH=auto (10% threshold)
+  activeProvider: { kind: 'anthropic' },
+  customProviders: [],
+  providerModelCache: {},
 };
 
 // Anthropic recommended defaults for agent modes
@@ -382,7 +394,7 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: 'settings-storage',
-        version: 12,
+        version: 13,
         partialize: (state) => ({
           // Persist all settings
           claude: state.claude,
@@ -502,6 +514,40 @@ export const useSettingsStore = create<SettingsState>()(
             if (persisted.claude && !persisted.claude.toolSearchMode) {
               persisted.claude.toolSearchMode = 'auto';
             }
+          }
+          // v13: Add Anthropic-compatible provider system (activeProvider + customProviders).
+          // Brain: 037-anthropic-compatible-providers
+          // Idempotent: runs for ANY persisted state missing the new fields, not just v<13.
+          // (Defensive: an earlier intermediate build may have bumped version to 13 without
+          // populating these fields, leading to runtime crashes.)
+          // Maps legacy `provider` field ('anthropic' | 'ollama' | 'custom') to ActiveProviderState.
+          // Legacy `provider`, `providerBaseUrl`, etc. are PRESERVED for rollback safety.
+          if (persisted.claude && !persisted.claude.activeProvider) {
+            const legacy = persisted.claude.provider;
+            const legacyBaseUrl: string = persisted.claude.providerBaseUrl || '';
+            if (legacy === 'custom' && legacyBaseUrl) {
+              const legacyCustom: CustomProvider = {
+                id: 'legacy-custom',
+                name: 'Legacy Custom',
+                baseUrl: legacyBaseUrl,
+                sonnetModel: persisted.claude.ollamaModel || 'claude-sonnet-4-5',
+                haikuModel: persisted.claude.ollamaModel || 'claude-haiku-4-5',
+                contextWindow: 200000,
+                isBuiltIn: false,
+                createdAt: Date.now(),
+              };
+              persisted.claude.customProviders = [legacyCustom];
+              persisted.claude.activeProvider = { kind: 'custom', providerId: 'legacy-custom' };
+            } else {
+              persisted.claude.customProviders = [];
+              persisted.claude.activeProvider = { kind: 'anthropic' };
+            }
+          }
+          if (persisted.claude && !Array.isArray(persisted.claude.customProviders)) {
+            persisted.claude.customProviders = [];
+          }
+          if (persisted.claude && (typeof persisted.claude.providerModelCache !== 'object' || persisted.claude.providerModelCache === null)) {
+            persisted.claude.providerModelCache = {};
           }
           return persisted;
         },
