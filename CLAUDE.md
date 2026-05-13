@@ -219,6 +219,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 
 **Key patterns**: `documentation/patterns/` — search by name before implementing similar features.
 - Multi-provider LLM: `documentation/patterns/pattern-multi-provider-llm.md`
+- Anthropic-compatible providers (z.ai/MiniMax/Kimi/Qwen/DeepSeek): `documentation/patterns/pattern-anthropic-compatible-providers.md`
 - Automation layer: `documentation/patterns/pattern-automation-layer.md`
 - Tab system: `documentation/patterns/pattern-tab-system-singleton.md`
 - Dark theme CSS + accent tokens: `documentation/patterns/pattern-dark-theme-css-values.md`
@@ -260,6 +261,8 @@ Full knowledge store: `documentation/` (project) + `~/.quack/brain/` (global). U
 - In-memory HashMap for session-message mappings; `app-preferences.json` for mute toggle (002-telegram-bidirectional-chat)
 - TypeScript strict (React 18 frontend), Rust 1.75+ (Tauri v2 backend) + React 18, Zustand, Tauri v2 invoke API (003-changes-panel-branch-commits)
 - N/A (reads from Git via Tauri commands) (003-changes-panel-branch-commits)
+- TypeScript strict (React 18 frontend), Rust 1.75+ (Tauri v2 backend), Node.js 18.17.0 (SDK bridge) + Tauri v2, Zustand (settings store), `@anthropic-ai/claude-agent-sdk`, Tauri Store plugin, Tauri secure storage (existing `save_api_key`) (037-anthropic-compatible-providers)
+- OS-level secure storage via Tauri (API keys, namespaced `provider:<id>`); localStorage via Zustand persist (`settings-storage` v11→v12) per provider metadata + default; nessun nuovo file (037-anthropic-compatible-providers)
 
 ## Recent Changes
 - 004-feature-map-whiteboard: Added TypeScript strict (React 18 frontend) + PixiJS (@pixi/react), Tauri v2 invoke API (list_directory, read_file_content)

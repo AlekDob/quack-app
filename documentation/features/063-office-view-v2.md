@@ -4,7 +4,7 @@ project: quack-app
 stack: TypeScript strict (React 18 frontend), Tauri v2 invoke API (read_file_content, write_file_content, get_home_directory, rename_file)
 created: 2026-04-22
 last_verified: 2026-05-12
-tags: [office, office-v2, whiteboard, annotations, post-it, sticker, custom-group, undo-redo, toolbar, svg, layout, room-click, flip-transition, working-pulse]
+tags: [office, office-v2, whiteboard, annotations, post-it, sticker, custom-group, undo-redo, toolbar, svg, layout, room-click, flip-transition, working-pulse, notebook-grid]
 ---
 
 ## Office View v2
@@ -90,6 +90,21 @@ OfficeLayout {
 - `Space + left-drag` = pan (cursor: grab/grabbing)
 - Wheel = zoom (MIN 0.3, MAX 2.0)
 - Cmd+0 = reset viewport; Cmd+1 = zoom 0.8 / pan 50,50
+
+### Notebook-Paper Grid Background (2026-05-12)
+Lo sfondo del canvas (`.office-canvas`) ospita un layer `.office-canvas__grid` con un pattern di quadretti tipo pagina di quaderno. Il layer è posizionato `absolute; inset: 0; pointer-events: none` e renderizzato come primo figlio del container, **sotto** SVG e cards (z-ordering naturale via source order).
+
+**Pattern**: doppio `linear-gradient` (orizzontale + verticale) con linee `rgba(255, 255, 255, 0.03)` da 1px su cella base **40px** (`GRID_BASE_PX = 40`).
+
+**Pan sync (screen-space)**: la cella è **costante in CSS pixel** (no scaling col zoom). Solo `backgroundPosition` trasla via modulo cella:
+- `backgroundSize = 40px 40px` (fisso).
+- `backgroundPosition = ((panX % 40) + 40) % 40, idem panY`.
+
+**Perché screen-space e non world-space?** Scalare `backgroundSize = 40 * zoom` produce dimensioni cella non-intere (zoom 0.73 → 29.2px) → le linee da 1px finiscono a sub-pixel → blur/moiré orribile a quasi tutti i livelli di zoom. Screen-space mantiene linee crispy a qualsiasi zoom (stesso approccio di Figma/Miro). Trade-off: la griglia non comunica il livello di zoom — accettabile, l'utente lo legge dal viewport.
+
+**Wiring**: `GRID_BASE_PX = 40` definito in `OfficeCanvas.tsx`. Il layer è renderizzato `<div className="office-canvas__grid" style={gridStyle} />` come primo elemento del container, prima dello `<svg>`.
+
+**Consistency**: stesso pattern (40px / alpha 0.03) usato anche nella Whiteboard (feature 026) per dare un'identità visiva uniforme tra Office View e Feature Map.
 
 ### Annotation Interaction
 All three annotation kinds go through a single `annotRef` tagged-union state in `OfficeCanvas`:

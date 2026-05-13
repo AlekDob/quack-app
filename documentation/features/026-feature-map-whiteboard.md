@@ -5,7 +5,7 @@ stack: TypeScript strict (React 18 frontend), Tauri v2 invoke API (list_director
 created: 2026-04-03
 last_verified: 2026-05-12
 shortcut: Cmd+Shift+W (Meta+Shift+W)
-tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, mention, autocomplete, image, agent-bridge, skill, nested-components, matryoshka, drag-assign, drag-eject, md-card, markdown, mermaid]
+tags: [feature-map, whiteboard, visualization, graph, svg, architecture-layers, mention, autocomplete, image, agent-bridge, skill, nested-components, matryoshka, drag-assign, drag-eject, md-card, markdown, mermaid, notebook-grid, brain-node, knowledge-graph, force-graph, wikilink]
 image: images/026-whiteboard-overview.png
 ---
 
@@ -28,10 +28,14 @@ image: images/026-whiteboard-overview.png
 | Component | `src/components/featureMap/CanvasImage.tsx` | SVG canvas image annotation — draggable, aspect-ratio resize (corner handle), delete on hover, blob URL loading from filesystem |
 | Component | `src/components/featureMap/CanvasMdCard.tsx` | HTML-overlay MD Preview Card (NOT SVG foreignObject — avoids WebKit clipping bug) — renders inline markdown or referenced `.md`/`.mmd` file (with Mermaid diagrams), edit-first UX (textarea auto-focus on new cards), preview/edit toggle, draggable header, resize handle, collapse toggle, file hot-reload (2s polling), double-click to open source file in editor. Positioned via CSS transform mirroring canvas pan/zoom. |
 | Component | `src/components/featureMap/CanvasText.tsx` | HTML-overlay "titoletto" — draggable, edit-on-double-click (auto-focus on spawn), A−/A+ to resize font (10-72px), × to delete. Same pan/zoom transform pattern as MdCard. |
-| Component | `src/components/featureMap/AnnotationToolbar.tsx` | Floating HTML toolbar for Select/Lasso/Post-it/Group/Image/MD Card mode toggle + selection count badge + Create Component button |
+| Component | `src/components/featureMap/CanvasBrainNode.tsx` | HTML-overlay Knowledge Graph card — compact preview (static mini-graph SVG of first 12 nodes) + doc/link counts + double-click to enter `BrainNodeExplorer`. Same drag/resize pattern as `CanvasMdCard`. |
+| Component | `src/components/featureMap/BrainNodeExplorer.tsx` | Fullscreen-within-whiteboard knowledge explorer rendered when the user enters a BrainNode. ForceGraph2D + filters (All/Features/Bugs/Patterns/Gotchas/Decisions/Diary/Diagrams) + side preview (MarkdownText + MermaidDiagram lazy) + "Drop on canvas" (spawns live `mdCard` with filePath) + "Open in editor". |
+| Service | `src/services/wikiLinkService.ts` | `parseWikiLinks(content)` — extracts `[[target]]` / `[[target\|display]]` references. Regex mirrored from `src/tests/wikilinks.test.ts`. |
+| Service | `src/services/brainGraphService.ts` | `loadProjectDocs`, `buildBrainGraph`, `loadBrainGraph` (60s session cache), `invalidateBrainGraphCache`. Combines tag-overlap (weight 1, skip tag fanout >20) + wikilink (weight 2) into a deduplicated graph; merges to `via: 'mixed'` when both apply. |
+| Component | `src/components/featureMap/AnnotationToolbar.tsx` | Floating HTML toolbar for Select/Lasso/Post-it/Group/Image/MD Card/Title/Brain mode toggle + selection count badge + Create Component button |
 | Component | `src/components/featureMap/FeatureMapMinimap.tsx` | Minimap overview panel — node dots + viewport rect + click-to-navigate |
 | Component | `src/components/featureMap/WhiteboardBreadcrumb.tsx` | Navigation breadcrumb for nested components — Root > Parent > Current |
-| Model/Type | `src/components/featureMap/annotationTypes.ts` | PostIt, GroupRect, CanvasImage, MdCard, CanvasText, CanvasAnnotations, WhiteboardFile, AnnotationMode (incl. 'lasso', 'mdcard', 'text'), ComponentNavigation, LassoRect types + color/dimension constants |
+| Model/Type | `src/components/featureMap/annotationTypes.ts` | PostIt, GroupRect, CanvasImage, MdCard, CanvasText, **BrainNode**, CanvasAnnotations, WhiteboardFile, AnnotationMode (incl. 'lasso', 'mdcard', 'text', 'brain'), ComponentNavigation, LassoRect types + color/dimension constants |
 | Store/State | `src/hooks/useCanvasSelection.ts` | Multi-selection hook — lasso rect state, selectedIds Set, startLasso/updateLasso/resetLasso/setSelection/toggleSelect/clearSelection |
 | Service | `src/services/whiteboardFileService.ts` | File-based I/O for `.whiteboard.json` — readWhiteboardFile, writeWhiteboardFile, migrateFromLocalStorage (Tauri read_file_content + write_file_content) |
 | Store/State | `src/hooks/useWhiteboardFile.ts` | Unified annotation + position CRUD hook with file-based persistence + 2s polling for external changes (agent bridge) |
@@ -78,6 +82,15 @@ image: images/026-whiteboard-overview.png
 - **Collapsible layers**: click layer header to collapse/expand; collapsed layers set rows=0 and hide their nodes; state in `collapsedLayers: Set<string>` (component state)
 - **Section gap**: 24px between layer sections (`SECTION_GAP`), 32px reserved for header (`SECTION_HEADER_H`)
 - **Left-aligned node text**: title and subtitle use `textAnchor="start"` at `x=-NW/2+14` (14px inset from left edge)
+
+### Notebook-Paper Grid Background (2026-05-12)
+Sfondo del canvas con pattern di quadretti tipo pagina di quaderno, allineato con Office V2 (feature 063).
+
+- Layer `<div>` con `position: absolute; inset: 0; pointerEvents: 'none'` iniettato come PRIMO figlio del container in `FeatureMapCanvas.tsx`, **prima** dello `<svg>`.
+- Pattern: doppio `linear-gradient` (orizzontale + verticale) `rgba(255, 255, 255, 0.03)` da 1px su cella base **40px** (`GRID_BASE_PX = 40`).
+- **Screen-space sync**: `backgroundSize = 40px` fisso (no zoom scaling); `backgroundPosition = ((panX % 40) + 40) % 40, idem panY`. La griglia trasla col pan ma NON scala col zoom — linee sempre crispy a qualsiasi livello di zoom (stesso pattern di Figma/Miro). Evita il sub-pixel blur che si otteneva scalando `backgroundSize` con zoom non-interi.
+- **Z-stacking**: il div grid è `absolute` (z-stack 0 implicito), quindi sovrascriverebbe lo `<svg>` che è static; per ripristinare l'ordine corretto allo `<svg>` è stato aggiunto `position: relative; zIndex: 1`. L'overlay HTML md-cards (già `absolute`, successivo nel sorgente) resta sopra all'svg naturalmente.
+- Costo rendering trascurabile (CSS gradient GPU-compositato).
 
 ### Fit-to-Content Zoom
 - On first render, auto-calculates zoom to fit all content within the viewport
@@ -347,6 +360,26 @@ Components are nestable group rects that act as sub-whiteboards. Select 2+ annot
 
 ### Fix: Title tool non creava titoletti (2026-05-12)
 Il tool "Title" (tasto `7`, bottone T nella toolbar) sembrava resettarsi a Select senza creare nulla. Causa: `filterByParent` in `useWhiteboardFile.ts:67-71` ricostruiva `CanvasAnnotations` senza il campo `texts` — `CanvasText[]` veniva strippato silenziosamente da `visibleAnnotations` perché il campo è opzionale (TypeScript non urlava). I titoletti venivano persistiti nel `.whiteboard.json` ma non renderizzati al re-render. Fix: aggiunto `texts: match(a.texts ?? [])` al return. Inoltre `MODES` in `FeatureMapView.tsx:220` non includeva `'text'`, quindi il Ctrl-cycling saltava il Title (Ctrl con mode `text` → `'select'`); aggiunto `'text'` all'array. Brain: `documentation/bugs/fix-whiteboard-texts-stripped-by-filterbyparent.md`. **Regola generale**: ogni nuovo campo collezione in `CanvasAnnotations` va aggiunto a `filterByParent`, `duplicateAnnotations`, `MODES`, `BUTTONS` toolbar, branch `handleMouseDown` canvas, render block canvas.
+
+### Brain Node — Knowledge Graph on canvas (2026-05-12)
+First-class whiteboard element che trasforma `documentation/` in un knowledge graph navigabile alla Heptabase/Obsidian senza lasciare la canvas.
+
+- **Insert**: select Brain mode in toolbar (tasto `8`, icona network/brain) + click su canvas. Default `280×180` (`BRAIN_NODE_DEFAULT_W/H`), min `220×140`.
+- **Vista compatta** (`CanvasBrainNode`): card con accento arancio che mostra un mini-grafo statico SVG dei primi 12 nodi + count "349 docs · 412 links". HTML overlay, NON SVG `foreignObject` (stesso motivo di WebKit clipping di `CanvasMdCard`).
+- **Vista espansa** (`BrainNodeExplorer`): double-click sulla card → riusa il `ComponentNavigation` breadcrumb (`Root > Brain`) e renderizza un `ForceGraph2D` fullscreen sopra il canvas. ESC / Backspace esce.
+- **Scope di indicizzazione**: ogni `.md` / `.mmd` in `{projectPath}/documentation/` via `listBrainEntries({ projectRoot })` + `readBrainEntry`. NO cross-project, NO brain globale.
+- **Sorgenti di link**:
+  - **Tag overlap** (`weight: 1`) — stesso algoritmo di `BrainGraph.buildAiGraph` (skip tag con > 20 entries per evitare clutter).
+  - **Wikilink** `[[slug]]` nel body (`weight: 2`) — risolti contro slugMap (`filename` senza `.md`/`.mmd`, lowercased). Quando entrambi i tipi di link valgono fra due doc, `via` diventa `'mixed'` e weight è il max + 1.
+  - NON usati: file-path-shared, "See also" testuale — troppo rumoroso / fragile.
+- **Side preview**: click su un nodo nell'Explorer mostra il doc in un pannello laterale destro (360px) con `MarkdownText` per `.md` e `MermaidDiagram` lazy per `.mmd`. Errori → "Could not read {path}".
+- **Drop on canvas**: pulsante nel side panel che materializza il doc selezionato come `mdCard` con `filePath` (hot-reload 2s) accanto al BrainNode sorgente, allo stesso livello di nesting. Implementato via `useWhiteboardFile.spawnMdCardFromBrain()`. L'Explorer esce automaticamente dopo il drop, così l'utente vede subito la nuova card.
+- **Open in editor**: pulsante separato che propaga `onOpenFileInEditor` (Code Editor tab).
+- **Filtri**: All / Features / Bugs / Patterns / Gotchas / Decisions / Diary / Diagrams — tipizzati su `BrainEntry.type` (decision, bug_fix, pattern, gotcha, diary, diagram, feature, feature-doc, note).
+- **Performance**: cache di sessione in `brainGraphService` (`Map<projectPath, { ts, data }>`, TTL 60s). La mini-preview compatta è SVG deterministica — niente force sim. Force sim parte SOLO dentro l'Explorer (`d3-force` via react-force-graph-2d, `charge.strength=-150`, `link.distance` weight-based, `cooldownTicks=400`).
+- **Colore semantico**: edge wikilink/mixed in arancio (`rgba(255,107,53,*)`) per distinguerli dai tag-only (bianco). Nodo selezionato con un alone più spesso.
+- **Persistenza**: `CanvasAnnotations.brainNodes?: BrainNode[]` (campo opzionale con fallback `[]` al load del file). Aggiunto a tutti i 6 hot-spot obbligati di `useWhiteboardFile` (vedi "Regola generale" sopra).
+- **Data shape** (`BrainNode`): `{ id, x, y, w, h, title?, parentComponentId? }` — nessun body content, la lista doc viene derivata dinamicamente da `documentation/`.
 
 ### UI Language
 - All user-facing strings in English (international audience)

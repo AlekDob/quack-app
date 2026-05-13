@@ -110,6 +110,22 @@ Even with PreToolUse handling AskUserQuestion, the SDK still calls `canUseTool` 
 
 - `src-tauri/node-sdk/stream-daemon.js` — added `pendingAskAnswers` map, PreToolUse + PostToolUse hooks for AskUserQuestion, simplified canUseTool's AskUserQuestion branch.
 
+## Hook timeout — must override the 60s default
+
+The SDK's default `HookMatcher.timeout` is **60 seconds**. AskUserQuestion can sit pending for many minutes (the user reads carefully, switches context, comes back later). If the hook times out, the SDK proceeds without staged answers — `pendingAskAnswers` stays empty, the tool runs with `answers={}`, and PostToolUse skips because there's nothing to inject. The model sees the same empty answer the bug was supposed to fix.
+
+Symptom in `~/.quack/daemon-diag.log`:
+
+```
+PreToolUse AskUserQuestion fired ... toolUseId=toolu_xxx
+... (~60s pass) ...
+RESULT_EVENT: subtype=success
+canUseTool AskUserQuestion bypassed ... (same toolUseId)
+PostToolUse AskUserQuestion: no staged answers for toolUseId=toolu_xxx (skipping)
+```
+
+Fix: set `timeout: 86400` (24h) on the PreToolUse HookMatcher. The hook then effectively waits forever for the user, matching the documented `canUseTool` semantic ("The callback can stay pending indefinitely").
+
 ## Verification
 
 `~/.quack/daemon-diag.log` shows the correct flow when the fix works:
