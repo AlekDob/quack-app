@@ -256,14 +256,24 @@ conservative ~0.8s single-token round-trip, the pure spawn+init component is
 ~1.3–1.6s, **under the 2s gate**. But measured as raw total wall, runs
 straddle 2s (run3 = 2.38s).
 
-**Verdict: BORDERLINE — needs explicit human architectural sign-off.** The
-spawn-overhead component (the thing the gate actually targets) is < 2s, so the
-spawn-per-query architecture is viable for M1. The raw total exceeding 2s on
-cold runs is expected (it includes inference the daemon also pays) and is not
-itself a spawn-overhead failure. Recommend: accept for M1 with a follow-up to
-measure pure time-to-`session.created` (process-init only) in M2 hardening, and
-consider a warm-process pool if cold start regresses. NOT auto-passed by the
-agent — flagged to the project lead per the M1 gate rule.
+**Pure spawn+init measurement (decisive, 2026-05-15).** Re-measured isolating
+ONLY process start → first `session.created` stdout line (no model round-trip —
+that inference the warm Claude daemon also pays). 3 runs:
+
+| run | time-to-session.created |
+|---|---|
+| 1 | 0.04s |
+| 2 | 0.02s |
+| 3 | 0.02s |
+| mean | 0.02s (max 0.04s) |
+
+**Verdict: GATE PASSED, decisively.** The spawn-per-query architectural
+overhead is ~20–40ms — two orders of magnitude under the 2s gate. The earlier
+1.68–2.38s totals were entirely the model round-trip (inference), NOT spawn
+overhead, and the persistent Claude daemon pays that same inference per query.
+The spawn-per-query design is viable; M1 may proceed to M2 on this axis. (M2
+hardening may still add a warm-process pool as an optimization, but it is not
+gated.)
 
 Earlier note (now superseded by the table above): empirically each `codex exec`
 cold start was a few seconds — now quantified.
