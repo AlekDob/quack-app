@@ -233,6 +233,82 @@ mod codex_stream_tests {
     }
 }
 
+/// Extract per-turn token usage from a rollout JSONL line.
+/// Spike §4.7: usage lives ONLY in the rollout file (NOT stdout), as
+/// event_msg/token_count. Use `last_token_usage` (per-turn) — `total_token_usage`
+/// is cumulative (mirrors Quack's Claude result-vs-assistant rule, auto-memory).
+/// The turn-start token_count has `info: null` -> skipped.
+pub fn codex_rollout_to_usage(v: &serde_json::Value) -> Option<QuackAgentEvent> {
+    let payload = v.get("payload")?;
+    if payload.get("type")?.as_str()? != "token_count" {
+        return None;
+    }
+    let info = payload.get("info")?;
+    if info.is_null() {
+        return None;
+    }
+    let last = info.get("last_token_usage")?;
+    Some(QuackAgentEvent::Usage {
+        input_tokens: last.get("input_tokens").and_then(|n| n.as_u64()).unwrap_or(0),
+        output_tokens: last.get("output_tokens").and_then(|n| n.as_u64()).unwrap_or(0),
+        cached_tokens: last.get("cached_input_tokens").and_then(|n| n.as_u64()).unwrap_or(0),
+        cost_usd: None,
+    })
+}
+
+/// Extract the model name from a rollout `turn_context` line.
+/// Spike §4.1/§4.7: model is NOT in stdout `session.created`; it is here.
+pub fn codex_rollout_model(v: &serde_json::Value) -> Option<String> {
+    if v.get("type")?.as_str()? != "turn_context" {
+        return None;
+    }
+    v.get("payload")?.get("model")?.as_str().map(|s| s.to_string())
+}
+
+#[cfg(test)]
+mod codex_rollout_tests {
+    use super::*;
+
+    #[test]
+    fn null_info_token_count_yields_nothing() {
+        let v = serde_json::json!({
+            "type":"event_msg","payload":{"type":"token_count","info":null}
+        });
+        assert!(codex_rollout_to_usage(&v).is_none());
+    }
+
+    #[test]
+    fn full_token_count_maps_last_usage() {
+        let v = serde_json::json!({
+            "type":"event_msg","payload":{"type":"token_count","info":{
+                "total_token_usage":{"input_tokens":9999,"cached_input_tokens":0,"output_tokens":0,"reasoning_output_tokens":0,"total_tokens":9999},
+                "last_token_usage":{"input_tokens":2594,"cached_input_tokens":2432,"output_tokens":28,"reasoning_output_tokens":0,"total_tokens":2622},
+                "model_context_window":272000}}
+        });
+        assert_eq!(codex_rollout_to_usage(&v).unwrap(), QuackAgentEvent::Usage {
+            input_tokens: 2594, output_tokens: 28, cached_tokens: 2432, cost_usd: None,
+        });
+    }
+
+    #[test]
+    fn extracts_model_from_turn_context() {
+        let v = serde_json::json!({
+            "type":"turn_context","payload":{"model":"gpt-5-codex"}
+        });
+        assert_eq!(codex_rollout_model(&v), Some("gpt-5-codex".to_string()));
+    }
+
+    #[test]
+    fn fixture_has_exactly_one_usable_usage() {
+        let raw = include_str!("fixtures/codex_rollout.jsonl");
+        let n = raw.lines().filter(|l| !l.trim().is_empty())
+            .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
+            .filter_map(|v| codex_rollout_to_usage(&v))
+            .count();
+        assert_eq!(n, 1);
+    }
+}
+
 #[cfg(test)]
 mod tool_name_tests {
     use super::*;
