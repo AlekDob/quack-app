@@ -1261,7 +1261,7 @@ export default function RepositoryGroup({
 
   // Handle new session creation from agent card button
   const handleNewSession = useCallback(
-    async (title: string, branch?: string, useWorktree?: boolean) => {
+    async (title: string, branch?: string, useWorktree?: boolean, backend?: import('../types/agentBackend').AgentBackendKind) => {
       if (!newSessionModalAgentId) return;
 
       // Find agent to get project info
@@ -1347,6 +1347,7 @@ export default function RepositoryGroup({
           branch,
           useWorktree,
           worktreePath,
+          backend: backend ?? 'claude',
         });
 
         // Close modal and open the new session
