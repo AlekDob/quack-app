@@ -193,6 +193,7 @@ name = "app"
 version = "0.9.3"
 dependencies = [
  "anyhow",
+ "async-trait",
  "axum",
  "base64 0.22.1",
  "chrono",
