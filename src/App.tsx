@@ -166,6 +166,8 @@ import { loadProjectColors, getProjectColor, DEFAULT_PROJECT_COLORS } from "./ut
 import { cleanupOldSessions } from "./utils/sessionCleanup";
 import { injectAgentPersonality } from "./utils/agentPersonality";
 import { notifyLeadAgent } from "./services/remoteApi";
+import { quackEventToClaudeEvents } from "./utils/codexEventAdapter";
+import type { QuackAgentEvent } from "./types/agentBackend";
 import type { DroidMetadata, ActiveProject } from "./components/modal-steps/types";
 // TEMPORARILY DISABLED: MaxPlanProvider causing TDZ error - will fix separately
 // import { MaxPlanProvider, useMaxPlan } from "./contexts/MaxPlanContext";
@@ -1167,6 +1169,12 @@ function AppContent() {
   // Without this, Multi-Listener and Pre-warm can both call listen() for the same agentId
   // before either resolves, causing Tauri's "listeners[eventId].handlerId" crash
   const pendingListenersRef = useRef<Set<string>>(new Set());
+
+  // Codex parallel listener tracking — SEPARATE from Claude refs (do not share)
+  const activeCodexListenersRef = useRef<Map<string, () => void>>(new Map());
+  const pendingCodexListenersRef = useRef<Set<string>>(new Set());
+  // Per-session monotonic counter for text_delta seq numbers (distinct message ids)
+  const codexSeqCountersRef = useRef<Map<string, number>>(new Map());
 
   // 🦆 EVENT BUFFER FIX: Buffer events that arrive before the streaming message is ready
   // This fixes the intermittent bug where Task/droid widgets don't appear because
@@ -2624,6 +2632,70 @@ function AppContent() {
       );
     };
   }, [tauriAvailable, activeAgentIdsKey]); // 🦆 RACE FIX: Only re-setup when agent IDs change, not on every message update!
+
+  // Brain: decision-quack-abstraction-agent-level-not-model-level
+  // Codex Multi-Listener: parallel to the Claude Multi-Listener above.
+  // Listens on codex-event:{agentId} (emitted by the Rust Codex backend) and routes
+  // each QuackAgentEvent through the pure adapter into handleClaudeEvent.
+  // PURELY ADDITIVE: the Claude listener path above is byte-identical after this addition.
+  useEffect(() => {
+    if (!tauriAvailable) return;
+
+    const activeAgentIds = activeAgentIdsKey.split(',').filter(Boolean);
+
+    const setupPromises = activeAgentIds.map(async (agentId) => {
+      if (activeCodexListenersRef.current.has(agentId) || pendingCodexListenersRef.current.has(agentId)) {
+        return;
+      }
+
+      pendingCodexListenersRef.current.add(agentId);
+      const eventName = `codex-event:${agentId}`;
+
+      try {
+        const unlisten = await listen<{ sessionKey: string; turnId: string | null; event: QuackAgentEvent }>(
+          eventName,
+          (tauri) => {
+            const { sessionKey, turnId, event } = tauri.payload;
+
+            // Persist Codex backend session id so resume path can use it (Task 2b+)
+            if (event.kind === 'session_started') {
+              useSessionStore.getState().updateSession(sessionKey, {
+                backendSessionId: event.backend_session_id,
+              }).catch((err: Error) => {
+                console.warn('[Codex-Listener] Failed to save backendSessionId:', err);
+              });
+            }
+
+            // Increment per-session seq counter for text_delta id uniqueness
+            const seq = (codexSeqCountersRef.current.get(sessionKey) ?? 0) + 1;
+            codexSeqCountersRef.current.set(sessionKey, seq);
+
+            const claudeEvents = quackEventToClaudeEvents(event, seq);
+            for (const ce of claudeEvents) {
+              handleClaudeEvent(agentId, ce, 'Codex-Listener', sessionKey, turnId ?? undefined);
+            }
+          },
+        );
+
+        activeCodexListenersRef.current.set(agentId, unlisten);
+        pendingCodexListenersRef.current.delete(agentId);
+      } catch (error) {
+        pendingCodexListenersRef.current.delete(agentId);
+        console.error(`[Codex-Listener] Failed to setup listener for ${agentId}:`, error);
+      }
+    });
+
+    Promise.all(setupPromises).catch((error) => {
+      console.error('[Codex-Listener] Error setting up listeners:', error);
+    });
+
+    // Persist listeners for app lifetime — same discipline as Claude Multi-Listener above
+    return () => {
+      console.log('[Codex-Listener] Effect cleanup - listeners preserved:',
+        Array.from(activeCodexListenersRef.current.keys())
+      );
+    };
+  }, [tauriAvailable, activeAgentIdsKey, handleClaudeEvent]);
 
   // 🦆 PRE-WARM LISTENER: REMOVED — was a third listener registration point
   // alongside Multi-Listener and ensureListenerReady, causing duplicate event
