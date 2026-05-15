@@ -2698,6 +2698,8 @@ function AppContent() {
             // This block runs ONLY inside the codex-event handler — the Claude path is unaffected.
             if (event.kind === 'session_ended' || event.kind === 'error') {
               const isError = event.kind === 'error';
+              // Capture here where TS narrows the discriminated union (avoids a cast inside the closure)
+              const errorMessage = event.kind === 'error' ? event.message : undefined;
               const lastUsage = codexLastUsageRef.current.get(sessionKey);
               setChatSessions((prev) => {
                 const msgs = prev.get(sessionKey);
@@ -2708,7 +2710,7 @@ function AppContent() {
                 next.set(sessionKey, msgs.map((msg, i) => i === idx ? {
                   ...msg,
                   status: (isError ? 'error' : 'complete') as const,
-                  ...(isError ? { error: (event as { kind: 'error'; code: string; message: string; recoverable: boolean }).message } : {}),
+                  ...(isError ? { error: errorMessage } : {}),
                   metadata: {
                     ...msg.metadata,
                     ...(lastUsage ? {
