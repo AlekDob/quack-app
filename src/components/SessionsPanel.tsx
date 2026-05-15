@@ -237,9 +237,16 @@ function SessionCard({ session, onClick }: SessionCardProps) {
             {session.id}
           </p>
         </div>
-        <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded border uppercase ${statusColor}`}>
-          {session.status}
-        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          {session.backend === 'codex' && (
+            <span className="px-1.5 py-0.5 text-[9px] font-medium rounded border uppercase border-emerald-500/40 text-emerald-300/90">
+              Codex
+            </span>
+          )}
+          <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded border uppercase ${statusColor}`}>
+            {session.status}
+          </span>
+        </div>
       </div>
 
       {/* Metadata */}
