@@ -166,6 +166,7 @@ export default function NewSessionModal({
     onSubmit,
     effectiveBranch,
     useWorktree,
+    backend,
   ]);
 
   const handleKeyDown = useCallback(
