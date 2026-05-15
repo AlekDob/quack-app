@@ -3098,6 +3098,28 @@ function AppContent() {
         });
       });
 
+      // Brain: decision-quack-abstraction-agent-level-not-model-level
+      // Codex backend: send via the Codex agent harness. Completion, assistant
+      // text, tool calls and token usage all arrive asynchronously through the
+      // codex-event channel (consumed alongside the Claude listener) and render
+      // via the existing reducer. M1 uses Codex's own default model (agent-level
+      // abstraction — no Quack model override). Resume uses the persisted
+      // backendSessionId. The shared finally{} below still runs cleanup.
+      if (currentSession?.backend === 'codex') {
+        const codexPromise = invoke<{ backend_session_id?: string }>('send_message_via_codex', {
+          agentId: capturedAgentId,
+          sessionKey: messageKey,
+          workingDir,
+          prompt,
+          model: null,
+          turnId,
+          resumeSessionId: currentSession?.backendSessionId ?? null,
+        });
+        codexPromise.catch(() => {}); // suppress unhandled rejection if abort wins the race
+        await Promise.race([codexPromise, abortPromise]);
+        return;
+      }
+
       // 🦆 SIMPLIFIED: Always start fresh conversation
       // Users can resume sessions via Sessions panel -> "Resume Session" button
       // Race between invoke and abort
