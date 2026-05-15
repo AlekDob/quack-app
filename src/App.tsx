@@ -220,6 +220,7 @@ import { getRandomName } from "./utils/agentNames";
 import {
   appendMessagesToSession,
   createChatTurnId,
+  findAssistantMessageIndexForTurn,
   routeClaudeEventToSession,
   shouldRejectClaudeEvent,
   type BufferedClaudeEvent,
@@ -1175,6 +1176,8 @@ function AppContent() {
   const pendingCodexListenersRef = useRef<Set<string>>(new Set());
   // Per-session monotonic counter for text_delta seq numbers (distinct message ids)
   const codexSeqCountersRef = useRef<Map<string, number>>(new Map());
+  // Latest usage snapshot per in-flight Codex turn (keyed by sessionKey); self-clears on terminal events
+  const codexLastUsageRef = useRef<Map<string, { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number; cost: number | null }>>(new Map());
 
   // 🦆 EVENT BUFFER FIX: Buffer events that arrive before the streaming message is ready
   // This fixes the intermittent bug where Task/droid widgets don't appear because
@@ -2670,6 +2673,17 @@ function AppContent() {
               });
             }
 
+            // Capture latest usage for this turn so we can finalize the placeholder with token stats
+            if (event.kind === 'usage') {
+              codexLastUsageRef.current.set(sessionKey, {
+                input_tokens: event.input_tokens,
+                output_tokens: event.output_tokens,
+                cache_read_input_tokens: event.cached_tokens,
+                cache_creation_input_tokens: 0,
+                cost: event.cost_usd,
+              });
+            }
+
             // Increment per-agent seq counter for text_delta id uniqueness (keyed by agentId for uniform teardown)
             const seq = (codexSeqCountersRef.current.get(agentId) ?? 0) + 1;
             codexSeqCountersRef.current.set(agentId, seq);
@@ -2677,6 +2691,40 @@ function AppContent() {
             const claudeEvents = quackEventToClaudeEvents(event, seq);
             for (const ce of claudeEvents) {
               handleClaudeEvent(agentId, ce, 'Codex-Listener', sessionKey, turnId ?? undefined);
+            }
+
+            // Finalize the assistant placeholder on terminal events so status transitions
+            // from 'streaming' to 'complete'/'error' and per-turn token stats render correctly.
+            // This block runs ONLY inside the codex-event handler — the Claude path is unaffected.
+            if (event.kind === 'session_ended' || event.kind === 'error') {
+              const isError = event.kind === 'error';
+              const lastUsage = codexLastUsageRef.current.get(sessionKey);
+              setChatSessions((prev) => {
+                const msgs = prev.get(sessionKey);
+                if (!msgs) return prev;
+                const idx = findAssistantMessageIndexForTurn(msgs, turnId ?? undefined);
+                if (idx < 0) return prev;
+                const next = new Map(prev);
+                next.set(sessionKey, msgs.map((msg, i) => i === idx ? {
+                  ...msg,
+                  status: (isError ? 'error' : 'complete') as const,
+                  ...(isError ? { error: (event as { kind: 'error'; code: string; message: string; recoverable: boolean }).message } : {}),
+                  metadata: {
+                    ...msg.metadata,
+                    ...(lastUsage ? {
+                      turnUsage: {
+                        input_tokens: lastUsage.input_tokens,
+                        output_tokens: lastUsage.output_tokens,
+                        cache_read_input_tokens: lastUsage.cache_read_input_tokens,
+                        cache_creation_input_tokens: lastUsage.cache_creation_input_tokens,
+                      },
+                      ...(lastUsage.cost != null ? { turnCost: lastUsage.cost } : {}),
+                    } : {}),
+                  },
+                } : msg));
+                return next;
+              });
+              codexLastUsageRef.current.delete(sessionKey);
             }
           },
         );
