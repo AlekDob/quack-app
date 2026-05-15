@@ -1,0 +1,6 @@
+{"type":"session.created","session_id":"019e2bf1-7d75-74b0-85cc-6319b619f0a9"}
+{"type":"item.started","item":{"id":"item_0","item_type":"command_execution","command":"bash -lc 'echo PING > note.txt'","aggregated_output":"","status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_0","item_type":"command_execution","command":"bash -lc 'echo PING > note.txt'","aggregated_output":"","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_1","item_type":"command_execution","command":"bash -lc 'cat note.txt'","aggregated_output":"PING\n","exit_code":0,"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_2","item_type":"assistant_message","text":"Created note.txt with PING."}}
+{"type":"error","message":"Failed to refresh token: 401 Unauthorized"}
