@@ -125,5 +125,12 @@ export function quackEventToClaudeEvents(ev: QuackAgentEvent, seq = 0): ClaudeEv
     case 'usage':           return [mapUsage(ev)];
     case 'error':           return [mapError(ev)];
     case 'session_ended':   return [mapSessionEnded()];
+    default: {
+      // Exhaustiveness guard: a new QuackAgentEvent kind without a case
+      // above becomes a TS compile error here (cannot assign to `never`).
+      const _exhaustive: never = ev;
+      void _exhaustive;
+      return [];
+    }
   }
 }
