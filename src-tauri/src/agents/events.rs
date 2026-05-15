@@ -309,6 +309,78 @@ mod codex_rollout_tests {
     }
 }
 
+/// Translate a Claude Agent SDK event (raw JSON, as emitted by stream-daemon.js
+/// and parsed in claude_cli.rs) into a QuackAgentEvent. Subset for Milestone 1.
+/// Claude is the existing default — this adapter is additive, it does NOT
+/// replace the existing `claude-event:{agent_id}` path (zero behavior change).
+pub fn claude_event_to_quack(v: &serde_json::Value) -> Option<QuackAgentEvent> {
+    match v.get("type")?.as_str()? {
+        "system" if v.get("subtype").and_then(|s| s.as_str()) == Some("init") => {
+            Some(QuackAgentEvent::SessionStarted {
+                backend_session_id: v.get("session_id")?.as_str()?.to_string(),
+                model: v.get("model").and_then(|m| m.as_str()).map(String::from),
+                backend: AgentBackendKind::Claude,
+            })
+        }
+        "result" => {
+            let u = v.get("usage")?;
+            Some(QuackAgentEvent::Usage {
+                input_tokens: u.get("input_tokens").and_then(|n| n.as_u64()).unwrap_or(0),
+                output_tokens: u.get("output_tokens").and_then(|n| n.as_u64()).unwrap_or(0),
+                cached_tokens: u.get("cache_read_input_tokens").and_then(|n| n.as_u64()).unwrap_or(0),
+                cost_usd: v.get("total_cost_usd").and_then(|c| c.as_f64()),
+            })
+        }
+        "error" => {
+            let message = v.get("error").and_then(|e| e.get("message"))
+                .and_then(|m| m.as_str())
+                .or_else(|| v.get("message").and_then(|m| m.as_str()))
+                .unwrap_or("unknown error").to_string();
+            Some(QuackAgentEvent::Error { code: "claude".into(), message, recoverable: false })
+        }
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod claude_event_tests {
+    use super::*;
+
+    #[test]
+    fn system_init_is_session_started() {
+        let v = serde_json::json!({
+            "type":"system","subtype":"init",
+            "session_id":"claude-sess-1","model":"claude-opus-4-7"
+        });
+        assert_eq!(claude_event_to_quack(&v).unwrap(), QuackAgentEvent::SessionStarted {
+            backend_session_id: "claude-sess-1".into(),
+            model: Some("claude-opus-4-7".into()),
+            backend: AgentBackendKind::Claude,
+        });
+    }
+
+    #[test]
+    fn result_event_maps_usage() {
+        let v = serde_json::json!({
+            "type":"result","subtype":"success","session_id":"s",
+            "total_cost_usd":0.012,
+            "usage":{"input_tokens":10,"output_tokens":5,"cache_read_input_tokens":3,"cache_creation_input_tokens":2}
+        });
+        assert_eq!(claude_event_to_quack(&v).unwrap(), QuackAgentEvent::Usage {
+            input_tokens: 10, output_tokens: 5, cached_tokens: 3, cost_usd: Some(0.012),
+        });
+    }
+
+    #[test]
+    fn error_event_is_recoverable_false_by_default() {
+        let v = serde_json::json!({"type":"error","error":{"message":"boom"}});
+        match claude_event_to_quack(&v).unwrap() {
+            QuackAgentEvent::Error { message, .. } => assert_eq!(message, "boom"),
+            other => panic!("got {other:?}"),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tool_name_tests {
     use super::*;
