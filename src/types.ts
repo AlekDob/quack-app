@@ -485,6 +485,10 @@ export interface AgentSession {
   initialPrompt?: string;
   initialAttachments?: ChatAttachment[];
   initialPromptConsumed?: boolean;  // Flag to avoid re-population on re-open
+  // Multi-backend (Codex integration, Milestone 1). Immutable after create.
+  backend?: import('./types/agentBackend').AgentBackendKind; // default 'claude' on load
+  backendSessionId?: string;                                 // Codex native session id (resume)
+  backendAuthMethod?: 'oauth' | 'apikey';                    // Codex only; ignored by Claude
 }
 
 export type AgentSessionStatus = 'todo' | 'in_progress' | 'done' | 'human_review';
