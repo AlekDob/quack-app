@@ -21,6 +21,7 @@ use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, AppHandle, Emitter, Listen
 
 mod agency;
 mod agency_setup;
+mod agents; // Multi-backend agent abstraction (Claude + Codex)
 mod ai;
 mod brain_window;
 mod browser;
