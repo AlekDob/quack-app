@@ -610,6 +610,27 @@ async fn handle_status_update(
     StatusCode::OK
 }
 
+#[tauri::command]
+async fn send_message_via_codex(
+    app: tauri::AppHandle,
+    agent_id: String,
+    session_key: String,
+    working_dir: String,
+    prompt: String,
+    model: Option<String>,
+    turn_id: Option<String>,
+    resume_session_id: Option<String>,
+) -> Result<agents::backend::BackendSessionHandle, String> {
+    use agents::backend::{AgentBackend, StartSessionParams};
+    use agents::codex_backend::CodexBackend;
+    let backend = CodexBackend { app };
+    let params = StartSessionParams { agent_id, session_key, working_dir, model, turn_id };
+    match resume_session_id {
+        Some(sid) => backend.resume(&sid, params, prompt).await,
+        None => backend.send_message(params, prompt).await,
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1409,6 +1430,9 @@ pub fn run() {
             project_stats::bulk_import_token_events,
             project_stats::get_stats_migration_flag,
             project_stats::set_stats_migration_flag,
+            // Codex backend commands
+            agents::codex_backend::codex_auth_status,
+            send_message_via_codex,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
