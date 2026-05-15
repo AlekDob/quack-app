@@ -1299,6 +1299,8 @@ function AppContent() {
     // Unlisten Tauri events
     const unlisten = activeListenersRef.current.get(agentId);
     if (unlisten) { try { unlisten(); } catch { /* ignore */ } activeListenersRef.current.delete(agentId); }
+    const unlistenCodex = activeCodexListenersRef.current.get(agentId);
+    if (unlistenCodex) { try { unlistenCodex(); } catch { /* ignore */ } activeCodexListenersRef.current.delete(agentId); }
     // Clear timers
     for (const timerMap of [idleTimersRef.current, notificationTimersRef.current, visualIdleTimersRef.current]) {
       const timer = timerMap.get(agentId);
@@ -1306,6 +1308,8 @@ function AppContent() {
     }
     // Clear refs
     pendingListenersRef.current.delete(agentId);
+    pendingCodexListenersRef.current.delete(agentId);
+    codexSeqCountersRef.current.delete(agentId);
     eventBufferRef.current.delete(agentId);
     activeQueryIdRef.current.delete(agentId);
     abortedTurnIdsRef.current.delete(agentId);
@@ -2666,9 +2670,9 @@ function AppContent() {
               });
             }
 
-            // Increment per-session seq counter for text_delta id uniqueness
-            const seq = (codexSeqCountersRef.current.get(sessionKey) ?? 0) + 1;
-            codexSeqCountersRef.current.set(sessionKey, seq);
+            // Increment per-agent seq counter for text_delta id uniqueness (keyed by agentId for uniform teardown)
+            const seq = (codexSeqCountersRef.current.get(agentId) ?? 0) + 1;
+            codexSeqCountersRef.current.set(agentId, seq);
 
             const claudeEvents = quackEventToClaudeEvents(event, seq);
             for (const ce of claudeEvents) {
