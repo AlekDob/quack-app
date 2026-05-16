@@ -1,3 +1,56 @@
+# Codex M1 — E4 Step 2 handoff (DONE)
+
+Status: **DONE** (2026-05-15, completed same day after the deferral). The
+deferral's safety concern was resolved by a SAFER design than this doc
+originally proposed: instead of extracting the inline `onEventReceived` body
+(Claude-risk refactor), a pure `quackEventToClaudeEvents` adapter feeds a NEW
+parallel `codex-event` listener into the EXISTING `handleClaudeEvent` reducer.
+`App.tsx:2444-2650` (Claude consumption) is byte-identical; the Claude send
+path is byte-identical (reverse-patch verified). Two-stage subagent review ran
+per task. Manual GUI E2E remains the only human checkpoint.
+
+## Implementation (branch `038-codex-backend-m1`)
+
+- **Task 1** `65c4d12` + `7a1936f`: pure `src/utils/codexEventAdapter.ts`
+  `quackEventToClaudeEvents(ev, seq): ClaudeEvent[]` (14 TDD tests, `never`
+  exhaustiveness guard). Frontend mirror of the Rust `events.rs` translator.
+- **Task 2a** `ff81444` + I1 fix `74a2823`: parallel `codex-event:{agentId}`
+  listener in App.tsx → adapter → existing `handleClaudeEvent`; persists
+  `backendSessionId` for resume; `cleanupAgentData` extended; `codexSeqCountersRef`
+  re-keyed to agentId for uniform teardown.
+- **Task 2b** `17a3566`: additive send-routing branch in `sendMessageForAgent`
+  — `session.backend === 'codex'` → `invoke('send_message_via_codex', …)` then
+  `return` (shared `finally{}` still cleans up). Claude `else` byte-identical.
+- **C1 fix** `b3f3b0b` + `1afcfdf`: finalize the assistant placeholder on
+  terminal `session_ended`/`error` (status `complete`/`error` + `turnUsage`/
+  `turnCost`, Claude-parity) so per-turn token stats render and the
+  `chatTurnIsolation` stale-`streaming` fallback heals.
+
+Gates: `tsc --noEmit` clean; vitest 16/16; `cargo test` 38p/2f (only the 2
+pre-existing baseline failures — zero Claude regression).
+
+## Remaining human follow-ups
+
+1. **Manual GUI E2E** (plan Task E4 Step 4): real Codex session, prompt
+   "create note.txt with PING and read it back" — verify `Bash` tool renders,
+   `PING` output, assistant text, token usage from rollout, AND Claude sessions
+   byte-identical in behavior.
+2. **Claude GUI smoke** (deferred from Task B2 Step 4).
+3. **M2 hardening**: no-terminal-event watchdog. The Codex turn lifecycle is
+   100% event-driven; if the Tauri backend dies before emitting any terminal
+   `session_ended`/`error`, the placeholder stays `streaming` with no React
+   recovery. `CodexBackend` synthesizes `session_ended` after process wait
+   (spike §4.4), so this only manifests on a full backend crash — accepted for
+   M1; a timeout watchdog is M2-class.
+
+Do NOT merge `038-codex-backend-m1` to `main` until the manual E2E (1) passes.
+
+## Original deferral context (historical)
+
+Kept for provenance.
+
+---
+
 # Codex M1 — E4 Step 2 handoff (deferred)
 
 Status: **deferred** (2026-05-15). Reason: wiring touches `App.tsx:2444-2650`
