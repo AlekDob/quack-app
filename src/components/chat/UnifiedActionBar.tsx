@@ -28,6 +28,7 @@ interface SettingsProps {
   onPermissionModeChange: (mode: PermissionMode) => void;
   onEffortChange: (e: EffortLevel) => void;
   disabled: boolean;
+  isCodexSession?: boolean;
 }
 
 export interface UnifiedActionBarProps {
@@ -92,6 +93,7 @@ export default function UnifiedActionBar(props: UnifiedActionBarProps) {
           onPermissionModeChange={props.settingsProps.onPermissionModeChange}
           onEffortChange={props.settingsProps.onEffortChange}
           disabled={props.settingsProps.disabled}
+          isCodexSession={props.settingsProps.isCodexSession}
         />
 
         {/* Attach - always visible, most used */}
