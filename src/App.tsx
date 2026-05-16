@@ -3078,13 +3078,15 @@ function AppContent() {
       // Timestamp will be updated to Date.now() when first response arrives (see event listener)
       timestamp: 0,
       status: 'streaming',
-      // Store settings used for this message (for UI display)
+      // Store settings used for this message (for UI display).
+      // Codex sessions run Codex's own model — label the message accordingly
+      // instead of the Claude active model (which does not apply to Codex).
       settings: {
-        model: getActiveModelName(options?.model),
+        model: currentSession?.backend === 'codex' ? 'gpt-5-codex' : getActiveModelName(options?.model),
         // Brain: task-effort-model-aware-refactor — use model-aware default instead of hardcoded 'medium'
         effort: options?.effort || defaultEffortForModel(options?.model || ''),
         thinkingMode: options?.thinkingMode || 'auto',
-        modelDisplayName: getActiveModelDisplayName(options?.model) || undefined,
+        modelDisplayName: currentSession?.backend === 'codex' ? 'gpt-5-codex' : (getActiveModelDisplayName(options?.model) || undefined),
       },
       // Hide header + init widget on resumed sessions (known at message creation time)
       metadata: {
