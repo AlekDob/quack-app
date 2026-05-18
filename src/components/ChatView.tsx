@@ -298,6 +298,9 @@ export default function ChatView({
   const providerOverrideId = useSessionProviderOverride(internalSessionId);
   const activeProviderState = useSettingsStore(s => s.claude.activeProvider);
   const customProviders = useSettingsStore(s => s.claude.customProviders);
+  // Codex-backend model (separate from Claude). Only consumed when isCodexSession.
+  const codexModel = useSettingsStore(s => s.codexModel);
+  const setCodexModel = useSettingsStore(s => s.setCodexModel);
   const effectiveProviderContextWindow = useMemo(() => {
     // Defensive: persisted state from older builds may lack `activeProvider`.
     const ap = activeProviderState ?? { kind: 'anthropic' as const };
@@ -1084,6 +1087,8 @@ export default function ChatView({
               onEffortChange: (e) => onEffortChange?.(e),
               disabled: isLoading,
               isCodexSession,
+              codexModel,
+              onCodexModelChange: setCodexModel,
             },
             hasMessages: messages.length > 0,
             isLoading,

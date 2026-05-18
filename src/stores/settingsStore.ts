@@ -100,10 +100,15 @@ interface SettingsState {
   agentModePresets: AgentModePresets;
   typography: TypographySettings;
   appearance: AppearanceSettings;
+  /** Model passed to `codex exec -c model=` for Codex-backend sessions.
+   *  Separate from `claude.model` (different backend). Codex CLI has no
+   *  model-discovery endpoint, so this is a free string with a curated UI. */
+  codexModel: string;
 
   // Actions - Claude
   setClaudeApiKey: (key: string | null) => void;
   setClaudeModel: (model: string) => void;
+  setCodexModel: (model: string) => void;
   setClaudePermissionMode: (mode: 'plan' | 'act' | 'bypass') => void;
   setClaudeEffort: (effort: EffortLevel) => void;
   updateClaudeSettings: (settings: Partial<ClaudeSettings>) => void;
@@ -236,6 +241,7 @@ export const useSettingsStore = create<SettingsState>()(
         agentModePresets: defaultAgentModePresets,
         typography: DEFAULT_TYPOGRAPHY,
         appearance: { accentColor: DEFAULT_ACCENT },
+        codexModel: 'gpt-5-codex',
 
         // Claude actions
         setClaudeApiKey: (key) => set((state) => ({
@@ -245,6 +251,8 @@ export const useSettingsStore = create<SettingsState>()(
         setClaudeModel: (model) => set((state) => ({
           claude: { ...state.claude, model },
         })),
+
+        setCodexModel: (model) => set(() => ({ codexModel: model })),
 
         setClaudePermissionMode: (mode) => set((state) => ({
           claude: { ...state.claude, permissionMode: mode },
@@ -403,6 +411,7 @@ export const useSettingsStore = create<SettingsState>()(
           agentModePresets: state.agentModePresets,
           typography: state.typography,
           appearance: state.appearance,
+          codexModel: state.codexModel,
         }),
         // Migrate persisted legacy model IDs (sonnet→sonnet45, opus→opus46, haiku→haiku45)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

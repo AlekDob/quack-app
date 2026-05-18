@@ -3179,7 +3179,10 @@ function AppContent() {
           sessionKey: messageKey,
           workingDir,
           prompt,
-          model: null,
+          // Codex-backend model picker (settingsStore). Empty → null → Rust
+          // omits `-c model=` and Codex uses its own default. This is a Codex
+          // knob (like --sandbox), not Claude model selection.
+          model: useSettingsStore.getState().codexModel || null,
           turnId,
           resumeSessionId: currentSession?.backendSessionId ?? null,
         });

@@ -119,5 +119,15 @@ Parity via Quack-owned prompt/file composition (NOT harness reimplementation). P
 | Test | `src/utils/__tests__/codexPromptComposer.test.ts` | 6 unit tests (pure expansion logic) |
 | Route/Page | `src/App.tsx` | `backend === 'codex'` branch: `injectAgentPersonalityAgentsMd` + `composeCodexPrompt` before `send_message_via_codex` (Claude path never imports either) |
 
-**Parity behavior:** Codex session now (a) writes persona into `AGENTS.md` in the working dir (same mechanism as CLAUDE.md injection — Codex reads it natively); (b) gets working slash commands the native `codex exec` lacks; (c) gets an injected index of the agent's *selected* skills (Codex `cat`s the SKILL.md by path = progressive disclosure w/o bloat). Autonomous skill discovery + subagents stay Claude-only (capability-gate, transparent).
+**Parity behavior:** Codex session now (a) writes persona into `AGENTS.md` in the working dir (same mechanism as CLAUDE.md injection — Codex reads it natively); (b) gets working slash commands the native `codex exec` lacks; (c) gets an injected index of the agent's *selected* skills (Codex `cat`s the SKILL.md by path = progressive disclosure w/o bloat). Autonomous skill discovery stays Claude-only; **subagents are NOT** (0.130 has them natively — retracted, see re-target section).
 **M1.5 deferred:** live GUI smoke (command+skill on real Codex session); M2 decision inject full SKILL.md body vs index by real token cost.
+
+### M1.5b — Codex model picker
+Codex CLI has no model-discovery endpoint and availability is OpenAI-account-gated, so the picker is a **curated list anchored to textual evidence + a free-text override** (not an invented list). Passing `codex exec -c model=<id>` is a Codex knob (like `--sandbox`) — does NOT violate the agent-level decision (no model-selection reimplementation). Additive + `isCodexSession`-gated → zero Claude regression (tsc clean, TS adapter 20/20 unchanged, Rust untouched: `build_codex_args` already took `Option<model>`).
+
+| Type | Path | Exports/Purpose |
+|------|------|-----------------|
+| Constant | `src/constants/codexModels.ts` | `CURATED_CODEX_MODELS` (`gpt-5-codex` default, `gpt-5`, `gpt-5.5`, `o3`), `CODEX_DEFAULT_MODEL` |
+| Store | `src/stores/settingsStore.ts` | `codexModel` field + `setCodexModel` + persisted (settings-storage v13, additive — no migration) |
+| Component | `src/components/ChatSettingsMenu.tsx` | Codex panel: curated `<select>` + override `<input>`; trigger summary shows `Codex · <model>` |
+| Wiring | `UnifiedActionBar.tsx` → `ChatView.tsx` → `App.tsx` | optional `codexModel`/`onCodexModelChange` in `SettingsProps`; App Codex branch sends `useSettingsStore.getState().codexModel || null` |

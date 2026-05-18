@@ -9,6 +9,7 @@ import { fetchOllamaModels, getOllamaModelOptions } from '../services/ollamaServ
 // Brain: 037-anthropic-compatible-providers
 import { BUILTIN_PRESETS } from '../constants/providerPresets';
 import { getProviderToken } from '../services/providerService';
+import { CURATED_CODEX_MODELS, CODEX_DEFAULT_MODEL } from '../constants/codexModels';
 import './ChatSettingsMenu.css';
 
 interface ChatSettingsMenuProps {
@@ -22,8 +23,12 @@ interface ChatSettingsMenuProps {
   onEffortChange: (effort: EffortLevel) => void;
   disabled?: boolean;
   /** True when the active session runs on the Codex backend. Codex manages its
-   *  own model/mode/effort, so the Claude provider controls are hidden for it. */
+   *  own mode/effort, so the Claude provider controls are hidden for it. */
   isCodexSession?: boolean;
+  /** Codex-backend model (passed to `codex exec -c model=`). Only meaningful
+   *  when isCodexSession. Distinct from `model` (Claude). */
+  codexModel?: string;
+  onCodexModelChange?: (model: string) => void;
 }
 
 // ThinkingMode options removed - now controlled via brain icon toggle in footer
@@ -55,7 +60,11 @@ export default function ChatSettingsMenu({
   onEffortChange,
   disabled,
   isCodexSession,
+  codexModel,
+  onCodexModelChange,
 }: ChatSettingsMenuProps) {
+  const effectiveCodexModel = codexModel || CODEX_DEFAULT_MODEL;
+  const codexModelInCurated = CURATED_CODEX_MODELS.some(m => m.id === effectiveCodexModel);
   const { models: remoteModels, loading: modelsLoading } = useModelsConfig();
   const modelOptions = getModelOptions(remoteModels);
   const { provider, providerBaseUrl, ollamaModel, bedrockModelOverride } = useSettingsStore(s => s.claude);
@@ -67,6 +76,7 @@ export default function ChatSettingsMenu({
   const activeProviderId = activeProvider.kind === 'custom' ? activeProvider.providerId : 'anthropic';
 
   const [isOpen, setIsOpen] = useState(false);
+  const [codexCustomMode, setCodexCustomMode] = useState(false);
   const [ollamaModelOptions, setOllamaModelOptions] = useState<{ value: string; label: string }[]>([]);
   const [providerSwitched, setProviderSwitched] = useState(false);
   // Brain: 037-anthropic-compatible-providers
@@ -234,7 +244,7 @@ export default function ChatSettingsMenu({
         </svg>
         <span className="chat-settings-summary">
           {isCodexSession ? (
-            <>Codex · <span style={{ fontWeight: 600 }}>gpt-5-codex</span></>
+            <>Codex · <span style={{ fontWeight: 600 }}>{effectiveCodexModel}</span></>
           ) : (
             <>
               {getModelLabelText()} ·
@@ -249,21 +259,41 @@ export default function ChatSettingsMenu({
         <div ref={menuRef} className="chat-settings-popover">
           {isCodexSession && (
             <div className="chat-settings-section">
-              <span className="chat-settings-label-text">Backend</span>
-              <div style={{
-                marginTop: 4, padding: '8px 10px', borderRadius: 6,
-                backgroundColor: 'rgba(255,255,255,0.05)',
-                fontSize: 13, fontWeight: 600, color: 'var(--text-primary)',
-              }}>
-                Codex · gpt-5-codex
-              </div>
-              <div style={{
-                fontSize: 11, color: 'var(--text-secondary)', opacity: 0.85,
-                padding: '6px 0 0', lineHeight: 1.4,
-              }}>
-                This session runs on the Codex agent. Model, mode and effort are
-                managed by Codex itself — the Claude provider/model settings do
-                not apply and are ignored for Codex sessions.
+              <span className="chat-settings-label-text">Backend · Codex model</span>
+              <select
+                className="chat-settings-select chat-settings-select--codex"
+                value={(codexModelInCurated && !codexCustomMode) ? effectiveCodexModel : '__custom__'}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === '__custom__') { setCodexCustomMode(true); return; }
+                  setCodexCustomMode(false);
+                  onCodexModelChange?.(v);
+                }}
+                disabled={!onCodexModelChange}
+              >
+                {CURATED_CODEX_MODELS.map(m => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+                <option value="__custom__">
+                  {codexModelInCurated ? 'Custom model…' : `Custom · ${effectiveCodexModel}`}
+                </option>
+              </select>
+              {(codexCustomMode || !codexModelInCurated) && (
+                <input
+                  type="text"
+                  className="chat-settings-select"
+                  value={codexModel ?? ''}
+                  onChange={(e) => onCodexModelChange?.(e.target.value.trim())}
+                  disabled={!onCodexModelChange}
+                  placeholder="codex model id (e.g. gpt-5.5)"
+                  spellCheck={false}
+                  autoFocus
+                  style={{ marginTop: 6, cursor: 'text' }}
+                />
+              )}
+              <div className="chat-settings-hint">
+                Sent to <code>codex -c model=</code> · availability depends on
+                your OpenAI account
               </div>
             </div>
           )}
