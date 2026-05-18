@@ -244,6 +244,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - DiffViewer modes (unified/split/fullscreen): `documentation/patterns/pattern-diff-viewer-modes.md`
 - Session Scroll Memory (restore/scroll-to-bottom): `documentation/patterns/pattern-session-scroll-memory.md`
 - Backend capability-gated UI (hide Claude-only controls for Codex/non-Claude sessions): `documentation/patterns/pattern-backend-capability-gated-ui.md`
+- Codex `exec` capability matrix (what skills/commands/subagents/AGENTS.md survive non-interactive — read before wiring any Claude-harness feature for Codex): `documentation/research/codex-exec-capability-matrix.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)

@@ -57,3 +57,31 @@ export async function injectAgentPersonality(
     console.warn("[injectAgentPersonality] Failed to inject personality:", err);
   }
 }
+
+/**
+ * Codex-backend twin of {@link injectAgentPersonality}: writes the SAME
+ * persona header into AGENTS.md instead of CLAUDE.md. Codex `exec` reads
+ * AGENTS.md natively from its working root (verified 2026-05-17), so this
+ * gives Codex sessions identity parity with Claude. Same best-effort
+ * contract (never throws). Call this ONLY on the Codex send branch — the
+ * Claude path keeps using {@link injectAgentPersonality} untouched.
+ *
+ * Brain: pattern-backend-capability-gated-ui
+ */
+export async function injectAgentPersonalityAgentsMd(
+  agent: AgentWithPersonality | undefined,
+  projectPath?: string,
+): Promise<void> {
+  if (!agent?.personality) return;
+  const target = projectPath || agent.cwd;
+  if (!target) return;
+
+  try {
+    await invoke("inject_personality_to_agents_md", {
+      projectPath: target,
+      personality: agent.personality as Partial<AgentPersonality>,
+    });
+  } catch (err) {
+    console.warn("[injectAgentPersonality] Failed to inject AGENTS.md personality:", err);
+  }
+}

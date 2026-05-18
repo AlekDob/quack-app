@@ -1,0 +1,9 @@
+Reading additional input from stdin...
+{"type":"thread.started","thread_id":"019e39fd-34eb-7ec3-83ba-47c9c901bbd3"}
+{"type":"turn.started"}
+{"type":"item.started","item":{"id":"item_0","type":"collab_tool_call","tool":"spawn_agent","sender_thread_id":"019e39fd-34eb-7ec3-83ba-47c9c901bbd3","receiver_thread_ids":[],"prompt":"Compute 21 + 21.","agents_states":{},"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_0","type":"collab_tool_call","tool":"spawn_agent","sender_thread_id":"019e39fd-34eb-7ec3-83ba-47c9c901bbd3","receiver_thread_ids":["019e39fd-791c-76e0-a1bc-133562d3aba4"],"prompt":"Compute 21 + 21.","agents_states":{"019e39fd-791c-76e0-a1bc-133562d3aba4":{"status":"pending_init","message":null}},"status":"completed"}}
+{"type":"item.started","item":{"id":"item_1","type":"collab_tool_call","tool":"wait","sender_thread_id":"019e39fd-34eb-7ec3-83ba-47c9c901bbd3","receiver_thread_ids":["019e39fd-791c-76e0-a1bc-133562d3aba4"],"prompt":null,"agents_states":{},"status":"in_progress"}}
+{"type":"item.completed","item":{"id":"item_1","type":"collab_tool_call","tool":"wait","sender_thread_id":"019e39fd-34eb-7ec3-83ba-47c9c901bbd3","receiver_thread_ids":["019e39fd-791c-76e0-a1bc-133562d3aba4"],"prompt":null,"agents_states":{"019e39fd-791c-76e0-a1bc-133562d3aba4":{"status":"completed","message":"42"}},"status":"completed"}}
+{"type":"item.completed","item":{"id":"item_2","type":"agent_message","text":"Result: 42"}}
+{"type":"turn.completed","usage":{"input_tokens":69206,"cached_input_tokens":29824,"output_tokens":311,"reasoning_output_tokens":128}}

@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React)
 created: 2026-05-16
-last_verified: 2026-05-16
-tags: [codex, multi-backend, agent-abstraction, quack-agent-event, openai-codex, m1]
+last_verified: 2026-05-17
+tags: [codex, multi-backend, agent-abstraction, quack-agent-event, openai-codex, m1, m1.5, skills, slash-commands, agents-md]
 ---
 
 ## Codex Backend — Multi-Backend Agent Abstraction (M1)
@@ -93,3 +93,31 @@ tags: [codex, multi-backend, agent-abstraction, quack-agent-event, openai-codex,
 - Turn lifecycle relies on backend always synthesizing `session_ended` after process wait; true watchdog/timeout deferred to M2
 - 2 preexisting baseline test failures on main (`claude_usage`, `telegram_obfuscation`) — not regressions (`gotcha-preexisting-test-failures-main.md`)
 - Human residual: E2E manual Codex chat, Claude smoke (B2 Step 4)
+
+### M1 RE-TARGET → codex-cli 0.130 (2026-05-18) — SUPERSEDES 0.42 specifics above
+M1 was built/verified on a Homebrew-stale `codex 0.42`; **broken on current 0.130**. Re-targeted (zero Claude regression: `QuackAgentEvent` contract unchanged, `claude_event_tests` byte-identical, cargo 39p/2f = only the 2 pre-existing fails, adapter TS 20/20).
+
+| 0.42 (stale rows above) | 0.130 (current) |
+|---|---|
+| `--experimental-json` | **`--json`** |
+| stdin inherited | **`Stdio::null()`** (else `exec` hangs on "Reading additional input from stdin…") |
+| `session.created`/`session_id` | `thread.started`/**`thread_id`** |
+| `item_type`/`assistant_message` | **`item.type`**/`agent_message`; +`turn.started/completed`, `collab_tool_call`, `mcp_tool_call` |
+| usage via rollout-JSONL tail | **in-stream** `turn.completed.usage` → `codex_rollout_*`, `read_last_usage_for_session`, `walk_jsonl` **deleted** |
+
+Fixtures regenerated RAW from live 0.130 (`codex_stream_tool_run.jsonl`, `codex_subagent.jsonl`, `codex_skill_discovery.jsonl`). `events.rs` adds `codex_tool_identity`/`codex_aux_tool_output` (subagent/MCP → tool calls). **Subagents WORK in codex 0.130 `exec`** (`.codex/agents/*.toml`) — the earlier "subagent Claude-only" claim is RETRACTED. Authoritative: `documentation/research/codex-exec-capability-matrix.md` (version-pinned). Residual: live GUI smoke on 0.130 not yet done.
+
+### M1.5 — Codex UX parity (personality / slash commands / skills)
+Parity via Quack-owned prompt/file composition (NOT harness reimplementation). Personality→AGENTS.md + slash/skill composer are version-independent (survived the 0.130 re-target untouched).
+
+| Type | Path | Exports/Purpose |
+|------|------|-----------------|
+| Service | `src-tauri/src/personality.rs` | `build_agent_header()` pure (shared CLAUDE.md+AGENTS.md → byte-identical persona); `inject_personality_to_agents_md` command; `write_personality_doc()`; 2 golden tests (parity + idempotency) |
+| Service | `src-tauri/src/lib.rs` | registers `inject_personality_to_agents_md` |
+| Util | `src/utils/agentPersonality.ts` | `injectAgentPersonalityAgentsMd()` — Codex twin of `injectAgentPersonality`, best-effort |
+| Util | `src/utils/codexPromptComposer.ts` | `composeCodexPrompt()` / `expandSlashCommands()` — `/cmd`→`<command-context>` + `<available-skills>` index for `selectedSkills`; bypasses openai/codex#3641 |
+| Test | `src/utils/__tests__/codexPromptComposer.test.ts` | 6 unit tests (pure expansion logic) |
+| Route/Page | `src/App.tsx` | `backend === 'codex'` branch: `injectAgentPersonalityAgentsMd` + `composeCodexPrompt` before `send_message_via_codex` (Claude path never imports either) |
+
+**Parity behavior:** Codex session now (a) writes persona into `AGENTS.md` in the working dir (same mechanism as CLAUDE.md injection — Codex reads it natively); (b) gets working slash commands the native `codex exec` lacks; (c) gets an injected index of the agent's *selected* skills (Codex `cat`s the SKILL.md by path = progressive disclosure w/o bloat). Autonomous skill discovery + subagents stay Claude-only (capability-gate, transparent).
+**M1.5 deferred:** live GUI smoke (command+skill on real Codex session); M2 decision inject full SKILL.md body vs index by real token cost.

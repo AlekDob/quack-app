@@ -164,7 +164,8 @@ import { showProjectToast } from "./components/ProjectToast";
 import { loadAvailableDroids } from "./utils/skillsAndDroidsLoader";
 import { loadProjectColors, getProjectColor, DEFAULT_PROJECT_COLORS } from "./utils/projectColors";
 import { cleanupOldSessions } from "./utils/sessionCleanup";
-import { injectAgentPersonality } from "./utils/agentPersonality";
+import { injectAgentPersonality, injectAgentPersonalityAgentsMd } from "./utils/agentPersonality";
+import { composeCodexPrompt } from "./utils/codexPromptComposer";
 import { notifyLeadAgent } from "./services/remoteApi";
 import { quackEventToClaudeEvents } from "./utils/codexEventAdapter";
 import type { QuackAgentEvent } from "./types/agentBackend";
@@ -3158,6 +3159,21 @@ function AppContent() {
       // abstraction — no Quack model override). Resume uses the persisted
       // backendSessionId. The shared finally{} below still runs cleanup.
       if (currentSession?.backend === 'codex') {
+        // Codex UX parity (M1.5). Claude gets these from the Agent SDK CLI
+        // natively; Codex `exec` does not, so Quack supplies the equivalent
+        // via pure prompt/file composition (agent-level abstraction — no
+        // harness reimplementation). 1) persona → AGENTS.md (Codex reads it
+        // natively from --cd); 2) slash-command expansion + selected-skill
+        // index composed into the prompt (#3641 / no native skill discovery,
+        // both verified 2026-05-17). Best-effort: failures degrade to the
+        // raw prompt, never block the turn.
+        // Brain: pattern-backend-capability-gated-ui
+        await injectAgentPersonalityAgentsMd(activeTerminal, workingDir);
+        prompt = await composeCodexPrompt({
+          message: prompt,
+          basePath: workingDir ?? '',
+          selectedSkills: activeTerminal?.personality?.selectedSkills,
+        });
         const codexPromise = invoke<{ backend_session_id?: string }>('send_message_via_codex', {
           agentId: capturedAgentId,
           sessionKey: messageKey,

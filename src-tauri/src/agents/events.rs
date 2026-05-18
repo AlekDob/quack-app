@@ -1,7 +1,11 @@
 //! Unified agent event contract.
-//! Authoritative source: documentation/research/codex-cli-events.md §6 (spike, verified).
-//! NOTE: Codex `error` has only {type,message} — no code/recoverable (spike §4.3).
-//! NOTE: PermissionRequest has NO source via `codex exec` (spike §4.6).
+//! Authoritative source: codex-cli 0.130 `--json` stream, verified live
+//! 2026-05-18 (fixtures/codex_stream_tool_run.jsonl, _subagent, _skill_discovery).
+//! 0.130 schema (vs the obsolete 0.42 `--experimental-json`):
+//!   thread.started{thread_id} / turn.started / item.{started,completed} with
+//!   item.type / agent_message / turn.completed{usage}.
+//! NOTE: Codex `error` has only {type,message} — no code/recoverable.
+//! NOTE: PermissionRequest has NO source via `codex exec` (non-interactive).
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,8 +37,9 @@ pub enum QuackAgentEvent {
 }
 
 /// Map a backend-native tool/item identifier to Quack's canonical tool name.
-/// Codex 0.42 `--experimental-json` exposes a single `command_execution`
-/// item type (spike §7, VERIFIED -- `apply_patch`/`shell`/`view` do NOT exist).
+/// Codex 0.130 shells everything via `command_execution`; `collab_tool_call`
+/// (subagents) and `mcp_tool_call` carry their own `tool`/`server` names and
+/// are resolved directly in `codex_tool_identity`, not here.
 pub fn normalize_tool_name(backend: AgentBackendKind, raw: &str) -> &str {
     match (backend, raw) {
         (AgentBackendKind::Codex, "command_execution") => "Bash",
@@ -58,35 +63,78 @@ fn classify_codex_error(message: &str) -> (String, bool) {
     ("stream".into(), recoverable)
 }
 
-/// Translate ONE Codex `--experimental-json` stdout event into a QuackAgentEvent.
-/// Returns None for events Quack does not surface (e.g. non-command item.started).
-/// Surface contract: spike §4.1-§4.3, mapping table §6 ([S] rows).
+/// Resolve (id, canonical tool name, command/summary) for a Codex 0.130 tool
+/// item. Returns None for item types Quack does not surface as a tool.
+fn codex_tool_identity(item: &serde_json::Value) -> Option<(String, String, String)> {
+    let id = item.get("id")?.as_str()?.to_string();
+    match item.get("type")?.as_str()? {
+        "command_execution" => Some((
+            id,
+            normalize_tool_name(AgentBackendKind::Codex, "command_execution").to_string(),
+            item.get("command").and_then(|c| c.as_str()).unwrap_or("").to_string(),
+        )),
+        // Subagents (0.130): spawn_agent / wait collaboration tools.
+        "collab_tool_call" => Some((
+            id,
+            item.get("tool").and_then(|t| t.as_str()).unwrap_or("collab_tool_call").to_string(),
+            item.get("prompt").and_then(|p| p.as_str()).unwrap_or("").to_string(),
+        )),
+        "mcp_tool_call" => {
+            let server = item.get("server").and_then(|s| s.as_str()).unwrap_or("mcp");
+            let tool = item.get("tool").and_then(|t| t.as_str()).unwrap_or("call");
+            Some((id, format!("{server}.{tool}"), String::new()))
+        }
+        _ => None,
+    }
+}
+
+/// Concise output for a completed collab/mcp tool item (subagent reply or the
+/// first MCP text result, char-truncated so events stay lean).
+fn codex_aux_tool_output(item: &serde_json::Value) -> String {
+    if let Some(states) = item.get("agents_states").and_then(|s| s.as_object()) {
+        let msgs: Vec<String> = states.values()
+            .filter_map(|st| st.get("message").and_then(|m| m.as_str()))
+            .map(|s| s.to_string())
+            .collect();
+        if !msgs.is_empty() {
+            return msgs.join("\n");
+        }
+    }
+    if let Some(text) = item.get("result").and_then(|r| r.get("content"))
+        .and_then(|c| c.as_array()).and_then(|a| a.first())
+        .and_then(|x| x.get("text")).and_then(|t| t.as_str())
+    {
+        let t = text.trim();
+        let truncated: String = t.chars().take(2000).collect();
+        return if truncated.len() < t.len() { format!("{truncated}…") } else { truncated };
+    }
+    String::new()
+}
+
+/// Translate ONE Codex 0.130 `--json` stdout event into a QuackAgentEvent.
+/// Returns None for events Quack does not surface (turn.started, non-tool
+/// item.started, the non-JSON "Reading additional input…" preamble line).
+/// Verified live against fixtures/codex_stream_tool_run.jsonl (2026-05-18).
 pub fn codex_stream_to_quack(v: serde_json::Value) -> Option<QuackAgentEvent> {
     match v.get("type").and_then(|t| t.as_str())? {
-        "session.created" => Some(QuackAgentEvent::SessionStarted {
-            backend_session_id: v.get("session_id")?.as_str()?.to_string(),
+        // 0.130: the backend session id arrives as `thread_id`. No model in
+        // the stream (UI labels Codex sessions gpt-5-codex separately).
+        "thread.started" => Some(QuackAgentEvent::SessionStarted {
+            backend_session_id: v.get("thread_id")?.as_str()?.to_string(),
             model: None,
             backend: AgentBackendKind::Codex,
         }),
         "item.started" => {
-            let item = v.get("item")?;
-            if item.get("item_type")?.as_str()? != "command_execution" {
-                return None;
-            }
+            let (id, name, command) = codex_tool_identity(v.get("item")?)?;
             Some(QuackAgentEvent::ToolCallStart {
-                id: item.get("id")?.as_str()?.to_string(),
-                name: normalize_tool_name(
-                    AgentBackendKind::Codex,
-                    item.get("item_type")?.as_str()?,
-                ).to_string(),
-                args: serde_json::json!({
-                    "command": item.get("command").and_then(|c| c.as_str()).unwrap_or("")
-                }),
+                id,
+                name,
+                args: serde_json::json!({ "command": command }),
             })
         }
         "item.completed" => {
             let item = v.get("item")?;
-            match item.get("item_type")?.as_str()? {
+            match item.get("type")?.as_str()? {
                 "command_execution" => {
                     let status = item.get("status").and_then(|s| s.as_str()).unwrap_or("");
                     let exit_code = item.get("exit_code").and_then(|c| c.as_i64()).unwrap_or(0);
@@ -103,11 +151,27 @@ pub fn codex_stream_to_quack(v: serde_json::Value) -> Option<QuackAgentEvent> {
                         error,
                     })
                 }
-                "assistant_message" => Some(QuackAgentEvent::TextDelta {
+                "agent_message" => Some(QuackAgentEvent::TextDelta {
                     content: item.get("text")?.as_str()?.to_string(),
+                }),
+                // Subagent / MCP activity → surface as a completed tool call.
+                "collab_tool_call" | "mcp_tool_call" => Some(QuackAgentEvent::ToolCallEnd {
+                    id: item.get("id")?.as_str()?.to_string(),
+                    output: codex_aux_tool_output(item),
+                    error: None,
                 }),
                 _ => None,
             }
+        }
+        // 0.130: per-turn usage is IN-STREAM (was rollout-file-only on 0.42).
+        "turn.completed" => {
+            let u = v.get("usage")?;
+            Some(QuackAgentEvent::Usage {
+                input_tokens: u.get("input_tokens").and_then(|n| n.as_u64()).unwrap_or(0),
+                output_tokens: u.get("output_tokens").and_then(|n| n.as_u64()).unwrap_or(0),
+                cached_tokens: u.get("cached_input_tokens").and_then(|n| n.as_u64()).unwrap_or(0),
+                cost_usd: None,
+            })
         }
         "error" => {
             let message = v.get("message")?.as_str()?.to_string();
@@ -131,9 +195,9 @@ mod codex_stream_tests {
     }
 
     #[test]
-    fn maps_session_created() {
+    fn maps_thread_started() {
         let ev = codex_stream_to_quack(
-            serde_json::json!({"type":"session.created","session_id":"abc-123"})
+            serde_json::json!({"type":"thread.started","thread_id":"abc-123"})
         ).unwrap();
         assert_eq!(ev, QuackAgentEvent::SessionStarted {
             backend_session_id: "abc-123".into(),
@@ -143,17 +207,23 @@ mod codex_stream_tests {
     }
 
     #[test]
+    fn turn_started_is_ignored() {
+        assert!(codex_stream_to_quack(serde_json::json!({"type":"turn.started"})).is_none());
+    }
+
+    #[test]
     fn command_execution_started_is_toolcallstart() {
         let ev = codex_stream_to_quack(serde_json::json!({
             "type":"item.started",
-            "item":{"id":"item_0","item_type":"command_execution",
-                    "command":"bash -lc 'echo hi'","aggregated_output":"","status":"in_progress"}
+            "item":{"id":"item_0","type":"command_execution",
+                    "command":"/bin/zsh -lc 'echo hi'","aggregated_output":"",
+                    "exit_code":null,"status":"in_progress"}
         })).unwrap();
         match ev {
             QuackAgentEvent::ToolCallStart { id, name, args } => {
                 assert_eq!(id, "item_0");
                 assert_eq!(name, "Bash");
-                assert_eq!(args["command"], "bash -lc 'echo hi'");
+                assert_eq!(args["command"], "/bin/zsh -lc 'echo hi'");
             }
             other => panic!("expected ToolCallStart, got {other:?}"),
         }
@@ -163,12 +233,12 @@ mod codex_stream_tests {
     fn command_execution_completed_is_toolcallend_with_output() {
         let ev = codex_stream_to_quack(serde_json::json!({
             "type":"item.completed",
-            "item":{"id":"item_1","item_type":"command_execution",
-                    "command":"bash -lc 'cat note.txt'","aggregated_output":"PING\n",
+            "item":{"id":"item_0","type":"command_execution",
+                    "command":"/bin/zsh -lc 'cat note.txt'","aggregated_output":"PING\n",
                     "exit_code":0,"status":"completed"}
         })).unwrap();
         assert_eq!(ev, QuackAgentEvent::ToolCallEnd {
-            id: "item_1".into(), output: "PING\n".into(), error: None,
+            id: "item_0".into(), output: "PING\n".into(), error: None,
         });
     }
 
@@ -176,30 +246,42 @@ mod codex_stream_tests {
     fn failed_command_execution_carries_error() {
         let ev = codex_stream_to_quack(serde_json::json!({
             "type":"item.completed",
-            "item":{"id":"item_0","item_type":"command_execution",
-                    "command":"bash -lc 'echo X > b.txt'",
-                    "aggregated_output":"bash: b.txt: Operation not permitted\n",
-                    "exit_code":-1,"status":"failed"}
+            "item":{"id":"item_0","type":"command_execution",
+                    "command":"/bin/zsh -lc 'echo X > b.txt'",
+                    "aggregated_output":"zsh: operation not permitted: b.txt\n",
+                    "exit_code":1,"status":"failed"}
         })).unwrap();
         match ev {
             QuackAgentEvent::ToolCallEnd { error: Some(e), .. } => {
-                assert!(e.contains("Operation not permitted"));
+                assert!(e.contains("operation not permitted"));
             }
             other => panic!("expected ToolCallEnd with error, got {other:?}"),
         }
     }
 
     #[test]
-    fn assistant_message_is_textdelta() {
+    fn agent_message_is_textdelta() {
         let ev = codex_stream_to_quack(serde_json::json!({
             "type":"item.completed",
-            "item":{"id":"item_2","item_type":"assistant_message","text":"Done."}
+            "item":{"id":"item_1","type":"agent_message","text":"done"}
         })).unwrap();
-        assert_eq!(ev, QuackAgentEvent::TextDelta { content: "Done.".into() });
+        assert_eq!(ev, QuackAgentEvent::TextDelta { content: "done".into() });
     }
 
     #[test]
-    fn error_event_has_no_code_or_recoverable_natively() {
+    fn turn_completed_maps_in_stream_usage() {
+        let ev = codex_stream_to_quack(serde_json::json!({
+            "type":"turn.completed",
+            "usage":{"input_tokens":45761,"cached_input_tokens":41728,
+                     "output_tokens":124,"reasoning_output_tokens":64}
+        })).unwrap();
+        assert_eq!(ev, QuackAgentEvent::Usage {
+            input_tokens: 45761, output_tokens: 124, cached_tokens: 41728, cost_usd: None,
+        });
+    }
+
+    #[test]
+    fn error_event_classified() {
         let ev = codex_stream_to_quack(serde_json::json!({
             "type":"error","message":"Failed to refresh token: 401 Unauthorized"
         })).unwrap();
@@ -214,98 +296,48 @@ mod codex_stream_tests {
     }
 
     #[test]
-    fn item_started_non_command_is_ignored() {
+    fn non_tool_item_started_is_ignored() {
         assert!(codex_stream_to_quack(serde_json::json!({
             "type":"item.started",
-            "item":{"id":"x","item_type":"assistant_message","status":"in_progress"}
+            "item":{"id":"x","type":"agent_message","status":"in_progress"}
         })).is_none());
     }
 
     #[test]
-    fn full_fixture_stream_shape() {
+    fn full_tool_run_fixture_shape() {
+        // Includes the non-JSON "Reading additional input…" preamble line,
+        // which must be skipped (parse_all filters non-JSON).
         let raw = include_str!("fixtures/codex_stream_tool_run.jsonl");
         let evs = parse_all(raw);
         assert!(matches!(evs.first(), Some(QuackAgentEvent::SessionStarted { .. })));
-        assert!(matches!(evs.last(), Some(QuackAgentEvent::Error { .. })));
+        assert!(matches!(evs.last(), Some(QuackAgentEvent::Usage { .. })));
         assert_eq!(evs.iter().filter(|e| matches!(e, QuackAgentEvent::ToolCallStart { .. })).count(), 1);
-        assert_eq!(evs.iter().filter(|e| matches!(e, QuackAgentEvent::ToolCallEnd { .. })).count(), 2);
+        assert_eq!(evs.iter().filter(|e| matches!(e, QuackAgentEvent::ToolCallEnd { .. })).count(), 1);
         assert_eq!(evs.iter().filter(|e| matches!(e, QuackAgentEvent::TextDelta { .. })).count(), 1);
     }
-}
-
-/// Extract per-turn token usage from a rollout JSONL line.
-/// Spike §4.7: usage lives ONLY in the rollout file (NOT stdout), as
-/// event_msg/token_count. Use `last_token_usage` (per-turn) — `total_token_usage`
-/// is cumulative (mirrors Quack's Claude result-vs-assistant rule, auto-memory).
-/// The turn-start token_count has `info: null` -> skipped.
-pub fn codex_rollout_to_usage(v: &serde_json::Value) -> Option<QuackAgentEvent> {
-    let payload = v.get("payload")?;
-    if payload.get("type")?.as_str()? != "token_count" {
-        return None;
-    }
-    let info = payload.get("info")?;
-    if info.is_null() {
-        return None;
-    }
-    let last = info.get("last_token_usage")?;
-    Some(QuackAgentEvent::Usage {
-        input_tokens: last.get("input_tokens").and_then(|n| n.as_u64()).unwrap_or(0),
-        output_tokens: last.get("output_tokens").and_then(|n| n.as_u64()).unwrap_or(0),
-        cached_tokens: last.get("cached_input_tokens").and_then(|n| n.as_u64()).unwrap_or(0),
-        cost_usd: None,
-    })
-}
-
-/// Extract the model name from a rollout `turn_context` line.
-/// Spike §4.1/§4.7: model is NOT in stdout `session.created`; it is here.
-pub fn codex_rollout_model(v: &serde_json::Value) -> Option<String> {
-    if v.get("type")?.as_str()? != "turn_context" {
-        return None;
-    }
-    v.get("payload")?.get("model")?.as_str().map(|s| s.to_string())
-}
-
-#[cfg(test)]
-mod codex_rollout_tests {
-    use super::*;
 
     #[test]
-    fn null_info_token_count_yields_nothing() {
-        let v = serde_json::json!({
-            "type":"event_msg","payload":{"type":"token_count","info":null}
-        });
-        assert!(codex_rollout_to_usage(&v).is_none());
+    fn subagent_fixture_surfaces_collab_and_child_result() {
+        let raw = include_str!("fixtures/codex_subagent.jsonl");
+        let evs = parse_all(raw);
+        assert!(matches!(evs.first(), Some(QuackAgentEvent::SessionStarted { .. })));
+        // The `wait` collab tool completes carrying the child's "42" message.
+        assert!(evs.iter().any(|e| matches!(
+            e, QuackAgentEvent::ToolCallEnd { output, .. } if output.contains("42"))));
+        assert!(evs.iter().any(|e| matches!(
+            e, QuackAgentEvent::TextDelta { content } if content.contains("42"))));
+        assert!(matches!(evs.last(), Some(QuackAgentEvent::Usage { .. })));
     }
 
     #[test]
-    fn full_token_count_maps_last_usage() {
-        let v = serde_json::json!({
-            "type":"event_msg","payload":{"type":"token_count","info":{
-                "total_token_usage":{"input_tokens":9999,"cached_input_tokens":0,"output_tokens":0,"reasoning_output_tokens":0,"total_tokens":9999},
-                "last_token_usage":{"input_tokens":2594,"cached_input_tokens":2432,"output_tokens":28,"reasoning_output_tokens":0,"total_tokens":2622},
-                "model_context_window":272000}}
-        });
-        assert_eq!(codex_rollout_to_usage(&v).unwrap(), QuackAgentEvent::Usage {
-            input_tokens: 2594, output_tokens: 28, cached_tokens: 2432, cost_usd: None,
-        });
-    }
-
-    #[test]
-    fn extracts_model_from_turn_context() {
-        let v = serde_json::json!({
-            "type":"turn_context","payload":{"model":"gpt-5-codex"}
-        });
-        assert_eq!(codex_rollout_model(&v), Some("gpt-5-codex".to_string()));
-    }
-
-    #[test]
-    fn fixture_has_exactly_one_usable_usage() {
-        let raw = include_str!("fixtures/codex_rollout.jsonl");
-        let n = raw.lines().filter(|l| !l.trim().is_empty())
-            .filter_map(|l| serde_json::from_str::<serde_json::Value>(l).ok())
-            .filter_map(|v| codex_rollout_to_usage(&v))
-            .count();
-        assert_eq!(n, 1);
+    fn skill_discovery_fixture_parses_without_panic() {
+        // Large mcp_tool_call result (posthog resources) must not panic the
+        // char-truncation and must still yield the skill token in a TextDelta.
+        let raw = include_str!("fixtures/codex_skill_discovery.jsonl");
+        let evs = parse_all(raw);
+        assert!(evs.iter().any(|e| matches!(e, QuackAgentEvent::ToolCallEnd { .. })));
+        assert!(evs.iter().any(|e| matches!(
+            e, QuackAgentEvent::TextDelta { content } if content.contains("QUACKSPIKE_OK_7F3A"))));
     }
 }
 

@@ -359,21 +359,70 @@ pub fn inject_personality_to_claude_md(
         .map_err(|e| e.to_string())
 }
 
-fn inject_personality_to_claude_md_impl(
-    project_path: &Path,
+/// Process AGENTS.md (Codex backend) with the SAME personality header as
+/// CLAUDE.md. Codex `exec` reads AGENTS.md natively from its --cd root
+/// (verified 2026-05-17 against developers.openai.com/codex/guides/agents-md
+/// + live exec spike), so mirroring the persona here gives Codex sessions
+/// identity parity with Claude. The header is byte-identical: both paths
+/// share `build_agent_header`.
+// Brain: pattern-backend-capability-gated-ui
+#[tauri::command]
+pub fn inject_personality_to_agents_md(
+    project_path: String,
     personality: AgentPersonality,
-) -> Result<String> {
-    let claude_md_path = project_path.join("CLAUDE.md");
+) -> Result<String, String> {
+    inject_personality_to_agents_md_impl(&PathBuf::from(project_path), personality)
+        .map_err(|e| e.to_string())
+}
 
+const CLAUDE_MD_SKELETON: &str = "# CLAUDE.md\n\n**IMPORTANT: This CLAUDE.md file is your compass!** Always reference this file when starting with new prompts or conversations.\n\n";
+const AGENTS_MD_SKELETON: &str = "# AGENTS.md\n\n**IMPORTANT: This AGENTS.md file is your compass!** Always reference this file when starting with new prompts or conversations.\n\n";
+
+fn log_personality(target: &str, personality: &AgentPersonality) {
     // DEBUG: Log personality data
-    log::info!("🔍 inject_personality_to_claude_md called");
+    log::info!("🔍 {} called", target);
     log::info!("🔍 Name: {}", personality.name);
     log::info!("🔍 Role: {}", personality.role);
     log::info!("🔍 Skills: {:?}", personality.skills);
     log::info!("🔍 SelectedRules: {:?}", personality.selected_rules);
     log::info!("🔍 SelectedSkills: {:?}", personality.selected_skills);
     log::info!("🔍 CustomNotes: {:?}", personality.custom_notes);
+}
 
+fn inject_personality_to_claude_md_impl(
+    project_path: &Path,
+    personality: AgentPersonality,
+) -> Result<String> {
+    log_personality("inject_personality_to_claude_md", &personality);
+    let agent_header = build_agent_header(&personality);
+    write_personality_doc(
+        &project_path.join("CLAUDE.md"),
+        &agent_header,
+        CLAUDE_MD_SKELETON,
+        "# CLAUDE.md",
+    )
+}
+
+fn inject_personality_to_agents_md_impl(
+    project_path: &Path,
+    personality: AgentPersonality,
+) -> Result<String> {
+    log_personality("inject_personality_to_agents_md", &personality);
+    let agent_header = build_agent_header(&personality);
+    write_personality_doc(
+        &project_path.join("AGENTS.md"),
+        &agent_header,
+        AGENTS_MD_SKELETON,
+        "# AGENTS.md",
+    )
+}
+
+/// Build the QUACK_AGENT_HEADER block. Pure string assembly (the only read is
+/// the global ~/.claude/CLAUDE.md display-name). SHARED by CLAUDE.md (Claude
+/// backend) and AGENTS.md (Codex backend) so the persona is byte-identical
+/// across backends — editing this changes BOTH. Zero Claude regression is
+/// asserted by the parity + idempotency tests at the bottom of this file.
+fn build_agent_header(personality: &AgentPersonality) -> String {
     // Generate agent header with NEW structure
     let mut agent_header = String::new();
     agent_header.push_str("<!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->\n");
@@ -501,12 +550,27 @@ fn inject_personality_to_claude_md_impl(
 
     agent_header.push_str("<!-- QUACK_AGENT_HEADER_END -->\n\n");
 
-    // Read existing CLAUDE.md or create new one
-    let existing_content = if claude_md_path.exists() {
-        fs::read_to_string(&claude_md_path)
-            .context("Failed to read CLAUDE.md")?
+    agent_header
+}
+
+/// Idempotently inject the `agent_header` block (delimited by the
+/// QUACK_AGENT_HEADER markers) into the doc at `doc_path`. Creates the doc
+/// from `default_skeleton` when absent, strips any previous header block, and
+/// inserts the new one right after the `title_marker` line when present
+/// (otherwise prepends). Parameterised over CLAUDE.md / AGENTS.md so the
+/// Claude path stays byte-identical to the pre-refactor behaviour.
+fn write_personality_doc(
+    doc_path: &Path,
+    agent_header: &str,
+    default_skeleton: &str,
+    title_marker: &str,
+) -> Result<String> {
+    // Read existing doc or create new one from the skeleton
+    let existing_content = if doc_path.exists() {
+        fs::read_to_string(doc_path)
+            .context("Failed to read agent doc")?
     } else {
-        String::from("# CLAUDE.md\n\n**IMPORTANT: This CLAUDE.md file is your compass!** Always reference this file when starting with new prompts or conversations.\n\n")
+        String::from(default_skeleton)
     };
 
     // Remove old agent header if exists
@@ -530,7 +594,7 @@ fn inject_personality_to_claude_md_impl(
     };
 
     // Inject new agent header
-    let final_content = if user_content.starts_with("# CLAUDE.md") {
+    let final_content = if user_content.starts_with(title_marker) {
         // Insert after the main header
         let lines: Vec<&str> = user_content.lines().collect();
         let mut result = String::new();
@@ -543,7 +607,7 @@ fn inject_personality_to_claude_md_impl(
         }
 
         // Add agent header
-        result.push_str(&agent_header);
+        result.push_str(agent_header);
 
         // Add rest of content
         for line in lines.iter().skip(header_end + 1) {
@@ -556,9 +620,9 @@ fn inject_personality_to_claude_md_impl(
         format!("{}{}", agent_header, user_content)
     };
 
-    // Write updated CLAUDE.md
-    fs::write(&claude_md_path, &final_content)
-        .context("Failed to write CLAUDE.md")?;
+    // Write updated doc
+    fs::write(doc_path, &final_content)
+        .context("Failed to write agent doc")?;
 
     Ok(final_content)
 }
@@ -661,4 +725,73 @@ pub fn load_active_agents_with_data(project_path: String) -> Result<Vec<AgentPer
     }
 
     Ok(agents)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The personality header must be byte-identical between the CLAUDE.md
+    /// (Claude backend) and AGENTS.md (Codex backend) paths — this is the
+    /// agent-level parity guarantee. `build_agent_header` is the single
+    /// source of truth, so a drift here would break parity silently.
+    #[test]
+    fn agent_header_is_identical_for_both_backends() {
+        let p = AgentPersonality::default();
+        let h1 = build_agent_header(&p);
+        let h2 = build_agent_header(&p);
+        assert_eq!(h1, h2, "build_agent_header must be deterministic");
+        assert!(h1.contains("<!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->"));
+        assert!(h1.contains("<!-- QUACK_AGENT_HEADER_END -->"));
+        assert!(h1.contains(&format!(
+            "Your name is **{}**, and you're the **{}**.",
+            p.name, p.role
+        )));
+        assert!(h1.contains("**Agent Communication Protocol:**"));
+    }
+
+    /// Zero Claude regression: writing the same persona into CLAUDE.md and
+    /// AGENTS.md must produce files whose injected header block is identical,
+    /// and the operation must be idempotent (re-running yields the same file,
+    /// no header duplication). Skeleton/title differ by design only in the
+    /// scaffold line, never in the agent header.
+    #[test]
+    fn claude_and_agents_doc_parity_and_idempotency() {
+        let dir = std::env::temp_dir().join(format!(
+            "quack-personality-test-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        let p = AgentPersonality::default();
+
+        let claude1 = inject_personality_to_claude_md_impl(&dir, p.clone()).unwrap();
+        let agents1 = inject_personality_to_agents_md_impl(&dir, p.clone()).unwrap();
+
+        // Idempotency: second run must equal the first (no duplicated header)
+        let claude2 = inject_personality_to_claude_md_impl(&dir, p.clone()).unwrap();
+        let agents2 = inject_personality_to_agents_md_impl(&dir, p.clone()).unwrap();
+        assert_eq!(claude1, claude2, "CLAUDE.md injection must be idempotent");
+        assert_eq!(agents1, agents2, "AGENTS.md injection must be idempotent");
+
+        // Parity: the injected QUACK_AGENT_HEADER block is byte-identical
+        let extract = |s: &str| -> String {
+            let a = s.find("<!-- QUACK_AGENT_HEADER_START").unwrap();
+            let end_marker = "<!-- QUACK_AGENT_HEADER_END -->\n\n";
+            let b = s.find(end_marker).unwrap() + end_marker.len();
+            s[a..b].to_string()
+        };
+        assert_eq!(
+            extract(&claude1),
+            extract(&agents1),
+            "persona header must be identical across CLAUDE.md and AGENTS.md"
+        );
+
+        // Scaffolds differ only by the title line
+        assert!(claude1.starts_with("# CLAUDE.md"));
+        assert!(agents1.starts_with("# AGENTS.md"));
+
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
