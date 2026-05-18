@@ -282,6 +282,14 @@ export default function ChatView({
     return s.sessions.find(sess => sess.id === internalSessionId)?.title;
   });
 
+  // Codex sessions manage their own model/mode/effort — used to hide the
+  // Claude-only provider controls in the chat settings menu.
+  const isCodexSession = useSessionStore(s => {
+    const sid = internalSessionId || currentSessionId;
+    if (!sid) return false;
+    return s.sessions.find(sess => sess.id === sid)?.backend === 'codex';
+  });
+
   // Brain: 037-anthropic-compatible-providers
   // Resolve the effective contextWindow for the stamina bar / token usage modal.
   // Custom Anthropic-compatible providers may have non-200k context (e.g. MiniMax 1M,
@@ -290,6 +298,9 @@ export default function ChatView({
   const providerOverrideId = useSessionProviderOverride(internalSessionId);
   const activeProviderState = useSettingsStore(s => s.claude.activeProvider);
   const customProviders = useSettingsStore(s => s.claude.customProviders);
+  // Codex-backend model (separate from Claude). Only consumed when isCodexSession.
+  const codexModel = useSettingsStore(s => s.codexModel);
+  const setCodexModel = useSettingsStore(s => s.setCodexModel);
   const effectiveProviderContextWindow = useMemo(() => {
     // Defensive: persisted state from older builds may lack `activeProvider`.
     const ap = activeProviderState ?? { kind: 'anthropic' as const };
@@ -1075,6 +1086,9 @@ export default function ChatView({
               onPermissionModeChange: (mode) => onPermissionModeChange?.(mode),
               onEffortChange: (e) => onEffortChange?.(e),
               disabled: isLoading,
+              isCodexSession,
+              codexModel,
+              onCodexModelChange: setCodexModel,
             },
             hasMessages: messages.length > 0,
             isLoading,

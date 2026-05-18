@@ -211,6 +211,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Whiteboard Title tool — `texts` strippati da `filterByParent`: `documentation/bugs/fix-whiteboard-texts-stripped-by-filterbyparent.md`
 - Anthropic-compatible clones — identity hallucination ("I am Claude"): `documentation/gotchas/gotcha-anthropic-compatible-identity-hallucination.md`
 - JS `a && b && c` interpolato in template literal — secret leak: `documentation/gotchas/gotcha-js-template-literal-secret-leak.md`
+- External CLI: pin `<bin> --version` before claiming any capability/wiring schema (codex 0.42 vs 0.130 incident): `documentation/gotchas/gotcha-external-cli-version-pin.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
@@ -243,6 +244,8 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Brain Accordion Section (scoped FileExplorer): `documentation/patterns/pattern-brain-accordion-section.md`
 - DiffViewer modes (unified/split/fullscreen): `documentation/patterns/pattern-diff-viewer-modes.md`
 - Session Scroll Memory (restore/scroll-to-bottom): `documentation/patterns/pattern-session-scroll-memory.md`
+- Backend capability-gated UI (hide Claude-only controls for Codex/non-Claude sessions): `documentation/patterns/pattern-backend-capability-gated-ui.md`
+- Codex `exec` capability matrix (what skills/commands/subagents/AGENTS.md survive non-interactive — read before wiring any Claude-harness feature for Codex): `documentation/research/codex-exec-capability-matrix.md`
 
 **Human Guides** (`documentation/guide/`):
 - Brain system: `documentation/guide/brain/` (overview, access chain, entry types, UI, writing entries)

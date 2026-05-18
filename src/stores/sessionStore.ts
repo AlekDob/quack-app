@@ -16,6 +16,13 @@ import { sessionWriteLock } from './sessionWriteLock';
 import { appendBrainDiaryOnDone } from '../services/brainSessionService';
 import { useProjectStatsStore } from './projectStatsStore';
 
+// Brain: decision-quack-abstraction-agent-level-not-model-level
+// Sessions created before the Codex integration have no `backend`.
+// Default to 'claude' so existing sessions behave exactly as before.
+export function normalizeSessionBackend(s: AgentSession): AgentSession {
+  return s.backend ? s : { ...s, backend: 'claude' };
+}
+
 /**
  * Maximum messages allowed per session before archiving is recommended
  */
@@ -97,7 +104,7 @@ export const useSessionStore = create<SessionState>()(
           }
           try {
             const previousCount = get().sessions.length;
-            const sessions = await loadAgentSessions();
+            const sessions = (await loadAgentSessions()).map(normalizeSessionBackend);
             console.log(`[sessionStore] loadSessions: previous=${previousCount}, loaded=${sessions.length}`);
             set({ sessions, isLoading: false });
 

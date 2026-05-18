@@ -164,8 +164,11 @@ import { showProjectToast } from "./components/ProjectToast";
 import { loadAvailableDroids } from "./utils/skillsAndDroidsLoader";
 import { loadProjectColors, getProjectColor, DEFAULT_PROJECT_COLORS } from "./utils/projectColors";
 import { cleanupOldSessions } from "./utils/sessionCleanup";
-import { injectAgentPersonality } from "./utils/agentPersonality";
+import { injectAgentPersonality, injectAgentPersonalityAgentsMd } from "./utils/agentPersonality";
+import { composeCodexPrompt } from "./utils/codexPromptComposer";
 import { notifyLeadAgent } from "./services/remoteApi";
+import { quackEventToClaudeEvents } from "./utils/codexEventAdapter";
+import type { QuackAgentEvent } from "./types/agentBackend";
 import type { DroidMetadata, ActiveProject } from "./components/modal-steps/types";
 // TEMPORARILY DISABLED: MaxPlanProvider causing TDZ error - will fix separately
 // import { MaxPlanProvider, useMaxPlan } from "./contexts/MaxPlanContext";
@@ -218,6 +221,7 @@ import { getRandomName } from "./utils/agentNames";
 import {
   appendMessagesToSession,
   createChatTurnId,
+  findAssistantMessageIndexForTurn,
   routeClaudeEventToSession,
   shouldRejectClaudeEvent,
   type BufferedClaudeEvent,
@@ -1168,6 +1172,14 @@ function AppContent() {
   // before either resolves, causing Tauri's "listeners[eventId].handlerId" crash
   const pendingListenersRef = useRef<Set<string>>(new Set());
 
+  // Codex parallel listener tracking — SEPARATE from Claude refs (do not share)
+  const activeCodexListenersRef = useRef<Map<string, () => void>>(new Map());
+  const pendingCodexListenersRef = useRef<Set<string>>(new Set());
+  // Per-session monotonic counter for text_delta seq numbers (distinct message ids)
+  const codexSeqCountersRef = useRef<Map<string, number>>(new Map());
+  // Latest usage snapshot per in-flight Codex turn (keyed by sessionKey); self-clears on terminal events
+  const codexLastUsageRef = useRef<Map<string, { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number; cost: number | null }>>(new Map());
+
   // 🦆 EVENT BUFFER FIX: Buffer events that arrive before the streaming message is ready
   // This fixes the intermittent bug where Task/droid widgets don't appear because
   // the event arrives before React's setState has created the streaming message
@@ -1291,6 +1303,8 @@ function AppContent() {
     // Unlisten Tauri events
     const unlisten = activeListenersRef.current.get(agentId);
     if (unlisten) { try { unlisten(); } catch { /* ignore */ } activeListenersRef.current.delete(agentId); }
+    const unlistenCodex = activeCodexListenersRef.current.get(agentId);
+    if (unlistenCodex) { try { unlistenCodex(); } catch { /* ignore */ } activeCodexListenersRef.current.delete(agentId); }
     // Clear timers
     for (const timerMap of [idleTimersRef.current, notificationTimersRef.current, visualIdleTimersRef.current]) {
       const timer = timerMap.get(agentId);
@@ -1298,6 +1312,8 @@ function AppContent() {
     }
     // Clear refs
     pendingListenersRef.current.delete(agentId);
+    pendingCodexListenersRef.current.delete(agentId);
+    codexSeqCountersRef.current.delete(agentId);
     eventBufferRef.current.delete(agentId);
     activeQueryIdRef.current.delete(agentId);
     abortedTurnIdsRef.current.delete(agentId);
@@ -2625,6 +2641,117 @@ function AppContent() {
     };
   }, [tauriAvailable, activeAgentIdsKey]); // 🦆 RACE FIX: Only re-setup when agent IDs change, not on every message update!
 
+  // Brain: decision-quack-abstraction-agent-level-not-model-level
+  // Codex Multi-Listener: parallel to the Claude Multi-Listener above.
+  // Listens on codex-event:{agentId} (emitted by the Rust Codex backend) and routes
+  // each QuackAgentEvent through the pure adapter into handleClaudeEvent.
+  // PURELY ADDITIVE: the Claude listener path above is byte-identical after this addition.
+  useEffect(() => {
+    if (!tauriAvailable) return;
+
+    const activeAgentIds = activeAgentIdsKey.split(',').filter(Boolean);
+
+    const setupPromises = activeAgentIds.map(async (agentId) => {
+      if (activeCodexListenersRef.current.has(agentId) || pendingCodexListenersRef.current.has(agentId)) {
+        return;
+      }
+
+      pendingCodexListenersRef.current.add(agentId);
+      const eventName = `codex-event:${agentId}`;
+
+      try {
+        const unlisten = await listen<{ sessionKey: string; turnId: string | null; event: QuackAgentEvent }>(
+          eventName,
+          (tauri) => {
+            const { sessionKey, turnId, event } = tauri.payload;
+
+            // Persist Codex backend session id so resume path can use it (Task 2b+)
+            if (event.kind === 'session_started') {
+              useSessionStore.getState().updateSession(sessionKey, {
+                backendSessionId: event.backend_session_id,
+              }).catch((err: Error) => {
+                console.warn('[Codex-Listener] Failed to save backendSessionId:', err);
+              });
+            }
+
+            // Capture latest usage for this turn so we can finalize the placeholder with token stats
+            if (event.kind === 'usage') {
+              codexLastUsageRef.current.set(sessionKey, {
+                input_tokens: event.input_tokens,
+                output_tokens: event.output_tokens,
+                cache_read_input_tokens: event.cached_tokens,
+                cache_creation_input_tokens: 0,
+                cost: event.cost_usd,
+              });
+            }
+
+            // Increment per-agent seq counter for text_delta id uniqueness (keyed by agentId for uniform teardown)
+            const seq = (codexSeqCountersRef.current.get(agentId) ?? 0) + 1;
+            codexSeqCountersRef.current.set(agentId, seq);
+
+            const claudeEvents = quackEventToClaudeEvents(event, seq);
+            for (const ce of claudeEvents) {
+              handleClaudeEvent(agentId, ce, 'Codex-Listener', sessionKey, turnId ?? undefined);
+            }
+
+            // Finalize the assistant placeholder on terminal events so status transitions
+            // from 'streaming' to 'complete'/'error' and per-turn token stats render correctly.
+            // This block runs ONLY inside the codex-event handler — the Claude path is unaffected.
+            if (event.kind === 'session_ended' || event.kind === 'error') {
+              const isError = event.kind === 'error';
+              // Capture here where TS narrows the discriminated union (avoids a cast inside the closure)
+              const errorMessage = event.kind === 'error' ? event.message : undefined;
+              const lastUsage = codexLastUsageRef.current.get(sessionKey);
+              setChatSessions((prev) => {
+                const msgs = prev.get(sessionKey);
+                if (!msgs) return prev;
+                const idx = findAssistantMessageIndexForTurn(msgs, turnId ?? undefined);
+                if (idx < 0) return prev;
+                const next = new Map(prev);
+                next.set(sessionKey, msgs.map((msg, i) => i === idx ? {
+                  ...msg,
+                  status: (isError ? 'error' : 'complete') as const,
+                  ...(isError ? { error: errorMessage } : {}),
+                  metadata: {
+                    ...msg.metadata,
+                    ...(lastUsage ? {
+                      turnUsage: {
+                        input_tokens: lastUsage.input_tokens,
+                        output_tokens: lastUsage.output_tokens,
+                        cache_read_input_tokens: lastUsage.cache_read_input_tokens,
+                        cache_creation_input_tokens: lastUsage.cache_creation_input_tokens,
+                      },
+                      ...(lastUsage.cost != null ? { turnCost: lastUsage.cost } : {}),
+                    } : {}),
+                  },
+                } : msg));
+                return next;
+              });
+              codexLastUsageRef.current.delete(sessionKey);
+            }
+          },
+        );
+
+        activeCodexListenersRef.current.set(agentId, unlisten);
+        pendingCodexListenersRef.current.delete(agentId);
+      } catch (error) {
+        pendingCodexListenersRef.current.delete(agentId);
+        console.error(`[Codex-Listener] Failed to setup listener for ${agentId}:`, error);
+      }
+    });
+
+    Promise.all(setupPromises).catch((error) => {
+      console.error('[Codex-Listener] Error setting up listeners:', error);
+    });
+
+    // Persist listeners for app lifetime — same discipline as Claude Multi-Listener above
+    return () => {
+      console.log('[Codex-Listener] Effect cleanup - listeners preserved:',
+        Array.from(activeCodexListenersRef.current.keys())
+      );
+    };
+  }, [tauriAvailable, activeAgentIdsKey, handleClaudeEvent]);
+
   // 🦆 PRE-WARM LISTENER: REMOVED — was a third listener registration point
   // alongside Multi-Listener and ensureListenerReady, causing duplicate event
   // delivery. The Multi-Listener effect covers all active terminals, and
@@ -2952,13 +3079,15 @@ function AppContent() {
       // Timestamp will be updated to Date.now() when first response arrives (see event listener)
       timestamp: 0,
       status: 'streaming',
-      // Store settings used for this message (for UI display)
+      // Store settings used for this message (for UI display).
+      // Codex sessions run Codex's own model — label the message accordingly
+      // instead of the Claude active model (which does not apply to Codex).
       settings: {
-        model: getActiveModelName(options?.model),
+        model: currentSession?.backend === 'codex' ? 'gpt-5-codex' : getActiveModelName(options?.model),
         // Brain: task-effort-model-aware-refactor — use model-aware default instead of hardcoded 'medium'
         effort: options?.effort || defaultEffortForModel(options?.model || ''),
         thinkingMode: options?.thinkingMode || 'auto',
-        modelDisplayName: getActiveModelDisplayName(options?.model) || undefined,
+        modelDisplayName: currentSession?.backend === 'codex' ? 'gpt-5-codex' : (getActiveModelDisplayName(options?.model) || undefined),
       },
       // Hide header + init widget on resumed sessions (known at message creation time)
       metadata: {
@@ -3021,6 +3150,46 @@ function AppContent() {
           reject(new Error('Aborted'));
         });
       });
+
+      // Brain: decision-quack-abstraction-agent-level-not-model-level
+      // Codex backend: send via the Codex agent harness. Completion, assistant
+      // text, tool calls and token usage all arrive asynchronously through the
+      // codex-event channel (consumed alongside the Claude listener) and render
+      // via the existing reducer. M1 uses Codex's own default model (agent-level
+      // abstraction — no Quack model override). Resume uses the persisted
+      // backendSessionId. The shared finally{} below still runs cleanup.
+      if (currentSession?.backend === 'codex') {
+        // Codex UX parity (M1.5). Claude gets these from the Agent SDK CLI
+        // natively; Codex `exec` does not, so Quack supplies the equivalent
+        // via pure prompt/file composition (agent-level abstraction — no
+        // harness reimplementation). 1) persona → AGENTS.md (Codex reads it
+        // natively from --cd); 2) slash-command expansion + selected-skill
+        // index composed into the prompt (#3641 / no native skill discovery,
+        // both verified 2026-05-17). Best-effort: failures degrade to the
+        // raw prompt, never block the turn.
+        // Brain: pattern-backend-capability-gated-ui
+        await injectAgentPersonalityAgentsMd(activeTerminal, workingDir);
+        prompt = await composeCodexPrompt({
+          message: prompt,
+          basePath: workingDir ?? '',
+          selectedSkills: activeTerminal?.personality?.selectedSkills,
+        });
+        const codexPromise = invoke<{ backend_session_id?: string }>('send_message_via_codex', {
+          agentId: capturedAgentId,
+          sessionKey: messageKey,
+          workingDir,
+          prompt,
+          // Codex-backend model picker (settingsStore). Empty → null → Rust
+          // omits `-c model=` and Codex uses its own default. This is a Codex
+          // knob (like --sandbox), not Claude model selection.
+          model: useSettingsStore.getState().codexModel || null,
+          turnId,
+          resumeSessionId: currentSession?.backendSessionId ?? null,
+        });
+        codexPromise.catch(() => {}); // suppress unhandled rejection if abort wins the race
+        await Promise.race([codexPromise, abortPromise]);
+        return;
+      }
 
       // 🦆 SIMPLIFIED: Always start fresh conversation
       // Users can resume sessions via Sessions panel -> "Resume Session" button

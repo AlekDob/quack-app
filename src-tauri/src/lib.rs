@@ -21,6 +21,7 @@ use tauri::{menu::MenuBuilder, tray::TrayIconBuilder, AppHandle, Emitter, Listen
 
 mod agency;
 mod agency_setup;
+mod agents; // Multi-backend agent abstraction (Claude + Codex)
 mod ai;
 mod brain_window;
 mod browser;
@@ -609,8 +610,78 @@ async fn handle_status_update(
     StatusCode::OK
 }
 
+#[tauri::command]
+async fn send_message_via_codex(
+    app: tauri::AppHandle,
+    agent_id: String,
+    session_key: String,
+    working_dir: String,
+    prompt: String,
+    model: Option<String>,
+    turn_id: Option<String>,
+    resume_session_id: Option<String>,
+) -> Result<agents::backend::BackendSessionHandle, String> {
+    use agents::backend::{AgentBackend, StartSessionParams};
+    use agents::codex_backend::CodexBackend;
+    let backend = CodexBackend { app };
+    let params = StartSessionParams { agent_id, session_key, working_dir, model, turn_id };
+    match resume_session_id {
+        Some(sid) => backend.resume(&sid, params, prompt).await,
+        None => backend.send_message(params, prompt).await,
+    }
+}
+
+/// Path del crash log dei panic (`~/Library/Application Support/quack/panic.log` su macOS).
+fn panic_log_path() -> Option<std::path::PathBuf> {
+    dirs::data_dir().map(|d| d.join("quack").join("panic.log"))
+}
+
+/// Brain: fix-mutex-poisoning-cascade-abort — hardening #2.
+/// Con `panic = "unwind"` un task tokio che panica muore da solo: questo hook
+/// cattura messaggio + location (file:line) + thread PRIMA dell'unwind, così il
+/// prossimo crash è diagnosticabile anche in release stripped (sink log assente).
+fn install_panic_hook() {
+    std::panic::set_hook(Box::new(|info| {
+        let loc = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "<unknown>".to_string());
+        let msg = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "<non-string panic>".to_string());
+        let thread = std::thread::current()
+            .name()
+            .unwrap_or("<unnamed>")
+            .to_string();
+        let ts = chrono::Local::now().to_rfc3339();
+        let bt = std::backtrace::Backtrace::force_capture();
+        let entry = format!("\n[{ts}] PANIC thread='{thread}' at {loc}\n  {msg}\n{bt}\n");
+        eprint!("{entry}");
+        if let Some(path) = panic_log_path() {
+            if let Some(dir) = path.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&path)
+            {
+                use std::io::Write;
+                let _ = f.write_all(entry.as_bytes());
+            }
+        }
+    }));
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Brain: fix-mutex-poisoning-cascade-abort — installare PRIMA dello start del
+    // runtime tokio: i panic hook sono globali e devono precedere lo spawn dei worker.
+    install_panic_hook();
+
     tauri::Builder::default()
         .manage(SessionState::new()) // Register global session state
         .manage(license::LicenseState::default()) // Register license state
@@ -1306,6 +1377,7 @@ pub fn run() {
             personality::save_agent_personality,
             personality::load_agent_personality,
             personality::inject_personality_to_claude_md,
+            personality::inject_personality_to_agents_md,
             personality::load_active_agents,
             personality::save_active_agents,
             personality::add_active_agent,
@@ -1408,6 +1480,9 @@ pub fn run() {
             project_stats::bulk_import_token_events,
             project_stats::get_stats_migration_flag,
             project_stats::set_stats_migration_flag,
+            // Codex backend commands
+            agents::codex_backend::codex_auth_status,
+            send_message_via_codex,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

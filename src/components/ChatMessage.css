@@ -1,7 +1,7 @@
 .chat-message {
   display: flex;
   gap: 10px;
-  padding: 12px 16px;
+  padding: 16px 18px;
   width: 100%; /* Ensure messages take full width */
   animation: messageSlideIn 0.2s ease-out;
 }
@@ -164,6 +164,18 @@
   min-width: 0;
 }
 
+/* Assistant content: even vertical rhythm between header, events and body
+   instead of a single cramped 4px margin (felt too compact). */
+.chat-message.assistant .chat-message-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat-message.assistant .chat-message-header {
+  margin-bottom: 0; /* gap on the content column handles spacing now */
+}
+
 .chat-message-header {
   display: flex;
   align-items: center;
@@ -254,7 +266,7 @@
 
 .chat-message-body {
   font-size: var(--fs-body);
-  line-height: 1.5;
+  line-height: 1.62;
   color: var(--text-primary);
   word-wrap: break-word;
   white-space: pre-wrap;
