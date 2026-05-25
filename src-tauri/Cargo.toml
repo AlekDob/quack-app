@@ -74,8 +74,16 @@ libc = "0.2"  # For getpwuid to get home directory when $HOME is not set
 
 # 🔐 Security-optimized production build profile
 [profile.release]
-opt-level = "z"        # Optimize for size and performance
-lto = true             # Link Time Optimization (slower build, smaller/faster binary)
-codegen-units = 1      # Single codegen unit for better optimization
-strip = true           # Strip debug symbols from binary
-panic = "abort"        # Smaller panic handler
+opt-level = "z"            # Optimize for size and performance
+lto = true                 # Link Time Optimization (slower build, smaller/faster binary)
+codegen-units = 1          # Single codegen unit for better optimization
+strip = true               # Binario distribuito resta stripped (size): i simboli vivono nel .dSYM
+# Brain: fix-mutex-poisoning-cascade-abort — hardening #1+#3
+# panic="unwind" (NON "abort"): un panic in un task tokio uccide SOLO quel task,
+# il runtime e l'app sopravvivono (isolamento per-task). Con "abort" qualsiasi
+# panic in background (blip rete post-sleep, channel chiuso) abortiva l'intero processo.
+panic = "unwind"
+# debug=1 emette line-table (file:line); split-debuginfo="packed" su macOS genera
+# target/release/app.dSYM separato da archiviare per release → crash report simbolicabili.
+debug = 1
+split-debuginfo = "packed"

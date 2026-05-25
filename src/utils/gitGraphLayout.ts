@@ -28,6 +28,14 @@ export interface GraphNode {
   edges: GraphEdge[]
   /** Colors of active lanes at this row (null = inactive slot) */
   activeLanes: (string | null)[]
+  /** Lane indices whose vertical line should start at this row's center (forked from this commit) */
+  startLanes: number[]
+  /** Lane indices whose vertical line should end at this row's center (converged into another lane) */
+  endLanes: number[]
+  /** True if this commit has 2+ parents (merge commit) */
+  isMerge: boolean
+  /** True if this commit carries at least one branch/tag ref */
+  isBranchTip: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -87,18 +95,6 @@ function buildEdge(
   }
 }
 
-/**
- * Assign a lane for `parentHash` and return the lane index.
- * If the parent is already tracked, reuse its lane; otherwise claim a new one.
- */
-function resolveParentLane(
-  activeLanes: (string | null)[],
-  parentHash: string
-): number {
-  const existing = findLane(activeLanes, parentHash)
-  if (existing !== -1) return existing
-  return claimLane(activeLanes, parentHash)
-}
 
 // ---------------------------------------------------------------------------
 // Per-commit processing
@@ -107,6 +103,9 @@ function resolveParentLane(
 interface CommitProcessResult {
   lane: number
   edges: GraphEdge[]
+  deferredClears: number[]
+  startLanes: number[]
+  endLanes: number[]
 }
 
 function processCommit(
@@ -115,38 +114,47 @@ function processCommit(
   hashToIndex: Map<string, number>,
   selfIndex: number
 ): CommitProcessResult {
-  // 1. Find or claim lane for this commit
   let lane = findLane(activeLanes, commit.hash)
   if (lane === -1) lane = claimLane(activeLanes, commit.hash)
 
   const edges: GraphEdge[] = []
+  const deferredClears: number[] = []
+  const startLanes: number[] = []
+  const endLanes: number[] = []
 
   if (commit.parentHashes.length === 0) {
-    // Root commit — terminate this lane
-    activeLanes[lane] = null
-    trimTrailingNulls(activeLanes)
-    return { lane, edges }
+    deferredClears.push(lane)
+    endLanes.push(lane)
+    return { lane, edges, deferredClears, startLanes, endLanes }
   }
 
-  // 2. First parent: the lane continues straight
   const firstParent = commit.parentHashes[0]
-  activeLanes[lane] = firstParent
   const firstParentRow = hashToIndex.get(firstParent) ?? selfIndex + 1
-  edges.push(buildEdge(lane, lane, firstParentRow))
+  const existingFirstParentLane = findLane(activeLanes, firstParent)
+  if (existingFirstParentLane !== -1 && existingFirstParentLane !== lane) {
+    edges.push(buildEdge(lane, existingFirstParentLane, firstParentRow))
+    deferredClears.push(lane)
+    endLanes.push(lane)
+  } else {
+    activeLanes[lane] = firstParent
+    edges.push(buildEdge(lane, lane, firstParentRow))
+  }
 
-  // 3. Extra parents (merge sources)
   for (let i = 1; i < commit.parentHashes.length; i++) {
     const parentHash = commit.parentHashes[i]
-    const parentLane = resolveParentLane(activeLanes, parentHash)
-    if (findLane(activeLanes, parentHash) === -1) {
-      activeLanes[parentLane] = parentHash
+    const existingLane = findLane(activeLanes, parentHash)
+    let parentLane: number
+    if (existingLane !== -1) {
+      parentLane = existingLane
+    } else {
+      parentLane = claimLane(activeLanes, parentHash)
+      startLanes.push(parentLane)
     }
     const parentRow = hashToIndex.get(parentHash) ?? selfIndex + 1
     edges.push(buildEdge(lane, parentLane, parentRow))
   }
 
-  trimTrailingNulls(activeLanes)
-  return { lane, edges }
+  return { lane, edges, deferredClears, startLanes, endLanes }
 }
 
 // ---------------------------------------------------------------------------
@@ -174,14 +182,23 @@ export function computeGraphLanes(commits: GraphCommitInput[]): GraphNode[] {
 
   for (let i = 0; i < commits.length; i++) {
     const commit = commits[i]
-    const { lane, edges } = processCommit(commit, activeLanes, hashToIndex, i)
+    const { lane, edges, deferredClears, startLanes, endLanes } =
+      processCommit(commit, activeLanes, hashToIndex, i)
+    const isMerge = commit.parentHashes.length >= 2
+    const isBranchTip = (commit.refs ?? []).some((r) => !r.startsWith('tag: '))
     nodes.push({
       commit,
       lane,
       color: getLaneColor(lane),
       edges,
       activeLanes: activeLanes.map((h, idx) => h ? getLaneColor(idx) : null),
+      startLanes,
+      endLanes,
+      isMerge,
+      isBranchTip,
     })
+    for (const l of deferredClears) activeLanes[l] = null
+    trimTrailingNulls(activeLanes)
   }
 
   return nodes

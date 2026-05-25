@@ -255,8 +255,6 @@ export default function BrainNodeExplorer({ projectPath, onSpawnMdCard, onOpenIn
     return { positions, W, H, padX, topPad, baselineY, months, monthW: MONTH_W, stems };
   }, [viewMode, filteredData.nodes, dimensions]);
 
-  const [currentMonthIdx, setCurrentMonthIdx] = useState(0);
-
   // Apply / clear fixed positions on the underlying d3 nodes.
   useEffect(() => {
     const fg = fgRef.current;
@@ -272,7 +270,6 @@ export default function BrainNodeExplorer({ projectPath, onSpawnMdCard, onOpenIn
       fg.d3ReheatSimulation();
       // On entering timeline, center on the latest month with a soft zoom.
       const lastIdx = Math.max(0, timelineLayout.months.length - 1);
-      setCurrentMonthIdx(lastIdx);
       const t = window.setTimeout(() => {
         const f = fgRef.current;
         if (!f) return;
@@ -293,17 +290,7 @@ export default function BrainNodeExplorer({ projectPath, onSpawnMdCard, onOpenIn
     }
   }, [timelineLayout, graph, dimensions.width]);
 
-  const panToMonth = useCallback((idx: number) => {
-    const fg = fgRef.current;
-    if (!fg || !timelineLayout) return;
-    const clamped = Math.max(0, Math.min(timelineLayout.months.length - 1, idx));
-    setCurrentMonthIdx(clamped);
-    const x = timelineLayout.padX + clamped * timelineLayout.monthW + timelineLayout.monthW / 2;
-    const y = timelineLayout.baselineY;
-    fg.centerAt(x, y, 600);
-  }, [timelineLayout]);
-
-  // Load preview content when a node is selected
+// Load preview content when a node is selected
   useEffect(() => {
     if (!selected) {
       setPreviewContent('');
@@ -405,37 +392,6 @@ export default function BrainNodeExplorer({ projectPath, onSpawnMdCard, onOpenIn
           </button>
         </div>
 
-        {viewMode === 'timeline' && timelineLayout && (
-          <>
-            <div className="fm-brain-timeline-nav">
-              <button
-                className="fm-brain-timeline-navbtn"
-                onClick={() => panToMonth(currentMonthIdx - 1)}
-                disabled={currentMonthIdx <= 0}
-                title="Previous month"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </button>
-              <span className="fm-brain-timeline-current">
-                {timelineLayout.months[currentMonthIdx]?.label ?? ''}
-              </span>
-              <button
-                className="fm-brain-timeline-navbtn"
-                onClick={() => panToMonth(currentMonthIdx + 1)}
-                disabled={currentMonthIdx >= timelineLayout.months.length - 1}
-                title="Next month"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </button>
-            </div>
-
-          </>
-        )}
-
         {viewMode === 'graph' && (
           <button
             className={`fm-brain-explorer-filter ${showTagLinks ? 'active' : ''}`}
@@ -447,10 +403,6 @@ export default function BrainNodeExplorer({ projectPath, onSpawnMdCard, onOpenIn
             {showTagLinks ? 'Hide tag-links' : 'Show tag-links'}
           </button>
         )}
-
-        <div className="fm-brain-explorer-stats">
-          {graph ? `${filteredData.nodes.length}/${graph.docCount} docs · ${filteredData.links.length} links` : 'Loading…'}
-        </div>
 
         <button className="fm-brain-explorer-refresh" onClick={handleRefresh} title="Re-index documentation/">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -484,7 +436,7 @@ export default function BrainNodeExplorer({ projectPath, onSpawnMdCard, onOpenIn
                   : `rgba(255,255,255,${a})`;
               }}
               linkWidth={(link: BrainGraphLink) => Math.min(2.5, 0.5 + (link.weight || 1) * 0.4)}
-              backgroundColor="#0f1115"
+              backgroundColor="rgba(0,0,0,0)"
               onNodeClick={handleNodeClick}
               d3AlphaDecay={viewMode === 'timeline' ? 0.5 : 0.015}
               d3VelocityDecay={0.25}

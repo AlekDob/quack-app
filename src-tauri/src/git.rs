@@ -25,6 +25,7 @@ pub struct GitStatusSummary {
 }
 
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct GitCommitEntry {
     pub hash: String,
     pub summary: String,

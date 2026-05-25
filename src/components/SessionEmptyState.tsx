@@ -16,6 +16,7 @@ import { invoke, convertFileSrc } from '@tauri-apps/api/core';
 import { useSessionStore } from '../stores/sessionStore';
 import { useChatStore } from '../stores/chatStore';
 import type { AgentSession, TerminalInfo } from '../types';
+import type { AgentBackendKind } from '../types/agentBackend';
 import { formatRelativeTime } from '../utils/timeFormat';
 import { getCustomAvatarUrl, isCustomAvatar } from '../utils/customAvatarStorage';
 import NewSessionModal from './NewSessionModal';
@@ -83,7 +84,7 @@ export default function SessionEmptyState({
   }, [allSessions, agent.id]);
 
   // Handle new session creation
-  const handleNewSession = useCallback(async (title: string, branch?: string, useWorktree?: boolean) => {
+  const handleNewSession = useCallback(async (title: string, branch?: string, useWorktree?: boolean, backend?: AgentBackendKind) => {
     try {
       let worktreePath: string | undefined;
 
@@ -161,6 +162,7 @@ export default function SessionEmptyState({
         branch,
         useWorktree,
         worktreePath,
+        backend: backend ?? 'claude',
       });
 
       setIsModalOpen(false);

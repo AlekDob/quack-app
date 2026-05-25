@@ -34,6 +34,15 @@ export default function SettingsIcon({ category, className = '' }: SettingsIconP
         </svg>
       );
 
+    case 'codex':
+      return (
+        <svg {...iconProps}>
+          <polyline points="8 6 2 12 8 18"/>
+          <polyline points="16 6 22 12 16 18"/>
+          <line x1="14" y1="4" x2="10" y2="20"/>
+        </svg>
+      );
+
     case 'ai-assistant':
       return (
         <svg {...iconProps}>

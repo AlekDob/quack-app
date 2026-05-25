@@ -2,8 +2,8 @@
 type: bug-fix
 project: quack-app
 created: 2026-04-07
-last_verified: 2026-04-07
-tags: [rust, mutex, panic, tokio, crash, concurrency]
+last_verified: 2026-05-18
+tags: [rust, mutex, panic, tokio, crash, concurrency, panic-abort, dsym, sleep-wake]
 ---
 
 # Fix: Mutex Poisoning Cascade Abort
@@ -41,7 +41,32 @@ This recovers the inner data from a poisoned Mutex instead of panicking. The dat
 - `AGENT_STATUS` (RwLock): uses `if let Ok(...)` -- already safe
 - `SESSION_CACHE` (RwLock): uses `.map_err()` -- already safe
 
-## Future hardening (not yet implemented)
-1. Build debug builds to get symbolicated crash reports that reveal the ORIGINAL panic
-2. Add `catch_unwind` around tokio task spawns to prevent one task's panic from poisoning shared state
-3. Consider replacing `std::sync::Mutex` with `parking_lot::Mutex` which doesn't poison at all
+## Hardening implemented (2026-05-18, v0.9.3)
+
+Trigger: nuovo crash report `abort()` su `tokio-runtime-worker` ~13 min dopo il
+risveglio dallo sleep (uptime 39h). Mutex poisoning già sanato (zero
+`.lock().unwrap()` rimasti) → era un panic NUOVO, ma `panic = "abort"` lo
+amplificava a kill dell'intero processo.
+
+1. **`Cargo.toml [profile.release]`: `panic = "abort"` → `panic = "unwind"`.**
+   Ora un panic in un task tokio uccide SOLO quel task; runtime e app
+   sopravvivono (isolamento per-task nativo di tokio). Conseguenza chiave:
+   **con `abort` `std::panic::catch_unwind` NON funzionava** (niente unwinding da
+   intercettare) — ora il hardening #2 è finalmente efficace.
+2. **Panic hook diagnostico** (`lib.rs` `install_panic_hook()`, chiamato come
+   prima riga di `run()`). Logga timestamp + thread + `location()` (file:line) +
+   payload + backtrace su stderr e su `~/Library/Application Support/quack/panic.log`.
+   Necessario perché `tauri_plugin_log` è registrato solo in `cfg!(debug_assertions)`:
+   in release NON c'è sink di log.
+3. **Simbolicazione**: `strip = true` mantenuto (binario distribuito piccolo) ma
+   aggiunti `debug = 1` + `split-debuginfo = "packed"` → su macOS genera
+   `target/release/app.dSYM`. **Processo di release: archiviare il `.dSYM` per
+   ogni versione** così i crash report degli utenti diventano simbolicabili.
+
+## Future hardening (still open)
+- Aggiungere `catch_unwind` / supervisione esplicita attorno agli spawn dei task
+  long-lived (scheduler cron, WebSocket/Telegram reconnect) per restart automatico
+  invece di task morto silenzioso — ora possibile grazie a #1.
+- Valutare `parking_lot::Mutex` (non avvelena affatto).
+- Identificare il panic-site originale del crash 0.9.3 alla prossima ricorrenza
+  via `panic.log` (location file:line ora catturata).

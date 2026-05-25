@@ -1068,9 +1068,7 @@
 .fm-brain-explorer-viewmode {
   display: flex;
   gap: 2px;
-  padding: 2px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 7px;
+  margin-left: auto;
 }
 .fm-brain-explorer-filter {
   background: transparent;
@@ -1103,11 +1101,6 @@
   from { transform: translateX(20px); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
-.fm-brain-explorer-stats {
-  margin-left: auto;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
-}
 .fm-brain-explorer-refresh {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1136,38 +1129,10 @@
   position: relative;
   min-width: 0;
   min-height: 0;
-}
-.fm-brain-timeline-nav {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 6px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
-  font-size: 11px;
-}
-.fm-brain-timeline-navbtn {
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.65);
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 6px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-.fm-brain-timeline-navbtn:hover:not(:disabled) {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.06);
-}
-.fm-brain-timeline-navbtn:disabled { opacity: 0.3; cursor: default; }
-.fm-brain-timeline-current {
-  font-variant-numeric: tabular-nums;
-  color: #FF6B35;
-  font-weight: 600;
-  min-width: 64px;
-  text-align: center;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 .fm-brain-timeline-legend {
   display: flex;

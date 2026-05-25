@@ -185,7 +185,7 @@ export default function ProviderCard({ provider, isActive, onSetDefault, onDelet
                 Needs API key
               </span>
             )}
-            {provider.docsUrl && (
+            {'docsUrl' in provider && provider.docsUrl && (
               <a
                 href={provider.docsUrl}
                 target="_blank"
