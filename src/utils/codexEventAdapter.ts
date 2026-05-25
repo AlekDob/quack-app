@@ -15,7 +15,7 @@
 //
 // PURE FUNCTION CONTRACT: no I/O, no React, no Tauri, no randomness, no global state.
 
-import type { QuackAgentEvent } from '@/types/agentBackend';
+import type { QuackAgentEvent } from '../types/agentBackend';
 import type {
   ClaudeEvent,
   ClaudeSystemEvent,
@@ -24,7 +24,7 @@ import type {
   ClaudeResultEvent,
   ClaudeErrorEvent,
   UsageStats,
-} from '@/types';
+} from '../types';
 
 function mapSessionStarted(ev: Extract<QuackAgentEvent, { kind: 'session_started' }>): ClaudeSystemEvent {
   const event: ClaudeSystemEvent = {

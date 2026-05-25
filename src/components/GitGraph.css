@@ -1,13 +1,10 @@
 /* ============================================================
-   Git Graph (History tab)
-   IMPORTANT: rendered inside .accordion-content which has
-   `.accordion-content svg { width:14px!important; height:14px!important }`
-   and `.accordion-content { font-size:12px!important }`.
-   We neutralize those overrides with `revert !important` for SVG sizing
-   and prefix every selector with `.changes-history-list` to win specificity.
+   Git History (linear timeline — no graph lanes)
+   Side panel is too narrow for a multi-lane graph. We render a
+   simple vertical timeline with one dot per commit + ref badges.
    ============================================================ */
 
-/* === ISOLATION RESET === */
+/* === ISOLATION RESET: neutralize .accordion-content compact-mode === */
 .changes-history-list svg {
   width: revert !important;
   height: revert !important;
@@ -71,16 +68,37 @@
 .changes-history-list .git-graph-row:hover {
   background: rgba(255, 255, 255, 0.035);
 }
-.changes-history-list .git-graph-row--merge {
-  background: linear-gradient(90deg, rgba(255, 107, 53, 0.08), rgba(255, 107, 53, 0.02) 55%, transparent 90%);
-}
-.changes-history-list .git-graph-row--merge .git-graph-summary {
-  font-weight: 600;
-}
 
-/* === Graph column (absolute layer: dots + vertical lane lines + fork curves) === */
-.changes-history-list .git-graph-column {
-  pointer-events: none;
+/* === Dot column (vertical line + dot) === */
+.changes-history-list .git-graph-dot-col {
+  flex-shrink: 0;
+  width: 18px;
+  position: relative;
+}
+.changes-history-list .git-graph-line {
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: 1.5px;
+  background: rgba(255, 107, 53, 0.35);
+}
+.changes-history-list .git-graph-row:first-child .git-graph-line {
+  top: 50%;
+}
+.changes-history-list .git-graph-row:last-child .git-graph-line {
+  bottom: 50%;
+}
+.changes-history-list .git-graph-dot-simple {
+  position: absolute;
+  left: 5px;
+  top: calc(50% - 3.5px);
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent, #FF6B35);
+  border: 2px solid rgba(15, 17, 26, 1);
+  box-shadow: 0 0 0 1.5px rgba(255, 107, 53, 0.55);
 }
 
 /* === Content === */
@@ -90,8 +108,8 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 4px 8px;
-  gap: 1px;
+  padding: 6px 8px 6px 4px;
+  gap: 2px;
   overflow: hidden;
 }
 
@@ -100,7 +118,6 @@
   color: #f1f2f5;
   white-space: normal;
   overflow-wrap: anywhere;
-  min-width: 0;
   line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -145,15 +162,9 @@
   height: 10px !important;
   flex-shrink: 0;
 }
-.changes-history-list .ref-badge--current {
-  font-weight: 600;
-}
-.changes-history-list .ref-badge--remote {
-  font-weight: 400;
-}
-.changes-history-list .ref-badge--tag {
-  font-style: italic;
-}
+.changes-history-list .ref-badge--current { font-weight: 600; }
+.changes-history-list .ref-badge--remote { font-weight: 400; }
+.changes-history-list .ref-badge--tag { font-style: italic; }
 .changes-history-list .ref-badge-check {
   font-weight: 700;
   font-size: 9px !important;
@@ -165,18 +176,7 @@
   max-width: 120px;
 }
 
-/* === SVG Graph elements === */
-.changes-history-list .graph-dot {
-  transition: r 0.15s ease;
-}
-.changes-history-list .git-graph-row:hover .graph-dot {
-  r: 6;
-}
-.changes-history-list .graph-dot-group {
-  pointer-events: none;
-}
-
-/* === Commit Popover (legacy, kept in flow) === */
+/* === Commit Popover === */
 .commit-popover {
   position: absolute;
   left: 12px;

@@ -2710,7 +2710,7 @@ function AppContent() {
                 const next = new Map(prev);
                 next.set(sessionKey, msgs.map((msg, i) => i === idx ? {
                   ...msg,
-                  status: (isError ? 'error' : 'complete') as const,
+                  status: (isError ? 'error' : 'complete') as 'error' | 'complete',
                   ...(isError ? { error: errorMessage } : {}),
                   metadata: {
                     ...msg.metadata,
@@ -3168,7 +3168,7 @@ function AppContent() {
         // both verified 2026-05-17). Best-effort: failures degrade to the
         // raw prompt, never block the turn.
         // Brain: pattern-backend-capability-gated-ui
-        await injectAgentPersonalityAgentsMd(activeTerminal, workingDir);
+        await injectAgentPersonalityAgentsMd(activeTerminal ?? undefined, workingDir);
         prompt = await composeCodexPrompt({
           message: prompt,
           basePath: workingDir ?? '',

@@ -1,11 +1,7 @@
-import { useMemo, useState } from 'react'
-import GraphColumn, { getGraphWidth } from './GraphColumn'
+import { useState } from 'react'
 import RefBadge from './RefBadge'
 import CommitPopover from './CommitPopover'
-import { computeGraphLanes } from '../utils/gitGraphLayout'
-import type { GraphCommitInput } from '../utils/gitGraphLayout'
 import type { GitCommitEntry } from '../types'
-import { MAX_LANES } from '../utils/gitGraphColors'
 import './ChangesPanel.css'
 import './GitGraph.css'
 
@@ -15,33 +11,8 @@ interface HistoryTabProps {
   currentBranch?: string
 }
 
-function toGraphInput(entry: GitCommitEntry): GraphCommitInput {
-  return {
-    hash: entry.hash,
-    parentHashes: entry.parentHashes ?? [],
-    refs: entry.refs ?? [],
-    summary: entry.summary,
-    author: entry.author,
-    relativeTime: entry.relativeTime,
-    timestamp: entry.timestamp,
-  }
-}
-
 export default function HistoryTab({ history, historyLoading, currentBranch }: HistoryTabProps) {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
-
-  const graphNodes = useMemo(() => {
-    if (!history || history.length === 0) return []
-    return computeGraphLanes(history.map(toGraphInput))
-  }, [history])
-
-  const maxLanes = useMemo(() => {
-    if (graphNodes.length === 0) return 1
-    return Math.min(
-      MAX_LANES,
-      Math.max(...graphNodes.map((n) => n.activeLanes.length), 1)
-    )
-  }, [graphNodes])
 
   if (historyLoading) {
     return <div className="changes-panel-empty">Loading commits...</div>
@@ -67,44 +38,43 @@ export default function HistoryTab({ history, historyLoading, currentBranch }: H
       )}
 
       <div className="git-graph-container">
-        {graphNodes.map((node, idx) => {
-          const rowClass = `git-graph-row${node.isMerge ? ' git-graph-row--merge' : ''}`
-          return (
-            <div key={node.commit.hash} style={{ position: 'relative' }}>
-              <div
-                className={rowClass}
-                onClick={() => setSelectedIdx(selectedIdx === idx ? null : idx)}
-                style={{ paddingLeft: getGraphWidth(Math.max(node.activeLanes.length, node.lane + 1)) }}
-              >
-                <GraphColumn node={node} totalLanes={maxLanes} />
-                <div className="git-graph-content">
-                  {node.commit.refs.length > 0 && (
-                    <RefBadge
-                      refs={node.commit.refs}
-                      color={node.color}
-                      currentBranch={currentBranch}
-                    />
-                  )}
-                  <span className="git-graph-summary">{node.commit.summary}</span>
-                  <span className="git-graph-meta">
-                    {node.commit.author} • {node.commit.relativeTime}
-                  </span>
-                </div>
+        {history.map((commit, idx) => (
+          <div key={commit.hash} style={{ position: 'relative' }}>
+            <div
+              className="git-graph-row"
+              onClick={() => setSelectedIdx(selectedIdx === idx ? null : idx)}
+            >
+              <div className="git-graph-dot-col">
+                <div className="git-graph-line" />
+                <div className="git-graph-dot-simple" />
               </div>
-              {selectedIdx === idx && (
-                <CommitPopover
-                  hash={node.commit.hash}
-                  parentHashes={node.commit.parentHashes}
-                  author={node.commit.author}
-                  summary={node.commit.summary}
-                  timestamp={node.commit.timestamp}
-                  color={node.color}
-                  onClose={() => setSelectedIdx(null)}
-                />
-              )}
+              <div className="git-graph-content">
+                {(commit.refs?.length ?? 0) > 0 && (
+                  <RefBadge
+                    refs={commit.refs ?? []}
+                    color="#FF6B35"
+                    currentBranch={currentBranch}
+                  />
+                )}
+                <span className="git-graph-summary">{commit.summary}</span>
+                <span className="git-graph-meta">
+                  {commit.author} • {commit.relativeTime}
+                </span>
+              </div>
             </div>
-          )
-        })}
+            {selectedIdx === idx && (
+              <CommitPopover
+                hash={commit.hash}
+                parentHashes={commit.parentHashes ?? []}
+                author={commit.author}
+                summary={commit.summary}
+                timestamp={commit.timestamp}
+                color="#FF6B35"
+                onClose={() => setSelectedIdx(null)}
+              />
+            )}
+          </div>
+        ))}
       </div>
     </div>
   )

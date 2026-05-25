@@ -1142,6 +1142,7 @@ export interface SessionInfo {
   workingDirectory?: string; // CWD from first system event
   model?: string; // Model from first system event
   agentName?: string; // Agent name if available
+  backend?: 'claude' | 'codex'; // Agent backend that produced the session
 }
 
 export interface SessionDetails extends SessionInfo {
