@@ -40,18 +40,22 @@ export default function ChangesPanel({
   const [remoteCount, setRemoteCount] = useState(0)
 
   const {
-    expandedFiles, diffCache, stagedFiles,
+    expandedFiles, diffCache,
     fileToDelete, setFileToDelete,
     showCommitModal, setShowCommitModal,
     commitTitle, setCommitTitle,
     commitDesc, setCommitDesc,
     committing,
-    pendingEntries, committedEntries,
-    toggleFile, handleStageFile, handleDiscardFile,
+    committedEntries,
+    unstagedEntries, stagedEntries,
+    toggleFile, toggleGitFile,
+    handleStageRel, handleUnstageRel, handleDiscardGitEntry,
     confirmDeleteFile, handleAcceptAll, handleCommit, handleClearCommitted,
   } = useChangesPanelState({
     rootPath, modifiedFiles, onRefreshGitStatus, onRemoveModifiedFiles, lastRefreshTs,
   })
+
+  const pendingCount = unstagedEntries.length + stagedEntries.length
 
   // Lazy-load counts for badge display
   const loadCounts = useCallback(async () => {
@@ -81,7 +85,7 @@ export default function ChangesPanel({
 
       <ChangesPanelTabs
         activeTab={activeTab}
-        pendingCount={pendingEntries.length}
+        pendingCount={pendingCount}
         committedCount={committedEntries.length}
         history={history}
         branchCount={branchCount}
@@ -93,13 +97,14 @@ export default function ChangesPanel({
       {activeTab === 'pending' && (
         <PendingTab
           rootPath={rootPath}
-          pendingEntries={pendingEntries}
-          stagedFiles={stagedFiles}
+          unstagedEntries={unstagedEntries}
+          stagedEntries={stagedEntries}
           expandedFiles={expandedFiles}
           diffCache={diffCache}
-          onToggleFile={toggleFile}
-          onStageFile={handleStageFile}
-          onDiscardFile={handleDiscardFile}
+          onToggleGitFile={toggleGitFile}
+          onStageRel={handleStageRel}
+          onUnstageRel={handleUnstageRel}
+          onDiscardGitEntry={handleDiscardGitEntry}
           onAcceptAll={handleAcceptAll}
           onOpenCommitModal={() => setShowCommitModal(true)}
           onOpenInEditor={onOpenInEditor}
@@ -117,7 +122,11 @@ export default function ChangesPanel({
         />
       )}
       {activeTab === 'history' && (
-        <HistoryTab history={history} historyLoading={historyLoading} />
+        <HistoryTab
+          history={history}
+          historyLoading={historyLoading}
+          currentBranch={branch ?? undefined}
+        />
       )}
       {activeTab === 'branches' && (
         <BranchesTab rootPath={rootPath} currentBranch={branch} onBranchSwitch={handleBranchSwitch} />
@@ -131,7 +140,7 @@ export default function ChangesPanel({
 
       {showCommitModal && (
         <CommitModal
-          fileCount={pendingEntries.length}
+          fileCount={pendingCount}
           commitTitle={commitTitle}
           commitDesc={commitDesc}
           committing={committing}

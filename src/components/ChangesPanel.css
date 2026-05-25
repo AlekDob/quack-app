@@ -135,6 +135,67 @@ button.changes-tab,
   text-align: center;
 }
 
+.changes-panel-sections {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.changes-panel-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.changes-panel-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  text-align: left;
+}
+
+.changes-panel-section-header:hover {
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.changes-panel-section-chevron {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.45);
+  transition: transform 120ms ease;
+}
+
+.changes-panel-section-title {
+  flex: 1;
+}
+
+.changes-panel-section-empty {
+  padding: 8px 12px;
+  text-align: left;
+  font-style: italic;
+}
+
+.changes-btn-unstage {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.changes-btn-unstage:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+}
+
 /* Header */
 .changes-panel-header {
   display: flex;

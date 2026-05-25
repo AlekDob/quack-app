@@ -12,6 +12,7 @@ export interface FileRowProps {
   diff: DiffState | undefined
   onToggle: () => void
   onStage?: () => void
+  onUnstage?: () => void
   onDiscard?: () => void
   onOpenInEditor?: (filePath: string) => void
 }
@@ -46,6 +47,7 @@ export default function FileRow({
   diff,
   onToggle,
   onStage,
+  onUnstage,
   onDiscard,
   onOpenInEditor,
 }: FileRowProps) {
@@ -115,6 +117,18 @@ export default function FileRow({
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </button>
+              )}
+              {onUnstage && (
+                <button
+                  type="button"
+                  className="changes-btn changes-btn-unstage"
+                  onClick={onUnstage}
+                  title="Unstage change"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14" />
                   </svg>
                 </button>
               )}

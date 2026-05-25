@@ -1,7 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { toast } from 'sonner'
-import type { FileStatus, DiffState } from '../types'
+import type { FileStatus, DiffState, GitStatusEntry, GitStatusSummary } from '../types'
 
 interface UseChangesPanelStateParams {
   rootPath: string | null
@@ -43,6 +43,7 @@ export function useChangesPanelState({
   const [committing, setCommitting] = useState(false)
   const [stagedFiles, setStagedFiles] = useState<Set<string>>(new Set())
   const [committedFiles, setCommittedFiles] = useState<Set<string>>(new Set())
+  const [gitEntries, setGitEntries] = useState<GitStatusEntry[]>([])
 
   const expandedFilesRef = useRef(expandedFiles)
   useEffect(() => { expandedFilesRef.current = expandedFiles }, [expandedFiles])
@@ -84,6 +85,32 @@ export function useChangesPanelState({
     if (lastRefreshTs && lastRefreshTs > 0) void reconcileWithGit()
   }, [lastRefreshTs, reconcileWithGit])
 
+  // Full working-tree status (drives PendingTab Unstaged/Staged sections)
+  const loadGitStatus = useCallback(async () => {
+    if (!rootPath) { setGitEntries([]); return }
+    try {
+      const summary = await invoke<GitStatusSummary>('git_status_summary', { rootPath })
+      setGitEntries(summary.entries)
+    } catch { /* silent */ }
+  }, [rootPath])
+
+  useEffect(() => { void loadGitStatus() }, [loadGitStatus, lastRefreshTs])
+
+  useEffect(() => {
+    const handler = () => { void loadGitStatus() }
+    window.addEventListener('focus', handler)
+    return () => window.removeEventListener('focus', handler)
+  }, [loadGitStatus])
+
+  const unstagedEntries = useMemo(
+    () => gitEntries.filter((e) => e.is_untracked || (e.unstaged_status !== null && e.unstaged_status !== ' ')),
+    [gitEntries]
+  )
+  const stagedEntries = useMemo(
+    () => gitEntries.filter((e) => !e.is_untracked && e.staged_status !== null && e.staged_status !== ' '),
+    [gitEntries]
+  )
+
   const loadDiff = useCallback(async (filePath: string, status: FileStatus) => {
     const relativePath = getRelPath(filePath, rootPath)
     setDiffCache((prev) => { const next = new Map(prev); next.set(filePath, { content: '', loading: true, error: null }); return next })
@@ -119,29 +146,61 @@ export function useChangesPanelState({
     if (shouldLoad) void loadDiff(filePath, status)
   }, [modifiedFiles, diffCache, expandedFiles, loadDiff])
 
-  const handleStageFile = useCallback(async (filePath: string) => {
-    const relativePath = getRelPath(filePath, rootPath)
+  const handleStageRel = useCallback(async (relativePath: string) => {
     try {
       await invoke('git_stage', { path: relativePath, rootPath })
-      setStagedFiles((prev) => new Set(prev).add(filePath))
       toast.success(`Staged: ${relativePath}`)
+      void loadGitStatus()
       onRefreshGitStatus()
     } catch (err) { console.error('[ChangesPanel] Failed to stage:', err); toast.error(`Failed to stage: ${err}`) }
-  }, [rootPath, onRefreshGitStatus])
+  }, [rootPath, loadGitStatus, onRefreshGitStatus])
 
-  const handleDiscardFile = useCallback(async (filePath: string) => {
-    const status = modifiedFiles.get(filePath) ?? 'modified'
-    // Brain: gotcha-window-confirm-tauri-webview
-    if (status === 'created') { setFileToDelete(filePath); return }
-    const relativePath = getRelPath(filePath, rootPath)
+  const handleUnstageRel = useCallback(async (relativePath: string) => {
     try {
-      await invoke('git_discard_file', { path: relativePath, isUntracked: false, rootPath })
-      setExpandedFiles((prev) => removeFromSet(prev, filePath))
-      setDiffCache((prev) => removeFromMap(prev, filePath))
-      toast.success(`Discarded: ${relativePath}`)
+      await invoke('git_unstage', { path: relativePath, rootPath })
+      toast.success(`Unstaged: ${relativePath}`)
+      void loadGitStatus()
+      onRefreshGitStatus()
+    } catch (err) { console.error('[ChangesPanel] Failed to unstage:', err); toast.error(`Failed to unstage: ${err}`) }
+  }, [rootPath, loadGitStatus, onRefreshGitStatus])
+
+  const handleDiscardGitEntry = useCallback(async (entry: GitStatusEntry) => {
+    // Brain: gotcha-window-confirm-tauri-webview
+    if (entry.is_untracked) { setFileToDelete(entry.path); return }
+    try {
+      await invoke('git_discard_file', { path: entry.path, isUntracked: false, rootPath })
+      setExpandedFiles((prev) => removeFromSet(prev, entry.path))
+      setDiffCache((prev) => removeFromMap(prev, entry.path))
+      toast.success(`Discarded: ${entry.path}`)
+      void loadGitStatus()
       onRefreshGitStatus()
     } catch (err) { console.error('[ChangesPanel] Failed to discard:', err); toast.error(`Failed to discard: ${err}`) }
-  }, [modifiedFiles, rootPath, onRefreshGitStatus])
+  }, [rootPath, loadGitStatus, onRefreshGitStatus])
+
+  const loadGitDiff = useCallback(async (relativePath: string, staged: boolean, untracked: boolean) => {
+    setDiffCache((prev) => { const next = new Map(prev); next.set(relativePath, { content: '', loading: true, error: null }); return next })
+    try {
+      const content = await invoke<string>('git_diff', { path: relativePath, staged, untracked, rootPath })
+      setDiffCache((prev) => {
+        if (!expandedFilesRef.current.has(relativePath)) return prev
+        const next = new Map(prev); next.set(relativePath, { content, loading: false, error: null }); return next
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setDiffCache((prev) => { const next = new Map(prev); next.set(relativePath, { content: '', loading: false, error: msg }); return next })
+    }
+  }, [rootPath])
+
+  const toggleGitFile = useCallback((entry: GitStatusEntry, staged: boolean) => {
+    const key = entry.path
+    const shouldLoad = !diffCache.has(key) && !expandedFiles.has(key)
+    setExpandedFiles((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) { next.delete(key) } else { next.add(key) }
+      return next
+    })
+    if (shouldLoad) void loadGitDiff(entry.path, staged, entry.is_untracked)
+  }, [diffCache, expandedFiles, loadGitDiff])
 
   const confirmDeleteFile = useCallback(async () => {
     if (!fileToDelete) return
@@ -151,19 +210,21 @@ export function useChangesPanelState({
       setExpandedFiles((prev) => removeFromSet(prev, fileToDelete))
       setDiffCache((prev) => removeFromMap(prev, fileToDelete))
       toast.success(`Deleted: ${relativePath}`)
+      void loadGitStatus()
       onRefreshGitStatus()
     } catch (err) { console.error('[ChangesPanel] Failed to delete file:', err); toast.error(`Failed to delete: ${err}`) }
     finally { setFileToDelete(null) }
-  }, [fileToDelete, rootPath, onRefreshGitStatus])
+  }, [fileToDelete, rootPath, loadGitStatus, onRefreshGitStatus])
 
   const handleAcceptAll = useCallback(async () => {
     try {
       await invoke('git_stage_all', { rootPath })
       setStagedFiles(new Set(pendingEntries.map(([fp]) => fp)))
       toast.success('All files staged')
+      void loadGitStatus()
       onRefreshGitStatus()
     } catch (err) { console.error('[ChangesPanel] Failed to stage all:', err); toast.error(`Failed to stage all: ${err}`) }
-  }, [rootPath, pendingEntries, onRefreshGitStatus])
+  }, [rootPath, pendingEntries, loadGitStatus, onRefreshGitStatus])
 
   const handleCommit = useCallback(async () => {
     if (!commitTitle.trim()) { toast.error('Commit title required'); return }
@@ -176,10 +237,11 @@ export function useChangesPanelState({
       setCommitTitle(''); setCommitDesc(''); setShowCommitModal(false)
       setCommittedFiles((prev) => { const next = new Set(prev); pendingEntries.forEach(([fp]) => next.add(fp)); return next })
       setStagedFiles(new Set()); setExpandedFiles(new Set()); setDiffCache(new Map())
+      void loadGitStatus()
       onRefreshGitStatus()
     } catch (err) { console.error('[ChangesPanel] Failed to commit:', err); toast.error(`Commit failed: ${err}`) }
     finally { setCommitting(false) }
-  }, [commitTitle, commitDesc, rootPath, pendingEntries, onRefreshGitStatus])
+  }, [commitTitle, commitDesc, rootPath, pendingEntries, loadGitStatus, onRefreshGitStatus])
 
   const handleClearCommitted = useCallback(() => {
     const pathsToClear = committedEntries.map(([fp]) => fp)
@@ -197,10 +259,13 @@ export function useChangesPanelState({
     committing,
     // Derived
     pendingEntries, committedEntries,
+    unstagedEntries, stagedEntries,
     // Handlers
     toggleFile,
-    handleStageFile,
-    handleDiscardFile,
+    toggleGitFile,
+    handleStageRel,
+    handleUnstageRel,
+    handleDiscardGitEntry,
     confirmDeleteFile,
     handleAcceptAll,
     handleCommit,
