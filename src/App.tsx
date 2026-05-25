@@ -62,6 +62,7 @@ import TelegramSetup from "./components/TelegramSetup";
 // import { runDroidInBackground } from "./services/backgroundAgentService";
 // Background agent service for /background @agent commands
 import { useBackgroundAgentInit } from "./hooks/useBackgroundAgents";
+import { useRemoteLiveStateSync } from "./hooks/useRemoteLiveStateSync";
 import ChatView, { type LineChange, type FileEdit, type FileDeleted } from "./components/ChatView";
 import SessionEmptyState from "./components/SessionEmptyState";
 import SplashScreen from "./components/SplashScreen";
@@ -421,6 +422,9 @@ function AppContent() {
 
   // Background Agents initialization - needed for /background @agent commands
   useBackgroundAgentInit();
+
+  // Mirror chatStore (loading/pending/last-msg) → Rust backend → WS for mobile PWA Task Hub
+  useRemoteLiveStateSync();
 
   // TEMPORARILY DISABLED: Max Plan tracking
   // const { incrementMessageCount } = useMaxPlan();

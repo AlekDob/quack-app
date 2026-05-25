@@ -969,6 +969,14 @@ pub fn run() {
             // 📡 Create WebSocket broadcast hub (capacity 64 events)
             let ws_broadcast = remote_ws::WsBroadcast::new(64);
 
+            // 🪞 Live state mirror: chatLoadingMap + pendingQuestionsMap snapshots
+            // mirrored from the desktop frontend (via notify_* commands) for the
+            // mobile PWA Task Hub view.
+            // Brain: pattern-remote-api-architecture
+            let session_live: remote_api::SessionLiveStateMap =
+                std::sync::Arc::new(std::sync::RwLock::new(std::collections::HashMap::new()));
+            app.manage(session_live.clone());
+
             // 📡 Bridge Tauri events → WebSocket broadcast for mobile clients
             {
                 let bc = ws_broadcast.clone();
@@ -1057,6 +1065,8 @@ pub fn run() {
                     app_handle.clone(),
                     auth_for_server.clone(),
                     agent_status.clone(),
+                    session_live.clone(),
+                    ws_broadcast.clone(),
                 );
 
                 // 📡 WebSocket route (auth via query param)
@@ -1468,6 +1478,9 @@ pub fn run() {
             remote_config::get_local_ip,
             remote_config::get_local_hostname,
             remote_api::delegate_plan_to_agent,
+            remote_api::notify_session_streaming,
+            remote_api::notify_session_pending_question,
+            remote_api::notify_session_message,
             // BTW side-chain query
             btw::btw_query,
             // 📊 Project token stats (SQLite)

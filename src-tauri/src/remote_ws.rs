@@ -3,8 +3,6 @@
 //! Broadcasts live events (agent status, session updates, job firings)
 //! to connected mobile/external clients via `/ws?token=xxx`.
 
-use std::sync::Arc;
-
 use axum::{
     extract::{Query, State, WebSocketUpgrade},
     extract::ws::{Message, WebSocket},
@@ -77,6 +75,49 @@ pub enum WsEvent {
         #[serde(rename = "jobId")]
         job_id: String,
         status: String,
+    },
+    /// Streaming status for a session changed (chatLoadingMap on desktop).
+    /// Emitted by `notify_session_streaming` Tauri command.
+    SessionStreaming {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        #[serde(rename = "agentId", skip_serializing_if = "Option::is_none")]
+        agent_id: Option<String>,
+        #[serde(rename = "isStreaming")]
+        is_streaming: bool,
+    },
+    /// Pending AskUserQuestion count for a session changed.
+    /// Emitted by `notify_session_pending_question` Tauri command.
+    PendingQuestion {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        #[serde(rename = "agentId", skip_serializing_if = "Option::is_none")]
+        agent_id: Option<String>,
+        count: u32,
+    },
+    /// New chat message added (assistant/user).
+    /// Emitted by `notify_session_message` Tauri command.
+    MessageAdded {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        #[serde(rename = "agentId", skip_serializing_if = "Option::is_none")]
+        agent_id: Option<String>,
+        role: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        status: Option<String>,
+        timestamp: i64,
+    },
+    /// Generic session meta refresh (updatedAt, last message snapshot).
+    /// Emitted alongside MessageAdded or by other state changes.
+    SessionUpdated {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+        #[serde(rename = "updatedAt")]
+        updated_at: i64,
+        #[serde(rename = "lastMessageRole", skip_serializing_if = "Option::is_none")]
+        last_message_role: Option<String>,
+        #[serde(rename = "lastMessageStatus", skip_serializing_if = "Option::is_none")]
+        last_message_status: Option<String>,
     },
 }
 

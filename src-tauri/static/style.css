@@ -503,3 +503,109 @@ body {
 @supports (padding: env(safe-area-inset-top)) {
   .app { padding-top: calc(16px + env(safe-area-inset-top)); }
 }
+
+/* ── Task Hub view ── */
+.tab-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  margin-left: 6px; min-width: 18px; height: 18px; padding: 0 5px;
+  background: #a855f7; color: #fff; font-size: 10px; font-weight: 700;
+  border-radius: 9px;
+}
+.taskhub { display: flex; flex-direction: column; gap: 14px; }
+.taskhub-search-wrap { position: sticky; top: 0; z-index: 2; padding-bottom: 4px; }
+.taskhub-search {
+  width: 100%; padding: 10px 12px; border-radius: 10px;
+  background: var(--card); border: 1px solid var(--border); color: var(--text);
+  font-size: 14px; outline: none;
+  -webkit-appearance: none; appearance: none;
+}
+.taskhub-search:focus { border-color: var(--accent); }
+.taskhub-section { display: flex; flex-direction: column; gap: 6px; }
+.taskhub-section-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 4px 6px;
+  font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.taskhub-section-label { font-weight: 700; }
+.taskhub-section-count { color: var(--text-muted); font-weight: 600; }
+.taskhub-list { display: flex; flex-direction: column; gap: 4px; }
+.taskhub-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  border-radius: 10px;
+  font-size: 13px; cursor: pointer;
+  transition: background 0.12s, transform 0.06s;
+}
+.taskhub-item:active { transform: scale(0.99); background: var(--card-hover); }
+.taskhub-title {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text);
+}
+.taskhub-time { color: var(--text-secondary); font-size: 11px; flex-shrink: 0; }
+.taskhub-avatar {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  object-fit: cover;
+}
+.taskhub-avatar-fallback {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px;
+}
+.project-chip {
+  display: inline-flex; align-items: center; flex-shrink: 0;
+  padding: 2px 7px; border-radius: 4px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.3px;
+  background: color-mix(in srgb, var(--proj) 14%, transparent);
+  color: var(--proj);
+  border: 1px solid color-mix(in srgb, var(--proj) 35%, transparent);
+  max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── Floating Action Button (new conversation) ── */
+.fab-new {
+  position: fixed; right: 16px;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  width: 44px; height: 44px; border-radius: 22px;
+  background: var(--accent); color: #fff;
+  font-size: 26px; font-weight: 300; line-height: 1;
+  border: none; cursor: pointer;
+  box-shadow: 0 4px 14px rgba(242, 140, 82, 0.35);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 10;
+  transition: transform 0.08s, background 0.15s;
+}
+.fab-new:active { transform: scale(0.94); background: var(--accent-hover); }
+
+/* ── New-chat sheet (3-step) ── */
+.new-chat-sheet .drawer-header { display: flex; justify-content: space-between; align-items: center; }
+.btn-link {
+  background: transparent; border: none; color: var(--accent);
+  font-size: 13px; cursor: pointer; padding: 4px 6px;
+}
+.nc-list { display: flex; flex-direction: column; gap: 6px; }
+.nc-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); cursor: pointer; text-align: left;
+  font-size: 14px;
+}
+.nc-row:active { background: var(--card-hover); }
+.nc-row-label { flex: 1; font-weight: 600; }
+.nc-row-meta { color: var(--text-secondary); font-size: 11px; }
+.nc-color-dot {
+  width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+}
+.nc-avatar {
+  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; object-fit: cover;
+}
+.nc-summary {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 12px;
+  font-size: 12px; color: var(--text-secondary);
+}
+.nc-pill {
+  padding: 4px 10px; background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; color: var(--text); font-weight: 600;
+}
+.nc-arrow { color: var(--text-muted); }

@@ -7,13 +7,14 @@ const $$ = (sel) => [...document.querySelectorAll(sel)];
 // ── State ──────────────────────────────────────────────────────
 const state = {
   token: window.__QUACK_TOKEN__ || localStorage.getItem('quack_token') || '',
-  tab: 'agents',
+  tab: 'taskhub',
   agents: [],
   sessions: [],
   jobs: [],
   status: null,
   ws: null,
   wsConnected: false,
+  wsLastConnectedAt: 0,
   loading: true,
   chatSession: null,   // session object for chat view
   chatMessages: [],    // messages in current chat
@@ -25,8 +26,13 @@ const state = {
   drawer: null,        // { agentId, agentName } when execute drawer is open
   refreshing: false,   // pull-to-refresh in progress
   autoRefreshTimer: null, // stealth auto-refresh timer
+  fallbackPollTimer: null, // polling fallback when WS is down >10s
   ordering: null,      // { repoOrder: { order, colors }, agentOrders }
   namedGroups: [],     // ProjectGroup[] from /api/groups
+  projectColors: {},   // projectPath -> hex (loaded from /api/project-colors)
+  taskHubQuery: '',    // search input value for Task Hub
+  // FAB new-chat bottom-sheet: { step: 1|2|3, projectPath?, projectName?, agentId?, agentName?, prompt?, model? }
+  newChat: null,
 };
 
 // ── API Client ─────────────────────────────────────────────────
@@ -64,16 +70,35 @@ function connectWs() {
   const url = `${proto}//${location.host}/ws?token=${state.token}`;
   try {
     state.ws = new WebSocket(url);
-    state.ws.onopen = () => { state.wsConnected = true; render(); };
+    state.ws.onopen = () => {
+      state.wsConnected = true;
+      state.wsLastConnectedAt = Date.now();
+      stopFallbackPolling();
+      // Catch-up on any state we may have missed during the gap
+      loadData();
+      render();
+    };
     state.ws.onclose = () => {
       state.wsConnected = false;
       render();
+      // Start polling fallback after 10s of disconnection
+      setTimeout(() => {
+        if (!state.wsConnected) startFallbackPolling();
+      }, 10_000);
       setTimeout(connectWs, 3000);
     };
     state.ws.onmessage = (evt) => {
       try { handleWsEvent(JSON.parse(evt.data)); } catch {}
     };
   } catch {}
+}
+
+// Update a single session in-place by id. Returns true if updated.
+function patchSession(sessionId, patch) {
+  const idx = state.sessions.findIndex(s => s.id === sessionId);
+  if (idx === -1) return false;
+  state.sessions[idx] = { ...state.sessions[idx], ...patch };
+  return true;
 }
 
 function handleWsEvent(event) {
@@ -89,12 +114,50 @@ function handleWsEvent(event) {
       break;
     case 'session_completed':
       toast('Session completed', 'success');
-      loadData();
+      patchSession(event.sessionId, { status: event.status || 'done' });
       // If watching this session, refresh messages
       if (state.chatSession && state.chatSession.id === event.sessionId) {
         pollChatMessages();
       }
+      render();
       break;
+    case 'session_streaming': {
+      const patched = patchSession(event.sessionId, { isStreaming: !!event.isStreaming });
+      if (!patched) { loadData(); return; }
+      render();
+      break;
+    }
+    case 'pending_question': {
+      const patched = patchSession(event.sessionId, { pendingQuestionCount: event.count || 0 });
+      if (!patched) { loadData(); return; }
+      render();
+      break;
+    }
+    case 'message_added': {
+      const patched = patchSession(event.sessionId, {
+        lastMessageRole: event.role,
+        lastMessageStatus: event.status || null,
+        lastActivityAt: event.timestamp || Date.now(),
+        updatedAt: event.timestamp || Date.now(),
+      });
+      if (!patched) { loadData(); return; }
+      // If watching this session and a new assistant message arrived, poll
+      if (state.chatSession && state.chatSession.id === event.sessionId) {
+        pollChatMessages();
+      }
+      render();
+      break;
+    }
+    case 'session_updated': {
+      const patched = patchSession(event.sessionId, {
+        updatedAt: event.updatedAt || Date.now(),
+        ...(event.lastMessageRole != null ? { lastMessageRole: event.lastMessageRole } : {}),
+        ...(event.lastMessageStatus != null ? { lastMessageStatus: event.lastMessageStatus } : {}),
+      });
+      if (!patched) { loadData(); return; }
+      render();
+      break;
+    }
     case 'job_fired':
       toast(`Job fired: ${event.jobName}`, 'success');
       break;
@@ -104,23 +167,46 @@ function handleWsEvent(event) {
   }
 }
 
+// ── Polling Fallback (when WS is down) ────────────────────────
+function startFallbackPolling() {
+  if (state.fallbackPollTimer) return;
+  console.log('[Quack Remote] WS offline — switching to polling fallback (5s)');
+  state.fallbackPollTimer = setInterval(() => {
+    if (state.wsConnected) { stopFallbackPolling(); return; }
+    if (state.chatSession) return; // chat view already has its own poller
+    loadData();
+  }, 5_000);
+}
+
+function stopFallbackPolling() {
+  if (state.fallbackPollTimer) {
+    clearInterval(state.fallbackPollTimer);
+    state.fallbackPollTimer = null;
+  }
+}
+
 // ── Data Loading ───────────────────────────────────────────────
 async function loadData() {
   try {
-    const [statusData, agents, sessions, jobs, ordering, namedGroups] = await Promise.all([
+    const [statusData, agents, sessions, jobs, ordering, namedGroups, projectColors] = await Promise.all([
       api.get('/status'),
       api.get('/agents'),
       api.get('/sessions'),
       api.get('/jobs'),
       api.get('/ordering').catch(() => null),
       api.get('/groups').catch(() => []),
+      api.get('/project-colors').catch(() => ({})),
     ]);
     state.status = statusData;
     state.agents = agents;
-    state.sessions = sessions.sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
+    state.sessions = sessions
+      .slice()
+      .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
+      .slice(0, 100);
     state.jobs = jobs;
     state.ordering = ordering;
     state.namedGroups = namedGroups || [];
+    state.projectColors = projectColors || {};
     state.loading = false;
   } catch (err) {
     state.loading = false;
@@ -188,22 +274,27 @@ function startAutoRefresh() {
   stopAutoRefresh();
   // Refresh data every 30s silently (no spinner, no toast)
   state.autoRefreshTimer = setInterval(async () => {
-    if (state.chatSession || state.drawer || state.loading) return;
+    if (state.chatSession || state.drawer || state.newChat || state.loading) return;
     try {
-      const [statusData, agents, sessions, jobs, ordering, namedGroups] = await Promise.all([
+      const [statusData, agents, sessions, jobs, ordering, namedGroups, projectColors] = await Promise.all([
         api.get('/status'),
         api.get('/agents'),
         api.get('/sessions'),
         api.get('/jobs'),
         api.get('/ordering').catch(() => null),
         api.get('/groups').catch(() => []),
+        api.get('/project-colors').catch(() => ({})),
       ]);
       state.status = statusData;
       state.agents = agents;
-      state.sessions = sessions.sort((a, b) => b.createdAt - a.createdAt).slice(0, 100);
+      state.sessions = sessions
+        .slice()
+        .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
+        .slice(0, 100);
       state.jobs = jobs;
       state.ordering = ordering;
       state.namedGroups = namedGroups || [];
+      state.projectColors = projectColors || {};
       render();
     } catch {}
   }, 30000);
@@ -486,9 +577,17 @@ function render() {
     ${renderStats()}
     ${renderTabs()}
     ${renderContent()}
+    ${renderFab()}
     ${state.drawer ? renderDrawer() : ''}
+    ${state.newChat ? renderNewChatSheet() : ''}
   `;
   bindEvents();
+}
+
+function renderFab() {
+  // Hide FAB while bottom-sheets are open
+  if (state.drawer || state.newChat) return '';
+  return `<button id="fab-new" class="fab-new" title="New conversation">+</button>`;
 }
 
 function renderLogin() {
@@ -572,16 +671,17 @@ function renderStats() {
 }
 
 function renderTabs() {
+  const badge = computeTaskHubBadge();
   const tabs = [
+    { id: 'taskhub', label: 'Task Hub', badge },
     { id: 'agents', label: 'Agents' },
-    { id: 'sessions', label: 'Sessions' },
     { id: 'jobs', label: 'Jobs' },
   ];
   return `
     <div class="tab-nav">
       ${tabs.map(t => `
         <button class="tab-btn ${state.tab === t.id ? 'active' : ''}" data-tab="${t.id}">
-          ${t.label}
+          ${t.label}${t.badge ? `<span class="tab-badge">${t.badge}</span>` : ''}
         </button>
       `).join('')}
     </div>
@@ -590,8 +690,8 @@ function renderTabs() {
 
 function renderContent() {
   switch (state.tab) {
+    case 'taskhub': return renderTaskHub();
     case 'agents': return renderAgents();
-    case 'sessions': return renderSessions();
     case 'jobs': return renderJobs();
     default: return '';
   }
@@ -922,27 +1022,275 @@ function renderTypingIndicator() {
   `;
 }
 
-// ── Sessions Tab ───────────────────────────────────────────────
-function renderSessions() {
-  if (!state.sessions.length) {
-    return '<div class="empty"><div class="empty-icon">💬</div><div class="empty-text">No sessions yet</div></div>';
+// ── Task Hub Tab (mirrors desktop TaskHubView) ────────────────
+// Brain: pattern-remote-api-architecture
+// Mirrors src/components/TaskHubView.tsx priority logic for the mobile PWA.
+
+const TASKHUB_SECTION_LABELS = {
+  1: 'Needs attention',
+  2: 'Working',
+  3: 'Agent done',
+  4: 'Other',
+};
+const TASKHUB_PRIORITY_COLOR = {
+  1: '#a855f7', // purple
+  2: '#22c55e', // green
+  3: '#f59e0b', // orange
+  4: null,
+};
+
+function computePriority(s) {
+  if ((s.pendingQuestionCount ?? 0) > 0) return 1;
+  if (s.isStreaming || s.lastMessageStatus === 'streaming' || s.status === 'in_progress' || s.status === 'running') {
+    // Distinguish: backend "in_progress" alone (no live state yet) still maps to Working
+    if (s.isStreaming || s.lastMessageStatus === 'streaming') return 2;
+    // If we have a last assistant message that's complete, prefer P3 over a stale "in_progress"
+    if (
+      s.lastMessageRole === 'assistant' &&
+      (s.lastMessageStatus === 'complete' || s.lastMessageStatus == null)
+    ) {
+      return 3;
+    }
+    return 2;
   }
-  return `<div class="card">${
-    state.sessions.slice(0, 30).map(s => {
-      const agent = state.agents.find(a => a.id === s.agentId);
-      return `
-        <div class="session-item" data-open-chat="${s.id}" style="cursor:pointer">
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span class="session-title">${esc(s.title || 'Untitled')}</span>
-            <span class="badge badge-${s.status === 'in_progress' ? 'running' : s.status === 'done' ? 'done' : 'idle'}">${s.status}</span>
-          </div>
-          <div class="session-meta">
-            ${agent ? esc(agent.name) + ' · ' : ''}${timeAgo(s.createdAt)}${s.messageCount ? ` · ${s.messageCount} msgs` : ''}
-          </div>
-        </div>
-      `;
-    }).join('')
-  }</div>`;
+  if (
+    s.lastMessageRole === 'assistant' &&
+    (s.lastMessageStatus === 'complete' || s.lastMessageStatus == null)
+  ) {
+    return 3;
+  }
+  return 4;
+}
+
+function computeTaskHubBadge() {
+  return state.sessions.reduce((n, s) => {
+    if (s.status === 'done') return n;
+    const p = computePriority(s);
+    return p === 1 || p === 3 ? n + 1 : n;
+  }, 0);
+}
+
+function getProjectColor(projectPath) {
+  if (!projectPath) return null;
+  return state.projectColors[projectPath] || null;
+}
+
+function getProjectColorFromSession(s) {
+  return s.projectColor || getProjectColor(s.projectPath) || null;
+}
+
+function renderTaskHub() {
+  const query = (state.taskHubQuery || '').trim().toLowerCase();
+
+  const filtered = state.sessions.filter(s => {
+    if (s.status === 'done') return false;
+    if (!query) return true;
+    const agent = state.agents.find(a => a.id === s.agentId);
+    const haystack = `${s.title || ''} ${s.projectName || ''} ${agent?.name || ''}`.toLowerCase();
+    return haystack.includes(query);
+  });
+
+  // Group by priority, sort by updatedAt desc within group
+  const groups = { 1: [], 2: [], 3: [], 4: [] };
+  filtered.forEach(s => groups[computePriority(s)].push(s));
+  Object.keys(groups).forEach(k => {
+    groups[k].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
+  });
+
+  const search = `
+    <div class="taskhub-search-wrap">
+      <input id="taskhub-search" class="taskhub-search" type="search"
+        placeholder="Search tasks" value="${esc(state.taskHubQuery || '')}" />
+    </div>
+  `;
+
+  if (filtered.length === 0) {
+    return search + '<div class="empty"><div class="empty-icon">✨</div><div class="empty-text">No active sessions. Tap + to start one.</div></div>';
+  }
+
+  const sections = [1, 2, 3, 4]
+    .filter(p => groups[p].length > 0)
+    .map(p => renderTaskHubSection(p, groups[p]))
+    .join('');
+
+  return `<div class="taskhub">${search}${sections}</div>`;
+}
+
+function renderTaskHubSection(priority, sessions) {
+  return `
+    <div class="taskhub-section">
+      <div class="taskhub-section-header">
+        <span class="taskhub-section-label">${TASKHUB_SECTION_LABELS[priority]}</span>
+        <span class="taskhub-section-count">${sessions.length}</span>
+      </div>
+      <div class="taskhub-list">
+        ${sessions.map((s, i) => renderTaskHubItem(s, priority, i, sessions.length)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderTaskHubItem(s, priority, idx, total) {
+  const accent = TASKHUB_PRIORITY_COLOR[priority];
+  const accentStyle = accent ? `border-left-color:${accent}` : 'border-left-color:transparent';
+  const opacity = priority === 4
+    ? (total === 1 ? 0.7 : Math.max(0.4, 0.75 - (idx / Math.max(total, 1)) * 0.35))
+    : 1;
+  const agent = state.agents.find(a => a.id === s.agentId);
+  const dotClass = getSessionDotClass(agent?.status, idx === 0);
+
+  const projectColor = getProjectColorFromSession(s);
+  const projectChip = state.sessions.length > 1 && s.projectName && projectColor
+    ? `<span class="project-chip" style="--proj:${projectColor}">${esc(s.projectName.toLowerCase())}</span>`
+    : '';
+
+  const avatarHtml = agent?.avatar
+    ? `<img class="taskhub-avatar" src="${api.avatarUrl(agent.avatar)}" alt="" onerror="this.style.display='none'">`
+    : `<div class="taskhub-avatar taskhub-avatar-fallback" style="background:${agent?.color || 'var(--accent)'}">🦆</div>`;
+
+  return `
+    <div class="taskhub-item" data-open-chat="${s.id}" style="${accentStyle};opacity:${opacity}">
+      <span class="session-dot ${dotClass}"></span>
+      ${projectChip}
+      <span class="taskhub-title">${esc(s.title || 'Untitled')}</span>
+      ${avatarHtml}
+      <span class="taskhub-time">${timeAgo(s.updatedAt || s.createdAt)}</span>
+    </div>
+  `;
+}
+
+// ── New-chat Bottom Sheet (FAB '+' → 3 steps) ─────────────────
+function renderNewChatSheet() {
+  const nc = state.newChat;
+  return `
+    <div class="drawer-overlay" id="new-chat-overlay"></div>
+    <div class="drawer new-chat-sheet">
+      <div class="drawer-handle"></div>
+      <div class="drawer-header">
+        <span class="drawer-title">${nc.step === 1 ? 'Choose project' : nc.step === 2 ? 'Choose agent' : 'New conversation'}</span>
+        ${nc.step > 1
+          ? `<button class="btn-link" id="nc-back">← Back</button>`
+          : `<button class="btn-link" id="nc-close">Cancel</button>`}
+      </div>
+      <div class="drawer-body">
+        ${renderNewChatStep(nc)}
+      </div>
+    </div>
+  `;
+}
+
+function uniqueProjects() {
+  const map = new Map();
+  state.agents.forEach(a => {
+    if (!a.projectPath || !a.projectName) return;
+    if (!map.has(a.projectPath)) map.set(a.projectPath, a.projectName);
+  });
+  return [...map.entries()].map(([projectPath, projectName]) => ({ projectPath, projectName }));
+}
+
+function renderNewChatStep(nc) {
+  if (nc.step === 1) {
+    const projects = uniqueProjects();
+    if (!projects.length) {
+      return '<div class="empty-inline">No projects available. Open a project in Quack desktop first.</div>';
+    }
+    return `
+      <div class="nc-list">
+        ${projects.map(p => {
+          const color = getProjectColor(p.projectPath) || 'var(--accent)';
+          return `
+            <button class="nc-row" data-nc-project="${esc(p.projectPath)}" data-nc-project-name="${esc(p.projectName)}">
+              <span class="nc-color-dot" style="background:${color}"></span>
+              <span class="nc-row-label">${esc(p.projectName)}</span>
+              <span class="nc-row-meta">${
+                state.agents.filter(a => a.projectPath === p.projectPath).length
+              } agents</span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  if (nc.step === 2) {
+    const agents = state.agents.filter(a => a.projectPath === nc.projectPath);
+    if (!agents.length) {
+      return '<div class="empty-inline">No agents in this project.</div>';
+    }
+    return `
+      <div class="nc-list">
+        ${agents.map(a => `
+          <button class="nc-row" data-nc-agent="${esc(a.id)}" data-nc-agent-name="${esc(a.name || 'Agent')}">
+            ${a.avatar
+              ? `<img class="nc-avatar" src="${api.avatarUrl(a.avatar)}" alt="" onerror="this.style.display='none'">`
+              : `<span class="nc-avatar" style="background:${a.color || 'var(--accent)'};display:inline-flex;align-items:center;justify-content:center">🦆</span>`}
+            <span class="nc-row-label">${esc(a.name || 'Agent')}</span>
+            <span class="nc-row-meta">${esc(a.role || '')}</span>
+          </button>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  // Step 3: prompt
+  return `
+    <div class="nc-summary">
+      <span class="nc-pill">${esc(nc.projectName)}</span>
+      <span class="nc-arrow">›</span>
+      <span class="nc-pill">${esc(nc.agentName)}</span>
+    </div>
+    <select id="nc-model" class="select">
+      <option value="" selected>Default (agent preset)</option>
+      <option value="opus">Opus</option>
+      <option value="sonnet">Sonnet</option>
+      <option value="haiku">Haiku</option>
+    </select>
+    <textarea id="nc-prompt" class="textarea" placeholder="What should the agent do?" rows="4" autofocus>${esc(nc.prompt || '')}</textarea>
+    <button id="nc-send" class="btn btn-primary btn-block">Start conversation</button>
+  `;
+}
+
+async function startNewChat() {
+  const nc = state.newChat;
+  if (!nc) return;
+  const prompt = $('#nc-prompt')?.value?.trim();
+  if (!prompt) { toast('Please enter a prompt', 'error'); return; }
+  const model = $('#nc-model')?.value || '';
+  const sendBtn = $('#nc-send');
+  if (sendBtn) sendBtn.disabled = true;
+
+  try {
+    const body = { agentId: nc.agentId, prompt };
+    if (model) body.model = model;
+    if (nc.projectPath) body.projectPath = nc.projectPath;
+    const res = await api.post('/execute', body);
+    if (res.success && res.sessionId) {
+      const virtualSession = {
+        id: res.sessionId,
+        title: prompt.slice(0, 60) + (prompt.length > 60 ? '...' : ''),
+        agentId: nc.agentId,
+        status: 'in_progress',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        projectName: nc.projectName,
+        projectPath: nc.projectPath,
+      };
+      state.newChat = null;
+      state.chatSession = virtualSession;
+      state.chatMessages = [{ role: 'user', content: prompt, _optimistic: true }];
+      state.chatLoading = false;
+      render();
+      scrollChatToBottom();
+      startChatPolling();
+      loadData();
+    } else {
+      toast(res.error || 'Failed to start conversation', 'error');
+      if (sendBtn) sendBtn.disabled = false;
+    }
+  } catch (err) {
+    toast(`Error: ${err.message}`, 'error');
+    if (sendBtn) sendBtn.disabled = false;
+  }
 }
 
 // ── Jobs Tab ───────────────────────────────────────────────────
@@ -1101,6 +1449,92 @@ function bindEvents() {
       btn.disabled = false;
     };
   });
+
+  // Task Hub search
+  const taskhubSearch = $('#taskhub-search');
+  if (taskhubSearch) {
+    taskhubSearch.oninput = (e) => {
+      state.taskHubQuery = e.target.value;
+      // Partial re-render: only the task hub content (avoid losing input focus)
+      const container = $('.taskhub');
+      if (container) {
+        const newHtml = renderTaskHub();
+        container.outerHTML = newHtml;
+        // Re-bind after replace
+        bindEvents();
+        const newInput = $('#taskhub-search');
+        if (newInput) {
+          newInput.focus();
+          newInput.setSelectionRange(state.taskHubQuery.length, state.taskHubQuery.length);
+        }
+      }
+    };
+  }
+
+  // FAB "+" — open new-chat sheet (step 1)
+  const fab = $('#fab-new');
+  if (fab) {
+    fab.onclick = () => {
+      state.newChat = { step: 1 };
+      render();
+    };
+  }
+
+  // New-chat sheet: overlay close
+  const ncOverlay = $('#new-chat-overlay');
+  if (ncOverlay) {
+    ncOverlay.onclick = () => { state.newChat = null; render(); };
+  }
+  const ncClose = $('#nc-close');
+  if (ncClose) ncClose.onclick = () => { state.newChat = null; render(); };
+  const ncBack = $('#nc-back');
+  if (ncBack) {
+    ncBack.onclick = () => {
+      if (state.newChat && state.newChat.step > 1) {
+        state.newChat = { ...state.newChat, step: state.newChat.step - 1 };
+        render();
+      }
+    };
+  }
+  // Step 1 → 2: choose project
+  $$('[data-nc-project]').forEach(btn => {
+    btn.onclick = () => {
+      state.newChat = {
+        ...state.newChat,
+        projectPath: btn.dataset.ncProject,
+        projectName: btn.dataset.ncProjectName,
+        step: 2,
+      };
+      render();
+    };
+  });
+  // Step 2 → 3: choose agent
+  $$('[data-nc-agent]').forEach(btn => {
+    btn.onclick = () => {
+      state.newChat = {
+        ...state.newChat,
+        agentId: btn.dataset.ncAgent,
+        agentName: btn.dataset.ncAgentName,
+        step: 3,
+      };
+      render();
+      requestAnimationFrame(() => {
+        const ta = $('#nc-prompt');
+        if (ta) ta.focus();
+      });
+    };
+  });
+  // Step 3: submit
+  const ncSend = $('#nc-send');
+  if (ncSend) {
+    ncSend.onclick = startNewChat;
+    const ncPrompt = $('#nc-prompt');
+    if (ncPrompt) {
+      ncPrompt.onkeydown = (e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) startNewChat();
+      };
+    }
+  }
 }
 
 // ── Helpers ────────────────────────────────────────────────────

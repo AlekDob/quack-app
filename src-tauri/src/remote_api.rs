@@ -15,14 +15,35 @@ use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 
 use crate::remote_auth::RemoteAuthState;
+use crate::remote_ws::{WsBroadcast, WsEvent};
 
 // ─── Shared State ──────────────────────────────────────────────────
+
+/// Per-session live state mirrored from the desktop frontend (chatLoadingMap,
+/// pendingQuestionsMap, last assistant message status). Powers the mobile PWA
+/// Task Hub priority computation.
+///
+/// Brain: pattern-remote-api-architecture
+#[derive(Clone, Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionLiveEntry {
+    pub is_streaming: bool,
+    pub pending_question_count: u32,
+    pub last_message_role: Option<String>,
+    pub last_message_status: Option<String>,
+    pub last_activity_ms: i64,
+}
+
+pub type SessionLiveStateMap =
+    std::sync::Arc<std::sync::RwLock<std::collections::HashMap<String, SessionLiveEntry>>>;
 
 #[derive(Clone)]
 pub struct ApiState {
     pub app: AppHandle,
     pub auth: RemoteAuthState,
     pub agent_status: crate::AgentStatusMap,
+    pub session_live: SessionLiveStateMap,
+    pub ws_broadcast: WsBroadcast,
 }
 
 impl ApiState {
@@ -101,10 +122,27 @@ struct SessionSummary {
     agent_id: String,
     status: String,
     created_at: i64,
+    updated_at: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     message_count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     claude_session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    project_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    project_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    project_color: Option<String>,
+    // Live-state fields (mirrored from desktop chatStore via notify_* commands).
+    // Used by the mobile PWA to compute Task Hub priorities without an extra round-trip.
+    is_streaming: bool,
+    pending_question_count: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_message_role: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_message_status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last_activity_at: Option<i64>,
 }
 
 #[derive(Serialize, Clone)]
@@ -226,8 +264,14 @@ type ApiResult<T> = Result<Json<T>, (StatusCode, Json<ApiError>)>;
 // ─── Router ────────────────────────────────────────────────────────
 
 /// Create the /api sub-router. Mount via `nest("/api", ...)` in lib.rs.
-pub fn create_api_router(app: AppHandle, auth: RemoteAuthState, agent_status: crate::AgentStatusMap) -> Router {
-    let state = ApiState { app, auth, agent_status };
+pub fn create_api_router(
+    app: AppHandle,
+    auth: RemoteAuthState,
+    agent_status: crate::AgentStatusMap,
+    session_live: SessionLiveStateMap,
+    ws_broadcast: WsBroadcast,
+) -> Router {
+    let state = ApiState { app, auth, agent_status, session_live, ws_broadcast };
 
     Router::new()
         .route("/status", get(handle_status))
@@ -242,6 +286,7 @@ pub fn create_api_router(app: AppHandle, auth: RemoteAuthState, agent_status: cr
         .route("/execute", post(handle_execute))
         .route("/ordering", get(handle_ordering))
         .route("/groups", get(handle_list_groups))
+        .route("/project-colors", get(handle_project_colors))
         .route("/sessions/:id/messages", get(handle_session_messages))
         .route("/sessions/:id/send", post(handle_send_message))
         .route("/avatars/:filename", get(handle_avatar))
@@ -452,20 +497,44 @@ async fn handle_list_sessions(
     state.check_auth(&headers).await?;
 
     let storage = read_agents_storage().map_err(err)?;
+    let live = state.session_live.read().ok();
+    let colors = load_repo_colors();
 
     let sessions = storage
         .get("sessions")
         .and_then(|s| s.as_array())
         .map(|arr| {
             arr.iter()
-                .map(|s| SessionSummary {
-                    id: s.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    title: s.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    agent_id: s.get("agentId").and_then(|v| v.as_str()).unwrap_or("").to_string(),
-                    status: s.get("status").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
-                    created_at: s.get("createdAt").and_then(|v| v.as_i64()).unwrap_or(0),
-                    message_count: s.get("messageCount").and_then(|v| v.as_i64()),
-                    claude_session_id: s.get("claudeSessionId").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                .map(|s| {
+                    let id = s.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let created_at = s.get("createdAt").and_then(|v| v.as_i64()).unwrap_or(0);
+                    let updated_at = s.get("updatedAt").and_then(|v| v.as_i64()).unwrap_or(created_at);
+                    let project_path = s.get("projectPath").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    let project_name = s.get("projectName").and_then(|v| v.as_str()).map(|s| s.to_string());
+                    let project_color = project_path
+                        .as_deref()
+                        .and_then(|p| resolve_project_color(p, &colors));
+
+                    let live_entry = live.as_ref().and_then(|m| m.get(&id).cloned());
+
+                    SessionSummary {
+                        id: id.clone(),
+                        title: s.get("title").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        agent_id: s.get("agentId").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        status: s.get("status").and_then(|v| v.as_str()).unwrap_or("unknown").to_string(),
+                        created_at,
+                        updated_at,
+                        message_count: s.get("messageCount").and_then(|v| v.as_i64()),
+                        claude_session_id: s.get("claudeSessionId").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                        project_name,
+                        project_path,
+                        project_color,
+                        is_streaming: live_entry.as_ref().map(|e| e.is_streaming).unwrap_or(false),
+                        pending_question_count: live_entry.as_ref().map(|e| e.pending_question_count).unwrap_or(0),
+                        last_message_role: live_entry.as_ref().and_then(|e| e.last_message_role.clone()),
+                        last_message_status: live_entry.as_ref().and_then(|e| e.last_message_status.clone()),
+                        last_activity_at: live_entry.as_ref().map(|e| e.last_activity_ms).filter(|t| *t > 0),
+                    }
                 })
                 .collect()
         })
@@ -1161,4 +1230,186 @@ pub async fn delegate_plan_to_agent(
     log::info!("📋 [Delegate Plan] agent={}, session={}", agent_id, session_id);
 
     Ok(session_id)
+}
+
+// ─── Project Colors (for Task Hub chip) ──────────────────────────────
+// Brain: pattern-remote-api-architecture
+// Mirrors `useProjectColor` + `DEFAULT_PROJECT_COLORS` (src/utils/projectColors.ts).
+
+const DEFAULT_PROJECT_COLORS: &[&str] = &[
+    "#FF6B35", "#22D3EE", "#A855F7", "#F59E0B",
+    "#10B981", "#EC4899", "#3B82F6", "#84CC16",
+];
+
+fn load_repo_colors() -> std::collections::HashMap<String, String> {
+    let store = read_dat_store(".quack-repo-order.dat");
+    store
+        .get("repository-order")
+        .and_then(|v| v.as_object())
+        .and_then(|obj| obj.get("colors").and_then(|c| c.as_object()))
+        .map(|m| {
+            m.iter()
+                .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
+                .filter(|(_, v)| !v.is_empty())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn project_repo_key(project_path: &str) -> String {
+    // Mirrors `repo-${last segment of path}` from useProjectColor.
+    let last = std::path::Path::new(project_path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(project_path);
+    format!("repo-{}", last)
+}
+
+fn fallback_color(project_path: &str) -> String {
+    // Deterministic 32-bit string hash modulo palette length.
+    let mut hash: u32 = 0;
+    for c in project_path.chars() {
+        hash = hash.wrapping_mul(31).wrapping_add(c as u32);
+    }
+    let idx = (hash as usize) % DEFAULT_PROJECT_COLORS.len();
+    DEFAULT_PROJECT_COLORS[idx].to_string()
+}
+
+fn resolve_project_color(
+    project_path: &str,
+    colors: &std::collections::HashMap<String, String>,
+) -> Option<String> {
+    if project_path.is_empty() {
+        return None;
+    }
+    let key = project_repo_key(project_path);
+    Some(
+        colors
+            .get(&key)
+            .cloned()
+            .unwrap_or_else(|| fallback_color(project_path)),
+    )
+}
+
+async fn handle_project_colors(
+    headers: HeaderMap,
+    State(state): State<ApiState>,
+) -> ApiResult<std::collections::HashMap<String, String>> {
+    state.check_auth(&headers).await?;
+    let stored = load_repo_colors();
+
+    // Augment: include any project_path referenced by current agents/sessions
+    // with their deterministic fallback color, so the PWA can render chips
+    // for repos that don't have a custom color yet.
+    let mut out: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    if let Ok(storage) = read_agents_storage() {
+        let mut paths: std::collections::HashSet<String> = std::collections::HashSet::new();
+        for key in ["agents", "sessions"] {
+            if let Some(arr) = storage.get(key).and_then(|v| v.as_array()) {
+                for entry in arr {
+                    if let Some(p) = entry.get("projectPath").and_then(|v| v.as_str()) {
+                        if !p.is_empty() {
+                            paths.insert(p.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        for path in paths {
+            if let Some(color) = resolve_project_color(&path, &stored) {
+                out.insert(path, color);
+            }
+        }
+    }
+
+    Ok(Json(out))
+}
+
+// ─── Notify Commands (frontend desktop → mobile PWA via WS) ──────────
+// Brain: pattern-remote-api-architecture
+//
+// These three Tauri commands are invoked by the desktop React frontend
+// (via `useRemoteLiveStateSync` hook) whenever in-memory state changes
+// that the mobile PWA needs to mirror for its Task Hub view.
+//
+// They update `SessionLiveStateMap` and broadcast a `WsEvent` so connected
+// PWA clients refresh badges/sections without polling.
+
+fn update_session_live<F>(map: &SessionLiveStateMap, session_id: &str, mutator: F)
+where
+    F: FnOnce(&mut SessionLiveEntry),
+{
+    if let Ok(mut guard) = map.write() {
+        let entry = guard.entry(session_id.to_string()).or_default();
+        mutator(entry);
+        entry.last_activity_ms = chrono::Utc::now().timestamp_millis();
+    }
+}
+
+#[tauri::command]
+pub fn notify_session_streaming(
+    state: tauri::State<'_, SessionLiveStateMap>,
+    broadcast: tauri::State<'_, WsBroadcast>,
+    session_id: String,
+    is_streaming: bool,
+    agent_id: Option<String>,
+) -> Result<(), String> {
+    update_session_live(&state, &session_id, |entry| {
+        entry.is_streaming = is_streaming;
+    });
+    broadcast.send(WsEvent::SessionStreaming {
+        session_id,
+        agent_id,
+        is_streaming,
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn notify_session_pending_question(
+    state: tauri::State<'_, SessionLiveStateMap>,
+    broadcast: tauri::State<'_, WsBroadcast>,
+    session_id: String,
+    count: u32,
+    agent_id: Option<String>,
+) -> Result<(), String> {
+    update_session_live(&state, &session_id, |entry| {
+        entry.pending_question_count = count;
+    });
+    broadcast.send(WsEvent::PendingQuestion {
+        session_id,
+        agent_id,
+        count,
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub fn notify_session_message(
+    state: tauri::State<'_, SessionLiveStateMap>,
+    broadcast: tauri::State<'_, WsBroadcast>,
+    session_id: String,
+    role: String,
+    status: Option<String>,
+    agent_id: Option<String>,
+) -> Result<(), String> {
+    let now = chrono::Utc::now().timestamp_millis();
+    update_session_live(&state, &session_id, |entry| {
+        entry.last_message_role = Some(role.clone());
+        entry.last_message_status = status.clone();
+    });
+    broadcast.send(WsEvent::MessageAdded {
+        session_id: session_id.clone(),
+        agent_id: agent_id.clone(),
+        role,
+        status: status.clone(),
+        timestamp: now,
+    });
+    broadcast.send(WsEvent::SessionUpdated {
+        session_id,
+        updated_at: now,
+        last_message_role: None,
+        last_message_status: status,
+    });
+    Ok(())
 }

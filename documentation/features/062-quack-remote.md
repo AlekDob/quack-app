@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React 18 + TypeScript)
 created: 2026-04-17
-last_verified: 2026-04-17
-tags: [quack-remote, remote-api, rest-api, websocket, mobile-dashboard, team-delegation, automation, agent-to-agent]
+last_verified: 2026-05-25
+tags: [quack-remote, remote-api, rest-api, websocket, mobile-dashboard, team-delegation, automation, agent-to-agent, task-hub-mirror, session-live-state]
 ---
 
 ## Quack Remote API
@@ -14,10 +14,11 @@ tags: [quack-remote, remote-api, rest-api, websocket, mobile-dashboard, team-del
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Service | src-tauri/src/remote_api.rs | `create_api_router`, `delegate_plan_to_agent`, `init_uptime`, `read_agents_storage`, `ApiState`, `ApiError`, `ApiResult`, `err` — all `/api/*` handlers (status, agents, sessions, jobs, execute, ordering, groups, messages, avatars) + Bearer auth inline |
+| Service | src-tauri/src/remote_api.rs | `create_api_router`, `delegate_plan_to_agent`, `init_uptime`, `read_agents_storage`, `ApiState`, `ApiError`, `ApiResult`, `err`, **`SessionLiveEntry`, `SessionLiveStateMap`, `notify_session_streaming`, `notify_session_pending_question`, `notify_session_message`, `handle_project_colors`** — all `/api/*` handlers (status, agents, sessions, jobs, execute, ordering, groups, messages, avatars, **project-colors**) + Bearer auth inline |
 | Service | src-tauri/src/remote_auth.rs | `RemoteAuthState` (Arc<RwLock> token + enabled), `generate_token()` — 32-char hex Bearer token lifecycle |
 | Config | src-tauri/src/remote_config.rs | `RemoteConfig { enabled, token, port }`, `load_config`, `save_config`, `get_remote_config`, `set_remote_enabled`, `regenerate_remote_token`, `get_local_ip`, `get_local_hostname` — persists `quack-remote.json` via Tauri Store |
-| Service | src-tauri/src/remote_ws.rs | `WsBroadcast`, `WsEvent` (AgentStatus/SessionCreated/SessionCompleted/JobFired/JobCompleted), `WsState`, `handle_ws_upgrade` — `/ws?token=xxx` real-time push to mobile/external clients |
+| Service | src-tauri/src/remote_ws.rs | `WsBroadcast`, `WsEvent` (AgentStatus/SessionCreated/SessionCompleted/JobFired/JobCompleted **+ SessionStreaming / PendingQuestion / MessageAdded / SessionUpdated**), `WsState`, `handle_ws_upgrade` — `/ws?token=xxx` real-time push to mobile/external clients |
+| Hook | src/hooks/useRemoteLiveStateSync.ts | Mirrors `chatStore` (chatLoadingMap, pendingQuestionsMap, last assistant message) into the Rust `SessionLiveStateMap` via three `notify_*` Tauri commands (debounced 150ms per session). Skips when remote API disabled. |
 | Service | src-tauri/src/remote_api_teams.rs | `create_team_routes`, `RemoteTeam`, `RemoteTeamMember` — `/api/teams*` multi-agent orchestration with 500ms staggered `remote-execute` emits and live status sync |
 | Route/Page | src-tauri/src/remote_dashboard.rs | `create_dashboard_router` — serves `/dashboard/*` PWA (HTML/JS/CSS/manifest/sw.js/icons) embedded via `include_str!`/`include_bytes!`, injects token via `%%INJECT_TOKEN%%` placeholder |
 | Config | src-tauri/static/index.html, app.js, style.css, manifest.json, sw.js | Static PWA assets bundled into the Rust binary |
@@ -70,6 +71,7 @@ Real-time agent status: `AgentStatusMap` (RwLock<HashMap<agent_id, status>>) wri
 - `RemoteAuthState.token`: `Arc<RwLock<Option<String>>>` — active Bearer token (global)
 - `RemoteAuthState.enabled`: `Arc<RwLock<bool>>` — runtime remote-enabled flag (global)
 - `AgentStatusMap`: `Arc<RwLock<HashMap<String, String>>>` — live agent status map, reads win over disk (global)
+- `SessionLiveStateMap`: `Arc<RwLock<HashMap<String, SessionLiveEntry>>>` — per-session live state mirror (`isStreaming`, `pendingQuestionCount`, `lastMessageRole`, `lastMessageStatus`, `lastActivityMs`) populated by desktop `useRemoteLiveStateSync` hook (global). Powers PWA Task Hub priority computation.
 - `WsBroadcast.tx`: `tokio::broadcast::Sender<WsEvent>` — capacity 64, cloned into axum state + telegram subscribers (global)
 - `START_TIME`: `OnceLock<Instant>` — server uptime reference (global)
 - `config`: `RemoteApiConfig | null` — React state in `RemoteApiSettings` (component)
@@ -117,6 +119,7 @@ Real-time agent status: `AgentStatusMap` (RwLock<HashMap<agent_id, status>>) wri
 | POST | /api/execute | launch prompt on agent (optional `leadSessionId` → `[Team]` session) |
 | GET | /api/ordering | repo order + colors + per-repo agent order |
 | GET | /api/groups | list project groups |
+| GET | /api/project-colors | map `projectPath → hex` (custom from `.quack-repo-order.dat` + deterministic fallback) |
 | GET | /api/teams | list teams |
 | POST | /api/teams | create team (staggered launch) |
 | GET | /api/teams/:id | get team (auto-syncs member status) |
