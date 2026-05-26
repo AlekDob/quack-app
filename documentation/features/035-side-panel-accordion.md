@@ -3,12 +3,12 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React 18)
 created: 2026-04-04
-last_verified: 2026-05-12
-tags: [accordion, side-panel, ui, layout, navigation, brain, documentation-explorer, task-hub]
+last_verified: 2026-05-26
+tags: [accordion, side-panel, ui, layout, navigation, brain, documentation-explorer, task-hub, workstreams, project-ops]
 ---
 
 ## Side Panel Accordion
-**Purpose:** Collapsible side panel with 15 sections (focus-one-at-a-time pattern), compact icon-strip mode with peek-on-hover overlay, each section hosting a dedicated content panel for workspace management. Task Hub lives at slot #0 with a badge surfacing sessions that need user action.
+**Purpose:** Collapsible side panel with 16 sections (focus-one-at-a-time pattern), compact icon-strip mode with peek-on-hover overlay, each section hosting a dedicated content panel for workspace management. Task Hub lives at slot #0 with a badge surfacing sessions that need user action. Workstreams + Status slots (project-ops layer) sit right after Changes.
 **Stack:** React 18, TypeScript strict, CSS (glassmorphism)
 
 ### Files
@@ -20,7 +20,9 @@ tags: [accordion, side-panel, ui, layout, navigation, brain, documentation-explo
 | Component | `src/components/FileExplorer.tsx` | File tree browser with lazy-load children |
 | Component | `src/components/FeaturesPanel.tsx` | Feature map entries viewer |
 | Component | `src/components/AgentContextPanel.tsx` | Active agent personality, avatar, workspace info |
-| Component | `src/components/ProjectContextPanel.tsx` | Project notes, Brain, bookmarks |
+| Component | `src/components/WorkstreamsPanel.tsx` | project-ops workstreams grouped by focus (current/active/background/…) |
+| Component | `src/components/WorkstreamStatusPanel.tsx` | Snapshot of `focus: current` workstreams with their status field |
+| Hook | `src/hooks/useWorkstreams.ts` | Lists `documentation/workstreams/NN-*.md`, parses YAML frontmatter |
 | Component | `src/components/RulesPanel.tsx` | Agent rules (global + project scope) |
 | Component | `src/components/AgentsPanel.tsx` | Droids list, create/select/use agents |
 | Component | `src/components/SkillsPanel.tsx` | Skills list with search and refresh |
@@ -85,27 +87,40 @@ tags: [accordion, side-panel, ui, layout, navigation, brain, documentation-explo
 - Hydration flow: localStorage → `ui-storage` JSON parse → `sidePanelCollapsed` boolean → App.tsx `useEffect` sets Zustand store on mount
 
 ### Config
-- `CATEGORY_COLORS`: per-section color map (taskhub=#a855f7, changes=#34d399, brain=#e879f9, skills=#f28c52, agents=#f28c52, droids=#4ecdc4, rules=#60a5fa, hooks=#a78bfa, features=#FFD700, sessions=#00d9ff, mcp=#34d399, commands=#f472b6, context=#f28c52, project-context=#60a5fa, token-stats=#22d3ee)
-- `sectionIds`: fixed order array -- `['taskhub', 'changes', 'context', 'brain', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions', 'token-stats']`
+- `CATEGORY_COLORS`: per-section color map (taskhub=#a855f7, changes=#34d399, workstreams=#fbbf24, status=#84cc16, brain=#e879f9, skills=#f28c52, agents=#f28c52, droids=#4ecdc4, rules=#60a5fa, hooks=#a78bfa, features=#FFD700, sessions=#00d9ff, mcp=#34d399, commands=#f472b6, context=#f28c52, token-stats=#22d3ee)
+- `sectionIds`: fixed order array -- `['taskhub', 'changes', 'workstreams', 'status', 'context', 'brain', 'features', 'agent-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions', 'token-stats']`
 
-### Sections (15 total, 1 hidden)
+### Sections (16 total, 1 hidden)
 | # | ID | Title | Content Panel | Badge Source |
 |---|-----|-------|---------------|-------------|
 | 0 | taskhub | Task Hub | TaskHubView | `computeTaskHubBadge(...)` = P1 (Needs attention) + P3 (Agent done) |
 | 1 | changes | Changes | ChangesPanel | modifiedFiles.size |
-| 2 | context | File Explorer | FileExplorer | -- |
-| 3 | brain | Brain | FileExplorer (rooted at documentation/, sortBy=modified) | .md + .mmd file count |
-| 4 | features | Features | FeaturesPanel | -- |
-| 5 | agent-context | Agent Personality | AgentContextPanel | -- |
-| 6 | project-context | Context | ProjectContextPanel | -- |
-| 7 | rules | Agent Rules | RulesPanel | rulesCount (project + global) |
-| 8 | agents | Droids | AgentsPanel | agents.length |
-| 9 | skills | Skills | SkillsPanel | skills.length |
-| 10 | commands | Commands | CommandsPanel | commandsCount (hidden) |
-| 11 | mcp | MCP Servers | MCPPanel | mcpCount |
-| 12 | hooks | Hooks | HooksPanel | hooks.filter(enabled).length |
-| 13 | sessions | Sessions | SessionsPanel | -- |
-| 14 | token-stats | Token Stats | AgentTokenStatsPanel | -- |
+| 2 | workstreams | Workstreams | WorkstreamsPanel | -- (count visible inline) |
+| 3 | status | Status | WorkstreamStatusPanel | -- (focus:current count inline) |
+| 4 | context | File Explorer | FileExplorer | -- |
+| 5 | brain | Brain | FileExplorer (rooted at documentation/, sortBy=modified) | .md + .mmd file count |
+| 6 | features | Features | FeaturesPanel | -- |
+| 7 | agent-context | Agent Personality | AgentContextPanel | -- |
+| 8 | rules | Agent Rules | RulesPanel | rulesCount (project + global) |
+| 9 | agents | Droids | AgentsPanel | agents.length |
+| 10 | skills | Skills | SkillsPanel | skills.length |
+| 11 | commands | Commands | CommandsPanel | commandsCount (hidden) |
+| 12 | mcp | MCP Servers | MCPPanel | mcpCount |
+| 13 | hooks | Hooks | HooksPanel | hooks.filter(enabled).length |
+| 14 | sessions | Sessions | SessionsPanel | -- |
+| 15 | token-stats | Token Stats | AgentTokenStatsPanel | -- |
+
+### Workstreams + Status (project-ops integration)
+| Aspect | Detail |
+|--------|--------|
+| Source | `documentation/workstreams/NN-*.md` — YAML frontmatter (ws/title/status/focus/warning/updated) |
+| Hook | `useWorkstreams(rootPath)` — lists dir, parses frontmatter, returns typed `Workstream[]` |
+| Workstreams panel | Groups by `focus` (current → active → background → candidate → superseded → completed); each card shows num, title, status, warning, upd date |
+| Status panel | Only `focus:current`; surfaces the `status` field as a snapshot for daily standups / status reports |
+| Open file | Click on a card → `onOpenFile` → CodeMirror editor tab (same pipeline as FileExplorer) |
+| Refresh | Manual button; auto-refresh via PostToolUse hook regenerating `INDEX.md` after any Edit/Write |
+| Empty state | Hint to bootstrap via `bash ~/.claude/skills/project-ops/scripts/setup-pm-docs.sh` |
+| Colors | workstreams=amber `#fbbf24`, status=lime `#84cc16` |
 
 ### CSS Architecture
 - **Glassmorphism base**: `rgba(15,17,21,0.96)` + `backdrop-filter: blur(var(--blur-heavy)) saturate(150%)` (near-opaque for readability)

@@ -625,6 +625,86 @@ fn open_claude_memory_folder_impl(working_dir: Option<&str>) -> Result<String> {
     }
 }
 
+/// Validate `.claude/settings.json` syntactically.
+/// Returns Ok((true, "")) when parsable, Ok((false, error_message)) when corrupted,
+/// Ok((true, "")) when file doesn't exist (nothing to validate).
+#[tauri::command]
+pub fn validate_claude_settings_json(project_root: String) -> Result<(bool, String), String> {
+    let path = PathBuf::from(&project_root).join(".claude").join("settings.json");
+    if !path.exists() {
+        return Ok((true, String::new()));
+    }
+    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    match serde_json::from_str::<serde_json::Value>(&content) {
+        Ok(_) => Ok((true, String::new())),
+        Err(e) => Ok((false, e.to_string())),
+    }
+}
+
+/// Bootstrap project-ops layer for the given project.
+/// Idempotent: runs `~/.claude/skills/project-ops/scripts/setup-pm-docs.sh` if available.
+/// Returns the script stdout/stderr tail for surfacing in UI.
+#[tauri::command]
+pub fn bootstrap_project_ops(project_root: String) -> Result<BootstrapResult, String> {
+    let root = PathBuf::from(&project_root);
+    if !root.exists() {
+        return Err(format!("project root not found: {}", project_root));
+    }
+    let home = dirs::home_dir().ok_or_else(|| "no home dir".to_string())?;
+    let setup = home
+        .join(".claude")
+        .join("skills")
+        .join("project-ops")
+        .join("scripts")
+        .join("setup-pm-docs.sh");
+    if !setup.exists() {
+        return Ok(BootstrapResult {
+            installed: false,
+            already_present: false,
+            reason: "project-ops skill not installed (~/.claude/skills/project-ops/ missing). Install it via Quack Store.".to_string(),
+            output: String::new(),
+        });
+    }
+    let workstreams_dir = root.join("documentation").join("workstreams");
+    let already = workstreams_dir.exists()
+        && root.join("scripts").join("build-workstream-index.py").exists();
+    let output = std::process::Command::new("bash")
+        .arg(&setup)
+        .current_dir(&root)
+        .output()
+        .map_err(|e| format!("failed to run setup: {}", e))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let tail: String = stdout
+        .lines()
+        .chain(stderr.lines())
+        .rev()
+        .take(20)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<Vec<_>>()
+        .join("\n");
+    Ok(BootstrapResult {
+        installed: output.status.success(),
+        already_present: already,
+        reason: if output.status.success() {
+            "ok".to_string()
+        } else {
+            format!("setup-pm-docs.sh exit={}", output.status)
+        },
+        output: tail,
+    })
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BootstrapResult {
+    pub installed: bool,
+    pub already_present: bool,
+    pub reason: String,
+    pub output: String,
+}
+
 fn toggle_hook_impl(working_dir: Option<&str>, hook_id: &str, enabled: bool) -> Result<()> {
     // Try both project and global metadata
     for scope in [HookScope::Project, HookScope::Global] {

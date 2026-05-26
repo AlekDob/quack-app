@@ -6547,6 +6547,9 @@ Please respond ONLY with the summary, no preamble or explanations.`;
           [listing.path]: listing.entries,
         }));
         setExplorerRoot(listing.path);
+        // project-ops: silent idempotent bootstrap (workstreams/ + hook).
+        // Skipped if skill not installed; never blocks UI.
+        void invoke("bootstrap_project_ops", { projectRoot: listing.path }).catch(() => {});
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         setExplorerError(message);

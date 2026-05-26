@@ -45,6 +45,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/scripts/build-workstream-index.py\" 2>/dev/null || true",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   },
   "permissions": {

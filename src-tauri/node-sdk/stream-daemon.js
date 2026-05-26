@@ -415,7 +415,10 @@ async function handleQuery(cmd) {
     log('QUERY', `Model mapping: "${model}" → "${modelId}" (1M context: ${is1MContext})`);
 
     // SDK v0.2.133+: 'Skill' in allowedTools deprecated → use `skills: 'all'` below.
-    // SDK v0.2.136+: 'TodoWrite' deprecated → kept for FE renderer compat; added Task tools forward-compat.
+    // SDK v0.3.142: headless/SDK sessions switched TodoWrite → Task tools
+    // (TaskCreate/TaskUpdate/TaskGet/TaskList). 'TodoWrite' kept in the allow-list
+    // for backward compat with older sessions; the FE accumulator
+    // (`src/utils/taskAccumulator.ts`) folds both schemas into a single TodoWidget render.
     const defaultAllowedTools = [
       'Task', 'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep',
       'WebFetch', 'WebSearch', 'TodoWrite', 'NotebookEdit', 'SlashCommand',
@@ -533,6 +536,21 @@ ${hintsBlock}
           }
           return '';
         })() : '')
+        + (permissionMode === 'plan' ? `
+
+## PLAN MODE — PROJECT-OPS WORKSTREAM PROTOCOL
+
+You are in **PLAN MODE**. Before producing any implementation plan, you MUST use the \`project-ops\` skill to scaffold or update a workstream document.
+
+### Workflow:
+1. **Check existing workstreams** — read \`documentation/workstreams/INDEX.md\` (auto-generated). Identify if the current request maps to an existing workstream or needs a new one.
+2. **Scaffold/update** — for a new workstream, copy \`~/.claude/skills/project-ops/templates/workstream.md.template\` into \`documentation/workstreams/NN-<slug>.md\` and fill the YAML frontmatter (\`ws\`, \`title\`, \`status\`, \`focus: current\`, \`opened\`). For an existing one, update \`status\` and \`updated\` fields.
+3. **Plan body** — write the plan inside the workstream body (sections: Goal, Constraints, Steps, Risks, Done-when). The workstream IS the spec.
+4. **Surface for approval** — present the workstream content to the user before any Edit/Write to source code.
+
+The PostToolUse hook automatically regenerates \`INDEX.md\` after each Edit/Write to a workstream file.
+
+**The \`project-ops\` skill is the default spec system in Plan Mode** — do not produce ad-hoc planning docs outside \`documentation/workstreams/\`.` : '')
         + (teamContext ? buildTeamPromptAugmentation(teamContext) : ''),
         // Brain: fix-session-limit-prompt-cache
         // ideContext is NO LONGER appended here — it changes every turn (file open, git status)

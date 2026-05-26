@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { invoke } from "@tauri-apps/api/core";
 import type { HookConfig, HookType, HookTemplate } from "../types";
 
 /**
@@ -108,6 +109,25 @@ export default function HooksPanel({
   const [activeExpanded, setActiveExpanded] = useState(true);
   const [editingHook, setEditingHook] = useState<HookConfig | null>(null);
   const [creatingFromTemplate, setCreatingFromTemplate] = useState<(HookTemplate & { svgIcon: React.ReactNode }) | null>(null);
+  const [settingsValid, setSettingsValid] = useState<{ valid: boolean; error: string } | null>(null);
+
+  useEffect(() => {
+    if (!workingDir) {
+      setSettingsValid(null);
+      return;
+    }
+    void (async () => {
+      try {
+        const [valid, errorMessage] = await invoke<[boolean, string]>(
+          "validate_claude_settings_json",
+          { projectRoot: workingDir }
+        );
+        setSettingsValid({ valid, error: errorMessage });
+      } catch {
+        setSettingsValid(null);
+      }
+    })();
+  }, [workingDir, hooks.length]);
 
   // Group hooks by scope
   const projectHooks = hooks.filter(h => h.scope === 'project');
@@ -233,6 +253,17 @@ export default function HooksPanel({
 
   return (
     <div className="flex flex-col h-full">
+      {settingsValid && !settingsValid.valid && (
+        <div className="flex-shrink-0 px-4 py-3 border-b border-red-500/30 bg-red-500/10">
+          <div className="text-xs font-semibold text-red-300 mb-1">
+            .claude/settings.json non valido
+          </div>
+          <div className="text-[11px] text-red-200/80 leading-snug">
+            Claude Code dropperà silenziosamente tutti gli hook. Fix: <code className="font-mono text-[10px]">jq . .claude/settings.json</code>
+          </div>
+          <div className="text-[10px] text-red-200/60 mt-1 font-mono break-all">{settingsValid.error}</div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex-shrink-0 px-4 py-3 border-b border-white/10">
         <div className="flex items-center justify-between">

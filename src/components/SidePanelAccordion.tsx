@@ -16,7 +16,8 @@ import { useRules } from "../hooks/useRules";
 import { useSlashCommands } from "../hooks/useSlashCommands";
 import { useMCPServers } from "../hooks/useMCPServers";
 import AgentContextPanel from "./AgentContextPanel";
-import ProjectContextPanel from "./ProjectContextPanel";
+import WorkstreamsPanel from "./WorkstreamsPanel";
+import WorkstreamStatusPanel from "./WorkstreamStatusPanel";
 import TaskHubView, { computeTaskHubBadge } from "./TaskHubView";
 import { useSessionStore } from "../stores/sessionStore";
 import { useChatStore } from "../stores/chatStore";
@@ -45,7 +46,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   commands: '#f472b6',    // Pink - commands
   context: 'var(--accent-color)',     // Orange - file explorer
   'agent-context': 'var(--accent-color)', // Orange - personality
-  'project-context': '#60a5fa', // Blue - project notes
+  workstreams: '#fbbf24', // Amber - project-ops workstreams
+  status: '#84cc16',      // Lime - current focus status
   'token-stats': '#22d3ee',      // Sky cyan - metrics / analytics
   default: 'var(--accent-color)',     // Orange fallback
 };
@@ -196,10 +198,17 @@ const icons = {
       <path d="M3 5a2 2 0 0 1 2-2h3.5l1.5 1.5h5a2 2 0 0 1 2 2V15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   ),
-  projectContext: (
+  workstreams: (
     <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
-      <path d="M5 3h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M7 7h6M7 10h6M7 13h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="3" y="4" width="14" height="3" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="3" y="9" width="10" height="3" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="3" y="14" width="12" height="3" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  ),
+  status: (
+    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true">
+      <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="10" cy="10" r="2.5" fill="currentColor" />
     </svg>
   ),
   features: (
@@ -550,7 +559,7 @@ export default function SidePanelAccordion({
   }, [focusedSection]);
 
   // Section IDs for reference (order is determined by DOM position, not dynamically)
-  const sectionIds = ['taskhub', 'changes', 'context', 'brain', 'features', 'agent-context', 'project-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions', 'token-stats'];
+  const sectionIds = ['taskhub', 'changes', 'workstreams', 'status', 'context', 'brain', 'features', 'agent-context', 'rules', 'agents', 'skills', 'commands', 'mcp', 'hooks', 'sessions', 'token-stats'];
 
   // Handle forceExpandSection from parent
   useEffect(() => {
@@ -836,20 +845,46 @@ export default function SidePanelAccordion({
           />
         </AccordionSection>
 
-        {/* Project Context - Notes, Brain, Bookmarks */}
+        {/* Workstreams - project-ops layer */}
         <AccordionSection
-          id="project-context"
-          title="Context"
-          icon={icons.projectContext}
-          isExpanded={focusedSection === "project-context"}
-          isFocused={focusedSection === "project-context"}
-          order={getOrder("project-context")}
-          category="project-context"
-          onToggle={() => toggleSection("project-context")}
-          onHoverEnter={() => handleSectionHoverEnter("project-context")}
+          id="workstreams"
+          title="Workstreams"
+          icon={icons.workstreams}
+          isExpanded={focusedSection === "workstreams"}
+          isFocused={focusedSection === "workstreams"}
+          order={getOrder("workstreams")}
+          category="workstreams"
+          onToggle={() => toggleSection("workstreams")}
+          onHoverEnter={() => handleSectionHoverEnter("workstreams")}
           onHoverLeave={handleSectionHoverLeave}
         >
-          <ProjectContextPanel rootPath={rootPath || ''} />
+          <WorkstreamsPanel
+            rootPath={rootPath}
+            onOpenFile={(filePath, fileName) =>
+              onOpenFile({ path: filePath, name: fileName, is_dir: false, is_symlink: false })
+            }
+          />
+        </AccordionSection>
+
+        {/* Status - current focus snapshot */}
+        <AccordionSection
+          id="status"
+          title="Status"
+          icon={icons.status}
+          isExpanded={focusedSection === "status"}
+          isFocused={focusedSection === "status"}
+          order={getOrder("status")}
+          category="status"
+          onToggle={() => toggleSection("status")}
+          onHoverEnter={() => handleSectionHoverEnter("status")}
+          onHoverLeave={handleSectionHoverLeave}
+        >
+          <WorkstreamStatusPanel
+            rootPath={rootPath}
+            onOpenFile={(filePath, fileName) =>
+              onOpenFile({ path: filePath, name: fileName, is_dir: false, is_symlink: false })
+            }
+          />
         </AccordionSection>
 
         {/* Agent Rules */}
