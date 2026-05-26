@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef, useDeferredValue } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -50,6 +50,7 @@ export function TerminalWindowApp() {
   const [urlProjects, setUrlProjects] = useState<ProjectInfo[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [projectQuery, setProjectQuery] = useState('');
 
   // Use Zustand store for terminals AND manual projects persistence
   const {
@@ -58,6 +59,7 @@ export function TerminalWindowApp() {
     addProjectTerminal,
     removeProjectTerminal,
     updateProjectTerminal,
+    setProjectTerminals,
     setActiveProjectTerminalId: setActiveTerminalId,
     getProjectTerminalsByPath,
     // Manual projects (persisted)
@@ -205,10 +207,14 @@ export function TerminalWindowApp() {
   // Close terminal
   const handleCloseTerminal = useCallback(async (terminalId: string) => {
     try {
-      await invoke('close_terminal', { id: terminalId });
-
-      // Remove from Zustand store (persisted)
-      removeProjectTerminal(terminalId);
+      const terminal = terminals.find(t => t.id === terminalId);
+      // Dormant terminals have no live PTY in backend — skip the invoke
+      if (terminal && (terminal.status === 'dormant' || terminal.alive === false)) {
+        removeProjectTerminal(terminalId);
+      } else {
+        await invoke('close_terminal', { id: terminalId });
+        removeProjectTerminal(terminalId);
+      }
 
       // Select another terminal if closing active one
       if (activeTerminalId === terminalId) {
@@ -219,6 +225,45 @@ export function TerminalWindowApp() {
       console.error('Failed to close terminal:', error);
     }
   }, [activeTerminalId, terminals, removeProjectTerminal, setActiveTerminalId]);
+
+  // Revive a dormant terminal: recreate the PTY reusing name/color/cwd.
+  // The Rust id changes — swap the store record (remove old, add new with same metadata).
+  const handleReviveTerminal = useCallback(async (terminal: ProjectTerminal) => {
+    try {
+      const result = await invoke<{ id: string; label: string; color: string; cwd: string; alive: boolean }>('create_terminal', {
+        label: terminal.name,
+        color: terminal.color,
+        cwd: terminal.cwd,
+      });
+
+      const revived: ProjectTerminal = {
+        id: result.id,
+        name: result.label,
+        projectPath: terminal.projectPath,
+        color: result.color,
+        cwd: result.cwd,
+        alive: result.alive,
+        status: 'idle',
+        createdAt: Date.now(),
+      };
+
+      removeProjectTerminal(terminal.id);
+      addProjectTerminal(revived);
+      setActiveTerminalId(result.id);
+      setSelectedProject(terminal.projectPath);
+    } catch (error) {
+      console.error('Failed to revive terminal:', error);
+    }
+  }, [addProjectTerminal, removeProjectTerminal, setActiveTerminalId]);
+
+  // Click on a sidebar terminal: revive if dormant, otherwise just activate
+  const handleSelectTerminal = useCallback((terminal: ProjectTerminal) => {
+    if (terminal.status === 'dormant' || terminal.alive === false) {
+      handleReviveTerminal(terminal);
+    } else {
+      setActiveTerminalId(terminal.id);
+    }
+  }, [handleReviveTerminal, setActiveTerminalId]);
 
   // Toggle project expansion
   const toggleProject = (projectPath: string) => {
@@ -525,6 +570,16 @@ export function TerminalWindowApp() {
     );
   }, [urlProjects, manualProjects, terminals]);
 
+  // Filtered project list driven by the sidebar search input (name match only).
+  // useDeferredValue keeps typing snappy by deprioritizing the filter pass —
+  // matters when the user has many projects and TerminalMain is not memoized.
+  const deferredQuery = useDeferredValue(projectQuery);
+  const filteredProjects = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase();
+    if (!q) return allProjects;
+    return allProjects.filter(p => p.name.toLowerCase().includes(q));
+  }, [allProjects, deferredQuery]);
+
   // Auto-expand projects when terminals are added or manual projects loaded
   useEffect(() => {
     const projectPaths = new Set([
@@ -538,27 +593,38 @@ export function TerminalWindowApp() {
     });
   }, [terminals, manualProjects]);
 
-  // Verify and cleanup stale terminals on mount
-  // Terminals persist in Zustand, but PTY sessions die when app restarts
+  // Verify terminals on mount and mark dead PTYs as dormant (not removed)
+  // Metadata persists in Zustand so users can revive on click after restart
+  // Perf: parallelize get_terminal_status, then write the store ONCE (one persist
+  // serialization instead of N) — critical when the user has many dormant terminals.
   useEffect(() => {
     const verifyTerminals = async () => {
-      for (const terminal of terminals) {
-        try {
-          // Try to check if PTY session is still alive
-          const status = await invoke<{ alive: boolean }>('get_terminal_status', { id: terminal.id });
-          if (!status.alive) {
-            console.log(`[TerminalWindowApp] Terminal ${terminal.id} PTY is dead, removing...`);
-            removeProjectTerminal(terminal.id);
-          }
-        } catch {
-          // Terminal doesn't exist in backend, remove from store
-          console.log(`[TerminalWindowApp] Terminal ${terminal.id} not found in backend, removing...`);
-          removeProjectTerminal(terminal.id);
+      const snapshot = useTerminalStore.getState().projectTerminals;
+      if (snapshot.length === 0) return;
+
+      const checks = await Promise.allSettled(
+        snapshot.map(t =>
+          invoke<{ alive: boolean }>('get_terminal_status', { id: t.id })
+        )
+      );
+
+      const dormantIds = new Set<string>();
+      checks.forEach((res, i) => {
+        if (res.status === 'rejected' || !res.value.alive) {
+          dormantIds.add(snapshot[i].id);
         }
-      }
+      });
+
+      if (dormantIds.size === 0) return;
+
+      const next = snapshot.map(t =>
+        dormantIds.has(t.id)
+          ? { ...t, alive: false, status: 'dormant' as const }
+          : t
+      );
+      setProjectTerminals(next);
     };
 
-    // Run verification after a short delay to let Rust backend initialize
     const timer = setTimeout(verifyTerminals, 500);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -630,13 +696,20 @@ export function TerminalWindowApp() {
     };
   }, [handleCreateTerminalWithCommand]);
 
+  // Count only LIVE terminals (dormant ones have no PTY) — memoized to keep
+  // the close-listener effect dep primitive and avoid re-registering on every
+  // unrelated state change (search input, edit name, etc).
+  const aliveTerminalCount = useMemo(
+    () => terminals.filter(t => t.alive && t.status !== 'dormant').length,
+    [terminals]
+  );
+
   // Intercept window close and show confirmation dialog
   useEffect(() => {
     const currentWindow = getCurrentWindow();
 
     const unlistenPromise = currentWindow.onCloseRequested(async (event) => {
-      // Only show confirmation if there are active terminals
-      if (terminals.length > 0) {
+      if (aliveTerminalCount > 0) {
         const confirmed = await confirm(
           'Are you sure you want to close? All terminal sessions will be terminated.',
           {
@@ -655,7 +728,7 @@ export function TerminalWindowApp() {
     return () => {
       unlistenPromise.then(unlisten => unlisten());
     };
-  }, [terminals.length]);
+  }, [aliveTerminalCount]);
 
   // Manually add a project folder (persisted in Zustand store)
   const handleAddProjectFolder = useCallback(async () => {
@@ -712,14 +785,60 @@ export function TerminalWindowApp() {
             </button>
           </div>
 
+          {allProjects.length > 0 && (
+            <div className="terminal-sidebar-search">
+              <svg
+                className="terminal-sidebar-search-icon"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                className="terminal-sidebar-search-input"
+                placeholder="Search projects"
+                value={projectQuery}
+                onChange={(e) => setProjectQuery(e.target.value)}
+                aria-label="Search projects"
+              />
+              {projectQuery && (
+                <button
+                  type="button"
+                  className="terminal-sidebar-search-clear"
+                  onClick={() => setProjectQuery('')}
+                  title="Clear search"
+                  aria-label="Clear search"
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="terminal-sidebar-content">
             {allProjects.length === 0 ? (
               <div className="terminal-sidebar-empty">
                 <p>No projects yet</p>
                 <p className="terminal-sidebar-hint">Create an agent in the main window to get started</p>
               </div>
+            ) : filteredProjects.length === 0 ? (
+              <div className="terminal-sidebar-empty">
+                <p>No projects match &ldquo;{projectQuery}&rdquo;</p>
+              </div>
             ) : (
-              allProjects.map(project => (
+              filteredProjects.map(project => (
                 <div key={project.path} className="project-group">
                   <div
                     className={`project-header ${selectedProject === project.path ? 'selected' : ''}`}
@@ -748,13 +867,16 @@ export function TerminalWindowApp() {
 
                   {expandedProjects.has(project.path) && (
                     <div className="project-terminals">
-                      {(terminalsByProject.get(project.path) || []).map(terminal => (
+                      {(terminalsByProject.get(project.path) || []).map(terminal => {
+                        const isDormant = terminal.status === 'dormant' || terminal.alive === false;
+                        return (
                         <div
                           key={terminal.id}
-                          className={`terminal-item ${activeTerminalId === terminal.id ? 'active' : ''}`}
-                          onClick={() => editingTerminalId !== terminal.id && setActiveTerminalId(terminal.id)}
+                          className={`terminal-item ${activeTerminalId === terminal.id ? 'active' : ''} ${isDormant ? 'dormant' : ''}`}
+                          onClick={() => editingTerminalId !== terminal.id && handleSelectTerminal(terminal)}
                           onDoubleClick={(e) => handleDoubleClick(e, terminal.id)}
                           onContextMenu={(e) => handleContextMenu(e, terminal.id)}
+                          title={isDormant ? 'Dormant — click to revive' : undefined}
                         >
                           <div
                             className="terminal-indicator"
@@ -808,7 +930,8 @@ export function TerminalWindowApp() {
                             </>
                           )}
                         </div>
-                      ))}
+                        );
+                      })}
                       {(terminalsByProject.get(project.path) || []).length === 0 && (
                         <div className="project-no-terminals">
                           Click + to add terminal

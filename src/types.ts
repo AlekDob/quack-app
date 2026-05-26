@@ -68,7 +68,7 @@ export interface ProjectTerminal {
   color: string;
   cwd: string;
   alive: boolean;
-  status?: "idle" | "busy";
+  status?: "idle" | "busy" | "dormant";
   createdAt: number;
 }
 
