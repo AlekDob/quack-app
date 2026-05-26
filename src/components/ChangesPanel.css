@@ -332,8 +332,8 @@ button.changes-tab,
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -342,8 +342,13 @@ button.changes-tab,
   transition: background 0.15s ease, color 0.15s ease;
 }
 
+.changes-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 .changes-btn-reject {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .changes-btn-reject:hover {
@@ -352,7 +357,7 @@ button.changes-tab,
 }
 
 .changes-btn-accept {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .changes-btn-accept:hover {
@@ -361,7 +366,7 @@ button.changes-tab,
 }
 
 .changes-btn-ide {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .changes-btn-ide:hover {
