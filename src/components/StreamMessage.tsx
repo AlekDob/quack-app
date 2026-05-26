@@ -27,6 +27,7 @@ import { useTeamStore } from '../stores/teamStore';
 import { useAgentAvatar } from '../hooks/useAgentAvatar';
 import type { TeamConfig } from '../types';
 import { isBrainRead, BRAIN_COLOR } from '../utils/brainPathDetection';
+import { accumulateTodos, isTaskToolName } from '../utils/taskAccumulator';
 import HtmlVisualizer from './chat/HtmlVisualizer';
 
 // Import duck avatar
@@ -500,21 +501,14 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
       return null;
     }
 
-    // Find the last TodoWrite tool_use ID across all stream events
-    // so earlier TodoWrite sections are marked stale (animations stopped)
-    const lastTodoWriteId = useMemo(() => {
-      let lastId: string | null = null;
-      streamMessages.forEach((evt: any) => {
-        if (evt.type === 'assistant' && evt.message?.content && Array.isArray(evt.message.content)) {
-          evt.message.content.forEach((c: any) => {
-            if (c.type === 'tool_use' && c.name?.toLowerCase() === 'todowrite' && c.id) {
-              lastId = c.id;
-            }
-          });
-        }
-      });
-      return lastId;
-    }, [streamMessages]);
+    // Brain: WS01 SDK 0.3.150 — accumulate todos across both TodoWrite (legacy
+    // snapshot) and Task tools (TaskCreate/TaskUpdate/TaskList per-id deltas).
+    // The widget renders only on the LAST task-tool tool_use; earlier ones are
+    // marked stale (animations stopped).
+    const { todos: accumulatedTodos, lastTaskToolId } = useMemo(
+      () => accumulateTodos(streamMessages, toolResults),
+      [streamMessages, toolResults]
+    );
 
     // Render tools separately (after the main avatar+text block)
     const renderToolContent = (content: any, idx: number) => {
@@ -523,14 +517,24 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
       const toolId = content.id;
       const toolResult = toolResults.get(toolId);
 
-      // TodoWrite tool - special widget
-      if (toolName === 'todowrite' && input?.todos && Array.isArray(input.todos)) {
+      // Brain: WS01 SDK 0.3.150 — task-tools renderer.
+      // For legacy TodoWrite (snapshot) and Task tools (delta), the widget is
+      // rendered ONLY on the latest tool_use of the message; intermediate Task
+      // tool calls (TaskCreate/TaskUpdate) are silenced to avoid noise — the
+      // accumulator already folded their state into `accumulatedTodos`.
+      if (isTaskToolName(toolName)) {
+        if (toolId !== lastTaskToolId) {
+          return null;
+        }
+        if (accumulatedTodos.length === 0) {
+          return null;
+        }
         return (
           <MemoizedTodoWriteWidget
             key={idx}
-            todos={input.todos}
+            todos={accumulatedTodos}
             defaultExpanded={true}
-            isStale={toolId !== lastTodoWriteId}
+            isStale={false}
           />
         );
       }

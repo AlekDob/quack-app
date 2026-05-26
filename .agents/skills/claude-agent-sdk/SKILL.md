@@ -1,16 +1,52 @@
 ---
 name: claude-agent-sdk
 description: |
-  Build autonomous AI agents with Claude Agent SDK v0.2.85. Structured outputs, 14 hook events (incl. TeammateIdle/TaskCompleted), MCP tool annotations, Task System, prompt suggestions, taskBudget, reloadPlugins, agentProgressSummaries. Prevents 14 documented errors.
+  Build autonomous AI agents with Claude Agent SDK v0.3.150. Native binary spawn (per-platform optional deps), Task tools (TaskCreate/Update/Get/List) replacing TodoWrite headless, MCP non-blocking startup, structured outputs, 14 hook events (incl. TeammateIdle/TaskCompleted), managedSettings for embedders, forwardSubagentText, agentProgressSummaries, getContextUsage, startup() pre-warm. Prevents 15+ documented errors.
 
-  Use when: building coding agents, SRE systems, security auditors, or troubleshooting CLI not found, structured output validation, session forking errors, MCP config issues, subagent cleanup, task system setup.
+  Use when: building coding agents, SRE systems, security auditors, or troubleshooting CLI not found, structured output validation, session forking errors, MCP config issues, subagent cleanup, task system setup, AskUserQuestion native-binary schema stripping, TodoWrite → Task tools migration.
 user-invocable: true
 ---
 
 # Claude Agent SDK - Complete Reference & Error Prevention Guide
 
-**Package**: @anthropic-ai/claude-agent-sdk@0.2.85
-**Breaking Changes**: v0.1.45 - Structured outputs (Nov 2025), v0.1.0 - No default system prompt, settingSources required
+**Package**: @anthropic-ai/claude-agent-sdk@0.3.150
+**Breaking Changes (recent)**:
+- v0.3.142 — V2 session API removed; MCP non-blocking default; **TodoWrite → Task tools** (`TaskCreate`/`TaskUpdate`/`TaskGet`/`TaskList`); headless `--sdk-url` exits non-zero on transport close
+- v0.3.143 — `@anthropic-ai/sdk` + `@modelcontextprotocol/sdk` moved to peerDependencies
+- v0.3.144 — `error: 'model_not_found'` replaces generic `'invalid_request'`
+- v0.3.149 — `options.env` doc fix: **replaces** subprocess env (not merge with process.env)
+- v0.2.113 — SDK spawns **native Claude Code binary** instead of bundled JS (per-platform optional deps)
+- v0.2.113 — `options.env` replaces process.env (was overlay in 0.2.111, re-reverted)
+- v0.1.45 — Structured outputs
+- v0.1.0 — No default system prompt, settingSources required
+
+## Delta 0.2.85 → 0.3.150 (high-signal only)
+
+### Breaking
+- **0.3.142 — TodoWrite → Task tools wire rename**: tool consumers MUST accumulate by task ID instead of replacing a snapshot list. `TodoWrite` deprecated since 0.2.136.
+- **0.3.142 — MCP non-blocking default**: sessions start immediately; slow servers report `status: "pending"` in `init` until ready. Set `MCP_CONNECTION_NONBLOCKING=0` to restore old blocking behavior, or mark a server `alwaysLoad: true` to require it in turn 1.
+- **0.3.142 — V2 session API removed** (`unstable_v2_*`). Use `query()` with `AsyncIterable<SDKUserMessage>` for multi-turn or `options.resume` to continue.
+- **0.3.143 — peerDependencies**: `@anthropic-ai/sdk` + `@modelcontextprotocol/sdk` no longer auto-installed by yarn classic — npm/bun/pnpm fine.
+- **0.2.113 — Native binary spawn**: SDK no longer ships bundled `cli.js`; spawns `claude-agent-sdk-<platform>-<arch>` binary. The native IPC layer enforces `sdk-tools.d.ts` schemas and **strips off-schema fields** — this caused Quack's AskUserQuestion regression (see Known Issues #15).
+
+### New features worth knowing
+- **0.2.141** — `TaskCreateInput/Output`, `TaskGetInput/Output`, `TaskUpdateInput/Output`, `TaskListInput/Output` exported from `@anthropic-ai/claude-agent-sdk/sdk-tools` + included in `ToolInputSchemas`/`ToolOutputSchemas` unions
+- **0.2.136** — `resolveSettings()` (alpha) inspects effective merged settings without spawning Claude CLI; reads MDM (plist/HKLM/HKCU) for parity. **`TodoWrite` deprecated.**
+- **0.2.126** — `origin` field on result messages (`SDKResultSuccess`/`SDKResultError`) — forwards `SDKMessageOrigin` so consumers can distinguish user-prompted results from `task-notification` followups
+- **0.2.121** — `updatedToolOutput` on `PostToolUseHookSpecificOutput` for **any** tool (not just MCP). `updatedMCPToolOutput` deprecated.
+- **0.2.120** — `skills` option: `string[] | 'all'` (matches Python SDK)
+- **0.2.119** — `forwardSubagentText` option streams subagent text deltas to SDK consumers
+- **0.2.118** — `Options.managedSettings` for embedders to pass policy-tier settings inline (honored below IT-controlled managed sources)
+- **0.2.113** — `sessionStore` (alpha): mirror session transcripts to external storage; `SessionStore`/`SessionKey`/`SessionStoreEntry` types + `InMemorySessionStore`; `importSessionToStore()`. New `SDKMirrorErrorMessage` (`subtype: 'mirror_error'`). New `title` option skips auto-generation. OpenTelemetry trace context propagation.
+- **0.2.111** — **Opus 4.7 available** (requires this SDK version minimum)
+- **0.2.91** — `terminal_reason` on result (`completed`/`aborted_tools`/`max_turns`/`blocking_limit`/...). `'auto'` PermissionMode. Sandbox `failIfUnavailable` defaults to `true` when `enabled: true`.
+- **0.2.89** — `startup()` pre-warms CLI subprocess; first query ~20x faster. `listSubagents()` + `getSubagentMessages()`. `includeSystemMessages`/`includeHookEvents` on `getSessionMessages()`.
+- **0.2.86** — `getContextUsage()` control method: breakdown of context window usage by category. `session_id` optional in `SDKUserMessage`.
+- **0.2.84** — `taskBudget` option for API-side token budget awareness. `EffortLevel` type exported.
+- **0.2.76** — `forkSession(sessionId, opts?)` as standalone function. `cancel_async_message`. MCP elicitation hook types.
+- **0.2.75** — `getSessionInfo`, `tagSession`, `listSessions` pagination via `offset`. Improved error messages from CLI subprocess.
+- **0.2.74** — `renameSession(sessionId, title, opts?)`.
+- **0.2.72** — `agentProgressSummaries` option enables periodic AI-generated progress summaries for running subagents (emitted on `task_progress` events).
 
 ---
 
@@ -1021,6 +1057,67 @@ tool("fetch_content", "Fetch text content", {}, async (args) => {
 
 **Related**: [MCP Python SDK Issue #1356](https://github.com/modelcontextprotocol/python-sdk/issues/1356)
 
+### Issue #15: AskUserQuestion answers stripped by native binary (v0.2.113+)
+**Error**: AskUserQuestion replies arrive as empty `answers: {}` to the model; UI shows "Sembra che la risposta sia arrivata vuota"
+**Source**: SDK 0.2.113 changelog — native binary IPC enforces `sdk-tools.d.ts` schemas and strips off-schema fields
+**Why It Happens**: From 0.2.113 the SDK spawns a per-platform native binary instead of bundled JS. `AskUserQuestionInput` declares only `questions` (no `answers`), so the historical workaround returning `canUseTool: { behavior: 'allow', updatedInput: { questions, answers } }` silently loses the `answers` field — the tool's `call({questions, answers = {}})` runs with the empty default.
+**Prevention**: Use the **PreToolUse + PostToolUse hooks pattern** with `additionalContext` (not `updatedToolOutput`, which is re-validated against output schema and stripped the same way).
+
+```typescript
+const pendingAskAnswers = new Map<string, Record<string, unknown>>();
+
+hooks: {
+  PreToolUse: [{
+    matcher: 'AskUserQuestion',
+    timeout: 86400,  // 24h — default 60s is too short for human reply
+    hooks: [async (input, toolUseId) => {
+      const response = await promptUser(input.tool_input.questions);
+      pendingAskAnswers.set(toolUseId, response.answers);
+      return {
+        hookSpecificOutput: {
+          hookEventName: 'PreToolUse',
+          permissionDecision: 'allow',
+        },
+      };
+    }],
+  }],
+  PostToolUse: [{
+    matcher: 'AskUserQuestion',
+    hooks: [async (input, toolUseId) => {
+      const answers = pendingAskAnswers.get(toolUseId);
+      if (!answers) return {};
+      pendingAskAnswers.delete(toolUseId);
+      const lines = ['User answered the following questions:'];
+      for (const [header, value] of Object.entries(answers)) {
+        const display = Array.isArray(value) ? value.join(', ') : String(value);
+        lines.push(`- ${header}: ${display}`);
+      }
+      return {
+        hookSpecificOutput: {
+          hookEventName: 'PostToolUse',
+          additionalContext: lines.join('\n'),
+        },
+      };
+    }],
+  }],
+},
+
+// `requiresUserInteraction: true` forces canUseTool to fire even after PreToolUse allow.
+// Re-prompting from canUseTool would hang the daemon — bypass with original input.
+canUseTool: async (toolName, input) => {
+  if (toolName === 'AskUserQuestion') {
+    return { behavior: 'allow', updatedInput: input };
+  }
+  // ... other tools
+}
+```
+
+**Hook timeout**: default `HookMatcher.timeout` is **60 seconds**. AskUserQuestion can sit pending for minutes — override to `86400` (24h) to match the `canUseTool` "stay pending indefinitely" semantic.
+
+**Why not `updatedToolOutput`**: native binary validates it against `AskUserQuestionOutput` schema (`answers: Record<string, string>`) and drops the field. `additionalContext` appends plain text to the (empty) tool output — no schema validation, no structured-output round-trip.
+
+**Source files (Quack reference)**: `src-tauri/node-sdk/stream-daemon.js` + Brain entry `documentation/bugs/fix-askuserquestion-sdk-0.2.138-pretool-posttool-hook.md`.
+
 ---
 
 ## Official Documentation
@@ -1038,9 +1135,9 @@ tool("fetch_content", "Fetch text content", {}, async (args) => {
 - **With skill**: ~4,500 tokens (comprehensive v0.2.12 coverage + error prevention + advanced patterns)
 - **Savings**: ~70% (~10,500 tokens)
 
-**Errors prevented**: 14 documented issues with exact solutions (including 2 community-sourced gotchas)
-**Key value**: V2 Session APIs, Sandbox Settings, File Checkpointing, Query methods (close, reconnectMcpServer, toggleMcpServer, promptSuggestion), AskUserQuestion tool, structured outputs (v0.1.45+), session forking, canUseTool patterns, complete hooks system (14 events incl. TeammateIdle/TaskCompleted), Zod v4 support, subagent cleanup patterns, MCP tool annotations, Task System, stop_reason, debug logging, Sonnet 4.6 support
+**Errors prevented**: 15 documented issues with exact solutions (including the AskUserQuestion native-binary regression)
+**Key value**: V2 Session APIs (removed in 0.3.142), Sandbox Settings, File Checkpointing, Query methods (close, reconnectMcpServer, toggleMcpServer, promptSuggestion), AskUserQuestion tool + native-binary workaround, structured outputs (v0.1.45+), session forking (`forkSession()` standalone), canUseTool patterns, complete hooks system (14 events incl. TeammateIdle/TaskCompleted), Zod v4 support, subagent cleanup patterns, MCP tool annotations + non-blocking startup (0.3.142), Task System + TaskCreate/Update/Get/List replacing TodoWrite (0.3.142), `managedSettings` for embedders, `forwardSubagentText`, `agentProgressSummaries`, `getContextUsage()`, `startup()` pre-warm, `taskBudget`, stop_reason + terminal_reason, debug logging, Opus 4.7 + Sonnet 4.6 support, native binary spawn (0.2.113+)
 
 ---
 
-**Last verified**: 2026-02-22 | **Skill version**: 4.1.0 | **Changes**: Updated to SDK v0.2.48+ — added New Thinking API section: `thinkingMode` removed, replaced by `thinking` config (`adaptive`/`enabled`/`disabled`), `effort` levels (`low`/`medium`/`high`/`max`), model discovery fields for thinking support (v0.2.49+)
+**Last verified**: 2026-05-26 | **Skill version**: 5.0.0 | **Changes**: Full refresh to SDK v0.3.150 — covered delta 0.2.85 → 0.3.150 including Native Binary spawn (0.2.113, root cause of AskUserQuestion stripping), Task tools replacing TodoWrite headless (0.3.142 breaking), MCP non-blocking default (0.3.142), peerDependencies move (0.3.143), `model_not_found` error code (0.3.144), Opus 4.7 minimum SDK (0.2.111), `managedSettings` for embedders (0.2.118), `skills` option array-or-'all' (0.2.120), `updatedToolOutput` universal (0.2.121), `forwardSubagentText` (0.2.119), `agentProgressSummaries` (0.2.72), `getContextUsage()` (0.2.86), `startup()` pre-warm (0.2.89), `taskBudget` + `EffortLevel` export (0.2.84), `forkSession()` standalone (0.2.76), `terminal_reason` + sandbox `failIfUnavailable` default true (0.2.91). Added Issue #15 — AskUserQuestion native-binary schema stripping with Pre/PostToolUse hook workaround.

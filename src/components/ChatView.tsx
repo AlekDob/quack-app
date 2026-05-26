@@ -27,6 +27,7 @@ import { RemoteTeamWidget } from './RemoteTeamWidget';
 import { useTeamStore } from '../stores/teamStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useFileAttributionStore } from '../stores/fileAttributionStore';
+import { accumulateTodos } from '../utils/taskAccumulator';
 // Brain: 037-anthropic-compatible-providers
 import { useSessionProviderOverride } from '../services/sessionProviderOverrides';
 import { BUILTIN_PRESETS } from '../constants/providerPresets';
@@ -756,38 +757,38 @@ export default function ChatView({
   }, [messages]);
 
   // Extract todos from the LAST assistant message only (like EditSummaryBar)
-  // If the last message has no TodoWrite, the bar disappears
+  // If the last message has no task-tool activity, the bar disappears.
+  // Brain: WS01 SDK 0.3.150 — supports both legacy TodoWrite (snapshot) and
+  // new Task tools (TaskCreate/TaskUpdate/TaskList delta) via accumulateTodos.
+  // tool_result events live in the same events stream as tool_use, so we
+  // re-build the result map per-message instead of plumbing toolResults down.
   const currentTodos = useMemo<TodoItem[]>(() => {
-    // Find the last assistant message
     const lastAssistantMessage = [...messages]
       .reverse()
       .find(msg => msg.role === 'assistant');
 
     if (!lastAssistantMessage || !lastAssistantMessage.events) return [];
 
-    // Find the LAST TodoWrite in the last message (there could be multiple updates)
-    let lastTodos: TodoItem[] = [];
+    const events = lastAssistantMessage.events as any[];
 
-    for (const event of lastAssistantMessage.events as any[]) {
-      if (event.type === 'assistant' && event.message?.content) {
-        const content = event.message.content;
-        if (Array.isArray(content)) {
-          for (const item of content) {
-            if (item.type === 'tool_use') {
-              const toolName = item.name?.toLowerCase();
-              const input = item.input;
-
-              // Update lastTodos every time we find a TodoWrite in the last message
-              if (toolName === 'todowrite' && input?.todos && Array.isArray(input.todos)) {
-                lastTodos = input.todos as TodoItem[];
-              }
-            }
+    // Build a tool_use_id → result-text map from this message's events.
+    const toolResults = new Map<string, string>();
+    for (const event of events) {
+      if (event?.type === 'user' && event.message?.content && Array.isArray(event.message.content)) {
+        for (const c of event.message.content) {
+          if (c?.type === 'tool_result' && typeof c.tool_use_id === 'string') {
+            const text = typeof c.content === 'string'
+              ? c.content
+              : Array.isArray(c.content)
+                ? c.content.map((p: any) => (typeof p?.text === 'string' ? p.text : '')).join('')
+                : '';
+            toolResults.set(c.tool_use_id, text);
           }
         }
       }
     }
 
-    return lastTodos;
+    return accumulateTodos(events, toolResults).todos;
   }, [messages]);
 
   // Note: Tasks tab now reads directly from ~/.claude/tasks/ filesystem

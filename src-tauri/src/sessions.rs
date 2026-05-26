@@ -752,7 +752,10 @@ fn summarize_tool_use(name: &str, input: &Value) -> String {
         "Grep" | "grep" => input["pattern"].as_str()
             .unwrap_or("")
             .to_string(),
-        "TodoWrite" | "TodoRead" => String::new(),
+        // Brain: WS01 SDK 0.3.150 — Task tools (TaskCreate/Update/Get/List)
+        // replaced TodoWrite in headless mode (deprecated 0.2.136, switched 0.3.142).
+        // All produce empty session-title details to avoid noisy titles.
+        "TodoWrite" | "TodoRead" | "TaskCreate" | "TaskUpdate" | "TaskGet" | "TaskList" => String::new(),
         // Brain: gotcha-agent-tool-name-task-agent-migration
         // agent-sdk 0.2.x emits "Task" as tool name; next minor release will migrate to "Agent".
         // Matching both keeps us forward-compatible across the rename.
