@@ -26,6 +26,7 @@ import { useAgentRules } from '../hooks/useAgentRules';
 import { RemoteTeamWidget } from './RemoteTeamWidget';
 import { useTeamStore } from '../stores/teamStore';
 import { useSessionStore } from '../stores/sessionStore';
+import { useFileAttributionStore } from '../stores/fileAttributionStore';
 // Brain: 037-anthropic-compatible-providers
 import { useSessionProviderOverride } from '../services/sessionProviderOverrides';
 import { BUILTIN_PRESETS } from '../constants/providerPresets';
@@ -677,6 +678,26 @@ export default function ChatView({
       onEditsChange(allFileEdits, allFileDeletes);
     }
   }, [allFileEdits, allFileDeletes, onEditsChange]);
+
+  // Feature: 069-changes-agent-attribution
+  // Push edits to global attribution store so ChangesPanel can show "who edited what".
+  // Replaces prior contributions of this session — each ChatView is the source of
+  // truth for its own session's edits.
+  useEffect(() => {
+    if (!internalSessionId) return;
+    const session = useSessionStore.getState().sessions.find(s => s.id === internalSessionId);
+    const agentId = session?.agentId || activeAgent?.name || internalSessionId;
+    const name = agentName || activeAgent?.name || 'Agent';
+    useFileAttributionStore.getState().recordEdits(
+      {
+        sessionId: internalSessionId,
+        agentId,
+        agentName: name,
+        agentAvatar,
+      },
+      allFileEdits.map(e => ({ filePath: e.filePath, editCount: e.editCount })),
+    );
+  }, [allFileEdits, internalSessionId, agentName, agentAvatar, activeAgent?.name]);
 
   // Detect agent `git commit` calls to trigger ChangesPanel reconciliation
   const lastAgentCommitTs = useMemo(() => {

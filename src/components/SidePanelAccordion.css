@@ -277,17 +277,18 @@
   color: var(--category-color, var(--accent-color));
 }
 
-/* Changes badge always glows (even when collapsed) */
-.accordion-section[data-category="changes"] .accordion-badge {
-  background: color-mix(in srgb, var(--category-color, #34d399) 25%, transparent);
-  color: var(--category-color, #34d399);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--category-color, #34d399) 40%, transparent);
+/* Changes badge — yellow (pending files indicator), always visible */
+.accordion-section[data-category="changes"] .accordion-badge,
+.accordion-section[data-category="changes"].expanded .accordion-badge {
+  background: #eab308;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(234, 179, 8, 0.45);
   animation: changes-badge-pulse 2s ease-in-out infinite;
 }
 
 @keyframes changes-badge-pulse {
-  0%, 100% { box-shadow: 0 0 6px color-mix(in srgb, var(--category-color, #34d399) 30%, transparent); }
-  50% { box-shadow: 0 0 12px color-mix(in srgb, var(--category-color, #34d399) 50%, transparent); }
+  0%, 100% { box-shadow: 0 0 6px rgba(234, 179, 8, 0.35); }
+  50% { box-shadow: 0 0 12px rgba(234, 179, 8, 0.55); }
 }
 
 .accordion-badge-label {

@@ -21,6 +21,7 @@ interface ChangesPanelProps {
   onClearModifiedFiles?: () => void
   onRemoveModifiedFiles?: (paths: string[]) => void
   onOpenInEditor?: (filePath: string) => void
+  onOpenDiff?: (filePath: string, status: FileStatus) => void
   branch?: string | null
   isWorktree?: boolean
   projectName?: string | null
@@ -31,7 +32,7 @@ interface ChangesPanelProps {
 
 export default function ChangesPanel({
   rootPath, modifiedFiles, onRefreshGitStatus, onRemoveModifiedFiles,
-  onOpenInEditor, branch, isWorktree, projectName,
+  onOpenInEditor, onOpenDiff, branch, isWorktree, projectName,
   history, historyLoading, lastRefreshTs,
 }: ChangesPanelProps) {
   const [activeTab, setActiveTab] = useState<ActiveTab>('pending')
@@ -108,6 +109,7 @@ export default function ChangesPanel({
           onAcceptAll={handleAcceptAll}
           onOpenCommitModal={() => setShowCommitModal(true)}
           onOpenInEditor={onOpenInEditor}
+          onOpenDiff={onOpenDiff}
         />
       )}
       {activeTab === 'committed' && (

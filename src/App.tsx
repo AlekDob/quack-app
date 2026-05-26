@@ -14236,6 +14236,7 @@ You have access to all Bash tools to execute git commands like:
           onRefreshGitStatus={refreshGitSummary}
           onClearModifiedFiles={() => setModifiedFiles(new Map())}
           onOpenInEditor={handleOpenFileInEditorTab}
+          onOpenDiff={handleDiffClick}
           branch={gitBranch || null}
           isWorktree={!!activeTerminal?.useWorktree}
           gitHistory={commitHistory}
@@ -14425,6 +14426,7 @@ You have access to all Bash tools to execute git commands like:
             diffLoading={diffLoading}
             diffError={diffError}
             diffView={diffView}
+            rootPath={activeTerminal?.cwd ?? explorerRoot ?? explorerPath ?? null}
             onDiffViewChange={handleDiffViewChange}
             onStage={handleStageEntry}
             onUnstage={handleUnstageEntry}

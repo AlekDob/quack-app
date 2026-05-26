@@ -1,5 +1,6 @@
 import InlineDiffView from './InlineDiffView'
 import OpenInIDEButton from './OpenInIDEButton'
+import FileAttributionAvatars from './FileAttributionAvatars'
 import type { FileStatus, DiffState } from '../types'
 import './ChangesPanel.css'
 
@@ -15,6 +16,7 @@ export interface FileRowProps {
   onUnstage?: () => void
   onDiscard?: () => void
   onOpenInEditor?: (filePath: string) => void
+  onOpenDiff?: (filePath: string, status: FileStatus) => void
 }
 
 const shortenPath = (fullPath: string): string => {
@@ -50,13 +52,19 @@ export default function FileRow({
   onUnstage,
   onDiscard,
   onOpenInEditor,
+  onOpenDiff,
 }: FileRowProps) {
   const fileName = filePath.split('/').pop() || filePath
   const dirPath = shortenPath(filePath.substring(0, filePath.lastIndexOf('/')))
 
+  const handleRowClick = () => {
+    if (onOpenDiff) onOpenDiff(filePath, status)
+    else onToggle()
+  }
+
   return (
     <div className={`changes-file-item ${isStaged ? 'staged' : ''}`}>
-      <div className="changes-file-row" onClick={onToggle}>
+      <div className="changes-file-row" onClick={handleRowClick}>
         <svg
           className={`changes-file-chevron ${isExpanded ? 'expanded' : ''}`}
           width="10" height="10" viewBox="0 0 24 24"
@@ -78,6 +86,7 @@ export default function FileRow({
         <span className="changes-file-dir" title={filePath}>
           {dirPath}
         </span>
+        <FileAttributionAvatars filePath={filePath} />
         <div className="changes-file-actions" onClick={(e) => e.stopPropagation()}>
           {onOpenInEditor && (
             <button

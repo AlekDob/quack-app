@@ -253,3 +253,58 @@
   background: rgba(255, 255, 255, 0.25);
   background-clip: content-box;
 }
+
+/* Feature: 069-changes-agent-attribution — commento attribution in cima al diff */
+.diff-drawer-attribution {
+  margin: 0 0 12px 0;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+.diff-drawer-attribution-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+.diff-drawer-attribution-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.diff-drawer-attribution-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.diff-drawer-attribution-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+.diff-drawer-attribution-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.diff-drawer-attribution-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.diff-drawer-attribution-detail {
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.3;
+}

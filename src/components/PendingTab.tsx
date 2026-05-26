@@ -16,6 +16,7 @@ export interface PendingTabProps {
   onAcceptAll: () => void
   onOpenCommitModal: () => void
   onOpenInEditor?: (filePath: string) => void
+  onOpenDiff?: (filePath: string, status: FileStatus) => void
 }
 
 const toFileStatus = (entry: GitStatusEntry, staged: boolean): FileStatus => {
@@ -40,13 +41,14 @@ interface SectionProps {
   onUnstageRel: (relativePath: string) => void
   onDiscardGitEntry: (entry: GitStatusEntry) => void
   onOpenInEditor?: (filePath: string) => void
+  onOpenDiff?: (filePath: string, status: FileStatus) => void
   emptyLabel: string
 }
 
 function Section({
   title, entries, staged, rootPath, expandedFiles, diffCache,
   onToggleGitFile, onStageRel, onUnstageRel, onDiscardGitEntry,
-  onOpenInEditor, emptyLabel,
+  onOpenInEditor, onOpenDiff, emptyLabel,
 }: SectionProps) {
   const [expanded, setExpanded] = useState(true)
 
@@ -88,6 +90,7 @@ function Section({
                   onUnstage={staged ? () => onUnstageRel(entry.path) : undefined}
                   onDiscard={staged ? undefined : () => onDiscardGitEntry(entry)}
                   onOpenInEditor={onOpenInEditor}
+                  onOpenDiff={onOpenDiff}
                 />
               )
             })}
@@ -111,6 +114,7 @@ export default function PendingTab({
   onAcceptAll,
   onOpenCommitModal,
   onOpenInEditor,
+  onOpenDiff,
 }: PendingTabProps) {
   const total = unstagedEntries.length + stagedEntries.length
 
@@ -162,6 +166,7 @@ export default function PendingTab({
             onUnstageRel={onUnstageRel}
             onDiscardGitEntry={onDiscardGitEntry}
             onOpenInEditor={onOpenInEditor}
+            onOpenDiff={onOpenDiff}
             emptyLabel="No unstaged changes"
           />
           <Section
@@ -176,6 +181,7 @@ export default function PendingTab({
             onUnstageRel={onUnstageRel}
             onDiscardGitEntry={onDiscardGitEntry}
             onOpenInEditor={onOpenInEditor}
+            onOpenDiff={onOpenDiff}
             emptyLabel="No staged changes"
           />
         </div>

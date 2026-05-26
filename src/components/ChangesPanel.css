@@ -790,3 +790,45 @@ button.changes-tab,
 .sc-confirm-btn:hover {
   background: rgba(52, 211, 153, 0.25);
 }
+
+/* Feature: 069-changes-agent-attribution */
+.changes-file-avatars {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: 4px;
+  padding-left: 6px;
+}
+.changes-file-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--bg-secondary);
+  margin-left: -6px;
+  transition: transform 0.15s ease;
+}
+.changes-file-avatar:first-child {
+  margin-left: 0;
+}
+.changes-file-avatar:hover {
+  transform: scale(1.15);
+  z-index: 2;
+  position: relative;
+}
+.changes-file-avatars-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  margin-left: -6px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
