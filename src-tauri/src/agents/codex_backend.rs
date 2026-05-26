@@ -49,7 +49,15 @@ impl CodexBackend {
     }
 
     async fn run(&self, args: Vec<String>, p: &StartSessionParams) -> Result<Option<String>, String> {
-        let mut child = Command::new(CODEX_BIN)
+        // Brain: gotcha-shell-env-gui-launch
+        // GUI-launched .app has minimal PATH and won't find `codex` (Homebrew/npm
+        // installs live outside the bundle's inherited PATH). Inject the
+        // login-shell env captured by shell_env so prod matches dev.
+        let mut cmd = Command::new(CODEX_BIN);
+        for (k, v) in crate::shell_env::get_login_env() {
+            cmd.env(k, v);
+        }
+        let mut child = cmd
             .args(&args)
             // stdin MUST be closed: codex-cli 0.130 `exec` blocks on
             // "Reading additional input from stdin…" even with a prompt arg.
@@ -135,7 +143,12 @@ impl AgentBackend for CodexBackend {
 /// 0.130 `exec` does not block on "Reading additional input from stdin…".
 pub async fn codex_auth_probe() -> Result<bool, String> {
     let tmp = std::env::temp_dir();
-    let out = Command::new(CODEX_BIN)
+    // Brain: gotcha-shell-env-gui-launch — see run() above for context.
+    let mut cmd = Command::new(CODEX_BIN);
+    for (k, v) in crate::shell_env::get_login_env() {
+        cmd.env(k, v);
+    }
+    let out = cmd
         .args(["exec","--json","--sandbox","read-only",
                "--skip-git-repo-check","-c","mcp_servers={}",
                "--cd", tmp.to_str().unwrap_or("/tmp"),
