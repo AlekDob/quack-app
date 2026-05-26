@@ -201,6 +201,20 @@ export interface GitWorktree {
   isDetached: boolean;
 }
 
+export interface SubRepoStatus {
+  name: string;
+  path: string;
+  branch: string;
+  added: number;
+  modified: number;
+  untracked: number;
+  ahead: number;
+  behind: number;
+  lastCommitSubject: string | null;
+  lastCommitRelative: string | null;
+  clean: boolean;
+}
+
 export interface TerminalDataEvent {
   id: string;
   data: string;

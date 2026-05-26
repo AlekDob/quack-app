@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import CommitModal from './CommitModal'
 import { ConfirmModal } from './ConfirmModal'
@@ -10,9 +10,12 @@ import WorktreesTab from './WorktreesTab'
 import RemotesTab from './RemotesTab'
 import ChangesPanelContextBar from './ChangesPanelContextBar'
 import ChangesPanelTabs, { type ActiveTab } from './ChangesPanelTabs'
+import SubReposSection from './SubReposSection'
 import { useChangesPanelState } from '../hooks/useChangesPanelState'
-import type { FileStatus, GitCommitEntry, GitBranch, GitWorktree, GitRemote } from '../types'
+import type { FileStatus, GitCommitEntry, GitBranch, GitWorktree, GitRemote, SubRepoStatus } from '../types'
 import './ChangesPanel.css'
+
+const EMPTY_FILES: Map<string, FileStatus> = new Map()
 
 interface ChangesPanelProps {
   rootPath: string | null
@@ -39,6 +42,23 @@ export default function ChangesPanel({
   const [branchCount, setBranchCount] = useState(0)
   const [worktreeCount, setWorktreeCount] = useState(0)
   const [remoteCount, setRemoteCount] = useState(0)
+  const [subRepoOverride, setSubRepoOverride] = useState<SubRepoStatus | null>(null)
+
+  // Effective context: when override active, all queries use the sub-repo path.
+  // Brain: feature-071-changes-panel-subrepos
+  const effectiveRootPath = subRepoOverride?.path ?? rootPath
+  const effectiveFiles = subRepoOverride ? EMPTY_FILES : modifiedFiles
+  const effectiveBranch = subRepoOverride ? subRepoOverride.branch : branch
+  const effectiveProjectName = subRepoOverride ? subRepoOverride.name : projectName
+
+  // Force pending tab when override is active (other tabs not scoped to sub-repo)
+  useEffect(() => {
+    if (subRepoOverride && activeTab !== 'pending') {
+      setActiveTab('pending')
+    }
+  }, [subRepoOverride, activeTab])
+
+  const parentLabel = useMemo(() => projectName ?? 'project', [projectName])
 
   const {
     expandedFiles, diffCache,
@@ -53,25 +73,29 @@ export default function ChangesPanel({
     handleStageRel, handleUnstageRel, handleDiscardGitEntry,
     confirmDeleteFile, handleAcceptAll, handleCommit, handleClearCommitted,
   } = useChangesPanelState({
-    rootPath, modifiedFiles, onRefreshGitStatus, onRemoveModifiedFiles, lastRefreshTs,
+    rootPath: effectiveRootPath,
+    modifiedFiles: effectiveFiles,
+    onRefreshGitStatus,
+    onRemoveModifiedFiles: subRepoOverride ? undefined : onRemoveModifiedFiles,
+    lastRefreshTs,
   })
 
   const pendingCount = unstagedEntries.length + stagedEntries.length
 
   // Lazy-load counts for badge display
   const loadCounts = useCallback(async () => {
-    if (!rootPath) return
+    if (!effectiveRootPath) return
     try {
       const [branches, worktrees, remotes] = await Promise.all([
-        invoke<GitBranch[]>('git_list_branches', { rootPath }),
-        invoke<GitWorktree[]>('git_list_worktrees', { rootPath }),
-        invoke<GitRemote[]>('git_list_remotes', { rootPath }),
+        invoke<GitBranch[]>('git_list_branches', { rootPath: effectiveRootPath }),
+        invoke<GitWorktree[]>('git_list_worktrees', { rootPath: effectiveRootPath }),
+        invoke<GitRemote[]>('git_list_remotes', { rootPath: effectiveRootPath }),
       ])
       setBranchCount(branches.length)
       setWorktreeCount(worktrees.length)
       setRemoteCount(remotes.length)
     } catch { /* counts stay at 0 */ }
-  }, [rootPath])
+  }, [effectiveRootPath])
 
   useEffect(() => { loadCounts() }, [loadCounts, lastRefreshTs])
 
@@ -82,7 +106,32 @@ export default function ChangesPanel({
 
   return (
     <div className="changes-panel">
-      <ChangesPanelContextBar branch={branch} isWorktree={isWorktree} projectName={projectName} />
+      <ChangesPanelContextBar branch={effectiveBranch} isWorktree={isWorktree && !subRepoOverride} projectName={effectiveProjectName} />
+
+      {subRepoOverride && (
+        <div className="subrepo-breadcrumb">
+          <button
+            type="button"
+            className="subrepo-breadcrumb-back"
+            onClick={() => setSubRepoOverride(null)}
+            title="Back to parent project"
+          >
+            ← Back
+          </button>
+          <span className="subrepo-breadcrumb-trail">
+            {parentLabel} ›
+          </span>
+          <span className="subrepo-breadcrumb-current">{subRepoOverride.name}</span>
+        </div>
+      )}
+
+      {!subRepoOverride && (
+        <SubReposSection
+          rootPath={rootPath}
+          refreshTs={lastRefreshTs}
+          onSelect={setSubRepoOverride}
+        />
+      )}
 
       <ChangesPanelTabs
         activeTab={activeTab}
@@ -97,7 +146,7 @@ export default function ChangesPanel({
 
       {activeTab === 'pending' && (
         <PendingTab
-          rootPath={rootPath}
+          rootPath={effectiveRootPath}
           unstagedEntries={unstagedEntries}
           stagedEntries={stagedEntries}
           expandedFiles={expandedFiles}
@@ -112,7 +161,7 @@ export default function ChangesPanel({
           onOpenDiff={onOpenDiff}
         />
       )}
-      {activeTab === 'committed' && (
+      {activeTab === 'committed' && !subRepoOverride && (
         <CommittedTab
           rootPath={rootPath}
           committedEntries={committedEntries}
@@ -123,20 +172,20 @@ export default function ChangesPanel({
           onOpenInEditor={onOpenInEditor}
         />
       )}
-      {activeTab === 'history' && (
+      {activeTab === 'history' && !subRepoOverride && (
         <HistoryTab
           history={history}
           historyLoading={historyLoading}
           currentBranch={branch ?? undefined}
         />
       )}
-      {activeTab === 'branches' && (
+      {activeTab === 'branches' && !subRepoOverride && (
         <BranchesTab rootPath={rootPath} currentBranch={branch} onBranchSwitch={handleBranchSwitch} />
       )}
-      {activeTab === 'worktrees' && (
+      {activeTab === 'worktrees' && !subRepoOverride && (
         <WorktreesTab rootPath={rootPath} />
       )}
-      {activeTab === 'remotes' && (
+      {activeTab === 'remotes' && !subRepoOverride && (
         <RemotesTab rootPath={rootPath} />
       )}
 

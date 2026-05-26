@@ -1554,3 +1554,135 @@ fn git_list_remotes_impl(root_path: Option<String>) -> Result<Vec<GitRemote>> {
 
     Ok(remotes)
 }
+
+// ───────────────────────── Sub-repos scan ─────────────────────────
+// Feature: 071-changes-panel-subrepos
+// Brain: feature-071-changes-panel-subrepos
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SubRepoStatus {
+    pub name: String,
+    pub path: String,
+    pub branch: String,
+    pub added: i32,
+    pub modified: i32,
+    pub untracked: i32,
+    pub ahead: i32,
+    pub behind: i32,
+    pub last_commit_subject: Option<String>,
+    pub last_commit_relative: Option<String>,
+    pub clean: bool,
+}
+
+#[tauri::command]
+pub fn git_scan_subrepos(root_path: String) -> Result<Vec<SubRepoStatus>, String> {
+    git_scan_subrepos_impl(root_path).map_err(|err| err.to_string())
+}
+
+fn git_scan_subrepos_impl(root_path: String) -> Result<Vec<SubRepoStatus>> {
+    let root = PathBuf::from(&root_path);
+    if !root.is_dir() {
+        return Ok(vec![]);
+    }
+    let entries = std::fs::read_dir(&root)
+        .with_context(|| format!("Failed to read dir {}", root.display()))?;
+
+    let mut results = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) if !n.starts_with('.') => n.to_string(),
+            _ => continue,
+        };
+        if !path.join(".git").exists() {
+            continue;
+        }
+        if let Ok(mut status) = scan_one_subrepo(&path) {
+            status.name = name;
+            status.path = path.to_string_lossy().to_string();
+            results.push(status);
+        }
+    }
+    results.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(results)
+}
+
+fn scan_one_subrepo(repo_path: &PathBuf) -> Result<SubRepoStatus> {
+    let branch = run_git(repo_path, &["rev-parse", "--abbrev-ref", "HEAD"], true)
+        .map(|s| s.trim().to_string())
+        .unwrap_or_else(|_| String::from("?"));
+
+    let status_out = run_git(repo_path, &["status", "--porcelain=1", "--branch"], true)
+        .unwrap_or_default();
+
+    let (added, modified, untracked, ahead, behind) = parse_subrepo_status(&status_out);
+
+    let log_out = run_git(repo_path, &["log", "-1", "--format=%s|%cr"], true)
+        .unwrap_or_default();
+    let (last_commit_subject, last_commit_relative) = match log_out.trim().split_once('|') {
+        Some((subject, rel)) => (Some(subject.to_string()), Some(rel.to_string())),
+        None => (None, None),
+    };
+
+    let clean = added == 0 && modified == 0 && untracked == 0;
+
+    Ok(SubRepoStatus {
+        name: String::new(),
+        path: String::new(),
+        branch,
+        added,
+        modified,
+        untracked,
+        ahead,
+        behind,
+        last_commit_subject,
+        last_commit_relative,
+        clean,
+    })
+}
+
+fn parse_subrepo_status(output: &str) -> (i32, i32, i32, i32, i32) {
+    let mut added = 0;
+    let mut modified = 0;
+    let mut untracked = 0;
+    let mut ahead = 0;
+    let mut behind = 0;
+
+    for line in output.lines() {
+        if let Some(rest) = line.strip_prefix("## ") {
+            if let (Some(s), Some(e)) = (rest.find('['), rest.find(']')) {
+                if s < e {
+                    for chunk in rest[s + 1..e].split(',') {
+                        let chunk = chunk.trim();
+                        if let Some(v) = chunk.strip_prefix("ahead ") {
+                            ahead = v.parse().unwrap_or(0);
+                        } else if let Some(v) = chunk.strip_prefix("behind ") {
+                            behind = v.parse().unwrap_or(0);
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+        if line.starts_with("?? ") {
+            untracked += 1;
+            continue;
+        }
+        if line.len() < 3 {
+            continue;
+        }
+        let mut chars = line.chars();
+        let idx = chars.next().unwrap_or(' ');
+        let wt = chars.next().unwrap_or(' ');
+        if idx == 'A' || wt == 'A' {
+            added += 1;
+        } else if idx != ' ' || wt != ' ' {
+            modified += 1;
+        }
+    }
+    (added, modified, untracked, ahead, behind)
+}
