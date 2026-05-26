@@ -142,33 +142,38 @@ function FileExplorer({
     });
   }, [rootPath]);
 
-  // Auto-refresh: Reload expanded directories every 10 seconds (reduced from 3s)
+  // Refs to read latest values inside the auto-refresh interval WITHOUT making
+  // them effect deps — otherwise every expand/load tears down and recreates
+  // the setInterval, and the 10s cadence is never actually honored.
+  const expandedRef = useRef(expanded);
+  const onLoadChildrenRef = useRef(onLoadChildren);
+  useEffect(() => { expandedRef.current = expanded; }, [expanded]);
+  useEffect(() => { onLoadChildrenRef.current = onLoadChildren; }, [onLoadChildren]);
+
+  // Auto-refresh: Reload expanded directories every 10 seconds.
+  // Deps intentionally limited to [rootPath] — latest expanded/loadingNodes/onLoadChildren
+  // are read via refs above.
   useEffect(() => {
     if (!rootPath) {
       return;
     }
 
     const interval = setInterval(() => {
-      // Reload expanded directories to detect filesystem changes
-      const expandedPaths = Array.from(expanded);
-
-      // Limit to max 5 directories per refresh to reduce load
+      const expandedPaths = Array.from(expandedRef.current);
       const pathsToRefresh = expandedPaths.slice(0, 5);
 
       for (const path of pathsToRefresh) {
-        // Skip if already loading
-        if (loadingNodes.has(path)) {
+        if (loadingNodesRef.current.has(path)) {
           continue;
         }
-        // Reload directory silently
-        void onLoadChildren(path).catch(() => {
+        void onLoadChildrenRef.current(path).catch(() => {
           // Ignore errors during auto-refresh
         });
       }
-    }, 10000); // Refresh every 10 seconds (increased from 3s)
+    }, 10000);
 
     return () => clearInterval(interval);
-  }, [rootPath, expanded, loadingNodes, onLoadChildren]);
+  }, [rootPath]);
 
   const ensureExpanded = useCallback((path: string) => {
     setExpanded((previous) => {

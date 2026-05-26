@@ -42,6 +42,8 @@ import {
   isCustomAvatar,
 } from "../utils/customAvatarStorage";
 import { useSessionStore } from "../stores/sessionStore";
+import { useShallow } from "zustand/react/shallow";
+import { useMinuteTick } from "../hooks/useMinuteTick";
 import { useTeamStore } from "../stores/teamStore";
 import TeamCreationModal from "./TeamCreationModal";
 import TeamStatusBadge from "./TeamStatusBadge";
@@ -204,14 +206,16 @@ function SortableAgent({
   const [isHovered, setIsHovered] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [showQuackTooltip, setShowQuackTooltip] = useState(false);
-  // 🦆 Force re-render every minute to update relative time
-  const [tick, setTick] = useState(0);
+  // 🦆 Force re-render every minute to update relative time.
+  // Uses a SINGLETON ticker (one setInterval app-wide) instead of one per card.
+  // Brain: perf — was N intervals for N agent cards.
+  const tick = useMinuteTick();
 
-  // 🦆 SESSIONS-FIRST: Get all sessions for this agent
-  const { sessions: allSessions } = useSessionStore();
-  const agentSessions = useMemo(
-    () => allSessions.filter((s) => s.agentId === agent.id),
-    [allSessions, agent.id],
+  // 🦆 SESSIONS-FIRST: Get sessions for THIS agent only.
+  // Perf: useShallow restricts re-renders to actual changes in this agent's sessions
+  // (was subscribing to the whole store → every card re-rendered on any session mutation).
+  const agentSessions = useSessionStore(
+    useShallow((state) => state.sessions.filter((s) => s.agentId === agent.id)),
   );
 
   // 🔵 FIX: Active sessions only (exclude "done") for notification badge calculations
@@ -220,13 +224,6 @@ function SortableAgent({
     () => agentSessions.filter((s) => s.status !== "done"),
     [agentSessions],
   );
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTick((t) => t + 1);
-    }, 60000); // Update every 60 seconds (1 minute)
-    return () => clearInterval(interval);
-  }, []);
 
   // NOTE: Quack tooltip logic moved AFTER showNotificationBadge is calculated (see below)
 
@@ -579,9 +576,12 @@ function SortableAgent({
     [onGitMenuToggle, showGitMenu, agent.id],
   );
 
-  // Get relative time string with opacity - re-calculate on tick change
+  // Get relative time string with opacity - re-calculate on tick change.
+  // `tick` is read for side effect only (forces re-render every minute); the linter
+  // flags it as "unnecessary" because it isn't used inside the callback body.
   const relativeTime = useMemo(
     () => getRelativeTimeString(lastAssistantTimestamp),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [lastAssistantTimestamp, tick],
   );
 
