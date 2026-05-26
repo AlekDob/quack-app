@@ -15,6 +15,7 @@ import { loadAgentSessions, saveAgentSessions } from '../services/unifiedAgentSt
 import { sessionWriteLock } from './sessionWriteLock';
 import { appendBrainDiaryOnDone } from '../services/brainSessionService';
 import { useProjectStatsStore } from './projectStatsStore';
+import { useFileAttributionStore } from './fileAttributionStore';
 
 // Brain: decision-quack-abstraction-agent-level-not-model-level
 // Sessions created before the Codex integration have no `backend`.
@@ -225,6 +226,9 @@ export const useSessionStore = create<SessionState>()(
             sessions,
             selectedSessionId: selectedSessionId === id ? null : selectedSessionId,
           });
+
+          // Feature: 069-changes-agent-attribution — drop avatar attribution for this session
+          useFileAttributionStore.getState().clearForSession(id);
 
           // Brain: fix-session-create-race-load-overwrite — mark before await
           sessionWriteLock.markWrite();

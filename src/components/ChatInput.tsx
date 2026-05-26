@@ -29,6 +29,8 @@ import { loadAvailableSkills } from '../utils/skillsAndDroidsLoader';
 import { useFeatureMapData } from '../hooks/useFeatureMapData';
 import type { FeatureNode } from './featureMap/featureMapTypes';
 import { isMacOS } from '../utils/platform';
+import { getModelOptions } from '../services/modelService';
+import { useModelsConfig } from '../hooks/useAppConfig';
 import KeyboardShortcutTooltip from './KeyboardShortcutTooltip';
 import {
   compressImage,
@@ -139,6 +141,13 @@ export default function ChatInput({
   const [localAttachments, setLocalAttachments] = useState<ChatAttachment[]>(initialAttachments || []);
   const [error, setError] = useState<string | null>(null);
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
+
+  // Model cycle on Option (Alt) keydown — feature 051
+  const { models: remoteModelsForCycle } = useModelsConfig();
+  const modelOptionsForCycle = useMemo(
+    () => getModelOptions(remoteModelsForCycle),
+    [remoteModelsForCycle]
+  );
 
   // Initialize attachments from prop (for Kanban tasks) - only for uncontrolled mode
   useEffect(() => {
@@ -2029,6 +2038,27 @@ export default function ChatInput({
         setFileSearchResults([]);
         return;
       }
+    }
+
+    // Option (Alt) alone cycles the base model — feature 051
+    if (
+      e.key === 'Alt' &&
+      !e.repeat &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.shiftKey &&
+      unifiedBarProps?.settingsProps &&
+      modelOptionsForCycle.length > 0
+    ) {
+      const current = unifiedBarProps.settingsProps.model;
+      const is1M = current.endsWith('[1m]');
+      const baseCurrent = current.replace('[1m]', '');
+      const idx = modelOptionsForCycle.findIndex(o => o.value === baseCurrent);
+      const nextBase = modelOptionsForCycle[(idx + 1) % modelOptionsForCycle.length].value;
+      const next = is1M ? `${nextBase}[1m]` : nextBase;
+      e.preventDefault();
+      unifiedBarProps.settingsProps.onModelChange(next);
+      return;
     }
 
     // Tab for snippet expansion (when not in autocomplete mode)
