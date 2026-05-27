@@ -215,6 +215,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - CSS flex chain broken (canvas collapses to 0px): `documentation/gotchas/gotcha-css-flex-chain-broken.md`
 - New session from dormant agent disappears (race condition): `documentation/bugs/fix-session-create-race-load-overwrite.md`
 - Office View v2 crash on pan (ref-in-setState-updater race): `documentation/bugs/fix-office-canvas-pointermove-ref-race.md`
+- Telegram partial/stale notifications: `documentation/bugs/fix-telegram-partial-stale-notifications.md`
 - Token Stats panel blocks cross-project switch (~2-3s): `documentation/bugs/fix-token-stats-panel-blocks-project-switch.md`
 - Double `loadAgents` on session switch (deps cascade): `documentation/bugs/fix-double-loadagents-cross-project-session.md`
 - Stale closure in onPointerUp (lasso Office V2): `documentation/bugs/fix-stale-closure-pointerup-lasso.md`

@@ -147,6 +147,13 @@ static DAEMON_QUERIES: Lazy<TokioMutex<HashMap<String, DaemonQueryState>>> =
 static DAEMON_QUERY_RESULTS: Lazy<TokioMutex<HashMap<String, ClaudeCliResponse>>> =
     Lazy::new(|| TokioMutex::new(HashMap::new()));
 
+/// Last result text per agent_id — used by Telegram notifications to avoid reading
+/// stale data from the JSONL session file. Populated on "result" stream event,
+/// consumed (and removed) when the notification fires.
+// Brain: fix-telegram-partial-stale-notifications
+pub static AGENT_LAST_RESULT: Lazy<TokioMutex<HashMap<String, String>>> =
+    Lazy::new(|| TokioMutex::new(HashMap::new()));
+
 
 struct DaemonProcess {
     stdin: ChildStdin,
@@ -490,6 +497,13 @@ async fn daemon_stdout_reader(stdout: tokio::process::ChildStdout, _app: AppHand
                                     log::info!("[DAEMON:QUERY] query={} received Result event — capturing usage data", qid);
                                     if let Ok(result_event) = serde_json::from_value::<ClaudeEvent>(event.clone()) {
                                         if let ClaudeEvent::Result { result, session_id, total_cost_usd, usage, .. } = result_event {
+                                            // Brain: fix-telegram-partial-stale-notifications
+                                            // Store result text for Telegram notifications before
+                                            // it's consumed by the query completion flow.
+                                            if !result.is_empty() {
+                                                let mut last = AGENT_LAST_RESULT.lock().await;
+                                                last.insert(agent_id.clone(), result.clone());
+                                            }
                                             let response = ClaudeCliResponse {
                                                 result, session_id, total_cost_usd, usage,
                                             };

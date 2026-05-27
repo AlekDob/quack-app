@@ -2,9 +2,17 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use once_cell::sync::Lazy;
 use tauri::{AppHandle, Manager};
 use crate::remote_ws::{WsBroadcast, WsEvent};
 use crate::telegram_types::InlineKeyboardButton;
+
+// Brain: fix-telegram-partial-stale-notifications
+// Track last notification time per agent to prevent duplicate notifications
+// from multiple idle event sources (daemon result + hook endpoint).
+static LAST_SENT: Lazy<Mutex<HashMap<String, Instant>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+const DEDUP_WINDOW_SECS: u64 = 30;
 
 /// Shared session mappings accessible from polling and notification modules
 #[derive(Clone)]
@@ -129,6 +137,19 @@ async fn handle_agent_idle(
 
 async fn send_agent_notification(app: &AppHandle, agent_id: &str) -> Result<(), String> {
     log::info!("[TG-NOTIFY] Starting for agent_id={}", agent_id);
+
+    // Brain: fix-telegram-partial-stale-notifications
+    // Dedup: skip if we already sent a notification for this agent recently.
+    if let Ok(map) = LAST_SENT.lock() {
+        if let Some(last) = map.get(agent_id) {
+            if last.elapsed().as_secs() < DEDUP_WINDOW_SECS {
+                log::info!("[TG-NOTIFY] Dedup: already sent for {} {}s ago, skipping",
+                    agent_id, last.elapsed().as_secs());
+                return Ok(());
+            }
+        }
+    }
+
     let prefs = crate::preferences::get_preferences(app.clone()).await?;
     if prefs.telegram_mute_notifications {
         log::info!("[TG-NOTIFY] Muted, skipping");
@@ -153,7 +174,12 @@ async fn send_agent_notification(app: &AppHandle, agent_id: &str) -> Result<(), 
             e
         })?;
     log::info!("[TG-NOTIFY] agent={} project={} store={}", agent_name, project_name, store_session_id);
-    let (session_title, last_message) = get_session_summary(&claude_session_id);
+
+    // Brain: fix-telegram-partial-stale-notifications
+    // Prefer the result text captured from the SDK Result event — it's the actual
+    // final agent output, not an intermediate tool-use step from the JSONL file.
+    let (session_title, last_message) = get_session_summary_with_result(agent_id, &claude_session_id).await;
+
     log::info!("[TG-NOTIFY] title={}", clean_message_content(&session_title));
     let text = format_notification(&agent_name, &project_name, &session_title, &last_message);
     let keyboard = build_notification_keyboard(&store_session_id, app).await;
@@ -165,6 +191,12 @@ async fn send_agent_notification(app: &AppHandle, agent_id: &str) -> Result<(), 
     })?;
     log::info!("[TG-NOTIFY] Sent! msg_id={}", msg_id);
     store_session_mapping(app, &store_session_id, msg_id);
+
+    // Record send time for dedup
+    if let Ok(mut map) = LAST_SENT.lock() {
+        map.insert(agent_id.to_string(), Instant::now());
+    }
+
     Ok(())
 }
 
@@ -232,19 +264,37 @@ fn find_latest_session(
     Ok((store_id, claude_id))
 }
 
-fn get_session_summary(claude_session_id: &str) -> (String, String) {
+// Brain: fix-telegram-partial-stale-notifications
+/// Prefer result text from AGENT_LAST_RESULT (captured from the SDK Result event)
+/// over reading the JSONL session file. The JSONL's last "assistant" entry is often
+/// an intermediate tool-use step, not the final summary the user sees.
+async fn get_session_summary_with_result(agent_id: &str, claude_session_id: &str) -> (String, String) {
+    let captured_result = {
+        let mut last = crate::claude_cli::AGENT_LAST_RESULT.lock().await;
+        last.remove(agent_id)
+    };
+
     match crate::sessions::get_session_details(claude_session_id.to_string()) {
         Ok(details) => {
             let title = clean_message_content(&details.title);
-            let last_msg = details.messages.iter().rev()
-                .find(|m| m.role == "assistant")
-                .map(|m| clean_message_content(&m.content))
-                .unwrap_or_default();
+            let last_msg = if let Some(result_text) = captured_result {
+                log::info!("[TG-NOTIFY] Using captured result text for {}", agent_id);
+                clean_message_content(&result_text)
+            } else {
+                log::info!("[TG-NOTIFY] No captured result, falling back to JSONL for {}", agent_id);
+                details.messages.iter().rev()
+                    .find(|m| m.role == "assistant")
+                    .map(|m| clean_message_content(&m.content))
+                    .unwrap_or_default()
+            };
             (title, last_msg)
         }
         Err(e) => {
             log::warn!("[TG-NOTIFY] Can't read session: {}", e);
-            ("Session".to_string(), String::new())
+            let last_msg = captured_result
+                .map(|r| clean_message_content(&r))
+                .unwrap_or_default();
+            ("Session".to_string(), last_msg)
         }
     }
 }
