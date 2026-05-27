@@ -1039,20 +1039,15 @@ const TASKHUB_PRIORITY_COLOR = {
   4: null,
 };
 
-function computePriority(s) {
+// Brain: gotcha-mobile-session-dot-status
+// session.status === 'in_progress' is a disk flag, NOT real-time activity.
+// Without live-state (isStreaming) AND without a busy agent, treat as P4 (Other),
+// otherwise every never-closed session sticks in Working forever.
+function computePriority(s, agentStatus) {
   if ((s.pendingQuestionCount ?? 0) > 0) return 1;
-  if (s.isStreaming || s.lastMessageStatus === 'streaming' || s.status === 'in_progress' || s.status === 'running') {
-    // Distinguish: backend "in_progress" alone (no live state yet) still maps to Working
-    if (s.isStreaming || s.lastMessageStatus === 'streaming') return 2;
-    // If we have a last assistant message that's complete, prefer P3 over a stale "in_progress"
-    if (
-      s.lastMessageRole === 'assistant' &&
-      (s.lastMessageStatus === 'complete' || s.lastMessageStatus == null)
-    ) {
-      return 3;
-    }
-    return 2;
-  }
+  const agentBusy = agentStatus === 'busy' || agentStatus === 'running';
+  const liveStreaming = s.isStreaming || s.lastMessageStatus === 'streaming';
+  if (liveStreaming || agentBusy) return 2;
   if (
     s.lastMessageRole === 'assistant' &&
     (s.lastMessageStatus === 'complete' || s.lastMessageStatus == null)
@@ -1065,7 +1060,8 @@ function computePriority(s) {
 function computeTaskHubBadge() {
   return state.sessions.reduce((n, s) => {
     if (s.status === 'done') return n;
-    const p = computePriority(s);
+    const agent = state.agents.find(a => a.id === s.agentId);
+    const p = computePriority(s, agent?.status);
     return p === 1 || p === 3 ? n + 1 : n;
   }, 0);
 }
@@ -1092,7 +1088,10 @@ function renderTaskHub() {
 
   // Group by priority, sort by updatedAt desc within group
   const groups = { 1: [], 2: [], 3: [], 4: [] };
-  filtered.forEach(s => groups[computePriority(s)].push(s));
+  filtered.forEach(s => {
+    const agent = state.agents.find(a => a.id === s.agentId);
+    groups[computePriority(s, agent?.status)].push(s);
+  });
   Object.keys(groups).forEach(k => {
     groups[k].sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt));
   });

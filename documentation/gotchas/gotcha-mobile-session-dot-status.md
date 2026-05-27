@@ -2,8 +2,8 @@
 type: gotcha
 project: quack-app
 created: 2026-03-01
-last_verified: 2026-03-03
-tags: [remote-api, mobile-dashboard, session-status, dot-color]
+last_verified: 2026-05-26
+tags: [remote-api, mobile-dashboard, session-status, dot-color, task-hub]
 ---
 # Gotcha: Mobile Session Dot Color Depends on Agent Status, Not Session Status
 
@@ -109,6 +109,20 @@ The chat view (opened when tapping a session) had a separate problem: it used `s
 ## Key Insight
 
 `session.status` ≠ real-time activity. Use `agent.status` to determine if work is happening NOW — but only if the status comes from the in-memory `AGENT_STATUS` global, not from disk.
+
+## Same Trap Inside PWA Task Hub `computePriority` (2026-05-26)
+
+The PWA Task Hub had the same disk-status bug at a *second* layer: `computePriority(session)` in `src-tauri/static/app.js` was classifying every session with `s.status === 'in_progress'` into P2 ("Working") even when:
+
+- `s.isStreaming` was false (live-state mirror never observed it)
+- `s.lastMessageStatus` was not `'streaming'`
+- the agent itself was idle
+
+Result: any session never explicitly closed on disk stuck in WORKING forever, with a green ready-dot next to it (because `getSessionDotClass` correctly read the idle agent). User-visible incoherence: green border + green dot + label "Working".
+
+**Fix**: `computePriority(s, agentStatus)` now requires *either* `liveStreaming` (`isStreaming` / `lastMessageStatus==='streaming'`) *or* `agentBusy` (status `busy`/`running`) to return P2. Otherwise it falls through to P3 (assistant-complete) or P4 (Other). Disk `in_progress` alone is no longer trusted.
+
+Both call sites (`computeTaskHubBadge`, `renderTaskHub`) now resolve `agent?.status` and pass it through.
 
 ## Files
 
