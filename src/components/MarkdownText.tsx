@@ -4,6 +4,10 @@ import HtmlVisualizer from './chat/HtmlVisualizer';
 import './MarkdownText.css';
 
 const MermaidDiagram = lazy(() => import('./MermaidDiagram'));
+const WorkstreamBoard = lazy(() => import('./jack/widgets/WorkstreamBoard'));
+const TaskSuggester = lazy(() => import('./jack/widgets/TaskSuggester'));
+const AgentActivityGrid = lazy(() => import('./jack/widgets/AgentActivityGrid'));
+const DailyBriefing = lazy(() => import('./jack/widgets/DailyBriefing'));
 
 /** File extensions that make inline code clickable */
 const FILE_EXTENSIONS = /\.(tsx?|jsx?|css|scss|rs|py|go|html|json|md|mdx|yaml|yml|toml|sh|sql|xml|svg|java|kt|swift|rb|php|cpp|c|h|vue|mjs|cjs)$/i;
@@ -64,6 +68,30 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
           elements.push(
             <Suspense key={`mermaid-${key}`} fallback={<div className="md-code-block-wrapper"><pre className="md-code-block"><code>{codeContent}</code></pre></div>}>
               <MermaidDiagram>{codeContent}</MermaidDiagram>
+            </Suspense>
+          );
+        } else if (codeBlockLang === 'ws-board') {
+          elements.push(
+            <Suspense key={`wsboard-${key}`} fallback={null}>
+              <WorkstreamBoard data={JSON.parse(codeContent)} />
+            </Suspense>
+          );
+        } else if (codeBlockLang === 'task-suggest') {
+          elements.push(
+            <Suspense key={`tasksuggest-${key}`} fallback={null}>
+              <TaskSuggester data={JSON.parse(codeContent)} />
+            </Suspense>
+          );
+        } else if (codeBlockLang === 'agent-grid') {
+          elements.push(
+            <Suspense key={`agentgrid-${key}`} fallback={null}>
+              <AgentActivityGrid data={JSON.parse(codeContent)} />
+            </Suspense>
+          );
+        } else if (codeBlockLang === 'briefing') {
+          elements.push(
+            <Suspense key={`briefing-${key}`} fallback={null}>
+              <DailyBriefing data={JSON.parse(codeContent)} />
             </Suspense>
           );
         } else {

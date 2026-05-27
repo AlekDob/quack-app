@@ -138,6 +138,43 @@ Cross-project agent data flow:
 - **Persistence**: sessions auto-saved 600ms after any change, final save on window close
 - **macOS traffic lights**: sidebar header has `paddingTop: 38` to clear the overlay titlebar buttons
 
+### PM Widgets (Phase 1.5 — Inline Visual Tools)
+
+Jack renders structured visual widgets inline in the chat stream, using fenced code blocks with special language tags. `MarkdownText` intercepts them and renders React components instead of code.
+
+**Rendering pipeline** (`src/components/MarkdownText.tsx`):
+```
+code block with lang `ws-board` → <WorkstreamBoard>
+code block with lang `task-suggest` → <TaskSuggester>
+code block with lang `agent-grid` → <AgentActivityGrid>
+code block with lang `briefing` → <DailyBriefing>
+```
+
+| Widget | Lang tag | Data shape |
+|--------|----------|------------|
+| WorkstreamBoard | `ws-board` | `{ workstreams: [{ ws, title, status, focus, warning }] }` |
+| TaskSuggester | `task-suggest` | `{ tasks: [{ title, reason, priority, agent, workstream }] }` |
+| AgentActivityGrid | `agent-grid` | `{ agents: [{ name, project, status, activeSessions, color }] }` |
+| DailyBriefing | `briefing` | `{ date, sections: [{ title, items }] }` |
+
+**Files:**
+| Type | Path |
+|------|------|
+| Widgets | `src/components/jack/widgets/types.ts` — shared types + color constants |
+| Widgets | `src/components/jack/widgets/WorkstreamBoard.tsx` — kanban columns (Current / Active / Done) |
+| Widgets | `src/components/jack/widgets/TaskSuggester.tsx` — priority-colored checklist |
+| Widgets | `src/components/jack/widgets/AgentActivityGrid.tsx` — responsive card grid with busy/idle pulse |
+| Widgets | `src/components/jack/widgets/DailyBriefing.tsx` — collapsible sectioned briefing card |
+| CSS | `src/components/jack/widgets/JackWidgets.css` — shared `.jack-widget` shell + per-widget styles |
+| Hook | `src/hooks/useJackPMData.ts` — future: feeds real data to widgets from workstreams + jackStore |
+
+**Design patterns:**
+- Shared `.jack-widget` container: dark glass (`rgba(255,255,255,0.03)` bg), 1px border, 8px radius, backdrop blur
+- `.jack-widget-header` with SVG icon + title + badge pill
+- Priority colors: high=`#EF4444`, medium=`#EAB308`, low=`#10B981`
+- Focus colors: current=`#FF6B35`, active=`#00D9FF`, background=`#6b7280`, completed=`#22c55e`
+- Busy agent dot pulses with CSS animation
+
 ### Related
 
 - Phase 2 (Option+Option hotkey): pending — `jack_hotkey.rs` with `CGEventTap` (Mac) + `SetWindowsHookExW` (Windows)

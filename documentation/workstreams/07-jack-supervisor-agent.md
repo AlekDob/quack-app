@@ -1,7 +1,7 @@
 ---
 ws: 7
 title: "Jack Supervisor Agent — finestra dedicata cross-project per orchestrazione agenti"
-status: "PHASE 1 MVP IMPLEMENTED — SMOKE TEST PENDING"
+status: "PHASE 1 MVP + PM WIDGETS IMPLEMENTED — SMOKE TEST PENDING"
 focus: current
 opened: 2026-05-27
 updated: 2026-05-27
@@ -37,6 +37,14 @@ Reinventare Jack (attualmente una personality di default nella sidebar) come **s
 - ✅ Settings UI: nuova categoria "Jack" in UnifiedSettings, model selector, shortcut display
 - ✅ Toolbar entry: ActionIcons icon Cmd+Shift+J shortcut
 - ✅ StreamMessage rendering: full fidelity con main chat (tool_use, thinking, AskUserQuestion)
+
+**PM Widgets — Inline Visual Tools (Phase 1.5, 2026-05-27):**
+
+- ✅ 4 widget React in `src/components/jack/widgets/`: `WorkstreamBoard`, `TaskSuggester`, `AgentActivityGrid`, `DailyBriefing`
+- ✅ CSS shared: `.jack-widget` shell con glass effect + per-widget styles
+- ✅ Types in `widgets/types.ts`: `WorkstreamBoardData`, `TaskSuggestData`, `AgentGridData`, `DailyBriefingData`
+- ✅ Wire in `MarkdownText.tsx`: lazy imports + `flushCodeBlock()` switch su lang tag (`ws-board`, `task-suggest`, `agent-grid`, `briefing`)
+- Layout: inline nel chat stream come code block speciali
 
 **Bug critici risolti:**
 
