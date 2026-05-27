@@ -50,6 +50,7 @@ interface ClaudeSettings {
   // Brain: 037-anthropic-compatible-providers
   // Cache of /v1/models per provider id. Populated by Refresh button on each card.
   providerModelCache: Record<string, ProviderModelCacheEntry>;
+  jackModel: string;
 }
 
 interface TerminalSettings {
@@ -197,6 +198,7 @@ const defaultClaudeSettings: ClaudeSettings = {
   activeProvider: { kind: 'anthropic' },
   customProviders: [],
   providerModelCache: {},
+  jackModel: '',
 };
 
 // Anthropic recommended defaults for agent modes

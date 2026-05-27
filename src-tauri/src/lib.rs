@@ -25,6 +25,7 @@ mod agents; // Multi-backend agent abstraction (Claude + Codex)
 mod ai;
 mod brain_window;
 mod browser;
+mod jack_window; // Jack supervisor agent — dedicated cross-project window
 mod btw; // BTW side-chain: one-shot Anthropic Messages API queries
 mod claude_auth;
 mod claude_cli;
@@ -888,12 +889,16 @@ pub fn run() {
                 let show_pip_item = MenuItemBuilder::with_id("show_pip", "Show Active Agents")
                     .build(app)?;
 
+                let show_jack_item = MenuItemBuilder::with_id("show_jack", "Open Jack")
+                    .build(app)?;
+
                 let quit_item = MenuItemBuilder::with_id("quit_tray", "Quit Quack")
                     .build(app)?;
 
                 let tray_menu = TrayMenuBuilder::new(app)
                     .item(&show_app_item)
                     .item(&show_pip_item)
+                    .item(&show_jack_item)
                     .separator()
                     .item(&quit_item)
                     .build()?;
@@ -914,6 +919,12 @@ pub fn run() {
                             "show_pip" => {
                                 // Emit event to open PiP window
                                 let _ = app.emit("open-pip-window", ());
+                            }
+                            "show_jack" => {
+                                let handle = app.clone();
+                                tauri::async_runtime::spawn(async move {
+                                    let _ = jack_window::open_jack_window(handle).await;
+                                });
                             }
                             "quit_tray" => {
                                 app.exit(0);
@@ -1145,6 +1156,7 @@ pub fn run() {
             skills::get_skill_details,
             skills::check_skills_directory,
             brain_window::open_brain_window,
+            jack_window::open_jack_window,
             browser::open_browser_window,
             browser::close_browser_window,
             browser::emit_to_main,

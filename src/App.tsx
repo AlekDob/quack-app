@@ -136,6 +136,7 @@ import { findDefinition } from "./services/codeIntelService";
 import { getProviderRequestFields, getActiveModelName, getActiveModelDisplayName, getActiveProviderConfig } from "./services/claudeSDK";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
+import { useJackWindow } from "./hooks/useJackWindow";
 import { useSystemWakeHandler } from "./hooks/useSystemWakeHandler";
 import { useWindowFocus } from "./hooks/useWindowFocus";
 // import { useTelegramBot } from "./hooks/useTelegramBot"; // DEPRECATED - using Telegram Central Bot now
@@ -5139,6 +5140,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // PiP Window hook
   const { isPipOpen, openPipWindow, togglePipWindow, closePipWindow, updatePipAgents, showPipWindow, hidePipWindow } = usePipWindow();
+  const { toggleJackWindow } = useJackWindow();
 
   // activeTerminal moved to top of component for TypeScript hoisting
 
@@ -11173,6 +11175,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         setForceExpandSection('taskhub');
       }
     }, [sidePanelCollapsed]),
+    toggleJack: toggleJackWindow,
   });
 
   // Tab management handlers
@@ -13165,6 +13168,7 @@ You have access to all Bash tools to execute git commands like:
               isCodeEditorActive={isCodeEditorTabActive}
               onStoreClick={() => setShowStoreDrawer(!showStoreDrawer)}
               isStoreOpen={showStoreDrawer}
+              onJackClick={toggleJackWindow}
             />
 
             {/* Tab Bar - VSCode style (always shown) */}

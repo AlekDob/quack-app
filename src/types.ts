@@ -494,6 +494,10 @@ export interface AgentSession {
   // Team delegation — lead agent notification on completion
   leadSessionId?: string;           // Session ID of lead agent to notify on completion
 
+  // Handoff — sidebar genealogy (visual-only, no runtime semantics)
+  // Brain: handoff-agent-fork
+  parentSessionId?: string;         // Session this was forked from via /handoff
+
   // Initial prompt and attachments from Kanban task creation
   // These are pre-populated in ChatInput when opening the session for the first time
   initialPrompt?: string;
@@ -1760,6 +1764,7 @@ export type ShortcutActionId =
   | 'chatNewLine'
   | 'toggleSidebarView'
   | 'toggleBTW'
+  | 'toggleJack'
   | 'toggleCodeEditor'
   | 'toggleFeatureMap'
   | 'toggleEditorPreview'
