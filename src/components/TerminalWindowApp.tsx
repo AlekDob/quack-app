@@ -8,7 +8,7 @@ import { TerminalMain, type TerminalMainHandle } from './terminal/TerminalMain';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useSystemWakeHandler } from '../hooks/useSystemWakeHandler';
 import { extractProjectId } from '../utils/projectUtils';
-import type { ProjectTerminal, SavedCommand } from '../types';
+import type { ProjectTerminal, SavedCommand, TerminalInfo } from '../types';
 import type { ProjectInfo, InitialCommand } from '../hooks/useTerminalWindowManager';
 import SavedCommandsDrawer from './SavedCommandsDrawer';
 import SavedCommandModal from './SavedCommandModal';
@@ -695,6 +695,35 @@ export function TerminalWindowApp() {
       unlistenPromise.then(unlisten => unlisten());
     };
   }, [handleCreateTerminalWithCommand]);
+
+  // Listen for remote terminal selection (Remote API created a terminal → focus it)
+  const terminalsRef = useRef(terminals);
+  useEffect(() => { terminalsRef.current = terminals; }, [terminals]);
+
+  useEffect(() => {
+    const unlistenPromise = listen<{ terminalId: string }>('terminal-window-select-terminal', (event) => {
+      const { terminalId } = event.payload;
+      const exists = terminalsRef.current.some(t => t.id === terminalId);
+      if (exists) {
+        setActiveTerminalId(terminalId);
+      } else {
+        invoke<TerminalInfo[]>('list_terminals').then(freshList => {
+          const mapped = freshList.map(t => ({
+            id: t.id, name: t.label, projectPath: t.cwd, cwd: t.cwd,
+            color: t.color, alive: t.alive, createdAt: Date.now(),
+          }));
+          mapped.forEach(t => {
+            if (!terminalsRef.current.find(existing => existing.id === t.id)) {
+              addProjectTerminal(t);
+            }
+          });
+          setActiveTerminalId(terminalId);
+        });
+      }
+    });
+
+    return () => { unlistenPromise.then(unlisten => unlisten()); };
+  }, [setActiveTerminalId, addProjectTerminal]);
 
   // Count only LIVE terminals (dormant ones have no PTY) — memoized to keep
   // the close-listener effect dep primitive and avoid re-registering on every

@@ -76,6 +76,7 @@ mod code_intel; // 🧠 Tree-sitter code intelligence (outline, definitions, ref
 mod git_watcher; // 🔀 Git branch change watcher
 mod teammate_watcher; // 👥 Teammate session stream watcher
 mod remote_api; // 🌐 Remote REST API for external tools and mobile dashboard
+mod remote_api_terminal; // 🖥️ Remote API terminal management endpoints
 mod remote_auth; // 🔐 Remote API Bearer token authentication
 mod remote_config; // ⚙️ Remote API configuration (enable/disable, token, port)
 mod remote_ws; // 📡 WebSocket real-time push for mobile clients
@@ -968,6 +969,7 @@ pub fn run() {
 
             // 📡 Create WebSocket broadcast hub (capacity 64 events)
             let ws_broadcast = remote_ws::WsBroadcast::new(64);
+            let _ = remote_ws::WS_BROADCAST.set(ws_broadcast.clone());
 
             // 🪞 Live state mirror: chatLoadingMap + pendingQuestionsMap snapshots
             // mirrored from the desktop frontend (via notify_* commands) for the

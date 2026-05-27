@@ -23,6 +23,8 @@ import "./sonner-custom.css";
 import { saveSessionBackup, cleanupOldBackups } from "./utils/sessionRecovery";
 
 import TerminalSidebar from "./components/TerminalSidebar";
+import HandoffDialog from "./components/HandoffDialog";
+import { registerSendMessageForTargetAgent } from "./services/sendMessageBridge";
 import SidePanel from "./components/SidePanel";
 import SidePanelAccordion from "./components/SidePanelAccordion";
 import { SplitPaneDivider, SplitDropZone, SplitCodeEditor, type SidebarDropData } from "./components/SplitView";
@@ -4169,6 +4171,14 @@ function AppContent() {
     }
   }, [isChatConfigured, chatSessions, ensureListenerReady, saveKanbanChatSession, remoteModels]);
 
+  // Expose sendMessageForTargetAgent to services outside the React tree
+  // (handoffService.executeHandoff fires it right after createSession so the
+  // handoff bootstrap prompt is sent automatically without manual Enter).
+  // Brain: handoff-agent-fork
+  useEffect(() => {
+    registerSendMessageForTargetAgent(sendMessageForTargetAgent);
+  }, [sendMessageForTargetAgent]);
+
   // Abort stream for a specific agent (used by Kanban)
   const abortStreamForTargetAgent = useCallback((targetAgentId: string) => {
     const activeStreams = activeStreamsRef.current.get(targetAgentId);
@@ -8296,6 +8306,45 @@ Please respond ONLY with the summary, no preamble or explanations.`;
       }
     };
   }, [markTerminalIdle, tauriAvailable]);
+
+  // Listen for remote terminal creation/deletion (Remote API → visible PTY terminals)
+  const activeProjectsRef = useRef(activeProjects);
+  useEffect(() => { activeProjectsRef.current = activeProjects; }, [activeProjects]);
+
+  useEffect(() => {
+    if (!tauriAvailable) return;
+    let cancelled = false;
+    let cleanupFn: (() => void) | undefined;
+
+    listen<{ terminalId: string; action: string; cwd?: string; label?: string }>(
+      "terminal-list-changed",
+      async (event) => {
+        if (cancelled) return;
+        const { terminalId, action } = event.payload;
+        if (action === "created") {
+          const freshList = await invoke<TerminalInfo[]>("list_terminals");
+          if (cancelled) return;
+          setTerminals(freshList);
+          const projects = activeProjectsRef.current.map(p => ({ path: p.path, name: p.name }));
+          await openTerminalWindow(projects);
+          try {
+            const { emitTo } = await import("@tauri-apps/api/event");
+            await emitTo("terminal-manager", "terminal-window-select-terminal", { terminalId });
+          } catch { /* terminal window may not exist yet */ }
+        } else if (action === "closed") {
+          setTerminals(prev => prev.filter(t => t.id !== terminalId));
+        }
+      }
+    ).then(fn => {
+      if (cancelled) fn();
+      else cleanupFn = fn;
+    }).catch(err => console.warn("Unable to listen to terminal-list-changed", err));
+
+    return () => {
+      cancelled = true;
+      cleanupFn?.();
+    };
+  }, [tauriAvailable, openTerminalWindow]);
 
   const handleToggleGroup = useCallback((cwd: string) => {
     setCollapsedGroups((prev) => {
@@ -14620,6 +14669,10 @@ You have access to all Bash tools to execute git commands like:
 
       {/* Update notification toast — checks GitHub releases on mount */}
       <UpdateToast />
+
+      {/* Handoff dialog — global singleton driven by useHandoffDialogStore */}
+      {/* Brain: handoff-agent-fork */}
+      <HandoffDialog />
 
       <Toaster position="bottom-right" richColors closeButton />
     </>

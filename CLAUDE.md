@@ -129,6 +129,9 @@ You evaluate tasks critically, assess feasibility and economic impact before act
 - **WS1** — Claude Agent SDK 0.2.138 → 0.3.150 upgrade — BUMP + FE MIGRATION DONE — SMOKE TEST PENDING — ⚠️ Smoke test manuale ancora da fare: 1M context, AskUserQuestion (workaround Pre/PostToolUse), MCP startup non-blocking, Plan mode, TodoWrite legacy + Task tools nuovi resi via accumulator. Run `pnpm tauri dev` su branch `chore/sdk-0.3-upgrade`.
 - **WS2** — ChangesPanel — Sub-repos section (nested git status) — FE+BE IMPLEMENTED — SMOKE TEST PENDING
 - **WS3** — Project-ops as Quack's native spec system — FE + BE + HOOK SHIPPED — SMOKE TEST PENDING — ⚠️ Smoke test richiede restart Quack (PostToolUse hook viene letto solo a session start). Verificare: (a) workstreams + status tab visibili nell'accordion, (b) bootstrap_project_ops silenzioso al cambio progetto, (c) Plan Mode che invoca project-ops skill, (d) banner rosso HooksPanel se settings.json corrotto.
+- **WS4** — Handoff — fork sessione su altro agente con summary — FE + SLASH + SIDEBAR IMPLEMENTED — SMOKE TEST PENDING
+- **WS5** — Remote Terminal Management — API endpoints per terminali visibili — BE + FE + SKILL IMPLEMENTED — REBUILD NEEDED — ⚠️ Skill quack-remote.md e' bundled via include_str! — agenti esterni non vedono i nuovi endpoint finche' Quack non viene rebuildato.
+- **WS6** — MCP HTTP Server Pool — eliminate per-session stdio fanout — PLANNED — READY FOR IMPLEMENTATION
 <!-- WS-CURRENT-END -->
 
 Full workstream picture: see `documentation/workstreams/INDEX.md`.
@@ -224,6 +227,9 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Anthropic-compatible clones — identity hallucination ("I am Claude"): `documentation/gotchas/gotcha-anthropic-compatible-identity-hallucination.md`
 - JS `a && b && c` interpolato in template literal — secret leak: `documentation/gotchas/gotcha-js-template-literal-secret-leak.md`
 - External CLI: pin `<bin> --version` before claiming any capability/wiring schema (codex 0.42 vs 0.130 incident): `documentation/gotchas/gotcha-external-cli-version-pin.md`
+- Codex `agent_message` render rotto: regex "Following rules:" greedy in StreamMessage che mangia l'intera bolla in rule-pills: `documentation/gotchas/gotcha-following-rules-regex-codex-prose-collision.md`
+- Built-in skills bundled via include_str!: `documentation/gotchas/gotcha-builtin-skill-bundled-include-str.md`
+- TodoWrite widget righe vuote dopo SDK 0.3.150 (type mismatch toolResults `Map<string,any>` vs accumulator `Map<string,string>`, `JSON.parse([object Object])` silenzioso): `documentation/bugs/fix-task-accumulator-toolresult-text-mismatch.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`
