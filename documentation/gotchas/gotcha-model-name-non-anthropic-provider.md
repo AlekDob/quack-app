@@ -2,8 +2,8 @@
 type: gotcha
 project: quack-app
 created: 2026-02-23
-last_verified: 2026-02-23
-tags: [model-name, provider, ollama, ui, display]
+last_verified: 2026-05-28
+tags: [model-name, provider, ollama, ui, display, opus47]
 ---
 # Model Name Shows "Opus 4.6" When Using Non-Anthropic Provider
 
@@ -43,3 +43,6 @@ This function returns the `ollamaModel` name when provider !== 'anthropic', so a
 ## Key Insight
 
 When adding multi-provider support, always trace every place the model name is displayed or stored. The Anthropic default (`'opus46'`) was hardcoded in multiple locations that needed to become provider-aware.
+
+## 2026-05-28 update
+La stessa classe di bug si e' ripresentata con il rollout di Opus 4.7: 11 fallback hardcoded `'opus46'` (in App.tsx, ChatView.tsx, claudeSDK.ts, modelUtils.ts, settingsStore.ts) sovrascrivevano il nuovo `defaultClaudeSettings.model = 'opus47'`. Vedi [[fix-opus46-hardcoded-fallback-overrides-opus47-default]]. **Regola**: il flagship model id NON va mai hardcodato in codice runtime — leggere sempre da `modelService.getDefaultModel()` o `defaultClaudeSettings.model`.

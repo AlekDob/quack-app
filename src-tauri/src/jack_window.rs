@@ -15,7 +15,7 @@ pub async fn open_jack_window(app: AppHandle) -> Result<String, String> {
     let webview_url = WebviewUrl::App("jack.html".into());
 
     let builder = WebviewWindowBuilder::new(&app, JACK_WINDOW_LABEL, webview_url)
-        .title("Jack — Project Manager")
+        .title("")
         .inner_size(1000.0, 700.0)
         .min_inner_size(800.0, 600.0)
         .resizable(true)

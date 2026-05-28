@@ -10,6 +10,7 @@ interface SessionPopoverProps {
   btwIsOpen: boolean;
   onToggleLoop: () => void;
   onCompact: () => void;
+  onHandoff?: () => void;
   onOpenTerminal?: () => void;
   onClear?: () => void;
   isLoading: boolean;
@@ -23,6 +24,7 @@ export default function SessionPopover({
   btwIsOpen,
   onToggleLoop,
   onCompact,
+  onHandoff,
   onOpenTerminal,
   onClear,
   isLoading,
@@ -98,6 +100,22 @@ export default function SessionPopover({
           </svg>
           <span>Compact</span>
         </button>
+
+        {onHandoff && (
+          <button
+            className="uab-popover-item"
+            onClick={() => handleItemClick(onHandoff)}
+            disabled={isLoading}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 8l4 4-4 4"/>
+              <path d="M3 12h18"/>
+              <circle cx="6" cy="6" r="2"/>
+              <circle cx="18" cy="18" r="2"/>
+            </svg>
+            <span>Handoff to…</span>
+          </button>
+        )}
 
         {onOpenTerminal && (
           <button

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { AgentSession, ChatMessage } from '../types';
 import { formatRelativeTime } from '../utils/timeFormat';
 import { getActivityDotColor, getTimeColor } from '../utils/sessionStatus';
+import { useHandoffDialogStore } from '../stores/handoffDialogStore';
 import './AgentSessionItem.css';
 
 interface AgentSessionItemProps {
@@ -26,6 +27,9 @@ interface AgentSessionItemProps {
   onRename?: (sessionId: string) => void;
   /** Agent's default branch (fallback when session has no branch) */
   agentBranch?: string;
+  /** Indentation depth for handoff-forked sessions (0 = root, 1 = forked, 2+ = clamped) */
+  /** Brain: handoff-agent-fork */
+  depth?: number;
 }
 
 /**
@@ -51,7 +55,11 @@ function AgentSessionItem({
   onDelete,
   onRename,
   agentBranch,
+  depth = 0,
 }: AgentSessionItemProps) {
+  // Brain: handoff-agent-fork — clamp to keep layout readable
+  const clampedDepth = Math.min(Math.max(depth, 0), 2);
+  const indentPx = clampedDepth * 14;
   const relativeTime = formatRelativeTime(session.updatedAt);
   const itemRef = useRef<HTMLDivElement>(null);
   const lastClickTime = useRef<number>(0);
@@ -91,11 +99,20 @@ function AgentSessionItem({
     return () => window.removeEventListener('quack:scroll-to-active-session', handleScrollToActive);
   }, [isActive]);
 
-  // Handle right-click context menu
+  // Handle right-click context menu — clamp to viewport so the menu never clips off-screen
+  // Brain: handoff-agent-fork (added Handoff entry pushed Delete off bottom on short viewports)
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenuPos({ x: e.clientX, y: e.clientY });
+    const menuWidth = 200;
+    const menuHeight = 180;
+    const padding = 8;
+    const maxX = Math.max(padding, window.innerWidth - menuWidth - padding);
+    const maxY = Math.max(padding, window.innerHeight - menuHeight - padding);
+    setContextMenuPos({
+      x: Math.min(e.clientX, maxX),
+      y: Math.min(e.clientY, maxY),
+    });
     setShowContextMenu(true);
   }, []);
 
@@ -179,15 +196,34 @@ function AgentSessionItem({
 
   return (
     <div
-      className={`session-item-wrapper${isActuallyLoading ? ' has-pulse' : ''}`}
+      className={`session-item-wrapper${isActuallyLoading ? ' has-pulse' : ''}${clampedDepth > 0 ? ' session-item-wrapper--forked' : ''}`}
       style={{
         display: 'flex',
         alignItems: 'center',
         position: 'relative',
+        marginLeft: indentPx ? `${indentPx}px` : undefined,
         // Pass agent color for CSS animations
         '--pulse-color': agentColor,
       } as React.CSSProperties}
     >
+      {/* Handoff fork connector — small vertical-then-horizontal hook in the indent gutter */}
+      {/* Brain: handoff-agent-fork */}
+      {clampedDepth > 0 && (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: `-${indentPx + 2}px`,
+            top: '-6px',
+            bottom: '50%',
+            width: `${indentPx + 4}px`,
+            borderLeft: `1px solid ${agentColor}66`,
+            borderBottom: `1px solid ${agentColor}66`,
+            borderBottomLeftRadius: '4px',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
       {/* Metro horizontal connector line - uses agent color */}
       <div
         className="metro-horizontal-line"
@@ -388,6 +424,23 @@ function AgentSessionItem({
               Rename Session
             </button>
           )}
+          {/* Brain: handoff-agent-fork — fork this session onto another agent (or same) with AI summary */}
+          <button
+            className="session-context-menu-item"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowContextMenu(false);
+              useHandoffDialogStore.getState().open(session.id);
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 8l4 4-4 4" />
+              <path d="M3 12h18" />
+              <circle cx="6" cy="6" r="2" />
+              <circle cx="18" cy="18" r="2" />
+            </svg>
+            Handoff to…
+          </button>
           {onDelete && (
             <button
               className="session-context-menu-item delete"

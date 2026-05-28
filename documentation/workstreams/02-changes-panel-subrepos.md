@@ -1,10 +1,10 @@
 ---
 ws: 02
 title: "ChangesPanel — Sub-repos section (nested git status)"
-status: "FE+BE IMPLEMENTED — SMOKE TEST PENDING"
-focus: current
+status: "COMPLETED — SMOKE TEST PASSED"
+focus: completed
 opened: 2026-05-26
-updated: 2026-05-26
+updated: 2026-05-27
 feature: documentation/features/071-changes-panel-subrepos.md
 ---
 

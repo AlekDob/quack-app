@@ -11,7 +11,11 @@ interface StoredAgent {
   projectName: string;
   color: string;
   avatar?: string;
-  sessions?: Array<{ status: string }>;
+}
+
+interface StoredSession {
+  agentId: string;
+  status: string;
 }
 
 interface RepoOrderData {
@@ -28,20 +32,28 @@ function repoKey(path: string): string {
 }
 
 function buildSnapshots(
-  agentMap: Map<string, StoredAgent>,
+  agents: StoredAgent[],
+  sessions: StoredSession[],
   colorMap: Record<string, string>,
 ): { agents: JackAgentSnapshot[]; projects: JackProjectSnapshot[] } {
-  const projectMap = new Map<string, JackProjectSnapshot>();
-  const agents: JackAgentSnapshot[] = [];
+  const activeByAgent = new Map<string, number>();
+  for (const s of sessions) {
+    if (!s?.agentId) continue;
+    if (s.status === 'done' || s.status === 'completed') continue;
+    activeByAgent.set(s.agentId, (activeByAgent.get(s.agentId) || 0) + 1);
+  }
 
-  for (const agent of agentMap.values()) {
+  const projectMap = new Map<string, JackProjectSnapshot>();
+  const agentSnapshots: JackAgentSnapshot[] = [];
+
+  for (const agent of agents) {
+    if (!agent?.id || !agent?.name) continue;
     const pPath = agent.projectPath || '';
     const pName = agent.projectName || extractProjectName(pPath);
-    const pColor = colorMap[repoKey(pPath)] || '#666';
-    const activeSessions = (agent.sessions || [])
-      .filter((s) => s.status !== 'done').length;
+    const pColor = colorMap[repoKey(pPath)] || agent.color || '#666';
+    const activeSessions = activeByAgent.get(agent.id) || 0;
 
-    agents.push({
+    agentSnapshots.push({
       id: agent.id, name: agent.name,
       projectPath: pPath, projectName: pName,
       color: pColor, avatar: agent.avatar,
@@ -62,7 +74,7 @@ function buildSnapshots(
     }
   }
 
-  return { agents, projects: Array.from(projectMap.values()) };
+  return { agents: agentSnapshots, projects: Array.from(projectMap.values()) };
 }
 
 export function useJackAgentRefresh(): void {
@@ -80,19 +92,17 @@ export function useJackAgentRefresh(): void {
     try {
       const store = agentsStoreRef.current ?? await Store.load('quack-agents.json');
       agentsStoreRef.current = store;
-      const raw = await store.entries();
-      const agentMap = new Map<string, StoredAgent>();
-      for (const [, value] of raw) {
-        const v = value as StoredAgent;
-        if (v?.id && v?.name) agentMap.set(v.id, v);
-      }
+      // Brain: quack-agents.json schema is { agents: UnifiedAgent[], sessions: AgentSession[], version }
+      // NOT a flat map of id -> agent. Iterating entries() returns 2 keys, not agents.
+      const agentsRaw = (await store.get<StoredAgent[]>('agents')) || [];
+      const sessionsRaw = (await store.get<StoredSession[]>('sessions')) || [];
 
       const orderStore = orderStoreRef.current ?? await Store.load('.quack-repo-order.dat');
       orderStoreRef.current = orderStore;
       const orderData = await orderStore.get<RepoOrderData>('repository-order');
       const colorMap = orderData?.colors || {};
 
-      const { agents, projects } = buildSnapshots(agentMap, colorMap);
+      const { agents, projects } = buildSnapshots(agentsRaw, sessionsRaw, colorMap);
       setAgents(agents);
       setProjects(projects);
     } catch (err) {

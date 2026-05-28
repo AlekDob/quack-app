@@ -1,8 +1,8 @@
 ---
 ws: 4
 title: "Handoff — fork sessione su altro agente con summary"
-status: "FE + SLASH + SIDEBAR IMPLEMENTED — SMOKE TEST PENDING"
-focus: current
+status: "COMPLETED — SMOKE TEST PASSED"
+focus: completed
 opened: 2026-05-27
 updated: 2026-05-27
 ---

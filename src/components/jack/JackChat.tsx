@@ -1,12 +1,71 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useJackChat } from '../../hooks/useJackChat';
 import { useJackStore } from '../../stores/jackStore';
 import { AgentAvatar } from '../AgentAvatar';
-import StreamMessage from '../StreamMessage';
-import { JACK_AVATAR } from '../../services/jackPersonalityService';
+import MessageList from '../MessageList';
+import { JACK_AGENT_ID, JACK_AVATAR } from '../../services/jackPersonalityService';
+import { compressImage, blobToBase64 } from '../../utils/imageCompression';
 import type { JackTimelineItem } from '../../stores/jackStore';
-import type { ClaudeEvent } from '../../types';
-import '../StreamMessage.css';
+import type { ChatMessage, AskUserQuestionAnswers, ClaudeEvent } from '../../types';
+
+interface PastedImage {
+  id: string;
+  path: string;
+  previewUrl: string;
+  name: string;
+}
+
+const MAX_JACK_IMAGES = 6;
+
+function extToMime(ext: string): string {
+  const map: Record<string, string> = {
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', webp: 'image/webp',
+  };
+  return map[ext.toLowerCase()] || 'image/png';
+}
+
+function mimeToExt(mime: string): string {
+  if (mime === 'image/jpeg') return 'jpg';
+  if (mime === 'image/png') return 'png';
+  if (mime === 'image/gif') return 'gif';
+  if (mime === 'image/webp') return 'webp';
+  return 'png';
+}
+
+function timelineToMessages(timeline: JackTimelineItem[]): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  let buffer: { events: ClaudeEvent[]; timestamp: number; id: string } | null = null;
+  const flush = () => {
+    if (!buffer) return;
+    out.push({
+      id: buffer.id,
+      role: 'assistant',
+      content: '',
+      timestamp: buffer.timestamp,
+      events: buffer.events,
+    });
+    buffer = null;
+  };
+  for (const item of timeline) {
+    if (item.kind === 'user') {
+      flush();
+      out.push({
+        id: item.id,
+        role: 'user',
+        content: item.content,
+        timestamp: item.timestamp,
+      });
+    } else {
+      if (!buffer) buffer = { events: [], timestamp: item.timestamp, id: item.id };
+      buffer.events.push(item.event);
+    }
+  }
+  flush();
+  return out;
+}
 
 export default function JackChat() {
   const agents = useJackStore((s) => s.agents);
@@ -24,28 +83,124 @@ export default function JackChat() {
     useJackChat({ agents, projects });
 
   // Brain: fix-jack-multisession-events-wrong-session
-  // L'UI di streaming (Stop, "sta pensando") deve mostrarsi solo sulla sessione
-  // che sta effettivamente streamando, non su tutte quante.
   const isThisSessionStreaming = isStreaming && streamingSessionId === activeSessionId;
 
   const [input, setInput] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [pastedImages, setPastedImages] = useState<PastedImage[]>([]);
+  const [pasteError, setPasteError] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  const handlePaste = useCallback(
+    async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      const files = Array.from(items)
+        .filter((i) => i.kind === 'file')
+        .map((i) => i.getAsFile())
+        .filter((f): f is File => Boolean(f) && f!.type.startsWith('image/'));
+      if (files.length === 0) return;
+      event.preventDefault();
+
+      for (const file of files) {
+        if (pastedImages.length >= MAX_JACK_IMAGES) {
+          setPasteError(`Max ${MAX_JACK_IMAGES} immagini per messaggio.`);
+          break;
+        }
+        try {
+          const result = await compressImage(file);
+          const ext = mimeToExt(file.type);
+          const base64 = await blobToBase64(result.blob);
+          const tempPath = await invoke<string>('save_clipboard_file', {
+            dataBase64: base64,
+            extension: ext,
+            suggestedName: file.name ?? null,
+          });
+          const previewUrl = `data:${extToMime(ext)};base64,${base64}`;
+          const entry: PastedImage = {
+            id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            path: tempPath,
+            previewUrl,
+            name: file.name || `image.${ext}`,
+          };
+          setPastedImages((prev) => [...prev, entry]);
+          setPasteError(null);
+        } catch (err) {
+          console.error('Jack: paste image failed', err);
+          setPasteError('Impossibile incollare immagine.');
+        }
+      }
+    },
+    [pastedImages.length]
+  );
+
+  const removeImage = useCallback((id: string) => {
+    setPastedImages((prev) => prev.filter((i) => i.id !== id));
+  }, []);
+
+  // AskUserQuestion: listen for events targeting Jack
+  const pendingRequestsRef = useRef<Array<{ requestId: string; sessionKey?: string }>>([]);
+  const [pendingQuestionIds, setPendingQuestionIds] = useState<Set<string>>(new Set());
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeSession?.timeline.length, isStreaming]);
+    const unlisten = listen<{
+      requestId: string;
+      questions: unknown[];
+      agentId: string;
+      sessionKey?: string;
+    }>('ask-user-question', (event) => {
+      if (event.payload.agentId !== JACK_AGENT_ID) return;
+      const { requestId, sessionKey } = event.payload;
+      pendingRequestsRef.current.push({ requestId, sessionKey });
+      setPendingQuestionIds((prev) => {
+        const next = new Set(prev);
+        next.add(requestId);
+        return next;
+      });
+    });
+    return () => { unlisten.then((fn) => fn()); };
+  }, []);
+
+  const handleUserQuestionAnswer = useCallback(
+    async (_toolUseId: string, answers: AskUserQuestionAnswers) => {
+      const pending = pendingRequestsRef.current;
+      if (pending.length === 0) return;
+      const { requestId } = pending[pending.length - 1];
+      pendingRequestsRef.current = pending.slice(0, -1);
+      try {
+        await invoke('answer_user_question', {
+          agentId: JACK_AGENT_ID,
+          requestId,
+          answers,
+        });
+      } catch (err) {
+        console.error('Jack: failed to submit answer', err);
+      }
+      setPendingQuestionIds((prev) => {
+        const next = new Set(prev);
+        next.delete(requestId);
+        return next;
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     inputRef.current?.focus();
   }, [activeSessionId]);
 
   const handleSend = useCallback(async () => {
-    if (!input.trim() || isStreaming) return;
-    const text = input;
+    const trimmed = input.trim();
+    if ((!trimmed && pastedImages.length === 0) || isStreaming) return;
+    let text = trimmed;
+    if (pastedImages.length > 0) {
+      const list = pastedImages.map((i) => `- ${i.path}`).join('\n');
+      text = `${trimmed}\n\n[Pasted images — read them with Read tool to see content]\n${list}`.trim();
+    }
     setInput('');
+    setPastedImages([]);
+    setPasteError(null);
     await sendMessage(text);
-  }, [input, isStreaming, sendMessage]);
+  }, [input, isStreaming, sendMessage, pastedImages]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -57,15 +212,12 @@ export default function JackChat() {
     [handleSend]
   );
 
-  // Build the linear stream events list for StreamMessage's `streamMessages` prop
-  const streamEvents = useMemo<ClaudeEvent[]>(() => {
-    if (!activeSession) return [];
-    return activeSession.timeline
-      .filter((it): it is Extract<JackTimelineItem, { kind: 'event' }> => it.kind === 'event')
-      .map((it) => it.event);
-  }, [activeSession]);
+  const messages = useMemo<ChatMessage[]>(
+    () => (activeSession ? timelineToMessages(activeSession.timeline) : []),
+    [activeSession]
+  );
 
-  const timeline = activeSession?.timeline ?? [];
+  const isEmpty = messages.length === 0;
 
   return (
     <div style={{
@@ -75,46 +227,26 @@ export default function JackChat() {
       overflow: 'hidden',
     }}>
       {/* Messages */}
-      <div style={{
-        flex: 1,
-        overflowY: 'auto',
-        padding: '16px 20px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-      }}>
-        {timeline.length === 0 && <EmptyState />}
-
-        {timeline.map((item, idx) => {
-          if (item.kind === 'user') {
-            return <UserBubble key={item.id} content={item.content} />;
-          }
-          // Hide consecutive headers when same role
-          const prev = timeline[idx - 1];
-          const showHeader = !prev || prev.kind === 'user';
-          return (
-            <div key={item.id} className="stream-message-wrapper">
-              <StreamMessage
-                message={item.event}
-                streamMessages={streamEvents}
-                agentName="Jack"
-                agentAvatar={JACK_AVATAR}
-                showHeader={showHeader}
-                showThinkingBlocks={true}
-              />
-            </div>
-          );
-        })}
-
-        {isThisSessionStreaming && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', opacity: 0.5, padding: '4px 8px' }}>
-            <span style={{ fontSize: 12 }}>Jack sta pensando...</span>
-          </div>
+      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        {isEmpty ? (
+          <EmptyState />
+        ) : (
+          <MessageList
+            messages={messages}
+            loading={isThisSessionStreaming}
+            agentName="Jack"
+            agentAvatar={JACK_AVATAR}
+            onUserQuestionAnswer={handleUserQuestionAnswer}
+            pendingQuestionIds={pendingQuestionIds}
+            showThinkingBlocks={true}
+            currentSessionId={activeSessionId ?? undefined}
+          />
         )}
 
         {error && (
           <div style={{
             padding: '8px 12px',
+            margin: '0 16px 8px',
             background: 'rgba(239,68,68,0.15)',
             borderRadius: 8,
             color: '#f87171',
@@ -123,9 +255,54 @@ export default function JackChat() {
             {error}
           </div>
         )}
-
-        <div ref={messagesEndRef} />
       </div>
+
+      {/* Pasted images preview */}
+      {(pastedImages.length > 0 || pasteError) && (
+        <div style={{
+          padding: '8px 16px 0',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          flexShrink: 0,
+        }}>
+          {pasteError && (
+            <div style={{ fontSize: 12, color: '#f87171' }}>{pasteError}</div>
+          )}
+          {pastedImages.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {pastedImages.map((img) => (
+                <div key={img.id} style={{
+                  position: 'relative',
+                  width: 56, height: 56,
+                  borderRadius: 6,
+                  overflow: 'hidden',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                }}>
+                  <img src={img.previewUrl} alt={img.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button
+                    onClick={() => removeImage(img.id)}
+                    aria-label="Remove image"
+                    style={{
+                      position: 'absolute', top: 2, right: 2,
+                      width: 18, height: 18,
+                      borderRadius: '50%',
+                      border: 'none',
+                      background: 'rgba(0,0,0,0.7)',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      lineHeight: '18px',
+                      padding: 0,
+                    }}
+                  >×</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Input area */}
       <div style={{
@@ -141,7 +318,8 @@ export default function JackChat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Chiedi qualcosa a Jack..."
+          onPaste={handlePaste}
+          placeholder="Chiedi qualcosa a Jack... (incolla immagini con Cmd+V)"
           rows={1}
           style={{
             flex: 1,
@@ -162,9 +340,9 @@ export default function JackChat() {
         ) : (
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
+            disabled={(!input.trim() && pastedImages.length === 0) || isStreaming}
             title={isStreaming ? 'Un\'altra sessione sta streamando, aspetta...' : undefined}
-            style={btnStyle(input.trim() && !isStreaming ? 'var(--accent, #FF6B35)' : '#555')}
+            style={btnStyle((input.trim() || pastedImages.length > 0) && !isStreaming ? 'var(--accent, #FF6B35)' : '#555')}
           >
             Invia
           </button>
@@ -195,25 +373,6 @@ function EmptyState() {
       <div style={{ fontSize: 12, textAlign: 'center', maxWidth: 280 }}>
         Chiedi stato progetti, delega task, organizza il lavoro
       </div>
-    </div>
-  );
-}
-
-function UserBubble({ content }: { content: string }) {
-  return (
-    <div style={{
-      alignSelf: 'flex-end',
-      maxWidth: '85%',
-      padding: '10px 14px',
-      borderRadius: 12,
-      background: 'var(--accent, #FF6B35)',
-      color: '#fff',
-      fontSize: 14,
-      lineHeight: 1.5,
-      whiteSpace: 'pre-wrap',
-      wordBreak: 'break-word',
-    }}>
-      {content}
     </div>
   );
 }

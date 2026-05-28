@@ -3070,7 +3070,7 @@ function AppContent() {
       agent_name: capturedAgentLabel,
       has_attachments: attachments.length > 0,
       attachments_count: attachments.length,
-      model: options?.model || 'opus46',
+      model: options?.model || 'opus47',
       thinking_mode: options?.thinkingMode || 'auto',
       message_length: content.length,
     });
@@ -3219,9 +3219,9 @@ function AppContent() {
             const providerConfig = await getActiveProviderConfig(capturedAgentId);
           return {
             prompt,
-            // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
+            // 🦆 MODEL FIX: Map friendly name (opus47) to API model ID (claude-opus-4-7)
             model: (() => {
-              const friendlyName = options?.model || 'opus46';
+              const friendlyName = options?.model || 'opus47';
               const resolvedId = prf.resolveModel(friendlyName);
               console.log(`🦆 [MODEL DEBUG sendMessageForAgent] friendlyName=${friendlyName}, resolvedId=${resolvedId}`);
               return resolvedId;
@@ -3414,7 +3414,7 @@ function AppContent() {
         agent_name: capturedAgentLabel,
         response_time_ms: responseTime,
         response_length: response.result?.length || 0,
-        model: options?.model || 'opus46',
+        model: options?.model || 'opus47',
         session_id: response.session_id,
         total_cost_usd: response.total_cost_usd,
       });
@@ -3432,7 +3432,7 @@ function AppContent() {
         agent_id: capturedAgentId,
         error_type: wasAborted ? 'user_aborted' : 'stream_error',
         error_message: errorMsg.substring(0, 200),
-        model: options?.model || 'opus46',
+        model: options?.model || 'opus47',
       });
 
       // Check if this was an abort
@@ -3976,7 +3976,7 @@ function AppContent() {
             return {
             prompt,
             // 🦆 MODEL FIX: For non-anthropic providers, use model ID directly; for Anthropic, resolve friendly name
-            model: isJobProvider ? (options?.model || 'opus46') : prf.resolveModel(options?.model || 'opus46'),
+            model: isJobProvider ? (options?.model || 'opus47') : prf.resolveModel(options?.model || 'opus47'),
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
             // Extract only file paths from ChatAttachment objects - Rust expects Vec<String>

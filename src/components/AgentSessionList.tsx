@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type JSX } from 'react';
 import { useSessionStore } from '../stores/sessionStore';
 import { useChatStore } from '../stores/chatStore';
 import AgentSessionItem from './AgentSessionItem';
@@ -374,31 +374,67 @@ function AgentSessionList({
                 ({branchSessions.length})
               </span>
             </div>
-            {/* Sessions in this branch */}
-            {branchSessions.map((session, index) => {
-              const isLoadingForSession = chatLoadingMap.get(session.id) ?? false;
-              const pendingQuestionsSet = pendingQuestionsMap.get(session.id);
-              const hasPendingQuestion = pendingQuestionsSet ? pendingQuestionsSet.size > 0 : false;
-              const isLast = index === branchSessions.length - 1
-                && branchName === branchNames[branchNames.length - 1];
-              return (
-                <AgentSessionItem
-                  key={session.id}
-                  session={session}
-                  onClick={onSessionClick}
-                  isActive={session.id === activeSessionId}
-                  agentColor={agentColor}
-                  isLast={isLast}
-                  chatMessages={chatSessions.get(session.id) || []}
-                  isLoading={isLoadingForSession}
-                  hasPendingQuestion={hasPendingQuestion}
-                  onMarkDone={handleMarkDone}
-                  onDelete={handleDeleteRequest}
-                  onRename={handleRenameRequest}
-                  agentBranch={agentBranch}
-                />
-              );
-            })}
+            {/* Sessions in this branch — nest handoff forks under their parent */}
+            {/* Brain: handoff-agent-fork */}
+            {(() => {
+              const branchIds = new Set(branchSessions.map((s) => s.id));
+              const childrenByParent = new Map<string, typeof branchSessions>();
+              const roots: typeof branchSessions = [];
+              for (const s of branchSessions) {
+                const parent = s.parentSessionId;
+                if (parent && branchIds.has(parent)) {
+                  const arr = childrenByParent.get(parent) ?? [];
+                  arr.push(s);
+                  childrenByParent.set(parent, arr);
+                } else {
+                  roots.push(s);
+                }
+              }
+
+              const rendered: JSX.Element[] = [];
+              const visit = (s: typeof branchSessions[number], depth: number) => {
+                const isLoadingForSession = chatLoadingMap.get(s.id) ?? false;
+                const pendingQuestionsSet = pendingQuestionsMap.get(s.id);
+                const hasPendingQuestion = pendingQuestionsSet ? pendingQuestionsSet.size > 0 : false;
+                rendered.push(
+                  <AgentSessionItem
+                    key={s.id}
+                    session={s}
+                    onClick={onSessionClick}
+                    isActive={s.id === activeSessionId}
+                    agentColor={agentColor}
+                    isLast={false}
+                    chatMessages={chatSessions.get(s.id) || []}
+                    isLoading={isLoadingForSession}
+                    hasPendingQuestion={hasPendingQuestion}
+                    onMarkDone={handleMarkDone}
+                    onDelete={handleDeleteRequest}
+                    onRename={handleRenameRequest}
+                    agentBranch={agentBranch}
+                    depth={depth}
+                  />,
+                );
+                const kids = childrenByParent.get(s.id);
+                if (kids && kids.length > 0) {
+                  for (const kid of kids) visit(kid, depth + 1);
+                }
+              };
+              for (const root of roots) visit(root, 0);
+
+              // Mark the actual last rendered item to preserve metro line termination
+              const lastIdx = rendered.length - 1;
+              if (lastIdx >= 0 && branchName === branchNames[branchNames.length - 1]) {
+                const lastEl = rendered[lastIdx];
+                rendered[lastIdx] = (
+                  <AgentSessionItem
+                    {...(lastEl.props as React.ComponentProps<typeof AgentSessionItem>)}
+                    key={lastEl.key ?? undefined}
+                    isLast
+                  />
+                );
+              }
+              return rendered;
+            })()}
           </div>
         );
       })}

@@ -166,6 +166,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Tauri Store .dat files: `documentation/gotchas/gotcha-tauri-store-dat-files-plain-json.md`
 - Marketplace resource ID: `documentation/gotchas/gotcha-marketplace-resource-id-format.md`
 - Sonnet 4.5 deprecated fallback: `documentation/gotchas/gotcha-sonnet45-deprecated-fallback.md`
+- Opus 4.6 hardcoded fallback overrides 4.7 default: `documentation/bugs/fix-opus46-hardcoded-fallback-overrides-opus47-default.md`
 - Automation session title lost: `documentation/bugs/fix-automation-session-title-missing.md`
 - Session reset after Stop: `documentation/bugs/fix-session-reset-after-stop.md`
 - Remote team session tracking: `documentation/bugs/fix-remote-team-session-tracking.md`

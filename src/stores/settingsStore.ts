@@ -16,7 +16,7 @@ import { defaultEffortForModel } from '../services/modelService';
 const LEGACY_MODEL_MAP: Record<string, string> = {
   'sonnet': 'sonnet46',
   'sonnet45': 'sonnet46', // Sonnet 4.5 deprecated, upgrade to 4.6
-  'opus': 'opus46',
+  'opus': 'opus47',
   'haiku': 'haiku45',
 };
 

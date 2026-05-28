@@ -59,6 +59,7 @@ export interface UnifiedActionBarProps {
   btwIsOpen: boolean;
   quickLoop: QuickLoopProps;
   onCompact: () => void;
+  onHandoff?: () => void;
   onOpenTerminal?: () => void;
   onClear?: () => void;
   // Send/Stop
@@ -186,6 +187,7 @@ export default function UnifiedActionBar(props: UnifiedActionBarProps) {
                 setLoopPopoverOpen(true);
               }}
               onCompact={props.onCompact}
+              onHandoff={props.onHandoff}
               onOpenTerminal={props.onOpenTerminal}
               onClear={props.onClear}
               isLoading={props.isLoading}

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Visualizer MCP Server (stdio-based)
+ * Visualizer MCP Server (dual transport: stdio | http)
  *
  * Provides the visualize_html tool that Claude auto-discovers and invokes
  * when it wants to render interactive HTML visualizations inline in chat.
@@ -11,6 +11,12 @@
  * event and renders the HtmlVisualizer component with the input.html content.
  *
  * Brain: quack-visualizer-inline-html
+ * Brain: ws6-mcp-http-pool
+ *
+ * Usage:
+ *   node visualizer-mcp-server.js                  # stdio (default, retro-compat)
+ *   node visualizer-mcp-server.js --http --port 0  # HTTP, OS-assigned port
+ *   node visualizer-mcp-server.js --http --port 47823
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -19,10 +25,10 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { parseHttpArgs, startHttpTransport } from './lib/mcp-http-transport.js';
 
-// =============================================================================
-// TOOL DEFINITIONS
-// =============================================================================
+const SERVER_NAME = 'visualizer';
+const SERVER_VERSION = '1.1.0';
 
 const TOOLS = [
   {
@@ -63,11 +69,7 @@ Include all CSS inline. The iframe has no access to the parent page.`,
   },
 ];
 
-// =============================================================================
-// TOOL HANDLER
-// =============================================================================
-
-// WHY: The tool handler is intentionally a no-op that returns confirmation.
+// WHY: the tool handler is intentionally a no-op that returns confirmation.
 // The rendering happens client-side in StreamMessage.tsx when it detects
 // a tool_use with name 'visualize_html' and reads input.html.
 function handleVisualizeHtml(args) {
@@ -76,37 +78,52 @@ function handleVisualizeHtml(args) {
   return `Rendered "${title}" (${htmlLength} chars of HTML). The visualization is displayed inline in the chat.`;
 }
 
-// =============================================================================
-// MAIN SERVER
-// =============================================================================
+function createMcpServer() {
+  const server = new Server(
+    { name: SERVER_NAME, version: SERVER_VERSION },
+    { capabilities: { tools: {} } },
+  );
 
-const server = new Server(
-  { name: 'visualizer', version: '1.0.0' },
-  { capabilities: { tools: {} } },
-);
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
 
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return { tools: TOOLS };
-});
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    if (name === 'visualize_html') {
+      return { content: [{ type: 'text', text: handleVisualizeHtml(args) }] };
+    }
+    return {
+      content: [{ type: 'text', text: `Unknown tool: ${name}` }],
+      isError: true,
+    };
+  });
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
-  if (name === 'visualize_html') {
-    const result = handleVisualizeHtml(args);
-    return { content: [{ type: 'text', text: result }] };
-  }
-
-  return {
-    content: [{ type: 'text', text: `Unknown tool: ${name}` }],
-    isError: true,
-  };
-});
-
-async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error('[VISUALIZER-MCP] Server started — visualize_html tool ready');
+  return server;
 }
 
-main().catch(console.error);
+async function main() {
+  const { useHttp, port } = parseHttpArgs(process.argv);
+
+  if (useHttp) {
+    if (Number.isNaN(port) || port < 0 || port > 65535) {
+      console.error('[VISUALIZER-MCP] invalid --port value, must be 0-65535');
+      process.exit(2);
+    }
+    // Brain: ws6-mcp-http-pool — factory for per-session Server instances
+    await startHttpTransport({
+      serverFactory: createMcpServer,
+      port,
+      name: SERVER_NAME,
+      version: SERVER_VERSION,
+    });
+  } else {
+    const server = createMcpServer();
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error('[VISUALIZER-MCP] stdio transport ready — visualize_html tool exposed');
+  }
+}
+
+main().catch((err) => {
+  console.error('[VISUALIZER-MCP] fatal:', err);
+  process.exit(1);
+});
