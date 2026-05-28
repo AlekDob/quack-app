@@ -62,14 +62,8 @@ export default function NewSessionModal({
   const [useWorktree, setUseWorktree] = useState(false);
   const [showBranchSection, setShowBranchSection] = useState(false);
 
-  // Backend selector
-  const [backend, setBackend] = useState<'claude' | 'codex'>('claude');
-  const [codexAuth, setCodexAuth] = useState<'ready' | 'needs_login' | 'unknown'>('unknown');
-  useEffect(() => {
-    if (backend === 'codex') {
-      import('../services/codexAuthService').then(m => m.getCodexAuthStatus().then(setCodexAuth));
-    }
-  }, [backend]);
+  // Backend: Codex on-hold (feature 066) — only Claude is exposed for now.
+  // Brain: handoff-agent-fork — when Codex returns, restore the selector block below.
 
   // Git status
   const [isDirty, setIsDirty] = useState(false);
@@ -157,7 +151,7 @@ export default function NewSessionModal({
       sessionTitle,
       effectiveBranch,
       effectiveBranch ? useWorktree : undefined,
-      backend
+      'claude'
     );
   }, [
     title,
@@ -166,7 +160,6 @@ export default function NewSessionModal({
     onSubmit,
     effectiveBranch,
     useWorktree,
-    backend,
   ]);
 
   const handleKeyDown = useCallback(
@@ -234,29 +227,7 @@ export default function NewSessionModal({
             />
           </div>
 
-          {/* Backend Selector */}
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-white/50 mb-1.5">Backend</label>
-            <div className="flex gap-1 p-1 rounded-lg bg-white/5">
-              {(['claude', 'codex'] as const).map((b) => (
-                <button
-                  key={b}
-                  type="button"
-                  onClick={() => setBackend(b)}
-                  className={`flex-1 px-3 py-1.5 text-xs rounded-md transition-colors ${
-                    backend === b ? 'bg-white/15 text-white' : 'text-white/50 hover:text-white/80'
-                  }`}
-                >
-                  {b === 'claude' ? 'Claude Code' : 'Codex'}
-                </button>
-              ))}
-            </div>
-            {backend === 'codex' && codexAuth === 'needs_login' && (
-              <p className="mt-1.5 text-[11px] text-amber-400/90">
-                Codex not authenticated. Run <code>codex login --api-key</code> in a terminal.
-              </p>
-            )}
-          </div>
+          {/* Backend Selector removed — Codex on-hold (feature 066). Only Claude active. */}
 
           {/* Git Branch Section */}
           {projectPath && (

@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-app
 stack: Tauri (Rust + React)
 created: 2026-04-07
-last_verified: 2026-05-26
+last_verified: 2026-05-28
 tags: [chat-input-bar, chat, ui, compose, session, popover, drag-drop, file-mention, mention-autocomplete, icons]
 ---
 
@@ -89,7 +89,6 @@ When a skill is dragged from the sidebar, the `SplitDropZone` overlay intercepts
 | Tab | Cursor after a snippet tag with matching snippet | Expand snippet |
 | Tab | No autocomplete, no snippet match | **Cycle effort forward** (low → medium → high → xhigh → max → low) |
 | Shift+Tab | No autocomplete, no snippet match | Cycle effort backward |
-| Option (Alt) | No modifier combo, not auto-repeat | **Cycle base model forward** through `getModelOptions(remoteModels)`. Preserves `[1m]` suffix. |
 | Cmd/Ctrl+Enter | Always | Send message |
 | Escape | Autocomplete open | Close autocomplete |
 
