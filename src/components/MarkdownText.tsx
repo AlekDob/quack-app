@@ -23,6 +23,21 @@ interface MarkdownTextProps {
   children: string;
 }
 
+// Brain: fix-markdown-pm-widgets-streaming-json-crash
+// PM widget code-blocks (ws-board, task-suggest, agent-grid, briefing) arrive via
+// streaming and may render before the closing `}` is in. JSON.parse on an
+// incomplete payload throws SyntaxError, bubbles to the outermost ErrorBoundary
+// (Git in src/contexts/index.tsx) and shows "Provider Error: Git". Return null
+// while parsing fails — the next streaming chunk re-renders with the full JSON.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function safeParseWidgetData(content: string): any | null {
+  try {
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Simple markdown renderer for Claude messages
  * Supports: bold, headings, lists, horizontal rules, code blocks
@@ -71,29 +86,41 @@ export default function MarkdownText({ children }: MarkdownTextProps) {
             </Suspense>
           );
         } else if (codeBlockLang === 'ws-board') {
-          elements.push(
-            <Suspense key={`wsboard-${key}`} fallback={null}>
-              <WorkstreamBoard data={JSON.parse(codeContent)} />
-            </Suspense>
-          );
+          const data = safeParseWidgetData(codeContent);
+          if (data) {
+            elements.push(
+              <Suspense key={`wsboard-${key}`} fallback={null}>
+                <WorkstreamBoard data={data} />
+              </Suspense>
+            );
+          }
         } else if (codeBlockLang === 'task-suggest') {
-          elements.push(
-            <Suspense key={`tasksuggest-${key}`} fallback={null}>
-              <TaskSuggester data={JSON.parse(codeContent)} />
-            </Suspense>
-          );
+          const data = safeParseWidgetData(codeContent);
+          if (data) {
+            elements.push(
+              <Suspense key={`tasksuggest-${key}`} fallback={null}>
+                <TaskSuggester data={data} />
+              </Suspense>
+            );
+          }
         } else if (codeBlockLang === 'agent-grid') {
-          elements.push(
-            <Suspense key={`agentgrid-${key}`} fallback={null}>
-              <AgentActivityGrid data={JSON.parse(codeContent)} />
-            </Suspense>
-          );
+          const data = safeParseWidgetData(codeContent);
+          if (data) {
+            elements.push(
+              <Suspense key={`agentgrid-${key}`} fallback={null}>
+                <AgentActivityGrid data={data} />
+              </Suspense>
+            );
+          }
         } else if (codeBlockLang === 'briefing') {
-          elements.push(
-            <Suspense key={`briefing-${key}`} fallback={null}>
-              <DailyBriefing data={JSON.parse(codeContent)} />
-            </Suspense>
-          );
+          const data = safeParseWidgetData(codeContent);
+          if (data) {
+            elements.push(
+              <Suspense key={`briefing-${key}`} fallback={null}>
+                <DailyBriefing data={data} />
+              </Suspense>
+            );
+          }
         } else {
           elements.push(
             <div key={`code-wrapper-${key}`} className="md-code-block-wrapper">
