@@ -7,6 +7,7 @@ import ClaudeCodeSettings from './categories/ClaudeCodeSettings';
 import CodexSettings from './categories/CodexSettings';
 import AIAssistantSettings from './categories/AIAssistantSettings';
 import AgentModesSettings from './categories/AgentModesSettings';
+import JackSettings from './categories/JackSettings';
 import SecondBrainSettings from './categories/SecondBrainSettings';
 import IDESettings from './categories/IDESettings';
 import TerminalSettings from './categories/TerminalSettings';
@@ -58,6 +59,8 @@ export default function UnifiedSettings({
         return <AIAssistantSettings />;
       case 'agent-modes':
         return <AgentModesSettings />;
+      case 'jack':
+        return <JackSettings />;
       case 'second-brain':
         return <SecondBrainSettings />;
       case 'ide':

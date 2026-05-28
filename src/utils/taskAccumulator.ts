@@ -88,15 +88,29 @@ export function accumulateTodos(
         const input = c.input ?? {};
         const subject = (input.subject as string) ?? '';
         const activeForm = (input.activeForm as string) ?? '';
-        const parsed = parseJsonSafe<{ task?: { id?: string } }>(toolResults.get(c.id));
-        const id = parsed?.task?.id ?? `pending-${c.id}`;
+        const rawResult = toolResults.get(c.id);
+        const parsed = parseJsonSafe<{ task?: { id?: string } }>(rawResult);
+        const realTaskId = parsed?.task?.id;
+        // Use toolUseId as the internal key when the real task.id can't be parsed
+        // (tool_result not yet arrived OR unexpected payload shape). This keeps the
+        // entry visible with its subject; TaskUpdate will reconcile via toolUseToTaskId
+        // when the result lands.
+        const id = realTaskId ?? `pending-${c.id}`;
         byId.set(id, { content: subject, status: 'pending', activeForm });
         if (!order.includes(id)) order.push(id);
+        if (typeof window !== 'undefined' && (window as { __TODO_DEBUG__?: boolean }).__TODO_DEBUG__) {
+          // eslint-disable-next-line no-console
+          console.log('[TodoDebug] TaskCreate', {
+            toolUseId: c.id,
+            subject,
+            rawResult,
+            parsedTaskId: realTaskId,
+          });
+        }
       } else if (toolName === 'taskupdate') {
         const input = c.input ?? {};
         const id = input.taskId as string | undefined;
         if (!id) continue;
-        const prev = byId.get(id) ?? { content: '', status: 'pending', activeForm: '' };
         const nextStatus = input.status as TodoItem['status'] | 'deleted' | undefined;
         if (nextStatus === 'deleted') {
           byId.delete(id);
@@ -104,12 +118,27 @@ export function accumulateTodos(
           if (i >= 0) order.splice(i, 1);
           continue;
         }
+        // Brain: fix-task-accumulator-toolresult-text-mismatch — guard against
+        // orphan updates. If we never saw a TaskCreate for this real task.id
+        // (typically because parsed?.task?.id was null on TaskCreate), DO NOT
+        // create a new empty entry. The original `pending-${toolUseId}` entry
+        // keeps its subject; status stays stale but at least no blank rows.
+        const prev = byId.get(id);
+        if (!prev) {
+          if (typeof window !== 'undefined' && (window as { __TODO_DEBUG__?: boolean }).__TODO_DEBUG__) {
+            // eslint-disable-next-line no-console
+            console.warn('[TodoDebug] TaskUpdate orphan — no matching TaskCreate', {
+              taskId: id,
+              knownIds: Array.from(byId.keys()),
+            });
+          }
+          continue;
+        }
         byId.set(id, {
           content: (input.subject as string) ?? prev.content,
           status: nextStatus ?? prev.status,
           activeForm: (input.activeForm as string) ?? prev.activeForm,
         });
-        if (!order.includes(id)) order.push(id);
       } else if (toolName === 'tasklist') {
         const parsed = parseJsonSafe<{ tasks?: Array<{ id?: string; subject?: string; status?: TodoItem['status'] }> }>(
           toolResults.get(c.id)

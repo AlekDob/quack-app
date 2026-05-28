@@ -429,20 +429,42 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
   const teammateStatus = useTeamStore((s) => s.teammateStatus);
 
   // Build a map of tool results for quick lookup
-  const toolResults = useMemo(() => {
+  // Brain: WS01 SDK 0.3.150 — `toolResults` stores the full block (used by
+  // image extraction etc.); `toolResultTexts` stores the flattened text so
+  // accumulateTodos can JSON.parse TaskCreate/TaskList payloads. Without the
+  // text variant, JSON.parse runs against `[object Object]` and every
+  // TaskCreate id falls back to `pending-${toolUseId}`, leaving TaskUpdate
+  // events orphaned with empty content.
+  const { toolResults, toolResultTexts } = useMemo(() => {
     const results = new Map<string, any>();
+    const texts = new Map<string, string>();
 
     streamMessages.forEach((msg) => {
       if (msg.type === 'user' && msg.message?.content && Array.isArray(msg.message.content)) {
         msg.message.content.forEach((content: any) => {
           if (content.type === 'tool_result' && content.tool_use_id) {
             results.set(content.tool_use_id, content);
+            const raw = content.content;
+            let text = '';
+            if (typeof raw === 'string') {
+              text = raw;
+            } else if (Array.isArray(raw)) {
+              text = raw.map((p: any) => (typeof p?.text === 'string' ? p.text : '')).join('');
+            } else if (typeof raw?.text === 'string') {
+              text = raw.text;
+            } else if (raw && typeof raw === 'object') {
+              // Last-resort: SDK 0.3.x native binary may serialize structured
+              // tool_result (e.g. TaskCreateOutput) as a plain object instead of
+              // a string content block. Stringify so accumulator can JSON.parse.
+              try { text = JSON.stringify(raw); } catch { text = ''; }
+            }
+            texts.set(content.tool_use_id, text);
           }
         });
       }
     });
 
-    return results;
+    return { toolResults: results, toolResultTexts: texts };
   }, [streamMessages]);
 
   // Helper function to extract image data from tool results
@@ -506,8 +528,8 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
     // The widget renders only on the LAST task-tool tool_use; earlier ones are
     // marked stale (animations stopped).
     const { todos: accumulatedTodos, lastTaskToolId } = useMemo(
-      () => accumulateTodos(streamMessages, toolResults),
-      [streamMessages, toolResults]
+      () => accumulateTodos(streamMessages, toolResultTexts),
+      [streamMessages, toolResultTexts]
     );
 
     // Render tools separately (after the main avatar+text block)
@@ -760,12 +782,18 @@ const StreamMessage: React.FC<StreamMessageProps> = ({
     let combinedText = '';
     let ruleNames: string[] = [];
 
+    // Brain: gotcha-following-rules-regex-codex-prose-collision
+    // Strict: only a clean comma-separated list of kebab/snake/word identifiers
+    // ended at EOL. Codex (gpt-5-codex) reinterprets the personality.rs hint
+    // ("Following rules: X, Y") as free Italian prose; a permissive `(.+)$`
+    // greedy-swallows the whole turn into rule-pills, erasing the bubble.
+    const RULES_PATTERN = /^Following rules?:\s*([\w-]+(?:\s*,\s*[\w-]+)*)\s*\.?\s*$/m;
     msg.content.forEach((content: any) => {
       if (content.type === 'text' && content.text) {
-        const rulesMatch = content.text.match(/^(?:Following rules?:\s*)(.+)$/m);
+        const rulesMatch = content.text.match(RULES_PATTERN);
         if (rulesMatch) {
           ruleNames = rulesMatch[1].split(',').map((r: string) => r.trim().replace(/\.$/, '')).filter(Boolean);
-          combinedText += content.text.replace(/^Following rules?:\s*.+$/m, '').replace(/^\n+/, '');
+          combinedText += content.text.replace(RULES_PATTERN, '').replace(/^\n+/, '');
         } else {
           combinedText += content.text;
         }

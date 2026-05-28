@@ -23,6 +23,8 @@ import "./sonner-custom.css";
 import { saveSessionBackup, cleanupOldBackups } from "./utils/sessionRecovery";
 
 import TerminalSidebar from "./components/TerminalSidebar";
+import HandoffDialog from "./components/HandoffDialog";
+import { registerSendMessageForTargetAgent } from "./services/sendMessageBridge";
 import SidePanel from "./components/SidePanel";
 import SidePanelAccordion from "./components/SidePanelAccordion";
 import { SplitPaneDivider, SplitDropZone, SplitCodeEditor, type SidebarDropData } from "./components/SplitView";
@@ -134,6 +136,7 @@ import { findDefinition } from "./services/codeIntelService";
 import { getProviderRequestFields, getActiveModelName, getActiveModelDisplayName, getActiveProviderConfig } from "./services/claudeSDK";
 import { useDeepLinkHandler } from "./hooks/useDeepLinkHandler";
 import { usePipWindow } from "./hooks/usePipWindow";
+import { useJackWindow } from "./hooks/useJackWindow";
 import { useSystemWakeHandler } from "./hooks/useSystemWakeHandler";
 import { useWindowFocus } from "./hooks/useWindowFocus";
 // import { useTelegramBot } from "./hooks/useTelegramBot"; // DEPRECATED - using Telegram Central Bot now
@@ -3067,7 +3070,7 @@ function AppContent() {
       agent_name: capturedAgentLabel,
       has_attachments: attachments.length > 0,
       attachments_count: attachments.length,
-      model: options?.model || 'opus46',
+      model: options?.model || 'opus47',
       thinking_mode: options?.thinkingMode || 'auto',
       message_length: content.length,
     });
@@ -3216,9 +3219,9 @@ function AppContent() {
             const providerConfig = await getActiveProviderConfig(capturedAgentId);
           return {
             prompt,
-            // 🦆 MODEL FIX: Map friendly name (opus46) to API model ID (claude-opus-4-6)
+            // 🦆 MODEL FIX: Map friendly name (opus47) to API model ID (claude-opus-4-7)
             model: (() => {
-              const friendlyName = options?.model || 'opus46';
+              const friendlyName = options?.model || 'opus47';
               const resolvedId = prf.resolveModel(friendlyName);
               console.log(`🦆 [MODEL DEBUG sendMessageForAgent] friendlyName=${friendlyName}, resolvedId=${resolvedId}`);
               return resolvedId;
@@ -3411,7 +3414,7 @@ function AppContent() {
         agent_name: capturedAgentLabel,
         response_time_ms: responseTime,
         response_length: response.result?.length || 0,
-        model: options?.model || 'opus46',
+        model: options?.model || 'opus47',
         session_id: response.session_id,
         total_cost_usd: response.total_cost_usd,
       });
@@ -3429,7 +3432,7 @@ function AppContent() {
         agent_id: capturedAgentId,
         error_type: wasAborted ? 'user_aborted' : 'stream_error',
         error_message: errorMsg.substring(0, 200),
-        model: options?.model || 'opus46',
+        model: options?.model || 'opus47',
       });
 
       // Check if this was an abort
@@ -3973,7 +3976,7 @@ function AppContent() {
             return {
             prompt,
             // 🦆 MODEL FIX: For non-anthropic providers, use model ID directly; for Anthropic, resolve friendly name
-            model: isJobProvider ? (options?.model || 'opus46') : prf.resolveModel(options?.model || 'opus46'),
+            model: isJobProvider ? (options?.model || 'opus47') : prf.resolveModel(options?.model || 'opus47'),
             thinkingMode: options?.thinkingMode,
             permissionMode: options?.permissionMode,
             // Extract only file paths from ChatAttachment objects - Rust expects Vec<String>
@@ -4168,6 +4171,14 @@ function AppContent() {
       abortControllersRef.current.delete(streamKey);
     }
   }, [isChatConfigured, chatSessions, ensureListenerReady, saveKanbanChatSession, remoteModels]);
+
+  // Expose sendMessageForTargetAgent to services outside the React tree
+  // (handoffService.executeHandoff fires it right after createSession so the
+  // handoff bootstrap prompt is sent automatically without manual Enter).
+  // Brain: handoff-agent-fork
+  useEffect(() => {
+    registerSendMessageForTargetAgent(sendMessageForTargetAgent);
+  }, [sendMessageForTargetAgent]);
 
   // Abort stream for a specific agent (used by Kanban)
   const abortStreamForTargetAgent = useCallback((targetAgentId: string) => {
@@ -5129,6 +5140,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
 
   // PiP Window hook
   const { isPipOpen, openPipWindow, togglePipWindow, closePipWindow, updatePipAgents, showPipWindow, hidePipWindow } = usePipWindow();
+  const { toggleJackWindow } = useJackWindow();
 
   // activeTerminal moved to top of component for TypeScript hoisting
 
@@ -8297,6 +8309,45 @@ Please respond ONLY with the summary, no preamble or explanations.`;
     };
   }, [markTerminalIdle, tauriAvailable]);
 
+  // Listen for remote terminal creation/deletion (Remote API → visible PTY terminals)
+  const activeProjectsRef = useRef(activeProjects);
+  useEffect(() => { activeProjectsRef.current = activeProjects; }, [activeProjects]);
+
+  useEffect(() => {
+    if (!tauriAvailable) return;
+    let cancelled = false;
+    let cleanupFn: (() => void) | undefined;
+
+    listen<{ terminalId: string; action: string; cwd?: string; label?: string }>(
+      "terminal-list-changed",
+      async (event) => {
+        if (cancelled) return;
+        const { terminalId, action } = event.payload;
+        if (action === "created") {
+          const freshList = await invoke<TerminalInfo[]>("list_terminals");
+          if (cancelled) return;
+          setTerminals(freshList);
+          const projects = activeProjectsRef.current.map(p => ({ path: p.path, name: p.name }));
+          await openTerminalWindow(projects);
+          try {
+            const { emitTo } = await import("@tauri-apps/api/event");
+            await emitTo("terminal-manager", "terminal-window-select-terminal", { terminalId });
+          } catch { /* terminal window may not exist yet */ }
+        } else if (action === "closed") {
+          setTerminals(prev => prev.filter(t => t.id !== terminalId));
+        }
+      }
+    ).then(fn => {
+      if (cancelled) fn();
+      else cleanupFn = fn;
+    }).catch(err => console.warn("Unable to listen to terminal-list-changed", err));
+
+    return () => {
+      cancelled = true;
+      cleanupFn?.();
+    };
+  }, [tauriAvailable, openTerminalWindow]);
+
   const handleToggleGroup = useCallback((cwd: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -11124,6 +11175,7 @@ Please respond ONLY with the summary, no preamble or explanations.`;
         setForceExpandSection('taskhub');
       }
     }, [sidePanelCollapsed]),
+    toggleJack: toggleJackWindow,
   });
 
   // Tab management handlers
@@ -13116,6 +13168,7 @@ You have access to all Bash tools to execute git commands like:
               isCodeEditorActive={isCodeEditorTabActive}
               onStoreClick={() => setShowStoreDrawer(!showStoreDrawer)}
               isStoreOpen={showStoreDrawer}
+              onJackClick={toggleJackWindow}
             />
 
             {/* Tab Bar - VSCode style (always shown) */}
@@ -14620,6 +14673,10 @@ You have access to all Bash tools to execute git commands like:
 
       {/* Update notification toast — checks GitHub releases on mount */}
       <UpdateToast />
+
+      {/* Handoff dialog — global singleton driven by useHandoffDialogStore */}
+      {/* Brain: handoff-agent-fork */}
+      <HandoffDialog />
 
       <Toaster position="bottom-right" richColors closeButton />
     </>

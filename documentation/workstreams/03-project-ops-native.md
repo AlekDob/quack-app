@@ -1,13 +1,11 @@
 ---
 ws: 03
 title: "Project-ops as Quack's native spec system"
-status: "FE + BE + HOOK SHIPPED — SMOKE TEST PENDING"
-focus: current
+status: "COMPLETED — SMOKE TEST PASSED"
+focus: completed
 opened: 2026-05-26
-updated: 2026-05-26
+updated: 2026-05-27
 feature: documentation/features/072-project-ops-native-integration.md
-warning: |
-  Smoke test richiede restart Quack (PostToolUse hook viene letto solo a session start). Verificare: (a) workstreams + status tab visibili nell'accordion, (b) bootstrap_project_ops silenzioso al cambio progetto, (c) Plan Mode che invoca project-ops skill, (d) banner rosso HooksPanel se settings.json corrotto.
 ---
 
 # WS03 — Project-ops as Quack's native spec system

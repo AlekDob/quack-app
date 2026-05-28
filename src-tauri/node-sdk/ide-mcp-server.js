@@ -31,6 +31,11 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { parseHttpArgs, startHttpTransport } from './lib/mcp-http-transport.js';
+
+// Brain: ws6-mcp-http-pool — dual transport (stdio | http)
+const SERVER_NAME = 'ide-tools';
+const SERVER_VERSION = '1.1.0';
 import { execSync, spawn, spawnSync } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync } from 'fs';
 import { join, basename } from 'path';
@@ -878,25 +883,26 @@ async function handleGetContext(args) {
 // MAIN SERVER
 // =============================================================================
 
-const server = new Server(
-  {
-    name: 'ide-tools',
-    version: '1.0.0',
-  },
-  {
-    capabilities: {
-      tools: {},
+function createMcpServer() {
+  const server = new Server(
+    {
+      name: SERVER_NAME,
+      version: SERVER_VERSION,
     },
-  }
-);
+    {
+      capabilities: {
+        tools: {},
+      },
+    }
+  );
 
-// Handle tool listing
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return { tools: TOOLS };
-});
+  // Handle tool listing
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    return { tools: TOOLS };
+  });
 
-// Handle tool calls
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  // Handle tool calls
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
@@ -952,13 +958,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       isError: true,
     };
   }
-});
+  });
+
+  return server;
+}
 
 // Start server
 async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error('[IDE-MCP] Server started - Universal IDE integration ready');
+  const { useHttp, port } = parseHttpArgs(process.argv);
+
+  if (useHttp) {
+    if (Number.isNaN(port) || port < 0 || port > 65535) {
+      console.error('[IDE-MCP] invalid --port value, must be 0-65535');
+      process.exit(2);
+    }
+    // Brain: ws6-mcp-http-pool — factory for per-session Server instances
+    await startHttpTransport({
+      serverFactory: createMcpServer,
+      port,
+      name: SERVER_NAME,
+      version: SERVER_VERSION,
+    });
+  } else {
+    const server = createMcpServer();
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error('[IDE-MCP] stdio transport ready — Universal IDE integration ready');
+  }
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error('[IDE-MCP] fatal:', err);
+  process.exit(1);
+});

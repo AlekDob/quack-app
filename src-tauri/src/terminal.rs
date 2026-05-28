@@ -1,5 +1,5 @@
 use std::{
-  collections::HashMap,
+  collections::{HashMap, VecDeque},
   fs,
   io::{Read, Write},
   path::{Path, PathBuf},
@@ -16,21 +16,20 @@ use tauri_plugin_store::StoreExt;
 use uuid::Uuid;
 
 #[derive(Default)]
-struct TerminalRegistry {
+pub(crate) struct TerminalRegistry {
   sessions: HashMap<String, TerminalSession>,
   order: Vec<String>,
   counter: usize,
 }
 
-#[allow(dead_code)]
-struct TerminalSession {
+pub(crate) struct TerminalSession {
   label: String,
   color: String,
   cwd: PathBuf,
   alive: bool,
   process: Option<TerminalProcess>,
   detected_port: Option<u16>,
-  output_buffer: String,
+  output_ring: OutputRingBuffer,
   working_on: Option<String>,
   avatar: Option<String>,
   branch: Option<String>,
@@ -40,6 +39,45 @@ struct TerminalProcess {
   master: Arc<Mutex<Box<dyn MasterPty + Send>>>,
   writer: Arc<Mutex<Box<dyn Write + Send>>>,
   child: Arc<Mutex<Box<dyn Child + Send + Sync>>>,
+}
+
+// ─── Output Ring Buffer ────────────────────────────────────────
+// Captures terminal output for Remote API polling (GET /api/terminals/:id/output).
+// Stored per-session, fed by the PTY output thread alongside Tauri event emission.
+
+struct OutputRingBuffer {
+  lines: VecDeque<String>,
+  pending: String,
+  max_lines: usize,
+  total_lines_seen: usize,
+}
+
+impl OutputRingBuffer {
+  fn new(max_lines: usize) -> Self {
+    Self { lines: VecDeque::with_capacity(max_lines), pending: String::new(), max_lines, total_lines_seen: 0 }
+  }
+
+  fn push(&mut self, text: &str) {
+    self.pending.push_str(text);
+    while let Some(pos) = self.pending.find('\n') {
+      let line = self.pending[..pos].trim_end_matches('\r').to_string();
+      self.pending.drain(..=pos);
+      self.lines.push_back(line);
+      self.total_lines_seen += 1;
+      if self.lines.len() > self.max_lines {
+        self.lines.pop_front();
+      }
+    }
+  }
+
+  fn last_n(&self, n: usize) -> Vec<String> {
+    let start = self.lines.len().saturating_sub(n);
+    self.lines.iter().skip(start).cloned().collect()
+  }
+}
+
+impl Default for OutputRingBuffer {
+  fn default() -> Self { Self::new(5000) }
 }
 
 #[derive(Serialize, Clone)]
@@ -85,7 +123,7 @@ pub struct ProcessInfo {
   pub status: String, // "running" | "idle"
 }
 
-static REGISTRY: Lazy<Mutex<TerminalRegistry>> = Lazy::new(|| Mutex::new(TerminalRegistry::default()));
+pub(crate) static REGISTRY: Lazy<Mutex<TerminalRegistry>> = Lazy::new(|| Mutex::new(TerminalRegistry::default()));
 
 // Detect port from terminal output
 fn detect_port_from_output(text: &str) -> Option<u16> {
@@ -119,17 +157,6 @@ fn detect_port_from_output(text: &str) -> Option<u16> {
   None
 }
 
-// Update detected port for terminal
-fn update_terminal_port(id: &str, port: u16) {
-  if let Ok(mut registry) = REGISTRY.lock() {
-    if let Some(session) = registry.sessions.get_mut(id) {
-      if session.detected_port != Some(port) {
-        session.detected_port = Some(port);
-        eprintln!("🦆 Detected port {} for terminal {}", port, session.label);
-      }
-    }
-  }
-}
 
 #[tauri::command]
 pub fn create_terminal(
@@ -150,7 +177,7 @@ pub fn list_terminals() -> Result<Vec<TerminalInfo>, String> {
   list_terminals_impl().map_err(|err| err.to_string())
 }
 
-fn list_terminals_impl() -> Result<Vec<TerminalInfo>> {
+pub(crate) fn list_terminals_impl() -> Result<Vec<TerminalInfo>> {
   let registry = REGISTRY
     .lock()
     .map_err(|_| anyhow!("Errore di sincronizzazione"))?;
@@ -245,7 +272,7 @@ pub fn update_terminal_working_on(
   update_terminal(terminal_id, None, None, None, Some(working_on), None, None)
 }
 
-fn create_terminal_impl(
+pub(crate) fn create_terminal_impl(
   app: &AppHandle,
   id_input: Option<String>,
   label: Option<String>,
@@ -278,7 +305,7 @@ fn create_terminal_impl(
     alive: true,
     process: Some(process),
     detected_port: None,
-    output_buffer: String::new(),
+    output_ring: OutputRingBuffer::default(),
     working_on: working_on.clone(),
     avatar: avatar.clone(),
     branch: branch.clone(),
@@ -300,7 +327,7 @@ fn create_terminal_impl(
   })
 }
 
-fn write_to_terminal_impl(id: &str, data: &str) -> Result<()> {
+pub(crate) fn write_to_terminal_impl(id: &str, data: &str) -> Result<()> {
   let writer = {
     let registry = REGISTRY
       .lock()
@@ -359,7 +386,7 @@ fn resize_terminal_impl(id: &str, rows: u16, cols: u16) -> Result<()> {
     .context("Impossibile ridimensionare il terminale")
 }
 
-fn close_terminal_impl(id: &str) -> Result<()> {
+pub(crate) fn close_terminal_impl(id: &str) -> Result<()> {
   let process = {
     let mut registry = REGISTRY
       .lock()
@@ -507,6 +534,50 @@ fn spawn_process(app: &AppHandle, id: &str, cwd: &Path) -> Result<TerminalProces
   })
 }
 
+pub(crate) fn get_terminal_info(id: &str) -> Result<TerminalInfo> {
+  let registry = REGISTRY.lock().map_err(|_| anyhow!("Sync error"))?;
+  let session = registry.sessions.get(id).ok_or_else(|| anyhow!("Terminal not found"))?;
+  Ok(compile_info(id, session))
+}
+
+static ANSI_RE: Lazy<Regex> = Lazy::new(|| {
+  Regex::new(r"[\x1b\x9b][\[\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><~]|\x1b[PX^_].*?\x1b\\|\x1b\][^\x07]*\x07").unwrap()
+});
+
+pub(crate) fn read_terminal_output(id: &str, lines: usize, strip_ansi: bool) -> Result<(Vec<String>, usize, bool)> {
+  let (mut output, total, alive) = {
+    let registry = REGISTRY.lock().map_err(|_| anyhow!("Sync error"))?;
+    let session = registry.sessions.get(id).ok_or_else(|| anyhow!("Terminal not found"))?;
+    (session.output_ring.last_n(lines), session.output_ring.total_lines_seen, session.alive)
+  };
+  if strip_ansi {
+    output = output.iter().map(|l| ANSI_RE.replace_all(l, "").to_string()).collect();
+  }
+  Ok((output, total, alive))
+}
+
+fn flush_and_store(app: &AppHandle, id: &str, text: &str) {
+  if let Ok(mut reg) = REGISTRY.lock() {
+    if let Some(session) = reg.sessions.get_mut(id) {
+      session.output_ring.push(text);
+      if let Some(port) = detect_port_from_output(text) {
+        if session.detected_port != Some(port) {
+          session.detected_port = Some(port);
+          eprintln!("🦆 Detected port {} for terminal {}", port, session.label);
+        }
+      }
+    }
+  }
+  let payload = TerminalDataPayload { id: id.to_string(), data: text.to_string() };
+  let _ = app.emit("terminal-data", payload);
+  if let Some(broadcast) = crate::remote_ws::WS_BROADCAST.get() {
+    broadcast.send(crate::remote_ws::WsEvent::TerminalOutput {
+      terminal_id: id.to_string(),
+      data: text.to_string(),
+    });
+  }
+}
+
 fn start_output_thread(
   app: AppHandle,
   id: String,
@@ -575,14 +646,7 @@ fn start_output_thread(
 
           if should_flush && !accumulated_bytes.is_empty() {
             let text = String::from_utf8_lossy(&accumulated_bytes).to_string();
-            if let Some(port) = detect_port_from_output(&text) {
-              update_terminal_port(&id, port);
-            }
-            let payload = TerminalDataPayload {
-              id: id.clone(),
-              data: text,
-            };
-            let _ = app.emit("terminal-data", payload);
+            flush_and_store(&app, &id, &text);
             accumulated_bytes.clear();
             last_flush = std::time::Instant::now();
           }
@@ -592,14 +656,7 @@ fn start_output_thread(
           // Flush any accumulated data so prompts without trailing \n are shown.
           if !accumulated_bytes.is_empty() {
             let text = String::from_utf8_lossy(&accumulated_bytes).to_string();
-            if let Some(port) = detect_port_from_output(&text) {
-              update_terminal_port(&id, port);
-            }
-            let payload = TerminalDataPayload {
-              id: id.clone(),
-              data: text,
-            };
-            let _ = app.emit("terminal-data", payload);
+            flush_and_store(&app, &id, &text);
             accumulated_bytes.clear();
             last_flush = std::time::Instant::now();
           }
@@ -611,14 +668,7 @@ fn start_output_thread(
     // Flush any remaining data
     if !accumulated_bytes.is_empty() {
       let text = String::from_utf8_lossy(&accumulated_bytes).to_string();
-      if let Some(port) = detect_port_from_output(&text) {
-        update_terminal_port(&id, port);
-      }
-      let payload = TerminalDataPayload {
-        id: id.clone(),
-        data: text,
-      };
-      let _ = app.emit("terminal-data", payload);
+      flush_and_store(&app, &id, &text);
     }
 
     let (code, success, message) = match child.lock() {
@@ -684,7 +734,7 @@ fn resolve_cwd(cwd_input: Option<String>) -> Result<PathBuf> {
   default_cwd()
 }
 
-fn compile_info(id: &str, session: &TerminalSession) -> TerminalInfo {
+pub(crate) fn compile_info(id: &str, session: &TerminalSession) -> TerminalInfo {
   TerminalInfo {
     id: id.to_string(),
     label: session.label.clone(),

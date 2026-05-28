@@ -199,6 +199,13 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutConfig> = (() =
       defaultKeys: "Ctrl+B",
       currentKeys: "Ctrl+B",
     },
+    toggleJack: {
+      id: "toggleJack" as const,
+      label: "Toggle Jack",
+      description: "Open Jack supervisor window (cross-project PM)",
+      defaultKeys: buildShortcut("J", true),
+      currentKeys: buildShortcut("J", true),
+    },
     toggleEditorPreview: {
       id: "toggleEditorPreview" as const,
       label: "Toggle Editor Preview",

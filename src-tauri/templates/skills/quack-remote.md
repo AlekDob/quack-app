@@ -9,6 +9,19 @@ builtin: true
 
 Control your Quack workspace remotely from any project. This skill lets any Claude agent interact with Quack's agents, sessions, and automations via the local REST API.
 
+## CRITICAL: Terminals vs Agent Sessions
+
+**Choose the right endpoint for the task:**
+
+| Need | Endpoint | What happens in Quack |
+|------|----------|-----------------------|
+| **Run a shell command** (npm, cargo, git, docker, etc.) | `POST /api/terminals` + `POST /api/terminals/:id/write` | Opens a **CLI terminal** in Quack's Terminal Window (xterm.js + PTY). No AI agent involved. |
+| **Ask an AI agent to do work** (analyze code, write tests, etc.) | `POST /api/execute` | Creates an **AI agent session** in Quack's sidebar. Claude/Codex processes the prompt. |
+
+**Rule of thumb:** If you would run it in a shell (`bash`, `zsh`, `cmd`), use `/api/terminals`. If you need an AI agent to think about it, use `/api/execute`.
+
+**NEVER use `/api/execute` to run shell commands.** That creates an AI session where the agent will try to interpret your shell command as a task. Use `/api/terminals` instead — it opens a real terminal visible in Quack's Terminal Window, executes instantly, and you can read the output.
+
 ## Prerequisites
 
 Quack must be running with Remote API enabled (Settings > Remote API > Enable).
@@ -245,7 +258,121 @@ Get team status with auto-synced member statuses. Use for polling team progress 
 ### DELETE /api/teams/:id
 Disband a team (soft delete — sessions remain active).
 
+## Terminal Management (Shell Commands)
+
+**Use these endpoints whenever you need to run a CLI command** (npm, cargo, git, docker, python, etc.). This creates a real PTY terminal in Quack's Terminal Window — NOT an AI agent session. The user sees the terminal open and can watch the output live. The command executes instantly and you can poll the output later.
+
+### POST /api/terminals
+Create a new terminal session. Opens in Quack's Terminal Window and auto-focuses.
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cwd": "/path/to/project",
+    "label": "Dev Server",
+    "color": "#4ecdc4",
+    "workingOn": "Running dev server"
+  }' \
+  http://127.0.0.1:$PORT/api/terminals
+```
+
+Response: `TerminalInfo` object with `id`, `label`, `cwd`, `alive`, etc.
+
+### GET /api/terminals
+List all terminal sessions.
+
+### GET /api/terminals/:id
+Get info for a specific terminal.
+
+### POST /api/terminals/:id/write
+Send data (commands) to a terminal. Always include `\n` to execute.
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"data": "npm run dev\n"}' \
+  http://127.0.0.1:$PORT/api/terminals/$TERMINAL_ID/write
+```
+
+### GET /api/terminals/:id/output
+Read the last N lines of terminal output. Use `strip_ansi=true` for clean text.
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:$PORT/api/terminals/$TERMINAL_ID/output?lines=50&strip_ansi=true"
+```
+
+Response:
+```json
+{
+  "terminalId": "uuid",
+  "lines": ["$ npm run dev", "> ready on http://localhost:3000"],
+  "totalLines": 42,
+  "alive": true
+}
+```
+
+### DELETE /api/terminals/:id
+Close and remove a terminal session.
+
+### Terminal workflow (non-blocking command execution)
+
+```bash
+# 1. Create terminal
+TERM_RESULT=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"cwd\": \"$PROJECT_PATH\", \"label\": \"Build\"}" \
+  http://127.0.0.1:$PORT/api/terminals)
+TERMINAL_ID=$(echo $TERM_RESULT | jq -r '.id')
+
+# 2. Execute command (non-blocking — returns immediately)
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"data": "npm run build\n"}' \
+  http://127.0.0.1:$PORT/api/terminals/$TERMINAL_ID/write
+
+# 3. Continue other work... then check output later
+sleep 5
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:$PORT/api/terminals/$TERMINAL_ID/output?lines=20&strip_ansi=true" | jq
+```
+
 ## Common Workflows
+
+### Run a shell command in a Quack terminal (most common)
+
+Use this when you need to run npm, cargo, docker, git, or any CLI tool.
+This opens a real terminal in Quack — NOT an AI agent session.
+
+```bash
+# 1. Read config
+CONFIG=$(cat ~/Library/Application\ Support/com.quack.terminal/quack-remote.json)
+PORT=$(echo $CONFIG | jq -r '.port')
+TOKEN=$(echo $CONFIG | jq -r '.token')
+
+# 2. Create a terminal (opens in Quack's Terminal Window)
+TERM=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "{\"cwd\": \"$(pwd)\", \"label\": \"Build\"}" \
+  http://127.0.0.1:$PORT/api/terminals)
+TID=$(echo $TERM | jq -r '.id')
+
+# 3. Run a command (non-blocking — returns immediately)
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"data": "npm run build\n"}' \
+  http://127.0.0.1:$PORT/api/terminals/$TID/write
+
+# 4. Check output later
+sleep 10
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "http://127.0.0.1:$PORT/api/terminals/$TID/output?lines=30&strip_ansi=true" | jq '.lines[]'
+
+# 5. Optionally close when done
+curl -s -X DELETE -H "Authorization: Bearer $TOKEN" \
+  http://127.0.0.1:$PORT/api/terminals/$TID
+```
 
 ### Execute a task on a Quack agent and monitor it
 
@@ -283,6 +410,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://127.0.0.1:$PORT/api/agents \
 
 Connect to `ws://127.0.0.1:{port}/ws?token={token}` for live events:
 - `AgentStatus`, `SessionCreated`, `SessionCompleted`, `JobFired`
+- `TerminalCreated`, `TerminalOutput`, `TerminalClosed`
 
 ## Error Handling
 

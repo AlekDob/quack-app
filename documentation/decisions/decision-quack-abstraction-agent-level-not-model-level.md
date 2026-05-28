@@ -2,16 +2,18 @@
 type: decision
 project: quack-app
 created: 2026-05-15
-last_verified: 2026-05-15
-status: proposed
-tags: [architecture, sdk, multi-vendor, codex, claude-agent-sdk, vercel-ai-sdk, abstraction, adapter]
+last_verified: 2026-05-28
+status: on-hold
+tags: [architecture, sdk, multi-vendor, codex, claude-agent-sdk, vercel-ai-sdk, abstraction, adapter, on-hold]
 ---
 
 # Decision: il layer di astrazione Quack va al LIVELLO AGENTE, non al livello modello
 
 ## Status
 
-**Proposed** (2026-05-15). Reply formale al doc di Antonio
+**On-hold** (2026-05-28). Backend abstraction (Rust `AgentBackend` trait + `QuackAgentEvent`) completata ma UI descoped. Feature 066 in pausa — Codex integration non prioritaria. Decisione architetturale resta valida se/quando si riprende.
+
+Originale: **Proposed** (2026-05-15). Reply formale al doc di Antonio
 `decision-quack-sdk-abstraction-multi-vendor.md` (2026-05-14). Non lo contraddice:
 lo **raffina** fissando il livello dove mettere il confine di proprietà Quack, sulla
 base di evidenza empirica già in repo (branch `036-vercel-ai-sdk-multi-provider`).

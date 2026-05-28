@@ -2,10 +2,12 @@
 type: pattern
 project: quack-app
 created: 2026-05-16
-last_verified: 2026-05-16
-tags: [codex, multi-backend, ui, capability-gate, sessionStore, agent-abstraction]
+last_verified: 2026-05-28
+tags: [codex, multi-backend, ui, capability-gate, sessionStore, agent-abstraction, on-hold]
 ---
 # Pattern: capability-gate Claude-only UI for non-Claude session backends
+
+> **ON-HOLD (2026-05-28):** Feature 066 (Codex backend) in pausa. UI descoped dalla feature doc. Questo pattern resta come riferimento architetturale valido se/quando si riprende il multi-backend.
 
 ## When to apply
 

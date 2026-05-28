@@ -17,6 +17,7 @@ import type { TodoItem } from './TodoProgressBar';
 import AgentRulesBanner from './AgentRulesBanner';
 import BrainContextBanner from './BrainContextBanner';
 import BTWDrawer from './btw/BTWDrawer';
+import { useHandoffDialogStore } from '../stores/handoffDialogStore';
 import { useBTW } from '../hooks/useBTW';
 import { useQuickLoop } from '../hooks/useQuickLoop';
 import { useKanbanStore, type KanbanNotification } from '../stores/kanbanStore';
@@ -26,6 +27,7 @@ import { useAgentRules } from '../hooks/useAgentRules';
 import { RemoteTeamWidget } from './RemoteTeamWidget';
 import { useTeamStore } from '../stores/teamStore';
 import { useSessionStore } from '../stores/sessionStore';
+import { useTerminalStore } from '../stores/terminalStore';
 import { useFileAttributionStore } from '../stores/fileAttributionStore';
 import { accumulateTodos } from '../utils/taskAccumulator';
 // Brain: 037-anthropic-compatible-providers
@@ -192,7 +194,7 @@ export default function ChatView({
   // Agent Chat Settings - controlled from parent
   inputDraft = '',
   onInputDraftChange,
-  model = 'opus46',
+  model = 'opus47',
   onModelChange,
   thinkingMode = 'auto',
   onThinkingModeChange,
@@ -266,6 +268,10 @@ export default function ChatView({
 
   // Debug mode banner accordion state
   const [debugBannerExpanded, setDebugBannerExpanded] = useState(false);
+
+  // Handoff dialog — opened via global store so popover, slash command, and sidebar share state
+  // Brain: handoff-agent-fork
+  const openHandoffDialog = useHandoffDialogStore((s) => s.open);
 
 
   // Load active rules using the hook (automatic, zero config)
@@ -404,6 +410,32 @@ export default function ChatView({
         return;
       }
 
+      // INTERCEPT /handoff @agent — open HandoffDialog with target pre-selected
+      // Brain: handoff-agent-fork
+      if (commandName === 'handoff') {
+        if (!internalSessionId) {
+          toast.error('Handoff requires an active session.');
+          return;
+        }
+        const args = (commandArgs || '').trim();
+        const agentMatch = args.match(/^@([\w-]+)/);
+        if (!agentMatch) {
+          openHandoffDialog(internalSessionId);
+          return;
+        }
+        const wantedName = agentMatch[1].toLowerCase();
+        const terminals = useTerminalStore.getState().terminals;
+        const target = terminals.find(
+          (t) => (t.label || '').toLowerCase() === wantedName || t.id.toLowerCase() === wantedName,
+        );
+        if (!target) {
+          toast.error(`Agent "${wantedName}" not found in this project.`);
+          return;
+        }
+        openHandoffDialog(internalSessionId, target.id);
+        return;
+      }
+
       // INTERCEPT /background command - create background task instead of sending message
       if (commandName === 'background') {
         if (!commandArgs || !commandArgs.trim()) {
@@ -440,7 +472,7 @@ export default function ChatView({
             description: prompt,
             agentId: agentName,
             prompt: prompt,
-            model: 'opus46',
+            model: 'opus47',
             workingDirectory: projectPath,
             notifyOnComplete: true,
             kanbanTaskId: newTask.id, // Link to Kanban for status sync
@@ -1125,6 +1157,9 @@ export default function ChatView({
               stopLoop: quickLoop.stopLoop,
             },
             onCompact: () => onSendMessage('/compact'),
+            onHandoff: internalSessionId
+              ? () => openHandoffDialog(internalSessionId)
+              : undefined,
             onOpenTerminal: onOpenSessionInTerminal,
             onClear: onClearConversation,
           }}

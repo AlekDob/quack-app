@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_store::StoreExt;
 
+use crate::remote_api_terminal;
 use crate::remote_auth::RemoteAuthState;
 use crate::remote_ws::{WsBroadcast, WsEvent};
 
@@ -48,7 +49,7 @@ pub struct ApiState {
 
 impl ApiState {
     /// Validate Bearer token from request headers. Returns Err(401) if invalid.
-    async fn check_auth(&self, headers: &HeaderMap) -> Result<(), (StatusCode, Json<ApiError>)> {
+    pub async fn check_auth(&self, headers: &HeaderMap) -> Result<(), (StatusCode, Json<ApiError>)> {
         let expected = self.auth.get_token().await;
         let expected_token = match expected.as_deref() {
             Some(t) => t,
@@ -255,8 +256,8 @@ struct OrderingResponse {
 }
 
 #[derive(Serialize, Clone)]
-struct ApiError {
-    error: String,
+pub struct ApiError {
+    pub error: String,
 }
 
 type ApiResult<T> = Result<Json<T>, (StatusCode, Json<ApiError>)>;
@@ -290,6 +291,11 @@ pub fn create_api_router(
         .route("/sessions/:id/messages", get(handle_session_messages))
         .route("/sessions/:id/send", post(handle_send_message))
         .route("/avatars/:filename", get(handle_avatar))
+        // Terminal management endpoints (Remote API → visible PTY terminals)
+        .route("/terminals", get(remote_api_terminal::handle_list_terminals).post(remote_api_terminal::handle_create_terminal))
+        .route("/terminals/:id", get(remote_api_terminal::handle_get_terminal).delete(remote_api_terminal::handle_close_terminal))
+        .route("/terminals/:id/write", post(remote_api_terminal::handle_write_terminal))
+        .route("/terminals/:id/output", get(remote_api_terminal::handle_terminal_output))
         .with_state(state)
 }
 

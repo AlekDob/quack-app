@@ -27,6 +27,8 @@ import { createInterface } from 'readline';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import { execSync } from 'child_process';
+// Brain: ws6-mcp-http-pool
+import { McpPool } from './lib/mcp-pool.js';
 // 🐛 DIAG: Write diagnostics to a file that's easy to check
 const DIAG_FILE = join(homedir(), '.quack', 'daemon-diag.log');
 function diag(msg) {
@@ -779,11 +781,22 @@ The PostToolUse hook automatically regenerates \`INDEX.md\` after each Edit/Writ
     const codeIntelMcpServerPath = join(__dirname, 'code-intel-mcp-server.js');
     const visualizerMcpServerPath = join(__dirname, 'visualizer-mcp-server.js');
     // Brain: quack-visualizer-inline-html
+    // Brain: ws6-mcp-http-pool
+    // When QUACK_MCP_POOL=1 the daemon spawned a shared pool at boot; reuse its
+    // HTTP URLs for all sessions (3 processes total instead of 3×N).
+    // Otherwise fall back to per-session stdio (legacy behaviour).
+    const poolConfig = mcpPool ? mcpPool.toMcpConfig() : null;
     options.mcpServers = {
       ...(resolvedMcpServers || {}),
-      'ide-tools': { command: 'node', args: [ideMcpServerPath] },
-      'code-intel': { type: 'stdio', command: 'node', args: [codeIntelMcpServerPath] },
-      'visualizer': { command: 'node', args: [visualizerMcpServerPath] },
+      ...(poolConfig && poolConfig['ide-tools']
+        ? { 'ide-tools': poolConfig['ide-tools'] }
+        : { 'ide-tools': { command: 'node', args: [ideMcpServerPath] } }),
+      ...(poolConfig && poolConfig['code-intel']
+        ? { 'code-intel': poolConfig['code-intel'] }
+        : { 'code-intel': { type: 'stdio', command: 'node', args: [codeIntelMcpServerPath] } }),
+      ...(poolConfig && poolConfig['visualizer']
+        ? { 'visualizer': poolConfig['visualizer'] }
+        : { 'visualizer': { command: 'node', args: [visualizerMcpServerPath] } }),
     };
 
     const mcpCount = options.mcpServers ? Object.keys(options.mcpServers).length : 0;
@@ -1154,6 +1167,15 @@ async function handleShutdown() {
     log('LIFECYCLE', `Aborted query=${queryId} during shutdown`);
   }
   await new Promise(resolve => setTimeout(resolve, 1000));
+  // Brain: ws6-mcp-http-pool — stop pooled MCP servers gracefully so they don't leak
+  if (mcpPool) {
+    try {
+      log('LIFECYCLE', 'Stopping MCP pool');
+      await mcpPool.stop();
+    } catch (err) {
+      log('LIFECYCLE', `MCP pool stop error: ${err.message}`);
+    }
+  }
   log('LIFECYCLE', 'Daemon shutting down');
   process.exit(0);
 }
@@ -1162,8 +1184,36 @@ async function handleShutdown() {
 // MAIN EVENT LOOP
 // =============================================================================
 
+// Brain: ws6-mcp-http-pool — opt-in via env QUACK_MCP_POOL=1
+let mcpPool = null;
+
+async function bootMcpPool() {
+  if (process.env.QUACK_MCP_POOL !== '1') {
+    log('LIFECYCLE', 'MCP pool disabled (set QUACK_MCP_POOL=1 to enable)');
+    return;
+  }
+  try {
+    mcpPool = new McpPool({
+      scriptPaths: {
+        'ide-tools':  join(__dirname, 'ide-mcp-server.js'),
+        'code-intel': join(__dirname, 'code-intel-mcp-server.js'),
+        'visualizer': join(__dirname, 'visualizer-mcp-server.js'),
+      },
+      logFn: (tag, msg) => log(tag, msg),
+    });
+    await mcpPool.start();
+    log('LIFECYCLE', `MCP pool ready: ${JSON.stringify(mcpPool.getStatus())}`);
+  } catch (err) {
+    log('LIFECYCLE', `MCP pool boot failed: ${err.message} — falling back to per-session stdio`);
+    mcpPool = null;
+  }
+}
+
 async function main() {
   log('LIFECYCLE', `Starting daemon (pid=${process.pid}, node=${process.version})`);
+
+  // Boot MCP pool BEFORE signalling ready, so first query sees URLs.
+  await bootMcpPool();
 
   const stdinReader = createInterface({
     input: process.stdin,

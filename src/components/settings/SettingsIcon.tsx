@@ -68,6 +68,14 @@ export default function SettingsIcon({ category, className = '' }: SettingsIconP
         </svg>
       );
 
+    case 'jack':
+      return (
+        <svg {...iconProps}>
+          <rect x="2" y="7" width="20" height="14" rx="2" />
+          <path d="M16 7V5a4 4 0 0 0-8 0v2" />
+        </svg>
+      );
+
     case 'second-brain':
       return (
         <svg {...iconProps}>

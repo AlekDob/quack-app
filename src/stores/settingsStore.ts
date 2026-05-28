@@ -16,7 +16,7 @@ import { defaultEffortForModel } from '../services/modelService';
 const LEGACY_MODEL_MAP: Record<string, string> = {
   'sonnet': 'sonnet46',
   'sonnet45': 'sonnet46', // Sonnet 4.5 deprecated, upgrade to 4.6
-  'opus': 'opus46',
+  'opus': 'opus47',
   'haiku': 'haiku45',
 };
 
@@ -50,6 +50,7 @@ interface ClaudeSettings {
   // Brain: 037-anthropic-compatible-providers
   // Cache of /v1/models per provider id. Populated by Refresh button on each card.
   providerModelCache: Record<string, ProviderModelCacheEntry>;
+  jackModel: string;
 }
 
 interface TerminalSettings {
@@ -197,6 +198,7 @@ const defaultClaudeSettings: ClaudeSettings = {
   activeProvider: { kind: 'anthropic' },
   customProviders: [],
   providerModelCache: {},
+  jackModel: '',
 };
 
 // Anthropic recommended defaults for agent modes

@@ -60,6 +60,14 @@ const QUACK_BUILTIN_COMMANDS: &[(&str, &str, &str)] = &[
         "Update Quack Brain with session discoveries",
         "Update the Quack Brain with the progress and discoveries made in this session. Only add new items not already documented — check existing brain entries before creating duplicates.",
     ),
+    // Brain: handoff-agent-fork
+    // Intercepted by the frontend in ChatView.handleSend — opens HandoffDialog.
+    // The content here is a fallback only (won't be shown unless the intercept misses).
+    (
+        "handoff",
+        "Handoff conversation to another agent with an AI-generated summary",
+        "Open the handoff dialog to fork the current session onto another agent. Usage: /handoff @agent-name",
+    ),
 ];
 
 /// Check if a command name is an SDK built-in slash command

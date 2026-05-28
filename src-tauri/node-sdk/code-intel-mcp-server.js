@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 // Brain: code-intel-mcp-server
-// MCP server exposing code intelligence tools via tree-sitter
+// Brain: ws6-mcp-http-pool
+// MCP server exposing code intelligence tools via tree-sitter (dual transport: stdio | http)
+//
+// Usage:
+//   node code-intel-mcp-server.js                  # stdio (default, retro-compat)
+//   node code-intel-mcp-server.js --http --port 0  # HTTP, OS-assigned port
 
 import { writeFileSync, appendFileSync } from 'fs';
 import { homedir } from 'os';
@@ -24,6 +29,7 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import { parseHttpArgs, startHttpTransport } from './lib/mcp-http-transport.js';
 
 import { getOutline } from './lib/code-intel/outline.js';
 import { findDefinition } from './lib/code-intel/definitions.js';
@@ -31,6 +37,9 @@ import { findReferences } from './lib/code-intel/references.js';
 import { getImports } from './lib/code-intel/imports.js';
 
 log('Modules imported successfully');
+
+const SERVER_NAME = 'code-intel';
+const SERVER_VERSION = '1.1.0';
 
 // --- Tool Definitions ---
 
@@ -244,59 +253,83 @@ function handleGetImports(args) {
 
 // --- Server Setup ---
 
-const server = new Server(
-  { name: 'code-intel', version: '1.0.0' },
-  { capabilities: { tools: {} } }
-);
+function createMcpServer() {
+  const server = new Server(
+    { name: SERVER_NAME, version: SERVER_VERSION },
+    { capabilities: { tools: {} } }
+  );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  log('ListTools called');
-  return { tools: TOOLS };
-});
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    log('ListTools called');
+    return { tools: TOOLS };
+  });
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-  log(`CallTool: ${name} with args ${JSON.stringify(args)}`);
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    log(`CallTool: ${name} with args ${JSON.stringify(args)}`);
 
-  try {
-    let text;
-    switch (name) {
-      case 'code_outline':
-        text = handleCodeOutline(args);
-        break;
-      case 'code_find_definition':
-        text = handleFindDefinition(args);
-        break;
-      case 'code_find_references':
-        text = handleFindReferences(args);
-        break;
-      case 'code_get_imports':
-        text = handleGetImports(args);
-        break;
-      default:
-        text = `Unknown tool: ${name}`;
+    try {
+      let text;
+      switch (name) {
+        case 'code_outline':
+          text = handleCodeOutline(args);
+          break;
+        case 'code_find_definition':
+          text = handleFindDefinition(args);
+          break;
+        case 'code_find_references':
+          text = handleFindReferences(args);
+          break;
+        case 'code_get_imports':
+          text = handleGetImports(args);
+          break;
+        default:
+          text = `Unknown tool: ${name}`;
+      }
+
+      return { content: [{ type: 'text', text }] };
+    } catch (error) {
+      log(`Error in ${name}: ${error.message}`);
+      return {
+        content: [{ type: 'text', text: `Error: ${error.message}` }],
+        isError: true,
+      };
     }
+  });
 
-    return { content: [{ type: 'text', text }] };
-  } catch (error) {
-    log(`Error in ${name}: ${error.message}`);
-    return {
-      content: [{ type: 'text', text: `Error: ${error.message}` }],
-      isError: true,
-    };
-  }
-});
+  return server;
+}
 
 // --- Start ---
 
 async function main() {
-  log('Starting stdio transport...');
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  log('Server connected and running');
+  const { useHttp, port } = parseHttpArgs(process.argv);
+
+  if (useHttp) {
+    if (Number.isNaN(port) || port < 0 || port > 65535) {
+      log('Invalid --port value');
+      console.error('[CODE-INTEL-MCP] invalid --port value, must be 0-65535');
+      process.exit(2);
+    }
+    log(`Starting HTTP transport on port ${port}`);
+    // Brain: ws6-mcp-http-pool — factory for per-session Server instances
+    await startHttpTransport({
+      serverFactory: createMcpServer,
+      port,
+      name: SERVER_NAME,
+      version: SERVER_VERSION,
+    });
+  } else {
+    log('Starting stdio transport...');
+    const server = createMcpServer();
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    log('Server connected and running');
+  }
 }
 
 main().catch((error) => {
   log(`Fatal error: ${error.message}`);
+  console.error('[CODE-INTEL-MCP] fatal:', error);
   process.exit(1);
 });

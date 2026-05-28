@@ -322,6 +322,7 @@ export default function ClaudeCodeSettings() {
               <option value="haiku45">Haiku 4.5</option>
               <option value="sonnet46">Sonnet 4.6</option>
               <option value="opus46">Opus 4.6</option>
+              <option value="opus47">Opus 4.7</option>
             </select>
           }
         />

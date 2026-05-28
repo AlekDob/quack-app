@@ -15,6 +15,7 @@ tags: [quack-remote, remote-api, rest-api, websocket, mobile-dashboard, team-del
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Service | src-tauri/src/remote_api.rs | `create_api_router`, `delegate_plan_to_agent`, `init_uptime`, `read_agents_storage`, `ApiState`, `ApiError`, `ApiResult`, `err`, **`SessionLiveEntry`, `SessionLiveStateMap`, `notify_session_streaming`, `notify_session_pending_question`, `notify_session_message`, `handle_project_colors`** — all `/api/*` handlers (status, agents, sessions, jobs, execute, ordering, groups, messages, avatars, **project-colors**) + Bearer auth inline |
+| Service | src-tauri/src/remote_api_terminal.rs | `handle_create_terminal`, `handle_list_terminals`, `handle_get_terminal`, `handle_write_terminal`, `handle_terminal_output`, `handle_close_terminal`, `TerminalListChangedPayload` — `/api/terminals*` handlers for remote terminal management (create visible PTY terminals, write commands, read output ring buffer) |
 | Service | src-tauri/src/remote_auth.rs | `RemoteAuthState` (Arc<RwLock> token + enabled), `generate_token()` — 32-char hex Bearer token lifecycle |
 | Config | src-tauri/src/remote_config.rs | `RemoteConfig { enabled, token, port }`, `load_config`, `save_config`, `get_remote_config`, `set_remote_enabled`, `regenerate_remote_token`, `get_local_ip`, `get_local_hostname` — persists `quack-remote.json` via Tauri Store |
 | Service | src-tauri/src/remote_ws.rs | `WsBroadcast`, `WsEvent` (AgentStatus/SessionCreated/SessionCompleted/JobFired/JobCompleted **+ SessionStreaming / PendingQuestion / MessageAdded / SessionUpdated**), `WsState`, `handle_ws_upgrade` — `/ws?token=xxx` real-time push to mobile/external clients |
@@ -125,7 +126,13 @@ Real-time agent status: `AgentStatusMap` (RwLock<HashMap<agent_id, status>>) wri
 | GET | /api/teams/:id | get team (auto-syncs member status) |
 | DELETE | /api/teams/:id | disband team |
 | GET | /api/avatars/:filename | serve duck avatar (sanitized .png/.jpeg) |
-| GET | /ws?token= | WebSocket push (AgentStatus/SessionCreated/SessionCompleted/JobFired/JobCompleted) |
+| POST | /api/terminals | create visible terminal (PTY + xterm.js), auto-focuses Terminal Window |
+| GET | /api/terminals | list all terminal sessions |
+| GET | /api/terminals/:id | single terminal info |
+| POST | /api/terminals/:id/write | write data/command to terminal PTY |
+| GET | /api/terminals/:id/output?lines=&strip_ansi= | read last N lines from output ring buffer |
+| DELETE | /api/terminals/:id | close terminal + kill PTY process |
+| GET | /ws?token= | WebSocket push (AgentStatus/SessionCreated/SessionCompleted/JobFired/JobCompleted/TerminalCreated/TerminalOutput/TerminalClosed) |
 | GET | /dashboard/ | PWA shell with `?token=` injection |
 | GET | /dashboard/{app.js,style.css,manifest.json,sw.js,icon-*.png} | embedded static assets |
 

@@ -12,7 +12,14 @@ use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
+use once_cell::sync::OnceCell;
+
 use crate::remote_auth::RemoteAuthState;
+
+/// Global broadcast handle initialized by lib.rs after server creation.
+/// Used by terminal output threads to push TerminalOutput events without
+/// access to ApiState.
+pub static WS_BROADCAST: OnceCell<WsBroadcast> = OnceCell::new();
 
 // ─── Broadcast Hub ──────────────────────────────────────────────
 
@@ -106,6 +113,25 @@ pub enum WsEvent {
         #[serde(skip_serializing_if = "Option::is_none")]
         status: Option<String>,
         timestamp: i64,
+    },
+    /// Remote terminal created via /api/terminals.
+    TerminalCreated {
+        #[serde(rename = "terminalId")]
+        terminal_id: String,
+        label: String,
+        cwd: String,
+        color: String,
+    },
+    /// Terminal PTY output chunk (raw, including ANSI codes).
+    TerminalOutput {
+        #[serde(rename = "terminalId")]
+        terminal_id: String,
+        data: String,
+    },
+    /// Terminal closed via /api/terminals/:id DELETE.
+    TerminalClosed {
+        #[serde(rename = "terminalId")]
+        terminal_id: String,
     },
     /// Generic session meta refresh (updatedAt, last message snapshot).
     /// Emitted alongside MessageAdded or by other state changes.
