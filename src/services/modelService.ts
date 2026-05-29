@@ -24,11 +24,12 @@ export interface ModelConfig {
  * Uses Sonnet as a safe, cost-effective default.
  */
 const EMERGENCY_FALLBACK: ModelConfig[] = [
-  { id: 'opus47', modelId: 'claude-opus-4-7', label: 'Opus 4.7', isDefault: true, isActive: true, sortOrder: 0 },
-  { id: 'opus46-1m', modelId: 'claude-opus-4-6[1m]', label: 'Opus 4.6 (1M)', isDefault: false, isActive: true, sortOrder: 1 },
-  { id: 'opus46', modelId: 'claude-opus-4-6', label: 'Opus 4.6', isDefault: false, isActive: true, sortOrder: 2 },
-  { id: 'sonnet46', modelId: 'claude-sonnet-4-6', label: 'Sonnet 4.6', isDefault: false, isActive: true, sortOrder: 3 },
-  { id: 'haiku45', modelId: 'claude-haiku-4-5', label: 'Haiku 4.5', isDefault: false, isActive: true, sortOrder: 4 },
+  { id: 'opus48', modelId: 'claude-opus-4-8', label: 'Opus 4.8', isDefault: true, isActive: true, sortOrder: 0 },
+  { id: 'opus47', modelId: 'claude-opus-4-7', label: 'Opus 4.7', isDefault: false, isActive: true, sortOrder: 1 },
+  { id: 'opus46-1m', modelId: 'claude-opus-4-6[1m]', label: 'Opus 4.6 (1M)', isDefault: false, isActive: true, sortOrder: 2 },
+  { id: 'opus46', modelId: 'claude-opus-4-6', label: 'Opus 4.6', isDefault: false, isActive: true, sortOrder: 3 },
+  { id: 'sonnet46', modelId: 'claude-sonnet-4-6', label: 'Sonnet 4.6', isDefault: false, isActive: true, sortOrder: 4 },
+  { id: 'haiku45', modelId: 'claude-haiku-4-5', label: 'Haiku 4.5', isDefault: false, isActive: true, sortOrder: 5 },
 ];
 
 /**
@@ -40,8 +41,9 @@ const LEGACY_ID_MAP: Record<string, string> = {
   'sonnet': 'sonnet46',
   'sonnet45': 'sonnet46', // Sonnet 4.5 deprecated, upgrade to 4.6
   'haiku': 'haiku45',
-  'opus': 'opus47',
-  'opus46': 'opus47', // Opus 4.6 deprecated, upgrade to 4.7
+  'opus': 'opus48',
+  'opus46': 'opus48', // upgrade old codepaths to latest Opus
+  'opus47': 'opus48', // Opus 4.7 superseded by 4.8 (2026-05-28)
 };
 
 // Brain: fix-session-backup-quota-cascade
@@ -147,7 +149,7 @@ export function getModelOptions(
  */
 export function defaultEffortForModel(modelId: string): 'low' | 'medium' | 'high' | 'xhigh' | 'max' {
   const base = modelId.replace('[1m]', '');
-  if (base === 'opus47' || base === 'opus') return 'xhigh';
+  if (base === 'opus48' || base === 'opus47' || base === 'opus') return 'xhigh';
   if (base === 'opus46' || base === 'sonnet46') return 'high';
   return 'medium';
 }

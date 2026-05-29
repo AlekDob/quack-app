@@ -258,6 +258,8 @@ function getModelId(model) {
     'sonnet45': 'claude-sonnet-4-5-20250929',
     'opus45': 'claude-opus-4-5-20251101',
     'opus46': 'claude-opus-4-6',
+    'opus47': 'claude-opus-4-7',
+    'opus48': 'claude-opus-4-8',
     'sonnet46': 'claude-sonnet-4-6',
   };
 

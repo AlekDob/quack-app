@@ -14,7 +14,7 @@ import type { QuackProviderConfig } from '../types/providers';
 export function getActiveModelName(fallback?: string): string {
   const { provider, ollamaModel } = useSettingsStore.getState().claude;
   if (provider !== 'anthropic') return ollamaModel || provider;
-  return fallback || 'opus47';
+  return fallback || 'opus48';
 }
 
 /**
