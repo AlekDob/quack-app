@@ -790,6 +790,36 @@ fn flush_and_store(app: &AppHandle, id: &str, text: &str) {
   }
 }
 
+/// Decode as much valid UTF-8 as possible from `buf`, RETAINING any trailing
+/// incomplete multi-byte sequence in `buf` for the next read. Without this, a
+/// multi-byte char (e.g. box-drawing `─` = 3 bytes E2 94 80) split across a
+/// PTY read/flush boundary gets lossy-decoded into U+FFFD on both sides,
+/// garbling long runs of box-drawing/braille output (claude's TUI separators).
+/// A genuinely invalid byte in the middle is still lossy-replaced (rare).
+/// Brain: fix-pty-utf8-split-multibyte
+fn drain_valid_utf8(buf: &mut Vec<u8>) -> String {
+  match std::str::from_utf8(buf) {
+    Ok(_) => String::from_utf8(std::mem::take(buf)).unwrap_or_default(),
+    Err(e) => {
+      let valid = e.valid_up_to();
+      match e.error_len() {
+        // Incomplete sequence at the end → emit valid prefix, keep the tail.
+        None => {
+          let s = std::str::from_utf8(&buf[..valid]).unwrap_or_default().to_string();
+          buf.drain(..valid);
+          s
+        }
+        // Real invalid bytes mid-stream → lossy-decode everything, clear.
+        Some(_) => {
+          let s = String::from_utf8_lossy(buf).to_string();
+          buf.clear();
+          s
+        }
+      }
+    }
+  }
+}
+
 fn start_output_thread(
   app: AppHandle,
   id: String,
@@ -857,9 +887,12 @@ fn start_output_thread(
             || accumulated_bytes.len() >= 65536;
 
           if should_flush && !accumulated_bytes.is_empty() {
-            let text = String::from_utf8_lossy(&accumulated_bytes).to_string();
-            flush_and_store(&app, &id, &text);
-            accumulated_bytes.clear();
+            // UTF-8 boundary-safe: any incomplete trailing char stays buffered
+            // for the next chunk instead of becoming U+FFFD. Brain: fix-pty-utf8-split-multibyte
+            let text = drain_valid_utf8(&mut accumulated_bytes);
+            if !text.is_empty() {
+              flush_and_store(&app, &id, &text);
+            }
             last_flush = std::time::Instant::now();
           }
         }
@@ -867,9 +900,10 @@ fn start_output_thread(
           // Reader is blocked (e.g. process waiting for password input).
           // Flush any accumulated data so prompts without trailing \n are shown.
           if !accumulated_bytes.is_empty() {
-            let text = String::from_utf8_lossy(&accumulated_bytes).to_string();
-            flush_and_store(&app, &id, &text);
-            accumulated_bytes.clear();
+            let text = drain_valid_utf8(&mut accumulated_bytes);
+            if !text.is_empty() {
+              flush_and_store(&app, &id, &text);
+            }
             last_flush = std::time::Instant::now();
           }
         }

@@ -29,6 +29,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
+import { useSettingsStore } from '../stores/settingsStore';
 import '@xterm/xterm/css/xterm.css';
 import './AgentTerminalView.css';
 
@@ -50,6 +51,73 @@ interface AgentTerminalViewProps {
 }
 
 const terminalIdFor = (sessionId: string) => `agent-cli-${sessionId}`;
+
+/** Convert a #rrggbb / #rgb hex to an rgba() string (for the selection tint). */
+function accentRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  const full = clean.length === 3 ? clean.split('').map((c) => c + c).join('') : clean;
+  const n = parseInt(full, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+// --- Experimental: highlight the user's own messages with the accent. --------
+// claude renders its user-message bars itself (ANSI frames in the PTY), so we
+// cannot recolor them directly. Instead we capture the EXACT text the user
+// submits (ground truth from term.onData), then — once claude has redrawn it
+// into a bar — locate that line in the xterm buffer and lay an accent
+// decoration UNDER it. Best-effort: bails on edited/escape/pasted input.
+// Disable with localStorage 'quack:cliHighlightUser' = '0'.
+const HIGHLIGHT_USER_MESSAGES = (() => {
+  try {
+    return localStorage.getItem('quack:cliHighlightUser') !== '0';
+  } catch {
+    return true;
+  }
+})();
+
+const HL_SCAN_LINES = 60; // how far above the cursor to look for the bar
+const HL_RETRIES = 14; // claude redraw can lag a few frames
+const HL_RETRY_MS = 120;
+
+/** Lay a full-width accent band under buffer line `y` (absolute buffer index). */
+function decorateUserLine(term: Terminal, y: number): void {
+  const active = term.buffer.active;
+  const offset = y - (active.baseY + active.cursorY); // negative = above cursor
+  const marker = term.registerMarker(offset);
+  if (!marker) return;
+  const accent = useSettingsStore.getState().appearance.accentColor;
+  // layer:'top' (not 'bottom') — claude paints the bar's grey via cell
+  // backgrounds, which sit ABOVE a 'bottom' decoration and would hide it. A
+  // translucent 'top' tint reads over both the grey and the text.
+  const deco = term.registerDecoration({ marker, x: 0, width: term.cols, layer: 'top' });
+  deco?.onRender((el) => {
+    el.style.backgroundColor = accentRgba(accent, 0.22);
+    el.style.borderLeft = `3px solid ${accent}`;
+    el.style.boxSizing = 'border-box';
+    el.style.width = '100%';
+    el.style.pointerEvents = 'none';
+  });
+}
+
+/** Find the nearest line above the cursor whose text matches `needle`. */
+function highlightSubmitted(term: Terminal, needle: string): boolean {
+  const active = term.buffer.active;
+  const cursorAbs = active.baseY + active.cursorY;
+  const lo = Math.max(0, cursorAbs - HL_SCAN_LINES);
+  // Skip the live input line itself (cursorAbs); the committed bar sits above.
+  for (let y = cursorAbs - 1; y >= lo; y--) {
+    const line = active.getLine(y);
+    if (!line) continue;
+    // Strip claude's bar prefix ("> ", vertical rules, spaces) before matching.
+    const stripped = line.translateToString(true).replace(/^[\s>│┃|]+/, '').trim();
+    if (stripped.length === 0) continue;
+    if (stripped === needle || stripped.startsWith(needle)) {
+      decorateUserLine(term, y);
+      return true;
+    }
+  }
+  return false;
+}
 
 interface AgentTermInstance {
   term: Terminal;
@@ -105,6 +173,24 @@ export function AgentTerminalView({
   const terminalId = terminalIdFor(sessionId);
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
+  // Accent from Settings → drives the cursor (where the user types) and the
+  // text selection tint. The user-message bars themselves are rendered by the
+  // claude CLI inside the PTY (its own ANSI frames) and are NOT recolorable
+  // from here without fragile TUI parsing — see the view header.
+  const accentColor = useSettingsStore((s) => s.appearance.accentColor);
+
+  // Live-update the persisted instance's theme when the accent changes (the
+  // xterm is created once and kept alive across mounts, so a prop/store change
+  // must be pushed onto term.options rather than recreating it).
+  useEffect(() => {
+    const inst = agentTerminalInstances.get(terminalId);
+    if (!inst) return;
+    inst.term.options.theme = {
+      ...(inst.term.options.theme || {}),
+      cursor: accentColor,
+      selectionBackground: accentRgba(accentColor, 0.3),
+    };
+  }, [accentColor, terminalId]);
 
   useEffect(() => {
     let disposedLocal = false;
@@ -198,7 +284,12 @@ export function AgentTerminalView({
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         allowProposedApi: true,
         scrollback: 4000,
-        theme: { background: '#1e1e1e', foreground: '#ffffff', cursor: color },
+        theme: {
+          background: '#1e1e1e',
+          foreground: '#ffffff',
+          cursor: accentColor || color,
+          selectionBackground: accentRgba(accentColor || color, 0.3),
+        },
       });
       const fitAddon = new FitAddon();
       term.loadAddon(fitAddon);
@@ -218,9 +309,37 @@ export function AgentTerminalView({
           term.write('\r\n\x1b[33m[sessione terminata]\x1b[0m\r\n');
         }
       });
-      // xterm → PTY.
+      // xterm → PTY (+ capture the submitted line for accent highlighting).
+      let pendingInput = '';
+      const scheduleHighlight = (submitted: string) => {
+        const needle = submitted.trim();
+        if (needle.length < 1) return;
+        let tries = 0;
+        const attempt = () => {
+          if (highlightSubmitted(term, needle)) return;
+          if (tries++ < HL_RETRIES) window.setTimeout(attempt, HL_RETRY_MS);
+        };
+        window.setTimeout(attempt, 140);
+      };
       term.onData((data) => {
         invoke('write_to_terminal', { id: terminalId, data }).catch(() => {});
+        if (!HIGHLIGHT_USER_MESSAGES) return;
+        for (let i = 0; i < data.length; i++) {
+          const ch = data[i];
+          const code = ch.charCodeAt(0);
+          if (ch === '\r' || ch === '\n') {
+            const submitted = pendingInput;
+            pendingInput = '';
+            scheduleHighlight(submitted);
+          } else if (code === 0x7f || code === 0x08) {
+            pendingInput = pendingInput.slice(0, -1); // backspace
+          } else if (code === 0x1b) {
+            pendingInput = ''; // escape seq (arrows/paste/edit) → bail on this line
+            break;
+          } else if (code >= 0x20) {
+            pendingInput += ch;
+          }
+        }
       });
 
       agentTerminalInstances.set(terminalId, { term, fitAddon, unlistenData, unlistenExit });
@@ -295,7 +414,10 @@ export function AgentTerminalView({
           (Hai ricompilato il backend con `cargo tauri dev`?)
         </div>
       ) : (
-        <div ref={containerRef} style={{ position: 'absolute', inset: 0, overflow: 'hidden' }} />
+        <div
+          ref={containerRef}
+          style={{ position: 'absolute', inset: 0, overflow: 'hidden', padding: '8px 12px' }}
+        />
       )}
     </div>
   );
