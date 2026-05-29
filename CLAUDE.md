@@ -128,7 +128,7 @@ You evaluate tasks critically, assess feasibility and economic impact before act
 - **WS5** — Remote Terminal Management — API endpoints per terminali visibili — BE + FE + SKILL IMPLEMENTED — REBUILD NEEDED — ⚠️ Skill quack-remote.md e' bundled via include_str! — agenti esterni non vedono i nuovi endpoint finche' Quack non viene rebuildato.
 - **WS6** — MCP HTTP Server Pool — eliminate per-session stdio fanout — IMPLEMENTED (opt-in QUACK_MCP_POOL=1) — SMOKE TEST PENDING
 - **WS7** — Jack Supervisor Agent — finestra dedicata cross-project per orchestrazione agenti — PHASE 1 MVP + PM WIDGETS IMPLEMENTED — SMOKE TEST PENDING
-- **WS8** — Embedded CLI Pivot — centro = Claude Code interattivo, stato dagli hook — RENDER + AUTOSTART + HOOK-STATUS WORKING — Fasi 4/7/9 PENDING
+- **WS8** — Embedded CLI Pivot — centro = Claude Code interattivo, stato dagli hook — RENDER + AUTOSTART + HOOK-STATUS + TOKEN + SDK-GUARD WORKING — Fase 7 BLOCCATA (design)
 <!-- WS-CURRENT-END -->
 
 Full workstream picture: see `documentation/workstreams/INDEX.md`.

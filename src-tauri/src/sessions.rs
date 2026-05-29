@@ -932,6 +932,107 @@ fn parse_session_messages(
     Ok((messages, usage))
 }
 
+/// Result of tailing a Claude Code interactive transcript (feature 069, Fase 4).
+#[derive(Debug, Serialize, Clone)]
+pub struct TranscriptTail {
+    /// Usage from the LAST assistant message that carried a `usage` object.
+    /// This is the per-turn (context-fill) usage, NOT a sum across the session.
+    pub usage: UsageStats,
+    /// Last non-empty assistant text block (for refreshing the session preview).
+    pub last_text: Option<String>,
+    /// total_cost_usd if a `result` line carried it.
+    pub total_cost_usd: Option<f64>,
+}
+
+/// Parse the tail of a Claude Code transcript JSONL (the `transcript_path` from
+/// the Stop hook) to recover per-turn token usage + the last assistant text.
+/// Embedded-CLI mode has no SDK event stream, so this backfills the stamina bar.
+///
+/// Reads only the last ~512KB to stay cheap on long sessions (the final turn's
+/// data lives at the end). A multi-byte char on the read boundary is harmless
+/// here (lossy on the dropped partial first line only). Returns zeroed usage
+/// (→ UI shows N/A) rather than erroring when nothing parseable is found.
+/// Brain: 069-embedded-cli-hooks-pivot
+#[command]
+pub fn parse_transcript_tail(path: String) -> Result<TranscriptTail, String> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    const TAIL_BYTES: u64 = 512 * 1024;
+    let mut file = fs::File::open(&path).map_err(|e| format!("open {path}: {e}"))?;
+    let len = file.metadata().map_err(|e| e.to_string())?.len();
+    let start = len.saturating_sub(TAIL_BYTES);
+    if start > 0 {
+        file.seek(SeekFrom::Start(start)).map_err(|e| e.to_string())?;
+    }
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf).map_err(|e| e.to_string())?;
+    let content = String::from_utf8_lossy(&buf);
+
+    let mut lines: Vec<&str> = content.lines().collect();
+    // Drop the (likely partial) first line when we seeked into the file.
+    if start > 0 && !lines.is_empty() {
+        lines.remove(0);
+    }
+
+    let mut usage = UsageStats {
+        input_tokens: 0,
+        output_tokens: 0,
+        cache_creation_input_tokens: 0,
+        cache_read_input_tokens: 0,
+    };
+    let mut last_text: Option<String> = None;
+    let mut total_cost_usd: Option<f64> = None;
+
+    for line in lines {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let event: Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        if event["type"] == "assistant" {
+            if let Some(message) = event["message"].as_object() {
+                // Last assistant usage wins → per-turn context fill.
+                if let Some(u) = message.get("usage").and_then(|x| x.as_object()) {
+                    let get = |k: &str| u.get(k).and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+                    usage = UsageStats {
+                        input_tokens: get("input_tokens"),
+                        output_tokens: get("output_tokens"),
+                        cache_creation_input_tokens: get("cache_creation_input_tokens"),
+                        cache_read_input_tokens: get("cache_read_input_tokens"),
+                    };
+                }
+                if let Some(content_array) = message.get("content").and_then(|c| c.as_array()) {
+                    let mut text = String::new();
+                    for block in content_array {
+                        if block["type"] == "text" {
+                            if let Some(t) = block["text"].as_str() {
+                                text.push_str(t);
+                            }
+                        }
+                    }
+                    if !text.trim().is_empty() {
+                        last_text = Some(text);
+                    }
+                }
+            }
+        } else if event["type"] == "result" {
+            if let Some(c) = event.get("total_cost_usd").and_then(|v| v.as_f64()) {
+                total_cost_usd = Some(c);
+            }
+        }
+    }
+
+    Ok(TranscriptTail {
+        usage,
+        last_text,
+        total_cost_usd,
+    })
+}
+
 /// Resume a session - get complete session data for resuming conversation
 #[command]
 pub fn resume_session(session_id: String) -> Result<SessionDetails, String> {

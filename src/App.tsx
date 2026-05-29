@@ -1519,6 +1519,24 @@ function AppContent() {
     });
   }, []);
 
+  // Fase 4 (feature 069): embedded-CLI sessions have no SDK token stream, so
+  // useHookStatusListener parses the transcript tail on Stop and dispatches the
+  // per-turn usage here. The token map is keyed by chatKey (== the hook's
+  // session id), so this lights up the stamina bar for the embedded session.
+  useEffect(() => {
+    const onTranscriptUsage = (e: Event) => {
+      const detail = (e as CustomEvent).detail as {
+        sessionKey?: string;
+        usage?: { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
+        cost?: number;
+      };
+      if (!detail?.sessionKey || !detail.usage) return;
+      handleTokenUpdate(detail.sessionKey, detail.usage, detail.cost);
+    };
+    window.addEventListener('quack:transcript-usage', onTranscriptUsage);
+    return () => window.removeEventListener('quack:transcript-usage', onTranscriptUsage);
+  }, [handleTokenUpdate]);
+
   // 🦆 EVENT BUFFER FIX: Centralized event handler with buffering support
   // This function handles all incoming Claude events and manages buffering
   // when events arrive before the streaming message is ready

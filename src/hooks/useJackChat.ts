@@ -10,6 +10,7 @@ import {
   buildJackSystemPrompt,
 } from '../services/jackPersonalityService';
 import { useJackStore } from '../stores/jackStore';
+import { isSdkStreamEnabled, SDK_DISABLED_MESSAGE } from '../utils/sdkStreamGuard';
 import type { JackAgentSnapshot, JackProjectSnapshot, JackTimelineItem } from '../stores/jackStore';
 import type { ClaudeEvent } from '../types';
 
@@ -68,6 +69,12 @@ export function useJackChat(options: UseJackChatOptions): UseJackChatReturn {
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isStreamingRef.current) return;
+
+    // Fase 9 (069): graceful degradation when the SDK stream kill-switch is on.
+    if (!isSdkStreamEnabled()) {
+      setError(SDK_DISABLED_MESSAGE);
+      return;
+    }
 
     const store = useJackStore.getState();
     let session = store.sessions.find((s) => s.id === store.activeSessionId);

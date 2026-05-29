@@ -58,11 +58,17 @@ claude CLI (in PTY, env: QUACK_API_PORT/QUACK_HOOK_TOKEN/QUACK_SESSION_ID)
 - **Hook gating**: `quack-status.js` no-ops without `QUACK_API_PORT` → safe to register globally.
 
 ### Phases (see plan)
-1. ✅ Hook→status pipeline (script + route + settings, mock-validated). 2. ✅ Frontend listener (flag, tsc clean). 3. ⏳ AgentTerminalView + PTY env injection + global hook registration for managed projects. 4. ⏳ Token from transcript on Stop. 5. ⏳ Flip flag + validate consumers. 6. ⏳ Delete chat-stream center (~9k LOC). 7. ⏳ Strip App.tsx SDK path. 9. ⏳ Headless degradation guards (Jack/BTW/Kanban inline/Remote/Telegram/PWA).
+1. ✅ Hook→status pipeline. 2. ✅ Frontend listener. 3. ✅ AgentTerminalView + PTY env injection. 4. ✅ Token from transcript on Stop. 5. ✅ Flip + validate consumers. 6. ✅ Delete chat-stream center. 7. ⛔ Strip App.tsx SDK path — BLOCKED (design). 9. ✅ SDK guard (reframed).
+
+### Update 2026-05-29 (afternoon)
+- ⚠️ **Feature flag deleted in Fase 6.** `src/utils/featureFlags.ts` / `isEmbeddedCliEnabled()` / `quack:useEmbeddedCLI` **no longer exist**. Embedded CLI is now **permanently on** (`AgentTerminalView` mounted unconditionally; `useHookStatusListener()` unconditional). The "single-writer flag" / "rollback without rebuild" invariants above are HISTORICAL — there is no flag and no SDK-center rollback. (Doc rows mentioning the flag are kept for history.)
+- ✅ **Fase 4 — token from transcript.** New Rust command `sessions::parse_transcript_tail(path) -> {usage, last_text, total_cost_usd}` (reads last ~512KB of the JSONL; takes the LAST assistant `message.usage` = per-turn context fill, not a sum; zero-usage → UI N/A, never errors). `useHookStatusListener` Stop case invokes it and dispatches `CustomEvent('quack:transcript-usage', {sessionKey, usage, cost})`; `App.tsx` listens → `handleTokenUpdate(sessionKey, usage, cost)`. Key matches because the token map is keyed by `chatKey` == hook `quack_session_id`.
+- ✅ **Fase 9 — SDK guard (reframed).** Since embedded is permanent, "gate behind embedded flag" would disable Jack/BTW/Kanban entirely. Instead: opt-OUT kill-switch `src/utils/sdkStreamGuard.ts` → `isSdkStreamEnabled()` (default ON; off via `localStorage quack:disableSdkStream='1'`) + `SDK_DISABLED_MESSAGE`. Gated the 3 standalone programmatic SDK sends: `useJackChat`, `useBTW`, `usePopoutKanbanChat`. Lets the user stop paid-pool SDK usage (2026-06-15) without breaking anything by default.
+- ⛔ **Fase 7 — BLOCKED (not dead-code).** `handleClaudeEvent` + `claude-event` listener + `sendMessageForAgent` are still live: remote-execute/remote-send-message (Telegram/PWA/Remote WS5), DroidFactory, auto-start, git-commit all stream via SDK on the main agent. Prerequisite: repoint those sends from `send_message_via_sdk_streaming` to `write_to_terminal` (PTY), validate in-app, THEN strip. Do NOT delete the Rust `send_message_via_sdk_streaming` command (shared with Jack/BTW/Kanban). See WS8 "Fase 7 — perché è bloccata".
 
 ### Accepted regressions
-- Token stats: hooks carry no usage data → backfill from `transcript_path` on Stop, `N/A` fallback.
-- Headless features (Automations/Remote/Jack/Telegram/PWA-write) degrade; gated gracefully in Fase 9.
+- Token stats: hooks carry no usage data → backfilled from `transcript_path` on Stop (Fase 4), `N/A` fallback.
+- Jack/BTW/Kanban-inline still use the paid SDK pool (gated by the Fase 9 opt-out switch). Remote/Telegram/PWA-write/DroidFactory still SDK until Fase 7 repoint.
 
 ### Cross-References
 - **043-agent-sidebar**, **054-task-hub-view** — consumers, unchanged.

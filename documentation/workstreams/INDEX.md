@@ -12,7 +12,7 @@ Total workstreams: **8**.
 | 5 | **Remote Terminal Management — API endpoints per terminali visibili** ([`05-remote-terminal-management.md`](./05-remote-terminal-management.md)) | BE + FE + SKILL IMPLEMENTED — REBUILD NEEDED | ⚠️ Skill quack-remote.md e' bundled via include_str! — agenti esterni non vedono i nuovi endpoint finche' Quack non viene rebuildato. · upd 2026-05-27 |
 | 6 | **MCP HTTP Server Pool — eliminate per-session stdio fanout** ([`06-mcp-http-pool.md`](./06-mcp-http-pool.md)) | IMPLEMENTED (opt-in QUACK_MCP_POOL=1) — SMOKE TEST PENDING | upd 2026-05-27 |
 | 7 | **Jack Supervisor Agent — finestra dedicata cross-project per orchestrazione agenti** ([`07-jack-supervisor-agent.md`](./07-jack-supervisor-agent.md)) | PHASE 1 MVP + PM WIDGETS IMPLEMENTED — SMOKE TEST PENDING | upd 2026-05-27 |
-| 8 | **Embedded CLI Pivot — centro = Claude Code interattivo, stato dagli hook** ([`08-embedded-cli-pivot.md`](./08-embedded-cli-pivot.md)) | RENDER + AUTOSTART + HOOK-STATUS WORKING — Fasi 4/7/9 PENDING | upd 2026-05-29 |
+| 8 | **Embedded CLI Pivot — centro = Claude Code interattivo, stato dagli hook** ([`08-embedded-cli-pivot.md`](./08-embedded-cli-pivot.md)) | RENDER + AUTOSTART + HOOK-STATUS + TOKEN + SDK-GUARD WORKING — Fase 7 BLOCCATA (design) | upd 2026-05-29 |
 
 ## Completed
 

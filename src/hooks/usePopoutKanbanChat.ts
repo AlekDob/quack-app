@@ -15,6 +15,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { ChatMessage, KanbanTask, ClaudeEvent } from '../types';
 import { getProviderRequestFields, getActiveProviderConfig } from '../services/claudeSDK';
 import { useSettingsStore } from '../stores/settingsStore';
+import { isSdkStreamEnabled, SDK_DISABLED_MESSAGE } from '../utils/sdkStreamGuard';
 import type { ChatSendOptions } from './useClaudeChat';
 import {
   appendMessagesToSession,
@@ -141,6 +142,18 @@ export function usePopoutKanbanChat(): UsePopoutKanbanChatReturn {
   // Send message with streaming
   const sendMessage = useCallback(async (taskId: string, content: string, options?: ChatSendOptions) => {
     if (!content.trim()) return;
+
+    // Fase 9 (069): SDK stream kill-switch → surface a graceful notice, no send.
+    if (!isSdkStreamEnabled()) {
+      setChatSessions(prev => appendMessagesToSession(prev, taskId, [{
+        id: `sdk-disabled-${Date.now()}`,
+        role: 'assistant',
+        content: SDK_DISABLED_MESSAGE,
+        timestamp: Date.now(),
+        status: 'complete',
+      }]));
+      return;
+    }
 
     // Store last prompt for retry
     lastPromptsRef.current.set(taskId, content);

@@ -1,7 +1,7 @@
 ---
 ws: 8
 title: "Embedded CLI Pivot — centro = Claude Code interattivo, stato dagli hook"
-status: "RENDER + AUTOSTART + HOOK-STATUS WORKING — Fasi 4/7/9 PENDING"
+status: "RENDER + AUTOSTART + HOOK-STATUS + TOKEN + SDK-GUARD WORKING — Fase 7 BLOCCATA (design)"
 focus: current
 opened: 2026-05-29
 updated: 2026-05-29
@@ -24,11 +24,11 @@ REFACTOR in-place (NON rewrite). `chatStore` e' gia' una facade (4 Map, 19 consu
 1. **Pipeline hook→status** — `~/.quack/hooks/brain/quack-status.js` + route Rust `/hooks/status` → emit `hook-status` — ✅ DONE
 2. **Listener frontend sulla facade** — `useHookStatusListener.ts` (UserPromptSubmit→working, Notification/PermissionRequest→waiting, Stop→done) — ✅ DONE (always-on)
 3. **Centro CLI embedded** — `AgentTerminalView.tsx` + backend `create_agent_terminal` (env injection QUACK_SESSION_ID/QUACK_API_PORT/QUACK_HOOK_TOKEN, hook per-progetto) — ✅ DONE
-4. **Sorgente token da transcript** — su Stop leggere `transcript_path` per ultimo messaggio + token approssimati (AgentTokenStatsPanel) — ⏳ PENDING
+4. **Sorgente token da transcript** — su Stop leggere `transcript_path` per token per-turno → stamina bar — ✅ DONE (comando Rust `parse_transcript_tail` + bridge CustomEvent → `handleTokenUpdate`)
 5. **Flip + validazione consumer** — ✅ DONE (validato nell'app reale)
 6. **Cancellare il centro chat-stream** — ChatView/ChatInput/ChatContext/AppRefactored/featureFlags cancellati (~5.500 righe) — ✅ DONE (tsc 0)
-7. **Strip path SDK in App.tsx** — rimuovere handleClaudeEvent/sendMessageForAgent/Map pending* — ⏳ DEFERRED (Jack/Kanban/BTW usano ancora sendMessageForAgent → prima Fase 9)
-9. **Guard degradazione headless** — Jack/BTW/Kanban-inline/Remote-execute/Telegram/PWA mirror dietro fallback "non disponibile in embedded mode" — ⏳ PENDING
+7. **Strip path SDK in App.tsx** — ⛔ BLOCCATA (non è dead-code): `handleClaudeEvent` + listener `claude-event` + `sendMessageForAgent` restano VIVI perché remote-execute/remote-send-message (Telegram/PWA/Remote)/DroidFactory/auto-start/git-commit streammano ancora via SDK sul main agent. Strippare romperebbe quelle feature. Serve PRIMA una decisione di design: repointare quei "send" sul PTY (`write_to_terminal`) invece dell'SDK. Vedi sezione "Fase 7 — perché è bloccata".
+9. **Guard degradazione SDK** — ✅ DONE (riformulata): non più "gate dietro embedded flag" (embedded è permanente, disabiliterebbe Jack/BTW/Kanban). Implementato kill-switch **opt-out** `quack:disableSdkStream` (default OFF = tutto invariato) che disabilita con fallback grazioso i 3 send SDK programmatici secondari (Jack/BTW/Kanban-inline). Util `src/utils/sdkStreamGuard.ts`.
 
 ## Status (2026-05-29)
 
@@ -40,7 +40,24 @@ REFACTOR in-place (NON rewrite). `chatStore` e' gia' una facade (4 Map, 19 consu
 - ✅ **Autostart `claude`**: one-shot per PTY (Set `createdTerminals`/`launchedTerminals`), trigger su primo byte + fallback 1200ms, StrictMode-safe
 - ✅ **Persistenza istanza xterm** (Map globale `agentTerminalInstances`): l'xterm + listener NON vengono mai distrutti all'unmount, solo ri-agganciati — fix del "terminale vuoto" causato dal dispose/recreate su doppio-mount di StrictMode
 
-**Pending:** Fase 4 (token), Fase 7 (strip SDK App.tsx), Fase 9 (guard headless). Wiring `disposeAgentTerminal(sessionId)` alla chiusura tab/sessione (oggi i PTY restano in Map fino a chiusura app).
+**Aggiunto 2026-05-29 (pomeriggio):**
+
+- ✅ **Fase 4 — token da transcript**: comando Rust `sessions::parse_transcript_tail(path)` (legge solo gli ultimi ~512KB del JSONL, prende l'`usage` dell'**ultimo** messaggio assistant = context-fill per-turno, non la somma). Su `Stop`, `useHookStatusListener` lo invoca e dispatcha un `CustomEvent('quack:transcript-usage', {sessionKey, usage, cost})`; App.tsx ascolta e chiama `handleTokenUpdate(sessionKey, ...)`. La chiave combacia perché il token map è keyed by `chatKey` (= session id = `quack_session_id` dell'hook). Best-effort: se il transcript manca/illeggibile → N/A, nessun crash.
+- ✅ **Fase 9 — guard SDK (riformulata)**: `src/utils/sdkStreamGuard.ts` → `isSdkStreamEnabled()` (opt-OUT via `localStorage quack:disableSdkStream='1'`, default abilitato). Gating con fallback grazioso (`SDK_DISABLED_MESSAGE`) su Jack (`useJackChat`), BTW (`useBTW`), Kanban inline (`usePopoutKanbanChat`). Motivo: dare all'utente un kill-switch per il pool SDK a pagamento (15/06) senza rompere niente di default.
+
+## Fase 7 — perché è bloccata (non è dead-code)
+
+L'audit (3 esploratori) ha smentito l'assunto del piano. `handleClaudeEvent` (App.tsx 1526–1897), il listener `claude-event:${agentId}` (2478–2656) e `sendMessageForAgent` (2847–3554) **NON sono morti**: sono ancora cablati a feature vive che streammano via SDK sul **main agent**:
+
+- `remote-execute` / `remote-send-message` (App.tsx ~6100/6138) ← Remote API (WS5), **Telegram**, **PWA inbound** convergono qui
+- `DroidFactoryDrawer` `onSendMessage` (App.tsx 14366)
+- auto-start (ref consumers) + git-commit-message handler (12363)
+
+Tutti chiamano `sendMessageForAgentRef.current(...)` → `invoke('send_message_via_sdk_streaming')` → emette `claude-event:${activeAgentId}` → processato SOLO da `handleClaudeEvent`. Inoltre il flag che il piano assumeva (`useEmbeddedCLI`) **non esiste più** (cancellato in Fase 6): embedded è permanente, niente rollback.
+
+**Prerequisito per la Fase 7:** decidere il comportamento "embedded" di quei send → repointarli da SDK a **`write_to_terminal`** sul PTY del main agent (digitare il prompt nel `claude` interattivo) invece di `send_message_via_sdk_streaming`. Solo dopo aver repointato (e validato nell'app) si può rimuovere `handleClaudeEvent` + listener `claude-event` + `sendMessageForAgent` + le Map `pending*` (607/611/614/618) e i 3 listener SDK (ask-user-question/tool-permission/plan-approval, surgicalmente dentro l'effetto 5640–6160). NON toccare il comando Rust `send_message_via_sdk_streaming` (usato anche da Jack/BTW/Kanban) né `pendingQuestionIdsMap` (condiviso).
+
+**Pending residui:** Fase 7 (sopra). Wiring `disposeAgentTerminal(sessionId)` alla chiusura tab/sessione (oggi i PTY restano in Map fino a chiusura app).
 
 ## File chiave
 

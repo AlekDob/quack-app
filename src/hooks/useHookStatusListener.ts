@@ -24,6 +24,7 @@
  */
 import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import { useChatStore } from '../stores/chatStore';
 
 interface HookStatusEvent {
@@ -102,6 +103,36 @@ export function useHookStatusListener(): void {
               timestamp: evt.ts || Date.now(),
               status: 'complete',
             });
+          }
+          // Fase 4: embedded mode has no SDK token stream → backfill the stamina
+          // bar from the transcript tail. Bridge to App.tsx's handleTokenUpdate
+          // (which owns the token map) via a window event, since this hook can't
+          // reach App.tsx local state. Best-effort: silent on failure → UI N/A.
+          if (evt.transcript_path) {
+            invoke<{
+              usage: {
+                input_tokens: number;
+                output_tokens: number;
+                cache_creation_input_tokens: number;
+                cache_read_input_tokens: number;
+              };
+              last_text: string | null;
+              total_cost_usd: number | null;
+            }>('parse_transcript_tail', { path: evt.transcript_path })
+              .then((tail) => {
+                if (!tail) return;
+                window.dispatchEvent(
+                  new CustomEvent('quack:transcript-usage', {
+                    detail: {
+                      sessionKey: key,
+                      usage: tail.usage,
+                      lastText: tail.last_text,
+                      cost: tail.total_cost_usd ?? undefined,
+                    },
+                  })
+                );
+              })
+              .catch(() => {});
           }
           break;
         }

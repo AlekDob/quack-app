@@ -13,6 +13,7 @@ import { listen } from '@tauri-apps/api/event';
 import { useSettingsStore } from '../stores/settingsStore';
 import { getProviderRequestFields } from '../services/claudeSDK';
 import { getModelId } from '../services/modelService';
+import { isSdkStreamEnabled, SDK_DISABLED_MESSAGE } from '../utils/sdkStreamGuard';
 import type { ChatMessage, ClaudeEvent } from '../types';
 
 interface BTWState {
@@ -130,6 +131,12 @@ export function useBTW(options?: UseBTWOptions): UseBTWReturn {
   const sendQuery = useCallback(
     async (question: string) => {
       if (!question.trim()) return;
+
+      // Fase 9 (069): SDK stream kill-switch → degrade gracefully.
+      if (!isSdkStreamEnabled()) {
+        setState((prev) => ({ ...prev, isLoading: false, error: SDK_DISABLED_MESSAGE }));
+        return;
+      }
 
       setState((prev) => ({
         ...prev,
