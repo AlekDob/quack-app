@@ -60,6 +60,13 @@ export function accumulateTodos(
   let snapshot: TodoItem[] | null = null;
   let snapshotIsLatest = false;
 
+  // Brain: fix-task-accumulator-pending-reconciliation
+  // SDK 0.3.150 doesn't emit tool_result as user events for managed Task tools.
+  // TaskCreate entries keyed as `pending-${toolUseId}` can't be matched by
+  // TaskUpdate's real `taskId`. We track unresolved pending tool_use_ids in
+  // creation order and reconcile them when TaskUpdate references unknown IDs.
+  const unresolvedPending: string[] = [];
+
   const messages = streamMessages as AssistantStreamEvent[];
   for (const evt of messages) {
     if (evt?.type !== 'assistant' || !evt.message?.content) continue;
@@ -91,13 +98,12 @@ export function accumulateTodos(
         const rawResult = toolResults.get(c.id);
         const parsed = parseJsonSafe<{ task?: { id?: string } }>(rawResult);
         const realTaskId = parsed?.task?.id;
-        // Use toolUseId as the internal key when the real task.id can't be parsed
-        // (tool_result not yet arrived OR unexpected payload shape). This keeps the
-        // entry visible with its subject; TaskUpdate will reconcile via toolUseToTaskId
-        // when the result lands.
         const id = realTaskId ?? `pending-${c.id}`;
         byId.set(id, { content: subject, status: 'pending', activeForm });
         if (!order.includes(id)) order.push(id);
+        if (!realTaskId) {
+          unresolvedPending.push(c.id);
+        }
         if (typeof window !== 'undefined' && (window as { __TODO_DEBUG__?: boolean }).__TODO_DEBUG__) {
           // eslint-disable-next-line no-console
           console.log('[TodoDebug] TaskCreate', {
@@ -105,6 +111,7 @@ export function accumulateTodos(
             subject,
             rawResult,
             parsedTaskId: realTaskId,
+            unresolvedCount: unresolvedPending.length,
           });
         }
       } else if (toolName === 'taskupdate') {
@@ -118,12 +125,35 @@ export function accumulateTodos(
           if (i >= 0) order.splice(i, 1);
           continue;
         }
-        // Brain: fix-task-accumulator-toolresult-text-mismatch — guard against
-        // orphan updates. If we never saw a TaskCreate for this real task.id
-        // (typically because parsed?.task?.id was null on TaskCreate), DO NOT
-        // create a new empty entry. The original `pending-${toolUseId}` entry
-        // keeps its subject; status stays stale but at least no blank rows.
-        const prev = byId.get(id);
+        // Brain: fix-task-accumulator-pending-reconciliation
+        // SDK 0.3.150 managed Task tools don't emit tool_result in the stream,
+        // so TaskCreate entries are keyed as `pending-${toolUseId}`. When
+        // TaskUpdate arrives with the real taskId, reconcile with the first
+        // unresolved pending entry (creation order = update order).
+        let prev = byId.get(id);
+        if (!prev && unresolvedPending.length > 0) {
+          const idx = unresolvedPending.findIndex(
+            (uid) => byId.has(`pending-${uid}`)
+          );
+          if (idx >= 0) {
+            const pendingToolUseId = unresolvedPending.splice(idx, 1)[0];
+            const pendingKey = `pending-${pendingToolUseId}`;
+            const pendingEntry = byId.get(pendingKey)!;
+            byId.delete(pendingKey);
+            byId.set(id, pendingEntry);
+            const orderIdx = order.indexOf(pendingKey);
+            if (orderIdx >= 0) order[orderIdx] = id;
+            prev = pendingEntry;
+            if (typeof window !== 'undefined' && (window as { __TODO_DEBUG__?: boolean }).__TODO_DEBUG__) {
+              // eslint-disable-next-line no-console
+              console.log('[TodoDebug] TaskUpdate reconciled', {
+                realTaskId: id,
+                pendingKey,
+                subject: pendingEntry.content,
+              });
+            }
+          }
+        }
         if (!prev) {
           if (typeof window !== 'undefined' && (window as { __TODO_DEBUG__?: boolean }).__TODO_DEBUG__) {
             // eslint-disable-next-line no-console
@@ -146,6 +176,7 @@ export function accumulateTodos(
         if (parsed?.tasks && Array.isArray(parsed.tasks)) {
           byId.clear();
           order.length = 0;
+          unresolvedPending.length = 0;
           for (const t of parsed.tasks) {
             if (!t.id) continue;
             byId.set(t.id, {
