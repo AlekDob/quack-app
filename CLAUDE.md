@@ -229,6 +229,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Codex `agent_message` render rotto: regex "Following rules:" greedy in StreamMessage che mangia l'intera bolla in rule-pills: `documentation/gotchas/gotcha-following-rules-regex-codex-prose-collision.md`
 - Built-in skills bundled via include_str!: `documentation/gotchas/gotcha-builtin-skill-bundled-include-str.md`
 - TodoWrite widget righe vuote dopo SDK 0.3.150 (type mismatch toolResults `Map<string,any>` vs accumulator `Map<string,string>`, `JSON.parse([object Object])` silenzioso): `documentation/bugs/fix-task-accumulator-toolresult-text-mismatch.md`
+- TodoWrite 0/N completed — TaskUpdate orphaned (SDK 0.3.150 managed tools non emettono tool_result nello stream): `documentation/bugs/fix-task-accumulator-pending-reconciliation.md`
 - PM widgets Jack crashano app ("Provider Error: Git") — `MarkdownText.tsx` faceva `JSON.parse` inline su fenced block streaming incompleti: `documentation/bugs/fix-markdown-pm-widgets-streaming-json-crash.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
