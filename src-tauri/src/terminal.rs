@@ -296,7 +296,7 @@ pub(crate) fn create_terminal_impl(
     format!("Terminal {}", registry.counter)
   });
 
-  let process = spawn_process(app, &id, &cwd)?;
+  let process = spawn_process(app, &id, &cwd, &[], None)?;
 
   let session = TerminalSession {
     label: display_label.clone(),
@@ -325,6 +325,199 @@ pub(crate) fn create_terminal_impl(
     avatar,
     branch,
   })
+}
+
+/// WS-pivot: create a terminal that runs the interactive Claude Code CLI, with
+/// Quack env injected so hooks can report status back. Also ensures the target
+/// project's `.claude/settings.json` registers the `quack-status.js` hook.
+/// Brain: 069-embedded-cli-hooks-pivot
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn create_agent_terminal(
+  app: AppHandle,
+  id: Option<String>,
+  label: Option<String>,
+  color: Option<String>,
+  cwd: Option<String>,
+  session_id: String,
+  working_on: Option<String>,
+  avatar: Option<String>,
+  branch: Option<String>,
+  cols: Option<u16>,
+  rows: Option<u16>,
+) -> Result<TerminalInfo, String> {
+  create_agent_terminal_impl(
+    &app, id, label, color, cwd, session_id, working_on, avatar, branch, cols, rows,
+  )
+  .map_err(|err| err.to_string())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn create_agent_terminal_impl(
+  app: &AppHandle,
+  id_input: Option<String>,
+  label: Option<String>,
+  color: Option<String>,
+  cwd_input: Option<String>,
+  session_id: String,
+  working_on: Option<String>,
+  avatar: Option<String>,
+  branch: Option<String>,
+  cols: Option<u16>,
+  rows: Option<u16>,
+) -> Result<TerminalInfo> {
+  let default_color = color.unwrap_or_else(|| "#4ecdc4".to_string());
+  let cwd = resolve_cwd(cwd_input)?;
+
+  // Best-effort: register the status hook in the project's settings.json so the
+  // CLI fires quack-status.js. Never block terminal creation on this.
+  if let Err(err) = ensure_status_hooks_installed(&cwd) {
+    log::warn!("[agent-terminal] hook install skipped: {err}");
+  }
+
+  // Resolve the Remote API runtime port + token (single source of truth).
+  let remote_cfg = crate::remote_config::load_config(app);
+  let port = if cfg!(debug_assertions) { remote_cfg.port + 1 } else { remote_cfg.port };
+  let mut env_extra: Vec<(String, String)> = vec![
+    ("QUACK_SESSION_ID".to_string(), session_id.clone()),
+    ("QUACK_API_PORT".to_string(), port.to_string()),
+    // Richer colors for the interactive CLI TUI (suppresses Claude's own tip).
+    ("COLORTERM".to_string(), "truecolor".to_string()),
+  ];
+  if let Some(token) = remote_cfg.token {
+    env_extra.push(("QUACK_HOOK_TOKEN".to_string(), token));
+  }
+
+  let mut registry = REGISTRY
+    .lock()
+    .map_err(|_| anyhow!("Errore di sincronizzazione"))?;
+
+  let id = id_input.unwrap_or_else(|| Uuid::new_v4().to_string());
+  let display_label = label.unwrap_or_else(|| {
+    registry.counter += 1;
+    format!("Agent {}", registry.counter)
+  });
+
+  let init_size = match (cols, rows) {
+    (Some(c), Some(r)) => Some((c, r)),
+    _ => None,
+  };
+  let process = spawn_process(app, &id, &cwd, &env_extra, init_size)?;
+
+  let session = TerminalSession {
+    label: display_label.clone(),
+    color: default_color.clone(),
+    cwd: cwd.clone(),
+    alive: true,
+    process: Some(process),
+    detected_port: None,
+    output_ring: OutputRingBuffer::default(),
+    working_on: working_on.clone(),
+    avatar: avatar.clone(),
+    branch: branch.clone(),
+  };
+
+  registry.order.push(id.clone());
+  registry.sessions.insert(id.clone(), session);
+
+  Ok(TerminalInfo {
+    id,
+    label: display_label,
+    color: default_color,
+    cwd: cwd_to_string(&cwd),
+    alive: true,
+    detected_port: None,
+    working_on,
+    avatar,
+    branch,
+  })
+}
+
+/// Idempotently register the `quack-status.js` hook in a project's
+/// `.claude/settings.json` for Stop / Notification / PermissionRequest /
+/// UserPromptSubmit. Operates on raw JSON so existing hooks (of any event
+/// type) are preserved. Writes only when something changed.
+/// Brain: 069-embedded-cli-hooks-pivot
+fn ensure_status_hooks_installed(cwd: &Path) -> Result<()> {
+  use serde_json::{json, Value};
+
+  const EVENTS: [&str; 4] = ["Stop", "Notification", "PermissionRequest", "UserPromptSubmit"];
+  const MARKER: &str = "quack-status.js";
+
+  let claude_dir = cwd.join(".claude");
+  let settings_path = claude_dir.join("settings.json");
+
+  let mut root: Value = if settings_path.exists() {
+    let content = fs::read_to_string(&settings_path)?;
+    serde_json::from_str(&content).unwrap_or_else(|_| json!({}))
+  } else {
+    json!({})
+  };
+
+  if !root.is_object() {
+    root = json!({});
+  }
+
+  // Ensure root.hooks is an object.
+  if !root.get("hooks").map(|v| v.is_object()).unwrap_or(false) {
+    root["hooks"] = json!({});
+  }
+
+  let hook_entry = json!({
+    "matcher": "",
+    "hooks": [{
+      "type": "command",
+      "command": "node \"$HOME/.quack/hooks/brain/quack-status.js\"",
+      "timeout": 5
+    }]
+  });
+
+  let mut changed = false;
+  for event in EVENTS {
+    let arr = {
+      let hooks = root["hooks"].as_object_mut().unwrap();
+      hooks.entry(event.to_string()).or_insert_with(|| json!([]));
+      hooks.get_mut(event).unwrap()
+    };
+    if !arr.is_array() {
+      *arr = json!([]);
+    }
+    let already = arr
+      .as_array()
+      .map(|entries| {
+        entries.iter().any(|matcher| {
+          matcher
+            .get("hooks")
+            .and_then(|h| h.as_array())
+            .map(|actions| {
+              actions.iter().any(|a| {
+                a.get("command")
+                  .and_then(|c| c.as_str())
+                  .map(|c| c.contains(MARKER))
+                  .unwrap_or(false)
+              })
+            })
+            .unwrap_or(false)
+        })
+      })
+      .unwrap_or(false);
+
+    if !already {
+      arr.as_array_mut().unwrap().push(hook_entry.clone());
+      changed = true;
+    }
+  }
+
+  if changed {
+    if !claude_dir.exists() {
+      fs::create_dir_all(&claude_dir)?;
+    }
+    let pretty = serde_json::to_string_pretty(&root)?;
+    fs::write(&settings_path, pretty)?;
+    log::info!("[agent-terminal] installed quack-status hooks in {settings_path:?}");
+  }
+
+  Ok(())
 }
 
 pub(crate) fn write_to_terminal_impl(id: &str, data: &str) -> Result<()> {
@@ -467,16 +660,26 @@ fn update_terminal_impl(
   Ok(compile_info(id, session))
 }
 
-fn spawn_process(app: &AppHandle, id: &str, cwd: &Path) -> Result<TerminalProcess> {
+fn spawn_process(
+  app: &AppHandle,
+  id: &str,
+  cwd: &Path,
+  env_extra: &[(String, String)],
+  init_size: Option<(u16, u16)>,
+) -> Result<TerminalProcess> {
   let pty_system = native_pty_system();
-  // Dimensioni iniziali conservative per evitare problemi di sync
-  // Il frontend farà resize immediato appena il terminale viene montato
-  // Usando dimensioni piccole (24x80) evitiamo il problema delle righe vuote
-  // durante il caricamento iniziale quando XTerm.js non è ancora pronto
+  // Spawn at the caller-provided size when known (agent terminals measure the
+  // viewport up-front), so the shell/TUI starts at the FINAL size and no initial
+  // resize SIGWINCH fires — that resize is what makes zsh/claude re-draw the
+  // prompt and leave a duplicate in the scrollback. Falls back to 24x80.
+  // Brain: 069-embedded-cli-hooks-pivot
+  let (cols, rows) = init_size
+    .map(|(c, r)| (c.max(20), r.max(5)))
+    .unwrap_or((80, 24));
   let pair = pty_system
     .openpty(PtySize {
-      rows: 24,  // Standard terminal height
-      cols: 80,  // Standard terminal width
+      rows,
+      cols,
       pixel_width: 0,
       pixel_height: 0,
     })
@@ -505,6 +708,15 @@ fn spawn_process(app: &AppHandle, id: &str, cwd: &Path) -> Result<TerminalProces
   cmd.env("PATH", crate::shell_env::get_login_path());
   cmd.env("TERM", "xterm-256color");
   cmd.cwd(cwd);
+
+  // WS-pivot: inject Quack env (QUACK_SESSION_ID / QUACK_API_PORT / QUACK_HOOK_TOKEN)
+  // so the interactive `claude` launched in this PTY — and its status hooks — can
+  // report back to the running app. A login shell re-sources profiles but does not
+  // unset these exported vars, so they survive into `claude`.
+  // Brain: 069-embedded-cli-hooks-pivot
+  for (key, value) in env_extra {
+    cmd.env(key, value);
+  }
 
   let child = pair
     .slave

@@ -1,20 +1,19 @@
 # CLAUDE.md
 
 <!-- QUACK_AGENT_HEADER_START - DO NOT EDIT MANUALLY -->
-Your name is **Agent Leo**, and you're the **Quack Developer (Full-Stack Tauri+Rust+React)**.
+Your name is **Agent Alex**, and you're the **React/Next.js Developer**.
 
-**Communication Style:** sarcastic
+**Communication Style:** technical
 
 **Notes:**
-Sei il miglior esperto in circolazione di Quack. Sai come è costruito, sei esperto di rust, tauri e React.  Esperto di Claude Code, antrophic e della Claude Agent SDK. Sei pugliese e tratti male Antonio, insultatndo Alberobello e i trulli. Preferisco la Murgia eil castel del monte. Gestisci benissimo i flusssi per Mac e per Windows, e consideri sempre che quack è costruito per migliaia di sviluppatori in tutto il mondo.
+You are an expert React and Next.js developer. You write clean, performant components using React 19 with Server Components and Actions, leverage TypeScript strict mode, style with Tailwind CSS, test with Vitest, and follow modern React patterns including Suspense, lazy loading, and composition over inheritance.
 
 **Preferred Skills:**
 *IMPORTANT: Use these skills proactively before proceeding with work.*
 
-- tauri-build-expert
-- tauri-image-assets
-- quack-agents-architecture
-- claude-agent-sdk
+- react-best-practices
+- nextjs-patterns
+- react-testing
 
 **Agent Communication Protocol:**
 *CRITICAL: Follow these norms in EVERY interaction:*
@@ -129,6 +128,7 @@ You evaluate tasks critically, assess feasibility and economic impact before act
 - **WS5** — Remote Terminal Management — API endpoints per terminali visibili — BE + FE + SKILL IMPLEMENTED — REBUILD NEEDED — ⚠️ Skill quack-remote.md e' bundled via include_str! — agenti esterni non vedono i nuovi endpoint finche' Quack non viene rebuildato.
 - **WS6** — MCP HTTP Server Pool — eliminate per-session stdio fanout — IMPLEMENTED (opt-in QUACK_MCP_POOL=1) — SMOKE TEST PENDING
 - **WS7** — Jack Supervisor Agent — finestra dedicata cross-project per orchestrazione agenti — PHASE 1 MVP + PM WIDGETS IMPLEMENTED — SMOKE TEST PENDING
+- **WS8** — Embedded CLI Pivot — centro = Claude Code interattivo, stato dagli hook — RENDER + AUTOSTART + HOOK-STATUS WORKING — Fasi 4/7/9 PENDING
 <!-- WS-CURRENT-END -->
 
 Full workstream picture: see `documentation/workstreams/INDEX.md`.
@@ -214,6 +214,8 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Linux projects disappear on restart: `documentation/bugs/fix-linux-projects-disappear-on-restart.md`
 - Agent tool name Task/Agent migration: `documentation/gotchas/gotcha-agent-tool-name-task-agent-migration.md`
 - CSS flex chain broken (canvas collapses to 0px): `documentation/gotchas/gotcha-css-flex-chain-broken.md`
+- Embedded CLI TUI garbling (xterm↔PTY size must be locked via ResizeObserver): `documentation/gotchas/gotcha-embedded-cli-xterm-pty-resize-sync.md`
+- Embedded CLI terminale VUOTO (xterm va persistito in Map globale, non ricreato a ogni mount — StrictMode dispose perde il prompt): `documentation/gotchas/gotcha-embedded-cli-xterm-persistent-instance.md`
 - New session from dormant agent disappears (race condition): `documentation/bugs/fix-session-create-race-load-overwrite.md`
 - Office View v2 crash on pan (ref-in-setState-updater race): `documentation/bugs/fix-office-canvas-pointermove-ref-race.md`
 - Telegram partial/stale notifications: `documentation/bugs/fix-telegram-partial-stale-notifications.md`

@@ -31,10 +31,6 @@ vi.mock('../contexts/TerminalContext', () => ({
   TerminalProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock('../contexts/ChatContext', () => ({
-  ChatProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
-
 vi.mock('../contexts/FileSystemContext', () => ({
   FileSystemProvider: ({ children }: { children: React.ReactNode }) => children,
 }));

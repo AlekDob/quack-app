@@ -144,6 +144,71 @@ fn default_true() -> bool {
 }
 
 // ============================================================
+// Hook → Status Endpoint (WS-pivot: embedded CLI)
+// ============================================================
+// Receives status pings from the `quack-status.js` Claude Code hook
+// (Stop / Notification / PermissionRequest / UserPromptSubmit) and
+// re-emits them to the frontend as a `hook-status` Tauri event. The
+// frontend listener maps these onto chatStore (setLoading /
+// setPendingQuestion), so the sidebar + Task Hub stay live WITHOUT the
+// Agent SDK event stream. Localhost, no bearer auth (mirrors the
+// existing `/terminal/status` legacy hook pattern).
+// Brain: 069-embedded-cli-hooks-pivot
+#[derive(Deserialize, Clone)]
+struct HookStatusPayload {
+    #[serde(default)]
+    quack_session_id: Option<String>,
+    #[serde(default)]
+    session_id: Option<String>,
+    hook_event_name: String,
+    #[serde(default)]
+    notification_type: Option<String>,
+    #[serde(default)]
+    cwd: Option<String>,
+    #[serde(default)]
+    transcript_path: Option<String>,
+    #[serde(default)]
+    ts: Option<i64>,
+}
+
+#[derive(Serialize, Clone)]
+struct HookStatusEvent {
+    quack_session_id: Option<String>,
+    session_id: Option<String>,
+    hook_event_name: String,
+    notification_type: Option<String>,
+    cwd: Option<String>,
+    transcript_path: Option<String>,
+    ts: i64,
+}
+
+async fn handle_hook_status(
+    State(state): State<HookState>,
+    Json(payload): Json<HookStatusPayload>,
+) -> StatusCode {
+    // A status ping is meaningless without at least one session key.
+    if payload.quack_session_id.is_none() && payload.session_id.is_none() {
+        return StatusCode::BAD_REQUEST;
+    }
+
+    let event = HookStatusEvent {
+        quack_session_id: payload.quack_session_id,
+        session_id: payload.session_id,
+        hook_event_name: payload.hook_event_name,
+        notification_type: payload.notification_type,
+        cwd: payload.cwd,
+        transcript_path: payload.transcript_path,
+        ts: payload.ts.unwrap_or_else(|| chrono::Utc::now().timestamp_millis()),
+    };
+
+    if state.app.emit("hook-status", event).is_err() {
+        return StatusCode::INTERNAL_SERVER_ERROR;
+    }
+
+    StatusCode::OK
+}
+
+// ============================================================
 // WhatsApp Session Creation Endpoint
 // ============================================================
 
@@ -1066,6 +1131,7 @@ pub fn run() {
                 let telegram_router = telegram_bot::create_telegram_router(app_handle.clone());
                 let legacy_router = Router::new()
                     .route("/terminal/status", post(handle_status_update))
+                    .route("/hooks/status", post(handle_hook_status))
                     .route("/session/create", post(handle_create_session))
                     .route("/session/message", post(handle_add_message))
                     .route("/session/start-chat", post(handle_start_chat))
@@ -1164,6 +1230,7 @@ pub fn run() {
             browser::open_oauth_window,
             browser::handle_oauth_callback,
             terminal::create_terminal,
+            terminal::create_agent_terminal,
             terminal::execute_command,
             terminal::list_terminals,
             terminal::get_active_processes,

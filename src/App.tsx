@@ -65,7 +65,9 @@ import TelegramSetup from "./components/TelegramSetup";
 // Background agent service for /background @agent commands
 import { useBackgroundAgentInit } from "./hooks/useBackgroundAgents";
 import { useRemoteLiveStateSync } from "./hooks/useRemoteLiveStateSync";
-import ChatView, { type LineChange, type FileEdit, type FileDeleted } from "./components/ChatView";
+import { useHookStatusListener } from "./hooks/useHookStatusListener";
+import { AgentTerminalView } from "./components/AgentTerminalView";
+import type { LineChange, FileEdit, FileDeleted } from "./components/EditSummaryBar";
 import SessionEmptyState from "./components/SessionEmptyState";
 import SplashScreen from "./components/SplashScreen";
 import TabBar, { type Tab, type PopoutPosition } from "./components/TabBar";
@@ -428,6 +430,11 @@ function AppContent() {
 
   // Mirror chatStore (loading/pending/last-msg) → Rust backend → WS for mobile PWA Task Hub
   useRemoteLiveStateSync();
+
+  // WS-pivot: drive session status from Claude Code hooks (embedded CLI) instead
+  // of the SDK event stream. Single-writer: active only when useEmbeddedCLI is on.
+  // Brain: 069-embedded-cli-hooks-pivot
+  useHookStatusListener();
 
   // TEMPORARILY DISABLED: Max Plan tracking
   // const { incrementMessageCount } = useMaxPlan();
@@ -13422,173 +13429,25 @@ You have access to all Bash tools to execute git commands like:
                   );
                 }
 
-                return (
-                  <ChatView
-                    key={isTaskChat ? `task-${activeTaskId}` : `${activeId ?? 'no-agent'}-${activeSessionId ?? 'no-session'}`}
-                    projectTerminals={activeTerminal ? terminals.filter(t => t.cwd === activeTerminal.cwd && t.id !== activeId) : []}
-                    messages={isTaskChat ? taskMessages : currentAgentMessages}
-                    isLoading={isTaskChat ? taskLoading : currentAgentLoading}
-                    onSendMessage={isTaskChat
-                      ? (content, opts) => sendMessageForTargetAgent(activeTaskId!, content, {
-                          ...opts,
-                          workingDirectory: activeTaskSession?.projectPath || opts?.workingDirectory || '/',
-                        })
-                      : sendMessageForAgent
-                    }
-                    activeAgent={activeAgent}
-                    onClearAgent={isTaskChat
-                      ? () => setActiveTaskId(null) // Just deselect task, don't close anything
-                      : handleClearAgent
-                    }
-                    agents={agents}
-                    onSelectAgent={handleUseAgent}
-                    onFilePathClick={handleFilePathClick}
-                    onOpenInIDE={handleOpenInIDE}
-                    onSessionIdClick={handleSessionIdClick}
-                    onDiffClick={handleDiffClick}
-                    onEditsChange={handleEditsChange}
-                    pendingAgentMention={pendingAgentMention}
-                    onMentionInserted={() => setPendingAgentMention(null)}
-                    pendingFileMention={pendingFileMention}
-                    onFileMentionInserted={() => setPendingFileMention(null)}
-                    pendingSlashCommand={pendingSlashCommand}
-                    onCommandInserted={() => setPendingSlashCommand(null)}
-                    pendingSkillMention={pendingSkillMention}
-                    onSkillMentionInserted={() => setPendingSkillMention(null)}
-                    basePath={isTaskChat ? (activeTaskSession?.projectPath || explorerRoot || explorerPath) : (explorerRoot ?? explorerPath)}
-                    inputDraft={isTaskChat
-                      ? (taskInputDrafts.get(activeTaskId!) || (taskMessages.length === 0 ? '' : ''))
-                      : currentSettings.inputDraft
-                    }
-                    onInputDraftChange={(draft) => {
-                      if (isTaskChat && activeTaskId) {
-                        setTaskInputDrafts(prev => {
-                          const newMap = new Map(prev);
-                          newMap.set(activeTaskId, draft);
-                          return newMap;
-                        });
-                      } else {
-                        updateAgentSettings({ inputDraft: draft });
-                      }
-                    }}
-                    model={currentSettings.model}
-                    onModelChange={(model) => updateAgentSettings({ model })}
-                    thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
-                    onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
-                    permissionMode={currentSettings.permissionMode as PermissionMode}
-                    onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
-                    effort={currentSettings.effort || 'medium'}
-                    onEffortChange={(effort) => updateAgentSettings({ effort })}
-                    onAbortStream={isTaskChat ? () => abortStreamForTargetAgent(activeTaskId!) : abortStreamForAgent}
-                    lastPrompt={isTaskChat
-                      ? (getLastPromptForTargetAgent(activeTaskId!) || undefined)
-                      : (getLastPromptForAgent() || undefined)
-                    }
-                    onClearConversation={isTaskChat
-                      ? () => clearConversationForTargetAgent(activeTaskId!)
-                      : clearCurrentAgentConversation
-                    }
-                    onCompactConversation={isTaskChat
-                      ? () => compactConversationForTargetAgent(activeTaskId!)
-                      : compactCurrentAgentConversation
-                    }
-                    onOpenSessionInTerminal={isTaskChat
-                      ? () => openKanbanSessionInTerminal(activeTaskId!)
-                      : openSessionInTerminal
-                    }
-                    sessionTokens={isTaskChat ? taskTokens : currentAgentTokens}
-                    openaiApiKey={openaiApiKey ?? undefined}
-                    onOpenPromptEngineer={handleOpenPromptEngineer}
-                    agentName={isTaskChat ? (activeTaskSession?.title || 'Task') : (activeTerminal?.label || 'Jack')}
-                    agentAvatar={isTaskChat ? taskAgentInfo?.avatar : activeTerminal?.avatar}
-                    projectName={isTaskChat ? (activeTaskSession?.projectName || projectName) : projectName}
-                    gitBranch={gitBranch}
-                    workingOn={activeTerminal?.workingOn}
-                    onWorkingOnChange={(value) => {
-                      if (!showNewTerminalModal && !editingTerminal && activeTerminal) {
-                        handleUpdateWorkingOn(activeTerminal.id, value);
-                      }
-                    }}
-                    selectedRules={activeTerminal?.personality?.selectedRules}
-                    onEditRules={activeTerminal ? () => {
-                      setEditingTerminal(activeTerminal);
-                      setShowNewTerminalModal(true);
-                    } : undefined}
-                    // Agent Toolkit - quick-access tools for EquipBar (chips at bottom of input)
-                    agentToolkit={activeTerminal?.personality?.toolkit}
-                    onInsertAtCursor={(text) => {
-                      // Insert text at cursor by appending to current input draft
-                      if (isTaskChat && activeTaskId) {
-                        const currentDraft = taskInputDrafts.get(activeTaskId) || '';
-                        const newDraft = currentDraft + text;
-                        setTaskInputDrafts(prev => {
-                          const newMap = new Map(prev);
-                          newMap.set(activeTaskId, newDraft);
-                          return newMap;
-                        });
-                      } else {
-                        const currentDraft = currentSettings.inputDraft || '';
-                        const newDraft = currentDraft + text;
-                        updateAgentSettings({ inputDraft: newDraft });
-                      }
-                    }}
-                    onOpenKanban={handleOpenKanbanTab}
-                    onUserQuestionAnswer={answerUserQuestionForAgent}
-                    pendingQuestionIds={pendingQuestionIdsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || EMPTY_SET}
-                    answeredQuestions={answeredQuestionsMap.get(isTaskChat ? activeTaskId! : (activeId ?? '')) || EMPTY_MAP}
-                    currentSessionId={isTaskChat
-                      ? activeTaskId ?? undefined
-                      : (activeSessionId
-                        ? agentSessions.find(s => s.id === activeSessionId)?.claudeSessionId ?? activeSessionId
-                        : undefined)
-                    }
-                    // 🦆 SESSION-FIRST: Internal session ID for state management (attachments, settings)
-                    internalSessionId={isTaskChat ? activeTaskId ?? undefined : activeSessionId ?? undefined}
-                    // Fullscreen mode
-                    isFullscreen={isChatFullscreen}
-                    onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
-                    // File Checkpointing (SDK 0.2.7+)
-                    onRewindFiles={handleRewindFiles}
-                    onOpenImageTab={handleOpenImageTab}
-                    // Open Agent Personality in sidebar
-                    onOpenPersonality={() => {
-                      // Ensure side panel is not collapsed, then expand Agent Personality section
-                      if (sidePanelCollapsed) {
-                        setSidePanelCollapsed(false);
-                      }
-                      setForceExpandSection('agent-context');
-                    }}
-                    // Plan approval
-                    pendingPlanApprovalIds={(() => {
-                      const ids = new Set<string>();
-                      const key = isTaskChat ? activeTaskId! : (activeId ?? '');
-                      for (const [reqId, data] of pendingPlanApprovals.entries()) {
-                        if (data.agentId === key || data.sessionKey === key) {
-                          ids.add(reqId);
-                        }
-                      }
-                      return ids;
-                    })()}
-                    onPlanApprovalResponse={respondToPlanApproval}
-                    pendingToolPermissions={(() => {
-                      const key = isTaskChat ? activeTaskId! : (activeId ?? '');
-                      const perms: PendingToolPermission[] = [];
-                      for (const [, data] of pendingToolPermissions.entries()) {
-                        if (data.agentId === key || data.sessionKey === key) {
-                          perms.push(data);
-                        }
-                      }
-                      return perms;
-                    })()}
-                    onToolPermissionResponse={respondToToolPermission}
-                    onAllowAlwaysTool={handleAllowAlwaysTool}
-                    onTeammateDrillDown={handleTeammateDrillDown}
-                    onAgentCommitDetected={() => {
-                      void refreshGitSummary();
-                      setAgentCommitTs(Date.now());
-                    }}
-                  />
-                );
+                // WS-pivot: every session renders as an embedded Claude Code CLI
+                // terminal (SDK chat-stream removed). Brain: 069-embedded-cli-hooks-pivot
+                const cliSessionId = isTaskChat ? activeTaskId : activeSessionId;
+                const cliCwd = isTaskChat
+                  ? (activeTaskSession?.projectPath || explorerRoot || explorerPath || activeTerminal?.cwd)
+                  : activeTerminal?.cwd;
+                if (cliSessionId && cliCwd) {
+                  return (
+                    <AgentTerminalView
+                      key={`agentcli-${cliSessionId}`}
+                      sessionId={cliSessionId}
+                      cwd={cliCwd}
+                      color={activeTerminal?.color}
+                      label={isTaskChat ? activeTaskSession?.title : activeTerminal?.label}
+                      isActive={true}
+                    />
+                  );
+                }
+                return null;
               })()}
 
               {/* Task Chat View - shown when a task tab is active */}
@@ -13613,144 +13472,15 @@ You have access to all Bash tools to execute git commands like:
                 const taskLoading = chatLoadingMap.get(taskSessionId) ?? false;
                 const taskTokens = chatTokensMap.get(taskSessionId);
 
+                // WS-pivot: task session = embedded Claude Code CLI terminal.
                 return (
-                  <ChatView
-                    key={`task-${taskSessionId}`}
-                    projectTerminals={activeTerminal ? terminals.filter(t => t.cwd === activeTerminal.cwd && t.id !== activeId) : []}
-                    messages={taskMessages}
-                    isLoading={taskLoading}
-                    onSendMessage={(content, opts) => sendMessageForTargetAgent(taskSessionId, content, {
-                      ...opts,
-                      workingDirectory: activeSession.projectPath || opts?.workingDirectory || '/',
-                    })}
-                    activeAgent={activeAgent}
-                    onClearAgent={() => {
-                      // Close the task tab when clearing
-                      handleTabClose(activeTabId);
-                    }}
-                    agents={agents}
-                    onSelectAgent={handleUseAgent}
-                    onFilePathClick={handleFilePathClick}
-                    onOpenInIDE={handleOpenInIDE}
-                    onSessionIdClick={handleSessionIdClick}
-                    onDiffClick={handleDiffClick}
-                    onEditsChange={handleEditsChange}
-                    pendingAgentMention={pendingAgentMention}
-                    onMentionInserted={() => setPendingAgentMention(null)}
-                    pendingFileMention={pendingFileMention}
-                    onFileMentionInserted={() => setPendingFileMention(null)}
-                    pendingSlashCommand={pendingSlashCommand}
-                    onCommandInserted={() => setPendingSlashCommand(null)}
-                    pendingSkillMention={pendingSkillMention}
-                    onSkillMentionInserted={() => setPendingSkillMention(null)}
-                    basePath={activeSession.projectPath || explorerRoot || explorerPath}
-                    inputDraft={taskInputDrafts.get(taskSessionId) || (taskMessages.length === 0 ? '' : '')}
-                    onInputDraftChange={(draft) => {
-                      setTaskInputDrafts(prev => {
-                        const newMap = new Map(prev);
-                        newMap.set(taskSessionId, draft);
-                        return newMap;
-                      });
-                    }}
-                    model={currentSettings.model}
-                    onModelChange={(model) => updateAgentSettings({ model })}
-                    thinkingMode={currentSettings.thinkingMode as 'auto' | 'think' | 'hard' | 'harder' | 'ultra'}
-                    onThinkingModeChange={(thinkingMode) => updateAgentSettings({ thinkingMode })}
-                    permissionMode={currentSettings.permissionMode as PermissionMode}
-                    onPermissionModeChange={(permissionMode) => updateAgentSettings({ permissionMode })}
-                    effort={currentSettings.effort || 'medium'}
-                    onEffortChange={(effort) => updateAgentSettings({ effort })}
-                    onAbortStream={() => abortStreamForTargetAgent(taskSessionId)}
-                    lastPrompt={getLastPromptForTargetAgent(taskSessionId) || undefined}
-                    onClearConversation={() => clearConversationForTargetAgent(taskSessionId)}
-                    onCompactConversation={() => compactConversationForTargetAgent(taskSessionId)}
-                    onOpenSessionInTerminal={() => openKanbanSessionInTerminal(taskSessionId)}
-                    sessionTokens={taskTokens}
-                    openaiApiKey={openaiApiKey ?? undefined}
-                    onOpenPromptEngineer={handleOpenPromptEngineer}
-                    // Agent display info - show task title for task chat
-                    agentName={activeSession.title || 'Task'}
-                    agentAvatar={agentInfo?.avatar}
-                    // Project context
-                    projectName={activeSession.projectName || projectName}
-                    gitBranch={gitBranch}
-                    // Working on field
-                    workingOn={activeTerminal?.workingOn}
-                    onWorkingOnChange={(value) => {
-                      // CRITICAL FIX: Don't update if modal is open for editing to prevent infinite loop
-                      if (!showNewTerminalModal && !editingTerminal && activeTerminal) {
-                        handleUpdateWorkingOn(activeTerminal.id, value);
-                      }
-                    }}
-                    // Agent Toolkit - quick-access tools for EquipBar
-                    agentToolkit={activeTerminal?.personality?.toolkit}
-                    onInsertAtCursor={(text) => {
-                      // Insert text at cursor by appending to current input draft
-                      const currentDraft = taskInputDrafts.get(taskSessionId) || '';
-                      const newDraft = currentDraft + text;
-                      setTaskInputDrafts(prev => {
-                        const newMap = new Map(prev);
-                        newMap.set(taskSessionId, newDraft);
-                        return newMap;
-                      });
-                    }}
-                    // Agent Rules - automatically loaded from personality
-                    selectedRules={activeTerminal?.personality?.selectedRules}
-                    onEditRules={activeTerminal ? () => {
-                      // Open the edit modal with the current terminal
-                      setEditingTerminal(activeTerminal);
-                      setShowNewTerminalModal(true);
-                    } : undefined}
-                    // Open Kanban view callback
-                    onOpenKanban={handleOpenKanbanTab}
-                    onUserQuestionAnswer={answerUserQuestionForAgent}
-                    pendingQuestionIds={pendingQuestionIdsMap.get(taskSessionId) || EMPTY_SET}
-                    answeredQuestions={answeredQuestionsMap.get(taskSessionId) || EMPTY_MAP}
-                    // 🦆 FIX: Display claudeSessionId (real Claude Code ID) in header badge
-                    currentSessionId={agentSessions.find(s => s.id === taskSessionId)?.claudeSessionId ?? taskSessionId}
-                    // 🦆 Internal session ID for state management (attachments, settings)
-                    internalSessionId={taskSessionId}
-                    // Fullscreen mode
-                    isFullscreen={isChatFullscreen}
-                    onToggleFullscreen={() => setIsChatFullscreen(!isChatFullscreen)}
-                    // File Checkpointing (SDK 0.2.7+)
-                    onRewindFiles={handleRewindFiles}
-                    onOpenImageTab={handleOpenImageTab}
-                    // Open Agent Personality in sidebar
-                    onOpenPersonality={() => {
-                      // Ensure side panel is not collapsed, then expand Agent Personality section
-                      if (sidePanelCollapsed) {
-                        setSidePanelCollapsed(false);
-                      }
-                      setForceExpandSection('agent-context');
-                    }}
-                    // Plan approval
-                    pendingPlanApprovalIds={(() => {
-                      const ids = new Set<string>();
-                      for (const [reqId, data] of pendingPlanApprovals.entries()) {
-                        if (data.agentId === taskSessionId || data.sessionKey === taskSessionId) {
-                          ids.add(reqId);
-                        }
-                      }
-                      return ids;
-                    })()}
-                    onPlanApprovalResponse={respondToPlanApproval}
-                    pendingToolPermissions={(() => {
-                      const perms: PendingToolPermission[] = [];
-                      for (const [, data] of pendingToolPermissions.entries()) {
-                        if (data.agentId === taskSessionId || data.sessionKey === taskSessionId) {
-                          perms.push(data);
-                        }
-                      }
-                      return perms;
-                    })()}
-                    onToolPermissionResponse={respondToToolPermission}
-                    onAllowAlwaysTool={handleAllowAlwaysTool}
-                    onTeammateDrillDown={handleTeammateDrillDown}
-                    onAgentCommitDetected={() => {
-                      void refreshGitSummary();
-                      setAgentCommitTs(Date.now());
-                    }}
+                  <AgentTerminalView
+                    key={`agentcli-${taskSessionId}`}
+                    sessionId={taskSessionId}
+                    cwd={activeSession.projectPath}
+                    color={activeTerminal?.color}
+                    label={activeSession.title}
+                    isActive={true}
                   />
                 );
               })()}

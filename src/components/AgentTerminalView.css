@@ -1,0 +1,25 @@
+/**
+ * AgentTerminalView (WS-pivot: embedded CLI)
+ * ------------------------------------------------------------------
+ * Zero-width (overlay) scrollbar for the embedded claude terminal.
+ *
+ * Why: xterm's fit addon computes cols from the viewport's clientWidth at fit
+ * time (empty terminal → no scrollbar → full width). Once claude fills the
+ * screen, a reserved scrollbar steals ~15px (~2 cols), shrinking the real
+ * viewport WITHOUT a refit → claude keeps drawing at the wider cols → its
+ * full-screen TUI overflows by a couple columns (fragments like "to paste"
+ * wrapping at the right edge). Making the scrollbar take 0 width keeps
+ * clientWidth constant so the fitted cols stay valid as content scrolls.
+ * Scrolling still works via wheel/trackpad.
+ *
+ * Scoped to .agent-terminal-view so normal terminals are unaffected.
+ * Brain: 069-embedded-cli-hooks-pivot
+ */
+.agent-terminal-view .xterm-viewport::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.agent-terminal-view .xterm-viewport {
+  scrollbar-width: none; /* Firefox / non-WebKit */
+}
