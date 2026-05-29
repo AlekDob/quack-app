@@ -1,7 +1,7 @@
 ---
 ws: 8
 title: "Embedded CLI Pivot — centro = Claude Code interattivo, stato dagli hook"
-status: "RENDER + AUTOSTART + HOOK-STATUS + TOKEN + SDK-GUARD WORKING — Fase 7 BLOCCATA (design)"
+status: "RENDER + AUTOSTART + HOOK-STATUS + TOKEN + SDK-GUARD + FASE7-REPOINT WORKING — strip aggressivo deferred (Codex/Jack)"
 focus: current
 opened: 2026-05-29
 updated: 2026-05-29
@@ -27,7 +27,7 @@ REFACTOR in-place (NON rewrite). `chatStore` e' gia' una facade (4 Map, 19 consu
 4. **Sorgente token da transcript** — su Stop leggere `transcript_path` per token per-turno → stamina bar — ✅ DONE (comando Rust `parse_transcript_tail` + bridge CustomEvent → `handleTokenUpdate`)
 5. **Flip + validazione consumer** — ✅ DONE (validato nell'app reale)
 6. **Cancellare il centro chat-stream** — ChatView/ChatInput/ChatContext/AppRefactored/featureFlags cancellati (~5.500 righe) — ✅ DONE (tsc 0)
-7. **Strip path SDK in App.tsx** — ⛔ BLOCCATA (non è dead-code): `handleClaudeEvent` + listener `claude-event` + `sendMessageForAgent` restano VIVI perché remote-execute/remote-send-message (Telegram/PWA/Remote)/DroidFactory/auto-start/git-commit streammano ancora via SDK sul main agent. Strippare romperebbe quelle feature. Serve PRIMA una decisione di design: repointare quei "send" sul PTY (`write_to_terminal`) invece dell'SDK. Vedi sezione "Fase 7 — perché è bloccata".
+7. **Repoint send SDK → PTY in App.tsx** — ✅ DONE (come REPOINT, non strip). Sbloccata da Alek ("possiamo annientare telegram/whatsapp/pwa → procedi"). `sendMessageForAgent` ora, per le sessioni **non-Codex**, fa early-return scrivendo il prompt nel PTY embedded (`write_to_terminal` su `agent-cli-<sessionId>`, bracketed paste + CR) invece di `send_message_via_sdk_streaming`. Tutti i 9 call-site programmatici (remote-execute/remote-send-message/WhatsApp/auto-start/git-commit/`/clear`/@team) confluiscono lì → azzerato l'uso del pool SDK a pagamento sul main agent. **Strip aggressivo (handleClaudeEvent + Map pending* + 3 listener SDK) NON eseguito**: condiviso con Codex (OpenAI, fuori dal billing) e Jack/Kanban → rimuoverlo romperebbe feature non sacrificabili. Vedi sezione "Fase 7 — repoint fatto, strip deferred".
 9. **Guard degradazione SDK** — ✅ DONE (riformulata): non più "gate dietro embedded flag" (embedded è permanente, disabiliterebbe Jack/BTW/Kanban). Implementato kill-switch **opt-out** `quack:disableSdkStream` (default OFF = tutto invariato) che disabilita con fallback grazioso i 3 send SDK programmatici secondari (Jack/BTW/Kanban-inline). Util `src/utils/sdkStreamGuard.ts`.
 
 ## Status (2026-05-29)
@@ -45,19 +45,25 @@ REFACTOR in-place (NON rewrite). `chatStore` e' gia' una facade (4 Map, 19 consu
 - ✅ **Fase 4 — token da transcript**: comando Rust `sessions::parse_transcript_tail(path)` (legge solo gli ultimi ~512KB del JSONL, prende l'`usage` dell'**ultimo** messaggio assistant = context-fill per-turno, non la somma). Su `Stop`, `useHookStatusListener` lo invoca e dispatcha un `CustomEvent('quack:transcript-usage', {sessionKey, usage, cost})`; App.tsx ascolta e chiama `handleTokenUpdate(sessionKey, ...)`. La chiave combacia perché il token map è keyed by `chatKey` (= session id = `quack_session_id` dell'hook). Best-effort: se il transcript manca/illeggibile → N/A, nessun crash.
 - ✅ **Fase 9 — guard SDK (riformulata)**: `src/utils/sdkStreamGuard.ts` → `isSdkStreamEnabled()` (opt-OUT via `localStorage quack:disableSdkStream='1'`, default abilitato). Gating con fallback grazioso (`SDK_DISABLED_MESSAGE`) su Jack (`useJackChat`), BTW (`useBTW`), Kanban inline (`usePopoutKanbanChat`). Motivo: dare all'utente un kill-switch per il pool SDK a pagamento (15/06) senza rompere niente di default.
 
-## Fase 7 — perché è bloccata (non è dead-code)
+## Fase 7 — repoint fatto, strip deferred
 
-L'audit (3 esploratori) ha smentito l'assunto del piano. `handleClaudeEvent` (App.tsx 1526–1897), il listener `claude-event:${agentId}` (2478–2656) e `sendMessageForAgent` (2847–3554) **NON sono morti**: sono ancora cablati a feature vive che streammano via SDK sul **main agent**:
+**Fatto (REPOINT).** `sendMessageForAgent` (App.tsx ~2865), per `currentSession?.backend !== 'codex'`, fa early-return e scrive il prompt nel PTY embedded:
+```ts
+const ptyData = `\x1b[200~${resolvedContent}\x1b[201~\r`; // bracketed paste + CR
+await invoke('write_to_terminal', { id: `agent-cli-${messageKey}`, data: ptyData });
+return;
+```
+Tutti i 9 call-site programmatici confluiscono lì (remote-execute ~6118, remote-send-message ~6156, WhatsApp auto-start ~6039, pendingAutoStart ~3588, git-commit ~12381, `/clear` ~4577, @team enrichment). Risultato: **zero uso del pool SDK a pagamento (15/06) sul main agent** — il typing manuale era già su PTY (`term.onData`), lo stato resta dagli hook.
 
-- `remote-execute` / `remote-send-message` (App.tsx ~6100/6138) ← Remote API (WS5), **Telegram**, **PWA inbound** convergono qui
-- `DroidFactoryDrawer` `onSendMessage` (App.tsx 14366)
-- auto-start (ref consumers) + git-commit-message handler (12363)
+**Verifica chiave:** il mount centrale (App.tsx ~13458/13495) è `AgentTerminalView` **incondizionato** (lancia sempre `claude`), per ogni sessione. Quindi dopo la cancellazione di `ChatView` (Fase 6) l'output SDK Claude non era più renderizzato da nessuna parte → il repoint è strettamente meglio (il prompt ora appare nel terminale + guida gli hook).
 
-Tutti chiamano `sendMessageForAgentRef.current(...)` → `invoke('send_message_via_sdk_streaming')` → emette `claude-event:${activeAgentId}` → processato SOLO da `handleClaudeEvent`. Inoltre il flag che il piano assumeva (`useEmbeddedCLI`) **non esiste più** (cancellato in Fase 6): embedded è permanente, niente rollback.
+**NON fatto (strip aggressivo) — deliberato.** `handleClaudeEvent` (1544-1915) + le `Map pending*` (pendingUserQuestions/ToolPermissions/PlanApprovals, 607/611/618) + i 3 listener SDK (ask-user-question/tool-permission/plan-approval) **restano VIVI** perché condivisi:
+- **Codex** (OpenAI, NON toccato dal billing Anthropic): `codex-event:${agentId}` listener → `handleClaudeEvent`; `sendMessageForAgent` ha un branch Codex (~3193).
+- **Jack / Kanban**: usano ancora `send_message_via_sdk_streaming` → possono emettere ask-user-question/tool-permission/plan-approval.
 
-**Prerequisito per la Fase 7:** decidere il comportamento "embedded" di quei send → repointarli da SDK a **`write_to_terminal`** sul PTY del main agent (digitare il prompt nel `claude` interattivo) invece di `send_message_via_sdk_streaming`. Solo dopo aver repointato (e validato nell'app) si può rimuovere `handleClaudeEvent` + listener `claude-event` + `sendMessageForAgent` + le Map `pending*` (607/611/614/618) e i 3 listener SDK (ask-user-question/tool-permission/plan-approval, surgicalmente dentro l'effetto 5640–6160). NON toccare il comando Rust `send_message_via_sdk_streaming` (usato anche da Jack/BTW/Kanban) né `pendingQuestionIdsMap` (condiviso).
+Alek ha autorizzato ad annientare SOLO telegram/whatsapp/pwa, non Codex/Jack → rimuovere quel codice romperebbe feature non sacrificabili, su un branch senza rollback e non validabile da me. Se in futuro si vuole completare lo strip: prima confermare che Codex e Jack/Kanban siano dismessi o repointati, poi rimuovere handleClaudeEvent + i listener + le Map. NON toccare il comando Rust `send_message_via_sdk_streaming` né `pendingQuestionIdsMap`.
 
-**Pending residui:** Fase 7 (sopra). Wiring `disposeAgentTerminal(sessionId)` alla chiusura tab/sessione (oggi i PTY restano in Map fino a chiusura app).
+**Pending residui:** strip aggressivo (sopra, condizionato a Codex/Jack). Wiring `disposeAgentTerminal(sessionId)` alla chiusura tab/sessione (oggi i PTY restano in Map fino a chiusura app). Nota: il *model override* passato da remote-execute non si applica al `claude` già avviato nel PTY (limite accettato).
 
 ## File chiave
 

@@ -2950,6 +2950,30 @@ function AppContent() {
       }
     }
 
+    // WS8 Fase 7 (069): Claude sessions now run as an embedded interactive Claude
+    // Code CLI inside a PTY (AgentTerminalView, id `agent-cli-<sessionId>`). Deliver
+    // programmatic prompts (remote/Telegram/WhatsApp/auto-start/git-commit/@team) by
+    // TYPING them into that PTY — billed against the *subscription* pool — instead of
+    // the Agent SDK stream that moves to a separate paid pool on 2026-06-15. Manual
+    // typing already goes straight to the PTY (term.onData). Session status comes from
+    // the Claude Code hooks (UserPromptSubmit→working, Stop→done), not these events.
+    // Codex sessions keep their own OpenAI harness below (NOT affected by the Anthropic
+    // billing change), so only non-codex backends are repointed here.
+    // Brain: 069-embedded-cli-hooks-pivot
+    if (currentSession?.backend !== 'codex') {
+      // Bracketed paste (ESC[200~ … ESC[201~) so multi-line prompts are inserted
+      // literally into claude's TUI; the trailing CR submits the turn.
+      const ptyData = `\x1b[200~${resolvedContent}\x1b[201~\r`;
+      await invoke('write_to_terminal', {
+        id: `agent-cli-${messageKey}`,
+        data: ptyData,
+      }).catch((err) => {
+        console.error('[Fase7] PTY write_to_terminal failed:', err);
+        toast.error('Impossibile inviare il prompt al terminale embedded');
+      });
+      return;
+    }
+
     // 🦆 SESSIONS-FIRST: Set loading IMMEDIATELY when user presses Enter/Send
     // This ensures the yellow dot and progress bar appear instantly
     setChatLoadingMap((prev) => {
