@@ -270,57 +270,19 @@ fn extract_session_metadata_fast(session_file: &PathBuf) -> Result<SessionInfo, 
         }
     }
 
-    // Quick scan for title and message count (sample middle section)
+    // Quick scan for message count (sample first 100 events).
     let sample_size = lines.len().min(100);
-    let mut found_title = false;
-
     for i in 0..sample_size {
         if let Ok(event) = serde_json::from_str::<Value>(lines[i]) {
-            // Count non-meta messages
             if (event["type"] == "user" || event["type"] == "assistant")
                 && !event["isMeta"].as_bool().unwrap_or(false) {
                 message_count += 1;
             }
-
-            // Get first user message as title
-            if !found_title && event["type"] == "user" && !event["isMeta"].as_bool().unwrap_or(false) {
-                if let Some(message) = event["message"].as_object() {
-                    // Content can be either string or array
-                    let content_text = if let Some(content_str) = message["content"].as_str() {
-                        Some(content_str.to_string())
-                    } else if let Some(content_array) = message["content"].as_array() {
-                        // Extract text from array of content blocks
-                        let mut text = String::new();
-                        for block in content_array {
-                            if block["type"] == "text" {
-                                if let Some(t) = block["text"].as_str() {
-                                    text.push_str(t);
-                                }
-                            }
-                        }
-                        if !text.is_empty() {
-                            Some(text)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
-
-                    if let Some(content) = content_text {
-                        if !content.contains("<command-name>") && !content.contains("<local-command") && !content.is_empty() {
-                            let trimmed = content.trim();
-                            if trimmed.len() > 60 {
-                                title = format!("{}...", safe_truncate(trimmed, 57));
-                            } else {
-                                title = trimmed.to_string();
-                            }
-                            found_title = true;
-                        }
-                    }
-                }
-            }
         }
+    }
+    // Title = first non-meta user message (shared helper, DRY).
+    if let Some(t) = first_user_message_title(&lines[..sample_size]) {
+        title = t;
     }
 
     // If we couldn't get updated_at, use file modified time
@@ -1031,6 +993,73 @@ pub fn parse_transcript_tail(path: String) -> Result<TranscriptTail, String> {
         last_text,
         total_cost_usd,
     })
+}
+
+/// Extract a session "name" from transcript lines: the first non-meta user
+/// message, truncated to 60 chars — this is what Claude Code's `/resume` picker
+/// shows. Skips slash-command meta lines. Shared by the metadata scan and
+/// `read_transcript_title` (DRY).
+fn first_user_message_title(lines: &[&str]) -> Option<String> {
+    for line in lines {
+        let event: Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if event["type"] != "user" || event["isMeta"].as_bool().unwrap_or(false) {
+            continue;
+        }
+        let message = match event["message"].as_object() {
+            Some(m) => m,
+            None => continue,
+        };
+        // Content can be a string or an array of content blocks.
+        let content_text = if let Some(s) = message["content"].as_str() {
+            s.to_string()
+        } else if let Some(arr) = message["content"].as_array() {
+            let mut text = String::new();
+            for block in arr {
+                if block["type"] == "text" {
+                    if let Some(t) = block["text"].as_str() {
+                        text.push_str(t);
+                    }
+                }
+            }
+            text
+        } else {
+            continue;
+        };
+        let trimmed = content_text.trim();
+        if trimmed.is_empty()
+            || trimmed.contains("<command-name>")
+            || trimmed.contains("<local-command")
+        {
+            continue;
+        }
+        return Some(if trimmed.len() > 60 {
+            format!("{}...", safe_truncate(trimmed, 57))
+        } else {
+            trimmed.to_string()
+        });
+    }
+    None
+}
+
+/// Read a session "name" from a transcript JSONL path (the `transcript_path` the
+/// hooks carry). Reads only the first ~100 lines — the first user message lives
+/// at the head. Used by embedded CLI to mirror Claude Code's session name into
+/// the Quack session title. Returns Ok(None) when no suitable message is found.
+/// Brain: 069-embedded-cli-hooks-pivot
+#[command]
+pub fn read_transcript_title(path: String) -> Result<Option<String>, String> {
+    use std::io::{BufRead, BufReader};
+    let file = fs::File::open(&path).map_err(|e| format!("open {path}: {e}"))?;
+    let lines: Vec<String> = BufReader::new(file)
+        .lines()
+        .take(100)
+        .filter_map(|l| l.ok())
+        .collect();
+    let refs: Vec<&str> = lines.iter().map(String::as_str).collect();
+    Ok(first_user_message_title(&refs))
 }
 
 /// Resume a session - get complete session data for resuming conversation

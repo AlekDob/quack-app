@@ -1497,6 +1497,7 @@ pub fn run() {
             sessions::reset_agent_session,
             sessions::resume_session,
             sessions::parse_transcript_tail,
+            sessions::read_transcript_title,
             // 💰 License management commands (Gumroad + Supabase)
             license::validate_license,
             license::revalidate_license,

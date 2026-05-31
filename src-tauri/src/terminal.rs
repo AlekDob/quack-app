@@ -434,14 +434,31 @@ pub(crate) fn create_agent_terminal_impl(
 }
 
 /// Idempotently register the `quack-status.js` hook in a project's
-/// `.claude/settings.json` for Stop / Notification / PermissionRequest /
-/// UserPromptSubmit. Operates on raw JSON so existing hooks (of any event
-/// type) are preserved. Writes only when something changed.
+/// `.claude/settings.json`. Operates on raw JSON so existing hooks (of any
+/// event type) are preserved. Writes only when something changed.
+///
+/// Mapping mirrors herdr's claude integration (UserPromptSubmit=working,
+/// PermissionRequest=blocked, Stop=done, SessionStart/SessionEnd=idle/release)
+/// PLUS a targeted PreToolUse/PostToolUse on `ExitPlanMode|AskUserQuestion`: the
+/// precise blocked signal for plan/question prompts, which the screen scan can't
+/// tell apart from a harmless slash/settings menu. Notification is intentionally
+/// NOT registered (noisy); working sustain + idle come from the screen scan
+/// (useScreenStateArbitration). (Any legacy Notification hook in existing
+/// projects is inert: the listener ignores it.)
 /// Brain: 069-embedded-cli-hooks-pivot
 fn ensure_status_hooks_installed(cwd: &Path) -> Result<()> {
   use serde_json::{json, Value};
 
-  const EVENTS: [&str; 4] = ["Stop", "Notification", "PermissionRequest", "UserPromptSubmit"];
+  // (event, matcher). Empty matcher = all tools / lifecycle event.
+  const EVENTS: [(&str, &str); 7] = [
+    ("SessionStart", ""),
+    ("UserPromptSubmit", ""),
+    ("PermissionRequest", ""),
+    ("Stop", ""),
+    ("SessionEnd", ""),
+    ("PreToolUse", "ExitPlanMode|AskUserQuestion"),
+    ("PostToolUse", "ExitPlanMode|AskUserQuestion"),
+  ];
   const MARKER: &str = "quack-status.js";
 
   let claude_dir = cwd.join(".claude");
@@ -463,17 +480,8 @@ fn ensure_status_hooks_installed(cwd: &Path) -> Result<()> {
     root["hooks"] = json!({});
   }
 
-  let hook_entry = json!({
-    "matcher": "",
-    "hooks": [{
-      "type": "command",
-      "command": "node \"$HOME/.quack/hooks/brain/quack-status.js\"",
-      "timeout": 5
-    }]
-  });
-
   let mut changed = false;
-  for event in EVENTS {
+  for (event, matcher) in EVENTS {
     let arr = {
       let hooks = root["hooks"].as_object_mut().unwrap();
       hooks.entry(event.to_string()).or_insert_with(|| json!([]));
@@ -482,11 +490,19 @@ fn ensure_status_hooks_installed(cwd: &Path) -> Result<()> {
     if !arr.is_array() {
       *arr = json!([]);
     }
+    // Idempotent on (marker command, matcher): re-add if a quack-status entry
+    // exists but under a different matcher (e.g. legacy PreToolUse without the
+    // ExitPlanMode|AskUserQuestion scope).
     let already = arr
       .as_array()
       .map(|entries| {
-        entries.iter().any(|matcher| {
-          matcher
+        entries.iter().any(|entry| {
+          let same_matcher = entry
+            .get("matcher")
+            .and_then(|m| m.as_str())
+            .unwrap_or("")
+            == matcher;
+          let has_marker = entry
             .get("hooks")
             .and_then(|h| h.as_array())
             .map(|actions| {
@@ -497,13 +513,21 @@ fn ensure_status_hooks_installed(cwd: &Path) -> Result<()> {
                   .unwrap_or(false)
               })
             })
-            .unwrap_or(false)
+            .unwrap_or(false);
+          same_matcher && has_marker
         })
       })
       .unwrap_or(false);
 
     if !already {
-      arr.as_array_mut().unwrap().push(hook_entry.clone());
+      arr.as_array_mut().unwrap().push(json!({
+        "matcher": matcher,
+        "hooks": [{
+          "type": "command",
+          "command": "node \"$HOME/.quack/hooks/brain/quack-status.js\"",
+          "timeout": 5
+        }]
+      }));
       changed = true;
     }
   }
