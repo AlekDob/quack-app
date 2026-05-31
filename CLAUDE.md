@@ -236,6 +236,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - TodoWrite 0/N completed — TaskUpdate orphaned (SDK 0.3.150 managed tools non emettono tool_result nello stream): `documentation/bugs/fix-task-accumulator-pending-reconciliation.md`
 - PM widgets Jack crashano app ("Provider Error: Git") — `MarkdownText.tsx` faceva `JSON.parse` inline su fenced block streaming incompleti: `documentation/bugs/fix-markdown-pm-widgets-streaming-json-crash.md`
 - PTY output `���` (U+FFFD) nelle righe box-drawing — UTF-8 multi-byte spezzato sul confine del flush (`from_utf8_lossy` per-chunk): `documentation/bugs/fix-pty-utf8-split-multibyte.md`
+- Embedded CLI PTY orfani — processo `claude` mai ucciso al delete sessione (`disposeAgentTerminal` mai chiamata); fix = choke-point in `deleteSession` + reaper su `list_terminals`: `documentation/bugs/fix-embedded-cli-orphan-pty-leak.md`
 
 **Architecture decisions**: `documentation/decisions/` — read before starting related work.
 - Remote API + Mobile Dashboard: `documentation/decisions/decision-quack-remote-api-mobile-dashboard.md`

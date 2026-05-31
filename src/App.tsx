@@ -67,6 +67,7 @@ import { useBackgroundAgentInit } from "./hooks/useBackgroundAgents";
 import { useRemoteLiveStateSync } from "./hooks/useRemoteLiveStateSync";
 import { useHookStatusListener } from "./hooks/useHookStatusListener";
 import { useScreenStateArbitration } from "./hooks/useScreenStateArbitration";
+import { useTerminalReaper } from "./hooks/useTerminalReaper";
 import { AgentTerminalView } from "./components/AgentTerminalView";
 import type { LineChange, FileEdit, FileDeleted } from "./components/EditSummaryBar";
 import SessionEmptyState from "./components/SessionEmptyState";
@@ -438,6 +439,7 @@ function AppContent() {
   // Brain: 069-embedded-cli-hooks-pivot
   useHookStatusListener();
   useScreenStateArbitration();
+  useTerminalReaper();
 
   // TEMPORARILY DISABLED: Max Plan tracking
   // const { incrementMessageCount } = useMaxPlan();

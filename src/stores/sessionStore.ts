@@ -230,6 +230,17 @@ export const useSessionStore = create<SessionState>()(
           // Feature: 069-changes-agent-attribution — drop avatar attribution for this session
           useFileAttributionStore.getState().clearForSession(id);
 
+          // WS8 leak fix: the embedded CLI PTY (+ its `claude` child) is NOT tied
+          // to the session record — deleting a session left the process alive,
+          // accumulating orphan `claude` instances. This is the single choke-point
+          // hit by every delete path (TaskHub, sidebar, Kanban, drawer), so we tear
+          // down the terminal here. Dynamic import avoids pulling xterm into the
+          // store eagerly (and breaks a potential import cycle).
+          // Brain: 069-embedded-cli-hooks-pivot
+          void import('../components/AgentTerminalView')
+            .then((m) => m.disposeAgentTerminal(id))
+            .catch(() => {});
+
           // Brain: fix-session-create-race-load-overwrite — mark before await
           sessionWriteLock.markWrite();
           await saveAgentSessions(sessions);

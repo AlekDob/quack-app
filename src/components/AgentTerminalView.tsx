@@ -182,8 +182,11 @@ export function disposeAgentTerminal(sessionId: string): void {
       /* ignore */
     }
     agentTerminalInstances.delete(id);
-    invoke('close_terminal', { id }).catch(() => {});
   }
+  // Always kill the PTY (and its `claude` child), even when no live xterm
+  // instance exists in this run's Map — the backend registry is authoritative
+  // for the process, so the reaper can reach orphans the frontend never tracked.
+  invoke('close_terminal', { id }).catch(() => {});
   createdTerminals.delete(id);
   launchedTerminals.delete(id);
 }
