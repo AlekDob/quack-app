@@ -30,13 +30,12 @@ const isEditableElement = (target: EventTarget | null): boolean => {
   // Check for contenteditable
   if (target.isContentEditable) return true;
 
-  // Check for CodeMirror or xterm
-  if (
-    target.closest(".cm-editor") ||
-    target.closest(".xterm")
-  ) {
-    return true;
-  }
+  // CodeMirror editor — block (a text editing surface). NOTE: `.xterm` is handled
+  // separately in handleKeyDown, NOT here: the embedded CLI is the permanent
+  // focused center, so a blanket block would kill every app shortcut while a
+  // session is open. (xterm's input is a hidden helper <textarea>, which the
+  // tagName check above would also catch — the terminal branch runs first.)
+  if (target.closest(".cm-editor")) return true;
 
   return false;
 };
@@ -104,8 +103,17 @@ export function useGlobalKeyboardShortcuts(actions: ShortcutActions): void {
   // Handle keydown event
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Ignore if typing in an input
-      if (isEditableElement(e.target)) {
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      const inTerminal = !!target?.closest(".xterm");
+
+      if (inTerminal) {
+        // Embedded CLI is the permanent focused center. Plain keystrokes are
+        // terminal typing → never intercept. Only modifier combos (Cmd/Ctrl app
+        // shortcuts) are matched below; unmatched combos (Ctrl+C, Cmd+V, …) fall
+        // through to the terminal because we preventDefault only on a real match.
+        if (!e.metaKey && !e.ctrlKey) return;
+      } else if (isEditableElement(e.target)) {
+        // Typing in a regular input/textarea/CodeMirror → ignore shortcuts.
         return;
       }
 

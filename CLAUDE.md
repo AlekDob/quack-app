@@ -217,6 +217,7 @@ Read `documentation/AST.md` for a complete index of all exported symbols per fil
 - Embedded CLI TUI garbling (xterm↔PTY size must be locked via ResizeObserver): `documentation/gotchas/gotcha-embedded-cli-xterm-pty-resize-sync.md`
 - Embedded CLI terminale VUOTO (xterm va persistito in Map globale, non ricreato a ogni mount — StrictMode dispose perde il prompt): `documentation/gotchas/gotcha-embedded-cli-xterm-persistent-instance.md`
 - Embedded CLI dot bloccato GIALLO su piano/domanda (serve PreToolUse `ExitPlanMode|AskUserQuestion`, non Notification; Notification filtrato per i viola a caso): `documentation/gotchas/gotcha-embedded-cli-plan-question-dot-stuck-yellow.md`
+- Embedded CLI xterm blocca TUTTI gli shortcut globali (Cmd+T non apre): `.xterm` faceva early-return in useGlobalKeyboardShortcuts; ora solo digitazione senza Cmd/Ctrl resta nel terminale: `documentation/gotchas/gotcha-embedded-cli-xterm-blocks-global-shortcuts.md`
 - New session from dormant agent disappears (race condition): `documentation/bugs/fix-session-create-race-load-overwrite.md`
 - Office View v2 crash on pan (ref-in-setState-updater race): `documentation/bugs/fix-office-canvas-pointermove-ref-race.md`
 - Telegram partial/stale notifications: `documentation/bugs/fix-telegram-partial-stale-notifications.md`
