@@ -21,7 +21,7 @@ import WorkstreamStatusPanel from "./WorkstreamStatusPanel";
 import TaskHubView, { computeTaskHubBadge } from "./TaskHubView";
 import { useSessionStore } from "../stores/sessionStore";
 import { useChatStore } from "../stores/chatStore";
-import type { DirectoryEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionInfo, AgentPersonality, HookConfig, ChatMessage, SearchResult } from "../types";
+import type { DirectoryEntry, AgentInfo, AgentDetails, SkillInfo, TerminalInfo, SessionInfo, AgentPersonality, HookConfig, SearchResult } from "../types";
 import type { SlashCommand } from "../hooks/useSlashCommands";
 import "./SidePanelAccordion.css";
 
@@ -310,7 +310,6 @@ interface SidePanelAccordionProps {
   // Task Hub props
   terminals?: TerminalInfo[];
   onActiveSessionDone?: () => void;
-  chatSessions?: Map<string, ChatMessage[]>;
 
   // Agent Context props
   activeAgentId?: string | null;
@@ -415,7 +414,6 @@ export default function SidePanelAccordion({
   // Task Hub
   terminals = [],
   onActiveSessionDone,
-  chatSessions,
 
   // Agent Context
   activeAgentId,
@@ -479,9 +477,12 @@ export default function SidePanelAccordion({
   // Hover-to-open debounce for accordion sections
   const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Task Hub badge — count of P1 (pending question) + P3 (agent done) sessions
+  // Task Hub badge — count of P1 (pending question) + P3 (agent done) sessions.
+  // chatSessions comes from chatStore (single source of truth, same as the
+  // sidebar + TaskHubView) so the badge sees the hook/screen "done" markers.
   const taskHubSessions = useSessionStore((s) => s.sessions);
   const pendingQuestionsMap = useChatStore((s) => s.pendingQuestionsMap);
+  const chatSessions = useChatStore((s) => s.chatSessions);
   const taskHubBadge = useMemo(
     () => computeTaskHubBadge(taskHubSessions, chatSessions, pendingQuestionsMap),
     [taskHubSessions, chatSessions, pendingQuestionsMap],
@@ -700,7 +701,6 @@ export default function SidePanelAccordion({
             onSessionClick={onSessionClick}
             activeSessionId={activeSessionId}
             onActiveSessionDone={onActiveSessionDone}
-            chatSessions={chatSessions}
           />
         </AccordionSection>
 

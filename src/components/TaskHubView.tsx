@@ -10,7 +10,6 @@ interface TaskHubViewProps {
   onSessionClick?: (sessionId: string) => void;
   activeSessionId?: string;
   onActiveSessionDone?: () => void;
-  chatSessions?: Map<string, ChatMessage[]>;
 }
 
 const SECTION_LABELS: Record<SessionPriority, string> = {
@@ -67,13 +66,17 @@ export default function TaskHubView({
   onSessionClick,
   activeSessionId,
   onActiveSessionDone,
-  chatSessions,
 }: TaskHubViewProps) {
   const sessions = useSessionStore((s) => s.sessions);
   const updateSession = useSessionStore((s) => s.updateSession);
   const deleteSession = useSessionStore((s) => s.deleteSession);
   const chatLoadingMap = useChatStore((s) => s.chatLoadingMap);
   const pendingQuestionsMap = useChatStore((s) => s.pendingQuestionsMap);
+  // Read messages from the SAME store the sidebar uses — the hook/screen status
+  // markers (the green "agent done" signal) are written to chatStore.chatSessions
+  // by sessionStatusWrites. The old App.useState `chatSessions` prop never
+  // received them, so the Task Hub showed done sessions as grey under OTHER.
+  const chatSessions = useChatStore((s) => s.chatSessions);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteDialog, setDeleteDialog] = useState<{ id: string; title: string } | null>(null);

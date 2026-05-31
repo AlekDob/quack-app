@@ -143,6 +143,32 @@ function launchClaudeInto(terminalId: string, claudeArgs?: string) {
   invoke('write_to_terminal', { id: terminalId, data: `clear && ${base}\n` }).catch(() => {});
 }
 
+/**
+ * Read the bottom `maxLines` of an agent terminal's rendered buffer as plain
+ * text. This is the input for screen-based state detection (the herdr method):
+ * the rendered screen is the ground truth that corrects lossy hooks. Buffers
+ * stay live across mounts/tab-switches, so background sessions are readable too.
+ * Returns null when no live instance exists for the session.
+ */
+export function readAgentTerminalScreen(sessionId: string, maxLines = 80): string | null {
+  const inst = agentTerminalInstances.get(terminalIdFor(sessionId));
+  if (!inst) return null;
+  const buf = inst.term.buffer.active;
+  const end = buf.length;
+  const start = Math.max(0, end - maxLines);
+  const lines: string[] = [];
+  for (let y = start; y < end; y++) {
+    const line = buf.getLine(y);
+    lines.push(line ? line.translateToString(true) : '');
+  }
+  return lines.join('\n');
+}
+
+/** Session ids of all live agent terminals (for the arbitration sweep). */
+export function listAgentTerminalSessionIds(): string[] {
+  return [...agentTerminalInstances.keys()].map((id) => id.replace(/^agent-cli-/, ''));
+}
+
 /** Fully tear down an agent terminal (call when its session/tab is closed). */
 export function disposeAgentTerminal(sessionId: string): void {
   const id = terminalIdFor(sessionId);
@@ -285,7 +311,7 @@ export function AgentTerminalView({
         allowProposedApi: true,
         scrollback: 4000,
         theme: {
-          background: '#1e1e1e',
+          background: '#0F1115',
           foreground: '#ffffff',
           cursor: accentColor || color,
           selectionBackground: accentRgba(accentColor || color, 0.3),
@@ -392,7 +418,7 @@ export function AgentTerminalView({
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
-        background: '#1e1e1e',
+        background: '#0F1115',
       }}
     >
       {error ? (

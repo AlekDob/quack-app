@@ -66,6 +66,7 @@ import TelegramSetup from "./components/TelegramSetup";
 import { useBackgroundAgentInit } from "./hooks/useBackgroundAgents";
 import { useRemoteLiveStateSync } from "./hooks/useRemoteLiveStateSync";
 import { useHookStatusListener } from "./hooks/useHookStatusListener";
+import { useScreenStateArbitration } from "./hooks/useScreenStateArbitration";
 import { AgentTerminalView } from "./components/AgentTerminalView";
 import type { LineChange, FileEdit, FileDeleted } from "./components/EditSummaryBar";
 import SessionEmptyState from "./components/SessionEmptyState";
@@ -431,10 +432,12 @@ function AppContent() {
   // Mirror chatStore (loading/pending/last-msg) → Rust backend → WS for mobile PWA Task Hub
   useRemoteLiveStateSync();
 
-  // WS-pivot: drive session status from Claude Code hooks (embedded CLI) instead
-  // of the SDK event stream. Single-writer: active only when useEmbeddedCLI is on.
+  // WS-pivot: drive session status from Claude Code hooks (instant hint) PLUS a
+  // terminal-screen scan that is the ground truth and corrects lossy hooks (the
+  // herdr method). Both write through sessionStatusWrites so they agree.
   // Brain: 069-embedded-cli-hooks-pivot
   useHookStatusListener();
+  useScreenStateArbitration();
 
   // TEMPORARILY DISABLED: Max Plan tracking
   // const { incrementMessageCount } = useMaxPlan();
@@ -13478,6 +13481,14 @@ You have access to all Bash tools to execute git commands like:
                   ? (activeTaskSession?.projectPath || explorerRoot || explorerPath || activeTerminal?.cwd)
                   : activeTerminal?.cwd;
                 if (cliSessionId && cliCwd) {
+                  // Resume the prior Claude session on a fresh PTY launch (after
+                  // app restart / tab reopen). The createdTerminals/launchedTerminals
+                  // guards in AgentTerminalView ensure this never relaunches a live
+                  // session. Brain: 069-embedded-cli-hooks-pivot
+                  const cliSession = agentSessions.find((s) => s.id === cliSessionId);
+                  const cliResumeArgs = cliSession?.claudeSessionId
+                    ? `--resume ${cliSession.claudeSessionId}`
+                    : undefined;
                   return (
                     <AgentTerminalView
                       key={`agentcli-${cliSessionId}`}
@@ -13486,6 +13497,7 @@ You have access to all Bash tools to execute git commands like:
                       color={activeTerminal?.color}
                       label={isTaskChat ? activeTaskSession?.title : activeTerminal?.label}
                       isActive={true}
+                      claudeArgs={cliResumeArgs}
                     />
                   );
                 }
@@ -13515,6 +13527,11 @@ You have access to all Bash tools to execute git commands like:
                 const taskTokens = chatTokensMap.get(taskSessionId);
 
                 // WS-pivot: task session = embedded Claude Code CLI terminal.
+                // Resume the prior Claude session on a fresh PTY launch (guards in
+                // AgentTerminalView prevent relaunch of a live session).
+                const taskResumeArgs = activeSession.claudeSessionId
+                  ? `--resume ${activeSession.claudeSessionId}`
+                  : undefined;
                 return (
                   <AgentTerminalView
                     key={`agentcli-${taskSessionId}`}
@@ -13523,6 +13540,7 @@ You have access to all Bash tools to execute git commands like:
                     color={activeTerminal?.color}
                     label={activeSession.title}
                     isActive={true}
+                    claudeArgs={taskResumeArgs}
                   />
                 );
               })()}
@@ -14072,7 +14090,6 @@ You have access to all Bash tools to execute git commands like:
           lastRefreshTs={agentCommitTs}
           // Task Hub props
           terminals={terminals}
-          chatSessions={chatSessions}
           onActiveSessionDone={() => {
             setActiveSessionId(null);
             setActiveTaskId(null);
