@@ -32,6 +32,9 @@ medium-auth.json
 *.sln
 *.sw?
 
+# Rust build artifacts (any subproject)
+target/
+
 # Tauri binaries (auto-generated, too large for GitHub)
 src-tauri/binaries/
 /.quack/agent-personalities
@@ -43,3 +46,6 @@ src-tauri/binaries/
 dist-linux
 .worktrees/
 .superpowers/
+
+# v2 app copy (build artifacts, untracked)
+/v2/
