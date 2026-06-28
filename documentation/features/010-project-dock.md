@@ -14,16 +14,16 @@ tags: [dock, floating-window, always-on-top, badge, notifications, agent-status,
 
 ### What it shows
 
-A horizontal strip: a drag grip (dotted handle) · Jack avatar (`/jack.jpeg`, circular) · separator · one circle per open workspace. Each circle = project color + initials; an attention **ring** for the most urgent state (purple = needs-input, green = ready) and a **counter badge** (needs-input + ready). Click a circle → bring the main window forward and jump to that project's most urgent chat (needs-input → ready → most recent).
+A strip (horizontal or vertical): a drag grip (dotted handle) · Jack avatar (`/jack.jpeg`, circular) · an **orientation toggle** (⟲) · separator · one circle per open workspace. Each circle = project color + initials; an attention **ring** for the most urgent state (purple = needs-input, green = ready) and a **counter badge**. Click a circle → bring the main window forward and jump to that project's most urgent chat (needs-input → ready → most recent).
 
 ### Architecture — main produces, dock renders
 
 The Dock is a separate webview (separate JS context), so it can't read the main window's stores. The main window is the single producer:
-- **`AgentHubWatcher`** (main) calls `emitDockSummary()` after each recompute and on permission events → emits the `dock:summary` Tauri event (per-project `{wsId, name, colorHex, ready, needsInput}`) and sets the native badge via the `set_dock_badge` Rust command.
+- **`AgentHubWatcher`** (main) calls `emitDockSummary()` after each recompute and on permission events → emits the `dock:summary` Tauri event (per-project `{wsId, name, colorHex, ready, needsInput}`) and sets the native badge via the `set_dock_badge` Rust command. `emitDockSummary` wraps the compute in try/catch so a status-compute error can never kill the watcher's poll loop.
 - **`DockWindow`** listens to `dock:summary`, renders, and on mount emits `dock:request` so the main window pushes the current state immediately.
 - **Click** → `DockWindow` emits `dock:focus-project` (wsId) and focuses the main window; the main window's bridge (`App.tsx`) does `setActiveWorkspace` + `focusAIChat(urgent)`.
 
-Counter semantics: "ready"/"needs-input" here mean **actionable** — a live status record that's still unseen — NOT the hub's resting "ready" baseline. So the badge reflects "things waiting for you", not every chat (`computeDockProjects` in `dockSummary.ts`).
+Counter semantics: `computeDockProjects` counts via the SAME `resolveDisplayStatus` the Agent Hub uses (`ready` + `needs-input`), so a project that reads "Ready" in the hub shows its badge here too — they're always consistent. (Earlier it counted only live records and missed resting-ready chats.)
 
 ### Key files
 
@@ -40,13 +40,13 @@ Counter semantics: "ready"/"needs-input" here mean **actionable** — a live sta
 | Transparent window enablement | `src-tauri/tauri.conf.json` `app.macOSPrivateApi: true` + Cargo feature `macos-private-api` |
 | Dock styles | `src/App.css` (`.dock-*`) |
 
-### Orientation (dock to a side)
+### Orientation (horizontal ⇄ vertical)
 
-Drag the dock to the left/right third of the screen → it flips to a **vertical** column (circles stacked); back to the middle → horizontal. `detectOrient()` uses plain web APIs (`window.screenX` / `outerWidth` / `screen.availWidth`), persisted in `lcp.dock.orient`. On orientation or project-count change the window is resized to fit exactly via `setSize(windowSizeFor(...))` (so no clipping, no dead space), and the projects strip replays a short `dock-reflow` entry animation (keyed by orientation). `.dock-projects` uses `overflow: visible` (NOT scroll) so the hover scale + attention ring/badge are never clipped — the window is sized to the count instead.
+The **⟲ toggle button** flips the dock between horizontal and vertical (circles stacked); persisted in `lcp.dock.orient`. (Earlier this was auto-detected from screen-edge proximity on drag — removed as fiddly/surprising in favour of the explicit button.) On orientation or project-count change the window is resized to fit exactly via `setSize(windowSizeFor(orient, n))` (constants must match the `.dock-*` CSS), and the projects strip replays a short `dock-reflow` entry animation (keyed by orientation). `.dock-projects` uses `overflow: visible` (NOT scroll) so the hover scale + attention ring/badge are never clipped — the window is sized to the count instead. **Self-heal:** if `setSize` is rejected (the `allow-set-size` capability isn't live until tauri restarts), orientation reverts to horizontal so the dock can't end up an invisible vertical pill in a wide-short window.
 
-### Window config
+### Window config + recovery
 
-`new WebviewWindow("dock", { width:400, height:72, decorations:false, transparent:true, alwaysOnTop:true, visibleOnAllWorkspaces:true, skipTaskbar:true, resizable:false, focus:false })`. Position persisted to localStorage (`lcp.dock.pos`) on move; enabled pref `lcp.dock.enabled` (default on). Auto-opens on boot.
+`new WebviewWindow("dock", { width:440, height:104, decorations:false, transparent:true, alwaysOnTop:true, visibleOnAllWorkspaces:true, skipTaskbar:true, resizable:false, focus:false })` then resized to fit. Position persisted to localStorage (`lcp.dock.pos`) on move; `onScreenPos()` discards a stale off-screen position (re-centres). Enabled pref `lcp.dock.enabled` (default on). Auto-opens on boot. **Recovery:** if a `dock` window already exists (e.g. survived a reload in a broken/off-screen/wrong-sized state), `openDock` recovers it in place — reset to horizontal, default size, on-screen position, show/focus — instead of just show/focus.
 
 ### Gotchas
 
@@ -54,4 +54,6 @@ Drag the dock to the left/right third of the screen → it flips to a **vertical
 - **`set_badge_count` lives on `WebviewWindow`/`Window`, not `AppHandle`** (tauri 2.x). The command grabs the `main` window and sets it; macOS maps it to the app icon.
 - **The producer is the main window's JS.** If the main window is hidden/minimized/on another Space the watcher keeps running (dock stays live). If the main window is fully CLOSED, the watcher stops and the dock freezes (badge/summary stop updating) — acceptable v1; a self-sufficient dock watcher would be phase 2.
 - Same shared-bundle pattern as the terminal popout (`index.html?dock=1`); the dock pulls the full app JS — fine, mirrors popout.
-- Requires a full `tauri dev` restart to pick up: the new command, capability, window label, notification plugin, and `macOSPrivateApi` (Rust/config changes, not HMR).
+- **A separate window survives a main-window reload** (Cmd+R) but NOT a full `tauri dev` restart. A window left in a broken state (failed vertical resize → invisible/off-screen) reappears on reload; `openDock`'s recovery fixes it in place, and a full restart clears it entirely.
+- **`allow-set-size` / `allow-set-position` need a `tauri dev` restart** to take effect — until then orientation/resize/recovery silently no-op (the self-heal keeps the dock horizontal-and-visible).
+- Requires a full `tauri dev` restart to pick up: the new commands, capabilities, window label, notification plugin, and `macOSPrivateApi` (Rust/config changes, not HMR).

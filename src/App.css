@@ -10762,6 +10762,24 @@ body.ws-dragging * {
   height: 100%;
   object-fit: cover;
 }
+.dock-orient-toggle {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.dock-orient-toggle:hover {
+  background: var(--bg-hi);
+  color: var(--fg);
+}
 .dock-sep {
   flex: 0 0 auto;
   width: 1px;

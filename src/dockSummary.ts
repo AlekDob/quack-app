@@ -72,7 +72,13 @@ export function computeDockProjects(): DockProject[] {
 /** Broadcast the current summary to the Dock window and update the native
  *  Dock-icon badge. Fire-and-forget; safe when no Dock window exists. */
 export function emitDockSummary(): void {
-  const projects = computeDockProjects();
+  let projects: DockProject[] = [];
+  try {
+    projects = computeDockProjects();
+  } catch (e) {
+    // Never let a status-compute error kill the watcher's poll loop.
+    console.error("[dock] computeDockProjects failed", e);
+  }
   void emit(DOCK_SUMMARY_EVENT, projects);
   const total = projects.reduce((n, p) => n + p.ready + p.needsInput, 0);
   void invoke("set_dock_badge", { count: total }).catch(() => {});

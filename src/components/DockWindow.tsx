@@ -20,11 +20,12 @@ import {
   getDockOrient,
   type DockOrient,
 } from "../dock";
+import { Icon } from "./Icon";
 
 // Pill geometry — must match .dock-* CSS. Used to size the OS window so it
 // fits the project count exactly (no clipping, no dead space).
 const SHORT_SIDE = 104; // fixed cross-axis (height when horizontal)
-const HEAD = 110; // grip + Jack avatar + separator + paddings + insets
+const HEAD = 140; // grip + avatar + orient toggle + separator + paddings + insets
 const CELL = 46; // circle (36) + gap (10)
 
 function windowSizeFor(orient: DockOrient, n: number): LogicalSize {
@@ -35,15 +36,6 @@ function windowSizeFor(orient: DockOrient, n: number): LogicalSize {
     : new LogicalSize(SHORT_SIDE, long);
 }
 
-// Which screen edge is the window near? Left/right third → vertical dock,
-// otherwise horizontal. Uses plain web APIs (CSS px) — no Tauri monitor
-// permission needed; good enough for the common single-monitor case.
-function detectOrient(): DockOrient {
-  const avail = window.screen.availWidth || window.innerWidth;
-  const centerX = window.screenX + window.outerWidth / 2;
-  const r = centerX / avail;
-  return r < 0.2 || r > 0.8 ? "v" : "h";
-}
 
 function initials(name: string): string {
   const parts = name.trim().split(/[\s_\-./]+/).filter(Boolean);
@@ -108,19 +100,22 @@ export function DockWindow() {
     return () => void off.then((f) => f());
   }, []);
 
-  // Persist position on drag, and flip to vertical when dragged to a screen
-  // edge (left/right third) — back to horizontal in the middle.
+  // Persist position as the window is dragged. Orientation is changed
+  // manually via the toggle button (not auto-detected from screen edge —
+  // that was fiddly and surprising).
   useEffect(() => {
-    const off = getCurrentWindow().onMoved(({ payload }) => {
-      saveDockPos(payload.x, payload.y);
-      const next = detectOrient();
-      setOrient((cur) => {
-        if (cur !== next) saveDockOrient(next);
-        return next;
-      });
-    });
+    const off = getCurrentWindow().onMoved(({ payload }) =>
+      saveDockPos(payload.x, payload.y),
+    );
     return () => void off.then((f) => f());
   }, []);
+
+  const toggleOrient = () =>
+    setOrient((cur) => {
+      const next: DockOrient = cur === "h" ? "v" : "h";
+      saveDockOrient(next);
+      return next;
+    });
 
   // Resize the OS window to fit the orientation + project count exactly.
   // If the resize is rejected (e.g. the set-size capability isn't active
@@ -155,6 +150,14 @@ export function DockWindow() {
       <div className="dock-mark" data-tauri-drag-region aria-hidden="true">
         <img src="/jack.jpeg" alt="" className="dock-mark-img" />
       </div>
+      <button
+        className="dock-orient-toggle"
+        onClick={toggleOrient}
+        title={orient === "h" ? "Switch to vertical" : "Switch to horizontal"}
+        aria-label="Toggle dock orientation"
+      >
+        <Icon name="rotate-ccw" size={13} />
+      </button>
       <div className="dock-sep" data-tauri-drag-region />
       {/* keyed by orientation so the reflow replays its entry animation */}
       <div className="dock-projects" key={orient}>
