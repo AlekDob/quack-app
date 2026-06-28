@@ -60,11 +60,14 @@ export async function openDock(): Promise<void> {
     document.documentElement.dataset.theme === "light" ? "light" : "dark";
   const pos = savedPos();
 
+  // Window is intentionally larger than the pill so the soft drop-shadow
+  // has room to render inside the (transparent) window instead of being
+  // clipped at the edge into a hard band.
   const w = new WebviewWindow(LABEL, {
     url: `index.html?dock=1&theme=${theme}`,
     title: "Quack Dock",
-    width: 400,
-    height: 72,
+    width: 440,
+    height: 104,
     resizable: false,
     decorations: false,
     transparent: true,

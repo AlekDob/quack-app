@@ -14,7 +14,7 @@ tags: [dock, floating-window, always-on-top, badge, notifications, agent-status,
 
 ### What it shows
 
-A horizontal strip: a duck mark (`AIIcon`) · separator · one circle per open workspace. Each circle = project color + initials; an attention **ring** for the most urgent state (purple = needs-input, green = ready) and a **counter badge** (needs-input + ready). Click a circle → bring the main window forward and jump to that project's most urgent chat (needs-input → ready → most recent).
+A horizontal strip: a drag grip (dotted handle) · Jack avatar (`/jack.jpeg`, circular) · separator · one circle per open workspace. Each circle = project color + initials; an attention **ring** for the most urgent state (purple = needs-input, green = ready) and a **counter badge** (needs-input + ready). Click a circle → bring the main window forward and jump to that project's most urgent chat (needs-input → ready → most recent).
 
 ### Architecture — main produces, dock renders
 

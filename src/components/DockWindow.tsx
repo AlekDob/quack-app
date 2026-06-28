@@ -14,7 +14,6 @@ import {
   type DockProject,
 } from "../dockSummary";
 import { saveDockPos } from "../dock";
-import { AIIcon } from "./AIIcon";
 
 function initials(name: string): string {
   const parts = name.trim().split(/[\s_\-./]+/).filter(Boolean);
@@ -88,8 +87,14 @@ export function DockWindow() {
 
   return (
     <div className="dock-shell" data-tauri-drag-region>
+      <span
+        className="dock-grip"
+        data-tauri-drag-region
+        title="Drag to move"
+        aria-hidden="true"
+      />
       <div className="dock-mark" data-tauri-drag-region aria-hidden="true">
-        <AIIcon size={26} />
+        <img src="/jack.jpeg" alt="" className="dock-mark-img" />
       </div>
       <div className="dock-sep" data-tauri-drag-region />
       <div className="dock-projects">
