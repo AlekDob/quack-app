@@ -25,6 +25,7 @@ import {
   publishAgentStatus,
 } from "../agentStatusStore";
 import { notifyAgentEvent } from "../notifications";
+import { emitDockSummary } from "../dockSummary";
 
 const POLL_MS = 1500;
 // A real permission prompt waits on the user; an auto-allowed tool (Read,
@@ -117,6 +118,7 @@ export function AgentHubWatcher() {
           isFocusedHere: false,
         });
       }
+      emitDockSummary();
     };
 
     const reconcile = (
@@ -189,6 +191,7 @@ export function AgentHubWatcher() {
       for (const id of [...getAllAgentStatus().keys()]) {
         if (!liveIds.has(id)) clearAgentStatus(id);
       }
+      emitDockSummary(); // keep the floating Dock + app-icon badge in sync
     };
 
     const onRequest = (req: PermissionRequest) => {
@@ -222,6 +225,7 @@ export function AgentHubWatcher() {
       if (getAgentStatus(entry.chatId)?.derived === "needs-input") {
         publishAgentStatus(entry.chatId, null); // poll re-derives working/idle
       }
+      emitDockSummary();
     };
 
     const interval = window.setInterval(() => void recompute(), POLL_MS);

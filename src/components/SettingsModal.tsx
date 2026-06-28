@@ -498,7 +498,11 @@ export function SettingsModal() {
                     className={`segmented-btn ${theme === m ? "active" : ""}`}
                     onClick={() => setTheme(m)}
                   >
-                    {m === "light" ? "☀ Light" : m === "dark" ? "🌙 Dark" : "⚙ System"}
+                    <Icon
+                      name={m === "light" ? "sun" : m === "dark" ? "moon" : "monitor"}
+                      size={13}
+                    />
+                    <span>{m === "light" ? "Light" : m === "dark" ? "Dark" : "System"}</span>
                   </button>
                 ))}
               </div>

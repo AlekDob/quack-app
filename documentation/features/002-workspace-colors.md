@@ -16,7 +16,8 @@ tags: [workspace, colors, palette, popover, activity-bar, agent-rail, theming, l
 |------|------|-----------------|
 | Service | `src/workspaceColors.ts` | `WORKSPACE_COLORS` palette, `get/setWorkspaceColor`, `subscribeWorkspaceColors`; localStorage map + pub/sub |
 | Component | `src/components/WorkspaceColorPopover.tsx` | Right-click popover: swatch grid + "No color"; portals to body |
-| Component | `src/components/ActivityBar.tsx` | Editor-mode workspace icons: context menu → popover, applies `--ws-color` |
+| Component | `src/components/ActivityBar.tsx` | Editor-mode workspace icons: context menu → popover, applies `--ws-color`, pointer drag-to-reorder |
+| Hook | `src/useWorkspaceReorder.ts` | Pointer-based drag-to-reorder (WKWebView-safe); `drag` state + `onPointerDown`/`shouldSuppressClick` |
 | Component | `src/components/AgentModeShell.tsx` | Agent-mode workspace rail: same context menu + color application |
 | Config | `src/App.css` | `.ws-icon.has-color` / `.agent-wsrail-icon.has-color` (color-mix tint) + `.ws-color-*` popover styles |
 
@@ -40,9 +41,10 @@ tags: [workspace, colors, palette, popover, activity-bar, agent-rail, theming, l
 - `colorMenu`: `{ wsId, x, y } | null` — open popover target (component, in both bars)
 
 ### Drag-to-reorder (activity bar)
-- The open-workspace icons reorder by **native HTML5 drag-and-drop** (no library). `ActivityBar` tracks `dragIndex`/`dragOverIndex`; `onDrop` calls `store.reorderWorkspaces(from, to)`.
+- The open-workspace icons reorder by **pointer events**, NOT HTML5 drag-and-drop. GOTCHA: native HTML5 DnD is broken in Tauri/WKWebView (macOS) — `dragstart` fires then `dragend` immediately, no `dragover`/`drop`, so the reorder never runs. Confirmed live via console logs.
+- Hook `src/useWorkspaceReorder.ts`: `pointerdown` records the source index in a ref; a window `pointermove` past a 4px threshold becomes an active drag and resolves the slot under the pointer via `document.elementFromPoint` → `data-ws-index`; `pointerup` calls `store.reorderWorkspaces(from, to)`. A `shouldSuppressClick()` flag stops the trailing click from re-selecting the workspace after a drag.
 - `reorderWorkspaces` splices `openIds` and `persistIdx()`s — the new order survives reload (persisted in Rust `workspaces.json` `open_ids`, unlike colors which are localStorage).
-- CSS: `.ws-icon.dragging` (fade) + `.ws-icon.drag-over` (top insertion line). `e.dataTransfer.setData("text/plain", id)` is set so Firefox starts the drag.
+- CSS: `.ws-icon` carries `data-ws-index`; `.ws-icon.dragging` (fade) + `.ws-icon.drag-over` (top insertion line).
 
 ### Notes / gotchas
 - Persistence is **frontend localStorage**, not Rust `workspace.json` — keeps it light, no IPC. Survives reloads; not synced across machines (acceptable).

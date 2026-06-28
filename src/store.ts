@@ -1315,6 +1315,7 @@ export const useStore = create<AppState>((set, get) => {
 
     reorderWorkspaces: (fromIndex, toIndex) => {
       const openIds = get().openIds;
+      console.log("[ws-dnd] reorderWorkspaces", { fromIndex, toIndex, openIds });
       if (
         fromIndex === toIndex ||
         fromIndex < 0 ||

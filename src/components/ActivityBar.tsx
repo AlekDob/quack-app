@@ -7,6 +7,7 @@ import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
 import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
 import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
+import { useWorkspaceReorder } from "../useWorkspaceReorder";
 
 function initials(name: string): string {
   const parts = name.split(/[\s\-_.]+/).filter(Boolean);
@@ -25,7 +26,6 @@ export function ActivityBar() {
   const recent = useStore((s) => s.recent);
   const removeRecent = useStore((s) => s.removeFromRecent);
   const openWs = useStore((s) => s.openWorkspace);
-  const reorderWorkspaces = useStore((s) => s.reorderWorkspaces);
   const setSidebarVisible = useStore((s) => s.setSidebarVisible);
 
   const ws = activeId ? loaded[activeId] : null;
@@ -43,15 +43,9 @@ export function ActivityBar() {
   const [addOpen, setAddOpen] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement>(null);
 
-  // Drag-and-drop reordering of the open-workspace icons. `dragIndex` is the
-  // icon being dragged; `dragOverIndex` is the slot it would drop into (for
-  // the live insertion-line hint). Both clear on dragend.
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
-  const endDrag = () => {
-    setDragIndex(null);
-    setDragOverIndex(null);
-  };
+  // Drag-to-reorder the open-workspace icons (pointer-based — HTML5 DnD is
+  // broken in Tauri/WKWebView; see useWorkspaceReorder).
+  const { drag, onPointerDown, shouldSuppressClick } = useWorkspaceReorder();
 
   // Right-click color popover for a workspace icon. Re-render on color
   // change so the tint updates live across the activity bar.
@@ -115,11 +109,12 @@ export function ActivityBar() {
           if (!meta) return null;
           const isActive = id === activeId;
           const color = getWorkspaceColor(id);
-          const isDragging = dragIndex === index;
-          const isDragOver = dragOverIndex === index && dragIndex !== index;
+          const isDragging = drag?.from === index;
+          const isDragOver = !!drag && drag.over === index && drag.from !== index;
           return (
             <div
               key={id}
+              data-ws-index={index}
               className={`ws-icon ${isActive ? "active" : ""} ${color ? "has-color" : ""} ${isDragging ? "dragging" : ""} ${isDragOver ? "drag-over" : ""}`}
               style={
                 color
@@ -131,26 +126,12 @@ export function ActivityBar() {
               tabIndex={0}
               aria-label={`Switch to workspace ${meta.name}`}
               aria-pressed={isActive}
-              draggable
-              onDragStart={(e) => {
-                setDragIndex(index);
-                e.dataTransfer.effectAllowed = "move";
-                // Firefox needs data set for the drag to start at all.
-                e.dataTransfer.setData("text/plain", id);
+              onPointerDown={(e) => onPointerDown(e, index)}
+              onClick={() => {
+                // Suppress the click that trails a real drag.
+                if (shouldSuppressClick()) return;
+                void setActive(id);
               }}
-              onDragOver={(e) => {
-                if (dragIndex === null) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = "move";
-                setDragOverIndex(index);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (dragIndex !== null) reorderWorkspaces(dragIndex, index);
-                endDrag();
-              }}
-              onDragEnd={endDrag}
-              onClick={() => void setActive(id)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 e.stopPropagation();

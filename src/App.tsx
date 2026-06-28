@@ -22,6 +22,14 @@ import { TopBar } from "./components/TopBar";
 import { ActivityBar } from "./components/ActivityBar";
 import { AIChatsRail } from "./components/AIChatsRail";
 import { AgentHubWatcher } from "./components/AgentHubWatcher";
+import { DockWindow } from "./components/DockWindow";
+import { openDock, isDockEnabled } from "./dock";
+import {
+  emitDockSummary,
+  DOCK_REQUEST_EVENT,
+  DOCK_FOCUS_EVENT,
+} from "./dockSummary";
+import { getAgentStatus, markSeen } from "./agentStatusStore";
 import { CommandPalette } from "./components/CommandPalette";
 import { DragGhost } from "./components/DragGhost";
 import { StatusBar } from "./components/StatusBar";
@@ -52,6 +60,14 @@ import "./App.css";
 const IS_POPOUT = (() => {
   try {
     return new URLSearchParams(window.location.search).get("popout") === "1";
+  } catch {
+    return false;
+  }
+})();
+
+const IS_DOCK = (() => {
+  try {
+    return new URLSearchParams(window.location.search).get("dock") === "1";
   } catch {
     return false;
   }
@@ -300,6 +316,39 @@ function MainApp() {
       off?.();
     };
   }, []);
+
+  // Floating Dock bridge. The Dock is a separate window that renders a
+  // per-project status summary; the main window is the producer. Auto-open
+  // it on boot (unless the user closed it), answer its initial pull
+  // (dock:request → push summary), and handle clicks (dock:focus-project →
+  // jump to that project's most urgent chat).
+  useEffect(() => {
+    if (!hydrated) return;
+    if (isDockEnabled()) void openDock();
+    const offs: Array<() => void> = [];
+    void listen(DOCK_REQUEST_EVENT, () => emitDockSummary()).then((u) =>
+      offs.push(u),
+    );
+    void listen<string>(DOCK_FOCUS_EVENT, async (e) => {
+      const wsId = e.payload;
+      const st = useStore.getState();
+      if (!st.loaded[wsId]) return;
+      if (st.activeId !== wsId) await st.setActiveWorkspace(wsId);
+      const ws = useStore.getState().loaded[wsId];
+      if (!ws) return;
+      // Most urgent first: needs-input → ready → most-recent.
+      const chats = Object.values(ws.aiChats).filter((c) => !c.archivedAt);
+      const pick =
+        chats.find((c) => getAgentStatus(c.id)?.derived === "needs-input") ??
+        chats.find((c) => getAgentStatus(c.id)?.derived === "ready") ??
+        chats.sort((a, b) => b.createdAt - a.createdAt)[0];
+      if (pick) {
+        markSeen(pick.id);
+        useStore.getState().focusAIChat(wsId, pick.id);
+      }
+    }).then((u) => offs.push(u));
+    return () => offs.forEach((f) => f());
+  }, [hydrated]);
 
   // After a Ctrl+R reload, popout windows from the previous session may
   // still be alive. Mark their terminals as popped so the main window
@@ -729,5 +778,6 @@ function MainApp() {
 }
 
 export default function App() {
+  if (IS_DOCK) return <DockWindow />;
   return IS_POPOUT ? <TerminalPopoutWindow /> : <MainApp />;
 }

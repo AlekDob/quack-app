@@ -682,6 +682,9 @@ input {
   font-size: 12px;
   font-weight: 600;
   user-select: none;
+  /* Reorder is pointer-based (see useWorkspaceReorder); suppress the OS text
+     drag so a press-drag doesn't try to drag the label glyphs. */
+  touch-action: none;
   padding: 0;
   outline: none;
 }
@@ -4357,8 +4360,8 @@ input {
   height: min(720px, 85vh);
   background: var(--bg-elev);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -4420,7 +4423,7 @@ input {
 }
 .settings-toc {
   border-right: 1px solid var(--border);
-  background: var(--bg);
+  background: transparent;
   padding: 10px 8px;
   overflow-y: auto;
   display: flex;
@@ -4431,23 +4434,21 @@ input {
   text-align: left;
   background: transparent;
   border: none;
-  border-left: 2px solid transparent;
-  padding: 6px 10px;
+  padding: 7px 10px;
   font-size: 12px;
   color: var(--fg-dim);
   cursor: pointer;
   font-family: inherit;
-  border-radius: 0 4px 4px 0;
-  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+  border-radius: var(--radius-sm);
+  transition: color 120ms ease, background 120ms ease;
 }
 .settings-toc-item:hover {
   color: var(--fg);
-  background: var(--bg-alt);
+  background: var(--bg-hover);
 }
 .settings-toc-item.active {
   color: var(--fg);
-  border-left-color: var(--accent);
-  background: var(--bg-alt);
+  background: var(--bg-hi);
   font-weight: 500;
 }
 @media (max-width: 700px) {
@@ -5030,12 +5031,18 @@ input {
   overflow: hidden;
 }
 .segmented-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   border: none;
-  border-radius: 0;
-  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
   font-size: 12px;
   color: var(--fg-dim);
+}
+.segmented-btn svg {
+  opacity: 0.8;
 }
 .segmented-btn:hover {
   background: var(--bg-hi);
@@ -10673,6 +10680,105 @@ input {
 .popped-placeholder-btn:hover {
   background: var(--bg-hover, var(--bg-elev));
   border-color: var(--accent);
+}
+
+/* ---------- Floating project Dock window ---------- */
+/* A transparent always-on-top window hosting one rounded pill of project
+   circles. The window itself is transparent; this pill floats with a shadow. */
+.dock-shell {
+  position: fixed;
+  inset: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-radius: var(--radius-full);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.dock-mark {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.9;
+}
+.dock-sep {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+}
+.dock-projects {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.dock-projects::-webkit-scrollbar {
+  display: none;
+}
+.dock-circle {
+  position: relative;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: var(--bg-hi);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--duration-fast, 120ms) var(--ease-default, ease);
+}
+.dock-circle:hover {
+  transform: scale(1.08);
+}
+.dock-circle-label {
+  mix-blend-mode: normal;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+/* Attention ring around a circle with pending items. */
+.dock-circle.dock-state-needs-input {
+  box-shadow: 0 0 0 2px var(--bg-elev), 0 0 0 4px #a855f7, 0 0 9px 2px rgba(168, 85, 247, 0.7);
+}
+.dock-circle.dock-state-ready {
+  box-shadow: 0 0 0 2px var(--bg-elev), 0 0 0 4px #22c55e, 0 0 8px 1px rgba(34, 197, 94, 0.6);
+}
+/* Counter badge, top-right of the circle. */
+.dock-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  color: #fff;
+  box-shadow: 0 0 0 2px var(--bg-elev);
+}
+.dock-badge-needs-input {
+  background: #a855f7;
+}
+.dock-badge-ready {
+  background: #22c55e;
 }
 
 /* Pop-out terminal window — minimal chrome above a full-bleed xterm. */

@@ -17,6 +17,21 @@ use claude_perm::PermState;
 use pty::PtyState;
 use watcher::WatcherState;
 
+/// Set the native Dock/taskbar app-icon badge to the count of chats needing
+/// attention (0 clears it). Driven by the frontend's AgentHubWatcher so the
+/// counter is visible even when the app isn't focused.
+#[tauri::command]
+fn set_dock_badge(app: tauri::AppHandle, count: u32) {
+    use tauri::Manager;
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.set_badge_count(if count == 0 {
+            None
+        } else {
+            Some(count as i64)
+        });
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -145,6 +160,7 @@ pub fn run() {
             sftp::sftp_forget_host_key,
             sysmon::process_stats,
             sysmon::process_kill,
+            set_dock_badge,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

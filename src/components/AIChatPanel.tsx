@@ -1219,7 +1219,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       if (!next) continue;
       // No aborted-check here: the previous turn's controller is
       // ALWAYS aborted/stale by drain time, and checking it silently
-      // discarded the queue — which made "⏭ Send now" (abort current
+      // discarded the queue — which made "Send now" (abort current
       // turn, then drain) look like the app hung. Discarding is the
       // queue indicator's explicit Clear button, not a side effect.
       await sendUserTextRef.current?.(next);
@@ -4591,7 +4591,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             onClick={stop}
             title="Stop (Esc)"
           >
-            ◼ Stop
+            Stop
           </button>
         ) : (
           <button
@@ -4628,7 +4628,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             }}
             title="Stop the current turn and send the queued message now"
           >
-            ⏭ Send now
+            Send now
           </button>
           <button
             className="ai-queue-clear"

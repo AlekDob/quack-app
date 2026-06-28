@@ -43,6 +43,7 @@ import { joinPath } from "./pathUtils";
 import { revealInTree } from "./revealInTree";
 import { toggleZenMode } from "./zenMode";
 import { toggleAgentMode } from "./agentMode";
+import { toggleDock } from "./dock";
 
 function runEditorAction(actionId: string) {
   const ed = getActiveEditor();
@@ -374,6 +375,15 @@ export const commands: CommandSpec[] = [
     accel: "Ctrl+Shift+A",
     run: () => {
       toggleAgentMode();
+    },
+  },
+  {
+    id: "view.toggle_dock",
+    label: "Toggle Project Dock",
+    category: "View",
+    accel: "Ctrl+Shift+D",
+    run: () => {
+      void toggleDock();
     },
   },
   {
