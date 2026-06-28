@@ -61,8 +61,9 @@ dependency).
 5. `attachedAgents` resets after the turn goes out (alongside `attachedFiles`).
 
 ### Flow — subagent chip → read-only transcript tab
-1. A `Task` tool-call renders as a **duck-avatar chip** (`chatToolRender` ToolCallRow special-case),
-   avatar from `duckAvatarFor(subagent_type)`.
+1. The subagent tool-call renders as a **duck-avatar chip** (`chatToolRender` ToolCallRow special-case),
+   avatar from `duckAvatarFor(subagent_type)`. **The tool is named `Agent` in current Claude Code**
+   (older versions / other providers use `Task`) — the chip matches BOTH names.
 2. Click → `SubagentOpen` context → `openSubagentTab(call.id, agentType)` → `store.openSubagent`,
    which opens a self-contained `sub:<ccSessionId>|<toolUseId>|<agentType>` tab.
 3. `SubagentTranscriptView` calls `claude_code_load_subagent(cwd, ccSessionId, toolUseId)`.
@@ -73,7 +74,11 @@ dependency).
 5. Rendered read-only: delegation prompt as a "user" bubble, subagent steps via `ToolCallRow`. **No composer.**
 
 ### Gotchas
-- **CC-only:** `agents` is empty for non-CC providers; `attachedAgents` and Task chips never appear elsewhere.
+- **Tool name is `Agent`, not `Task`:** current Claude Code emits the subagent dispatch tool as
+  `Agent` (input `{description, prompt, subagent_type}`). The chip special-case matches `Agent` AND
+  `Task`; `friendlyToolName` maps both to "Subagent". Matching only `Task` left the generic "• Agent"
+  row (the original bug).
+- **CC-only:** `agents` is empty for non-CC providers; `attachedAgents` and subagent chips never appear elsewhere.
 - **Timing:** the subagent jsonl/meta land on disk only when the run **finishes** — clicking the chip
   mid-run shows "transcript isn't ready". `claudeSessionId` must also be captured (the `session` stream event).
 - **Ephemeral tabs:** `sub:` keys have no store record and return `false` in the load-time `clean()` filter,

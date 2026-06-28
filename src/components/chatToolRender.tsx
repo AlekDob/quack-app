@@ -151,6 +151,7 @@ const CLAUDE_CODE_TOOL_LABELS: Record<string, string> = {
   TodoWrite: "Todos",
   NotebookEdit: "Notebook edit",
   Task: "Subagent",
+  Agent: "Subagent",
   ExitPlanMode: "Exit plan mode",
 };
 
@@ -1365,10 +1366,11 @@ export function ToolCallRow({
   // and a conditional hook would then violate React's hook ordering.
   const [expanded, setExpanded] = useState(false);
   const openSubagent = useContext(SubagentOpen);
-  // Task = a subagent run. Render it as a duck-avatar chip that opens the
-  // subagent's read-only transcript on click (the transcript lands on disk
-  // once the run finishes, linked by this call's id).
-  if (call.function.name === "Task") {
+  // A subagent run. Newer Claude Code names this tool "Agent"; older
+  // versions / other providers use "Task". Render it as a duck-avatar chip
+  // that opens the subagent's read-only transcript on click (the transcript
+  // lands on disk once the run finishes, linked by this call's id).
+  if (call.function.name === "Task" || call.function.name === "Agent") {
     const agentType = subagentTypeOf(call.function.arguments);
     const desc =
       typeof call.function.arguments.description === "string"
