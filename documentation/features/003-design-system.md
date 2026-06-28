@@ -58,6 +58,26 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 - Message body `.ai-msg-body .md-preview` is 13px / line-height 1.55; headings h1–h4 17/15/14/13; code blocks 13px; fallback `.ai-msg` 13px. Sized for comfortable reading without dwarfing the chrome.
 - Assistant identity header = **Jack** (duck avatar 32px + name 14px + "Project Manager" 10px) — full feature in `features/005-jack-duck-identity.md`. `.ai-msg-assistant .ai-msg-body` uses a discreet 1px `--border` left rule (not an accent rail).
 
+### Top bar & command center
+- Brand (`.topbar-brand`): Quack square logo (`public/quack-logo.png`, 22px) + "Quack",
+  shown on ALL platforms (no longer gated to non-macOS). On macOS it sits right of the
+  traffic-light inset.
+- Command center (`.topbar-search`): centered VS-Code-style (`position:absolute; left:50%`),
+  visible everywhere, shortcut label ⌘P (mac) / Ctrl+P. Opens the command palette.
+
+### Settings modal
+- `.settings-modal` = `radius-lg` + `shadow-lg`. Side nav (`.settings-toc`) is TRANSPARENT
+  (inherits the modal grey — no white/grey bicolor) with rounded active items (`--bg-hi`,
+  no accent bar). Segmented controls (`.segmented-btn`) are icon+label pills.
+
+### Command palette
+- Cursor-style rows — see `features/011-command-palette.md`. Compact rounded items, leading
+  type icon (`iconForCategory`), trailing hint, active = `--bg-hi` rounded (no accent bar).
+
+### No emoji (enforced)
+- Zero emoji in chrome — full rules in `design/directives.md`. Theme toggle uses
+  sun/moon/monitor icons; composer Stop/Send-now are text. Minor leftover: SFTP `✓/✗`.
+
 ### Config
 - Theme persisted: localStorage `lcp.theme` (`theme.ts`). Default = system, dark-first feel.
 - `data-os` set once at boot from `navigator.platform`.

@@ -112,6 +112,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `007-native-macos-menu.md` — macOS uses the native system menu bar (built from the command registry); the in-window `TopBar` menus are hidden there, kept on Win/Linux.
   - `008-skill-slash-menu.md` — Claude Code skills in the `/` menu (lightning icon + orange, name only), loaded from `.claude/skills/`, dispatched like CC commands.
   - `010-project-dock.md` — floating always-on-top Dock window (per-project circles + counters) + native macOS Dock-icon badge.
+  - `011-command-palette.md` — Ctrl/⌘P overlay (workspaces/files/commands/symbols/search), Cursor-style rows + leading icons.
 - `documentation/decisions/` — architectural rationales.
   - `001-agent-status-indicators.md` — the per-session agent-status design (the focus feature).
   - `002-ui-styling-rebrand-not-rewrite.md` — why CSS-token rebrand, not Tailwind/shadcn.
