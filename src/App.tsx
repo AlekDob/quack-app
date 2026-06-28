@@ -11,6 +11,7 @@ import {
   parseChordAccel,
 } from "./accelMatch";
 import { bootstrapTheme } from "./theme";
+import { installNativeMenu } from "./nativeMenu";
 import { onPaletteOpen } from "./paletteBus";
 import { onFootprintOpen } from "./footprintBus";
 import { basename } from "./pathUtils";
@@ -160,6 +161,9 @@ function MainApp() {
   useEffect(() => {
     bootstrapTheme();
     startFsBusOnce();
+    // macOS: move the menubar into the native system menu bar (no-op on
+    // Win/Linux, which keep the in-window TopBar menus).
+    void installNativeMenu();
     void hydrate();
   }, [hydrate]);
 

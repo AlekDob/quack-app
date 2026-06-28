@@ -107,6 +107,8 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `003-design-system.md` — tokens, themes, neutral chrome, liquid glass, native window, composer, pill tabs.
   - `004-subagent-mentions.md` — `@`-mention subagents + click a Task chip to open its read-only transcript tab.
   - `005-jack-duck-identity.md` — the assistant IS Jack (duck PM): persona, `AIIcon` duck mark, chat header.
+  - `006-chat-tool-render.md` — chat tool-call rendering (pills, result drawer, diff modal).
+  - `007-native-macos-menu.md` — macOS uses the native system menu bar (built from the command registry); the in-window `TopBar` menus are hidden there, kept on Win/Linux.
 - `documentation/decisions/` — architectural rationales.
   - `001-agent-status-indicators.md` — the per-session agent-status design (the focus feature).
   - `002-ui-styling-rebrand-not-rewrite.md` — why CSS-token rebrand, not Tailwind/shadcn.

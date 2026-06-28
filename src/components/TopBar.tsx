@@ -6,7 +6,7 @@ import {
   commandsForCategory,
   type CommandSpec,
 } from "../actions";
-import { useTheme, type ThemeMode } from "../theme";
+import { useTheme, type ThemeMode, IS_MACOS } from "../theme";
 import { getActiveEditor } from "../editorState";
 import { Icon } from "./Icon";
 import { AIIcon } from "./AIIcon";
@@ -372,10 +372,16 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
 
   return (
     <div className="topbar" data-tauri-drag-region>
-      <div className="topbar-brand" data-tauri-drag-region>
-        Quack
-      </div>
+      {/* macOS moves the menubar into the native system menu bar (see
+          nativeMenu.ts), so the in-window brand + menus + palette are
+          hidden there — the titlebar is just a drag region + Agents. */}
+      {!IS_MACOS && (
+        <div className="topbar-brand" data-tauri-drag-region>
+          Quack
+        </div>
+      )}
 
+      {!IS_MACOS && (
       <div className="topbar-menus" data-tauri-drag-region={false}>
         <MenuButton
           label="File"
@@ -612,6 +618,7 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
           {renderCategoryItems("Help")}
         </MenuButton>
       </div>
+      )}
 
       <div className="topbar-spacer" data-tauri-drag-region />
 
@@ -630,20 +637,22 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
         <span className="topbar-agent-toggle-label">Agents</span>
       </button>
 
-      <button
-        className="topbar-search"
-        onClick={onOpenPalette}
-        title="Command palette (Ctrl+P)"
-        data-tauri-drag-region={false}
-      >
-        <span className="topbar-search-icon">
-          <Icon name="command" size={12} />
-        </span>
-        <span className="topbar-search-text">
-          Search commands & workspaces
-        </span>
-        <span className="topbar-search-kbd">Ctrl+P</span>
-      </button>
+      {!IS_MACOS && (
+        <button
+          className="topbar-search"
+          onClick={onOpenPalette}
+          title="Command palette (Ctrl+P)"
+          data-tauri-drag-region={false}
+        >
+          <span className="topbar-search-icon">
+            <Icon name="command" size={12} />
+          </span>
+          <span className="topbar-search-text">
+            Search commands & workspaces
+          </span>
+          <span className="topbar-search-kbd">Ctrl+P</span>
+        </button>
+      )}
 
       <div className="window-controls" data-tauri-drag-region={false}>
         <button
