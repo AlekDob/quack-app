@@ -8,6 +8,13 @@ license-file = "../LICENSE"
 homepage = "https://codetta.dev"
 repository = "https://github.com/getcodetta/codetta"
 
+# Name the dev/run binary "Quack" so the macOS app menu (whose bold title is
+# the executable name in dev) reads "Quack", matching productName used in
+# release bundles. The library stays codetta_lib to avoid a wider rename.
+[[bin]]
+name = "Quack"
+path = "src/main.rs"
+
 [lib]
 name = "codetta_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
