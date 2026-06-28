@@ -133,6 +133,14 @@ export interface AIChatDescriptor {
    *  per-chat provider badge. The chat panel writes this when the user
    *  picks a model. Optional for back-compat with older sessions. */
   model?: string;
+  /** Manual lifecycle set from the Agent Hub's right-click menu.
+   *  `doneAt` → shown in the collapsed "Done" group; `archivedAt`
+   *  → hidden from the hub. Both optional/back-compat. */
+  doneAt?: number;
+  archivedAt?: number;
+  /** True once the user renamed the chat by hand — stops the auto-title
+   *  effect (derives a title from the first message) from clobbering it. */
+  titleLocked?: boolean;
 }
 
 export type SidebarView =
@@ -237,6 +245,27 @@ export function parseKey(
     };
   }
   return null;
+}
+
+/** The AI chat id currently focused in a workspace (active pane's active
+ *  tab, if it's an `ai:` tab), else null. Shared by the Agent Hub +
+ *  watcher to know which chat the user is actually looking at. */
+export function activeAiChatId(ws: WorkspaceData): string | null {
+  const layout = ws.layout;
+  if (!layout.activePaneId) return null;
+  const visit = (p: Pane): string | null => {
+    if (p.kind === "tabs") {
+      if (p.id === layout.activePaneId && p.active?.startsWith("ai:")) {
+        return p.active.slice(3);
+      }
+      return null;
+    }
+    return visit(p.first) ?? visit(p.second);
+  };
+  return (
+    visit(layout.editorRoot) ??
+    (layout.bottomRoot ? visit(layout.bottomRoot) : null)
+  );
 }
 
 // -------- Pane tree helpers --------
@@ -534,6 +563,9 @@ interface AppState {
   closeWorkspace(id: string): Promise<void>;
   removeFromRecent(id: string): Promise<void>;
   setActiveWorkspace(id: string): Promise<void>;
+  /** Reorder the open-workspaces list (activity bar) by moving the icon at
+   *  `fromIndex` to `toIndex`. Drives the drag-and-drop sort and persists. */
+  reorderWorkspaces(fromIndex: number, toIndex: number): void;
 
   openFile(wsId: string, path: string): Promise<void>;
   closeTab(wsId: string, key: string): Promise<void>;
@@ -609,7 +641,20 @@ interface AppState {
     agentType: string,
   ): void;
   closeAIChat(wsId: string, id: string): void;
+  /** Focus an existing chat's tab (reopening it in the active editor pane
+   *  if its tab was closed). Used by the Agent Hub to jump to a chat. */
+  focusAIChat(wsId: string, id: string): void;
   setAIChatTitle(wsId: string, id: string, title: string): void;
+  /** User-driven rename from the Agent Hub — locks the title against the
+   *  auto-title effect. */
+  renameAIChat(wsId: string, id: string, title: string): void;
+  /** Manual lifecycle for the Agent Hub: "active" clears both timestamps,
+   *  "done" sets doneAt, "archived" sets archivedAt + hides from the hub. */
+  setAIChatLifecycle(
+    wsId: string,
+    id: string,
+    state: "active" | "done" | "archived",
+  ): void;
   setAIChatSession(wsId: string, id: string, sessionId: string): void;
   setAIChatModel(wsId: string, id: string, model: string): void;
   /** Reorder by adjusting the dragged chat's createdAt to land just
@@ -683,7 +728,20 @@ function parseAIChatsRaw(raw: unknown): Record<string, AIChatDescriptor> {
     const createdAt =
       typeof v.createdAt === "number" ? v.createdAt : ++migrationStamp;
     const model = typeof v.model === "string" ? v.model : undefined;
-    out[id] = { id: v.id, title: v.title, sessionId: v.sessionId, createdAt, model };
+    const doneAt = typeof v.doneAt === "number" ? v.doneAt : undefined;
+    const archivedAt =
+      typeof v.archivedAt === "number" ? v.archivedAt : undefined;
+    const titleLocked = v.titleLocked === true ? true : undefined;
+    out[id] = {
+      id: v.id,
+      title: v.title,
+      sessionId: v.sessionId,
+      createdAt,
+      model,
+      doneAt,
+      archivedAt,
+      titleLocked,
+    };
   }
   return out;
 }
@@ -1253,6 +1311,24 @@ export const useStore = create<AppState>((set, get) => {
       }
       set({ activeId: id });
       await persistIdx();
+    },
+
+    reorderWorkspaces: (fromIndex, toIndex) => {
+      const openIds = get().openIds;
+      if (
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= openIds.length ||
+        toIndex >= openIds.length
+      ) {
+        return;
+      }
+      const next = [...openIds];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      set({ openIds: next });
+      void persistIdx();
     },
 
     openFile: async (wsId, path) => {
@@ -2149,6 +2225,62 @@ export const useStore = create<AppState>((set, get) => {
       return id;
     },
 
+    focusAIChat: (wsId, id) => {
+      const ws = get().loaded[wsId];
+      if (!ws || !ws.aiChats[id]) return;
+      const k = aiKey(id);
+      updateWs(wsId, (w) => {
+        const inEditor = findTabsPaneByTab(w.layout.editorRoot, k);
+        if (inEditor) {
+          return {
+            ...w,
+            layout: {
+              ...w.layout,
+              editorRoot: setActiveInPane(w.layout.editorRoot, inEditor.id, k),
+              activePaneId: inEditor.id,
+            },
+          };
+        }
+        const inBottom = w.layout.bottomRoot
+          ? findTabsPaneByTab(w.layout.bottomRoot, k)
+          : null;
+        if (inBottom && w.layout.bottomRoot) {
+          return {
+            ...w,
+            layout: {
+              ...w.layout,
+              bottomRoot: setActiveInPane(w.layout.bottomRoot, inBottom.id, k),
+              activePaneId: inBottom.id,
+              bottomVisible: true,
+            },
+          };
+        }
+        // Tab was closed but the descriptor survives — reopen it in the
+        // active editor pane.
+        const targetPaneId =
+          (w.layout.activePaneId &&
+            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
+            w.layout.activePaneId) ||
+          firstLeaf(w.layout.editorRoot).id;
+        return {
+          ...w,
+          layout: {
+            ...w.layout,
+            editorRoot: mapTree(w.layout.editorRoot, (t) =>
+              t.id === targetPaneId
+                ? {
+                    ...t,
+                    tabs: t.tabs.includes(k) ? t.tabs : [...t.tabs, k],
+                    active: k,
+                  }
+                : t,
+            ),
+            activePaneId: targetPaneId,
+          },
+        };
+      });
+    },
+
     openSubagent: (wsId, sessionId, toolUseId, agentType) => {
       const k = subKey(sessionId, toolUseId, agentType);
       updateWs(wsId, (w) => {
@@ -2224,6 +2356,33 @@ export const useStore = create<AppState>((set, get) => {
           ...w,
           aiChats: { ...w.aiChats, [id]: { ...desc, title } },
         };
+      }),
+
+    renameAIChat: (wsId, id, title) =>
+      updateWs(wsId, (w) => {
+        const desc = w.aiChats[id];
+        if (!desc) return w;
+        return {
+          ...w,
+          aiChats: {
+            ...w.aiChats,
+            [id]: { ...desc, title, titleLocked: true },
+          },
+        };
+      }),
+
+    setAIChatLifecycle: (wsId, id, state) =>
+      updateWs(wsId, (w) => {
+        const desc = w.aiChats[id];
+        if (!desc) return w;
+        const next = { ...desc };
+        // Mutually exclusive timestamps — a chat is active, done, OR
+        // archived, never two at once.
+        delete next.doneAt;
+        delete next.archivedAt;
+        if (state === "done") next.doneAt = Date.now();
+        else if (state === "archived") next.archivedAt = Date.now();
+        return { ...w, aiChats: { ...w.aiChats, [id]: next } };
       }),
 
     setAIChatSession: (wsId, id, sessionId) =>

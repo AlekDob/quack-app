@@ -4,8 +4,18 @@ project: quack-desktop
 created: 2026-06-28
 last_verified: 2026-06-28
 tags: [agent-status, sessions, ui, agent-mode, aitaskstore, design]
-status: proposed
+status: implemented
 ---
+
+> **Implemented (2026-06-28)** as the cross-project Agent Hub — see
+> `features/009-agent-hub.md`. Diverged from the draft below in two ways:
+> (1) status is produced by ONE global `AgentHubWatcher` reading app-wide
+> signals (backend `claude_code_active_sessions` + the global
+> `claude:permission-request` event), NOT by each `AIChatPanel` publishing —
+> this sidesteps mount-asymmetry without background-mounting panels (the
+> Phase-2 idea below is no longer needed). (2) The hub is global + grouped by
+> status with project name+color badges, plus OS notifications and right-click
+> lifecycle (done/archive/rename).
 
 # Decision: Per-session agent status indicators
 

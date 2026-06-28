@@ -22,6 +22,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(PtyState::default())
         .manage(WatcherState::default())
         .manage(ClaudeCodeState::default())
@@ -116,6 +117,7 @@ pub fn run() {
             claude_code::claude_code_chat,
             claude_code::claude_code_kill,
             claude_code::claude_code_attach,
+            claude_code::claude_code_active_sessions,
             claude_code::claude_code_clear_session,
             claude_code::claude_code_list_sessions,
             claude_code::claude_code_load_session,

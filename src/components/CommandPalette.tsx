@@ -5,6 +5,19 @@ import { search, type SymbolHit } from "../ipc";
 import { setEditorGoto } from "../editorState";
 import { relPath } from "../pathUtils";
 import { recordCommand, scoreCommand } from "../commandHistory";
+import { Icon } from "./Icon";
+
+// Map a result's category to a leading icon (Cursor-style rows). Falls back
+// to the generic command glyph for menu commands.
+function iconForCategory(cat: string): Parameters<typeof Icon>[0]["name"] {
+  const c = cat.toLowerCase();
+  if (c.includes("workspace")) return "folder";
+  if (c.includes("file")) return "file-text";
+  if (c.includes("symbol")) return "code";
+  if (c.includes("git")) return "git-branch";
+  if (c.includes("search")) return "search";
+  return "command";
+}
 
 interface PaletteEntry {
   key: string;
@@ -382,7 +395,9 @@ export function CommandPalette({ open, onClose, initialQuery }: Props) {
               onMouseEnter={() => setIndex(i)}
               onClick={() => activate(i)}
             >
-              <span className="palette-item-cat">{e.category}</span>
+              <span className="palette-item-icon" aria-hidden="true">
+                <Icon name={iconForCategory(e.category)} size={15} />
+              </span>
               <span className="palette-item-label">{e.label}</span>
               {e.hint && (
                 <span className="palette-item-hint">{e.hint}</span>

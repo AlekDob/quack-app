@@ -871,6 +871,23 @@ pub fn claude_code_attach(
     })
 }
 
+/// List the chat-session ids whose subprocess is still alive. Powers the
+/// global agent hub's "working" indicator: the hub matches each chat-tab
+/// `sessionId` against this set without needing to mount its panel (the
+/// mount-asymmetry gotcha). A session is "active" only while its child is
+/// in the `children` map — the watchdog removes it on exit (`buf.ended`
+/// is set at the same time), so a finished run drops out immediately.
+#[tauri::command]
+pub fn claude_code_active_sessions(state: State<'_, ClaudeCodeState>) -> Vec<String> {
+    let children = state.children.lock();
+    let streams = state.session_streams.lock();
+    streams
+        .iter()
+        .filter(|(_, stream_id)| children.contains_key(*stream_id))
+        .map(|(chat_sid, _)| chat_sid.clone())
+        .collect()
+}
+
 /// Drop the buffer + reverse mapping for a chat session. Called by the
 /// frontend after the user starts a fresh chat or explicitly clears, so
 /// subsequent attaches for that session don't replay stale state.

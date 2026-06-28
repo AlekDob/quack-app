@@ -39,10 +39,10 @@ export function duckAvatarFor(name: string, explicit?: string): string {
   return `/images/ducks/duck${idx}.jpeg`;
 }
 
-// Minimal frontmatter scalar reader. Agent files use simple `key: value`
-// lines, so a full YAML parser (and a new dependency) would be overkill;
-// we only need a few top-level scalars.
-function frontmatterField(src: string, key: string): string | undefined {
+// Minimal frontmatter scalar reader. Agent/skill files use simple
+// `key: value` lines, so a full YAML parser (and a new dependency) would be
+// overkill; we only need a few top-level scalars. Shared with skills.ts.
+export function frontmatterField(src: string, key: string): string | undefined {
   const fm = src.match(/^---\n([\s\S]*?)\n---/);
   if (!fm) return undefined;
   const line = fm[1]

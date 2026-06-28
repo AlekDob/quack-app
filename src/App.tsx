@@ -20,6 +20,8 @@ import { WorkspaceShell } from "./components/WorkspaceShell";
 import { AgentModeShell } from "./components/AgentModeShell";
 import { TopBar } from "./components/TopBar";
 import { ActivityBar } from "./components/ActivityBar";
+import { AIChatsRail } from "./components/AIChatsRail";
+import { AgentHubWatcher } from "./components/AgentHubWatcher";
 import { CommandPalette } from "./components/CommandPalette";
 import { DragGhost } from "./components/DragGhost";
 import { StatusBar } from "./components/StatusBar";
@@ -665,6 +667,9 @@ function MainApp() {
             ))
           )}
         </div>
+        {/* Cross-project Agent Hub — one rail aggregating every open
+            workspace's chats by status. Far-right column for all layouts. */}
+        {!zen && openIds.length > 0 && <AIChatsRail />}
       </div>
       {zen && (
         // Tiny escape hatch for users who hit F11 by accident or
@@ -688,6 +693,7 @@ function MainApp() {
       />
       <DragGhost />
       <Toasts />
+      <AgentHubWatcher />
       <DiffModal />
       <ToolResultDrawer />
       <Dialog />

@@ -273,6 +273,7 @@ fn handle_request(
 /// matching reply channel.
 #[tauri::command]
 pub fn claude_perm_decide(
+    app: AppHandle,
     state: tauri::State<'_, PermState>,
     request_id: String,
     decision: PermDecision,
@@ -280,6 +281,10 @@ pub fn claude_perm_decide(
 ) -> Result<(), String> {
     if let Some(tx) = state.pending.lock().remove(&request_id) {
         let _ = tx.send((decision, reason));
+        // Tell the Agent Hub watcher this request is settled so a chat
+        // doesn't linger in "needs-input" — and so auto-allowed tools
+        // (resolved within milliseconds) never flash that state at all.
+        let _ = app.emit("claude:permission-resolved", &request_id);
         Ok(())
     } else {
         // Already timed out or never existed. Not an error per se —

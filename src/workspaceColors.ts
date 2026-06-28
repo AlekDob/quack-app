@@ -19,15 +19,31 @@ export interface WorkspaceColor {
 
 // Premium, restrained palette. Includes Quack's signature orange as one
 // option among neutrals-but-saturated hues. Tuned to read on both themes.
+// Laid out as a 4-column grid in the popover (see WorkspaceColorPopover):
+// the rows below read row-by-row, cool → warm → extras.
 export const WORKSPACE_COLORS: WorkspaceColor[] = [
+  // Row 1 — cool
   { id: "blue", label: "Blue", hex: "#3b82f6" },
+  { id: "indigo", label: "Indigo", hex: "#6366f1" },
+  { id: "sky", label: "Sky", hex: "#0ea5e9" },
+  { id: "cyan", label: "Cyan", hex: "#06b6d4" },
+  // Row 2 — green family
   { id: "teal", label: "Teal", hex: "#14b8a6" },
+  { id: "emerald", label: "Emerald", hex: "#10b981" },
   { id: "green", label: "Green", hex: "#22c55e" },
+  { id: "lime", label: "Lime", hex: "#84cc16" },
+  // Row 3 — warm
+  { id: "yellow", label: "Yellow", hex: "#eab308" },
   { id: "amber", label: "Amber", hex: "#f59e0b" },
   { id: "orange", label: "Orange", hex: "#f28c52" },
   { id: "red", label: "Red", hex: "#ef4444" },
+  // Row 4 — pinks / purples / neutral
+  { id: "rose", label: "Rose", hex: "#f43f5e" },
   { id: "pink", label: "Pink", hex: "#ec4899" },
+  { id: "fuchsia", label: "Fuchsia", hex: "#d946ef" },
   { id: "violet", label: "Violet", hex: "#8b5cf6" },
+  { id: "purple", label: "Purple", hex: "#a855f7" },
+  { id: "slate", label: "Slate", hex: "#64748b" },
 ];
 
 const KEY = "lcp.ws.colors";

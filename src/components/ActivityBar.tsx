@@ -25,6 +25,7 @@ export function ActivityBar() {
   const recent = useStore((s) => s.recent);
   const removeRecent = useStore((s) => s.removeFromRecent);
   const openWs = useStore((s) => s.openWorkspace);
+  const reorderWorkspaces = useStore((s) => s.reorderWorkspaces);
   const setSidebarVisible = useStore((s) => s.setSidebarVisible);
 
   const ws = activeId ? loaded[activeId] : null;
@@ -41,6 +42,16 @@ export function ActivityBar() {
 
   const [addOpen, setAddOpen] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Drag-and-drop reordering of the open-workspace icons. `dragIndex` is the
+  // icon being dragged; `dragOverIndex` is the slot it would drop into (for
+  // the live insertion-line hint). Both clear on dragend.
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const endDrag = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
 
   // Right-click color popover for a workspace icon. Re-render on color
   // change so the tint updates live across the activity bar.
@@ -99,25 +110,46 @@ export function ActivityBar() {
       title="Right-click to flip sidebar to the other side"
     >
       <div className="activity-section ws-list">
-        {openIds.map((id) => {
+        {openIds.map((id, index) => {
           const meta = loaded[id]?.meta;
           if (!meta) return null;
           const isActive = id === activeId;
           const color = getWorkspaceColor(id);
+          const isDragging = dragIndex === index;
+          const isDragOver = dragOverIndex === index && dragIndex !== index;
           return (
             <div
               key={id}
-              className={`ws-icon ${isActive ? "active" : ""} ${color ? "has-color" : ""}`}
+              className={`ws-icon ${isActive ? "active" : ""} ${color ? "has-color" : ""} ${isDragging ? "dragging" : ""} ${isDragOver ? "drag-over" : ""}`}
               style={
                 color
                   ? ({ "--ws-color": color.hex } as React.CSSProperties)
                   : undefined
               }
-              title={`${meta.name}\n${meta.root}\nRight-click to set a color`}
+              title={`${meta.name}\n${meta.root}\nRight-click to set a color · drag to reorder`}
               role="button"
               tabIndex={0}
               aria-label={`Switch to workspace ${meta.name}`}
               aria-pressed={isActive}
+              draggable
+              onDragStart={(e) => {
+                setDragIndex(index);
+                e.dataTransfer.effectAllowed = "move";
+                // Firefox needs data set for the drag to start at all.
+                e.dataTransfer.setData("text/plain", id);
+              }}
+              onDragOver={(e) => {
+                if (dragIndex === null) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                setDragOverIndex(index);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (dragIndex !== null) reorderWorkspaces(dragIndex, index);
+                endDrag();
+              }}
+              onDragEnd={endDrag}
               onClick={() => void setActive(id)}
               onContextMenu={(e) => {
                 e.preventDefault();

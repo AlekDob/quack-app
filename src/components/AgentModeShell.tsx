@@ -17,43 +17,13 @@ import {
 import { FilePopupModal } from "./FilePopupModal";
 import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
 import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
+import { modelBadge } from "../modelBadge";
 
 interface Props {
   // Always the active workspace id. The shell is NOT remounted on
   // workspace switch (no React key), so this prop simply updates and the
   // component's per-workspace selection map survives the switch.
   wsId: string;
-}
-
-// Same provider→badge mapping the AI chats rail uses, kept compact here so
-// AgentModeShell stays self-contained. If a third surface ever needs it,
-// promote this to a shared module.
-function modelBadge(model: string | undefined): {
-  short: string;
-  className: string;
-  full: string;
-} {
-  if (!model)
-    return { short: "··", className: "badge-none", full: "No model selected" };
-  const colon = model.indexOf(":");
-  const provider = colon > 0 ? model.slice(0, colon) : model;
-  const id = colon > 0 ? model.slice(colon + 1) : "";
-  switch (provider) {
-    case "claude-code":
-      return {
-        short: "CC",
-        className: "badge-claude-code",
-        full: `Claude Code · ${id || "default"}`,
-      };
-    case "anthropic":
-      return { short: "Cl", className: "badge-anthropic", full: `Anthropic API · ${id}` };
-    case "openai":
-      return { short: "AI", className: "badge-openai", full: `OpenAI · ${id}` };
-    case "ollama":
-      return { short: "OL", className: "badge-ollama", full: `Ollama · ${id}` };
-    default:
-      return { short: provider.slice(0, 2).toUpperCase(), className: "badge-other", full: model };
-  }
 }
 
 // ── Customizations ──────────────────────────────────────────────────

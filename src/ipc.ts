@@ -187,6 +187,9 @@ export const claudeCode = {
       sessionId,
       toolUseId,
     }),
+  /** Chat-tab sessionIds whose subprocess is still running. Powers the
+   *  Agent Hub's cross-project "working" indicator without mounting panels. */
+  activeSessions: () => invoke<string[]>("claude_code_active_sessions"),
 };
 
 export interface McpServer {

@@ -5,7 +5,6 @@ import { TerminalCore } from "./TerminalCore";
 import { PaneNode } from "./PaneNode";
 import { SidebarStack } from "./SidebarStack";
 import { AIChatPanel } from "./AIChatPanel";
-import { AIChatsRail } from "./AIChatsRail";
 import { AIIcon } from "./AIIcon";
 import { SubagentTranscriptView } from "./SubagentTranscriptView";
 import {
@@ -149,7 +148,8 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
       data-sidebar-side={layout.sidebarSide}
     >
       {layout.sidebarVisible && !zen && <SidebarStack wsId={wsId} ws={ws} />}
-      {!zen && <AIChatsRail wsId={wsId} ws={ws} />}
+      {/* The cross-project Agent Hub (was the per-workspace AI rail) now
+          mounts once at App root — see App.tsx. */}
       {layout.aiPanelVisible && !zen && (
         <>
           <div

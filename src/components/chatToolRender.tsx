@@ -295,6 +295,7 @@ function ToolRowHead({
   extra,
   onPrimary,
   primaryTitle,
+  skill,
 }: {
   icon: IconName | null;
   name: string;
@@ -303,9 +304,15 @@ function ToolRowHead({
   extra?: ReactNode;
   onPrimary?: () => void;
   primaryTitle?: string;
+  /** Tint the pill violet — the Skill tool, matching the `/` skill menu. */
+  skill?: boolean;
 }) {
   return (
-    <div className={`ai-tcall-head${onPrimary ? " is-interactive" : ""}`}>
+    <div
+      className={`ai-tcall-head${onPrimary ? " is-interactive" : ""}${
+        skill ? " ai-tcall-skill" : ""
+      }`}
+    >
       <button
         type="button"
         className="ai-tcall-open"
@@ -386,6 +393,8 @@ function toolIconFor(name: string): IconName | null {
       return "check-square";
     case "NotebookEdit":
       return "file-text";
+    case "Skill":
+      return "zap";
     default:
       return null;
   }
@@ -1526,6 +1535,7 @@ export function ToolCallRow({
         detailTitle={detail}
         onPrimary={onPrimary}
         primaryTitle={primaryTitle}
+        skill={call.function.name === "Skill"}
         extra={
           !hasResult ? (
             <span className="ai-spinner ai-spinner-sm" />

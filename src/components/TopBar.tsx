@@ -375,11 +375,15 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
       {/* macOS moves the menubar into the native system menu bar (see
           nativeMenu.ts), so the in-window brand + menus + palette are
           hidden there — the titlebar is just a drag region + Agents. */}
-      {!IS_MACOS && (
-        <div className="topbar-brand" data-tauri-drag-region>
-          Quack
-        </div>
-      )}
+      <div className="topbar-brand" data-tauri-drag-region>
+        <img
+          src="/quack-logo.png"
+          className="topbar-logo"
+          alt=""
+          aria-hidden="true"
+        />
+        <span>Quack</span>
+      </div>
 
       {!IS_MACOS && (
       <div className="topbar-menus" data-tauri-drag-region={false}>
@@ -637,8 +641,7 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
         <span className="topbar-agent-toggle-label">Agents</span>
       </button>
 
-      {!IS_MACOS && (
-        <button
+      <button
           className="topbar-search"
           onClick={onOpenPalette}
           title="Command palette (Ctrl+P)"
@@ -650,9 +653,8 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
           <span className="topbar-search-text">
             Search commands & workspaces
           </span>
-          <span className="topbar-search-kbd">Ctrl+P</span>
+          <span className="topbar-search-kbd">{IS_MACOS ? "⌘P" : "Ctrl+P"}</span>
         </button>
-      )}
 
       <div className="window-controls" data-tauri-drag-region={false}>
         <button

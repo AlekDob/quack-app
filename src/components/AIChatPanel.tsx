@@ -103,6 +103,7 @@ import {
 import { MarkdownPreview } from "./MarkdownPreview";
 import { ModelBrowser } from "./ModelBrowser";
 import { loadSubagents, type SubagentDef } from "../subagents";
+import { loadSkills, type SkillDef } from "../skills";
 import { permissionFor } from "../toolPermissions";
 import { onAIPromptRequest } from "../aiBus";
 import { relPath } from "../pathUtils";
@@ -520,6 +521,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // catalog (project + global .claude/agents) is loaded into `agents`.
   const [agents, setAgents] = useState<SubagentDef[]>([]);
   const [attachedAgents, setAttachedAgents] = useState<string[]>([]);
+  // Skills offered in the `/` menu (Claude Code only) — loaded from
+  // <ws>/.claude/skills + ~/.claude/skills alongside the subagent scan.
+  const [skills, setSkills] = useState<SkillDef[]>([]);
   const [slashIndex, setSlashIndex] = useState(0);
   // @-mention file autocomplete in the composer. mentionState carries
   // the active query (text after @ up to cursor) and the byte range
@@ -1131,6 +1135,8 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     if (!title) return;
     const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
     if (!desc || desc.title === title) return;
+    // Respect a hand-set title from the Agent Hub rename — don't clobber it.
+    if (desc.titleLocked) return;
     useStore.getState().setAIChatTitle(wsId, aiChatId, title);
   }, [wsId, aiChatId, messages]);
 
@@ -1421,6 +1427,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   useEffect(() => {
     if (!selectedIsCC || !root) {
       setAgents([]);
+      setSkills([]);
       return;
     }
     let cancelled = false;
@@ -1430,10 +1437,15 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         const { homeDir } = await import("@tauri-apps/api/path");
         home = (await homeDir()).replace(/[\\/]+$/, "");
       } catch {
-        /* home unavailable — project agents still load */
+        /* home unavailable — project agents/skills still load */
       }
-      const list = await loadSubagents(root, home);
-      if (!cancelled) setAgents(list);
+      const [agentList, skillList] = await Promise.all([
+        loadSubagents(root, home),
+        loadSkills(root, home),
+      ]);
+      if (cancelled) return;
+      setAgents(agentList);
+      setSkills(skillList);
     })();
     return () => {
       cancelled = true;
@@ -1470,7 +1482,25 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         hint: c.hint,
         cmd: undefined,
       }));
-    return [...local, ...cc];
+    // Skills (`/skill-name`) come last so the built-in commands stay on top.
+    // Invoked exactly like a CC command — sent as the prompt → the CLI runs
+    // the skill. Tagged "skill" so the row gets its own icon + colour.
+    const sk = skills
+      .filter((s) => {
+        const name = `/${s.name}`;
+        return (
+          s.name.toLowerCase().startsWith(q) &&
+          !local.some((l) => l.name === name) &&
+          !cc.some((c) => c.name === name)
+        );
+      })
+      .map((s) => ({
+        kind: "skill" as const,
+        name: `/${s.name}`,
+        hint: s.description || "Skill",
+        cmd: undefined,
+      }));
+    return [...local, ...cc, ...sk];
   };
 
   // Send a Claude Code slash command through as the prompt — the CLI
@@ -4121,7 +4151,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             {matches.map((c, i) => (
               <button
                 key={c.name}
-                className={`ai-slash-item ${i === idx ? "active" : ""}`}
+                className={`ai-slash-item ${i === idx ? "active" : ""} ${
+                  c.kind === "skill" ? "ai-slash-item-skill" : ""
+                }`}
                 onMouseEnter={() => setSlashIndex(i)}
                 onClick={() =>
                   c.kind === "local"
@@ -4129,8 +4161,15 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                     : sendCcCommand(c.name)
                 }
               >
+                {c.kind === "skill" && (
+                  <span className="ai-slash-skill-ico" aria-hidden="true">
+                    <Icon name="zap" size={14} />
+                  </span>
+                )}
                 <span className="ai-slash-name">{c.name}</span>
-                <span className="ai-slash-hint">{c.hint}</span>
+                {c.kind !== "skill" && (
+                  <span className="ai-slash-hint">{c.hint}</span>
+                )}
               </button>
             ))}
           </div>
@@ -4792,13 +4831,24 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                   setSlashIndex((i) => Math.max(0, i - 1));
                   return;
                 }
-                if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+                const idx = Math.max(
+                  0,
+                  Math.min(slashIndex, matches.length - 1),
+                );
+                const m = matches[idx];
+                // Tab = autocomplete the command/skill name into the input
+                // (keeping any args already typed) so the user can keep
+                // typing the skill's argument — it does NOT run.
+                if (e.key === "Tab") {
                   e.preventDefault();
-                  const idx = Math.max(
-                    0,
-                    Math.min(slashIndex, matches.length - 1),
-                  );
-                  const m = matches[idx];
+                  const after = input.slice(firstWord.length).trimStart();
+                  setInput(after ? `${m.name} ${after}` : `${m.name} `);
+                  setSlashIndex(0);
+                  return;
+                }
+                // Enter = run it (local action / prompt) or send it (cc / skill).
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
                   if (m.kind === "local") runSlashCommand(m.cmd);
                   else sendCcCommand(m.name);
                   return;
