@@ -53,6 +53,7 @@ export function useWorkspaceReorder() {
     (e: PointerEvent) => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      document.body.classList.remove("ws-dragging");
       const p = press.current;
       press.current = null;
       if (p?.active) {

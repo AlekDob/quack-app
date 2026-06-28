@@ -113,6 +113,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `008-skill-slash-menu.md` — Claude Code skills in the `/` menu (lightning icon + orange, name only), loaded from `.claude/skills/`, dispatched like CC commands.
   - `010-project-dock.md` — floating always-on-top Dock window (per-project circles + counters) + native macOS Dock-icon badge.
   - `011-command-palette.md` — Ctrl/⌘P overlay (workspaces/files/commands/symbols/search), Cursor-style rows + leading icons.
+  - `012-workspace-reorder.md` — drag-to-reorder the activity-bar project icons (pointer-events, NOT HTML5 DnD — broken in WKWebView; Monaco DOM-move crash gotcha).
 - `documentation/decisions/` — architectural rationales.
   - `001-agent-status-indicators.md` — the per-session agent-status design (the focus feature).
   - `002-ui-styling-rebrand-not-rewrite.md` — why CSS-token rebrand, not Tailwind/shadcn.

@@ -99,9 +99,12 @@ export function DockWindow() {
   }, []);
 
   useEffect(() => {
-    const off = listen<DockProject[]>(DOCK_SUMMARY_EVENT, (e) =>
-      setProjects(e.payload),
-    );
+    console.log("[dock] DockWindow mounted, orient:", getDockOrient());
+    void emit("dock:alive");
+    const off = listen<DockProject[]>(DOCK_SUMMARY_EVENT, (e) => {
+      console.log("[dock] summary received:", e.payload.length, "projects");
+      setProjects(e.payload);
+    });
     // Ask the main window to push the current state right away.
     void emit(DOCK_REQUEST_EVENT);
     return () => void off.then((f) => f());

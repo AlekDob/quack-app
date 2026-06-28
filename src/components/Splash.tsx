@@ -77,11 +77,8 @@ export function Splash() {
   return (
     <div className="splash" role="status" aria-live="polite">
       <div className="splash-card">
-        <div className="splash-mark" aria-hidden="true">
-          <span className="splash-mark-letter">Q</span>
-        </div>
+        <img src="/quack-icon.png" className="splash-icon" alt="Quack" />
         <div className="splash-wordmark">
-          <span className="splash-wordmark-text">QUACK</span>
           <span className="splash-wordmark-version">{VERSION}</span>
         </div>
         <div className="splash-tagline">
