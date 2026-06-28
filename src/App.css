@@ -3841,25 +3841,50 @@ input {
 /* ---------- Diff modal / view ---------- */
 .diff-modal {
   position: fixed;
-  left: 0;
-  right: 0;
-  top: var(--topbar-h);
-  bottom: var(--statusbar-h);
+  inset: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 200;
+  /* Above the chat / rail chrome (which climbs to ~300) so it doesn't peek
+     through; matches the tool-result drawer's overlay layer. */
+  z-index: 1000;
   display: grid;
   place-items: center;
+  animation: diff-modal-scrim-in 0.18s ease;
 }
 .diff-modal-card {
   width: min(1400px, 95vw);
   height: 85vh;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md, 8px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-lg, 0 20px 60px rgba(0, 0, 0, 0.5));
+  animation: diff-modal-card-in 0.2s var(--ease-out, ease);
+}
+@keyframes diff-modal-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes diff-modal-card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .diff-modal,
+  .diff-modal-card {
+    animation: none;
+  }
 }
 .diff-modal-header {
   display: flex;
@@ -5369,50 +5394,6 @@ input {
 }
 /* Grouped runs of the same read-ish tool ("Read × 8"): one bordered
    card, slim rows inside. */
-/* Merged read/search burst ("Read × 3") — borderless, reads as a single
-   compact pill row matching the individual tool rows around it. */
-.ai-tcall-group {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.ai-tcall-group-head {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  width: 100%;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--fg-muted);
-  padding: 3px 7px;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-xs);
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.13s ease, color 0.13s ease;
-}
-.ai-tcall-group-head:hover {
-  color: var(--fg);
-  background: var(--bg-hi);
-}
-.ai-tcall-group-label {
-  flex-shrink: 0;
-}
-.ai-tcall-chips {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  flex-wrap: wrap;
-  color: var(--fg-muted);
-  text-transform: none;
-}
-.ai-tcall-chip-more {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--fg-muted);
-}
-
 /* Action strip — compact-chat activity chips (reads / searches / runs) */
 .ai-actionstrip {
   margin: 6px 0 2px;
@@ -5610,22 +5591,8 @@ input {
 .ai-panel.compact .ai-tcalls {
   margin: 2px 0;
 }
-.ai-panel.compact .ai-tcall-group {
-  padding: 2px 6px;
-}
-.ai-panel.compact .ai-tcall-group-head {
-  padding: 3px 4px;
-}
 .ai-panel.compact .ai-msg-assistant .ai-msg-body {
   padding-left: 10px;
-}
-.ai-panel.compact .ai-tcall-chips :is(svg, .ai-tcall-chip-more) {
-  opacity: 0.8;
-}
-/* Expanded group children sit slightly indented under the group head so
-   the burst reads as one unit even without the old border. */
-.ai-tcall-group .ai-tcall {
-  margin-left: 14px;
 }
 /* Task Manager modal — Codetta's own process tree with CPU/RAM. */
 .taskman-modal {
@@ -7735,107 +7702,20 @@ input {
   padding: 6px 10px 10px;
 }
 
-/* Edit / Write / MultiEdit tool calls — collapsible card showing the
-   actual diff inline so the user can see what the agent changed. */
-.ai-tcall-edit {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-.ai-tcall-edit.errored {
-  border-color: var(--danger, #c43d3d);
-}
-.ai-tcall-edit-head {
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: none;
-  padding: 6px 9px;
-  gap: 7px;
-  transition: background 0.13s ease;
-}
-.ai-tcall-edit-head:hover {
-  background: var(--bg-hi);
-}
-.ai-tcall-edit-stats {
-  display: inline-flex;
-  gap: 6px;
-  font-family: var(--mono);
-  font-size: 10.5px;
-  margin-left: auto;
-}
+/* Edit / Write / MultiEdit — Cursor-style one-line pill ("Edited test.md +8");
+   clicking opens the real before/after in the centered DiffModal. The +/−
+   stats sit in the trailing cluster, bold so the change size reads at a glance. */
 .ai-tcall-edit-rm {
   color: var(--err);
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 700;
 }
 .ai-tcall-edit-add {
   color: #22c55e;
-}
-.ai-tcall-edit-body {
-  padding: 4px 0 6px;
-  border-top: 1px solid var(--border);
-  background: var(--bg);
-}
-.ai-tcall-edit-result {
-  margin: 6px 8px 2px;
-  padding: 4px 8px;
-  font-size: 11px;
-  border-radius: 3px;
-  background: var(--bg-elev);
-  color: var(--fg-dim);
-  font-family: var(--mono);
-}
-.ai-tcall-edit-result.applied {
-  color: #22c55e;
-}
-.ai-tcall-edit-result.errored {
-  color: var(--err);
-}
-.ai-diff {
   font-family: var(--mono);
   font-size: 11.5px;
-  line-height: 1.5;
-  max-height: 320px;
-  overflow-y: auto;
-  margin: 4px 0;
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-}
-.ai-diff:not(:first-child) {
-  margin-top: 8px;
-}
-.ai-diff-line {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 0 8px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.ai-diff-mark {
-  width: 12px;
-  flex-shrink: 0;
-  text-align: right;
-  user-select: none;
-  font-weight: 600;
-  opacity: 0.85;
-}
-.ai-diff-text {
-  flex: 1;
-}
-.ai-diff-rm {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--fg);
-}
-.ai-diff-rm .ai-diff-mark {
-  color: var(--err);
-}
-.ai-diff-add {
-  background: rgba(34, 197, 94, 0.12);
-  color: var(--fg);
-}
-.ai-diff-add .ai-diff-mark {
-  color: #22c55e;
+  font-weight: 700;
 }
 
 /* Timeline scrubber — slider + branch action above the chat. Lets
@@ -8715,45 +8595,62 @@ input {
 .ai-tcalls.ai-tcalls-inline {
   margin: 6px 0;
 }
-/* ── Tool-call rows (docked chat) — Cursor/Conductor-style compact pills.
-   A run of calls reads as a tight stack of one-line rows; the result is
-   tucked behind a click and reveals with a smooth height/opacity slide. */
+/* ── Tool-call rows (docked chat) — Cursor/Conductor-style pills. Each row is
+   a content-hugging bordered pill (NOT full width); the result tucks behind a
+   click and reveals with a smooth slide. Clicking a file-targeted row opens
+   the file in a new tab; the caret (its own button) toggles the result. */
 .ai-tcall {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  align-items: flex-start; /* pills hug their content; reveal stretches */
+  gap: 2px;
   animation: ai-tcall-in 0.18s ease;
 }
 .ai-tcall-head {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
-  width: 100%;
+  max-width: 100%;
   min-width: 0;
-  font-size: 12px;
-  padding: 3px 7px;
-  border: none;
-  background: transparent;
-  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  border-radius: var(--radius-sm);
   color: inherit;
-  text-align: left;
-  /* fast colour fades on hover; no layout-affecting transitions */
-  transition: background 0.13s ease, color 0.13s ease;
+  transition: background 0.13s ease, border-color 0.13s ease;
 }
-.ai-tcall-head.is-toggle {
+.ai-tcall-head.is-interactive:hover {
+  background: var(--bg-hi);
+  border-color: var(--fg-muted);
+}
+/* Primary clickable area: icon · name · detail. */
+.ai-tcall-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px 5px 3px 8px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+.ai-tcall-head.is-interactive .ai-tcall-open:not(:disabled) {
   cursor: pointer;
 }
-.ai-tcall-head.is-toggle:hover {
-  background: var(--bg-hi);
-}
+/* Fixed square so every glyph lands on the same baseline across rows. */
 .ai-tcall-ico {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 14px;
+  height: 14px;
+  line-height: 0;
   color: var(--fg-muted);
   flex-shrink: 0;
 }
-.ai-tcall-head.is-toggle:hover .ai-tcall-ico {
+.ai-tcall-head.is-interactive:hover .ai-tcall-ico {
   color: var(--fg);
 }
 .ai-tcall-dot {
@@ -8764,6 +8661,7 @@ input {
 }
 .ai-tcall-name {
   font-weight: 600;
+  font-size: 12px;
   color: var(--fg);
   flex-shrink: 0;
 }
@@ -8776,12 +8674,12 @@ input {
   white-space: nowrap;
   min-width: 0;
 }
-/* Right-aligned status cluster: spinner → check → caret. */
+/* Trailing status cluster: spinner / check / stats + caret button. */
 .ai-tcall-trail {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
+  padding: 0 8px 0 2px;
   flex-shrink: 0;
   color: var(--fg-muted);
 }
@@ -8795,57 +8693,16 @@ input {
   align-items: center;
   color: var(--fg-muted);
 }
-/* Shared rotating chevron — points right, rotates down when open. */
-.ai-caret {
-  display: inline-flex;
-  align-items: center;
-  color: var(--fg-muted);
-  transition: transform 0.16s ease;
+/* A run of read/search tools → wrapping cloud of pills (side by side, flowing
+   onto the next line) instead of a tall stack. Detail opens in the drawer. */
+.ai-tcall-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 6px 0;
 }
-.ai-caret.open {
-  transform: rotate(90deg);
-}
-/* Revealed result body — slides open from the head. */
-.ai-tcall-reveal {
-  overflow: hidden;
-  margin: 2px 0 6px 22px;
-  animation: ai-reveal-in 0.18s ease;
-}
-.ai-tcall-result-body {
+.ai-tcall-wrap .ai-tcall {
   margin: 0;
-  padding: 8px 11px;
-  background: var(--bg-alt);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--fg-dim);
-  max-height: 360px;
-  overflow: auto;
-}
-/* Markdown-file read → rendered prose instead of a numbered code dump.
-   Tighter than the full chat-message prose (smaller base, collapsed outer
-   margins) since it sits inside a tucked-away tool result, not the turn. */
-.ai-tcall-result-md {
-  padding: 10px 14px;
-  background: var(--bg-alt);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  max-height: 360px;
-  overflow: auto;
-}
-.ai-tcall-result-md .md-preview {
-  font-size: 13px;
-  line-height: 1.55;
-}
-.ai-tcall-result-md .md-preview > :first-child {
-  margin-top: 0;
-}
-.ai-tcall-result-md .md-preview > :last-child {
-  margin-bottom: 0;
 }
 @keyframes ai-tcall-in {
   from {
@@ -8857,24 +8714,135 @@ input {
     transform: translateY(0);
   }
 }
-@keyframes ai-reveal-in {
-  from {
-    opacity: 0;
-    max-height: 0;
-  }
-  to {
-    opacity: 1;
-    max-height: 320px;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
-  .ai-tcall,
-  .ai-tcall-reveal {
+  .ai-tcall {
     animation: none;
   }
-  .ai-caret {
+  .tool-drawer,
+  .tool-drawer-scrim {
     transition: none;
   }
+}
+
+/* ── Tool-result drawer — right slide-over for read/bash/search output.
+   Edits use the centered DiffModal instead (real before/after). */
+.tool-drawer-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0);
+  transition: background 0.2s ease;
+}
+.tool-drawer-scrim.shown {
+  background: rgba(0, 0, 0, 0.32);
+}
+.tool-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(640px, 88vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elev);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(100%);
+  transition: transform 0.22s var(--ease-out, ease);
+}
+.tool-drawer.shown {
+  transform: translateX(0);
+}
+.tool-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tool-drawer-titles {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-right: auto;
+}
+.tool-drawer-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--fg);
+}
+.tool-drawer-sub {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tool-drawer-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-alt);
+  color: var(--fg);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tool-drawer-open:hover {
+  background: var(--bg-hi);
+}
+.tool-drawer-close {
+  display: inline-flex;
+  padding: 5px;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.tool-drawer-close:hover {
+  color: var(--fg);
+  background: var(--bg-hi);
+}
+.tool-drawer-body {
+  flex: 1;
+  overflow: auto;
+  padding: 14px;
+}
+/* The body IS the scroll area — drop the inner card's frame/scroll so the
+   output fills the drawer edge to edge. */
+.tool-drawer-body .ai-tcall-result-body,
+.tool-drawer-body .ai-tcall-result-md {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  max-height: none;
+  overflow: visible;
+}
+.ai-tcall-result-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--fg-dim);
+}
+.ai-tcall-result-md .md-preview {
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.ai-tcall-result-md .md-preview > :first-child {
+  margin-top: 0;
+}
+.ai-tcall-result-md .md-preview > :last-child {
+  margin-bottom: 0;
 }
 .ai-msg-action-run {
   background: rgba(var(--accent-rgb), 0.15);

@@ -24,6 +24,7 @@ import { DragGhost } from "./components/DragGhost";
 import { StatusBar } from "./components/StatusBar";
 import { Toasts } from "./components/Toast";
 import { DiffModal } from "./components/DiffModal";
+import { ToolResultDrawer } from "./components/ToolResultDrawer";
 import { Splash } from "./components/Splash";
 import { RecentFilesOverlay } from "./components/RecentFilesOverlay";
 import { getRecentFiles } from "./recentFiles";
@@ -684,6 +685,7 @@ function MainApp() {
       <DragGhost />
       <Toasts />
       <DiffModal />
+      <ToolResultDrawer />
       <Dialog />
       <SettingsModal />
       <WelcomeModal />

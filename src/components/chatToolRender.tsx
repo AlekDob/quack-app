@@ -20,6 +20,9 @@ import { balanceFences, splitThinking } from "../chatTextUtils";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { Icon, type IconName } from "./Icon";
 import { duckAvatarFor } from "../subagents";
+import { requestToolDrawer } from "../toolDrawer";
+import { requestDiff } from "../editorState";
+import { langOf } from "../langDetect";
 
 // Agent mode turns this on to render the chat denser: grouped tool bursts
 // collapse to an icon row by default, expandable on click. The normal
@@ -223,17 +226,6 @@ export function shortDetail(detail: string): string {
   return "…/" + parts.slice(-2).join("/");
 }
 
-// Rotating chevron used by every expandable tool head (generic row, read
-// group, edit diff). One component → one rotation behaviour everywhere,
-// instead of three ▾/▸ text glyphs that don't animate.
-function Caret({ open }: { open: boolean }) {
-  return (
-    <span className={`ai-caret${open ? " open" : ""}`} aria-hidden="true">
-      <Icon name="chevron-right" size={12} />
-    </span>
-  );
-}
-
 const READ_NAMES = new Set(["Read", "read_file", "read", "NotebookRead"]);
 const MARKDOWN_EXT = /\.(md|mdx|markdown)$/i;
 
@@ -251,6 +243,89 @@ function stripReadGutter(text: string): string {
 function isMarkdownRead(call: ToolCall): boolean {
   if (!READ_NAMES.has(call.function.name)) return false;
   return MARKDOWN_EXT.test(pathOf(call));
+}
+
+// Tools that point at a single openable file (vs. Grep/Glob which point at a
+// pattern). Clicking such a row opens that file in a new editor tab.
+const FILE_REF_NAMES = new Set([
+  "Read",
+  "NotebookRead",
+  "read_file",
+  "read",
+  "Edit",
+  "MultiEdit",
+  "edit_file",
+  "edit",
+  "Write",
+  "write_file",
+  "create_file",
+  "NotebookEdit",
+]);
+
+/** Openable file path of a file-targeted tool, or "" if it has none. */
+function fileRefOf(call: ToolCall): string {
+  if (!FILE_REF_NAMES.has(call.function.name)) return "";
+  const p = pathOf(call);
+  return p && p !== "(unknown)" ? p : "";
+}
+
+// Tools that render on their own row (NOT in the wrapping pill cloud): edits
+// (own diff), Task/Agent (subagent chip), AskUserQuestion (summary). Everything
+// else (Read/Grep/Bash/Web…) flows into the compact wrap. EDIT_NAMES is defined
+// below; this runs at render time so it's initialised by then.
+function isWrapStandalone(name: string): boolean {
+  return (
+    EDIT_NAMES.has(name) ||
+    name === "Task" ||
+    name === "Agent" ||
+    name === "AskUserQuestion"
+  );
+}
+
+// Shared head for every tool row (generic + edit). A content-hugging bordered
+// pill: icon · name · detail on a primary button, status in a trailing cluster.
+// The whole pill is one click target → `onPrimary` (open the result drawer, the
+// diff modal, or the file). No inline expansion any more: detail lives in the
+// right-side drawer / DiffModal, keeping the row a compact one-liner.
+function ToolRowHead({
+  icon,
+  name,
+  detail,
+  detailTitle,
+  extra,
+  onPrimary,
+  primaryTitle,
+}: {
+  icon: IconName | null;
+  name: string;
+  detail: string;
+  detailTitle?: string;
+  extra?: ReactNode;
+  onPrimary?: () => void;
+  primaryTitle?: string;
+}) {
+  return (
+    <div className={`ai-tcall-head${onPrimary ? " is-interactive" : ""}`}>
+      <button
+        type="button"
+        className="ai-tcall-open"
+        disabled={!onPrimary}
+        onClick={onPrimary}
+        title={primaryTitle}
+      >
+        <span className="ai-tcall-ico" aria-hidden="true">
+          {icon ? <Icon name={icon} size={13} /> : <span className="ai-tcall-dot" />}
+        </span>
+        <span className="ai-tcall-name">{name}</span>
+        {detail && (
+          <span className="ai-tcall-detail" title={detailTitle ?? detail}>
+            {detail}
+          </span>
+        )}
+      </button>
+      {extra && <span className="ai-tcall-trail">{extra}</span>}
+    </div>
+  );
 }
 
 // Pick the most-informative argument to show alongside the tool name
@@ -596,50 +671,39 @@ export function InterleavedBlocks({
       else seenIds.add(b.callId);
     });
   }
-  // Merge RUNS of the same read-ish tool into one grouped card: an
-  // agentic burst of 8 Reads (or 6 TaskCreate/TaskUpdate calls) was
-  // eight full-height rows saying almost nothing each. Mutating tools
-  // (Edit/Write/Bash) stay individual — each one deserves its own row.
-  const MERGEABLE = new Set([
-    "Read",
-    "Grep",
-    "Glob",
-    "ToolSearch",
-    "TaskCreate",
-    "TaskUpdate",
-    "WebSearch",
-    "WebFetch",
-  ]);
-  const groupAt = new Map<number, number[]>();
-  const inGroup = new Set<number>();
+  // Lay consecutive read-ish tool calls out as a wrapping row of compact pills
+  // ("Read · Glob · Grep" side by side, flowing onto the next line) instead of
+  // a tall stack. Edits and Tasks break out onto their own row — they're
+  // actions that change code / spawn agents, so they stay prominent.
+  const wrapAt = new Map<number, number[]>();
+  const inWrap = new Set<number>();
   {
     let run: number[] = [];
-    let runName: string | null = null;
     const flush = () => {
-      if (run.length >= 2) {
-        groupAt.set(run[0], [...run]);
-        for (const k of run.slice(1)) inGroup.add(k);
+      if (run.length) {
+        wrapAt.set(run[0], [...run]);
+        for (const k of run.slice(1)) inWrap.add(k);
       }
       run = [];
-      runName = null;
     };
     blocks.forEach((b, i) => {
-      if (b.kind !== "tool_call" || askDupSkip.has(i) || dupCallSkip.has(i)) {
-        if (b.kind !== "text" || b.text) flush();
-        return;
-      }
-      const name = callsById.get(b.callId)?.function.name ?? "";
-      if (!MERGEABLE.has(name)) {
-        flush();
-        return;
-      }
-      if (runName === name) {
+      const name =
+        b.kind === "tool_call" ? callsById.get(b.callId)?.function.name ?? "" : "";
+      const wrappable =
+        b.kind === "tool_call" &&
+        !askDupSkip.has(i) &&
+        !dupCallSkip.has(i) &&
+        !isWrapStandalone(name);
+      if (wrappable) {
         run.push(i);
-      } else {
-        flush();
-        runName = name;
-        run = [i];
+        return;
       }
+      // Empty text and skipped dup blocks don't break a run; real text and
+      // standalone tools (edits/tasks) do.
+      if (b.kind === "text" && !b.text) return;
+      if (b.kind === "tool_call" && (askDupSkip.has(i) || dupCallSkip.has(i)))
+        return;
+      flush();
     });
     flush();
   }
@@ -655,11 +719,11 @@ export function InterleavedBlocks({
             />
           );
         }
-        if (askDupSkip.has(i) || dupCallSkip.has(i) || inGroup.has(i))
+        if (askDupSkip.has(i) || dupCallSkip.has(i) || inWrap.has(i))
           return null;
-        const group = groupAt.get(i);
-        if (group) {
-          const calls = group
+        const wrap = wrapAt.get(i);
+        if (wrap) {
+          const items = wrap
             .map((k) => {
               const blk = blocks[k];
               return blk.kind === "tool_call"
@@ -669,8 +733,18 @@ export function InterleavedBlocks({
             .filter(
               (c): c is { id: string; call: ToolCall } => !!c && !!c.call,
             );
-          if (calls.length === 0) return null;
-          return <ToolGroupCard key={`g${i}`} calls={calls} resultsById={resultsById} />;
+          if (items.length === 0) return null;
+          return (
+            <div key={`w${i}`} className="ai-tcall-wrap">
+              {items.map((it) => (
+                <ToolCallRow
+                  key={it.id}
+                  call={it.call}
+                  result={resultsById.get(it.id)}
+                />
+              ))}
+            </div>
+          );
         }
         const call = callsById.get(b.callId);
         if (!call) return null;
@@ -918,50 +992,6 @@ function CompactBlocks({
   });
   flush();
   return <>{out}</>;
-}
-
-// A merged burst of read-ish tools (Read × 8, Grep × 3…). In compact
-// (agent) mode it starts collapsed to just a Replit-style icon row; click
-// the head to expand the individual rows. Normal mode renders expanded as
-// before, now also collapsible.
-function ToolGroupCard({
-  calls,
-  resultsById,
-}: {
-  calls: { id: string; call: ToolCall }[];
-  resultsById: Map<string, string>;
-}) {
-  const compact = useContext(CompactChat);
-  const [open, setOpen] = useState(!compact);
-  const name = calls[0].call.function.name;
-  return (
-    <div className="ai-tcalls ai-tcalls-inline ai-tcall-group">
-      <button
-        className="ai-tcall-group-head"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-      >
-        <Caret open={open} />
-        <span className="ai-tcall-group-label">
-          {friendlyToolName(name)} × {calls.length}
-        </span>
-        {!open && (
-          <span className="ai-tcall-chips" aria-hidden="true">
-            {calls.slice(0, 12).map(({ id }, idx) => (
-              <Icon key={id + idx} name={toolIconName(name)} size={12} />
-            ))}
-            {calls.length > 12 && (
-              <span className="ai-tcall-chip-more">+{calls.length - 12}</span>
-            )}
-          </span>
-        )}
-      </button>
-      {open &&
-        calls.map(({ id, call }) => (
-          <ToolCallRow key={id} call={call} result={resultsById.get(id)} />
-        ))}
-    </div>
-  );
 }
 
 // ── Action strip (compact / agent chat) ────────────────────────────
@@ -1381,10 +1411,9 @@ export function ToolCallRow({
   result: string | undefined;
 }) {
   // Hook before the edit-card early return — a row whose args stream in
-  // can flip between the generic and diff renders across re-renders,
-  // and a conditional hook would then violate React's hook ordering.
-  const [expanded, setExpanded] = useState(false);
+  // can flip between the generic and diff renders across re-renders.
   const openSubagent = useContext(SubagentOpen);
+  const openFile = useContext(AgentFileOpen);
   // A subagent run. Newer Claude Code names this tool "Agent"; older
   // versions / other providers use "Task". Render it as a duck-avatar chip
   // that opens the subagent's read-only transcript on click (the transcript
@@ -1464,58 +1493,49 @@ export function ToolCallRow({
   const icon = toolIconFor(call.function.name);
   const hasResult = typeof result === "string";
   // Tools like ToolSearch / TaskUpdate legitimately return no text —
-  // their effect is the side channel, not the output. Rendering the
-  // empty string as an expandable "(empty)" row read like a failure;
-  // a quiet check says "done" instead.
+  // their effect is the side channel, not the output. A quiet check says
+  // "done" instead of an empty "(empty)" row that read like a failure.
   const resultIsEmpty = hasResult && result!.trim().length === 0;
-  const canExpand = hasResult && !resultIsEmpty;
-  // The head is the toggle when there's a result to reveal; otherwise it's
-  // a plain (running / empty-done) row. Same markup either way so the row
-  // doesn't reflow when the result lands mid-stream.
-  const Head = canExpand ? "button" : "div";
+  const canShow = hasResult && !resultIsEmpty;
+  const fileRef = fileRefOf(call);
+  const markdown = isMarkdownRead(call);
+  const onOpenFile = openFile && fileRef ? () => openFile(fileRef) : undefined;
+  // Clicking the pill opens the right-side result drawer (read/bash/search
+  // output). With no output but a file path it just opens the file in a tab.
+  const onPrimary = canShow
+    ? () =>
+        requestToolDrawer({
+          title: label,
+          subtitle: detail || undefined,
+          result: markdown ? stripReadGutter(result!) : result!,
+          markdown,
+          onOpenFile,
+        })
+    : onOpenFile;
+  const primaryTitle = canShow
+    ? "Show output"
+    : fileRef
+      ? `Open ${fileRef} in a new tab`
+      : undefined;
   return (
     <div className="ai-tcall">
-      <Head
-        className={`ai-tcall-head${canExpand ? " is-toggle" : ""}${expanded ? " expanded" : ""}`}
-        {...(canExpand
-          ? {
-              type: "button" as const,
-              onClick: () => setExpanded((v) => !v),
-              "aria-expanded": expanded,
-              title: expanded ? "Hide result" : "Show result",
-            }
-          : {})}
-      >
-        <span className="ai-tcall-ico" aria-hidden="true">
-          {icon ? <Icon name={icon} size={13} /> : <span className="ai-tcall-dot" />}
-        </span>
-        <span className="ai-tcall-name">{label}</span>
-        {detail && (
-          <span className="ai-tcall-detail" title={detail}>
-            {shortDetail(detail)}
-          </span>
-        )}
-        <span className="ai-tcall-trail">
-          {!hasResult && <span className="ai-spinner ai-spinner-sm" />}
-          {resultIsEmpty && (
+      <ToolRowHead
+        icon={icon}
+        name={label}
+        detail={shortDetail(detail)}
+        detailTitle={detail}
+        onPrimary={onPrimary}
+        primaryTitle={primaryTitle}
+        extra={
+          !hasResult ? (
+            <span className="ai-spinner ai-spinner-sm" />
+          ) : resultIsEmpty ? (
             <span className="ai-tcall-done" title="Done">
               <Icon name="check" size={12} />
             </span>
-          )}
-          {canExpand && <Caret open={expanded} />}
-        </span>
-      </Head>
-      {canExpand && expanded && (
-        <div className="ai-tcall-reveal">
-          {isMarkdownRead(call) ? (
-            <div className="ai-tcall-result-md">
-              <MarkdownPreview content={stripReadGutter(result!)} />
-            </div>
-          ) : (
-            <pre className="ai-tcall-result-body">{result}</pre>
-          )}
-        </div>
-      )}
+          ) : undefined
+        }
+      />
     </div>
   );
 }
@@ -1527,83 +1547,52 @@ interface EditDiffCardProps {
 }
 
 function EditDiffCard({ call, diffs, result }: EditDiffCardProps) {
-  const [expanded, setExpanded] = useState(false);
   const args = call.function.arguments as Record<string, unknown>;
   const path =
     (typeof args.file_path === "string" && args.file_path) ||
     (typeof args.path === "string" && args.path) ||
     "(unknown file)";
-  const label = friendlyToolName(call.function.name);
+  // Past-tense verb + basename, Cursor-style ("Edited test.md") — full path in
+  // the tooltip. Clicking opens the real before/after in the centered DiffModal
+  // (Monaco), the same surface the source-control panel uses.
+  const verb = toolVerb(call.function.name);
+  const label = verb.charAt(0).toUpperCase() + verb.slice(1);
+  const base = path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+  const icon = toolIconFor(call.function.name);
   const { added, removed } = diffStats(diffs);
   const isError =
     typeof result === "string" && /^Error|error:/i.test(result.trim());
+  // Join the edit fragments into one original/modified pair for the diff view.
+  // Write/create → empty original → renders as all-added.
+  const original = diffs.map((d) => d.oldText).filter(Boolean).join("\n\n");
+  const modified = diffs.map((d) => d.newText).filter(Boolean).join("\n\n");
+  const openDiff = () =>
+    requestDiff({
+      path: base,
+      refspec: "before → after",
+      originalContent: original,
+      modifiedContent: modified,
+      language: langOf(path),
+    });
   return (
     <div className={`ai-tcall ai-tcall-edit ${isError ? "errored" : ""}`}>
-      <button
-        type="button"
-        className="ai-tcall-head ai-tcall-edit-head"
-        onClick={() => setExpanded((v) => !v)}
-        title={expanded ? "Hide diff" : "Show diff"}
-      >
-        <span className="ai-tcall-dot" />
-        <span className="ai-tcall-name">{label}</span>
-        <span className="ai-tcall-detail">{path}</span>
-        <span className="ai-tcall-edit-stats">
-          {removed > 0 && (
-            <span className="ai-tcall-edit-rm">−{removed}</span>
-          )}
-          {added > 0 && <span className="ai-tcall-edit-add">+{added}</span>}
-        </span>
-        <Caret open={expanded} />
-      </button>
-      {expanded && (
-        <div className="ai-tcall-edit-body">
-          {diffs.map((d, i) => (
-            <UnifiedDiff key={i} oldText={d.oldText} newText={d.newText} />
-          ))}
-          {result && (
-            <div
-              className={`ai-tcall-edit-result ${isError ? "errored" : "applied"}`}
-            >
-              <Icon name={isError ? "x" : "check"} size={11} />{" "}
-              {result.split("\n")[0]}
-            </div>
-          )}
-        </div>
-      )}
+      <ToolRowHead
+        icon={icon}
+        name={label}
+        detail={base}
+        detailTitle={path}
+        onPrimary={openDiff}
+        primaryTitle={`Open the diff for ${base}`}
+        extra={
+          <>
+            {removed > 0 && (
+              <span className="ai-tcall-edit-rm">−{removed}</span>
+            )}
+            {added > 0 && <span className="ai-tcall-edit-add">+{added}</span>}
+          </>
+        }
+      />
     </div>
   );
 }
 
-/**
- * Render two strings as a unified-diff-style block. We don't compute a
- * proper LCS — the input is already structured as "exactly this old →
- * exactly this new", so we just show old as removed lines and new as
- * added lines. Fast, deterministic, no diff algorithm dependency.
- */
-export function UnifiedDiff({
-  oldText,
-  newText,
-}: {
-  oldText: string;
-  newText: string;
-}) {
-  const oldLines = oldText ? oldText.split("\n") : [];
-  const newLines = newText ? newText.split("\n") : [];
-  return (
-    <div className="ai-diff">
-      {oldLines.map((line, i) => (
-        <div key={`o-${i}`} className="ai-diff-line ai-diff-rm">
-          <span className="ai-diff-mark">−</span>
-          <span className="ai-diff-text">{line || " "}</span>
-        </div>
-      ))}
-      {newLines.map((line, i) => (
-        <div key={`n-${i}`} className="ai-diff-line ai-diff-add">
-          <span className="ai-diff-mark">+</span>
-          <span className="ai-diff-text">{line || " "}</span>
-        </div>
-      ))}
-    </div>
-  );
-}

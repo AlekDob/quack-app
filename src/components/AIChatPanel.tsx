@@ -48,6 +48,7 @@ import {
 import { executeTool, TOOLS } from "../aiTools";
 import { SLASH_COMMANDS, type SlashCommand } from "../slashCommands";
 import {
+  AgentFileOpen,
   AskQuestionCard,
   CompactChat,
   extractEditDiffs,
@@ -254,6 +255,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // collapse to an icon row, tighter spacing). Default false → the docked
   // chat is unchanged.
   const compact = useContext(CompactChat);
+  // Parent-provided file opener (agent-mode popup); forwarded in compact mode
+  // so the docked-chat opener below doesn't clobber it. See fileOpenHandler.
+  const parentFileOpen = useContext(AgentFileOpen);
   // Start in "ready" rather than "checking" so the panel renders the
   // normal UI immediately on open. "Checking for Ollama…" used to flash
   // up before model discovery finished, which was confusing for users
@@ -1261,7 +1265,10 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // Per-chat Claude Code session knobs, set via /effort and /mode.
   // Applied to every subsequent spawn; null = CLI default.
   const [ccEffort, setCcEffort] = useState<string | null>(null);
-  const [ccPermMode, setCcPermMode] = useState<string | null>(null);
+  // Claude Code CLI defaults to "auto" (its own auto mode) so Alek isn't
+  // prompted to confirm every edit/command out of the box. /mode off resets
+  // back to this, not to "ask". Only used when provider === "claude-code".
+  const [ccPermMode, setCcPermMode] = useState<string | null>("auto");
   // Extended thinking: null = CLI default, true = forced on, false = off.
   const [ccThinking, setCcThinking] = useState<boolean | null>(null);
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
@@ -1309,10 +1316,10 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     }
     if (fw === "/mode") {
       const opts: Array<[string, string | null, string]> = [
-        ["ask", null, "Confirm each edit / command (default)"],
+        ["ask", null, "Confirm each edit / command"],
         ["plan", "plan", "Plan only — no edits"],
         ["auto-edit", "acceptEdits", "Auto-accept file edits"],
-        ["auto", "auto", "Claude Code's auto mode"],
+        ["auto", "auto", "Claude Code's auto mode (default)"],
       ];
       return opts
         .filter(([o]) => o.startsWith(partial))
@@ -2854,8 +2861,8 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         return;
       }
       if (arg === "off") {
-        setCcPermMode(null);
-        toastInfo("Permission mode reset to ask (default)");
+        setCcPermMode("auto");
+        toastInfo("Permission mode reset to auto (default)");
         return;
       }
       const mode = map[arg];
@@ -3358,8 +3365,17 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     useStore.getState().openSubagent(wsId, claudeSessionId, toolUseId, agentType);
   };
 
+  // Clicking a file-targeted tool row opens that file in a new editor tab.
+  // In compact (agent) mode AgentModeShell already provides a handler (the
+  // file popup) — forward it so we don't clobber it; in docked chat we open
+  // a real tab via the store.
+  const fileOpenHandler = compact
+    ? parentFileOpen
+    : (path: string) => void useStore.getState().openFile(wsId, path);
+
   return (
     <SubagentOpen.Provider value={openSubagentTab}>
+    <AgentFileOpen.Provider value={fileOpenHandler}>
     <div className="ai-panel">
       {renderHeader()}
       {renderHistoryDropdown()}
@@ -4993,6 +5009,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         }}
       />
     </div>
+    </AgentFileOpen.Provider>
     </SubagentOpen.Provider>
   );
 }
