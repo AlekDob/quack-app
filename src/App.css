@@ -682,6 +682,9 @@ input {
   font-size: 12px;
   font-weight: 600;
   user-select: none;
+  /* WebKit (Tauri) needs the prefixed form or the 2-letter label still
+     highlights on a press-drag. */
+  -webkit-user-select: none;
   /* Reorder is pointer-based (see useWorkspaceReorder); suppress the OS text
      drag so a press-drag doesn't try to drag the label glyphs. */
   touch-action: none;
@@ -719,13 +722,32 @@ input {
   box-shadow: -2px 0 0 var(--ws-color);
 }
 
-/* Drag-to-reorder feedback. The dragged icon fades; the slot it would drop
-   into shows a neutral insertion line at its top edge. */
+/* Drag-to-reorder feedback. The dragged icon dims + shrinks; the target slot
+   shows a clear accent insertion bar (with glow) in the gap above it. */
 .ws-icon.dragging {
-  opacity: 0.4;
+  opacity: 0.35;
+  transform: scale(0.92);
+  cursor: grabbing;
 }
-.ws-icon.drag-over {
-  box-shadow: 0 -2px 0 var(--accent);
+.ws-icon.drag-over::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -5px; /* sits in the 6px gap between icons */
+  height: 3px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+
+/* While a drag is active, kill text selection app-wide so the pointer-drag
+   doesn't highlight the file tree or the icon labels. */
+body.ws-dragging,
+body.ws-dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  cursor: grabbing !important;
 }
 
 /* Workspace color popover (right-click) */

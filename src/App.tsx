@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useStore } from "./store";
@@ -143,6 +143,21 @@ function MainApp() {
   const openIds = useStore((s) => s.openIds);
   const activeId = useStore((s) => s.activeId);
   const loaded = useStore((s) => s.loaded);
+  // WorkspaceShells are a stacked overlay (only the active one is shown via
+  // `display`), so their DOM order is irrelevant to what's visible. But Monaco
+  // editors crash ("InstantiationService has been disposed") if React MOVES
+  // their DOM node — which is exactly what reordering `openIds` (drag-to-
+  // reorder) would do. So mount the shells in a STABLE order: append newly
+  // opened ids, drop closed ones, never reorder. Only the ActivityBar icons
+  // reflect the user's chosen order.
+  const shellOrderRef = useRef<string[]>([]);
+  const shellOrder = useMemo(() => {
+    const kept = shellOrderRef.current.filter((id) => openIds.includes(id));
+    const added = openIds.filter((id) => !kept.includes(id));
+    const next = [...kept, ...added];
+    shellOrderRef.current = next;
+    return next;
+  }, [openIds]);
   const zen = useZenMode();
   const agentMode = useAgentMode();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -393,8 +408,11 @@ function MainApp() {
   // map — otherwise every buffer edit / layout tweak re-invokes the watch
   // command for every open ws. The Rust side deduplicates so it's
   // idempotent, but cheap is better than free IPC roundtrips.
+  // Sorted so drag-to-reorder (which permutes openIds) doesn't change the key
+  // and needlessly re-run the watch effect — only the SET of ids+roots matters.
   const watchKey = openIds
     .map((id) => `${id}:${loaded[id]?.meta.root ?? ""}`)
+    .sort()
     .join("|");
   useEffect(() => {
     for (const id of openIds) {
@@ -707,7 +725,7 @@ function MainApp() {
             // survives clicking between workspaces in the sessions list.
             <AgentModeShell wsId={activeId} />
           ) : (
-            openIds.map((id) => (
+            shellOrder.map((id) => (
               <WorkspaceShell
                 key={id}
                 wsId={id}

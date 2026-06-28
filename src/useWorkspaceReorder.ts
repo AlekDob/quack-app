@@ -43,6 +43,7 @@ export function useWorkspaceReorder() {
     const p = press.current;
     if (!p) return;
     if (!p.active && Math.abs(e.clientY - p.startY) < THRESHOLD) return;
+    if (!p.active) document.body.classList.add("ws-dragging"); // first activation
     p.active = true;
     const over = indexAtPoint(e.clientX, e.clientY);
     setDrag({ from: p.from, over: over ?? p.from });

@@ -122,10 +122,22 @@ export function DockWindow() {
   }, []);
 
   // Resize the OS window to fit the orientation + project count exactly.
+  // If the resize is rejected (e.g. the set-size capability isn't active
+  // until tauri restarts), fall back to horizontal so the dock never ends
+  // up as a broken/invisible vertical pill in a wide-short window.
   useEffect(() => {
+    let cancelled = false;
     void getCurrentWindow()
       .setSize(windowSizeFor(orient, projects.length))
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled && orient !== "h") {
+          saveDockOrient("h");
+          setOrient("h");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [orient, projects.length]);
 
   return (
