@@ -10741,13 +10741,42 @@ input {
 .dock-projects {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex: 1 1 auto;
-  overflow-x: auto;
-  scrollbar-width: none;
+  justify-content: center;
+  /* visible (NOT auto): the hover scale + attention ring/badge extend past
+     each circle and must not be clipped. The OS window is sized to the
+     project count, so there's nothing to scroll. */
+  overflow: visible;
+  animation: dock-reflow 220ms var(--ease-default, ease);
 }
-.dock-projects::-webkit-scrollbar {
-  display: none;
+@keyframes dock-reflow {
+  from {
+    opacity: 0.2;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Vertical dock (dragged to a screen side): stack everything in a column. */
+.dock-shell.dock-vertical {
+  flex-direction: column;
+  inset: 20px 18px;
+  padding: 8px 0 14px;
+  gap: 10px;
+}
+.dock-shell.dock-vertical .dock-grip {
+  width: 24px;
+  height: 8px;
+}
+.dock-shell.dock-vertical .dock-sep {
+  width: 30px;
+  height: 1px;
+}
+.dock-shell.dock-vertical .dock-projects {
+  flex-direction: column;
 }
 .dock-circle {
   position: relative;

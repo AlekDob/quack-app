@@ -7,13 +7,42 @@
 import { useEffect, useState } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { LogicalSize } from "@tauri-apps/api/dpi";
 import {
   DOCK_FOCUS_EVENT,
   DOCK_REQUEST_EVENT,
   DOCK_SUMMARY_EVENT,
   type DockProject,
 } from "../dockSummary";
-import { saveDockPos } from "../dock";
+import {
+  saveDockPos,
+  saveDockOrient,
+  getDockOrient,
+  type DockOrient,
+} from "../dock";
+
+// Pill geometry — must match .dock-* CSS. Used to size the OS window so it
+// fits the project count exactly (no clipping, no dead space).
+const SHORT_SIDE = 104; // fixed cross-axis (height when horizontal)
+const HEAD = 95; // grip + Jack avatar + separator + paddings
+const CELL = 46; // circle (36) + gap (10)
+
+function windowSizeFor(orient: DockOrient, n: number): LogicalSize {
+  const long = HEAD + Math.max(n, 1) * CELL + 24;
+  return orient === "h"
+    ? new LogicalSize(long, SHORT_SIDE)
+    : new LogicalSize(SHORT_SIDE, long);
+}
+
+// Which screen edge is the window near? Left/right third → vertical dock,
+// otherwise horizontal. Uses plain web APIs (CSS px) — no Tauri monitor
+// permission needed; good enough for the common single-monitor case.
+function detectOrient(): DockOrient {
+  const avail = window.screen.availWidth || window.innerWidth;
+  const centerX = window.screenX + window.outerWidth / 2;
+  const r = centerX / avail;
+  return r < 0.2 || r > 0.8 ? "v" : "h";
+}
 
 function initials(name: string): string {
   const parts = name.trim().split(/[\s_\-./]+/).filter(Boolean);
@@ -57,6 +86,7 @@ function useThemeSync() {
 
 export function DockWindow() {
   const [projects, setProjects] = useState<DockProject[]>([]);
+  const [orient, setOrient] = useState<DockOrient>(getDockOrient);
   useThemeSync();
 
   // Transparent window chrome + initial theme from the URL (the main window
@@ -77,16 +107,32 @@ export function DockWindow() {
     return () => void off.then((f) => f());
   }, []);
 
-  // Persist position as the user drags the window around.
+  // Persist position on drag, and flip to vertical when dragged to a screen
+  // edge (left/right third) — back to horizontal in the middle.
   useEffect(() => {
-    const off = getCurrentWindow().onMoved(({ payload }) =>
-      saveDockPos(payload.x, payload.y),
-    );
+    const off = getCurrentWindow().onMoved(({ payload }) => {
+      saveDockPos(payload.x, payload.y);
+      const next = detectOrient();
+      setOrient((cur) => {
+        if (cur !== next) saveDockOrient(next);
+        return next;
+      });
+    });
     return () => void off.then((f) => f());
   }, []);
 
+  // Resize the OS window to fit the orientation + project count exactly.
+  useEffect(() => {
+    void getCurrentWindow()
+      .setSize(windowSizeFor(orient, projects.length))
+      .catch(() => {});
+  }, [orient, projects.length]);
+
   return (
-    <div className="dock-shell" data-tauri-drag-region>
+    <div
+      className={`dock-shell ${orient === "v" ? "dock-vertical" : ""}`}
+      data-tauri-drag-region
+    >
       <span
         className="dock-grip"
         data-tauri-drag-region
@@ -97,7 +143,8 @@ export function DockWindow() {
         <img src="/jack.jpeg" alt="" className="dock-mark-img" />
       </div>
       <div className="dock-sep" data-tauri-drag-region />
-      <div className="dock-projects">
+      {/* keyed by orientation so the reflow replays its entry animation */}
+      <div className="dock-projects" key={orient}>
         {projects.map((p) => (
           <DockCircle key={p.wsId} project={p} />
         ))}

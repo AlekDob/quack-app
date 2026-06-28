@@ -40,6 +40,10 @@ Counter semantics: "ready"/"needs-input" here mean **actionable** — a live sta
 | Transparent window enablement | `src-tauri/tauri.conf.json` `app.macOSPrivateApi: true` + Cargo feature `macos-private-api` |
 | Dock styles | `src/App.css` (`.dock-*`) |
 
+### Orientation (dock to a side)
+
+Drag the dock to the left/right third of the screen → it flips to a **vertical** column (circles stacked); back to the middle → horizontal. `detectOrient()` uses plain web APIs (`window.screenX` / `outerWidth` / `screen.availWidth`), persisted in `lcp.dock.orient`. On orientation or project-count change the window is resized to fit exactly via `setSize(windowSizeFor(...))` (so no clipping, no dead space), and the projects strip replays a short `dock-reflow` entry animation (keyed by orientation). `.dock-projects` uses `overflow: visible` (NOT scroll) so the hover scale + attention ring/badge are never clipped — the window is sized to the count instead.
+
 ### Window config
 
 `new WebviewWindow("dock", { width:400, height:72, decorations:false, transparent:true, alwaysOnTop:true, visibleOnAllWorkspaces:true, skipTaskbar:true, resizable:false, focus:false })`. Position persisted to localStorage (`lcp.dock.pos`) on move; enabled pref `lcp.dock.enabled` (default on). Auto-opens on boot.

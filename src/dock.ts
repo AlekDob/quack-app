@@ -13,6 +13,17 @@ import {
 const LABEL = "dock";
 const KEY_ENABLED = "lcp.dock.enabled";
 const KEY_POS = "lcp.dock.pos";
+const KEY_ORIENT = "lcp.dock.orient";
+
+export type DockOrient = "h" | "v";
+
+export function getDockOrient(): DockOrient {
+  return lsGetString(KEY_ORIENT) === "v" ? "v" : "h";
+}
+
+export function saveDockOrient(o: DockOrient): void {
+  lsSetString(KEY_ORIENT, o);
+}
 
 // Default ON — the Dock is the headline "read the room" surface. Persisted
 // so a deliberate close survives reloads.
