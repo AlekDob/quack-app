@@ -339,12 +339,8 @@ function MainApp() {
   // jump to that project's most urgent chat).
   useEffect(() => {
     if (!hydrated) return;
-    console.log("[dock] auto-open effect — enabled:", isDockEnabled());
     if (isDockEnabled()) void openDock();
     const offs: Array<() => void> = [];
-    void listen("dock:alive", () =>
-      console.log("[dock] alive ping from dock window"),
-    ).then((u) => offs.push(u));
     void listen(DOCK_REQUEST_EVENT, () => emitDockSummary()).then((u) =>
       offs.push(u),
     );

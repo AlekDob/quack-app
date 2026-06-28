@@ -24,11 +24,12 @@ import {
 // Pill geometry — must match .dock-* CSS. Used to size the OS window so it
 // fits the project count exactly (no clipping, no dead space).
 const SHORT_SIDE = 104; // fixed cross-axis (height when horizontal)
-const HEAD = 95; // grip + Jack avatar + separator + paddings
+const HEAD = 110; // grip + Jack avatar + separator + paddings + insets
 const CELL = 46; // circle (36) + gap (10)
 
 function windowSizeFor(orient: DockOrient, n: number): LogicalSize {
-  const long = HEAD + Math.max(n, 1) * CELL + 24;
+  // +40 keeps the last circle (and its hover ring) clear of the edge.
+  const long = HEAD + Math.max(n, 1) * CELL + 40;
   return orient === "h"
     ? new LogicalSize(long, SHORT_SIDE)
     : new LogicalSize(SHORT_SIDE, long);
@@ -99,12 +100,9 @@ export function DockWindow() {
   }, []);
 
   useEffect(() => {
-    console.log("[dock] DockWindow mounted, orient:", getDockOrient());
-    void emit("dock:alive");
-    const off = listen<DockProject[]>(DOCK_SUMMARY_EVENT, (e) => {
-      console.log("[dock] summary received:", e.payload.length, "projects");
-      setProjects(e.payload);
-    });
+    const off = listen<DockProject[]>(DOCK_SUMMARY_EVENT, (e) =>
+      setProjects(e.payload),
+    );
     // Ask the main window to push the current state right away.
     void emit(DOCK_REQUEST_EVENT);
     return () => void off.then((f) => f());

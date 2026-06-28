@@ -8,7 +8,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { useStore } from "./store";
-import { getAgentStatus, isSeen } from "./agentStatusStore";
+import {
+  getAgentStatus,
+  isSeen,
+  resolveDisplayStatus,
+} from "./agentStatusStore";
 import { getWorkspaceColor } from "./workspaceColors";
 
 /** One project (open workspace) as the Dock shows it: a colored circle with
@@ -29,10 +33,11 @@ export const DOCK_FOCUS_EVENT = "dock:focus-project";
 export const DOCK_REQUEST_EVENT = "dock:request";
 
 /**
- * Per-project attention counts. "ready"/"needs-input" here mean ACTIONABLE
- * (a live record that's still unseen) — NOT the hub's resting "ready"
- * baseline, so the Dock counter reflects "things waiting for you", not
- * every chat. Archived chats are excluded.
+ * Per-project counts, using the SAME display status the Agent Hub shows
+ * (so a chat that reads "Ready" in the hub is counted here too — earlier
+ * the dock only counted live records and missed resting-ready chats).
+ * "ready" is the resting state (waiting for the user); "needs-input" is a
+ * pending permission/question. Archived/done/working chats aren't counted.
  */
 export function computeDockProjects(): DockProject[] {
   const { loaded } = useStore.getState();
@@ -41,11 +46,17 @@ export function computeDockProjects(): DockProject[] {
     let ready = 0;
     let needsInput = 0;
     for (const chat of Object.values(ws.aiChats)) {
-      if (chat.archivedAt) continue;
-      const live = getAgentStatus(chat.id);
-      if (!live || isSeen(chat.id)) continue;
-      if (live.derived === "needs-input") needsInput++;
-      else if (live.derived === "ready") ready++;
+      const status = resolveDisplayStatus({
+        lifecycle: chat.archivedAt
+          ? "archived"
+          : chat.doneAt
+            ? "done"
+            : "active",
+        live: getAgentStatus(chat.id),
+        seen: isSeen(chat.id),
+      });
+      if (status === "needs-input") needsInput++;
+      else if (status === "ready") ready++;
     }
     out.push({
       wsId,

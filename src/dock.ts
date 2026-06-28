@@ -69,33 +69,27 @@ function onScreenPos(): { x: number; y: number } | null {
 export async function openDock(): Promise<void> {
   setDockEnabled(true);
   const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
-  const all = await WebviewWindow.getAll();
-  console.log(
-    "[dock] openDock — existing windows:",
-    all.map((w) => w.label),
-  );
   const existing = await WebviewWindow.getByLabel(LABEL);
   if (existing) {
     // Recover a possibly-broken (invisible / off-screen / wrong-sized)
     // window in place — no flicker. Reset to a known-good horizontal size +
     // an on-screen position, then show. set-size/position may reject if the
     // capability isn't live yet; show/focus still run.
-    console.log("[dock] existing found — recovering in place");
     saveDockOrient("h");
     const { LogicalSize, LogicalPosition } = await import("@tauri-apps/api/dpi");
-    const pos = onScreenPos() ?? { x: 120, y: 80 };
+    const recoverPos = onScreenPos() ?? { x: 120, y: 80 };
     try {
       await existing.setSize(new LogicalSize(440, 104));
-      await existing.setPosition(new LogicalPosition(pos.x, pos.y));
-    } catch (e) {
-      console.warn("[dock] recover resize/move failed", e);
+      await existing.setPosition(new LogicalPosition(recoverPos.x, recoverPos.y));
+    } catch {
+      /* capability not live yet — show/focus below still helps */
     }
     try {
       await existing.unminimize();
       await existing.show();
       await existing.setFocus();
-    } catch (e) {
-      console.warn("[dock] recover show failed", e);
+    } catch {
+      /* ignore */
     }
     return;
   }
@@ -103,7 +97,6 @@ export async function openDock(): Promise<void> {
   const theme =
     document.documentElement.dataset.theme === "light" ? "light" : "dark";
   const pos = onScreenPos();
-  console.log("[dock] creating window", { theme, pos });
 
   const w = new WebviewWindow(LABEL, {
     url: `index.html?dock=1&theme=${theme}`,
@@ -120,9 +113,7 @@ export async function openDock(): Promise<void> {
     focus: false,
     ...(pos ? { x: pos.x, y: pos.y } : {}),
   });
-  void w.once("tauri://created", () => console.log("[dock] window created OK"));
   void w.once("tauri://error", (e) => {
-    console.error("[dock] window creation FAILED", e.payload);
     toastError(`Dock failed: ${String(e.payload)}`);
   });
 }
