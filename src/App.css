@@ -354,6 +354,14 @@ input {
   -webkit-backdrop-filter: blur(20px);
   animation: splash-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
+/* Quack app icon on the splash (replaces the old monogram square). */
+.splash-icon {
+  width: 128px;
+  height: 128px;
+  object-fit: contain;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
 .splash-mark {
   width: 96px;
   height: 96px;
