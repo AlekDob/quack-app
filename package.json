@@ -1,6 +1,6 @@
 {
   "name": "codetta",
-  "version": "0.5.1",
+  "version": "1.0.0",
   "description": "A lightweight desktop code editor with first-class AI. Bring your own model — Anthropic, OpenAI, Ollama, or Claude Code.",
   "private": false,
   "type": "module",
