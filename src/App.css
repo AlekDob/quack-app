@@ -1,70 +1,93 @@
+/* ── Quack Design System tokens ──────────────────────────────────────
+   Brand: premium-minimal, dark-first, monochrome neutrals + ONE accent
+   (orange #f28c52). Source of truth: the `brand-guidelines` skill.
+   Everything visual flows from these vars — rebranding = changing values
+   here, not the architecture. Light mode is a full sibling theme below. */
 :root,
 :root[data-theme="dark"] {
-  --bg: #1e1e1e;
-  --bg-alt: #252526;
-  --bg-elev: #2d2d30;
-  --bg-hi: #3a3d41;
-  --fg: #d4d4d4;
-  --fg-dim: #9a9a9a;
-  --fg-muted: #6a6a6a;
-  --border: #3c3c3c;
-  --accent: #007acc;
-  --accent-hover: #1f8ed8;
-  --danger: #c75252;
-  --term-bg: #1e1e1e;
-  --term-fg: #d4d4d4;
-  /* Semantic tokens. Status colors exist so toasts, diff markers,
-     permission cards, MCP badges and the toast-history modal agree on
-     one green/red/amber per theme instead of per-surface pastels —
-     several of which were dark-only and vanished on a light background.
-     --accent-fg is the text color readable ON the accent (buttons like
-     the permission "Allow" used near-black text that disappeared on the
-     dark-mode accent). */
-  --mono: "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
-  --border-strong: #5a5a5a;
-  --accent-fg: #fff;
-  --accent-soft: rgba(0, 122, 204, 0.15);
-  --bg-hover: rgba(255, 255, 255, 0.04);
+  /* Neutral surface scale (base → elevated → hover) */
+  --bg: #0f1115;
+  --bg-alt: #14161c;
+  --bg-elev: #181b22;
+  --bg-hi: #20242d;
+  --fg: #e7ebf3;
+  --fg-dim: rgba(231, 235, 243, 0.55);
+  --fg-muted: rgba(231, 235, 243, 0.35);
+  --border: rgba(255, 255, 255, 0.08);
+  /* Accent is NEUTRAL (Cursor-style "zero orange" chrome). Real color lives
+     only on per-project workspace badges (separate palette) and semantic
+     states. Kept as a token so reverting to orange is a one-liner. */
+  --accent: #9aa0ad;
+  --accent-rgb: 154, 160, 173;
+  --accent-hover: #b4b9c4;
+  --accent-fg: #16181d;
+  --accent-soft: rgba(255, 255, 255, 0.07);
+  /* Primary action = monochrome (Cursor-like): near-white fill in dark,
+     near-black in light (both via --fg). Orange stays only as a rare
+     trace (focus ring, side accent, status dot) — never a button fill. */
+  --primary-bg: var(--fg);
+  --primary-fg: var(--bg);
+  --primary-bg-hover: #ffffff;
+  --danger: #ef4444;
+  --term-bg: #0f1115;
+  --term-fg: #e7ebf3;
+  /* Mono: Quack uses JetBrains Mono; Cascadia kept as fallback so the
+     editor/terminal stay consistent where JBM isn't installed. */
+  --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  /* Semantic — for MEANING only (toasts, diff markers, agent status),
+     used sparingly. These also drive the agent-status dots. */
   --ok: #22c55e;
   --ok-bg: rgba(34, 197, 94, 0.12);
   --warn: #f59e0b;
   --warn-bg: rgba(245, 158, 11, 0.1);
   --err: #ef4444;
   --err-bg: rgba(239, 68, 68, 0.12);
-  --info: #6ea8ff;
-  --info-bg: rgba(110, 168, 255, 0.1);
+  --info: #9aa0ad;
+  --info-bg: rgba(255, 255, 255, 0.07);
+  /* Frosted surface fill for static chrome (topbar, dropdowns, modals) */
+  --glass-bg: rgba(20, 22, 28, 0.72);
 }
 
+/* Light theme — a true sibling, not an afterthought. Same orange accent;
+   neutrals invert to a clean premium off-white. Dark stays the default
+   (brand is dark-first) — this applies only on [data-theme="light"]. */
 :root[data-theme="light"] {
   --bg: #ffffff;
-  --bg-alt: #f3f3f3;
-  --bg-elev: #ececec;
-  --bg-hi: #d8d8d8;
-  --fg: #1f1f1f;
-  --fg-dim: #555;
-  --fg-muted: #888;
-  --border: #d0d0d0;
-  --accent: #0d6efd;
-  --accent-hover: #0b5ed7;
-  --danger: #c0392b;
+  --bg-alt: #f5f6f8;
+  --bg-elev: #eef0f3;
+  --bg-hi: #e3e6ea;
+  --fg: #16181d;
+  --fg-dim: rgba(22, 24, 29, 0.6);
+  --fg-muted: rgba(22, 24, 29, 0.4);
+  --border: rgba(0, 0, 0, 0.09);
+  /* Neutral accent in light theme too (zero orange chrome). */
+  --accent: #6b7280;
+  --accent-rgb: 107, 114, 128;
+  --accent-hover: #4b5563;
+  --accent-fg: #ffffff;
+  --accent-soft: rgba(0, 0, 0, 0.06);
+  --primary-bg: var(--fg);
+  --primary-fg: var(--bg);
+  --primary-bg-hover: #000000;
+  --danger: #dc2626;
   --term-bg: #fafafa;
   --term-fg: #2d2d2d;
-  /* Light counterparts of the semantic tokens. Status text colors are
-     pulled darker than the dark-theme ones — the bright dark-mode
-     greens/ambers (#22c55e, #f59e0b) fail contrast on white. */
-  --mono: "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
-  --border-strong: #a8a8a8;
-  --accent-fg: #fff;
-  --accent-soft: rgba(13, 110, 253, 0.12);
+  --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+  --border-strong: rgba(0, 0, 0, 0.16);
   --bg-hover: rgba(0, 0, 0, 0.05);
+  /* Light counterparts: status colors pulled darker — the bright dark
+     greens/ambers fail contrast on white. */
   --ok: #15803d;
   --ok-bg: rgba(34, 197, 94, 0.14);
   --warn: #b45309;
   --warn-bg: rgba(245, 158, 11, 0.16);
   --err: #dc2626;
   --err-bg: rgba(239, 68, 68, 0.1);
-  --info: #0b5ed7;
-  --info-bg: rgba(13, 110, 253, 0.1);
+  --info: #6b7280;
+  --info-bg: rgba(0, 0, 0, 0.06);
+  --glass-bg: rgba(255, 255, 255, 0.72);
 }
 
 /* Themed scrollbars across the app. Default Chromium / Windows
@@ -118,7 +141,10 @@
      above the statusbar so both stay clickable while popups are open. */
   --topbar-h: 36px;
   --statusbar-h: 24px;
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  /* Quack UI font: General Sans first, Inter as the workhorse fallback.
+     Exposed as --font so callsites (splash, badges) share one stack. */
+  --font: "General Sans", Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: var(--font);
   font-size: 13px;
   line-height: 1.4;
   color: var(--fg);
@@ -126,6 +152,83 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+
+  /* ── Modernization tokens (Quack brand) ────────────────────────────
+     Radius/shadow/blur/motion scales. IDE-density elements (tabs, tree
+     rows) keep tighter radii via --radius-xs; conversational surfaces
+     use the larger ones. Use these instead of hardcoding values. */
+  --radius-xs: 5px;   /* dense IDE chrome: tabs, tree rows, small chips */
+  --radius-sm: 8px;   /* buttons, inputs, small cards */
+  --radius-md: 14px;  /* cards, panels, dropdowns */
+  --radius-lg: 20px;  /* modals, liquid-glass surfaces */
+  --radius-full: 999px;
+  --radius-window: 12px; /* the floating app window — native-macOS-ish */
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.18);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.28);
+
+  --blur-light: 8px;
+  --blur-medium: 16px;
+  --blur-heavy: 40px;
+
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+}
+
+/* ── Liquid glass ───────────────────────────────────────────────────
+   Translucent frosted surface for STATIC chrome only (sidebar, topbar,
+   modals, dropdowns) — never on scrollable lists (blur is GPU-heavy).
+   Pairs -webkit- for Tauri's WebKit on macOS. The ::after is the signature
+   top-edge light reflection. Falls back to a solid surface where
+   backdrop-filter is unsupported. */
+.liquid-glass {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(255, 255, 255, 0.015) 100%
+  );
+  backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+:root[data-theme="light"] .liquid-glass {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.7) 0%,
+    rgba(255, 255, 255, 0.4) 100%
+  );
+}
+.liquid-glass::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.18),
+    transparent
+  );
+  pointer-events: none;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .liquid-glass {
+    background: var(--bg-alt);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-glass {
+    backdrop-filter: blur(var(--blur-medium));
+    -webkit-backdrop-filter: blur(var(--blur-medium));
+  }
 }
 
 * {
@@ -147,10 +250,11 @@ button {
   color: var(--fg);
   background: var(--bg-elev);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 4px 8px;
   cursor: pointer;
-  transition: background 0.1s, border-color 0.1s;
+  transition: background var(--duration-fast) var(--ease-default),
+    border-color var(--duration-fast) var(--ease-default);
 }
 button:hover {
   background: var(--bg-hi);
@@ -161,13 +265,13 @@ button:disabled {
   cursor: not-allowed;
 }
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  border-color: var(--primary-bg);
+  color: var(--primary-fg);
 }
 button.primary:hover:not(:disabled) {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: var(--primary-bg-hover);
+  border-color: var(--primary-bg-hover);
 }
 
 textarea,
@@ -177,8 +281,8 @@ input {
   color: var(--fg);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
 }
 
 .boot {
@@ -199,15 +303,15 @@ input {
   background:
     radial-gradient(
       ellipse at 30% 20%,
-      rgba(120, 80, 220, 0.45),
+      rgba(154, 160, 173, 0.45),
       transparent 60%
     ),
     radial-gradient(
       ellipse at 80% 80%,
-      rgba(0, 122, 204, 0.40),
+      rgba(var(--accent-rgb), 0.40),
       transparent 60%
     ),
-    linear-gradient(135deg, #0d0a1a 0%, #08111e 100%);
+    linear-gradient(135deg, #0f1115 0%, #14161c 100%);
   overflow: hidden;
 }
 /* Subtle ambient noise/grain so the gradient doesn't band on cheap displays */
@@ -247,9 +351,9 @@ input {
   border-radius: 22px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #7a4fff 0%, #2d8cff 100%);
+  background: linear-gradient(135deg, #2a2e38 0%, #3a3f4a 100%);
   box-shadow:
-    0 16px 40px rgba(80, 60, 220, 0.6),
+    0 16px 40px rgba(154, 160, 173, 0.6),
     0 0 0 1px rgba(255, 255, 255, 0.12) inset;
   position: relative;
   overflow: hidden;
@@ -271,7 +375,7 @@ input {
   font-weight: 800;
   color: #fff;
   letter-spacing: -2px;
-  font-family: var(--font, "Inter", system-ui, sans-serif);
+  font-family: var(--font);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
   position: relative;
   z-index: 1;
@@ -386,7 +490,7 @@ input {
   width: 7px;
   height: 1.15em;
   margin-left: 1px;
-  background: #6e9eff;
+  background: #3a3f4a;
   transform: translateY(2px);
   animation: splash-caret-blink 1.05s steps(2, start) infinite;
 }
@@ -406,7 +510,7 @@ input {
   color: #8ddc8f;
 }
 .tok-fn {
-  color: #6e9eff;
+  color: #3a3f4a;
 }
 .tok-cmt {
   color: rgba(255, 255, 255, 0.32);
@@ -431,10 +535,10 @@ input {
 }
 .splash-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #7a4fff, #2d8cff);
+  background: linear-gradient(90deg, #2a2e38, #3a3f4a);
   border-radius: 2px;
   transition: width 0.3s ease-out;
-  box-shadow: 0 0 12px rgba(120, 100, 255, 0.7);
+  box-shadow: 0 0 12px rgba(154, 160, 173, 0.7);
 }
 .splash-progress-shimmer {
   position: absolute;
@@ -580,13 +684,81 @@ input {
   border-color: var(--accent);
 }
 .ws-icon.active {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-  box-shadow: -3px 0 0 var(--accent);
+  /* Cursor-like: neutral fill, accent only as a thin side trace */
+  background: var(--bg-hi);
+  color: var(--fg);
+  border-color: var(--border-strong);
+  box-shadow: -2px 0 0 var(--accent);
+}
+
+/* Per-project color (right-click → popover). The ONE chromatic touch in a
+   neutral chrome: a faint tint + colored label, stronger when active.
+   color-mix blends the chosen hex with the surface (WebKit/Tauri supports it). */
+.ws-icon.has-color {
+  background: color-mix(in srgb, var(--ws-color) 13%, var(--bg-elev));
+  border-color: color-mix(in srgb, var(--ws-color) 30%, var(--border));
+}
+.ws-icon.has-color .ws-icon-text {
+  color: var(--ws-color);
+}
+.ws-icon.active.has-color {
+  background: color-mix(in srgb, var(--ws-color) 22%, var(--bg-hi));
+  border-color: color-mix(in srgb, var(--ws-color) 45%, var(--border));
+  box-shadow: -2px 0 0 var(--ws-color);
+}
+
+/* Workspace color popover (right-click) */
+.ws-color-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+.ws-color-popover {
+  position: fixed;
+  z-index: 210;
+  width: 156px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ws-color-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.ws-color-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform var(--duration-fast) var(--ease-default);
+}
+.ws-color-swatch:hover {
+  transform: scale(1.12);
+}
+.ws-color-swatch.active {
+  border-color: var(--fg);
+}
+.ws-color-clear {
+  font-size: 12px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+.ws-color-clear:hover {
+  color: var(--fg);
+  background: var(--bg-hi);
 }
 .ws-icon-text {
-  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font);
 }
 .ws-icon-close {
   position: absolute;
@@ -646,8 +818,8 @@ input {
   height: 14px;
   padding: 0 3px;
   border-radius: 7px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-soft);
+  color: var(--accent);
   font-size: 9px;
   font-weight: 700;
   line-height: 14px;
@@ -683,11 +855,24 @@ input {
   display: flex;
   align-items: stretch;
   height: 36px;
-  background: var(--bg-alt);
+  /* Liquid glass: frosted translucent chrome over the app behind it */
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur-medium)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-medium)) saturate(180%);
   border-bottom: 1px solid var(--border);
   padding: 0 0 0 10px;
   gap: 2px;
   flex-shrink: 0;
+}
+
+/* macOS: native traffic lights (titleBarStyle: Overlay) sit top-left, so
+   inset the top bar to clear them and hide our custom window controls
+   (the semaphores replace them). Win/Linux keep the custom controls. */
+:root[data-os="macos"] .topbar {
+  padding-left: 78px;
+}
+:root[data-os="macos"] .window-controls {
+  display: none;
 }
 
 .window-controls {
@@ -711,7 +896,7 @@ input {
   color: var(--fg);
 }
 .winctl-close:hover {
-  background: #c75252;
+  background: var(--danger);
   color: #fff;
 }
 .topbar-brand {
@@ -852,14 +1037,17 @@ input {
   position: absolute;
   top: 100%;
   left: 0;
-  margin-top: 2px;
+  margin-top: 6px;
   min-width: 240px;
-  background: var(--bg-elev);
+  /* Liquid glass dropdown */
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
   z-index: 70;
-  padding: 4px 0;
+  padding: 6px;
   max-height: 70vh;
   overflow-y: auto;
 }
@@ -894,14 +1082,14 @@ input {
   text-align: left;
   background: transparent;
   border: none;
-  border-radius: 0;
-  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
   gap: 16px;
   font-size: 12px;
   color: var(--fg);
 }
 .menu-item:hover {
-  background: var(--bg-hi);
+  background: var(--bg-hover);
 }
 .menu-item-label {
   flex: 1;
@@ -969,13 +1157,16 @@ input {
   max-height: 60vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg-elev);
+  /* Liquid glass command palette */
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--blur-heavy)) saturate(180%);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
   z-index: 110;
   overflow: hidden;
-  animation: palette-in 0.14s ease-out;
+  animation: palette-in var(--duration-fast) var(--ease-default);
 }
 @keyframes palette-in {
   from {
@@ -1004,7 +1195,7 @@ input {
   flex-shrink: 0;
 }
 .palette-mode.mode-search {
-  background: rgba(0, 122, 204, 0.18);
+  background: rgba(var(--accent-rgb), 0.18);
   color: var(--accent);
 }
 .palette-mode.mode-commands {
@@ -1045,8 +1236,9 @@ input {
   color: var(--fg);
 }
 .palette-item.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--bg-hi);
+  color: var(--fg);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 .palette-item-cat {
   flex-shrink: 0;
@@ -1057,7 +1249,7 @@ input {
   color: var(--fg-muted);
 }
 .palette-item.active .palette-item-cat {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--fg-muted);
 }
 .palette-item-label {
   flex: 1;
@@ -1068,7 +1260,7 @@ input {
   font-family: var(--mono);
 }
 .palette-item.active .palette-item-hint {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--fg-dim);
 }
 .palette-empty {
   padding: 16px;
@@ -1092,7 +1284,7 @@ input {
   background: var(--bg);
   background-image: radial-gradient(
     circle at 30% 0%,
-    rgba(0, 122, 204, 0.12),
+    rgba(var(--accent-rgb), 0.12),
     transparent 50%
   );
   overflow-y: auto;
@@ -1109,7 +1301,7 @@ input {
 }
 .welcome-logo {
   font-size: 44px;
-  background: linear-gradient(135deg, var(--accent), #6fb1ff);
+  background: linear-gradient(135deg, var(--accent), #9aa0ad);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1120,7 +1312,7 @@ input {
   margin: 0;
   font-size: 32px;
   font-weight: 700;
-  background: linear-gradient(90deg, var(--accent), #6fb1ff);
+  background: linear-gradient(90deg, var(--accent), #9aa0ad);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1173,8 +1365,8 @@ input {
 .welcome-action.primary:hover {
   background: linear-gradient(
     135deg,
-    rgba(0, 122, 204, 0.12),
-    rgba(0, 122, 204, 0.04)
+    rgba(var(--accent-rgb), 0.12),
+    rgba(var(--accent-rgb), 0.04)
   );
   border-color: var(--accent);
   color: var(--fg);
@@ -1695,25 +1887,16 @@ input {
   min-width: 22px;
   text-align: center;
 }
-.ai-chats-rail-badge.badge-claude-code {
-  background: #d97706;
-  color: #fff;
-}
-.ai-chats-rail-badge.badge-anthropic {
-  background: #c2410c;
-  color: #fff;
-}
-.ai-chats-rail-badge.badge-openai {
-  background: #047857;
-  color: #fff;
-}
-.ai-chats-rail-badge.badge-ollama {
-  background: #1e40af;
-  color: #fff;
-}
+/* Neutral provider chips (Cursor-like) — the CC/Cl/AI/OL letters carry
+   the meaning, so no rainbow of saturated fills. */
+.ai-chats-rail-badge.badge-claude-code,
+.ai-chats-rail-badge.badge-anthropic,
+.ai-chats-rail-badge.badge-openai,
+.ai-chats-rail-badge.badge-ollama,
 .ai-chats-rail-badge.badge-other {
-  background: #6b21a8;
-  color: #fff;
+  background: var(--bg-hi);
+  color: var(--fg-dim);
+  border: 1px solid var(--border);
 }
 .ai-chats-rail-badge.badge-none {
   background: transparent;
@@ -1965,7 +2148,7 @@ input {
 }
 .pane-empty-icon {
   font-size: 36px;
-  background: linear-gradient(135deg, var(--accent), #6fb1ff);
+  background: linear-gradient(135deg, var(--accent), #9aa0ad);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -2000,10 +2183,10 @@ input {
 .pane-empty-ai {
   background: var(--accent);
   border: 1px solid var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
 }
 .pane-empty-ai:hover {
-  background: var(--accent-hover);
+  background: var(--primary-bg-hover);
   border-color: var(--accent-hover);
 }
 .pane-empty-agent {
@@ -2081,7 +2264,7 @@ input {
 
 .drop-overlay {
   position: absolute;
-  background: rgba(0, 122, 204, 0.25);
+  background: rgba(var(--accent-rgb), 0.25);
   border: 2px solid var(--accent);
   pointer-events: none;
   z-index: 8;
@@ -2297,8 +2480,8 @@ input {
 .search-panel-replace-all {
   width: 100%;
   padding: 5px 10px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   border: 1px solid var(--accent);
   border-radius: 3px;
   font-size: 11px;
@@ -2362,8 +2545,8 @@ input {
   border-color: var(--accent);
 }
 .search-panel-toggle.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   border-color: var(--accent);
 }
 .search-panel-status {
@@ -2568,25 +2751,28 @@ input {
   border-radius: 3px;
   flex-shrink: 0;
 }
+/* Soft, theme-aware tag chips (were dark saturated fills that broke in
+   light mode). Semantic only where it helps: FIXME=err, NOTE=ok, XXX=warn;
+   TODO/HACK stay neutral to keep noise down. */
 .todo-kind[data-kind="TODO"] {
-  background: #1f4480;
-  color: #cfe1ff;
+  background: var(--bg-hi);
+  color: var(--fg-dim);
 }
 .todo-kind[data-kind="FIXME"] {
-  background: #6b1d1d;
-  color: #ffd6d6;
+  background: var(--err-bg);
+  color: var(--err);
 }
 .todo-kind[data-kind="HACK"] {
-  background: #4a1d6e;
-  color: #ead6ff;
+  background: var(--bg-hi);
+  color: var(--fg-dim);
 }
 .todo-kind[data-kind="NOTE"] {
-  background: #1d5f3a;
-  color: #cef0d6;
+  background: var(--ok-bg);
+  color: var(--ok);
 }
 .todo-kind[data-kind="XXX"] {
-  background: #6e4a1d;
-  color: #f0ddc6;
+  background: var(--warn-bg);
+  color: var(--warn);
 }
 .todo-line {
   color: var(--fg-muted);
@@ -3122,8 +3308,8 @@ input {
 }
 .remote-connect-btn {
   padding: 6px 10px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   border: 1px solid var(--accent);
   border-radius: 4px;
   cursor: pointer;
@@ -3196,10 +3382,10 @@ input {
 }
 .remote-icon-btn-accent {
   color: var(--accent);
-  background: rgba(120, 100, 255, 0.12);
+  background: rgba(154, 160, 173, 0.12);
 }
 .remote-icon-btn-accent:hover {
-  background: rgba(120, 100, 255, 0.22);
+  background: rgba(154, 160, 173, 0.22);
   color: var(--accent);
 }
 .remote-panel-pwd {
@@ -3541,8 +3727,8 @@ input {
   cursor: wait;
 }
 .sftp-btn-primary {
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   border-color: var(--accent);
 }
 .sftp-btn-primary:hover {
@@ -4095,8 +4281,8 @@ input {
 .model-browser-configure {
   padding: 4px 10px;
   font-size: 11px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -4120,7 +4306,7 @@ input {
 }
 .model-card.selected {
   border-color: var(--accent);
-  background: rgba(0, 122, 204, 0.06);
+  background: rgba(var(--accent-rgb), 0.06);
 }
 .model-card-left {
   flex: 1;
@@ -4152,9 +4338,9 @@ input {
   border: 1px solid rgba(255, 191, 0, 0.4);
 }
 .tag-tools {
-  background: rgba(0, 122, 204, 0.18);
+  background: rgba(var(--accent-rgb), 0.18);
   color: var(--accent);
-  border: 1px solid rgba(0, 122, 204, 0.4);
+  border: 1px solid rgba(var(--accent-rgb), 0.4);
 }
 .tag-installed {
   background: rgba(46, 160, 67, 0.18);
@@ -4162,8 +4348,8 @@ input {
   border: 1px solid rgba(46, 160, 67, 0.4);
 }
 .tag-selected {
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
 }
 .model-card-desc {
   margin-top: 4px;
@@ -4289,8 +4475,8 @@ input {
   border-color: var(--accent);
 }
 .ai-perm-btn-primary {
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   border-color: var(--accent);
 }
 .ai-perm-btn-primary:hover {
@@ -4376,8 +4562,8 @@ input {
   color: var(--fg);
 }
 .segmented-btn.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--bg-hi);
+  color: var(--fg);
 }
 .settings-toggle {
   width: 36px;
@@ -4546,8 +4732,8 @@ input {
   cursor: pointer;
 }
 .recent-overlay-item.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
 }
 .recent-overlay-name {
   font-size: 13px;
@@ -4649,6 +4835,47 @@ input {
 }
 /* Single meta row above the input: model chip + context-attachment
    chip side by side — they used to be two full-width stacked bars. */
+/* Cursor-style unified composer pill — wraps the controls row + input row.
+   CSS order stacks them: permission/queue (0, default) on top, textarea
+   row (1), controls row (2) at the bottom. */
+.ai-composer-shell {
+  display: flex;
+  flex-direction: column;
+  margin: 8px 10px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--duration-fast) var(--ease-default);
+}
+.ai-composer-shell:focus-within {
+  border-color: var(--border-strong);
+}
+.ai-composer-shell > .ai-input-row {
+  order: 1;
+  border-top: none;
+  background: transparent;
+  padding: 6px 8px 4px;
+}
+.ai-composer-shell > .ai-composer-meta {
+  order: 2;
+  border-top: none;
+  background: transparent;
+  align-items: center;
+  padding: 2px 6px 6px;
+  gap: 4px;
+}
+.ai-composer-shell .ai-input {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  min-height: 38px;
+}
+.ai-composer-shell .ai-input:focus {
+  outline: none;
+  border: none;
+  box-shadow: none;
+}
+
 .ai-composer-meta {
   display: flex;
   align-items: stretch;
@@ -4658,7 +4885,8 @@ input {
   min-width: 0;
 }
 .ai-composer-meta .ai-model-chip {
-  border-top: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
   flex: 0 1 auto;
 }
 .ai-composer-meta .ai-context-indicator {
@@ -4687,14 +4915,14 @@ input {
 .ai-meta-flag {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   background: var(--bg-alt);
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: var(--radius-full);
   color: var(--fg-dim);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
-  padding: 2px 7px;
+  padding: 5px 12px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -4702,7 +4930,7 @@ input {
 .ai-meta-flag.open {
   background: var(--bg-hi);
   color: var(--fg);
-  border-color: var(--accent);
+  border-color: var(--border-strong);
 }
 .ai-meta-flag svg {
   opacity: 0.6;
@@ -4755,10 +4983,11 @@ input {
    reads as one aligned control group, not floating pills. */
 .ai-input-slash {
   flex: 0 0 auto;
-  align-self: stretch;
-  width: 34px;
+  align-self: flex-end;
+  width: 30px;
+  height: 30px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg-muted);
   font-family: var(--mono);
@@ -4776,13 +5005,14 @@ input {
   display: flex;
 }
 .ai-mode-btn {
-  height: 100%;
+  height: 30px;
+  align-self: flex-end;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--fg-muted);
   font-size: 12px;
-  padding: 0 12px;
+  padding: 0 10px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -4843,7 +5073,7 @@ input {
   gap: 10px;
   padding: 10px 12px;
   margin: 6px 0;
-  border: 1px solid var(--accent-soft, rgba(0, 122, 204, 0.3));
+  border: 1px solid var(--accent-soft, rgba(var(--accent-rgb), 0.3));
   border-left: 3px solid var(--accent);
   border-radius: 6px;
   background: var(--bg-alt);
@@ -4883,7 +5113,7 @@ input {
   margin-right: 8px;
   padding: 1px 7px;
   border-radius: 9px;
-  background: var(--accent-soft, rgba(0, 122, 204, 0.15));
+  background: var(--accent-soft, rgba(var(--accent-rgb), 0.15));
   color: var(--accent);
   font-size: 10px;
   font-weight: 700;
@@ -5596,7 +5826,7 @@ input {
 }
 .ai-ask-option.picked {
   border-color: var(--accent);
-  background: var(--accent-soft, rgba(0, 122, 204, 0.12));
+  background: var(--accent-soft, rgba(var(--accent-rgb), 0.12));
 }
 .ai-ask-option:disabled {
   cursor: default;
@@ -5615,12 +5845,15 @@ input {
   align-self: flex-start;
   padding: 5px 14px;
   border: none;
-  border-radius: 5px;
-  background: var(--accent);
-  color: var(--accent-fg, #fff);
+  border-radius: var(--radius-sm);
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+}
+.ai-ask-send:hover:not(:disabled) {
+  background: var(--primary-bg-hover);
 }
 .ai-ask-send:disabled {
   opacity: 0.45;
@@ -5677,8 +5910,8 @@ input {
   flex-shrink: 0;
 }
 .ai-header-primary {
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   border: 1px solid var(--accent);
   border-radius: 8px;
   font-weight: 500;
@@ -5989,8 +6222,8 @@ input {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   border: 0;
   cursor: pointer;
   display: inline-flex;
@@ -6020,7 +6253,7 @@ input {
 .ai-welcome-title {
   font-size: 15px;
   font-weight: 600;
-  background: linear-gradient(90deg, var(--accent), #6fb1ff);
+  background: linear-gradient(90deg, var(--accent), #9aa0ad);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -6218,7 +6451,7 @@ input {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent, #007acc);
+  background: var(--accent);
   flex-shrink: 0;
 }
 .ai-thinking {
@@ -6235,7 +6468,7 @@ input {
   padding: 4px 10px;
   font-size: 11px;
   color: var(--fg-muted);
-  background: rgba(0, 122, 204, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -6328,13 +6561,13 @@ input {
   background: var(--accent);
   border: 1px solid var(--accent);
   border-radius: 5px;
-  color: #fff;
+  color: var(--accent-fg);
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
 }
 .mcp-add-btn:hover {
-  background: var(--accent-hover);
+  background: var(--primary-bg-hover);
   border-color: var(--accent-hover);
 }
 .mcp-add-menu {
@@ -6488,7 +6721,7 @@ input {
 .mcp-seg-btn.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
 }
 .mcp-addform-actions {
   display: flex;
@@ -6598,7 +6831,7 @@ input {
   align-self: center;
 }
 .mcp-card-status-user {
-  color: #6ea8ff;
+  color: var(--info);
   border-color: rgba(110, 168, 255, 0.55);
   background: rgba(110, 168, 255, 0.10);
 }
@@ -6706,8 +6939,8 @@ input {
   border: 1px solid var(--border);
 }
 .mcp-scope-user {
-  color: #6ea8ff;
-  border-color: #6ea8ff;
+  color: var(--info);
+  border-color: var(--info);
   background: rgba(110, 168, 255, 0.08);
 }
 .mcp-scope-project {
@@ -6767,8 +7000,8 @@ input {
   font-size: 11px;
   font-weight: 500;
   padding: 3px 10px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   border: 1px solid var(--accent);
   border-radius: 3px;
   cursor: pointer;
@@ -6805,8 +7038,8 @@ input {
   cursor: pointer;
 }
 .privacy-suggest-add:hover {
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
 }
 .privacy-suggest-patterns {
   display: flex;
@@ -7090,7 +7323,7 @@ input {
   border-color: var(--accent);
 }
 .cc-perm-allow:hover {
-  background: var(--accent-hover);
+  background: var(--primary-bg-hover);
   border-color: var(--accent-hover);
 }
 .cc-perm-allow-always {
@@ -7099,7 +7332,7 @@ input {
   border-color: var(--accent);
 }
 .cc-perm-allow-always:hover {
-  background: rgba(13, 110, 253, 0.10);
+  background: rgba(var(--accent-rgb), 0.10);
   color: var(--accent-hover);
   border-color: var(--accent-hover);
 }
@@ -8099,7 +8332,7 @@ input {
   flex-direction: column;
   gap: 2px;
   padding: 6px 10px;
-  background: rgba(0, 122, 204, 0.05);
+  background: rgba(var(--accent-rgb), 0.05);
   border-left: 2px solid var(--accent);
   border-radius: 0 4px 4px 0;
   max-height: 320px;
@@ -8444,12 +8677,12 @@ input {
   overflow: auto;
 }
 .ai-msg-action-run {
-  background: rgba(0, 122, 204, 0.15);
+  background: rgba(var(--accent-rgb), 0.15);
   color: var(--accent);
   border-color: var(--accent);
 }
 .ai-msg-action-run:hover {
-  background: rgba(0, 122, 204, 0.25);
+  background: rgba(var(--accent-rgb), 0.25);
   color: var(--accent);
 }
 .ai-slash-suggestions {
@@ -8475,7 +8708,7 @@ input {
 }
 .ai-slash-item.active,
 .ai-slash-item:hover {
-  background: var(--accent-soft, rgba(0, 122, 204, 0.15));
+  background: var(--accent-soft, rgba(var(--accent-rgb), 0.15));
 }
 .ai-slash-name {
   font-family: var(--mono);
@@ -8510,7 +8743,7 @@ input {
   border-bottom: none;
 }
 .ai-history-item.active {
-  background: var(--accent-soft, rgba(0, 122, 204, 0.12));
+  background: var(--accent-soft, rgba(var(--accent-rgb), 0.12));
 }
 .ai-history-open {
   flex: 1;
@@ -8525,7 +8758,7 @@ input {
   min-width: 0;
 }
 .ai-history-open:hover {
-  background: rgba(0, 122, 204, 0.08);
+  background: rgba(var(--accent-rgb), 0.08);
 }
 .ai-history-title {
   font-size: 12px;
@@ -8593,9 +8826,10 @@ input {
 }
 .ai-send-btn {
   white-space: nowrap;
-  align-self: stretch;
-  border-radius: 6px;
-  padding: 4px 16px;
+  align-self: flex-end;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  padding: 0 16px;
 }
 /* Distinct treatment for the Stop button so it's obvious during a long
    stream (and matches what the placeholder/Esc hint promises). */
@@ -8678,8 +8912,8 @@ input {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 .tree-row.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--bg-hi);
+  color: var(--fg);
 }
 .tree-row.active:focus-visible {
   box-shadow: inset 0 0 0 1px #fff;
@@ -9204,8 +9438,8 @@ input {
   color: var(--fg);
 }
 .editor-preview-toggle.active {
-  background: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
   border-color: var(--accent);
 }
 
@@ -9364,15 +9598,18 @@ input {
   display: flex;
   align-items: center;
   height: 24px;
-  background: var(--accent);
-  color: #fff;
+  /* Neutral, discreet status bar (brand: accent used sparingly, never as
+     a full-width fill). Sits at the rounded bottom of the floating window. */
+  background: var(--bg-alt);
+  color: var(--fg-dim);
+  border-top: 1px solid var(--border);
   font-size: 11px;
   flex-shrink: 0;
   padding: 0;
   user-select: none;
 }
 :root[data-theme="light"] .statusbar {
-  background: #0d6efd;
+  background: var(--bg-alt);
 }
 .sb-section {
   display: flex;
@@ -9401,7 +9638,7 @@ input {
   opacity: 0.85;
 }
 .sb-dirty {
-  color: #ffd54f;
+  color: var(--warn);
   font-weight: 500;
 }
 .sb-git {
@@ -9458,8 +9695,8 @@ input {
 .sb-btn {
   background: transparent;
   border: none;
-  border-radius: 0;
-  color: #fff;
+  border-radius: var(--radius-xs);
+  color: var(--fg-dim);
   font-size: 13px;
   height: 24px;
   width: 30px;
@@ -9469,7 +9706,8 @@ input {
   opacity: 0.85;
 }
 .sb-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--bg-hover);
+  color: var(--fg);
   opacity: 1;
 }
 .sb-btn:disabled {
@@ -9477,7 +9715,7 @@ input {
   cursor: not-allowed;
 }
 .sb-btn.active {
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--bg-hi);
   opacity: 1;
 }
 .sb-theme {
@@ -10321,8 +10559,8 @@ input {
   gap: 4px;
 }
 .task-stop:hover {
-  border-color: #c75252;
-  color: #c75252;
+  border-color: var(--danger);
+  color: var(--danger);
 }
 /* Pulsing dot = "this task's terminal is open", not "process is still
    running" — we can't see inside the shell, so don't overclaim with a
@@ -10385,13 +10623,13 @@ input {
   color: var(--fg);
 }
 .topbar-agent-toggle.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--primary-bg);
+  border-color: var(--primary-bg);
+  color: var(--primary-fg);
 }
 .topbar-agent-toggle.active:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
+  background: var(--primary-bg-hover);
+  border-color: var(--primary-bg-hover);
 }
 .topbar-agent-toggle-label {
   font-weight: 600;
@@ -10446,9 +10684,23 @@ input {
   border-color: var(--fg-muted);
 }
 .agent-wsrail-icon.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--bg-hi);
+  border-color: var(--border-strong);
+  color: var(--fg);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+/* Per-project color in the agent rail (mirrors .ws-icon.has-color) */
+.agent-wsrail-icon.has-color {
+  background: color-mix(in srgb, var(--ws-color) 13%, var(--bg-elev));
+  border-color: color-mix(in srgb, var(--ws-color) 30%, var(--border));
+}
+.agent-wsrail-icon.has-color .agent-wsrail-text {
+  color: var(--ws-color);
+}
+.agent-wsrail-icon.active.has-color {
+  background: color-mix(in srgb, var(--ws-color) 22%, var(--bg-hi));
+  border-color: color-mix(in srgb, var(--ws-color) 45%, var(--border));
+  box-shadow: inset 2px 0 0 var(--ws-color);
 }
 .agent-wsrail-text {
   font-size: 12px;
@@ -10463,8 +10715,8 @@ input {
   height: 14px;
   padding: 0 3px;
   border-radius: 7px;
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-soft);
+  color: var(--accent);
   font-size: 9px;
   font-weight: 700;
   line-height: 14px;
@@ -10948,12 +11200,12 @@ input {
   background: var(--accent);
   border: 1px solid var(--accent);
   border-radius: 5px;
-  color: #fff;
+  color: var(--accent-fg);
   font-size: 13px;
   cursor: pointer;
 }
 .agent-main-empty-btn:hover {
-  background: var(--accent-hover);
+  background: var(--primary-bg-hover);
   border-color: var(--accent-hover);
 }
 
@@ -11180,10 +11432,10 @@ input {
 .agent-modal-btn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
 }
 .agent-modal-btn.primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: var(--primary-bg-hover);
   border-color: var(--accent-hover);
 }
 .agent-modal-btn:disabled {
@@ -11360,10 +11612,10 @@ input {
 .cust-btn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
 }
 .cust-btn.primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: var(--primary-bg-hover);
   border-color: var(--accent-hover);
 }
 .cust-btn:disabled {
@@ -11681,7 +11933,7 @@ input {
   font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.5px;
-  background: linear-gradient(135deg, var(--accent), #a78bfa);
+  background: linear-gradient(135deg, var(--accent), #9aa0ad);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -11744,10 +11996,10 @@ input {
 .welcome-btn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-fg);
 }
 .welcome-btn.primary:hover {
-  background: var(--accent-hover);
+  background: var(--primary-bg-hover);
   border-color: var(--accent-hover);
 }
 .welcome-btn.ghost {

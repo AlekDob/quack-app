@@ -1581,7 +1581,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     const parsed = activeKey ? parseKey(activeKey) : null;
     const sysParts: string[] = [
       [
-        "You are a coding agent embedded in Codetta, a desktop code editor.",
+        "You are a coding agent embedded in Quack, a desktop code editor.",
         "The user has a workspace open and you are running with the workspace root as the current working directory.",
         "",
         "OPERATING PRINCIPLES",
@@ -1810,7 +1810,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       // its own internal rules. Our "tools available" section would only
       // confuse it. Just orient it briefly.
       sysParts.push(
-        "You are running inside Codetta, a code editor. The user has the workspace open as your current working directory. Use your normal tools (Read, Glob, Grep, Edit, Bash, etc.) to investigate and modify files as needed. Be thorough and substantive.",
+        "You are running inside Quack, a code editor. The user has the workspace open as your current working directory. Use your normal tools (Read, Glob, Grep, Edit, Bash, etc.) to investigate and modify files as needed. Be thorough and substantive.",
       );
     } else {
       sysParts.push(
@@ -4110,7 +4110,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                     </div>
                   )}
                   <div className="usage-section-title">
-                    Codetta — API-billed spend
+                    Quack — API-billed spend
                   </div>
                   <div className="usage-cards">
                     <div className="usage-card">
@@ -4222,9 +4222,10 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           />
         </div>
       )}
-      {/* One slim meta row: model picker + context-attachment chip.
-          These were two full-width stacked bars ("Sending whole file
-          index.html" + "MODEL default") eating ~50px above the input. */}
+      {/* Cursor-style composer: one pill. CSS `order` puts the textarea
+          row on top and the controls (model/effort/thinking) below;
+          permission/queue cards float to the top when present. */}
+      <div className="ai-composer-shell">
       <div className="ai-composer-meta">
         {renderModelChip()}
         {parseQualifiedModel(selected)?.providerId === "claude-code" && (
@@ -4722,6 +4723,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             Send
           </button>
         )}
+      </div>
       </div>
       {aggregatedPullProgress && (
         <div className="ai-status-strip">

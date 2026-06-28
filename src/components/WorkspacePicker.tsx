@@ -68,7 +68,7 @@ export function WorkspacePicker() {
       <div className="welcome-content">
         <div className="welcome-brand">
           <div className="welcome-logo">⌘</div>
-          <h1>Codetta</h1>
+          <h1>Quack</h1>
           <p className="welcome-tagline">
             A lightweight desktop code editor with AI
           </p>

@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Codetta",
+  "productName": "Quack",
   "version": "0.5.1",
   "identifier": "dev.getcodetta.app",
   "build": {
@@ -12,14 +12,15 @@
   "app": {
     "windows": [
       {
-        "title": "Codetta",
+        "title": "Quack",
         "width": 1280,
         "height": 800,
         "minWidth": 800,
         "minHeight": 500,
-        "decorations": false,
         "resizable": true,
-        "shadow": true
+        "shadow": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
       }
     ],
     "security": {
@@ -29,11 +30,11 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "publisher": "Codetta",
-    "copyright": "Copyright © 2026 Codetta Maintainers",
+    "publisher": "Quack",
+    "copyright": "Copyright © 2026 Quack",
     "category": "DeveloperTool",
     "shortDescription": "A lightweight desktop code editor with first-class AI.",
-    "longDescription": "Codetta is a lightweight desktop code editor built on Tauri. Bring your own AI model — Anthropic Claude, OpenAI, Ollama, or Claude Code — and edit with multi-pane splits, integrated git, multi-terminal support (with pop-out windows), and per-project workspaces.",
+    "longDescription": "Quack is a lightweight desktop code editor built on Tauri. Bring your own AI model — Anthropic Claude, OpenAI, Ollama, or Claude Code — and edit with multi-pane splits, integrated git, multi-terminal support (with pop-out windows), and per-project workspaces.",
     "homepage": "https://codetta.dev",
     "icon": [
       "icons/32x32.png",
@@ -53,7 +54,7 @@
         "languages": ["English"],
         "compression": "lzma",
         "installerIcon": "icons/icon.ico",
-        "startMenuFolder": "Codetta"
+        "startMenuFolder": "Quack"
       }
     }
   }

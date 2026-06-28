@@ -373,7 +373,7 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
   return (
     <div className="topbar" data-tauri-drag-region>
       <div className="topbar-brand" data-tauri-drag-region>
-        Codetta
+        Quack
       </div>
 
       <div className="topbar-menus" data-tauri-drag-region={false}>

@@ -40,6 +40,18 @@ pub fn run() {
                     eprintln!("[claude_perm] failed to start server: {}", e);
                 }
             });
+            // macOS uses native decorations + titleBarStyle:Overlay (rounded
+            // corners + shadow + traffic lights, the modern Mac look). On
+            // Windows/Linux that same config would stack a native title bar
+            // on top of our custom top bar, so strip decorations there and
+            // keep the custom chrome (window controls re-appear via CSS).
+            #[cfg(not(target_os = "macos"))]
+            {
+                use tauri::Manager;
+                if let Some(win) = app.get_webview_window("main") {
+                    let _ = win.set_decorations(false);
+                }
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

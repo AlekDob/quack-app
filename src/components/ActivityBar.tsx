@@ -5,6 +5,8 @@ import { useStore, type SidebarView } from "../store";
 import { getGitStatus, subscribeGitStatus } from "../gitStatusStore";
 import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
+import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
+import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
 
 function initials(name: string): string {
   const parts = name.split(/[\s\-_.]+/).filter(Boolean);
@@ -39,6 +41,19 @@ export function ActivityBar() {
 
   const [addOpen, setAddOpen] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement>(null);
+
+  // Right-click color popover for a workspace icon. Re-render on color
+  // change so the tint updates live across the activity bar.
+  const [colorMenu, setColorMenu] = useState<{
+    wsId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [, setColorTick] = useState(0);
+  useEffect(
+    () => subscribeWorkspaceColors(() => setColorTick((n) => n + 1)),
+    [],
+  );
 
   // Pending-changes badge on the Source Control icon. Piggybacks on the
   // shared gitStatusStore watch the FileTree/SourceControlPanel start —
@@ -88,16 +103,28 @@ export function ActivityBar() {
           const meta = loaded[id]?.meta;
           if (!meta) return null;
           const isActive = id === activeId;
+          const color = getWorkspaceColor(id);
           return (
             <div
               key={id}
-              className={`ws-icon ${isActive ? "active" : ""}`}
-              title={`${meta.name}\n${meta.root}`}
+              className={`ws-icon ${isActive ? "active" : ""} ${color ? "has-color" : ""}`}
+              style={
+                color
+                  ? ({ "--ws-color": color.hex } as React.CSSProperties)
+                  : undefined
+              }
+              title={`${meta.name}\n${meta.root}\nRight-click to set a color`}
               role="button"
               tabIndex={0}
               aria-label={`Switch to workspace ${meta.name}`}
               aria-pressed={isActive}
               onClick={() => void setActive(id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setColorMenu({ wsId: id, x: r.right + 6, y: r.top });
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
@@ -314,6 +341,15 @@ export function ActivityBar() {
             document.body,
           );
         })()}
+
+      {colorMenu && (
+        <WorkspaceColorPopover
+          wsId={colorMenu.wsId}
+          x={colorMenu.x}
+          y={colorMenu.y}
+          onClose={() => setColorMenu(null)}
+        />
+      )}
     </div>
   );
 }

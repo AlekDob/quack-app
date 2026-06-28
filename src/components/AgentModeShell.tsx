@@ -15,6 +15,8 @@ import {
   type CustomizationTab,
 } from "./CustomizationsModal";
 import { FilePopupModal } from "./FilePopupModal";
+import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
+import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
 
 interface Props {
   // Always the active workspace id. The shell is NOT remounted on
@@ -216,6 +218,18 @@ export function AgentModeShell({ wsId }: Props) {
   const [railMenu, setRailMenu] = useState(false);
   const railAddRef = useRef<HTMLButtonElement>(null);
 
+  // Right-click color popover for a workspace icon (shared with ActivityBar).
+  const [colorMenu, setColorMenu] = useState<{
+    wsId: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [, setColorTick] = useState(0);
+  useEffect(
+    () => subscribeWorkspaceColors(() => setColorTick((n) => n + 1)),
+    [],
+  );
+
   const ws = loaded[wsId];
 
   const chatsFor = (id: string) => {
@@ -271,16 +285,27 @@ export function AgentModeShell({ wsId }: Props) {
             if (!meta) return null;
             const isActiveWs = id === wsId;
             const count = chatsFor(id).length;
+            const color = getWorkspaceColor(id);
             return (
               <button
                 key={id}
-                className={`agent-wsrail-icon ${isActiveWs ? "active" : ""}`}
+                className={`agent-wsrail-icon ${isActiveWs ? "active" : ""} ${color ? "has-color" : ""}`}
+                style={
+                  color
+                    ? ({ "--ws-color": color.hex } as React.CSSProperties)
+                    : undefined
+                }
                 role="tab"
                 aria-selected={isActiveWs}
-                title={`${meta.name}\n${meta.root}`}
+                title={`${meta.name}\n${meta.root}\nRight-click to set a color`}
                 aria-label={`Workspace ${meta.name}`}
                 onClick={() => {
                   if (!isActiveWs) void setActiveWorkspace(id);
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  setColorMenu({ wsId: id, x: r.right + 6, y: r.top });
                 }}
               >
                 <span className="agent-wsrail-text">{initials(meta.name)}</span>
@@ -538,6 +563,15 @@ export function AgentModeShell({ wsId }: Props) {
         root={ws?.meta.root ?? ""}
         onClose={() => setOpenFilePath(null)}
       />
+
+      {colorMenu && (
+        <WorkspaceColorPopover
+          wsId={colorMenu.wsId}
+          x={colorMenu.x}
+          y={colorMenu.y}
+          onClose={() => setColorMenu(null)}
+        />
+      )}
     </div>
   );
 }

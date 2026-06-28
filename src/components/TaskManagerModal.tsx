@@ -1,4 +1,4 @@
-// Task Manager — live view of Codetta's own process tree (the app,
+// Task Manager — live view of Quack's own process tree (the app,
 // PTY shells, Claude Code subprocesses, hook helpers, anything they
 // spawned) with CPU / RAM per process and a kill button for runaway
 // descendants. Scoped to OUR tree on the Rust side; this is "what is
@@ -33,7 +33,7 @@ function fmtMem(bytes: number): string {
 function roleOf(p: ProcStat): string {
   const n = p.name.toLowerCase();
   const cmd = p.cmd.toLowerCase();
-  if (p.depth === 0) return "Codetta";
+  if (p.depth === 0) return "Quack";
   if (n.includes("claude")) return "Claude Code";
   if (n.startsWith("node")) {
     if (cmd.includes("hookspecificoutput") || cmd.includes("pretooluse"))
@@ -186,7 +186,7 @@ export function TaskManagerModal() {
         </div>
         <div className="taskman-foot">
           CPU is per-core percent since the previous 2s sample. Only
-          Codetta's own process tree is shown; Kill only works on
+          Quack's own process tree is shown; Kill only works on
           descendants.
         </div>
       </div>

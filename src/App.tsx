@@ -194,11 +194,11 @@ function MainApp() {
   const activeWsName = activeId ? loaded[activeId]?.meta.name ?? null : null;
   useEffect(() => {
     const file = editorState.filePath;
-    let title = "Codetta";
+    let title = "Quack";
     if (activeWsName && file) {
-      title = `${basename(file)} — ${activeWsName} — Codetta`;
+      title = `${basename(file)} — ${activeWsName} — Quack`;
     } else if (activeWsName) {
-      title = `${activeWsName} — Codetta`;
+      title = `${activeWsName} — Quack`;
     }
     getCurrentWindow()
       .setTitle(title)

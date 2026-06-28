@@ -144,7 +144,7 @@ export function Splash() {
         </div>
       </div>
       <div className="splash-credit">
-        © {new Date().getFullYear()} Codetta · Open source
+        © {new Date().getFullYear()} Quack · Open source
       </div>
     </div>
   );

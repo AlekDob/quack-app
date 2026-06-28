@@ -57,7 +57,7 @@ export function StatusBar({ onOpenPalette }: Props) {
   const bottomVisible = ws?.layout.bottomVisible ?? true;
   const sidebarView = ws?.layout.sidebarView ?? "files";
 
-  // Live resource glance for Codetta's own process tree (app + PTY
+  // Live resource glance for Quack's own process tree (app + PTY
   // shells + Claude Code subprocesses), polled every 5s. Clicking it
   // opens the Task Manager. CPU is summed per-core percent.
   const [procTotals, setProcTotals] = useState<{
@@ -126,7 +126,7 @@ export function StatusBar({ onOpenPalette }: Props) {
             type="button"
             className="sb-item sb-proc"
             onClick={openTaskManager}
-            title="Codetta process tree — CPU (sum of per-core %) · RAM. Click for Task Manager (Ctrl+Alt+U)"
+            title="Quack process tree — CPU (sum of per-core %) · RAM. Click for Task Manager (Ctrl+Alt+U)"
           >
             <Icon name="monitor" size={11} />
             {Math.round(procTotals.cpu)}% ·{" "}

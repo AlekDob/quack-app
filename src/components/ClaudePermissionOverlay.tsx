@@ -424,8 +424,8 @@ export function ClaudePermissionOverlay() {
               onClick={() => void allowThisSession()}
               title={
                 isBash && bashPrefix
-                  ? `Auto-allow any "${bashPrefix} ..." for the rest of this Codetta session (resets on restart).`
-                  : `Auto-allow ${req.tool_name} for the rest of this Codetta session (resets on restart).`
+                  ? `Auto-allow any "${bashPrefix} ..." for the rest of this Quack session (resets on restart).`
+                  : `Auto-allow ${req.tool_name} for the rest of this Quack session (resets on restart).`
               }
             >
               <Icon name="check" size={12} />

@@ -156,7 +156,7 @@ export function TerminalPopoutWindow() {
   useEffect(() => {
     if (!params) return;
     void getCurrentWindow()
-      .setTitle(`${params.title} — Codetta`)
+      .setTitle(`${params.title} — Quack`)
       .catch(() => {});
   }, [params?.title]);
 

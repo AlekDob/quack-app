@@ -74,7 +74,7 @@ export function WelcomeModal() {
         className="welcome-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="Welcome to Codetta"
+        aria-label="Welcome to Quack"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <button
@@ -86,7 +86,7 @@ export function WelcomeModal() {
           <Icon name="x" size={14} />
         </button>
         <div className="welcome-head">
-          <div className="welcome-brand">Codetta</div>
+          <div className="welcome-brand">Quack</div>
           <div className="welcome-tag">
             A lightweight code editor with first-class AI.
           </div>

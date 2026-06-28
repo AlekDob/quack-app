@@ -1046,12 +1046,12 @@ ${sample}
   },
   {
     id: "help.about",
-    label: "About Codetta",
+    label: "About Quack",
     category: "Help",
     run: () =>
       void dialogAlert(
-        `Codetta v${__APP_VERSION__} — a lightweight Tauri-based code editor with first-class AI.\n\nMulti-workspace · multi-terminal (with pop-out) · integrated git · drag-and-drop splits · BYOK AI (Anthropic, OpenAI, Ollama, Claude Code).\n\nhttps://codetta.dev`,
-        { title: "About Codetta" },
+        `Quack v${__APP_VERSION__} — a lightweight Tauri-based code editor with first-class AI.\n\nMulti-workspace · multi-terminal (with pop-out) · integrated git · drag-and-drop splits · BYOK AI (Anthropic, OpenAI, Ollama, Claude Code).\n\nhttps://codetta.dev`,
+        { title: "About Quack" },
       ),
   },
   {

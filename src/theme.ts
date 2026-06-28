@@ -44,6 +44,16 @@ export function useTheme(): [ThemeMode, (m: ThemeMode) => void] {
 // Apply the stored theme as early as possible to avoid a flash.
 export function bootstrapTheme() {
   applyTheme(readStoredTheme());
+  // Tag the OS so CSS can adapt the title bar: on macOS we use native
+  // traffic lights (titleBarStyle: Overlay) and need left room for them
+  // while hiding the custom window controls. navigator.platform is
+  // deprecated but stable and already used elsewhere (aiPrivacy.ts).
+  const p = navigator.platform || "";
+  document.documentElement.dataset.os = /mac/i.test(p)
+    ? "macos"
+    : /win/i.test(p)
+      ? "windows"
+      : "linux";
 }
 
 // Returns the currently applied resolved theme ("light" | "dark"),
