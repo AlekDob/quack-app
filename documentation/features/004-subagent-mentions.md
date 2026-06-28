@@ -73,6 +73,13 @@ dependency).
    `toolUseId` matches the Task call id, then parses the sibling jsonl (reuses `parse_session_jsonl`).
 5. Rendered read-only: delegation prompt as a "user" bubble, subagent steps via `ToolCallRow`. **No composer.**
 
+### Inner steps hidden from the main stream
+The subagent's own tool calls (its Read/Glob/Grep/…) arrive in the live stream as records tagged
+with `parent_tool_use_id` (and aren't persisted to the main session jsonl — they go to the subagent
+file). `providers/claudeCode.ts` skips emitting any `assistant`/`user` record where
+`parent_tool_use_id` (or `parentToolUseID`) is set, so the main transcript shows **only** the
+Agent chip + its final report. The full inner work lives in the read-only transcript tab.
+
 ### Gotchas
 - **Tool name is `Agent`, not `Task`:** current Claude Code emits the subagent dispatch tool as
   `Agent` (input `{description, prompt, subagent_type}`). The chip special-case matches `Agent` AND

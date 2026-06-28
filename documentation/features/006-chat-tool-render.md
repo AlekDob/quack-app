@@ -30,7 +30,18 @@ The 2026-06-28 redesign targets the **docked** path (the agent path already had 
 | Name | `friendlyToolName(name)` | |
 | Detail | `shortDetail(primaryToolDetail(args))` | basename / host; full value in `title` |
 | Trail | spinner → check → `<Caret>` | spinner while no result; neutral check when empty-done |
-| Result | `<pre>` in `.ai-tcall-reveal` | mounted only when expanded; `ai-reveal-in` animation |
+| Result | `<pre>` or rendered Markdown in `.ai-tcall-reveal` | mounted only when expanded; `ai-reveal-in` animation |
+
+### Result rendering: code-view vs Markdown
+| Condition | Render |
+|---|---|
+| Read (`Read`/`read_file`/`read`/`NotebookRead`) of `.md`/`.mdx`/`.markdown` | `MarkdownPreview` in `.ai-tcall-result-md` (gutter stripped) |
+| everything else (code reads, Bash, Grep, …) | raw `<pre class="ai-tcall-result-body">` |
+
+`isMarkdownRead(call)` gates this; `stripReadGutter(text)` removes Claude Code's
+`cat -n` line-number prefix (`/^\s*\d+\t/gm`) so the doc renders as itself, not a
+numbered dump. **Scope is deliberate** — Bash/Grep output and code files are NOT
+Markdown; rendering them as Markdown would mangle them, so they stay code-view.
 
 Head is a `<button>` (`.is-toggle`) when there's an expandable result, else a
 `<div>` — **same markup** so the row doesn't reflow when the result lands

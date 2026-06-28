@@ -234,6 +234,25 @@ function Caret({ open }: { open: boolean }) {
   );
 }
 
+const READ_NAMES = new Set(["Read", "read_file", "read", "NotebookRead"]);
+const MARKDOWN_EXT = /\.(md|mdx|markdown)$/i;
+
+// Claude Code's Read returns its content in `cat -n` form ("   123\tline").
+// Strip that gutter so a Markdown read renders as the real document instead
+// of a numbered dump. Tolerant of the optional leading arrow Read prefixes
+// with for long lines.
+function stripReadGutter(text: string): string {
+  return text.replace(/^\s*\d+\t/gm, "");
+}
+
+// A Markdown file read → render the result as formatted Markdown, not raw
+// monospace. Scoped to Read+`.md` only: Bash/Grep output and code-file reads
+// are NOT Markdown and must stay in the code view.
+function isMarkdownRead(call: ToolCall): boolean {
+  if (!READ_NAMES.has(call.function.name)) return false;
+  return MARKDOWN_EXT.test(pathOf(call));
+}
+
 // Pick the most-informative argument to show alongside the tool name
 // in the running-tools status rows. Falls through a list of common arg
 // names so this works for both Claude Code's tool catalog (file_path,
@@ -1488,7 +1507,13 @@ export function ToolCallRow({
       </Head>
       {canExpand && expanded && (
         <div className="ai-tcall-reveal">
-          <pre className="ai-tcall-result-body">{result}</pre>
+          {isMarkdownRead(call) ? (
+            <div className="ai-tcall-result-md">
+              <MarkdownPreview content={stripReadGutter(result!)} />
+            </div>
+          ) : (
+            <pre className="ai-tcall-result-body">{result}</pre>
+          )}
         </div>
       )}
     </div>

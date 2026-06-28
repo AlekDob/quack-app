@@ -415,7 +415,14 @@ export const claudeCodeProvider: ChatProvider = {
             wake();
           }
         }
-        if (obj.type === "assistant" && obj.message?.content) {
+        // Subagent (sidechain) activity carries parent_tool_use_id — the
+        // id of the parent Agent/Task call. We hide these inner steps from
+        // the main transcript: the duck-avatar chip shows the run, and the
+        // full subagent transcript lives in its own read-only tab.
+        const isSubagentRecord = !!(
+          obj.parent_tool_use_id || obj.parentToolUseID
+        );
+        if (obj.type === "assistant" && obj.message?.content && !isSubagentRecord) {
           // If we've already streamed this message's text via
           // content_block_delta events, suppress the duplicate text
           // blocks here. tool_use blocks always pass through (their
@@ -489,7 +496,7 @@ export const claudeCodeProvider: ChatProvider = {
           });
           wake();
         }
-        if (obj.type === "user" && obj.message?.content) {
+        if (obj.type === "user" && obj.message?.content && !isSubagentRecord) {
           for (const block of obj.message.content) {
             if (block.type !== "tool_result") continue;
             // Content can be a string OR an array of blocks (text + image).
