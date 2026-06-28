@@ -1,0 +1,109 @@
+// Subagent discovery for the @-mention composer. Claude Code subagents are
+// markdown files with YAML frontmatter living in `.claude/agents/` — both
+// project-local (<workspace>/.claude/agents) and user-global
+// (~/.claude/agents). We surface them in the chat composer so the user can
+// @-mention one and delegate a turn to it (see AIChatPanel send flow).
+import { fs, type DirEntry } from "./ipc";
+
+export interface SubagentDef {
+  name: string;
+  description: string;
+  source: "project" | "user";
+  /** Public URL of the duck avatar, e.g. "/images/ducks/duck12.jpeg". */
+  avatar: string;
+}
+
+// Number of duck avatars shipped in public/images/ducks/ (duck1..duckN).
+const DUCK_COUNT = 35;
+
+// Stable string hash → duck index. Same agent name always maps to the same
+// duck, so an avatar never shuffles between sessions.
+function hashName(name: string): number {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+/**
+ * Resolve an agent's duck avatar. A frontmatter `avatar:` value wins —
+ * it accepts "duck12", a bare "12", or a full "/path.png". Otherwise we
+ * derive a deterministic duck from the agent name.
+ */
+export function duckAvatarFor(name: string, explicit?: string): string {
+  if (explicit) {
+    if (explicit.startsWith("/")) return explicit;
+    const m = explicit.match(/(\d+)/);
+    if (m) return `/images/ducks/duck${m[1]}.jpeg`;
+  }
+  const idx = (hashName(name) % DUCK_COUNT) + 1;
+  return `/images/ducks/duck${idx}.jpeg`;
+}
+
+// Minimal frontmatter scalar reader. Agent files use simple `key: value`
+// lines, so a full YAML parser (and a new dependency) would be overkill;
+// we only need a few top-level scalars.
+function frontmatterField(src: string, key: string): string | undefined {
+  const fm = src.match(/^---\n([\s\S]*?)\n---/);
+  if (!fm) return undefined;
+  const line = fm[1]
+    .split("\n")
+    .find((l) => l.trimStart().startsWith(`${key}:`));
+  if (!line) return undefined;
+  return line
+    .slice(line.indexOf(":") + 1)
+    .trim()
+    .replace(/^["']|["']$/g, "");
+}
+
+// Parse one .md file into a SubagentDef, falling back to the filename.
+function parseAgent(
+  src: string,
+  fileName: string,
+  source: SubagentDef["source"],
+): SubagentDef {
+  const name = frontmatterField(src, "name") ?? fileName.replace(/\.md$/, "");
+  return {
+    name,
+    description: frontmatterField(src, "description") ?? "",
+    source,
+    avatar: duckAvatarFor(name, frontmatterField(src, "avatar")),
+  };
+}
+
+async function readAgentDir(
+  dir: string,
+  source: SubagentDef["source"],
+): Promise<SubagentDef[]> {
+  let entries: DirEntry[];
+  try {
+    entries = await fs.listDir(dir);
+  } catch {
+    return []; // directory doesn't exist — fine
+  }
+  const out: SubagentDef[] = [];
+  for (const e of entries) {
+    if (e.is_dir || !e.name.endsWith(".md")) continue;
+    try {
+      out.push(parseAgent(await fs.readFile(e.path), e.name, source));
+    } catch {
+      /* unreadable file — skip */
+    }
+  }
+  return out;
+}
+
+/**
+ * Load all available subagents. Project agents win name collisions over
+ * user-global ones (same precedence as Claude Code's own resolution).
+ */
+export async function loadSubagents(
+  root: string,
+  homeDir: string | null,
+): Promise<SubagentDef[]> {
+  const proj = await readAgentDir(`${root}/.claude/agents`, "project");
+  const user = homeDir
+    ? await readAgentDir(`${homeDir}/.claude/agents`, "user")
+    : [];
+  const seen = new Set(proj.map((a) => a.name));
+  return [...proj, ...user.filter((a) => !seen.has(a.name))];
+}

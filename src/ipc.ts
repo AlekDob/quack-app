@@ -163,6 +163,12 @@ export interface LoadedMessage {
   tool_results?: LoadedToolResult[];
 }
 
+export interface LoadedSubagent {
+  agent_type: string;
+  description: string;
+  messages: LoadedMessage[];
+}
+
 export const claudeCode = {
   /** List on-disk Claude Code sessions for the given workspace cwd. */
   listSessions: (cwd: string) =>
@@ -172,6 +178,14 @@ export const claudeCode = {
     invoke<LoadedMessage[]>("claude_code_load_session", {
       cwd,
       sessionId,
+    }),
+  /** Load one subagent's full transcript, linked by the parent Task
+   *  tool-call id (toolUseId in the subagent's sidecar meta.json). */
+  loadSubagent: (cwd: string, sessionId: string, toolUseId: string) =>
+    invoke<LoadedSubagent>("claude_code_load_subagent", {
+      cwd,
+      sessionId,
+      toolUseId,
     }),
 };
 

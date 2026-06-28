@@ -148,11 +148,21 @@ export function AIChatsRail({ wsId, ws }: Props) {
           title="New AI chat"
           aria-label="New AI chat"
         >
-          <AIIcon size={14} />
-          <span className="ai-chats-rail-plus" aria-hidden="true">
-            <Icon name="plus" size={10} />
-          </span>
+          {/* Avatar più grande da collassata (è l'unico elemento del bottone);
+             resta 14px da espansa, dove affianca la label "New chat". */}
+          <AIIcon size={expanded ? 14 : 22} />
+          {/* Il "+" sovrapposto serve solo da collassata: da espansa la label "New chat" basta. */}
+          {!expanded && (
+            <span className="ai-chats-rail-plus" aria-hidden="true">
+              <Icon name="plus" size={10} />
+            </span>
+          )}
           {expanded && <span className="ai-chats-rail-add-label">New chat</span>}
+          {expanded && (
+            <span className="ai-chats-rail-add-hint" aria-hidden="true">
+              <Icon name="plus" size={12} />
+            </span>
+          )}
         </button>
         <button
           className="ai-chats-rail-toggle"
@@ -173,11 +183,20 @@ export function AIChatsRail({ wsId, ws }: Props) {
         </button>
       </div>
       <div className="ai-chats-rail-list" role="tablist" aria-label="AI chats">
-        {chats.length === 0 && (
-          <div className="ai-chats-rail-empty" title="No AI chats yet">
-            {expanded ? "No chats yet — click + to start." : "·"}
-          </div>
-        )}
+        {chats.length === 0 &&
+          (expanded ? (
+            <div className="ai-chats-rail-empty" title="No AI chats yet">
+              <AIIcon size={32} className="ai-chats-rail-empty-mark" />
+              <span className="ai-chats-rail-empty-title">No chats yet</span>
+              <span className="ai-chats-rail-empty-hint">
+                Start a new one with the button above.
+              </span>
+            </div>
+          ) : (
+            <div className="ai-chats-rail-empty collapsed" title="No AI chats yet">
+              ·
+            </div>
+          ))}
         {chats.map((chat) => {
           const isActive = chat.id === activeChatId;
           const isDragging = drag?.id === chat.id;

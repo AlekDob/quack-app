@@ -627,7 +627,7 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
         data-tauri-drag-region={false}
       >
         <AIIcon size={13} />
-        <span className="topbar-agent-toggle-label">Agent</span>
+        <span className="topbar-agent-toggle-label">Agents</span>
       </button>
 
       <button

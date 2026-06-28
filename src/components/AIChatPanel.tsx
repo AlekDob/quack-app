@@ -53,6 +53,7 @@ import {
   extractEditDiffs,
   InterleavedBlocks,
   RunningToolList,
+  SubagentOpen,
   ToolCallRow,
   toolDetailFor,
 } from "./chatToolRender";
@@ -100,6 +101,7 @@ import {
 } from "../ipc";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { ModelBrowser } from "./ModelBrowser";
+import { loadSubagents, type SubagentDef } from "../subagents";
 import { permissionFor } from "../toolPermissions";
 import { onAIPromptRequest } from "../aiBus";
 import { relPath } from "../pathUtils";
@@ -509,6 +511,11 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const [attachTree, setAttachTree] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
   const [attachTerminal, setAttachTerminal] = useState(false);
+  // Subagents the user @-mentioned this turn — the send flow delegates
+  // the turn to them via the Task tool (Claude Code only). The full
+  // catalog (project + global .claude/agents) is loaded into `agents`.
+  const [agents, setAgents] = useState<SubagentDef[]>([]);
+  const [attachedAgents, setAttachedAgents] = useState<string[]>([]);
   const [slashIndex, setSlashIndex] = useState(0);
   // @-mention file autocomplete in the composer. mentionState carries
   // the active query (text after @ up to cursor) and the byte range
@@ -1258,6 +1265,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // Extended thinking: null = CLI default, true = forced on, false = off.
   const [ccThinking, setCcThinking] = useState<boolean | null>(null);
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  // "Smart" composer: effort + thinking are hidden behind a ⚙ toggle so the
+  // control bar stays clean (Cursor-style); revealed on demand.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Argument submenu for /effort, /mode and /thinking: once the command
   // name is complete ("/effort "), the slash window switches to the
@@ -1398,6 +1408,31 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     };
   }, [selectedIsCC, root]);
 
+  // Subagent catalog for @-mentions. Only Claude Code can dispatch
+  // subagents (via its Task tool), so we skip the scan for other
+  // providers and clear any stale list.
+  useEffect(() => {
+    if (!selectedIsCC || !root) {
+      setAgents([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      let home: string | null = null;
+      try {
+        const { homeDir } = await import("@tauri-apps/api/path");
+        home = (await homeDir()).replace(/[\\/]+$/, "");
+      } catch {
+        /* home unavailable — project agents still load */
+      }
+      const list = await loadSubagents(root, home);
+      if (!cancelled) setAgents(list);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedIsCC, root]);
+
   // Combined slash matches: local commands first, then Claude Code
   // passthroughs. Used by both the dropdown render and the keyboard
   // navigation so they can't disagree.
@@ -1462,46 +1497,61 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     return call;
   }, [messages, streaming, runningTools, dismissedAskId]);
 
-  // Filter the cached workspace files by the current mention query.
-  // Match against the workspace-relative path (a file's basename
-  // surfaces highest because it appears earlier in the relpath when
-  // there are few directories above it), capped at 8 hits to keep
-  // the popover compact.
-  const mentionMatches = useMemo(() => {
-    if (!mentionState || !mentionFiles || !root) return [];
+  // @-mention candidates: subagents first (short, high-signal list),
+  // then workspace files. Agents only appear with Claude Code (the
+  // `agents` catalog is empty otherwise). Files match on the workspace-
+  // relative path; the whole popover is capped at 8 rows.
+  type MentionItem =
+    | { type: "agent"; agent: SubagentDef }
+    | { type: "file"; abs: string; rel: string };
+  const mentionMatches = useMemo<MentionItem[]>(() => {
+    if (!mentionState) return [];
     const q = mentionState.query.toLowerCase();
-    const out: Array<{ abs: string; rel: string }> = [];
-    for (const f of mentionFiles) {
-      const rel = relPath(f, root);
-      const lower = rel.toLowerCase();
-      if (q === "" || lower.includes(q)) {
-        out.push({ abs: f, rel });
-        if (out.length >= 8) break;
+    const out: MentionItem[] = [];
+    for (const a of agents) {
+      if (q === "" || a.name.toLowerCase().includes(q)) {
+        out.push({ type: "agent", agent: a });
+        if (out.length >= 4) break;
+      }
+    }
+    if (mentionFiles && root) {
+      for (const f of mentionFiles) {
+        const rel = relPath(f, root);
+        if (q === "" || rel.toLowerCase().includes(q)) {
+          out.push({ type: "file", abs: f, rel });
+          if (out.length >= 8) break;
+        }
       }
     }
     return out;
-  }, [mentionState, mentionFiles, root]);
+  }, [mentionState, mentionFiles, root, agents]);
 
-  const acceptMention = (pick: { abs: string; rel: string }) => {
+  const acceptMention = (pick: MentionItem) => {
     if (!mentionState) return;
-    // Splice the relpath in place of the @query, leave a trailing
-    // space so the user can keep typing without manually closing
-    // the segment.
+    // Splice the chosen token in place of the @query, leave a trailing
+    // space so the user can keep typing without closing the segment.
+    const token = pick.type === "agent" ? pick.agent.name : pick.rel;
     const before = input.slice(0, mentionState.start);
     const after = input.slice(mentionState.end);
-    const next = `${before}@${pick.rel}${after.startsWith(" ") ? "" : " "}${after}`;
+    const next = `${before}@${token}${after.startsWith(" ") ? "" : " "}${after}`;
     setInput(next);
     setMentionState(null);
     setMentionIndex(0);
-    setAttachedFiles((prev) =>
-      prev.includes(pick.abs) ? prev : [...prev, pick.abs],
-    );
-    // Restore focus + place cursor after the inserted path so the
+    if (pick.type === "agent") {
+      setAttachedAgents((prev) =>
+        prev.includes(pick.agent.name) ? prev : [...prev, pick.agent.name],
+      );
+    } else {
+      setAttachedFiles((prev) =>
+        prev.includes(pick.abs) ? prev : [...prev, pick.abs],
+      );
+    }
+    // Restore focus + place cursor after the inserted token so the
     // user can keep typing without clicking back into the textarea.
     requestAnimationFrame(() => {
       const el = inputRef.current;
       if (!el) return;
-      const cursor = mentionState.start + 1 + pick.rel.length + 1;
+      const cursor = mentionState.start + 1 + token.length + 1;
       el.focus();
       try {
         el.setSelectionRange(cursor, cursor);
@@ -1581,7 +1631,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     const parsed = activeKey ? parseKey(activeKey) : null;
     const sysParts: string[] = [
       [
-        "You are a coding agent embedded in Quack, a desktop code editor.",
+        // Jack = il PM-papero, persona con cui Alek dialoga (Quack v1 identity)
+        "You are Jack, the project manager and coding agent embedded in Quack, a desktop code editor.",
+        "Speak as Jack — warm, direct, hands-on. When you greet or introduce yourself, do so as Jack (never invent another name).",
         "The user has a workspace open and you are running with the workspace root as the current working directory.",
         "",
         "OPERATING PRINCIPLES",
@@ -1713,6 +1765,15 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       if (attachedFiles.length > 0) {
         ccTurnContext.push(
           `The user wants you to look at: ${attachedFiles.join(", ")}. Use your Read tool on these.`,
+        );
+      }
+      // @-mentioned subagents: instruct Claude Code to delegate this turn
+      // to them via the Task tool. Only CC reaches this branch, and the
+      // agent catalog is CC-only, so attachedAgents is empty elsewhere.
+      if (attachedAgents.length > 0) {
+        ccTurnContext.push(
+          `Delegate this task to the following subagent(s): ${attachedAgents.join(", ")}. ` +
+            `Use your Task tool with the matching subagent_type for each — prefer them over handling it yourself.`,
         );
       }
       // /terminal for Claude Code: it can't see Codetta's terminal
@@ -2364,6 +2425,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       // One-shot attach flags reset after the message goes out.
       setAttachTree(false);
       setAttachedFiles([]);
+      setAttachedAgents([]);
       setAttachTerminal(false);
       // Drain any messages the user typed while this turn was in
       // flight. Fires after a microtask so the React state from the
@@ -3285,7 +3347,19 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     );
   }
 
+  // Open a Task subagent's transcript in a read-only tab. Needs the live
+  // Claude Code session id (the on-disk jsonl name); until it's captured
+  // the run is too early to inspect.
+  const openSubagentTab = (toolUseId: string, agentType: string) => {
+    if (!claudeSessionId) {
+      toastInfo("Subagent transcript isn't ready yet — try again once it finishes.");
+      return;
+    }
+    useStore.getState().openSubagent(wsId, claudeSessionId, toolUseId, agentType);
+  };
+
   return (
+    <SubagentOpen.Provider value={openSubagentTab}>
     <div className="ai-panel">
       {renderHeader()}
       {renderHistoryDropdown()}
@@ -3491,7 +3565,23 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
               className={`ai-msg ai-msg-${m.role}${dimmedByScrub ? " ai-msg-scrubbed-past" : ""}`}
             >
               <span className="ai-msg-role">
-                {m.role === "user" ? "You" : "AI"}
+                {m.role === "user" ? (
+                  "You"
+                ) : (
+                  // Jack: il PM-papero con cui Alek dialoga (Quack v1 identity)
+                  <>
+                    <img
+                      className="ai-msg-avatar"
+                      src="/jack.jpeg"
+                      alt=""
+                      aria-hidden="true"
+                    />
+                    <span className="ai-msg-identity">
+                      <span className="ai-msg-name">Jack</span>
+                      <span className="ai-msg-title">Project Manager</span>
+                    </span>
+                  </>
+                )}
                 {m.role === "user" && (
                   <>
                     <button
@@ -3914,17 +4004,66 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           </button>
         </div>
       )}
+      {attachedAgents.length > 0 && (
+        <div className="ai-agent-chips" role="status">
+          {attachedAgents.map((name) => {
+            const def = agents.find((a) => a.name === name);
+            return (
+              <span key={name} className="ai-agent-chip" title={def?.description}>
+                {def && (
+                  <img
+                    className="ai-agent-chip-avatar"
+                    src={def.avatar}
+                    alt=""
+                    aria-hidden="true"
+                  />
+                )}
+                {name}
+                <button
+                  className="ai-agent-chip-x"
+                  onClick={() =>
+                    setAttachedAgents((prev) => prev.filter((n) => n !== name))
+                  }
+                  title={`Don't delegate to ${name}`}
+                  aria-label={`Remove ${name}`}
+                >
+                  <Icon name="x" size={10} />
+                </button>
+              </span>
+            );
+          })}
+        </div>
+      )}
       {mentionState && mentionMatches.length > 0 && streaming === null && (
         <div className="ai-slash-suggestions ai-mention-suggestions">
           {mentionMatches.map((m, i) => (
             <button
-              key={m.abs}
+              key={m.type === "agent" ? `agent:${m.agent.name}` : m.abs}
               className={`ai-slash-item ${i === mentionIndex ? "active" : ""}`}
               onMouseEnter={() => setMentionIndex(i)}
               onClick={() => acceptMention(m)}
             >
-              <span className="ai-slash-name">@{m.rel}</span>
-              <span className="ai-slash-hint">attach file</span>
+              {m.type === "agent" ? (
+                <>
+                  <img
+                    className="ai-mention-avatar"
+                    src={m.agent.avatar}
+                    alt=""
+                    aria-hidden="true"
+                  />
+                  <span className="ai-slash-name">@{m.agent.name}</span>
+                  <span className="ai-slash-hint">
+                    {m.agent.description
+                      ? m.agent.description.slice(0, 60)
+                      : `subagent · ${m.agent.source}`}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="ai-slash-name">@{m.rel}</span>
+                  <span className="ai-slash-hint">attach file</span>
+                </>
+              )}
             </button>
           ))}
         </div>
@@ -4226,10 +4365,20 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           row on top and the controls (model/effort/thinking) below;
           permission/queue cards float to the top when present. */}
       <div className="ai-composer-shell">
-      <div className="ai-composer-meta">
+      <div className={`ai-composer-meta ${advancedOpen ? "advanced-open" : ""}`}>
         {renderModelChip()}
         {parseQualifiedModel(selected)?.providerId === "claude-code" && (
           <>
+            <button
+              type="button"
+              className={`ai-meta-flag ai-tune-btn ${advancedOpen ? "open" : ""}`}
+              onClick={() => setAdvancedOpen((v) => !v)}
+              title="Effort & extended thinking"
+              aria-pressed={advancedOpen}
+            >
+              <Icon name="settings" size={12} />
+            </button>
+            <span className="ai-adv-flags">
             <MetaFlag
               label="effort"
               current={ccEffort ?? "default"}
@@ -4289,6 +4438,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                 },
               ]}
             />
+              </span>
           </>
         )}
         {contextLabel && (
@@ -4303,6 +4453,98 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             <span className="ai-context-toggle">
               {attachContext ? "off" : "on"}
             </span>
+          </button>
+        )}
+        <div className="ai-composer-spacer" />
+        {selectedIsCC && (
+          <div className="ai-mode-wrap">
+            {modeMenuOpen && (
+              <>
+                <div
+                  className="ai-mode-backdrop"
+                  onClick={() => setModeMenuOpen(false)}
+                />
+                <div className="ai-mode-menu" role="menu">
+                  {(
+                    [
+                      {
+                        v: null,
+                        label: "Ask",
+                        desc: "Confirm each edit / command",
+                      },
+                      {
+                        v: "plan",
+                        label: "Plan",
+                        desc: "Plan only — no edits",
+                      },
+                      {
+                        v: "acceptEdits",
+                        label: "Auto-edit",
+                        desc: "Auto-accept file edits, ask for the rest",
+                      },
+                      {
+                        v: "auto",
+                        label: "Auto",
+                        desc: "Claude Code's auto mode",
+                      },
+                    ] as Array<{ v: string | null; label: string; desc: string }>
+                  ).map((o) => (
+                    <button
+                      key={o.label}
+                      type="button"
+                      className={`ai-mode-item ${ccPermMode === o.v ? "active" : ""}`}
+                      onClick={() => {
+                        setCcPermMode(o.v);
+                        setModeMenuOpen(false);
+                        toastInfo(
+                          `Mode: ${o.label} (applies from the next message)`,
+                        );
+                      }}
+                    >
+                      <span className="ai-mode-item-label">
+                        {ccPermMode === o.v ? "● " : ""}
+                        {o.label}
+                      </span>
+                      <span className="ai-mode-item-desc">{o.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            <button
+              type="button"
+              className="ai-mode-btn"
+              onClick={() => setModeMenuOpen((v) => !v)}
+              title="Claude Code permission mode (also /mode)"
+            >
+              {ccPermMode === "plan"
+                ? "Plan"
+                : ccPermMode === "acceptEdits"
+                  ? "Auto-edit"
+                  : ccPermMode === "auto"
+                    ? "Auto"
+                    : ccPermMode === "dontAsk"
+                      ? "Don't ask"
+                      : "Ask"}{" "}
+              ▾
+            </button>
+          </div>
+        )}
+        {streaming !== null || runningTools ? (
+          <button
+            className="ai-send-btn ai-stop-btn"
+            onClick={stop}
+            title="Stop (Esc)"
+          >
+            ◼ Stop
+          </button>
+        ) : (
+          <button
+            className="primary ai-send-btn"
+            onClick={() => void send()}
+            disabled={!input.trim() || !selected}
+          >
+            Send
           </button>
         )}
       </div>
@@ -4620,109 +4862,6 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             }
           }}
         />
-        <button
-          type="button"
-          className="ai-input-slash"
-          title="Slash commands"
-          onClick={() => {
-            setInput("/");
-            setSlashIndex(0);
-            inputRef.current?.focus();
-          }}
-        >
-          /
-        </button>
-        {selectedIsCC && (
-          <div className="ai-mode-wrap">
-            {modeMenuOpen && (
-              <>
-                <div
-                  className="ai-mode-backdrop"
-                  onClick={() => setModeMenuOpen(false)}
-                />
-                <div className="ai-mode-menu" role="menu">
-                  {(
-                    [
-                      {
-                        v: null,
-                        label: "Ask",
-                        desc: "Confirm each edit / command",
-                      },
-                      {
-                        v: "plan",
-                        label: "Plan",
-                        desc: "Plan only — no edits",
-                      },
-                      {
-                        v: "acceptEdits",
-                        label: "Auto-edit",
-                        desc: "Auto-accept file edits, ask for the rest",
-                      },
-                      {
-                        v: "auto",
-                        label: "Auto",
-                        desc: "Claude Code's auto mode",
-                      },
-                    ] as Array<{ v: string | null; label: string; desc: string }>
-                  ).map((o) => (
-                    <button
-                      key={o.label}
-                      type="button"
-                      className={`ai-mode-item ${ccPermMode === o.v ? "active" : ""}`}
-                      onClick={() => {
-                        setCcPermMode(o.v);
-                        setModeMenuOpen(false);
-                        toastInfo(
-                          `Mode: ${o.label} (applies from the next message)`,
-                        );
-                      }}
-                    >
-                      <span className="ai-mode-item-label">
-                        {ccPermMode === o.v ? "● " : ""}
-                        {o.label}
-                      </span>
-                      <span className="ai-mode-item-desc">{o.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-            <button
-              type="button"
-              className="ai-mode-btn"
-              onClick={() => setModeMenuOpen((v) => !v)}
-              title="Claude Code permission mode (also /mode)"
-            >
-              {ccPermMode === "plan"
-                ? "Plan"
-                : ccPermMode === "acceptEdits"
-                  ? "Auto-edit"
-                  : ccPermMode === "auto"
-                    ? "Auto"
-                    : ccPermMode === "dontAsk"
-                      ? "Don't ask"
-                      : "Ask"}{" "}
-              ▾
-            </button>
-          </div>
-        )}
-        {streaming !== null || runningTools ? (
-          <button
-            className="ai-send-btn ai-stop-btn"
-            onClick={stop}
-            title="Stop (Esc)"
-          >
-            ◼ Stop
-          </button>
-        ) : (
-          <button
-            className="primary ai-send-btn"
-            onClick={() => void send()}
-            disabled={!input.trim() || !selected}
-          >
-            Send
-          </button>
-        )}
       </div>
       </div>
       {aggregatedPullProgress && (
@@ -4854,6 +4993,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         }}
       />
     </div>
+    </SubagentOpen.Provider>
   );
 }
 

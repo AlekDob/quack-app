@@ -211,16 +211,31 @@ export interface WorkspaceData {
 export const fileKey = (p: string) => "file:" + p;
 export const termKey = (id: string) => "term:" + id;
 export const aiKey = (id: string) => "ai:" + id;
+// Read-only subagent transcript tab. Self-contained key (no backing store
+// record): carries everything the view needs to reload from disk —
+// the CC session id, the parent Task tool-call id, and the agent type.
+export const subKey = (sessionId: string, toolUseId: string, agentType: string) =>
+  `sub:${sessionId}|${toolUseId}|${agentType}`;
 export function parseKey(
   k: string,
 ):
   | { kind: "file"; path: string }
   | { kind: "terminal"; id: string }
   | { kind: "ai"; id: string }
+  | { kind: "subagent"; sessionId: string; toolUseId: string; agentType: string }
   | null {
   if (k.startsWith("file:")) return { kind: "file", path: k.slice(5) };
   if (k.startsWith("term:")) return { kind: "terminal", id: k.slice(5) };
   if (k.startsWith("ai:")) return { kind: "ai", id: k.slice(3) };
+  if (k.startsWith("sub:")) {
+    const [sessionId, toolUseId, ...rest] = k.slice(4).split("|");
+    return {
+      kind: "subagent",
+      sessionId: sessionId ?? "",
+      toolUseId: toolUseId ?? "",
+      agentType: rest.join("|"),
+    };
+  }
   return null;
 }
 
@@ -586,6 +601,13 @@ interface AppState {
   setTerminalPopped(wsId: string, termId: string, popped: boolean): void;
 
   addAIChat(wsId: string, location?: TerminalLocation): string;
+  /** Open (or focus) a read-only subagent transcript tab in the editor. */
+  openSubagent(
+    wsId: string,
+    sessionId: string,
+    toolUseId: string,
+    agentType: string,
+  ): void;
   closeAIChat(wsId: string, id: string): void;
   setAIChatTitle(wsId: string, id: string, title: string): void;
   setAIChatSession(wsId: string, id: string, sessionId: string): void;
@@ -1449,6 +1471,7 @@ export const useStore = create<AppState>((set, get) => {
         if (parsed.kind === "terminal") {
           return ws.terminals[parsed.id]?.title ?? key;
         }
+        if (parsed.kind === "subagent") return parsed.agentType || key;
         // ai
         return ws.aiChats[parsed.id]?.title ?? key;
       };
@@ -1516,6 +1539,7 @@ export const useStore = create<AppState>((set, get) => {
           if (last === undefined) return Number.POSITIVE_INFINITY;
           return now - last;
         }
+        if (parsed.kind === "subagent") return Number.POSITIVE_INFINITY;
         // ai
         const desc = ws.aiChats[parsed.id];
         if (!desc) return Number.POSITIVE_INFINITY;
@@ -2123,6 +2147,47 @@ export const useStore = create<AppState>((set, get) => {
         };
       });
       return id;
+    },
+
+    openSubagent: (wsId, sessionId, toolUseId, agentType) => {
+      const k = subKey(sessionId, toolUseId, agentType);
+      updateWs(wsId, (w) => {
+        // Already open somewhere? Focus that pane + tab instead of duping.
+        let foundPane: PaneId | null = null;
+        mapTree(w.layout.editorRoot, (t) => {
+          if (t.tabs.includes(k)) foundPane = t.id;
+          return t;
+        });
+        if (foundPane) {
+          return {
+            ...w,
+            layout: {
+              ...w.layout,
+              activePaneId: foundPane,
+              editorRoot: mapTree(w.layout.editorRoot, (t) =>
+                t.id === foundPane ? { ...t, active: k } : t,
+              ),
+            },
+          };
+        }
+        const targetPaneId =
+          (w.layout.activePaneId &&
+            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
+            w.layout.activePaneId) ||
+          firstLeaf(w.layout.editorRoot).id;
+        return {
+          ...w,
+          layout: {
+            ...w.layout,
+            activePaneId: targetPaneId,
+            editorRoot: mapTree(w.layout.editorRoot, (t) =>
+              t.id === targetPaneId
+                ? { ...t, tabs: [...t.tabs, k], active: k }
+                : t,
+            ),
+          },
+        };
+      });
     },
 
     closeAIChat: (wsId, id) => {

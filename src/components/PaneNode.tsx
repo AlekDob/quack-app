@@ -20,6 +20,7 @@ import { openPalette } from "../paletteBus";
 import { prompt as dialogPrompt } from "../dialog";
 import { popOutTerminal, redockTerminal } from "../terminalPopout";
 import { AIIcon } from "./AIIcon";
+import { duckAvatarFor } from "../subagents";
 import { lookupRemoteLink } from "../sftpLinks";
 import { basename, relPath } from "../pathUtils";
 import { revealInTree } from "../revealInTree";
@@ -37,6 +38,8 @@ function tabLabel(
   isTerminal: boolean;
   isAI: boolean;
   popped: boolean;
+  /** Read-only subagent transcript tab — drives the duck-avatar tab icon. */
+  subAvatar?: string;
 } {
   const parsed = parseKey(key);
   if (parsed?.kind === "terminal") {
@@ -57,6 +60,16 @@ function tabLabel(
       isTerminal: false,
       isAI: true,
       popped: false,
+    };
+  }
+  if (parsed?.kind === "subagent") {
+    return {
+      label: parsed.agentType || "Subagent",
+      dirty: false,
+      isTerminal: false,
+      isAI: false,
+      popped: false,
+      subAvatar: duckAvatarFor(parsed.agentType),
     };
   }
   if (parsed?.kind === "file") {
@@ -586,6 +599,13 @@ function TabsPaneView(
                   <Icon name="terminal" size={12} />
                 ) : info.isAI ? (
                   <AIIcon size={12} />
+                ) : info.subAvatar ? (
+                  <img
+                    className="tab-sub-avatar"
+                    src={info.subAvatar}
+                    alt=""
+                    aria-hidden="true"
+                  />
                 ) : (
                   <Icon name="file-text" size={12} />
                 )}

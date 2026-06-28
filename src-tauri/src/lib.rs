@@ -119,6 +119,7 @@ pub fn run() {
             claude_code::claude_code_clear_session,
             claude_code::claude_code_list_sessions,
             claude_code::claude_code_load_session,
+            claude_code::claude_code_load_subagent,
             claude_code::claude_plugin_cmd,
             claude_perm::claude_perm_decide,
             claude_perm::claude_perm_endpoint,

@@ -19,6 +19,7 @@ import type { ChatMessage, ToolCall } from "../ai";
 import { balanceFences, splitThinking } from "../chatTextUtils";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { Icon, type IconName } from "./Icon";
+import { duckAvatarFor } from "../subagents";
 
 // Agent mode turns this on to render the chat denser: grouped tool bursts
 // collapse to an icon row by default, expandable on click. The normal
@@ -31,6 +32,22 @@ export const CompactChat = createContext(false);
 export const AgentFileOpen = createContext<((path: string) => void) | null>(
   null,
 );
+
+// The chat panel provides this so a Task (subagent) chip can open the
+// subagent's full transcript in a read-only tab. The panel binds wsId +
+// the current Claude Code session id; the chip supplies the Task call id
+// and the agent type. Null elsewhere → the chip renders but isn't clickable.
+export const SubagentOpen = createContext<
+  ((toolUseId: string, agentType: string) => void) | null
+>(null);
+
+// Pull the subagent type out of a Task tool-call's input. Claude Code uses
+// `subagent_type`; we fall back to a couple of aliases just in case.
+export function subagentTypeOf(args: Record<string, unknown>): string {
+  const v =
+    args.subagent_type ?? args.subagentType ?? args.agent_type ?? args.agent;
+  return typeof v === "string" ? v : "";
+}
 
 // Past-tense verb for a chip label — reads as "edited run.ts" / "ran tsc"
 // rather than the raw tool name.
@@ -181,11 +198,39 @@ export function primaryToolDetail(args: Record<string, unknown>): string {
   return "";
 }
 
-function resultPreview(result: string): string {
-  const trimmed = result.trim();
-  if (!trimmed) return "(empty)";
-  const firstLine = trimmed.split("\n")[0];
-  return firstLine.length > 200 ? firstLine.slice(0, 200) + "…" : firstLine;
+// Compact, scannable form of a tool's detail arg. Paths collapse to their
+// last two segments ("…/projects/index.html"); URLs to host + short path
+// ("example.com/blog/post"); plain strings pass through. Shared by the
+// live ticker (RunningToolRow) and the transcript rows (ToolCallRow) so
+// both read the same way — DRY, one place to tune the truncation.
+export function shortDetail(detail: string): string {
+  if (!detail) return "";
+  if (/^https?:\/\//i.test(detail)) {
+    try {
+      const u = new URL(detail);
+      const path = (u.pathname + (u.search || "")).replace(/\/$/, "");
+      const tail = path.length > 36 ? path.slice(0, 33) + "…" : path;
+      return u.host + tail;
+    } catch {
+      return detail;
+    }
+  }
+  const norm = detail.replace(/\\/g, "/");
+  if (!norm.includes("/")) return norm;
+  const parts = norm.split("/").filter(Boolean);
+  if (parts.length <= 2) return norm;
+  return "…/" + parts.slice(-2).join("/");
+}
+
+// Rotating chevron used by every expandable tool head (generic row, read
+// group, edit diff). One component → one rotation behaviour everywhere,
+// instead of three ▾/▸ text glyphs that don't animate.
+function Caret({ open }: { open: boolean }) {
+  return (
+    <span className={`ai-caret${open ? " open" : ""}`} aria-hidden="true">
+      <Icon name="chevron-right" size={12} />
+    </span>
+  );
 }
 
 // Pick the most-informative argument to show alongside the tool name
@@ -414,27 +459,7 @@ export function RunningToolRow({
   // list stays a tight one-line-per-tool ticker instead of dumping file
   // contents / command output mid-stream.
   const compact = useContext(CompactChat);
-  // Compact display detail. For paths: keep the last two segments
-  // ("…/projects/index.html"). For URLs: hostname + truncated path
-  // ("example.com/blog/post"). Plain strings: untouched.
-  const niceDetail = (() => {
-    if (!entry.detail) return "";
-    if (/^https?:\/\//i.test(entry.detail)) {
-      try {
-        const u = new URL(entry.detail);
-        const path = (u.pathname + (u.search || "")).replace(/\/$/, "");
-        const tail = path.length > 36 ? path.slice(0, 33) + "…" : path;
-        return u.host + tail;
-      } catch {
-        return entry.detail;
-      }
-    }
-    const norm = entry.detail.replace(/\\/g, "/");
-    if (!norm.includes("/")) return norm;
-    const parts = norm.split("/").filter(Boolean);
-    if (parts.length <= 2) return norm;
-    return "…/" + parts.slice(-2).join("/");
-  })();
+  const niceDetail = shortDetail(entry.detail);
   const previewLines = entry.preview
     ? entry.preview.split("\n").slice(0, 6).join("\n").trim()
     : "";
@@ -896,7 +921,7 @@ function ToolGroupCard({
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
-        <span className="ai-tcall-caret">{open ? "▾" : "▸"}</span>
+        <Caret open={open} />
         <span className="ai-tcall-group-label">
           {friendlyToolName(name)} × {calls.length}
         </span>
@@ -1339,6 +1364,51 @@ export function ToolCallRow({
   // can flip between the generic and diff renders across re-renders,
   // and a conditional hook would then violate React's hook ordering.
   const [expanded, setExpanded] = useState(false);
+  const openSubagent = useContext(SubagentOpen);
+  // Task = a subagent run. Render it as a duck-avatar chip that opens the
+  // subagent's read-only transcript on click (the transcript lands on disk
+  // once the run finishes, linked by this call's id).
+  if (call.function.name === "Task") {
+    const agentType = subagentTypeOf(call.function.arguments);
+    const desc =
+      typeof call.function.arguments.description === "string"
+        ? call.function.arguments.description
+        : "";
+    const canOpen = !!openSubagent && !!call.id;
+    return (
+      <div className="ai-tcall ai-tcall-subagent">
+        <button
+          type="button"
+          className="ai-tcall-head ai-subagent-head"
+          disabled={!canOpen}
+          onClick={
+            canOpen
+              ? () => openSubagent!(call.id!, agentType)
+              : undefined
+          }
+          title={
+            canOpen
+              ? "Open this subagent's transcript (read-only)"
+              : "Subagent"
+          }
+        >
+          <img
+            className="ai-subagent-avatar"
+            src={duckAvatarFor(agentType)}
+            alt=""
+            aria-hidden="true"
+          />
+          <span className="ai-tcall-name">{agentType || "Subagent"}</span>
+          {desc && <span className="ai-tcall-detail">{desc}</span>}
+          {typeof result !== "string" && (
+            <span className="ai-tcall-pending">
+              <span className="ai-spinner" />
+            </span>
+          )}
+        </button>
+      </div>
+    );
+  }
   // AskUserQuestion: a compact one-line record in the transcript. The
   // INTERACTIVE card renders docked above the composer (AIChatPanel's
   // ask-dock) while the question is pending — rendering full option
@@ -1370,44 +1440,54 @@ export function ToolCallRow({
   }
   const label = friendlyToolName(call.function.name);
   const detail = primaryToolDetail(call.function.arguments);
+  const icon = toolIconFor(call.function.name);
   const hasResult = typeof result === "string";
   // Tools like ToolSearch / TaskUpdate legitimately return no text —
   // their effect is the side channel, not the output. Rendering the
   // empty string as an expandable "(empty)" row read like a failure;
   // a quiet check says "done" instead.
   const resultIsEmpty = hasResult && result!.trim().length === 0;
+  const canExpand = hasResult && !resultIsEmpty;
+  // The head is the toggle when there's a result to reveal; otherwise it's
+  // a plain (running / empty-done) row. Same markup either way so the row
+  // doesn't reflow when the result lands mid-stream.
+  const Head = canExpand ? "button" : "div";
   return (
     <div className="ai-tcall">
-      <div className="ai-tcall-head">
-        <span className="ai-tcall-dot" />
+      <Head
+        className={`ai-tcall-head${canExpand ? " is-toggle" : ""}${expanded ? " expanded" : ""}`}
+        {...(canExpand
+          ? {
+              type: "button" as const,
+              onClick: () => setExpanded((v) => !v),
+              "aria-expanded": expanded,
+              title: expanded ? "Hide result" : "Show result",
+            }
+          : {})}
+      >
+        <span className="ai-tcall-ico" aria-hidden="true">
+          {icon ? <Icon name={icon} size={13} /> : <span className="ai-tcall-dot" />}
+        </span>
         <span className="ai-tcall-name">{label}</span>
-        {detail && <span className="ai-tcall-detail">{detail}</span>}
-        {!hasResult && (
-          <span className="ai-tcall-pending">
-            <span className="ai-spinner" />
+        {detail && (
+          <span className="ai-tcall-detail" title={detail}>
+            {shortDetail(detail)}
           </span>
         )}
-        {resultIsEmpty && (
-          <span className="ai-tcall-done" aria-hidden="true">
-            ✓
-          </span>
-        )}
-      </div>
-      {hasResult && !resultIsEmpty && (
-        <button
-          type="button"
-          className={`ai-tcall-result${expanded ? " expanded" : ""}`}
-          onClick={() => setExpanded((v) => !v)}
-          title={expanded ? "Hide result" : "Click to expand"}
-        >
-          {expanded ? (
-            <pre className="ai-tcall-result-body">{result}</pre>
-          ) : (
-            <span className="ai-tcall-result-preview">
-              {resultPreview(result!)}
+        <span className="ai-tcall-trail">
+          {!hasResult && <span className="ai-spinner ai-spinner-sm" />}
+          {resultIsEmpty && (
+            <span className="ai-tcall-done" title="Done">
+              <Icon name="check" size={12} />
             </span>
           )}
-        </button>
+          {canExpand && <Caret open={expanded} />}
+        </span>
+      </Head>
+      {canExpand && expanded && (
+        <div className="ai-tcall-reveal">
+          <pre className="ai-tcall-result-body">{result}</pre>
+        </div>
       )}
     </div>
   );
@@ -1447,7 +1527,7 @@ function EditDiffCard({ call, diffs, result }: EditDiffCardProps) {
           )}
           {added > 0 && <span className="ai-tcall-edit-add">+{added}</span>}
         </span>
-        <span className="ai-tcall-caret">{expanded ? "▾" : "▸"}</span>
+        <Caret open={expanded} />
       </button>
       {expanded && (
         <div className="ai-tcall-edit-body">

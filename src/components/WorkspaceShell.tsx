@@ -7,9 +7,11 @@ import { SidebarStack } from "./SidebarStack";
 import { AIChatPanel } from "./AIChatPanel";
 import { AIChatsRail } from "./AIChatsRail";
 import { AIIcon } from "./AIIcon";
+import { SubagentTranscriptView } from "./SubagentTranscriptView";
 import {
   aiKey,
   findTabsPaneByTab,
+  parseKey,
   termKey,
   useStore,
   type PaneId,
@@ -429,6 +431,52 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
           />
         );
       })}
+
+      {/* Read-only subagent transcript tabs. Their `sub:` keys live only
+          in the layout (no descriptor record), so we walk the pane tree
+          to find them and portal one viewer per open key. */}
+      {(() => {
+        const keys = new Set<string>();
+        const walk = (pane: typeof layout.editorRoot) => {
+          if (pane.kind === "tabs") {
+            pane.tabs.forEach((k) => {
+              if (k.startsWith("sub:")) keys.add(k);
+            });
+          } else {
+            walk(pane.first);
+            walk(pane.second);
+          }
+        };
+        walk(layout.editorRoot);
+        if (layout.bottomRoot) walk(layout.bottomRoot);
+        return [...keys].map((key) => {
+          const parsed = parseKey(key);
+          if (parsed?.kind !== "subagent") return null;
+          const editorPane = findTabsPaneByTab(layout.editorRoot, key);
+          const bottomPane = layout.bottomRoot
+            ? findTabsPaneByTab(layout.bottomRoot, key)
+            : null;
+          const pane = editorPane ?? bottomPane;
+          const inBottom = !editorPane && !!bottomPane;
+          const container = pane ? (paneContainers[pane.id] ?? null) : null;
+          const visible =
+            isActive &&
+            !!pane &&
+            pane.active === key &&
+            (inBottom ? layout.bottomVisible : true);
+          return (
+            <SubagentTranscriptView
+              key={key}
+              root={ws.meta.root}
+              sessionId={parsed.sessionId}
+              toolUseId={parsed.toolUseId}
+              agentType={parsed.agentType}
+              container={container}
+              visible={visible}
+            />
+          );
+        });
+      })()}
 
       {/* Terminals: one TerminalCore per terminal, portal-ed to its current pane's container. */}
       {Object.values(ws.terminals).map((t) => {

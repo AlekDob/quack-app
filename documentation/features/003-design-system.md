@@ -49,6 +49,15 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 ### Composer pill (Cursor-style)
 - `.ai-composer-shell` wraps `.ai-composer-meta` + `.ai-input-row`; CSS `order` puts textarea on top, controls below, permission/queue on top. Textarea transparent inside the pill. Meta pills (model/effort/thinking) homologated to one size (`5px 12px`, 11px, `radius-full`). Buttons compact 30px.
 
+### Floating-pill tabs (Cursor-style)
+- Editor tabs (`.tab-bar`/`.tab`): the bar has `gap:4px` + `padding:6px 8px`; each tab is a `radius-sm` pill, **no** vertical `border-right` dividers. Active = raised surface (`--bg`) + hairline trace (`--shadow-sm` + inset 1px border), **no accent underline** (brand: zero-orange). `.tab-add`/`.tab-list-btn` rounded to match.
+- Agent-mode context tabs (`.agent-context-tabs`/`.agent-context-tab`, Changes/Files) use the SAME pill treatment (full-width `flex:1` pills, active = raised + hairline) instead of the old bottom-border indicator.
+- The removed `.tabs-pane.focused .tab-bar` accent box-shadow is gone (no orange line under the focused pane).
+
+### Chat reading type
+- Message body `.ai-msg-body .md-preview` is 13px / line-height 1.55; headings h1–h4 17/15/14/13; code blocks 13px; fallback `.ai-msg` 13px. Sized for comfortable reading without dwarfing the chrome.
+- Assistant identity header = **Jack** (duck avatar 32px + name 14px + "Project Manager" 10px) — full feature in `features/005-jack-duck-identity.md`. `.ai-msg-assistant .ai-msg-body` uses a discreet 1px `--border` left rule (not an accent rail).
+
 ### Config
 - Theme persisted: localStorage `lcp.theme` (`theme.ts`). Default = system, dark-first feel.
 - `data-os` set once at boot from `navigator.platform`.

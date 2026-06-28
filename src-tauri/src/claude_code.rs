@@ -1067,8 +1067,6 @@ pub fn claude_code_load_session(
     cwd: String,
     session_id: String,
 ) -> Result<Vec<LoadedMessage>, String> {
-    use std::fs;
-
     let home = dirs::home_dir().ok_or_else(|| "no home dir".to_string())?;
     let encoded = encode_project_path(&cwd);
     let path = home
@@ -1079,8 +1077,83 @@ pub fn claude_code_load_session(
     if !path.exists() {
         return Err(format!("session {} not found at {:?}", session_id, path));
     }
+    parse_session_jsonl(&path)
+}
 
-    let file = fs::File::open(&path).map_err(|e| e.to_string())?;
+/// Result of loading one subagent's full transcript from disk. `agent_type`
+/// and `description` come from the sibling `*.meta.json`.
+#[derive(serde::Serialize)]
+pub struct LoadedSubagent {
+    pub agent_type: String,
+    pub description: String,
+    pub messages: Vec<LoadedMessage>,
+}
+
+/// Load the FULL transcript of one subagent (sidechain) run. Claude Code
+/// writes each subagent to `<session>/subagents/agent-<id>.jsonl` with a
+/// sibling `agent-<id>.meta.json` carrying `{agentType, description,
+/// toolUseId}`. We locate the meta whose `toolUseId` matches the parent
+/// Task tool-call, then parse its jsonl with the same reader as the main
+/// session.
+#[tauri::command]
+pub fn claude_code_load_subagent(
+    cwd: String,
+    session_id: String,
+    tool_use_id: String,
+) -> Result<LoadedSubagent, String> {
+    let home = dirs::home_dir().ok_or_else(|| "no home dir".to_string())?;
+    let encoded = encode_project_path(&cwd);
+    let sub_dir = home
+        .join(".claude")
+        .join("projects")
+        .join(&encoded)
+        .join(&session_id)
+        .join("subagents");
+    if !sub_dir.exists() {
+        return Err(format!("no subagents dir at {:?}", sub_dir));
+    }
+    for entry in std::fs::read_dir(&sub_dir).map_err(|e| e.to_string())? {
+        let p = entry.map_err(|e| e.to_string())?.path();
+        let name = p.file_name().and_then(|s| s.to_str()).unwrap_or("");
+        if !name.ends_with(".meta.json") {
+            continue;
+        }
+        let txt = match std::fs::read_to_string(&p) {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        let meta: serde_json::Value = match serde_json::from_str(&txt) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if meta.get("toolUseId").and_then(|x| x.as_str()) != Some(tool_use_id.as_str()) {
+            continue;
+        }
+        let base = name.trim_end_matches(".meta.json");
+        let jsonl = sub_dir.join(format!("{}.jsonl", base));
+        return Ok(LoadedSubagent {
+            agent_type: meta
+                .get("agentType")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string(),
+            description: meta
+                .get("description")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string(),
+            messages: parse_session_jsonl(&jsonl)?,
+        });
+    }
+    Err(format!("no subagent transcript for tool_use {}", tool_use_id))
+}
+
+/// Parse a Claude Code JSONL transcript (main session OR subagent) into our
+/// message model. Coalesces tool_use blocks into the assistant message they
+/// belong to and attaches tool_result blocks to the latest assistant message.
+fn parse_session_jsonl(path: &std::path::Path) -> Result<Vec<LoadedMessage>, String> {
+    use std::fs;
+    let file = fs::File::open(path).map_err(|e| e.to_string())?;
     let mut reader = BufReader::new(file);
     let mut buf = String::with_capacity(8 * 1024);
 

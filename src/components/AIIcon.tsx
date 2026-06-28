@@ -1,76 +1,41 @@
-import logoUrl from "../assets/app-logo.png";
-
 interface AIIconProps {
   size?: number;
   className?: string;
   title?: string;
-  /** When false, render the bare app logo without the AI accent. */
+  /** Kept for API compatibility; the duck mark needs no extra accent. */
   sparkle?: boolean;
 }
 
 /**
  * Single source of truth for the AI brand mark used across the app
- * (activity bar, AI chat tabs, side panel header, "New AI chat" buttons).
+ * (activity bar, AI chat tabs, side panel header, "New AI"/"New chat"
+ * buttons, the Agent toggle). It IS Jack — the Quack duck mascot — so every
+ * agent/chat affordance reads as Quack at a glance.
  *
- * Renders the app logo with a small "AI sparkle" badge tucked into the
- * top-right corner, so the AI affordances stay visually anchored to the
- * product brand. To rebrand the app icon itself, replace
- * `src/assets/app-logo.png`. To restyle the sparkle badge, edit the
- * inline SVG below.
+ * Renders Jack's duck avatar as a rounded mark. The image lives in
+ * `public/jack.jpeg` (served at `/jack.jpeg`); swap that file to restyle
+ * the mascot everywhere at once.
  */
-export function AIIcon({
-  size = 16,
-  className,
-  title,
-  sparkle = true,
-}: AIIconProps) {
-  const sparkleSize = Math.max(8, Math.round(size * 0.55));
+export function AIIcon({ size = 16, className, title }: AIIconProps) {
+  // Rounded square that scales with the icon — keeps a coherent "avatar"
+  // shape from 12px chrome marks up to the 28px empty-state hero.
+  const radius = Math.max(3, Math.round(size * 0.28));
   return (
-    <span
+    <img
       className={className}
-      style={{
-        position: "relative",
-        display: "inline-flex",
-        width: size,
-        height: size,
-        flexShrink: 0,
-      }}
-      aria-label={title ?? (sparkle ? "AI" : "App")}
+      src="/jack.jpeg"
+      width={size}
+      height={size}
+      alt=""
+      draggable={false}
+      aria-label={title ?? "Quack AI"}
       role="img"
-    >
-      <img
-        src={logoUrl}
-        width={size}
-        height={size}
-        alt=""
-        draggable={false}
-        style={{ display: "block", objectFit: "contain" }}
-      />
-      {sparkle && (
-        <svg
-          width={sparkleSize}
-          height={sparkleSize}
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          style={{
-            position: "absolute",
-            top: -Math.round(sparkleSize * 0.15),
-            right: -Math.round(sparkleSize * 0.15),
-            filter: "drop-shadow(0 0 1px rgba(0,0,0,0.35))",
-          }}
-          aria-hidden="true"
-        >
-          {/* Four-pointed sparkle = the universal "AI" accent */}
-          <path
-            d="M12 1.5L14 9L21.5 11L14 13L12 20.5L10 13L2.5 11L10 9L12 1.5Z"
-            fill="#F5B524"
-            stroke="#ffffff"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
-        </svg>
-      )}
-    </span>
+      style={{
+        display: "block",
+        flexShrink: 0,
+        objectFit: "cover",
+        borderRadius: radius,
+      }}
+    />
   );
 }
