@@ -4,6 +4,7 @@ import { onToolDrawer, type ToolDrawerData } from "../toolDrawer";
 import { useModalFocus } from "../useModalFocus";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { Icon } from "./Icon";
+import { fs } from "../ipc";
 
 // Right-side slide-over showing a tool call's full output. Animates IN and OUT:
 // `data` stays mounted through the closing transition, `shown` drives the
@@ -11,6 +12,9 @@ import { Icon } from "./Icon";
 export function ToolResultDrawer() {
   const [data, setData] = useState<ToolDrawerData | null>(null);
   const [shown, setShown] = useState(false);
+  // Full-quality data: URL for image reads — loaded from disk on demand so
+  // the body shows the picture instead of the `[image]` placeholder.
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
   useModalFocus(panelRef, shown);
 
@@ -21,6 +25,19 @@ export function ToolResultDrawer() {
       requestAnimationFrame(() => setShown(true));
     });
   }, []);
+
+  useEffect(() => {
+    setImgSrc(null);
+    if (!data?.imagePath) return;
+    let alive = true;
+    void fs
+      .readImageDataUrl(data.imagePath)
+      .then((url) => alive && setImgSrc(url))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [data?.imagePath]);
 
   const close = () => {
     setShown(false);
@@ -82,7 +99,13 @@ export function ToolResultDrawer() {
           </button>
         </div>
         <div className="tool-drawer-body">
-          {data.markdown ? (
+          {data.imagePath ? (
+            imgSrc ? (
+              <img className="tool-drawer-image" src={imgSrc} alt={data.subtitle ?? ""} />
+            ) : (
+              <pre className="ai-tcall-result-body">Carico immagine…</pre>
+            )
+          ) : data.markdown ? (
             <div className="ai-tcall-result-md">
               <MarkdownPreview content={data.result} />
             </div>

@@ -63,6 +63,10 @@ async-trait = "0.1"
 trash = "5"
 sysinfo = "0.39.3"
 ureq = { version = "3.3.0", features = ["json"] }
+# Decode/encode chat image attachments: the frontend compresses an image
+# (WebP/JPEG) and ships it base64; Rust just persists the bytes to a temp
+# dir and reads them back as data: URLs for the in-app preview / zoom.
+base64 = "0.22"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"

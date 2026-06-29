@@ -594,6 +594,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "base64 0.22.1",
  "chardetng",
  "dirs 5.0.1",
  "encoding_rs",

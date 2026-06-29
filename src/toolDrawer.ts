@@ -16,6 +16,9 @@ export interface ToolDrawerData {
   result: string;
   /** Render the body as Markdown (a `.md` read) instead of monospace. */
   markdown?: boolean;
+  /** When set, the body renders the image at this path (a Read of an image)
+   *  instead of the textual `[image]` placeholder. Loaded as a data: URL. */
+  imagePath?: string;
   /** When set, the drawer shows an "Open in editor" action (file-ref tools). */
   onOpenFile?: () => void;
 }

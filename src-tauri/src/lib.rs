@@ -79,6 +79,8 @@ pub fn run() {
             fs_ops::create_dir,
             fs_ops::path_exists,
             fs_ops::create_file,
+            fs_ops::save_image_attachment,
+            fs_ops::read_image_data_url,
             pty::pty_spawn,
             pty::pty_write,
             pty::pty_resize,

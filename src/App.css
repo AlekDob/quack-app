@@ -49,6 +49,9 @@
   /* Skills — dedicated Quack orange so `/skill` rows + the Skill tool stand out. */
   --skill: #f28c52;
   --skill-bg: rgba(242, 140, 82, 0.16);
+  /* Image reads — teal tint so a Read of an attached image is identifiable. */
+  --img: #3bb6c4;
+  --img-bg: rgba(59, 182, 196, 0.16);
   /* Frosted surface fill for static chrome (topbar, dropdowns, modals) */
   --glass-bg: rgba(20, 22, 28, 0.72);
 }
@@ -92,6 +95,8 @@
   --info-bg: rgba(0, 0, 0, 0.06);
   --skill: #d9722e;
   --skill-bg: rgba(217, 114, 46, 0.14);
+  --img: #0e8a99;
+  --img-bg: rgba(14, 138, 153, 0.12);
   --glass-bg: rgba(255, 255, 255, 0.72);
 }
 
@@ -950,26 +955,18 @@ body.ws-dragging * {
   background: var(--danger);
   color: #fff;
 }
+/* Logo-less wordmark: no duck mark, the "Quack" text carries the brand.
+   Heavier weight + tighter tracking gives it presence in the neutral chrome. */
 .topbar-brand {
   display: flex;
   align-items: center;
-  gap: 7px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--fg);
-  font-size: 13px;
-  letter-spacing: 0.2px;
+  font-size: 14px;
+  letter-spacing: -0.1px;
   margin-right: 8px;
   padding-left: 4px;
   user-select: none;
-  flex-shrink: 0;
-}
-/* Quack duck mark (cropped from the brand logo) — the one branded image
-   in the otherwise neutral chrome. */
-.topbar-logo {
-  height: 22px;
-  width: 22px;
-  object-fit: contain;
-  display: block;
   flex-shrink: 0;
 }
 .topbar-menus {
@@ -9115,6 +9112,21 @@ body.ws-dragging * {
 .ai-tcall-head.ai-tcall-skill.is-interactive:hover .ai-tcall-ico {
   color: var(--skill);
 }
+/* Image reads — teal tint, distinct from the orange Skill pill. */
+.ai-tcall-head.ai-tcall-image {
+  border-color: color-mix(in srgb, var(--img) 45%, var(--border));
+  background: var(--img-bg);
+}
+.ai-tcall-head.ai-tcall-image .ai-tcall-ico,
+.ai-tcall-head.ai-tcall-image .ai-tcall-name {
+  color: var(--img);
+}
+.ai-tcall-head.ai-tcall-image.is-interactive:hover {
+  background: color-mix(in srgb, var(--img) 16%, var(--bg-hi));
+}
+.ai-tcall-head.ai-tcall-image.is-interactive:hover .ai-tcall-ico {
+  color: var(--img);
+}
 .ai-tcall-dot {
   width: 6px;
   height: 6px;
@@ -12994,4 +13006,97 @@ body.ws-dragging * {
   .welcome-features {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Chat image attachments (Cmd+V / Finder drop) ─────────────────────── */
+/* Strip of staged thumbnails above the composer, before sending. */
+.ai-attach-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px 0;
+}
+.ai-attach-thumb {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--bg-hi);
+}
+.ai-attach-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: zoom-in;
+  display: block;
+}
+/* Remove (×) button — top-right corner, appears on hover of the chip. */
+.ai-attach-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.ai-attach-thumb:hover .ai-attach-remove {
+  opacity: 1;
+}
+.ai-attach-remove:hover {
+  background: var(--err);
+}
+
+/* Thumbnails rendered inside a sent user message. */
+.ai-msg-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.ai-msg-image {
+  max-width: 180px;
+  max-height: 180px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  cursor: zoom-in;
+  object-fit: cover;
+}
+
+/* Full-screen zoom modal — click anywhere (or Esc) to dismiss. */
+.ai-image-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.78);
+  backdrop-filter: blur(var(--blur-light));
+  cursor: zoom-out;
+}
+.ai-image-modal-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Image read shown inside the tool-result drawer. */
+.tool-drawer-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
 }

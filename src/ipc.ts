@@ -18,6 +18,13 @@ export const fs = {
   createDir: (path: string) => invoke<void>("create_dir", { path }),
   createFile: (path: string) => invoke<void>("create_file", { path }),
   exists: (path: string) => invoke<boolean>("path_exists", { path }),
+  /** Persist a chat image attachment (base64 bytes) to the temp dir;
+   *  returns the absolute path Claude Code reads back with its Read tool. */
+  saveImageAttachment: (filename: string, dataB64: string) =>
+    invoke<string>("save_image_attachment", { filename, dataB64 }),
+  /** Read an image file back as a data: URL for the preview / zoom modal. */
+  readImageDataUrl: (path: string) =>
+    invoke<string>("read_image_data_url", { path }),
 };
 
 export interface ShellOption {

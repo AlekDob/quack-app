@@ -15,6 +15,7 @@ import { installNativeMenu } from "./nativeMenu";
 import { onPaletteOpen } from "./paletteBus";
 import { onFootprintOpen } from "./footprintBus";
 import { basename } from "./pathUtils";
+import { tryRouteDropToChat } from "./imageAttach";
 import { WorkspacePicker } from "./components/WorkspacePicker";
 import { WorkspaceShell } from "./components/WorkspaceShell";
 import { AgentModeShell } from "./components/AgentModeShell";
@@ -275,6 +276,13 @@ function MainApp() {
           const wsId = useStore.getState().activeId;
           if (!wsId) return;
           const paths = (event.payload as { paths: string[] }).paths ?? [];
+          // Images dropped over the AI chat attach to the composer instead
+          // of opening as editor tabs. The chat panel registers its rect +
+          // handler; this no-ops (falls through to open-as-tab) when the
+          // drop lands elsewhere or carries no images.
+          const pos = (event.payload as { position?: { x: number; y: number } })
+            .position;
+          if (tryRouteDropToChat(paths, pos)) return;
           for (const p of paths) {
             // openFile handles "already open" (activates the tab) and
             // unreadable paths (logs + bails) — caller-side filtering

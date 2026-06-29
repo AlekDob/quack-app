@@ -46,6 +46,15 @@ export interface ChatMessage {
     | { kind: "text"; text: string }
     | { kind: "tool_call"; callId: string }
   >;
+  /**
+   * Image attachments on a user message (Claude Code only — it reads them
+   * via its Read tool from the on-disk `path`). Additive + optional, so
+   * providers that only consume `content` are unaffected and old saved
+   * sessions render fine. We persist only the lightweight `path`/`name`
+   * plus a tiny `thumb` data: URL for the inline preview — full-quality
+   * bytes stay on disk and are fetched on demand for the zoom modal.
+   */
+  images?: Array<{ path: string; name: string; thumb: string }>;
 }
 
 export interface ToolDef {

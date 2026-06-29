@@ -117,6 +117,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `013-file-type-icons.md` — per-type icons in the file tree (`fileIconName` map); monochrome shapes only, no Seti-style color (brand rule).
   - `014-claude-code-bridge.md` — CC CLI bridge: spawn/stream/attach + Stop. **Stop kills the whole process group** (no orphaned tool children pinning the CPU); `children` map holds pids, not lockable `Child`s.
   - `015-claude-permission-mode.md` — per-chat permission mode (Ask/Plan/Auto-edit/Auto/Bypass); `permModeStore` bridges the composer mode to `ClaudePermissionOverlay`, the single auto-allow authority.
+  - `016-image-attachments.md` — paste/drag up to 10 images into a Claude Code chat; client-side compression, on-disk temp storage, path inlined for CC's Read tool, in-message thumbnails + zoom modal.
 - `documentation/decisions/` — architectural rationales.
   - `001-agent-status-indicators.md` — the per-session agent-status design (the focus feature).
   - `002-ui-styling-rebrand-not-rewrite.md` — why CSS-token rebrand, not Tailwind/shadcn.

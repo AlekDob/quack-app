@@ -71,6 +71,13 @@ import {
 import { matchExclusion } from "../aiPrivacy";
 import { publishTasks } from "../aiTaskStore";
 import { loadWorkspaceRules } from "../workspaceRules";
+import {
+  type ImageAttachment,
+  MAX_ATTACHED_IMAGES,
+  attachFromBlob,
+  attachFromPath,
+  registerChatDropZone,
+} from "../imageAttach";
 import { ClaudePermissionOverlay } from "./ClaudePermissionOverlay";
 import {
   loadUsage,
@@ -285,6 +292,11 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const [rulesPath, setRulesPath] = useState<string | null>(null);
   const [selected, setSelected] = useState<string>("");
   const [input, setInput] = useState("");
+  // Image attachments staged on the composer (Claude Code only). Cleared
+  // after each send. The zoom modal holds the full-quality data: URL of
+  // whichever thumbnail the user clicked (fetched from disk on demand).
+  const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([]);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState<string | null>(null);
   // Live chronological block log for the in-progress assistant bubble.
@@ -555,6 +567,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const editorState = useEditorState();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Root element ref — its bounding rect is the drop-zone the window-level
+  // drag-drop listener (App.tsx) hit-tests image drops against.
+  const panelRef = useRef<HTMLDivElement>(null);
   const stickyBottomRef = useRef(true);
   // Visible "jump to bottom" affordance. Mirrors stickyBottomRef into
   // React state so the button can render when the user scrolls up
@@ -1236,20 +1251,112 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     sendUserTextRef.current = (t: string) => sendUserText(t);
   });
 
+  // Stage image attachments from a Cmd+V paste or a Finder drop. Compresses
+  // each (client-side) and persists it to disk; caps at MAX_ATTACHED_IMAGES.
+  // Images are a Claude Code feature (it reads them with its Read tool) — for
+  // any other provider we no-op with a hint instead of silently dropping them.
+  const appendImages = useCallback(
+    async (
+      sources: Array<
+        | { kind: "blob"; blob: Blob; name: string }
+        | { kind: "path"; path: string }
+      >,
+    ) => {
+      const providerId = parseQualifiedModel(selected)?.providerId ?? "ollama";
+      if (providerId !== "claude-code") {
+        toastInfo("Le immagini si allegano solo con Claude Code");
+        return;
+      }
+      const room = MAX_ATTACHED_IMAGES - attachedImages.length;
+      if (room <= 0) {
+        toastError(`Massimo ${MAX_ATTACHED_IMAGES} immagini per messaggio`);
+        return;
+      }
+      const slice = sources.slice(0, room);
+      if (sources.length > room) {
+        toastInfo(`Allegate ${room} immagini (limite ${MAX_ATTACHED_IMAGES})`);
+      }
+      for (const s of slice) {
+        try {
+          const att =
+            s.kind === "blob"
+              ? await attachFromBlob(s.blob, s.name)
+              : await attachFromPath(s.path);
+          // Guard the cap again inside the loop — awaits interleave.
+          setAttachedImages((cur) =>
+            cur.length >= MAX_ATTACHED_IMAGES ? cur : [...cur, att],
+          );
+        } catch (err) {
+          toastError(
+            `Immagine non caricata: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    },
+    [selected, attachedImages.length],
+  );
+
+  const removeImage = (id: string) =>
+    setAttachedImages((cur) => cur.filter((a) => a.id !== id));
+
+  // Open the full-quality version of an attachment in the zoom modal. We
+  // keep full bytes off localStorage, so re-read from disk on click.
+  const openZoom = async (att: { path: string; thumb: string }) => {
+    try {
+      setZoomImage(await fs.readImageDataUrl(att.path));
+    } catch {
+      // File gone (temp cleanup / old session) — fall back to the thumb.
+      setZoomImage(att.thumb);
+    }
+  };
+
+  // Register this panel as the chat drop-zone so App.tsx routes image drops
+  // landing over it to appendImages instead of opening them as editor tabs.
+  useEffect(() => {
+    return registerChatDropZone({
+      getRect: () => panelRef.current?.getBoundingClientRect() ?? null,
+      onPaths: (paths) =>
+        void appendImages(paths.map((path) => ({ kind: "path", path }))),
+    });
+  }, [appendImages]);
+
+  // Esc closes the image zoom modal (click-outside also closes it).
+  useEffect(() => {
+    if (!zoomImage) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setZoomImage(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoomImage]);
+
   const send = async () => {
     const text = input.trim();
-    if (!text) return;
-    setInput("");
-    setHistoryIdx(null);
-    historyDraftRef.current = "";
+    const imgs = attachedImages;
+    if (!text && imgs.length === 0) return;
     if (streaming !== null || runningTools) {
-      // Active turn — queue this message instead of dropping it.
+      // Active turn — queue the text. The queue is text-only, so hold
+      // images back rather than silently dropping them.
+      if (imgs.length > 0) {
+        toastInfo("Attendi la fine del turno per inviare le immagini");
+        return;
+      }
+      setInput("");
+      setHistoryIdx(null);
+      historyDraftRef.current = "";
       queueRef.current.push(text);
       setQueueLen(queueRef.current.length);
       toastInfo(`Queued (${queueRef.current.length} pending)`);
       return;
     }
-    await sendUserText(text);
+    setInput("");
+    setHistoryIdx(null);
+    historyDraftRef.current = "";
+    setAttachedImages([]);
+    // A message that's images-only still needs a prompt for the model.
+    const prompt =
+      text || (imgs.length > 0 ? "Guarda le immagini allegate." : text);
+    await sendUserText(prompt, messages, imgs);
   };
 
   // Option clicked on the docked AskUserQuestion card — the selection
@@ -1648,8 +1755,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const sendUserText = async (
     text: string,
     baseMessages: ChatMessage[] = messages,
+    images: ImageAttachment[] = [],
   ) => {
-    if (!text || !selected) return;
+    if ((!text && images.length === 0) || !selected) return;
     // Mark the live loop as the stream's owner so the attach effect
     // can't subscribe a duplicate consumer (cleared in the finally).
     liveTurnRef.current = true;
@@ -1821,6 +1929,15 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           `The user wants you to look at: ${attachedFiles.join(", ")}. Use your Read tool on these.`,
         );
       }
+      // Image attachments: Claude Code's Read tool renders image files
+      // visually, so we just hand it the on-disk paths (kept outside the
+      // workspace — see save_image_attachment).
+      if (images.length > 0) {
+        ccTurnContext.push(
+          `The user attached ${images.length} image${images.length === 1 ? "" : "s"} to this message. ` +
+            `View ${images.length === 1 ? "it" : "them"} with your Read tool: ${images.map((i) => i.path).join(", ")}.`,
+        );
+      }
       // @-mentioned subagents: instruct Claude Code to delegate this turn
       // to them via the Task tool. Only CC reaches this branch, and the
       // agent catalog is CC-only, so attachedAgents is empty elsewhere.
@@ -1951,7 +2068,22 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     // Display the user's bare text in the chat — but send an augmented
     // version (with the inline tree / per-turn editor context) to the
     // model.
-    const displayUserMsg: ChatMessage = { role: "user", content: text };
+    const displayUserMsg: ChatMessage = {
+      role: "user",
+      content: text,
+      // Persist only path + name + tiny thumb (not full bytes) so the chat
+      // can re-render the inline preview after reload without bloating
+      // localStorage; the zoom modal re-reads full quality from disk.
+      ...(images.length > 0
+        ? {
+            images: images.map((i) => ({
+              path: i.path,
+              name: i.name,
+              thumb: i.thumb,
+            })),
+          }
+        : {}),
+    };
     const ccPrefix =
       ccTurnContext.length > 0
         ? `[Editor context]\n${ccTurnContext.join("\n\n")}\n[/Editor context]\n\n`
@@ -3424,7 +3556,17 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   return (
     <SubagentOpen.Provider value={openSubagentTab}>
     <AgentFileOpen.Provider value={fileOpenHandler}>
-    <div className="ai-panel">
+    <div className="ai-panel" ref={panelRef}>
+      {zoomImage && (
+        <div
+          className="ai-image-modal"
+          onClick={() => setZoomImage(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <img src={zoomImage} alt="" className="ai-image-modal-img" />
+        </div>
+      )}
       {renderHeader()}
       {renderHistoryDropdown()}
       <PrivacyBanner activeFilePath={editorState.filePath} />
@@ -3730,6 +3872,20 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                   </details>
                 )}
               <div className="ai-msg-body">
+                {m.images && m.images.length > 0 && (
+                  <div className="ai-msg-images">
+                    {m.images.map((img, idx) => (
+                      <img
+                        key={idx}
+                        className="ai-msg-image"
+                        src={img.thumb}
+                        alt={img.name}
+                        title={img.name}
+                        onClick={() => void openZoom(img)}
+                      />
+                    ))}
+                  </div>
+                )}
                 {showThinking ? (
                   <span className="ai-thinking">
                     <span className="ai-spinner" /> Thinking…
@@ -4666,6 +4822,27 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           </button>
         </div>
       )}
+      {attachedImages.length > 0 && (
+        <div className="ai-attach-strip">
+          {attachedImages.map((att) => (
+            <div key={att.id} className="ai-attach-thumb" title={att.name}>
+              <img
+                src={att.thumb}
+                alt={att.name}
+                onClick={() => void openZoom(att)}
+              />
+              <button
+                className="ai-attach-remove"
+                aria-label="Rimuovi immagine"
+                title="Rimuovi"
+                onClick={() => removeImage(att.id)}
+              >
+                <Icon name="x" size={10} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="ai-input-row">
         <textarea
           ref={inputRef}
@@ -4678,6 +4855,26 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           }
           value={input}
           onPaste={(e) => {
+            // Image paste (Cmd+V): pull any image items out of the
+            // clipboard before the text-fence logic runs. Attaching wins
+            // over pasting their (usually empty) text representation.
+            const imageItems = Array.from(e.clipboardData.items).filter((it) =>
+              it.type.startsWith("image/"),
+            );
+            if (imageItems.length > 0) {
+              e.preventDefault();
+              const blobs = imageItems
+                .map((it) => it.getAsFile())
+                .filter((f): f is File => f !== null);
+              void appendImages(
+                blobs.map((b) => ({
+                  kind: "blob" as const,
+                  blob: b,
+                  name: b.name || "pasted",
+                })),
+              );
+              return;
+            }
             // Auto-fence multi-line code paste so the model sees a
             // properly-delimited code block instead of free-form text
             // that breaks markdown rendering. Heuristic: 4+ lines AND
@@ -4761,6 +4958,16 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             ) {
               e.preventDefault();
               stop();
+              return;
+            }
+            // Escape on an empty composer clears staged image attachments.
+            if (
+              e.key === "Escape" &&
+              input.length === 0 &&
+              attachedImages.length > 0
+            ) {
+              e.preventDefault();
+              setAttachedImages([]);
               return;
             }
             // @-mention popover navigation takes precedence over the

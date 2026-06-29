@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::Serialize;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -166,4 +167,51 @@ pub fn create_file(path: String) -> Result<(), String> {
         return Err("File already exists".to_string());
     }
     std::fs::write(&p, "").map_err(|e| e.to_string())
+}
+
+/// Persist a chat image attachment outside the workspace (system temp dir)
+/// and return its absolute path. The frontend already compressed + encoded
+/// the image (WebP/JPEG) and sends the bytes base64; here we just decode and
+/// write. Lives in temp so we never dirty the user's repo — Claude Code
+/// reads it back with its Read tool (the path is inlined into the prompt).
+#[tauri::command]
+pub fn save_image_attachment(filename: String, data_b64: String) -> Result<String, String> {
+    let dir = std::env::temp_dir().join("quack-attachments");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    // Strip any directory components from the frontend-supplied name so a
+    // crafted value (e.g. "../foo") can't escape the attachments dir.
+    let safe = Path::new(&filename)
+        .file_name()
+        .ok_or_else(|| "invalid filename".to_string())?
+        .to_string_lossy()
+        .into_owned();
+    let bytes = STANDARD
+        .decode(data_b64.as_bytes())
+        .map_err(|e| e.to_string())?;
+    let path = dir.join(safe);
+    std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
+/// Read an image file back as a `data:` URL for the in-app preview / zoom
+/// modal. Keeps base64 OUT of localStorage — the chat persists only the
+/// path + a tiny thumbnail, and asks for full quality on demand. Mime is
+/// derived from the extension (good enough for our own attachments).
+#[tauri::command]
+pub fn read_image_data_url(path: String) -> Result<String, String> {
+    let p = Path::new(&path);
+    let bytes = std::fs::read(p).map_err(|e| e.to_string())?;
+    let mime = match p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .as_deref()
+    {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        _ => "application/octet-stream",
+    };
+    Ok(format!("data:{};base64,{}", mime, STANDARD.encode(&bytes)))
 }

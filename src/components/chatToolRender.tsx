@@ -23,6 +23,7 @@ import { duckAvatarFor } from "../subagents";
 import { requestToolDrawer } from "../toolDrawer";
 import { requestDiff } from "../editorState";
 import { langOf } from "../langDetect";
+import { isImagePath } from "../imageAttach";
 
 // Agent mode turns this on to render the chat denser: grouped tool bursts
 // collapse to an icon row by default, expandable on click. The normal
@@ -187,6 +188,9 @@ export function primaryToolDetail(args: Record<string, unknown>): string {
     return cmd.length > 80 ? cmd.slice(0, 80) + "…" : cmd;
   }
   for (const k of [
+    // `skill` first: the Skill tool names which skill it runs here, so the
+    // chip reads "Skill feature-creator" instead of a bare "Skill".
+    "skill",
     "path",
     "file_path",
     "url",
@@ -296,6 +300,7 @@ function ToolRowHead({
   onPrimary,
   primaryTitle,
   skill,
+  image,
 }: {
   icon: IconName | null;
   name: string;
@@ -306,12 +311,14 @@ function ToolRowHead({
   primaryTitle?: string;
   /** Tint the pill violet — the Skill tool, matching the `/` skill menu. */
   skill?: boolean;
+  /** Tint the pill — a Read of an image attachment (distinct, identifiable). */
+  image?: boolean;
 }) {
   return (
     <div
       className={`ai-tcall-head${onPrimary ? " is-interactive" : ""}${
         skill ? " ai-tcall-skill" : ""
-      }`}
+      }${image ? " ai-tcall-image" : ""}`}
     >
       <button
         type="button"
@@ -351,6 +358,9 @@ export function toolDetailFor(
     if (q && typeof q.question === "string") return q.question.slice(0, 200);
   }
   for (const key of [
+    // `skill` first: surface which skill the Skill tool runs, so the live
+    // ticker reads "Skill feature-creator" instead of a bare "Skill".
+    "skill",
     "url",
     "path",
     "file_path",
@@ -1499,7 +1509,14 @@ export function ToolCallRow({
   }
   const label = friendlyToolName(call.function.name);
   const detail = primaryToolDetail(call.function.arguments);
-  const icon = toolIconFor(call.function.name);
+  // A Read of an image attachment gets its own icon/tint, and the drawer
+  // shows the picture instead of the textual "[image]" placeholder.
+  const imageRef =
+    READ_NAMES.has(call.function.name) && (() => {
+      const p = fileRefOf(call);
+      return p && isImagePath(p) ? p : "";
+    })();
+  const icon = imageRef ? "image" : toolIconFor(call.function.name);
   const hasResult = typeof result === "string";
   // Tools like ToolSearch / TaskUpdate legitimately return no text —
   // their effect is the side channel, not the output. A quiet check says
@@ -1511,21 +1528,27 @@ export function ToolCallRow({
   const onOpenFile = openFile && fileRef ? () => openFile(fileRef) : undefined;
   // Clicking the pill opens the right-side result drawer (read/bash/search
   // output). With no output but a file path it just opens the file in a tab.
-  const onPrimary = canShow
-    ? () =>
-        requestToolDrawer({
-          title: label,
-          subtitle: detail || undefined,
-          result: markdown ? stripReadGutter(result!) : result!,
-          markdown,
-          onOpenFile,
-        })
-    : onOpenFile;
-  const primaryTitle = canShow
-    ? "Show output"
-    : fileRef
-      ? `Open ${fileRef} in a new tab`
-      : undefined;
+  // An image read still has a (placeholder) result, so canShow is true and
+  // clicking the pill opens the drawer — where imagePath shows the picture.
+  const onPrimary =
+    canShow || imageRef
+      ? () =>
+          requestToolDrawer({
+            title: label,
+            subtitle: detail || undefined,
+            result: markdown ? stripReadGutter(result ?? "") : (result ?? ""),
+            markdown,
+            imagePath: imageRef || undefined,
+            onOpenFile,
+          })
+      : onOpenFile;
+  const primaryTitle = imageRef
+    ? "Show image"
+    : canShow
+      ? "Show output"
+      : fileRef
+        ? `Open ${fileRef} in a new tab`
+        : undefined;
   return (
     <div className="ai-tcall">
       <ToolRowHead
@@ -1536,6 +1559,7 @@ export function ToolCallRow({
         onPrimary={onPrimary}
         primaryTitle={primaryTitle}
         skill={call.function.name === "Skill"}
+        image={!!imageRef}
         extra={
           !hasResult ? (
             <span className="ai-spinner ai-spinner-sm" />
