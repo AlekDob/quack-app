@@ -49,6 +49,7 @@ import {
 } from "../gitStatusStore";
 import { FileHistoryModal } from "./FileHistoryModal";
 import { Icon } from "./Icon";
+import { fileIconName } from "../fileIcons";
 
 interface MenuTarget {
   x: number;
@@ -248,7 +249,10 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
           )}
         </span>
         <span className="tree-icon">
-          <Icon name={entry.is_dir ? "folder" : "file"} size={14} />
+          <Icon
+            name={entry.is_dir ? "folder" : fileIconName(entry.name)}
+            size={14}
+          />
         </span>
         <span className="tree-name">{entry.name}</span>
         {gitFile && (

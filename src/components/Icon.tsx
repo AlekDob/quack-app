@@ -87,6 +87,10 @@ export type IconName =
   | "circle"
   | "info"
   | "hash"
+  | "braces"
+  | "image"
+  | "file-code"
+  | "lock"
   | "zap";
 
 // Each entry returns the inner JSX for an svg with viewBox 0 0 24 24.
@@ -387,6 +391,37 @@ const ICONS: Record<IconName, ReactNode> = {
       <line x1="4" y1="15" x2="20" y2="15" />
       <line x1="10" y1="3" x2="8" y2="21" />
       <line x1="16" y1="3" x2="14" y2="21" />
+    </>
+  ),
+  // Curly braces — data files (JSON, package.json, etc.).
+  braces: (
+    <>
+      <path d="M8 3c-2 0-3 1-3 3v2c0 1.5-.6 2-2 2 1.4 0 2 .5 2 2v3c0 2 1 3 3 3" />
+      <path d="M16 3c2 0 3 1 3 3v2c0 1.5.6 2 2 2-1.4 0-2 .5-2 2v3c0 2-1 3-3 3" />
+    </>
+  ),
+  // Picture frame with horizon — raster/vector image files.
+  image: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="8.5" cy="8.5" r="1.5" />
+      <path d="m21 15-5-5L5 21" />
+    </>
+  ),
+  // Document sheet with code chevrons — source files.
+  "file-code": (
+    <>
+      <path d="M14 3v5h5" />
+      <path d="M19 8 14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z" />
+      <polyline points="10 13 8 15 10 17" />
+      <polyline points="14 13 16 15 14 17" />
+    </>
+  ),
+  // Padlock — lock/secret files (yarn.lock, Cargo.lock, .env).
+  lock: (
+    <>
+      <rect x="4" y="10" width="16" height="11" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" />
     </>
   ),
 };
