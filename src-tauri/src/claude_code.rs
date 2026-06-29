@@ -257,14 +257,13 @@ fn build_claude_command(
         cmd.arg("--include-partial-messages");
         // Permission strategy:
         //   - use_hooks=true: PreToolUse hook in .claude/settings.local.json
-        //     calls our localhost server, which surfaces a permission
-        //     card in the GUI. The hook fires under every --permission-mode
-        //     except bypass, which short-circuits hooks — so the caller
-        //     hands us only `plan` or None here (acceptEdits/auto are
-        //     enforced GUI-side by the permission overlay).
-        //   - use_hooks=false: bypass mode (user opted in) OR the legacy
-        //     fallback when the perm server didn't come up. Skip prompts
-        //     entirely so the agent loop can run.
+        //     calls our localhost server, which surfaces a permission card in
+        //     the GUI. The hook fires under EVERY --permission-mode (including
+        //     bypass — --dangerously-skip-permissions does NOT disable hooks),
+        //     so all modes are enforced GUI-side by the overlay and the caller
+        //     hands us only `plan` or None here.
+        //   - use_hooks=false: legacy fallback for when the perm server didn't
+        //     come up. Skip prompts entirely so the agent loop can run.
         if use_hooks {
             cmd.arg("--permission-mode")
                 .arg(permission_mode.unwrap_or("default"));
@@ -551,12 +550,11 @@ pub fn claude_code_chat(
             "default" | "plan" | "acceptEdits" | "auto" | "bypassPermissions"
         )
     });
-    // "bypassPermissions" is Claude Code's real full-skip mode, chosen
-    // explicitly by the user. We run it WITHOUT the hook (the hook would be
-    // short-circuited by --dangerously-skip-permissions anyway) so there are
-    // no cards and no privacy gate. acceptEdits/auto, by contrast, keep the
-    // hook on and are enforced GUI-side by the permission overlay.
-    let bypass = permission_mode.as_deref() == Some("bypassPermissions");
+    // NOTE: every mode keeps the PreToolUse hook ON. --dangerously-skip-
+    // permissions does NOT disable hooks, so there's no point running bypass
+    // hook-off — the hook would still fire and still card. Instead ALL modes
+    // (auto / acceptEdits / plan / bypassPermissions) are enforced GUI-side
+    // by the permission overlay, which is the single allow/deny authority.
     let id = Uuid::new_v4().to_string();
     let event_name = format!("claude-stream:{}", id);
 
@@ -601,10 +599,7 @@ pub fn claude_code_chat(
                 _ => None,
             }
         });
-    let use_hooks = if bypass {
-        // User opted into full bypass — don't install/refresh the hook.
-        false
-    } else if let (Some(endpoint), Some(workspace_cwd)) =
+    let use_hooks = if let (Some(endpoint), Some(workspace_cwd)) =
         (perm_endpoint.as_ref(), cwd.as_deref())
     {
         match ensure_pretooluse_hook(workspace_cwd, endpoint) {
@@ -623,9 +618,7 @@ pub fn claude_code_chat(
     // degrading to --dangerously-skip-permissions contradicted the
     // product's own red line: every Edit/Bash would have executed with
     // no card and no indication the guard was gone.
-    // `bypass` is itself an explicit opt-in to unguarded execution, so it
-    // doesn't trip the refusal below.
-    if !use_hooks && !bypass && !allow_unguarded.unwrap_or(false) {
+    if !use_hooks && !allow_unguarded.unwrap_or(false) {
         state.buffers.lock().remove(&id);
         state.session_streams.lock().remove(&chat_sid);
         return Err(
@@ -640,10 +633,10 @@ pub fn claude_code_chat(
     }
 
     // On the hooked path the CLI value is inert except for `plan` (the
-    // overlay enforces acceptEdits/auto, and "auto" isn't even a valid CLI
-    // mode). Pass only `plan`; everything else collapses to the CLI default.
-    // Bypass takes use_hooks=false, so build_claude_command ignores this and
-    // uses --dangerously-skip-permissions instead.
+    // overlay enforces acceptEdits/auto/bypass, and "auto"/"bypassPermissions"
+    // aren't even valid CLI modes). Pass only `plan`; everything else
+    // collapses to the CLI default. The use_hooks=false fallback (perm server
+    // down) ignores this and uses --dangerously-skip-permissions.
     let cli_mode = match permission_mode.as_deref() {
         Some("plan") => Some("plan"),
         _ => None,

@@ -158,8 +158,8 @@ function isReadOnlyBash(input: Record<string, unknown>): boolean {
  *                     upstream). The CLI blocks edits in plan mode, so safe
  *                     exploration flows without cards; writing Bash still cards.
  *   - anything else → no mode-based allow (Ask shows the card).
- * ("bypassPermissions" never reaches here — the backend runs that with the
- *  hook off, so no card events fire at all.)
+ * ("bypassPermissions" is handled earlier in the listener — it allows before
+ *  the privacy gate — so it never reaches here.)
  */
 function modeAutoAllow(req: PermissionRequest): boolean {
   const mode = getPermModeFor(req);
@@ -276,6 +276,21 @@ export function ClaudePermissionOverlay() {
           reason:
             "The editor is showing your question to the user as clickable option buttons right now. Do NOT repeat the question or options in text. Briefly say you're waiting for their selection, then END YOUR TURN; their next message will contain the answer.",
         }).catch((err) => console.warn("ask-redirect failed", err));
+        return;
+      }
+      // BYPASS — the user opted into "skip ALL checks". Allow immediately,
+      // even before the privacy gate (that's the documented difference from
+      // Auto, which keeps the privacy guard). Enforced here, not by the CLI:
+      // --dangerously-skip-permissions does NOT disable PreToolUse hooks, so
+      // the hook still fires and only the overlay can honor the intent. Read
+      // live from permModeStore, so flipping to Bypass mid-run takes effect
+      // on the very next tool call. AskUserQuestion is handled above — it
+      // can't work headless regardless of mode.
+      if (getPermModeFor(req) === "bypassPermissions") {
+        void invoke("claude_perm_decide", {
+          requestId: req.request_id,
+          decision: "allow",
+        }).catch((err) => console.warn("bypass-allow failed", err));
         return;
       }
       // PRIVACY GATE — comes BEFORE always-allow rules. If the
