@@ -10143,6 +10143,58 @@ body.ws-dragging * {
   padding-top: 24px;
 }
 
+/* In-tab preview for binary media (images + PDF). Fills the pane; the
+   surface is the neutral editor background so a transparent PNG reads
+   against chrome rather than white. */
+.media-preview {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  overflow: auto;
+}
+.media-preview-loading,
+.media-preview-error {
+  gap: 8px;
+  color: var(--fg-dim);
+  font-size: 13px;
+}
+.media-preview-error {
+  color: var(--err);
+}
+.media-preview-image {
+  cursor: zoom-in;
+  padding: 16px;
+}
+.media-preview-image img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  /* Checkered hint so transparency is obvious without a heavy backdrop. */
+  border-radius: var(--radius-sm);
+}
+/* Actual-size mode: stop shrinking, let the scroll container pan. */
+.media-preview-image.actual-size {
+  cursor: zoom-out;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+.media-preview-image.actual-size img {
+  max-width: none;
+  max-height: none;
+}
+.media-preview-pdf {
+  padding: 0;
+}
+.media-preview-pdf iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
 /* Breadcrumb bar — sits at the very top of the editor-host, overlaying
    the padding-top reserved above. Absolute positioning lets it span the
    full width even when editor-host-split flips the flex direction to row. */

@@ -22,7 +22,8 @@ export const fs = {
    *  returns the absolute path Claude Code reads back with its Read tool. */
   saveImageAttachment: (filename: string, dataB64: string) =>
     invoke<string>("save_image_attachment", { filename, dataB64 }),
-  /** Read an image file back as a data: URL for the preview / zoom modal. */
+  /** Read a binary media file (image or PDF) back as a data: URL — used by
+   *  the chat zoom modal and the in-tab media preview. */
   readImageDataUrl: (path: string) =>
     invoke<string>("read_image_data_url", { path }),
 };

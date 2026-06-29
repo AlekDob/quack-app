@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { EditorPane } from "./EditorPane";
+import { MediaPreviewPane } from "./MediaPreviewPane";
+import { mediaKindOf } from "../mediaPreview";
 import { TerminalCore } from "./TerminalCore";
 import { PaneNode } from "./PaneNode";
 import { SidebarStack } from "./SidebarStack";
@@ -376,13 +378,23 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
               const path = active.slice(5);
               const container = paneContainers[pane.id];
               if (container && ws.files[path]) {
+                const media = mediaKindOf(path);
                 overlays.push(
                   createPortal(
-                    <EditorPane
-                      key={pane.id + ":" + path}
-                      wsId={wsId}
-                      path={path}
-                    />,
+                    media ? (
+                      <MediaPreviewPane
+                        key={pane.id + ":" + path}
+                        wsId={wsId}
+                        path={path}
+                        kind={media}
+                      />
+                    ) : (
+                      <EditorPane
+                        key={pane.id + ":" + path}
+                        wsId={wsId}
+                        path={path}
+                      />
+                    ),
                     container,
                     pane.id + ":" + path,
                   ),

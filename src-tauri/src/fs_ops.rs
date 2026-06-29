@@ -193,10 +193,10 @@ pub fn save_image_attachment(filename: String, data_b64: String) -> Result<Strin
     Ok(path.to_string_lossy().into_owned())
 }
 
-/// Read an image file back as a `data:` URL for the in-app preview / zoom
-/// modal. Keeps base64 OUT of localStorage — the chat persists only the
-/// path + a tiny thumbnail, and asks for full quality on demand. Mime is
-/// derived from the extension (good enough for our own attachments).
+/// Read a binary media file (image or PDF) back as a `data:` URL. Used by
+/// the chat zoom modal AND by the in-tab media preview (MediaPreviewPane).
+/// Keeps base64 OUT of localStorage — callers ask for full quality on
+/// demand. Mime is derived from the extension (good enough for previews).
 #[tauri::command]
 pub fn read_image_data_url(path: String) -> Result<String, String> {
     let p = Path::new(&path);
@@ -211,6 +211,10 @@ pub fn read_image_data_url(path: String) -> Result<String, String> {
         Some("jpg") | Some("jpeg") => "image/jpeg",
         Some("gif") => "image/gif",
         Some("webp") => "image/webp",
+        Some("bmp") => "image/bmp",
+        Some("ico") => "image/x-icon",
+        Some("avif") => "image/avif",
+        Some("pdf") => "application/pdf",
         _ => "application/octet-stream",
     };
     Ok(format!("data:{};base64,{}", mime, STANDARD.encode(&bytes)))

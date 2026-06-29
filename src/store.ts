@@ -23,6 +23,7 @@ import { choice as dialogChoice } from "./dialog";
 import { getEditorSettings } from "./editorSettings";
 import { getFootprintSettings } from "./footprintSettings";
 import { basename, dirname } from "./pathUtils";
+import { mediaKindOf } from "./mediaPreview";
 import { fsBus, pathsEqual } from "./fsBus";
 import { pushClosedTab, popClosedTab, forgetClosedTab } from "./closedTabsStack";
 import { getRecentFiles } from "./recentFiles";
@@ -1003,6 +1004,12 @@ async function loadWorkspaceFromDisk(
   await Promise.all(
     Array.from(new Set(fileKeys)).map(async (k) => {
       const path = k.slice(5);
+      if (mediaKindOf(path)) {
+        // Media tabs carry an empty sentinel buffer (see openFile) so the
+        // tab survives the restore filter without a text read.
+        files[path] = { contents: "", original: "" };
+        return;
+      }
       try {
         const c = await fsApi.readFile(path);
         files[path] = { contents: c, original: c };
@@ -1362,14 +1369,22 @@ export const useStore = create<AppState>((set, get) => {
         return;
       }
       let contents: string;
-      try {
-        contents = await fsApi.readFile(path);
-      } catch (e) {
-        // The backend's messages are user-worthy ("File is too large…",
-        // "binary file"); a console.error meant double-clicking a PNG
-        // or a 100 MB log just silently did nothing.
-        toastError(`Can't open ${basename(path)}: ${errMsg(e)}`);
-        return;
+      if (mediaKindOf(path)) {
+        // Image / PDF: never feed it to readFile (the backend rejects
+        // binary) or to Monaco. We keep an empty sentinel buffer so the
+        // tab persists + tracks as a known file; MediaPreviewPane reads
+        // the bytes from disk on its own.
+        contents = "";
+      } else {
+        try {
+          contents = await fsApi.readFile(path);
+        } catch (e) {
+          // The backend's messages are user-worthy ("File is too large…",
+          // "binary file"); a console.error meant double-clicking a PNG
+          // or a 100 MB log just silently did nothing.
+          toastError(`Can't open ${basename(path)}: ${errMsg(e)}`);
+          return;
+        }
       }
       updateWs(wsId, (w) => {
         const targetPaneId =
