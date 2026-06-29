@@ -114,6 +114,37 @@ function extFromPath(path: string): string | null {
  *  Read/Grep/Glob are NOT here — they auto-allow as read-only regardless. */
 const WRITE_TOOLS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
 
+/** Bash command names that only ever READ — safe to auto-allow during Plan
+ *  mode (where the CLI already forbids edits, so the only residual risk is a
+ *  Bash side-effect). Deliberately tight: runners (env/xargs/sudo/nohup) and
+ *  in-place editors (sed -i) are excluded, and any redirect / pipe / chain /
+ *  subshell is rejected separately via BASH_CHAIN_RE — so these can't write. */
+const READ_ONLY_BASH = new Set([
+  "ls", "cat", "head", "tail", "wc", "pwd", "echo", "grep", "rg", "tree",
+  "stat", "file", "which", "type", "date", "whoami", "uname", "hostname",
+  "du", "df", "printenv", "sort", "uniq", "cut", "basename", "dirname",
+  "realpath",
+]);
+
+/** git subcommands that are read-only even with arguments. `branch`, `tag`,
+ *  `config`, `remote` are excluded — they all have mutating forms. */
+const GIT_RO_SUBCMDS = new Set([
+  "status", "log", "diff", "show", "blame", "ls-files", "rev-parse",
+  "describe",
+]);
+
+/** True when a Bash command is provably read-only: no chaining / redirect /
+ *  pipe / command-substitution (BASH_CHAIN_RE), and its head is a read-only
+ *  command (git gated on a read-only subcommand). */
+function isReadOnlyBash(input: Record<string, unknown>): boolean {
+  const cmd = typeof input.command === "string" ? input.command : "";
+  if (!cmd || BASH_CHAIN_RE.test(cmd)) return false;
+  const tokens = cmd.trim().split(/\s+/);
+  const first = tokens[0] ?? "";
+  if (first === "git") return GIT_RO_SUBCMDS.has(tokens[1] ?? "");
+  return READ_ONLY_BASH.has(first);
+}
+
 /**
  * Auto-allow driven by the chat's Claude Code permission mode (the composer
  * mode menu / `/mode`). Runs AFTER the privacy gate and read-only allow so
@@ -123,7 +154,10 @@ const WRITE_TOOLS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
  *                     "stop asking"; privacy exclusions + AskUserQuestion
  *                     redirect still apply (handled before this).
  *   - "acceptEdits" → allow file-edit tools only; Bash & the rest still card.
- *   - anything else → no mode-based allow (Ask / Plan show the card).
+ *   - "plan"        → allow read-only Bash (Read/Grep/Glob already auto-allow
+ *                     upstream). The CLI blocks edits in plan mode, so safe
+ *                     exploration flows without cards; writing Bash still cards.
+ *   - anything else → no mode-based allow (Ask shows the card).
  * ("bypassPermissions" never reaches here — the backend runs that with the
  *  hook off, so no card events fire at all.)
  */
@@ -131,6 +165,9 @@ function modeAutoAllow(req: PermissionRequest): boolean {
   const mode = getPermModeFor(req);
   if (mode === "auto") return true;
   if (mode === "acceptEdits") return WRITE_TOOLS.has(req.tool_name);
+  if (mode === "plan") {
+    return req.tool_name === "Bash" && isReadOnlyBash(req.tool_input);
+  }
   return false;
 }
 
@@ -278,6 +315,15 @@ export function ClaudePermissionOverlay() {
           requestId: req.request_id,
           decision: "allow",
         }).catch((err) => console.warn("mode-allow failed", err));
+        return;
+      }
+      // In Plan mode, persisted always-allow rules must NOT fire: a saved
+      // "always allow Edit on .ts" would otherwise let an edit through (the
+      // hook's allow overrides the CLI's plan-mode block), defeating the
+      // whole point of planning. Read-only allows already happened above; a
+      // writing tool here just cards.
+      if (getPermModeFor(req) === "plan") {
+        setQueue((q) => [...q, req]);
         return;
       }
       // Check both the persisted rules AND the in-memory session rules.
