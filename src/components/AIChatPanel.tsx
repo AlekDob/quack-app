@@ -35,6 +35,7 @@ import {
   getString as lsGetString,
   setString as lsSetString,
 } from "../localStore";
+import { setPermMode } from "../permModeStore";
 import {
   balanceFences,
   cleanStaleToolMessages,
@@ -157,6 +158,10 @@ interface Props {
 // disabled (no warning ever fires). Read on every turn so changes
 // from Settings take effect immediately.
 const BUDGET_KEY = "lcp.claudeCode.budgetUsd";
+// Last-used Claude Code permission mode, persisted so "Auto" sticks across
+// restarts. Empty / missing = Ask (null). See permModeStore for how the mode
+// reaches the permission overlay.
+const PERM_MODE_KEY = "lcp.claudeCode.permMode";
 function readBudgetUsd(): number {
   const raw = lsGetString(BUDGET_KEY);
   if (!raw) return 0;
@@ -1271,13 +1276,24 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // Per-chat Claude Code session knobs, set via /effort and /mode.
   // Applied to every subsequent spawn; null = CLI default.
   const [ccEffort, setCcEffort] = useState<string | null>(null);
-  // Claude Code CLI defaults to "auto" (its own auto mode) so Alek isn't
-  // prompted to confirm every edit/command out of the box. /mode off resets
-  // back to this, not to "ask". Only used when provider === "claude-code".
-  const [ccPermMode, setCcPermMode] = useState<string | null>("auto");
+  // Per-chat permission mode. null = Ask (card on every edit/command — the
+  // safe default and what a fresh install gets). The chosen mode is the ONLY
+  // thing that drives auto-allow: ClaudePermissionOverlay reads it via
+  // permModeStore. We seed from localStorage so a power user's "Auto" sticks
+  // across restarts. /mode off resets to Ask. Only used for claude-code.
+  const [ccPermMode, setCcPermMode] = useState<string | null>(
+    () => lsGetString(PERM_MODE_KEY),
+  );
   // Extended thinking: null = CLI default, true = forced on, false = off.
   const [ccThinking, setCcThinking] = useState<boolean | null>(null);
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
+  // Persist the chosen mode and publish it to the permission overlay's
+  // bridge. Keyed by both the captured CC session id (preferred) and the
+  // workspace root (fallback for the first tool call of a fresh chat).
+  useEffect(() => {
+    lsSetString(PERM_MODE_KEY, ccPermMode ?? "");
+    setPermMode({ sessionId: claudeSessionId, cwd: root }, ccPermMode);
+  }, [ccPermMode, claudeSessionId, root]);
   // "Smart" composer: effort + thinking are hidden behind a ⚙ toggle so the
   // control bar stays clean (Cursor-style); revealed on demand.
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -1324,8 +1340,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       const opts: Array<[string, string | null, string]> = [
         ["ask", null, "Confirm each edit / command"],
         ["plan", "plan", "Plan only — no edits"],
-        ["auto-edit", "acceptEdits", "Auto-accept file edits"],
-        ["auto", "auto", "Claude Code's auto mode (default)"],
+        ["auto-edit", "acceptEdits", "Auto-accept file edits, ask for the rest"],
+        ["auto", "auto", "Run everything without asking (privacy guard stays)"],
+        ["bypass", "bypassPermissions", "Skip all checks — no cards, no guard"],
       ];
       return opts
         .filter(([o]) => o.startsWith(partial))
@@ -2871,8 +2888,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     if (cmd.action === "mode") {
       const arg = input.split(/\s+/)[1]?.toLowerCase() ?? "";
       setInput("");
-      // Friendly aliases → CLI --permission-mode values. No bypass:
-      // that would disable the permission guard entirely.
+      // Friendly aliases → permission-mode values. "bypass" maps to Claude
+      // Code's real bypassPermissions: the backend runs it with the hook
+      // OFF — zero cards, no privacy gate. Everything else keeps the hook.
       const map: Record<string, string> = {
         ask: "default",
         default: "default",
@@ -2881,8 +2899,8 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         "accept-edits": "acceptEdits",
         acceptedits: "acceptEdits",
         auto: "auto",
-        dontask: "dontAsk",
-        "dont-ask": "dontAsk",
+        bypass: "bypassPermissions",
+        yolo: "bypassPermissions",
       };
       if (!arg) {
         setInput("/mode ");
@@ -2891,18 +2909,18 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         return;
       }
       if (arg === "off") {
-        setCcPermMode("auto");
-        toastInfo("Permission mode reset to auto (default)");
+        setCcPermMode(null);
+        toastInfo("Permission mode reset to Ask");
         return;
       }
       const mode = map[arg];
       if (!mode) {
         toastError(
-          `Unknown mode "${arg}" — use ask, plan, auto-edit, or auto`,
+          `Unknown mode "${arg}" — use ask, plan, auto-edit, auto, or bypass`,
         );
         return;
       }
-      setCcPermMode(mode);
+      setCcPermMode(mode === "default" ? null : mode);
       toastInfo(
         `Mode: ${mode}${mode === "plan" ? " — Claude will plan without editing" : ""} (applies from the next message)`,
       );
@@ -4540,7 +4558,12 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                       {
                         v: "auto",
                         label: "Auto",
-                        desc: "Claude Code's auto mode",
+                        desc: "Run everything without asking (privacy guard stays)",
+                      },
+                      {
+                        v: "bypassPermissions",
+                        label: "Bypass",
+                        desc: "Skip all permission checks — no cards, no guard",
                       },
                     ] as Array<{ v: string | null; label: string; desc: string }>
                   ).map((o) => (
@@ -4578,8 +4601,8 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                   ? "Auto-edit"
                   : ccPermMode === "auto"
                     ? "Auto"
-                    : ccPermMode === "dontAsk"
-                      ? "Don't ask"
+                    : ccPermMode === "bypassPermissions"
+                      ? "Bypass"
                       : "Ask"}{" "}
               ▾
             </button>

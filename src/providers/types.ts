@@ -58,8 +58,9 @@ export interface ChatProvider {
     cwd?: string;
     /** Claude Code --effort (low|medium|high|xhigh|max). */
     effort?: string;
-    /** Claude Code --permission-mode (default|plan|acceptEdits|auto|
-     *  dontAsk). bypassPermissions is rejected backend-side. */
+    /** Permission mode. plan/acceptEdits/auto keep the hook on (the GUI
+     *  overlay enforces acceptEdits/auto); bypassPermissions runs hook-off
+     *  (--dangerously-skip-permissions). null/absent = Ask (default). */
     permissionMode?: string;
     /** Claude Code extended-thinking toggle (MAX_THINKING_TOKENS env:
      *  true = forced on, false = off, undefined = CLI default). */

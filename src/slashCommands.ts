@@ -98,7 +98,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   },
   {
     name: "/mode",
-    hint: "/mode ask|plan|auto-edit|auto — Claude Code permission mode",
+    hint: "/mode ask|plan|auto-edit|auto|bypass — Claude Code permission mode",
     action: "mode",
     takesArg: true,
   },

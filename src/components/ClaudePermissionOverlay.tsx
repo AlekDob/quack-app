@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { matchExclusion } from "../aiPrivacy";
+import { getPermModeFor } from "../permModeStore";
 import { error as toastError } from "../notify";
 import { getJson as lsGetJson, setJson as lsSetJson } from "../localStore";
 import { Icon } from "./Icon";
@@ -107,6 +108,30 @@ function extFromPath(path: string): string | null {
   const dot = base.lastIndexOf(".");
   if (dot <= 0 || dot === base.length - 1) return null; // no ext or trailing dot
   return base.slice(dot).toLowerCase();
+}
+
+/** File-writing tools auto-allowed in the "acceptEdits" (Auto-edit) mode.
+ *  Read/Grep/Glob are NOT here — they auto-allow as read-only regardless. */
+const WRITE_TOOLS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
+
+/**
+ * Auto-allow driven by the chat's Claude Code permission mode (the composer
+ * mode menu / `/mode`). Runs AFTER the privacy gate and read-only allow so
+ * those safety checks always win. Mode is resolved per-request via the
+ * session-id/cwd bridge in permModeStore.
+ *   - "auto"        → allow everything (Bash included). The user opted into
+ *                     "stop asking"; privacy exclusions + AskUserQuestion
+ *                     redirect still apply (handled before this).
+ *   - "acceptEdits" → allow file-edit tools only; Bash & the rest still card.
+ *   - anything else → no mode-based allow (Ask / Plan show the card).
+ * ("bypassPermissions" never reaches here — the backend runs that with the
+ *  hook off, so no card events fire at all.)
+ */
+function modeAutoAllow(req: PermissionRequest): boolean {
+  const mode = getPermModeFor(req);
+  if (mode === "auto") return true;
+  if (mode === "acceptEdits") return WRITE_TOOLS.has(req.tool_name);
+  return false;
 }
 
 /** Tools we refuse to add as bare-name always-allow even if user clicks.
@@ -243,6 +268,16 @@ export function ClaudePermissionOverlay() {
           requestId: req.request_id,
           decision: "allow",
         }).catch((err) => console.warn("read-allow failed", err));
+        return;
+      }
+      // Permission-mode auto-allow (Auto / Auto-edit). Comes after the
+      // privacy + read-only gates so those always win, before the saved
+      // always-allow rules since the mode is the broader intent.
+      if (modeAutoAllow(req)) {
+        void invoke("claude_perm_decide", {
+          requestId: req.request_id,
+          decision: "allow",
+        }).catch((err) => console.warn("mode-allow failed", err));
         return;
       }
       // Check both the persisted rules AND the in-memory session rules.

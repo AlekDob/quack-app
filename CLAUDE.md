@@ -115,6 +115,8 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `011-command-palette.md` — Ctrl/⌘P overlay (workspaces/files/commands/symbols/search), Cursor-style rows + leading icons.
   - `012-workspace-reorder.md` — drag-to-reorder the activity-bar project icons (pointer-events, NOT HTML5 DnD — broken in WKWebView; Monaco DOM-move crash gotcha).
   - `013-file-type-icons.md` — per-type icons in the file tree (`fileIconName` map); monochrome shapes only, no Seti-style color (brand rule).
+  - `014-claude-code-bridge.md` — CC CLI bridge: spawn/stream/attach + Stop. **Stop kills the whole process group** (no orphaned tool children pinning the CPU); `children` map holds pids, not lockable `Child`s.
+  - `015-claude-permission-mode.md` — per-chat permission mode (Ask/Plan/Auto-edit/Auto/Bypass); `permModeStore` bridges the composer mode to `ClaudePermissionOverlay`, the single auto-allow authority.
 - `documentation/decisions/` — architectural rationales.
   - `001-agent-status-indicators.md` — the per-session agent-status design (the focus feature).
   - `002-ui-styling-rebrand-not-rewrite.md` — why CSS-token rebrand, not Tailwind/shadcn.
