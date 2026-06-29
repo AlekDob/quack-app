@@ -1,8 +1,8 @@
 use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicI64, Ordering};
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -18,7 +18,12 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[derive(Default)]
 pub struct ClaudeCodeState {
-    children: Mutex<HashMap<String, Arc<Mutex<Child>>>>,
+    /// stream id → pid of the live `claude` process. We store only the
+    /// pid (not the `Child`) so a stop/kill can signal the process group
+    /// without contending for a lock: the wait thread owns the `Child`
+    /// and holds it for the whole run while blocked in `wait()`.
+    /// Brain: claude-stop-kills-process-group
+    children: Mutex<HashMap<String, u32>>,
     /// Per-stream buffer of every event emitted, keyed by stream id.
     /// Used by `claude_code_attach` so a frontend that just refreshed
     /// can replay everything it missed and re-subscribe to live events.
@@ -253,16 +258,14 @@ fn build_claude_command(
         // Permission strategy:
         //   - use_hooks=true: PreToolUse hook in .claude/settings.local.json
         //     calls our localhost server, which surfaces a permission
-        //     card in the GUI. We use --permission-mode default so the
-        //     hook actually fires (bypass mode short-circuits hooks).
-        //   - use_hooks=false: legacy fallback for when the perm server
-        //     didn't come up. Skip prompts entirely so the agent loop
-        //     can run; user accepts the same blast radius as before.
+        //     card in the GUI. The hook fires under every --permission-mode
+        //     except bypass, which short-circuits hooks — so the caller
+        //     hands us only `plan` or None here (acceptEdits/auto are
+        //     enforced GUI-side by the permission overlay).
+        //   - use_hooks=false: bypass mode (user opted in) OR the legacy
+        //     fallback when the perm server didn't come up. Skip prompts
+        //     entirely so the agent loop can run.
         if use_hooks {
-            // User-chosen mode (plan / acceptEdits / auto / dontAsk) —
-            // every one of these still fires PreToolUse hooks, so the
-            // GUI permission cards keep working. bypassPermissions is
-            // rejected upstream in claude_code_chat.
             cmd.arg("--permission-mode")
                 .arg(permission_mode.unwrap_or("default"));
         } else {
@@ -543,8 +546,17 @@ pub fn claude_code_chat(
         matches!(e.as_str(), "low" | "medium" | "high" | "xhigh" | "max")
     });
     let permission_mode = permission_mode.filter(|m| {
-        matches!(m.as_str(), "default" | "plan" | "acceptEdits" | "auto" | "dontAsk")
+        matches!(
+            m.as_str(),
+            "default" | "plan" | "acceptEdits" | "auto" | "bypassPermissions"
+        )
     });
+    // "bypassPermissions" is Claude Code's real full-skip mode, chosen
+    // explicitly by the user. We run it WITHOUT the hook (the hook would be
+    // short-circuited by --dangerously-skip-permissions anyway) so there are
+    // no cards and no privacy gate. acceptEdits/auto, by contrast, keep the
+    // hook on and are enforced GUI-side by the permission overlay.
+    let bypass = permission_mode.as_deref() == Some("bypassPermissions");
     let id = Uuid::new_v4().to_string();
     let event_name = format!("claude-stream:{}", id);
 
@@ -589,7 +601,10 @@ pub fn claude_code_chat(
                 _ => None,
             }
         });
-    let use_hooks = if let (Some(endpoint), Some(workspace_cwd)) =
+    let use_hooks = if bypass {
+        // User opted into full bypass — don't install/refresh the hook.
+        false
+    } else if let (Some(endpoint), Some(workspace_cwd)) =
         (perm_endpoint.as_ref(), cwd.as_deref())
     {
         match ensure_pretooluse_hook(workspace_cwd, endpoint) {
@@ -608,7 +623,9 @@ pub fn claude_code_chat(
     // degrading to --dangerously-skip-permissions contradicted the
     // product's own red line: every Edit/Bash would have executed with
     // no card and no indication the guard was gone.
-    if !use_hooks && !allow_unguarded.unwrap_or(false) {
+    // `bypass` is itself an explicit opt-in to unguarded execution, so it
+    // doesn't trip the refusal below.
+    if !use_hooks && !bypass && !allow_unguarded.unwrap_or(false) {
         state.buffers.lock().remove(&id);
         state.session_streams.lock().remove(&chat_sid);
         return Err(
@@ -622,6 +639,15 @@ pub fn claude_code_chat(
         );
     }
 
+    // On the hooked path the CLI value is inert except for `plan` (the
+    // overlay enforces acceptEdits/auto, and "auto" isn't even a valid CLI
+    // mode). Pass only `plan`; everything else collapses to the CLI default.
+    // Bypass takes use_hooks=false, so build_claude_command ignores this and
+    // uses --dangerously-skip-permissions instead.
+    let cli_mode = match permission_mode.as_deref() {
+        Some("plan") => Some("plan"),
+        _ => None,
+    };
     let mut cmd = build_claude_command(
         &prompt,
         model.as_deref(),
@@ -629,7 +655,7 @@ pub fn claude_code_chat(
         cwd.as_deref(),
         use_hooks,
         effort.as_deref(),
-        permission_mode.as_deref(),
+        cli_mode,
     );
     // Extended-thinking toggle. There's no headless CLI flag for it,
     // but the CLI honors MAX_THINKING_TOKENS: 0 disables thinking,
@@ -641,10 +667,21 @@ pub fn claude_code_chat(
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
 
+    // Run claude in its own process group so a stop reaches the whole
+    // subtree (node + every tool/search child). Signalling only the
+    // parent pid orphans those children → a runaway recursive search
+    // keeps pinning the CPU and drags the whole machine down.
+    // Brain: claude-stop-kills-process-group
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0); // new group; pgid == child pid
+    }
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        // CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
+        cmd.creation_flags(0x0000_0200 | 0x0800_0000);
     }
 
     let mut child = cmd
@@ -668,11 +705,15 @@ pub fn claude_code_chat(
         .ok_or_else(|| "no stdout from claude".to_string())?;
     let stderr = child.stderr.take();
 
-    let child_arc = Arc::new(Mutex::new(child));
-    state
-        .children
-        .lock()
-        .insert(id.clone(), Arc::clone(&child_arc));
+    // Record the pid so stop/kill can signal the whole process group
+    // (see kill_process_tree) without ever locking the Child — the wait
+    // thread below owns it and blocks in wait() for the entire run.
+    let pid = child.id();
+    state.children.lock().insert(id.clone(), pid);
+
+    // Flipped to true once the process has been reaped, so the watchdog
+    // stops polling and never signals a pid the OS may have recycled.
+    let finished = Arc::new(AtomicBool::new(false));
 
     // Tracks the wall-clock instant of the most recent stdout/stderr
     // event so the watchdog thread can detect a hung subprocess. Stored
@@ -760,14 +801,13 @@ pub fn claude_code_chat(
     let app_for_watchdog = app.clone();
     let event_for_watchdog = event_name.clone();
     let id_for_watchdog = id.clone();
-    let child_for_watchdog = Arc::clone(&child_arc);
+    let finished_watchdog = Arc::clone(&finished);
     let last_activity_watchdog = Arc::clone(&last_activity);
     thread::spawn(move || {
         loop {
             thread::sleep(Duration::from_secs(5));
-            // Poll: is the child still alive?
-            let still_running = matches!(child_for_watchdog.lock().try_wait(), Ok(None));
-            if !still_running {
+            // Reaped already (exited or stopped)? Stop polling.
+            if finished_watchdog.load(Ordering::Relaxed) {
                 return;
             }
             let last = last_activity_watchdog.load(Ordering::Relaxed);
@@ -777,7 +817,7 @@ pub fn claude_code_chat(
             }
             let now = started.elapsed().as_millis() as i64;
             if now - last > IDLE_TIMEOUT.as_millis() as i64 {
-                // Hung. Force-kill and let the wait thread emit `end`.
+                // Hung. Kill the whole group and let the wait thread emit `end`.
                 let payload = serde_json::json!({
                     "kind": "stderr",
                     "line": format!(
@@ -791,22 +831,24 @@ pub fn claude_code_chat(
                     }
                 }
                 let _ = app_for_watchdog.emit(&event_for_watchdog, payload);
-                let _ = child_for_watchdog.lock().kill();
+                kill_process_tree(pid);
                 return;
             }
         }
     });
 
-    // Waiter thread — emit `end` once the process exits.
+    // Waiter thread — owns the Child, emits `end` once the process exits.
     let app_for_wait = app.clone();
     let event_for_wait = event_name.clone();
-    let child_for_wait = Arc::clone(&child_arc);
     let id_for_wait = id.clone();
+    let finished_wait = Arc::clone(&finished);
     thread::spawn(move || {
-        let exit_code = match child_for_wait.lock().wait() {
+        let exit_code = match child.wait() {
             Ok(s) => s.code().unwrap_or(-1),
             Err(_) => -1,
         };
+        // Let the watchdog stop polling before we touch shared state.
+        finished_wait.store(true, Ordering::Relaxed);
         let payload = serde_json::json!({ "kind": "end", "code": exit_code });
         if let Some(state) = app_for_wait.try_state::<ClaudeCodeState>() {
             if let Some(buf) = state.buffers.lock().get_mut(&id_for_wait) {
@@ -821,13 +863,38 @@ pub fn claude_code_chat(
     Ok(id)
 }
 
-/// Kill an in-flight claude process by stream id.
+/// Force-kill the claude subprocess together with everything it spawned.
+/// claude runs in its own process group (see the spawn site), so a single
+/// signal to the negated pid reaps node + all tool/search children at
+/// once. Killing just the parent pid would orphan its children → a
+/// mid-flight recursive file search keeps burning CPU and freezes the box.
+/// Brain: claude-stop-kills-process-group
+#[cfg(unix)]
+fn kill_process_tree(pid: u32) {
+    // SAFETY: a negative pid targets the whole process group; an
+    // already-dead group just yields ESRCH, which we ignore.
+    unsafe {
+        libc::kill(-(pid as i32), libc::SIGKILL);
+    }
+}
+
+#[cfg(windows)]
+fn kill_process_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    // taskkill /T walks and kills the whole tree; /F forces it.
+    let _ = Command::new("taskkill")
+        .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+        .status();
+}
+
+/// Kill an in-flight claude process (and its whole subtree) by stream id.
+/// We leave the map entry in place — the wait thread removes it once the
+/// process is actually reaped, so `active_sessions` stays honest.
 #[tauri::command]
 pub fn claude_code_kill(state: State<'_, ClaudeCodeState>, id: String) -> Result<(), String> {
-    let child = state.children.lock().remove(&id);
-    if let Some(child) = child {
-        let mut guard = child.lock();
-        let _ = guard.kill();
+    if let Some(pid) = state.children.lock().get(&id).copied() {
+        kill_process_tree(pid);
     }
     Ok(())
 }

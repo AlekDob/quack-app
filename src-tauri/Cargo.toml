@@ -66,3 +66,9 @@ ureq = { version = "3.3.0", features = ["json"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
+
+[target.'cfg(unix)'.dependencies]
+# Needed to signal a whole process group (killpg via a negated pid) when
+# stopping a claude run — std only kills the direct child, orphaning its
+# tool/search subprocesses. See claude_code::kill_process_tree.
+libc = "0.2"

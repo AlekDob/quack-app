@@ -597,6 +597,7 @@ dependencies = [
  "chardetng",
  "dirs 5.0.1",
  "encoding_rs",
+ "libc",
  "notify",
  "notify-debouncer-mini",
  "parking_lot",
