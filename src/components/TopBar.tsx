@@ -376,12 +376,6 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
           nativeMenu.ts), so the in-window brand + menus + palette are
           hidden there — the titlebar is just a drag region + Agents. */}
       <div className="topbar-brand" data-tauri-drag-region>
-        <img
-          src="/quack-logo.png"
-          className="topbar-logo"
-          alt=""
-          aria-hidden="true"
-        />
         <span>Quack</span>
       </div>
 
