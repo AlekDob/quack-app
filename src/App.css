@@ -5290,6 +5290,10 @@ body.ws-dragging * {
   min-width: 0;
   font-size: 12px;
   overflow: hidden;
+  /* Small lateral inset for the whole chat column so nothing hugs the pane
+     edges. The bigger 20px stream gutter lives on .ai-messages (below) so it
+     doesn't push the nav rail (which sits in .ai-messages-wrap) onto the text. */
+  padding: 0 5px;
 }
 .ai-header {
   display: flex;
@@ -5369,18 +5373,24 @@ body.ws-dragging * {
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  transition: border-color var(--duration-fast) var(--ease-default);
+  /* Soft resting elevation; lifts slightly on focus (see below). Signals the
+     active surface without changing layout — spaceship-style. */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  transition:
+    border-color var(--duration-fast) var(--ease-default),
+    box-shadow var(--duration-fast) var(--ease-default);
   /* Enables @container queries for the composer's responsive controls */
   container-type: inline-size;
 }
 .ai-composer-shell:focus-within {
   border-color: var(--border-strong);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 .ai-composer-shell > .ai-input-row {
   order: 1;
   border-top: none;
   background: transparent;
-  padding: 6px 8px 4px;
+  padding: 8px 12px 2px;
   /* Responsive: textarea takes the full first line, action buttons wrap to
      a second line aligned right — so a narrow panel never squashes them. */
   flex-wrap: wrap;
@@ -5394,21 +5404,27 @@ body.ws-dragging * {
   border-top: none;
   background: transparent;
   align-items: center;
-  padding: 2px 6px 6px;
-  gap: 6px;
+  padding: 2px 10px 8px;
+  gap: 5px;
   /* Responsive: model / effort / thinking pills wrap instead of truncating. */
   flex-wrap: wrap;
 }
-.ai-composer-shell .ai-input {
-  border: none;
-  background: transparent;
-  border-radius: 0;
-  min-height: 38px;
-}
+.ai-composer-shell .ai-input,
 .ai-composer-shell .ai-input:focus {
-  outline: none;
   border: none;
+  border-radius: 0;
+  /* Flush with the shell — no white field-on-grey contrast (spaceship-style,
+     the input IS the surface, not a raised box). */
+  background: transparent;
   box-shadow: none;
+  outline: none;
+  min-height: 22px;
+  padding: 4px 6px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.ai-composer-shell .ai-input::placeholder {
+  font-size: 14px;
 }
 
 .ai-composer-meta {
@@ -5472,32 +5488,116 @@ body.ws-dragging * {
 .ai-meta-flag svg {
   opacity: 0.6;
 }
-/* ⚙ toggle that reveals effort/thinking — square pill, icon only */
-.ai-tune-btn {
-  padding: 5px 8px;
-  color: var(--fg-muted);
-  /* Hidden when the panel is wide — effort/thinking show inline instead.
-     The ⚙ only appears when narrow (container query below). */
-  display: none;
-}
-.ai-tune-btn.open {
-  color: var(--fg);
-}
-/* Wide panel (default): effort/thinking visible inline, no ⚙ needed. */
+/* Effort + thinking shown inline (no ⚙ gate) — small uniform pills. */
 .ai-adv-flags {
   display: contents;
 }
-/* Narrow composer: collapse effort/thinking behind the ⚙ toggle. */
-@container (max-width: 460px) {
-  .ai-composer-shell .ai-tune-btn {
-    display: inline-flex;
-  }
-  .ai-composer-shell .ai-adv-flags {
-    display: none;
-  }
-  .ai-composer-shell .ai-composer-meta.advanced-open .ai-adv-flags {
-    display: contents;
-  }
+
+/* Reserved value width — keeps the effort pill a constant size across
+   default/low/medium/high/xhigh/max so the popover doesn't drift. */
+.ai-effort-cur {
+  display: inline-block;
+  min-width: 52px;
+  text-align: left;
+}
+/* Effort + thinking popover — astronave-style surface, Claude-desktop slider.
+   One control sets both; opens upward (composer sits at the bottom). */
+.ai-effort-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 95;
+  width: 260px;
+  padding: 14px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+.ai-effort-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.ai-effort-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.ai-effort-value {
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+.ai-effort-slider {
+  width: 100%;
+  margin: 2px 0 4px;
+  accent-color: var(--fg);
+  cursor: pointer;
+}
+.ai-effort-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--fg-muted);
+}
+.ai-effort-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 12px 0;
+}
+.ai-effort-seg {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+.ai-effort-seg-btn {
+  flex: 1 1 0;
+  padding: 5px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-alt);
+  color: var(--fg-dim);
+  font-size: 11px;
+  text-transform: capitalize;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-default),
+    color var(--duration-fast) var(--ease-default);
+}
+.ai-effort-seg-btn:hover {
+  background: var(--bg-hi);
+  color: var(--fg);
+}
+.ai-effort-seg-btn.active {
+  background: var(--primary-bg);
+  border-color: var(--primary-bg);
+  color: var(--primary-fg);
+}
+/* Uniform toolbar: every meta control is one pill height / radius / weight so
+   the row reads as a single coherent group (no size divergence). */
+.ai-composer-shell .ai-model-chip,
+.ai-composer-shell .ai-meta-flag,
+.ai-composer-shell .ai-mode-btn,
+.ai-composer-shell .ai-context-indicator {
+  height: 28px;
+  align-self: center;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--bg-alt);
+  color: var(--fg-dim);
+  font-size: 11px;
+  font-weight: 500;
+  gap: 5px;
+}
+.ai-composer-shell .ai-model-chip:hover,
+.ai-composer-shell .ai-meta-flag:hover,
+.ai-composer-shell .ai-mode-btn:hover,
+.ai-composer-shell .ai-context-indicator:hover {
+  background: var(--bg-hi);
+  color: var(--fg);
+  border-color: var(--border-strong);
 }
 /* Upward popover (the composer sits at the bottom of the panel). */
 .ai-flag-menu-overlay {
@@ -5629,6 +5729,180 @@ body.ws-dragging * {
   font-size: 10.5px;
   color: var(--fg-muted);
 }
+
+/* ── Composer toolbar: attach button, subagent pill, mic, hint row ──
+   Roomier, spaceship-inspired controls. Neutral chrome throughout — colour
+   only lives on per-project badges and semantic states (brand rule). */
+
+/* "+" attach button — icon-only, quiet until hover. */
+.ai-attach-btn,
+.ai-mic-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-default),
+    color var(--duration-fast) var(--ease-default);
+}
+.ai-attach-btn:hover,
+.ai-mic-btn:hover {
+  background: var(--bg-hi);
+  color: var(--fg);
+}
+/* Live dictation — subtle accent + pulse so it reads as "recording". */
+.ai-mic-btn.listening {
+  color: var(--fg);
+  background: var(--bg-hi);
+  animation: ai-mic-pulse 1.4s ease-in-out infinite;
+}
+@keyframes ai-mic-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Subagent target pill — who the next message is addressed to. */
+.ai-agent-wrap {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.ai-agent-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 3px 9px 3px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-alt);
+  color: var(--fg);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-default),
+    border-color var(--duration-fast) var(--ease-default);
+}
+.ai-agent-pill:hover:not(:disabled) {
+  background: var(--bg-hi);
+  border-color: var(--border-strong);
+}
+.ai-agent-pill:disabled {
+  cursor: default;
+}
+.ai-agent-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.ai-agent-avatar-jack {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hi);
+  color: var(--fg);
+}
+.ai-agent-name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ai-agent-role {
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+/* Upward menu (composer sits at the bottom of the panel). */
+.ai-agent-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  z-index: 95;
+  min-width: 240px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+}
+.ai-agent-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+.ai-agent-item:hover {
+  background: var(--bg-alt);
+}
+.ai-agent-item.active {
+  background: var(--bg-hi);
+}
+.ai-agent-item-mark {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-hi);
+}
+.ai-agent-item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ai-agent-item-name {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.ai-agent-item-role {
+  font-size: 11px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Hint row under the textarea — the keyboard affordances, faint. */
+.ai-composer-hint {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  margin-top: 1px;
+  color: var(--fg-muted);
+  font-size: 11px;
+  user-select: none;
+}
+
 /* Interactive AskUserQuestion card — clickable options inline in the
    conversation. */
 .ai-ask-card {
@@ -6700,16 +6974,80 @@ body.ws-dragging * {
   display: flex;
   flex-direction: column;
 }
+
+/* Navigation rail (minimap) — Codex-style. Lives in the left gutter, doesn't
+   scroll with content; faint at rest, full on hover. Pointer-transparent
+   except the ticks so it never eats clicks meant for the messages. */
+.ai-nav-rail {
+  position: absolute;
+  /* Right gutter — that's where the user's own turns live, so the minimap
+     reads as "my messages" and its preview never covers the text. */
+  right: 2px;
+  top: 8px;
+  bottom: 8px;
+  width: 14px;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0.45;
+  transition: opacity var(--duration-fast) var(--ease-default);
+}
+.ai-messages-wrap:hover .ai-nav-rail {
+  opacity: 1;
+}
+.ai-nav-tick {
+  position: absolute;
+  right: 3px;
+  width: 8px;
+  height: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 1px;
+  background: var(--fg-muted);
+  cursor: pointer;
+  pointer-events: auto;
+  transform: translateY(-50%);
+  transition:
+    width var(--duration-fast) var(--ease-default),
+    background var(--duration-fast) var(--ease-default);
+}
+.ai-nav-tick:hover,
+.ai-nav-tick.active {
+  width: 11px;
+  background: var(--fg);
+}
+.ai-nav-preview {
+  position: absolute;
+  right: 20px;
+  transform: translateY(-50%);
+  max-width: 260px;
+  padding: 6px 10px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  z-index: 6;
+  text-align: right;
+}
 .ai-messages {
   flex: 1;
   min-height: 0;
   min-width: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 8px 10px;
+  /* Asymmetric gutters: tight left (nothing lives there), wide right so text
+     AND tool rows clear the nav rail + its hover preview. One place controls
+     both — everything in the stream shifts together. */
+  padding: 8px 28px 8px 8px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 14px;
 }
 /* Floating "back to bottom" affordance — visible only when the user
    has scrolled away from the live tail. Sits inside the relatively-
@@ -6814,7 +7152,7 @@ body.ws-dragging * {
   flex-direction: column;
   gap: 4px;
   /* Matches the markdown body size */
-  font-size: 13px;
+  font-size: 14px;
   min-width: 0;
   max-width: 100%;
   animation: aiMsgIn 0.18s ease-out;
@@ -6908,13 +7246,12 @@ body.ws-dragging * {
   max-width: 90%;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
-/* Assistant: full-width, soft accent border-left rather than a big bubble */
+/* Assistant: full-width, no rail — just roomier horizontal padding so the
+   text breathes (spaceship-style clean stream). */
 .ai-msg-assistant .ai-msg-body {
   background: transparent;
   border: none;
-  /* Discreet hairline guide instead of a thick accent rail */
-  border-left: 1px solid var(--border);
-  padding: 0 0 0 12px;
+  padding: 0 8px;
   border-radius: 0;
 }
 .ai-msg-actions {
@@ -8665,9 +9002,9 @@ body.ws-dragging * {
 .ai-msg-body .md-preview {
   padding: 0;
   max-width: none;
-  /* Chat reading text — comfortable but not oversized */
-  font-size: 13px;
-  line-height: 1.55;
+  /* Chat reading text — comfortable, matched to spaceship-style stream */
+  font-size: 13.5px;
+  line-height: 1.6;
 }
 .ai-msg-body .md-preview h1,
 .ai-msg-body .md-preview h2,
@@ -8682,7 +9019,7 @@ body.ws-dragging * {
 .ai-msg-body .md-preview h3 { font-size: 14px; }
 .ai-msg-body .md-preview h4 { font-size: 13px; }
 .ai-msg-body .md-preview p {
-  margin: 0 0 6px;
+  margin: 0 0 10px;
 }
 .ai-msg-body .md-preview p:last-child {
   margin-bottom: 0;
@@ -9045,14 +9382,14 @@ body.ws-dragging * {
 .ai-tcalls {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin: 4px 0;
+  gap: 7px;
+  margin: 8px 0;
 }
-/* Inline variant rendered between text fragments by InterleavedBlocks.
-   Slightly tighter vertical spacing so the call row reads as part of
-   the surrounding sentence ("let me check X" → row → "found Y"). */
+/* Inline variant rendered between text fragments by InterleavedBlocks —
+   sits between a sentence and its result; keep it airy so the stream
+   doesn't feel cramped. */
 .ai-tcalls.ai-tcalls-inline {
-  margin: 6px 0;
+  margin: 10px 0;
 }
 /* ── Tool-call rows (docked chat) — Cursor/Conductor-style pills. Each row is
    a content-hugging bordered pill (NOT full width); the result tucks behind a
@@ -9187,8 +9524,8 @@ body.ws-dragging * {
 .ai-tcall-wrap {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin: 6px 0;
+  gap: 7px;
+  margin: 8px 0;
 }
 .ai-tcall-wrap .ai-tcall {
   margin: 0;
@@ -9647,10 +9984,15 @@ body.ws-dragging * {
 }
 .ai-send-btn {
   white-space: nowrap;
-  align-self: flex-end;
-  height: 30px;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
   border-radius: var(--radius-sm);
-  padding: 0 16px;
+  flex: 0 0 auto;
 }
 /* Distinct treatment for the Stop button so it's obvious during a long
    stream (and matches what the placeholder/Esc hint promises). */

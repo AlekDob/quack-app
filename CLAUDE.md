@@ -129,6 +129,8 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `018-whiteboard-organigramma.md` — Whiteboard editor tab (Jack → agents → skills tree), HTML5 DnD that writes `skills:` into the agent's `.md` frontmatter in place, operational `.md` export (`renderWhiteboardMd`, save to `.codetta/whiteboard.md`).
   - `019-usage-monitor.md` — Usage tab (live Claude Code cost/session monitor + chunked transcript viewer); opens as a tab like the whiteboard; the freeze fix (mtime gate + cache-on-success + `spawn_blocking`).
   - `020-context-optimizer.md` — Usage tab "Context" view: measures per-skill/subagent system-prompt weight (~char/4) + real invocation count (from transcripts), ranks heavy-but-unused skills, per-skill visibility toggle writing `skillOverrides` in `~/.claude/settings.json` (`name-only`/`user-invocable-only`); click a row → open its `.md` + reveal in tree via shared `openFileAndReveal`.
+  - `021-chat-nav-rail.md` — Codex-style navigation rail (minimap) in the chat's right gutter: one tick per user turn (from `data-anchor-*` on messages), hover to preview, click to jump, active tick tracks the turn in view.
+  - `022-chat-composer.md` — roomier "spaceship" composer: single-row uniform toolbar, subagent target pill (`SubagentPill`, derived from `attachedAgents`), one effort+thinking popover (`EffortPopover`, slider + segmented), voice dictation (`ComposerMic`), `+` attach, hint row, transparent flush textarea.
 - `documentation/decisions/` — architectural rationales.
   - `001-agent-status-indicators.md` — the per-session agent-status design (the focus feature).
   - `002-ui-styling-rebrand-not-rewrite.md` — why CSS-token rebrand, not Tailwind/shadcn.

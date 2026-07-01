@@ -9,6 +9,8 @@ import {
 import { Icon } from "./Icon";
 import { SubagentPill } from "./SubagentPill";
 import { ComposerMic } from "./ComposerMic";
+import { EffortPopover } from "./EffortPopover";
+import { ChatNavRail } from "./ChatNavRail";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -206,63 +208,6 @@ function insertIntoActiveEditor(text: string): boolean {
   ]);
   ed.focus();
   return true;
-}
-
-// A composer meta badge (effort / thinking) that's always visible so its
-// current value is glanceable, and opens a small upward popover to change
-// it. Replaces the old "only shows once you've set a non-default value,
-// click to reset" behaviour.
-function MetaFlag({
-  label,
-  current,
-  options,
-}: {
-  label: string;
-  current: string;
-  options: { key: string; label: string; active: boolean; onSelect: () => void }[];
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="ai-meta-flag-wrap">
-      <button
-        type="button"
-        className={`ai-meta-flag ${open ? "open" : ""}`}
-        title={`${label} — click to change (applies from your next message)`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {label}: {current}
-        <Icon name="chevron-down" size={10} />
-      </button>
-      {open && (
-        <>
-          <div
-            className="ai-flag-menu-overlay"
-            onClick={() => setOpen(false)}
-          />
-          <div className="ai-flag-menu" role="menu">
-            {options.map((o) => (
-              <button
-                key={o.key}
-                type="button"
-                role="menuitemradio"
-                aria-checked={o.active}
-                className={`ai-flag-menu-item ${o.active ? "active" : ""}`}
-                onClick={() => {
-                  o.onSelect();
-                  setOpen(false);
-                }}
-              >
-                <span>{o.label}</span>
-                {o.active && <Icon name="check" size={11} />}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
 }
 
 export function AIChatPanel({ wsId, root, aiChatId }: Props) {
@@ -569,6 +514,8 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const editorState = useEditorState();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Hidden file picker behind the composer "+" button (image attachments).
+  const attachInputRef = useRef<HTMLInputElement>(null);
   // Root element ref — its bounding rect is the drop-zone the window-level
   // drag-drop listener (App.tsx) hit-tests image drops against.
   const panelRef = useRef<HTMLDivElement>(null);
@@ -1403,9 +1350,6 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     lsSetString(PERM_MODE_KEY, ccPermMode ?? "");
     setPermMode({ sessionId: claudeSessionId, cwd: root }, ccPermMode);
   }, [ccPermMode, claudeSessionId, root]);
-  // "Smart" composer: effort + thinking are hidden behind a ⚙ toggle so the
-  // control bar stays clean (Cursor-style); revealed on demand.
-  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Argument submenu for /effort, /mode and /thinking: once the command
   // name is complete ("/effort "), the slash window switches to the
@@ -1722,6 +1666,25 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         /* ignore */
       }
     });
+  };
+
+  // The subagent pill's "active" target is DERIVED from attachedAgents (the
+  // delegation source of truth) — no parallel state. The last-added agent is
+  // the one shown; null means the message goes to Jack (the default).
+  const activeAgent =
+    attachedAgents.length > 0
+      ? (agents.find(
+          (a) => a.name === attachedAgents[attachedAgents.length - 1],
+        ) ?? null)
+      : null;
+  const selectAgent = (agent: SubagentDef | null) => {
+    if (!agent) {
+      setAttachedAgents([]);
+      return;
+    }
+    setAttachedAgents((prev) =>
+      prev.includes(agent.name) ? prev : [...prev, agent.name],
+    );
   };
 
   // Editor right-click "Ask AI to …" actions land here. The bus
@@ -3295,20 +3258,15 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       >
         {meta && parsed ? (
           <>
-            <span className="ai-model-chip-label">Model</span>
             <span
               className="ai-model-dot"
               style={{ background: meta.color }}
               aria-hidden="true"
             />
             <span className="ai-model-id">{parsed.modelId}</span>
-            <span className="ai-model-provider">{meta.label}</span>
           </>
         ) : (
-          <>
-            <span className="ai-model-chip-label">Model</span>
-            <span className="ai-model-btn-empty">Pick a model…</span>
-          </>
+          <span className="ai-model-btn-empty">Pick a model…</span>
         )}
         <span className="ai-model-btn-caret">▾</span>
       </button>
@@ -3600,6 +3558,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         />
       )}
       <div className="ai-messages-wrap">
+      <ChatNavRail scrollRef={scrollRef} version={display.length} />
       {showJumpToBottom && (
         <button
           className="ai-jump-to-bottom"
@@ -3771,6 +3730,11 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             <div
               key={i}
               className={`ai-msg ai-msg-${m.role}${dimmedByScrub ? " ai-msg-scrubbed-past" : ""}`}
+              data-anchor-idx={i}
+              data-anchor-role={m.role}
+              data-anchor-preview={
+                m.role === "user" ? m.content.slice(0, 120) : undefined
+              }
             >
               <span className="ai-msg-role">
                 {m.role === "user" ? (
@@ -4596,81 +4560,46 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           row on top and the controls (model/effort/thinking) below;
           permission/queue cards float to the top when present. */}
       <div className="ai-composer-shell">
-      <div className={`ai-composer-meta ${advancedOpen ? "advanced-open" : ""}`}>
+      <div className="ai-composer-meta">
+        {/* Left group: attach + subagent target (who the message goes to). */}
+        <button
+          type="button"
+          className="ai-attach-btn"
+          onClick={() => attachInputRef.current?.click()}
+          title="Attach images"
+          aria-label="Attach images"
+        >
+          <Icon name="plus" size={16} />
+        </button>
+        <SubagentPill
+          agents={agents}
+          active={activeAgent}
+          onSelect={selectAgent}
+          disabled={!selectedIsCC}
+        />
+        <div className="ai-composer-spacer" />
         {renderModelChip()}
         {parseQualifiedModel(selected)?.providerId === "claude-code" && (
-          <>
-            <button
-              type="button"
-              className={`ai-meta-flag ai-tune-btn ${advancedOpen ? "open" : ""}`}
-              onClick={() => setAdvancedOpen((v) => !v)}
-              title="Effort & extended thinking"
-              aria-pressed={advancedOpen}
-            >
-              <Icon name="settings" size={12} />
-            </button>
-            <span className="ai-adv-flags">
-            <MetaFlag
-              label="effort"
-              current={ccEffort ?? "default"}
-              options={[
-                {
-                  key: "default",
-                  label: "Default (CLI)",
-                  active: ccEffort === null,
-                  onSelect: () => {
-                    setCcEffort(null);
-                    toastInfo("Effort: default");
-                  },
-                },
-                ...["low", "medium", "high", "xhigh", "max"].map((o) => ({
-                  key: o,
-                  label: o,
-                  active: ccEffort === o,
-                  onSelect: () => {
-                    setCcEffort(o);
-                    toastInfo(`Effort: ${o} (from your next message)`);
-                  },
-                })),
-              ]}
-            />
-            <MetaFlag
-              label="thinking"
-              current={
-                ccThinking === null ? "auto" : ccThinking ? "on" : "off"
-              }
-              options={[
-                {
-                  key: "auto",
-                  label: "Auto (CLI default)",
-                  active: ccThinking === null,
-                  onSelect: () => {
-                    setCcThinking(null);
-                    toastInfo("Extended thinking: auto");
-                  },
-                },
-                {
-                  key: "on",
-                  label: "On",
-                  active: ccThinking === true,
-                  onSelect: () => {
-                    setCcThinking(true);
-                    toastInfo("Extended thinking: on (from your next message)");
-                  },
-                },
-                {
-                  key: "off",
-                  label: "Off",
-                  active: ccThinking === false,
-                  onSelect: () => {
-                    setCcThinking(false);
-                    toastInfo("Extended thinking: off (from your next message)");
-                  },
-                },
-              ]}
-            />
-              </span>
-          </>
+          <EffortPopover
+            effort={ccEffort}
+            onEffort={(v) => {
+              setCcEffort(v);
+              toastInfo(
+                v ? `Effort: ${v} (from your next message)` : "Effort: default",
+              );
+            }}
+            thinking={ccThinking}
+            onThinking={(v) => {
+              setCcThinking(v);
+              toastInfo(
+                v === null
+                  ? "Extended thinking: auto"
+                  : v
+                    ? "Extended thinking: on (from your next message)"
+                    : "Extended thinking: off (from your next message)",
+              );
+            }}
+          />
         )}
         {contextLabel && (
           <button
@@ -4686,7 +4615,6 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             </span>
           </button>
         )}
-        <div className="ai-composer-spacer" />
         {selectedIsCC && (
           <div className="ai-mode-wrap">
             {modeMenuOpen && (
@@ -4766,21 +4694,29 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             </button>
           </div>
         )}
+        <ComposerMic
+          onTranscript={(text) =>
+            setInput((v) => (v.trim() ? `${v.replace(/\s+$/, "")} ${text}` : text))
+          }
+        />
         {streaming !== null || runningTools ? (
           <button
             className="ai-send-btn ai-stop-btn"
             onClick={stop}
             title="Stop (Esc)"
+            aria-label="Stop"
           >
-            Stop
+            <Icon name="stop" size={16} />
           </button>
         ) : (
           <button
             className="primary ai-send-btn"
             onClick={() => void send()}
             disabled={!input.trim() || !selected}
+            title="Send (Enter)"
+            aria-label="Send"
           >
-            Send
+            <Icon name="arrow-up" size={16} />
           </button>
         )}
       </div>
@@ -4853,7 +4789,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           placeholder={
             streaming !== null || runningTools
               ? "Type to queue (sends when this turn finishes; Esc to stop)…"
-              : "Ask the model, or type / for commands… (Enter to send, Shift+Enter newline, ↑ to recall)"
+              : `Message ${activeAgent ? activeAgent.name : "Jack"}…`
           }
           value={input}
           onPaste={(e) => {
@@ -5158,6 +5094,37 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
               e.preventDefault();
               void send();
             }
+          }}
+        />
+        {input.trim().length === 0 &&
+          streaming === null &&
+          !runningTools && (
+            <div className="ai-composer-hint" aria-hidden="true">
+              <span>@ mentions</span>
+              <span>/ commands</span>
+              <span>Shift+Enter for newline</span>
+              <span>↑ to recall</span>
+            </div>
+          )}
+        {/* Hidden picker driven by the composer "+" button. */}
+        <input
+          ref={attachInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            if (files.length > 0) {
+              void appendImages(
+                files.map((f) => ({
+                  kind: "blob" as const,
+                  blob: f,
+                  name: f.name || "image",
+                })),
+              );
+            }
+            e.target.value = "";
           }}
         />
       </div>
