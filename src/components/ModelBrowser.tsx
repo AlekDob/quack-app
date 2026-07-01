@@ -21,11 +21,15 @@ interface Props {
   selectedQualified: string;
   pullProgressByName: Record<string, string>;
   onClose: () => void;
+  /** Toggle which models appear in the quick picker popover. */
+  onManageVisibility?: () => void;
   onSelect: (qualifiedModelId: string) => void;
   onPull: (name: string) => void;
   onConfigureKey: () => void;
   /** Spawn an Ollama-style install terminal for Claude Code. */
   onInstallClaudeCode: () => void;
+  /** Open Cursor CLI install docs. */
+  onInstallCursorCli?: () => void;
 }
 
 type ProviderFilter = "all" | ProviderId;
@@ -34,6 +38,7 @@ const PROVIDER_TABS: { id: ProviderFilter; label: string }[] = [
   { id: "all", label: "All providers" },
   { id: "ollama", label: "Ollama (local)" },
   { id: "claude-code", label: "Claude Code (CLI)" },
+  { id: "cursor-cli", label: "Cursor CLI" },
   { id: "openai", label: "OpenAI" },
   { id: "anthropic", label: "Anthropic" },
 ];
@@ -53,10 +58,12 @@ export function ModelBrowser({
   selectedQualified,
   pullProgressByName,
   onClose,
+  onManageVisibility,
   onSelect,
   onPull,
   onConfigureKey,
   onInstallClaudeCode,
+  onInstallCursorCli,
 }: Props) {
   const [query, setQuery] = useState("");
   const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
@@ -110,6 +117,8 @@ export function ModelBrowser({
     providerFilter === "all" || providerFilter === "ollama";
   const showClaudeCode =
     providerFilter === "all" || providerFilter === "claude-code";
+  const showCursorCli =
+    providerFilter === "all" || providerFilter === "cursor-cli";
   const showOpenai =
     providerFilter === "all" || providerFilter === "openai";
   const showAnthropic =
@@ -120,7 +129,7 @@ export function ModelBrowser({
       <div
         ref={modalRef}
         tabIndex={-1}
-        className="model-browser"
+        className="model-browser liquid-glass"
         onMouseDown={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -130,14 +139,26 @@ export function ModelBrowser({
           <span className="model-browser-title" id="model-browser-title">
             Choose a model
           </span>
-          <button
-            className="settings-close"
-            onClick={onClose}
-            title="Close (Esc)"
-            aria-label="Close model browser"
-          >
-            <Icon name="x" size={14} />
-          </button>
+          <div className="model-browser-head-actions">
+            {onManageVisibility && (
+              <button
+                type="button"
+                className="model-browser-configure"
+                onClick={onManageVisibility}
+                title="Choose which models appear in the quick picker"
+              >
+                Visibility
+              </button>
+            )}
+            <button
+              className="settings-close"
+              onClick={onClose}
+              title="Close (Esc)"
+              aria-label="Close model browser"
+            >
+              <Icon name="x" size={14} />
+            </button>
+          </div>
         </div>
 
         <div className="model-browser-toolbar">
@@ -264,6 +285,59 @@ export function ModelBrowser({
                       }
                       onUse={() => {
                         onSelect(`claude-code:${m.modelId}`);
+                        onClose();
+                      }}
+                    />
+                  ))
+              )}
+            </Section>
+          )}
+
+          {showCursorCli && (
+            <Section
+              title="Cursor CLI (local)"
+              subtitle={
+                hasKey["cursor-cli"]
+                  ? "cursor-agent detected ✓ — uses your Cursor subscription login."
+                  : "Install cursor-agent and run `cursor-agent login`. Then refresh."
+              }
+              right={
+                !hasKey["cursor-cli"] && (
+                  <button
+                    className="model-browser-configure"
+                    style={{ background: "var(--bg-alt)", color: "var(--fg)" }}
+                    onClick={() =>
+                      onInstallCursorCli
+                        ? onInstallCursorCli()
+                        : void openUrl("https://cursor.com/docs/cli/overview")
+                    }
+                    title="Open Cursor CLI install docs"
+                  >
+                    Docs
+                  </button>
+                )
+              }
+            >
+              {!hasKey["cursor-cli"] ? (
+                <div className="model-browser-empty">
+                  Install cursor-agent, log in with{" "}
+                  <code>cursor-agent login</code>, then refresh this panel.
+                </div>
+              ) : filteredCloud.filter((m) => m.providerId === "cursor-cli")
+                  .length === 0 ? (
+                <div className="model-browser-empty">No models match.</div>
+              ) : (
+                filteredCloud
+                  .filter((m) => m.providerId === "cursor-cli")
+                  .map((m) => (
+                    <CloudCard
+                      key={m.modelId}
+                      model={m}
+                      selected={
+                        selectedQualified === `cursor-cli:${m.modelId}`
+                      }
+                      onUse={() => {
+                        onSelect(`cursor-cli:${m.modelId}`);
                         onClose();
                       }}
                     />
@@ -478,7 +552,9 @@ function CloudCard({
   const billingLabel =
     model.providerId === "claude-code"
       ? "uses your `claude /login` session (Max / Pro / API key / Bedrock / Vertex)"
-      : "billed via your API key";
+      : model.providerId === "cursor-cli"
+        ? "uses your Cursor subscription (`cursor-agent login`)"
+        : "billed via your API key";
   return (
     <div className={`model-card ${selected ? "selected" : ""}`}>
       <div className="model-card-left">

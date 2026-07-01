@@ -42,6 +42,7 @@ import {
   ClaudeCodeBudgetEditor,
   ClaudeCodeUnguardedEditor,
 } from "./claudeCodeSettings";
+import { CursorCliForceEditor } from "./cursorCodeSettings";
 import { SftpProfilesEditor } from "./sftpProfilesEditor";
 import { Icon } from "./Icon";
 // Canonical templates store — same module the palette commands
@@ -721,6 +722,10 @@ export function SettingsModal() {
 
           <Section title="Claude Code — MCP servers">
             <McpServerBrowser />
+          </Section>
+
+          <Section title="Cursor CLI — Force mode">
+            <CursorCliForceEditor />
           </Section>
 
           <Section title="SFTP — Remote connections">

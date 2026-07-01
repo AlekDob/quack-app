@@ -106,6 +106,11 @@ import {
   deriveTitle,
   type ChatSession,
 } from "../chatHistory";
+import { SessionUsageCircle } from "./SessionUsageCircle";
+import {
+  SessionUsageDrawer,
+  type SessionUsageData,
+} from "./SessionUsageDrawer";
 import {
   search,
   pty,
@@ -113,7 +118,9 @@ import {
   claudeCode as claudeCodeIpc,
 } from "../ipc";
 import { MarkdownPreview } from "./MarkdownPreview";
+import { ModelPickerPopover } from "./ModelPickerPopover";
 import { ModelBrowser } from "./ModelBrowser";
+import { ManageModelsModal } from "./ManageModelsModal";
 import { loadSubagents, type SubagentDef } from "../subagents";
 import { loadSkills, type SkillDef } from "../skills";
 import { permissionFor } from "../toolPermissions";
@@ -232,11 +239,14 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // users can discover what's available before setting up a key.
   const [allCloudCatalog, setAllCloudCatalog] = useState<ProviderModel[]>([]);
   const [claudeCodeAvailable, setClaudeCodeAvailable] = useState(false);
+  const [cursorCliAvailable, setCursorCliAvailable] = useState(false);
   // Rules-file hint shown in the header. Loaded once per workspace
   // mount + refreshed whenever fs events suggest the file may have
   // changed. Null when no rules file exists.
   const [rulesSource, setRulesSource] = useState<string | null>(null);
   const [rulesPath, setRulesPath] = useState<string | null>(null);
+  // Full char count of the rules file — drives the colored token-weight dot.
+  const [rulesBytes, setRulesBytes] = useState<number>(0);
   const [selected, setSelected] = useState<string>("");
   const [input, setInput] = useState("");
   // Image attachments staged on the composer (Claude Code only). Cleared
@@ -260,6 +270,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     Record<string, string>
   >({});
   const [browserOpen, setBrowserOpen] = useState(false);
+  const [manageModelsOpen, setManageModelsOpen] = useState(false);
   const isAnyPulling = Object.keys(pullProgressMap).length > 0;
   const aggregatedPullProgress = isAnyPulling
     ? Object.values(pullProgressMap).join(" · ")
@@ -423,6 +434,13 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // alongside the conversation so the running tally survives reloads.
   // Used by the spend chip in the footer + the budget-warning toast.
   const [chatTotalCost, setChatTotalCost] = useState<number>(0);
+  // Cumulative token counters for the session usage drawer.
+  const [cumulativeTokensIn, setCumulativeTokensIn] = useState(0);
+  const [cumulativeTokensOut, setCumulativeTokensOut] = useState(0);
+  const [cumulativeCacheRead, setCumulativeCacheRead] = useState(0);
+  const [cumulativeTurns, setCumulativeTurns] = useState(0);
+  const [sessionStartTs] = useState(() => Date.now());
+  const sessionDurationMs = Date.now() - sessionStartTs;
   // Toggle: has the user been warned about the budget for this chat
   // yet? Avoids spamming the toast every turn once they cross.
   const [budgetWarned, setBudgetWarned] = useState(false);
@@ -548,11 +566,13 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         if (cancelled) return;
         setRulesSource(r?.source ?? null);
         setRulesPath(r?.absolutePath ?? null);
+        setRulesBytes(r?.bytes ?? 0);
       })
       .catch(() => {
         if (cancelled) return;
         setRulesSource(null);
         setRulesPath(null);
+        setRulesBytes(0);
       });
     return () => {
       cancelled = true;
@@ -597,6 +617,14 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       setClaudeCodeAvailable(await ccProvider.isAvailable());
     } catch {
       setClaudeCodeAvailable(false);
+    }
+    try {
+      const cursorProvider = (await import("../providers")).getProvider(
+        "cursor-cli",
+      );
+      setCursorCliAvailable(await cursorProvider.isAvailable());
+    } catch {
+      setCursorCliAvailable(false);
     }
     // Track Ollama-specific availability for the install/pull onboarding UI.
     const ollamaUp = await ping();
@@ -2214,6 +2242,13 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                 return next;
               });
             }
+            // Roll cumulative token counters for the session drawer.
+            if (ev.tokens) {
+              setCumulativeTokensIn((p) => p + (ev.tokens?.input ?? 0));
+              setCumulativeTokensOut((p) => p + (ev.tokens?.output ?? 0));
+              setCumulativeCacheRead((p) => p + (ev.tokens?.cacheRead ?? 0));
+            }
+            setCumulativeTurns((p) => p + 1);
             continue;
           }
           if (ev.kind === "content") {
@@ -2811,6 +2846,105 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     limitsError: string | null;
   } | null>(null);
 
+  // ── Live session usage (polled for the ProgressCircle + drawer) ──
+  const [sessionUsage, setSessionUsage] = useState<SessionUsageData | null>(
+    null,
+  );
+  // Cache the five_hour pct + resetsAt separately for the circle (avoids
+  // re-parsing the full SessionUsageData on every 30s tick).
+  const [sessionPct, setSessionPct] = useState(0);
+  const [sessionResetsAt, setSessionResetsAt] = useState<string | null>(null);
+  const [_sdOpen, setSessionDrawerOpen] = useState(false);
+
+  // Poll claude_usage_limits every 30s while Claude Code is selected.
+  // (selectedIsCC is already derived above.)
+  useEffect(() => {
+    if (!selectedIsCC) return;
+    const poll = async () => {
+      try {
+        const res = await invoke<{
+          usage?: Record<
+            string,
+            { utilization?: number; resets_at?: string | null } | null
+          > & {
+            extra_usage?: {
+              is_enabled?: boolean;
+              monthly_limit?: number;
+              used_credits?: number;
+              utilization?: number;
+              currency?: string;
+            } | null;
+          };
+        }>("claude_usage_limits");
+        const u = res.usage ?? {};
+
+        // Five-hour window (used by the circle)
+        const fh = u.five_hour;
+        if (fh && typeof fh.utilization === "number") {
+          setSessionPct(fh.utilization);
+          setSessionResetsAt(fh.resets_at ?? null);
+        }
+
+        // Full data for the drawer
+        const limits: SessionUsageData["limits"] = [];
+        const windows: Array<[string, string]> = [
+          ["five_hour", "Session (5hr)"],
+          ["seven_day", "Weekly (7 day)"],
+          ["seven_day_sonnet", "Weekly Sonnet"],
+          ["seven_day_opus", "Weekly Opus"],
+        ];
+        for (const [key, label] of windows) {
+          const w = u[key];
+          if (w && typeof w.utilization === "number") {
+            limits.push({
+              label,
+              pct: w.utilization,
+              resetsAt: w.resets_at ?? null,
+            });
+          }
+        }
+        const ex = u.extra_usage;
+        const extra: SessionUsageData["extra"] =
+          ex?.is_enabled && typeof ex.used_credits === "number"
+            ? {
+                used: ex.used_credits,
+                limit: ex.monthly_limit ?? 0,
+                pct: ex.utilization ?? 0,
+                currency: ex.currency ?? "USD",
+              }
+            : null;
+
+        // Merge with local state
+        const records = loadUsage();
+        const todayKey = new Date().toDateString();
+        setSessionUsage({
+          limits,
+          extra,
+          chat: {
+            cost: chatTotalCost,
+            tokensIn: cumulativeTokensIn,
+            tokensOut: cumulativeTokensOut,
+            cacheRead: cumulativeCacheRead,
+            turns: cumulativeTurns,
+            model: lastUsage?.model ?? null,
+            durationMs: sessionDurationMs,
+          },
+          wsMonth: thisMonthWorkspaceTotal(wsId, records),
+          month: thisMonthTotal(records),
+          today: records
+            .filter((r) => new Date(r.ts).toDateString() === todayKey)
+            .reduce((a, r) => a + r.costUsd, 0),
+        });
+      } catch {
+        // Silently ignore — limits unavailable (offline, no auth, etc.)
+      }
+    };
+    // Initial fetch
+    poll();
+    const t = window.setInterval(poll, 30_000);
+    return () => window.clearInterval(t);
+  }, [selectedIsCC, wsId]);
+
   const showUsageReport = async () => {
     let cli: NonNullable<typeof usageReport>["cli"] = null;
     try {
@@ -3146,6 +3280,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const providerMeta: Record<string, { label: string; color: string }> = {
     ollama: { label: "ollama", color: "#4ade80" },
     "claude-code": { label: "claude code", color: "#b18cf0" },
+    "cursor-cli": { label: "cursor cli", color: "#6b9bd1" },
     openai: { label: "openai", color: "#10a37f" },
     anthropic: { label: "anthropic", color: "#d97757" },
   };
@@ -3154,24 +3289,35 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     const parsed = parseQualifiedModel(selected);
     return (
       <div className="ai-header">
-        {rulesSource && rulesPath && (
-          <button
-            className="ai-rules-indicator"
-            onClick={() => {
-              if (rulesPath) {
-                void useStore.getState().openFile(wsId, rulesPath);
+        {rulesSource && rulesPath && (() => {
+          // ~4 chars/token. Color the dot by weight so a bloated CLAUDE.md
+          // (which taxes every turn) is visible at a glance.
+          const tok = Math.round(rulesBytes / 4);
+          const level = tok > 6000 ? "heavy" : tok > 2500 ? "warn" : "ok";
+          const tokLabel =
+            tok >= 1000 ? `${(tok / 1000).toFixed(1)}k` : `${tok}`;
+          return (
+            <button
+              className={`ai-rules-indicator level-${level}`}
+              onClick={() => void useStore.getState().openFile(wsId, rulesPath)}
+              title={
+                `${rulesSource} · ~${tokLabel} tokens` +
+                (level === "heavy"
+                  ? " — heavy, taxes every turn. Consider trimming."
+                  : level === "warn"
+                    ? " — getting large."
+                    : "") +
+                (parsed?.providerId === "claude-code"
+                  ? " · loaded by Claude Code natively. Click to open."
+                  : " · loaded into the system prompt. Click to open.")
               }
-            }}
-            title={
-              parsed?.providerId === "claude-code"
-                ? `${rulesSource} loaded by Claude Code natively. Click to open.`
-                : `Loaded ${rulesSource} into the system prompt for this provider. Click to open.`
-            }
-          >
-            <Icon name="file-text" size={11} />
-            <span>{rulesSource}</span>
-          </button>
-        )}
+            >
+              <span className="ai-rules-dot" aria-hidden="true" />
+              <span>{rulesSource}</span>
+              <span className="ai-rules-tokens">{tokLabel}</span>
+            </button>
+          );
+        })()}
         <div className="ai-header-spacer" />
         {parsed?.providerId === "claude-code" && (
           <ClaudeSessionsButton
@@ -3232,44 +3378,38 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     );
   };
 
+  const ollamaModels = useMemo(
+    () => allModels.filter((m) => m.providerId === "ollama"),
+    [allModels],
+  );
+
+  const modelHasKey = useMemo(
+    () => ({
+      ollama: true,
+      "claude-code": claudeCodeAvailable,
+      "cursor-cli": cursorCliAvailable,
+      openai: hasApiKey("openai"),
+      anthropic: hasApiKey("anthropic"),
+    }),
+    [claudeCodeAvailable, cursorCliAvailable],
+  );
+
   const renderModelChip = () => {
     const parsed = parseQualifiedModel(selected);
-    const currentModel = allModels.find(
-      (m) =>
-        parsed &&
-        m.providerId === parsed.providerId &&
-        m.modelId === parsed.modelId,
-    );
-    const meta = parsed
-      ? (providerMeta[parsed.providerId] ?? {
-          label: parsed.providerId,
-          color: "#888",
-        })
-      : null;
+    const dotColor = parsed
+      ? (providerMeta[parsed.providerId]?.color ?? "var(--fg-muted)")
+      : undefined;
     return (
-      <button
-        className="ai-model-chip"
-        onClick={() => setBrowserOpen(true)}
-        title={
-          currentModel
-            ? `${currentModel.displayName} — click to switch`
-            : "Open model browser"
-        }
-      >
-        {meta && parsed ? (
-          <>
-            <span
-              className="ai-model-dot"
-              style={{ background: meta.color }}
-              aria-hidden="true"
-            />
-            <span className="ai-model-id">{parsed.modelId}</span>
-          </>
-        ) : (
-          <span className="ai-model-btn-empty">Pick a model…</span>
-        )}
-        <span className="ai-model-btn-caret">▾</span>
-      </button>
+      <ModelPickerPopover
+        selectedQualified={selected}
+        dotColor={dotColor}
+        onSelect={(q) => setSelected(q)}
+        cloudModels={allCloudCatalog}
+        ollamaModels={ollamaModels}
+        hasKey={modelHasKey}
+        onConfigureProviders={() => openSettings("ai-providers")}
+        onOpenFullBrowser={() => setBrowserOpen(true)}
+      />
     );
   };
 
@@ -3342,18 +3482,23 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     streamingToolResults,
   ]);
 
+  // Label for the "attach editor context" chip. Phrased as what Claude
+  // WILL receive, so the chip reads as a clear state (paired with an
+  // ON/OFF pill), not an ambiguous verb.
   const contextLabel = useMemo(() => {
-    if (!attachContext) return "No context attached";
+    const base = editorState.filePath
+      ? editorState.filePath.replace(/\\/g, "/").split("/").pop() ??
+        editorState.filePath
+      : null;
+    if (!attachContext) {
+      // Still name the file so the user knows what turning it ON would send.
+      return base ? `Editor: ${base} not attached` : "Editor context off";
+    }
     if (editorState.selectionText.length > 0 && editorState.selectionLines > 0) {
       const n = editorState.selectionLines;
-      return `Sending ${n} selected line${n === 1 ? "" : "s"} as context`;
+      return `Attaching ${n} selected line${n === 1 ? "" : "s"}`;
     }
-    if (editorState.filePath) {
-      const base =
-        editorState.filePath.replace(/\\/g, "/").split("/").pop() ??
-        editorState.filePath;
-      return `Sending whole file ${base}`;
-    }
+    if (base) return `Attaching file: ${base}`;
     return null;
   }, [
     attachContext,
@@ -3513,6 +3658,18 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     ? parentFileOpen
     : (path: string) => void useStore.getState().openFile(wsId, path);
 
+  // Format a resetsAt ISO timestamp into a human-friendly countdown
+  // (e.g. "2h 14m", "35m", "4d"). Used by SessionUsageCircle.
+  const fmtResetsIn = (resetsAt: string | null): string => {
+    if (!resetsAt) return "—";
+    const ms = new Date(resetsAt).getTime() - Date.now();
+    if (ms <= 0) return "—";
+    const h = ms / 3_600_000;
+    if (h < 1) return `${Math.ceil(ms / 60_000)}m`;
+    if (h < 48) return `${Math.floor(h)}h ${Math.ceil((h % 1) * 60)}m`;
+    return `${Math.ceil(h / 24)}d`;
+  };
+
   return (
     <SubagentOpen.Provider value={openSubagentTab}>
     <AgentFileOpen.Provider value={fileOpenHandler}>
@@ -3530,9 +3687,6 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       {renderHeader()}
       {renderHistoryDropdown()}
       <PrivacyBanner activeFilePath={editorState.filePath} />
-      {/* In compact (agent) mode the checklist lives in the sidebar Tasks
-          section, so the sticky in-chat card would just duplicate it. */}
-      {!compact && todos && todos.length > 0 && <TodosCard items={todos} />}
       {messages.length >= 4 && streaming === null && !runningTools && (
         <TimelineScrubber
           totalMessages={messages.length}
@@ -4556,6 +4710,14 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           />
         </div>
       )}
+      {/* Plan chip above the composer (astronave-style): collapsed by default,
+          expands upward on click. In compact (agent) mode the checklist lives
+          in the sidebar Tasks section, so we skip the duplicate here. */}
+      {!compact && todos && todos.length > 0 && (
+        <div className="ai-todos-bar">
+          <TodosCard items={todos} />
+        </div>
+      )}
       {/* Cursor-style composer: one pill. CSS `order` puts the textarea
           row on top and the controls (model/effort/thinking) below;
           permission/queue cards float to the top when present. */}
@@ -4580,38 +4742,49 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         <div className="ai-composer-spacer" />
         {renderModelChip()}
         {parseQualifiedModel(selected)?.providerId === "claude-code" && (
-          <EffortPopover
-            effort={ccEffort}
-            onEffort={(v) => {
-              setCcEffort(v);
-              toastInfo(
-                v ? `Effort: ${v} (from your next message)` : "Effort: default",
-              );
-            }}
-            thinking={ccThinking}
-            onThinking={(v) => {
-              setCcThinking(v);
-              toastInfo(
-                v === null
-                  ? "Extended thinking: auto"
-                  : v
-                    ? "Extended thinking: on (from your next message)"
-                    : "Extended thinking: off (from your next message)",
-              );
-            }}
-          />
+          <>
+            <EffortPopover
+              effort={ccEffort}
+              onEffort={(v) => {
+                setCcEffort(v);
+                toastInfo(
+                  v ? `Effort: ${v} (from your next message)` : "Effort: default",
+                );
+              }}
+              thinking={ccThinking}
+              onThinking={(v) => {
+                setCcThinking(v);
+                toastInfo(
+                  v === null
+                    ? "Extended thinking: auto"
+                    : v
+                      ? "Extended thinking: on (from your next message)"
+                      : "Extended thinking: off (from your next message)",
+                );
+              }}
+            />
+            <SessionUsageCircle
+              pct={sessionPct}
+              resetsIn={fmtResetsIn(sessionResetsAt)}
+              onClick={() => setSessionDrawerOpen(true)}
+            />
+          </>
         )}
         {contextLabel && (
           <button
             type="button"
             className={`ai-context-indicator ${attachContext ? "" : "off"}`}
-            title={`${contextLabel} — click to toggle attaching it to your next message`}
+            title={
+              attachContext
+                ? "ON — the file (or selection) open in your editor is sent to Claude with every message, so it sees it without a Read. Click to turn OFF."
+                : "OFF — your messages don't include the open file. Turn ON to attach the file/selection you're viewing (Claude can still Read files on its own). Click to turn ON."
+            }
             onClick={() => setAttachContext((v) => !v)}
           >
             <span className="ai-context-dot" />
             <span className="ai-context-text">{contextLabel}</span>
             <span className="ai-context-toggle">
-              {attachContext ? "off" : "on"}
+              {attachContext ? "ON" : "OFF"}
             </span>
           </button>
         )}
@@ -5220,15 +5393,14 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           )
         }
         cloudModels={allCloudCatalog}
-        hasKey={{
-          ollama: true,
-          "claude-code": claudeCodeAvailable,
-          openai: hasApiKey("openai"),
-          anthropic: hasApiKey("anthropic"),
-        }}
+        hasKey={modelHasKey}
         selectedQualified={selected}
         pullProgressByName={pullProgressMap}
         onClose={() => setBrowserOpen(false)}
+        onManageVisibility={() => {
+          setBrowserOpen(false);
+          setManageModelsOpen(true);
+        }}
         onSelect={(q) => setSelected(q)}
         onPull={(name) => void pullSpecific(name)}
         onConfigureKey={() => {
@@ -5236,13 +5408,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           openSettings("ai-providers");
         }}
         onInstallClaudeCode={async () => {
-          // Spawn a workspace terminal that runs the install. We use the
-          // default shell so npm resolves through the user's normal PATH,
-          // then queue the install command via pty.write once spawned.
           const termId = useStore
             .getState()
             .addTerminal(wsId, "bottom", undefined);
-          // Wait briefly for the PTY to be ready, then send the command.
           setTimeout(() => {
             const ws = useStore.getState().loaded[wsId];
             const t = ws?.terminals[termId];
@@ -5256,12 +5424,33 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             "Installing Claude Code via npm — when it finishes, run `claude /login`.",
           );
           setBrowserOpen(false);
-          // Recheck a few times after install likely finishes.
           setTimeout(() => void refresh(), 15000);
           setTimeout(() => void refresh(), 30000);
         }}
+        onInstallCursorCli={() => {
+          void openUrl("https://cursor.com/docs/cli/overview");
+          setBrowserOpen(false);
+        }}
+      />
+      <ManageModelsModal
+        open={manageModelsOpen}
+        onClose={() => setManageModelsOpen(false)}
+        cloudModels={allCloudCatalog}
+        ollamaModels={ollamaModels}
+        hasKey={modelHasKey}
+        onConfigureProviders={() => openSettings("ai-providers")}
       />
     </div>
+    {/* Live session usage drawer (click on the ProgressCircle). */}
+    <SessionUsageDrawer
+      open={_sdOpen}
+      data={sessionUsage}
+      onClose={() => setSessionDrawerOpen(false)}
+      onOpenDashboard={() => {
+        setSessionDrawerOpen(false);
+        openSettings("ai-usage-cross-chat-dashboard");
+      }}
+    />
     </AgentFileOpen.Provider>
     </SubagentOpen.Provider>
   );

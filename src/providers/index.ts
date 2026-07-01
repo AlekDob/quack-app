@@ -3,23 +3,27 @@ import { ollamaProvider } from "./ollama";
 import { openaiProvider } from "./openai";
 import { anthropicProvider } from "./anthropic";
 import { claudeCodeProvider } from "./claudeCode";
+import { cursorCliProvider } from "./cursorCode";
 
 export { hasApiKey, getApiKey, setApiKey } from "./keys";
 export type { ProviderId, ProviderModel } from "./types";
 export { parseQualifiedModel, makeQualifiedModel } from "./types";
 export { warmupOllamaModel } from "./ollama";
 export { invalidateClaudeCodeCache } from "./claudeCode";
+export { invalidateCursorCliCache } from "./cursorCode";
 
 const REGISTRY: Record<ProviderId, ChatProvider> = {
   ollama: ollamaProvider,
   openai: openaiProvider,
   anthropic: anthropicProvider,
   "claude-code": claudeCodeProvider,
+  "cursor-cli": cursorCliProvider,
 };
 
 export const PROVIDERS: ChatProvider[] = [
   ollamaProvider,
   claudeCodeProvider,
+  cursorCliProvider,
   openaiProvider,
   anthropicProvider,
 ];

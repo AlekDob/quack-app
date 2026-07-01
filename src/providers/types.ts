@@ -11,7 +11,7 @@ export interface ProviderModel {
   supportsTools?: boolean;
 }
 
-export type ProviderId = "ollama" | "openai" | "anthropic" | "claude-code";
+export type ProviderId = "ollama" | "openai" | "anthropic" | "claude-code" | "cursor-cli";
 
 export interface ChatProvider {
   id: ProviderId;
@@ -79,7 +79,8 @@ export function parseQualifiedModel(
     providerId !== "ollama" &&
     providerId !== "openai" &&
     providerId !== "anthropic" &&
-    providerId !== "claude-code"
+    providerId !== "claude-code" &&
+    providerId !== "cursor-cli"
   ) {
     return null;
   }

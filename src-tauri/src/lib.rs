@@ -1,5 +1,6 @@
 mod atomic;
 mod claude_code;
+mod cursor_code;
 mod claude_mcp;
 mod claude_perm;
 mod claude_sessions;
@@ -15,6 +16,7 @@ mod watcher;
 mod workspace;
 
 use claude_code::ClaudeCodeState;
+use cursor_code::CursorCodeState;
 use claude_perm::PermState;
 use pty::PtyState;
 use watcher::WatcherState;
@@ -43,6 +45,7 @@ pub fn run() {
         .manage(PtyState::default())
         .manage(WatcherState::default())
         .manage(ClaudeCodeState::default())
+        .manage(CursorCodeState::default())
         .manage(PermState::default())
         .manage(sftp::SftpPoolState::default())
         .manage(sysmon::SysMonState::default())
@@ -142,6 +145,10 @@ pub fn run() {
             claude_code::claude_code_load_session,
             claude_code::claude_code_load_subagent,
             claude_code::claude_plugin_cmd,
+            cursor_code::cursor_code_check,
+            cursor_code::cursor_code_list_models,
+            cursor_code::cursor_code_chat,
+            cursor_code::cursor_code_kill,
             claude_perm::claude_perm_decide,
             claude_perm::claude_perm_endpoint,
             claude_usage::claude_usage_limits,

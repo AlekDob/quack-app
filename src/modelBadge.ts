@@ -20,6 +20,12 @@ export function modelBadge(model: string | undefined): {
         className: "badge-claude-code",
         full: `Claude Code · ${id || "default"}`,
       };
+    case "cursor-cli":
+      return {
+        short: "CU",
+        className: "badge-cursor-cli",
+        full: `Cursor CLI · ${id || "default"}`,
+      };
     case "anthropic":
       return {
         short: "Cl",

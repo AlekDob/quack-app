@@ -2,7 +2,7 @@
 type: design-directives
 project: quack-desktop
 created: 2026-06-28
-last_verified: 2026-06-28
+last_verified: 2026-07-01
 tags: [design, directives, ui, brand, rules, no-emoji, tokens, cursor-style]
 ---
 
@@ -46,6 +46,9 @@ while building. When in doubt, match Cursor's restraint.
   advanced (effort/thinking) collapse behind a `⚙` icon only when narrow (container query).
 - **Top bar:** Quack logo + name; command center (search) centered VS Code-style.
 - **Native macOS window:** `titleBarStyle: Overlay` + `hiddenTitle`; custom chrome on Win/Linux.
+- **Model modals:** reuse `.model-browser.liquid-glass` for catalog + visibility — pill search,
+  `settings-close`, `settings-toggle` for visibility rows; theme-specific surfaces in `App.css`.
+  See `design/model-modal-pattern.md`. Do not fork a third modal style.
 
 ## Workflow
 

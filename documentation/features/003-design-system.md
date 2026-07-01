@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS (no Tailwind)
 created: 2026-06-28
-last_verified: 2026-06-28
+last_verified: 2026-07-01
 tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monochrome, macos, window, composer, cursor-style]
 ---
 
@@ -41,7 +41,7 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 - **Selection = neutral:** active rows/tabs use `--bg-hi` + a thin accent trace, never a full fill.
 
 ### Liquid glass
-- `.liquid-glass` utility (`@supports` fallback + reduced-motion) for STATIC surfaces only. Applied to topbar, `.menu-dropdown`, `.palette`, `WorkspaceColorPopover`. Never on scrollable lists.
+- `.liquid-glass` utility (`@supports` fallback + reduced-motion) for STATIC surfaces only. Applied to topbar, `.menu-dropdown`, `.palette`, `WorkspaceColorPopover`, **model catalog/visibility modals** (`.model-browser.liquid-glass`). Never on scrollable lists.
 
 ### Native window (macOS)
 - `titleBarStyle: "Overlay"` + `hiddenTitle: true` → native rounded corners + shadow + traffic lights. `data-os="macos"` insets the topbar (78px) for the lights and hides custom window controls. **Gotcha:** Overlay is macOS-only; `lib.rs` strips decorations on Win/Linux to avoid a double title bar. Earlier `transparent:true` + CSS `border-radius` did NOT work (borderless window has no native rounding/shadow).
@@ -85,6 +85,13 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 ### Command palette
 - Cursor-style rows — see `features/011-command-palette.md`. Compact rounded items, leading
   type icon (`iconForCategory`), trailing hint, active = `--bg-hi` rounded (no accent bar).
+
+### Model modals (catalog + visibility)
+- **Choose a model** + **Manage models** share one shell: `.model-browser.liquid-glass`
+  (760px catalog / 520px visibility). Cursor-style neutral chrome — pill search, pill header
+  actions, uppercase provider sections, card rows (catalog) or `settings-toggle` rows (visibility).
+- Light shell `#fcfcfd`; dark = charcoal gradient + rgba cards. Full pattern:
+  `documentation/design/model-modal-pattern.md`. Feature wiring: `features/025-model-selector.md`.
 
 ### No emoji (enforced)
 - Zero emoji in chrome — full rules in `design/directives.md`. Theme toggle uses
