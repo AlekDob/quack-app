@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-06-28
+last_verified: 2026-07-01
 tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, workspace, zustand, persistence]
 ---
 
@@ -28,6 +28,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | Store/State | `src/store.ts` | `AIChatDescriptor`, `WorkspaceData.aiChats`, `addAIChat`, `closeAIChat`, `reorderAIChat` |
 | Store/State | `src/aiTaskStore.ts` | Module-level task store keyed by chatId; `publishTasks`/`getTasks`/`subscribeTasks` |
 | Service | `src/chatHistory.ts` | `ChatSession` model + `loadSessions`/`saveSession`/`deleteSession`/`deriveTitle` |
+| Service | `src/providerSession.ts` | `providerSessionIds` read/write; legacy `claudeSessionId` migration |
 | Model/Type | `src/ai.ts` | `ChatMessage`, `ToolCall`, `ChatStreamEvent` (streaming contract) |
 | Service (Rust) | `src-tauri/src/workspace.rs` | `WorkspaceMeta`, `WorkspacesIndex`, load/save workspace state |
 | Service | `src/ipc.ts` | `workspaces.load/save/loadState/saveState` IPC bridge |
@@ -35,8 +36,8 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 ### Data Flow
 - **Open a session:** `addAIChat(wsId)` → new `AIChatDescriptor` in `ws.aiChats` (createdAt = max+1) → persisted in `state.json` → appears in both lists
 - **Render the lists:** `Object.values(ws.aiChats).sort(by createdAt)` → `AIChatsRail` (editor) / `AgentModeShell` sessions (agent)
-- **Per-chat badge:** `chat.model` → `modelBadge()` → 2-char provider chip (CC/Cl/AI/OL)
-- **Transcript load/save:** `AIChatPanel` ↔ `chatHistory.ts` via `descriptor.sessionId`
+- **Per-chat badge:** `chat.model` → `modelBadge()` → 2-char provider chip (CC/CU/OC/Cl/AI/OL)
+- **Transcript load/save:** `AIChatPanel` ↔ `chatHistory.ts` via `descriptor.sessionId`; agent resume ids in `providerSessionIds` (see `028-opencode-bridge.md`)
 - **Live tasks:** `AIChatPanel` `publishTasks(chatId, todos)` → `aiTaskStore` → `AgentTasks` in `AgentModeShell`
 - **Reorder:** drag in `AIChatsRail` → `reorderAIChat` rewrites `createdAt` (sort key, no separate order list)
 
@@ -50,6 +51,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 
 ### State
 - `ws.aiChats`: `Record<id, AIChatDescriptor>` — open sessions (global, persisted)
+- `ChatSession.providerSessionIds`: `Partial<Record<ProviderId, string>>` — per-provider server session for resume (CC/Cursor/OpenCode); legacy `claudeSessionId` kept in sync
 - `selectedByWs`: `Record<wsId, chatId>` — which session fills the center column in Agent Mode (component)
 - runtime run-state (`streaming`, `runningTools`, `activeToolLabels{status}`, `abortRef`): **local to `AIChatPanel`** (component) — not yet surfaced per-session in the lists
 

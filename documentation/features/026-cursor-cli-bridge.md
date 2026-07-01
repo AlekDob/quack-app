@@ -4,7 +4,7 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-01
 last_verified: 2026-07-01
-tags: [cursor-cli, bridge, subprocess, streaming, stream-json, rust, cursor-agent]
+tags: [cursor-cli, bridge, subprocess, streaming, stream-json, rust, cursor-agent, lazy-load]
 ---
 
 ## Cursor CLI Bridge (spawn / stream / kill / list-models)
@@ -16,9 +16,10 @@ tags: [cursor-cli, bridge, subprocess, streaming, stream-json, rust, cursor-agen
 |------|------|---------|
 | Bridge | `src-tauri/src/cursor_code.rs` | check, list_models, chat spawn, kill, idle watchdog |
 | State | `cursor_code.rs` → `CursorCodeState` | `children` pid map, event buffers |
-| Provider | `src/providers/cursorCode.ts` | `ChatProvider` id `cursor-cli`; dynamic `listModels()` |
+| Provider | `src/providers/cursorCode.ts` | `ChatProvider` id `cursor-cli`; lazy + live `listModels()` |
 | Shared | `src/providers/cliStreamJson.ts` | Parse `stream-json` lines (shared with CC path) |
 | Shared | `src/providers/cliPrompt.ts` | Flatten messages → stdin prompt |
+| Session | `src/providerSession.ts` | Resume id in `providerSessionIds["cursor-cli"]` |
 | Settings UI | `src/components/cursorCodeSettings.tsx` | Force mode toggle (`--force`) |
 | Config | `src/modelPrefs.ts` | N/A — uses `lcp.cursorCli.forceMode` in provider |
 
@@ -33,17 +34,19 @@ tags: [cursor-cli, bridge, subprocess, streaming, stream-json, rust, cursor-agen
 ### Data Flow
 User message → `cursorCliProvider.chat()` → `cursor_code_chat` (stdin prompt, flags) → stdout lines → `parseCliStreamJsonObject` → `ChatStreamEvent[]` → `AIChatPanel` stream
 
-Model list → `invoke("cursor_code_list_models")` → cache 60s in `cursorCode.ts` → `ModelBrowser` / `ModelPickerPopover` groups
+**Models (lazy):** mount → `listModels()` returns `[DEFAULT_MODEL]` if cache cold → picker/browser open → `refreshCursorModelsLive()` → `cursor_code_list_models` → cache 60s
 
 ### Key Functions
-- `cursorCliProvider.listModels() → ProviderModel[]` — dynamic list + synthetic "default" entry
+- `cursorCliProvider.listModels() → ProviderModel[]` — default row at startup; full list after live refresh
+- `refreshCursorModelsLive() → ProviderModel[]` — subprocess `--list-models`; updates cache
 - `getForceMode() → boolean` — reads `lcp.cursorCli.forceMode` (default `true`)
 - `invalidateCursorCliCache() → void` — clear availability + models cache after settings change
-- `parseCliStreamJsonObject(line, state) → ChatStreamEvent[]` — shared parser
+- `isAgenticProviderId("cursor-cli") → true` — display-only tool calls in chat
 
 ### State
 - `lcp.cursorCli.forceMode`: `boolean` — pass `--force` to skip tool prompts (global)
-- `modelsCache` / `availabilityCache`: in-module TTL caches in `cursorCode.ts` (60s / 5s)
+- `modelsCache` / `availabilityCache`: in-module TTL caches in `cursorCode.ts` (60s)
+- `providerSessionIds["cursor-cli"]`: resume session id (see `028-opencode-bridge.md` session section)
 
 ### External Dependencies
 - Binary: `cursor-agent` on PATH or `cursor agent` subcommand
@@ -53,6 +56,7 @@ Model list → `invoke("cursor_code_list_models")` → cache 60s in `cursorCode.
 - `lcp.cursorCli.forceMode`: force mode default `true`
 
 ### Gotchas
+- **Lazy model list:** `listModels()` does not spawn `--list-models` at app startup — defer to `refreshCursorModelsLive()` (picker/browser). See `025-model-selector.md`.
 - **Dynamic models only:** no hardcoded Cursor model list — UI shows whatever `--list-models` returns plus a "Default" row (no `--model` flag).
 - **Parser reuse:** stream-json format matches Claude Code closely; parser lives in `cliStreamJson.ts` — extend there, don't duplicate in `cursorCode.ts`.
 - **Smoke test pending:** mission w11 — verify live chat in `npm run tauri dev` after `cursor-agent login`.

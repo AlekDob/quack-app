@@ -92,6 +92,8 @@ On provider switch: flatten Quack messages to new provider; keep stored ids for 
 ## UI contract
 
 - Model picker groups by `ProviderId`; qualified key `providerId:modelId`.
+- **Lazy CLI catalogs:** OpenCode + Cursor return a single default model at cold start; full lists load when the model picker or ModelBrowser opens (`refreshLiveCliModels` in `AIChatPanel`) — never spawn sidecar/subprocess from `refresh()` on mount.
+- **Agentic providers:** `isAgenticProviderId` (`claude-code`, `cursor-cli`, `opencode-cli`) — Quack displays tool calls only; does not run local `aiTools`.
 - Agent-only composer features (`@` subagents, CC skills) gated on `claude-code` until v2 per-provider menus exist.
 - Settings: one section per local agent (auth hint, sandbox/force toggles, sidecar status for Template B).
 

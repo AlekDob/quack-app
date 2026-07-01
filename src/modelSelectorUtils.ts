@@ -11,6 +11,7 @@ const PROVIDER_LABELS: Record<ProviderId, string> = {
   ollama: "Ollama (local)",
   "claude-code": "Claude Code (CLI)",
   "cursor-cli": "Cursor CLI",
+  "opencode-cli": "OpenCode (local)",
   openai: "OpenAI",
   anthropic: "Anthropic",
 };
@@ -19,6 +20,7 @@ const PROVIDER_ORDER: ProviderId[] = [
   "ollama",
   "claude-code",
   "cursor-cli",
+  "opencode-cli",
   "openai",
   "anthropic",
 ];

@@ -1,4 +1,5 @@
 import type { ChatMessage } from "./ai";
+import type { ProviderId } from "./providers/types";
 import { getJson, setJson } from "./localStore";
 
 export interface ChatSession {
@@ -12,11 +13,15 @@ export interface ChatSession {
   model?: string;
   updatedAt: number;
   /**
-   * Provider-side session id (currently only set by the Claude Code
-   * provider). When present we pass it as `resumeSessionId` on the
-   * next turn so the CLI's --resume keeps the server-side context
-   * window + prompt cache alive instead of re-paying cold-start every
-   * turn. Cleared when the user starts a new chat.
+   * Per-provider server-side session ids for resume (`--resume`, OpenCode
+   * `ses_*`, Codex `thread_id`, etc.). Cleared when the user starts a new
+   * chat. Prefer this over `claudeSessionId` for new code.
+   */
+  providerSessionIds?: Partial<Record<ProviderId, string>>;
+  /**
+   * Legacy Claude Code session id — kept for backward compatibility with
+   * sessions saved before `providerSessionIds`. New writes mirror the
+   * `claude-code` entry from `providerSessionIds`.
    */
   claudeSessionId?: string;
   /**

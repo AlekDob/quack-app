@@ -9,9 +9,24 @@ export interface ProviderModel {
   contextWindow?: number;
   /** Whether the model supports native tool calling. */
   supportsTools?: boolean;
+  /** Zero-cost model (OpenCode Zen free tier, etc.). Shown with a badge in pickers. */
+  isFree?: boolean;
 }
 
-export type ProviderId = "ollama" | "openai" | "anthropic" | "claude-code" | "cursor-cli";
+export type ProviderId =
+  | "ollama"
+  | "openai"
+  | "anthropic"
+  | "claude-code"
+  | "cursor-cli"
+  | "opencode-cli";
+
+/** Providers that run their own tool loop (Quack only displays, never executes). */
+export function isAgenticProviderId(id: ProviderId): boolean {
+  return (
+    id === "claude-code" || id === "cursor-cli" || id === "opencode-cli"
+  );
+}
 
 export interface ChatProvider {
   id: ProviderId;
@@ -80,7 +95,8 @@ export function parseQualifiedModel(
     providerId !== "openai" &&
     providerId !== "anthropic" &&
     providerId !== "claude-code" &&
-    providerId !== "cursor-cli"
+    providerId !== "cursor-cli" &&
+    providerId !== "opencode-cli"
   ) {
     return null;
   }

@@ -4,13 +4,15 @@ import { openaiProvider } from "./openai";
 import { anthropicProvider } from "./anthropic";
 import { claudeCodeProvider } from "./claudeCode";
 import { cursorCliProvider } from "./cursorCode";
+import { openCodeProvider } from "./openCode";
 
 export { hasApiKey, getApiKey, setApiKey } from "./keys";
 export type { ProviderId, ProviderModel } from "./types";
-export { parseQualifiedModel, makeQualifiedModel } from "./types";
+export { parseQualifiedModel, makeQualifiedModel, isAgenticProviderId } from "./types";
 export { warmupOllamaModel } from "./ollama";
 export { invalidateClaudeCodeCache } from "./claudeCode";
-export { invalidateCursorCliCache } from "./cursorCode";
+export { invalidateCursorCliCache, refreshCursorModelsLive } from "./cursorCode";
+export { invalidateOpenCodeCache, refreshOpenCodeModelsLive } from "./openCode";
 
 const REGISTRY: Record<ProviderId, ChatProvider> = {
   ollama: ollamaProvider,
@@ -18,12 +20,14 @@ const REGISTRY: Record<ProviderId, ChatProvider> = {
   anthropic: anthropicProvider,
   "claude-code": claudeCodeProvider,
   "cursor-cli": cursorCliProvider,
+  "opencode-cli": openCodeProvider,
 };
 
 export const PROVIDERS: ChatProvider[] = [
   ollamaProvider,
   claudeCodeProvider,
   cursorCliProvider,
+  openCodeProvider,
   openaiProvider,
   anthropicProvider,
 ];
@@ -40,18 +44,17 @@ export { REGISTRY as _registry };
  * curated lists when an API key is present.
  */
 export async function listAllModels(): Promise<ProviderModel[]> {
-  const out: ProviderModel[] = [];
-  for (const p of PROVIDERS) {
-    try {
-      const ok = await p.isAvailable();
-      if (!ok) continue;
-      const m = await p.listModels();
-      out.push(...m);
-    } catch {
-      /* skip provider that fails */
-    }
-  }
-  return out;
+  const chunks = await Promise.all(
+    PROVIDERS.map(async (p) => {
+      try {
+        if (!(await p.isAvailable())) return [] as ProviderModel[];
+        return await p.listModels();
+      } catch {
+        return [] as ProviderModel[];
+      }
+    }),
+  );
+  return chunks.flat();
 }
 
 /**
@@ -60,15 +63,14 @@ export async function listAllModels(): Promise<ProviderModel[]> {
  * before deciding to set up a provider.
  */
 export async function listAllCloudModels(): Promise<ProviderModel[]> {
-  const out: ProviderModel[] = [];
-  for (const p of PROVIDERS) {
-    if (p.id === "ollama") continue;
-    try {
-      const m = await p.listModels();
-      out.push(...m);
-    } catch {
-      /* skip */
-    }
-  }
-  return out;
+  const chunks = await Promise.all(
+    PROVIDERS.filter((p) => p.id !== "ollama").map(async (p) => {
+      try {
+        return await p.listModels();
+      } catch {
+        return [] as ProviderModel[];
+      }
+    }),
+  );
+  return chunks.flat();
 }

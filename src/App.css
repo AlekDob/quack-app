@@ -4950,6 +4950,11 @@ body.ws-dragging * {
   color: var(--fg-dim);
   border-color: var(--border);
 }
+.tag-free {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border-color: transparent;
+}
 .model-card-desc {
   margin-top: 5px;
   font-size: 12.5px;
@@ -5276,6 +5281,11 @@ body.ws-dragging * {
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+.model-picker-row-tag.tag-free {
+  background: var(--ok-bg);
+  color: var(--ok);
+  font-weight: 600;
+}
 .model-picker-row-check {
   flex: 0 0 auto;
   color: var(--fg);
@@ -5292,15 +5302,16 @@ body.ws-dragging * {
   background: transparent;
   color: var(--fg-muted);
   cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--duration-fast) var(--ease-default);
+  opacity: 0.4;
+  transition: opacity var(--duration-fast) var(--ease-default),
+    color var(--duration-fast) var(--ease-default);
 }
 .model-picker-row:hover .model-picker-star,
 .model-picker-star.on {
   opacity: 1;
 }
 .model-picker-star.on {
-  color: var(--fg);
+  color: var(--warn);
 }
 .model-picker-star:hover {
   color: var(--fg);

@@ -52,7 +52,7 @@ async function fetchModels(): Promise<ProviderModel[]> {
 }
 
 let availabilityCache: { ok: boolean; checkedAt: number } | null = null;
-const AVAILABILITY_TTL_MS = 5_000;
+const AVAILABILITY_TTL_MS = 60_000;
 
 async function checkAvailability(): Promise<boolean> {
   if (
@@ -76,6 +76,15 @@ export function invalidateCursorCliCache(): void {
   modelsCache = null;
 }
 
+/** Full catalog — runs `cursor-agent --list-models`. Defer until picker/browser open. */
+export async function refreshCursorModelsLive(): Promise<ProviderModel[]> {
+  modelsCache = null;
+  if (!(await checkAvailability())) return [DEFAULT_MODEL];
+  const models = await fetchModels();
+  modelsCache = { models, checkedAt: Date.now() };
+  return models;
+}
+
 export const cursorCliProvider: ChatProvider = {
   id: "cursor-cli",
   displayName: "Cursor CLI (local)",
@@ -93,13 +102,8 @@ export const cursorCliProvider: ChatProvider = {
     ) {
       return modelsCache.models;
     }
-    try {
-      const models = await fetchModels();
-      modelsCache = { models, checkedAt: Date.now() };
-      return models;
-    } catch {
-      return [DEFAULT_MODEL];
-    }
+    if (!(await checkAvailability())) return [DEFAULT_MODEL];
+    return [DEFAULT_MODEL];
   },
 
   async *chat({

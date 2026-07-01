@@ -31,6 +31,8 @@ interface Props {
   onConfigureProviders: () => void;
   /** Opens the full model catalog modal (Choose a model). */
   onOpenFullBrowser: () => void;
+  /** Lazy-load heavy CLI model catalogs when the popover opens. */
+  onOpen?: () => void;
 }
 
 export function ModelPickerPopover({
@@ -44,6 +46,7 @@ export function ModelPickerPopover({
   onOpenChange,
   onConfigureProviders,
   onOpenFullBrowser,
+  onOpen,
 }: Props) {
   const [openInternal, setOpenInternal] = useState(false);
   const open = openProp ?? openInternal;
@@ -88,7 +91,11 @@ export function ModelPickerPopover({
         <button
           type="button"
           className="ai-model-chip"
-          onClick={() => setOpen(!open)}
+          onClick={() => {
+            const next = !open;
+            if (next) onOpen?.();
+            setOpen(next);
+          }}
           aria-haspopup="listbox"
           aria-expanded={open}
           title={

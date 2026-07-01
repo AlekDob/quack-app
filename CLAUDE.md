@@ -55,6 +55,7 @@ Frontend `src/` (React 19 + TypeScript + Zustand, Monaco, xterm — **no Tailwin
 | Global state (workspaces, panes, files, terminals) | `src/store.ts` |
 | AI types — `ToolCall`, `ChatMessage`, `ChatStreamEvent` | `src/ai.ts` |
 | Chat session model + localStorage persistence | `src/chatHistory.ts` |
+| Per-provider agent session ids (resume) | `src/providerSession.ts` |
 | Agent Mode toggle (localStorage) | `src/agentMode.ts` |
 | Main chat panel — streaming, tool calls, todos, status | `src/components/AIChatPanel.tsx` |
 | Editor tab toolbar — md Edit/Split/Preview, git Changes, Save | `src/components/EditorTabToolbar.tsx`, `EditorPane.tsx`, `editorMdView.ts`, `editorGitDiff.ts` |
@@ -72,7 +73,8 @@ Frontend `src/` (React 19 + TypeScript + Zustand, Monaco, xterm — **no Tailwin
 | Whiteboard tab — organigramma + DnD + .md export | `src/components/WhiteboardPane.tsx`, `src/components/WhiteboardOrganigramma.tsx`, `src/whiteboardMd.ts`, `src/frontmatter.ts` |
 
 Backend `src-tauri/src/`: `lib.rs` (command registration), `claude_code.rs` (CC bridge),
-`cursor_code.rs` (Cursor CLI bridge), `workspace.rs` (persistent workspace state → `workspaces.json` + per-ws `state.json`),
+`cursor_code.rs` (Cursor CLI bridge), `opencode_sidecar.rs` (OpenCode HTTP sidecar),
+`workspace.rs` (persistent workspace state → `workspaces.json` + per-ws `state.json`),
 `pty.rs`, `git.rs`, `fs_ops.rs`, `search.rs`, `watcher.rs`.
 
 ## Agent-state model (the focus area)
@@ -135,8 +137,9 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `022-chat-composer.md` — roomier "spaceship" composer: single-row uniform toolbar, subagent target pill (`SubagentPill`, derived from `attachedAgents`), one effort+thinking popover (`EffortPopover`, slider + segmented), voice dictation (`ComposerMic`), `+` attach, hint row, transparent flush textarea.
   - `024-resume-white-screen-recovery.md` — detect resume from macOS standby (`resumeDebug.ts`), heal the blank webview (Monaco `layout()` / xterm `fit()` + synthetic resize), log every event to console **and** a durable `localStorage` ring (`__resumeLog()`). Gotcha: a Vite compile error also blanks the page but never fires `[resume]` — check the red overlay first.
   - `025-model-selector.md` — composer chip popover (favorites + groups), full ModelBrowser catalog, ManageModelsModal visibility toggles; prefs in `lcp.modelFavorites` / `lcp.modelDisabled`.
-  - `026-cursor-cli-bridge.md` — `cursor-agent` spawn/stream/kill + dynamic `--list-models`; shared `cliStreamJson` parser.
+  - `026-cursor-cli-bridge.md` — `cursor-agent` spawn/stream/kill + lazy `--list-models`; shared `cliStreamJson` parser.
   - `027-editor-tab-toolbar.md` — editor tab row under breadcrumb: markdown Edit/Split/Preview, git Changes (HEAD vs buffer), Inline/Split diff layout, Save; shared with `FileEditorPane` modals.
+  - `028-opencode-bridge.md` — `opencode serve` sidecar (port 17346), SSE `/global/event`, `providerSessionIds`, lazy startup catalog.
 - `documentation/design/` — UI style contracts beyond tokens.
   - `directives.md` — hard rules (no emoji, tokens-only, neutral chrome).
   - `model-modal-pattern.md` — shared shell for Choose a model + Manage models (liquid glass, pill controls, light/dark surfaces).

@@ -28,6 +28,7 @@ import {
   listAllCloudModels,
   makeQualifiedModel,
   parseQualifiedModel,
+  isAgenticProviderId,
   warmupOllamaModel,
   type ProviderModel,
 } from "../providers";
@@ -106,6 +107,12 @@ import {
   deriveTitle,
   type ChatSession,
 } from "../chatHistory";
+import {
+  readProviderSessionIds,
+  setProviderSessionId,
+  writeProviderSessionIds,
+} from "../providerSession";
+import type { ProviderId } from "../providers/types";
 import { SessionUsageCircle } from "./SessionUsageCircle";
 import {
   SessionUsageDrawer,
@@ -126,6 +133,16 @@ import { loadSkills, type SkillDef } from "../skills";
 import { permissionFor } from "../toolPermissions";
 import { onAIPromptRequest } from "../aiBus";
 import { relPath } from "../pathUtils";
+
+function mergeProviderModels(
+  prev: ProviderModel[],
+  fresh: ProviderModel[],
+  providerId: ProviderId,
+): ProviderModel[] {
+  if (fresh.length === 0) return prev;
+  const rest = prev.filter((m) => m.providerId !== providerId);
+  return [...rest, ...fresh];
+}
 
 // @-mention parser: given the composer text and current cursor index,
 // return the active @-segment when the cursor sits in one. A segment
@@ -240,6 +257,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const [allCloudCatalog, setAllCloudCatalog] = useState<ProviderModel[]>([]);
   const [claudeCodeAvailable, setClaudeCodeAvailable] = useState(false);
   const [cursorCliAvailable, setCursorCliAvailable] = useState(false);
+  const [openCodeAvailable, setOpenCodeAvailable] = useState(false);
   // Rules-file hint shown in the header. Loaded once per workspace
   // mount + refreshed whenever fs events suggest the file may have
   // changed. Null when no rules file exists.
@@ -490,9 +508,10 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // Lets us pass --resume on every follow-up turn so the CLI keeps the
   // server-side context window alive instead of re-paying cold-start cost.
   // Cleared when the user starts a new chat or restores a non-CC session.
-  const [claudeSessionId, setClaudeSessionId] = useState<string | undefined>(
-    undefined,
-  );
+  const [providerSessionIds, setProviderSessionIds] = useState<
+    Partial<Record<ProviderId, string>>
+  >({});
+  const claudeSessionId = providerSessionIds["claude-code"];
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [attachTree, setAttachTree] = useState(false);
@@ -590,43 +609,70 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     el.style.height = Math.min(el.scrollHeight, max) + "px";
   }, [input]);
 
+  const refreshLiveCliModels = useCallback(async () => {
+    try {
+      const [{ refreshOpenCodeModelsLive }, { refreshCursorModelsLive }] =
+        await Promise.all([
+          import("../providers/openCode"),
+          import("../providers/cursorCode"),
+        ]);
+      const [ocModels, cursorModels] = await Promise.all([
+        refreshOpenCodeModelsLive().catch(() => [] as ProviderModel[]),
+        refreshCursorModelsLive().catch(() => [] as ProviderModel[]),
+      ]);
+      if (ocModels.length > 0) {
+        setAllCloudCatalog((prev) =>
+          mergeProviderModels(prev, ocModels, "opencode-cli"),
+        );
+        setAllModels((prev) =>
+          mergeProviderModels(prev, ocModels, "opencode-cli"),
+        );
+      }
+      if (cursorModels.length > 0) {
+        setAllCloudCatalog((prev) =>
+          mergeProviderModels(prev, cursorModels, "cursor-cli"),
+        );
+        setAllModels((prev) =>
+          mergeProviderModels(prev, cursorModels, "cursor-cli"),
+        );
+      }
+    } catch {
+      /* keep lightweight startup catalog */
+    }
+  }, []);
+
   const refresh = async (showChecking = false) => {
     if (showChecking) setStatus("checking");
     // Always re-check Claude Code availability so post-install detects.
     invalidateClaudeCodeCache();
-    // Aggregate models across every configured provider.
-    let aggregate: ProviderModel[] = [];
-    try {
-      aggregate = await listAllModels();
-    } catch {
-      aggregate = [];
-    }
+    const providersMod = await import("../providers");
+    const [
+      aggregate,
+      cloudCatalog,
+      ccAvail,
+      cursorAvail,
+      ocAvail,
+    ] = await Promise.all([
+      listAllModels().catch(() => [] as ProviderModel[]),
+      listAllCloudModels().catch(() => [] as ProviderModel[]),
+      providersMod
+        .getProvider("claude-code")
+        .isAvailable()
+        .catch(() => false),
+      providersMod
+        .getProvider("cursor-cli")
+        .isAvailable()
+        .catch(() => false),
+      providersMod
+        .getProvider("opencode-cli")
+        .isAvailable()
+        .catch(() => false),
+    ]);
     setAllModels(aggregate);
-    // Always populate curated cloud lists so the browser can show them
-    // regardless of key status.
-    try {
-      setAllCloudCatalog(await listAllCloudModels());
-    } catch {
-      setAllCloudCatalog([]);
-    }
-    // Detect whether the Claude Code CLI is available on PATH.
-    try {
-      const ccProvider = (await import("../providers")).getProvider(
-        "claude-code",
-      );
-      setClaudeCodeAvailable(await ccProvider.isAvailable());
-    } catch {
-      setClaudeCodeAvailable(false);
-    }
-    try {
-      const cursorProvider = (await import("../providers")).getProvider(
-        "cursor-cli",
-      );
-      setCursorCliAvailable(await cursorProvider.isAvailable());
-    } catch {
-      setCursorCliAvailable(false);
-    }
-    // Track Ollama-specific availability for the install/pull onboarding UI.
+    setAllCloudCatalog(cloudCatalog);
+    setClaudeCodeAvailable(ccAvail);
+    setCursorCliAvailable(cursorAvail);
+    setOpenCodeAvailable(ocAvail);
     const ollamaUp = await ping();
 
     if (aggregate.length > 0) {
@@ -685,6 +731,11 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   useEffect(() => {
     void refresh(true);
   }, []);
+
+  useEffect(() => {
+    if (!browserOpen) return;
+    void refreshLiveCliModels();
+  }, [browserOpen, refreshLiveCliModels]);
 
   // Auto-poll when Ollama isn't reachable or has no models so the
   // user doesn't have to keep clicking Refresh after installing.
@@ -829,7 +880,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           obj.subtype === "init" &&
           typeof obj.session_id === "string"
         ) {
-          setClaudeSessionId(obj.session_id);
+          setProviderSessionIds((prev) =>
+            setProviderSessionId(prev, "claude-code", obj.session_id as string),
+          );
         }
         // Token-level deltas via --include-partial-messages. Append
         // each text_delta straight to streaming. The wrapping
@@ -1073,7 +1126,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       // Restore the Claude Code session id alongside the conversation
       // so the next turn resumes server-side context. If the chat is
       // empty / non-CC, this stays undefined.
-      setClaudeSessionId(found?.claudeSessionId);
+      setProviderSessionIds(readProviderSessionIds(found ?? {}));
       setChatTotalCost(found?.totalCostUsd ?? 0);
       if (found) {
         const msgs = cleanStaleToolMessages(found.messages);
@@ -1093,7 +1146,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
 
     if (list.length > 0) {
       setSessionId(list[0].id);
-      setClaudeSessionId(list[0].claudeSessionId);
+      setProviderSessionIds(readProviderSessionIds(list[0]));
       setChatTotalCost(list[0].totalCostUsd ?? 0);
       // Filter out stale "Unknown tool: X" result messages from older
       // sessions where we incorrectly tried to execute the agentic
@@ -1109,7 +1162,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       }
     } else {
       setSessionId(newSessionId());
-      setClaudeSessionId(undefined);
+      setProviderSessionIds({});
       setChatTotalCost(0);
       setMessages([]);
     }
@@ -1151,12 +1204,12 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       messages,
       model: selected,
       updatedAt: Date.now(),
-      claudeSessionId,
+      ...writeProviderSessionIds(providerSessionIds),
       totalCostUsd: chatTotalCost > 0 ? chatTotalCost : undefined,
     };
     saveSession(wsId, session);
     setSessions(loadSessions(wsId));
-  }, [messages, sessionId, wsId, selected, claudeSessionId, chatTotalCost]);
+  }, [messages, sessionId, wsId, selected, providerSessionIds, chatTotalCost]);
 
   // Last-resort flush: if the page is about to close (refresh, tab
   // close), write the current state synchronously even if a streaming
@@ -1181,7 +1234,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         messages: finalMessages,
         model: selected,
         updatedAt: Date.now(),
-        claudeSessionId,
+        ...writeProviderSessionIds(providerSessionIds),
         totalCostUsd: chatTotalCost > 0 ? chatTotalCost : undefined,
       };
       saveSession(wsId, session);
@@ -1194,7 +1247,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     sessionId,
     wsId,
     selected,
-    claudeSessionId,
+    providerSessionIds,
     chatTotalCost,
   ]);
 
@@ -1829,8 +1882,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     //   - ollama: inline the tree (small models often won't tool-call).
     const selectedParsed = parseQualifiedModel(selected);
     const selectedProvider = selectedParsed?.providerId ?? "ollama";
+    const providerRunsOwnTools = isAgenticProviderId(selectedProvider);
     const providerCanReadItself =
-      selectedProvider === "claude-code" ||
+      providerRunsOwnTools ||
       selectedProvider === "openai" ||
       selectedProvider === "anthropic";
 
@@ -1878,6 +1932,8 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     // For Claude Code, skip ALL inlined attachments — its own Read tool
     // can fetch any file in the workspace far more efficiently than
     // shoving file contents through the prompt.
+    // Claude Code natively loads CLAUDE.md + reads files via its own tools.
+    // OpenCode/Cursor also run their own tool loop but still need rules inlined.
     const skipAllInlining = selectedProvider === "claude-code";
 
     // Workspace AI rules. Claude Code natively loads CLAUDE.md so we
@@ -1904,7 +1960,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     // the active-file hint stopped working exactly when conversations
     // got going.
     const ccTurnContext: string[] = [];
-    if (skipAllInlining) {
+    if (skipAllInlining || providerRunsOwnTools) {
       // Hint to the user's request which file they're focused on —
       // unless the active file is on the AI privacy exclusion list,
       // in which case we omit the hint entirely so the model never
@@ -2098,7 +2154,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     // The tool_use blocks it streams are informational — they show what it
     // ALREADY did, not requests for us to execute. So for that provider we
     // skip our N-round tool-execution loop and just stream once.
-    const isAgenticProvider = selectedProvider === "claude-code";
+    const isAgenticProvider = providerRunsOwnTools;
     const MAX_ROUNDS = isAgenticProvider ? 1 : 8;
 
     // Snapshot every open buffer's contents BEFORE the turn fires so
@@ -2170,7 +2226,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           // Only pass resumeSessionId when we're on Claude Code AND we
           // already have one captured from a prior turn in this chat.
           // Other providers ignore this param.
-          selectedProvider === "claude-code" ? claudeSessionId : undefined,
+          providerSessionIds[selectedProvider],
           // chatSessionId tags the in-flight stream in the Rust buffer
           // so a frontend refresh can re-attach via attachToChat().
           selectedProvider === "claude-code" ? sessionId : undefined,
@@ -2195,7 +2251,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           if (ev.kind === "session") {
             // Captured the Claude Code session id — store it so the next
             // turn passes --resume <id> and avoids re-flattening history.
-            setClaudeSessionId(ev.id);
+            setProviderSessionIds((prev) =>
+              setProviderSessionId(prev, selectedProvider, ev.id),
+            );
             continue;
           }
           if (ev.kind === "usage") {
@@ -2629,6 +2687,16 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     queueRef.current = [];
     setQueueLen(0);
     abortRef.current?.abort();
+    // Immediate UI reset — don't wait for the tool-execution loop or
+    // provider generator to unwind (OpenCode could sit in runningTools).
+    setStreaming(null);
+    setStreamingBlocks([]);
+    setStreamingToolCalls([]);
+    setStreamingToolResults([]);
+    setRunningTools(false);
+    setActiveToolLabels([]);
+    setTokensPerSec(null);
+    setLastStreamEventAt(null);
   };
 
   // Make the "Stop (Esc)" tooltip honest — Esc previously only worked
@@ -2695,7 +2763,11 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     // Force a fresh Claude Code session — the existing CC session has
     // turns we just truncated, so resuming it would feed the model
     // context the user explicitly wiped. Next turn will get a new id.
-    setClaudeSessionId(undefined);
+    const parsed = parseQualifiedModel(selected);
+    const provider = parsed?.providerId ?? "ollama";
+    setProviderSessionIds((prev) =>
+      setProviderSessionId(prev, provider, undefined),
+    );
     setChatTotalCost(0);
     resetTurnTransients();
     await sendUserText(target.content, truncated);
@@ -2747,7 +2819,11 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     setSessionId(newSessionId());
     // Forget the prior Claude Code session so the next turn spawns a
     // fresh server-side session instead of resuming an unrelated one.
-    setClaudeSessionId(undefined);
+    const parsed = parseQualifiedModel(selected);
+    const provider = parsed?.providerId ?? "ollama";
+    setProviderSessionIds((prev) =>
+      setProviderSessionId(prev, provider, undefined),
+    );
     setChatTotalCost(0);
     resetTurnTransients();
     setMessages([]);
@@ -2766,7 +2842,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     // off. If the chat predates this feature it'll be undefined and the
     // first turn will start a fresh CC session — the next stream-init
     // event will populate it.
-    setClaudeSessionId(s.claudeSessionId);
+    setProviderSessionIds(readProviderSessionIds(s));
     // The cumulative cost IS persisted across reloads, so restore it
     // from the session — the running total in the footer should reflect
     // the chat's full history of spend, not reset to 0. Everything else
@@ -3178,7 +3254,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       // Wipe Claude Code session context too — /clear means "forget what
       // we were talking about", and resuming an old CC session would
       // contradict that even if the local message list is empty.
-      setClaudeSessionId(undefined);
+      setProviderSessionIds({});
       setChatTotalCost(0);
       resetTurnTransients();
       setInput("");
@@ -3237,7 +3313,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       // values that no longer relate to anything visible.
       setSessionId(newSessionId());
       setMessages([]);
-      setClaudeSessionId(undefined);
+      setProviderSessionIds({});
       setChatTotalCost(0);
       resetTurnTransients();
     }
@@ -3281,6 +3357,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     ollama: { label: "ollama", color: "#4ade80" },
     "claude-code": { label: "claude code", color: "#b18cf0" },
     "cursor-cli": { label: "cursor cli", color: "#6b9bd1" },
+    "opencode-cli": { label: "opencode", color: "#8b7fd4" },
     openai: { label: "openai", color: "#10a37f" },
     anthropic: { label: "anthropic", color: "#d97757" },
   };
@@ -3323,7 +3400,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           <ClaudeSessionsButton
             cwd={root}
             onResume={async (id) => {
-              setClaudeSessionId(id);
+              setProviderSessionIds((prev) =>
+                setProviderSessionId(prev, "claude-code", id),
+              );
               resetTurnTransients();
               // Hydrate the full prior transcript from the on-disk
               // JSONL so the user sees what they're continuing from,
@@ -3388,10 +3467,11 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       ollama: true,
       "claude-code": claudeCodeAvailable,
       "cursor-cli": cursorCliAvailable,
+      "opencode-cli": openCodeAvailable,
       openai: hasApiKey("openai"),
       anthropic: hasApiKey("anthropic"),
     }),
-    [claudeCodeAvailable, cursorCliAvailable],
+    [claudeCodeAvailable, cursorCliAvailable, openCodeAvailable],
   );
 
   const renderModelChip = () => {
@@ -3407,6 +3487,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         cloudModels={allCloudCatalog}
         ollamaModels={ollamaModels}
         hasKey={modelHasKey}
+        onOpen={() => void refreshLiveCliModels()}
         onConfigureProviders={() => openSettings("ai-providers")}
         onOpenFullBrowser={() => setBrowserOpen(true)}
       />

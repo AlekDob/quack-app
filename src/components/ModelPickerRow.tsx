@@ -26,6 +26,9 @@ export function ModelPickerRow({
     <div className="model-picker-row">
       <button type="button" className="model-picker-row-main" onClick={onPick}>
         <span className="model-picker-row-name">{model.displayName}</span>
+        {model.isFree && (
+          <span className="model-picker-row-tag tag-free">free</span>
+        )}
         {model.supportsTools && (
           <span className="model-picker-row-tag">tools</span>
         )}

@@ -26,6 +26,12 @@ export function modelBadge(model: string | undefined): {
         className: "badge-cursor-cli",
         full: `Cursor CLI · ${id || "default"}`,
       };
+    case "opencode-cli":
+      return {
+        short: "OC",
+        className: "badge-opencode-cli",
+        full: `OpenCode · ${id || "default"}`,
+      };
     case "anthropic":
       return {
         short: "Cl",
