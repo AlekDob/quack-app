@@ -196,6 +196,39 @@ interface PermissionRequest {
   session_id?: string | null;
 }
 
+/** Normalize a path for owner-matching: forward slashes, no trailing
+ *  separator, lowercased (macOS/Windows are case-insensitive; a stray
+ *  case difference must not misroute a card). */
+function normRoot(p: string): string {
+  return p.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+}
+
+/**
+ * Route guard: does this permission request belong to the AIChatPanel
+ * that mounts THIS overlay? The permission server is app-wide (one port,
+ * one global `claude:permission-request` event), so without this filter a
+ * background agent in ANOTHER workspace — whose `.claude/settings.local.json`
+ * still points its PreToolUse hook at our port — would surface its card in
+ * whatever chat is on screen ("permessi dal nulla a conversazione ferma").
+ *
+ * `cwd` is the authoritative key: it's stable and always known, so we never
+ * drop a legitimate request from our own workspace. A request from a DIFFERENT
+ * cwd is not ours — ignore it and let the owning workspace's overlay handle it.
+ * (Two chats in the SAME workspace both matching is a pre-existing, benign
+ * duplication — the first decision resolves the request; the other is a no-op.)
+ */
+function isForThisPanel(
+  req: PermissionRequest,
+  ownerRoot: string,
+  ownerSessionId: string | undefined,
+): boolean {
+  if (req.cwd && ownerRoot) return normRoot(req.cwd) === normRoot(ownerRoot);
+  // No cwd on the request (shouldn't happen) — fall back to session id when
+  // both sides know it; otherwise accept to avoid dropping a real request.
+  if (req.session_id && ownerSessionId) return req.session_id === ownerSessionId;
+  return true;
+}
+
 /**
  * Decide whether an incoming request should auto-resolve to allow.
  * Pure function — easy to test, no React state involvement.
@@ -238,8 +271,28 @@ function shouldAutoAllow(req: PermissionRequest, rules: AllowRules): boolean {
  * app restart — for "I'm doing focused work, stop interrupting me"
  * without committing to a forever-allow.
  */
-export function ClaudePermissionOverlay() {
+export function ClaudePermissionOverlay({
+  ownerRoot,
+  ownerSessionId,
+  onAllowAll,
+}: {
+  /** Workspace cwd this overlay's panel drives — used to route cards. */
+  ownerRoot: string;
+  /** CC session id of this panel, once it has streamed back (tiebreaker). */
+  ownerSessionId?: string;
+  /** Flip this chat to "stop asking" (Auto mode). Wired by AIChatPanel to
+   *  setCcPermMode("auto") so the composer chip + persistence stay in sync. */
+  onAllowAll?: () => void;
+}) {
   const [queue, setQueue] = useState<PermissionRequest[]>([]);
+
+  // Owner identity mirrored to a ref: the listener is registered once and
+  // lives forever, so it must read fresh values (claudeSessionId streams in
+  // after mount) without re-subscribing.
+  const ownerRef = useRef({ root: ownerRoot, sessionId: ownerSessionId });
+  useEffect(() => {
+    ownerRef.current = { root: ownerRoot, sessionId: ownerSessionId };
+  }, [ownerRoot, ownerSessionId]);
 
   // Persisted always-allow. Mirrored to a ref so the listener (which
   // is registered once and lives forever) can read fresh state without
@@ -264,6 +317,13 @@ export function ClaudePermissionOverlay() {
 
     void listen<PermissionRequest>("claude:permission-request", (e) => {
       const req = e.payload;
+      // ROUTE GUARD — the permission server is app-wide, so this event fires
+      // for EVERY running Claude Code session (including background agents in
+      // other workspaces). Only handle requests that belong to this panel;
+      // another workspace's overlay owns the rest. Without this, a stopped
+      // chat surfaces cards from an unrelated project ("permessi dal nulla").
+      const owner = ownerRef.current;
+      if (!isForThisPanel(req, owner.root, owner.sessionId)) return;
       // AskUserQuestion can't work headless — the CLI's question UI
       // doesn't exist under -p, so the call dies opaquely and the user
       // never sees the question. Deny with a reason that redirects the
@@ -303,7 +363,7 @@ export function ClaudePermissionOverlay() {
         const matched = p ? matchExclusion(p) : null;
         if (matched) {
           toastError(
-            `🛡 AI privacy: blocked ${req.tool_name} on ${p?.split(/[\\/]/).pop()} (matches "${matched}")`,
+            `AI privacy: blocked ${req.tool_name} on ${p?.split(/[\\/]/).pop()} (matches "${matched}")`,
           );
           void invoke("claude_perm_decide", {
             requestId: req.request_id,
@@ -475,6 +535,26 @@ export function ClaudePermissionOverlay() {
     await respond("allow");
   };
 
+  // "Allow all — stop asking": flip THIS chat into Auto mode (via the
+  // AIChatPanel callback, so the composer mode chip + localStorage stay in
+  // sync) and resolve everything already queued. Future tool calls then
+  // auto-allow through modeAutoAllow — no more cards for this run. This is
+  // the answer to "otherwise it asks me 100 times". Auto keeps the privacy
+  // gate + AskUserQuestion redirect; only Bypass would drop those.
+  const allowAll = async () => {
+    onAllowAll?.();
+    const pending = queue;
+    setQueue([]);
+    await Promise.all(
+      pending.map((r) =>
+        invoke("claude_perm_decide", {
+          requestId: r.request_id,
+          decision: "allow",
+        }).catch((e) => console.warn("allow-all failed", e)),
+      ),
+    );
+  };
+
   // "Allow this session" — in-memory only, resets on app reload. For
   // Bash we widen to the prefix; for path-tools we widen to the exact
   // extension; for everything else we widen to the tool name. Same UX
@@ -502,84 +582,101 @@ export function ClaudePermissionOverlay() {
       <div className={`cc-perm-card ${isPlan ? "cc-perm-plan-card" : ""}`}>
         <PermissionCardBody req={req} />
         <div className="cc-perm-actions">
-          <button
-            className="cc-perm-btn cc-perm-deny"
-            onClick={() => void respond("deny")}
-            title={
-              isPlan
-                ? "Don't start yet — Claude keeps planning and you can refine it."
-                : "Block this tool call. The agent treats it as a failure and may try a different approach."
-            }
-          >
-            <Icon name="x" size={12} />
-            <span>{isPlan ? "Keep planning" : "Deny"}</span>
-          </button>
-          {!isPlan && (
+          {/* Left cluster — quiet, granular "remember this" scopes. */}
+          {!isPlan &&
+            ((isBash && bashPrefix) || fileExt || canBlanketAllow) && (
+              <div className="cc-perm-more">
+                {isBash && bashPrefix && (
+                  <button
+                    className="cc-perm-btn cc-perm-btn-sm"
+                    onClick={() => void allowAlwaysBashPrefix()}
+                    title={`Always allow Bash commands starting with "${bashPrefix}". Persisted across restarts. Manage in Settings.`}
+                  >
+                    <Icon name="check-circle" size={12} />
+                    <span>
+                      Always <code className="cc-perm-prefix">{bashPrefix}</code>
+                    </span>
+                  </button>
+                )}
+                {fileExt && (
+                  <button
+                    className="cc-perm-btn cc-perm-btn-sm"
+                    onClick={() => void allowAlwaysExt()}
+                    title={`Always allow ${req.tool_name} on ${fileExt} files. Persisted. Manage in Settings.`}
+                  >
+                    <Icon name="check-circle" size={12} />
+                    <span>
+                      Always {req.tool_name} on{" "}
+                      <code className="cc-perm-prefix">{fileExt}</code>
+                    </span>
+                  </button>
+                )}
+                {canBlanketAllow && (
+                  <button
+                    className="cc-perm-btn cc-perm-btn-sm"
+                    onClick={() => void allowAlwaysTool()}
+                    title={`Always allow every ${req.tool_name} call. Persisted. Manage in Settings.`}
+                  >
+                    <Icon name="check-circle" size={12} />
+                    <span>Always {req.tool_name}</span>
+                  </button>
+                )}
+                <button
+                  className="cc-perm-btn cc-perm-btn-sm"
+                  onClick={() => void allowThisSession()}
+                  title={
+                    isBash && bashPrefix
+                      ? `Auto-allow any "${bashPrefix} ..." for the rest of this Quack session (resets on restart).`
+                      : `Auto-allow ${req.tool_name} for the rest of this Quack session (resets on restart).`
+                  }
+                >
+                  <Icon name="check" size={12} />
+                  <span>This session</span>
+                </button>
+              </div>
+            )}
+          {/* Right cluster — the decision. Allow all is the emphasized action. */}
+          <div className="cc-perm-decide">
             <button
-              className="cc-perm-btn cc-perm-allow-session"
-              onClick={() => void allowThisSession()}
+              className="cc-perm-btn cc-perm-deny"
+              onClick={() => void respond("deny")}
               title={
-                isBash && bashPrefix
-                  ? `Auto-allow any "${bashPrefix} ..." for the rest of this Quack session (resets on restart).`
-                  : `Auto-allow ${req.tool_name} for the rest of this Quack session (resets on restart).`
+                isPlan
+                  ? "Don't start yet — Claude keeps planning and you can refine it."
+                  : "Block this tool call. The agent treats it as a failure and may try a different approach."
+              }
+            >
+              <Icon name="x" size={12} />
+              <span>{isPlan ? "Keep planning" : "Deny"}</span>
+            </button>
+            <button
+              className="cc-perm-btn cc-perm-allow"
+              onClick={() => void respond("allow")}
+              title={
+                isPlan
+                  ? "Approve the plan — Claude exits plan mode and starts building."
+                  : "Run this single call. You'll be prompted again next time."
               }
             >
               <Icon name="check" size={12} />
-              <span>Allow this session</span>
+              <span>{isPlan ? "Approve & start" : "Allow once"}</span>
             </button>
-          )}
-          {isBash && bashPrefix && (
-            <button
-              className="cc-perm-btn cc-perm-allow-always"
-              onClick={() => void allowAlwaysBashPrefix()}
-              title={`Always allow Bash commands starting with "${bashPrefix}". Persisted across restarts. Manage in Settings.`}
-            >
-              <Icon name="check-circle" size={12} />
-              <span>
-                Always allow{" "}
-                <code className="cc-perm-prefix">{bashPrefix}</code>
-              </span>
-            </button>
-          )}
-          {fileExt && (
-            <button
-              className="cc-perm-btn cc-perm-allow-always"
-              onClick={() => void allowAlwaysExt()}
-              title={`Always allow ${req.tool_name} on ${fileExt} files. Persisted. Manage in Settings.`}
-            >
-              <Icon name="check-circle" size={12} />
-              <span>
-                Always allow {req.tool_name} on{" "}
-                <code className="cc-perm-prefix">{fileExt}</code>
-              </span>
-            </button>
-          )}
-          {canBlanketAllow && (
-            <button
-              className="cc-perm-btn cc-perm-allow-always"
-              onClick={() => void allowAlwaysTool()}
-              title={`Always allow every ${req.tool_name} call. Persisted. Manage in Settings.`}
-            >
-              <Icon name="check-circle" size={12} />
-              <span>Always allow {req.tool_name}</span>
-            </button>
-          )}
-          <button
-            className="cc-perm-btn cc-perm-allow"
-            onClick={() => void respond("allow")}
-            title={
-              isPlan
-                ? "Approve the plan — Claude exits plan mode and starts building."
-                : "Run this single call. You'll be prompted again next time."
-            }
-          >
-            <Icon name="check" size={12} />
-            <span>{isPlan ? "Approve & start" : "Allow once"}</span>
-          </button>
+            {!isPlan && (
+              <button
+                className="cc-perm-btn cc-perm-allow-all"
+                onClick={() => void allowAll()}
+                title="Switch this chat to Auto — allow every tool for the rest of the run without asking. Change it anytime from the composer mode menu."
+              >
+                <Icon name="zap" size={12} />
+                <span>Allow all</span>
+              </button>
+            )}
+          </div>
         </div>
         <div className="cc-perm-shortcut-hint">
           <kbd>Enter</kbd> {isPlan ? "Approve" : "Allow once"} ·{" "}
           <kbd>Esc</kbd> {isPlan ? "Keep planning" : "Deny"}
+          {!isPlan && <span className="cc-perm-hint-all"> · Allow all stops the prompts</span>}
           {queue.length > 1 && (
             <span className="cc-perm-queue-inline">
               {" · "}+{queue.length - 1} more pending
@@ -599,7 +696,9 @@ function PermissionCardBody({ req }: { req: PermissionRequest }) {
   return (
     <>
       <div className="cc-perm-head">
-        <span className="cc-perm-icon">{isPlan ? "📋" : "🔒"}</span>
+        <span className="cc-perm-icon">
+          <Icon name={isPlan ? "check-square" : "lock"} size={14} />
+        </span>
         <span className="cc-perm-title">
           {isPlan ? (
             <>Claude has a plan — ready to start</>

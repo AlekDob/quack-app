@@ -4724,7 +4724,11 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           Renders nothing when there are no pending requests; otherwise
           shows the request just above the input where the user is
           already focused, instead of dimming the whole window. */}
-      <ClaudePermissionOverlay />
+      <ClaudePermissionOverlay
+        ownerRoot={root}
+        ownerSessionId={claudeSessionId}
+        onAllowAll={() => setCcPermMode("auto")}
+      />
       {queueLen > 0 && (
         <div className="ai-queue-indicator">
           <span>

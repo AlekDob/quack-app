@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-06-29
+last_verified: 2026-07-01
 tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command]
 ---
 
@@ -25,7 +25,7 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 | UI label | Stored value | Effect |
 |---|---|---|
 | Ask (default) | `null` | card on every gated tool; the safe default a fresh install gets |
-| Plan | `plan` | plan only, no edits; Read/Grep/Glob auto + **read-only Bash auto** (ls/cat/grep/git status…); writing Bash still cards |
+| Plan | `plan` | plan only, no edits; Read/Grep/Glob auto + **read-only Bash auto** (`ls`/`cat`/`grep`/`sort`/`du`/`git status`…); writing Bash still cards |
 | Auto-edit | `acceptEdits` | auto-allow file-edit tools (`Edit`/`MultiEdit`/`Write`/`NotebookEdit`); Bash & rest still card |
 | Auto | `auto` | auto-allow everything (Bash included); privacy gate + AskUserQuestion redirect still apply |
 | Bypass | `bypassPermissions` | overlay allows EVERY tool, **before** the privacy gate too → no cards, no guard. Hook stays on (see gotcha) |
@@ -48,7 +48,11 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 - **Order matters:** mode auto-allow runs AFTER the privacy gate and read-only allow so those safety checks always win, and BEFORE saved always-allow rules since the mode is the broader intent.
 - **Bypass is enforced by the overlay, NOT by the CLI (gotcha):** `--dangerously-skip-permissions` does NOT disable PreToolUse hooks — the hook still fires and still POSTs, so running bypass "hook-off" on the backend left a stale hook in `settings.local.json` carding everything. So EVERY mode (bypass included) keeps the hook on; bypass is allowed in the listener **before** the privacy gate. Bonus: reading the mode live from `permModeStore` means flipping to Bypass mid-run takes effect on the next tool call.
 - **Plan mode ignores saved always-allow rules:** otherwise a persisted "always allow Edit on .ts" would slip an edit past plan mode (the hook's `allow` overrides the CLI's plan block). In plan mode only read-only allows fire; everything else cards.
-- **Plan-mode read-only Bash:** the safelist is intentionally tight — runners (`env`/`xargs`/`sudo`), in-place editors (`sed -i`), and `git branch/tag/config/remote` (mutating forms exist) are excluded; any `>`/`|`/`;`/`` ` ``/`$(` rejects the command (`BASH_CHAIN_RE`). Read/Grep/Glob never reach `modeAutoAllow` — they auto-allow upstream as `READ_ONLY_HOOK_TOOLS`.
+- **Plan-mode read-only Bash:** `READ_ONLY_BASH` lists provably-read commands only (`ls cat head tail wc pwd echo grep rg tree stat file which type date whoami uname hostname du df printenv sort uniq cut basename dirname realpath`); `git` is gated separately on `GIT_RO_SUBCMDS` (`status log diff show blame ls-files rev-parse describe`). Deliberately excluded: runners (`env`/`xargs`/`sudo`/`nohup`), in-place editors (`sed -i`), and `git branch/tag/config/remote` (mutating forms exist). Any redirect/pipe/chain/subshell (`;`/`&`/`|`/`` ` ``/`<`/`>`/newline/`$(`) rejects the command via `BASH_CHAIN_RE` first, so a safelisted head can't smuggle a second command. Read/Grep/Glob never reach `modeAutoAllow` — they auto-allow upstream as `READ_ONLY_HOOK_TOOLS`.
+- **`NEVER_BLANKET_ALLOW` (`Bash`, `ExitPlanMode`):** even if the user clicks a bare-name "always allow", these are refused a blanket rule — `Bash` because one name would allow arbitrary commands, `ExitPlanMode` because it's a per-plan approval that blanket-allowing would defeat.
 - **`/mode off` resets to Ask (`null`)**, not to a permissive default — the safe direction.
 - Mode is normalized: `default` is stored as `null` (Ask) so "no mode set" and "explicitly Ask" are the same state.
+- **"Allow all" card shortcut:** the card's emphasized action flips the chat to Auto in one click. The overlay takes an `onAllowAll` prop wired by `AIChatPanel` to `setCcPermMode("auto")` — so the composer mode chip + localStorage stay in sync (the overlay does NOT write `permModeStore` directly, which would diverge from the UI). On click it also resolves every already-queued request as allow. This is the "otherwise it asks 100 times" fix; Auto keeps the privacy gate + AskUserQuestion redirect.
+- **Card visuals:** styled to match the airy neutral composer — `--radius-md` + `--shadow-md`, hairline `--border` (not accent), SVG header icon (no emoji), two action clusters (quiet granular "always/this-session" chips left; Deny · Allow once · **Allow all** right). Allow once = solid neutral (Enter default); Allow all = monochrome primary (`--primary-bg`).
+- **Route guard (per-workspace ownership):** the permission server is app-wide (one port, one global `claude:permission-request` event), so the event fires for EVERY running CC session — including background agents in other open workspaces (their `.claude/settings.local.json` still points its PreToolUse hook at our port). `AIChatPanel` passes `ownerRoot={root}`/`ownerSessionId={claudeSessionId}` to the overlay; `isForThisPanel(req)` at the top of the listener drops any request whose `cwd` doesn't match the panel's root (authoritative + always-known key → never drops a legit request from your own workspace; `session_id` is only a fallback tiebreak when `cwd` is absent). Without it, a stopped chat surfaced cards from an unrelated project ("permessi dal nulla"). Known benign edge: two chats in the SAME workspace both show the card — first decision resolves it, the other is a no-op.
 - The overlay/cards themselves are documented alongside the bridge — see [014-claude-code-bridge.md](014-claude-code-bridge.md).
