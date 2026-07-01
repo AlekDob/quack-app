@@ -6919,8 +6919,9 @@ body.ws-dragging * {
 }
 .ai-msg-actions {
   display: flex;
-  gap: 4px;
-  margin-top: 4px;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
   opacity: 0;
   transition: opacity 0.15s;
 }
@@ -6929,16 +6930,30 @@ body.ws-dragging * {
   opacity: 1;
 }
 .ai-msg-action {
-  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  height: 24px;
   font-size: 11px;
-  background: var(--bg-alt);
+  line-height: 1;
+  background: transparent;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 8px;
   color: var(--fg-muted);
   cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+/* Keep the icon optically centered with the label */
+.ai-msg-action svg {
+  flex-shrink: 0;
 }
 .ai-msg-action:hover {
-  background: var(--bg);
+  background: var(--bg-hi);
+  border-color: var(--border-hi, var(--border));
   color: var(--fg);
 }
 .ai-context-indicator {
@@ -13151,4 +13166,1279 @@ body.ws-dragging * {
   height: auto;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
+}
+
+/* ── Whiteboard (editor tab) ───────────────────────────────────────
+ * Three sub-tabs (Overview / Organigramma / Workflows). Visual lines in the
+ * organigramma are drawn with pseudo-elements — no SVG. Neutral chrome:
+ * no accent, no glass (static tab body is fine without it). */
+.whiteboard-root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+  overflow: hidden;
+}
+
+.whiteboard-subtabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+  flex-shrink: 0;
+}
+.whiteboard-subtab {
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-default);
+}
+.whiteboard-subtab:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.whiteboard-subtab.active {
+  background: var(--bg);
+  color: var(--fg);
+  border-color: var(--border);
+}
+.whiteboard-subtabs-spacer {
+  flex: 1;
+}
+.whiteboard-status {
+  font-size: 11px;
+  color: var(--fg-muted);
+  padding-right: 4px;
+}
+
+.whiteboard-body {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 24px;
+}
+
+/* Overview */
+.whiteboard-overview {
+  max-width: 920px;
+  margin: 0 auto;
+}
+.whiteboard-overview-head {
+  margin-bottom: 20px;
+}
+.whiteboard-overview-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+.whiteboard-overview-sub {
+  font-size: 11px;
+  color: var(--fg-muted);
+  margin-top: 4px;
+}
+.whiteboard-overview-actions {
+  display: flex;
+  gap: 8px;
+  margin: 20px 0;
+}
+.whiteboard-counter-label {
+  font-size: 11px;
+  color: var(--fg-dim);
+  margin-top: 2px;
+}
+.whiteboard-counter-sub {
+  font-size: 10px;
+  color: var(--fg-muted);
+  margin-top: 2px;
+}
+.whiteboard-legend {
+  margin-top: 28px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-alt);
+}
+.whiteboard-legend-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.whiteboard-legend ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+.whiteboard-legend li {
+  margin-bottom: 4px;
+}
+
+/* Empty state (used by overview and organigramma) */
+.whiteboard-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+  gap: 8px;
+  color: var(--fg-dim);
+}
+.whiteboard-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.whiteboard-empty-hint {
+  font-size: 12px;
+  max-width: 480px;
+  line-height: 1.5;
+}
+.whiteboard-empty-row {
+  margin-top: 12px;
+}
+
+/* ── Organigramma ──────────────────────────────────────────────── */
+.whiteboard-org {
+  max-width: 920px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0 32px;
+}
+
+/* Root row: Jack */
+.whiteboard-org-root-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+.whiteboard-org-root {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.whiteboard-org-root-text {
+  display: flex;
+  flex-direction: column;
+}
+.whiteboard-org-root-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+.whiteboard-org-role {
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+/* Vertical stem below Jack */
+.whiteboard-org-stem {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+}
+
+/* Group (Project / Global) */
+.whiteboard-org-group {
+  width: 100%;
+  margin-top: 8px;
+}
+.whiteboard-org-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: center;
+  margin: 12px 0 10px;
+  position: relative;
+}
+.whiteboard-org-group-title::before,
+.whiteboard-org-group-title::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 32%;
+  height: 1px;
+  background: var(--border);
+}
+.whiteboard-org-group-title::before { left: 0; }
+.whiteboard-org-group-title::after  { right: 0; }
+.whiteboard-org-group-agents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Single agent node (drop target + clickable to open .md) */
+.whiteboard-org-agent {
+  position: relative;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  width: 220px;
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease-default),
+    background var(--duration-fast) var(--ease-default);
+}
+.whiteboard-org-agent:hover {
+  border-color: var(--border-strong);
+}
+.whiteboard-org-agent:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.whiteboard-org-agent.is-drop-target {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+.whiteboard-org-agent-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.whiteboard-org-agent-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.whiteboard-org-agent-meta {
+  flex: 1;
+  min-width: 0;
+}
+.whiteboard-org-agent-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.whiteboard-org-agent-desc {
+  font-size: 11px;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.whiteboard-org-agent-count {
+  font-size: 10px;
+  color: var(--fg-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 2px 7px;
+  flex-shrink: 0;
+}
+.whiteboard-org-agent-skills {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+
+/* Skill chip — draggable (free) or linked (with ×) */
+.whiteboard-skill-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 11px;
+  color: var(--fg-dim);
+  cursor: grab;
+  user-select: none;
+}
+.whiteboard-skill-chip:active {
+  cursor: grabbing;
+}
+.whiteboard-skill-chip.linked {
+  cursor: default;
+  border-style: dashed;
+}
+.whiteboard-skill-chip-name {
+  white-space: nowrap;
+}
+.whiteboard-skill-chip-scope {
+  font-size: 9px;
+  color: var(--fg-muted);
+  background: var(--bg-alt);
+  padding: 1px 5px;
+  border-radius: var(--radius-full);
+  margin-left: 2px;
+}
+.whiteboard-skill-chip-x {
+  font: inherit;
+  background: transparent;
+  border: none;
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+}
+.whiteboard-skill-chip-x:hover {
+  color: var(--err);
+}
+/* Standalone × button rendered next to a linked skill chip inside
+   an AgentNode. Positioned relative to the wrapping <li>, so the
+   chip doesn't need to grow a × inside. */
+.whiteboard-org-agent-skills > li {
+  position: relative;
+}
+.whiteboard-skill-chip-x-standalone {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--fg-muted);
+  cursor: pointer;
+  padding: 0;
+}
+.whiteboard-skill-chip-x-standalone:hover {
+  color: var(--err);
+  border-color: var(--err);
+}
+
+/* ActivityBar — the Organigramma icon. Same look as the other
+   activity-icon buttons; gets the .active class when the focused
+   editor pane's active tab is a wb: key. */
+.activity-icon[aria-label="Organigramma"] {
+  /* Slight accent so users spot it among the section toggles — it's
+     a feature launcher, not a section toggle. Uses neutral border,
+     never orange. */
+  position: relative;
+}
+.activity-icon[aria-label="Organigramma"].active::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  pointer-events: none;
+}
+
+/* ── Drag ghost + dimmed source (whiteboard mouse-based DnD) ─── */
+/* Source chip while a drag is in flight — fades to half-opacity so
+   the user sees it "lifted" off the pool. */
+.whiteboard-skill-chip--dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+  transition: opacity var(--duration-fast) var(--ease-default);
+}
+/* The floating ghost follows the cursor. position/left/top are set
+   inline by the DnD controller (startDrag). */
+.whiteboard-drag-ghost {
+  /* Force these even though we set them inline too — defensive against
+     a future Style merge where the inline style is clobbered. */
+  position: fixed !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+  box-shadow: var(--shadow-md);
+  border-radius: var(--radius-full);
+  /* Slight scale already set inline; this transition makes the
+     appear/disappear feel snappy. */
+  transition:
+    opacity 120ms var(--ease-default),
+    transform 120ms var(--ease-default);
+  will-change: transform, left, top;
+}
+.whiteboard-drag-ghost--fading {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.9);
+  transition: opacity 120ms var(--ease-default),
+    transform 120ms var(--ease-default);
+}
+
+/* Free skills pool at the bottom */
+.whiteboard-org-pool {
+  width: 100%;
+  margin-top: 24px;
+  padding: 12px 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-alt);
+}
+.whiteboard-org-pool-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--fg-dim);
+  margin-bottom: 8px;
+}
+.whiteboard-org-pool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ── Workflows ──────────────────────────────────────────────── */
+.whiteboard-workflows {
+  max-width: 920px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.whiteboard-workflows-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-alt);
+}
+.whiteboard-workflows-info {
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+.whiteboard-workflows-actions {
+  display: flex;
+  gap: 8px;
+}
+.whiteboard-workflows-preview {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
+  background: var(--bg);
+  min-height: 240px;
+}
+
+/* ---------- Usage panel (Claude Code session + cost monitor) ---------- */
+.usage-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  font-size: 12px;
+  min-height: 0;
+  background: var(--bg);
+}
+/* Centre + cap the content so the wide tab doesn't stretch rows
+   edge-to-edge on large screens (reading width, not full-bleed). */
+.usage-content {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.usage-loading,
+.usage-empty,
+.usage-error {
+  padding: 28px 4px;
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+.usage-error {
+  color: var(--err, #f87171);
+}
+
+/* ---- Summary cards ---- */
+.usage-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.usage-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  transition: border-color 0.15s ease;
+}
+.usage-stat.is-highlight {
+  background: var(--bg-hi, var(--bg-alt));
+  border-color: var(--border-hi, var(--border));
+}
+.usage-stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+  font-weight: 600;
+}
+.usage-stat-value {
+  font-size: 22px;
+  font-weight: 650;
+  color: var(--fg);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+.usage-zombie-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--err, #f87171) 16%, transparent);
+  color: var(--err, #f87171);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ---- Controls ---- */
+.usage-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.usage-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.usage-sort select {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg);
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.usage-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--fg-muted);
+  font-size: 12px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.usage-toggle:hover {
+  color: var(--fg);
+  border-color: var(--fg-muted);
+}
+.usage-toggle.is-on {
+  background: var(--bg-hi, var(--bg-alt));
+  color: var(--fg);
+  border-color: var(--border-hi, var(--fg-muted));
+}
+
+/* ---- Session list ---- */
+.usage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.usage-row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-alt);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.1s ease;
+}
+.usage-row:hover {
+  border-color: var(--fg-muted);
+  background: var(--bg-hi, var(--bg-alt));
+}
+.usage-row:active {
+  transform: translateY(1px);
+}
+/* Thin semantic trace on the left edge for non-idle states. */
+.usage-row.state-active {
+  border-left: 2px solid #4ade80;
+}
+.usage-row.state-zombie {
+  border-left: 2px solid var(--err, #f87171);
+  background: color-mix(in srgb, var(--err, #f87171) 5%, var(--bg-alt));
+}
+.usage-row.state-fresh {
+  border-left: 2px solid var(--accent);
+}
+.usage-row.opening {
+  opacity: 0.55;
+  cursor: progress;
+}
+.usage-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.usage-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.usage-state-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.usage-state-dot.state-active {
+  background: #4ade80;
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
+}
+.usage-state-dot.state-zombie {
+  background: var(--err, #f87171);
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.18);
+}
+.usage-state-dot.state-idle {
+  background: var(--fg-muted);
+  opacity: 0.45;
+}
+.usage-state-dot.state-fresh {
+  background: var(--accent);
+  opacity: 0.7;
+}
+.usage-row-project {
+  flex: 1;
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.usage-row-model {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 10px;
+  color: var(--fg-muted);
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.usage-row-cost {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--fg);
+  letter-spacing: -0.01em;
+}
+.usage-source-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--fg-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.usage-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  flex-wrap: wrap;
+}
+.usage-chip {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.usage-row-when {
+  margin-left: auto;
+  color: var(--fg-dim, var(--fg-muted));
+  white-space: nowrap;
+}
+/* Cache-hit micro-bar — at-a-glance efficiency, neutral fill. */
+.usage-cache {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.usage-cache-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.usage-cache-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--fg-muted);
+  transition: width 0.3s ease;
+}
+.usage-cache-label {
+  font-size: 10px;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  min-width: 64px;
+  text-align: right;
+}
+
+/* ---- Infinite-scroll sentinel + footer ---- */
+.usage-sentinel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  color: var(--fg-muted);
+  font-size: 11px;
+}
+.usage-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  border-top-color: var(--fg-muted);
+  animation: usage-spin 0.7s linear infinite;
+}
+@keyframes usage-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.usage-foot-count {
+  text-align: center;
+  padding: 4px 0;
+  color: var(--fg-dim, var(--fg-muted));
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+@media (max-width: 640px) {
+  .usage-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- Usage shell: Sessions | Context segmented control ---------- */
+.usage-root {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg);
+}
+.usage-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 24px 0;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+.usage-tab {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-dim);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.usage-tab:hover {
+  color: var(--fg);
+}
+.usage-tab.is-on {
+  color: var(--fg);
+  background: var(--bg-hi);
+}
+
+/* ---------- Context view (skill/plugin cost analyzer) ---------- */
+.ctx-note {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--fg-muted);
+  margin: 0;
+}
+.ctx-note code,
+.ctx-legend code {
+  font-family: var(--font-mono, monospace);
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-hi);
+}
+/* Compact legend explaining the three visibility states to a new user. */
+.ctx-legend {
+  list-style: none;
+  margin: -4px 0 0;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--fg-dim);
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.ctx-legend strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+.ctx-legend-src {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-muted);
+}
+.ctx-stat-sub {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--fg-muted);
+  margin-top: 2px;
+}
+.ctx-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* Each row: an impact bar sits behind the content as a subtle track. */
+.ctx-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-alt);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+.ctx-row:hover {
+  border-color: var(--fg-muted);
+}
+.ctx-row:focus-visible {
+  outline: none;
+  border-color: var(--fg);
+}
+/* Kind glyph (zap = skill, bot = agent) — sits above the impact track. */
+.ctx-kind-icon {
+  position: relative;
+  flex-shrink: 0;
+  color: var(--fg-muted);
+}
+.ctx-bar {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ctx-bar-fill {
+  height: 100%;
+  background: var(--accent-soft);
+}
+/* Never-used skills carry a warn trace on the left edge — the thing to cut. */
+.ctx-row.is-unused {
+  border-left: 2px solid var(--warn);
+}
+.ctx-row-main {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.ctx-name {
+  font-weight: 600;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ctx-tag {
+  flex-shrink: 0;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  color: var(--fg-muted);
+  background: var(--bg-hi);
+}
+.ctx-tag.src-project {
+  color: var(--fg);
+}
+.ctx-tag.src-plugin {
+  color: var(--fg-dim);
+}
+.ctx-use {
+  position: relative;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+}
+.ctx-use.is-zero {
+  color: var(--warn);
+  font-weight: 600;
+}
+.ctx-tok {
+  position: relative;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--fg-dim);
+  font-variant-numeric: tabular-nums;
+  min-width: 44px;
+  text-align: right;
+}
+/* Visibility toggle (skillOverrides). Compact select on the row's right. */
+.ctx-vis {
+  position: relative;
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.ctx-vis:hover:not(:disabled) {
+  color: var(--fg);
+  border-color: var(--fg-muted);
+}
+.ctx-vis:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+/* A skill dimmed by a name-only / hidden override — reads as "parked". */
+.ctx-row.is-muted .ctx-name,
+.ctx-row.is-muted .ctx-kind-icon {
+  opacity: 0.55;
+}
+.ctx-row.is-muted .ctx-tok {
+  color: var(--ok);
+}
+
+/* ---------- Session transcript pane (lazy chunked viewer) ---------- */
+.session-transcript-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  padding: 0;
+  font-size: 13px;
+  background: var(--bg);
+}
+.session-transcript-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 18px;
+  background: var(--bg-alt);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+.session-transcript-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fg);
+  font-family: var(--mono, ui-monospace, monospace);
+}
+.session-transcript-title code {
+  background: var(--bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--accent);
+}
+.session-transcript-meta {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.session-transcript-empty,
+.session-transcript-error,
+.session-transcript-loading,
+.session-transcript-end {
+  padding: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.session-transcript-error {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.06);
+}
+.session-turn {
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.session-turn.is-assistant {
+  background: var(--bg-alt);
+}
+.session-turn-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.session-turn-kind {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 10px;
+  color: var(--accent);
+}
+.session-turn.is-user .session-turn-kind {
+  color: var(--fg);
+}
+.session-turn-idx {
+  color: var(--fg-muted);
+}
+.session-turn-ts {
+  color: var(--fg-dim);
+}
+.session-turn-cost {
+  color: #4ade80;
+  font-variant-numeric: tabular-nums;
+}
+.session-turn-body {
+  font-size: 13px;
+  line-height: 1.5;
+}
+.session-turn-md {
+  white-space: normal;
+}
+.session-turn-md p {
+  margin: 0 0 8px;
+}
+.session-turn-md p:last-child {
+  margin-bottom: 0;
+}
+.session-turn-md code {
+  font-family: var(--mono, ui-monospace, monospace);
+  background: var(--bg);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+.session-turn-md pre {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  font-size: 12px;
+}
+.session-turn-md pre code {
+  background: none;
+  padding: 0;
+}
+.session-turn-thinking {
+  font-size: 12px;
+  color: var(--fg-muted);
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+}
+.session-turn-thinking summary {
+  cursor: pointer;
+  padding: 4px 0;
+  user-select: none;
+}
+.session-turn-thinking pre {
+  background: var(--bg);
+  padding: 8px 10px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  font-size: 11px;
+  color: var(--fg-dim);
+  font-family: var(--mono, ui-monospace, monospace);
+}
+.session-turn-tools,
+.session-turn-tool-results {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.session-turn-tool-use,
+.session-turn-tool-result {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+}
+.session-turn-tool-use {
+  border-left: 3px solid var(--accent);
+}
+.session-turn-tool-result {
+  border-left: 3px solid var(--fg-muted);
+}
+.session-turn-tool-result.is-error {
+  border-left-color: #f87171;
+}
+.session-turn-tool-name {
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: lowercase;
+  font-family: var(--mono, ui-monospace, monospace);
+}
+.session-turn-tool-id {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 10px;
+  color: var(--fg-dim);
+}
+.session-turn-tool-use pre,
+.session-turn-tool-result pre {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 11px;
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  color: var(--fg-muted);
+}
+.session-turn-tokens {
+  font-size: 10px;
+  color: var(--fg-dim);
+  font-family: var(--mono, ui-monospace, monospace);
+}
+.session-transcript-footer {
+  padding: 12px 18px;
+}
+
+/* ---------- Session transcript: collapsed/expanded row + load-more button ---------- */
+.session-transcript-loadmore {
+  display: block;
+  width: calc(100% - 32px);
+  margin: 8px 16px;
+  padding: 8px 12px;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--fg);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+.session-transcript-loadmore:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.session-transcript-loadmore-meta {
+  margin-left: 8px;
+  color: var(--fg-muted);
+  font-size: 11px;
+}
+.session-transcript-loadmore-all {
+  background: transparent;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.session-turn-collapsed {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 18px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.session-turn-collapsed:hover {
+  background: var(--bg-alt);
+}
+.session-turn.is-open > .session-turn-collapsed {
+  background: var(--bg-alt);
+  border-bottom-color: transparent;
+}
+.session-turn-preview {
+  flex: 1;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--mono, ui-monospace, monospace);
+}
+.session-turn.is-open .session-turn-preview {
+  color: var(--fg);
+}
+.session-turn-expanded {
+  padding: 12px 18px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg);
 }

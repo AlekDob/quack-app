@@ -2,6 +2,8 @@ mod atomic;
 mod claude_code;
 mod claude_mcp;
 mod claude_perm;
+mod claude_sessions;
+mod context_assets;
 mod claude_usage;
 mod fs_ops;
 mod git;
@@ -143,6 +145,12 @@ pub fn run() {
             claude_perm::claude_perm_decide,
             claude_perm::claude_perm_endpoint,
             claude_usage::claude_usage_limits,
+            claude_sessions::claude_usage_sessions,
+            claude_sessions::claude_session_export_markdown,
+            claude_sessions::claude_session_load_turns,
+            context_assets::claude_context_assets,
+            context_assets::claude_set_skill_override,
+            context_assets::claude_invalidate_context_cache,
             claude_mcp::claude_mcp_list,
             claude_mcp::claude_mcp_add,
             claude_mcp::claude_mcp_add_remote,

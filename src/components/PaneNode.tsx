@@ -40,6 +40,10 @@ function tabLabel(
   popped: boolean;
   /** Read-only subagent transcript tab — drives the duck-avatar tab icon. */
   subAvatar?: string;
+  /** Whiteboard tab — uses the dedicated "whiteboard" SVG icon. */
+  isWhiteboard?: boolean;
+  /** Usage tab — uses the "chart-bar" SVG icon. */
+  isUsage?: boolean;
 } {
   const parsed = parseKey(key);
   if (parsed?.kind === "terminal") {
@@ -60,6 +64,26 @@ function tabLabel(
       isTerminal: false,
       isAI: true,
       popped: false,
+    };
+  }
+  if (parsed?.kind === "whiteboard") {
+    return {
+      label: "Organigramma",
+      dirty: false,
+      isTerminal: false,
+      isAI: false,
+      popped: false,
+      isWhiteboard: true,
+    };
+  }
+  if (parsed?.kind === "usage") {
+    return {
+      label: "Usage",
+      dirty: false,
+      isTerminal: false,
+      isAI: false,
+      popped: false,
+      isUsage: true,
     };
   }
   if (parsed?.kind === "subagent") {
@@ -599,6 +623,10 @@ function TabsPaneView(
                   <Icon name="terminal" size={12} />
                 ) : info.isAI ? (
                   <AIIcon size={12} />
+                ) : info.isWhiteboard ? (
+                  <Icon name="whiteboard" size={12} />
+                ) : info.isUsage ? (
+                  <Icon name="chart-bar" size={12} />
                 ) : info.subAvatar ? (
                   <img
                     className="tab-sub-avatar"

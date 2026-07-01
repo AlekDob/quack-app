@@ -16,6 +16,7 @@ import { useResolvedTheme } from "../theme";
 import { getEditorSettings, useEditorSettings } from "../editorSettings";
 import { setEditorGoto } from "../editorState";
 import { ContextMenu } from "./ContextMenu";
+import { registerResumeComponent } from "../resumeDebug";
 
 /**
  * Match `path:line` and `path:line:col` patterns in terminal output so the
@@ -216,6 +217,30 @@ export function TerminalCore({
     term.loadAddon(fit);
     termRef.current = term;
     fitRef.current = fit;
+
+    // Register with the resume-debug registry so a wake-from-standby can
+    // refit xterm (its internal canvas occasionally desyncs from the
+    // surrounding flex layout after macOS sleep).
+    const unregisterTerm = registerResumeComponent({
+      id: `xterm:${termId}`,
+      kind: "xterm",
+      snapshot: () => {
+        const host = hostNodeRef.current;
+        return {
+          cols: term.cols,
+          rows: term.rows,
+          box: host ? `${host.clientWidth}x${host.clientHeight}` : "detached",
+          visible: host ? host.getBoundingClientRect().width > 0 : false,
+        };
+      },
+      heal: () => {
+        try {
+          fit.fit();
+        } catch {
+          /* ignore — see resumeDebug contract */
+        }
+      },
+    });
 
     // Ref callbacks fire BEFORE this effect, so by the time we create
     // the Terminal here the host div may already exist. Open onto it.
@@ -510,6 +535,7 @@ export function TerminalCore({
       cancelled = true;
       unlistenOut?.();
       unlistenExit?.();
+      unregisterTerm();
       try {
         linkDisposable.dispose();
         urlLinkDisposable.dispose();

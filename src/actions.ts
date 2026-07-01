@@ -144,6 +144,8 @@ export interface CommandSpec {
   id: string;
   label: string;
   category: "File" | "View" | "Terminal" | "AI" | "Help" | "Workspace" | "Edit";
+  /** Short secondary line in the palette (right side, muted). */
+  hint?: string;
   accel?: string;
   /** Don't dispatch this accel while the user is typing in a terminal
    *  or plain input — for keys shells/inputs own (Ctrl+W is
@@ -991,6 +993,20 @@ export const commands: CommandSpec[] = [
     label: "Claude Code: Open user CLAUDE.md (~/.claude/CLAUDE.md)",
     category: "AI",
     run: () => void openUserClaudeMd(),
+  },
+  {
+    id: "view.open_whiteboard",
+    label: "Open Whiteboard",
+    category: "View",
+    hint: "Organize subagents (Jack + skills) per workspace",
+    run: () => {
+      const wsId = s().activeId;
+      if (!wsId) {
+        toastError("Open a workspace first");
+        return;
+      }
+      s().wbOpen(wsId);
+    },
   },
   {
     id: "help.shortcuts",

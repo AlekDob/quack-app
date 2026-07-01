@@ -91,7 +91,12 @@ export type IconName =
   | "image"
   | "file-code"
   | "lock"
-  | "zap";
+  | "zap"
+  | "bot"
+  | "whiteboard"
+  | "chart-bar"
+  | "arrow-up"
+  | "microphone";
 
 // Each entry returns the inner JSX for an svg with viewBox 0 0 24 24.
 // Use stroke={currentColor} + strokeWidth + strokeLinecap/Linejoin so
@@ -422,6 +427,54 @@ const ICONS: Record<IconName, ReactNode> = {
     <>
       <rect x="4" y="10" width="16" height="11" rx="2" />
       <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+    </>
+  ),
+  // Robot head with antenna + two eyes — a subagent (distinct from the
+  // lightning `zap` used for skills).
+  bot: (
+    <>
+      <rect x="4" y="8" width="16" height="12" rx="2" />
+      <path d="M12 8V4" />
+      <circle cx="12" cy="3" r="1" fill="currentColor" stroke="none" />
+      <circle cx="9" cy="14" r="1" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="14" r="1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // Whiteboard with a tiny org-chart (root dot + 2 leaves, connected).
+  // Reads as "interactive canvas" — fits the Whiteboard tab purpose.
+  whiteboard: (
+    <>
+      <rect x="3" y="4" width="18" height="14" rx="2" />
+      <circle cx="9" cy="10" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="10" r="1.5" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="14.5" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M9 10 12 14.5 15 10" />
+      <line x1="9" y1="21" x2="15" y2="21" />
+    </>
+  ),
+  // Three vertical bars of varying height — usage / metrics panel.
+  "chart-bar": (
+    <>
+      <line x1="6" y1="20" x2="6" y2="12" />
+      <line x1="12" y1="20" x2="12" y2="6" />
+      <line x1="18" y1="20" x2="18" y2="15" />
+      <line x1="3" y1="20" x2="21" y2="20" />
+    </>
+  ),
+  // Upward arrow — the send affordance (Cursor / spaceship-style composer).
+  "arrow-up": (
+    <>
+      <line x1="12" y1="20" x2="12" y2="5" />
+      <polyline points="6 11 12 5 18 11" />
+    </>
+  ),
+  // Microphone — voice dictation toggle in the composer.
+  microphone: (
+    <>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M6 11a6 6 0 0 0 12 0" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+      <line x1="9" y1="21" x2="15" y2="21" />
     </>
   ),
 };

@@ -242,7 +242,10 @@ export function CommandPalette({ open, onClose, initialQuery }: Props) {
         out.push({
           key: c.id,
           label: c.label,
-          hint: c.accel,
+          // Descriptive `hint` wins over the keyboard shortcut so actions
+          // like "Open Whiteboard" can advertise their purpose; commands
+          // without a hint fall back to showing the accel.
+          hint: c.hint ?? c.accel,
           category: c.category,
           run: c.run,
         });

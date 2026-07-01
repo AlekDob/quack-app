@@ -14,6 +14,9 @@ export interface SkillDef {
   name: string;
   description: string;
   source: "project" | "user";
+  /** Absolute path to the SKILL.md backing this skill. Used by the
+   *  whiteboard click-to-open action. */
+  path: string;
 }
 
 // First meaningful prose line of a SKILL.md that lacks a `description:`
@@ -32,12 +35,13 @@ function parseSkill(
   src: string,
   dirName: string,
   source: SkillDef["source"],
+  path: string,
 ): SkillDef {
   const name = frontmatterField(src, "name") ?? dirName;
   const description =
     frontmatterField(src, "description") ?? firstParagraph(src);
   // Keep slash rows tidy — the full description lives in the skill itself.
-  return { name, description: description.slice(0, 120), source };
+  return { name, description: description.slice(0, 120), source, path };
 }
 
 async function readSkillsDir(
@@ -55,7 +59,7 @@ async function readSkillsDir(
     if (!e.is_dir) continue; // each skill is a folder with a SKILL.md inside
     try {
       const md = await fs.readFile(`${e.path}/SKILL.md`);
-      out.push(parseSkill(md, e.name, source));
+      out.push(parseSkill(md, e.name, source, `${e.path}/SKILL.md`));
     } catch {
       /* no SKILL.md (not a skill folder) — skip */
     }

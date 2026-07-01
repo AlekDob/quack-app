@@ -36,6 +36,33 @@ export function ActivityBar() {
   const setSidebarSide = useStore((s) => s.setSidebarSide);
   const setAIPanelVisible = useStore((s) => s.setAIPanelVisible);
   const aiPanelVisible = ws?.layout.aiPanelVisible ?? false;
+  const wbOpen = useStore((s) => s.wbOpen);
+  const usageOpen = useStore((s) => s.usageOpen);
+
+  // Key of the focused pane's active tab — drives the "this tab is open
+  // and focused" highlight on the Organigramma + Usage icons. Walks the
+  // pane tree to find the active pane.
+  const activeTabKey: string | null = ((): string | null => {
+    if (!ws) return null;
+    const root = ws.layout.editorRoot;
+    const activePaneId = ws.layout.activePaneId;
+    if (!activePaneId) return null;
+    // Holder object so the closure assignment doesn't trip TS's control
+    // flow narrowing (which kept collapsing the result to `never`).
+    const holder: { tab: string | null } = { tab: null };
+    const walk = (p: typeof root): void => {
+      if (p.kind === "tabs") {
+        if (p.id === activePaneId) holder.tab = p.active;
+        return;
+      }
+      walk(p.first);
+      if (!holder.tab) walk(p.second);
+    };
+    walk(root);
+    return holder.tab;
+  })();
+  const whiteboardActive = !!activeTabKey && activeTabKey.startsWith("wb:");
+  const usageActive = !!activeTabKey && activeTabKey.startsWith("usage:");
   const hasSection = (v: SidebarView) =>
     sections.some((s) => s.view === v && !s.collapsed);
   const sectionActive = (v: SidebarView) => sidebarVisible && hasSection(v);
@@ -272,6 +299,26 @@ export function ActivityBar() {
           disabled={!activeId}
         >
           <Icon name="cloud" size={20} />
+        </button>
+        <button
+          className={`activity-icon ${usageActive ? "active" : ""}`}
+          title="Usage — live Claude Code session + cost monitor (opens as a tab)"
+          aria-label="Usage"
+          aria-pressed={usageActive}
+          onClick={() => activeId && usageOpen(activeId)}
+          disabled={!activeId}
+        >
+          <Icon name="chart-bar" size={20} />
+        </button>
+        <button
+          className={`activity-icon ${whiteboardActive ? "active" : ""}`}
+          title="Organigramma — agents + skills runbook (⌘P → Open Organigramma)"
+          aria-label="Organigramma"
+          aria-pressed={whiteboardActive}
+          onClick={() => activeId && wbOpen(activeId)}
+          disabled={!activeId}
+        >
+          <Icon name="whiteboard" size={20} />
         </button>
         <button
           className={`activity-icon ${aiPanelVisible ? "active" : ""}`}

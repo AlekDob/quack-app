@@ -153,7 +153,8 @@ export type SidebarView =
   | "outline"
   | "bookmarks"
   | "ai"
-  | "remote";
+  | "remote"
+  | "usage";
 
 export interface SidebarSection {
   view: SidebarView;
@@ -225,17 +226,37 @@ export const aiKey = (id: string) => "ai:" + id;
 // the CC session id, the parent Task tool-call id, and the agent type.
 export const subKey = (sessionId: string, toolUseId: string, agentType: string) =>
   `sub:${sessionId}|${toolUseId}|${agentType}`;
+// Whiteboard tab. One persistent tab per workspace (mirrors the
+// per-workspace ai: chats) — survives restart because the data it shows
+// is reloaded from the filesystem on mount.
+export const wbKey = (wsId: string) => `wb:${wsId}`;
+// Tab key for an inline Claude Code session transcript. The `project`
+// segment encodes the on-disk encoded-cwd; the sessionId is the CLI
+// session uuid. Two tabs with the same key are the same session —
+// re-clicking the Usage row focuses the existing tab instead of duping.
+export const sessionKey = (project: string, sessionId: string) =>
+  `sess:${project}|${sessionId}`;
+// Usage tab. Machine-global content (every Claude Code session on this
+// box) but keyed per-workspace like the whiteboard, so each workspace
+// owns at most one Usage tab. Self-contained — its data is polled from
+// the Rust backend on mount, so it survives restart with no descriptor.
+export const usageKey = (wsId: string) => `usage:${wsId}`;
 export function parseKey(
   k: string,
 ):
   | { kind: "file"; path: string }
   | { kind: "terminal"; id: string }
   | { kind: "ai"; id: string }
+  | { kind: "whiteboard"; wsId: string }
+  | { kind: "usage"; wsId: string }
   | { kind: "subagent"; sessionId: string; toolUseId: string; agentType: string }
+  | { kind: "session"; project: string; sessionId: string }
   | null {
   if (k.startsWith("file:")) return { kind: "file", path: k.slice(5) };
   if (k.startsWith("term:")) return { kind: "terminal", id: k.slice(5) };
   if (k.startsWith("ai:")) return { kind: "ai", id: k.slice(3) };
+  if (k.startsWith("wb:")) return { kind: "whiteboard", wsId: k.slice(3) };
+  if (k.startsWith("usage:")) return { kind: "usage", wsId: k.slice(6) };
   if (k.startsWith("sub:")) {
     const [sessionId, toolUseId, ...rest] = k.slice(4).split("|");
     return {
@@ -243,6 +264,15 @@ export function parseKey(
       sessionId: sessionId ?? "",
       toolUseId: toolUseId ?? "",
       agentType: rest.join("|"),
+    };
+  }
+  if (k.startsWith("sess:")) {
+    const pipe = k.indexOf("|");
+    if (pipe < 0) return null;
+    return {
+      kind: "session",
+      project: k.slice(5, pipe),
+      sessionId: k.slice(pipe + 1),
     };
   }
   return null;
@@ -641,6 +671,16 @@ interface AppState {
     toolUseId: string,
     agentType: string,
   ): void;
+  /** Open (or focus) the persistent Whiteboard tab for a workspace. */
+  wbOpen(wsId: string): void;
+  /** Open (or focus) the Usage tab (live Claude Code cost monitor) for a
+   *  workspace. One tab per workspace, mirrors wbOpen. */
+  usageOpen(wsId: string): void;
+  /** Open (or focus) a session transcript tab in the active editor pane.
+   *  The pane renders a lazy chunked loader for the given Claude Code
+   *  session. Re-clicking the same row focuses the existing tab. */
+  sessionOpen(wsId: string, project: string, sessionId: string): void;
+  sessionClose(wsId: string, project: string, sessionId: string): void;
   closeAIChat(wsId: string, id: string): void;
   /** Focus an existing chat's tab (reopening it in the active editor pane
    *  if its tab was closed). Used by the Agent Hub to jump to a chat. */
@@ -780,7 +820,7 @@ function commonLayoutFields(
   r: Record<string, unknown>,
 ): Omit<WorkspaceLayout, "editorRoot" | "bottomRoot" | "activePaneId"> {
   const validViews: SidebarView[] = [
-    "files", "search", "git", "tasks", "todos", "outline", "bookmarks", "ai", "remote",
+    "files", "search", "git", "tasks", "todos", "outline", "bookmarks", "ai", "remote", "usage",
   ];
   const view = validViews.includes(r.sidebarView as SidebarView)
     ? (r.sidebarView as SidebarView)
@@ -1025,6 +1065,13 @@ async function loadWorkspaceFromDisk(
         if (k.startsWith("file:")) return files[k.slice(5)] !== undefined;
         if (k.startsWith("term:")) return liveTerminals[k.slice(5)] !== undefined;
         if (k.startsWith("ai:")) return aiChats[k.slice(3)] !== undefined;
+        // Whiteboard is per-workspace and self-contained (its data is
+        // re-loaded from disk on mount). Always survives layout cleanup
+        // so an active whiteboard tab is never silently dropped.
+        if (k.startsWith("wb:")) return true;
+        // Usage is self-contained too (polls the backend on mount), so it
+        // survives cleanup like the whiteboard tab.
+        if (k.startsWith("usage:")) return true;
         return false;
       });
       if (tabs.length === 0) return null;
@@ -1370,10 +1417,11 @@ export const useStore = create<AppState>((set, get) => {
       }
       let contents: string;
       if (mediaKindOf(path)) {
-        // Image / PDF: never feed it to readFile (the backend rejects
-        // binary) or to Monaco. We keep an empty sentinel buffer so the
-        // tab persists + tracks as a known file; MediaPreviewPane reads
-        // the bytes from disk on its own.
+        // Image / PDF / session-transcript: never feed it to readFile
+        // (the backend rejects binary, and the session kind has no
+        // backing file at all). We keep an empty sentinel buffer so the
+        // tab persists + tracks as a known file; MediaPreviewPane /
+        // SessionTranscriptPane fetch the real bytes via IPC on mount.
         contents = "";
       } else {
         try {
@@ -1563,6 +1611,11 @@ export const useStore = create<AppState>((set, get) => {
           return ws.terminals[parsed.id]?.title ?? key;
         }
         if (parsed.kind === "subagent") return parsed.agentType || key;
+        if (parsed.kind === "whiteboard") return "Organigramma";
+        if (parsed.kind === "usage") return "Usage";
+        if (parsed.kind === "session") {
+          return `Session ${parsed.sessionId.slice(0, 8)}`;
+        }
         // ai
         return ws.aiChats[parsed.id]?.title ?? key;
       };
@@ -1631,6 +1684,9 @@ export const useStore = create<AppState>((set, get) => {
           return now - last;
         }
         if (parsed.kind === "subagent") return Number.POSITIVE_INFINITY;
+        if (parsed.kind === "whiteboard") return Number.POSITIVE_INFINITY;
+        if (parsed.kind === "usage") return Number.POSITIVE_INFINITY;
+        if (parsed.kind === "session") return Number.POSITIVE_INFINITY;
         // ai
         const desc = ws.aiChats[parsed.id];
         if (!desc) return Number.POSITIVE_INFINITY;
@@ -2333,6 +2389,161 @@ export const useStore = create<AppState>((set, get) => {
                 : t,
             ),
           },
+        };
+      });
+    },
+
+    wbOpen: (wsId) => {
+      const k = wbKey(wsId);
+      updateWs(wsId, (w) => {
+        // Already open? Focus the pane + tab instead of duping.
+        let foundPane: PaneId | null = null;
+        mapTree(w.layout.editorRoot, (t) => {
+          if (t.tabs.includes(k)) foundPane = t.id;
+          return t;
+        });
+        if (foundPane) {
+          return {
+            ...w,
+            layout: {
+              ...w.layout,
+              activePaneId: foundPane,
+              editorRoot: mapTree(w.layout.editorRoot, (t) =>
+                t.id === foundPane ? { ...t, active: k } : t,
+              ),
+            },
+          };
+        }
+        const targetPaneId =
+          (w.layout.activePaneId &&
+            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
+            w.layout.activePaneId) ||
+          firstLeaf(w.layout.editorRoot).id;
+        return {
+          ...w,
+          layout: {
+            ...w.layout,
+            activePaneId: targetPaneId,
+            editorRoot: mapTree(w.layout.editorRoot, (t) =>
+              t.id === targetPaneId
+                ? { ...t, tabs: [...t.tabs, k], active: k }
+                : t,
+            ),
+          },
+        };
+      });
+    },
+
+    // Same focus-or-append shape as wbOpen (singleton per-workspace tab).
+    usageOpen: (wsId) => {
+      const k = usageKey(wsId);
+      updateWs(wsId, (w) => {
+        let foundPane: PaneId | null = null;
+        mapTree(w.layout.editorRoot, (t) => {
+          if (t.tabs.includes(k)) foundPane = t.id;
+          return t;
+        });
+        if (foundPane) {
+          return {
+            ...w,
+            layout: {
+              ...w.layout,
+              activePaneId: foundPane,
+              editorRoot: mapTree(w.layout.editorRoot, (t) =>
+                t.id === foundPane ? { ...t, active: k } : t,
+              ),
+            },
+          };
+        }
+        const targetPaneId =
+          (w.layout.activePaneId &&
+            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
+            w.layout.activePaneId) ||
+          firstLeaf(w.layout.editorRoot).id;
+        return {
+          ...w,
+          layout: {
+            ...w.layout,
+            activePaneId: targetPaneId,
+            editorRoot: mapTree(w.layout.editorRoot, (t) =>
+              t.id === targetPaneId
+                ? { ...t, tabs: [...t.tabs, k], active: k }
+                : t,
+            ),
+          },
+        };
+      });
+    },
+
+    sessionOpen: (wsId, project, sessionId) => {
+      const k = sessionKey(project, sessionId);
+      updateWs(wsId, (w) => {
+        // Already open? Just focus the existing tab.
+        let foundPane: PaneId | null = null;
+        mapTree(w.layout.editorRoot, (t) => {
+          if (t.tabs.includes(k)) foundPane = t.id;
+          return t;
+        });
+        if (foundPane) {
+          return {
+            ...w,
+            layout: {
+              ...w.layout,
+              activePaneId: foundPane,
+              editorRoot: mapTree(w.layout.editorRoot, (t) =>
+                t.id === foundPane ? { ...t, active: k } : t,
+              ),
+            },
+          };
+        }
+        const targetPaneId =
+          (w.layout.activePaneId &&
+            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
+            w.layout.activePaneId) ||
+          firstLeaf(w.layout.editorRoot).id;
+        return {
+          ...w,
+          layout: {
+            ...w.layout,
+            activePaneId: targetPaneId,
+            editorRoot: mapTree(w.layout.editorRoot, (t) =>
+              t.id === targetPaneId
+                ? { ...t, tabs: [...t.tabs, k], active: k }
+                : t,
+            ),
+          },
+        };
+      });
+    },
+
+    sessionClose: (wsId, project, sessionId) => {
+      const k = sessionKey(project, sessionId);
+      updateWs(wsId, (w) => {
+        // Remove the tab from every pane that holds it (usually one).
+        const editorRoot = mapTree(w.layout.editorRoot, (t) =>
+          t.tabs.includes(k)
+            ? {
+                ...t,
+                tabs: t.tabs.filter((x) => x !== k),
+                active: t.active === k ? (t.tabs[0] ?? null) : t.active,
+              }
+            : t,
+        );
+        const bottomRoot = w.layout.bottomRoot
+          ? mapTree(w.layout.bottomRoot, (t) =>
+              t.tabs.includes(k)
+                ? {
+                    ...t,
+                    tabs: t.tabs.filter((x) => x !== k),
+                    active:
+                      t.active === k ? (t.tabs[0] ?? null) : t.active,
+                  }
+                : t,
+            )
+          : null;
+        return {
+          ...w,
+          layout: { ...w.layout, editorRoot, bottomRoot },
         };
       });
     },

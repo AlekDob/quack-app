@@ -11,6 +11,14 @@ export interface SubagentDef {
   source: "project" | "user";
   /** Public URL of the duck avatar, e.g. "/images/ducks/duck12.jpeg". */
   avatar: string;
+  /** Slugs of skills attached to this agent (from `skills:` frontmatter).
+   *  Empty array when unset — agents without skills still appear in the
+   *  organigramma, just without child leaves. */
+  skills: string[];
+  /** Absolute path to the .md file backing this agent. Needed by the
+   *  whiteboard drag-and-drop to write back the frontmatter `skills:`
+   *  list. Null when the file's location couldn't be resolved. */
+  path: string | null;
 }
 
 // Number of duck avatars shipped in public/images/ducks/ (duck1..duckN).
@@ -55,11 +63,60 @@ export function frontmatterField(src: string, key: string): string | undefined {
     .replace(/^["']|["']$/g, "");
 }
 
+/**
+ * Read a YAML-ish list from frontmatter. Accepts both the block form
+ *
+ *   skills:
+ *     - code-navigation
+ *     - brand-guidelines
+ *
+ * and the inline form `skills: [code-navigation, brand-guidelines]`.
+ * Quotes around items are stripped. Unset / empty → [].
+ */
+export function frontmatterList(src: string, key: string): string[] {
+  const fm = src.match(/^---\n([\s\S]*?)\n---/);
+  if (!fm) return [];
+  const body = fm[1];
+  const lines = body.split("\n");
+  const keyIdx = lines.findIndex((l) => l.trimStart().startsWith(`${key}:`));
+  if (keyIdx < 0) return [];
+  const head = lines[keyIdx].slice(lines[keyIdx].indexOf(":") + 1).trim();
+  // Inline form: `skills: [a, b, c]`
+  if (head.startsWith("[") && head.endsWith("]")) {
+    return head
+      .slice(1, -1)
+      .split(",")
+      .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+      .filter(Boolean);
+  }
+  // Inline-form fallback: anything after the colon on the same line
+  // (still useful if someone writes `skills: a, b` on one line).
+  if (head && !head.startsWith("-")) {
+    return head
+      .split(",")
+      .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+      .filter(Boolean);
+  }
+  // Block form: gather subsequent indented lines starting with `-`.
+  const out: string[] = [];
+  for (let i = keyIdx + 1; i < lines.length; i++) {
+    const raw = lines[i];
+    if (raw.trim() === "") continue;
+    // A non-indented, non-empty line ends the block.
+    if (!/^\s/.test(raw)) break;
+    const m = raw.match(/^\s*-\s*(.+?)\s*$/);
+    if (!m) break; // malformed — don't guess
+    out.push(m[1].replace(/^["']|["']$/g, ""));
+  }
+  return out;
+}
+
 // Parse one .md file into a SubagentDef, falling back to the filename.
 function parseAgent(
   src: string,
   fileName: string,
   source: SubagentDef["source"],
+  path: string,
 ): SubagentDef {
   const name = frontmatterField(src, "name") ?? fileName.replace(/\.md$/, "");
   return {
@@ -67,6 +124,8 @@ function parseAgent(
     description: frontmatterField(src, "description") ?? "",
     source,
     avatar: duckAvatarFor(name, frontmatterField(src, "avatar")),
+    skills: frontmatterList(src, "skills"),
+    path,
   };
 }
 
@@ -84,7 +143,9 @@ async function readAgentDir(
   for (const e of entries) {
     if (e.is_dir || !e.name.endsWith(".md")) continue;
     try {
-      out.push(parseAgent(await fs.readFile(e.path), e.name, source));
+      out.push(
+        parseAgent(await fs.readFile(e.path), e.name, source, e.path),
+      );
     } catch {
       /* unreadable file — skip */
     }

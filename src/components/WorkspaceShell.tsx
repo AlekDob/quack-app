@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { EditorPane } from "./EditorPane";
 import { MediaPreviewPane } from "./MediaPreviewPane";
+import { SessionTranscriptPane } from "./SessionTranscriptPane";
 import { mediaKindOf } from "../mediaPreview";
 import { TerminalCore } from "./TerminalCore";
 import { PaneNode } from "./PaneNode";
@@ -9,6 +10,8 @@ import { SidebarStack } from "./SidebarStack";
 import { AIChatPanel } from "./AIChatPanel";
 import { AIIcon } from "./AIIcon";
 import { SubagentTranscriptView } from "./SubagentTranscriptView";
+import { WhiteboardPane } from "./WhiteboardPane";
+import { UsagePanel } from "./UsagePanel";
 import {
   aiKey,
   findTabsPaneByTab,
@@ -377,8 +380,16 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
             if (active && active.startsWith("file:")) {
               const path = active.slice(5);
               const container = paneContainers[pane.id];
-              if (container && ws.files[path]) {
-                const media = mediaKindOf(path);
+              const media = mediaKindOf(path);
+              // Media panes (image / pdf) render without a backing
+              // ws.files entry — they read bytes themselves. Session
+              // tabs are handled by the separate portal below; we skip
+              // them here so they don't double-mount.
+              const isSessionTab = media === "session-transcript";
+              const canRender =
+                container && !isSessionTab &&
+                (media !== null || ws.files[path]);
+              if (canRender) {
                 overlays.push(
                   createPortal(
                     media ? (
@@ -486,6 +497,132 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
               container={container}
               visible={visible}
             />
+          );
+        });
+      })()}
+
+      {/* Whiteboard tab — one persistent per workspace. Walk the pane
+          tree for `wb:` keys and portal one WhiteboardPane per key. */}
+      {(() => {
+        const keys = new Set<string>();
+        const walk = (pane: typeof layout.editorRoot) => {
+          if (pane.kind === "tabs") {
+            pane.tabs.forEach((k) => {
+              if (k.startsWith("wb:")) keys.add(k);
+            });
+          } else {
+            walk(pane.first);
+            walk(pane.second);
+          }
+        };
+        walk(layout.editorRoot);
+        if (layout.bottomRoot) walk(layout.bottomRoot);
+        return [...keys].map((key) => {
+          const parsed = parseKey(key);
+          if (parsed?.kind !== "whiteboard") return null;
+          const editorPane = findTabsPaneByTab(layout.editorRoot, key);
+          const bottomPane = layout.bottomRoot
+            ? findTabsPaneByTab(layout.bottomRoot, key)
+            : null;
+          const pane = editorPane ?? bottomPane;
+          const inBottom = !editorPane && !!bottomPane;
+          const container = pane ? (paneContainers[pane.id] ?? null) : null;
+          const visible =
+            isActive &&
+            !!pane &&
+            pane.active === key &&
+            (inBottom ? layout.bottomVisible : true);
+          return (
+            <WhiteboardPane
+              key={key}
+              wsId={wsId}
+              root={ws.meta.root}
+              container={container}
+              visible={visible}
+            />
+          );
+        });
+      })()}
+
+      {/* Session transcript tabs — one per open Claude Code session.
+          Uses the same portal pattern as Whiteboard; the pane fetches
+          turns lazily via `claude_session_load_turns` so a multi-MB
+          session never blocks the tab open. */}
+      {(() => {
+        const keys = new Set<string>();
+        const walk = (pane: typeof layout.editorRoot) => {
+          if (pane.kind === "tabs") {
+            pane.tabs.forEach((k) => {
+              if (k.startsWith("sess:")) keys.add(k);
+            });
+          } else {
+            walk(pane.first);
+            walk(pane.second);
+          }
+        };
+        walk(layout.editorRoot);
+        if (layout.bottomRoot) walk(layout.bottomRoot);
+        return [...keys].map((key) => {
+          const parsed = parseKey(key);
+          if (parsed?.kind !== "session") return null;
+          const editorPane = findTabsPaneByTab(layout.editorRoot, key);
+          const bottomPane = layout.bottomRoot
+            ? findTabsPaneByTab(layout.bottomRoot, key)
+            : null;
+          const pane = editorPane ?? bottomPane;
+          const inBottom = !editorPane && !!bottomPane;
+          const container = pane ? (paneContainers[pane.id] ?? null) : null;
+          const visible =
+            isActive &&
+            !!pane &&
+            pane.active === key &&
+            (inBottom ? layout.bottomVisible : true);
+          if (!container || !visible) return null;
+          return createPortal(
+            <SessionTranscriptPane key={key} tabKey={key} />,
+            container,
+            key,
+          );
+        });
+      })()}
+
+      {/* Usage tab — one per workspace. Same portal pattern; the panel
+          polls the Rust backend for the live cost monitor. Only mounted
+          when its tab is the active one so the 12s poll doesn't run for
+          background tabs. */}
+      {(() => {
+        const keys = new Set<string>();
+        const walk = (pane: typeof layout.editorRoot) => {
+          if (pane.kind === "tabs") {
+            pane.tabs.forEach((k) => {
+              if (k.startsWith("usage:")) keys.add(k);
+            });
+          } else {
+            walk(pane.first);
+            walk(pane.second);
+          }
+        };
+        walk(layout.editorRoot);
+        if (layout.bottomRoot) walk(layout.bottomRoot);
+        return [...keys].map((key) => {
+          if (parseKey(key)?.kind !== "usage") return null;
+          const editorPane = findTabsPaneByTab(layout.editorRoot, key);
+          const bottomPane = layout.bottomRoot
+            ? findTabsPaneByTab(layout.bottomRoot, key)
+            : null;
+          const pane = editorPane ?? bottomPane;
+          const inBottom = !editorPane && !!bottomPane;
+          const container = pane ? (paneContainers[pane.id] ?? null) : null;
+          const visible =
+            isActive &&
+            !!pane &&
+            pane.active === key &&
+            (inBottom ? layout.bottomVisible : true);
+          if (!container || !visible) return null;
+          return createPortal(
+            <UsagePanel key={key} wsId={wsId} root={ws.meta.root} />,
+            container,
+            key,
           );
         });
       })()}

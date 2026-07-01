@@ -23,6 +23,7 @@ import { dirname } from "../pathUtils";
 import { Icon } from "./Icon";
 import { EditorBreadcrumbs } from "./EditorBreadcrumbs";
 import { requestAIPrompt } from "../aiBus";
+import { registerResumeComponent } from "../resumeDebug";
 import {
   loadViewState,
   saveViewState,
@@ -555,6 +556,39 @@ export function EditorPane({ wsId, path }: Props) {
           monacoRef.current = monaco;
           setMonacoInstance(monaco);
           setActiveEditor(ed);
+          // Register with the resume-debug registry so a wake-from-standby
+          // can re-trigger Monaco layout (its WebGL/canvas renderer
+          // occasionally lands at 0×0 after macOS sleep). The function
+          // `unregisterMonaco` is closed over inside onDidDispose below.
+          const unregisterMonaco = registerResumeComponent({
+            id: `monaco:${wsId}:${path}`,
+            kind: "monaco",
+            snapshot: () => {
+              const dom = ed.getContainerDomNode();
+              const model = ed.getModel();
+              return {
+                hasModel: !!model,
+                lines: model?.getLineCount() ?? 0,
+                box: dom
+                  ? `${dom.clientWidth}x${dom.clientHeight}`
+                  : "detached",
+                visible: dom
+                  ? dom.offsetParent !== null ||
+                    // offsetParent is null for fixed/absolute positioned
+                    // nodes that ARE visible (Monaco hosts use position:
+                    // relative) — fall back to the bounding rect.
+                    dom.getBoundingClientRect().width > 0
+                  : false,
+              };
+            },
+            heal: () => {
+              try {
+                ed.layout();
+              } catch {
+                /* ignore — see resumeDebug contract */
+              }
+            },
+          });
           // keepCurrentModel can hand us a model that went stale while
           // this file was a background tab (the AI's edit_file or an
           // accepted external-change reload updates the store buffer
@@ -871,6 +905,7 @@ export function EditorPane({ wsId, path }: Props) {
             }),
           ];
           ed.onDidDispose(() => {
+            unregisterMonaco();
             off();
             offScroll.dispose();
             for (const d of disposables) d.dispose();

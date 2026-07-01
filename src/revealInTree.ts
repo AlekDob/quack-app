@@ -16,6 +16,29 @@ export interface RevealInTreeDetail {
   path: string;
 }
 
+// True when `filePath` lives inside the workspace root (so it has a row
+// in the file tree worth revealing). Global ~/.claude assets don't.
+function isInWorkspace(wsId: string, filePath: string): boolean {
+  const ws = useStore.getState().loaded[wsId];
+  if (!ws) return false;
+  const root = ws.meta.root.replace(/\\/g, "/").replace(/\/+$/, "");
+  const norm = filePath.replace(/\\/g, "/");
+  return norm.toLowerCase().startsWith(root.toLowerCase() + "/");
+}
+
+/**
+ * Open a file in an editor tab and, if it lives inside the project, also
+ * reveal + highlight it in the left file tree. Shared by the whiteboard
+ * organigramma and the Usage → Context view so the click-to-open behaviour
+ * is defined once (DRY).
+ */
+export async function openFileAndReveal(wsId: string, filePath: string) {
+  await useStore.getState().openFile(wsId, filePath);
+  if (isInWorkspace(wsId, filePath)) {
+    revealInTree(wsId, filePath);
+  }
+}
+
 export function revealInTree(wsId: string, filePath: string) {
   const st = useStore.getState();
   const ws = st.loaded[wsId];

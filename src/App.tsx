@@ -54,6 +54,7 @@ import { ToastHistoryModal } from "./components/ToastHistoryModal";
 import { onNotificationsOpen } from "./notifyBus";
 import { useZenMode } from "./zenMode";
 import { useAgentMode } from "./agentMode";
+import { installResumeDebug } from "./resumeDebug";
 import "./App.css";
 
 // When this document was opened as a terminal pop-out window, render only
@@ -200,6 +201,13 @@ function MainApp() {
     void installNativeMenu();
     void hydrate();
   }, [hydrate]);
+
+  // Install the resume-debug listeners once at mount. Editor and terminal
+  // panes register themselves into the registry when they mount, so by the
+  // time the user resumes from macOS sleep the registry already knows
+  // about every Monaco/xterm instance worth healing. Idempotent — safe to
+  // call again in StrictMode.
+  useEffect(() => installResumeDebug(), []);
 
   // Guard the OS close button / Alt+F4 / taskbar-close against unsaved
   // edits. The custom titlebar × had its own confirm, but every other

@@ -9,6 +9,7 @@ import { SearchPanel } from "./SearchPanel";
 import { SourceControlPanel } from "./SourceControlPanel";
 import { TasksPanel } from "./TasksPanel";
 import { TodosPanel } from "./TodosPanel";
+import { UsagePanel } from "./UsagePanel";
 import { AIChatPanel } from "./AIChatPanel";
 import { OutlinePanel } from "./OutlinePanel";
 import { BookmarksPanel } from "./BookmarksPanel";
@@ -27,6 +28,7 @@ const VIEW_LABEL: Record<SidebarView, string> = {
   bookmarks: "Bookmarks",
   ai: "AI Chat",
   remote: "Remote (SFTP)",
+  usage: "Usage",
 };
 
 interface Props {
@@ -169,6 +171,8 @@ export function SidebarStack({ wsId, ws }: Props) {
         return <AIChatPanel wsId={wsId} root={ws.meta.root} />;
       case "remote":
         return <RemoteSftpPanel wsId={wsId} root={ws.meta.root} />;
+      case "usage":
+        return <UsagePanel wsId={wsId} root={ws.meta.root} />;
     }
   };
 

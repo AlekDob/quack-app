@@ -65,6 +65,9 @@ Frontend `src/` (React 19 + TypeScript + Zustand, Monaco, xterm — **no Tailwin
 | Theme (System/Light/Dark) + `data-os` at boot | `src/theme.ts` |
 | Per-project workspace colors (palette + persistence) | `src/workspaceColors.ts` |
 | Workspace color popover (right-click) | `src/components/WorkspaceColorPopover.tsx` |
+| Subagent discovery + `skills:`/`path` parsing | `src/subagents.ts` |
+| Skill discovery | `src/skills.ts` |
+| Whiteboard tab — organigramma + DnD + .md export | `src/components/WhiteboardPane.tsx`, `src/components/WhiteboardOrganigramma.tsx`, `src/whiteboardMd.ts`, `src/frontmatter.ts` |
 
 Backend `src-tauri/src/`: `lib.rs` (command registration), `claude_code.rs` (CC bridge),
 `workspace.rs` (persistent workspace state → `workspaces.json` + per-ws `state.json`),
@@ -96,7 +99,11 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
 - TypeScript strict, **no `any`**. CSS variables only (no hardcoded visual values).
 - DRY: extract repeated logic/markup into functions/components/constants. Reuse before writing.
 - Comments explain the **why** (intent, constraint, gotcha): IT for business, EN for tech.
-- Docs & code in English; UI copy Italian-first (English planned).
+- **This app's UI is in ENGLISH.** EVERY user-facing string the app renders — button
+  labels, tab names, dropdown options, tooltips/`title`, empty/loading/error states,
+  summary labels, placeholders — MUST be in English. This OVERRIDES the global
+  "Italian-first" default: Quack desktop (Codetta) ships English UI. Never write
+  Italian UI copy here. (Code, identifiers, comments and docs are English too.)
 - Conventional commits (EN), DCO sign-off (`git commit -s`) — upstream Codetta requires it.
 
 ## Knowledge Base (documentation/)
@@ -119,6 +126,9 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `015-claude-permission-mode.md` — per-chat permission mode (Ask/Plan/Auto-edit/Auto/Bypass); `permModeStore` bridges the composer mode to `ClaudePermissionOverlay`, the single auto-allow authority.
   - `016-image-attachments.md` — paste/drag up to 10 images into a Claude Code chat; client-side compression, on-disk temp storage, path inlined for CC's Read tool, in-message thumbnails + zoom modal.
   - `017-media-preview.md` — open images + PDFs as a read-only preview tab from the file tree (replaces the "File appears to be binary" toast); `mediaKindOf` classifier, `MediaPreviewPane`, empty-sentinel buffer.
+  - `018-whiteboard-organigramma.md` — Whiteboard editor tab (Jack → agents → skills tree), HTML5 DnD that writes `skills:` into the agent's `.md` frontmatter in place, operational `.md` export (`renderWhiteboardMd`, save to `.codetta/whiteboard.md`).
+  - `019-usage-monitor.md` — Usage tab (live Claude Code cost/session monitor + chunked transcript viewer); opens as a tab like the whiteboard; the freeze fix (mtime gate + cache-on-success + `spawn_blocking`).
+  - `020-context-optimizer.md` — Usage tab "Context" view: measures per-skill/subagent system-prompt weight (~char/4) + real invocation count (from transcripts), ranks heavy-but-unused skills, per-skill visibility toggle writing `skillOverrides` in `~/.claude/settings.json` (`name-only`/`user-invocable-only`); click a row → open its `.md` + reveal in tree via shared `openFileAndReveal`.
 - `documentation/decisions/` — architectural rationales.
   - `001-agent-status-indicators.md` — the per-session agent-status design (the focus feature).
   - `002-ui-styling-rebrand-not-rewrite.md` — why CSS-token rebrand, not Tailwind/shadcn.

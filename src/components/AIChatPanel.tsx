@@ -7,6 +7,8 @@ import {
   useState,
 } from "react";
 import { Icon } from "./Icon";
+import { SubagentPill } from "./SubagentPill";
+import { ComposerMic } from "./ComposerMic";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
