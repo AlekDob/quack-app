@@ -4361,6 +4361,9 @@ body.ws-dragging * {
 .diff-view {
   width: 100%;
   height: 100%;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
 }
 
 /* git panel rows clickable */
@@ -10986,7 +10989,112 @@ body.ws-dragging * {
   flex-direction: column;
   width: 100%;
   position: relative;
-  padding-top: 24px;
+}
+
+.editor-tab-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.editor-tab-toolbar-spacer {
+  flex: 1;
+  min-width: 0;
+}
+.editor-tab-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+.editor-tab-seg {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+.editor-tab-seg.labeled {
+  width: auto;
+  padding: 0 10px;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.editor-tab-seg:hover {
+  color: var(--fg);
+  background: var(--bg-hi);
+}
+.editor-tab-seg.active {
+  color: var(--fg);
+  background: var(--bg-hi);
+  box-shadow: inset 0 0 0 1px var(--border);
+  border-radius: var(--radius-full);
+}
+.editor-tab-changes {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+.editor-tab-changes:hover {
+  color: var(--fg);
+  background: var(--bg-hi);
+}
+.editor-tab-changes.active {
+  color: var(--fg);
+  background: var(--bg-hi);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.editor-tab-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+.editor-tab-save:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.editor-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.editor-body-split {
+  flex-direction: row;
 }
 
 /* In-tab preview for binary media (images + PDF). Fills the pane; the
@@ -11041,20 +11149,15 @@ body.ws-dragging * {
   border: 0;
 }
 
-/* Breadcrumb bar — sits at the very top of the editor-host, overlaying
-   the padding-top reserved above. Absolute positioning lets it span the
-   full width even when editor-host-split flips the flex direction to row. */
+/* Breadcrumb bar — first row in the editor host. */
 .editor-breadcrumbs {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  position: relative;
+  flex-shrink: 0;
   z-index: 5;
   display: flex;
   align-items: center;
   height: 24px;
   padding: 0 10px;
-  padding-right: 110px;
   gap: 2px;
   font-size: 11px;
   color: var(--fg-dim);
@@ -11112,49 +11215,20 @@ body.ws-dragging * {
   flex: 1;
   min-height: 0;
 }
-.editor-host-split {
-  flex-direction: row;
-}
-.editor-host-split .editor-half,
-.editor-host-split .preview-half {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
 .editor-half {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
 .preview-half {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   border-left: 1px solid var(--border);
   background: var(--bg);
   overflow-y: auto;
-}
-.editor-preview-toggle {
-  position: absolute;
-  top: 6px;
-  right: 12px;
-  z-index: 6;
-  font-size: 11px;
-  padding: 3px 10px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--fg-dim);
-  cursor: pointer;
-}
-.editor-preview-toggle:hover {
-  border-color: var(--accent);
-  color: var(--fg);
-}
-.editor-preview-toggle.active {
-  background: var(--primary-bg);
-  color: var(--primary-fg);
-  border-color: var(--accent);
 }
 
 /* Markdown preview content */
@@ -13551,6 +13625,38 @@ body.ws-dragging * {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.cust-editor-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cust-editor-body-split {
+  flex-direction: row;
+}
+.cust-editor-half {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cust-editor-preview {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+}
+.cust-editor-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-dim);
+  font-size: 13px;
 }
 .cust-editor-textarea {
   flex: 1 1 auto;

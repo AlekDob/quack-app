@@ -20,8 +20,9 @@ import { pushRecentFile } from "../recentFiles";
 import { confirm as dialogConfirm } from "../dialog";
 import { langOf } from "../langDetect";
 import { dirname } from "../pathUtils";
-import { Icon } from "./Icon";
 import { EditorBreadcrumbs } from "./EditorBreadcrumbs";
+import { EditorTabToolbar } from "./EditorTabToolbar";
+import { DiffView } from "./DiffView";
 import { requestAIPrompt } from "../aiBus";
 import { registerResumeComponent } from "../resumeDebug";
 import {
@@ -39,6 +40,17 @@ import {
   loadEditorConfig,
   type EditorConfigResolved,
 } from "../editorConfig";
+import {
+  isMarkdownPath,
+  readEditorMdView,
+  writeEditorMdView,
+  type EditorMdView,
+} from "../editorMdView";
+import {
+  readDiffSideBySide,
+  writeDiffSideBySide,
+} from "../editorDiffPrefs";
+import { useGitDiffPair } from "../hooks/useGitDiffPair";
 
 // Right-click "Ask AI to …" actions registered with Monaco. Each one
 // grabs the current selection (or the whole file when nothing is
@@ -211,7 +223,10 @@ export function EditorPane({ wsId, path }: Props) {
   const decorationsRef = useRef<editor.IEditorDecorationsCollection | null>(
     null,
   );
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [mdView, setMdView] = useState<EditorMdView>(readEditorMdView);
+  const [showDiff, setShowDiff] = useState(false);
+  const [diffSideBySide, setDiffSideBySide] = useState(readDiffSideBySide);
+  const [saving, setSaving] = useState(false);
   // Per-file `.editorconfig` overlay. Loaded async whenever the file
   // path or workspace root changes; while it's resolving, the editor
   // shows the global settings — see src/editorConfig.ts for the
@@ -236,12 +251,41 @@ export function EditorPane({ wsId, path }: Props) {
   const mdSplitActiveRef = useRef(false);
 
   const language = file ? langOf(path) : null;
-  const isMarkdown = language === "markdown";
+  const isMarkdown = isMarkdownPath(path);
+  const dirty = !!file && file.contents !== file.original;
+  const gitDiffPair = useGitDiffPair(
+    wsRoot || undefined,
+    path,
+    file?.contents ?? "",
+  );
+
+  useEffect(() => {
+    setShowDiff(false);
+  }, [path]);
+
+  const onMdViewChange = (view: EditorMdView) => {
+    setMdView(view);
+    writeEditorMdView(view);
+  };
+
+  const onDiffSideBySideChange = (sideBySide: boolean) => {
+    setDiffSideBySide(sideBySide);
+    writeDiffSideBySide(sideBySide);
+  };
+
+  const save = async () => {
+    if (!dirty) return;
+    setSaving(true);
+    await useStore.getState().saveFile(wsId, path);
+    setSaving(false);
+  };
+
   // Keep the scroll-sync mirror updated so the onMount listener sees
   // the current state without needing to re-register.
   useEffect(() => {
-    mdSplitActiveRef.current = isMarkdown && previewOpen;
-  }, [isMarkdown, previewOpen]);
+    mdSplitActiveRef.current =
+      isMarkdown && mdView === "split" && !showDiff;
+  }, [isMarkdown, mdView, showDiff]);
 
   // Apply runtime settings changes (font size, word wrap) without remounting.
   // The .editorconfig overlay (`ec`) wins for tabSize / insertSpaces when
@@ -491,26 +535,42 @@ export function EditorPane({ wsId, path }: Props) {
 
   if (!file) return null;
 
+  const showEditor = !showDiff && (!isMarkdown || mdView !== "preview");
+  const showPreview =
+    !showDiff && isMarkdown && (mdView === "split" || mdView === "preview");
+
   return (
-    <div
-      className={`editor-host ${
-        isMarkdown && previewOpen ? "editor-host-split" : ""
-      }`}
-    >
+    <div className="editor-host">
       <EditorBreadcrumbs wsId={wsId} root={wsRoot} path={path} />
-      {isMarkdown && (
-        <button
-          className={`editor-preview-toggle ${previewOpen ? "active" : ""}`}
-          onClick={() => setPreviewOpen((v) => !v)}
-          title="Toggle Markdown preview"
-          aria-label="Toggle Markdown preview"
-          aria-pressed={previewOpen}
-        >
-          <Icon name={previewOpen ? "edit" : "eye"} size={12} />
-          <span>{previewOpen ? "Edit only" : "Preview"}</span>
-        </button>
-      )}
-      <div className="editor-half">
+      <EditorTabToolbar
+        isMarkdown={isMarkdown}
+        mdView={mdView}
+        onMdViewChange={onMdViewChange}
+        hasGitChanges={!!gitDiffPair}
+        showDiff={showDiff}
+        onToggleDiff={() => setShowDiff((v) => !v)}
+        diffSideBySide={diffSideBySide}
+        onDiffSideBySideChange={onDiffSideBySideChange}
+        dirty={dirty}
+        saving={saving}
+        onSave={() => void save()}
+      />
+      <div
+        className={`editor-body ${
+          showPreview && showEditor ? "editor-body-split" : ""
+        }`}
+      >
+        {showDiff && gitDiffPair ? (
+          <DiffView
+            originalContent={gitDiffPair.original}
+            modifiedContent={gitDiffPair.modified}
+            path={path}
+            sideBySide={diffSideBySide}
+          />
+        ) : (
+          <>
+            {showEditor && (
+              <div className="editor-half">
       <Editor
         height="100%"
         path={path}
@@ -920,12 +980,16 @@ export function EditorPane({ wsId, path }: Props) {
         }}
         onChange={(v) => update(wsId, path, v ?? "")}
       />
+              </div>
+            )}
+            {showPreview && (
+              <div className="preview-half">
+                <MarkdownPreview content={file.contents} interactive={mdView === "split"} />
+              </div>
+            )}
+          </>
+        )}
       </div>
-      {isMarkdown && previewOpen && (
-        <div className="preview-half">
-          <MarkdownPreview content={file.contents} interactive />
-        </div>
-      )}
     </div>
   );
 }

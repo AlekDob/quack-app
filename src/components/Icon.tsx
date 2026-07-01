@@ -68,6 +68,8 @@ export type IconName =
   | "trash"
   | "edit"
   | "eye"
+  | "columns-2"
+  | "git-compare"
   | "send"
   | "x"
   | "check"
@@ -291,6 +293,21 @@ const ICONS: Record<IconName, ReactNode> = {
     <>
       <path d="M2 12s4-8 10-8 10 8 10 8-4 8-10 8-10-8-10-8Z" />
       <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  "columns-2": (
+    <>
+      <rect x="3" y="4" width="8" height="16" rx="1" />
+      <rect x="13" y="4" width="8" height="16" rx="1" />
+    </>
+  ),
+  "git-compare": (
+    <>
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="18" cy="18" r="3" />
+      <path d="M8.5 8.5 15.5 15.5" />
+      <path d="M15 8.5V6h2.5" />
+      <path d="M8.5 15.5H6V18" />
     </>
   ),
   send: (

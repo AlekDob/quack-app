@@ -124,6 +124,7 @@ export function SkillsPane({ root, onDirtyChange }: Props) {
         title={editing.name}
         subtitle="SKILL.md"
         starter={editing.starter}
+        gitRoot={root}
         onDirtyChange={onDirtyChange}
         onBack={() => {
           setEditing(null);

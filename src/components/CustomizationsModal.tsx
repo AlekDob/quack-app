@@ -149,6 +149,7 @@ export function CustomizationsModal({ open, onClose, root, initialTab }: Props) 
                 path={rulesPath}
                 subtitle={rulesPath ? relPath(rulesPath, root) : undefined}
                 starter={INSTRUCTIONS_STARTER}
+                gitRoot={root}
                 onDirtyChange={setDirty}
               />
             )}

@@ -57,6 +57,7 @@ Frontend `src/` (React 19 + TypeScript + Zustand, Monaco, xterm — **no Tailwin
 | Chat session model + localStorage persistence | `src/chatHistory.ts` |
 | Agent Mode toggle (localStorage) | `src/agentMode.ts` |
 | Main chat panel — streaming, tool calls, todos, status | `src/components/AIChatPanel.tsx` |
+| Editor tab toolbar — md Edit/Split/Preview, git Changes, Save | `src/components/EditorTabToolbar.tsx`, `EditorPane.tsx`, `editorMdView.ts`, `editorGitDiff.ts` |
 | Tool-call rendering (chips, diffs, running/done state) | `src/components/chatToolRender.tsx` |
 | Agent-centric layout (rail + sessions + tasks) | `src/components/AgentModeShell.tsx` |
 | Right-side sessions list ("library") | `src/components/AIChatsRail.tsx` |
@@ -135,6 +136,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `024-resume-white-screen-recovery.md` — detect resume from macOS standby (`resumeDebug.ts`), heal the blank webview (Monaco `layout()` / xterm `fit()` + synthetic resize), log every event to console **and** a durable `localStorage` ring (`__resumeLog()`). Gotcha: a Vite compile error also blanks the page but never fires `[resume]` — check the red overlay first.
   - `025-model-selector.md` — composer chip popover (favorites + groups), full ModelBrowser catalog, ManageModelsModal visibility toggles; prefs in `lcp.modelFavorites` / `lcp.modelDisabled`.
   - `026-cursor-cli-bridge.md` — `cursor-agent` spawn/stream/kill + dynamic `--list-models`; shared `cliStreamJson` parser.
+  - `027-editor-tab-toolbar.md` — editor tab row under breadcrumb: markdown Edit/Split/Preview, git Changes (HEAD vs buffer), Inline/Split diff layout, Save; shared with `FileEditorPane` modals.
 - `documentation/design/` — UI style contracts beyond tokens.
   - `directives.md` — hard rules (no emoji, tokens-only, neutral chrome).
   - `model-modal-pattern.md` — shared shell for Choose a model + Manage models (liquid glass, pill controls, light/dark surfaces).

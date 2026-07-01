@@ -17,6 +17,7 @@ const EXT_TO_LANG: Record<string, string> = {
   cjs: "javascript",
   json: "json",
   md: "markdown",
+  mdx: "markdown",
   rs: "rust",
   py: "python",
   html: "html",

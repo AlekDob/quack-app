@@ -53,7 +53,8 @@ export function DiffModal() {
           <DiffView
             originalContent={req.originalContent}
             modifiedContent={req.modifiedContent}
-            language={req.language}
+            path={req.path}
+            sideBySide
           />
         </div>
       </div>

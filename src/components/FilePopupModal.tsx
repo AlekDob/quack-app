@@ -72,6 +72,7 @@ export function FilePopupModal({ path, root, onClose }: Props) {
           key={path}
           path={path}
           subtitle={relPath(path, root)}
+          gitRoot={root}
           onDirtyChange={setDirty}
         />
       </div>

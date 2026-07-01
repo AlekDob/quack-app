@@ -1,28 +1,41 @@
-// Inline single-file editor (textarea) used inside the Agent
-// Customizations modal — for the workspace instructions file and for a
-// skill's SKILL.md. Deliberately a plain <textarea>: Monaco is overkill
-// for a markdown blob and fragile to mount in a transient surface.
+// Inline file editor for modals (instructions, skills, agent file popup).
+// Monaco + the shared editor tab toolbar (markdown views, git diff, save).
 
 import { useEffect, useRef, useState } from "react";
 import { fs } from "../ipc";
 import { dirname } from "../pathUtils";
 import { confirm as dialogConfirm } from "../dialog";
-import { success as toastSuccess, error as toastError, errMsg } from "../notify";
+import {
+  success as toastSuccess,
+  error as toastError,
+  errMsg,
+} from "../notify";
 import { Icon } from "./Icon";
+import { SimpleMonacoEditor } from "./SimpleMonacoEditor";
+import { MarkdownPreview } from "./MarkdownPreview";
+import { EditorTabToolbar } from "./EditorTabToolbar";
+import { DiffView } from "./DiffView";
+import {
+  isMarkdownPath,
+  readEditorMdView,
+  writeEditorMdView,
+  type EditorMdView,
+} from "../editorMdView";
+import {
+  readDiffSideBySide,
+  writeDiffSideBySide,
+} from "../editorDiffPrefs";
+import { useGitDiffPair } from "../hooks/useGitDiffPair";
 
 interface Props {
-  /** Absolute path of the file to edit. */
   path: string | null;
-  /** Sub-heading, e.g. the workspace-relative path. */
   subtitle?: string;
-  /** Seed content used when the file doesn't exist yet. */
   starter?: string;
-  /** When set, renders a back button (e.g. return to the skills list). */
   onBack?: () => void;
-  /** Heading shown next to the back button. */
   title?: string;
-  /** Reports unsaved-edit state so a host can guard close. */
   onDirtyChange?: (dirty: boolean) => void;
+  /** Workspace root for git diff (Changes view). */
+  gitRoot?: string;
 }
 
 export function FileEditorPane({
@@ -32,17 +45,21 @@ export function FileEditorPane({
   onBack,
   title,
   onDirtyChange,
+  gitRoot,
 }: Props) {
   const [content, setContent] = useState("");
   const [original, setOriginal] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [mdView, setMdView] = useState<EditorMdView>(readEditorMdView);
+  const [showDiff, setShowDiff] = useState(false);
+  const [diffSideBySide, setDiffSideBySide] = useState(readDiffSideBySide);
   const dirty = content !== original;
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
+  const isMarkdown = !!path && isMarkdownPath(path);
+  const gitDiffPair = useGitDiffPair(gitRoot, path ?? undefined, content);
 
-  // Surface dirty state to the host (modal guards its close on it), and
-  // clear it on unmount so a stale "unsaved" flag can't block closing.
   useEffect(() => {
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
@@ -54,6 +71,7 @@ export function FileEditorPane({
     if (!path) return;
     let alive = true;
     setLoading(true);
+    setShowDiff(false);
     (async () => {
       let text = starter ?? "";
       try {
@@ -72,7 +90,7 @@ export function FileEditorPane({
   }, [path, starter]);
 
   const save = async () => {
-    if (!path) return;
+    if (!path || !dirty) return;
     setSaving(true);
     try {
       await fs.writeFile(path, content);
@@ -104,7 +122,6 @@ export function FileEditorPane({
     onBack();
   };
 
-  // Ctrl+S saves while this pane is mounted.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
@@ -116,6 +133,20 @@ export function FileEditorPane({
     return () => window.removeEventListener("keydown", onKey, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, path]);
+
+  const onMdViewChange = (view: EditorMdView) => {
+    setMdView(view);
+    writeEditorMdView(view);
+  };
+
+  const onDiffSideBySideChange = (sideBySide: boolean) => {
+    setDiffSideBySide(sideBySide);
+    writeDiffSideBySide(sideBySide);
+  };
+
+  const showEditor = !loading && !showDiff && (!isMarkdown || mdView !== "preview");
+  const showPreview =
+    !loading && !showDiff && isMarkdown && (mdView === "split" || mdView === "preview");
 
   return (
     <div className="cust-editor">
@@ -130,25 +161,58 @@ export function FileEditorPane({
           {subtitle && <span className="cust-editor-path">{subtitle}</span>}
         </div>
       )}
-      <textarea
-        className="cust-editor-textarea"
-        value={loading ? "" : content}
-        placeholder={loading ? "Loading…" : ""}
-        spellCheck={false}
-        disabled={loading || !path}
-        onChange={(e) => setContent(e.target.value)}
-      />
-      <div className="cust-editor-foot">
-        <span className="cust-foot-hint">
-          {dirty ? "Unsaved changes" : "Saved"} · Ctrl+S to save
-        </span>
-        <button
-          className="cust-btn primary"
-          onClick={() => void save()}
-          disabled={!dirty || saving}
-        >
-          {saving ? "Saving…" : "Save"}
-        </button>
+      {path && !loading && (
+        <EditorTabToolbar
+          isMarkdown={isMarkdown}
+          mdView={mdView}
+          onMdViewChange={onMdViewChange}
+          hasGitChanges={!!gitDiffPair}
+          showDiff={showDiff}
+          onToggleDiff={() => setShowDiff((v) => !v)}
+          diffSideBySide={diffSideBySide}
+          onDiffSideBySideChange={onDiffSideBySideChange}
+          dirty={dirty}
+          saving={saving}
+          onSave={() => void save()}
+        />
+      )}
+      <div
+        className={`cust-editor-body ${
+          showPreview && showEditor ? "cust-editor-body-split" : ""
+        }`}
+      >
+        {loading && (
+          <div className="cust-editor-loading">Loading…</div>
+        )}
+        {!loading && showDiff && gitDiffPair && path && (
+          <DiffView
+            originalContent={gitDiffPair.original}
+            modifiedContent={gitDiffPair.modified}
+            path={path}
+            sideBySide={diffSideBySide}
+          />
+        )}
+        {!loading && !showDiff && (
+          <>
+            {showEditor && path && (
+              <div className="cust-editor-half">
+                <SimpleMonacoEditor
+                  path={path}
+                  value={content}
+                  onChange={setContent}
+                />
+              </div>
+            )}
+            {showPreview && (
+              <div className="cust-editor-preview">
+                <MarkdownPreview
+                  content={content}
+                  interactive={mdView === "split"}
+                />
+              </div>
+            )}
+          </>
+        )}
       </div>
     </div>
   );
