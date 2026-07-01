@@ -35,7 +35,26 @@ export interface ResumeComponent {
   heal?(): void;
 }
 
+/** A single captured resume event, persisted so it survives a reload. */
+export interface ResumeLogEntry {
+  at: number; // epoch ms
+  reason: string;
+  components: number;
+  healed: number;
+  viewport: { w: number; h: number; dpr: number };
+  visible: boolean;
+  heap: string;
+  snaps: Array<Record<string, unknown>>;
+}
+
 const components = new Map<string, ResumeComponent>();
+
+// Persist the last N events to localStorage. The whole point: the previous
+// system logged only to the live console, so if DevTools wasn't open at the
+// moment of wake the incident left no trace. Now every resume is durable and
+// readable after the fact (window.__resumeLog or getResumeLog()).
+const RESUME_LOG_KEY = "codetta:resumeLog";
+const RESUME_LOG_MAX = 50;
 
 let installed = false;
 let lastFireAt = 0;
@@ -69,6 +88,30 @@ function safeHeal(c: ResumeComponent): boolean {
   }
 }
 
+// performance.memory is a Chromium-only extension; on Tauri (WKWebView) and
+// Firefox it's undefined. Gate defensively so the snapshot never throws.
+function readHeap(): string {
+  const mem = (performance as Performance & {
+    memory?: { usedJSHeapSize: number };
+  }).memory;
+  if (typeof performance === "undefined" || !mem) return "n/a";
+  return Math.round(mem.usedJSHeapSize / 1024 / 1024) + "MB";
+}
+
+/** Append an entry to the capped localStorage ring. Never throws. */
+function persistResumeEntry(entry: ResumeLogEntry): void {
+  try {
+    const log = getResumeLog();
+    log.push(entry);
+    localStorage.setItem(
+      RESUME_LOG_KEY,
+      JSON.stringify(log.slice(-RESUME_LOG_MAX)),
+    );
+  } catch {
+    /* localStorage full/unavailable — the console log still stands. */
+  }
+}
+
 function fireResumeOnce(reason: string): void {
   const now = Date.now();
   if (now - lastFireAt < FIRE_MIN_GAP_MS) return;
@@ -97,41 +140,66 @@ function fireResumeOnce(reason: string): void {
     /* ignore */
   }
 
+  const entry: ResumeLogEntry = {
+    at: now,
+    reason,
+    components: components.size,
+    healed: healedComponents.length,
+    viewport: {
+      w: window.innerWidth,
+      h: window.innerHeight,
+      dpr: window.devicePixelRatio,
+    },
+    visible: typeof document !== "undefined" ? !document.hidden : true,
+    heap: readHeap(),
+    snaps,
+  };
+
+  persistResumeEntry(entry);
+
   // Single grouped console so the entire resume story is one collapsible
   // entry in DevTools instead of 4 disjoint lines.
   // eslint-disable-next-line no-console
   console.warn(
-    `[resume] reason=${reason} components=${components.size} ` +
-      `healed=${healedComponents.length}`,
-    {
-      viewport: {
-        w: window.innerWidth,
-        h: window.innerHeight,
-        dpr: window.devicePixelRatio,
-      },
-      visible: typeof document !== "undefined" ? !document.hidden : true,
-      heap:
-        // performance.memory is a Chromium-only extension; on Tauri
-        // (WKWebView) and Firefox it's undefined. Gate defensively so
-        // the log doesn't throw mid-resume.
-        typeof performance !== "undefined" &&
-        (performance as Performance & { memory?: { usedJSHeapSize: number } })
-          .memory
-          ? Math.round(
-              (performance as Performance & {
-                memory?: { usedJSHeapSize: number };
-              }).memory!.usedJSHeapSize / 1024 / 1024,
-            ) + "MB"
-          : "n/a",
-      snaps,
-    },
+    `[resume] reason=${reason} components=${entry.components} ` +
+      `healed=${entry.healed}`,
+    entry,
   );
+}
+
+/** Read the persisted resume log (oldest → newest). Never throws. */
+export function getResumeLog(): ResumeLogEntry[] {
+  try {
+    const raw = localStorage.getItem(RESUME_LOG_KEY);
+    return raw ? (JSON.parse(raw) as ResumeLogEntry[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Wipe the persisted resume log. */
+export function clearResumeLog(): void {
+  try {
+    localStorage.removeItem(RESUME_LOG_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 /** Wire visibility/focus/pageshow listeners. Idempotent. */
 export function installResumeDebug(): () => void {
   if (installed) return () => {};
   installed = true;
+
+  // Console conveniences so an incident can be inspected without importing
+  // anything: `__resumeLog()` prints the durable ring, `__resumeClear()` wipes.
+  const w = window as unknown as Record<string, unknown>;
+  w.__resumeLog = () => {
+    // eslint-disable-next-line no-console
+    console.table(getResumeLog());
+    return getResumeLog();
+  };
+  w.__resumeClear = clearResumeLog;
 
   let lastHiddenAt = 0;
 
