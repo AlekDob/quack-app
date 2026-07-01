@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import type { RefObject } from "react";
 
-// Codex-style navigation rail (minimap) for long chat threads. One tick per
-// USER turn, positioned proportionally to its place in the scroll content;
-// hover a tick to preview that turn, click to jump. The active tick tracks the
-// turn currently in view. Reads anchors straight from the DOM (data-anchor-*)
-// so it stays decoupled from the message render code.
+// Navigation rail (minimap) for long chat threads. One tick per USER turn,
+// positioned proportionally to its place in the whole thread (offsetTop /
+// scrollHeight) so the bar stays a COMPACT overview of the conversation —
+// hover a tick to preview, click to jump. The active tick tracks the turn in
+// view. Reads anchors from the DOM (data-anchor-*) to stay decoupled from the
+// render. offsetTop is honest because .ai-messages is position:relative.
 
 interface Anchor {
   idx: number;
@@ -40,8 +41,7 @@ export function ChatNavRail({ scrollRef, version }: ChatNavRailProps) {
     );
   }, [scrollRef]);
 
-  // Rescan when the turn count changes, and whenever content grows/reflows
-  // (streaming) — a rAF-throttled MutationObserver keeps tick positions honest.
+  // Rescan on turn-count change + on content growth/reflow (streaming).
   useEffect(() => {
     rescan();
     const sc = scrollRef.current;
@@ -58,7 +58,7 @@ export function ChatNavRail({ scrollRef, version }: ChatNavRailProps) {
     };
   }, [rescan, version, scrollRef]);
 
-  // Active turn = last user anchor above the upper-third of the viewport.
+  // Active turn = last user anchor above the viewport's upper third.
   useEffect(() => {
     const sc = scrollRef.current;
     if (!sc) return;
@@ -84,7 +84,6 @@ export function ChatNavRail({ scrollRef, version }: ChatNavRailProps) {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // No rail for short threads — it only earns its space once scrolling hurts.
   if (anchors.length < 3) return null;
   const hover = anchors.find((a) => a.idx === hoverIdx) ?? null;
 
@@ -97,9 +96,7 @@ export function ChatNavRail({ scrollRef, version }: ChatNavRailProps) {
           className={`ai-nav-tick ${activeIdx === a.idx ? "active" : ""}`}
           style={{ top: `${a.frac * 100}%` }}
           onMouseEnter={() => setHoverIdx(a.idx)}
-          onMouseLeave={() =>
-            setHoverIdx((h) => (h === a.idx ? null : h))
-          }
+          onMouseLeave={() => setHoverIdx((h) => (h === a.idx ? null : h))}
           onClick={() => jump(a.idx)}
           title={a.preview}
         />

@@ -44,6 +44,10 @@ export interface LoadedRules {
   text: string;
   /** True when MAX_RULES_BYTES was hit and the body got truncated. */
   truncated: boolean;
+  /** Full trimmed size in chars (BEFORE truncation) — drives the header
+   *  token-weight indicator, which must reflect the real file, not the
+   *  16 KB slice we inject for non-CC providers. */
+  bytes: number;
 }
 
 function joinPath(root: string, rel: string): string {
@@ -97,6 +101,7 @@ export async function loadWorkspaceRules(
         ? trimmed.slice(0, MAX_RULES_BYTES) + "\n\n[…rules truncated]"
         : trimmed,
       truncated,
+      bytes: trimmed.length,
     };
   }
   return null;

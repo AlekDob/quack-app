@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+# claude-cost-watch-bg — background daemon for claude-cost-watch
+#
+# Periodically scans ~/.claude/projects/, fires macOS notifications
+# via osascript when a session exceeds thresholds or goes zombie.
+# Designed to be installed as a launchd agent (~/Library/LaunchAgents/
+# com.codetta.claude-cost-watch.plist).
+#
+# Brain: claude-usage-spike
+import json
+import os
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+# Reuse parsing from the main script.
+sys.path.insert(0, str(Path(__file__).parent))
+from claude_cost_watch import (
+    parse_jsonl, short_project, PROJECTS_DIR, estimate_cost, pick_pricing
+)
+
+ALERT_COST = float(os.environ.get("CCW_ALERT_COST", "5.0"))
+ZOMBIE_MIN = float(os.environ.get("CCW_ZOMBIE_MIN", "30"))
+ACTIVE_MIN = float(os.environ.get("CCW_ACTIVE_MIN", "10"))
+INTERVAL = int(os.environ.get("CCW_INTERVAL", "120"))
+STATE_FILE = Path.home() / ".claude-cost-watch-state.json"
+
+
+def load_state() -> dict:
+    if STATE_FILE.exists():
+        try:
+            return json.loads(STATE_FILE.read_text())
+        except json.JSONDecodeError:
+            pass
+    return {"notified_sessions": {}}
+
+
+def save_state(state: dict):
+    STATE_FILE.write_text(json.dumps(state, indent=2))
+
+
+def notify(title: str, message: str):
+    """Send a macOS notification via osascript."""
+    script = f'display notification "{message}" with title "{title}" sound name "Submarine"'
+    try:
+        subprocess.run(
+            ["osascript", "-e", script],
+            check=False,
+            timeout=5,
+            capture_output=True,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        # Fallback: print to stderr (visible in launchd logs).
+        print(f"[notify] {title}: {message}", file=sys.stderr)
+
+
+def scan_and_notify(state: dict) -> dict:
+    now = datetime.now(timezone.utc)
+    notified = state.get("notified_sessions", {})
+    new_notified = dict(notified)
+
+    if not PROJECTS_DIR.exists():
+        return state
+
+    for proj_dir in PROJECTS_DIR.iterdir():
+        if not proj_dir.is_dir():
+            continue
+        for jpath in proj_dir.glob("*.jsonl"):
+            s = parse_jsonl(jpath)
+            if s is None:
+                continue
+            sid = s["session_id"]
+            last_any_age = (now - s["last_dt"]).total_seconds() / 60 if s["last_dt"] else 999
+            last_user_age = (now - s["last_user_dt"]).total_seconds() / 60 if s["last_user_dt"] else 999
+            is_active = last_any_age < ACTIVE_MIN
+            is_zombie = is_active and last_user_age > ZOMBIE_MIN
+            cost = s["estimated_cost_usd"]
+            key = f"{sid}:cost:{int(cost // 1)}"  # bucket by dollar to avoid spam
+
+            # Already notified? Skip.
+            if notified.get(key):
+                continue
+
+            # Alert: cost above threshold AND active.
+            if is_active and cost >= ALERT_COST:
+                notify(
+                    "Claude cost alert",
+                    f"{short_project(s['project'])} session ${cost:.2f} "
+                    f"({s['turns']} turns). Last activity {int(last_any_age)}m ago."
+                )
+                new_notified[key] = now.isoformat()
+                continue
+
+            # Alert: zombie session still has accumulated cost.
+            if is_zombie and cost >= 1.0:
+                notify(
+                    "Claude zombie session",
+                    f"{short_project(s['project'])} ${cost:.2f} still active, "
+                    f"no user input for {int(last_user_age)}m. Kill it?"
+                )
+                new_notified[key] = now.isoformat()
+
+    state["notified_sessions"] = new_notified
+    state["last_scan_at"] = now.isoformat()
+    return state
+
+
+def main():
+    print(
+        f"[claude-cost-watch-bg] starting — "
+        f"alert_cost=${ALERT_COST} zombie_min={ZOMBIE_MIN}m interval={INTERVAL}s",
+        file=sys.stderr,
+    )
+    state = load_state()
+    while True:
+        try:
+            state = scan_and_notify(state)
+            save_state(state)
+        except Exception as e:
+            print(f"[claude-cost-watch-bg] scan error: {e}", file=sys.stderr)
+        time.sleep(INTERVAL)
+
+
+if __name__ == "__main__":
+    main()

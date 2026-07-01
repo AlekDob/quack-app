@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.codetta.claude-cost-watch</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/env</string>
+        <string>python3</string>
+        <string>/Users/alekdob/Desktop/Dev/Personal/codetta/bin/claude-cost-watch-bg</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>CCW_ALERT_COST</key>
+        <string>5.0</string>
+        <key>CCW_ZOMBIE_MIN</key>
+        <string>30</string>
+        <key>CCW_INTERVAL</key>
+        <string>120</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/claude-cost-watch.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/claude-cost-watch.err</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/alekdob</string>
+</dict>
+</plist>

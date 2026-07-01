@@ -225,56 +225,64 @@ interface TodosCardProps {
 }
 
 export function TodosCard({ items }: TodosCardProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  // Astronave-style: a compact chip that lives above the composer and expands
+  // UPWARD into a panel on click (collapsed by default so the plan stays out
+  // of the way until you want it).
+  const [open, setOpen] = useState(false);
   const total = items.length;
   const done = items.filter((t) => t.status === "completed").length;
   const inProgress = items.find((t) => t.status === "in_progress");
   const summary = inProgress
-    ? `${done}/${total} · doing: ${inProgress.activeForm ?? inProgress.content}`
-    : `${done}/${total} done`;
+    ? `${done}/${total} · ${inProgress.activeForm ?? inProgress.content}`
+    : `Plan · ${done}/${total}`;
   return (
-    <div className={`ai-todos ${collapsed ? "collapsed" : ""}`}>
+    <div className="ai-todos-wrap">
+      {open && (
+        <>
+          <div className="ai-todos-backdrop" onClick={() => setOpen(false)} />
+          <div className="ai-todos-pop" role="dialog">
+            <ul className="ai-todos-list">
+              {items.map((t, i) => (
+                <li
+                  key={i}
+                  className={`ai-todo ai-todo-${t.status}`}
+                  title={t.status}
+                >
+                  <span className="ai-todo-mark">
+                    <Icon
+                      name={
+                        t.status === "completed"
+                          ? "check"
+                          : t.status === "in_progress"
+                            ? "rotate-ccw"
+                            : "circle"
+                      }
+                      size={11}
+                    />
+                  </span>
+                  <span className="ai-todo-text">
+                    {t.status === "in_progress" && t.activeForm
+                      ? t.activeForm
+                      : t.content}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
       <button
         type="button"
-        className="ai-todos-head"
-        onClick={() => setCollapsed((c) => !c)}
-        title={collapsed ? "Show todos" : "Hide todos"}
+        className={`ai-todos-chip ${open ? "open" : ""}`}
+        onClick={() => setOpen((v) => !v)}
+        title={open ? "Hide plan" : "Show plan"}
       >
         <span className="ai-todos-icon">
-          <Icon name="check-square" size={14} />
+          <Icon name="check-square" size={13} />
         </span>
         <span className="ai-todos-summary">{summary}</span>
-        <span className="ai-todos-caret">{collapsed ? "▸" : "▾"}</span>
+        <Icon name="chevron-down" size={12} />
       </button>
-      {!collapsed && (
-        <ul className="ai-todos-list">
-          {items.map((t, i) => (
-            <li
-              key={i}
-              className={`ai-todo ai-todo-${t.status}`}
-              title={t.status}
-            >
-              <span className="ai-todo-mark">
-                <Icon
-                  name={
-                    t.status === "completed"
-                      ? "check"
-                      : t.status === "in_progress"
-                        ? "rotate-ccw"
-                        : "circle"
-                  }
-                  size={11}
-                />
-              </span>
-              <span className="ai-todo-text">
-                {t.status === "in_progress" && t.activeForm
-                  ? t.activeForm
-                  : t.content}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
     </div>
   );
 }

@@ -1,0 +1,529 @@
+[
+  {
+    "session_id": "50f52b18-6187-4d99-9ef9-ff665517be14",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Kyron",
+    "primary_model": "claude-opus-4-8",
+    "turns": 339,
+    "cache_hit_ratio": 0.9648,
+    "estimated_cost_usd": 181.7905,
+    "input_tokens": 644885,
+    "output_tokens": 638584,
+    "thinking_blocks": 170,
+    "task_subagents": 8,
+    "first_ts": "2026-06-04T08:38:30.028Z",
+    "reasons": [
+      "many_subagents(8)"
+    ]
+  },
+  {
+    "session_id": "5f111dbe-a139-4bd8-b26e-ae3bce9c1136",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Kyron",
+    "primary_model": "claude-opus-4-7",
+    "turns": 1,
+    "cache_hit_ratio": 0.0,
+    "estimated_cost_usd": 0.3506,
+    "input_tokens": 6,
+    "output_tokens": 12,
+    "thinking_blocks": 0,
+    "task_subagents": 0,
+    "first_ts": "2026-06-25T09:11:33.442Z",
+    "reasons": [
+      "low_cache_hit(0.0%)"
+    ]
+  },
+  {
+    "session_id": "6857333d-f9c9-4c85-8f11-b62a6bb8cb24",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Kyron",
+    "primary_model": "claude-opus-4-8",
+    "turns": 404,
+    "cache_hit_ratio": 0.9417,
+    "estimated_cost_usd": 233.1817,
+    "input_tokens": 379645,
+    "output_tokens": 862217,
+    "thinking_blocks": 209,
+    "task_subagents": 6,
+    "first_ts": "2026-06-08T06:47:18.971Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "73c208f2-d2bc-4441-8d52-f0e1bc5779af",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Kyron",
+    "primary_model": "claude-opus-4-8",
+    "turns": 250,
+    "cache_hit_ratio": 0.9668,
+    "estimated_cost_usd": 156.7611,
+    "input_tokens": 418611,
+    "output_tokens": 761959,
+    "thinking_blocks": 164,
+    "task_subagents": 6,
+    "first_ts": "2026-06-09T10:18:57.863Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "80675574-cc38-44c5-b683-9250be5dc194",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Kyron",
+    "primary_model": "claude-opus-4-8",
+    "turns": 558,
+    "cache_hit_ratio": 0.9501,
+    "estimated_cost_usd": 282.9437,
+    "input_tokens": 648132,
+    "output_tokens": 1069939,
+    "thinking_blocks": 273,
+    "task_subagents": 6,
+    "first_ts": "2026-06-08T06:47:18.971Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "d3bb346b-f4ff-4047-b69a-bb785e1211ca",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Kyron",
+    "primary_model": "claude-opus-4-8",
+    "turns": 640,
+    "cache_hit_ratio": 0.9395,
+    "estimated_cost_usd": 523.7215,
+    "input_tokens": 1062293,
+    "output_tokens": 2617168,
+    "thinking_blocks": 424,
+    "task_subagents": 6,
+    "first_ts": "2026-06-12T15:41:59.721Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "0aa9a2cf-85f7-4729-a21e-8269ea3322b7",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Virgilio",
+    "primary_model": "claude-opus-4-8",
+    "turns": 211,
+    "cache_hit_ratio": 0.9603,
+    "estimated_cost_usd": 121.6228,
+    "input_tokens": 97745,
+    "output_tokens": 724369,
+    "thinking_blocks": 129,
+    "task_subagents": 9,
+    "first_ts": "2026-06-08T06:56:29.790Z",
+    "reasons": [
+      "many_subagents(9)"
+    ]
+  },
+  {
+    "session_id": "16b72642-ab11-4642-9ecb-eb8cd408ecfe",
+    "source": "quack",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Virgilio",
+    "primary_model": "claude-opus-4-8",
+    "turns": 422,
+    "cache_hit_ratio": 0.9757,
+    "estimated_cost_usd": 253.865,
+    "input_tokens": 574885,
+    "output_tokens": 2081527,
+    "thinking_blocks": 270,
+    "task_subagents": 9,
+    "first_ts": "2026-06-24T14:25:16.748Z",
+    "reasons": [
+      "many_subagents(9)"
+    ]
+  },
+  {
+    "session_id": "2e60764e-6e20-4874-a4e1-69cedbea700c",
+    "source": "quack",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Virgilio",
+    "primary_model": "claude-opus-4-8",
+    "turns": 328,
+    "cache_hit_ratio": 0.9746,
+    "estimated_cost_usd": 159.9129,
+    "input_tokens": 316939,
+    "output_tokens": 1308882,
+    "thinking_blocks": 187,
+    "task_subagents": 6,
+    "first_ts": "2026-06-24T10:31:40.672Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "40b860d8-f8a8-4193-9df0-c730cc28c2f8",
+    "source": "quack",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Virgilio",
+    "primary_model": "claude-opus-4-8",
+    "turns": 1278,
+    "cache_hit_ratio": 0.983,
+    "estimated_cost_usd": 495.2734,
+    "input_tokens": 955686,
+    "output_tokens": 3275067,
+    "thinking_blocks": 668,
+    "task_subagents": 12,
+    "first_ts": "2026-06-23T15:16:06.351Z",
+    "reasons": [
+      "many_subagents(12)"
+    ]
+  },
+  {
+    "session_id": "4d4fcea0-5ac2-45fa-8328-6b161a22b99e",
+    "source": "quack",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Virgilio",
+    "primary_model": "claude-opus-4-8",
+    "turns": 1538,
+    "cache_hit_ratio": 0.98,
+    "estimated_cost_usd": 549.3376,
+    "input_tokens": 1127330,
+    "output_tokens": 2582635,
+    "thinking_blocks": 687,
+    "task_subagents": 6,
+    "first_ts": "2026-06-23T12:27:35.432Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "6bff2558-910a-4000-94c9-f6c71e3528df",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Virgilio",
+    "primary_model": "claude-opus-4-8",
+    "turns": 937,
+    "cache_hit_ratio": 0.9789,
+    "estimated_cost_usd": 555.3683,
+    "input_tokens": 563290,
+    "output_tokens": 3752652,
+    "thinking_blocks": 540,
+    "task_subagents": 6,
+    "first_ts": "2026-06-05T08:14:27.098Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "75e71bd3-b3b9-478d-bbe4-fb165fe9dbe4",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Virgilio",
+    "primary_model": "claude-opus-4-8",
+    "turns": 213,
+    "cache_hit_ratio": 0.9666,
+    "estimated_cost_usd": 116.3048,
+    "input_tokens": 112667,
+    "output_tokens": 721376,
+    "thinking_blocks": 127,
+    "task_subagents": 9,
+    "first_ts": "2026-06-08T06:56:29.790Z",
+    "reasons": [
+      "many_subagents(9)"
+    ]
+  },
+  {
+    "session_id": "9a3957cc-fb8c-419b-8c75-7d4b7462ecf3",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Virgilio",
+    "primary_model": "claude-opus-4-8",
+    "turns": 1,
+    "cache_hit_ratio": 0.1811,
+    "estimated_cost_usd": 0.4579,
+    "input_tokens": 13238,
+    "output_tokens": 217,
+    "thinking_blocks": 0,
+    "task_subagents": 0,
+    "first_ts": "2026-06-28T09:41:46.240Z",
+    "reasons": [
+      "low_cache_hit(18.1%)"
+    ]
+  },
+  {
+    "session_id": "b47507a6-b8ff-44cc-8623-98b8ef48ee41",
+    "source": "quack",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Virgilio",
+    "primary_model": "claude-opus-4-8",
+    "turns": 476,
+    "cache_hit_ratio": 0.9951,
+    "estimated_cost_usd": 262.497,
+    "input_tokens": 188229,
+    "output_tokens": 1082254,
+    "thinking_blocks": 267,
+    "task_subagents": 8,
+    "first_ts": "2026-06-23T07:07:55.395Z",
+    "reasons": [
+      "many_subagents(8)"
+    ]
+  },
+  {
+    "session_id": "bac6df8f-ee13-47d8-a5ea-061aaea8469d",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-Virgilio",
+    "primary_model": "claude-opus-4-8",
+    "turns": 323,
+    "cache_hit_ratio": 0.9464,
+    "estimated_cost_usd": 132.9517,
+    "input_tokens": 267916,
+    "output_tokens": 731108,
+    "thinking_blocks": 148,
+    "task_subagents": 7,
+    "first_ts": "2026-06-15T16:10:48.376Z",
+    "reasons": [
+      "many_subagents(7)"
+    ]
+  },
+  {
+    "session_id": "e8375fbe-31d2-4383-9a37-c636f42f5456",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-meow---",
+    "primary_model": "claude-opus-4-8",
+    "turns": 121,
+    "cache_hit_ratio": 0.9155,
+    "estimated_cost_usd": 97.7598,
+    "input_tokens": 155094,
+    "output_tokens": 1080792,
+    "thinking_blocks": 69,
+    "task_subagents": 6,
+    "first_ts": "2026-06-04T14:06:30.582Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "af353b48-a06e-4fc1-9b6e-d08c624becc3",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-quack-app",
+    "primary_model": "claude-opus-4-8",
+    "turns": 210,
+    "cache_hit_ratio": 0.9588,
+    "estimated_cost_usd": 78.1748,
+    "input_tokens": 203216,
+    "output_tokens": 570844,
+    "thinking_blocks": 127,
+    "task_subagents": 11,
+    "first_ts": "2026-05-30T09:40:20.542Z",
+    "reasons": [
+      "many_subagents(11)"
+    ]
+  },
+  {
+    "session_id": "dd87e040-aeb2-4926-9efc-3d03b2eaa299",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-quack-app",
+    "primary_model": "claude-opus-4-8",
+    "turns": 455,
+    "cache_hit_ratio": 0.9796,
+    "estimated_cost_usd": 167.2502,
+    "input_tokens": 333664,
+    "output_tokens": 1360411,
+    "thinking_blocks": 272,
+    "task_subagents": 7,
+    "first_ts": "2026-05-29T06:39:18.563Z",
+    "reasons": [
+      "many_subagents(7)"
+    ]
+  },
+  {
+    "session_id": "5e297d41-c886-4b53-8ebd-8383b65c3e34",
+    "source": "quack",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-quack-studio-code",
+    "primary_model": "claude-opus-4-8",
+    "turns": 74,
+    "cache_hit_ratio": 0.8976,
+    "estimated_cost_usd": 26.0417,
+    "input_tokens": 141225,
+    "output_tokens": 154309,
+    "thinking_blocks": 39,
+    "task_subagents": 6,
+    "first_ts": "2026-06-23T10:35:18.482Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "c6d62186-e459-4617-b8cb-c83477db80a2",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-quack-studio-code",
+    "primary_model": "claude-opus-4-8",
+    "turns": 143,
+    "cache_hit_ratio": 0.9731,
+    "estimated_cost_usd": 45.7811,
+    "input_tokens": 91875,
+    "output_tokens": 437346,
+    "thinking_blocks": 79,
+    "task_subagents": 7,
+    "first_ts": "2026-06-19T11:19:06.343Z",
+    "reasons": [
+      "many_subagents(7)"
+    ]
+  },
+  {
+    "session_id": "020b4fa6-cd59-4f1d-a663-f97c7b7f5b43",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-spaceship-ai",
+    "primary_model": "claude-opus-4-8",
+    "turns": 431,
+    "cache_hit_ratio": 0.9728,
+    "estimated_cost_usd": 225.5142,
+    "input_tokens": 483149,
+    "output_tokens": 1614889,
+    "thinking_blocks": 226,
+    "task_subagents": 6,
+    "first_ts": "2026-06-03T12:33:39.103Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "0ac3b8b3-966f-4f80-8249-10630501d657",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-spaceship-ai",
+    "primary_model": "claude-fable-5",
+    "turns": 479,
+    "cache_hit_ratio": 0.9479,
+    "estimated_cost_usd": 212.3915,
+    "input_tokens": 308216,
+    "output_tokens": 1011156,
+    "thinking_blocks": 268,
+    "task_subagents": 6,
+    "first_ts": "2026-06-10T10:15:00.491Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "25fdf16b-e357-4b76-bce1-ff6c197c08f3",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-spaceship-ai",
+    "primary_model": "claude-opus-4-8",
+    "turns": 539,
+    "cache_hit_ratio": 0.7265,
+    "estimated_cost_usd": 714.6623,
+    "input_tokens": 1781785,
+    "output_tokens": 13789753,
+    "thinking_blocks": 235,
+    "task_subagents": 6,
+    "first_ts": "2026-05-31T08:28:51.982Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "289b5a64-407b-4d4c-af72-2a4044559ae6",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-spaceship-ai",
+    "primary_model": "claude-opus-4-8",
+    "turns": 559,
+    "cache_hit_ratio": 0.9793,
+    "estimated_cost_usd": 193.4867,
+    "input_tokens": 500994,
+    "output_tokens": 1007793,
+    "thinking_blocks": 180,
+    "task_subagents": 12,
+    "first_ts": "2026-06-02T09:52:06.208Z",
+    "reasons": [
+      "many_subagents(12)"
+    ]
+  },
+  {
+    "session_id": "35c7593f-3b61-4fb2-b276-bea2a980e9e7",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-spaceship-ai",
+    "primary_model": "claude-opus-4-8",
+    "turns": 370,
+    "cache_hit_ratio": 0.9859,
+    "estimated_cost_usd": 113.6053,
+    "input_tokens": 321059,
+    "output_tokens": 667097,
+    "thinking_blocks": 163,
+    "task_subagents": 6,
+    "first_ts": "2026-06-01T15:37:19.744Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "48c0a3cf-106d-40a9-a566-e72db54ee265",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-spaceship-ai",
+    "primary_model": "claude-opus-4-8",
+    "turns": 599,
+    "cache_hit_ratio": 0.9868,
+    "estimated_cost_usd": 205.8865,
+    "input_tokens": 490796,
+    "output_tokens": 1075846,
+    "thinking_blocks": 191,
+    "task_subagents": 12,
+    "first_ts": "2026-06-02T09:52:06.208Z",
+    "reasons": [
+      "many_subagents(12)"
+    ]
+  },
+  {
+    "session_id": "56f42f4e-e33c-498a-9ed4-69429359a78d",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-spaceship-ai",
+    "primary_model": "claude-opus-4-8",
+    "turns": 1,
+    "cache_hit_ratio": 0.2944,
+    "estimated_cost_usd": 0.2134,
+    "input_tokens": 13170,
+    "output_tokens": 5,
+    "thinking_blocks": 0,
+    "task_subagents": 0,
+    "first_ts": "2026-06-28T09:37:39.470Z",
+    "reasons": [
+      "low_cache_hit(29.4%)"
+    ]
+  },
+  {
+    "session_id": "638470ce-330d-4aa9-a664-11693de4b638",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-spaceship-ai",
+    "primary_model": "claude-opus-4-8",
+    "turns": 324,
+    "cache_hit_ratio": 0.9515,
+    "estimated_cost_usd": 111.8282,
+    "input_tokens": 245903,
+    "output_tokens": 762506,
+    "thinking_blocks": 159,
+    "task_subagents": 9,
+    "first_ts": "2026-06-12T10:08:22.353Z",
+    "reasons": [
+      "many_subagents(9)"
+    ]
+  },
+  {
+    "session_id": "c1e98c8a-79b6-4956-974f-980ed0ffae15",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-spaceship-ai",
+    "primary_model": "claude-opus-4-8",
+    "turns": 630,
+    "cache_hit_ratio": 0.9782,
+    "estimated_cost_usd": 177.0707,
+    "input_tokens": 349814,
+    "output_tokens": 1227414,
+    "thinking_blocks": 273,
+    "task_subagents": 6,
+    "first_ts": "2026-05-31T15:24:04.318Z",
+    "reasons": [
+      "many_subagents(6)"
+    ]
+  },
+  {
+    "session_id": "d8f00e14-c3d3-4f14-8476-9461467bfc30",
+    "source": "cli",
+    "project": "-Users-alekdob-Desktop-Dev-Personal-spaceship-ai",
+    "primary_model": "claude-opus-4-8",
+    "turns": 560,
+    "cache_hit_ratio": 0.9771,
+    "estimated_cost_usd": 260.1877,
+    "input_tokens": 748609,
+    "output_tokens": 1637269,
+    "thinking_blocks": 276,
+    "task_subagents": 8,
+    "first_ts": "2026-06-03T06:38:23.005Z",
+    "reasons": [
+      "many_subagents(8)"
+    ]
+  }
+]

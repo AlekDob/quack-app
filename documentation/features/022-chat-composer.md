@@ -48,6 +48,24 @@ mode/mic/send on the right.
   - **Extended thinking** segmented `auto / on / off`.
 - Replaced the two separate `MetaFlag` pills + the ⚙ tune gate (both removed).
 
+## Plan chip (todos)
+
+- `TodosCard` (`chatPanelChrome.tsx`) moved from a top sticky card to an
+  astronave-style **chip above the composer** (`.ai-todos-bar` / `.ai-todos-wrap`).
+- Collapsed by default: shows `Plan · {done}/{total}` (or the in-progress item).
+  Click expands **upward** into a popover (`.ai-todos-pop`) with the full list
+  (reuses `.ai-todos-list` / `.ai-todo-*`). Backdrop closes it. Skipped in
+  compact/agent mode (the checklist lives in the sidebar there).
+
+## Rules indicator (CLAUDE.md token weight)
+
+- Header `.ai-rules-indicator` now carries a **colored dot** + `~Nk` token
+  count, sized from the rules file's full length (`LoadedRules.bytes`, ~chars/4
+  — measured before the 16 KB injection truncation).
+- Levels (semantic colour, meaning only): `ok` ≤2500, `warn` ≤6000, `heavy`
+  >6000 tokens. Heavy = "taxes every turn, consider trimming" (tooltip). Click
+  still opens the file.
+
 ## Attach + dictation
 
 - `+` opens a hidden `<input type=file accept=image/*>` → `appendImages` (same path as paste/drag, feature 016).

@@ -25,8 +25,8 @@ endless scrolling. Preview opens leftward so it never covers the messages.
 ## How it works
 
 - **Decoupled via DOM data-attributes.** Each message div carries `data-anchor-idx`, `data-anchor-role`, and (user only) `data-anchor-preview` (first 120 chars). The rail never imports the message model — it queries `[data-anchor-role="user"]`.
-- **Minimap positioning.** Each tick's `top` = `el.offsetTop / scrollHeight` (0..1) → proportional to its place in the content, so the rail reads as a true minimap.
-- **Freshness.** Rescans on `version` (turn count) + a rAF-throttled `MutationObserver` on the scroll container (catches streaming growth / reflow).
+- **Minimap positioning (compact overview).** Each tick's `top` = `el.offsetTop / scrollHeight` (0..1) → proportional to its place in the WHOLE thread, so all turns stay visible as a compact overview you can click to jump anywhere. `offsetTop` is honest because `.ai-messages` is `position: relative` (else offsetParent bubbles to `.ai-messages-wrap` and values drift on scroll). Chosen over live per-message tracking, which spread the ticks out and lost the overview.
+- **Freshness.** Rescans on `version` (turn count) + a rAF-throttled `MutationObserver` on the scroll container (streaming growth / reflow).
 - **Active tick.** A `scroll` listener marks the last user anchor above the viewport's upper third (`scrollTop + clientHeight * 0.35`).
 - **Jump.** Click → `element.scrollIntoView({ behavior: "smooth", block: "start" })`.
 
@@ -41,5 +41,5 @@ endless scrolling. Preview opens leftward so it never covers the messages.
 ## Known limits / TODO
 
 - One tick per user turn (assistant-only turns aren't anchored).
-- Very large sessions (1000+ turns) render one button per turn — fine in practice but not virtualized.
+- Compact minimap: ticks are proportional to the whole thread, so they don't sit exactly beside on-screen messages (that's by design — it's an overview, jumpable). A live per-message variant was tried and reverted (too spread out).
 - Preview is a single-line ellipsis of raw content (markdown not stripped).

@@ -1,0 +1,487 @@
+#!/usr/bin/env python3
+# claude-cost-watch — real-time Claude Code cost monitor
+#
+# Scans ~/.claude/projects/ JSONL files to surface:
+#   - Active sessions (modified in the last N minutes)
+#   - Estimated cost per session (using current Claude pricing)
+#   - Wall-clock duration
+#   - "Zombie" sessions: still streaming but no recent user input
+#
+# Designed to run as a one-shot CLI (`claude-cost-watch`) or as a
+# launchd agent (`claude-cost-watch --watch --interval 60`) that
+# posts notifications when sessions cross user-defined thresholds.
+#
+# Pricing model (Opus 4.x default):
+#   input            $5/M
+#   output          $25/M
+#   cache_5m_write  $6.25/M
+#   cache_1h_write  $10/M
+#   cache_read      $0.50/M
+#
+# Override with --pricing sonnet / haiku / path/to/custom.json.
+#
+# Brain: claude-usage-spike
+import argparse
+import json
+import os
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+HOME = Path(os.path.expanduser("~"))
+PROJECTS_DIR = HOME / ".claude" / "projects"
+
+# Pricing tables (per MTok). Add new models here.
+PRICING = {
+    "opus":  {"input": 5.0,  "output": 25.0, "cc_5m": 6.25, "cc_1h": 10.0, "cr": 0.50},
+    "sonnet":{"input": 3.0,  "output": 15.0, "cc_5m": 3.75, "cc_1h": 6.0,  "cr": 0.30},
+    "haiku": {"input": 1.0,  "output": 5.0,  "cc_5m": 1.25, "cc_1h": 2.0,  "cr": 0.10},
+}
+
+# Default to Opus (most common in this user's setup)
+DEFAULT_PRICING = "opus"
+
+
+def pick_pricing(model_name: str) -> dict:
+    """Map model id to pricing bucket."""
+    m = (model_name or "").lower()
+    if "haiku" in m:
+        return PRICING["haiku"]
+    if "sonnet" in m:
+        return PRICING["sonnet"]
+    return PRICING[DEFAULT_PRICING]
+
+
+def estimate_cost(p: dict, usage: dict) -> float:
+    return (
+        usage.get("input", 0) * p["input"] / 1e6
+        + usage.get("output", 0) * p["output"] / 1e6
+        + usage.get("cc_5m", 0) * p["cc_5m"] / 1e6
+        + usage.get("cc_1h", 0) * p["cc_1h"] / 1e6
+        + usage.get("cache_read", 0) * p["cr"] / 1e6
+    )
+
+
+def parse_jsonl(path: Path) -> dict | None:
+    """Parse a session JSONL into a summary. Returns None if empty/invalid."""
+    records = []
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        return None
+    if not records:
+        return None
+
+    # Aggregate per-assistant usage.
+    usage = {"input": 0, "output": 0, "cc_5m": 0, "cc_1h": 0, "cache_read": 0}
+    models = {}
+    user_msgs = 0
+    last_user_ts = None
+    last_any_ts = None
+    first_ts = None
+    thinking_blocks = 0
+    thinking_chars = 0
+    task_subagents = 0
+    quack_spawned = False
+
+    for r in records:
+        ts = r.get("timestamp")
+        if ts:
+            if first_ts is None or ts < first_ts:
+                first_ts = ts
+            if last_any_ts is None or ts > last_any_ts:
+                last_any_ts = ts
+
+        t = r.get("type")
+        if t == "user":
+            content = r.get("message", {}).get("content")
+            is_tool_echo = False
+            if isinstance(content, list):
+                is_tool_echo = any(b.get("type") == "tool_result" for b in content)
+            if not is_tool_echo and not r.get("isSidechain"):
+                user_msgs += 1
+                last_user_ts = ts
+        elif t == "assistant":
+            msg = r.get("message", {})
+            model = msg.get("model")
+            if model:
+                models[model] = models.get(model, 0) + 1
+            u = msg.get("usage")
+            if u:
+                usage["input"] += u.get("input_tokens", 0) or 0
+                usage["output"] += u.get("output_tokens", 0) or 0
+                usage["cache_read"] += u.get("cache_read_input_tokens", 0) or 0
+                usage["cache_creation"] = usage.get("cache_creation", 0) + (
+                    u.get("cache_creation_input_tokens", 0) or 0
+                )
+                cc = u.get("cache_creation", {}) or {}
+                usage["cc_5m"] += cc.get("ephemeral_5m_input_tokens", 0) or 0
+                usage["cc_1h"] += cc.get("ephemeral_1h_input_tokens", 0) or 0
+            for block in (msg.get("content") or []):
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "thinking":
+                    thinking_blocks += 1
+                    thinking_chars += len(block.get("thinking", "") or "")
+                if block.get("type") == "tool_use" and block.get("name") in ("Task", "Agent"):
+                    task_subagents += 1
+        elif t == "system":
+            for hi in (r.get("hookInfos") or []):
+                if "quack-managed-hook" in (hi.get("command") or ""):
+                    quack_spawned = True
+
+    # Determine primary model.
+    primary_model = max(models.items(), key=lambda x: x[1])[0] if models else ""
+    pricing = pick_pricing(primary_model)
+    cost = estimate_cost(pricing, usage)
+
+    # Parse timestamps for human display.
+    def parse(ts):
+        if not ts:
+            return None
+        try:
+            return datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+
+    first_dt = parse(first_ts)
+    last_dt = parse(last_any_ts)
+    last_user_dt = parse(last_user_ts)
+
+    return {
+        "session_id": path.stem,
+        "project": path.parent.name,
+        "primary_model": primary_model,
+        "pricing_bucket": next(
+            (k for k, v in PRICING.items() if v is pricing), DEFAULT_PRICING
+        ),
+        "first_ts": first_ts,
+        "last_ts": last_any_ts,
+        "first_dt": first_dt,
+        "last_dt": last_dt,
+        "last_user_ts": last_user_ts,
+        "last_user_dt": last_user_dt,
+        "turns": user_msgs,
+        "thinking_blocks": thinking_blocks,
+        "thinking_chars": thinking_chars,
+        "task_subagents": task_subagents,
+        "quack_spawned": quack_spawned,
+        "usage": usage,
+        "estimated_cost_usd": cost,
+    }
+
+
+def short_project(name: str) -> str:
+    """Trim /Users/foo/Desktop/Dev/Personal/ prefix for display."""
+    prefixes = [
+        "-Users-alekdob-Desktop-Dev-Personal-",
+        "-Users-alekdob-Desktop-Dev-",
+        "-Users-alekdob-Documents-",
+        "-Users-alekdob-",
+    ]
+    for p in prefixes:
+        if name.startswith(p):
+            return name[len(p):]
+    return name
+
+
+def fmt_age(dt: datetime | None, now: datetime) -> str:
+    """Human-readable age."""
+    if dt is None:
+        return "—"
+    secs = (now - dt).total_seconds()
+    if secs < 0:
+        return "now"
+    if secs < 60:
+        return f"{int(secs)}s ago"
+    if secs < 3600:
+        return f"{int(secs // 60)}m ago"
+    if secs < 86400:
+        return f"{secs / 3600:.1f}h ago"
+    return f"{secs / 86400:.1f}d ago"
+
+
+def fmt_duration(dt_start: datetime | None, dt_end: datetime | None) -> str:
+    if dt_start is None or dt_end is None:
+        return "—"
+    secs = (dt_end - dt_start).total_seconds()
+    if secs < 60:
+        return f"{int(secs)}s"
+    if secs < 3600:
+        return f"{int(secs // 60)}m"
+    return f"{secs / 3600:.1f}h"
+
+
+def render_session(s: dict, now: datetime, options: dict) -> str:
+    """Format one session as a multi-line block."""
+    flags = []
+    if s["quack_spawned"]:
+        flags.append("Quack")
+    if s["task_subagents"] > 0:
+        flags.append(f"{s['task_subagents']} subagent")
+    if s["thinking_blocks"] > 0:
+        flags.append(f"{s['thinking_blocks']} thinking")
+    flag_str = " · " + ", ".join(flags) if flags else ""
+
+    # Zombie = active recently but no user input for >zombie_min minutes.
+    last_any_age = (now - s["last_dt"]).total_seconds() / 60 if s["last_dt"] else 0
+    last_user_age = (now - s["last_user_dt"]).total_seconds() / 60 if s["last_user_dt"] else 999
+    is_active = last_any_age < options["active_min"]
+    is_zombie = is_active and last_user_age > options["zombie_min"]
+    state = "ZOMBIE" if is_zombie else ("ACTIVE" if is_active else "idle")
+    marker = ""
+    if is_zombie:
+        marker = "[!! ZOMBIE]"
+    elif is_active:
+        marker = "[>]"
+
+    proj = short_project(s["project"])[:40]
+    cost = s["estimated_cost_usd"]
+    lines = [
+        f"{marker} {state:6}  {proj:<40}  ${cost:>7.2f}  "
+        f"{s['turns']:>4} turns  {fmt_duration(s['first_dt'], s['last_dt']):>6}{flag_str}",
+        f"        last activity {fmt_age(s['last_dt'], now)} · "
+        f"last user msg {fmt_age(s['last_user_dt'], now)} · "
+        f"model {s['primary_model'] or '?'}",
+    ]
+    return "\n".join(lines)
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        description="Real-time Claude Code cost monitor"
+    )
+    ap.add_argument(
+        "--active-min", type=float, default=10,
+        help="A session is ACTIVE if modified within N minutes (default 10)",
+    )
+    ap.add_argument(
+        "--zombie-min", type=float, default=30,
+        help="A session is ZOMBIE if active but no user input for N minutes (default 30)",
+    )
+    ap.add_argument(
+        "--min-cost", type=float, default=0.10,
+        help="Hide sessions with cost below this USD (default 0.10)",
+    )
+    ap.add_argument(
+        "--all", action="store_true",
+        help="Show all sessions, including idle/old",
+    )
+    ap.add_argument(
+        "--watch", action="store_true",
+        help="Run continuously, refreshing every --interval seconds",
+    )
+    ap.add_argument(
+        "--interval", type=float, default=60,
+        help="Watch interval in seconds (default 60)",
+    )
+    ap.add_argument(
+        "--alert-cost", type=float, default=None,
+        help="Print ALERT line if any session cost exceeds this USD",
+    )
+    ap.add_argument(
+        "--kill-zombie", action="store_true",
+        help="SIGKILL any zombie claude process whose session has no user input for >zombie-min",
+    )
+    ap.add_argument(
+        "--dry-run-kill", action="store_true",
+        help="With --kill-zombie, only show what would be killed, do not actually kill",
+    )
+    args = ap.parse_args()
+
+    if not PROJECTS_DIR.exists():
+        print(f"ERR: {PROJECTS_DIR} not found", file=sys.stderr)
+        sys.exit(1)
+
+    while True:
+        if not args.watch:
+            run_once(args)
+            break
+        else:
+            run_once(args, clear_screen=True)
+            time.sleep(args.interval)
+
+
+def run_once(args, clear_screen=False):
+    if clear_screen:
+        sys.stdout.write("\033[2J\033[H")
+        sys.stdout.flush()
+    now = datetime.now(timezone.utc)
+    sessions = []
+    for proj_dir in sorted(PROJECTS_DIR.iterdir()):
+        if not proj_dir.is_dir():
+            continue
+        for jpath in proj_dir.glob("*.jsonl"):
+            s = parse_jsonl(jpath)
+            if s is None:
+                continue
+            last_any_age = (now - s["last_dt"]).total_seconds() / 60 if s["last_dt"] else 999
+            if not args.all:
+                if last_any_age > args.active_min and s["estimated_cost_usd"] < args.min_cost:
+                    continue
+            sessions.append(s)
+
+    # Sort: zombies first, then active, then by cost desc.
+    def sort_key(s):
+        last_any_age = (now - s["last_dt"]).total_seconds() / 60 if s["last_dt"] else 999
+        last_user_age = (now - s["last_user_dt"]).total_seconds() / 60 if s["last_user_dt"] else 999
+        is_active = last_any_age < args.active_min
+        is_zombie = is_active and last_user_age > args.zombie_min
+        return (not is_zombie, not is_active, -s["estimated_cost_usd"])
+    sessions.sort(key=sort_key)
+
+    if not sessions and not args.kill_zombie:
+        print("(no active sessions)")
+        return
+
+    if sessions:
+        total_cost = sum(s["estimated_cost_usd"] for s in sessions)
+        header = (
+            f"claude-cost-watch · {now.strftime('%Y-%m-%d %H:%M:%S UTC')} · "
+            f"{len(sessions)} sessions · total ${total_cost:.2f}"
+        )
+        print(header)
+        print("=" * len(header))
+
+        options = {
+            "active_min": args.active_min,
+            "zombie_min": args.zombie_min,
+        }
+        alerts = []
+        for s in sessions:
+            print(render_session(s, now, options))
+            print()
+            if args.alert_cost and s["estimated_cost_usd"] > args.alert_cost:
+                last_any_age = (now - s["last_dt"]).total_seconds() / 60 if s["last_dt"] else 999
+                last_user_age = (now - s["last_user_dt"]).total_seconds() / 60 if s["last_user_dt"] else 999
+                if last_any_age < args.active_min:
+                    alerts.append(s)
+
+        if alerts:
+            print()
+            print(f"ALERTS ({len(alerts)} active sessions over ${args.alert_cost:.2f}):")
+            for s in alerts:
+                print(
+                    f"  {short_project(s['project'])} ${s['estimated_cost_usd']:.2f} "
+                    f"({s['turns']} turns) — last activity {fmt_age(s['last_dt'], now)}"
+                )
+
+    # Zombie kill mode.
+    if args.kill_zombie:
+        print()
+        print("=" * 60)
+        print("ZOMBIE KILL MODE")
+        print("=" * 60)
+        killed = kill_zombies(sessions, args, now)
+        if not killed:
+            print("(no zombie processes to kill)")
+        else:
+            for k in killed:
+                print(f"  {'DRY-RUN' if args.dry_run_kill else 'KILLED'}: "
+                      f"PID {k['pid']} session {k['session_id'][:8]} "
+                      f"({k['reason']})")
+
+
+def kill_zombies(sessions, args, now):
+    """Find zombie claude processes and SIGKILL them.
+
+    A zombie = a running `claude` process whose --resume session id
+    matches a JSONL session with no user input for >zombie_min minutes.
+    Also catches `claude` processes with --resume whose session JSONL
+    doesn't exist locally (orphaned re-spawns).
+    """
+    import subprocess
+
+    # Build set of (session_id, age_min) for fast lookup.
+    zombie_session_ids = set()
+    for s in sessions:
+        last_any_age = (now - s["last_dt"]).total_seconds() / 60 if s["last_dt"] else 999
+        last_user_age = (now - s["last_user_dt"]).total_seconds() / 60 if s["last_user_dt"] else 999
+        if last_any_age < args.active_min and last_user_age > args.zombie_min:
+            zombie_session_ids.add(s["session_id"])
+
+    # Find all `claude` processes with --resume <id>.
+    try:
+        out = subprocess.run(
+            ["ps", "axo", "pid,command"],
+            capture_output=True, text=True, check=True, timeout=5,
+        ).stdout
+    except (subprocess.SubprocessError, FileNotFoundError):
+        return []
+
+    killed = []
+    for line in out.splitlines():
+        if "claude" not in line or "--resume" not in line:
+            continue
+        if "/Applications/Claude.app/" in line and "Helper" in line:
+            continue  # skip Claude Desktop helpers
+        # Extract PID and --resume value.
+        parts = line.strip().split(None, 1)
+        if len(parts) < 2:
+            continue
+        try:
+            pid = int(parts[0])
+        except ValueError:
+            continue
+        cmd = parts[1]
+        # Find --resume <uuid>
+        resume_id = None
+        tokens = cmd.split()
+        for i, t in enumerate(tokens):
+            if t == "--resume" and i + 1 < len(tokens):
+                resume_id = tokens[i + 1]
+                break
+        if not resume_id:
+            continue
+        reason = None
+        if resume_id in zombie_session_ids:
+            reason = f"matches zombie session (no user input >{args.zombie_min}m)"
+        else:
+            # Maybe orphan: --resume session not in JSONL files at all.
+            jpath = None
+            for proj_dir in PROJECTS_DIR.iterdir():
+                candidate = proj_dir / f"{resume_id}.jsonl"
+                if candidate.exists():
+                    jpath = candidate
+                    break
+            if jpath is None:
+                reason = "orphaned --resume (no matching JSONL)"
+            else:
+                continue  # active session with recent user input, skip
+        if args.dry_run_kill:
+            killed.append({
+                "pid": pid,
+                "session_id": resume_id,
+                "reason": reason,
+            })
+        else:
+            try:
+                import signal
+                os.kill(pid, signal.SIGKILL)
+                killed.append({
+                    "pid": pid,
+                    "session_id": resume_id,
+                    "reason": reason,
+                })
+            except ProcessLookupError:
+                pass  # already dead
+            except PermissionError:
+                killed.append({
+                    "pid": pid,
+                    "session_id": resume_id,
+                    "reason": f"{reason} (KILL DENIED: permission)",
+                })
+    return killed
+
+
+if __name__ == "__main__":
+    main()
