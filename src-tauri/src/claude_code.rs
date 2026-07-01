@@ -465,7 +465,7 @@ fn build_hook_command(endpoint: &str) -> String {
     // used e.g. to redirect AskUserQuestion ("ask in plain text") so
     // the agent recovers instead of treating it as a hard failure.
     let js = format!(
-        r#"const http=require('http');let b='';process.stdin.on('data',c=>b+=c).on('end',()=>{{let done=false;function out(d,reason){{if(done)return;done=true;const o={{hookEventName:'PreToolUse',permissionDecision:d}};if(reason)o.permissionDecisionReason=reason;process.stdout.write(JSON.stringify({{hookSpecificOutput:o}}));process.exit(0)}}const t=setTimeout(()=>out('allow'),3000);try{{const u=new URL('{endpoint}');const r=http.request({{hostname:u.hostname,port:u.port,path:u.pathname+u.search,method:'POST',headers:{{'content-length':Buffer.byteLength(b)}}}},res=>{{let d='';res.on('data',c=>d+=c);res.on('end',()=>{{clearTimeout(t);const s=String(d).trim();if(s[0]==='2'){{const i=s.indexOf(':');out('deny',i>0?s.slice(i+1):undefined)}}else{{out('allow')}}}})}});r.on('error',()=>{{clearTimeout(t);out('allow')}});r.write(b);r.end()}}catch(_){{clearTimeout(t);out('allow')}}}});"#,
+        r#"const http=require('http');let b='';process.stdin.on('data',c=>b+=c).on('end',()=>{{let done=false;function out(d,reason){{if(done)return;done=true;const o={{hookEventName:'PreToolUse',permissionDecision:d}};if(reason)o.permissionDecisionReason=reason;process.stdout.write(JSON.stringify({{hookSpecificOutput:o}}));process.exit(0)}}if(!process.env.CODETTA_PERM_HOOK){{out('ask');return}}const t=setTimeout(()=>out('allow'),3000);try{{const u=new URL('{endpoint}');const r=http.request({{hostname:u.hostname,port:u.port,path:u.pathname+u.search,method:'POST',headers:{{'content-length':Buffer.byteLength(b)}}}},res=>{{let d='';res.on('data',c=>d+=c);res.on('end',()=>{{clearTimeout(t);const s=String(d).trim();if(s[0]==='2'){{const i=s.indexOf(':');out('deny',i>0?s.slice(i+1):undefined)}}else{{out('allow')}}}})}});r.on('error',()=>{{clearTimeout(t);out('allow')}});r.write(b);r.end()}}catch(_){{clearTimeout(t);out('allow')}}}});"#,
         endpoint = endpoint
     );
     format!("node -e \"{}\"", js.replace('"', "\\\""))
@@ -486,6 +486,14 @@ fn apply_clean_env(cmd: &mut Command) {
     // Avoid claude-cli's auto-update banner stealing the first stdout
     // line (which would break our JSON parser).
     cmd.env("CLAUDE_SKIP_UPDATE_CHECK", "1");
+    // Mark this as a Codetta-spawned session so the PreToolUse hook knows
+    // to route permission requests to us. The hook we install lives in the
+    // workspace's .claude/settings.local.json forever, so it also fires for
+    // OTHER claude sessions in that folder (a terminal `claude`, another
+    // editor). Those inherit the shell env, NOT this var — so the hook
+    // defers them to Claude Code's native prompt instead of hijacking their
+    // permissions into Codetta's UI. See build_hook_command.
+    cmd.env("CODETTA_PERM_HOOK", "1");
 }
 
 fn shell_quote(s: &str) -> String {
