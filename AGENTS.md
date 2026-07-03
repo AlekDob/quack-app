@@ -25,6 +25,23 @@ Prereqs: Node 18+, Rust 1.77+ stable, Tauri OS prerequisites.
 
 Verify a change by running `npm run tauri dev` (or `npm run build` for a quick TS gate).
 
+## Git / remote (Quack desktop fork)
+
+Remote: `https://github.com/AlekDob/quack-app.git`
+
+| Branch | Role |
+|---|---|
+| **Local `main`** | Desktop integration branch (merge topic work here) |
+| **`origin/quack-1.0`** | **Push target** for desktop — tracks local `main` |
+| **`origin/main`** | Other product line — **do not push desktop here** |
+
+```bash
+git checkout main && git merge feat/my-topic
+git push origin main:quack-1.0   # or `git push` if upstream is quack-1.0
+```
+
+Full rationale: `documentation/decisions/003-git-remote-quack-1.0.md`.
+
 ## Where to work
 
 | Task | Start here |

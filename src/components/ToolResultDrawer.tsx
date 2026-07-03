@@ -4,6 +4,7 @@ import { onToolDrawer, type ToolDrawerData } from "../toolDrawer";
 import { useModalFocus } from "../useModalFocus";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { Icon } from "./Icon";
+import { TerminalResultView } from "./TerminalResultView";
 import { fs } from "../ipc";
 
 // Right-side slide-over showing a tool call's full output. Animates IN and OUT:
@@ -62,7 +63,9 @@ export function ToolResultDrawer() {
       <div
         ref={panelRef}
         tabIndex={-1}
-        className={`tool-drawer${shown ? " shown" : ""}`}
+        className={`tool-drawer${shown ? " shown" : ""}${
+          data.variant === "terminal" ? " tool-drawer--terminal" : ""
+        }`}
         role="dialog"
         aria-modal="true"
         aria-label={`${data.title} output`}
@@ -99,11 +102,16 @@ export function ToolResultDrawer() {
           </button>
         </div>
         <div className="tool-drawer-body">
-          {data.imagePath ? (
+          {data.variant === "terminal" ? (
+            <TerminalResultView
+              command={data.command ?? data.subtitle ?? ""}
+              output={data.result}
+            />
+          ) : data.imagePath ? (
             imgSrc ? (
               <img className="tool-drawer-image" src={imgSrc} alt={data.subtitle ?? ""} />
             ) : (
-              <pre className="ai-tcall-result-body">Carico immagine…</pre>
+              <pre className="ai-tcall-result-body">Loading image…</pre>
             )
           ) : data.markdown ? (
             <div className="ai-tcall-result-md">

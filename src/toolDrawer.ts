@@ -7,6 +7,8 @@
 // so their before/after reads as a real diff. This drawer is for read-only
 // output (file contents, command output, search hits).
 
+export type ToolDrawerVariant = "default" | "terminal";
+
 export interface ToolDrawerData {
   /** Tool name, e.g. "Read" / "Bash" — shown as the drawer title. */
   title: string;
@@ -16,6 +18,10 @@ export interface ToolDrawerData {
   result: string;
   /** Render the body as Markdown (a `.md` read) instead of monospace. */
   markdown?: boolean;
+  /** Terminal-style chrome for Bash / shell output. */
+  variant?: ToolDrawerVariant;
+  /** Full shell command — shown on the simulated prompt line. */
+  command?: string;
   /** When set, the body renders the image at this path (a Read of an image)
    *  instead of the textual `[image]` placeholder. Loaded as a data: URL. */
   imagePath?: string;

@@ -21,3 +21,7 @@ updated: 2026-07-01
 - **Docs**: feature `028-opencode-bridge.md`; updated `025`, `026`, `agent-provider-patterns.md`, `CLAUDE.md`.
 - Build: `npm run build` + `cargo check` pass.
 - **Next**: Codex CLI (`codex_code.rs` fork of `cursor_code.rs`), smoke in `tauri dev`.
+
+## 2026-07-01 (git remote)
+
+- Documented branching: desktop → `origin/quack-1.0`; `origin/main` left alone (unrelated embedded-cli history). Decision `003-git-remote-quack-1.0.md`.

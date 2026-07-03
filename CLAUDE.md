@@ -146,6 +146,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
 - `documentation/decisions/` — architectural rationales.
   - `001-agent-status-indicators.md` — the per-session agent-status design (the focus feature).
   - `002-ui-styling-rebrand-not-rewrite.md` — why CSS-token rebrand, not Tailwind/shadcn.
+  - `003-git-remote-quack-1.0.md` — desktop pushes to `origin/quack-1.0`; leave GitHub `main` alone (unrelated embedded-cli history).
 - `documentation/diary/YYYY-MM-DD.md` — daily changelog. Append after non-trivial work.
 
 ## Working agreement

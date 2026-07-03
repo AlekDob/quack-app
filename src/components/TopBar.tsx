@@ -11,6 +11,8 @@ import { getActiveEditor } from "../editorState";
 import { Icon } from "./Icon";
 import { AIIcon } from "./AIIcon";
 import { useAgentMode, toggleAgentMode } from "../agentMode";
+import { useStore } from "../store";
+import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
 
 // Edit-menu actions delegate to the active Monaco editor when one is
 // focused (its built-in commands handle the editor's undo stack +
@@ -213,6 +215,16 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
   const [theme, setTheme] = useTheme();
   const [maximized, setMaximized] = useState(false);
   const agentMode = useAgentMode();
+  const activeId = useStore((s) => s.activeId);
+  const activeWsName = useStore((s) =>
+    s.activeId ? s.loaded[s.activeId]?.meta.name ?? null : null,
+  );
+  const [, setColorTick] = useState(0);
+  useEffect(
+    () => subscribeWorkspaceColors(() => setColorTick((n) => n + 1)),
+    [],
+  );
+  const wsColor = activeId ? getWorkspaceColor(activeId) : null;
 
   const closeMenu = () => setMenu(null);
   const toggleMenu = (k: string) => setMenu((cur) => (cur === k ? null : k));
@@ -376,7 +388,25 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
           nativeMenu.ts), so the in-window brand + menus + palette are
           hidden there — the titlebar is just a drag region + Agents. */}
       <div className="topbar-brand" data-tauri-drag-region>
-        <span>Quack</span>
+        <span className="topbar-brand-name">Quack</span>
+        {activeWsName && (
+          <>
+            <span className="topbar-brand-sep" aria-hidden="true">
+              --&gt;
+            </span>
+            <span
+              className={`topbar-brand-project ${wsColor ? "has-color" : ""}`}
+              style={
+                wsColor
+                  ? ({ "--ws-color": wsColor.hex } as React.CSSProperties)
+                  : undefined
+              }
+              title={activeWsName}
+            >
+              {activeWsName}
+            </span>
+          </>
+        )}
       </div>
 
       {!IS_MACOS && (

@@ -916,7 +916,12 @@ function EmptyPane({ wsId }: { wsId: string }) {
     <div className="pane-empty">
       <div className="pane-empty-card">
         <div className="pane-empty-icon">
-          <Icon name="command" size={28} />
+          <img
+            src="/quack-mark.png"
+            alt="Quack"
+            className="pane-empty-logo"
+            draggable={false}
+          />
         </div>
         <div className="pane-empty-title">Nothing open here</div>
         <div className="pane-empty-sub">

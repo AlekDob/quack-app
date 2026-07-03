@@ -231,6 +231,14 @@ export function shortDetail(detail: string): string {
 }
 
 const READ_NAMES = new Set(["Read", "read_file", "read", "NotebookRead"]);
+const BASH_NAMES = new Set([
+  "Bash",
+  "bash",
+  "shell",
+  "run_command",
+  "run",
+  "BashOutput",
+]);
 const MARKDOWN_EXT = /\.(md|mdx|markdown)$/i;
 
 // Claude Code's Read returns its content in `cat -n` form ("   123\tline").
@@ -494,6 +502,26 @@ export function extractEditDiffs(call: ToolCall): EditDiff[] | null {
  *  OLDEST finished ones collapse behind a count toggle — ten expanded
  *  Read rows were pushing the whole conversation off-screen. Running
  *  and errored rows always stay visible. */
+export function StatusPill({
+  children,
+  trail,
+  list,
+}: {
+  children: ReactNode;
+  trail?: ReactNode;
+  list?: ReactNode;
+}) {
+  return (
+    <div className="ai-tcall ai-tcall-status">
+      <div className="ai-status-pill">
+        <span className="ai-status-pill-main">{children}</span>
+        {trail ? <span className="ai-status-pill-trail">{trail}</span> : null}
+      </div>
+      {list ? <div className="ai-status-tools">{list}</div> : null}
+    </div>
+  );
+}
+
 export function RunningToolList({
   entries,
 }: {
@@ -582,33 +610,34 @@ export function RunningToolRow({
   const icon = toolIconFor(entry.name);
   const status = entry.status ?? "running";
   return (
-    <div className={`ai-running-row ai-running-row-${status}`}>
-      <div className="ai-running-row-head">
-        <span className="ai-running-row-icon" aria-hidden>
-          {icon ? <Icon name={icon} size={12} /> : "•"}
+    <div className={`ai-tcall ai-tcall-running ai-tcall-running-${status}`}>
+      <div className="ai-tcall-head">
+        <span className="ai-tcall-open">
+          <span className="ai-tcall-ico" aria-hidden>
+            {icon ? <Icon name={icon} size={12} /> : <span className="ai-tcall-dot" />}
+          </span>
+          <span className="ai-tcall-name">{entry.name}</span>
+          {niceDetail && (
+            <span className="ai-tcall-detail" title={entry.detail}>
+              {niceDetail}
+            </span>
+          )}
         </span>
-        <span className="ai-running-row-name">{entry.name}</span>
-        {niceDetail && (
-          <span
-            className="ai-running-row-detail"
-            title={entry.detail}
-          >
-            {niceDetail}
-          </span>
-        )}
-        {status === "running" && (
-          <span className="ai-spinner ai-spinner-sm ai-running-row-spinner" />
-        )}
-        {status === "done" && (
-          <span className="ai-running-row-check" title="Finished">
-            <Icon name="check" size={11} />
-          </span>
-        )}
-        {status === "error" && (
-          <span className="ai-running-row-x" title="Errored">
-            <Icon name="x" size={11} />
-          </span>
-        )}
+        <span className="ai-tcall-trail">
+          {status === "running" && (
+            <span className="ai-spinner ai-spinner-sm" />
+          )}
+          {status === "done" && (
+            <span className="ai-running-row-check" title="Finished">
+              <Icon name="check" size={11} />
+            </span>
+          )}
+          {status === "error" && (
+            <span className="ai-running-row-x" title="Errored">
+              <Icon name="x" size={11} />
+            </span>
+          )}
+        </span>
       </div>
       {!compact && previewLines && (
         <pre className="ai-running-row-preview">
@@ -1530,14 +1559,24 @@ export function ToolCallRow({
   // output). With no output but a file path it just opens the file in a tab.
   // An image read still has a (placeholder) result, so canShow is true and
   // clicking the pill opens the drawer — where imagePath shows the picture.
+  const isBash = BASH_NAMES.has(call.function.name);
+  const bashCommand = isBash
+    ? (() => {
+        const args = call.function.arguments as Record<string, unknown>;
+        const cmd = args.command;
+        return typeof cmd === "string" ? cmd.replace(/\s+/g, " ").trim() : detail;
+      })()
+    : "";
   const onPrimary =
     canShow || imageRef
       ? () =>
           requestToolDrawer({
             title: label,
-            subtitle: detail || undefined,
+            subtitle: isBash ? undefined : detail || undefined,
             result: markdown ? stripReadGutter(result ?? "") : (result ?? ""),
             markdown,
+            variant: isBash ? "terminal" : undefined,
+            command: isBash ? bashCommand || detail : undefined,
             imagePath: imageRef || undefined,
             onOpenFile,
           })

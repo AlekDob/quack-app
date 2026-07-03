@@ -42,7 +42,11 @@ section](README.md#develop--build-from-source) for full prerequisites.
 
 ## Branch + commit style
 
-- Branch off `main`. Name branches by topic: `feat/popout-redock`,
+> **This fork (`AlekDob/quack-app`):** integrate desktop work on local `main`, push to
+> **`origin/quack-1.0`** — not `origin/main`. See
+> `documentation/decisions/003-git-remote-quack-1.0.md`.
+
+- Branch off `main` (local). Name branches by topic: `feat/popout-redock`,
   `fix/ai-stop-button`, `docs/install-instructions`.
 - Use the [Developer Certificate of Origin](https://developercertificate.org/)
   by signing your commits: `git commit -s -m "your message"`. We don't
@@ -53,7 +57,7 @@ section](README.md#develop--build-from-source) for full prerequisites.
 
 ## Pull requests
 
-- Open against `main`.
+- Open against `main` (upstream Codetta). **This fork:** open against **`quack-1.0`** for desktop work.
 - Include a short description of what changed and why.
 - If the change is user-visible, mention how to test it (e.g. "open AI
   panel, type a message, hit Esc — stream should stop").

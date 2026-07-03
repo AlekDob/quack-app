@@ -60,6 +60,7 @@ import {
   extractEditDiffs,
   InterleavedBlocks,
   RunningToolList,
+  StatusPill,
   SubagentOpen,
   ToolCallRow,
   toolDetailFor,
@@ -3961,6 +3962,12 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             );
           }
           const dimmedByScrub = scrubIndex !== null && i > scrubIndex;
+          const composeFileCalls =
+            m.role === "assistant" && m.tool_calls
+              ? m.tool_calls.filter((c) => extractEditDiffs(c) !== null)
+              : [];
+          const showComposeCard = composeFileCalls.length >= 2;
+          const msgHasBlocks = !!(m.blocks && m.blocks.length > 0);
           return (
             <div
               key={i}
@@ -4015,40 +4022,18 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                 )}
               </span>
               {m.tool_calls && m.tool_calls.length > 0 && (() => {
-                // If this turn made 2+ file-modifying tool calls,
-                // collapse them into a single ComposeCard with per-
-                // file diffs and aggregate stats. The per-call rows
-                // still render below for full fidelity (Read/Glob/
-                // Bash/etc. don't enter the composer).
-                //
-                // When the message has a `blocks` log, the per-call
-                // rows are rendered inline by <InterleavedBlocks>
-                // (preserves chronological order with the text). We
-                // still show the ComposeCard summary at top in that
-                // case — it's a higher-level affordance (revert
-                // all / accept all) that doesn't belong inline.
-                const hasBlocks = !!(m.blocks && m.blocks.length > 0);
-                const fileCalls = m.tool_calls.filter(
-                  (c) => extractEditDiffs(c) !== null,
-                );
+                if (msgHasBlocks && !showComposeCard) return null;
                 const otherCalls = m.tool_calls.filter(
                   (c) => extractEditDiffs(c) === null,
                 );
-                const useCompose = fileCalls.length >= 2;
-                if (hasBlocks && !useCompose) return null;
-                const rows = hasBlocks
+                const rows = msgHasBlocks
                   ? []
-                  : (useCompose ? otherCalls : m.tool_calls);
+                  : showComposeCard
+                    ? otherCalls
+                    : m.tool_calls;
+                if (rows.length === 0) return null;
                 return (
                   <div className="ai-tcalls">
-                    {useCompose && (
-                      <ComposeCard
-                        wsId={wsId}
-                        chatId={aiChatId}
-                        msgIndex={i}
-                        calls={fileCalls}
-                      />
-                    )}
                     {rows.map((c, j) => (
                       <ToolCallRow
                         key={c.id ?? j}
@@ -4164,6 +4149,16 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                   m.content
                 )}
               </div>
+              {showComposeCard && isAssistant && !isStreamingThis && (
+                <div className="ai-compose-foot">
+                  <ComposeCard
+                    wsId={wsId}
+                    chatId={aiChatId}
+                    msgIndex={i}
+                    calls={composeFileCalls}
+                  />
+                </div>
+              )}
               {isAssistant && !isStreamingThis && m.content.length > 0 && (
                 <div className="ai-msg-actions">
                   <button
@@ -4251,89 +4246,109 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             !warmingUp)) && (
           <div className="ai-inline-status">
             {runningTools && (
-              <div className="ai-running-tools">
-                {activeToolLabels.length === 0 ? (
-                  <span className="ai-thinking">
-                    <span className="ai-spinner" /> Running tools…
-                  </span>
-                ) : (() => {
-                  // Header shows accurate "X of N done" counter so the
-                  // user can see progress as results land — was a
-                  // perpetual "Running 10 tools" spinner before, even
-                  // when 9 had already finished.
+              activeToolLabels.length === 0 ? (
+                <StatusPill
+                  trail={
+                    streaming !== null && tokensPerSec !== null ? (
+                      <span className="ai-inline-tps">
+                        {tokensPerSec.toFixed(1)} t/s
+                      </span>
+                    ) : undefined
+                  }
+                >
+                  <span className="ai-spinner" />
+                  <span>Running tools…</span>
+                </StatusPill>
+              ) : (() => {
                   const done = activeToolLabels.filter(
                     (t) => t.status === "done" || t.status === "error",
                   ).length;
                   const total = activeToolLabels.length;
                   const allDone = done === total;
-                  // When all tools are done but the stream is still
-                  // active, the agent is generating its follow-up text.
-                  // The old "✓ Finished N tools" header looked terminal
-                  // and made users think the conversation had ended,
-                  // even though more was coming. Keep the spinner +
-                  // active wording until streaming actually closes.
                   const streamStillActive = streaming !== null;
-                  // When the live bubble is rendering the chronological
-                  // blocks log (agentic providers), every tool already
-                  // appears INLINE where it happened — repeating the
-                  // rows down here doubled the list. Keep just the
-                  // one-line progress header in that case; the full
-                  // row list remains for providers whose tools run
-                  // outside the blocks log (local tool loop).
                   const toolsRenderedInline = streamingBlocks.some(
                     (b) => b.kind === "tool_call",
                   );
+                  const header =
+                    allDone && streamStillActive
+                      ? `Got ${total} tool result${total === 1 ? "" : "s"} — generating response…`
+                      : allDone
+                        ? `Finished ${total} tool${total === 1 ? "" : "s"}`
+                        : `${done} of ${total} done · ${total - done} running`;
                   return (
-                    <>
-                      <span className="ai-thinking ai-running-header">
-                        {allDone && !streamStillActive ? (
-                          <span className="ai-running-check">
-                            <Icon name="check" size={12} />
+                    <StatusPill
+                      trail={
+                        streaming !== null && tokensPerSec !== null ? (
+                          <span className="ai-inline-tps">
+                            {tokensPerSec.toFixed(1)} t/s
                           </span>
-                        ) : (
-                          <span className="ai-spinner" />
-                        )}
-                        {allDone && streamStillActive
-                          ? `Got ${total} tool result${total === 1 ? "" : "s"} — generating response…`
-                          : allDone
-                            ? `Finished ${total} tool${total === 1 ? "" : "s"}`
-                            : `${done} of ${total} done · ${total - done} running`}
-                      </span>
-                      {!toolsRenderedInline && (
-                        <RunningToolList entries={activeToolLabels} />
+                        ) : undefined
+                      }
+                      list={
+                        !toolsRenderedInline ? (
+                          <RunningToolList entries={activeToolLabels} />
+                        ) : undefined
+                      }
+                    >
+                      {allDone && !streamStillActive ? (
+                        <span className="ai-running-check">
+                          <Icon name="check" size={12} />
+                        </span>
+                      ) : (
+                        <span className="ai-spinner" />
                       )}
-                    </>
+                      <span>{header}</span>
+                    </StatusPill>
                   );
-                })()}
-              </div>
+                })()
             )}
             {streaming !== null &&
               warmingUp &&
               streaming.length === 0 &&
               !runningTools && (
-                <span className="ai-thinking">
-                  <span className="ai-spinner" /> Loading model
-                </span>
+                <StatusPill>
+                  <span className="ai-spinner" />
+                  <span>Loading model</span>
+                </StatusPill>
               )}
-            {/* Gap between hitting Enter and the first token / tool call.
-                For Claude Code that's CLI spawn + auth + initial API call
-                — can be 1-3s on a fresh session, longer with --resume.
-                Without this, the user sees their own message then nothing
-                and assumes the app froze. */}
             {streaming !== null &&
               streaming.length === 0 &&
               streamingBlocks.length === 0 &&
               !runningTools &&
               !warmingUp && (
-                <span className="ai-thinking">
-                  <span className="ai-spinner" /> Waiting for response…
-                </span>
+                <StatusPill
+                  trail={
+                    tokensPerSec !== null ? (
+                      <span className="ai-inline-tps">
+                        {tokensPerSec.toFixed(1)} t/s
+                      </span>
+                    ) : undefined
+                  }
+                >
+                  <span className="ai-spinner" />
+                  <span>Waiting for response…</span>
+                </StatusPill>
               )}
-            {streaming !== null && tokensPerSec !== null && (
-              <span className="ai-inline-tps">
-                {tokensPerSec.toFixed(1)} t/s
-              </span>
-            )}
+            {streaming !== null &&
+              tokensPerSec !== null &&
+              !runningTools &&
+              !(warmingUp && streaming.length === 0) &&
+              !(
+                streaming.length === 0 &&
+                streamingBlocks.length === 0 &&
+                !warmingUp
+              ) && (
+                <StatusPill
+                  trail={
+                    <span className="ai-inline-tps">
+                      {tokensPerSec.toFixed(1)} t/s
+                    </span>
+                  }
+                >
+                  <span className="ai-spinner" />
+                  <span>Generating…</span>
+                </StatusPill>
+              )}
             {/* Stream-staleness badge. Fires when no provider event has
                 arrived in the last 10s while a turn is in flight. Lets
                 the user see "the app didn't forget about me" instead
@@ -4351,31 +4366,34 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                 if (idleSec < 10) return null;
                 const looksStuck = idleSec >= 30;
                 return (
-                  <>
+                  <StatusPill
+                    trail={
+                      looksStuck ? (
+                        <button
+                          type="button"
+                          className="ai-inline-stop"
+                          onClick={() => stop()}
+                          title="Cancel this turn"
+                        >
+                          <Icon name="stop" size={11} />
+                          <span>Stop</span>
+                        </button>
+                      ) : undefined
+                    }
+                  >
                     <span
-                      className={`ai-thinking ai-inline-stale${looksStuck ? " ai-inline-stale-stuck" : ""}`}
+                      className={`ai-inline-stale${looksStuck ? " ai-inline-stale-stuck" : ""}`}
                       title={
                         looksStuck
                           ? "Stream hasn't produced anything in 30+ seconds. Could be a slow tool, a slow API response, or genuinely stuck — Stop and try again if you don't want to wait."
                           : "No data from the model in this window. Click Stop to cancel if it's stuck."
                       }
                     >
-                      ·{" "}
                       {looksStuck
-                        ? `unusually slow (${idleSec}s)`
-                        : `still working (${idleSec}s)`}
+                        ? `Unusually slow (${idleSec}s)`
+                        : `Still working (${idleSec}s)`}
                     </span>
-                    {looksStuck && (
-                      <button
-                        className="ai-inline-stop"
-                        onClick={() => stop()}
-                        title="Cancel this turn"
-                      >
-                        <Icon name="stop" size={11} />
-                        <span>Stop</span>
-                      </button>
-                    )}
-                  </>
+                  </StatusPill>
                 );
               })()}
           </div>

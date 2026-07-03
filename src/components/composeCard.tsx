@@ -1,16 +1,9 @@
-// Changed-files summary bar — shown when an agentic turn made 2+
-// file-modifying tool calls. One collapsed line (file count + line
-// stats + Open all + Revert); expanding lists the touched files with
-// per-file stats. Deliberately NO diff bodies here — the inline edit
-// chips in the transcript already show each diff on click, and
-// duplicating them made this card a screen-tall wall on big turns.
-//
-// Lives outside AIChatPanel so the chat panel doesn't have to host
-// another 200 lines of UI logic. Pure component — props in, render out;
-// the only side-effects are file writes triggered by the Revert button.
+// Changed-files recap — Cursor-style panel at the end of a turn (2+ edits).
+// Neutral chrome: one bar (count + Undo / Keep / Review), expandable file list.
 
 import { useMemo, useState } from "react";
 import type { ToolCall } from "../ai";
+import { fileIconName } from "../fileIcons";
 import {
   diffStats,
   extractEditDiffs,
@@ -27,14 +20,12 @@ import {
 import { useStore } from "../store";
 import { Icon } from "./Icon";
 
-/**
- * Revert button rendered inside the ComposeCard header. Looks up the
- * pre-turn snapshot captured by sendUserText, then writes each touched
- * path's old content back to disk. Only enabled when (a) a snapshot
- * exists for this turn and (b) at least one of the touched paths is in
- * the snapshot.
- */
-function ComposeRevertButton({
+function basename(path: string): string {
+  const parts = path.replace(/\\/g, "/").split("/").filter(Boolean);
+  return parts[parts.length - 1] ?? path;
+}
+
+function ComposeUndoButton({
   wsId,
   chatId,
   msgIndex,
@@ -47,24 +38,19 @@ function ComposeRevertButton({
 }) {
   const [reverted, setReverted] = useState(false);
   const snap = lookupSnapshot(wsId, chatId, msgIndex);
-  // Only paths that were both modified by the agent AND captured in
-  // the pre-turn snapshot can be reverted. A file the agent created
-  // (Write to a brand-new path) won't be in the snapshot — we leave
-  // those alone since "revert" would mean delete, which is too
-  // destructive for a one-click action.
   const restorable = snap
     ? touchedPaths.filter((p) => snap.files.has(p))
     : [];
   const eligible = restorable.length;
-  const canRevert = !reverted && eligible > 0;
+  const canUndo = !reverted && eligible > 0;
 
   const onClick = async () => {
     if (!snap || eligible === 0) return;
     const ok = await dialogConfirm(
       `Revert ${eligible} file${eligible === 1 ? "" : "s"} back to the pre-turn state? Local edits made AFTER the agent's turn will also be discarded.`,
       {
-        title: "Revert all changes",
-        okLabel: "Revert",
+        title: "Undo all changes",
+        okLabel: "Undo all",
         cancelLabel: "Cancel",
         danger: true,
       },
@@ -76,8 +62,6 @@ function ComposeRevertButton({
       try {
         const before = snap.files.get(path);
         if (before === undefined) continue;
-        // Write to disk via the IPC layer + update the in-memory
-        // buffer so Monaco picks it up immediately.
         await fs.writeFile(path, before);
         useStore.setState((s) => {
           const w = s.loaded[wsId];
@@ -116,34 +100,26 @@ function ComposeRevertButton({
 
   if (reverted) {
     return (
-      <span className="ai-compose-reverted" title="Files restored to pre-turn state">
-        <Icon name="check" size={12} />
-        <span>Reverted</span>
+      <span className="ai-compose-undone" title="Files restored to pre-turn state">
+        Undone
       </span>
-    );
-  }
-  if (!canRevert) {
-    return (
-      <button
-        className="ai-compose-revert"
-        disabled
-        title={
-          snap
-            ? "No restorable files in the pre-turn snapshot (the agent may have created new files)"
-            : "No pre-turn snapshot available — Revert only works for turns started after page load with this feature live"
-        }
-      >
-        Revert
-      </button>
     );
   }
   return (
     <button
-      className="ai-compose-revert"
+      type="button"
+      className="ai-compose-ghost"
+      disabled={!canUndo}
       onClick={() => void onClick()}
-      title={`Roll ${eligible} file${eligible === 1 ? "" : "s"} back to pre-turn state`}
+      title={
+        canUndo
+          ? `Roll ${eligible} file${eligible === 1 ? "" : "s"} back to pre-turn state`
+          : snap
+            ? "No restorable files in the pre-turn snapshot"
+            : "No pre-turn snapshot available"
+      }
     >
-      ↶ Revert {eligible}
+      Undo All
     </button>
   );
 }
@@ -159,11 +135,7 @@ export function ComposeCard({
   msgIndex: number;
   calls: ToolCall[];
 }) {
-  // Collapsed by default — the bar is a summary + action strip, not
-  // the place to read diffs (the inline chips are).
   const [collapsed, setCollapsed] = useState(true);
-  // Group calls by target file, since one turn can hit the same
-  // file multiple times (Edit + Edit).
   const byPath = useMemo(() => {
     const m = new Map<string, ToolCall[]>();
     for (const c of calls) {
@@ -172,29 +144,14 @@ export function ComposeCard({
       if (arr) arr.push(c);
       else m.set(p, [c]);
     }
-    return Array.from(m.entries()); // [path, calls[]]
-  }, [calls]);
-
-  // Aggregate stats across every call in the turn.
-  const totals = useMemo(() => {
-    let added = 0;
-    let removed = 0;
-    for (const c of calls) {
-      const d = extractEditDiffs(c);
-      if (d) {
-        const s = diffStats(d);
-        added += s.added;
-        removed += s.removed;
-      }
-    }
-    return { added, removed };
+    return Array.from(m.entries());
   }, [calls]);
 
   const openFile = async (path: string) => {
     try {
       await useStore.getState().openFile(wsId, path);
     } catch {
-      /* file may not exist (Write to a new path that didn't take) */
+      /* file may not exist */
     }
   };
 
@@ -202,40 +159,52 @@ export function ComposeCard({
     for (const [path] of byPath) await openFile(path);
   };
 
+  const n = byPath.length;
+  const label = `${n} File${n === 1 ? "" : "s"}`;
+
   return (
-    <div className="ai-compose-card">
-      <div className="ai-compose-head">
+    <div className={`ai-compose-cursor${collapsed ? "" : " is-open"}`}>
+      <div className="ai-compose-bar">
         <button
-          className="ai-compose-toggle"
+          type="button"
+          className="ai-compose-bar-left"
           onClick={() => setCollapsed((c) => !c)}
-          title={collapsed ? "List changed files" : "Collapse"}
+          aria-expanded={!collapsed}
+          title={collapsed ? "Show changed files" : "Collapse"}
         >
-          {collapsed ? "▸" : "▾"}
+          <Icon
+            name={collapsed ? "chevron-right" : "chevron-down"}
+            size={14}
+          />
+          <span>{label}</span>
         </button>
-        <div className="ai-compose-title">
-          <strong>Files changed</strong>
-          <span className="ai-compose-meta">
-            {byPath.length} file{byPath.length === 1 ? "" : "s"} ·
-            <span className="ai-compose-add"> +{totals.added}</span>
-            <span className="ai-compose-rem"> −{totals.removed}</span>
-          </span>
+        <div className="ai-compose-bar-actions">
+          <ComposeUndoButton
+            wsId={wsId}
+            chatId={chatId}
+            msgIndex={msgIndex}
+            touchedPaths={byPath.map(([p]) => p)}
+          />
+          <button
+            type="button"
+            className="ai-compose-ghost"
+            onClick={() => setCollapsed(true)}
+            title="Collapse — changes are already saved"
+          >
+            Keep All
+          </button>
+          <button
+            type="button"
+            className="ai-compose-review"
+            onClick={() => void openAll()}
+            title="Open every modified file in editor tabs"
+          >
+            Review
+          </button>
         </div>
-        <button
-          className="ai-compose-open-all"
-          onClick={() => void openAll()}
-          title="Open every modified file in editor tabs"
-        >
-          Open all
-        </button>
-        <ComposeRevertButton
-          wsId={wsId}
-          chatId={chatId}
-          msgIndex={msgIndex}
-          touchedPaths={byPath.map(([p]) => p)}
-        />
       </div>
       {!collapsed && (
-        <div className="ai-compose-files">
+        <ul className="ai-compose-list">
           {byPath.map(([path, fileCalls]) => {
             const stats = fileCalls.reduce(
               (acc, c) => {
@@ -249,35 +218,28 @@ export function ComposeCard({
               },
               { added: 0, removed: 0 },
             );
-            const shortPath = (() => {
-              const parts = path.replace(/\\/g, "/").split("/").filter(Boolean);
-              if (parts.length <= 2) return path.replace(/\\/g, "/");
-              return "…/" + parts.slice(-2).join("/");
-            })();
+            const name = basename(path);
             return (
-              <div key={path} className="ai-compose-file">
-                <div className="ai-compose-file-head">
-                  <button
-                    className="ai-compose-path"
-                    onClick={() => void openFile(path)}
-                    title={`Open ${path}`}
-                  >
-                    {shortPath}
-                  </button>
-                  <span className="ai-compose-file-stats">
+              <li key={path}>
+                <button
+                  type="button"
+                  className="ai-compose-row"
+                  onClick={() => void openFile(path)}
+                  title={path}
+                >
+                  <span className="ai-compose-row-icon" aria-hidden>
+                    <Icon name={fileIconName(name)} size={14} />
+                  </span>
+                  <span className="ai-compose-row-name">{name}</span>
+                  <span className="ai-compose-row-stats">
                     <span className="ai-compose-add">+{stats.added}</span>
                     <span className="ai-compose-rem">−{stats.removed}</span>
-                    <span className="ai-compose-file-kind">
-                      {fileCalls.length > 1
-                        ? `${fileCalls.length} edits`
-                        : fileCalls[0].function.name}
-                    </span>
                   </span>
-                </div>
-              </div>
+                </button>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
     </div>
   );

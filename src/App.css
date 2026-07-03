@@ -52,6 +52,8 @@
   /* Image reads — teal tint so a Read of an attached image is identifiable. */
   --img: #3bb6c4;
   --img-bg: rgba(59, 182, 196, 0.16);
+  /* Label on a saturated workspace badge (active icon full fill). */
+  --ws-on-color: #ffffff;
   /* Frosted surface fill for static chrome (topbar, dropdowns, modals) */
   --glass-bg: rgba(20, 22, 28, 0.72);
 }
@@ -97,6 +99,7 @@
   --skill-bg: rgba(217, 114, 46, 0.14);
   --img: #0e8a99;
   --img-bg: rgba(14, 138, 153, 0.12);
+  --ws-on-color: #ffffff;
   --glass-bg: rgba(255, 255, 255, 0.72);
 }
 
@@ -712,16 +715,12 @@ input {
   border-color: var(--accent);
 }
 .ws-icon.active {
-  /* Cursor-like: neutral fill, accent only as a thin side trace */
   background: var(--bg-hi);
   color: var(--fg);
-  border-color: var(--border-strong);
-  box-shadow: -2px 0 0 var(--accent);
 }
 
-/* Per-project color (right-click → popover). The ONE chromatic touch in a
-   neutral chrome: a faint tint + colored label, stronger when active.
-   color-mix blends the chosen hex with the surface (WebKit/Tauri supports it). */
+/* Per-project color (right-click → popover). Inactive = faint tint;
+   active = full fill with white initials. */
 .ws-icon.has-color {
   background: color-mix(in srgb, var(--ws-color) 13%, var(--bg-elev));
   border-color: color-mix(in srgb, var(--ws-color) 30%, var(--border));
@@ -730,9 +729,12 @@ input {
   color: var(--ws-color);
 }
 .ws-icon.active.has-color {
-  background: color-mix(in srgb, var(--ws-color) 22%, var(--bg-hi));
-  border-color: color-mix(in srgb, var(--ws-color) 45%, var(--border));
-  box-shadow: -2px 0 0 var(--ws-color);
+  background: var(--ws-color);
+  border-color: var(--ws-color);
+}
+.ws-icon.active.has-color .ws-icon-text {
+  color: var(--ws-on-color);
+  font-weight: 700;
 }
 
 /* Drag-to-reorder feedback. The dragged icon dims + shrinks; the target slot
@@ -960,6 +962,7 @@ body.ws-dragging * {
 .topbar-brand {
   display: flex;
   align-items: center;
+  gap: 6px;
   font-weight: 700;
   color: var(--fg);
   font-size: 14px;
@@ -968,6 +971,29 @@ body.ws-dragging * {
   padding-left: 4px;
   user-select: none;
   flex-shrink: 0;
+  min-width: 0;
+}
+.topbar-brand-name {
+  flex-shrink: 0;
+}
+.topbar-brand-sep {
+  flex-shrink: 0;
+  font-weight: 500;
+  font-size: 12px;
+  color: var(--fg-muted);
+  letter-spacing: 0;
+}
+.topbar-brand-project {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--fg);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.topbar-brand-project.has-color {
+  color: var(--ws-color);
 }
 .topbar-menus {
   display: flex;
@@ -2633,12 +2659,16 @@ body.ws-dragging * {
   text-align: center;
 }
 .pane-empty-icon {
-  font-size: 36px;
-  background: linear-gradient(135deg, var(--accent), #9aa0ad);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  display: flex;
+  justify-content: center;
   margin-bottom: 4px;
+}
+.pane-empty-logo {
+  display: block;
+  height: 80px;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 .pane-empty-title {
   font-size: 14px;
@@ -5467,10 +5497,12 @@ body.ws-dragging * {
 }
 .settings-segmented {
   display: inline-flex;
+  gap: 4px;
+  padding: 3px;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  overflow: hidden;
+  border-radius: var(--radius-full);
+  overflow: visible;
 }
 .segmented-btn {
   display: inline-flex;
@@ -5478,7 +5510,7 @@ body.ws-dragging * {
   gap: 6px;
   background: transparent;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   padding: 5px 12px;
   font-size: 12px;
   color: var(--fg-dim);
@@ -8837,146 +8869,141 @@ body.ws-dragging * {
   color: var(--fg-muted);
 }
 
-/* Compose card — shown above per-call rows when an agentic turn
-   modified 2+ files. Aggregates them into a single header (file
-   count + line stats) with collapsible per-file diffs. */
-.ai-compose-card {
-  border: 1px solid var(--accent);
-  border-radius: 6px;
-  background: linear-gradient(
-    180deg,
-    rgba(124, 158, 255, 0.06),
-    rgba(124, 158, 255, 0.02) 30%,
-    transparent
-  );
-  margin: 6px 0;
+/* Files-changed — Cursor-style recap at end of turn. Neutral elevated
+   shell; diff colors only on +/− counts in the file list. */
+.ai-compose-foot {
+  width: 100%;
+  max-width: 100%;
+  margin: 12px 0 4px;
+}
+.ai-compose-cursor {
+  width: 100%;
+  max-width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
   overflow: hidden;
 }
-.ai-compose-head {
+.ai-compose-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  background: rgba(124, 158, 255, 0.05);
-}
-.ai-compose-toggle {
-  background: transparent;
-  border: none;
-  color: var(--fg-muted);
-  cursor: pointer;
-  font-size: 12px;
-  padding: 0 4px;
-  font-family: inherit;
-}
-.ai-compose-toggle:hover { color: var(--fg); }
-.ai-compose-title {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex: 1 1 auto;
-  font-size: 12px;
-  color: var(--fg);
-}
-.ai-compose-title strong { font-weight: 600; letter-spacing: 0.2px; }
-.ai-compose-meta {
-  color: var(--fg-muted);
-  font-size: 11px;
-  font-family: var(--mono);
-}
-.ai-compose-add { color: #7ddc99; font-weight: 500; }
-.ai-compose-rem { color: #ff8989; font-weight: 500; margin-left: 4px; }
-.ai-compose-open-all {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--fg-muted);
-  padding: 3px 9px;
-  border-radius: 4px;
-  font-size: 11px;
-  cursor: pointer;
-  font-family: inherit;
-}
-.ai-compose-open-all:hover {
-  color: var(--fg);
-  border-color: var(--border-strong);
-}
-.ai-compose-revert {
-  background: transparent;
-  border: 1px solid rgba(220, 70, 70, 0.45);
-  color: #ff8989;
-  padding: 3px 9px;
-  border-radius: 4px;
-  font-size: 11px;
-  cursor: pointer;
-  font-family: inherit;
-  margin-left: 6px;
-}
-.ai-compose-revert:hover:not(:disabled) {
-  background: rgba(220, 70, 70, 0.12);
-  color: #ffc7c7;
-}
-.ai-compose-revert:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  border-color: var(--border);
-  color: var(--fg-muted);
-}
-.ai-compose-reverted {
-  color: #7ddc99;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 9px;
-  margin-left: 6px;
-}
-.ai-compose-files {
-  display: flex;
-  flex-direction: column;
-}
-.ai-compose-file {
-  border-top: 1px solid var(--border);
-}
-.ai-compose-file:first-child { border-top: none; }
-.ai-compose-file-head {
-  display: flex;
   justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: var(--bg-alt);
-  font-size: 11.5px;
+  gap: 10px;
+  padding: 5px 8px 5px 4px;
+  min-height: 34px;
 }
-.ai-compose-path {
-  background: transparent;
-  border: none;
-  color: var(--fg);
-  font-family: var(--mono);
-  font-size: 11.5px;
-  cursor: pointer;
-  padding: 0;
-  text-align: left;
-  font-family: inherit;
-}
-.ai-compose-path:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-.ai-compose-file-stats {
+.ai-compose-bar-left {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 4px 6px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+}
+.ai-compose-bar-left:hover {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+.ai-compose-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.ai-compose-ghost {
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+}
+.ai-compose-ghost:hover:not(:disabled) {
+  color: var(--fg);
+  background: var(--bg-hover);
+}
+.ai-compose-ghost:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+.ai-compose-review {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-hi);
+  color: var(--fg);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+}
+.ai-compose-review:hover {
+  background: var(--bg);
+  border-color: var(--border-strong);
+}
+.ai-compose-undone {
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+.ai-compose-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+.ai-compose-row {
+  display: flex;
+  align-items: center;
   gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ai-compose-row:hover {
+  background: var(--bg-hover);
+}
+.ai-compose-row-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--fg-muted);
+}
+.ai-compose-row-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: var(--mono);
-  color: var(--fg-muted);
+  font-size: 12px;
+}
+.ai-compose-row-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-family: var(--mono);
   font-size: 11px;
+  font-weight: 600;
 }
-.ai-compose-file-kind {
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  font-size: 10px;
-  color: var(--fg-muted);
-}
-.ai-compose-file-body {
-  padding: 6px 10px 10px;
-}
+.ai-compose-add { color: var(--ok); }
+.ai-compose-rem { color: var(--err); }
 
 /* Edit / Write / MultiEdit — Cursor-style one-line pill ("Edited test.md +8");
    clicking opens the real before/after in the centered DiffModal. The +/−
@@ -9690,186 +9717,157 @@ body.ws-dragging * {
   max-height: 240px;
   overflow: auto;
 }
-/* Inline status row that lives in the conversation flow (right after the
-   latest AI message) instead of in a strip below the input. Mirrors how
-   Claude Code shows "Web Fetch …" / "Read …" rows as the AI works. */
+/* Inline status — Cursor-style pills in the message flow (not a full-width
+   accent strip). Each state is a compact bordered row; live tool rows stack
+   below as the same pill family as completed tool calls. */
 .ai-inline-status {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 4px 10px;
-  margin: 2px 0 4px;
-  border-left: 2px solid var(--accent);
-  font-size: 11px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 0;
+  margin: 8px 0 4px 14px;
+  border: none;
+  font-size: 12px;
   color: var(--fg-muted);
+}
+.ai-tcall-status {
+  width: 100%;
+  max-width: calc(100% - 2px);
+  margin: 0;
+  animation: ai-tcall-in 0.18s ease;
+}
+.ai-status-pill {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.ai-status-pill:has(.ai-inline-stale-stuck) {
+  border-color: color-mix(in srgb, var(--warn) 35%, var(--border));
+  background: var(--bg-elev);
+}
+.ai-status-pill-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-dim);
+  font-style: normal;
+}
+.ai-status-pill-trail {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 4px 8px 4px 10px;
+  border-left: 1px solid var(--border);
+  background: var(--bg-hi);
+}
+.ai-status-pill:has(.ai-inline-stale-stuck) .ai-status-pill-trail {
+  border-left-color: color-mix(in srgb, var(--warn) 28%, var(--border));
 }
 .ai-inline-tps {
   font-family: var(--mono);
-  font-size: 10px;
-  color: var(--accent);
-  margin-left: auto;
-}
-/* "still working (Xs)" badge that appears once the stream has been
-   silent for >10s. Subtler color so it doesn't compete with the main
-   spinner — its job is just to confirm the app hasn't lost track. */
-.ai-inline-stale {
-  font-style: italic;
+  font-size: 10.5px;
+  font-weight: 600;
   color: var(--fg-muted);
-  font-size: 10px;
+  letter-spacing: 0.02em;
 }
-/* After 30s the badge sharpens — the wording changes to "unusually slow"
-   and the color shifts toward warning so it's clear something might be
-   wrong. Paired with an inline Stop button (.ai-inline-stop). */
-.ai-inline-stale-stuck {
-  color: #e2c08d;
-  font-style: italic;
+.ai-status-pill-main .ai-spinner {
+  border-top-color: var(--fg-muted);
+  flex-shrink: 0;
+}
+.ai-status-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+}
+.ai-inline-stale {
+  color: var(--fg-muted);
+  font-size: 12px;
   font-weight: 500;
 }
+.ai-inline-stale-stuck {
+  color: var(--warn);
+}
 .ai-inline-stop {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   background: transparent;
-  border: 1px solid #e2c08d;
-  color: #e2c08d;
+  border: 1px solid color-mix(in srgb, var(--warn) 50%, var(--border));
+  color: var(--warn);
   padding: 2px 8px;
-  border-radius: 3px;
-  font-size: 10px;
+  border-radius: var(--radius-xs);
+  font-size: 10.5px;
+  font-weight: 500;
   cursor: pointer;
   font-family: inherit;
 }
 .ai-inline-stop:hover {
-  background: rgba(226, 192, 141, 0.15);
+  background: var(--warn-bg);
 }
-/* Running-tools live list — one row per in-flight tool with a small
-   code preview of the change about to land. Replaces the old
-   "Running: a, b, c +7" overflow string. */
-.ai-running-tools {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 4px;
-  width: 100%;
-  margin: 4px 0;
+/* Live tool rows during a turn — reuse .ai-tcall-head pills. */
+.ai-tcall-running .ai-tcall-head {
+  opacity: 1;
+  transition: opacity 0.2s ease;
 }
-.ai-running-header {
+.ai-tcall-running-done .ai-tcall-head {
+  opacity: 0.72;
+}
+.ai-tcall-running-error .ai-tcall-head {
+  border-color: color-mix(in srgb, var(--err) 45%, var(--border));
+  background: var(--err-bg);
+}
+.ai-running-row-check {
   display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  /* Sentence case, muted — the old SHOUTING-CAPS header made a routine
-     progress line read like an alert. */
-  color: var(--fg-muted);
-  padding: 2px 0;
+  color: var(--ok);
 }
-.ai-running-row {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 3px 10px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-left: 2px solid var(--accent);
-  border-radius: 4px;
-  width: 100%;
-  box-sizing: border-box;
-  align-self: stretch;
-  transition: background 200ms ease, border-left-color 200ms ease, opacity 200ms ease;
+.ai-running-row-x {
+  display: inline-flex;
+  color: var(--err);
 }
-.ai-running-row-running {
-  background: var(--bg-alt);
-  border-color: var(--border);
-  padding: 6px 10px;
+.ai-running-check {
+  display: inline-flex;
+  color: var(--ok);
 }
-.ai-running-row-done {
-  border-left-color: rgba(46, 204, 113, 0.55);
-  opacity: 0.7;
-}
-.ai-running-row-done .ai-running-row-head {
-  font-size: 11px;
-}
-/* Collapse toggle for long tool lists ("✓ 6 earlier tool calls"). */
 .ai-running-collapse {
   align-self: flex-start;
-  background: transparent;
+  background: var(--bg-alt);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   color: var(--fg-muted);
   font-size: 10.5px;
-  padding: 2px 8px;
+  font-weight: 500;
+  padding: 3px 9px;
   cursor: pointer;
+  font-family: inherit;
 }
 .ai-running-collapse:hover {
   color: var(--fg);
-  border-color: var(--border-strong, var(--border));
-}
-.ai-running-row-error {
-  border-left-color: #dc4646;
-  background: linear-gradient(90deg, rgba(220, 70, 70, 0.10), var(--bg-alt) 30%);
-}
-.ai-running-row-check {
-  color: #2ecc71;
-  font-size: 13px;
-  font-weight: 700;
-  margin-left: auto;
-  line-height: 1;
-}
-.ai-running-row-x {
-  color: #ff8989;
-  font-size: 13px;
-  font-weight: 700;
-  margin-left: auto;
-  line-height: 1;
-}
-.ai-running-check {
-  color: #2ecc71;
-  font-size: 12px;
-  font-weight: 700;
-  margin-right: 6px;
-}
-.ai-running-row-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  min-width: 0;
-}
-.ai-running-row-icon {
-  flex: 0 0 auto;
-  font-size: 13px;
-  line-height: 1;
-  width: 16px;
-  text-align: center;
-}
-.ai-running-row-name {
-  flex: 0 0 auto;
-  font-weight: 600;
-  color: var(--fg);
-  font-size: 11px;
-  letter-spacing: 0.2px;
-}
-.ai-running-row-detail {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--fg-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.ai-running-row-spinner {
-  flex: 0 0 auto;
-  margin-left: auto;
+  border-color: var(--border-strong);
+  background: var(--bg-hi);
 }
 .ai-running-row-preview {
-  margin: 0;
+  margin: 2px 0 0 8px;
   padding: 6px 8px;
   font-family: var(--mono);
   font-size: 10.5px;
   line-height: 1.45;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   max-height: 120px;
   overflow: hidden;
   white-space: pre-wrap;
@@ -10143,6 +10141,120 @@ body.ws-dragging * {
   flex: 1;
   overflow: auto;
   padding: 14px;
+}
+.tool-drawer--terminal .tool-drawer-body {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--term-bg);
+}
+/* Simulated terminal inside the Bash tool drawer — mirrors the in-app xterm pane. */
+.term-sim {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--term-bg);
+  color: var(--term-fg);
+}
+.term-sim-chrome {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+  flex-shrink: 0;
+  user-select: none;
+}
+.term-sim-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.term-sim-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: block;
+}
+.term-sim-dot--close {
+  background: var(--err);
+}
+.term-sim-dot--min {
+  background: var(--warn);
+}
+.term-sim-dot--max {
+  background: var(--ok);
+}
+.term-sim-chrome-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--fg-muted);
+  letter-spacing: 0.01em;
+}
+.term-sim-screen {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 16px 18px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.term-sim-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.term-sim-prompt {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  flex-shrink: 0;
+  user-select: none;
+}
+.term-sim-prompt-user {
+  color: var(--ok);
+  font-weight: 600;
+}
+.term-sim-prompt-char {
+  color: var(--ok);
+  font-weight: 600;
+}
+.term-sim-command {
+  color: var(--term-fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+  flex: 1;
+  min-width: 0;
+}
+.term-sim-output {
+  margin: 10px 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--term-fg) 88%, transparent);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+.term-sim-exit {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: color-mix(in srgb, var(--term-fg) 45%, transparent);
+}
+.term-sim-exit--ok {
+  color: var(--ok);
+}
+.term-sim-exit--err {
+  color: var(--err);
 }
 /* The body IS the scroll area — drop the inner card's frame/scroll so the
    output fills the drawer edge to edge. */
@@ -12653,9 +12765,7 @@ body.ws-dragging * {
 }
 .agent-wsrail-icon.active {
   background: var(--bg-hi);
-  border-color: var(--border-strong);
   color: var(--fg);
-  box-shadow: inset 2px 0 0 var(--accent);
 }
 /* Per-project color in the agent rail (mirrors .ws-icon.has-color) */
 .agent-wsrail-icon.has-color {
@@ -12666,9 +12776,12 @@ body.ws-dragging * {
   color: var(--ws-color);
 }
 .agent-wsrail-icon.active.has-color {
-  background: color-mix(in srgb, var(--ws-color) 22%, var(--bg-hi));
-  border-color: color-mix(in srgb, var(--ws-color) 45%, var(--border));
-  box-shadow: inset 2px 0 0 var(--ws-color);
+  background: var(--ws-color);
+  border-color: var(--ws-color);
+}
+.agent-wsrail-icon.active.has-color .agent-wsrail-text {
+  color: var(--ws-on-color);
+  font-weight: 800;
 }
 .agent-wsrail-text {
   font-size: 12px;
