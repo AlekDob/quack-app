@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-01
+last_verified: 2026-07-03
 tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command]
 ---
 
@@ -17,8 +17,8 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Bridge store | `src/permModeStore.ts` | `setPermMode(opts, mode)`, `getPermModeFor(req)` — mode keyed by CC session id (+ cwd fallback) |
-| Enforcer | `src/components/ClaudePermissionOverlay.tsx` | `modeAutoAllow(req)` + `WRITE_TOOLS`; auto-allows after the safety gates |
-| Producer | `src/components/AIChatPanel.tsx` | `ccPermMode` state, `/mode` handler, mode menu; publishes via `setPermMode` |
+| Enforcer | `src/components/ClaudePermissionOverlay.tsx` | `isForThisPanel(req)` route guard; `modeAutoAllow(req)` + `WRITE_TOOLS`; auto-allows after the safety gates |
+| Producer | `src/components/AIChatPanel.tsx` | `ccPermMode` state, `/mode` handler, mode menu; publishes via `setPermMode`; passes `ownerRoot` / `ownerSessionId` / `ownerStreaming` to the overlay |
 | Slash hint | `src/slashCommands.ts` | `/mode ask\|plan\|auto-edit\|auto\|bypass` |
 | Hook gate (backend) | `src-tauri/src/claude_code.rs` | `apply_clean_env` sets `CODETTA_PERM_HOOK=1`; `build_hook_command` emits `permissionDecision:'ask'` when that env is absent |
 
@@ -34,7 +34,7 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 ### Data Flow
 - `AIChatPanel` holds `ccPermMode` (seeded from `localStorage["lcp.claudeCode.permMode"]`). A `useEffect` persists it and calls `setPermMode({ sessionId, cwd: root }, mode)` on every change.
 - `permModeStore` records the mode in `bySession` (by CC session id) and `byCwd` (normalized root) — the cwd fallback covers the first tool call of a fresh chat before its session id has streamed back.
-- A `claude:permission-request` arrives → `ClaudePermissionOverlay` runs its gates **in order**: AskUserQuestion redirect → **Bypass allow-all** → privacy exclusion → read-only allow → `modeAutoAllow(req)` → (in Plan mode: stop, show card) → saved/always-allow rules → show card.
+- A `claude:permission-request` arrives → every mounted `ClaudePermissionOverlay` hears it (global event). `isForThisPanel` drops requests that belong to another workspace or another CC session within the same workspace. The surviving overlay runs its gates **in order**: AskUserQuestion redirect → **Bypass allow-all** → privacy exclusion → read-only allow → `modeAutoAllow(req)` → (in Plan mode: stop, show card) → saved/always-allow rules → show card.
 - `modeAutoAllow` calls `getPermModeFor(req)` (session id, then cwd, else `"default"`): `auto` → allow all; `acceptEdits` → allow only `WRITE_TOOLS`; `plan` → allow Bash only when `isReadOnlyBash` (head ∈ `READ_ONLY_BASH`, or `git` + read-only subcommand, and no chain/redirect/pipe/subshell via `BASH_CHAIN_RE`); else → no mode-based allow.
 
 ### State
@@ -43,6 +43,7 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 | `permModeStore` module Maps | `bySession`, `byCwd` | app session (in-memory) |
 | `localStorage` `lcp.claudeCode.permMode` | last chosen mode | across restarts |
 | `AIChatPanel` `ccPermMode` | per-chat React state | component |
+| `ClaudePermissionOverlay` `queue` | pending permission cards for THIS panel's CC session | component (purged on session switch) |
 
 ### Notes / gotchas
 - **Why a module store, not a prop:** the overlay registers its `claude:permission-request` listener once and lives for the whole app — it can't read a panel's React state without closure-staleness. Pattern cloned from `aiTaskStore.ts`.
@@ -55,6 +56,11 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 - Mode is normalized: `default` is stored as `null` (Ask) so "no mode set" and "explicitly Ask" are the same state.
 - **"Allow all" card shortcut:** the card's emphasized action flips the chat to Auto in one click. The overlay takes an `onAllowAll` prop wired by `AIChatPanel` to `setCcPermMode("auto")` — so the composer mode chip + localStorage stay in sync (the overlay does NOT write `permModeStore` directly, which would diverge from the UI). On click it also resolves every already-queued request as allow. This is the "otherwise it asks 100 times" fix; Auto keeps the privacy gate + AskUserQuestion redirect.
 - **Card visuals:** styled to match the airy neutral composer — `--radius-md` + `--shadow-md`, hairline `--border` (not accent), SVG header icon (no emoji), two action clusters (quiet granular "always/this-session" chips left; Deny · Allow once · **Allow all** right). Allow once = solid neutral (Enter default); Allow all = monochrome primary (`--primary-bg`).
-- **Foreign-session gate (the real root cause of "permessi dal nulla"):** the PreToolUse hook Codetta installs lives in `<workspace>/.claude/settings.local.json` forever, so it ALSO fires for claude sessions Codetta didn't spawn — a terminal `claude`, another editor — running in that folder, POSTing their permission prompts into Codetta. Fix at the hook level (`claude_code.rs`): Codetta spawns its own claude with the env var `CODETTA_PERM_HOOK=1` (set in `apply_clean_env`); the inlined Node hook script (`build_hook_command`) checks `process.env.CODETTA_PERM_HOOK` as its FIRST statement and, when absent, emits `permissionDecision:'ask'` and returns **before** building the URL or opening any socket — deferring to Claude Code's NATIVE terminal prompt instead of POSTing to Codetta. Only Codetta-spawned sessions carry the var and reach the localhost server. Takes effect once the workspace's `settings.local.json` hook is rewritten (on workspace open) AND the foreign session restarts (it caches the hook at startup). The frontend route-guard below is the complementary in-Codetta layer (routes OUR sessions to the right panel).
-- **Route guard (per-workspace ownership):** the permission server is app-wide (one port, one global `claude:permission-request` event), so the event fires for EVERY running CC session — including background agents in other open workspaces (their `.claude/settings.local.json` still points its PreToolUse hook at our port). `AIChatPanel` passes `ownerRoot={root}`/`ownerSessionId={claudeSessionId}` to the overlay; `isForThisPanel(req)` at the top of the listener drops any request whose `cwd` doesn't match the panel's root (authoritative + always-known key → never drops a legit request from your own workspace; `session_id` is only a fallback tiebreak when `cwd` is absent). Without it, a stopped chat surfaced cards from an unrelated project ("permessi dal nulla"). Known benign edge: two chats in the SAME workspace both show the card — first decision resolves it, the other is a no-op.
+- **Foreign-session gate (the real root cause of "permessi dal nulla" across workspaces):** the PreToolUse hook Codetta installs lives in `<workspace>/.claude/settings.local.json` forever, so it ALSO fires for claude sessions Codetta didn't spawn — a terminal `claude`, another editor — running in that folder, POSTing their permission prompts into Codetta. Fix at the hook level (`claude_code.rs`): Codetta spawns its own claude with the env var `CODETTA_PERM_HOOK=1` (set in `apply_clean_env`); the inlined Node hook script (`build_hook_command`) checks `process.env.CODETTA_PERM_HOOK` as its FIRST statement and, when absent, emits `permissionDecision:'ask'` and returns **before** building the URL or opening any socket — deferring to Claude Code's NATIVE terminal prompt instead of POSTing to Codetta. Only Codetta-spawned sessions carry the var and reach the localhost server. Takes effect once the workspace's `settings.local.json` hook is rewritten (on workspace open) AND the foreign session restarts (it caches the hook at startup). The frontend route-guard below is the complementary in-Codetta layer (routes OUR sessions to the right panel).
+- **Route guard (`isForThisPanel`) — two layers:** the permission server is app-wide (one port, one global `claude:permission-request` event), so the event fires for EVERY running CC session — including background agents in other open workspaces and **other chats in the same workspace** (multiple `AIChatPanel` instances stay mounted via `AIChatHost` lazy portals). `AIChatPanel` passes three owner props to the overlay:
+  1. `ownerRoot={root}` — workspace cwd gate. Different project → drop immediately.
+  2. `ownerSessionId={claudeSessionId}` — **authoritative within a workspace.** When the request carries `session_id` (always, from the PreToolUse hook), only the panel whose captured CC session id matches enqueues the card. This fixes "permission card stuck on every chat in Virgilio" — the old guard matched cwd alone, so every tab in the same folder showed the same pending Bash card even after switching to an unrelated session.
+  3. `ownerStreaming={streaming !== null || runningTools}` — pre-init fallback for the first tool call before the `system/init` event streams back a `session_id`. Only the panel with an in-flight turn can claim the request; idle background tabs in the same workspace no longer fan out.
+  **Queue purge:** a `useEffect` on `[ownerRoot, ownerSessionId, ownerStreaming]` filters the overlay queue through `isForThisPanel` so stale cards disappear when the user switches chat or the CC session id lands. Pattern mirrors `AgentHubWatcher.resolveChat`, which already preferred `claudeSessionId` over cwd for hub status — the overlay was the missing piece.
+  **Decision order inside `isForThisPanel`:** (1) reject different `cwd`; (2) if `req.session_id` present → match `ownerSessionId`, or require `ownerStreaming` when the panel hasn't captured init yet; (3) cwd-only fallback when `session_id` absent (shouldn't happen); (4) default `false` — never accept orphan requests.
 - The overlay/cards themselves are documented alongside the bridge — see [014-claude-code-bridge.md](014-claude-code-bridge.md).

@@ -206,27 +206,29 @@ function normRoot(p: string): string {
 /**
  * Route guard: does this permission request belong to the AIChatPanel
  * that mounts THIS overlay? The permission server is app-wide (one port,
- * one global `claude:permission-request` event), so without this filter a
- * background agent in ANOTHER workspace — whose `.claude/settings.local.json`
- * still points its PreToolUse hook at our port — would surface its card in
- * whatever chat is on screen ("permessi dal nulla a conversazione ferma").
- *
- * `cwd` is the authoritative key: it's stable and always known, so we never
- * drop a legitimate request from our own workspace. A request from a DIFFERENT
- * cwd is not ours — ignore it and let the owning workspace's overlay handle it.
- * (Two chats in the SAME workspace both matching is a pre-existing, benign
- * duplication — the first decision resolves the request; the other is a no-op.)
+ * one global `claude:permission-request` event), so every panel's listener
+ * sees every request. Filter on workspace cwd first, then Claude session id
+ * so two chats in the SAME workspace don't all surface the same card.
  */
 function isForThisPanel(
   req: PermissionRequest,
   ownerRoot: string,
   ownerSessionId: string | undefined,
+  ownerStreaming: boolean,
 ): boolean {
+  if (req.cwd && ownerRoot) {
+    if (normRoot(req.cwd) !== normRoot(ownerRoot)) return false;
+  } else if (req.cwd || ownerRoot) {
+    if (!req.session_id || !ownerSessionId) return false;
+  }
+
+  if (req.session_id) {
+    if (ownerSessionId) return req.session_id === ownerSessionId;
+    return ownerStreaming;
+  }
+
   if (req.cwd && ownerRoot) return normRoot(req.cwd) === normRoot(ownerRoot);
-  // No cwd on the request (shouldn't happen) — fall back to session id when
-  // both sides know it; otherwise accept to avoid dropping a real request.
-  if (req.session_id && ownerSessionId) return req.session_id === ownerSessionId;
-  return true;
+  return false;
 }
 
 /**
@@ -274,12 +276,15 @@ function shouldAutoAllow(req: PermissionRequest, rules: AllowRules): boolean {
 export function ClaudePermissionOverlay({
   ownerRoot,
   ownerSessionId,
+  ownerStreaming,
   onAllowAll,
 }: {
   /** Workspace cwd this overlay's panel drives — used to route cards. */
   ownerRoot: string;
   /** CC session id of this panel, once it has streamed back (tiebreaker). */
   ownerSessionId?: string;
+  /** True while this panel has an in-flight turn (pre-init session routing). */
+  ownerStreaming: boolean;
   /** Flip this chat to "stop asking" (Auto mode). Wired by AIChatPanel to
    *  setCcPermMode("auto") so the composer chip + persistence stay in sync. */
   onAllowAll?: () => void;
@@ -289,10 +294,27 @@ export function ClaudePermissionOverlay({
   // Owner identity mirrored to a ref: the listener is registered once and
   // lives forever, so it must read fresh values (claudeSessionId streams in
   // after mount) without re-subscribing.
-  const ownerRef = useRef({ root: ownerRoot, sessionId: ownerSessionId });
+  const ownerRef = useRef({
+    root: ownerRoot,
+    sessionId: ownerSessionId,
+    streaming: ownerStreaming,
+  });
   useEffect(() => {
-    ownerRef.current = { root: ownerRoot, sessionId: ownerSessionId };
-  }, [ownerRoot, ownerSessionId]);
+    ownerRef.current = {
+      root: ownerRoot,
+      sessionId: ownerSessionId,
+      streaming: ownerStreaming,
+    };
+  }, [ownerRoot, ownerSessionId, ownerStreaming]);
+
+  // Drop stale cards when the user switches chat or the CC session id lands.
+  useEffect(() => {
+    setQueue((q) =>
+      q.filter((r) =>
+        isForThisPanel(r, ownerRoot, ownerSessionId, ownerStreaming),
+      ),
+    );
+  }, [ownerRoot, ownerSessionId, ownerStreaming]);
 
   // Persisted always-allow. Mirrored to a ref so the listener (which
   // is registered once and lives forever) can read fresh state without
@@ -323,7 +345,11 @@ export function ClaudePermissionOverlay({
       // another workspace's overlay owns the rest. Without this, a stopped
       // chat surfaces cards from an unrelated project ("permessi dal nulla").
       const owner = ownerRef.current;
-      if (!isForThisPanel(req, owner.root, owner.sessionId)) return;
+      if (
+        !isForThisPanel(req, owner.root, owner.sessionId, owner.streaming)
+      ) {
+        return;
+      }
       // AskUserQuestion can't work headless — the CLI's question UI
       // doesn't exist under -p, so the call dies opaquely and the user
       // never sees the question. Deny with a reason that redirects the

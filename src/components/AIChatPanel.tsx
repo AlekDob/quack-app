@@ -4853,6 +4853,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       <ClaudePermissionOverlay
         ownerRoot={root}
         ownerSessionId={claudeSessionId}
+        ownerStreaming={streaming !== null || runningTools}
         onAllowAll={() => setCcPermMode("auto")}
       />
       {queueLen > 0 && (
