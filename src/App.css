@@ -53,6 +53,14 @@
   /* Image reads — teal tint so a Read of an attached image is identifiable. */
   --img: #3bb6c4;
   --img-bg: rgba(59, 182, 196, 0.16);
+  /* Per-tool icon tints — icon glyph only; pills stay neutral chrome. */
+  --tool-read: #5b9cf5;
+  --tool-bash: #e8a838;
+  --tool-search: #9b7cf6;
+  --tool-edit: #3ecf8e;
+  --tool-web: #36c5d0;
+  --tool-task: #e879a8;
+  --tool-todo: #a3d645;
   /* Label on a saturated workspace badge (active icon full fill). */
   --ws-on-color: #ffffff;
   /* Frosted surface fill for static chrome (topbar, dropdowns, modals) */
@@ -101,6 +109,13 @@
   --skill-bg: rgba(217, 114, 46, 0.14);
   --img: #0e8a99;
   --img-bg: rgba(14, 138, 153, 0.12);
+  --tool-read: #2563eb;
+  --tool-bash: #b45309;
+  --tool-search: #7c3aed;
+  --tool-edit: #059669;
+  --tool-web: #0891b2;
+  --tool-task: #db2777;
+  --tool-todo: #65a30d;
   --ws-on-color: #ffffff;
   --glass-bg: rgba(255, 255, 255, 0.72);
 }
@@ -6667,6 +6682,14 @@ body.ws-dragging * {
 .ai-chip.active svg {
   color: var(--accent);
 }
+.ai-chip.active svg[class*="ai-tool-tone-"] {
+  color: inherit;
+}
+.ai-chip.active svg.ai-tool-tone-read { color: var(--tool-read); }
+.ai-chip.active svg.ai-tool-tone-bash { color: var(--tool-bash); }
+.ai-chip.active svg.ai-tool-tone-search { color: var(--tool-search); }
+.ai-chip.active svg.ai-tool-tone-edit { color: var(--tool-edit); }
+.ai-chip.active svg.ai-tool-tone-web { color: var(--tool-web); }
 .ai-actionstrip-detail {
   margin-top: 6px;
   padding: 4px 6px;
@@ -6720,6 +6743,13 @@ body.ws-dragging * {
 .ai-ichip.active svg {
   color: var(--accent);
 }
+.ai-ichip.active svg.ai-tool-tone-read { color: var(--tool-read); }
+.ai-ichip.active svg.ai-tool-tone-bash { color: var(--tool-bash); }
+.ai-ichip.active svg.ai-tool-tone-search { color: var(--tool-search); }
+.ai-ichip.active svg.ai-tool-tone-edit { color: var(--tool-edit); }
+.ai-ichip.active svg.ai-tool-tone-web { color: var(--tool-web); }
+.ai-ichip.active svg.ai-tool-tone-task { color: var(--tool-task); }
+.ai-ichip.active svg.ai-tool-tone-todo { color: var(--tool-todo); }
 .ai-ichip-count {
   font-size: 10px;
   font-weight: 700;
@@ -6800,6 +6830,9 @@ body.ws-dragging * {
 }
 .ai-ichip.tone-edit svg {
   color: var(--accent);
+}
+.ai-ichip.tone-edit svg.ai-tool-tone-edit {
+  color: var(--tool-edit);
 }
 /* Error always wins over tone. */
 .ai-ichip.status-error.tone-edit,
@@ -10126,9 +10159,31 @@ body.ws-dragging * {
   color: var(--fg-muted);
   flex-shrink: 0;
 }
-.ai-tcall-head.is-interactive:hover .ai-tcall-ico {
+.ai-tcall-head.is-interactive:hover .ai-tcall-ico:not([class*="ai-tool-tone-"]) {
   color: var(--fg);
 }
+/* Per-tool icon tints — glyph only; pill chrome stays neutral. */
+.ai-tool-tone-read { color: var(--tool-read); }
+.ai-tool-tone-bash { color: var(--tool-bash); }
+.ai-tool-tone-search { color: var(--tool-search); }
+.ai-tool-tone-edit { color: var(--tool-edit); }
+.ai-tool-tone-web { color: var(--tool-web); }
+.ai-tool-tone-task { color: var(--tool-task); }
+.ai-tool-tone-todo { color: var(--tool-todo); }
+.ai-chip svg.ai-tool-tone-read,
+.ai-ichip svg.ai-tool-tone-read { color: var(--tool-read); }
+.ai-chip svg.ai-tool-tone-bash,
+.ai-ichip svg.ai-tool-tone-bash { color: var(--tool-bash); }
+.ai-chip svg.ai-tool-tone-search,
+.ai-ichip svg.ai-tool-tone-search { color: var(--tool-search); }
+.ai-chip svg.ai-tool-tone-edit,
+.ai-ichip svg.ai-tool-tone-edit { color: var(--tool-edit); }
+.ai-chip svg.ai-tool-tone-web,
+.ai-ichip svg.ai-tool-tone-web { color: var(--tool-web); }
+.ai-chip svg.ai-tool-tone-task,
+.ai-ichip svg.ai-tool-tone-task { color: var(--tool-task); }
+.ai-chip svg.ai-tool-tone-todo,
+.ai-ichip svg.ai-tool-tone-todo { color: var(--tool-todo); }
 /* Skill tool row — violet pill matching the `/` skill menu identity. */
 .ai-tcall-head.ai-tcall-skill {
   border-color: color-mix(in srgb, var(--skill) 45%, var(--border));

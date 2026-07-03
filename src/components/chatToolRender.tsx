@@ -309,6 +309,7 @@ function ToolRowHead({
   primaryTitle,
   skill,
   image,
+  toolName,
 }: {
   icon: IconName | null;
   name: string;
@@ -321,7 +322,10 @@ function ToolRowHead({
   skill?: boolean;
   /** Tint the pill — a Read of an image attachment (distinct, identifiable). */
   image?: boolean;
+  /** Raw tool name — drives per-family icon tint when not skill/image. */
+  toolName?: string;
 }) {
+  const icoTone = toolToneClass(toolName ?? name, { skill, image });
   return (
     <div
       className={`ai-tcall-head${onPrimary ? " is-interactive" : ""}${
@@ -335,7 +339,7 @@ function ToolRowHead({
         onClick={onPrimary}
         title={primaryTitle}
       >
-        <span className="ai-tcall-ico" aria-hidden="true">
+        <span className={`ai-tcall-ico${icoTone ? ` ${icoTone}` : ""}`} aria-hidden="true">
           {icon ? <Icon name={icon} size={13} /> : <span className="ai-tcall-dot" />}
         </span>
         <span className="ai-tcall-name">{name}</span>
@@ -609,11 +613,12 @@ export function RunningToolRow({
     entry.preview && entry.preview.split("\n").length > 6;
   const icon = toolIconFor(entry.name);
   const status = entry.status ?? "running";
+  const icoTone = toolToneClass(entry.name);
   return (
     <div className={`ai-tcall ai-tcall-running ai-tcall-running-${status}`}>
       <div className="ai-tcall-head">
         <span className="ai-tcall-open">
-          <span className="ai-tcall-ico" aria-hidden>
+          <span className={`ai-tcall-ico${icoTone ? ` ${icoTone}` : ""}`} aria-hidden>
             {icon ? <Icon name={icon} size={12} /> : <span className="ai-tcall-dot" />}
           </span>
           <span className="ai-tcall-name">{entry.name}</span>
@@ -908,7 +913,7 @@ function InlineActionRow({
             onClick={() => setOpen(open === "explore" ? null : "explore")}
           >
             <span className="ai-ichip-dot" aria-hidden="true" />
-            <Icon name="search" size={12} />
+            <Icon name="search" size={12} className="ai-tool-tone-search" />
             <span className="ai-ichip-label">{exLabel}</span>
           </button>
         )}
@@ -938,7 +943,11 @@ function InlineActionRow({
               }}
             >
               <span className="ai-ichip-dot" aria-hidden="true" />
-              <Icon name={toolIconName(g.name)} size={13} />
+              <Icon
+                name={toolIconName(g.name)}
+                size={13}
+                className={toolToneClass(g.name) || undefined}
+              />
               {targets.length > 1 && n > 1 && (
                 <span className="ai-ichip-count">{n}</span>
               )}
@@ -1075,6 +1084,71 @@ const TASK_NAMES = new Set([
   "AskUserQuestion",
 ]);
 
+export type ToolTone =
+  | "read"
+  | "bash"
+  | "search"
+  | "edit"
+  | "web"
+  | "todo"
+  | "task"
+  | "skill";
+
+/** Per-tool-family hue for icon glyphs — quick scan at a glance. */
+export function toolToneOf(name: string): ToolTone | null {
+  if (name === "Skill") return "skill";
+  if (READ_NAMES.has(name)) return "read";
+  if (BASH_NAMES.has(name) || name === "KillShell") return "bash";
+  if (
+    name === "Grep" ||
+    name === "Glob" ||
+    name === "ToolSearch" ||
+    name === "grep" ||
+    name === "glob" ||
+    name === "search"
+  ) {
+    return "search";
+  }
+  if (
+    EDIT_NAMES.has(name) ||
+    name === "edit_file" ||
+    name === "edit" ||
+    name === "write_file" ||
+    name === "write"
+  ) {
+    return "edit";
+  }
+  if (
+    name === "WebFetch" ||
+    name === "WebSearch" ||
+    name === "web_fetch" ||
+    name === "fetch" ||
+    name === "web_search" ||
+    name === "search_web"
+  ) {
+    return "web";
+  }
+  if (name === "TodoWrite") return "todo";
+  if (name === "Task" || name === "Agent" || TASK_NAMES.has(name)) return "task";
+  return null;
+}
+
+function toolToneClass(
+  name: string,
+  opts?: { skill?: boolean; image?: boolean },
+): string {
+  if (opts?.skill || opts?.image) return "";
+  const tone = toolToneOf(name);
+  return tone ? `ai-tool-tone-${tone}` : "";
+}
+
+const ACTION_TONE: Record<string, ToolTone> = {
+  read: "read",
+  search: "search",
+  run: "bash",
+  web: "web",
+};
+
 function actionCategoryKey(name: string): string {
   for (const c of ACTION_CATS) if (c.names.includes(name)) return c.key;
   return "other";
@@ -1132,7 +1206,13 @@ export function ActionStrip({
             onClick={() => setOpen(open === g.key ? null : g.key)}
             aria-expanded={open === g.key}
           >
-            <Icon name={g.icon} size={12} />
+            <Icon
+              name={g.icon}
+              size={12}
+              className={
+                ACTION_TONE[g.key] ? `ai-tool-tone-${ACTION_TONE[g.key]}` : undefined
+              }
+            />
             <span>{g.label(g.items.length)}</span>
           </button>
         ))}
@@ -1607,6 +1687,7 @@ export function ToolCallRow({
         primaryTitle={primaryTitle}
         skill={call.function.name === "Skill"}
         image={!!imageRef}
+        toolName={call.function.name}
         extra={
           !hasResult ? (
             <span className="ai-spinner ai-spinner-sm" />
@@ -1664,6 +1745,7 @@ function EditDiffCard({ call, diffs, result }: EditDiffCardProps) {
         detailTitle={path}
         onPrimary={openDiff}
         primaryTitle={`Open the diff for ${base}`}
+        toolName={call.function.name}
         extra={
           <>
             {removed > 0 && (

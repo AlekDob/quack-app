@@ -4,7 +4,7 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
 last_verified: 2026-07-03
-tags: [ai-chat, tool-calls, chatToolRender, cursor-style, drawer, diff-modal, css, presentational]
+tags: [ai-chat, tool-calls, chatToolRender, cursor-style, drawer, diff-modal, css, presentational, tool-icon-tints]
 ---
 
 ## Chat Tool-Call Rendering
@@ -94,6 +94,44 @@ pills. **Docked above the composer** in `.ai-status-dock` (feature 022), not in
 the message scroll. Includes optional `RunningToolList` below the header pill
 when tools aren't already rendered inline in `streamingBlocks`.
 
+### Per-tool icon tints (scan-at-a-glance)
+
+Each tool **family** gets a dedicated hue on its **icon glyph only** — the pill chrome
+stays neutral (`--bg-alt` border). Goal: scan a long turn (6+ Bash/Read/Grep rows) without
+reading every label.
+
+| Tone | CSS class | Token | Tools |
+|---|---|---|---|
+| read | `.ai-tool-tone-read` | `--tool-read` | `Read`, `read_file`, `NotebookRead` |
+| bash | `.ai-tool-tone-bash` | `--tool-bash` | `Bash`, `bash`, `shell`, `BashOutput`, `KillShell` |
+| search | `.ai-tool-tone-search` | `--tool-search` | `Grep`, `Glob`, `ToolSearch`, lowercase aliases |
+| edit | `.ai-tool-tone-edit` | `--tool-edit` | `Edit`, `Write`, `MultiEdit`, `create_file`, … |
+| web | `.ai-tool-tone-web` | `--tool-web` | `WebFetch`, `WebSearch`, fetch/search aliases |
+| todo | `.ai-tool-tone-todo` | `--tool-todo` | `TodoWrite` |
+| task | `.ai-tool-tone-task` | `--tool-task` | `Task`, `Agent`, `TaskCreate`/`Update`/`List` |
+
+**Exceptions (full-pill tint, not icon-only):**
+- **Skill** — existing `.ai-tcall-skill` pill (`--skill` orange).
+- **Image read** — existing `.ai-tcall-image` pill (`--img` teal) when `Read` targets an image path.
+
+**Logic:** `toolToneOf(name)` → `ToolTone | null` (exported). `toolToneClass(name, {skill, image})`
+returns the `ai-tool-tone-*` suffix; skill/image opts skip the class (pill rules own the colour).
+`ToolRowHead` accepts `toolName` and applies the class on `.ai-tcall-ico`.
+
+**Where it renders:**
+| Surface | How |
+|---|---|
+| Transcript pills | `ToolRowHead` → `.ai-tcall-ico.ai-tool-tone-*` |
+| Live ticker | `RunningToolRow` |
+| Compact chips | `InlineActionRow` — `Icon` `className` |
+| Action strip | `ActionStrip` — `ACTION_TONE` maps category key → tone |
+
+Hover on interactive pills: neutral icons brighten to `--fg`; toned icons **keep** their hue
+(`.ai-tcall-ico:not([class*="ai-tool-tone-"])` rule). Active compact chips preserve tone via
+`.ai-chip.active svg.ai-tool-tone-*` / `.ai-ichip.active svg.ai-tool-tone-*` overrides.
+
+Tokens live in `App.css` `:root` + `[data-theme="light"]` — see `features/003-design-system.md`.
+
 ### Shared helper (DRY)
 - **`shortDetail(detail)`** — compact path/URL form (basename / host). Used by both
   `RunningToolRow` (live ticker) and `ToolCallRow` (transcript).
@@ -104,13 +142,16 @@ when tools aren't already rendered inline in `streamingBlocks`.
 | `.ai-tcall-wrap` | `flex-wrap` pill cloud for read/search runs |
 | `.ai-tcall-head` / `.is-interactive` | content-hugging bordered pill + hover |
 | `.ai-tcall-open` / `.ai-tcall-trail` | primary click area / status cluster |
+| `.ai-tool-tone-*` | per-family icon hue on `.ai-tcall-ico` / compact-chip `svg` |
+| `.ai-tcall-skill` / `.ai-tcall-image` | full-pill tint exceptions (Skill / image Read) |
 | `@keyframes ai-tcall-in` | row entrance (fade + slide) |
 | `.tool-drawer` / `.tool-drawer-scrim` | right slide-over (translateX) + backdrop |
 | `.ai-tcall-result-body` / `.ai-tcall-result-md` | drawer body (mono / rendered md) |
 | `@media (prefers-reduced-motion)` | disables entrance + drawer transitions |
 
-Neutral chrome — no accent fill; the done-check is `--fg-muted`, the only color is
-the green/red `±` edit stats (semantic).
+Neutral chrome — no accent fill on pills; the done-check is `--fg-muted`. Colour on icons
+is **identification** (tool family), not semantic state. Edit `±` stats stay green/red
+(semantic). Skill/image reads keep their dedicated full-pill tints.
 
 ### Gotchas
 - The drawer/DiffModal are **universal** — `ToolCallRow` is also used in compact mode

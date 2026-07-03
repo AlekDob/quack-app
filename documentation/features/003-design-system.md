@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS (no Tailwind)
 created: 2026-06-28
-last_verified: 2026-07-01
-tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monochrome, macos, window, composer, cursor-style]
+last_verified: 2026-07-03
+tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monochrome, macos, window, composer, cursor-style, tool-icon-tints]
 ---
 
 ## Design System (Quack chrome)
@@ -29,6 +29,8 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 | Accent (NEUTRAL) | `--accent` (#9aa0ad dark / #6b7280 light), `--accent-rgb`, `--accent-hover`, `--accent-soft`, `--accent-fg` |
 | Primary action | `--primary-bg` (=`--fg`), `--primary-fg` (=`--bg`), `--primary-bg-hover` |
 | Semantic | `--ok`, `--warn`, `--err`, `--info` (+ `-bg` variants) |
+| Tool icons | `--tool-read`, `--tool-bash`, `--tool-search`, `--tool-edit`, `--tool-web`, `--tool-task`, `--tool-todo` (glyph only — see `features/006`) |
+| Skill / image | `--skill`, `--skill-bg`, `--img`, `--img-bg` (full-pill exceptions) |
 | Radius | `--radius-xs/sm/md/lg/full` (5/8/14/20/999), `--radius-window` (12) |
 | Shadow / blur | `--shadow-sm/md/lg`, `--blur-light/medium/heavy` |
 | Motion | `--ease-default/spring`, `--duration-fast/normal/slow` |
