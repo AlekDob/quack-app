@@ -22,6 +22,7 @@ tags: [editor, markdown, preview, split, git-diff, toolbar, monaco, spaceship-pa
 | Component | `src/components/MarkdownPreview.tsx` | Rendered preview pane (split + preview-only) |
 | Component | `src/components/EditorBreadcrumbs.tsx` | Path + symbol breadcrumb (unchanged; sits above toolbar) |
 | Service | `src/editorMdView.ts` | `readEditorMdView` / `writeEditorMdView` — `edit` \| `split` \| `preview` |
+| Service | `src/editorSettings.ts` | Global editor prefs incl. `lightColorTheme` / `darkColorTheme` — see feature 033 |
 | Service | `src/editorDiffPrefs.ts` | `readDiffSideBySide` / `writeDiffSideBySide` — diff layout pref |
 | Service | `src/editorGitDiff.ts` | `computeGitDiffPair(gitRoot, absPath, current) → GitDiffPair \| null` |
 | Hook | `src/hooks/useGitDiffPair.ts` | React hook wrapping `computeGitDiffPair` |
@@ -100,5 +101,6 @@ User-scoped skills under `~/.claude/skills` are outside `gitRoot` → no Changes
 
 ### Related docs
 - `documentation/design/directives.md` — neutral chrome, pill segmented controls
+- `documentation/features/033-editor-color-themes.md` — Monaco syntax theme per light/dark (`EditorPane`, `DiffView`, `SimpleMonacoEditor`)
 - `documentation/features/006-chat-tool-render.md` — `DiffModal` (global diff from git panel / tool chips; uses same `DiffView`)
 - `documentation/features/017-media-preview.md` — binary media tabs (separate from markdown preview)

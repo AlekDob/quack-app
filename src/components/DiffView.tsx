@@ -1,7 +1,8 @@
 import { DiffEditor } from "@monaco-editor/react";
-import { useResolvedTheme } from "../theme";
-import { langOf } from "../langDetect";
+import { ensureEditorColorThemes } from "../editorColorThemes";
+import { useResolvedEditorColorTheme } from "../useResolvedEditorColorTheme";
 import { useEditorSettings } from "../editorSettings";
+import { langOf } from "../langDetect";
 
 interface Props {
   originalContent: string;
@@ -16,7 +17,7 @@ export function DiffView({
   path,
   sideBySide = false,
 }: Props) {
-  const theme = useResolvedTheme();
+  const theme = useResolvedEditorColorTheme();
   const settings = useEditorSettings();
   return (
     <div className="diff-view">
@@ -26,9 +27,11 @@ export function DiffView({
         original={originalContent}
         modified={modifiedContent}
         language={langOf(path)}
-        theme={theme === "dark" ? "vs-dark" : "vs"}
+        theme={theme}
+        beforeMount={ensureEditorColorThemes}
         options={{
           readOnly: true,
+          colorDecorators: true,
           renderSideBySide: sideBySide,
           // Monaco 0.44+ falls back to inline when width is "limited" unless
           // this is explicitly disabled — without it Split looks like Inline.

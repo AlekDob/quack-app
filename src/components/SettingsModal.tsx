@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   setAutoClosingBrackets,
+  setColorThemeForMode,
   setEditorSettings,
   setRenderWhitespace,
   useEditorSettings,
 } from "../editorSettings";
 import type { EditorSettings } from "../editorSettings";
+import { themesForMode } from "../editorColorThemes";
 import {
   IDLE_BUFFER_MAX,
   IDLE_BUFFER_MIN,
@@ -15,7 +17,7 @@ import {
   setFootprintSettings,
   useFootprintSettings,
 } from "../footprintSettings";
-import { useTheme, type ThemeMode } from "../theme";
+import { useTheme, useResolvedTheme, type ThemeMode } from "../theme";
 import { onSettingsOpen } from "../settingsBus";
 import { useModalFocus } from "../useModalFocus";
 import { pty, type ShellOption } from "../ipc";
@@ -359,6 +361,7 @@ export function SettingsModal() {
   const settings = useEditorSettings();
   const footprint = useFootprintSettings();
   const [theme, setTheme] = useTheme();
+  const resolvedTheme = useResolvedTheme();
   const activeId = useStore((s) => s.activeId);
   const sidebarSide = useStore((s) =>
     s.activeId ? s.loaded[s.activeId]?.layout.sidebarSide : "left",
@@ -526,6 +529,30 @@ export function SettingsModal() {
           </Section>
 
           <Section title="Editor">
+            <Row label="Color theme">
+              <select
+                className="settings-select"
+                value={
+                  resolvedTheme === "dark"
+                    ? settings.darkColorTheme
+                    : settings.lightColorTheme
+                }
+                onChange={(e) =>
+                  setColorThemeForMode(resolvedTheme, e.target.value)
+                }
+              >
+                {themesForMode(resolvedTheme).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </Row>
+            <div className="settings-row settings-row-note">
+              Syntax colors for {resolvedTheme} mode. Light and dark choices
+              are remembered separately — switching app theme restores yours
+              for that mode.
+            </div>
             <NumberRow
               label="Font size"
               value={settings.fontSize}

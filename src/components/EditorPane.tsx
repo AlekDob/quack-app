@@ -2,7 +2,10 @@ import Editor, { type Monaco } from "@monaco-editor/react";
 import { useEffect, useRef, useState } from "react";
 import type { editor } from "monaco-editor";
 import { useStore } from "../store";
-import { useResolvedTheme } from "../theme";
+import {
+  ensureEditorColorThemes,
+} from "../editorColorThemes";
+import { useResolvedEditorColorTheme } from "../useResolvedEditorColorTheme";
 import { MarkdownPreview } from "./MarkdownPreview";
 import {
   setEditorState,
@@ -215,7 +218,7 @@ interface Props {
 export function EditorPane({ wsId, path }: Props) {
   const file = useStore((s) => s.loaded[wsId]?.files[path]);
   const update = useStore((s) => s.updateFileContents);
-  const resolvedTheme = useResolvedTheme();
+  const colorTheme = useResolvedEditorColorTheme();
   const settings = useEditorSettings();
   const wsRoot = useStore((s) => s.loaded[wsId]?.meta.root ?? "");
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -583,10 +586,11 @@ export function EditorPane({ wsId, path }: Props) {
         keepCurrentModel
         language={language ?? "plaintext"}
         value={file.contents}
-        theme={resolvedTheme === "dark" ? "vs-dark" : "vs"}
+        theme={colorTheme}
         options={{
           fontSize: settings.fontSize,
           minimap: { enabled: settings.minimap },
+          colorDecorators: true,
           scrollBeyondLastLine: false,
           tabSize: ec.tab_width ?? ec.indent_size ?? settings.tabSize,
           insertSpaces: ec.indent_style
@@ -612,6 +616,7 @@ export function EditorPane({ wsId, path }: Props) {
           formatOnPaste: settings.formatOnTypePaste,
         }}
         onMount={(ed: editor.IStandaloneCodeEditor, monaco: Monaco) => {
+          ensureEditorColorThemes(monaco);
           editorRef.current = ed;
           monacoRef.current = monaco;
           setMonacoInstance(monaco);

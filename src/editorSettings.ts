@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
+import {
+  defaultColorThemeForMode,
+  normalizeColorTheme,
+} from "./editorColorThemes";
 import { info as toastInfo } from "./notify";
 import { getJson, setJson } from "./localStore";
 
 export interface EditorSettings {
+  /** Monaco color theme when the app is in light mode. */
+  lightColorTheme: string;
+  /** Monaco color theme when the app is in dark mode. */
+  darkColorTheme: string;
   fontSize: number;
   wordWrap: "off" | "on";
   tabSize: number;
@@ -43,6 +51,8 @@ export interface EditorSettings {
 
 const STORAGE_KEY = "lcp.editorSettings";
 const DEFAULT: EditorSettings = {
+  lightColorTheme: defaultColorThemeForMode("light"),
+  darkColorTheme: defaultColorThemeForMode("dark"),
   fontSize: 13,
   wordWrap: "off",
   tabSize: 2,
@@ -66,6 +76,18 @@ function read(): EditorSettings {
     (p): p is Record<string, unknown> => !!p && typeof p === "object",
   );
   return {
+    lightColorTheme: normalizeColorTheme(
+      typeof raw.lightColorTheme === "string"
+        ? raw.lightColorTheme
+        : DEFAULT.lightColorTheme,
+      "light",
+    ),
+    darkColorTheme: normalizeColorTheme(
+      typeof raw.darkColorTheme === "string"
+        ? raw.darkColorTheme
+        : DEFAULT.darkColorTheme,
+      "dark",
+    ),
     fontSize:
       typeof raw.fontSize === "number" &&
       raw.fontSize >= 8 &&
@@ -242,4 +264,14 @@ export function toggleFormatOnTypePaste() {
   const next = !_settings.formatOnTypePaste;
   setEditorSettings({ formatOnTypePaste: next });
   toastInfo(`Format on type / paste: ${next ? "on" : "off"}`);
+}
+
+export function setColorThemeForMode(
+  mode: "light" | "dark",
+  themeId: string,
+) {
+  const key = mode === "dark" ? "darkColorTheme" : "lightColorTheme";
+  setEditorSettings({
+    [key]: normalizeColorTheme(themeId, mode),
+  } as Partial<EditorSettings>);
 }

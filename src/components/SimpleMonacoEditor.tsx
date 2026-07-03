@@ -1,7 +1,10 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
 import { useEffect, useRef } from "react";
 import type { editor } from "monaco-editor";
-import { useResolvedTheme } from "../theme";
+import {
+  ensureEditorColorThemes,
+} from "../editorColorThemes";
+import { useResolvedEditorColorTheme } from "../useResolvedEditorColorTheme";
 import { useEditorSettings } from "../editorSettings";
 import { langOf } from "../langDetect";
 
@@ -18,7 +21,7 @@ export function SimpleMonacoEditor({
   onChange,
   readOnly = false,
 }: Props) {
-  const theme = useResolvedTheme();
+  const theme = useResolvedEditorColorTheme();
   const settings = useEditorSettings();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
@@ -39,9 +42,10 @@ export function SimpleMonacoEditor({
       keepCurrentModel
       language={langOf(path)}
       value={value}
-      theme={theme === "dark" ? "vs-dark" : "vs"}
+      theme={theme}
       options={{
         readOnly,
+        colorDecorators: true,
         fontSize: settings.fontSize,
         minimap: { enabled: settings.minimap },
         scrollBeyondLastLine: false,
@@ -51,7 +55,8 @@ export function SimpleMonacoEditor({
         smoothScrolling: true,
         padding: { top: 8 },
       }}
-      onMount={(ed: editor.IStandaloneCodeEditor, _monaco: Monaco) => {
+      onMount={(ed: editor.IStandaloneCodeEditor, monaco: Monaco) => {
+        ensureEditorColorThemes(monaco);
         editorRef.current = ed;
       }}
       onChange={(v) => onChange(v ?? "")}
