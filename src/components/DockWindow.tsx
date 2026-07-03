@@ -146,7 +146,12 @@ export function DockWindow() {
         data-tauri-drag-region
         title="Drag to move"
         aria-hidden="true"
-      />
+      >
+        <Icon
+          name={orient === "h" ? "grip-vertical" : "grip-horizontal"}
+          size={14}
+        />
+      </span>
       <div className="dock-mark" data-tauri-drag-region aria-hidden="true">
         <img src="/jack.jpeg" alt="" className="dock-mark-img" />
       </div>

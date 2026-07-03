@@ -2,6 +2,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -11,21 +12,18 @@ import { SubagentPill } from "./SubagentPill";
 import { ComposerMic } from "./ComposerMic";
 import { EffortPopover } from "./EffortPopover";
 import { ChatNavRail } from "./ChatNavRail";
+import { TurnStreamStatus } from "./TurnStreamStatus";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
   chatStream,
-  ping,
   pullStream,
   type ChatMessage,
   type ToolCall,
 } from "../ai";
 import {
   hasApiKey,
-  invalidateClaudeCodeCache,
-  listAllModels,
-  listAllCloudModels,
   makeQualifiedModel,
   parseQualifiedModel,
   isAgenticProviderId,
@@ -59,8 +57,6 @@ import {
   CompactChat,
   extractEditDiffs,
   InterleavedBlocks,
-  RunningToolList,
-  StatusPill,
   SubagentOpen,
   ToolCallRow,
   toolDetailFor,
@@ -137,16 +133,19 @@ import { loadSkills, type SkillDef } from "../skills";
 import { permissionFor } from "../toolPermissions";
 import { onAIPromptRequest } from "../aiBus";
 import { relPath } from "../pathUtils";
-
-function mergeProviderModels(
-  prev: ProviderModel[],
-  fresh: ProviderModel[],
-  providerId: ProviderId,
-): ProviderModel[] {
-  if (fresh.length === 0) return prev;
-  const rest = prev.filter((m) => m.providerId !== providerId);
-  return [...rest, ...fresh];
-}
+import {
+  isNearBottom,
+  pinUserTurnWithRetry,
+  scrollToBottom,
+  type ChatFollowMode,
+} from "../chatScroll";
+import {
+  ensureModelDiscovery,
+  getModelDiscovery,
+  mergeLiveCliModelsIntoDiscovery,
+  subscribeModelDiscovery,
+  type ModelDiscoverySnapshot,
+} from "../modelDiscoveryStore";
 
 // @-mention parser: given the composer text and current cursor index,
 // return the active @-segment when the cursor sits in one. A segment
@@ -569,6 +568,10 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // drag-drop listener (App.tsx) hit-tests image drops against.
   const panelRef = useRef<HTMLDivElement>(null);
   const stickyBottomRef = useRef(true);
+  // Cursor-style: on send pin the user turn at the top; otherwise tail-follow.
+  const followModeRef = useRef<ChatFollowMode>("tail");
+  const programmaticScrollRef = useRef(false);
+  const [pinTurnToken, setPinTurnToken] = useState(0);
   // Visible "jump to bottom" affordance. Mirrors stickyBottomRef into
   // React state so the button can render when the user scrolls up
   // mid-stream and they need a one-click way back to the live tail.
@@ -621,84 +624,20 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     el.style.height = Math.min(el.scrollHeight, max) + "px";
   }, [input]);
 
-  const refreshLiveCliModels = useCallback(async () => {
-    try {
-      const [{ refreshOpenCodeModelsLive }, { refreshCursorModelsLive }] =
-        await Promise.all([
-          import("../providers/openCode"),
-          import("../providers/cursorCode"),
-        ]);
-      const [ocModels, cursorModels] = await Promise.all([
-        refreshOpenCodeModelsLive().catch(() => [] as ProviderModel[]),
-        refreshCursorModelsLive().catch(() => [] as ProviderModel[]),
-      ]);
-      if (ocModels.length > 0) {
-        setAllCloudCatalog((prev) =>
-          mergeProviderModels(prev, ocModels, "opencode-cli"),
-        );
-        setAllModels((prev) =>
-          mergeProviderModels(prev, ocModels, "opencode-cli"),
-        );
-      }
-      if (cursorModels.length > 0) {
-        setAllCloudCatalog((prev) =>
-          mergeProviderModels(prev, cursorModels, "cursor-cli"),
-        );
-        setAllModels((prev) =>
-          mergeProviderModels(prev, cursorModels, "cursor-cli"),
-        );
-      }
-    } catch {
-      /* keep lightweight startup catalog */
-    }
-  }, []);
-
-  const refresh = async (showChecking = false) => {
-    if (showChecking) setStatus("checking");
-    // Always re-check Claude Code availability so post-install detects.
-    invalidateClaudeCodeCache();
-    const providersMod = await import("../providers");
-    const [
-      aggregate,
-      cloudCatalog,
-      ccAvail,
-      cursorAvail,
-      ocAvail,
-    ] = await Promise.all([
-      listAllModels().catch(() => [] as ProviderModel[]),
-      listAllCloudModels().catch(() => [] as ProviderModel[]),
-      providersMod
-        .getProvider("claude-code")
-        .isAvailable()
-        .catch(() => false),
-      providersMod
-        .getProvider("cursor-cli")
-        .isAvailable()
-        .catch(() => false),
-      providersMod
-        .getProvider("opencode-cli")
-        .isAvailable()
-        .catch(() => false),
-    ]);
-    setAllModels(aggregate);
-    setAllCloudCatalog(cloudCatalog);
-    setClaudeCodeAvailable(ccAvail);
-    setCursorCliAvailable(cursorAvail);
-    setOpenCodeAvailable(ocAvail);
-    const ollamaUp = await ping();
-
+  const applyDiscoverySnapshot = useCallback((snap: ModelDiscoverySnapshot) => {
+    setAllModels(snap.allModels);
+    setAllCloudCatalog(snap.cloudCatalog);
+    setClaudeCodeAvailable(snap.claudeCodeAvailable);
+    setCursorCliAvailable(snap.cursorCliAvailable);
+    setOpenCodeAvailable(snap.openCodeAvailable);
+    const aggregate = snap.allModels;
     if (aggregate.length > 0) {
       setStatus("ready");
-      // Migrate any unqualified persisted model to ollama:<name>.
       const stored = lsGetString(STORAGE_KEY);
       const isPresent = (q: string) =>
         aggregate.some(
           (m) => makeQualifiedModel(m.providerId, m.modelId) === q,
         );
-      // Migrate stale Claude Code model IDs to "default". Both dated IDs
-      // (claude-opus-4-7 etc.) and aliases (sonnet/opus/haiku) can be
-      // rejected by various CLI versions or subscription tiers, but
-      // "default" — which skips the --model flag — always works.
       const migrateClaudeCode = (q: string): string => {
         if (!q.startsWith("claude-code:")) return q;
         const id = q.slice("claude-code:".length);
@@ -711,11 +650,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         }
         return q;
       };
-      const migratedSelected = selected ? migrateClaudeCode(selected) : selected;
-      if (migratedSelected !== selected) {
-        setSelected(migratedSelected);
-      }
-      if (!migratedSelected || !isPresent(migratedSelected)) {
+      setSelected((cur) => {
+        const migrated = cur ? migrateClaudeCode(cur) : cur;
+        if (migrated && isPresent(migrated)) return migrated;
         let preferred: string | null = null;
         if (stored) {
           const qualified = parseQualifiedModel(stored)
@@ -728,21 +665,51 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           const first = aggregate[0];
           preferred = makeQualifiedModel(first.providerId, first.modelId);
         }
-        setSelected(preferred);
-      }
+        return preferred;
+      });
       return;
     }
-    // No models anywhere.
-    if (ollamaUp) {
-      setStatus("no-models");
-    } else {
-      setStatus("missing");
+    if (snap.ollamaUp) setStatus("no-models");
+    else setStatus("missing");
+  }, []);
+
+  const refreshLiveCliModels = useCallback(async () => {
+    try {
+      const [{ refreshOpenCodeModelsLive }, { refreshCursorModelsLive }] =
+        await Promise.all([
+          import("../providers/openCode"),
+          import("../providers/cursorCode"),
+        ]);
+      const [ocModels, cursorModels] = await Promise.all([
+        refreshOpenCodeModelsLive().catch(() => [] as ProviderModel[]),
+        refreshCursorModelsLive().catch(() => [] as ProviderModel[]),
+      ]);
+      mergeLiveCliModelsIntoDiscovery(ocModels, cursorModels);
+      const snap = getModelDiscovery();
+      if (snap) applyDiscoverySnapshot(snap);
+    } catch {
+      /* keep lightweight startup catalog */
     }
+  }, [applyDiscoverySnapshot]);
+
+  const refresh = async (options?: { showChecking?: boolean; force?: boolean }) => {
+    const force = options?.force ?? true;
+    if (options?.showChecking) setStatus("checking");
+    const snap = await ensureModelDiscovery({ force });
+    applyDiscoverySnapshot(snap);
   };
 
   useEffect(() => {
-    void refresh(true);
-  }, []);
+    const warm = getModelDiscovery();
+    if (warm) applyDiscoverySnapshot(warm);
+    void refresh({ showChecking: !warm, force: false });
+    const unsub = subscribeModelDiscovery(() => {
+      const snap = getModelDiscovery();
+      if (snap) applyDiscoverySnapshot(snap);
+      else void refresh({ force: true });
+    });
+    return unsub;
+  }, [applyDiscoverySnapshot]);
 
   useEffect(() => {
     if (!browserOpen) return;
@@ -771,7 +738,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     let timer: number | undefined;
     const tick = () => {
       attempt++;
-      void refresh(false);
+      void refresh({ force: true });
       let next: number | null;
       if (attempt < 6) next = 4000;
       else if (attempt < 12) next = 30000;
@@ -1086,28 +1053,46 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     });
   }, [selected, aiChatId, wsId]);
 
-  // Track whether user is parked at the bottom. We only auto-follow when
-  // they were already at (or near) the bottom — otherwise we leave their
-  // scroll position alone while they're reading earlier output.
+  // Track scroll position. Tail-follow only when not in pin-top mode.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const onScroll = () => {
-      const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
-      const sticky = remaining < 60;
+      const sticky = isNearBottom(el);
       stickyBottomRef.current = sticky;
-      // Only flip state when the boolean would actually change so we
-      // don't trigger a re-render on every pixel of scroll.
+      if (
+        !sticky &&
+        followModeRef.current === "pin-top" &&
+        !programmaticScrollRef.current
+      ) {
+        followModeRef.current = "tail";
+      }
       setShowJumpToBottom((prev) => (prev === !sticky ? prev : !sticky));
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
+  // Pin the just-sent user turn at the top (Cursor-style). useLayoutEffect
+  // runs before paint; pinTurnToken bumps even when messages.length is unchanged.
+  useLayoutEffect(() => {
+    if (pinTurnToken === 0) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    programmaticScrollRef.current = true;
+    pinUserTurnWithRetry(el, () => {
+      stickyBottomRef.current = isNearBottom(el);
+      setShowJumpToBottom(!stickyBottomRef.current);
+      requestAnimationFrame(() => {
+        programmaticScrollRef.current = false;
+      });
+    });
+  }, [pinTurnToken]);
   useEffect(() => {
+    if (followModeRef.current === "pin-top") return;
     if (!stickyBottomRef.current) return;
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    scrollToBottom(el);
   }, [messages, streaming, streamingBlocks, streamingToolCalls]);
 
   // Reset chat & restore appropriate session when workspace or bound
@@ -2158,6 +2143,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       ...baseMessages,
       sentUserMsg,
     ];
+    followModeRef.current = "pin-top";
+    stickyBottomRef.current = false;
+    setPinTurnToken((t) => t + 1);
     setMessages([...baseMessages, displayUserMsg]);
     setStreaming("");
     abortRef.current = new AbortController();
@@ -2762,6 +2750,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     taskCounterRef.current = 0;
     setBudgetWarned(false);
     setScrubIndex(null);
+    followModeRef.current = "tail";
   };
 
   const regenerateFrom = async (index: number) => {
@@ -3812,7 +3801,8 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           onClick={() => {
             const el = scrollRef.current;
             if (!el) return;
-            el.scrollTop = el.scrollHeight;
+            scrollToBottom(el);
+            followModeRef.current = "tail";
             stickyBottomRef.current = true;
             setShowJumpToBottom(false);
           }}
@@ -4251,6 +4241,18 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           );
           });
         })()}
+        {turnActive && (
+          <TurnStreamStatus
+            runningTools={runningTools}
+            streaming={streaming}
+            streamingBlocks={streamingBlocks}
+            activeToolLabels={activeToolLabels}
+            tokensPerSec={tokensPerSec}
+            warmingUp={warmingUp}
+            lastStreamEventAt={lastStreamEventAt}
+            onStop={() => stop()}
+          />
+        )}
         {pendingPermission && (
           <PermissionCard
             call={pendingPermission.call}
@@ -4668,164 +4670,6 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       {!compact && todos && todos.length > 0 && (
         <div className="ai-todos-bar">
           <TodosCard items={todos} />
-        </div>
-      )}
-      {/* Live turn status — docked above the composer so it stays visible
-          while the user scrolls the transcript (same slot family as ask-dock). */}
-      {(runningTools ||
-        (streaming !== null && warmingUp && streaming.length === 0) ||
-        (streaming !== null && tokensPerSec !== null) ||
-        (streaming !== null &&
-          streaming.length === 0 &&
-          streamingBlocks.length === 0 &&
-          !runningTools &&
-          !warmingUp)) && (
-        <div className="ai-status-dock">
-          <div className="ai-inline-status">
-            {runningTools && (
-              activeToolLabels.length === 0 ? (
-                <StatusPill
-                  trail={
-                    streaming !== null && tokensPerSec !== null ? (
-                      <span className="ai-inline-tps">
-                        {tokensPerSec.toFixed(1)} t/s
-                      </span>
-                    ) : undefined
-                  }
-                >
-                  <span className="ai-spinner" />
-                  <span>Running tools…</span>
-                </StatusPill>
-              ) : (() => {
-                  const done = activeToolLabels.filter(
-                    (t) => t.status === "done" || t.status === "error",
-                  ).length;
-                  const total = activeToolLabels.length;
-                  const allDone = done === total;
-                  const streamStillActive = streaming !== null;
-                  const toolsRenderedInline = streamingBlocks.some(
-                    (b) => b.kind === "tool_call",
-                  );
-                  const header =
-                    allDone && streamStillActive
-                      ? `Got ${total} tool result${total === 1 ? "" : "s"} — generating response…`
-                      : allDone
-                        ? `Finished ${total} tool${total === 1 ? "" : "s"}`
-                        : `${done} of ${total} done · ${total - done} running`;
-                  return (
-                    <StatusPill
-                      trail={
-                        streaming !== null && tokensPerSec !== null ? (
-                          <span className="ai-inline-tps">
-                            {tokensPerSec.toFixed(1)} t/s
-                          </span>
-                        ) : undefined
-                      }
-                      list={
-                        !toolsRenderedInline ? (
-                          <RunningToolList entries={activeToolLabels} />
-                        ) : undefined
-                      }
-                    >
-                      {allDone && !streamStillActive ? (
-                        <span className="ai-running-check">
-                          <Icon name="check" size={12} />
-                        </span>
-                      ) : (
-                        <span className="ai-spinner" />
-                      )}
-                      <span>{header}</span>
-                    </StatusPill>
-                  );
-                })()
-            )}
-            {streaming !== null &&
-              warmingUp &&
-              streaming.length === 0 &&
-              !runningTools && (
-                <StatusPill>
-                  <span className="ai-spinner" />
-                  <span>Loading model</span>
-                </StatusPill>
-              )}
-            {streaming !== null &&
-              streaming.length === 0 &&
-              streamingBlocks.length === 0 &&
-              !runningTools &&
-              !warmingUp && (
-                <StatusPill
-                  trail={
-                    tokensPerSec !== null ? (
-                      <span className="ai-inline-tps">
-                        {tokensPerSec.toFixed(1)} t/s
-                      </span>
-                    ) : undefined
-                  }
-                >
-                  <span className="ai-spinner" />
-                  <span>Waiting for response…</span>
-                </StatusPill>
-              )}
-            {streaming !== null &&
-              tokensPerSec !== null &&
-              !runningTools &&
-              !(warmingUp && streaming.length === 0) &&
-              !(
-                streaming.length === 0 &&
-                streamingBlocks.length === 0 &&
-                !warmingUp
-              ) && (
-                <StatusPill
-                  trail={
-                    <span className="ai-inline-tps">
-                      {tokensPerSec.toFixed(1)} t/s
-                    </span>
-                  }
-                >
-                  <span className="ai-spinner" />
-                  <span>Generating…</span>
-                </StatusPill>
-              )}
-            {streaming !== null &&
-              lastStreamEventAt !== null &&
-              (() => {
-                const idleSec = Math.floor(
-                  (Date.now() - lastStreamEventAt) / 1000,
-                );
-                if (idleSec < 10) return null;
-                const looksStuck = idleSec >= 30;
-                return (
-                  <StatusPill
-                    trail={
-                      looksStuck ? (
-                        <button
-                          type="button"
-                          className="ai-inline-stop"
-                          onClick={() => stop()}
-                          title="Cancel this turn"
-                        >
-                          <Icon name="stop" size={11} />
-                          <span>Stop</span>
-                        </button>
-                      ) : undefined
-                    }
-                  >
-                    <span
-                      className={`ai-inline-stale${looksStuck ? " ai-inline-stale-stuck" : ""}`}
-                      title={
-                        looksStuck
-                          ? "Stream hasn't produced anything in 30+ seconds. Could be a slow tool, a slow API response, or genuinely stuck — Stop and try again if you don't want to wait."
-                          : "No data from the model in this window. Click Stop to cancel if it's stuck."
-                      }
-                    >
-                      {looksStuck
-                        ? `Unusually slow (${idleSec}s)`
-                        : `Still working (${idleSec}s)`}
-                    </span>
-                  </StatusPill>
-                );
-              })()}
-          </div>
         </div>
       )}
       {/* Cursor-style composer: one pill. CSS `order` puts the textarea

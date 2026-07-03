@@ -7510,6 +7510,23 @@ body.ws-dragging * {
   flex-direction: column;
   gap: 14px;
 }
+/* Inline turn status — in the message stream under the pinned user turn. */
+.ai-turn-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 0 2px 4px;
+}
+/* Planning hint row (subset of .ai-turn-status). */
+.ai-turn-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 2px 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
 /* Floating "back to bottom" affordance — visible only when the user
    has scrolled away from the live tail. Sits inside the relatively-
    positioned wrap so it stays in the viewport regardless of scroll. */
@@ -11907,20 +11924,27 @@ body.ws-dragging * {
   -webkit-user-select: none;
   user-select: none;
 }
-/* Drag handle — communicates the whole pill is draggable. Dots via a tiled
-   radial-gradient so there's no extra markup. */
+/* Drag handle — six-dot grip icon, sized to match the Jack avatar. */
 .dock-grip {
   flex: 0 0 auto;
-  width: 8px;
-  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 42px;
+  border-radius: var(--radius-sm);
   cursor: grab;
-  background-image: radial-gradient(var(--fg-muted) 1px, transparent 1.5px);
-  background-size: 4px 6px;
-  background-position: center;
-  opacity: 0.5;
+  color: var(--fg-muted);
+}
+.dock-grip svg {
+  pointer-events: none;
 }
 .dock-grip:hover {
-  opacity: 0.8;
+  color: var(--fg);
+  background: var(--bg-hi);
+}
+.dock-grip:active {
+  cursor: grabbing;
 }
 .dock-mark {
   flex: 0 0 auto;
@@ -11992,8 +12016,8 @@ body.ws-dragging * {
   gap: 10px;
 }
 .dock-shell.dock-vertical .dock-grip {
-  width: 24px;
-  height: 8px;
+  width: 42px;
+  height: 20px;
 }
 .dock-shell.dock-vertical .dock-sep {
   width: 30px;

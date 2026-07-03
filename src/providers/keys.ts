@@ -1,4 +1,5 @@
 import type { ProviderId } from "./types";
+import { invalidateModelDiscovery } from "../modelDiscoveryStore";
 import { getString, remove, setString } from "../localStore";
 
 const STORAGE_PREFIX = "lcp.providers.";
@@ -15,6 +16,7 @@ export function setApiKey(providerId: ProviderId, key: string): void {
   const cleaned = key.trim();
   if (cleaned) setString(keyFor(providerId), cleaned);
   else remove(keyFor(providerId));
+  invalidateModelDiscovery();
 }
 
 export function hasApiKey(providerId: ProviderId): boolean {

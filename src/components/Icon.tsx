@@ -98,7 +98,9 @@ export type IconName =
   | "whiteboard"
   | "chart-bar"
   | "arrow-up"
-  | "microphone";
+  | "microphone"
+  | "grip-vertical"
+  | "grip-horizontal";
 
 // Each entry returns the inner JSX for an svg with viewBox 0 0 24 24.
 // Use stroke={currentColor} + strokeWidth + strokeLinecap/Linejoin so
@@ -492,6 +494,27 @@ const ICONS: Record<IconName, ReactNode> = {
       <path d="M6 11a6 6 0 0 0 12 0" />
       <line x1="12" y1="17" x2="12" y2="21" />
       <line x1="9" y1="21" x2="15" y2="21" />
+    </>
+  ),
+  // Drag handles — six-dot grips for move affordances (dock, panels).
+  "grip-vertical": (
+    <>
+      <circle cx="9" cy="6" r="1.5" fill="currentColor" />
+      <circle cx="15" cy="6" r="1.5" fill="currentColor" />
+      <circle cx="9" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="15" cy="12" r="1.5" fill="currentColor" />
+      <circle cx="9" cy="18" r="1.5" fill="currentColor" />
+      <circle cx="15" cy="18" r="1.5" fill="currentColor" />
+    </>
+  ),
+  "grip-horizontal": (
+    <>
+      <circle cx="6" cy="9" r="1.5" fill="currentColor" />
+      <circle cx="12" cy="9" r="1.5" fill="currentColor" />
+      <circle cx="18" cy="9" r="1.5" fill="currentColor" />
+      <circle cx="6" cy="15" r="1.5" fill="currentColor" />
+      <circle cx="12" cy="15" r="1.5" fill="currentColor" />
+      <circle cx="18" cy="15" r="1.5" fill="currentColor" />
     </>
   ),
 };
