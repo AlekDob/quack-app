@@ -6,7 +6,9 @@ import {
   useMemo,
   useRef,
   useState,
+  Fragment,
 } from "react";
+import { flushSync } from "react-dom";
 import { Icon } from "./Icon";
 import { SubagentPill } from "./SubagentPill";
 import { ComposerMic } from "./ComposerMic";
@@ -135,11 +137,13 @@ import { onAIPromptRequest } from "../aiBus";
 import { relPath } from "../pathUtils";
 import {
   isNearBottom,
+  pinUserTurnToTop,
   pinUserTurnWithRetry,
   scrollToBottom,
   type ChatFollowMode,
 } from "../chatScroll";
 import {
+  ensureCloudCatalog,
   ensureModelDiscovery,
   getModelDiscovery,
   mergeLiveCliModelsIntoDiscovery,
@@ -712,9 +716,11 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   }, [applyDiscoverySnapshot]);
 
   useEffect(() => {
+    if (!browserOpen && !manageModelsOpen) return;
+    void ensureCloudCatalog().then((catalog) => setAllCloudCatalog(catalog));
     if (!browserOpen) return;
     void refreshLiveCliModels();
-  }, [browserOpen, refreshLiveCliModels]);
+  }, [browserOpen, manageModelsOpen, refreshLiveCliModels]);
 
   // Auto-poll when Ollama isn't reachable or has no models so the
   // user doesn't have to keep clicking Refresh after installing.
@@ -1086,7 +1092,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         programmaticScrollRef.current = false;
       });
     });
-  }, [pinTurnToken]);
+  }, [pinTurnToken, messages.length]);
   useEffect(() => {
     if (followModeRef.current === "pin-top") return;
     if (!stickyBottomRef.current) return;
@@ -2145,9 +2151,23 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     ];
     followModeRef.current = "pin-top";
     stickyBottomRef.current = false;
-    setPinTurnToken((t) => t + 1);
-    setMessages([...baseMessages, displayUserMsg]);
-    setStreaming("");
+    flushSync(() => {
+      setPinTurnToken((t) => t + 1);
+      setMessages([...baseMessages, displayUserMsg]);
+      setStreaming("");
+    });
+    programmaticScrollRef.current = true;
+    const scroller = scrollRef.current;
+    if (scroller) {
+      pinUserTurnToTop(scroller);
+      stickyBottomRef.current = isNearBottom(scroller);
+      setShowJumpToBottom(!stickyBottomRef.current);
+    }
+    requestAnimationFrame(() => {
+      const el = scrollRef.current;
+      if (el) pinUserTurnToTop(el);
+      programmaticScrollRef.current = false;
+    });
     abortRef.current = new AbortController();
 
     // Claude Code runs its own internal tool loop (Read/Glob/Edit/Bash/etc.).
@@ -3897,8 +3917,12 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           }
           const userTurnByIdx = new Map<number, number>();
           let userTurn = 0;
+          let lastUserDisplayIdx = -1;
           for (let j = 0; j < display.length; j++) {
-            if (display[j].role === "user") userTurnByIdx.set(j, ++userTurn);
+            if (display[j].role === "user") {
+              userTurnByIdx.set(j, ++userTurn);
+              lastUserDisplayIdx = j;
+            }
           }
           return display.map((m, i) => {
           const isAssistant = m.role === "assistant";
@@ -3969,29 +3993,43 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           }
           const dimmedByScrub = scrubIndex !== null && i > scrubIndex;
           if (m.role === "user") {
+            const isLatestUser = i === lastUserDisplayIdx;
             return (
-              <div
-                key={i}
-                className={`ai-msg ai-msg-user${dimmedByScrub ? " ai-msg-scrubbed-past" : ""}`}
-                data-anchor-idx={i}
-                data-anchor-role="user"
-                data-anchor-preview={m.content.slice(0, 120)}
-              >
-                <UserMessageBar
-                  content={m.content}
-                  images={m.images}
-                  zIndex={userTurnByIdx.get(i) ?? 1}
-                  actionsDisabled={streaming !== null || runningTools}
-                  showBranch={!!aiChatId}
-                  onCopy={() => {
-                    void navigator.clipboard.writeText(m.content);
-                    toastSuccess("Copied to clipboard");
-                  }}
-                  onRegen={() => void regenerateFrom(i)}
-                  onBranch={() => branchFromHere(i)}
-                  onImageClick={(img) => void openZoom(img)}
-                />
-              </div>
+              <Fragment key={i}>
+                <div
+                  className={`ai-msg ai-msg-user${isLatestUser ? " ai-msg-user-latest" : ""}${dimmedByScrub ? " ai-msg-scrubbed-past" : ""}`}
+                  data-anchor-idx={i}
+                  data-anchor-role="user"
+                  data-anchor-preview={m.content.slice(0, 120)}
+                >
+                  <UserMessageBar
+                    content={m.content}
+                    images={m.images}
+                    zIndex={userTurnByIdx.get(i) ?? 1}
+                    actionsDisabled={streaming !== null || runningTools}
+                    showBranch={!!aiChatId}
+                    onCopy={() => {
+                      void navigator.clipboard.writeText(m.content);
+                      toastSuccess("Copied to clipboard");
+                    }}
+                    onRegen={() => void regenerateFrom(i)}
+                    onBranch={() => branchFromHere(i)}
+                    onImageClick={(img) => void openZoom(img)}
+                  />
+                </div>
+                {isLatestUser && turnActive && (
+                  <TurnStreamStatus
+                    runningTools={runningTools}
+                    streaming={streaming}
+                    streamingBlocks={streamingBlocks}
+                    activeToolLabels={activeToolLabels}
+                    tokensPerSec={tokensPerSec}
+                    warmingUp={warmingUp}
+                    lastStreamEventAt={lastStreamEventAt}
+                    onStop={() => stop()}
+                  />
+                )}
+              </Fragment>
             );
           }
           const composeFileCalls =
@@ -4241,18 +4279,6 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           );
           });
         })()}
-        {turnActive && (
-          <TurnStreamStatus
-            runningTools={runningTools}
-            streaming={streaming}
-            streamingBlocks={streamingBlocks}
-            activeToolLabels={activeToolLabels}
-            tokensPerSec={tokensPerSec}
-            warmingUp={warmingUp}
-            lastStreamEventAt={lastStreamEventAt}
-            onStop={() => stop()}
-          />
-        )}
         {pendingPermission && (
           <PermissionCard
             call={pendingPermission.call}

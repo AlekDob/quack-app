@@ -55,6 +55,7 @@ import { onNotificationsOpen } from "./notifyBus";
 import { useZenMode } from "./zenMode";
 import { useAgentMode } from "./agentMode";
 import { installResumeDebug } from "./resumeDebug";
+import { prefetchModelDiscovery } from "./modelDiscoveryStore";
 import "./App.css";
 
 // When this document was opened as a terminal pop-out window, render only
@@ -199,6 +200,7 @@ function MainApp() {
     // macOS: move the menubar into the native system menu bar (no-op on
     // Win/Linux, which keep the in-window TopBar menus).
     void installNativeMenu();
+    prefetchModelDiscovery();
     void hydrate();
   }, [hydrate]);
 

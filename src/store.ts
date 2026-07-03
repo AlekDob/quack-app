@@ -1211,19 +1211,24 @@ export const useStore = create<AppState>((set, get) => {
       const loaded: Record<string, WorkspaceData> = {};
       const survivingIds: string[] = [];
 
-      for (let i = 0; i < requestedOpen.length; i++) {
-        const id = requestedOpen[i];
-        const meta = recent.find((w) => w.id === id);
-        if (!meta) continue;
-        const pct = 20 + Math.round(((i + 1) / total) * 70);
-        setProg(`Opening ${meta.name}…`, pct, 100);
-        try {
-          const data = await loadWorkspaceFromDisk(meta, liveSessions);
-          loaded[id] = data;
-          survivingIds.push(id);
-        } catch {
-          /* skip */
-        }
+      const opened = await Promise.all(
+        requestedOpen.map(async (id, i) => {
+          const meta = recent.find((w) => w.id === id);
+          if (!meta) return null;
+          const pct = 20 + Math.round(((i + 1) / total) * 70);
+          setProg(`Opening ${meta.name}…`, pct, 100);
+          try {
+            const data = await loadWorkspaceFromDisk(meta, liveSessions);
+            return { id, data };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      for (const row of opened) {
+        if (!row) continue;
+        loaded[row.id] = row.data;
+        survivingIds.push(row.id);
       }
 
       if (activeId && !loaded[activeId]) {

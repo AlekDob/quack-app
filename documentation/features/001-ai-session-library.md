@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-01
+last_verified: 2026-07-03
 tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, workspace, zustand, persistence]
 ---
 
@@ -47,7 +47,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 - `deriveTitle(messages) → string` — first user line, truncated to 60 chars
 - `modelBadge(model) → {short, className, full}` — provider → chip; **DUPLICATED** in `AIChatsRail.tsx` and `AgentModeShell.tsx` (extract to shared module)
 - `publishTasks(chatId, items|null)` — publish/clear a session's checklist into `aiTaskStore`
-- `AIChatHost({chatId, container, visible})` — keeps an `AIChatPanel` mounted, portals it into the active pane (editor mode only)
+- `AIChatHost({chatId, container, visible})` — portals `AIChatPanel` into the active pane; lazy-mount on first `visible`; only rendered when workspace `isActive` (see `031-model-discovery-cache.md`)
 
 ### State
 - `ws.aiChats`: `Record<id, AIChatDescriptor>` — open sessions (global, persisted)
@@ -56,9 +56,9 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 - runtime run-state (`streaming`, `runningTools`, `activeToolLabels{status}`, `abortRef`): **local to `AIChatPanel`** (component) — not yet surfaced per-session in the lists
 
 ### Gotcha — mount asymmetry (editor vs agent mode)
-- **Editor mode** (`WorkspaceShell.tsx:407` `AIChatHost`): every chat keeps an `AIChatPanel` mounted (portal + `display:none`) → background agents keep streaming.
+- **Editor mode** (`WorkspaceShell.tsx` `AIChatHost`): only the **active workspace** mounts chat hosts; within it, a tab's panel mounts on **first show** (`mounted` latch) — hidden background tabs do not run until selected. Previously every tab in every open workspace mounted immediately (slow new-chat / cold start).
 - **Agent mode** (`AgentModeShell.tsx:450`): only the selected session mounts an `AIChatPanel` (`key={wsId:activeChatId}`) → background agents are NOT mounted, cannot run or report status.
-- Consequence: any per-session live status (see `decisions/001-agent-status-indicators.md`) needs background panels mounted in Agent Mode too, or it only ever reflects the active session.
+- Consequence: any per-session live status (see `decisions/001-agent-status-indicators.md`) needs background panels mounted in Agent Mode too, or it only ever reflects the active session. Cross-workspace status uses `AgentHubWatcher` + `agentStatusStore`, not mounted panels.
 
 ### AIChatDescriptor
 | Field | Type | Description |

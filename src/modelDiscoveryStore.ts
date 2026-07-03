@@ -24,6 +24,7 @@ const TTL_MS = 60_000;
 
 let cache: ModelDiscoverySnapshot | null = null;
 let inflight: Promise<ModelDiscoverySnapshot> | null = null;
+let cloudInflight: Promise<ProviderModel[]> | null = null;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -34,31 +35,32 @@ function isFresh(snap: ModelDiscoverySnapshot): boolean {
   return Date.now() - snap.fetchedAt < TTL_MS;
 }
 
-async function fetchSnapshot(): Promise<ModelDiscoverySnapshot> {
-  invalidateClaudeCodeCache();
+async function fetchSnapshot(force: boolean): Promise<ModelDiscoverySnapshot> {
+  if (force) invalidateClaudeCodeCache();
+  const [aggregate, ollamaUp] = await Promise.all([
+    listAllModels().catch(() => [] as ProviderModel[]),
+    ping().catch(() => false),
+  ]);
+  const claudeCodeAvailable = aggregate.some(
+    (m) => m.providerId === "claude-code",
+  );
+  // Cursor/OpenCode still expose a default row when the CLI is missing —
+  // probe availability separately (listAllModels already checked CC + Ollama).
   const providersMod = await import("./providers");
-  const [aggregate, cloudCatalog, ccAvail, cursorAvail, ocAvail] =
-    await Promise.all([
-      listAllModels().catch(() => [] as ProviderModel[]),
-      listAllCloudModels().catch(() => [] as ProviderModel[]),
-      providersMod
-        .getProvider("claude-code")
-        .isAvailable()
-        .catch(() => false),
-      providersMod
-        .getProvider("cursor-cli")
-        .isAvailable()
-        .catch(() => false),
-      providersMod
-        .getProvider("opencode-cli")
-        .isAvailable()
-        .catch(() => false),
-    ]);
-  const ollamaUp = await ping().catch(() => false);
+  const [cursorAvail, ocAvail] = await Promise.all([
+    providersMod
+      .getProvider("cursor-cli")
+      .isAvailable()
+      .catch(() => false),
+    providersMod
+      .getProvider("opencode-cli")
+      .isAvailable()
+      .catch(() => false),
+  ]);
   return {
     allModels: aggregate,
-    cloudCatalog,
-    claudeCodeAvailable: ccAvail,
+    cloudCatalog: [],
+    claudeCodeAvailable,
     cursorCliAvailable: cursorAvail,
     openCodeAvailable: ocAvail,
     ollamaUp,
@@ -69,6 +71,7 @@ async function fetchSnapshot(): Promise<ModelDiscoverySnapshot> {
 /** Drop cached discovery — next ensure() refetches. Call on API-key edits. */
 export function invalidateModelDiscovery(): void {
   cache = null;
+  cloudInflight = null;
   notify();
 }
 
@@ -134,7 +137,7 @@ export async function ensureModelDiscovery(options?: {
   const force = options?.force ?? false;
   if (!force && cache && isFresh(cache)) return cache;
   if (!force && inflight) return inflight;
-  inflight = fetchSnapshot()
+  inflight = fetchSnapshot(force)
     .then((snap) => {
       cache = snap;
       inflight = null;
@@ -146,4 +149,29 @@ export async function ensureModelDiscovery(options?: {
       throw err;
     });
   return inflight;
+}
+
+/** Full cloud catalog for Model Browser — deferred until first open. */
+export async function ensureCloudCatalog(): Promise<ProviderModel[]> {
+  if (cache?.cloudCatalog.length) return cache.cloudCatalog;
+  if (cloudInflight) return cloudInflight;
+  cloudInflight = listAllCloudModels()
+    .then((catalog) => {
+      if (cache) {
+        cache = { ...cache, cloudCatalog: catalog };
+        notify();
+      }
+      cloudInflight = null;
+      return catalog;
+    })
+    .catch((err) => {
+      cloudInflight = null;
+      throw err;
+    });
+  return cloudInflight;
+}
+
+/** Warm discovery during splash — overlaps with workspace hydration. */
+export function prefetchModelDiscovery(): void {
+  void ensureModelDiscovery({ force: false });
 }

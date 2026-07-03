@@ -428,8 +428,11 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
           AIChatPanel into the pane container that currently owns the
           tab. Because the React component itself stays mounted across
           container changes, in-flight streams + chat state survive a
-          tab being dragged from one pane to another. */}
-      {Object.values(ws.aiChats).map((chat) => {
+          tab being dragged from one pane to another. Only mount hosts
+          for the active workspace — background projects hydrate from
+          the store without paying per-chat panel cost. */}
+      {isActive &&
+        Object.values(ws.aiChats).map((chat) => {
         const tabKeyStr = aiKey(chat.id);
         const editorPane = findTabsPaneByTab(layout.editorRoot, tabKeyStr);
         const bottomPane = layout.bottomRoot
@@ -695,7 +698,13 @@ function AIChatHost({
   container,
   visible,
 }: AIChatHostProps) {
-  if (!container) return null;
+  // Defer mounting until the tab is shown once — hidden background tabs
+  // no longer each spin up a full AIChatPanel at workspace open.
+  const [mounted, setMounted] = useState(visible);
+  useEffect(() => {
+    if (visible) setMounted(true);
+  }, [visible]);
+  if (!container || !mounted) return null;
   return createPortal(
     <div
       className="ai-tab-host"

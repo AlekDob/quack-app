@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-01
-last_verified: 2026-07-01
-tags: [model-selector, model-browser, model-picker, favorites, visibility, cursor-cli, opencode-cli, composer, lazy-load, free-models]
+last_verified: 2026-07-03
+tags: [model-selector, model-browser, model-picker, favorites, visibility, cursor-cli, opencode-cli, composer, lazy-load, free-models, model-discovery-cache]
 ---
 
 ## Model Selector (composer chip + catalog + visibility)
@@ -20,8 +20,9 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 | Component | `src/components/ManageModelsModal.tsx` | Toggle model visibility in quick picker (reuses `model-browser` shell) |
 | Service | `src/modelPrefs.ts` | Favorites + disabled-model maps in localStorage |
 | Service | `src/modelSelectorUtils.ts` | `buildModelGroups`, `filterVisibleGroups`, `splitFavoriteModels`, `modelLabel` |
-| Service | `src/providers/index.ts` | `listAllModels` / `listAllCloudModels` — parallel `Promise.all` |
-| Component | `src/components/AIChatPanel.tsx` | `refreshLiveCliModels`, `browserOpen` effect, parallel `refresh()` |
+| Service | `src/modelDiscoveryStore.ts` | Shared discovery cache — see `031-model-discovery-cache.md` |
+| Service | `src/providers/index.ts` | `listAllModels` / `listAllCloudModels` — underlying provider probes |
+| Component | `src/components/AIChatPanel.tsx` | Subscribes to discovery store; `refreshLiveCliModels`; lazy cloud catalog on browser/manage open |
 | Config | `src/App.css` | `.tag-free`, `.model-picker-star` (always visible, muted until favorited) |
 | Design | `documentation/design/model-modal-pattern.md` | Visual/style contract for catalog + manage modals |
 
@@ -35,14 +36,20 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 | `+` in popover | Settings (providers) |
 
 ### Data Flow
-**Startup (lightweight):** `AIChatPanel` mount → `refresh()` parallel → `listAllModels` + `listAllCloudModels` → CLI providers return default row only (no `opencode serve`, no `cursor-agent --list-models`)
+**Startup (lightweight):** `App.tsx` → `prefetchModelDiscovery()` during splash → first `AIChatPanel` reads warm cache → `listAllModels` + Ollama ping only (no cloud catalog yet) → CLI providers return default row only
 
-**Lazy catalog:** popover `onOpen` or `browserOpen` → `refreshLiveCliModels()` → `refreshOpenCodeModelsLive()` + `refreshCursorModelsLive()` → merge into `allModels` / `allCloudCatalog`
+**Panel mount:** `subscribeModelDiscovery` + `ensureModelDiscovery({ force: false })` → shared snapshot (TTL 60s) — no per-tab full probe
+
+**Lazy cloud catalog:** `browserOpen` or `manageModelsOpen` → `ensureCloudCatalog()` → `listAllCloudModels`
+
+**Lazy CLI catalog:** popover `onOpen` or `browserOpen` → `refreshLiveCliModels()` → `refreshOpenCodeModelsLive()` + `refreshCursorModelsLive()` → merge into shared cache
 
 **Pick:** `buildModelGroups()` → popover filters disabled via `isModelEnabled` → `onSelect(qualified)` → chat provider routing
 
 ### Key Functions
-- `refreshLiveCliModels() → void` — `AIChatPanel`; merges live OpenCode + Cursor lists into state
+- `ensureModelDiscovery({ force? }) → ModelDiscoverySnapshot` — shared cache (`031-model-discovery-cache.md`)
+- `ensureCloudCatalog() → ProviderModel[]` — deferred full cloud lists for browser/manage modals
+- `refreshLiveCliModels() → void` — `AIChatPanel`; merges live OpenCode + Cursor lists into shared cache
 - `refreshOpenCodeModelsLive() → ProviderModel[]` — see `028-opencode-bridge.md`
 - `refreshCursorModelsLive() → ProviderModel[]` — see `026-cursor-cli-bridge.md`
 - `buildModelGroups(cloud, ollama, hasKey) → ProviderGroup[]` — ordered provider sections
@@ -64,6 +71,7 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 - `lcp.modelDisabled`: disabled qualified model keys (default `{}`)
 
 ### Gotchas
+- **Shared discovery cache:** one probe serves all open chats; see `031-model-discovery-cache.md`.
 - **Lazy CLI catalogs:** at cold start OpenCode/Cursor show one default model each; full list loads when picker or browser opens (or after first sidecar spawn warms cache).
 - **Favorites star visibility:** star is always visible at 40% opacity (`--warn` when favorited) — was `opacity: 0` until hover (looked broken).
 - **Free badge:** semantic green via `.tag-free` token; not orange accent.
