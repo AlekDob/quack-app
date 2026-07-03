@@ -43,13 +43,13 @@ import {
   getGitStatus,
   normalizeGitPath,
   startGitStatusWatch,
-  statusColor,
+  statusClass,
   subscribeGitStatus,
   treeBadge,
 } from "../gitStatusStore";
 import { FileHistoryModal } from "./FileHistoryModal";
 import { Icon } from "./Icon";
-import { fileIconName } from "../fileIcons";
+import { fileIconName, fileIconTint } from "../fileIcons";
 
 interface MenuTarget {
   x: number;
@@ -224,12 +224,15 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
   const gitDirDot =
     entry.is_dir && gitSnap.changedDirs.has(normalizeGitPath(entry.path));
 
+  const rowStyle = { "--tree-depth": depth } as React.CSSProperties;
+
   return (
     <>
       <div
         className={`tree-row ${isActive ? "active" : ""}`}
-        style={{ paddingLeft: 6 + depth * 12 }}
+        style={rowStyle}
         data-path={entry.path}
+        data-depth={depth}
         tabIndex={0}
         role={entry.is_dir ? "treeitem" : "button"}
         aria-expanded={entry.is_dir ? expanded : undefined}
@@ -248,17 +251,26 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
             <Icon name={expanded ? "chevron-down" : "chevron-right"} size={10} />
           )}
         </span>
-        <span className="tree-icon">
+        <span className={`tree-icon tree-icon--${fileIconTint(entry.name, entry.is_dir)}`}>
           <Icon
             name={entry.is_dir ? "folder" : fileIconName(entry.name)}
             size={14}
           />
         </span>
-        <span className="tree-name">{entry.name}</span>
+        <span
+          className={[
+            "tree-name",
+            gitFile ? statusClass(gitFile) : "",
+            gitDirDot ? "tree-name--dirty-dir" : "",
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {entry.name}
+        </span>
         {gitFile && (
           <span
-            className="tree-git-badge"
-            style={{ color: statusColor(gitFile) }}
+            className={`tree-git-badge ${statusClass(gitFile)}`}
             aria-hidden="true"
             title={`Git: ${gitFile.index_status}${gitFile.worktree_status}`}
           >
@@ -327,7 +339,7 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
           treeRef.current?.querySelectorAll<HTMLElement>("[data-path]") ?? [];
         for (const row of rows) {
           if (pathsEqual(row.dataset.path ?? "", detail.path)) {
-            row.scrollIntoView({ block: "center" });
+            row.scrollIntoView({ block: "nearest", inline: "nearest" });
             row.focus();
             return;
           }

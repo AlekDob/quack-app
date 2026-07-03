@@ -417,11 +417,12 @@ const ICONS: Record<IconName, ReactNode> = {
       <line x1="16" y1="3" x2="14" y2="21" />
     </>
   ),
-  // Curly braces — data files (JSON, package.json, etc.).
+  // Curly braces — data files (JSON, package.json, etc.). Mirror-symmetric
+  // paths so the glyph stays visually upright at 14px tree sizes.
   braces: (
     <>
-      <path d="M8 3c-2 0-3 1-3 3v2c0 1.5-.6 2-2 2 1.4 0 2 .5 2 2v3c0 2 1 3 3 3" />
-      <path d="M16 3c2 0 3 1 3 3v2c0 1.5.6 2 2 2-1.4 0-2 .5-2 2v3c0 2-1 3-3 3" />
+      <path d="M8 3H7a2 2 0 0 0-2 2v2a2 2 0 0 1-2 2 2 2 0 0 1 2 2v2a2 2 0 0 0 2 2h1" />
+      <path d="M16 3h1a2 2 0 0 1 2 2v2a2 2 0 0 0 2 2 2 2 0 0 0-2 2v2a2 2 0 0 1-2 2h-1" />
     </>
   ),
   // Picture frame with horizon — raster/vector image files.
@@ -533,7 +534,7 @@ export function Icon({ name, size = 16, className, title }: IconProps) {
       className={className}
       aria-hidden={title ? undefined : true}
       role={title ? "img" : undefined}
-      style={{ flexShrink: 0 }}
+      style={{ display: "block", flexShrink: 0 }}
     >
       {title && <title>{title}</title>}
       {ICONS[name]}

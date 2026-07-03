@@ -22,7 +22,7 @@ import {
   forceGitStatusRefresh,
   getGitStatus,
   startGitStatusWatch,
-  statusColor,
+  statusClass,
   statusLabel,
   subscribeGitStatus,
 } from "../gitStatusStore";
@@ -736,7 +736,7 @@ export function SourceControlPanel({ wsId, root }: Props) {
 
       {conflicts.length > 0 && (
         <>
-          <div className="git-section-title" style={{ color: "#e5734f" }}>
+          <div className="git-section-title git-status--conflict">
             Merge Conflicts ({conflicts.length})
           </div>
           <ul className="git-files">
@@ -759,10 +759,7 @@ export function SourceControlPanel({ wsId, root }: Props) {
                   setCtx({ x: e.clientX, y: e.clientY, file: f });
                 }}
               >
-                <span
-                  className="git-status-tag"
-                  style={{ color: statusColor(f) }}
-                >
+                <span className={`git-status-tag ${statusClass(f)}`}>
                   {statusLabel(f)}
                 </span>
                 <span className="git-file-path" title={f.path}>
@@ -796,10 +793,7 @@ export function SourceControlPanel({ wsId, root }: Props) {
               setCtx({ x: e.clientX, y: e.clientY, file: f });
             }}
           >
-            <span
-              className="git-status-tag"
-              style={{ color: statusColor(f) }}
-            >
+            <span className={`git-status-tag ${statusClass(f)}`}>
               {statusLabel(f)}
             </span>
             <span className="git-file-path" title={f.path}>
@@ -841,10 +835,7 @@ export function SourceControlPanel({ wsId, root }: Props) {
               setCtx({ x: e.clientX, y: e.clientY, file: f });
             }}
           >
-            <span
-              className="git-status-tag"
-              style={{ color: statusColor(f) }}
-            >
+            <span className={`git-status-tag ${statusClass(f)}`}>
               {statusLabel(f)}
             </span>
             <span className="git-file-path" title={f.path}>

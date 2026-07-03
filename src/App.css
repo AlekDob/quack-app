@@ -37,6 +37,9 @@
   --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
   --border-strong: rgba(255, 255, 255, 0.12);
   --bg-hover: rgba(255, 255, 255, 0.06);
+  /* List/tree selection — stronger than hover (--bg-hi) + left accent trace. */
+  --selection-bg: color-mix(in srgb, var(--fg) 16%, var(--bg));
+  --selection-trace: var(--accent);
   /* Semantic — for MEANING only (toasts, diff markers, agent status),
      used sparingly. These also drive the agent-status dots. */
   --ok: #22c55e;
@@ -61,6 +64,35 @@
   --tool-web: #36c5d0;
   --tool-task: #e879a8;
   --tool-todo: #a3d645;
+  /* File-tree icon tints — glyph only, confined to the explorer panel. */
+  --tree-tint-folder: #8b8f98;
+  --tree-tint-folder-src: #6aab73;
+  --tree-tint-folder-modules: #5c8f5c;
+  --tree-tint-folder-public: #5b9cf5;
+  --tree-tint-folder-git: #e5734f;
+  --tree-tint-folder-scripts: #b8a088;
+  --tree-tint-code-ts: #61afef;
+  --tree-tint-code-js: #e8d44d;
+  --tree-tint-code-py: #4ea0d8;
+  --tree-tint-code-rs: #dea584;
+  --tree-tint-code-go: #00add8;
+  --tree-tint-web: #e37933;
+  --tree-tint-style: #cc6699;
+  --tree-tint-data: #cbcb41;
+  --tree-tint-config: #a074c4;
+  --tree-tint-doc: #519aba;
+  --tree-tint-shell: #89d185;
+  --tree-tint-image: #a074c4;
+  --tree-tint-lock: #7f848e;
+  --tree-tint-git: #e5734f;
+  --tree-tint-default: #9aa0ad;
+  --tree-indent-step: 14px;
+  /* Git status — file tree + source control (VS Code-like semantics). */
+  --git-conflict: #e5734f;
+  --git-added: #73c990;
+  --git-modified: #e2c08d;
+  --git-deleted: #c75252;
+  --git-renamed: #9cdcfe;
   /* Label on a saturated workspace badge (active icon full fill). */
   --ws-on-color: #ffffff;
   /* Frosted surface fill for static chrome (topbar, dropdowns, modals) */
@@ -95,6 +127,9 @@
   --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
   --border-strong: rgba(0, 0, 0, 0.16);
   --bg-hover: rgba(0, 0, 0, 0.05);
+  /* Light needs a touch more ink in the mix so the row reads on off-white. */
+  --selection-bg: color-mix(in srgb, var(--fg) 11%, var(--bg));
+  --selection-trace: var(--accent);
   /* Light counterparts: status colors pulled darker — the bright dark
      greens/ambers fail contrast on white. */
   --ok: #15803d;
@@ -116,6 +151,34 @@
   --tool-web: #0891b2;
   --tool-task: #db2777;
   --tool-todo: #65a30d;
+  /* File-tree icon tints — slightly deeper for light backgrounds. */
+  --tree-tint-folder: #6b7280;
+  --tree-tint-folder-src: #15803d;
+  --tree-tint-folder-modules: #166534;
+  --tree-tint-folder-public: #2563eb;
+  --tree-tint-folder-git: #c2410c;
+  --tree-tint-folder-scripts: #92400e;
+  --tree-tint-code-ts: #1d4ed8;
+  --tree-tint-code-js: #a16207;
+  --tree-tint-code-py: #0369a1;
+  --tree-tint-code-rs: #b45309;
+  --tree-tint-code-go: #0e7490;
+  --tree-tint-web: #c2410c;
+  --tree-tint-style: #be185d;
+  --tree-tint-data: #a16207;
+  --tree-tint-config: #7e22ce;
+  --tree-tint-doc: #0369a1;
+  --tree-tint-shell: #15803d;
+  --tree-tint-image: #7e22ce;
+  --tree-tint-lock: #6b7280;
+  --tree-tint-git: #c2410c;
+  --tree-tint-default: #6b7280;
+  /* Git status — darker inks for contrast on off-white surfaces. */
+  --git-conflict: #c2410c;
+  --git-added: #15803d;
+  --git-modified: #92400e;
+  --git-deleted: #b91c1c;
+  --git-renamed: #0369a1;
   --ws-on-color: #ffffff;
   --glass-bg: rgba(255, 255, 255, 0.72);
 }
@@ -10900,21 +10963,50 @@ body.ws-dragging * {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 }
 
+/* Git status tones — shared by file tree, source control, badges. */
+.git-status--conflict { color: var(--git-conflict); }
+.git-status--added { color: var(--git-added); }
+.git-status--modified { color: var(--git-modified); }
+.git-status--deleted { color: var(--git-deleted); }
+.git-status--renamed { color: var(--git-renamed); }
+.tree-name--dirty-dir { color: var(--warn); }
+
 /* File tree */
 .tree {
+  overflow-x: hidden;
   overflow-y: auto;
   flex: 1;
   padding: 4px 0;
   user-select: none;
 }
 .tree-row {
+  position: relative;
   display: flex;
   align-items: center;
-  padding: 2px 8px 2px 6px;
+  padding: 2px 8px;
+  padding-left: calc(8px + var(--tree-depth, 0) * var(--tree-indent-step));
   cursor: pointer;
   white-space: nowrap;
   font-size: 13px;
   outline: none;
+  min-width: 0;
+}
+.tree-row::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--tree-depth, 0) * var(--tree-indent-step));
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent calc(var(--tree-indent-step) - 1px),
+    color-mix(in srgb, var(--border) 75%, transparent)
+      calc(var(--tree-indent-step) - 1px),
+    color-mix(in srgb, var(--border) 75%, transparent) var(--tree-indent-step)
+  );
 }
 .tree-row:hover {
   background: var(--bg-hi);
@@ -10924,11 +11016,17 @@ body.ws-dragging * {
   box-shadow: inset 0 0 0 1px var(--accent);
 }
 .tree-row.active {
-  background: var(--bg-hi);
+  background: var(--selection-bg);
   color: var(--fg);
+  box-shadow: inset 2px 0 0 var(--selection-trace);
+}
+.tree-row.active .tree-name {
+  font-weight: 600;
 }
 .tree-row.active:focus-visible {
-  box-shadow: inset 0 0 0 1px #fff;
+  box-shadow:
+    inset 2px 0 0 var(--selection-trace),
+    inset 0 0 0 1px var(--accent);
 }
 .tree-empty {
   padding: 16px 12px;
@@ -10937,17 +11035,49 @@ body.ws-dragging * {
   text-align: center;
 }
 .tree-caret {
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 12px;
+  flex-shrink: 0;
   color: var(--fg-muted);
-  font-size: 10px;
 }
 .tree-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 18px;
-  display: inline-block;
-  text-align: center;
+  height: 18px;
+  flex-shrink: 0;
+  color: var(--tree-tint-default);
 }
+.tree-icon svg {
+  display: block;
+}
+.tree-icon--folder { color: var(--tree-tint-folder); }
+.tree-icon--folder-src { color: var(--tree-tint-folder-src); }
+.tree-icon--folder-modules { color: var(--tree-tint-folder-modules); }
+.tree-icon--folder-public { color: var(--tree-tint-folder-public); }
+.tree-icon--folder-git { color: var(--tree-tint-folder-git); }
+.tree-icon--folder-scripts { color: var(--tree-tint-folder-scripts); }
+.tree-icon--code-ts { color: var(--tree-tint-code-ts); }
+.tree-icon--code-js { color: var(--tree-tint-code-js); }
+.tree-icon--code-py { color: var(--tree-tint-code-py); }
+.tree-icon--code-rs { color: var(--tree-tint-code-rs); }
+.tree-icon--code-go { color: var(--tree-tint-code-go); }
+.tree-icon--web { color: var(--tree-tint-web); }
+.tree-icon--style { color: var(--tree-tint-style); }
+.tree-icon--data { color: var(--tree-tint-data); }
+.tree-icon--config { color: var(--tree-tint-config); }
+.tree-icon--doc { color: var(--tree-tint-doc); }
+.tree-icon--shell { color: var(--tree-tint-shell); }
+.tree-icon--image { color: var(--tree-tint-image); }
+.tree-icon--lock { color: var(--tree-tint-lock); }
+.tree-icon--git { color: var(--tree-tint-git); }
+.tree-icon--default { color: var(--tree-tint-default); }
 .tree-name {
+  flex: 1;
+  min-width: 0;
   margin-left: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -10967,7 +11097,7 @@ body.ws-dragging * {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--fg-muted);
+  background: var(--warn);
   flex: 0 0 auto;
 }
 .git-file-history-card {

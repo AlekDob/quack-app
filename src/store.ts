@@ -28,6 +28,7 @@ import { mediaKindOf } from "./mediaPreview";
 import { fsBus, pathsEqual } from "./fsBus";
 import { pushClosedTab, popClosedTab, forgetClosedTab } from "./closedTabsStack";
 import { getRecentFiles } from "./recentFiles";
+import { autoRevealInTree } from "./revealInTree";
 
 // -------- Idle tracking (footprint features) --------
 //
@@ -1442,6 +1443,7 @@ export const useStore = create<AppState>((set, get) => {
             activePaneId: existingPane.id,
           },
         }));
+        autoRevealInTree(wsId, path);
         return;
       }
       let contents: string;
@@ -1491,6 +1493,7 @@ export const useStore = create<AppState>((set, get) => {
           },
         };
       });
+      autoRevealInTree(wsId, path);
     },
 
     closeTab: async (wsId, key) => {
@@ -1585,7 +1588,7 @@ export const useStore = create<AppState>((set, get) => {
       }
     },
 
-    setActiveTab: (wsId, paneId, key) =>
+    setActiveTab: (wsId, paneId, key) => {
       updateWs(wsId, (w) => ({
         ...w,
         layout: {
@@ -1596,7 +1599,10 @@ export const useStore = create<AppState>((set, get) => {
             : null,
           activePaneId: paneId,
         },
-      })),
+      }));
+      const parsed = parseKey(key);
+      if (parsed?.kind === "file") autoRevealInTree(wsId, parsed.path);
+    },
 
     setActivePane: (wsId, paneId) =>
       updateWs(wsId, (w) => ({

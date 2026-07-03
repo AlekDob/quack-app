@@ -30,6 +30,8 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 | Primary action | `--primary-bg` (=`--fg`), `--primary-fg` (=`--bg`), `--primary-bg-hover` |
 | Semantic | `--ok`, `--warn`, `--err`, `--info` (+ `-bg` variants) |
 | Tool icons | `--tool-read`, `--tool-bash`, `--tool-search`, `--tool-edit`, `--tool-web`, `--tool-task`, `--tool-todo` (glyph only — see `features/006`) |
+| Explorer icon tints | `--tree-tint-*` per file/folder category; `--tree-indent-step` (14px) — glyph only in file tree (`features/013`, `034`) |
+| Git status (tree + SC) | `--git-modified`, `--git-added`, `--git-deleted`, `--git-renamed`, `--git-conflict` + `.git-status--*` classes (`features/034`) |
 | Skill / image | `--skill`, `--skill-bg`, `--img`, `--img-bg` (full-pill exceptions) |
 | Radius | `--radius-xs/sm/md/lg/full` (5/8/14/20/999), `--radius-window` (12) |
 | Shadow / blur | `--shadow-sm/md/lg`, `--blur-light/medium/heavy` |
@@ -38,7 +40,7 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 
 ### Key decisions baked in (see decisions/)
 - **Rebrand on tokens, NOT a Tailwind/shadcn rewrite** — `decisions/002-ui-styling-rebrand-not-rewrite.md`.
-- **Zero-orange chrome (Cursor-style):** `--accent` is NEUTRAL grey. Real color lives only on per-project workspace badges (`features/002-workspace-colors.md`) and semantic states.
+- **Zero-orange chrome (Cursor-style):** `--accent` is NEUTRAL grey. Real color lives on per-project workspace badges (`features/002-workspace-colors.md`), semantic states, and **explorer panel** icon/git tints (`features/013`, `034`) — not on topbar/tabs/composer.
 - **Primary = monochrome:** action buttons use `--primary-bg` (=`--fg`) → near-white in dark, near-black in light. Orange is gone from chrome.
 - **Selection = neutral:** active rows/tabs use `--bg-hi` + a thin accent trace, never a full fill.
 

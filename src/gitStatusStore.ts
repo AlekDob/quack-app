@@ -195,17 +195,34 @@ export function statusLabel(f: GitFile): string {
   return i || w || " ";
 }
 
-export function statusColor(f: GitFile): string {
-  // Conflicts first: their XY pairs contain U/A/D letters that would
-  // otherwise pick up the cheerful "untracked green".
-  if (f.conflicted) return "#e5734f";
+export type GitStatusTone =
+  | "conflict"
+  | "added"
+  | "modified"
+  | "deleted"
+  | "renamed"
+  | "neutral";
+
+export function statusTone(f: GitFile): GitStatusTone {
+  if (f.conflicted) return "conflict";
   const tag = statusLabel(f);
-  if (tag.includes("U")) return "#73c990";
-  if (tag.includes("A")) return "#73c990";
-  if (tag.includes("M")) return "#e2c08d";
-  if (tag.includes("D")) return "#c75252";
-  if (tag.includes("R")) return "#9cdcfe";
-  return "#d4d4d4";
+  if (tag.includes("U")) return "added";
+  if (tag.includes("A")) return "added";
+  if (tag.includes("M")) return "modified";
+  if (tag.includes("D")) return "deleted";
+  if (tag.includes("R")) return "renamed";
+  return "neutral";
+}
+
+/** Theme-aware class for git-colored labels (tree, source control). */
+export function statusClass(f: GitFile): string {
+  const tone = statusTone(f);
+  return tone === "neutral" ? "" : `git-status--${tone}`;
+}
+
+export function statusColor(f: GitFile): string {
+  const tone = statusTone(f);
+  return tone === "neutral" ? "var(--fg-muted)" : `var(--git-${tone})`;
 }
 
 /** Single letter for the right edge of a tree row. Worktree side wins

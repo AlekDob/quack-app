@@ -1,11 +1,10 @@
 import type { IconName } from "./components/Icon";
 
-// VS Code-style per-type icons for the file tree — but monochrome to
-// respect Quack's neutral-chrome brand rule (color only on workspace
-// badges + semantic states). Each file type maps to a distinct SHAPE
-// from the shared Icon registry; the color stays currentColor.
+// VS Code-style per-type icons for the file tree. Shapes come from the
+// shared Icon registry; tints (fileIconTint) add Cursor-like color on
+// the glyph only — chrome stays neutral.
 //
-// Single source of truth: call fileIconName(name) at every call-site,
+// Single source of truth: call fileIconName/fileIconTint at call-sites,
 // never branch on the extension inline.
 
 // Exact filenames (lowercased) that should win over the extension —
@@ -64,7 +63,85 @@ export function fileIconName(fileName: string): IconName {
   const lower = fileName.toLowerCase();
   if (lower in BY_NAME) return BY_NAME[lower];
   const dot = lower.lastIndexOf(".");
-  // Dotfiles with no real extension (e.g. ".prettierrc") read as config.
   if (dot <= 0) return "settings";
   return BY_EXT[lower.slice(dot + 1)] ?? "file";
+}
+
+/** CSS class suffix for tree-icon tint (tree-icon--{value}). */
+export type FileIconTint =
+  | "default"
+  | "folder"
+  | "folder-src"
+  | "folder-modules"
+  | "folder-public"
+  | "folder-git"
+  | "folder-scripts"
+  | "code-ts"
+  | "code-js"
+  | "code-py"
+  | "code-rs"
+  | "code-go"
+  | "web"
+  | "style"
+  | "data"
+  | "config"
+  | "doc"
+  | "shell"
+  | "image"
+  | "lock"
+  | "git";
+
+const FOLDER_TINT: Record<string, FileIconTint> = {
+  src: "folder-src",
+  source: "folder-src",
+  lib: "folder-src",
+  app: "folder-src",
+  apps: "folder-src",
+  node_modules: "folder-modules",
+  public: "folder-public",
+  static: "folder-public",
+  assets: "folder-public",
+  ".git": "folder-git",
+  scripts: "folder-scripts",
+  bin: "folder-scripts",
+};
+
+const EXT_TINT: Record<string, FileIconTint> = {
+  ts: "code-ts", tsx: "code-ts", mts: "code-ts", cts: "code-ts",
+  js: "code-js", jsx: "code-js", mjs: "code-js", cjs: "code-js",
+  py: "code-py", pyw: "code-py",
+  rs: "code-rs",
+  go: "code-go",
+  html: "web", htm: "web", xml: "web",
+  css: "style", scss: "style", sass: "style", less: "style", styl: "style",
+  json: "data", jsonc: "data", json5: "data",
+  yaml: "config", yml: "config", toml: "config", ini: "config",
+  conf: "config", cfg: "config", properties: "config", plist: "config",
+  md: "doc", mdx: "doc", markdown: "doc", txt: "doc", rst: "doc",
+  pdf: "doc", doc: "doc", docx: "doc",
+  sh: "shell", bash: "shell", zsh: "shell", fish: "shell",
+  ps1: "shell", bat: "shell", cmd: "shell",
+  png: "image", jpg: "image", jpeg: "image", gif: "image", svg: "image",
+  webp: "image", ico: "image", bmp: "image", avif: "image", tiff: "image",
+  lock: "lock", pem: "lock", key: "lock",
+};
+
+const NAME_TINT: Record<string, FileIconTint> = {
+  "package.json": "data",
+  ".gitignore": "git",
+  ".gitattributes": "git",
+  ".gitmodules": "git",
+  ".env": "lock",
+  dockerfile: "config",
+  makefile: "shell",
+};
+
+/** Tint class for a tree row icon — folders by name, files by ext. */
+export function fileIconTint(name: string, isDir: boolean): FileIconTint {
+  const lower = name.toLowerCase();
+  if (isDir) return FOLDER_TINT[lower] ?? "folder";
+  if (lower in NAME_TINT) return NAME_TINT[lower];
+  const dot = lower.lastIndexOf(".");
+  if (dot <= 0) return "config";
+  return EXT_TINT[lower.slice(dot + 1)] ?? "default";
 }

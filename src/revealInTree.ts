@@ -26,17 +26,19 @@ function isInWorkspace(wsId: string, filePath: string): boolean {
   return norm.toLowerCase().startsWith(root.toLowerCase() + "/");
 }
 
+/** Reveal a workspace file in the sidebar tree (no-op for out-of-root paths). */
+export function autoRevealInTree(wsId: string, filePath: string): void {
+  if (!isInWorkspace(wsId, filePath)) return;
+  revealInTree(wsId, filePath);
+}
+
 /**
- * Open a file in an editor tab and, if it lives inside the project, also
- * reveal + highlight it in the left file tree. Shared by the whiteboard
- * organigramma and the Usage → Context view so the click-to-open behaviour
- * is defined once (DRY).
+ * Open a file in an editor tab and reveal it in the tree. `openFile` already
+ * auto-reveals; this helper remains for call sites that want the intent spelled
+ * out (whiteboard organigramma, Usage → Context view).
  */
 export async function openFileAndReveal(wsId: string, filePath: string) {
   await useStore.getState().openFile(wsId, filePath);
-  if (isInWorkspace(wsId, filePath)) {
-    revealInTree(wsId, filePath);
-  }
 }
 
 export function revealInTree(wsId: string, filePath: string) {
