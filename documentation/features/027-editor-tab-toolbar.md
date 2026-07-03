@@ -23,6 +23,7 @@ tags: [editor, markdown, preview, split, git-diff, toolbar, monaco, spaceship-pa
 | Component | `src/components/EditorBreadcrumbs.tsx` | Path + symbol breadcrumb (unchanged; sits above toolbar) |
 | Service | `src/editorMdView.ts` | `readEditorMdView` / `writeEditorMdView` — `edit` \| `split` \| `preview` |
 | Service | `src/editorSettings.ts` | Global editor prefs incl. `lightColorTheme` / `darkColorTheme` — see feature 033 |
+| Service | `src/editorMonoFont.ts` | Monaco `fontFamily` from `--mono` (JetBrains Mono stack) |
 | Service | `src/editorDiffPrefs.ts` | `readDiffSideBySide` / `writeDiffSideBySide` — diff layout pref |
 | Service | `src/editorGitDiff.ts` | `computeGitDiffPair(gitRoot, absPath, current) → GitDiffPair \| null` |
 | Hook | `src/hooks/useGitDiffPair.ts` | React hook wrapping `computeGitDiffPair` |

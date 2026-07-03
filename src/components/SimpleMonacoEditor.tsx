@@ -1,9 +1,8 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
 import { useEffect, useRef } from "react";
 import type { editor } from "monaco-editor";
-import {
-  ensureEditorColorThemes,
-} from "../editorColorThemes";
+import { registerMonacoForThemes } from "../editorColorThemes";
+import { readEditorMonoFont } from "../editorMonoFont";
 import { useResolvedEditorColorTheme } from "../useResolvedEditorColorTheme";
 import { useEditorSettings } from "../editorSettings";
 import { langOf } from "../langDetect";
@@ -46,6 +45,7 @@ export function SimpleMonacoEditor({
       options={{
         readOnly,
         colorDecorators: true,
+        fontFamily: readEditorMonoFont(),
         fontSize: settings.fontSize,
         minimap: { enabled: settings.minimap },
         scrollBeyondLastLine: false,
@@ -56,7 +56,7 @@ export function SimpleMonacoEditor({
         padding: { top: 8 },
       }}
       onMount={(ed: editor.IStandaloneCodeEditor, monaco: Monaco) => {
-        ensureEditorColorThemes(monaco);
+        registerMonacoForThemes(monaco);
         editorRef.current = ed;
       }}
       onChange={(v) => onChange(v ?? "")}

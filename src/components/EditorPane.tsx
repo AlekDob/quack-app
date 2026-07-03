@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import type { editor } from "monaco-editor";
 import { useStore } from "../store";
 import {
-  ensureEditorColorThemes,
+  registerMonacoForThemes,
 } from "../editorColorThemes";
+import { readEditorMonoFont } from "../editorMonoFont";
 import { useResolvedEditorColorTheme } from "../useResolvedEditorColorTheme";
 import { MarkdownPreview } from "./MarkdownPreview";
 import {
@@ -297,6 +298,7 @@ export function EditorPane({ wsId, path }: Props) {
     if (!editorRef.current) return;
     editorRef.current.updateOptions({
       fontSize: settings.fontSize,
+      fontFamily: readEditorMonoFont(),
       wordWrap: settings.wordWrap,
       tabSize: ec.tab_width ?? ec.indent_size ?? settings.tabSize,
       insertSpaces: ec.indent_style
@@ -589,6 +591,7 @@ export function EditorPane({ wsId, path }: Props) {
         theme={colorTheme}
         options={{
           fontSize: settings.fontSize,
+          fontFamily: readEditorMonoFont(),
           minimap: { enabled: settings.minimap },
           colorDecorators: true,
           scrollBeyondLastLine: false,
@@ -616,7 +619,7 @@ export function EditorPane({ wsId, path }: Props) {
           formatOnPaste: settings.formatOnTypePaste,
         }}
         onMount={(ed: editor.IStandaloneCodeEditor, monaco: Monaco) => {
-          ensureEditorColorThemes(monaco);
+          registerMonacoForThemes(monaco);
           editorRef.current = ed;
           monacoRef.current = monaco;
           setMonacoInstance(monaco);

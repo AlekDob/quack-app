@@ -59,7 +59,7 @@ Frontend `src/` (React 19 + TypeScript + Zustand, Monaco, xterm — **no Tailwin
 | Agent Mode toggle (localStorage) | `src/agentMode.ts` |
 | Main chat panel — streaming, tool calls, todos, status | `src/components/AIChatPanel.tsx` |
 | Editor tab toolbar — md Edit/Split/Preview, git Changes, Save | `src/components/EditorTabToolbar.tsx`, `EditorPane.tsx`, `editorMdView.ts`, `editorGitDiff.ts` |
-| Editor color themes (Monaco syntax, per light/dark) | `src/editorColorThemes.ts`, `src/useResolvedEditorColorTheme.ts`, `src/editorSettings.ts` |
+| Editor color themes (Monaco syntax, per light/dark) | `src/editorColorThemes.ts`, `src/monacoThemeRules.ts`, `src/vscodeThemeBundles.ts`, `src/editorMonoFont.ts`, `src/useResolvedEditorColorTheme.ts` |
 | Tool-call rendering (chips, diffs, running/done state) | `src/components/chatToolRender.tsx` |
 | Agent-centric layout (rail + sessions + tasks) | `src/components/AgentModeShell.tsx` |
 | Right-side sessions list ("library") | `src/components/AIChatsRail.tsx` |
@@ -145,7 +145,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `030-user-message-bar.md` — user turns as right-aligned markdown cards with hover copy/re-send/branch actions (`UserMessageBar.tsx`).
   - `031-model-discovery-cache.md` — shared provider/model probe cache (`modelDiscoveryStore`); prefetch at splash; lazy cloud + CLI catalogs; invalidation on API-key edit / force refresh.
   - `032-startup-hydration.md` — splash gate, parallel workspace restore, overlap with model prefetch.
-  - `033-editor-color-themes.md` — VS Code bundled Monaco syntax themes (Modern, Dark+/Light+, Abyss, Monokai, Solarized, …); per-mode picker + separate light/dark persistence.
+  - `033-editor-color-themes.md` — VS Code bundled Monaco syntax themes; Monaco-compatible token rules (`monacoThemeRules.ts`), live `setTheme`, JetBrains Mono `fontFamily`; per-mode picker + separate light/dark persistence.
 - `documentation/design/` — UI style contracts beyond tokens.
   - `directives.md` — hard rules (no emoji, tokens-only, neutral chrome).
   - `model-modal-pattern.md` — shared shell for Choose a model + Manage models (liquid glass, pill controls, light/dark surfaces).

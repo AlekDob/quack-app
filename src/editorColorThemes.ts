@@ -76,6 +76,13 @@ export function colorThemeLabel(id: string, mode: "light" | "dark"): string {
 }
 
 let registered = false;
+let monacoApi: Monaco | null = null;
+
+/** Register custom themes and keep the Monaco handle for live `setTheme`. */
+export function registerMonacoForThemes(monaco: Monaco): void {
+  monacoApi = monaco;
+  ensureEditorColorThemes(monaco);
+}
 
 /** Register Quack custom Monaco themes once per runtime. */
 export function ensureEditorColorThemes(monaco: Monaco): void {
@@ -84,6 +91,11 @@ export function ensureEditorColorThemes(monaco: Monaco): void {
   for (const [id, data] of Object.entries(VS_CODE_THEME_BUNDLES)) {
     monaco.editor.defineTheme(id, data);
   }
+}
+
+/** Apply a theme id immediately (built-in or custom). */
+export function applyEditorColorTheme(themeId: string): void {
+  monacoApi?.editor.setTheme(themeId);
 }
 
 /** All custom theme ids (for JSON settings validation docs). */
