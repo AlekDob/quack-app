@@ -4,8 +4,6 @@
 const NEAR_BOTTOM_PX = 60;
 const PIN_TOP_GAP_PX = 8;
 
-export type ChatFollowMode = "pin-top" | "tail";
-
 export function isNearBottom(
   scroller: HTMLElement,
   threshold = NEAR_BOTTOM_PX,
@@ -30,29 +28,7 @@ function lastUserTurnEl(scroller: HTMLElement): HTMLElement | null {
 export function pinUserTurnToTop(scroller: HTMLElement): boolean {
   const el = lastUserTurnEl(scroller);
   if (!el) return false;
-  el.scrollIntoView({ block: "start", behavior: "auto" });
-  scroller.scrollTop = Math.max(0, scroller.scrollTop - PIN_TOP_GAP_PX);
+  // offsetTop is reliable here: .ai-messages is position:relative (nav rail).
+  scroller.scrollTop = Math.max(0, el.offsetTop - PIN_TOP_GAP_PX);
   return true;
-}
-
-/** Layout can lag one frame after React commit — retry until the anchor exists. */
-export function pinUserTurnWithRetry(
-  scroller: HTMLElement,
-  onDone?: () => void,
-): void {
-  const finish = () => onDone?.();
-  if (pinUserTurnToTop(scroller)) {
-    finish();
-    return;
-  }
-  requestAnimationFrame(() => {
-    if (pinUserTurnToTop(scroller)) {
-      finish();
-      return;
-    }
-    setTimeout(() => {
-      pinUserTurnToTop(scroller);
-      finish();
-    }, 48);
-  });
 }

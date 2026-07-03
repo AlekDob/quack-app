@@ -432,6 +432,29 @@ function pruneEmptyTabsPanes(p: Pane | null): Pane | null {
   return { ...p, first, second };
 }
 
+/** Remove an AI chat tab from the layout without deleting the descriptor
+ *  (used when archiving — the session stays in state, hidden from the hub). */
+function closeAiTabInLayout(
+  layout: WorkspaceLayout,
+  chatId: string,
+): WorkspaceLayout {
+  const k = aiKey(chatId);
+  const er = removeTabFromTree(layout.editorRoot, k);
+  const editorRoot: Pane = er.tree ?? emptyTabsPane();
+  let bottomRoot = layout.bottomRoot;
+  if (bottomRoot) {
+    const br = removeTabFromTree(bottomRoot, k);
+    bottomRoot = pruneEmptyTabsPanes(br.tree);
+  }
+  const activePaneId =
+    layout.activePaneId &&
+    (isInTree(editorRoot, layout.activePaneId) ||
+      (bottomRoot ? isInTree(bottomRoot, layout.activePaneId) : false))
+      ? layout.activePaneId
+      : firstLeaf(editorRoot).id;
+  return { ...layout, editorRoot, bottomRoot, activePaneId };
+}
+
 export function dropTabAt(
   root: Pane,
   targetPaneId: PaneId,
@@ -2615,7 +2638,14 @@ export const useStore = create<AppState>((set, get) => {
         delete next.archivedAt;
         if (state === "done") next.doneAt = Date.now();
         else if (state === "archived") next.archivedAt = Date.now();
-        return { ...w, aiChats: { ...w.aiChats, [id]: next } };
+        return {
+          ...w,
+          aiChats: { ...w.aiChats, [id]: next },
+          layout:
+            state === "archived"
+              ? closeAiTabInLayout(w.layout, id)
+              : w.layout,
+        };
       }),
 
     setAIChatSession: (wsId, id, sessionId) =>

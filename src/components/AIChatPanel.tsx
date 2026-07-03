@@ -2,11 +2,9 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  Fragment,
 } from "react";
 import { flushSync } from "react-dom";
 import { Icon } from "./Icon";
@@ -77,6 +75,7 @@ import { publishTasks } from "../aiTaskStore";
 import { publishChatDiff } from "../chatDiffStore";
 import { summarizeLastTurn } from "../sessionDiffStats";
 import { loadWorkspaceRules } from "../workspaceRules";
+import { appendJackUserPreferences } from "../jackPrefs";
 import {
   type ImageAttachment,
   MAX_ATTACHED_IMAGES,
@@ -138,9 +137,7 @@ import { relPath } from "../pathUtils";
 import {
   isNearBottom,
   pinUserTurnToTop,
-  pinUserTurnWithRetry,
   scrollToBottom,
-  type ChatFollowMode,
 } from "../chatScroll";
 import {
   ensureCloudCatalog,
@@ -572,10 +569,8 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // drag-drop listener (App.tsx) hit-tests image drops against.
   const panelRef = useRef<HTMLDivElement>(null);
   const stickyBottomRef = useRef(true);
-  // Cursor-style: on send pin the user turn at the top; otherwise tail-follow.
-  const followModeRef = useRef<ChatFollowMode>("tail");
-  const programmaticScrollRef = useRef(false);
-  const [pinTurnToken, setPinTurnToken] = useState(0);
+  // While true, auto tail-follow is suppressed (Cursor-style turn pin).
+  const pinActiveRef = useRef(false);
   // Visible "jump to bottom" affordance. Mirrors stickyBottomRef into
   // React state so the button can render when the user scrolls up
   // mid-stream and they need a one-click way back to the live tail.
@@ -1059,42 +1054,22 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     });
   }, [selected, aiChatId, wsId]);
 
-  // Track scroll position. Tail-follow only when not in pin-top mode.
+  // Track whether the user is parked at the bottom (for tail-follow + jump chip).
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const onScroll = () => {
       const sticky = isNearBottom(el);
       stickyBottomRef.current = sticky;
-      if (
-        !sticky &&
-        followModeRef.current === "pin-top" &&
-        !programmaticScrollRef.current
-      ) {
-        followModeRef.current = "tail";
-      }
       setShowJumpToBottom((prev) => (prev === !sticky ? prev : !sticky));
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
-  // Pin the just-sent user turn at the top (Cursor-style). useLayoutEffect
-  // runs before paint; pinTurnToken bumps even when messages.length is unchanged.
-  useLayoutEffect(() => {
-    if (pinTurnToken === 0) return;
-    const el = scrollRef.current;
-    if (!el) return;
-    programmaticScrollRef.current = true;
-    pinUserTurnWithRetry(el, () => {
-      stickyBottomRef.current = isNearBottom(el);
-      setShowJumpToBottom(!stickyBottomRef.current);
-      requestAnimationFrame(() => {
-        programmaticScrollRef.current = false;
-      });
-    });
-  }, [pinTurnToken, messages.length]);
+  // Tail-follow only when the user was already at the bottom AND we are not
+  // in a pinned turn (Cursor-style send pins the user message at the top).
   useEffect(() => {
-    if (followModeRef.current === "pin-top") return;
+    if (pinActiveRef.current) return;
     if (!stickyBottomRef.current) return;
     const el = scrollRef.current;
     if (!el) return;
@@ -2116,6 +2091,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         sysParts.push(investigationPlan);
       }
     }
+    appendJackUserPreferences(sysParts);
 
     // Display the user's bare text in the chat — but send an augmented
     // version (with the inline tree / per-turn editor context) to the
@@ -2149,25 +2125,18 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       ...baseMessages,
       sentUserMsg,
     ];
-    followModeRef.current = "pin-top";
+    pinActiveRef.current = true;
     stickyBottomRef.current = false;
     flushSync(() => {
-      setPinTurnToken((t) => t + 1);
       setMessages([...baseMessages, displayUserMsg]);
       setStreaming("");
     });
-    programmaticScrollRef.current = true;
     const scroller = scrollRef.current;
     if (scroller) {
       pinUserTurnToTop(scroller);
       stickyBottomRef.current = isNearBottom(scroller);
       setShowJumpToBottom(!stickyBottomRef.current);
     }
-    requestAnimationFrame(() => {
-      const el = scrollRef.current;
-      if (el) pinUserTurnToTop(el);
-      programmaticScrollRef.current = false;
-    });
     abortRef.current = new AbortController();
 
     // Claude Code runs its own internal tool loop (Read/Glob/Edit/Bash/etc.).
@@ -2770,7 +2739,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     taskCounterRef.current = 0;
     setBudgetWarned(false);
     setScrubIndex(null);
-    followModeRef.current = "tail";
+    pinActiveRef.current = false;
   };
 
   const regenerateFrom = async (index: number) => {
@@ -3822,7 +3791,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             const el = scrollRef.current;
             if (!el) return;
             scrollToBottom(el);
-            followModeRef.current = "tail";
+            pinActiveRef.current = false;
             stickyBottomRef.current = true;
             setShowJumpToBottom(false);
           }}
@@ -3995,41 +3964,28 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           if (m.role === "user") {
             const isLatestUser = i === lastUserDisplayIdx;
             return (
-              <Fragment key={i}>
-                <div
-                  className={`ai-msg ai-msg-user${isLatestUser ? " ai-msg-user-latest" : ""}${dimmedByScrub ? " ai-msg-scrubbed-past" : ""}`}
-                  data-anchor-idx={i}
-                  data-anchor-role="user"
-                  data-anchor-preview={m.content.slice(0, 120)}
-                >
-                  <UserMessageBar
-                    content={m.content}
-                    images={m.images}
-                    zIndex={userTurnByIdx.get(i) ?? 1}
-                    actionsDisabled={streaming !== null || runningTools}
-                    showBranch={!!aiChatId}
-                    onCopy={() => {
-                      void navigator.clipboard.writeText(m.content);
-                      toastSuccess("Copied to clipboard");
-                    }}
-                    onRegen={() => void regenerateFrom(i)}
-                    onBranch={() => branchFromHere(i)}
-                    onImageClick={(img) => void openZoom(img)}
-                  />
-                </div>
-                {isLatestUser && turnActive && (
-                  <TurnStreamStatus
-                    runningTools={runningTools}
-                    streaming={streaming}
-                    streamingBlocks={streamingBlocks}
-                    activeToolLabels={activeToolLabels}
-                    tokensPerSec={tokensPerSec}
-                    warmingUp={warmingUp}
-                    lastStreamEventAt={lastStreamEventAt}
-                    onStop={() => stop()}
-                  />
-                )}
-              </Fragment>
+              <div
+                key={i}
+                className={`ai-msg ai-msg-user${isLatestUser ? " ai-msg-user-latest" : ""}${dimmedByScrub ? " ai-msg-scrubbed-past" : ""}`}
+                data-anchor-idx={i}
+                data-anchor-role="user"
+                data-anchor-preview={m.content.slice(0, 120)}
+              >
+                <UserMessageBar
+                  content={m.content}
+                  images={m.images}
+                  zIndex={userTurnByIdx.get(i) ?? 1}
+                  actionsDisabled={streaming !== null || runningTools}
+                  showBranch={!!aiChatId}
+                  onCopy={() => {
+                    void navigator.clipboard.writeText(m.content);
+                    toastSuccess("Copied to clipboard");
+                  }}
+                  onRegen={() => void regenerateFrom(i)}
+                  onBranch={() => branchFromHere(i)}
+                  onImageClick={(img) => void openZoom(img)}
+                />
+              </div>
             );
           }
           const composeFileCalls =
@@ -4696,6 +4652,23 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       {!compact && todos && todos.length > 0 && (
         <div className="ai-todos-bar">
           <TodosCard items={todos} />
+        </div>
+      )}
+      {/* Live turn status — docked above the composer (stays visible while scrolling). */}
+      {turnActive && (
+        <div className="ai-status-dock" aria-live="polite">
+          <div className="ai-inline-status">
+            <TurnStreamStatus
+              runningTools={runningTools}
+              streaming={streaming}
+              streamingBlocks={streamingBlocks}
+              activeToolLabels={activeToolLabels}
+              tokensPerSec={tokensPerSec}
+              warmingUp={warmingUp}
+              lastStreamEventAt={lastStreamEventAt}
+              onStop={() => stop()}
+            />
+          </div>
         </div>
       )}
       {/* Cursor-style composer: one pill. CSS `order` puts the textarea

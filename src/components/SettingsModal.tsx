@@ -37,6 +37,7 @@ import {
   AIPrivacyEditor,
   AIUsageDashboard,
 } from "./aiSettingsSections";
+import { JackPrefsEditor } from "./jackSettings";
 import {
   ClaudeCodeAlwaysAllowEditor,
   ClaudeCodeBudgetEditor,
@@ -698,6 +699,10 @@ export function SettingsModal() {
               dialog each time. "Deny" disables the tool — the AI sees a
               denial message instead of executing.
             </div>
+          </Section>
+
+          <Section title="Jack — Your preferences" id="jack-preferences">
+            <JackPrefsEditor />
           </Section>
 
           <Section title="AI Templates">

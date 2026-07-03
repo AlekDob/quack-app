@@ -56,7 +56,7 @@ export function TurnStreamStatus({
   if (!runningTools && !planning && !generating && !stale) return null;
 
   return (
-    <div className="ai-turn-status" aria-live="polite">
+    <>
       {planning && (
         <div className="ai-turn-hint">
           <span className="ai-spinner" />
@@ -157,6 +157,6 @@ export function TurnStreamStatus({
           </StatusPill>
         );
       })()}
-    </div>
+    </>
   );
 }
