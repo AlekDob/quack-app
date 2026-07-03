@@ -145,7 +145,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `030-user-message-bar.md` — user turns as right-aligned markdown cards with hover copy/re-send/branch actions (`UserMessageBar.tsx`).
   - `031-model-discovery-cache.md` — shared provider/model probe cache (`modelDiscoveryStore`); prefetch at splash; lazy cloud + CLI catalogs; invalidation on API-key edit / force refresh.
   - `032-startup-hydration.md` — splash gate, parallel workspace restore, overlap with model prefetch.
-  - `033-editor-color-themes.md` — Monaco syntax themes (VS Code–style picker): catalog filtered by resolved light/dark, separate `lightColorTheme` / `darkColorTheme` in `lcp.editorSettings`, `colorDecorators` for CSS swatches.
+  - `033-editor-color-themes.md` — VS Code bundled Monaco syntax themes (Modern, Dark+/Light+, Abyss, Monokai, Solarized, …); per-mode picker + separate light/dark persistence.
 - `documentation/design/` — UI style contracts beyond tokens.
   - `directives.md` — hard rules (no emoji, tokens-only, neutral chrome).
   - `model-modal-pattern.md` — shared shell for Choose a model + Manage models (liquid glass, pill controls, light/dark surfaces).
