@@ -1,4 +1,4 @@
-// Changed-files recap — Cursor-style panel at the end of a turn (2+ edits).
+// Changed-files recap — Cursor-style panel at the end of a turn (≥1 edit).
 // Neutral chrome: one bar (count + Undo / Keep / Review), expandable file list.
 
 import { useMemo, useState } from "react";

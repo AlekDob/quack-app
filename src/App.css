@@ -5,14 +5,15 @@
    here, not the architecture. Light mode is a full sibling theme below. */
 :root,
 :root[data-theme="dark"] {
-  /* Neutral surface scale (base → elevated → hover) */
-  --bg: #0f1115;
-  --bg-alt: #14161c;
-  --bg-elev: #181b22;
-  --bg-hi: #20242d;
-  --fg: #e7ebf3;
-  --fg-dim: rgba(231, 235, 243, 0.55);
-  --fg-muted: rgba(231, 235, 243, 0.35);
+  /* Neutral surface scale — near-black base, not #000. Steps stay tight so
+     elevated chips read as "almost white" grey on charcoal (Cursor-like). */
+  --bg: #0c0d10;
+  --bg-alt: #101114;
+  --bg-elev: #141519;
+  --bg-hi: #1a1b21;
+  --fg: #f2f3f5;
+  --fg-dim: rgba(242, 243, 245, 0.58);
+  --fg-muted: rgba(242, 243, 245, 0.38);
   --border: rgba(255, 255, 255, 0.08);
   /* Accent is NEUTRAL (Cursor-style "zero orange" chrome). Real color lives
      only on per-project workspace badges (separate palette) and semantic
@@ -27,10 +28,10 @@
      trace (focus ring, side accent, status dot) — never a button fill. */
   --primary-bg: var(--fg);
   --primary-fg: var(--bg);
-  --primary-bg-hover: #ffffff;
+  --primary-bg-hover: #fafafb;
   --danger: #ef4444;
-  --term-bg: #0f1115;
-  --term-fg: #e7ebf3;
+  --term-bg: #0c0d10;
+  --term-fg: #f2f3f5;
   /* Mono: Quack uses JetBrains Mono; Cascadia kept as fallback so the
      editor/terminal stay consistent where JBM isn't installed. */
   --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
@@ -62,13 +63,14 @@
    neutrals invert to a clean premium off-white. Dark stays the default
    (brand is dark-first) — this applies only on [data-theme="light"]. */
 :root[data-theme="light"] {
-  --bg: #ffffff;
-  --bg-alt: #f5f6f8;
-  --bg-elev: #eef0f3;
-  --bg-hi: #e3e6ea;
-  --fg: #16181d;
-  --fg-dim: rgba(22, 24, 29, 0.6);
-  --fg-muted: rgba(22, 24, 29, 0.4);
+  /* Near-white base, near-black text — not pure #fff / #000. */
+  --bg: #f8f8f9;
+  --bg-alt: #f1f1f3;
+  --bg-elev: #fdfdfd;
+  --bg-hi: #e8e8eb;
+  --fg: #14151a;
+  --fg-dim: rgba(20, 21, 26, 0.62);
+  --fg-muted: rgba(20, 21, 26, 0.42);
   --border: rgba(0, 0, 0, 0.09);
   /* Neutral accent in light theme too (zero orange chrome). */
   --accent: #6b7280;
@@ -78,10 +80,10 @@
   --accent-soft: rgba(0, 0, 0, 0.06);
   --primary-bg: var(--fg);
   --primary-fg: var(--bg);
-  --primary-bg-hover: #000000;
+  --primary-bg-hover: #0a0a0c;
   --danger: #dc2626;
-  --term-bg: #fafafa;
-  --term-fg: #2d2d2d;
+  --term-bg: #f8f8f9;
+  --term-fg: #14151a;
   --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
   --border-strong: rgba(0, 0, 0, 0.16);
   --bg-hover: rgba(0, 0, 0, 0.05);
@@ -2312,6 +2314,13 @@ body.ws-dragging * {
 .agent-hub.expanded .agent-hub-row {
   justify-content: flex-start;
 }
+.agent-hub.expanded .agent-hub-row.has-diff {
+  height: auto;
+  min-height: 44px;
+  align-items: flex-start;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
 .agent-hub-row:hover {
   background: var(--bg-hi);
 }
@@ -2331,6 +2340,36 @@ body.ws-dragging * {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+.agent-hub-row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.agent-hub-row-diff {
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.agent-hub-diff-add {
+  color: var(--ok);
+}
+.agent-hub-diff-del {
+  color: var(--err);
+}
+.agent-hub.expanded .agent-hub-row.has-diff .agent-hub-dot {
+  margin-top: 3px;
+}
+.agent-hub.expanded .agent-hub-row.has-diff .agent-hub-badge {
+  margin-top: 1px;
+}
+.agent-hub.expanded .agent-hub-row.has-diff .agent-hub-row-close {
+  margin-top: 1px;
 }
 .agent-hub-rename {
   flex: 1 1 auto;
@@ -4682,58 +4721,6 @@ body.ws-dragging * {
 .settings-row-sub {
   font-size: 10px;
   color: var(--fg-muted);
-}
-.ai-msg-regen {
-  margin-left: 6px;
-  padding: 0 5px;
-  font-size: 11px;
-  line-height: 14px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  color: var(--fg-muted);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
-}
-.ai-msg-user:hover .ai-msg-regen {
-  opacity: 0.7;
-}
-.ai-msg-regen:hover {
-  opacity: 1 !important;
-  background: var(--bg-alt);
-  border-color: var(--border);
-  color: var(--fg);
-}
-.ai-msg-branch {
-  margin-left: 4px;
-  padding: 0 5px;
-  font-size: 11px;
-  line-height: 14px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  color: var(--fg-muted);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s;
-}
-.ai-msg-user:hover .ai-msg-branch {
-  opacity: 0.7;
-}
-.ai-msg-branch:hover {
-  opacity: 1 !important;
-  background: var(--bg-alt);
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.ai-msg-branch:disabled {
-  opacity: 0.3 !important;
-  cursor: not-allowed;
-}
-.ai-msg-regen:disabled {
-  opacity: 0.3 !important;
-  cursor: not-allowed;
 }
 /* Model browser modal — Cursor-style: soft glass, neutral chrome, pill filters. */
 .model-browser {
@@ -7651,11 +7638,101 @@ body.ws-dragging * {
   align-items: center;
   gap: 4px;
 }
+/* User message bar — Cursor-style: inset card, sticky, push-stacking. */
 .ai-msg-user {
-  align-items: flex-end;
+  align-items: stretch;
+  width: 100%;
 }
-.ai-msg-user .ai-msg-role {
-  color: var(--accent);
+.ai-user-bar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 7px 8px 7px 10px;
+  background: var(--bg-hi);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.ai-user-bar-main {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--fg);
+}
+.ai-user-bar-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.ai-user-bar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    background 0.12s,
+    color 0.12s;
+}
+.ai-user-bar:hover .ai-user-bar-btn,
+.ai-user-bar:focus-within .ai-user-bar-btn {
+  opacity: 0.65;
+}
+.ai-user-bar-btn:hover {
+  opacity: 1 !important;
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.ai-user-bar-btn:disabled {
+  opacity: 0.25 !important;
+  cursor: not-allowed;
+}
+.ai-user-bar-main .ai-msg-images {
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.ai-user-bar-main .ai-msg-image {
+  width: 44px;
+  height: 44px;
+  max-width: 44px;
+  max-height: 44px;
+  border-radius: var(--radius-xs);
+  object-fit: cover;
+}
+.ai-user-bar-main .md-preview {
+  padding: 0;
+  max-width: none;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.ai-user-bar-main .md-preview h1 { font-size: 17px; }
+.ai-user-bar-main .md-preview h2 { font-size: 15px; }
+.ai-user-bar-main .md-preview h3 { font-size: 14px; }
+.ai-user-bar-main .md-preview h4 { font-size: 13px; }
+.ai-user-bar-main .md-preview > :first-child {
+  margin-top: 0;
+}
+.ai-user-bar-main .md-preview > :last-child {
+  margin-bottom: 0;
+}
+.ai-user-bar-main .md-preview p {
+  margin: 0;
+}
+.ai-user-bar-main .md-preview ul,
+.ai-user-bar-main .md-preview ol {
+  margin: 0;
 }
 /* Jack's identity header: name + role, not a shouty role label */
 .ai-msg-assistant .ai-msg-role {
@@ -7706,19 +7783,6 @@ body.ws-dragging * {
   overflow-x: auto;
   word-break: normal;
   white-space: pre;
-}
-/* User: tight bubble, accent-tinted, right-aligned */
-.ai-msg-user .ai-msg-body {
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--accent) 16%, transparent),
-    color-mix(in srgb, var(--accent) 6%, transparent)
-  );
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-  padding: 8px 12px;
-  border-radius: 14px 14px 4px 14px;
-  max-width: 90%;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 /* Assistant: full-width, no rail — just roomier horizontal padding so the
    text breathes (spaceship-style clean stream). */
@@ -9532,9 +9596,8 @@ body.ws-dragging * {
 .ai-msg-body .md-preview {
   padding: 0;
   max-width: none;
-  /* Chat reading text — comfortable, matched to spaceship-style stream */
   font-size: 13.5px;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 .ai-msg-body .md-preview h1,
 .ai-msg-body .md-preview h2,
@@ -9717,16 +9780,22 @@ body.ws-dragging * {
   max-height: 240px;
   overflow: auto;
 }
-/* Inline status — Cursor-style pills in the message flow (not a full-width
-   accent strip). Each state is a compact bordered row; live tool rows stack
-   below as the same pill family as completed tool calls. */
+/* Live turn status — docked above the composer (not in the scroll stream).
+   Cursor-style pills; live tool rows stack below as the same pill family. */
+.ai-status-dock {
+  flex-shrink: 0;
+  padding: 6px 10px 2px;
+  max-height: 40%;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
 .ai-inline-status {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 7px;
   padding: 0;
-  margin: 8px 0 4px 14px;
+  margin: 0;
   border: none;
   font-size: 12px;
   color: var(--fg-muted);
@@ -9769,7 +9838,7 @@ body.ws-dragging * {
   flex-shrink: 0;
   padding: 4px 8px 4px 10px;
   border-left: 1px solid var(--border);
-  background: var(--bg-hi);
+  background: var(--bg-alt);
 }
 .ai-status-pill:has(.ai-inline-stale-stuck) .ai-status-pill-trail {
   border-left-color: color-mix(in srgb, var(--warn) 28%, var(--border));

@@ -664,6 +664,7 @@ export function InterleavedBlocks({
   resultsById,
   erroredIds,
   streaming = false,
+  hideEdits = false,
 }: {
   blocks: NonNullable<ChatMessage["blocks"]>;
   callsById: Map<string, ToolCall>;
@@ -673,6 +674,8 @@ export function InterleavedBlocks({
   /** True while this message is the in-flight turn (drives the live
    *  "working now" pulse on the last unfinished chip). */
   streaming?: boolean;
+  /** When true, file edits are summarized in ComposeCard at turn end. */
+  hideEdits?: boolean;
 }) {
   const compact = useContext(CompactChat);
   // Compact (agent) mode: a distinct, inline render — narration prose with
@@ -687,6 +690,7 @@ export function InterleavedBlocks({
         resultsById={resultsById}
         erroredIds={erroredIds ?? EMPTY_ID_SET}
         streaming={streaming}
+        hideEdits={hideEdits}
       />
     );
   }
@@ -796,6 +800,7 @@ export function InterleavedBlocks({
         }
         const call = callsById.get(b.callId);
         if (!call) return null;
+        if (hideEdits && extractEditDiffs(call)) return null;
         return (
           <div key={`c${i}`} className="ai-tcalls ai-tcalls-inline">
             <ToolCallRow
@@ -989,12 +994,14 @@ function CompactBlocks({
   resultsById,
   erroredIds,
   streaming,
+  hideEdits = false,
 }: {
   blocks: NonNullable<ChatMessage["blocks"]>;
   callsById: Map<string, ToolCall>;
   resultsById: Map<string, string>;
   erroredIds: Set<string>;
   streaming: boolean;
+  hideEdits?: boolean;
 }) {
   const seen = new Set<string>();
   const out: ReactNode[] = [];
@@ -1036,6 +1043,7 @@ function CompactBlocks({
     const call = callsById.get(b.callId);
     if (!call) return;
     if (TASK_NAMES.has(call.function.name)) return; // tasks live in the sidebar
+    if (hideEdits && extractEditDiffs(call)) return;
     run.push({ id: b.callId, call });
   });
   flush();

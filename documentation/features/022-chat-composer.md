@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-01
+last_verified: 2026-07-03
 tags: [chat, composer, input, subagent, dictation, effort, ux]
 ---
 
@@ -56,6 +56,19 @@ mode/mic/send on the right.
   Click expands **upward** into a popover (`.ai-todos-pop`) with the full list
   (reuses `.ai-todos-list` / `.ai-todo-*`). Backdrop closes it. Skipped in
   compact/agent mode (the checklist lives in the sidebar there).
+
+## Live turn status dock
+
+- `StatusPill` / `ai-inline-status` live in **`.ai-status-dock`** — a flex slot
+  immediately above `.ai-composer-shell`, NOT inside the scrollable `.ai-messages`.
+- Same slot family as `ai-ask-dock` and `ai-todos-bar`: operational chrome the
+  user should see while typing, even when scrolled up in the transcript.
+- Shows while a turn is in flight: running tools, warming up, waiting for
+  response, generating, tokens/s trail, stream-staleness badge (+ inline Stop
+  after 30s idle).
+- `max-height: 40%` + `overflow-y: auto` on the dock — long `RunningToolList`
+  stacks scroll internally instead of pushing the composer off-screen.
+- Implementation: `StatusPill` in `chatToolRender.tsx`, wired in `AIChatPanel.tsx`.
 
 ## Rules indicator (CLAUDE.md token weight)
 

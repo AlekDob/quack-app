@@ -26,6 +26,13 @@ import {
   useHubExpanded,
   setHubExpanded,
 } from "../hubPrefs";
+import {
+  getChatDiff,
+  hydrateChatDiff,
+  subscribeChatDiff,
+  type SessionDiffSummary,
+} from "../chatDiffStore";
+import { fileBase } from "../sessionDiffStats";
 import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
 
@@ -85,6 +92,7 @@ export function AIChatsRail() {
       subscribeAgentStatus(force),
       subscribeWorkspaceColors(force),
       subscribeHubCollapsed(force),
+      subscribeChatDiff(force),
     ];
     return () => offs.forEach((f) => f());
   }, []);
@@ -120,6 +128,12 @@ export function AIChatsRail() {
   };
 
   const totalChats = entries.length;
+
+  useEffect(() => {
+    for (const e of entries) {
+      hydrateChatDiff(e.chat.id, e.wsId, e.chat.sessionId);
+    }
+  }, [totalChats, activeId, loaded]);
 
   return (
     <div
@@ -304,9 +318,10 @@ function HubRow({
 }: RowProps) {
   const { chat, ws, color, status } = entry;
   const badge = initials(ws.meta.name);
+  const diff = expanded ? getChatDiff(chat.id) : undefined;
   return (
     <div
-      className={`agent-hub-row ${active ? "active" : ""}`}
+      className={`agent-hub-row ${active ? "active" : ""}${diff ? " has-diff" : ""}`}
       data-status={status}
       role="tab"
       tabIndex={0}
@@ -349,6 +364,11 @@ function HubRow({
             onCommit={onRename}
             onCancel={onRenameCancel}
           />
+        ) : diff ? (
+          <div className="agent-hub-row-body">
+            <span className="agent-hub-row-title">{chat.title}</span>
+            <HubDiffLine summary={diff} />
+          </div>
         ) : (
           <span className="agent-hub-row-title">{chat.title}</span>
         ))}
@@ -366,6 +386,45 @@ function HubRow({
         </button>
       )}
     </div>
+  );
+}
+
+function DiffCounts({
+  added,
+  removed,
+}: {
+  added: number;
+  removed: number;
+}) {
+  if (added === 0 && removed === 0) return null;
+  return (
+    <>
+      {" "}
+      {removed > 0 && (
+        <span className="agent-hub-diff-del">−{removed}</span>
+      )}
+      {removed > 0 && added > 0 && " "}
+      {added > 0 && <span className="agent-hub-diff-add">+{added}</span>}
+    </>
+  );
+}
+
+function HubDiffLine({ summary }: { summary: SessionDiffSummary }) {
+  if (summary.files.length === 1) {
+    return (
+      <span className="agent-hub-row-diff">
+        Edited {fileBase(summary.files[0])}
+        <DiffCounts added={summary.added} removed={summary.removed} />
+      </span>
+    );
+  }
+  const n = summary.files.length;
+  return (
+    <span className="agent-hub-row-diff">
+      <DiffCounts added={summary.added} removed={summary.removed} />
+      {n > 0 && (summary.added > 0 || summary.removed > 0) && " · "}
+      {n > 0 && `${n} ${n === 1 ? "file" : "files"}`}
+    </span>
   );
 }
 

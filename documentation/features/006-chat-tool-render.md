@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-06-28
+last_verified: 2026-07-03
 tags: [ai-chat, tool-calls, chatToolRender, cursor-style, drawer, diff-modal, css, presentational]
 ---
 
@@ -13,8 +13,8 @@ tags: [ai-chat, tool-calls, chatToolRender, cursor-style, drawer, diff-modal, cs
 Task / …) in the chat stream as compact one-line pills — Cursor/Conductor style.
 Detail is NOT inline: read/bash/search output opens in a right-side **drawer**,
 edits open in the centered **DiffModal**. Pure presentational React + CSS.
-**Files:** `src/components/chatToolRender.tsx`, `src/components/ToolResultDrawer.tsx`,
-`src/toolDrawer.ts`, styles in `src/App.css`.
+**Files:** | `src/components/chatToolRender.tsx`, `src/components/ToolResultDrawer.tsx`,
+`src/toolDrawer.ts`, `src/components/composeCard.tsx`, styles in `src/App.css`.
 
 ### Two render paths (same file)
 | Mode | Driver | Entry | Look |
@@ -75,6 +75,24 @@ a fade+scale entrance animation (`prefers-reduced-motion` guarded).
 after `stripReadGutter(text)` strips Claude Code's `cat -n` prefix (`/^\s*\d+\t/gm`).
 **Scope is deliberate** — Bash/Grep output and code files are NOT Markdown, so they
 stay raw `<pre class="ai-tcall-result-body">`.
+
+### ComposeCard + hideEdits dedup
+
+`ComposeCard` (`composeCard.tsx`) is the end-of-turn changed-files recap
+(Cursor-style bar: count + Undo / Keep / Review, expandable file list). Threshold:
+**≥1 edit** in the assistant message (was ≥2).
+
+When `ComposeCard` is shown, `InterleavedBlocks` receives `hideEdits={true}` so
+per-file Edit pills are NOT duplicated inline — the recap card is canonical.
+`hideEdits` applies to both docked (`InterleavedBlocks`) and compact
+(`CompactBlocks`) paths.
+
+### Live turn status (`StatusPill`)
+
+During an in-flight turn, `StatusPill` renders tool/stream state as compact
+pills. **Docked above the composer** in `.ai-status-dock` (feature 022), not in
+the message scroll. Includes optional `RunningToolList` below the header pill
+when tools aren't already rendered inline in `streamingBlocks`.
 
 ### Shared helper (DRY)
 - **`shortDetail(detail)`** — compact path/URL form (basename / host). Used by both

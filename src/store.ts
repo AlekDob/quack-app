@@ -7,6 +7,7 @@ import {
 import { consumeAutoPushSuppression, pushLinkedFile } from "./sftpPush";
 import { resolveDefaultShell } from "./terminalPrefs";
 import { clearEditorState, disposeModelForPath } from "./editorState";
+import { clearChatDiff } from "./chatDiffStore";
 import {
   error as toastError,
   errMsg,
@@ -2572,6 +2573,7 @@ export const useStore = create<AppState>((set, get) => {
           layout: { ...w.layout, editorRoot, bottomRoot, activePaneId },
         };
       });
+      clearChatDiff(id);
     },
 
     setAIChatTitle: (wsId, id, title) =>

@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-06-28
+last_verified: 2026-07-03
 tags: [agent-hub, agent-status, sessions, notifications, cross-project, workspace-colors, watcher, mount-asymmetry]
 ---
 
@@ -40,6 +40,7 @@ A single headless `AgentHubWatcher` (mounted once in `App.tsx`) derives status f
 | Status store (pub/sub, `resolveDisplayStatus`, seen) | `src/agentStatusStore.ts` |
 | Global watcher (poll + permission events + notifications) | `src/components/AgentHubWatcher.tsx` |
 | The hub UI (groups, rows, dots, badge, context menu, rename) | `src/components/AIChatsRail.tsx` |
+| Session diff subtitles (expanded rows) | `src/chatDiffStore.ts`, `src/sessionDiffStats.ts` → feature 029 |
 | OS notification + toast + quack sound (60s dedup, focus gate) | `src/notifications.ts` |
 | View prefs (expanded, collapsed sections) — global | `src/hubPrefs.ts` |
 | Shared provider badge (DRY extract) | `src/modelBadge.ts` |
@@ -52,6 +53,22 @@ A single headless `AgentHubWatcher` (mounted once in `App.tsx`) derives status f
 ### Right-click lifecycle
 
 Context menu on a row (`HubContextMenu`, clones `WorkspaceColorPopover`): **Rinomina** (inline input, sets `titleLocked` so the auto-title effect in `AIChatPanel` stops overwriting it), **Segna come fatto / Riapri** (toggles `doneAt`), **Archivia** (sets `archivedAt`, hides). Persisted on the descriptor in per-workspace `state.json`.
+
+### Session diff subtitles (expanded hub)
+
+When the hub is **expanded**, rows with edits in the latest agent turn show a
+second line (feature **029**):
+
+| Files touched | Subtitle example |
+|---|---|
+| 1 | `Edited App.css −3 +41` |
+| 2+ | `−12 +34 · 3 files` |
+
+- Data: `chatDiffStore` (live from mounted `AIChatPanel`, hydrated from
+  `chatHistory` for background chats).
+- CSS: `.agent-hub-row-body`, `.agent-hub-row-diff`, `.agent-hub-diff-add` /
+  `.agent-hub-diff-del` (semantic green/red).
+- Row class `.has-diff` when a summary exists.
 
 ### Notifications
 

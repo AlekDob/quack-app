@@ -76,6 +76,8 @@ import {
 } from "./chatPanelChrome";
 import { matchExclusion } from "../aiPrivacy";
 import { publishTasks } from "../aiTaskStore";
+import { publishChatDiff } from "../chatDiffStore";
+import { summarizeLastTurn } from "../sessionDiffStats";
 import { loadWorkspaceRules } from "../workspaceRules";
 import {
   type ImageAttachment,
@@ -126,6 +128,7 @@ import {
   claudeCode as claudeCodeIpc,
 } from "../ipc";
 import { MarkdownPreview } from "./MarkdownPreview";
+import { UserMessageBar } from "./UserMessageBar";
 import { ModelPickerPopover } from "./ModelPickerPopover";
 import { ModelBrowser } from "./ModelBrowser";
 import { ManageModelsModal } from "./ManageModelsModal";
@@ -367,6 +370,14 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   useEffect(() => {
     if (aiChatId) publishTasks(aiChatId, todos);
   }, [todos, aiChatId]);
+
+  useEffect(() => {
+    if (!aiChatId) return;
+    publishChatDiff(
+      aiChatId,
+      messages.length > 0 ? summarizeLastTurn(messages) : null,
+    );
+  }, [messages, aiChatId]);
 
   // Rebuild the sticky checklist from saved history. The checklist is
   // normally driven by LIVE tool_call events, so a reload or chat
@@ -3894,6 +3905,11 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
               }
             }
           }
+          const userTurnByIdx = new Map<number, number>();
+          let userTurn = 0;
+          for (let j = 0; j < display.length; j++) {
+            if (display[j].role === "user") userTurnByIdx.set(j, ++userTurn);
+          }
           return display.map((m, i) => {
           const isAssistant = m.role === "assistant";
           const isStreamingThis = isAssistant && i === display.length - 1 && streaming !== null;
@@ -3962,11 +3978,37 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             );
           }
           const dimmedByScrub = scrubIndex !== null && i > scrubIndex;
+          if (m.role === "user") {
+            return (
+              <div
+                key={i}
+                className={`ai-msg ai-msg-user${dimmedByScrub ? " ai-msg-scrubbed-past" : ""}`}
+                data-anchor-idx={i}
+                data-anchor-role="user"
+                data-anchor-preview={m.content.slice(0, 120)}
+              >
+                <UserMessageBar
+                  content={m.content}
+                  images={m.images}
+                  zIndex={userTurnByIdx.get(i) ?? 1}
+                  actionsDisabled={streaming !== null || runningTools}
+                  showBranch={!!aiChatId}
+                  onCopy={() => {
+                    void navigator.clipboard.writeText(m.content);
+                    toastSuccess("Copied to clipboard");
+                  }}
+                  onRegen={() => void regenerateFrom(i)}
+                  onBranch={() => branchFromHere(i)}
+                  onImageClick={(img) => void openZoom(img)}
+                />
+              </div>
+            );
+          }
           const composeFileCalls =
             m.role === "assistant" && m.tool_calls
               ? m.tool_calls.filter((c) => extractEditDiffs(c) !== null)
               : [];
-          const showComposeCard = composeFileCalls.length >= 2;
+          const showComposeCard = composeFileCalls.length >= 1;
           const msgHasBlocks = !!(m.blocks && m.blocks.length > 0);
           return (
             <div
@@ -3974,14 +4016,10 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
               className={`ai-msg ai-msg-${m.role}${dimmedByScrub ? " ai-msg-scrubbed-past" : ""}`}
               data-anchor-idx={i}
               data-anchor-role={m.role}
-              data-anchor-preview={
-                m.role === "user" ? m.content.slice(0, 120) : undefined
-              }
+              data-anchor-preview={undefined}
             >
               <span className="ai-msg-role">
-                {m.role === "user" ? (
-                  "You"
-                ) : (
+                {
                   // Jack: il PM-papero con cui Alek dialoga (Quack v1 identity)
                   <>
                     <img
@@ -3995,31 +4033,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                       <span className="ai-msg-title">Project Manager</span>
                     </span>
                   </>
-                )}
-                {m.role === "user" && (
-                  <>
-                    <button
-                      className="ai-msg-regen"
-                      title="Re-send this message — wipes everything below"
-                      aria-label="Re-send this message"
-                      onClick={() => void regenerateFrom(i)}
-                      disabled={streaming !== null || runningTools}
-                    >
-                      <Icon name="rotate-ccw" size={12} />
-                    </button>
-                    {aiChatId && (
-                      <button
-                        className="ai-msg-branch"
-                        title="Branch from here — open a new chat tab with the conversation up to this turn, leaving this one intact"
-                        aria-label="Branch from this message into a new chat"
-                        onClick={() => branchFromHere(i)}
-                        disabled={streaming !== null || runningTools}
-                      >
-                        <Icon name="git-branch" size={12} />
-                      </button>
-                    )}
-                  </>
-                )}
+                }
               </span>
               {m.tool_calls && m.tool_calls.length > 0 && (() => {
                 if (msgHasBlocks && !showComposeCard) return null;
@@ -4087,6 +4101,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                   // as slim inline chips instead of VS-Code-style rows.
                   <InterleavedBlocks
                     blocks={m.blocks}
+                    hideEdits={showComposeCard}
                     callsById={
                       new Map(
                         (m.tool_calls ?? [])
@@ -4236,168 +4251,6 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           );
           });
         })()}
-        {(runningTools ||
-          (streaming !== null && warmingUp && streaming.length === 0) ||
-          (streaming !== null && tokensPerSec !== null) ||
-          (streaming !== null &&
-            streaming.length === 0 &&
-            streamingBlocks.length === 0 &&
-            !runningTools &&
-            !warmingUp)) && (
-          <div className="ai-inline-status">
-            {runningTools && (
-              activeToolLabels.length === 0 ? (
-                <StatusPill
-                  trail={
-                    streaming !== null && tokensPerSec !== null ? (
-                      <span className="ai-inline-tps">
-                        {tokensPerSec.toFixed(1)} t/s
-                      </span>
-                    ) : undefined
-                  }
-                >
-                  <span className="ai-spinner" />
-                  <span>Running tools…</span>
-                </StatusPill>
-              ) : (() => {
-                  const done = activeToolLabels.filter(
-                    (t) => t.status === "done" || t.status === "error",
-                  ).length;
-                  const total = activeToolLabels.length;
-                  const allDone = done === total;
-                  const streamStillActive = streaming !== null;
-                  const toolsRenderedInline = streamingBlocks.some(
-                    (b) => b.kind === "tool_call",
-                  );
-                  const header =
-                    allDone && streamStillActive
-                      ? `Got ${total} tool result${total === 1 ? "" : "s"} — generating response…`
-                      : allDone
-                        ? `Finished ${total} tool${total === 1 ? "" : "s"}`
-                        : `${done} of ${total} done · ${total - done} running`;
-                  return (
-                    <StatusPill
-                      trail={
-                        streaming !== null && tokensPerSec !== null ? (
-                          <span className="ai-inline-tps">
-                            {tokensPerSec.toFixed(1)} t/s
-                          </span>
-                        ) : undefined
-                      }
-                      list={
-                        !toolsRenderedInline ? (
-                          <RunningToolList entries={activeToolLabels} />
-                        ) : undefined
-                      }
-                    >
-                      {allDone && !streamStillActive ? (
-                        <span className="ai-running-check">
-                          <Icon name="check" size={12} />
-                        </span>
-                      ) : (
-                        <span className="ai-spinner" />
-                      )}
-                      <span>{header}</span>
-                    </StatusPill>
-                  );
-                })()
-            )}
-            {streaming !== null &&
-              warmingUp &&
-              streaming.length === 0 &&
-              !runningTools && (
-                <StatusPill>
-                  <span className="ai-spinner" />
-                  <span>Loading model</span>
-                </StatusPill>
-              )}
-            {streaming !== null &&
-              streaming.length === 0 &&
-              streamingBlocks.length === 0 &&
-              !runningTools &&
-              !warmingUp && (
-                <StatusPill
-                  trail={
-                    tokensPerSec !== null ? (
-                      <span className="ai-inline-tps">
-                        {tokensPerSec.toFixed(1)} t/s
-                      </span>
-                    ) : undefined
-                  }
-                >
-                  <span className="ai-spinner" />
-                  <span>Waiting for response…</span>
-                </StatusPill>
-              )}
-            {streaming !== null &&
-              tokensPerSec !== null &&
-              !runningTools &&
-              !(warmingUp && streaming.length === 0) &&
-              !(
-                streaming.length === 0 &&
-                streamingBlocks.length === 0 &&
-                !warmingUp
-              ) && (
-                <StatusPill
-                  trail={
-                    <span className="ai-inline-tps">
-                      {tokensPerSec.toFixed(1)} t/s
-                    </span>
-                  }
-                >
-                  <span className="ai-spinner" />
-                  <span>Generating…</span>
-                </StatusPill>
-              )}
-            {/* Stream-staleness badge. Fires when no provider event has
-                arrived in the last 10s while a turn is in flight. Lets
-                the user see "the app didn't forget about me" instead
-                of suspecting a freeze when a model is slow / a long
-                tool is running. After 30s the wording sharpens and we
-                surface an inline Stop button so the user has an
-                obvious escape hatch from the chat area itself, not
-                just buried in the toolbar. */}
-            {streaming !== null &&
-              lastStreamEventAt !== null &&
-              (() => {
-                const idleSec = Math.floor(
-                  (Date.now() - lastStreamEventAt) / 1000,
-                );
-                if (idleSec < 10) return null;
-                const looksStuck = idleSec >= 30;
-                return (
-                  <StatusPill
-                    trail={
-                      looksStuck ? (
-                        <button
-                          type="button"
-                          className="ai-inline-stop"
-                          onClick={() => stop()}
-                          title="Cancel this turn"
-                        >
-                          <Icon name="stop" size={11} />
-                          <span>Stop</span>
-                        </button>
-                      ) : undefined
-                    }
-                  >
-                    <span
-                      className={`ai-inline-stale${looksStuck ? " ai-inline-stale-stuck" : ""}`}
-                      title={
-                        looksStuck
-                          ? "Stream hasn't produced anything in 30+ seconds. Could be a slow tool, a slow API response, or genuinely stuck — Stop and try again if you don't want to wait."
-                          : "No data from the model in this window. Click Stop to cancel if it's stuck."
-                      }
-                    >
-                      {looksStuck
-                        ? `Unusually slow (${idleSec}s)`
-                        : `Still working (${idleSec}s)`}
-                    </span>
-                  </StatusPill>
-                );
-              })()}
-          </div>
-        )}
         {pendingPermission && (
           <PermissionCard
             call={pendingPermission.call}
@@ -4815,6 +4668,164 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       {!compact && todos && todos.length > 0 && (
         <div className="ai-todos-bar">
           <TodosCard items={todos} />
+        </div>
+      )}
+      {/* Live turn status — docked above the composer so it stays visible
+          while the user scrolls the transcript (same slot family as ask-dock). */}
+      {(runningTools ||
+        (streaming !== null && warmingUp && streaming.length === 0) ||
+        (streaming !== null && tokensPerSec !== null) ||
+        (streaming !== null &&
+          streaming.length === 0 &&
+          streamingBlocks.length === 0 &&
+          !runningTools &&
+          !warmingUp)) && (
+        <div className="ai-status-dock">
+          <div className="ai-inline-status">
+            {runningTools && (
+              activeToolLabels.length === 0 ? (
+                <StatusPill
+                  trail={
+                    streaming !== null && tokensPerSec !== null ? (
+                      <span className="ai-inline-tps">
+                        {tokensPerSec.toFixed(1)} t/s
+                      </span>
+                    ) : undefined
+                  }
+                >
+                  <span className="ai-spinner" />
+                  <span>Running tools…</span>
+                </StatusPill>
+              ) : (() => {
+                  const done = activeToolLabels.filter(
+                    (t) => t.status === "done" || t.status === "error",
+                  ).length;
+                  const total = activeToolLabels.length;
+                  const allDone = done === total;
+                  const streamStillActive = streaming !== null;
+                  const toolsRenderedInline = streamingBlocks.some(
+                    (b) => b.kind === "tool_call",
+                  );
+                  const header =
+                    allDone && streamStillActive
+                      ? `Got ${total} tool result${total === 1 ? "" : "s"} — generating response…`
+                      : allDone
+                        ? `Finished ${total} tool${total === 1 ? "" : "s"}`
+                        : `${done} of ${total} done · ${total - done} running`;
+                  return (
+                    <StatusPill
+                      trail={
+                        streaming !== null && tokensPerSec !== null ? (
+                          <span className="ai-inline-tps">
+                            {tokensPerSec.toFixed(1)} t/s
+                          </span>
+                        ) : undefined
+                      }
+                      list={
+                        !toolsRenderedInline ? (
+                          <RunningToolList entries={activeToolLabels} />
+                        ) : undefined
+                      }
+                    >
+                      {allDone && !streamStillActive ? (
+                        <span className="ai-running-check">
+                          <Icon name="check" size={12} />
+                        </span>
+                      ) : (
+                        <span className="ai-spinner" />
+                      )}
+                      <span>{header}</span>
+                    </StatusPill>
+                  );
+                })()
+            )}
+            {streaming !== null &&
+              warmingUp &&
+              streaming.length === 0 &&
+              !runningTools && (
+                <StatusPill>
+                  <span className="ai-spinner" />
+                  <span>Loading model</span>
+                </StatusPill>
+              )}
+            {streaming !== null &&
+              streaming.length === 0 &&
+              streamingBlocks.length === 0 &&
+              !runningTools &&
+              !warmingUp && (
+                <StatusPill
+                  trail={
+                    tokensPerSec !== null ? (
+                      <span className="ai-inline-tps">
+                        {tokensPerSec.toFixed(1)} t/s
+                      </span>
+                    ) : undefined
+                  }
+                >
+                  <span className="ai-spinner" />
+                  <span>Waiting for response…</span>
+                </StatusPill>
+              )}
+            {streaming !== null &&
+              tokensPerSec !== null &&
+              !runningTools &&
+              !(warmingUp && streaming.length === 0) &&
+              !(
+                streaming.length === 0 &&
+                streamingBlocks.length === 0 &&
+                !warmingUp
+              ) && (
+                <StatusPill
+                  trail={
+                    <span className="ai-inline-tps">
+                      {tokensPerSec.toFixed(1)} t/s
+                    </span>
+                  }
+                >
+                  <span className="ai-spinner" />
+                  <span>Generating…</span>
+                </StatusPill>
+              )}
+            {streaming !== null &&
+              lastStreamEventAt !== null &&
+              (() => {
+                const idleSec = Math.floor(
+                  (Date.now() - lastStreamEventAt) / 1000,
+                );
+                if (idleSec < 10) return null;
+                const looksStuck = idleSec >= 30;
+                return (
+                  <StatusPill
+                    trail={
+                      looksStuck ? (
+                        <button
+                          type="button"
+                          className="ai-inline-stop"
+                          onClick={() => stop()}
+                          title="Cancel this turn"
+                        >
+                          <Icon name="stop" size={11} />
+                          <span>Stop</span>
+                        </button>
+                      ) : undefined
+                    }
+                  >
+                    <span
+                      className={`ai-inline-stale${looksStuck ? " ai-inline-stale-stuck" : ""}`}
+                      title={
+                        looksStuck
+                          ? "Stream hasn't produced anything in 30+ seconds. Could be a slow tool, a slow API response, or genuinely stuck — Stop and try again if you don't want to wait."
+                          : "No data from the model in this window. Click Stop to cancel if it's stuck."
+                      }
+                    >
+                      {looksStuck
+                        ? `Unusually slow (${idleSec}s)`
+                        : `Still working (${idleSec}s)`}
+                    </span>
+                  </StatusPill>
+                );
+              })()}
+          </div>
         </div>
       )}
       {/* Cursor-style composer: one pill. CSS `order` puts the textarea

@@ -249,7 +249,7 @@ Three ways, all open-or-focus the existing tab:
   `document.elementFromPoint(x, y).closest("[data-wb-agent]")`. This means
   even if the cursor is over a child element (the chip's name, the avatar)
   inside an agent, the closest() walker finds the agent wrapper. Robust.
-- **Vite dev port 1420** is hardcoded and collides with running Tauri sessions
+- **Vite dev port 1422** is hardcoded and collides with running Tauri sessions
   on this machine. To verify changes without Tauri, pass an alt port
   (`npm run dev -- --port 9999`); the homepage serves fine.
 - **Empty agents directory** — both the Overview and the Organigramma show an

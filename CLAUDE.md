@@ -134,12 +134,14 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `019-usage-monitor.md` — Usage tab (live Claude Code cost/session monitor + chunked transcript viewer); opens as a tab like the whiteboard; the freeze fix (mtime gate + cache-on-success + `spawn_blocking`).
   - `020-context-optimizer.md` — Usage tab "Context" view: measures per-skill/subagent system-prompt weight (~char/4) + real invocation count (from transcripts), ranks heavy-but-unused skills, per-skill visibility toggle writing `skillOverrides` in `~/.claude/settings.json` (`name-only`/`user-invocable-only`); click a row → open its `.md` + reveal in tree via shared `openFileAndReveal`.
   - `021-chat-nav-rail.md` — Codex-style navigation rail (minimap) in the chat's right gutter: one tick per user turn (from `data-anchor-*` on messages), hover to preview, click to jump, active tick tracks the turn in view.
-  - `022-chat-composer.md` — roomier "spaceship" composer: single-row uniform toolbar, subagent target pill (`SubagentPill`, derived from `attachedAgents`), one effort+thinking popover (`EffortPopover`, slider + segmented), voice dictation (`ComposerMic`), `+` attach, hint row, transparent flush textarea.
+  - `022-chat-composer.md` — roomier "spaceship" composer: single-row uniform toolbar, subagent target pill (`SubagentPill`, derived from `attachedAgents`), one effort+thinking popover (`EffortPopover`, slider + segmented), voice dictation (`ComposerMic`), `+` attach, hint row, transparent flush textarea; **live turn status dock** (`.ai-status-dock`) above the composer.
   - `024-resume-white-screen-recovery.md` — detect resume from macOS standby (`resumeDebug.ts`), heal the blank webview (Monaco `layout()` / xterm `fit()` + synthetic resize), log every event to console **and** a durable `localStorage` ring (`__resumeLog()`). Gotcha: a Vite compile error also blanks the page but never fires `[resume]` — check the red overlay first.
   - `025-model-selector.md` — composer chip popover (favorites + groups), full ModelBrowser catalog, ManageModelsModal visibility toggles; prefs in `lcp.modelFavorites` / `lcp.modelDisabled`.
   - `026-cursor-cli-bridge.md` — `cursor-agent` spawn/stream/kill + lazy `--list-models`; shared `cliStreamJson` parser.
   - `027-editor-tab-toolbar.md` — editor tab row under breadcrumb: markdown Edit/Split/Preview, git Changes (HEAD vs buffer), Inline/Split diff layout, Save; shared with `FileEditorPane` modals.
   - `028-opencode-bridge.md` — `opencode serve` sidecar (port 17346), SSE `/global/event`, `providerSessionIds`, lazy startup catalog.
+  - `029-session-diff-hub.md` — Agent Hub expanded-row edit subtitles (`Edited foo.ts −N +M`); `chatDiffStore` pub/sub + `summarizeLastTurn`.
+  - `030-user-message-bar.md` — user turns as right-aligned markdown cards with hover copy/re-send/branch actions (`UserMessageBar.tsx`).
 - `documentation/design/` — UI style contracts beyond tokens.
   - `directives.md` — hard rules (no emoji, tokens-only, neutral chrome).
   - `model-modal-pattern.md` — shared shell for Choose a model + Manage models (liquid glass, pill controls, light/dark surfaces).
