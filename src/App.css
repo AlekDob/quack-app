@@ -2194,6 +2194,7 @@ body.ws-dragging * {
   align-items: stretch;
   padding: 4px 0;
   gap: 2px;
+  min-height: 0;
   transition: flex-basis 120ms ease, width 120ms ease, max-width 120ms ease;
   overflow: hidden;
 }
@@ -2299,10 +2300,21 @@ body.ws-dragging * {
 .agent-hub-list {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.agent-hub-list-body {
+  display: flex;
+  flex-direction: column;
   gap: 2px;
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 4px 0;
   overflow-y: auto;
-  flex: 1 1 auto;
+}
+.agent-hub-list .agent-custom {
+  margin-top: auto;
 }
 .agent-hub-empty {
   text-align: center;
@@ -11769,25 +11781,32 @@ body.ws-dragging * {
 .md-preview h4,
 .md-preview h5,
 .md-preview h6 {
-  margin: 24px 0 8px;
+  margin: 18px 0 6px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
 }
 .md-preview h1 {
-  font-size: 28px;
+  font-size: 20px;
   border-bottom: 1px solid var(--border);
-  padding-bottom: 6px;
+  padding-bottom: 5px;
 }
 .md-preview h2 {
-  font-size: 22px;
+  font-size: 17px;
   border-bottom: 1px solid var(--border);
-  padding-bottom: 4px;
+  padding-bottom: 3px;
 }
 .md-preview h3 {
-  font-size: 18px;
+  font-size: 15px;
 }
 .md-preview h4 {
-  font-size: 15px;
+  font-size: 14px;
+}
+.md-preview h5 {
+  font-size: 13px;
+}
+.md-preview h6 {
+  font-size: 12px;
+  color: var(--fg-dim);
 }
 .md-preview p {
   margin: 0 0 12px;

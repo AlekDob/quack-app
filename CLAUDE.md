@@ -148,6 +148,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `033-editor-color-themes.md` — VS Code bundled Monaco syntax themes; Monaco-compatible token rules (`monacoThemeRules.ts`), live `setTheme`, JetBrains Mono `fontFamily`; per-mode picker + separate light/dark persistence.
   - `034-explorer-tree.md` — file tree layout (indent guides, overflow/ellipsis), theme-aware git decorations (`--git-*`), auto-reveal on tab switch; pairs with `013-file-type-icons.md` tints.
   - `035-macos-release-notarization.md` — local signed/notarized `.dmg` pipeline (`sign-and-notarize.sh`, `.env`, Entitlements); CI macOS still unsigned.
+  - `036-agent-customizations.md` — Agent Customizations footer (hub + agent mode) + tabbed modal (instructions, skills, MCP, providers, privacy).
 - `documentation/design/` — UI style contracts beyond tokens.
   - `directives.md` — hard rules (no emoji, tokens-only, neutral chrome).
   - `model-modal-pattern.md` — shared shell for Choose a model + Manage models (liquid glass, pill controls, light/dark surfaces).

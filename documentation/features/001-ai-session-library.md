@@ -21,8 +21,9 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Component | `src/components/AIChatsRail.tsx` | Right-side sessions rail (editor mode): list, drag-reorder, provider badge, open/close |
+| Component | `src/components/AIChatsRail.tsx` | Cross-project Agent Hub (editor mode): status groups, diff subtitles, Customizations footer when expanded |
 | Component | `src/components/AgentModeShell.tsx` | Agent-mode layout: workspace rail + sessions list + live Tasks + Customizations |
+| Component | `src/components/AgentCustomizations.tsx` | Shared Customizations footer menu → `CustomizationsModal` (feature 036) |
 | Component | `src/components/WorkspacePicker.tsx` | Library entry / recent-workspaces picker on first run |
 | Component | `src/components/AIChatPanel.tsx` | The chat panel itself; owns runtime state (streaming, tools, todos) per session |
 | Store/State | `src/store.ts` | `AIChatDescriptor`, `WorkspaceData.aiChats`, `addAIChat`, `closeAIChat`, `reorderAIChat` |

@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-03
+last_verified: 2026-07-04
 tags: [agent-hub, agent-status, sessions, notifications, cross-project, workspace-colors, watcher, mount-asymmetry]
 ---
 
@@ -40,6 +40,7 @@ A single headless `AgentHubWatcher` (mounted once in `App.tsx`) derives status f
 | Status store (pub/sub, `resolveDisplayStatus`, seen) | `src/agentStatusStore.ts` |
 | Global watcher (poll + permission events + notifications) | `src/components/AgentHubWatcher.tsx` |
 | The hub UI (groups, rows, dots, badge, context menu, rename) | `src/components/AIChatsRail.tsx` |
+| Customizations footer + modal (expanded hub) | `src/components/AgentCustomizations.tsx`, `CustomizationsModal` → feature 036 |
 | Session diff subtitles (expanded rows) | `src/chatDiffStore.ts`, `src/sessionDiffStats.ts` → feature 029 |
 | OS notification + toast + quack sound (60s dedup, focus gate) | `src/notifications.ts` |
 | View prefs (expanded, collapsed sections) — global | `src/hubPrefs.ts` |
@@ -69,6 +70,20 @@ second line (feature **029**):
 - CSS: `.agent-hub-row-body`, `.agent-hub-row-diff`, `.agent-hub-diff-add` /
   `.agent-hub-diff-del` (semantic green/red).
 - Row class `.has-diff` when a summary exists.
+
+### Customizations footer (expanded hub)
+
+When the hub is **expanded**, the shared **Agent Customizations** menu
+(`.agent-custom`) is pinned to the bottom of `.agent-hub-list`, below the scrollable
+status groups — same placement as Agent Mode's agents column (feature **036**).
+
+| Piece | Role |
+|---|---|
+| `.agent-hub-list-body` | Scrollable chat groups (`flex: 1`, `overflow-y: auto`) |
+| `.agent-custom` | Fixed footer (`flex-shrink: 0`, `margin-top: auto`) |
+| `CustomizationsModal` | Opens at the clicked tab; scoped to **active workspace** `root` |
+
+Hidden when the hub is collapsed (36px rail).
 
 ### Notifications
 

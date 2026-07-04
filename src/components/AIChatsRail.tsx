@@ -33,6 +33,11 @@ import {
   type SessionDiffSummary,
 } from "../chatDiffStore";
 import { fileBase } from "../sessionDiffStats";
+import { AgentCustomizations } from "./AgentCustomizations";
+import {
+  CustomizationsModal,
+  type CustomizationTab,
+} from "./CustomizationsModal";
 import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
 
@@ -101,6 +106,7 @@ export function AIChatsRail() {
     null,
   );
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [custTab, setCustTab] = useState<CustomizationTab | null>(null);
 
   // The chat the user is currently looking at (for highlight).
   const activeChatId =
@@ -128,6 +134,7 @@ export function AIChatsRail() {
   };
 
   const totalChats = entries.length;
+  const activeRoot = activeId ? loaded[activeId]?.meta.root ?? "" : "";
 
   useEffect(() => {
     for (const e of entries) {
@@ -181,61 +188,73 @@ export function AIChatsRail() {
       </div>
 
       <div className="agent-hub-list">
-        {totalChats === 0 && (
-          <div className="agent-hub-empty" title="No AI chats yet">
-            {expanded ? (
-              <>
-                <AIIcon size={32} className="agent-hub-empty-mark" />
-                <span className="agent-hub-empty-title">No chats yet</span>
-                <span className="agent-hub-empty-hint">
-                  Start a new one with the button above.
-                </span>
-              </>
-            ) : (
-              "·"
-            )}
-          </div>
+        <div className="agent-hub-list-body">
+          {totalChats === 0 && (
+            <div className="agent-hub-empty" title="No AI chats yet">
+              {expanded ? (
+                <>
+                  <AIIcon size={32} className="agent-hub-empty-mark" />
+                  <span className="agent-hub-empty-title">No chats yet</span>
+                  <span className="agent-hub-empty-hint">
+                    Start a new one with the button above.
+                  </span>
+                </>
+              ) : (
+                "·"
+              )}
+            </div>
+          )}
+          {GROUPS.map(({ status, label }) => {
+            const items = entries
+              .filter((e) => e.status === status)
+              .sort(byRecency);
+            if (items.length === 0) return null;
+            return (
+              <HubSection
+                key={status}
+                status={status}
+                label={label}
+                count={items.length}
+                expanded={expanded}
+              >
+                {items.map((entry) => (
+                  <HubRow
+                    key={entry.chat.id}
+                    entry={entry}
+                    expanded={expanded}
+                    active={
+                      entry.wsId === activeId && entry.chat.id === activeChatId
+                    }
+                    renaming={renaming === entry.chat.id}
+                    onClick={() => focusChat(entry.wsId, entry.chat.id)}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setMenu({ entry, x: e.clientX, y: e.clientY });
+                    }}
+                    onClose={() => closeAIChat(entry.wsId, entry.chat.id)}
+                    onRename={(title) => {
+                      if (title.trim())
+                        renameAIChat(entry.wsId, entry.chat.id, title.trim());
+                      setRenaming(null);
+                    }}
+                    onRenameCancel={() => setRenaming(null)}
+                  />
+                ))}
+              </HubSection>
+            );
+          })}
+        </div>
+        {expanded && (
+          <AgentCustomizations onOpen={(t) => setCustTab(t)} />
         )}
-        {GROUPS.map(({ status, label }) => {
-          const items = entries
-            .filter((e) => e.status === status)
-            .sort(byRecency);
-          if (items.length === 0) return null;
-          return (
-            <HubSection
-              key={status}
-              status={status}
-              label={label}
-              count={items.length}
-              expanded={expanded}
-            >
-              {items.map((entry) => (
-                <HubRow
-                  key={entry.chat.id}
-                  entry={entry}
-                  expanded={expanded}
-                  active={
-                    entry.wsId === activeId && entry.chat.id === activeChatId
-                  }
-                  renaming={renaming === entry.chat.id}
-                  onClick={() => focusChat(entry.wsId, entry.chat.id)}
-                  onContextMenu={(e) => {
-                    e.preventDefault();
-                    setMenu({ entry, x: e.clientX, y: e.clientY });
-                  }}
-                  onClose={() => closeAIChat(entry.wsId, entry.chat.id)}
-                  onRename={(title) => {
-                    if (title.trim())
-                      renameAIChat(entry.wsId, entry.chat.id, title.trim());
-                    setRenaming(null);
-                  }}
-                  onRenameCancel={() => setRenaming(null)}
-                />
-              ))}
-            </HubSection>
-          );
-        })}
       </div>
+
+      <CustomizationsModal
+        open={!!custTab}
+        initialTab={custTab ?? "instructions"}
+        onClose={() => setCustTab(null)}
+        root={activeRoot}
+      />
 
       {menu && (
         <HubContextMenu

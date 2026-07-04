@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), Monaco, plain CSS
 created: 2026-07-01
-last_verified: 2026-07-01
+last_verified: 2026-07-04
 tags: [editor, markdown, preview, split, git-diff, toolbar, monaco, spaceship-pattern]
 ---
 
@@ -42,6 +42,25 @@ editor-host (flex column)
 ```
 
 Modal editors (`FileEditorPane`) use the same toolbar below an optional back/subtitle bar; body classes are `cust-editor-body` / `cust-editor-body-split`.
+
+### Markdown preview typography (`.md-preview`)
+
+Document preview (editor tab, Customizations Instructions, whiteboard export) uses the
+base `.md-preview` scale in `App.css` — **not** the tighter chat overrides
+(`.ai-msg-body .md-preview`).
+
+| Element | Size (2026-07-04 pass) |
+|---------|------------------------|
+| Body | 14px / line-height 1.6 |
+| h1 | 20px + bottom border |
+| h2 | 17px + bottom border |
+| h3 | 15px |
+| h4 | 14px |
+| h5 / h6 | 13px / 12px (h6 dimmed) |
+
+Headings use `margin: 18px 0 6px` (down from 24/8) so long docs like `CLAUDE.md` read
+less shouty in split/preview panes. Chat bubbles keep their own smaller scale — see
+`003-design-system.md`.
 
 ### Toolbar controls
 | Control | When visible | Action |

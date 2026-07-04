@@ -69,6 +69,7 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 
 ### Chat reading type + stream spacing (spaceship pass, 2026-07-01)
 - Message body `.ai-msg-body .md-preview` is **13.5px** / line-height **1.6**; headings h1–h4 17/15/14/13; code blocks 13px; fallback `.ai-msg` 14px.
+- **Document preview** (`.md-preview` without chat scope — editor split/preview, Customizations Instructions, whiteboard): body **14px**; headings h1–h6 **20/17/15/14/13/12** (2026-07-04 tightening). Full table in `features/027-editor-tab-toolbar.md`.
 - **Vertical rhythm** (was cramped): messages `gap: 14px`; paragraphs `margin-bottom: 10px`; tool groups `.ai-tcalls` gap 7 / margin 8 (inline 10); `.ai-tcall-wrap` gap 7 / margin 8.
 - **Gutters:** panel `.ai-panel` `padding: 0 5px`; stream `.ai-messages` asymmetric `8px 28px 8px 8px` (tight left, wide right so text + tool rows clear the nav rail). Assistant body `.ai-msg-assistant .ai-msg-body` = `padding: 0 8px`, **no left rail** (removed the hairline rule).
 - Assistant identity header = **Jack** (duck avatar 32px + name 14px + "Project Manager" 10px) — full feature in `features/005-jack-duck-identity.md`.
