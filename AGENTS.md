@@ -22,6 +22,10 @@ Prereqs: Node 18+, Rust 1.77+ stable, Tauri OS prerequisites.
 | `npm run dev` | Vite only (no Tauri shell) — fast UI iteration, no Rust commands |
 | `npm run build` | Type-check + build frontend (catches TS errors) |
 | `npm run tauri build` | Production installers → `src-tauri/target/release/bundle/` |
+| `npm run build:mac:release:universal` | Signed + notarized universal `.dmg` (local; needs `.env`) |
+
+macOS signing/notarization: see **[README-MAC.md](README-MAC.md)** and
+`documentation/features/035-macos-release-notarization.md`.
 
 Verify a change by running `npm run tauri dev` (or `npm run build` for a quick TS gate).
 

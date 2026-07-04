@@ -23,6 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 
+# Local signing secrets (see .env.example)
+.env
+.env.local
+.env.*.local
+
 # Claude Code
 .claude/
 

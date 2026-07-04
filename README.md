@@ -75,9 +75,18 @@ After install, launch **Codetta** from the Start Menu. The first run prompts you
 
 ### macOS
 
-Download `Codetta_{version}_universal.dmg` from the [latest release](https://github.com/getcodetta/codetta/releases/latest) — universal binary covers both Apple Silicon and Intel.
+Download `Quack_{version}_universal.dmg` from the [latest release](https://github.com/AlekDob/quack-app/releases/latest) — universal binary covers both Apple Silicon and Intel.
 
-> First-launch only — Gatekeeper will warn because the binary isn't notarized yet (notarization is on the roadmap). Either right-click the app → Open → Open to bypass once, or run `xattr -cr /Applications/Codetta.app` after first install.
+**Developers:** signed + notarized builds are produced locally (not in CI yet). See [README-MAC.md](README-MAC.md):
+
+```bash
+cp .env.example .env   # or copy from quack-app
+npm run build:mac:release:universal
+```
+
+Output: `src-tauri/target/universal-apple-darwin/release/bundle/macos/Quack.dmg`
+
+> CI releases may still be unsigned (Gatekeeper workaround: right-click → Open). Local notarized builds pass Gatekeeper without that step.
 
 ### Linux
 

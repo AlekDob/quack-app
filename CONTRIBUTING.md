@@ -40,6 +40,9 @@ npm run tauri dev
 You need Node 18+ and the Rust toolchain. See the [README's developer
 section](README.md#develop--build-from-source) for full prerequisites.
 
+**macOS signed releases:** [README-MAC.md](README-MAC.md) — requires local `.env`
+(Apple Developer ID + notarization creds). Not wired in CI yet.
+
 ## Branch + commit style
 
 > **This fork (`AlekDob/quack-app`):** integrate desktop work on local `main`, push to

@@ -36,7 +36,7 @@
     "category": "DeveloperTool",
     "shortDescription": "A lightweight desktop code editor with first-class AI.",
     "longDescription": "Quack is a lightweight desktop code editor built on Tauri. Bring your own AI model — Anthropic Claude, OpenAI, Ollama, or Claude Code — and edit with multi-pane splits, integrated git, multi-terminal support (with pop-out windows), and per-project workspaces.",
-    "homepage": "https://codetta.dev",
+    "homepage": "https://www.quack.build/",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -44,6 +44,17 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "macOS": {
+      "entitlements": "Entitlements.plist",
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": null,
+      "hardenedRuntime": true,
+      "dmg": {
+        "appPosition": { "x": 180, "y": 200 },
+        "applicationFolderPosition": { "x": 480, "y": 200 },
+        "windowSize": { "width": 660, "height": 400 }
+      }
+    },
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper",
