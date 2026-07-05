@@ -1,28 +1,135 @@
-// Live Claude plan-limit usage — the same data the CLI's interactive
-// /usage panel and the official VS Code extension show (5-hour session
-// window, 7-day window, per-model weekly caps, extra-usage credits).
-//
-// The CLI doesn't expose this headlessly, but it fetches it from
-// `api.anthropic.com/api/oauth/usage` with the OAuth token it keeps in
-// ~/.claude/.credentials.json. We do exactly the same call. The token
-// NEVER leaves the Rust side — the frontend gets only the usage/profile
-// JSON. If the token has expired we bail with a hint instead of making
-// a doomed request (the CLI refreshes it on its next interactive run;
-// implementing the refresh dance here isn't worth owning a second
-// auth path).
+// Live Claude plan-limit usage — same data as Claude Code's /usage panel.
+// OAuth token source:
+//   macOS  → Keychain service "Claude Code-credentials" (CLI default since ~2025)
+//   Linux/Windows → ~/.claude/.credentials.json
 
-use serde_json::Value;
+use serde_json::{json, Value};
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::Duration;
 
 const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 const PROFILE_URL: &str = "https://api.anthropic.com/api/oauth/profile";
+const TOKEN_URL: &str = "https://console.anthropic.com/v1/oauth/token";
+const CLIENT_ID: &str = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
+#[cfg(target_os = "macos")]
+const KEYCHAIN_SERVICE: &str = "Claude Code-credentials";
 
-fn oauth_get(url: &str, token: &str) -> Result<Value, String> {
-    let agent: ureq::Agent = ureq::Agent::config_builder()
+enum CredStore {
+    #[cfg(target_os = "macos")]
+    Keychain,
+    File(PathBuf),
+}
+
+fn user_home() -> Result<PathBuf, String> {
+    if let Some(h) = std::env::var_os("HOME") {
+        let p = PathBuf::from(h);
+        if p.is_absolute() {
+            return Ok(p);
+        }
+    }
+    #[cfg(windows)]
+    if let Some(p) = std::env::var_os("USERPROFILE") {
+        return Ok(PathBuf::from(p));
+    }
+    #[cfg(not(windows))]
+    if let Ok(user) = std::env::var("USER") {
+        let p = PathBuf::from(format!("/Users/{}", user));
+        if p.is_dir() {
+            return Ok(p);
+        }
+    }
+    dirs::home_dir().ok_or_else(|| "no home dir".to_string())
+}
+
+fn cred_file_path(home: &Path) -> PathBuf {
+    home.join(".claude").join(".credentials.json")
+}
+
+#[cfg(target_os = "macos")]
+fn read_keychain_credentials() -> Result<Value, String> {
+    let out = Command::new("security")
+        .args(["find-generic-password", "-s", KEYCHAIN_SERVICE, "-w"])
+        .output()
+        .map_err(|e| format!("keychain read failed: {}", e))?;
+    if !out.status.success() {
+        return Err("Claude Code OAuth not in Keychain".to_string());
+    }
+    let raw = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    serde_json::from_str(&raw).map_err(|e| format!("keychain credentials parse: {}", e))
+}
+
+#[cfg(target_os = "macos")]
+fn write_keychain_credentials(cred: &Value) -> Result<(), String> {
+    let raw = serde_json::to_string(cred).map_err(|e| e.to_string())?;
+    let status = Command::new("security")
+        .args([
+            "add-generic-password",
+            "-U",
+            "-s",
+            KEYCHAIN_SERVICE,
+            "-w",
+            &raw,
+        ])
+        .status()
+        .map_err(|e| format!("keychain write failed: {}", e))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("could not update Claude Code Keychain entry".to_string())
+    }
+}
+
+fn read_file_credentials(path: &Path) -> Result<Value, String> {
+    let raw = std::fs::read_to_string(path)
+        .map_err(|_| format!("no credentials at {}", path.display()))?;
+    serde_json::from_str(&raw).map_err(|e| format!("credentials parse: {}", e))
+}
+
+fn load_credentials(home: &Path) -> Result<(Value, CredStore), String> {
+    #[cfg(target_os = "macos")]
+    if let Ok(cred) = read_keychain_credentials() {
+        return Ok((cred, CredStore::Keychain));
+    }
+    let path = cred_file_path(home);
+    let cred = read_file_credentials(&path).map_err(|_| {
+        "Claude Code OAuth not found (macOS Keychain or ~/.claude/.credentials.json) — run `claude /login`".to_string()
+    })?;
+    Ok((cred, CredStore::File(path)))
+}
+
+fn save_credentials(store: &CredStore, cred: &Value) -> Result<(), String> {
+    match store {
+        #[cfg(target_os = "macos")]
+        CredStore::Keychain => write_keychain_credentials(cred),
+        CredStore::File(path) => {
+            let out = serde_json::to_string_pretty(cred).map_err(|e| e.to_string())?;
+            std::fs::write(path, out).map_err(|e| format!("could not save credentials: {}", e))
+        }
+    }
+}
+
+fn oauth_agent() -> ureq::Agent {
+    ureq::Agent::config_builder()
         .timeout_global(Some(Duration::from_secs(10)))
         .build()
-        .into();
-    let mut resp = agent
+        .into()
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+fn token_expired(oauth: &Value) -> bool {
+    let expires_at = oauth.get("expiresAt").and_then(|v| v.as_i64()).unwrap_or(0);
+    expires_at > 0 && expires_at < now_ms()
+}
+
+fn oauth_get(url: &str, token: &str) -> Result<Value, String> {
+    let mut resp = oauth_agent()
         .get(url)
         .header("Authorization", &format!("Bearer {}", token))
         .header("anthropic-beta", "oauth-2025-04-20")
@@ -33,39 +140,79 @@ fn oauth_get(url: &str, token: &str) -> Result<Value, String> {
         .map_err(|e| format!("bad response: {}", e))
 }
 
-/// Returns `{ usage, profile, subscriptionType, rateLimitTier }`.
-/// `profile` is Null when that call fails — usage alone still renders.
-#[tauri::command]
-pub fn claude_usage_limits() -> Result<Value, String> {
-    let home = dirs::home_dir().ok_or_else(|| "no home dir".to_string())?;
-    let cred_path = home.join(".claude").join(".credentials.json");
-    let raw = std::fs::read_to_string(&cred_path).map_err(|_| {
-        "no Claude Code credentials found — sign in with `claude` in a terminal".to_string()
-    })?;
-    let cred: Value =
-        serde_json::from_str(&raw).map_err(|e| format!("credentials parse: {}", e))?;
+fn refresh_oauth(store: &CredStore, cred: &mut Value) -> Result<String, String> {
     let oauth = cred
-        .get("claudeAiOauth")
+        .get_mut("claudeAiOauth")
         .ok_or_else(|| "not signed in via claude.ai OAuth".to_string())?;
-    let token = oauth
-        .get("accessToken")
+    let refresh = oauth
+        .get("refreshToken")
         .and_then(|v| v.as_str())
-        .ok_or_else(|| "no access token in credentials".to_string())?;
-    let expires_at = oauth.get("expiresAt").and_then(|v| v.as_i64()).unwrap_or(0);
-    let now_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0);
-    if expires_at > 0 && expires_at < now_ms {
-        return Err(
-            "Claude session token expired — run `claude` in a terminal once to refresh it"
-                .to_string(),
+        .ok_or_else(|| "no refresh token — run `claude /login`".to_string())?;
+    let body = json!({
+        "grant_type": "refresh_token",
+        "refresh_token": refresh,
+        "client_id": CLIENT_ID,
+    });
+    let mut resp = oauth_agent()
+        .post(TOKEN_URL)
+        .header("Content-Type", "application/json")
+        .send_json(body)
+        .map_err(|e| format!("token refresh failed: {}", e))?;
+    let tok: Value = resp
+        .body_mut()
+        .read_json()
+        .map_err(|e| format!("token refresh bad response: {}", e))?;
+    let access = tok
+        .get("access_token")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "token refresh missing access_token".to_string())?;
+    let oauth_obj = oauth
+        .as_object_mut()
+        .ok_or_else(|| "oauth credentials not an object".to_string())?;
+    oauth_obj.insert("accessToken".into(), Value::String(access.to_string()));
+    if let Some(rt) = tok.get("refresh_token").and_then(|v| v.as_str()) {
+        oauth_obj.insert("refreshToken".into(), Value::String(rt.to_string()));
+    }
+    if let Some(exp) = tok.get("expires_in").and_then(|v| v.as_i64()) {
+        oauth_obj.insert(
+            "expiresAt".into(),
+            Value::Number((now_ms() + exp * 1000).into()),
         );
     }
+    save_credentials(store, cred)?;
+    Ok(access.to_string())
+}
 
-    let usage = oauth_get(USAGE_URL, token)?;
-    let profile = oauth_get(PROFILE_URL, token).unwrap_or(Value::Null);
-    Ok(serde_json::json!({
+fn resolve_access_token(home: &Path) -> Result<(String, Value), String> {
+    let (mut cred, store) = load_credentials(home)?;
+    let oauth_snapshot = cred
+        .get("claudeAiOauth")
+        .cloned()
+        .ok_or_else(|| "not signed in via claude.ai OAuth".to_string())?;
+    let token = if token_expired(&oauth_snapshot) {
+        refresh_oauth(&store, &mut cred)?
+    } else {
+        oauth_snapshot
+            .get("accessToken")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "no access token in credentials".to_string())?
+            .to_string()
+    };
+    let oauth = cred
+        .get("claudeAiOauth")
+        .cloned()
+        .unwrap_or(Value::Null);
+    Ok((token, oauth))
+}
+
+/// Returns `{ usage, profile, subscriptionType, rateLimitTier }`.
+#[tauri::command]
+pub fn claude_usage_limits() -> Result<Value, String> {
+    let home = user_home()?;
+    let (token, oauth) = resolve_access_token(&home)?;
+    let usage = oauth_get(USAGE_URL, &token)?;
+    let profile = oauth_get(PROFILE_URL, &token).unwrap_or(Value::Null);
+    Ok(json!({
         "usage": usage,
         "profile": profile,
         "subscriptionType": oauth.get("subscriptionType").cloned().unwrap_or(Value::Null),

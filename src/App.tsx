@@ -752,9 +752,9 @@ function MainApp() {
             ))
           )}
         </div>
-        {/* Cross-project Agent Hub — one rail aggregating every open
-            workspace's chats by status. Far-right column for all layouts. */}
-        {!zen && openIds.length > 0 && <AIChatsRail />}
+        {/* Cross-project Agent Hub — editor layout only; agent mode
+            embeds the hub in AgentModeShell's left sidebar. */}
+        {!zen && !agentMode && openIds.length > 0 && <AIChatsRail />}
       </div>
       {zen && (
         // Tiny escape hatch for users who hit F11 by accident or

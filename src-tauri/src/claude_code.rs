@@ -14,7 +14,10 @@ use uuid::Uuid;
 /// anthropics/claude-code#1920 class of bug — terminal `result` event
 /// never arrives) and force a clean shutdown so the frontend doesn't
 /// spin forever waiting for `end`.
-const IDLE_TIMEOUT: Duration = Duration::from_secs(120);
+/// Long Bash/deploy/build runs can go silent for several minutes while the
+/// CLI waits on the tool child. 10 min covers typical vercel/npm/docker
+/// work; true hangs (#1920) still get reaped, just slower.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(600);
 
 #[derive(Default)]
 pub struct ClaudeCodeState {
@@ -630,7 +633,7 @@ pub fn claude_code_chat(
         state.buffers.lock().remove(&id);
         state.session_streams.lock().remove(&chat_sid);
         return Err(
-            "Codetta's permission guard isn't available (the local permission \
+            "Quack's permission guard isn't available (the local permission \
              server failed to start, or no workspace folder is open), so this \
              chat would run Claude Code with --dangerously-skip-permissions. \
              Refusing by default. To accept unguarded runs, enable \

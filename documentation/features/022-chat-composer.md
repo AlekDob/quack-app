@@ -24,7 +24,9 @@ mode/mic/send on the right.
 | `src/components/Icon.tsx` | Added `arrow-up` (send) + `microphone` icons |
 | `src/components/TurnStreamStatus.tsx` | Composes `StatusPill` rows for planning / tools / generating / stale |
 | `src/components/ComposerQueue.tsx` | Cursor-style follow-up queue cards inside the composer pill |
-| `src/App.css` | `.ai-composer-*`, `.ai-agent-*`, `.ai-mic-btn`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-context-dock*`, `.ai-queue-*` |
+| `src/components/MentionSuggestions.tsx` | `@` autocomplete popover (agents + files, path preview) |
+| `src/components/MentionPathPreview.tsx` | Side path tree for highlighted file `@` row |
+| `src/App.css` | `.ai-composer-*`, `.ai-agent-*`, `.ai-mention-*`, `.ai-mic-btn`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-context-dock*`, `.ai-queue-*` |
 
 ## Layout (single row, uniform)
 
@@ -35,6 +37,17 @@ mode/mic/send on the right.
 - **Uniform pills** (`.ai-composer-shell` scope): model chip / effort / mode / context indicator all 28px height, `radius-full`, 11px, weight 500, shared hover. Send + stop are 28×28 icon buttons (send = `arrow-up` on monochrome `--primary-bg`, stop = `stop` on red).
 - **Hint row** (`.ai-composer-hint`): `@ mentions · / commands · Ctrl+1–5 effort` (Claude Code only) · `Shift+Enter for newline · ↑ to recall`, shown only when the input is empty and idle.
 - Placeholder is dynamic: `Message {activeAgent?.name ?? "Jack"}…` when idle; **`Send follow-up`** while a turn is in flight.
+
+## @-mention autocomplete (feature 041)
+
+Full detail: **`041-mention-file-preview.md`**.
+
+- Trigger: `@` at start-of-token or after whitespace (`parseMention` in `AIChatPanel`).
+- Popover sits **inline above** `.ai-composer-shell` (not portaled).
+- File rows: icon + basename + parent dir; **path tree preview** on the right when a file row is keyboard/hover-active.
+- While open, `.ai-panel` gets **`ai-mention-open`** so `overflow: visible` escapes clipping from panel/tab hosts (`:has()` on ancestors).
+- Lazy file index: first `@` keystroke calls `search.listFiles(root, 5000)` once per session.
+- Picking a file → `addAttachedFile`; picking an agent → `attachedAgents` (004).
 
 ## Follow-up queue (feature 039)
 
@@ -68,7 +81,7 @@ Claude Code only. Full bridge detail (`--effort` whitelist, spawn wiring): `014-
 | 5 | Max | `--effort max` |
 
 - **No CLI "default" slot** on the slider — the old index-0 `default`/`null` (omit `--effort`) was removed. Quack always sends an explicit level; fresh installs and `/effort off` reset to **medium**.
-- **Persistence (per session):** each `ChatSession` row stores `ccEffort` (feature 040). Global `localStorage` key `lcp.claudeCode.effort` seeds **new** chats only. `AIChatPanel` restores from the session on tab/history switch and writes back on change. Full flow: **`040-per-session-composer-state.md`**.
+- **Persistence (per session):** each `ChatSession` row stores `ccEffort` (feature 040). Global `localStorage` key `lcp.claudeCode.effort` seeds **new** chats only. Legacy rows without the field restore to **medium**, not global. Full flow + bugfix notes: **`040-per-session-composer-state.md`**.
 - Shared constants live in `EffortPopover.tsx`: `CC_EFFORTS`, `CC_EFFORT_DEFAULT`, `normalizeCcEffort()`.
 
 ### Popover (`.ai-effort-pop`)
@@ -164,3 +177,4 @@ Full DOM/CSS detail (turn wrappers, sticky containing block, z-index stacking):
 - Navigation rail (minimap): `021-chat-nav-rail.md`.
 - Follow-up queue while busy: `039-composer-queue.md`.
 - Per-session composer draft + knobs: `040-per-session-composer-state.md`.
+- `@` file path preview popover: `041-mention-file-preview.md`.

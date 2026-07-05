@@ -29,7 +29,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | Store/State | `src/store.ts` | `AIChatDescriptor`, `WorkspaceData.aiChats`, `addAIChat`, `closeAIChat`, `reorderAIChat` |
 | Store/State | `src/aiTaskStore.ts` | Module-level task store keyed by chatId; `publishTasks`/`getTasks`/`subscribeTasks` |
 | Service | `src/chatHistory.ts` | `ChatSession` model + `loadSessions`/`saveSession`/`deleteSession`/`deriveTitle` |
-| Service | `src/composerDraft.ts` | `ChatComposerDraft` + `mergeComposerDraft` — per-session composer UI on `ChatSession.composer` |
+| Service | `src/composerDraft.ts` | `ChatComposerDraft`, `mergeComposerDraft`, `mergeSessionKnobs` — per-session composer + CC knobs on `ChatSession` |
 | Service | `src/providerSession.ts` | `providerSessionIds` read/write; legacy `claudeSessionId` migration |
 | Model/Type | `src/ai.ts` | `ChatMessage`, `ToolCall`, `ChatStreamEvent` (streaming contract) |
 | Service (Rust) | `src-tauri/src/workspace.rs` | `WorkspaceMeta`, `WorkspacesIndex`, load/save workspace state |
@@ -54,7 +54,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 ### State
 - `ws.aiChats`: `Record<id, AIChatDescriptor>` — open sessions (global, persisted)
 - `ChatSession.providerSessionIds`: `Partial<Record<ProviderId, string>>` — per-provider server session for resume (CC/Cursor/OpenCode); legacy `claudeSessionId` kept in sync
-- `ChatSession.ccEffort` / `ccPermMode` / `ccThinking` / `composer`: per-session Claude Code knobs + composer draft (feature 040)
+- `ChatSession.ccEffort` / `ccPermMode` / `ccThinking` / `composer`: per-session Claude Code knobs + composer draft (feature 040; legacy rows without fields → medium + Ask, not global)
 - `selectedByWs`: `Record<wsId, chatId>` — which session fills the center column in Agent Mode (component)
 - runtime run-state (`streaming`, `runningTools`, `activeToolLabels{status}`, `abortRef`): **local to `AIChatPanel`** (component) — not yet surfaced per-session in the lists
 
@@ -71,7 +71,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | `sessionId` | `string` | Transcript id used by `chatHistory.ts` |
 | `createdAt` | `number` | Creation time; doubles as sort key (drag-reorder rewrites it) |
 | `model` | `string?` | Last qualified model id (`claude-code:default`, `openai:gpt-4o`, ...) |
-| `ccEffort` | `string?` | Claude Code effort for this chat (feature 040) |
+| `ccEffort` | `string?` | Claude Code effort; legacy rows without it restore **medium** |
 | `ccPermMode` | `string \| null?` | Permission mode for this chat |
 | `ccThinking` | `boolean \| null?` | Extended thinking knob |
 | `composer` | `ChatComposerDraft?` | Draft input, queue, attach toggles, staged images |

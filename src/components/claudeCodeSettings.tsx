@@ -51,7 +51,7 @@ export function ClaudeCodeUnguardedEditor() {
         onChange={(v) => void persist(v)}
       />
       <div className="settings-row settings-row-note">
-        Normally every Claude Code tool call is routed through Codetta's
+        Normally every Claude Code tool call is routed through Quack's
         permission cards. If the local permission server can't start
         (port in use, no workspace folder), chats <strong>refuse to
         run</strong> rather than silently dropping the guard. Turning
@@ -152,7 +152,7 @@ export function ClaudeCodeAlwaysAllowEditor() {
         <strong> “Always allow {"<prefix>"}”</strong> on the card to add
         an entry here. <em>“Allow this session”</em> on the card adds a
         temporary in-memory rule that doesn't appear here — it resets
-        when you restart Codetta.
+        when you restart Quack.
       </div>
     );
   }

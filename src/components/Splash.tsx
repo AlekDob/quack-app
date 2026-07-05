@@ -23,7 +23,7 @@ const CODE_LINES: CodeLine[] = [
       { t: " { ai, editor } " },
       { t: "from", cls: "tok-kw" },
       { t: " " },
-      { t: '"codetta"', cls: "tok-str" },
+      { t: '"quack"', cls: "tok-str" },
       { t: ";" },
     ],
   },

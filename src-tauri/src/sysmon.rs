@@ -125,7 +125,7 @@ pub fn process_kill(
     }
     let tree = descendants(&sys, me);
     if !tree.iter().any(|(p, _)| *p == target) {
-        return Err("process is not part of Codetta's tree".into());
+        return Err("process is not part of Quack's tree".into());
     }
     match sys.process(target) {
         Some(p) => Ok(p.kill()),

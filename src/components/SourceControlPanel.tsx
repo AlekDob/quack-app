@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   fs,
@@ -29,6 +29,11 @@ import {
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { FileHistoryModal } from "./FileHistoryModal";
 import { Icon } from "./Icon";
+import {
+  GitAccordionSection,
+  pickDefaultGitSection,
+  type GitSectionId,
+} from "./gitAccordion";
 
 function authorInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -51,12 +56,14 @@ function formatRelative(unixSec: number): string {
 interface Props {
   wsId: string;
   root: string;
+  /** Agent-mode context column: one git section open at a time. */
+  compact?: boolean;
 }
 
 // statusLabel / statusColor moved to gitStatusStore.ts so the file
 // tree paints the same palette — imported above.
 
-export function SourceControlPanel({ wsId, root }: Props) {
+export function SourceControlPanel({ wsId, root, compact = false }: Props) {
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -73,9 +80,15 @@ export function SourceControlPanel({ wsId, root }: Props) {
   const [commitDiffLoading, setCommitDiffLoading] = useState(false);
   const [stashes, setStashes] = useState<GitStash[]>([]);
   const [stashesOpen, setStashesOpen] = useState(false);
+  const [openSection, setOpenSection] = useState<GitSectionId | null>("changes");
   const [historyFile, setHistoryFile] = useState<string | null>(null);
+  const defaultSectionPicked = useRef(false);
   const commitCardRef = useRef<HTMLDivElement | null>(null);
   useModalFocus(commitCardRef, !!openCommit);
+
+  useEffect(() => {
+    defaultSectionPicked.current = false;
+  }, [wsId]);
 
   // Status comes from the shared gitStatusStore (one `git status` per
   // fs-event debounce window feeds this panel, the file tree's badges,
@@ -106,6 +119,16 @@ export function SourceControlPanel({ wsId, root }: Props) {
       stop();
     };
   }, [wsId, root]);
+
+  useEffect(() => {
+    if (!compact || !status?.is_repo || defaultSectionPicked.current) return;
+    const files = status.files;
+    const conflictN = files.filter((f) => f.conflicted).length;
+    const stagedN = files.filter((f) => f.staged).length;
+    const changeN = files.filter((f) => !f.staged && !f.conflicted).length;
+    defaultSectionPicked.current = true;
+    setOpenSection(pickDefaultGitSection(conflictN, stagedN, changeN));
+  }, [compact, status]);
 
   const refresh = useCallback(async () => {
     await forceGitStatusRefresh(wsId);
@@ -270,9 +293,18 @@ export function SourceControlPanel({ wsId, root }: Props) {
   }, [root, status?.is_repo]);
 
   useEffect(() => {
-    if (!historyOpen) return;
+    const visible = compact ? openSection === "history" : historyOpen;
+    if (!visible) return;
     void loadHistory();
-  }, [historyOpen, loadHistory, status?.branch, status?.ahead, status?.behind]);
+  }, [
+    compact,
+    openSection,
+    historyOpen,
+    loadHistory,
+    status?.branch,
+    status?.ahead,
+    status?.behind,
+  ]);
 
   const openCommitDetail = useCallback(
     async (c: GitCommit) => {
@@ -319,9 +351,10 @@ export function SourceControlPanel({ wsId, root }: Props) {
   }, [root, status?.is_repo]);
 
   useEffect(() => {
-    if (!stashesOpen) return;
+    const visible = compact ? openSection === "stashes" : stashesOpen;
+    if (!visible) return;
     void loadStashes();
-  }, [stashesOpen, loadStashes, status?.files.length]);
+  }, [compact, openSection, stashesOpen, loadStashes, status?.files.length]);
 
   const stashPush = useCallback(async () => {
     const msg = await dialogPrompt(
@@ -555,8 +588,45 @@ export function SourceControlPanel({ wsId, root }: Props) {
   const staged = status.files.filter((f) => f.staged);
   const changes = status.files.filter((f) => !f.staged && !f.conflicted);
 
+  const toggleSection = (id: GitSectionId) => {
+    setOpenSection((cur) => (cur === id ? null : id));
+  };
+
+  const wrapSection = (
+    id: GitSectionId,
+    title: string,
+    count: number,
+    body: ReactNode,
+    opts?: { hint?: string; trailing?: ReactNode },
+  ) => {
+    if (compact) {
+      return (
+        <GitAccordionSection
+          id={id}
+          openId={openSection}
+          onToggle={toggleSection}
+          title={title}
+          count={count}
+          hint={opts?.hint}
+          trailing={opts?.trailing}
+        >
+          {body}
+        </GitAccordionSection>
+      );
+    }
+    return (
+      <>
+        <div className="git-section-title">
+          {title} ({count})
+        </div>
+        {body}
+      </>
+    );
+  };
+
   return (
-    <div className="git-panel">
+    <div className={`git-panel${compact ? " git-panel--compact" : ""}`}>
+      <div className="git-panel-top">
       <div className="git-header">
         <div className="git-branch-row">
           <button
@@ -733,12 +803,14 @@ export function SourceControlPanel({ wsId, root }: Props) {
           </button>
         </div>
       </div>
+      </div>
 
-      {conflicts.length > 0 && (
-        <>
-          <div className="git-section-title git-status--conflict">
-            Merge Conflicts ({conflicts.length})
-          </div>
+      <div className={compact ? "git-panel-sections" : undefined}>
+      {conflicts.length > 0 &&
+        wrapSection(
+          "conflicts",
+          "Merge Conflicts",
+          conflicts.length,
           <ul className="git-files">
             {conflicts.map((f) => (
               <li
@@ -767,216 +839,349 @@ export function SourceControlPanel({ wsId, root }: Props) {
                 </span>
               </li>
             ))}
-          </ul>
+          </ul>,
+        )}
+
+      {wrapSection(
+        "staged",
+        "Staged",
+        staged.length,
+        <ul className="git-files">
+          {staged.map((f) => (
+            <li
+              key={"s:" + f.path}
+              tabIndex={0}
+              role="button"
+              aria-label={`View diff for staged ${f.path}`}
+              onClick={() => void showDiff(f, true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  void showDiff(f, true);
+                }
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setCtx({ x: e.clientX, y: e.clientY, file: f });
+              }}
+            >
+              <span className={`git-status-tag ${statusClass(f)}`}>
+                {statusLabel(f)}
+              </span>
+              <span className="git-file-path" title={f.path}>
+                {f.path}
+              </span>
+              <button
+                className="git-file-action"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void unstage(f.path);
+                }}
+                title="Unstage"
+              >
+                −
+              </button>
+            </li>
+          ))}
+        </ul>,
+      )}
+
+      {wrapSection(
+        "changes",
+        "Changes",
+        changes.length,
+        <ul className="git-files">
+          {changes.map((f) => (
+            <li
+              key={"c:" + f.path}
+              tabIndex={0}
+              role="button"
+              aria-label={`View diff for ${f.path}`}
+              onClick={() => void showDiff(f, false)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  void showDiff(f, false);
+                }
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setCtx({ x: e.clientX, y: e.clientY, file: f });
+              }}
+            >
+              <span className={`git-status-tag ${statusClass(f)}`}>
+                {statusLabel(f)}
+              </span>
+              <span className="git-file-path" title={f.path}>
+                {f.path}
+              </span>
+              <button
+                className="git-file-action"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void stage(f.path);
+                }}
+                title="Stage"
+              >
+                +
+              </button>
+            </li>
+          ))}
+        </ul>,
+      )}
+
+      {compact ? (
+        <GitAccordionSection
+          id="history"
+          openId={openSection}
+          onToggle={toggleSection}
+          title="History"
+          hint={
+            openSection === "history" && commits.length > 0
+              ? `· last ${commits.length}`
+              : undefined
+          }
+        >
+          <div className="git-history-list">
+            {commits.length === 0 && (
+              <div className="git-history-empty">
+                {status?.is_repo ? "Loading…" : "Not a git repository."}
+              </div>
+            )}
+            {commits.map((c) => (
+              <button
+                key={c.full_hash}
+                className="git-history-row"
+                onClick={() => void openCommitDetail(c)}
+                title={`${c.subject}\n\n${c.author_name} <${c.author_email}>\n${c.full_hash}`}
+              >
+                <span
+                  className="git-history-avatar"
+                  aria-hidden="true"
+                  title={c.author_name}
+                >
+                  {authorInitials(c.author_name)}
+                </span>
+                <span className="git-history-meta">
+                  <span className="git-history-subject">{c.subject}</span>
+                  <span className="git-history-sub">
+                    <span className="git-history-hash">{c.hash}</span>
+                    <span className="git-history-author">{c.author_name}</span>
+                    <span className="git-history-time">
+                      {formatRelative(c.timestamp)}
+                    </span>
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+        </GitAccordionSection>
+      ) : (
+        <>
+          <button
+            className="git-history-toggle"
+            onClick={() => setHistoryOpen((v) => !v)}
+            aria-expanded={historyOpen}
+          >
+            <Icon name={historyOpen ? "chevron-down" : "chevron-right"} size={11} />
+            <span>History</span>
+            {historyOpen && commits.length > 0 && (
+              <span className="git-history-count">· last {commits.length}</span>
+            )}
+          </button>
+          {historyOpen && (
+            <div className="git-history-list">
+              {commits.length === 0 && (
+                <div className="git-history-empty">
+                  {status?.is_repo ? "Loading…" : "Not a git repository."}
+                </div>
+              )}
+              {commits.map((c) => (
+                <button
+                  key={c.full_hash}
+                  className="git-history-row"
+                  onClick={() => void openCommitDetail(c)}
+                  title={`${c.subject}\n\n${c.author_name} <${c.author_email}>\n${c.full_hash}`}
+                >
+                  <span
+                    className="git-history-avatar"
+                    aria-hidden="true"
+                    title={c.author_name}
+                  >
+                    {authorInitials(c.author_name)}
+                  </span>
+                  <span className="git-history-meta">
+                    <span className="git-history-subject">{c.subject}</span>
+                    <span className="git-history-sub">
+                      <span className="git-history-hash">{c.hash}</span>
+                      <span className="git-history-author">{c.author_name}</span>
+                      <span className="git-history-time">
+                        {formatRelative(c.timestamp)}
+                      </span>
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </>
       )}
 
-      <div className="git-section-title">
-        Staged ({staged.length})
-      </div>
-      <ul className="git-files">
-        {staged.map((f) => (
-          <li
-            key={"s:" + f.path}
-            tabIndex={0}
-            role="button"
-            aria-label={`View diff for staged ${f.path}`}
-            onClick={() => void showDiff(f, true)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                void showDiff(f, true);
-              }
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setCtx({ x: e.clientX, y: e.clientY, file: f });
-            }}
-          >
-            <span className={`git-status-tag ${statusClass(f)}`}>
-              {statusLabel(f)}
-            </span>
-            <span className="git-file-path" title={f.path}>
-              {f.path}
-            </span>
-            <button
-              className="git-file-action"
+      {compact ? (
+        <GitAccordionSection
+          id="stashes"
+          openId={openSection}
+          onToggle={toggleSection}
+          title="Stashes"
+          hint={
+            openSection === "stashes" && stashes.length > 0
+              ? `· ${stashes.length}`
+              : undefined
+          }
+          trailing={
+            <span
+              className="git-stash-push-shortcut"
               onClick={(e) => {
                 e.stopPropagation();
-                void unstage(f.path);
+                void stashPush();
               }}
-              title="Unstage"
-            >
-              −
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <div className="git-section-title">
-        Changes ({changes.length})
-      </div>
-      <ul className="git-files">
-        {changes.map((f) => (
-          <li
-            key={"c:" + f.path}
-            tabIndex={0}
-            role="button"
-            aria-label={`View diff for ${f.path}`}
-            onClick={() => void showDiff(f, false)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                void showDiff(f, false);
-              }
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              setCtx({ x: e.clientX, y: e.clientY, file: f });
-            }}
-          >
-            <span className={`git-status-tag ${statusClass(f)}`}>
-              {statusLabel(f)}
-            </span>
-            <span className="git-file-path" title={f.path}>
-              {f.path}
-            </span>
-            <button
-              className="git-file-action"
-              onClick={(e) => {
-                e.stopPropagation();
-                void stage(f.path);
+              title="Stash uncommitted changes"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  void stashPush();
+                }
               }}
-              title="Stage"
             >
-              +
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      <button
-        className="git-history-toggle"
-        onClick={() => setHistoryOpen((v) => !v)}
-        aria-expanded={historyOpen}
-      >
-        <Icon name={historyOpen ? "chevron-down" : "chevron-right"} size={11} />
-        <span>History</span>
-        {historyOpen && commits.length > 0 && (
-          <span className="git-history-count">· last {commits.length}</span>
-        )}
-      </button>
-      {historyOpen && (
-        <div className="git-history-list">
-          {commits.length === 0 && (
-            <div className="git-history-empty">
-              {status?.is_repo
-                ? "Loading…"
-                : "Not a git repository."}
-            </div>
-          )}
-          {commits.map((c) => (
-            <button
-              key={c.full_hash}
-              className="git-history-row"
-              onClick={() => void openCommitDetail(c)}
-              title={`${c.subject}\n\n${c.author_name} <${c.author_email}>\n${c.full_hash}`}
-            >
-              <span
-                className="git-history-avatar"
-                aria-hidden="true"
-                title={c.author_name}
-              >
-                {authorInitials(c.author_name)}
-              </span>
-              <span className="git-history-meta">
-                <span className="git-history-subject">{c.subject}</span>
-                <span className="git-history-sub">
-                  <span className="git-history-hash">{c.hash}</span>
-                  <span className="git-history-author">{c.author_name}</span>
-                  <span className="git-history-time">
-                    {formatRelative(c.timestamp)}
-                  </span>
-                </span>
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-      <button
-        className="git-history-toggle"
-        onClick={() => setStashesOpen((v) => !v)}
-        aria-expanded={stashesOpen}
-      >
-        <Icon name={stashesOpen ? "chevron-down" : "chevron-right"} size={11} />
-        <span>Stashes</span>
-        {stashesOpen && stashes.length > 0 && (
-          <span className="git-history-count">· {stashes.length}</span>
-        )}
-        <span className="git-stash-push-shortcut" onClick={(e) => {
-          e.stopPropagation();
-          void stashPush();
-        }}
-          title="Stash uncommitted changes"
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.stopPropagation();
-              e.preventDefault();
-              void stashPush();
-            }
-          }}
+              <Icon name="plus" size={11} /> Stash
+            </span>
+          }
         >
-          <Icon name="plus" size={11} /> Stash
-        </span>
-      </button>
-      {stashesOpen && (
-        <div className="git-history-list">
-          {stashes.length === 0 && (
-            <div className="git-history-empty">
-              {status?.is_repo
-                ? "No stashes."
-                : "Not a git repository."}
+          <div className="git-history-list">
+            {stashes.length === 0 && (
+              <div className="git-history-empty">
+                {status?.is_repo ? "No stashes." : "Not a git repository."}
+              </div>
+            )}
+            {stashes.map((s) => (
+              <div key={s.ref_spec} className="git-stash-row">
+                <div className="git-stash-meta">
+                  <span className="git-stash-message">{s.message}</span>
+                  <span className="git-stash-sub">
+                    <span className="git-stash-ref">{s.ref_spec}</span>
+                    <span>on {s.branch}</span>
+                    <span>{formatRelative(s.timestamp)}</span>
+                  </span>
+                </div>
+                <div className="git-stash-actions">
+                  <button
+                    className="git-stash-btn"
+                    onClick={() => void stashApply(s)}
+                    title="Apply stash, keep in stash list"
+                  >
+                    Apply
+                  </button>
+                  <button
+                    className="git-stash-btn"
+                    onClick={() => void stashPop(s)}
+                    title="Apply stash and remove from list"
+                  >
+                    Pop
+                  </button>
+                  <button
+                    className="git-stash-btn git-stash-btn-danger"
+                    onClick={() => void stashDrop(s)}
+                    title="Discard this stash"
+                  >
+                    Drop
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </GitAccordionSection>
+      ) : (
+        <>
+          <button
+            className="git-history-toggle"
+            onClick={() => setStashesOpen((v) => !v)}
+            aria-expanded={stashesOpen}
+          >
+            <Icon name={stashesOpen ? "chevron-down" : "chevron-right"} size={11} />
+            <span>Stashes</span>
+            {stashesOpen && stashes.length > 0 && (
+              <span className="git-history-count">· {stashes.length}</span>
+            )}
+            <span
+              className="git-stash-push-shortcut"
+              onClick={(e) => {
+                e.stopPropagation();
+                void stashPush();
+              }}
+              title="Stash uncommitted changes"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.stopPropagation();
+                  e.preventDefault();
+                  void stashPush();
+                }
+              }}
+            >
+              <Icon name="plus" size={11} /> Stash
+            </span>
+          </button>
+          {stashesOpen && (
+            <div className="git-history-list">
+              {stashes.length === 0 && (
+                <div className="git-history-empty">
+                  {status?.is_repo ? "No stashes." : "Not a git repository."}
+                </div>
+              )}
+              {stashes.map((s) => (
+                <div key={s.ref_spec} className="git-stash-row">
+                  <div className="git-stash-meta">
+                    <span className="git-stash-message">{s.message}</span>
+                    <span className="git-stash-sub">
+                      <span className="git-stash-ref">{s.ref_spec}</span>
+                      <span>on {s.branch}</span>
+                      <span>{formatRelative(s.timestamp)}</span>
+                    </span>
+                  </div>
+                  <div className="git-stash-actions">
+                    <button
+                      className="git-stash-btn"
+                      onClick={() => void stashApply(s)}
+                      title="Apply stash, keep in stash list"
+                    >
+                      Apply
+                    </button>
+                    <button
+                      className="git-stash-btn"
+                      onClick={() => void stashPop(s)}
+                      title="Apply stash and remove from list"
+                    >
+                      Pop
+                    </button>
+                    <button
+                      className="git-stash-btn git-stash-btn-danger"
+                      onClick={() => void stashDrop(s)}
+                      title="Discard this stash"
+                    >
+                      Drop
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-          {stashes.map((s) => (
-            <div key={s.ref_spec} className="git-stash-row">
-              <div className="git-stash-meta">
-                <span className="git-stash-message">{s.message}</span>
-                <span className="git-stash-sub">
-                  <span className="git-stash-ref">{s.ref_spec}</span>
-                  <span>on {s.branch}</span>
-                  <span>{formatRelative(s.timestamp)}</span>
-                </span>
-              </div>
-              <div className="git-stash-actions">
-                <button
-                  className="git-stash-btn"
-                  onClick={() => void stashApply(s)}
-                  title="Apply stash, keep in stash list"
-                >
-                  Apply
-                </button>
-                <button
-                  className="git-stash-btn"
-                  onClick={() => void stashPop(s)}
-                  title="Apply stash and remove from list"
-                >
-                  Pop
-                </button>
-                <button
-                  className="git-stash-btn git-stash-btn-danger"
-                  onClick={() => void stashDrop(s)}
-                  title="Discard this stash"
-                >
-                  Drop
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        </>
       )}
+      </div>
       {openCommit && (
         <div className="git-commit-modal" onMouseDown={() => setOpenCommit(null)}>
           <div

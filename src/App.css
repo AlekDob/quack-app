@@ -17,6 +17,10 @@
   /* User prompt card — lifted above stream so turns read at a glance. */
   --user-bar-bg: color-mix(in srgb, var(--fg) 12%, var(--chat-stream-bg));
   --user-bar-border: color-mix(in srgb, var(--fg) 16%, transparent);
+  /* ComposeCard — lifted recap bar at end of agent turns. */
+  --compose-card-bg: color-mix(in srgb, var(--fg) 14%, var(--chat-stream-bg));
+  --compose-bar-bg: color-mix(in srgb, var(--fg) 22%, var(--chat-stream-bg));
+  --compose-card-border: color-mix(in srgb, var(--fg) 18%, transparent);
   --fg: #f2f3f5;
   --fg-dim: rgba(242, 243, 245, 0.58);
   --fg-muted: rgba(242, 243, 245, 0.38);
@@ -117,6 +121,9 @@
   --chat-stream-bg: var(--bg);
   --user-bar-bg: color-mix(in srgb, var(--fg) 5%, var(--bg-alt));
   --user-bar-border: color-mix(in srgb, var(--fg) 10%, transparent);
+  --compose-card-bg: color-mix(in srgb, var(--fg) 7%, var(--bg-alt));
+  --compose-bar-bg: color-mix(in srgb, var(--fg) 11%, var(--bg-hi));
+  --compose-card-border: color-mix(in srgb, var(--fg) 14%, transparent);
   --fg: #14151a;
   --fg-dim: rgba(20, 21, 26, 0.62);
   --fg-muted: rgba(20, 21, 26, 0.42);
@@ -9563,11 +9570,11 @@ body.ws-dragging * {
 .ai-compose-cursor {
   width: 100%;
   max-width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-elev);
+  border: 1px solid var(--compose-card-border);
+  border-radius: var(--radius-md);
+  background: var(--compose-card-bg);
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
   animation: ai-compose-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1);
 }
 .ai-compose-cursor:not(.is-streaming) {
@@ -9592,12 +9599,12 @@ body.ws-dragging * {
 @keyframes ai-compose-attention {
   0%,
   100% {
-    border-color: var(--border);
-    box-shadow: var(--shadow-sm);
+    border-color: var(--compose-card-border);
+    box-shadow: var(--shadow-md);
   }
   18% {
-    border-color: var(--fg-muted);
-    box-shadow: 0 0 0 1px var(--border-strong), var(--shadow-sm);
+    border-color: var(--border-strong);
+    box-shadow: 0 0 0 1px var(--border-strong), var(--shadow-md);
   }
 }
 .ai-compose-cursor.is-streaming .ai-compose-bar-left {
@@ -9608,9 +9615,9 @@ body.ws-dragging * {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 10px 8px 6px;
-  min-height: 40px;
-  background: var(--bg-hi);
+  padding: 10px 12px 10px 8px;
+  min-height: 44px;
+  background: var(--compose-bar-bg);
 }
 .ai-compose-bar-main {
   display: flex;
@@ -9624,10 +9631,10 @@ body.ws-dragging * {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
-  padding: 3px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  background: var(--bg);
+  padding: 4px 12px;
+  border: 1px solid var(--compose-card-border);
+  border-radius: var(--radius-md);
+  background: var(--compose-card-bg);
   font-family: var(--mono);
   font-size: 12px;
   font-weight: 700;
@@ -9689,18 +9696,18 @@ body.ws-dragging * {
   cursor: not-allowed;
 }
 .ai-compose-review {
-  padding: 4px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xs);
-  background: var(--bg-hi);
+  padding: 5px 12px;
+  border: 1px solid var(--compose-card-border);
+  border-radius: var(--radius-md);
+  background: var(--compose-card-bg);
   color: var(--fg);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
 }
 .ai-compose-review:hover {
-  background: var(--bg);
+  background: var(--compose-bar-bg);
   border-color: var(--border-strong);
 }
 .ai-compose-undone {
@@ -11317,6 +11324,115 @@ body.ws-dragging * {
 .ai-slash-item-skill.active,
 .ai-slash-item-skill:hover {
   background: var(--skill-bg);
+}
+/* @-mention popover — list + path preview, stacked above composer */
+.ai-mention-popover {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  max-height: 220px;
+  overflow: hidden;
+  margin: 0 10px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--bg-alt);
+}
+.ai-mention-list {
+  flex: 1;
+  min-width: 0;
+  border-top: none;
+  max-height: 220px;
+}
+/* Let the mention menu grow upward without clipping at the panel edge */
+.ai-panel.ai-mention-open {
+  overflow: visible;
+}
+.ai-tab-host:has(.ai-mention-open),
+.ai-side-panel-body:has(.ai-mention-open) {
+  overflow: visible;
+}
+.ai-mention-item {
+  align-items: flex-start;
+}
+.ai-mention-file-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--fg-muted);
+  margin-top: 1px;
+}
+.ai-mention-file-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ai-mention-file-name {
+  font-size: var(--fs-sm);
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ai-mention-file-dir {
+  font-size: 11px;
+  color: var(--fg-muted);
+  font-family: var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ai-mention-path-preview {
+  width: 168px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--bg);
+  padding: 4px 0;
+  overflow-y: auto;
+}
+.ai-mention-path-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  padding-left: calc(8px + var(--tree-depth, 0) * var(--tree-indent-step));
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  min-width: 0;
+}
+.ai-mention-path-row::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: calc(var(--tree-depth, 0) * var(--tree-indent-step));
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0,
+    transparent calc(var(--tree-indent-step) - 1px),
+    color-mix(in srgb, var(--border) 75%, transparent)
+      calc(var(--tree-indent-step) - 1px),
+    color-mix(in srgb, var(--border) 75%, transparent) var(--tree-indent-step)
+  );
+}
+.ai-mention-path-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--fg-muted);
+}
+.ai-mention-path-name {
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ai-mention-path-name.leaf {
+  color: var(--fg);
+  font-weight: var(--fw-medium);
 }
 /* Subagent duck avatar inside the @-mention popover */
 .ai-mention-avatar {
@@ -14406,38 +14522,35 @@ body.ws-dragging * {
   min-width: 0;
   min-height: 0;
   position: relative;
+  overflow: hidden;
 }
-.agent-main-chat-body {
+.agent-main-chat-panels {
+  position: relative;
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  transition: opacity var(--duration-fast) var(--ease-default);
 }
-.agent-main-chat[data-switching] .agent-main-chat-body {
-  opacity: 0;
-}
-.agent-chat-switch {
+.agent-chat-host {
   position: absolute;
   inset: 0;
-  z-index: 12;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  background: var(--chat-stream-bg);
+  min-width: 0;
+  min-height: 0;
+  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
+  transition:
+    opacity var(--duration-fast) var(--ease-default),
+    visibility var(--duration-fast) var(--ease-default);
 }
-.agent-chat-switch-spinner {
-  width: 14px;
-  height: 14px;
-  border-width: 2px;
-}
-.agent-chat-switch-label {
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
+.agent-chat-host[data-visible] {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 1;
 }
 .agent-main.has-review .agent-main-chat {
   flex: 1 1 50%;

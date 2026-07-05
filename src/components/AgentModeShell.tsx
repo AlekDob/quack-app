@@ -95,6 +95,41 @@ function initials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
+// One panel per chat, toggled with CSS — mirrors WorkspaceShell's
+// AIChatHost so switching doesn't remount and replay hydration.
+function AgentChatHost({
+  wsId,
+  root,
+  chatId,
+  visible,
+  onOpenFile,
+}: {
+  wsId: string;
+  root: string;
+  chatId: string;
+  visible: boolean;
+  onOpenFile: (path: string | null) => void;
+}) {
+  const [mounted, setMounted] = useState(visible);
+  useEffect(() => {
+    if (visible) setMounted(true);
+  }, [visible]);
+  if (!mounted) return null;
+  return (
+    <div
+      className="agent-chat-host"
+      data-visible={visible || undefined}
+      aria-hidden={!visible}
+    >
+      <CompactChat.Provider value={true}>
+        <AgentFileOpen.Provider value={onOpenFile}>
+          <AIChatPanel wsId={wsId} root={root} aiChatId={chatId} />
+        </AgentFileOpen.Provider>
+      </CompactChat.Provider>
+    </div>
+  );
+}
+
 export function AgentModeShell({ wsId }: Props) {
   const openIds = useStore((s) => s.openIds);
   const loaded = useStore((s) => s.loaded);
@@ -311,36 +346,38 @@ export function AgentModeShell({ wsId }: Props) {
       <main className={`agent-main${sidePanelKey ? " has-review" : ""}`}>
         <div className="agent-main-inner">
           <div className="agent-main-chat">
-        {ws && activeChatId ? (
-          <CompactChat.Provider value={true}>
-            <AgentFileOpen.Provider value={setOpenFilePath}>
-              <AIChatPanel
-                key={`${wsId}:${activeChatId}`}
-                wsId={wsId}
-                root={ws.meta.root}
-                aiChatId={activeChatId}
-              />
-            </AgentFileOpen.Provider>
-          </CompactChat.Provider>
-        ) : (
-          <div className="agent-main-empty">
-            <div className="agent-main-empty-card">
-              <AIIcon size={28} />
-              <div className="agent-main-empty-title">Start a session</div>
-              <div className="agent-main-empty-hint">
-                Open a conversation with your model — it can read and edit{" "}
-                {ws?.meta.name ?? "this workspace"} directly.
+            {ws && activeChats.length > 0 ? (
+              <div className="agent-main-chat-panels">
+                {activeChats.map((chat) => (
+                  <AgentChatHost
+                    key={chat.id}
+                    wsId={wsId}
+                    root={ws.meta.root}
+                    chatId={chat.id}
+                    visible={chat.id === activeChatId}
+                    onOpenFile={setOpenFilePath}
+                  />
+                ))}
               </div>
-              <button
-                className="agent-main-empty-btn"
-                onClick={() => newSession(wsId)}
-              >
-                <Icon name="plus" size={12} />
-                <span>New session</span>
-              </button>
-            </div>
-          </div>
-        )}
+            ) : (
+              <div className="agent-main-empty">
+                <div className="agent-main-empty-card">
+                  <AIIcon size={28} />
+                  <div className="agent-main-empty-title">Start a session</div>
+                  <div className="agent-main-empty-hint">
+                    Open a conversation with your model — it can read and edit{" "}
+                    {ws?.meta.name ?? "this workspace"} directly.
+                  </div>
+                  <button
+                    className="agent-main-empty-btn"
+                    onClick={() => newSession(wsId)}
+                  >
+                    <Icon name="plus" size={12} />
+                    <span>New session</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
           {sidePanelKey && sideParsed?.kind === "composeReview" && (
             <div className="agent-main-review">

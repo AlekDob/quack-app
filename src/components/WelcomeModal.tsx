@@ -1,5 +1,5 @@
 // First-run welcome. Shows once (localStorage-gated) the first time
-// Codetta launches, introducing the headline features and the two things
+// Quack launches, introducing the headline features and the two things
 // a new user wants: open a folder, or see what's new. Dismissing sets the
 // flag so it never nags again.
 
@@ -15,6 +15,7 @@ import { runCommand } from "../actions";
 import { setAgentMode } from "../agentMode";
 import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
+import { QUACK_DISCORD, QUACK_HOME } from "../quackLinks";
 
 const SEEN_KEY = "lcp.welcome.v1";
 
@@ -122,9 +123,15 @@ export function WelcomeModal() {
           </button>
           <button
             className="welcome-btn ghost"
-            onClick={() => void openUrl("https://codetta.dev")}
+            onClick={() => void openUrl(QUACK_HOME)}
           >
             What's new ↗
+          </button>
+          <button
+            className="welcome-btn ghost"
+            onClick={() => void openUrl(QUACK_DISCORD)}
+          >
+            <Icon name="link" size={14} /> Join Discord
           </button>
         </div>
       </div>

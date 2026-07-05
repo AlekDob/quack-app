@@ -4,10 +4,6 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
 last_verified: 2026-07-05
-tags: [subagents, agents, mention, composer, claude-code, task-tool, ai-chat, ducks, avatars, transcript, jsonl, read-only-tab, agent-mode]
----
-
-## Subagent @-Mentions + Transcript Tab
 
 **Purpose:** Let the user delegate a chat turn to a Claude Code **subagent** by
 typing `@` in the composer — the same affordance that already attaches files.
@@ -42,7 +38,9 @@ dependency).
 | Type | Path | Purpose |
 |---|---|---|
 | Module | `src/subagents.ts` | `loadSubagents(root, homeDir)`, `duckAvatarFor(name, explicit?)`, `SubagentDef` |
-| Component | `src/components/AIChatPanel.tsx` | `agents`/`attachedAgents` state, agent-load effect (CC-only), `@` popover (tagged union agent\|file), delegation injection, reset, chips; `SubagentOpen.Provider` + `openSubagentTab` |
+| Component | `src/components/MentionSuggestions.tsx` | `@` popover UI (agent + file rows, path preview) — see **`041-mention-file-preview.md`** |
+| Component | `src/components/MentionPathPreview.tsx` | Side tree for highlighted file row (041) |
+| Component | `src/components/AIChatPanel.tsx` | `agents`/`attachedAgents` state, agent-load effect (CC-only), `@` match logic + `acceptMention`, delegation injection, reset, chips; `SubagentOpen.Provider` + `openSubagentTab`; `.ai-mention-open` overflow toggle |
 | Render | `src/components/chatToolRender.tsx` | `SubagentOpen` context, `subagentTypeOf()`, Task→duck-avatar chip (clickable) |
 | Component | `src/components/SubagentTranscriptView.tsx` | read-only transcript viewer (portaled in editor, **inline** in agent mode), reuses `ToolCallRow` + `MarkdownPreview` |
 | Host | `src/components/WorkspaceShell.tsx` | walks panes for `sub:` keys, portals one viewer each |
@@ -51,11 +49,11 @@ dependency).
 | Backend | `src-tauri/src/claude_code.rs` | `claude_code_load_subagent`, `parse_session_jsonl` (shared) |
 | IPC | `src/ipc.ts` | `claudeCode.loadSubagent`, `LoadedSubagent` |
 | Assets | `public/images/ducks/duck1..35.jpeg` | duck avatars |
-| Styles | `src/App.css` | `.ai-mention-avatar`, `.ai-agent-chip*`, `.ai-tcall-subagent`, `.subagent-view*`, `.tab-sub-avatar` |
+| Styles | `src/App.css` | `.ai-mention-*`, `.ai-agent-chip*`, `.ai-tcall-subagent`, `.subagent-view*`, `.tab-sub-avatar` |
 
 ### Flow — mention & delegate
 1. `agents` loads when the provider is Claude Code (`selectedIsCC`) — project + global.
-2. Typing `@` opens the popover: **agents first** (≤4, with avatar), then files (up to 8 total).
+2. Typing `@` opens **`MentionSuggestions`** (041): **agents first** (≤4, avatar + description), then **files** (≤8 total — basename + parent dir; side path tree when a file row is active).
 3. Accepting an agent inserts `@name` and tracks it in `attachedAgents` (chips shown above composer).
 4. On send (`sendUserText`), if `attachedAgents` is non-empty a directive is pushed into
    `ccTurnContext`: *"Delegate this task to the following subagent(s)… use your Task tool…"*.

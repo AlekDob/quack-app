@@ -40,6 +40,7 @@ import {
   zoomReset,
 } from "./editorSettings";
 import { joinPath } from "./pathUtils";
+import { QUACK_DISCORD, QUACK_HOME } from "./quackLinks";
 import { revealInTree } from "./revealInTree";
 import { toggleZenMode } from "./zenMode";
 import { toggleAgentMode } from "./agentMode";
@@ -1059,12 +1060,24 @@ ${sample}
     },
   },
   {
-    id: "help.repo",
-    label: "GitHub Repository",
+    id: "help.website",
+    label: "Quack Website",
     category: "Help",
     run: async () => {
       try {
-        await openUrl("https://github.com/getcodetta/codetta");
+        await openUrl(QUACK_HOME);
+      } catch {
+        /* ignore */
+      }
+    },
+  },
+  {
+    id: "help.discord",
+    label: "Join Discord",
+    category: "Help",
+    run: async () => {
+      try {
+        await openUrl(QUACK_DISCORD);
       } catch {
         /* ignore */
       }
@@ -1076,7 +1089,7 @@ ${sample}
     category: "Help",
     run: () =>
       void dialogAlert(
-        `Quack v${__APP_VERSION__} — a lightweight Tauri-based code editor with first-class AI.\n\nMulti-workspace · multi-terminal (with pop-out) · integrated git · drag-and-drop splits · BYOK AI (Anthropic, OpenAI, Ollama, Claude Code).\n\nhttps://codetta.dev`,
+        `Quack v${__APP_VERSION__} — a lightweight Tauri-based code editor with first-class AI.\n\nMulti-workspace · multi-terminal (with pop-out) · integrated git · drag-and-drop splits · BYOK AI (Anthropic, OpenAI, Ollama, Claude Code).\n\n${QUACK_HOME}`,
         { title: "About Quack" },
       ),
   },

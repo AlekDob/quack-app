@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Codetta is a Tauri desktop app, not a Node-based CLI. This stub exists so
+// Quack is a Tauri desktop app, not a Node-based CLI. This stub exists so
 // the npm package has a working `bin` entry — `npx codetta` or
 // `npm i -g codetta && codetta` print a friendly pointer to the real
 // installer.
@@ -7,17 +7,16 @@
 const VERSION = require("../package.json").version;
 
 const msg = `
-  ⌘  Codetta ${VERSION}
+  ⌘  Quack ${VERSION}
   ─────────────────────────────────────────────────────────────
 
-  Codetta is a desktop application — it doesn't run from npm.
+  Quack is a desktop application — it doesn't run from npm.
 
-  Download the Windows installer:
-    https://github.com/getcodetta/codetta/releases/latest
+  Download the latest release:
+    https://www.quack.build/
 
-  Documentation & source:
-    https://codetta.dev
-    https://github.com/getcodetta/codetta
+  Community:
+    https://discord.com/invite/bQd39uDhnc
 `;
 
 process.stdout.write(msg + "\n");

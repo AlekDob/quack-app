@@ -51,7 +51,7 @@ export async function popOutTerminal(
 
   const w = new WebviewWindow(label, {
     url: `index.html?${params.toString()}`,
-    title: `${desc.title} — Codetta`,
+    title: `${desc.title} — Quack`,
     width: 900,
     height: 560,
     minWidth: 480,

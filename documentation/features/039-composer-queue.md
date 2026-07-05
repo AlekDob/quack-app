@@ -137,5 +137,6 @@ follow-ups would be lost on switch.
 - **Do not** reintroduce enqueue toasts; the card is the affordance.
 - Multitask **New chat** only sends the **first** queued message; the rest
   stay on the busy panel and drain when that turn ends.
+- Queue + draft persist on `ChatSession.composer` — see `040-per-session-composer-state.md`.
 - `sendUserText` defensive re-queue (if called while busy) uses `pushQueue`
   silently — callers should prefer `send()` which clears input first.

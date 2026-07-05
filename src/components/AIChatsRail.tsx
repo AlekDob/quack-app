@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   activeAiChatId,
@@ -75,7 +75,27 @@ function initials(name: string): string {
   return (parts[0][0] + parts[1][0]).toUpperCase();
 }
 
-export function AIChatsRail() {
+interface AIChatsRailProps {
+  /** Stack rail (editor) vs agent-mode left sidebar — always expanded. */
+  placement?: "stack" | "agent-sidebar";
+  /** Agent mode: no `ai:` tab — parent owns the focused session id. */
+  activeChatId?: string | null;
+  onSelectChat?: (wsId: string, chatId: string) => void;
+  onNewChat?: (wsId: string) => void;
+  onCloseChat?: (wsId: string, chatId: string) => void;
+  /** Rendered below customizations (tasks, exit, …). */
+  footer?: ReactNode;
+}
+
+export function AIChatsRail({
+  placement = "stack",
+  activeChatId: activeChatIdOverride,
+  onSelectChat,
+  onNewChat,
+  onCloseChat,
+  footer,
+}: AIChatsRailProps = {}) {
+  const inSidebar = placement === "agent-sidebar";
   const loaded = useStore((s) => s.loaded);
   const activeId = useStore((s) => s.activeId);
   const sidebarSide = useStore((s) =>
@@ -87,7 +107,8 @@ export function AIChatsRail() {
   const closeAIChat = useStore((s) => s.closeAIChat);
   const renameAIChat = useStore((s) => s.renameAIChat);
   const setAIChatLifecycle = useStore((s) => s.setAIChatLifecycle);
-  const expanded = useHubExpanded();
+  const hubExpanded = useHubExpanded();
+  const expanded = inSidebar || hubExpanded;
 
   // Re-render on status / color / section changes (module-level stores).
   const [, setTick] = useState(0);
@@ -110,7 +131,11 @@ export function AIChatsRail() {
 
   // The chat the user is currently looking at (for highlight).
   const activeChatId =
-    activeId && loaded[activeId] ? activeAiChatId(loaded[activeId]) : null;
+    activeChatIdOverride !== undefined
+      ? activeChatIdOverride
+      : activeId && loaded[activeId]
+        ? activeAiChatId(loaded[activeId])
+        : null;
 
   // Flatten every open workspace's chats, drop archived, attach status.
   const entries: HubEntry[] = [];
@@ -129,8 +154,26 @@ export function AIChatsRail() {
 
   const focusChat = async (wsId: string, chatId: string) => {
     markSeen(chatId);
+    if (onSelectChat) {
+      onSelectChat(wsId, chatId);
+      return;
+    }
     if (wsId !== activeId) await setActiveWorkspace(wsId);
     focusAIChat(wsId, chatId);
+  };
+
+  const closeChat = (wsId: string, chatId: string) => {
+    closeAIChat(wsId, chatId);
+    onCloseChat?.(wsId, chatId);
+  };
+
+  const newChat = () => {
+    if (!activeId) return;
+    if (onNewChat) {
+      onNewChat(activeId);
+      return;
+    }
+    addAIChat(activeId, "editor");
   };
 
   const totalChats = entries.length;
@@ -144,13 +187,13 @@ export function AIChatsRail() {
 
   return (
     <div
-      className={`agent-hub ${expanded ? "expanded" : ""}`}
-      data-rail-side={sidebarSide === "left" ? "right" : "left"}
+      className={`agent-hub ${expanded ? "expanded" : ""}${inSidebar ? " agent-hub--sidebar" : ""}`}
+      data-rail-side={inSidebar ? "left" : sidebarSide === "left" ? "right" : "left"}
     >
       <div className="agent-hub-header">
         <button
           className="agent-hub-add"
-          onClick={() => activeId && addAIChat(activeId, "editor")}
+          onClick={newChat}
           title="New AI chat"
           aria-label="New AI chat"
           disabled={!activeId}
@@ -168,23 +211,25 @@ export function AIChatsRail() {
             </span>
           )}
         </button>
-        <button
-          className="agent-hub-toggle"
-          onClick={() => setHubExpanded(!expanded)}
-          title={expanded ? "Collapse hub" : "Expand hub"}
-          aria-label={expanded ? "Collapse agent hub" : "Expand agent hub"}
-          aria-expanded={expanded}
-        >
-          <Icon
-            name={
-              (expanded && sidebarSide === "left") ||
-              (!expanded && sidebarSide !== "left")
-                ? "chevron-right"
-                : "chevron-left"
-            }
-            size={12}
-          />
-        </button>
+        {!inSidebar && (
+          <button
+            className="agent-hub-toggle"
+            onClick={() => setHubExpanded(!hubExpanded)}
+            title={expanded ? "Collapse hub" : "Expand hub"}
+            aria-label={expanded ? "Collapse agent hub" : "Expand agent hub"}
+            aria-expanded={expanded}
+          >
+            <Icon
+              name={
+                (expanded && sidebarSide === "left") ||
+                (!expanded && sidebarSide !== "left")
+                  ? "chevron-right"
+                  : "chevron-left"
+              }
+              size={12}
+            />
+          </button>
+        )}
       </div>
 
       <div className="agent-hub-list">
@@ -231,7 +276,7 @@ export function AIChatsRail() {
                       e.preventDefault();
                       setMenu({ entry, x: e.clientX, y: e.clientY });
                     }}
-                    onClose={() => closeAIChat(entry.wsId, entry.chat.id)}
+                    onClose={() => closeChat(entry.wsId, entry.chat.id)}
                     onRename={(title) => {
                       if (title.trim())
                         renameAIChat(entry.wsId, entry.chat.id, title.trim());
@@ -247,6 +292,7 @@ export function AIChatsRail() {
         {expanded && (
           <AgentCustomizations onOpen={(t) => setCustTab(t)} />
         )}
+        {footer}
       </div>
 
       <CustomizationsModal

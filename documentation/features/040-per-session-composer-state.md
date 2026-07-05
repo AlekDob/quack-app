@@ -16,7 +16,7 @@ not bleed settings or half-written text from one chat into another.
 
 ## Problem solved
 
-Before this pass:
+### Initial pass (feat `85010484`)
 
 | Symptom | Root cause |
 |---|---|
@@ -25,23 +25,26 @@ Before this pass:
 | Follow-up queue lost on tab switch | `queueRef` was in-memory only; remount wiped it |
 | Wrong model after returning to a session | `setSelected((cur) => cur \|\| session.model)` kept the global last model when `cur` was already set |
 
-Global `localStorage` keys (`lcp.claudeCode.effort`, `lcp.claudeCode.permMode`)
-now seed **brand-new** chats only — not restored sessions.
+### Follow-up fix (fix `7e72a1a4`) — still broken after first ship
+
+| Symptom | Root cause |
+|---|---|
+| Effort still “global” on older chats | `sessionKnobsFrom` fell back to `readEffort()` / `readDefaultPermMode()` when the row existed but lacked `ccEffort` — global keys had just been overwritten by another session |
+| Draft lost when switching quickly | Debounce effect `return () => clearTimeout(t)` **cancelled** the pending save; Agent Mode unmount left nothing on disk if switch happened within 400ms |
 
 ## Components & modules
 
 | File | Role |
 |---|---|
 | `src/chatHistory.ts` | `ChatSession` extended with `ccEffort`, `ccPermMode`, `ccThinking`, `composer` |
-| `src/composerDraft.ts` | `ChatComposerDraft` type, `draftFromSession`, `mergeComposerDraft` |
+| `src/composerDraft.ts` | `ChatComposerDraft`, `draftFromSession`, `mergeComposerDraft`, `mergeSessionKnobs` |
 | `src/imageAttach.ts` | `rehydrateAttachment()` — rebuild thumb from on-disk path on restore |
-| `src/components/AIChatPanel.tsx` | Restore on load/switch; flush on change, debounce, unmount, sessionId change |
-| `src/permModeStore.ts` | Unchanged — still bridges live mode to permission overlay by CC session id |
+| `src/components/AIChatPanel.tsx` | Restore, `sessionKnobsFrom`, refs, flush on change / switch / unmount |
+| `src/permModeStore.ts` | Unchanged — runtime bridge to permission overlay by CC session id |
 
 ## ChatSession fields (transcript row)
 
-Stored in `localStorage` `lcp.ollama.history.{wsId}` (max 30). Written by
-`saveSession` on message change, composer change, and `beforeunload`.
+Stored in `localStorage` `lcp.ollama.history.{wsId}` (max 30).
 
 | Field | Type | Purpose |
 |---|---|---|
@@ -50,7 +53,17 @@ Stored in `localStorage` `lcp.ollama.history.{wsId}` (max 30). Written by
 | `ccThinking` | `boolean \| null?` | Extended thinking: `null` = CLI auto |
 | `composer` | `ChatComposerDraft?` | Ephemeral composer UI (see below) |
 
-- Session row **exists** but field missing (legacy): app defaults — effort **medium**, mode **Ask**; never read global `localStorage` (that only seeds brand-new chats).
+### Knob restore rules (`sessionKnobsFrom`)
+
+| Session row | Effort | Mode | Thinking |
+|---|---|---|---|
+| **No row** (`found` undefined) | `readEffort()` global | `readDefaultPermMode()` global | `null` |
+| **Row exists**, field missing (legacy) | `CC_EFFORT_DEFAULT` (**medium**) | `null` (Ask) | `null` |
+| **Row exists**, field set | saved value | saved value | saved value |
+
+Global `localStorage` (`lcp.claudeCode.effort`, `lcp.claudeCode.permMode`) still
+updates on every knob change — but only seeds **brand-new** chats via
+`defaultSessionKnobs()`. Never read global when restoring an existing row.
 
 ## ChatComposerDraft (`composer` on session)
 
@@ -71,29 +84,40 @@ Empty draft objects are omitted from storage (`composer` undefined).
 
 ```
 loadSessions(wsId) → find row by descriptor.sessionId
-  → sessionKnobsFrom(session)     → ccEffort / ccThinking / ccPermMode
-  → draftFromSession(session)     → applyComposerDraft (input, queue, toggles, images)
-  → session.model                 → setSelected(model)  [no cur || guard]
+  → sessionKnobsFrom(found)       → ccEffort / ccThinking / ccPermMode
+  → draftFromSession(found)       → applyComposerDraft (input, queue, toggles, images)
+  → found.model                   → setSelected(model)  [no cur || guard]
 ```
 
 Triggers: hydration `useEffect([wsId, aiChatId])`, `openSession(id)`,
 Agent Mode panel mount after rail pick.
 
-### Persist (session stops being active or draft changes)
+### Persist (session leaves focus or draft/knobs change)
 
-```
-composerPersistRef (latest snap)
-  → draftFromComposerSnap()
-  → mergeComposerDraft(wsId, sessionId, draft)
-```
+Two merge helpers in `composerDraft.ts` — both upsert the existing
+`ChatSession` row without wiping messages:
+
+| Helper | Writes |
+|---|---|
+| `mergeComposerDraft(wsId, sessionId, draft)` | `composer` only |
+| `mergeSessionKnobs(wsId, sessionId, knobs)` | `ccEffort`, `ccPermMode`, `ccThinking` |
+
+`AIChatPanel` keeps live snapshots in refs (updated every render via
+`useLayoutEffect`):
+
+| Ref | Contents |
+|---|---|
+| `composerPersistRef` | `sessionId`, `input`, queue, attach toggles, images |
+| `knobsPersistRef` | `ccEffort`, `ccThinking`, `ccPermMode` |
+
+`flushSessionState(sid)` = `mergeComposerDraft` + `mergeSessionKnobs` from refs.
 
 | When | Mechanism |
 |---|---|
-| Keystroke / toggle / queue change | Debounced 400ms; **cleanup flushes immediately** (switch/unmount must not cancel the pending save) |
-| `sessionId` changes (`/new`, history) | `prevSessionIdRef` effect flushes **previous** id |
-| Panel unmount (Agent Mode switch) | Cleanup effect — immediate flush |
-| Effort / mode / thinking change | Immediate `mergeSessionKnobs` (no debounce) |
-| `beforeunload` | Same row shape as message persist |
+| Keystroke / toggle / queue / knob change | Debounced 400ms `flushSessionState`; **cleanup flushes synchronously** (must not only `clearTimeout`) |
+| `sessionId` changes (`/new`, history) | `prevSessionIdRef` effect → `flushSessionState(previous)` |
+| Panel unmount (Agent Mode switch) | `useLayoutEffect` cleanup → `mergeComposerDraft` + `mergeSessionKnobs` from refs |
+| Messages saved / `beforeunload` | Full `saveSession` row includes `composer` + knobs from refs |
 
 ### New / cleared chat
 
@@ -118,6 +142,9 @@ never survives a switch — persistence on `ChatSession` + unmount flush is
 Editor mode (`WorkspaceShell` `AIChatHost`) keeps panels mounted after first
 show; restore still runs on hydration but unmount flush is less critical.
 
+**Requires app reload** after deploying this feature — `npm run tauri dev`
+(not Vite-only `npm run dev` if testing the desktop shell).
+
 ## What stays per-workspace (not per session)
 
 | State | Module | Why |
@@ -132,11 +159,13 @@ show; restore still runs on hydration but unmount flush is less critical.
 - Permission modes: `015-claude-permission-mode.md`
 - CC spawn flags: `014-claude-code-bridge.md`
 - Session library model: `001-ai-session-library.md`
-- Diary: `documentation/diary/2026-07-05.md` (15:20 + 15:45 entries)
+- Diary: `documentation/diary/2026-07-05.md` (15:20, 15:45, 15:55)
 
 ## Gotchas
 
 - Do **not** call `setInput("")` on session switch — use `applyComposerDraft`.
-- Do **not** restore model with `setSelected((cur) => cur || q)` — overwrites session model with global default.
+- Do **not** restore model with `setSelected((cur) => cur || q)`.
+- Do **not** use `readEffort()` / `readDefaultPermMode()` when a `ChatSession` row exists but lacks knob fields — use `CC_EFFORT_DEFAULT` + Ask.
+- Do **not** debounce with cleanup that only `clearTimeout` — always flush on cleanup before unmount / session switch.
 - Image thumbs are **not** stored in localStorage — only paths; missing files on disk are dropped on rehydrate.
-- Global `lcp.claudeCode.effort` / `permMode` still update on every change (defaults for **new** chats); they are not the source of truth for existing sessions.
+- First time a legacy chat gets a custom effort, the value is written to its row — until then it shows **medium**, not whatever another chat last set globally.

@@ -9,7 +9,8 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
-const IDLE_TIMEOUT: Duration = Duration::from_secs(120);
+/// Tool runs (Bash, searches) can be silent for minutes — match Claude bridge.
+const IDLE_TIMEOUT: Duration = Duration::from_secs(600);
 
 #[derive(Default)]
 pub struct CursorCodeState {

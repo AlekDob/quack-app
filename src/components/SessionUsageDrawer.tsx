@@ -9,6 +9,9 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useModalFocus } from "../useModalFocus";
 import { Icon } from "./Icon";
+import { UsageRing } from "./UsageRing";
+import { fmtTokenCount } from "../contextUsage";
+import { sessionHeroPct } from "../sessionUsageLocal";
 
 /** Shape from AIChatPanel's `claude_usage_limits` parsing. */
 export interface SessionLimit {
@@ -25,6 +28,13 @@ export interface SessionExtra {
 }
 
 export interface SessionUsageData {
+  /** Context window fill from the last turn (or estimate). */
+  context: {
+    pct: number;
+    used: number;
+    window: number;
+    estimate: boolean;
+  };
   /** Plan-limit windows (5hr, 7day, etc.) */
   limits: SessionLimit[];
   /** Extra usage (monthly overage) */
@@ -51,6 +61,8 @@ interface SessionUsageDrawerProps {
   /** Controlled by parent — true = open, false = close. */
   open: boolean;
   data: SessionUsageData | null;
+  /** When OAuth plan limits could not be loaded. */
+  limitsError?: string | null;
   onClose: () => void;
   onOpenDashboard: () => void;
 }
@@ -58,6 +70,7 @@ interface SessionUsageDrawerProps {
 export function SessionUsageDrawer({
   open,
   data,
+  limitsError = null,
   onClose,
   onOpenDashboard,
 }: SessionUsageDrawerProps) {
@@ -91,6 +104,8 @@ export function SessionUsageDrawer({
 
   if (!mounted) return null;
 
+  const heroPct = data ? sessionHeroPct(data) : 0;
+
   return createPortal(
     <div
       className={`tool-drawer-scrim${shown ? " shown" : ""}`}
@@ -107,8 +122,12 @@ export function SessionUsageDrawer({
       >
         <div className="tool-drawer-head">
           <div className="tool-drawer-titles">
-            <span className="tool-drawer-title">Session Usage</span>
-            <span className="tool-drawer-sub">Claude Code plan limits</span>
+            <span className="tool-drawer-title">Context &amp; Usage</span>
+            <span className="tool-drawer-sub">
+              {data?.chat.model
+                ? data.chat.model.replace(/^claude-/, "")
+                : "Claude Code session"}
+            </span>
           </div>
           <button
             className="tool-drawer-close"
@@ -125,7 +144,42 @@ export function SessionUsageDrawer({
             <div className="session-drawer-empty">No data yet — polling…</div>
           ) : (
             <>
-              {/* Plan-limit windows */}
+              <div className="session-drawer-hero">
+                <UsageRing pct={heroPct} size={72} stroke={5} />
+                <div className="session-drawer-hero-text">
+                  <span className="session-drawer-hero-pct">{heroPct}%</span>
+                  <span className="session-drawer-hero-sub">
+                    {data.context.pct > 0 ? (
+                      <>
+                        {fmtTokenCount(data.context.used)} /{" "}
+                        {fmtTokenCount(data.context.window)} context
+                        {data.context.estimate ? " (estimated)" : ""}
+                      </>
+                    ) : data.limits.length > 0 ? (
+                      "Plan session usage"
+                    ) : (
+                      <>
+                        {fmtTokenCount(data.context.used)} /{" "}
+                        {fmtTokenCount(data.context.window)} context
+                        {data.context.estimate ? " (estimated)" : ""}
+                      </>
+                    )}
+                  </span>
+                </div>
+              </div>
+              <div className="session-drawer-ctx-bar">
+                <div
+                  className={`session-drawer-bar-fill ${heroPct >= 90 ? "hot" : heroPct >= 70 ? "warn" : ""}`}
+                  style={{ width: `${heroPct}%` }}
+                />
+              </div>
+
+              {limitsError && (
+                <div className="session-drawer-limits-err" role="status">
+                  Plan limits: {limitsError}
+                </div>
+              )}
+
               {data.limits.length > 0 && (
                 <div className="session-drawer-section">
                   <div className="session-drawer-section-title">
@@ -199,56 +253,39 @@ export function SessionUsageDrawer({
                 </div>
               )}
 
-              {/* Current session */}
               <div className="session-drawer-section">
-                <div className="session-drawer-section-title">
-                  This session
-                </div>
-                <div className="session-drawer-metrics">
-                  <div className="session-drawer-metric">
-                    <span className="session-drawer-metric-value">
-                      ${data.chat.cost.toFixed(4)}
-                    </span>
-                    <span className="session-drawer-metric-label">Cost</span>
+                <div className="session-drawer-section-title">This chat</div>
+                <div className="session-drawer-kv">
+                  <div className="session-drawer-kv-row">
+                    <span>Cost</span>
+                    <span className="mono">${data.chat.cost.toFixed(4)}</span>
                   </div>
-                  <div className="session-drawer-metric">
-                    <span className="session-drawer-metric-value">
-                      {data.chat.turns}
-                    </span>
-                    <span className="session-drawer-metric-label">Turns</span>
+                  <div className="session-drawer-kv-row">
+                    <span>Turns</span>
+                    <span>{data.chat.turns}</span>
                   </div>
-                  <div className="session-drawer-metric">
-                    <span className="session-drawer-metric-value mono">
-                      {fmtTokens(data.chat.tokensIn)}
+                  <div className="session-drawer-kv-row">
+                    <span>Input</span>
+                    <span className="mono">
+                      {fmtTokenCount(data.chat.tokensIn)}
                     </span>
-                    <span className="session-drawer-metric-label">In</span>
                   </div>
-                  <div className="session-drawer-metric">
-                    <span className="session-drawer-metric-value mono">
-                      {fmtTokens(data.chat.tokensOut)}
+                  <div className="session-drawer-kv-row">
+                    <span>Output</span>
+                    <span className="mono">
+                      {fmtTokenCount(data.chat.tokensOut)}
                     </span>
-                    <span className="session-drawer-metric-label">Out</span>
                   </div>
-                </div>
-                <div className="session-drawer-details">
                   {data.chat.cacheRead > 0 && (
-                    <div className="session-drawer-detail-row">
+                    <div className="session-drawer-kv-row">
                       <span>Cache read</span>
                       <span className="mono">
-                        {fmtTokens(data.chat.cacheRead)}
-                      </span>
-                    </div>
-                  )}
-                  {data.chat.model && (
-                    <div className="session-drawer-detail-row">
-                      <span>Model</span>
-                      <span className="mono">
-                        {data.chat.model.replace(/^claude-/, "")}
+                        {fmtTokenCount(data.chat.cacheRead)}
                       </span>
                     </div>
                   )}
                   {data.chat.durationMs > 0 && (
-                    <div className="session-drawer-detail-row">
+                    <div className="session-drawer-kv-row">
                       <span>Duration</span>
                       <span>{fmtDuration(data.chat.durationMs)}</span>
                     </div>
@@ -256,38 +293,24 @@ export function SessionUsageDrawer({
                 </div>
               </div>
 
-              {/* Quack spend cards */}
               <div className="session-drawer-section">
-                <div className="session-drawer-section-title">
-                  Quack spend
-                </div>
-                <div className="session-drawer-cards">
-                  <div className="session-drawer-card">
-                    <span className="session-drawer-card-num">
-                      ${data.today.toFixed(2)}
-                    </span>
-                    <span className="session-drawer-card-label">today</span>
+                <div className="session-drawer-section-title">Quack spend</div>
+                <div className="session-drawer-kv">
+                  <div className="session-drawer-kv-row">
+                    <span>Today</span>
+                    <span className="mono">${data.today.toFixed(2)}</span>
                   </div>
-                  <div className="session-drawer-card">
-                    <span className="session-drawer-card-num">
-                      ${data.wsMonth.toFixed(2)}
-                    </span>
-                    <span className="session-drawer-card-label">
-                      workspace · month
-                    </span>
+                  <div className="session-drawer-kv-row">
+                    <span>Workspace · month</span>
+                    <span className="mono">${data.wsMonth.toFixed(2)}</span>
                   </div>
-                  <div className="session-drawer-card">
-                    <span className="session-drawer-card-num">
-                      ${data.month.toFixed(2)}
-                    </span>
-                    <span className="session-drawer-card-label">
-                      all · month
-                    </span>
+                  <div className="session-drawer-kv-row">
+                    <span>All · month</span>
+                    <span className="mono">${data.month.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Footer link */}
               <div className="session-drawer-foot">
                 <button
                   className="usage-dash-btn"
@@ -303,12 +326,6 @@ export function SessionUsageDrawer({
     </div>,
     document.body,
   );
-}
-
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
 }
 
 function fmtDuration(ms: number): string {
