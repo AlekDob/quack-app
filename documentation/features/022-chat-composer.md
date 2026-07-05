@@ -127,6 +127,15 @@ the transcript `Files: …` indicator. Full detail: **`037-project-context-dock.
 - Pill: `1 file in context` / `N files in context`; hover popover lists editor
   (ON/OFF) + `@`-queued paths; scoped per `wsId` via `workspaceChatContext.ts`.
 
+## Sticky user turns (transcript scroll)
+
+Cursor-style: while you read a long assistant reply, **your prompt stays pinned**
+at the top of `.ai-messages`. On send, `pinUserTurnToTop()` scrolls the latest
+user anchor into view; `pinActiveRef` blocks tail-follow until the turn ends.
+
+Full DOM/CSS detail (turn wrappers, sticky containing block, z-index stacking):
+**`030-user-message-bar.md`**.
+
 ## Rules indicator (CLAUDE.md token weight)
 
 - Header `.ai-rules-indicator` now carries a **colored dot** + `~Nk` token

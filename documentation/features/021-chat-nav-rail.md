@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-01
+last_verified: 2026-07-05
 tags: [chat, navigation, minimap, ux, long-threads]
 ---
 
@@ -24,7 +24,7 @@ endless scrolling. Preview opens leftward so it never covers the messages.
 
 ## How it works
 
-- **Decoupled via DOM data-attributes.** Each message div carries `data-anchor-idx`, `data-anchor-role`, and (user only) `data-anchor-preview` (first 120 chars). The rail never imports the message model — it queries `[data-anchor-role="user"]`.
+- **Decoupled via DOM data-attributes.** Each user turn's anchor div carries `data-anchor-idx`, `data-anchor-role="user"`, and `data-anchor-preview` (first 120 chars). Anchors live on `.ai-msg-user` inside `.ai-turn` wrappers (see `030-user-message-bar.md`). The rail never imports the message model — it queries `[data-anchor-role="user"]`.
 - **Minimap positioning (compact overview).** Each tick's `top` = `el.offsetTop / scrollHeight` (0..1) → proportional to its place in the WHOLE thread, so all turns stay visible as a compact overview you can click to jump anywhere. `offsetTop` is honest because `.ai-messages` is `position: relative` (else offsetParent bubbles to `.ai-messages-wrap` and values drift on scroll). Chosen over live per-message tracking, which spread the ticks out and lost the overview.
 - **Freshness.** Rescans on `version` (turn count) + a rAF-throttled `MutationObserver` on the scroll container (streaming growth / reflow).
 - **Active tick.** A `scroll` listener marks the last user anchor above the viewport's upper third (`scrollTop + clientHeight * 0.35`).

@@ -155,6 +155,7 @@ import { permissionFor } from "../toolPermissions";
 import { onAIPromptRequest } from "../aiBus";
 import { relPath } from "../pathUtils";
 import {
+  groupChatTurns,
   isNearBottom,
   pinUserTurnToTop,
   scrollToBottom,
@@ -3985,14 +3986,13 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           }
           const userTurnByIdx = new Map<number, number>();
           let userTurn = 0;
-          let lastUserDisplayIdx = -1;
           for (let j = 0; j < display.length; j++) {
             if (display[j].role === "user") {
               userTurnByIdx.set(j, ++userTurn);
-              lastUserDisplayIdx = j;
             }
           }
-          return display.map((m, i) => {
+          const renderAt = (i: number) => {
+          const m = display[i];
           const isAssistant = m.role === "assistant";
           const isStreamingThis = isAssistant && i === display.length - 1 && streaming !== null;
           const blocks = isAssistant ? extractCodeBlocks(m.content) : [];
@@ -4060,33 +4060,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             );
           }
           const dimmedByScrub = scrubIndex !== null && i > scrubIndex;
-          if (m.role === "user") {
-            const isLatestUser = i === lastUserDisplayIdx;
-            return (
-              <div
-                key={i}
-                className={`ai-msg ai-msg-user${isLatestUser ? " ai-msg-user-latest" : ""}${dimmedByScrub ? " ai-msg-scrubbed-past" : ""}`}
-                data-anchor-idx={i}
-                data-anchor-role="user"
-                data-anchor-preview={m.content.slice(0, 120)}
-              >
-                <UserMessageBar
-                  content={m.content}
-                  images={m.images}
-                  zIndex={userTurnByIdx.get(i) ?? 1}
-                  actionsDisabled={streaming !== null || runningTools}
-                  showBranch={!!aiChatId}
-                  onCopy={() => {
-                    void navigator.clipboard.writeText(m.content);
-                    toastSuccess("Copied to clipboard");
-                  }}
-                  onRegen={() => void regenerateFrom(i)}
-                  onBranch={() => branchFromHere(i)}
-                  onImageClick={(img) => void openZoom(img)}
-                />
-              </div>
-            );
-          }
+          if (m.role === "user") return null;
           const composeFileCalls =
             m.role === "assistant" && m.tool_calls
               ? m.tool_calls.filter((c) => extractEditDiffs(c) !== null)
@@ -4332,7 +4306,44 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
               )}
             </div>
           );
-          });
+          };
+          const turns = groupChatTurns(display);
+          return turns.map((turn) => (
+            <div
+              key={turn.userIdx ?? `lead-${turn.followIdxs[0] ?? 0}`}
+              className="ai-turn"
+            >
+              {turn.userIdx !== null && (() => {
+                const i = turn.userIdx;
+                const m = display[i];
+                const dimmed = scrubIndex !== null && i > scrubIndex;
+                return (
+                  <div
+                    className={`ai-msg ai-msg-user${dimmed ? " ai-msg-scrubbed-past" : ""}`}
+                    style={{ zIndex: userTurnByIdx.get(i) ?? 1 }}
+                    data-anchor-idx={i}
+                    data-anchor-role="user"
+                    data-anchor-preview={m.content.slice(0, 120)}
+                  >
+                    <UserMessageBar
+                      content={m.content}
+                      images={m.images}
+                      actionsDisabled={streaming !== null || runningTools}
+                      showBranch={!!aiChatId}
+                      onCopy={() => {
+                        void navigator.clipboard.writeText(m.content);
+                        toastSuccess("Copied to clipboard");
+                      }}
+                      onRegen={() => void regenerateFrom(i)}
+                      onBranch={() => branchFromHere(i)}
+                      onImageClick={(img) => void openZoom(img)}
+                    />
+                  </div>
+                );
+              })()}
+              {turn.followIdxs.map((i) => renderAt(i))}
+            </div>
+          ));
         })()}
         {pendingPermission && (
           <PermissionCard

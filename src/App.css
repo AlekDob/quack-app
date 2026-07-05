@@ -8116,18 +8116,25 @@ body.ws-dragging * {
   align-items: center;
   gap: 4px;
 }
-/* User message bar — Cursor-style: inset card, sticky on the active turn only. */
+/* User message bar — Cursor-style: sticky for the whole turn. */
+.ai-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
 .ai-msg-user {
-  align-items: stretch;
-  width: 100%;
-}
-.ai-msg-user:not(.ai-msg-user-latest) .ai-user-bar {
-  position: relative;
-  top: auto;
-}
-.ai-user-bar {
   position: sticky;
   top: 0;
+  align-items: stretch;
+  width: 100%;
+  flex-shrink: 0;
+  padding-bottom: 2px;
+  background: var(--chat-stream-bg);
+  /* transform on .ai-msg breaks position:sticky */
+  animation: none;
+}
+.ai-user-bar {
   display: flex;
   align-items: center;
   gap: 4px;
@@ -8136,6 +8143,7 @@ body.ws-dragging * {
   background: var(--bg-hi);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--bg) 55%, transparent);
 }
 .ai-user-bar-main {
   flex: 1;

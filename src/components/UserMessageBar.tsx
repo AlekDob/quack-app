@@ -6,7 +6,6 @@ type ChatImage = { path: string; name: string; thumb: string };
 type Props = {
   content: string;
   images?: ChatImage[];
-  zIndex: number;
   actionsDisabled: boolean;
   showBranch: boolean;
   onCopy: () => void;
@@ -65,7 +64,6 @@ function UserBarActions({
 export function UserMessageBar({
   content,
   images,
-  zIndex,
   actionsDisabled,
   showBranch,
   onCopy,
@@ -74,7 +72,7 @@ export function UserMessageBar({
   onImageClick,
 }: Props) {
   return (
-    <div className="ai-user-bar" style={{ zIndex }}>
+    <div className="ai-user-bar">
       <div className="ai-user-bar-main">
         {images && images.length > 0 && (
           <div className="ai-msg-images">

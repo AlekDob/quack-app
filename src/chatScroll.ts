@@ -1,6 +1,30 @@
 // Cursor-style chat scroll: pin the active user turn at the top of the
 // viewport on send so the response streams into the space below.
 
+export interface ChatTurnGroup {
+  userIdx: number | null;
+  followIdxs: number[];
+}
+
+/** Group flat messages into turns (user prompt + following assistant/tool msgs). */
+export function groupChatTurns(
+  display: ReadonlyArray<{ role: string }>,
+): ChatTurnGroup[] {
+  const turns: ChatTurnGroup[] = [];
+  let current: ChatTurnGroup | null = null;
+  for (let i = 0; i < display.length; i++) {
+    if (display[i].role === "user") {
+      if (current) turns.push(current);
+      current = { userIdx: i, followIdxs: [] };
+    } else {
+      if (!current) current = { userIdx: null, followIdxs: [] };
+      current.followIdxs.push(i);
+    }
+  }
+  if (current) turns.push(current);
+  return turns;
+}
+
 const NEAR_BOTTOM_PX = 60;
 const PIN_TOP_GAP_PX = 8;
 
