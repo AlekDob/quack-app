@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-06-29
+last_verified: 2026-07-05
 tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog, rust, performance]
 ---
 
@@ -36,7 +36,7 @@ tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog
 | stdin writer | write prompt, drop pipe → EOF | takes `child.stdin` |
 | stdout reader | `read_line` loop → emit `{kind:"line"}` + buffer | takes `child.stdout` |
 | stderr reader | same → `{kind:"stderr"}` | takes `child.stderr` |
-| watchdog | every 5s; if idle > `IDLE_TIMEOUT` (120s) after first event → `kill_process_tree(pid)` | NO (pid + `AtomicBool finished`) |
+| watchdog | every 5s; if idle > `IDLE_TIMEOUT` (600s) after first event → `kill_process_tree(pid)` | NO (pid + `AtomicBool finished`) |
 | wait | `child.wait()` → emit `{kind:"end"}`, set `buf.ended`, remove pid | **owns** the `Child` |
 
 ### Stop / kill flow (the fix)
@@ -56,5 +56,17 @@ tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog
   Breadcrumb in code: `// Brain: claude-stop-kills-process-group`.
 - **Process-group caveat:** a grandchild that calls `setsid` itself escapes the group; in practice Claude Code's tool subprocesses stay in-group, so this covers the real cases.
 - **`active_sessions` stays honest:** `claude_code_kill` does NOT remove the map entry — the wait thread removes it on actual exit, so the hub's "working" indicator clears only once the process is truly gone.
-- **Watchdog handles the upstream hang** (anthropics/claude-code#1920): a run that streams then goes silent > 120s is force-closed via the same group kill so the frontend never spins forever.
+- **Watchdog handles the upstream hang** (anthropics/claude-code#1920): a run that streams then goes silent > 600s is force-closed via the same group kill so the frontend never spins forever. Shorter values killed legitimate long Bash/deploy runs with no CLI output.
 - The chat permission mode (Auto / Auto-edit / Bypass) is a separate concern — see [015-claude-permission-mode.md](015-claude-permission-mode.md).
+
+### Per-turn knobs (effort, permission mode, thinking)
+
+Forwarded from `AIChatPanel` → `claudeCodeProvider.chat()` → `claude_code_chat` on every spawn (Claude Code only).
+
+| Knob | Frontend state | CLI flag | Default / persistence |
+|---|---|---|---|
+| **Effort** | `ccEffort: string` | `--effort {low\|medium\|high\|xhigh\|max}` | **medium**; `localStorage` `lcp.claudeCode.effort`. Rust whitelist drops unknown values. UI: `EffortPopover.tsx` — see `022-chat-composer.md`. |
+| **Permission mode** | `ccPermMode: string \| null` | `--permission-mode …` | Ask (`null`); `lcp.claudeCode.permMode`. See `015`. |
+| **Extended thinking** | `ccThinking: boolean \| null` | passed when set | `null` = CLI auto; per-chat only (not persisted). |
+
+`/effort` slash command and composer `Ctrl+1–5` both write `ccEffort` + storage. `/effort off` resets to **medium**, not CLI default.

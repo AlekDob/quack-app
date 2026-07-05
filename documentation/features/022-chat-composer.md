@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-03
+last_verified: 2026-07-05
 tags: [chat, composer, input, subagent, dictation, effort, ux]
 ---
 
@@ -32,7 +32,7 @@ mode/mic/send on the right.
 - **Left group:** `+` attach (`.ai-attach-btn`) + subagent pill. `.ai-composer-spacer` splits.
 - **Right group:** model chip · effort · permission mode · mic · send.
 - **Uniform pills** (`.ai-composer-shell` scope): model chip / effort / mode / context indicator all 28px height, `radius-full`, 11px, weight 500, shared hover. Send + stop are 28×28 icon buttons (send = `arrow-up` on monochrome `--primary-bg`, stop = `stop` on red).
-- **Hint row** (`.ai-composer-hint`): `@ mentions · / commands · Shift+Enter for newline · ↑ to recall`, shown only when the input is empty and idle.
+- **Hint row** (`.ai-composer-hint`): `@ mentions · / commands · Ctrl+1–5 effort` (Claude Code only) · `Shift+Enter for newline · ↑ to recall`, shown only when the input is empty and idle.
 - Placeholder is dynamic: `Message {activeAgent?.name ?? "Jack"}…`.
 
 ## Subagent pill (feature 004 integration)
@@ -42,11 +42,55 @@ mode/mic/send on the right.
 
 ## Effort + thinking (one control)
 
-- Pill shows `effort: {label}`; the value span has a fixed `min-width` (`.ai-effort-cur`) so the pill never resizes as effort changes — otherwise the whole right group (and the popover) would drift.
-- Popover (`.ai-effort-pop`, astronave-style surface, opens upward) holds:
-  - **Effort slider** (Claude-desktop-style) Faster→Smarter over `default/low/medium/high/xhigh/max`, `accent-color: --fg`. Index 0 = default (null).
-  - **Extended thinking** segmented `auto / on / off`.
+Claude Code only. Full bridge detail (`--effort` whitelist, spawn wiring): `014-claude-code-bridge.md`.
+
+### Visual meter (toolbar pill)
+
+- Replaced the old text pill (`effort: {label}` + fixed `.ai-effort-cur` min-width) with a **compact signal-strength meter** (`.ai-effort-meter`): five vertical bars (`.ai-effort-bar-1`…`-5`, heights 4–11px). Lit bars = current level; chevron opens the popover.
+- Button: `.ai-effort-btn` — `radius-full`, 11px, same 28px uniform pill as model/mode (`.ai-composer-shell` scope).
+
+### Levels + default
+
+| Index | Level | Maps to |
+|---|---|---|
+| 1 | Low | `--effort low` |
+| 2 | **Medium** | `--effort medium` (**app default**) |
+| 3 | High | `--effort high` |
+| 4 | xHigh | `--effort xhigh` |
+| 5 | Max | `--effort max` |
+
+- **No CLI "default" slot** on the slider — the old index-0 `default`/`null` (omit `--effort`) was removed. Quack always sends an explicit level; fresh installs and `/effort off` reset to **medium**.
+- **Persistence:** `localStorage` key `lcp.claudeCode.effort` (same pattern as `lcp.claudeCode.permMode`). Survives tab switches, new chats, and app restarts. `AIChatPanel` seeds `ccEffort` from storage on mount and writes back in a `useEffect`.
+- Shared constants live in `EffortPopover.tsx`: `CC_EFFORTS`, `CC_EFFORT_DEFAULT`, `normalizeCcEffort()`.
+
+### Popover (`.ai-effort-pop`)
+
+- Portaled with **fixed coordinates** (escapes `.ai-panel { overflow: hidden }`). Position computed from the anchor button via `useLayoutEffect` + `clampPopPos`.
+- **Effort slider** (Claude-desktop-style) Faster→Smarter over the five levels; `accent-color: --fg`.
+- **Extended thinking** segmented `auto / on / off` (`ccThinking`: `null | true | false`).
 - Replaced the two separate `MetaFlag` pills + the ⚙ tune gate (both removed).
+
+### Compose reminder (typing + shortcuts)
+
+Users often forget the active effort level mid-compose. Reminder is **non-blocking** (`pointer-events: none`).
+
+| Trigger | Behaviour |
+|---|---|
+| First keystroke | Composer goes from empty → non-empty (`onChange` in `AIChatPanel`) → `bumpEffortPulse()` increments `pulseToken` passed to `EffortPopover`. |
+| `Ctrl+1` … `Ctrl+5` | Sets effort to levels 1–5 (Claude Code + composer focused). Toast + pulse. `meta`/`alt`/`shift` modifiers ignored. |
+
+When `pulseToken` bumps:
+
+1. **Button pulse** — `.ai-effort-btn.pulse`: border/background highlight (`ai-effort-pulse`, ~1.1s). Active bars briefly flash `--warn` (`ai-effort-bar-pulse`).
+2. **Floating label** — `.ai-effort-flash-label` above the meter (e.g. `Medium`): fade/slide in, hold ~0.4s, float up and out (`ai-effort-label-flash`, ~1.35s). `key={pulseToken}` restarts the animation; `onAnimationEnd` unmounts.
+
+Tooltip on the meter button: `Effort: {label} · Thinking: {auto|on|off} — Ctrl+1–5 to switch`.
+
+### Slash command `/effort`
+
+- `/effort low|medium|high|xhigh|max` — sets level + toast.
+- `/effort off` or `/effort default` — resets to **medium** (not CLI default).
+- Value submenu when typing `/effort ` (no arg typing needed).
 
 ## Plan chip (todos)
 

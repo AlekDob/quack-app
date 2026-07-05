@@ -10,7 +10,13 @@ import { flushSync } from "react-dom";
 import { Icon } from "./Icon";
 import { SubagentPill } from "./SubagentPill";
 import { ComposerMic } from "./ComposerMic";
-import { EffortPopover } from "./EffortPopover";
+import {
+  CC_EFFORT_DEFAULT,
+  CC_EFFORTS,
+  EffortPopover,
+  normalizeCcEffort,
+  type CcEffort,
+} from "./EffortPopover";
 import { ChatNavRail } from "./ChatNavRail";
 import { TurnStreamStatus } from "./TurnStreamStatus";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -113,6 +119,17 @@ import {
   writeProviderSessionIds,
 } from "../providerSession";
 import type { ProviderId } from "../providers/types";
+import {
+  buildSessionUsageLocal,
+  normUsagePct,
+  parseUsageExtra,
+  parseUsageLimits,
+} from "../sessionUsageLocal";
+import {
+  contextFillPct,
+  estimateContextUsed,
+  resolveContextWindow,
+} from "../contextUsage";
 import { SessionUsageCircle } from "./SessionUsageCircle";
 import {
   SessionUsageDrawer,
@@ -201,6 +218,11 @@ const BUDGET_KEY = "lcp.claudeCode.budgetUsd";
 // restarts. Empty / missing = Ask (null). See permModeStore for how the mode
 // reaches the permission overlay.
 const PERM_MODE_KEY = "lcp.claudeCode.permMode";
+// Last-used Claude Code effort level — sticks across tabs and restarts.
+const EFFORT_KEY = "lcp.claudeCode.effort";
+function readEffort(): string {
+  return normalizeCcEffort(lsGetString(EFFORT_KEY));
+}
 function readBudgetUsd(): number {
   const raw = lsGetString(BUDGET_KEY);
   if (!raw) return 0;
@@ -348,6 +370,14 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       cacheCreate: number;
     };
   } | null>(null);
+  // Last non-empty context ring reading — kept visible while a new turn
+  // is in flight so the circle doesn't flash empty before usage arrives.
+  const pinnedContextRef = useRef<{
+    pct: number;
+    used: number;
+    window: number;
+    estimate: boolean;
+  } | null>(null);
   // Latest TodoWrite snapshot from the agent, rendered as a sticky
   // checklist above the chat. Per Shrivu Shankar — "the todo list is
   // the most informative single artifact of an agent run". Updated
@@ -470,7 +500,27 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const [cumulativeCacheRead, setCumulativeCacheRead] = useState(0);
   const [cumulativeTurns, setCumulativeTurns] = useState(0);
   const [sessionStartTs] = useState(() => Date.now());
-  const sessionDurationMs = Date.now() - sessionStartTs;
+  // Pin the ring fill across in-flight turns (context or plan %).
+  const pinnedRingRef = useRef(0);
+  const planCacheRef = useRef<{
+    sessionPct: number;
+    sessionResetsAt: string | null;
+    limits: SessionUsageData["limits"];
+    extra: SessionUsageData["extra"];
+  } | null>(null);
+  const usageMetricsRef = useRef({
+    wsId,
+    selected,
+    allModels,
+    chatTotalCost: 0,
+    cumulativeTokensIn: 0,
+    cumulativeTokensOut: 0,
+    cumulativeCacheRead: 0,
+    cumulativeTurns: 0,
+    assistantTurns: 0,
+    lastUsage: null as typeof lastUsage,
+    sessionStartTs: Date.now(),
+  });
   // Toggle: has the user been warned about the budget for this chat
   // yet? Avoids spamming the toast every turn once they cross.
   const [budgetWarned, setBudgetWarned] = useState(false);
@@ -1389,8 +1439,14 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     Array<{ name: string; hint: string }>
   >([]);
   // Per-chat Claude Code session knobs, set via /effort and /mode.
-  // Applied to every subsequent spawn; null = CLI default.
-  const [ccEffort, setCcEffort] = useState<string | null>(null);
+  // Applied to every subsequent spawn. Persisted globally like perm mode.
+  const [ccEffort, setCcEffort] = useState<string>(() => readEffort());
+  const [effortPulseToken, setEffortPulseToken] = useState(0);
+  const bumpEffortPulse = () => setEffortPulseToken((n) => n + 1);
+  const applyCcEffort = (v: CcEffort, toast = true) => {
+    setCcEffort(v);
+    if (toast) toastInfo(`Effort: ${v} (from your next message)`);
+  };
   // Per-chat permission mode. null = Ask (card on every edit/command — the
   // safe default and what a fresh install gets). The chosen mode is the ONLY
   // thing that drives auto-allow: ClaudePermissionOverlay reads it via
@@ -1409,6 +1465,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     lsSetString(PERM_MODE_KEY, ccPermMode ?? "");
     setPermMode({ sessionId: claudeSessionId, cwd: root }, ccPermMode);
   }, [ccPermMode, claudeSessionId, root]);
+  useEffect(() => {
+    lsSetString(EFFORT_KEY, ccEffort);
+  }, [ccEffort]);
 
   // Argument submenu for /effort, /mode and /thinking: once the command
   // name is complete ("/effort "), the slash window switches to the
@@ -1422,9 +1481,8 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     const partial = (parts[1] ?? "").toLowerCase();
     if (fw === "/effort") {
       const opts: Array<[string, string]> = [
-        ["off", "Claude Code's default effort"],
         ["low", "Fastest — minimal reasoning"],
-        ["medium", "Balanced"],
+        ["medium", "Balanced (default)"],
         ["high", "More reasoning"],
         ["xhigh", "Heavy reasoning"],
         ["max", "Maximum reasoning"],
@@ -1433,19 +1491,8 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         .filter(([o]) => o.startsWith(partial))
         .map(([o, h]) => ({
           name: `/effort ${o}`,
-          hint:
-            h +
-            ((o === "off" ? ccEffort === null : ccEffort === o)
-              ? "  ✓ current"
-              : ""),
-          run: () => {
-            setCcEffort(o === "off" ? null : o);
-            toastInfo(
-              o === "off"
-                ? "Effort reset to default"
-                : `Effort: ${o} (applies from the next message)`,
-            );
-          },
+          hint: h + (ccEffort === o ? "  ✓ current" : ""),
+          run: () => applyCcEffort(o as CcEffort),
         }));
     }
     if (fw === "/mode") {
@@ -2223,9 +2270,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           // active when the turn fires (multi-workspace isolation).
           root,
           // Per-chat /effort, /mode and /thinking knobs (Claude Code only).
-          selectedProvider === "claude-code"
-            ? (ccEffort ?? undefined)
-            : undefined,
+          selectedProvider === "claude-code" ? ccEffort : undefined,
           selectedProvider === "claude-code"
             ? (ccPermMode ?? undefined)
             : undefined,
@@ -2731,6 +2776,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // were repeating these four lines and drifting in subtle ways
   // (one branch missed setLastUsage, another missed setTodos…).
   const resetTurnTransients = () => {
+    pinnedContextRef.current = null;
     setLastUsage(null);
     setTodos(null);
     // Task-id mapping follows the checklist's lifetime — stale indices
@@ -2916,96 +2962,119 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const [sessionUsage, setSessionUsage] = useState<SessionUsageData | null>(
     null,
   );
+  const [sessionLimitsError, setSessionLimitsError] = useState<string | null>(
+    null,
+  );
   // Cache the five_hour pct + resetsAt separately for the circle (avoids
   // re-parsing the full SessionUsageData on every 30s tick).
   const [sessionPct, setSessionPct] = useState(0);
   const [sessionResetsAt, setSessionResetsAt] = useState<string | null>(null);
   const [_sdOpen, setSessionDrawerOpen] = useState(false);
 
-  // Poll claude_usage_limits every 30s while Claude Code is selected.
-  // (selectedIsCC is already derived above.)
+  usageMetricsRef.current = {
+    wsId,
+    selected,
+    allModels,
+    chatTotalCost,
+    cumulativeTokensIn,
+    cumulativeTokensOut,
+    cumulativeCacheRead,
+    cumulativeTurns,
+    assistantTurns: messages.filter((m) => m.role === "assistant").length,
+    lastUsage,
+    sessionStartTs,
+  };
+
+  const buildUsageFromMetrics = () => {
+    const m = usageMetricsRef.current;
+    return buildSessionUsageLocal({
+      wsId: m.wsId,
+      chat: {
+        cost: m.chatTotalCost,
+        tokensIn: m.cumulativeTokensIn,
+        tokensOut: m.cumulativeTokensOut,
+        cacheRead: m.cumulativeCacheRead,
+        turns: m.cumulativeTurns || m.assistantTurns,
+        model: m.lastUsage?.model ?? null,
+        durationMs: Date.now() - m.sessionStartTs,
+      },
+      selectedQualified: m.selected,
+      models: m.allModels,
+      lastTurnTokens: m.lastUsage?.tokens,
+    });
+  };
+
+  // Refresh local drawer/circle data when chat metrics change — no API.
+  useEffect(() => {
+    if (!selectedIsCC) {
+      setSessionUsage(null);
+      setSessionLimitsError(null);
+      setSessionPct(0);
+      setSessionResetsAt(null);
+      planCacheRef.current = null;
+      return;
+    }
+    const cache = planCacheRef.current;
+    setSessionUsage({
+      ...buildUsageFromMetrics(),
+      limits: cache?.limits ?? [],
+      extra: cache?.extra ?? null,
+    });
+  }, [
+    selectedIsCC,
+    wsId,
+    selected,
+    allModels,
+    chatTotalCost,
+    cumulativeTokensIn,
+    cumulativeTokensOut,
+    cumulativeCacheRead,
+    cumulativeTurns,
+    lastUsage,
+    messages.length,
+    sessionStartTs,
+  ]);
+
+  // Poll plan limits every 30s — deps stay minimal so we don't 429.
   useEffect(() => {
     if (!selectedIsCC) return;
+
     const poll = async () => {
+      const local = buildUsageFromMetrics();
       try {
-        const res = await invoke<{
-          usage?: Record<
-            string,
-            { utilization?: number; resets_at?: string | null } | null
-          > & {
-            extra_usage?: {
-              is_enabled?: boolean;
-              monthly_limit?: number;
-              used_credits?: number;
-              utilization?: number;
-              currency?: string;
-            } | null;
-          };
-        }>("claude_usage_limits");
-        const u = res.usage ?? {};
-
-        // Five-hour window (used by the circle)
+        const res = await invoke<{ usage?: Record<string, unknown> }>(
+          "claude_usage_limits",
+        );
+        const u = (res.usage ?? {}) as Parameters<typeof parseUsageLimits>[0];
+        const limits = parseUsageLimits(u);
+        const extra = parseUsageExtra(u);
         const fh = u.five_hour;
+        let pct = 0;
+        let resetsAt: string | null = null;
         if (fh && typeof fh.utilization === "number") {
-          setSessionPct(fh.utilization);
-          setSessionResetsAt(fh.resets_at ?? null);
+          pct = normUsagePct(fh.utilization);
+          resetsAt = fh.resets_at ?? null;
         }
-
-        // Full data for the drawer
-        const limits: SessionUsageData["limits"] = [];
-        const windows: Array<[string, string]> = [
-          ["five_hour", "Session (5hr)"],
-          ["seven_day", "Weekly (7 day)"],
-          ["seven_day_sonnet", "Weekly Sonnet"],
-          ["seven_day_opus", "Weekly Opus"],
-        ];
-        for (const [key, label] of windows) {
-          const w = u[key];
-          if (w && typeof w.utilization === "number") {
-            limits.push({
-              label,
-              pct: w.utilization,
-              resetsAt: w.resets_at ?? null,
-            });
-          }
+        planCacheRef.current = { sessionPct: pct, sessionResetsAt: resetsAt, limits, extra };
+        setSessionPct(pct);
+        setSessionResetsAt(resetsAt);
+        setSessionLimitsError(null);
+        setSessionUsage({ ...local, limits, extra });
+      } catch (e) {
+        setSessionLimitsError(errMsg(e));
+        const cache = planCacheRef.current;
+        if (cache) {
+          setSessionPct(cache.sessionPct);
+          setSessionResetsAt(cache.sessionResetsAt);
         }
-        const ex = u.extra_usage;
-        const extra: SessionUsageData["extra"] =
-          ex?.is_enabled && typeof ex.used_credits === "number"
-            ? {
-                used: ex.used_credits,
-                limit: ex.monthly_limit ?? 0,
-                pct: ex.utilization ?? 0,
-                currency: ex.currency ?? "USD",
-              }
-            : null;
-
-        // Merge with local state
-        const records = loadUsage();
-        const todayKey = new Date().toDateString();
         setSessionUsage({
-          limits,
-          extra,
-          chat: {
-            cost: chatTotalCost,
-            tokensIn: cumulativeTokensIn,
-            tokensOut: cumulativeTokensOut,
-            cacheRead: cumulativeCacheRead,
-            turns: cumulativeTurns,
-            model: lastUsage?.model ?? null,
-            durationMs: sessionDurationMs,
-          },
-          wsMonth: thisMonthWorkspaceTotal(wsId, records),
-          month: thisMonthTotal(records),
-          today: records
-            .filter((r) => new Date(r.ts).toDateString() === todayKey)
-            .reduce((a, r) => a + r.costUsd, 0),
+          ...local,
+          limits: cache?.limits ?? [],
+          extra: cache?.extra ?? null,
         });
-      } catch {
-        // Silently ignore — limits unavailable (offline, no auth, etc.)
       }
     };
-    // Initial fetch
+
     poll();
     const t = window.setInterval(poll, 30_000);
     return () => window.clearInterval(t);
@@ -3160,7 +3229,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     if (cmd.action === "effort") {
       const arg = input.split(/\s+/)[1]?.toLowerCase() ?? "";
       setInput("");
-      const levels = ["low", "medium", "high", "xhigh", "max"];
+      const levels = [...CC_EFFORTS];
       if (!arg) {
         // No argument — reopen as the value submenu so the user picks
         // from a list instead of reading a syntax toast.
@@ -3170,11 +3239,11 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         return;
       }
       if (arg === "off" || arg === "default") {
-        setCcEffort(null);
-        toastInfo("Effort reset to Claude Code's default");
+        setCcEffort(CC_EFFORT_DEFAULT);
+        toastInfo(`Effort: ${CC_EFFORT_DEFAULT} (applies from the next message)`);
         return;
       }
-      if (!levels.includes(arg)) {
+      if (!levels.includes(arg as (typeof levels)[number])) {
         toastError(`Unknown effort "${arg}" — use ${levels.join("|")}`);
         return;
       }
@@ -3553,27 +3622,29 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     streamingToolResults,
   ]);
 
-  // Label for the "attach editor context" chip. Phrased as what Claude
-  // WILL receive, so the chip reads as a clear state (paired with an
-  // ON/OFF pill), not an ambiguous verb.
-  const contextLabel = useMemo(() => {
-    const base = editorState.filePath
-      ? editorState.filePath.replace(/\\/g, "/").split("/").pop() ??
-        editorState.filePath
-      : null;
-    if (!attachContext) {
-      // Still name the file so the user knows what turning it ON would send.
-      return base ? `Editor: ${base} not attached` : "Editor context off";
-    }
-    if (editorState.selectionText.length > 0 && editorState.selectionLines > 0) {
+  // Compact editor-context chip above the composer — filename only (full
+  // explanation lives in the chip tooltip).
+  const editorFileBase = useMemo(() => {
+    if (!editorState.filePath) return null;
+    return (
+      editorState.filePath.replace(/\\/g, "/").split("/").pop() ??
+      editorState.filePath
+    );
+  }, [editorState.filePath]);
+
+  const contextChipLabel = useMemo(() => {
+    if (
+      attachContext &&
+      editorState.selectionText.length > 0 &&
+      editorState.selectionLines > 0
+    ) {
       const n = editorState.selectionLines;
-      return `Attaching ${n} selected line${n === 1 ? "" : "s"}`;
+      return `${n} ln`;
     }
-    if (base) return `Attaching file: ${base}`;
-    return null;
+    return editorFileBase;
   }, [
     attachContext,
-    editorState.filePath,
+    editorFileBase,
     editorState.selectionText,
     editorState.selectionLines,
   ]);
@@ -3740,6 +3811,45 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     if (h < 48) return `${Math.floor(h)}h ${Math.ceil((h % 1) * 60)}m`;
     return `${Math.ceil(h / 24)}d`;
   };
+
+  const contextSnap = useMemo(() => {
+    const window = resolveContextWindow(selected, allModels);
+    const { used, estimate } = estimateContextUsed(
+      lastUsage?.tokens,
+      cumulativeTokensIn,
+      cumulativeCacheRead,
+    );
+    return {
+      pct: contextFillPct(used, window),
+      used,
+      window,
+      estimate,
+    };
+  }, [
+    selected,
+    allModels,
+    lastUsage,
+    cumulativeTokensIn,
+    cumulativeCacheRead,
+  ]);
+
+  const displayContextSnap = useMemo(() => {
+    if (contextSnap.pct > 0 || contextSnap.used > 0) {
+      pinnedContextRef.current = contextSnap;
+      return contextSnap;
+    }
+    return pinnedContextRef.current ?? contextSnap;
+  }, [contextSnap]);
+
+  const displayRingPct = useMemo(() => {
+    const fresh =
+      displayContextSnap.pct > 0 ? displayContextSnap.pct : sessionPct;
+    if (fresh > 0) {
+      pinnedRingRef.current = fresh;
+      return fresh;
+    }
+    return pinnedRingRef.current;
+  }, [displayContextSnap.pct, sessionPct]);
 
   return (
     <SubagentOpen.Provider value={openSubagentTab}>
@@ -4671,12 +4781,48 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           </div>
         </div>
       )}
+      {/* Editor file/selection context — compact pill above the composer. */}
+      {editorFileBase && contextChipLabel && (
+        <div className="ai-context-dock">
+          <button
+            type="button"
+            className={`ai-context-chip ${attachContext ? "" : "off"}`}
+            title={
+              attachContext
+                ? editorState.selectionLines > 0
+                  ? `ON — ${editorState.selectionLines} selected line${editorState.selectionLines === 1 ? "" : "s"} from ${editorFileBase} sent with every message. Click to turn OFF.`
+                  : `ON — ${editorFileBase} sent with every message (no Read needed). Click to turn OFF.`
+                : `OFF — ${editorFileBase} not attached. Click to turn ON.`
+            }
+            onClick={() => setAttachContext((v) => !v)}
+          >
+            <span className="ai-context-dot" />
+            <span className="ai-context-chip-label">{contextChipLabel}</span>
+            <span className="ai-context-chip-toggle">
+              {attachContext ? "ON" : "OFF"}
+            </span>
+          </button>
+        </div>
+      )}
       {/* Cursor-style composer: one pill. CSS `order` puts the textarea
           row on top and the controls (model/effort/thinking) below;
           permission/queue cards float to the top when present. */}
       <div className="ai-composer-shell">
+      {selectedIsCC && (
+        <div className="ai-context-ring-dock">
+          <SessionUsageCircle
+            pct={displayRingPct}
+            contextPct={displayContextSnap.pct}
+            contextUsed={displayContextSnap.used}
+            contextWindow={displayContextSnap.window}
+            contextEstimate={displayContextSnap.estimate}
+            planPct={sessionPct}
+            planResetsIn={fmtResetsIn(sessionResetsAt)}
+            onClick={() => setSessionDrawerOpen(true)}
+          />
+        </div>
+      )}
       <div className="ai-composer-meta">
-        {/* Left group: attach + subagent target (who the message goes to). */}
         <button
           type="button"
           className="ai-attach-btn"
@@ -4695,51 +4841,22 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         <div className="ai-composer-spacer" />
         {renderModelChip()}
         {parseQualifiedModel(selected)?.providerId === "claude-code" && (
-          <>
-            <EffortPopover
-              effort={ccEffort}
-              onEffort={(v) => {
-                setCcEffort(v);
-                toastInfo(
-                  v ? `Effort: ${v} (from your next message)` : "Effort: default",
-                );
-              }}
-              thinking={ccThinking}
-              onThinking={(v) => {
-                setCcThinking(v);
-                toastInfo(
-                  v === null
-                    ? "Extended thinking: auto"
-                    : v
-                      ? "Extended thinking: on (from your next message)"
-                      : "Extended thinking: off (from your next message)",
-                );
-              }}
-            />
-            <SessionUsageCircle
-              pct={sessionPct}
-              resetsIn={fmtResetsIn(sessionResetsAt)}
-              onClick={() => setSessionDrawerOpen(true)}
-            />
-          </>
-        )}
-        {contextLabel && (
-          <button
-            type="button"
-            className={`ai-context-indicator ${attachContext ? "" : "off"}`}
-            title={
-              attachContext
-                ? "ON — the file (or selection) open in your editor is sent to Claude with every message, so it sees it without a Read. Click to turn OFF."
-                : "OFF — your messages don't include the open file. Turn ON to attach the file/selection you're viewing (Claude can still Read files on its own). Click to turn ON."
-            }
-            onClick={() => setAttachContext((v) => !v)}
-          >
-            <span className="ai-context-dot" />
-            <span className="ai-context-text">{contextLabel}</span>
-            <span className="ai-context-toggle">
-              {attachContext ? "ON" : "OFF"}
-            </span>
-          </button>
+          <EffortPopover
+            effort={ccEffort}
+            pulseToken={effortPulseToken}
+            onEffort={(v) => applyCcEffort(v)}
+            thinking={ccThinking}
+            onThinking={(v) => {
+              setCcThinking(v);
+              toastInfo(
+                v === null
+                  ? "Extended thinking: auto"
+                  : v
+                    ? "Extended thinking: on (from your next message)"
+                    : "Extended thinking: off (from your next message)",
+              );
+            }}
+          />
         )}
         {selectedIsCC && (
           <div className="ai-mode-wrap">
@@ -4995,6 +5112,9 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           onChange={(e) => {
             const v = e.target.value;
             const cursor = e.target.selectionStart ?? v.length;
+            if (selectedIsCC && input.length === 0 && v.length > 0) {
+              bumpEffortPulse();
+            }
             setInput(v);
             setSlashIndex(0);
             // Any user-driven change (typing, paste) takes us out of
@@ -5038,6 +5158,21 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
               e.preventDefault();
               setAttachedImages([]);
               return;
+            }
+            if (
+              selectedIsCC &&
+              e.ctrlKey &&
+              !e.metaKey &&
+              !e.altKey &&
+              !e.shiftKey
+            ) {
+              const slot = Number(e.key);
+              if (slot >= 1 && slot <= CC_EFFORTS.length) {
+                e.preventDefault();
+                applyCcEffort(CC_EFFORTS[slot - 1]);
+                bumpEffortPulse();
+                return;
+              }
             }
             // @-mention popover navigation takes precedence over the
             // slash-command popover (they can't both be active — slash
@@ -5233,6 +5368,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
             <div className="ai-composer-hint" aria-hidden="true">
               <span>@ mentions</span>
               <span>/ commands</span>
+              {selectedIsCC && <span>Ctrl+1–5 effort</span>}
               <span>Shift+Enter for newline</span>
               <span>↑ to recall</span>
             </div>
@@ -5399,6 +5535,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     <SessionUsageDrawer
       open={_sdOpen}
       data={sessionUsage}
+      limitsError={sessionLimitsError}
       onClose={() => setSessionDrawerOpen(false)}
       onOpenDashboard={() => {
         setSessionDrawerOpen(false);
