@@ -14,6 +14,9 @@
   /* Chat stream column — slightly lifted from chrome so the center reads
      as the primary surface between side rails/panels. */
   --chat-stream-bg: #181818;
+  /* User prompt card — lifted above stream so turns read at a glance. */
+  --user-bar-bg: color-mix(in srgb, var(--fg) 12%, var(--chat-stream-bg));
+  --user-bar-border: color-mix(in srgb, var(--fg) 16%, transparent);
   --fg: #f2f3f5;
   --fg-dim: rgba(242, 243, 245, 0.58);
   --fg-muted: rgba(242, 243, 245, 0.38);
@@ -112,6 +115,8 @@
   --bg-elev: #fdfdfd;
   --bg-hi: #e8e8eb;
   --chat-stream-bg: var(--bg);
+  --user-bar-bg: color-mix(in srgb, var(--fg) 5%, var(--bg-alt));
+  --user-bar-border: color-mix(in srgb, var(--fg) 10%, transparent);
   --fg: #14151a;
   --fg-dim: rgba(20, 21, 26, 0.62);
   --fg-muted: rgba(20, 21, 26, 0.42);
@@ -8139,11 +8144,11 @@ body.ws-dragging * {
   align-items: center;
   gap: 4px;
   width: 100%;
-  padding: 7px 8px 7px 10px;
-  background: var(--bg-hi);
-  border: 1px solid var(--border);
+  padding: 8px 10px 8px 12px;
+  background: var(--user-bar-bg);
+  border: 1px solid var(--user-bar-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--bg) 55%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent);
 }
 .ai-user-bar-main {
   flex: 1;

@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS (no Tailwind)
 created: 2026-06-28
-last_verified: 2026-07-03
+last_verified: 2026-07-05
 tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monochrome, macos, window, composer, cursor-style, tool-icon-tints]
 ---
 
@@ -23,7 +23,7 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 ### Token groups (`App.css` `:root`)
 | Group | Tokens |
 |-------|--------|
-| Surfaces | `--bg`, `--bg-alt`, `--bg-elev`, `--bg-hi`, `--bg-hover`, `--glass-bg` |
+| Surfaces | `--bg`, `--bg-alt`, `--bg-elev`, `--bg-hi`, `--bg-hover`, `--chat-stream-bg`, `--user-bar-bg`, `--user-bar-border`, `--glass-bg` |
 | Text | `--fg`, `--fg-dim`, `--fg-muted` |
 | Borders | `--border`, `--border-strong` |
 | Accent (NEUTRAL) | `--accent` (#9aa0ad dark / #6b7280 light), `--accent-rgb`, `--accent-hover`, `--accent-soft`, `--accent-fg` |

@@ -68,6 +68,22 @@ a tall `.ai-turn` fixes it.
   scrolling underneath does not show through the pin gap.
 - `z-index` is inline on `.ai-msg-user` (`userTurnByIdx`, 1…N per thread).
 
+### Surface tokens
+
+User cards use **dedicated tokens** so they read clearly above the chat stream
+without jumping to semantic colour or orange accent:
+
+| Token | Dark | Light | Role |
+|---|---|---|---|
+| `--user-bar-bg` | `color-mix(fg 12%, chat-stream-bg)` | `color-mix(fg 5%, bg-alt)` | Card fill — one step lifted from `--chat-stream-bg` / `--bg` |
+| `--user-bar-border` | `color-mix(fg 16%, transparent)` | `color-mix(fg 10%, transparent)` | Edge definition (stronger than `--border`) |
+
+`.ai-user-bar` also uses a 1px top hairline (`box-shadow`) instead of a heavy
+drop shadow — minimal, Cursor-like separation when content scrolls underneath.
+
+**Do not** reuse `--bg-hi` here: on dark it is only ~2% lighter than the stream
+(`#1a1b21` vs `#181818`), so user turns vanished into the transcript.
+
 ### Layout
 
 ```
@@ -80,8 +96,9 @@ a tall `.ai-turn` fixes it.
 ```
 
 - Wrapper: `.ai-msg.ai-msg-user` — nav-rail anchors unchanged (`data-anchor-*`).
-- Card: `.ai-user-bar` — full width, elevated surface (`--bg-hi`, border,
-  `radius-md`, soft shadow).
+- Card: `.ai-user-bar` — full width, dedicated surface tokens (`--user-bar-bg`,
+  `--user-bar-border`), `radius-md`, 1px hairline shadow. See **Surface tokens**
+  below.
 - Body: `.ai-user-bar-main` — `MarkdownPreview` (compact heading sizes).
 - Actions: `.ai-user-bar-actions` — `opacity: 0` at rest; revealed on
   `.ai-user-bar:hover` or `:focus-within`.
