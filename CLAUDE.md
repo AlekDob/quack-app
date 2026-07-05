@@ -150,6 +150,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `035-macos-release-notarization.md` — local signed/notarized `.dmg` pipeline (`sign-and-notarize.sh`, `.env`, Entitlements); CI macOS still unsigned.
   - `036-agent-customizations.md` — Agent Customizations footer (hub + agent mode) + tabbed modal (instructions, skills, MCP, providers, privacy).
   - `037-project-context-dock.md` — per-workspace "N files in context" pill in the composer status row (right); hover popover lists active editor attach + `@`-queued files; `workspaceChatContext.ts` + `isUnderRoot` guards prevent cross-project bleed from the global editor singleton.
+  - `039-composer-queue.md` — Cursor-style follow-up queue inside the composer pill: visible preview, `Send follow-up` placeholder, Start Multitasking (new chat parallel send / send now), auto-drain on turn end; `ComposerQueue.tsx`, optional `chatId` on `aiBus`.
   - `038-compose-review.md` — Conductor-style agent edit review: live ComposeCard recap, `crev:` diff tabs (inline Monaco + Undo/Keep), editor pane + Agent Mode 50/50 split; `composeReview.ts`, `ComposeReviewPane.tsx`.
 - `documentation/design/` — UI style contracts beyond tokens.
   - `directives.md` — hard rules (no emoji, tokens-only, neutral chrome).

@@ -2,6 +2,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -152,7 +153,8 @@ import { ManageModelsModal } from "./ManageModelsModal";
 import { loadSubagents, type SubagentDef } from "../subagents";
 import { loadSkills, type SkillDef } from "../skills";
 import { permissionFor } from "../toolPermissions";
-import { onAIPromptRequest } from "../aiBus";
+import { onAIPromptRequest, requestAIPrompt } from "../aiBus";
+import { ComposerQueue } from "./ComposerQueue";
 import { relPath } from "../pathUtils";
 import {
   groupChatTurns,
@@ -212,6 +214,8 @@ interface Props {
    * just like before.
    */
   aiChatId?: string;
+  /** Fires after the bound tab's session + messages are hydrated (agent-mode switch overlay). */
+  onHydrated?: () => void;
 }
 
 // Per-chat budget threshold in USD, persisted in localStorage. 0 =
@@ -264,7 +268,7 @@ function insertIntoActiveEditor(text: string): boolean {
   return true;
 }
 
-export function AIChatPanel({ wsId, root, aiChatId }: Props) {
+export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   // Agent mode supplies this via context to render denser (tool bursts
   // collapse to an icon row, tighter spacing). Default false → the docked
   // chat is unchanged.
@@ -1204,6 +1208,13 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     }
   }, [wsId, aiChatId]);
 
+  // Parent overlay (agent-mode chat switch) clears after first paint with
+  // the hydrated session — useLayoutEffect so we don't flash old messages.
+  useLayoutEffect(() => {
+    if (!aiChatId || !onHydrated) return;
+    onHydrated();
+  }, [wsId, aiChatId, sessionId, onHydrated]);
+
   // When sessionId changes inside a tabbed panel (e.g. via /new or the
   // history dropdown), persist it back to the descriptor so a reload
   // re-opens the same conversation.
@@ -1290,7 +1301,28 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // Queue of follow-up messages typed while a turn is in flight.
   // Drains automatically once the active turn finishes.
   const queueRef = useRef<string[]>([]);
-  const [queueLen, setQueueLen] = useState(0);
+  const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
+  const syncQueueUi = useCallback(() => {
+    setQueuedMessages([...queueRef.current]);
+  }, []);
+  const pushQueue = useCallback(
+    (text: string) => {
+      queueRef.current.push(text);
+      syncQueueUi();
+    },
+    [syncQueueUi],
+  );
+  const removeQueueAt = useCallback(
+    (index: number) => {
+      queueRef.current.splice(index, 1);
+      syncQueueUi();
+    },
+    [syncQueueUi],
+  );
+  const clearQueue = useCallback(() => {
+    queueRef.current = [];
+    syncQueueUi();
+  }, [syncQueueUi]);
   // drainQueue is a stable useCallback([]), so it MUST call the latest
   // sendUserText through a ref — the empty-deps closure captured the
   // very first render's sendUserText, whose stale `messages`/`selected`
@@ -1301,7 +1333,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const drainQueue = useCallback(async () => {
     while (queueRef.current.length > 0) {
       const next = queueRef.current.shift();
-      setQueueLen(queueRef.current.length);
+      syncQueueUi();
       if (!next) continue;
       // No aborted-check here: the previous turn's controller is
       // ALWAYS aborted/stale by drain time, and checking it silently
@@ -1310,7 +1342,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       // queue indicator's explicit Clear button, not a side effect.
       await sendUserTextRef.current?.(next);
     }
-  }, []);
+  }, [syncQueueUi]);
   // Keep the ref pointing at this render's sendUserText (defined
   // further down; the effect runs post-render so the binding exists).
   useEffect(() => {
@@ -1410,9 +1442,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       setInput("");
       setHistoryIdx(null);
       historyDraftRef.current = "";
-      queueRef.current.push(text);
-      setQueueLen(queueRef.current.length);
-      toastInfo(`Queued (${queueRef.current.length} pending)`);
+      pushQueue(text);
       return;
     }
     setInput("");
@@ -1430,12 +1460,26 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const answerQuestion = (text: string) => {
     if (!text) return;
     if (streaming !== null || runningTools) {
-      queueRef.current.push(text);
-      setQueueLen(queueRef.current.length);
-      toastInfo(`Queued (${queueRef.current.length} pending)`);
+      pushQueue(text);
       return;
     }
     void sendUserText(text);
+  };
+
+  const sendQueuedNow = () => {
+    if (queueRef.current.length === 0) return;
+    abortRef.current?.abort();
+  };
+
+  const multitaskQueued = () => {
+    const text = queueRef.current.shift();
+    syncQueueUi();
+    if (!text) return;
+    const newChatId = useStore.getState().addAIChat(wsId, "editor");
+    useStore.getState().focusAIChat(wsId, newChatId);
+    queueMicrotask(() => {
+      requestAIPrompt({ wsId, chatId: newChatId, text, send: true });
+    });
   };
 
   // Claude Code slash commands: the CLI expands custom commands
@@ -1814,9 +1858,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     }
     setInput("");
     if (streaming !== null || runningTools) {
-      queueRef.current.push(text);
-      setQueueLen(queueRef.current.length);
-      toastInfo(`Queued (${queueRef.current.length} pending)`);
+      pushQueue(text);
       return;
     }
     void sendUserText(text);
@@ -1825,9 +1867,10 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   useEffect(() => {
     return onAIPromptRequest((req) => {
       if (req.wsId !== wsId) return;
+      if (req.chatId && req.chatId !== aiChatId) return;
       handleExternalPromptRef.current(req.text, req.send);
     });
-  }, [wsId]);
+  }, [wsId, aiChatId]);
 
   const sendUserText = async (
     text: string,
@@ -1841,8 +1884,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     if (streaming !== null || runningTools) {
       // Defensive: caller shouldn't get here, but if they do, queue
       // rather than drop.
-      queueRef.current.push(text);
-      setQueueLen(queueRef.current.length);
+      pushQueue(text);
       return;
     }
 
@@ -2733,8 +2775,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     // Stop also clears the queue — Stop should mean "I want to
     // change direction now," not "process my queued follow-ups
     // anyway with whatever the agent half-finished."
-    queueRef.current = [];
-    setQueueLen(0);
+    clearQueue();
     abortRef.current?.abort();
     // Immediate UI reset — don't wait for the tool-execution loop or
     // provider generator to unwind (OpenCode could sit in runningTools).
@@ -4942,41 +4983,13 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         ownerStreaming={streaming !== null || runningTools}
         onAllowAll={() => setCcPermMode("auto")}
       />
-      {queueLen > 0 && (
-        <div className="ai-queue-indicator">
-          <span>
-            {queueLen} message{queueLen === 1 ? "" : "s"} queued — will send
-            when the current turn finishes
-          </span>
-          <button
-            className="ai-queue-send-now"
-            onClick={() => {
-              // Stop the current turn (preserving the queue), then the
-              // finally-block in sendUserText will drain it. Without
-              // this, the user's only options are wait or discard —
-              // there's no "I'm done waiting, send my next message
-              // right now" affordance.
-              if (queueRef.current.length === 0) return;
-              abortRef.current?.abort();
-              toastInfo("Stopping current turn — queued message will send next");
-            }}
-            title="Stop the current turn and send the queued message now"
-          >
-            Send now
-          </button>
-          <button
-            className="ai-queue-clear"
-            onClick={() => {
-              queueRef.current = [];
-              setQueueLen(0);
-              toastInfo("Queued messages discarded");
-            }}
-            title="Discard queued messages"
-          >
-            Clear
-          </button>
-        </div>
-      )}
+      <ComposerQueue
+        messages={queuedMessages}
+        turnActive={turnActive}
+        onSendNow={sendQueuedNow}
+        onMultitask={multitaskQueued}
+        onRemove={removeQueueAt}
+      />
       {attachedImages.length > 0 && (
         <div className="ai-attach-strip">
           {attachedImages.map((att) => (
@@ -5005,7 +5018,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           rows={2}
           placeholder={
             streaming !== null || runningTools
-              ? "Type to queue (sends when this turn finishes; Esc to stop)…"
+              ? "Send follow-up"
               : `Message ${activeAgent ? activeAgent.name : "Jack"}…`
           }
           value={input}

@@ -23,6 +23,10 @@ export interface AIPromptRequest {
   /** Workspace this request is targeting; chat panels in other
    *  workspaces ignore the event. */
   wsId: string;
+  /** When set, only the chat tab with this id handles the request.
+   *  Used by queue multitasking so a parallel new chat receives the
+   *  prompt without the busy panel stealing it. */
+  chatId?: string;
   /** Pre-composed prompt body to drop into the composer. */
   text: string;
   /** When true, immediately dispatch the message after filling.

@@ -7735,39 +7735,159 @@ body.ws-dragging * {
   flex-shrink: 0;
 }
 
-/* Queue indicator above the composer when messages are pending. */
-.ai-queue-indicator {
+/* Cursor-style queue cards inside the composer pill. */
+.ai-queue-stack {
+  order: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 0;
+  flex-shrink: 0;
+}
+.ai-queue-card {
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+}
+.ai-queue-card-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  margin: 4px 8px 0;
-  background: rgba(122, 79, 255, 0.10);
-  border: 1px solid rgba(122, 79, 255, 0.35);
-  border-radius: 6px;
-  font-size: 11.5px;
+  gap: 8px;
+  margin-bottom: 6px;
+  min-width: 0;
+}
+.ai-queue-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--fg);
+}
+.ai-queue-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--fg-muted);
   flex-shrink: 0;
 }
-.ai-queue-indicator span { flex: 1 1 auto; }
-.ai-queue-clear,
-.ai-queue-send-now {
-  flex-shrink: 0;
-  background: transparent;
-  border: 1px solid rgba(122, 79, 255, 0.45);
-  color: #b08aff;
-  padding: 2px 8px;
-  border-radius: 4px;
+.ai-queue-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-elev);
+  color: var(--fg-dim);
+  font-family: inherit;
   font-size: 11px;
+  line-height: 1;
+}
+.ai-queue-card-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+.ai-queue-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--fg);
+  word-break: break-word;
+}
+.ai-queue-card-foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+.ai-queue-menu-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.ai-queue-multitask-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-elev);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ai-queue-multitask-btn:hover {
+  background: var(--bg-hi);
+  border-color: var(--border-strong);
+}
+.ai-queue-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 30;
+  min-width: 220px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elev);
+  box-shadow: var(--shadow-lg);
+}
+.ai-queue-menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ai-queue-menu-item:hover {
+  background: var(--bg-hi);
+}
+.ai-queue-menu-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg);
+}
+.ai-queue-menu-desc {
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--fg-muted);
+}
+.ai-queue-remove,
+.ai-queue-remove-inline {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
   cursor: pointer;
   font-family: inherit;
+  font-size: 11px;
 }
-.ai-queue-send-now {
-  border-color: rgba(80, 200, 120, 0.55);
-  color: #6dd49a;
+.ai-queue-remove {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
 }
-.ai-queue-clear:hover { background: rgba(122, 79, 255, 0.15); }
-.ai-queue-send-now:hover { background: rgba(80, 200, 120, 0.15); }
+.ai-queue-remove:hover,
+.ai-queue-remove-inline:hover {
+  background: var(--bg-hi);
+  color: var(--fg);
+}
 .ai-privacy-icon {
   font-size: 14px;
   line-height: 1;
@@ -14285,6 +14405,39 @@ body.ws-dragging * {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  position: relative;
+}
+.agent-main-chat-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  transition: opacity var(--duration-fast) var(--ease-default);
+}
+.agent-main-chat[data-switching] .agent-main-chat-body {
+  opacity: 0;
+}
+.agent-chat-switch {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--chat-stream-bg);
+  pointer-events: none;
+}
+.agent-chat-switch-spinner {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+}
+.agent-chat-switch-label {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
 }
 .agent-main.has-review .agent-main-chat {
   flex: 1 1 50%;

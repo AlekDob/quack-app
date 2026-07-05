@@ -23,7 +23,8 @@ mode/mic/send on the right.
 | `src/components/ComposerMic.tsx` | Voice dictation (Web Speech API), graceful `null`-render when unavailable |
 | `src/components/Icon.tsx` | Added `arrow-up` (send) + `microphone` icons |
 | `src/components/TurnStreamStatus.tsx` | Composes `StatusPill` rows for planning / tools / generating / stale |
-| `src/App.css` | `.ai-composer-*`, `.ai-agent-*`, `.ai-mic-btn`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-context-dock*` |
+| `src/components/ComposerQueue.tsx` | Cursor-style follow-up queue cards inside the composer pill |
+| `src/App.css` | `.ai-composer-*`, `.ai-agent-*`, `.ai-mic-btn`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-context-dock*`, `.ai-queue-*` |
 
 ## Layout (single row, uniform)
 
@@ -33,7 +34,14 @@ mode/mic/send on the right.
 - **Right group:** model chip · effort · permission mode · mic · send.
 - **Uniform pills** (`.ai-composer-shell` scope): model chip / effort / mode / context indicator all 28px height, `radius-full`, 11px, weight 500, shared hover. Send + stop are 28×28 icon buttons (send = `arrow-up` on monochrome `--primary-bg`, stop = `stop` on red).
 - **Hint row** (`.ai-composer-hint`): `@ mentions · / commands · Ctrl+1–5 effort` (Claude Code only) · `Shift+Enter for newline · ↑ to recall`, shown only when the input is empty and idle.
-- Placeholder is dynamic: `Message {activeAgent?.name ?? "Jack"}…`.
+- Placeholder is dynamic: `Message {activeAgent?.name ?? "Jack"}…` when idle; **`Send follow-up`** while a turn is in flight.
+
+## Follow-up queue (feature 039)
+
+While streaming or tools are running, Enter enqueues the composer text instead
+of sending immediately. Cards render **inside** the composer pill above the
+textarea (`ComposerQueue`). Full behaviour (drain, Send now, Start
+Multitasking → New chat, Stop clears queue): **`039-composer-queue.md`**.
 
 ## Subagent pill (feature 004 integration)
 
@@ -154,3 +162,4 @@ Full DOM/CSS detail (turn wrappers, sticky containing block, z-index stacking):
 
 - Stream reading type + spacing: `003-design-system.md`.
 - Navigation rail (minimap): `021-chat-nav-rail.md`.
+- Follow-up queue while busy: `039-composer-queue.md`.
