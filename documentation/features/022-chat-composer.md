@@ -3,7 +3,6 @@ type: feature
 project: quack-desktop
 created: 2026-07-01
 last_verified: 2026-07-05
-tags: [chat, composer, input, subagent, dictation, effort, ux]
 ---
 
 # 022 — Chat composer (roomier "spaceship" pass)
@@ -23,7 +22,8 @@ mode/mic/send on the right.
 | `src/components/EffortPopover.tsx` | Single control for BOTH reasoning effort (slider) and extended thinking (segmented) |
 | `src/components/ComposerMic.tsx` | Voice dictation (Web Speech API), graceful `null`-render when unavailable |
 | `src/components/Icon.tsx` | Added `arrow-up` (send) + `microphone` icons |
-| `src/App.css` | `.ai-composer-*`, `.ai-agent-*`, `.ai-mic-btn`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint` |
+| `src/components/TurnStreamStatus.tsx` | Composes `StatusPill` rows for planning / tools / generating / stale |
+| `src/App.css` | `.ai-composer-*`, `.ai-agent-*`, `.ai-mic-btn`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-context-dock*` |
 
 ## Layout (single row, uniform)
 
@@ -105,14 +105,27 @@ Tooltip on the meter button: `Effort: {label} · Thinking: {auto|on|off} — Ctr
 
 - `StatusPill` / `ai-inline-status` live in **`.ai-status-dock`** — a flex slot
   immediately above `.ai-composer-shell`, NOT inside the scrollable `.ai-messages`.
+- **Row layout:** `.ai-status-dock-row` — turn status on the **left**
+  (`.ai-inline-status`), per-project context files on the **right**
+  (`ContextFilesDock`, feature 037). See `037-project-context-dock.md`.
 - Same slot family as `ai-ask-dock` and `ai-todos-bar`: operational chrome the
   user should see while typing, even when scrolled up in the transcript.
 - Shows while a turn is in flight: running tools, warming up, waiting for
   response, generating, tokens/s trail, stream-staleness badge (+ inline Stop
-  after 30s idle).
+  after 30s idle). The dock row can also appear when only context files are
+  visible (editor open in this project, no active turn).
 - `max-height: 40%` + `overflow-y: auto` on the dock — long `RunningToolList`
   stacks scroll internally instead of pushing the composer off-screen.
-- Implementation: `StatusPill` in `chatToolRender.tsx`, wired in `AIChatPanel.tsx`.
+- Implementation: `TurnStreamStatus` → `StatusPill` in `chatToolRender.tsx`,
+  `ContextFilesDock.tsx`, wired in `AIChatPanel.tsx`.
+
+## Per-project context files (right side of status dock)
+
+Moved from the old standalone `ai-context-dock` chip above the composer and
+the transcript `Files: …` indicator. Full detail: **`037-project-context-dock.md`**.
+
+- Pill: `1 file in context` / `N files in context`; hover popover lists editor
+  (ON/OFF) + `@`-queued paths; scoped per `wsId` via `workspaceChatContext.ts`.
 
 ## Rules indicator (CLAUDE.md token weight)
 

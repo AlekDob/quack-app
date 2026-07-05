@@ -19,6 +19,9 @@ import {
 } from "./EffortPopover";
 import { ChatNavRail } from "./ChatNavRail";
 import { TurnStreamStatus } from "./TurnStreamStatus";
+import { ContextFilesDock } from "./ContextFilesDock";
+import { useWorkspaceChatContext } from "../workspaceChatContext";
+import { isUnderRoot } from "../pathUtils";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -319,7 +322,12 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const aggregatedPullProgress = isAnyPulling
     ? Object.values(pullProgressMap).join(" · ")
     : null;
-  const [attachContext, setAttachContext] = useState(true);
+  const {
+    attachContext,
+    attachedFiles,
+    addAttachedFile,
+    clearAttachedFiles,
+  } = useWorkspaceChatContext(wsId);
   const [runningTools, setRunningTools] = useState(false);
   // Tool calls currently in flight, with enough detail per row to render
   // a per-line "Tool path" + a short preview of the change (so the user
@@ -577,7 +585,6 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [attachTree, setAttachTree] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState<string[]>([]);
   const [attachTerminal, setAttachTerminal] = useState(false);
   // Subagents the user @-mentioned this turn — the send flow delegates
   // the turn to them via the Task tool (Claude Code only). The full
@@ -1755,9 +1762,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         prev.includes(pick.agent.name) ? prev : [...prev, pick.agent.name],
       );
     } else {
-      setAttachedFiles((prev) =>
-        prev.includes(pick.abs) ? prev : [...prev, pick.abs],
-      );
+      addAttachedFile(pick.abs, root);
     }
     // Restore focus + place cursor after the inserted token so the
     // user can keep typing without clicking back into the textarea.
@@ -1991,16 +1996,19 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       // in which case we omit the hint entirely so the model never
       // even learns the path exists in this conversation.
       if (
+        attachContext &&
         editorState.filePath &&
+        isUnderRoot(editorState.filePath, root) &&
         !matchExclusion(editorState.filePath)
       ) {
         ccTurnContext.push(
           `The user is currently looking at the file: ${editorState.filePath}. Use your Read tool to fetch it if relevant.`,
         );
       }
-      if (attachedFiles.length > 0) {
+      const wsAttached = attachedFiles.filter((f) => isUnderRoot(f, root));
+      if (wsAttached.length > 0) {
         ccTurnContext.push(
-          `The user wants you to look at: ${attachedFiles.join(", ")}. Use your Read tool on these.`,
+          `The user wants you to look at: ${wsAttached.join(", ")}. Use your Read tool on these.`,
         );
       }
       // Image attachments: Claude Code's Read tool renders image files
@@ -2046,7 +2054,8 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     // inline excluded contents into the prompt, even when the user
     // explicitly typed /file (defence-in-depth: a typo or muscle-
     // memory shouldn't leak secrets).
-    for (const filePath of skipAllInlining ? [] : attachedFiles) {
+    const wsAttached = attachedFiles.filter((f) => isUnderRoot(f, root));
+    for (const filePath of skipAllInlining ? [] : wsAttached) {
       try {
         const abs =
           filePath.includes(":") || filePath.startsWith("/")
@@ -2086,7 +2095,12 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         }
       }
     }
-    if (attachContext && !skipAllInlining) {
+    if (
+      attachContext &&
+      !skipAllInlining &&
+      editorState.filePath &&
+      isUnderRoot(editorState.filePath, root)
+    ) {
       if (editorState.filePath) {
         sysParts.push(`Active file: ${editorState.filePath}`);
       }
@@ -2702,7 +2716,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
       liveTurnRef.current = false;
       // One-shot attach flags reset after the message goes out.
       setAttachTree(false);
-      setAttachedFiles([]);
+      clearAttachedFiles();
       setAttachedAgents([]);
       setAttachTerminal(false);
       // Drain any messages the user typed while this turn was in
@@ -2748,6 +2762,10 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
   // times per second during a streaming response) — the only event the
   // effect cares about is the active/inactive flip, not the text.
   const turnActive = streaming !== null || runningTools;
+  const editorInWorkspace =
+    !!editorState.filePath && !!root && isUnderRoot(editorState.filePath, root);
+  const hasWsAttached = attachedFiles.some((f) => isUnderRoot(f, root));
+  const showComposerDock = turnActive || editorInWorkspace || hasWsAttached;
   useEffect(() => {
     if (!turnActive) return;
     const onKey = (e: KeyboardEvent) => {
@@ -3339,9 +3357,7 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
         setInput("/file ");
         return;
       }
-      setAttachedFiles((prev) =>
-        prev.includes(rest) ? prev : [...prev, rest],
-      );
+      addAttachedFile(rest, root);
       setInput("");
       toastInfo(`Attached ${rest} to next message`);
       return;
@@ -3620,33 +3636,6 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
     streamingBlocks,
     streamingToolCalls,
     streamingToolResults,
-  ]);
-
-  // Compact editor-context chip above the composer — filename only (full
-  // explanation lives in the chip tooltip).
-  const editorFileBase = useMemo(() => {
-    if (!editorState.filePath) return null;
-    return (
-      editorState.filePath.replace(/\\/g, "/").split("/").pop() ??
-      editorState.filePath
-    );
-  }, [editorState.filePath]);
-
-  const contextChipLabel = useMemo(() => {
-    if (
-      attachContext &&
-      editorState.selectionText.length > 0 &&
-      editorState.selectionLines > 0
-    ) {
-      const n = editorState.selectionLines;
-      return `${n} ln`;
-    }
-    return editorFileBase;
-  }, [
-    attachContext,
-    editorFileBase,
-    editorState.selectionText,
-    editorState.selectionLines,
   ]);
 
   // No early-return for "checking" — render the normal panel and let
@@ -4377,19 +4366,6 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           <span className="ai-context-toggle">cancel</span>
         </div>
       )}
-      {attachedFiles.length > 0 && (
-        <div className="ai-context-indicator" role="status">
-          <span className="ai-context-dot" />
-          Files: {attachedFiles.join(", ")}
-          <button
-            className="ai-context-toggle"
-            onClick={() => setAttachedFiles([])}
-            title="Detach all attached files"
-          >
-            clear
-          </button>
-        </div>
-      )}
       {attachedAgents.length > 0 && (
         <div className="ai-agent-chips" role="status">
           {attachedAgents.map((name) => {
@@ -4764,44 +4740,26 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
           <TodosCard items={todos} />
         </div>
       )}
-      {/* Live turn status — docked above the composer (stays visible while scrolling). */}
-      {turnActive && (
+      {/* Live turn status + per-project context files — docked above composer. */}
+      {showComposerDock && (
         <div className="ai-status-dock" aria-live="polite">
-          <div className="ai-inline-status">
-            <TurnStreamStatus
-              runningTools={runningTools}
-              streaming={streaming}
-              streamingBlocks={streamingBlocks}
-              activeToolLabels={activeToolLabels}
-              tokensPerSec={tokensPerSec}
-              warmingUp={warmingUp}
-              lastStreamEventAt={lastStreamEventAt}
-              onStop={() => stop()}
-            />
+          <div className="ai-status-dock-row">
+            <div className="ai-inline-status">
+              {turnActive && (
+                <TurnStreamStatus
+                  runningTools={runningTools}
+                  streaming={streaming}
+                  streamingBlocks={streamingBlocks}
+                  activeToolLabels={activeToolLabels}
+                  tokensPerSec={tokensPerSec}
+                  warmingUp={warmingUp}
+                  lastStreamEventAt={lastStreamEventAt}
+                  onStop={() => stop()}
+                />
+              )}
+            </div>
+            <ContextFilesDock wsId={wsId} root={root} />
           </div>
-        </div>
-      )}
-      {/* Editor file/selection context — compact pill above the composer. */}
-      {editorFileBase && contextChipLabel && (
-        <div className="ai-context-dock">
-          <button
-            type="button"
-            className={`ai-context-chip ${attachContext ? "" : "off"}`}
-            title={
-              attachContext
-                ? editorState.selectionLines > 0
-                  ? `ON — ${editorState.selectionLines} selected line${editorState.selectionLines === 1 ? "" : "s"} from ${editorFileBase} sent with every message. Click to turn OFF.`
-                  : `ON — ${editorFileBase} sent with every message (no Read needed). Click to turn OFF.`
-                : `OFF — ${editorFileBase} not attached. Click to turn ON.`
-            }
-            onClick={() => setAttachContext((v) => !v)}
-          >
-            <span className="ai-context-dot" />
-            <span className="ai-context-chip-label">{contextChipLabel}</span>
-            <span className="ai-context-chip-toggle">
-              {attachContext ? "ON" : "OFF"}
-            </span>
-          </button>
         </div>
       )}
       {/* Cursor-style composer: one pill. CSS `order` puts the textarea

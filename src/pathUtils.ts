@@ -47,3 +47,23 @@ export function relPath(path: string, root: string): string {
   const r = root.replace(/\\/g, "/").replace(/\/+$/, "") + "/";
   return p.startsWith(r) ? p.slice(r.length) : p;
 }
+
+/** True when `path` resolves under `root` (absolute or workspace-relative). */
+export function isUnderRoot(path: string, root: string): boolean {
+  if (!path || !root) return false;
+  const p = path.replace(/\\/g, "/");
+  const r = root.replace(/\\/g, "/").replace(/\/+$/, "");
+  if (p === r || p.startsWith(`${r}/`)) return true;
+  const joined = joinPath(r, p);
+  return joined === r || joined.startsWith(`${r}/`);
+}
+
+/** Normalize a workspace-relative or absolute path to an absolute path under root. */
+export function resolveUnderRoot(path: string, root: string): string | null {
+  if (!path || !root) return null;
+  const p = path.replace(/\\/g, "/");
+  const r = root.replace(/\\/g, "/").replace(/\/+$/, "");
+  if (p === r || p.startsWith(`${r}/`)) return p;
+  const joined = joinPath(r, p);
+  return joined === r || joined.startsWith(`${r}/`) ? joined : null;
+}

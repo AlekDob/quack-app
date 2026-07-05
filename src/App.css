@@ -5994,12 +5994,156 @@ body.ws-dragging * {
   border-color: var(--border-strong);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
-/* Editor file context — minimal pill docked just above the composer shell. */
+/* Per-project context files — right side of the status dock above composer. */
 .ai-context-dock {
   flex-shrink: 0;
+  margin-left: auto;
+  padding: 0;
   display: flex;
-  padding: 0 10px 2px;
+  align-items: flex-start;
 }
+.ai-context-dock-btn {
+  display: inline-flex;
+  align-items: center;
+  max-width: min(220px, 42vw);
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-elev);
+  color: var(--fg-muted);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: default;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    background var(--duration-fast) var(--ease-default),
+    border-color var(--duration-fast) var(--ease-default),
+    color var(--duration-fast) var(--ease-default);
+}
+.ai-context-dock-btn.has-files {
+  color: var(--fg);
+  border-color: var(--border-strong);
+}
+.ai-context-dock-btn:hover,
+.ai-context-dock-btn:focus-visible {
+  background: var(--bg-hi);
+  color: var(--fg);
+  border-color: var(--border-strong);
+  outline: none;
+}
+.ai-context-popover {
+  position: fixed;
+  z-index: 1200;
+  width: min(300px, calc(100vw - 16px));
+  padding: 8px 0 6px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+}
+.ai-context-popover-head {
+  padding: 0 12px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.ai-context-popover-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.ai-context-popover-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+}
+.ai-context-popover-file {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 5px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ai-context-popover-file:hover {
+  background: var(--bg-hover);
+}
+.ai-context-popover-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.ai-context-popover-meta {
+  font-size: 10px;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.ai-context-popover-toggle {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-alt);
+  color: var(--fg-muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  font-family: inherit;
+}
+.ai-context-popover-toggle.on {
+  color: var(--fg);
+  border-color: var(--border-strong);
+}
+.ai-context-popover-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.ai-context-popover-remove:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.ai-context-popover-empty {
+  margin: 0;
+  padding: 4px 12px 8px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+/* Legacy editor chip (removed from composer — kept for reference elsewhere). */
 .ai-context-chip {
   display: inline-flex;
   align-items: center;
@@ -10115,11 +10259,20 @@ body.ws-dragging * {
   overflow-y: auto;
   border-top: 1px solid var(--border);
 }
+.ai-status-dock-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
 .ai-inline-status {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 7px;
+  flex: 1;
+  min-width: 0;
   padding: 0;
   margin: 0;
   border: none;
@@ -10131,6 +10284,47 @@ body.ws-dragging * {
   max-width: calc(100% - 2px);
   margin: 0;
   animation: ai-tcall-in 0.18s ease;
+}
+/* Live turn status pill — inverted monochrome for punch (black on light, white on dark). */
+.ai-tcall-status .ai-status-pill {
+  background: var(--primary-bg);
+  border-color: var(--primary-bg);
+  color: var(--primary-fg);
+}
+.ai-tcall-status .ai-status-pill:has(.ai-inline-stale-stuck) {
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--primary-bg));
+  background: var(--primary-bg);
+}
+.ai-tcall-status .ai-status-pill-main {
+  color: var(--primary-fg);
+  font-weight: 600;
+}
+.ai-tcall-status .ai-status-pill-trail {
+  background: color-mix(in srgb, var(--primary-fg) 10%, var(--primary-bg));
+  border-left-color: color-mix(in srgb, var(--primary-fg) 18%, var(--primary-bg));
+}
+.ai-tcall-status .ai-status-pill:has(.ai-inline-stale-stuck) .ai-status-pill-trail {
+  border-left-color: color-mix(in srgb, var(--warn) 35%, var(--primary-bg));
+}
+.ai-tcall-status .ai-inline-tps {
+  color: color-mix(in srgb, var(--primary-fg) 68%, transparent);
+}
+.ai-tcall-status .ai-status-pill-main .ai-spinner {
+  border-color: color-mix(in srgb, var(--primary-fg) 22%, transparent);
+  border-top-color: var(--primary-fg);
+}
+.ai-tcall-status .ai-inline-stale {
+  color: color-mix(in srgb, var(--primary-fg) 78%, transparent);
+}
+.ai-tcall-status .ai-inline-stale-stuck {
+  color: var(--warn);
+}
+.ai-tcall-status .ai-inline-stop {
+  border-color: color-mix(in srgb, var(--warn) 55%, var(--primary-fg));
+  color: var(--warn);
+}
+.ai-tcall-status .ai-inline-stop:hover {
+  background: color-mix(in srgb, var(--warn) 14%, var(--primary-bg));
 }
 .ai-status-pill {
   display: inline-flex;

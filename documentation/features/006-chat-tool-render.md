@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-03
+last_verified: 2026-07-05
 tags: [ai-chat, tool-calls, chatToolRender, cursor-style, drawer, diff-modal, css, presentational, tool-icon-tints]
 ---
 
@@ -90,9 +90,17 @@ per-file Edit pills are NOT duplicated inline — the recap card is canonical.
 ### Live turn status (`StatusPill`)
 
 During an in-flight turn, `StatusPill` renders tool/stream state as compact
-pills. **Docked above the composer** in `.ai-status-dock` (feature 022), not in
-the message scroll. Includes optional `RunningToolList` below the header pill
-when tools aren't already rendered inline in `streamingBlocks`.
+pills. **Docked above the composer** in `.ai-status-dock` (feature 022), left
+side of `.ai-status-dock-row`; per-project context files sit on the right
+(feature 037). Not in the message scroll. Includes optional `RunningToolList`
+below the header pill when tools aren't already rendered inline in
+`streamingBlocks`.
+
+**Visual (`.ai-tcall-status`):** inverted monochrome for impact — pill fill
+`--primary-bg` (near-black in light, near-white in dark), text/spinner
+`--primary-fg`. Trail (t/s), stale copy, and Stop button are re-tinted for
+contrast on the inverted surface. Tool rows in `.ai-status-tools` below keep
+the neutral pill chrome.
 
 ### Per-tool icon tints (scan-at-a-glance)
 
