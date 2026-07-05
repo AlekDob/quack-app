@@ -44,6 +44,9 @@ function tabLabel(
   isWhiteboard?: boolean;
   /** Usage tab — uses the "chart-bar" SVG icon. */
   isUsage?: boolean;
+  /** Agent edit review diff tab. */
+  isComposeReview?: boolean;
+  composeReviewPath?: string;
 } {
   const parsed = parseKey(key);
   if (parsed?.kind === "terminal") {
@@ -94,6 +97,17 @@ function tabLabel(
       isAI: false,
       popped: false,
       subAvatar: duckAvatarFor(parsed.agentType),
+    };
+  }
+  if (parsed?.kind === "composeReview") {
+    return {
+      label: basename(parsed.path),
+      dirty: false,
+      isTerminal: false,
+      isAI: false,
+      popped: false,
+      isComposeReview: true,
+      composeReviewPath: parsed.path,
     };
   }
   if (parsed?.kind === "file") {
@@ -611,7 +625,13 @@ function TabsPaneView(
                   closeTab(wsId, k);
                 }
               }}
-              title={parsed?.kind === "file" ? parsed.path : info.label}
+              title={
+                parsed?.kind === "file"
+                  ? parsed.path
+                  : parsed?.kind === "composeReview"
+                    ? parsed.path
+                    : info.label
+              }
             >
               <span className="tab-icon">
                 {isPinned ? (
@@ -627,6 +647,8 @@ function TabsPaneView(
                   <Icon name="whiteboard" size={12} />
                 ) : info.isUsage ? (
                   <Icon name="chart-bar" size={12} />
+                ) : info.isComposeReview ? (
+                  <Icon name="git-compare" size={12} />
                 ) : info.subAvatar ? (
                   <img
                     className="tab-sub-avatar"

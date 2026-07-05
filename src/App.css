@@ -11,6 +11,9 @@
   --bg-alt: #101114;
   --bg-elev: #141519;
   --bg-hi: #1a1b21;
+  /* Chat stream column — slightly lifted from chrome so the center reads
+     as the primary surface between side rails/panels. */
+  --chat-stream-bg: #181818;
   --fg: #f2f3f5;
   --fg-dim: rgba(242, 243, 245, 0.58);
   --fg-muted: rgba(242, 243, 245, 0.38);
@@ -108,6 +111,7 @@
   --bg-alt: #f1f1f3;
   --bg-elev: #fdfdfd;
   --bg-hi: #e8e8eb;
+  --chat-stream-bg: var(--bg);
   --fg: #14151a;
   --fg-dim: rgba(20, 21, 26, 0.62);
   --fg-muted: rgba(20, 21, 26, 0.42);
@@ -2206,9 +2210,23 @@ body.ws-dragging * {
 }
 /* Sidebar-on-right flips the whole stack (row-reverse), so the hub lands
    on the left edge — swap its divider accordingly. */
-.shell-stack[data-sidebar-side="right"] .agent-hub {
+.shell-stack[data-sidebar-side="right"] .agent-hub:not(.agent-hub--sidebar) {
   border-left: none;
   border-right: 1px solid var(--border);
+}
+
+/* Agent mode: expanded hub replaces the per-workspace sessions panel. */
+.agent-sidebar > .agent-hub--sidebar {
+  flex: 1 1 240px;
+  width: 240px;
+  min-width: 240px;
+  max-width: 240px;
+  min-height: 0;
+  border-left: none;
+  border-right: 1px solid var(--border);
+}
+.agent-sidebar > .agent-hub--sidebar.expanded {
+  flex: 1 1 240px !important;
 }
 .agent-hub-header {
   display: flex;
@@ -5897,6 +5915,7 @@ body.ws-dragging * {
   min-width: 0;
   font-size: 12px;
   overflow: hidden;
+  background: var(--chat-stream-bg);
   /* Small lateral inset for the whole chat column so nothing hugs the pane
      edges. The bigger 20px stream gutter lives on .ai-messages (below) so it
      doesn't push the nav rail (which sits in .ai-messages-wrap) onto the text. */
@@ -7028,29 +7047,28 @@ body.ws-dragging * {
   gap: 1px;
 }
 
-/* Inline action chips — a run of tool calls in the compact chat rendered
-   as a row of icon chips (grouped by type). Icon-only by default; the
-   target label reveals on hover, full detail expands on click. */
+/* Inline action chips — a run of tool calls rendered as Conductor-style
+   grouped chips (`.ai-iarow`). Used in docked editor and agent mode. */
 .ai-iarow {
-  margin: 4px 0;
+  margin: 10px 0;
 }
 .ai-iarow-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
 }
 .ai-ichip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 24px;
+  min-height: 28px;
   max-width: 100%;
-  padding: 0 8px;
+  padding: 5px 10px;
   background: var(--bg-alt);
   border: 1px solid var(--border);
   border-radius: 12px;
   color: var(--fg-dim);
-  font-size: 11.5px;
+  font-size: 12.5px;
   cursor: pointer;
 }
 .ai-ichip:hover {
@@ -7089,7 +7107,7 @@ body.ws-dragging * {
   white-space: nowrap;
   text-overflow: ellipsis;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   max-width: 240px;
 }
 /* Outcome status: a small dot + accent. Error is loud; success is quiet;
@@ -7132,14 +7150,13 @@ body.ws-dragging * {
 /* Visual hierarchy: exploration is quiet, changes are loud. */
 .ai-ichip.tone-muted {
   background: transparent;
-  border-color: transparent;
+  border-color: var(--border);
   color: var(--fg-muted);
-  height: 22px;
-  padding: 0 6px;
+  padding: 5px 10px;
 }
 .ai-ichip.tone-muted:hover {
   background: var(--bg-alt);
-  border-color: var(--border);
+  border-color: var(--fg-muted);
 }
 .ai-ichip.tone-muted .ai-ichip-dot {
   display: none;
@@ -9418,6 +9435,12 @@ body.ws-dragging * {
   background: var(--bg-elev);
   overflow: hidden;
 }
+.ai-compose-cursor.is-streaming {
+  border-color: var(--fg-muted);
+}
+.ai-compose-cursor.is-streaming .ai-compose-bar-left {
+  color: var(--fg);
+}
 .ai-compose-bar {
   display: flex;
   align-items: center;
@@ -9538,6 +9561,146 @@ body.ws-dragging * {
 }
 .ai-compose-add { color: var(--ok); }
 .ai-compose-rem { color: var(--err); }
+
+/* Agent edit review tab — Conductor-style inline diff + floating dock. */
+.compose-review-host {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg);
+}
+.compose-review-host.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+.compose-review-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--fg-dim);
+  flex-shrink: 0;
+}
+.compose-review-close {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.compose-review-close:hover {
+  background: var(--bg-hi);
+  color: var(--fg);
+}
+.compose-review-title {
+  color: var(--fg);
+  font-weight: 600;
+}
+.compose-review-ref {
+  color: var(--fg-muted);
+  font-size: 11px;
+}
+.compose-review-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+.compose-review-body .diff-view {
+  height: 100%;
+}
+.compose-review-dock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-elev);
+  flex-shrink: 0;
+}
+.compose-review-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.compose-review-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-alt);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+.compose-review-nav-btn:hover:not(:disabled) {
+  background: var(--bg-hi);
+  color: var(--fg);
+}
+.compose-review-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.compose-review-nav-label {
+  font-size: 11.5px;
+  color: var(--fg-muted);
+  min-width: 56px;
+  text-align: center;
+}
+.compose-review-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.compose-review-undo,
+.compose-review-keep {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+}
+.compose-review-undo {
+  background: var(--bg-alt);
+  color: var(--fg);
+}
+.compose-review-undo:hover:not(:disabled) {
+  background: var(--bg-hi);
+}
+.compose-review-undo:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.compose-review-keep {
+  background: var(--ok);
+  color: var(--bg);
+  border-color: var(--ok);
+  font-weight: 600;
+}
+.compose-review-keep:hover {
+  filter: brightness(1.05);
+}
+.compose-review-undo kbd,
+.compose-review-keep kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  opacity: 0.75;
+}
 
 /* Edit / Write / MultiEdit — Cursor-style one-line pill ("Edited test.md +8");
    clicking opens the real before/after in the centered DiffModal. The +/−
@@ -13925,7 +14088,7 @@ body.ws-dragging * {
   color: var(--fg);
 }
 
-/* Chat column (primary) */
+/* Chat column (primary) — splits 50/50 with diff review in agent mode. */
 .agent-main {
   flex: 1 1 auto;
   display: flex;
@@ -13933,6 +14096,69 @@ body.ws-dragging * {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  background: var(--chat-stream-bg);
+}
+.agent-main-inner {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.agent-main.has-review .agent-main-inner {
+  flex-direction: row;
+}
+.agent-main-chat {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.agent-main.has-review .agent-main-chat {
+  flex: 1 1 50%;
+  border-right: 1px solid var(--border);
+}
+.agent-main-review {
+  flex: 1 1 50%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg);
+}
+.agent-review-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.agent-review-tab {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 11.5px;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.agent-review-tab:hover {
+  background: var(--bg-alt);
+  color: var(--fg);
+}
+.agent-review-tab.active {
+  background: var(--bg-hi);
+  border-color: var(--border);
+  color: var(--fg);
+}
+.agent-main-review .compose-review-host {
+  flex: 1;
+  min-height: 0;
 }
 .agent-main > * {
   flex: 1 1 auto;

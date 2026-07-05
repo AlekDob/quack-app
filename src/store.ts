@@ -7,6 +7,12 @@ import {
 import { consumeAutoPushSuppression, pushLinkedFile } from "./sftpPush";
 import { resolveDefaultShell } from "./terminalPrefs";
 import { clearEditorState, disposeModelForPath } from "./editorState";
+import {
+  composeReviewKey,
+  parseComposeReviewKey,
+  stashComposeReviewCalls,
+} from "./composeReview";
+import type { ToolCall } from "./ai";
 import { clearChatDiff } from "./chatDiffStore";
 import {
   error as toastError,
@@ -253,6 +259,13 @@ export function parseKey(
   | { kind: "usage"; wsId: string }
   | { kind: "subagent"; sessionId: string; toolUseId: string; agentType: string }
   | { kind: "session"; project: string; sessionId: string }
+  | {
+      kind: "composeReview";
+      wsId: string;
+      chatId: string | undefined;
+      msgIndex: number;
+      path: string;
+    }
   | null {
   if (k.startsWith("file:")) return { kind: "file", path: k.slice(5) };
   if (k.startsWith("term:")) return { kind: "terminal", id: k.slice(5) };
@@ -277,7 +290,49 @@ export function parseKey(
       sessionId: k.slice(pipe + 1),
     };
   }
+  if (k.startsWith("crev:")) {
+    const c = parseComposeReviewKey(k);
+    if (!c) return null;
+    return { kind: "composeReview", ...c };
+  }
   return null;
+}
+
+/** Open compose-review tab keys for a workspace (agent mode reads these). */
+export function collectComposeReviewTabs(wsId: string, root: Pane): string[] {
+  const out: string[] = [];
+  const walk = (p: Pane) => {
+    if (p.kind === "tabs") {
+      for (const t of p.tabs) {
+        if (!t.startsWith("crev:")) continue;
+        const c = parseComposeReviewKey(t);
+        if (c?.wsId === wsId) out.push(t);
+      }
+      return;
+    }
+    walk(p.first);
+    walk(p.second);
+  };
+  walk(root);
+  return out;
+}
+
+export function focusedComposeReviewKey(
+  wsId: string,
+  layout: WorkspaceLayout,
+  root: Pane,
+): string | null {
+  const tabs = collectComposeReviewTabs(wsId, root);
+  if (!tabs.length) return null;
+  const paneId = layout.activePaneId;
+  if (paneId) {
+    const pane = findPaneById(root, paneId);
+    if (pane?.kind === "tabs" && pane.active?.startsWith("crev:")) {
+      const c = parseComposeReviewKey(pane.active);
+      if (c?.wsId === wsId) return pane.active;
+    }
+  }
+  return tabs[tabs.length - 1] ?? null;
 }
 
 /** The AI chat id currently focused in a workspace (active pane's active
@@ -695,6 +750,14 @@ interface AppState {
     sessionId: string,
     toolUseId: string,
     agentType: string,
+  ): void;
+  /** Open (or focus) an agent edit review diff tab (Conductor-style). */
+  openComposeReview(
+    wsId: string,
+    chatId: string | undefined,
+    msgIndex: number,
+    path: string,
+    calls: ToolCall[],
   ): void;
   /** Open (or focus) the persistent Whiteboard tab for a workspace. */
   wbOpen(wsId: string): void;
@@ -1651,8 +1714,13 @@ export const useStore = create<AppState>((set, get) => {
         if (parsed.kind === "session") {
           return `Session ${parsed.sessionId.slice(0, 8)}`;
         }
-        // ai
-        return ws.aiChats[parsed.id]?.title ?? key;
+        if (parsed.kind === "composeReview") {
+          return basename(parsed.path) || parsed.path;
+        }
+        if (parsed.kind === "ai") {
+          return ws.aiChats[parsed.id]?.title ?? key;
+        }
+        return key;
       };
 
       const reordered = reorderTabsForSort(target.tabs, ws.layout.pinned ?? [], (a, b) =>
@@ -1722,11 +1790,13 @@ export const useStore = create<AppState>((set, get) => {
         if (parsed.kind === "whiteboard") return Number.POSITIVE_INFINITY;
         if (parsed.kind === "usage") return Number.POSITIVE_INFINITY;
         if (parsed.kind === "session") return Number.POSITIVE_INFINITY;
-        // ai
-        const desc = ws.aiChats[parsed.id];
-        if (!desc) return Number.POSITIVE_INFINITY;
-        // Newer createdAt ⇒ smaller rank.
-        return now - desc.createdAt;
+        if (parsed.kind === "composeReview") return Number.POSITIVE_INFINITY;
+        if (parsed.kind === "ai") {
+          const desc = ws.aiChats[parsed.id];
+          if (!desc) return Number.POSITIVE_INFINITY;
+          return now - desc.createdAt;
+        }
+        return Number.POSITIVE_INFINITY;
       };
 
       const reordered = reorderTabsForSort(target.tabs, ws.layout.pinned ?? [], (a, b) => {
@@ -2426,6 +2496,66 @@ export const useStore = create<AppState>((set, get) => {
           },
         };
       });
+    },
+
+    openComposeReview: (wsId, chatId, msgIndex, path, calls) => {
+      const k = composeReviewKey(wsId, chatId, msgIndex, path);
+      stashComposeReviewCalls(k, calls);
+      updateWs(wsId, (w) => {
+        let foundPane: PaneId | null = null;
+        mapTree(w.layout.editorRoot, (t) => {
+          if (t.tabs.includes(k)) foundPane = t.id;
+          return t;
+        });
+        if (foundPane) {
+          return {
+            ...w,
+            layout: {
+              ...w.layout,
+              activePaneId: foundPane,
+              editorRoot: mapTree(w.layout.editorRoot, (t) =>
+                t.id === foundPane ? { ...t, active: k } : t,
+              ),
+            },
+          };
+        }
+        let altPane: PaneId | null = null;
+        const activeId = w.layout.activePaneId;
+        const activePane = activeId
+          ? findPaneById(w.layout.editorRoot, activeId)
+          : null;
+        if (
+          activePane?.kind === "tabs" &&
+          activePane.active?.startsWith("ai:")
+        ) {
+          mapTree(w.layout.editorRoot, (t) => {
+            if (t.active && !t.active.startsWith("ai:")) altPane = t.id;
+            return t;
+          });
+        }
+        const targetPaneId: PaneId =
+          altPane ??
+          (activeId && isInTree(w.layout.editorRoot, activeId)
+            ? activeId
+            : firstLeaf(w.layout.editorRoot).id);
+        return {
+          ...w,
+          layout: {
+            ...w.layout,
+            activePaneId: targetPaneId,
+            editorRoot: mapTree(w.layout.editorRoot, (t) =>
+              t.id === targetPaneId
+                ? {
+                    ...t,
+                    tabs: t.tabs.includes(k) ? t.tabs : [...t.tabs, k],
+                    active: k,
+                  }
+                : t,
+            ),
+          },
+        };
+      });
+      autoRevealInTree(wsId, path);
     },
 
     wbOpen: (wsId) => {

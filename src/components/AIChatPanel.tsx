@@ -4179,9 +4179,8 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                   </span>
                 ) : isAssistant && m.blocks && m.blocks.length > 0 ? (
                   // Chronological render so narration stays attached to the
-                  // action it introduces ("Now hook into X:" → the chip for
-                  // that edit). In compact (agent) mode the tool calls render
-                  // as slim inline chips instead of VS-Code-style rows.
+                  // action it introduces. Tool runs collapse into Conductor-
+                  // style `.ai-iarow` chips in every surface (editor + agent).
                   <InterleavedBlocks
                     blocks={m.blocks}
                     hideEdits={showComposeCard}
@@ -4247,13 +4246,14 @@ export function AIChatPanel({ wsId, root, aiChatId }: Props) {
                   m.content
                 )}
               </div>
-              {showComposeCard && isAssistant && !isStreamingThis && (
+              {showComposeCard && isAssistant && (
                 <div className="ai-compose-foot">
                   <ComposeCard
                     wsId={wsId}
                     chatId={aiChatId}
                     msgIndex={i}
                     calls={composeFileCalls}
+                    streaming={isStreamingThis}
                   />
                 </div>
               )}

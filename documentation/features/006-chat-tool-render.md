@@ -4,166 +4,119 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
 last_verified: 2026-07-05
-tags: [ai-chat, tool-calls, chatToolRender, cursor-style, drawer, diff-modal, css, presentational, tool-icon-tints]
+tags: [ai-chat, tool-calls, chatToolRender, cursor-style, conductor-style, drawer, diff-modal, css, presentational, tool-icon-tints]
 ---
 
 ## Chat Tool-Call Rendering
 
 **Purpose:** Render an assistant turn's tool calls (Read / Bash / Edit / Grep /
-Task / …) in the chat stream as compact one-line pills — Cursor/Conductor style.
-Detail is NOT inline: read/bash/search output opens in a right-side **drawer**,
-edits open in the centered **DiffModal**. Pure presentational React + CSS.
-**Files:** | `src/components/chatToolRender.tsx`, `src/components/ToolResultDrawer.tsx`,
-`src/toolDrawer.ts`, `src/components/composeCard.tsx`, styles in `src/App.css`.
+Task / …) in the chat stream — **Conductor-style** grouped chips inline with prose.
+Read/bash/search detail opens in a right-side **drawer**; file edits recap in
+**ComposeCard** + **ComposeReviewPane** (feature 038). Pure presentational React + CSS.
 
-### Two render paths (same file)
-| Mode | Driver | Entry | Look |
-|---|---|---|---|
-| Docked chat (non-compact) | `CompactChat` ctx = false | `InterleavedBlocks` → `ToolCallRow` / `EditDiffCard` | wrapping pill cloud |
-| Agent mode (compact) | `CompactChat` ctx = true | `CompactBlocks` → `InlineActionRow` | chip clusters ("6 reads · 2 searches") |
+**Files:** `src/components/chatToolRender.tsx`, `src/components/ToolResultDrawer.tsx`,
+`src/toolDrawer.ts`, `src/components/composeCard.tsx`, `src/composeReview.ts`,
+`src/components/ComposeReviewPane.tsx`, styles in `src/App.css`.
 
-### Layout: wrapping pills, edits/tasks standalone
-`InterleavedBlocks` (non-compact) lays consecutive tool calls into `.ai-tcall-wrap`
-— a `flex-wrap` row of pills, side by side, flowing onto the next line. Tools that
-`isWrapStandalone(name)` (edits, `Task`/`Agent`, `AskUserQuestion`) break out onto
-their own row instead — they're actions worth their own line. Real text between
-runs breaks the wrap; empty text / de-duped re-emits don't.
+### Unified inline layout (editor + agent)
+
+Both docked chat and Agent Mode use the **same** chronology renderer:
+
+| Entry | Implementation | Look |
+|---|---|---|
+| `InterleavedBlocks` | Always delegates to `CompactBlocks` | prose interleaved with tool runs |
+| `CompactBlocks` | Walks `blocks[]`, flushes tool runs | `.ai-iarow` chip rows |
+| `InlineActionRow` | One row per consecutive tool run | Conductor-style grouped chips |
+
+The old non-compact **pill cloud** (`.ai-tcall-wrap` per Read/Grep) was removed —
+editor and agent surfaces now match.
+
+### Inline action chips (`.ai-iarow`)
+
+Consecutive non-task tool calls collapse into one row:
+
+| Chip | Contents |
+|---|---|
+| Explore (muted) | Reads + searches → `Explored 3 files, 4 searches` or `read N files` |
+| Action (prominent) | Bash → `4 ran`; edits → `edited foo.ts`; multi-target → count prefix |
+| Expand on click | Reveals underlying `ToolCallRow` list in `.ai-iaction-detail` |
+
+**Explore set:** `Read`, `NotebookRead`, `Grep`, `Glob`, `ToolSearch`, `WebSearch`, `WebFetch`.
+
+**Skipped in stream:** `TaskCreate`/`Update`/`List`, `TodoWrite`, `AskUserQuestion` (sidebar / ask-dock).
+
+Edits in the chip row are hidden when `hideEdits` (ComposeCard owns the recap).
 
 ### Shared row head: `ToolRowHead`
-Both the generic row and `EditDiffCard` render through one `ToolRowHead` → all rows
-look identical. A content-hugging bordered pill (`.ai-tcall` is `align-items:flex-start`):
+
+Used by generic `ToolCallRow` and `EditDiffCard` when expanded from a chip:
 
 | Part | Element | Behaviour |
 |---|---|---|
 | Primary | `<button class="ai-tcall-open">` icon · name · detail | one click → `onPrimary` |
-| Trail | `.ai-tcall-trail` — spinner / check / `±n` stats | status only; no caret (detail is in an overlay) |
+| Trail | `.ai-tcall-trail` — spinner / check / `±n` stats | status only |
 
-There is **no inline expansion** any more — clicking opens an overlay, so the row
-stays a compact one-liner.
+There is **no inline expansion** in the transcript — clicking opens an overlay/drawer.
 
 ### Click targets
 | Row | `onPrimary` |
 |---|---|
 | Generic with output | `requestToolDrawer(...)` — right slide-over |
 | Generic, no output but file-ref | `openFile(wsId, path)` — new editor tab |
-| Edit / Write / MultiEdit | `requestDiff(...)` — centered DiffModal (Monaco before/after) |
+| Edit / Write / MultiEdit (pill) | `requestDiff(...)` — centered DiffModal |
+| ComposeCard file row | `openComposeReviewTab(...)` — `crev:` diff tab (038) |
 
-`fileRefOf(call)` returns an openable path for `Read`/`Edit`/`Write`/`Notebook*`
-(NOT Grep/Glob — patterns). The file opener comes from the `AgentFileOpen` context:
-- **docked** — `AIChatPanel` provides `openFile(wsId, path)`.
-- **agent mode** — `AgentModeShell` provides the file popup; `AIChatPanel`
-  **forwards** it (`parentFileOpen`) in compact mode so it isn't clobbered.
+`fileRefOf(call)` — openable path for `Read`/`Edit`/`Write`/`Notebook*` (not Grep/Glob patterns).
+
+`AgentFileOpen` context: docked → `openFile`; agent mode → file popup (non-edit reads).
 
 ### Result drawer (`ToolResultDrawer` + `toolDrawer.ts`)
-A right-side slide-over rendered once at app level (`App.tsx`, beside `DiffModal`).
-`requestToolDrawer({title, subtitle, result, markdown, onOpenFile})` → it slides in
-(animates IN **and** OUT via `shown`+translateX; Esc / backdrop / `useModalFocus`).
-Body: `MarkdownPreview` for `.md` reads (gutter stripped) else `<pre>`. If the tool
-is file-ref, the header shows an **"Open in editor"** button.
 
-### Edits → DiffModal (`requestDiff`)
-`EditDiffCard` shows a Cursor-style pill — past-tense verb (`toolVerb` capitalized:
-"Edited"/"Wrote"/"Created") · basename (full path in `title`) · bold `−n`/`+n`. Click
-joins the edit fragments into one original/modified pair and calls `requestDiff(...)`
-with `langOf(path)` — the same centered Monaco diff the source-control panel uses.
-Write/create → empty original → renders all-added. The `DiffModal` itself is a
-full-viewport overlay (`inset:0`, `z-index:1000` — above the chat/rail chrome) with
-a fade+scale entrance animation (`prefers-reduced-motion` guarded).
+App-level right slide-over (`App.tsx`). Markdown for `.md` reads (`stripReadGutter`), else `<pre>`.
 
-### Result rendering: code-view vs Markdown (inside the drawer)
-`isMarkdownRead(call)` (Read of `.md`/`.mdx`/`.markdown`) → render via `MarkdownPreview`
-after `stripReadGutter(text)` strips Claude Code's `cat -n` prefix (`/^\s*\d+\t/gm`).
-**Scope is deliberate** — Bash/Grep output and code files are NOT Markdown, so they
-stay raw `<pre class="ai-tcall-result-body">`.
+### Edits → DiffModal vs Compose Review
 
-### ComposeCard + hideEdits dedup
+| Path | Trigger | UI |
+|---|---|---|
+| Stream `EditDiffCard` pill | Click inline edit chip (when not `hideEdits`) | Centered `DiffModal` |
+| **ComposeCard** | ≥1 edit in turn; click file / Review | **`crev:` tab** — see `038-compose-review.md` |
 
-`ComposeCard` (`composeCard.tsx`) is the end-of-turn changed-files recap
-(Cursor-style bar: count + Undo / Keep / Review, expandable file list). Threshold:
-**≥1 edit** in the assistant message (was ≥2).
+When ComposeCard is shown, `hideEdits={true}` — no duplicate edit pills in stream.
 
-When `ComposeCard` is shown, `InterleavedBlocks` receives `hideEdits={true}` so
-per-file Edit pills are NOT duplicated inline — the recap card is canonical.
-`hideEdits` applies to both docked (`InterleavedBlocks`) and compact
-(`CompactBlocks`) paths.
+### ComposeCard (live recap)
+
+Cursor-style bar: `N Files` (+ `· editing…` while streaming), expandable list with `+/-` stats.
+
+| Action | When |
+|---|---|
+| **Undo All** | Turn finished; restores pre-turn snapshot |
+| **Keep All** | Collapses recap |
+| **Review** | Opens compose-review tab per file |
+| File row click | Opens compose-review for that file |
+
+Visible **as soon as the first edit completes** (`showComposeCard && isAssistant`, including mid-stream).
 
 ### Live turn status (`StatusPill`)
 
-During an in-flight turn, `StatusPill` renders tool/stream state as compact
-pills. **Docked above the composer** in `.ai-status-dock` (feature 022), left
-side of `.ai-status-dock-row`; per-project context files sit on the right
-(feature 037). Not in the message scroll. Includes optional `RunningToolList`
-below the header pill when tools aren't already rendered inline in
-`streamingBlocks`.
+Docked above composer in `.ai-status-dock` (022). Inverted monochrome pill; optional
+`RunningToolList` when tools aren't yet in `streamingBlocks`.
 
-**Visual (`.ai-tcall-status`):** inverted monochrome for impact — pill fill
-`--primary-bg` (near-black in light, near-white in dark), text/spinner
-`--primary-fg`. Trail (t/s), stale copy, and Stop button are re-tinted for
-contrast on the inverted surface. Tool rows in `.ai-status-tools` below keep
-the neutral pill chrome.
+### Per-tool icon tints
 
-### Per-tool icon tints (scan-at-a-glance)
-
-Each tool **family** gets a dedicated hue on its **icon glyph only** — the pill chrome
-stays neutral (`--bg-alt` border). Goal: scan a long turn (6+ Bash/Read/Grep rows) without
-reading every label.
-
-| Tone | CSS class | Token | Tools |
-|---|---|---|---|
-| read | `.ai-tool-tone-read` | `--tool-read` | `Read`, `read_file`, `NotebookRead` |
-| bash | `.ai-tool-tone-bash` | `--tool-bash` | `Bash`, `bash`, `shell`, `BashOutput`, `KillShell` |
-| search | `.ai-tool-tone-search` | `--tool-search` | `Grep`, `Glob`, `ToolSearch`, lowercase aliases |
-| edit | `.ai-tool-tone-edit` | `--tool-edit` | `Edit`, `Write`, `MultiEdit`, `create_file`, … |
-| web | `.ai-tool-tone-web` | `--tool-web` | `WebFetch`, `WebSearch`, fetch/search aliases |
-| todo | `.ai-tool-tone-todo` | `--tool-todo` | `TodoWrite` |
-| task | `.ai-tool-tone-task` | `--tool-task` | `Task`, `Agent`, `TaskCreate`/`Update`/`List` |
-
-**Exceptions (full-pill tint, not icon-only):**
-- **Skill** — existing `.ai-tcall-skill` pill (`--skill` orange).
-- **Image read** — existing `.ai-tcall-image` pill (`--img` teal) when `Read` targets an image path.
-
-**Logic:** `toolToneOf(name)` → `ToolTone | null` (exported). `toolToneClass(name, {skill, image})`
-returns the `ai-tool-tone-*` suffix; skill/image opts skip the class (pill rules own the colour).
-`ToolRowHead` accepts `toolName` and applies the class on `.ai-tcall-ico`.
-
-**Where it renders:**
-| Surface | How |
-|---|---|
-| Transcript pills | `ToolRowHead` → `.ai-tcall-ico.ai-tool-tone-*` |
-| Live ticker | `RunningToolRow` |
-| Compact chips | `InlineActionRow` — `Icon` `className` |
-| Action strip | `ActionStrip` — `ACTION_TONE` maps category key → tone |
-
-Hover on interactive pills: neutral icons brighten to `--fg`; toned icons **keep** their hue
-(`.ai-tcall-ico:not([class*="ai-tool-tone-"])` rule). Active compact chips preserve tone via
-`.ai-chip.active svg.ai-tool-tone-*` / `.ai-ichip.active svg.ai-tool-tone-*` overrides.
-
-Tokens live in `App.css` `:root` + `[data-theme="light"]` — see `features/003-design-system.md`.
-
-### Shared helper (DRY)
-- **`shortDetail(detail)`** — compact path/URL form (basename / host). Used by both
-  `RunningToolRow` (live ticker) and `ToolCallRow` (transcript).
+`toolToneOf` / `.ai-tool-tone-*` on icon glyphs — see table in prior revision; unchanged.
 
 ### Key CSS (`src/App.css`)
+
 | Class | Role |
 |---|---|
-| `.ai-tcall-wrap` | `flex-wrap` pill cloud for read/search runs |
-| `.ai-tcall-head` / `.is-interactive` | content-hugging bordered pill + hover |
-| `.ai-tcall-open` / `.ai-tcall-trail` | primary click area / status cluster |
-| `.ai-tool-tone-*` | per-family icon hue on `.ai-tcall-ico` / compact-chip `svg` |
-| `.ai-tcall-skill` / `.ai-tcall-image` | full-pill tint exceptions (Skill / image Read) |
-| `@keyframes ai-tcall-in` | row entrance (fade + slide) |
-| `.tool-drawer` / `.tool-drawer-scrim` | right slide-over (translateX) + backdrop |
-| `.ai-tcall-result-body` / `.ai-tcall-result-md` | drawer body (mono / rendered md) |
-| `@media (prefers-reduced-motion)` | disables entrance + drawer transitions |
-
-Neutral chrome — no accent fill on pills; the done-check is `--fg-muted`. Colour on icons
-is **identification** (tool family), not semantic state. Edit `±` stats stay green/red
-(semantic). Skill/image reads keep their dedicated full-pill tints.
+| `.ai-iarow` / `.ai-iarow-chips` | Conductor-style grouped tool row |
+| `.ai-ichip` / `.ai-chip` | Compact category / action chips |
+| `.ai-compose-cursor` / `.is-streaming` | Live changed-files recap |
+| `.compose-review-*` | Diff review tab (038) |
+| `.tool-drawer` | Read/bash result slide-over |
 
 ### Gotchas
-- The drawer/DiffModal are **universal** — `ToolCallRow` is also used in compact mode
-  and the subagent transcript view, so clicking a row there opens the same overlay.
-  If that's unwanted in agent mode, gate on `CompactChat`.
-- Edit diff in the DiffModal is built from the tool's `old_string`/`new_string`
-  fragments (joined), NOT the full file — so it shows the changed region, not whole-file context.
+
+- Drawer/DiffModal are global — compact/subagent views share them.
+- Edit diff in DiffModal uses tool fragments, not full file; compose review uses snapshot vs disk.
+- During streaming with edits: stream shows ComposeCard live + explore/bash chips; edit pills hidden.

@@ -1,4 +1,5 @@
 import { DiffEditor } from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
 import { ensureEditorColorThemes, registerMonacoForThemes } from "../editorColorThemes";
 import { readEditorMonoFont } from "../editorMonoFont";
 import { useResolvedEditorColorTheme } from "../useResolvedEditorColorTheme";
@@ -10,6 +11,7 @@ interface Props {
   modifiedContent: string;
   path: string;
   sideBySide?: boolean;
+  onDiffMount?: (editor: editor.IStandaloneDiffEditor) => void;
 }
 
 export function DiffView({
@@ -17,6 +19,7 @@ export function DiffView({
   modifiedContent,
   path,
   sideBySide = false,
+  onDiffMount,
 }: Props) {
   const theme = useResolvedEditorColorTheme();
   const settings = useEditorSettings();
@@ -30,7 +33,10 @@ export function DiffView({
         language={langOf(path)}
         theme={theme}
         beforeMount={ensureEditorColorThemes}
-        onMount={(_ed, monaco) => registerMonacoForThemes(monaco)}
+        onMount={(ed, monaco) => {
+          registerMonacoForThemes(monaco);
+          onDiffMount?.(ed);
+        }}
         options={{
           readOnly: true,
           colorDecorators: true,

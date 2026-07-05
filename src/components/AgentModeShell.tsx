@@ -1,24 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { useStore } from "../store";
+import {
+  useStore,
+  collectComposeReviewTabs,
+  focusedComposeReviewKey,
+  findTabsPaneByTab,
+  parseKey,
+} from "../store";
 import { AIChatPanel } from "./AIChatPanel";
 import { CompactChat, AgentFileOpen } from "./chatToolRender";
+import { ComposeReviewPane } from "./ComposeReviewPane";
 import { SourceControlPanel } from "./SourceControlPanel";
 import { FileTree } from "./FileTree";
 import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
 import { setAgentMode } from "../agentMode";
 import { getTasks, subscribeTasks, clearTasks } from "../aiTaskStore";
-import { AgentCustomizations } from "./AgentCustomizations";
-import {
-  CustomizationsModal,
-  type CustomizationTab,
-} from "./CustomizationsModal";
 import { FilePopupModal } from "./FilePopupModal";
 import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
 import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
-import { modelBadge } from "../modelBadge";
+import { AIChatsRail } from "./AIChatsRail";
 
 interface Props {
   // Always the active workspace id. The shell is NOT remounted on
@@ -99,15 +101,12 @@ export function AgentModeShell({ wsId }: Props) {
   const setActiveWorkspace = useStore((s) => s.setActiveWorkspace);
   const openWorkspace = useStore((s) => s.openWorkspace);
   const addAIChat = useStore((s) => s.addAIChat);
-  const closeAIChat = useStore((s) => s.closeAIChat);
 
   // Which session fills the center column, tracked PER workspace so
   // switching workspaces (and back) restores what you were looking at.
   const [selectedByWs, setSelectedByWs] = useState<Record<string, string>>({});
   const [contextTab, setContextTab] = useState<ContextTab>("changes");
 
-  // The one Agent Customizations modal, opened at a chosen tab.
-  const [custTab, setCustTab] = useState<CustomizationTab | null>(null);
   // File opened from the Files tab (agent mode has no editor pane).
   const [openFilePath, setOpenFilePath] = useState<string | null>(null);
 
@@ -128,6 +127,14 @@ export function AgentModeShell({ wsId }: Props) {
   );
 
   const ws = loaded[wsId];
+  const editorRoot = ws?.layout.editorRoot;
+  const reviewTabs =
+    ws && editorRoot ? collectComposeReviewTabs(wsId, editorRoot) : [];
+  const reviewKey =
+    ws && editorRoot
+      ? focusedComposeReviewKey(wsId, ws.layout, editorRoot)
+      : null;
+  const setActiveTab = useStore((s) => s.setActiveTab);
 
   const chatsFor = (id: string) => {
     const w = loaded[id];
@@ -159,22 +166,10 @@ export function AgentModeShell({ wsId }: Props) {
     setSelectedByWs((m) => ({ ...m, [id]: chatId }));
   };
 
-  const removeSession = (id: string, chatId: string) => {
-    closeAIChat(id, chatId);
-    clearTasks(chatId);
-    setSelectedByWs((m) => {
-      if (m[id] !== chatId) return m;
-      const rest = { ...m };
-      delete rest[id];
-      return rest;
-    });
-  };
-
 
   return (
     <div className="agent-shell" data-ws-id={wsId}>
-      {/* ── Left: workspace rail (Codetta ActivityBar style) +
-             agents panel for the active workspace ──────────────── */}
+      {/* ── Left: workspace rail + expanded Agent Hub ───────── */}
       <aside className="agent-sidebar">
         <div className="agent-wsrail" role="tablist" aria-label="Workspaces">
           {openIds.map((id) => {
@@ -227,89 +222,34 @@ export function AgentModeShell({ wsId }: Props) {
           </button>
         </div>
 
-        <div className="agent-agents">
-          <div className="agent-agents-head">
-            <span className="agent-agents-title" title={ws?.meta.root}>
-              <AIIcon size={13} /> {ws?.meta.name ?? "Workspace"}
-            </span>
-            <button
-              className="agent-new-session"
-              onClick={() => newSession(wsId)}
-              title="New session"
-              aria-label="New session"
-            >
-              <Icon name="plus" size={12} />
-              <span>New</span>
-            </button>
-          </div>
-
-          <div className="agent-agents-list" role="tablist" aria-label="Sessions">
-            {activeChats.length === 0 && (
-              <div className="agent-sessions-empty">
-                No sessions yet — start one to begin.
-              </div>
-            )}
-            {activeChats.map((chat) => {
-              const isActive = chat.id === activeChatId;
-              const badge = modelBadge(chat.model);
-              return (
-                <div
-                  key={chat.id}
-                  className={`agent-session-item ${isActive ? "active" : ""}`}
-                  role="tab"
-                  tabIndex={0}
-                  aria-selected={isActive}
-                  aria-label={`${chat.title} — ${badge.full}`}
-                  title={`${chat.title}\n${badge.full}`}
-                  onClick={() => selectSession(wsId, chat.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      selectSession(wsId, chat.id);
-                    } else if (
-                      (e.key === "Delete" || e.key === "Backspace") &&
-                      !e.repeat
-                    ) {
-                      e.preventDefault();
-                      removeSession(wsId, chat.id);
-                    }
-                  }}
-                >
-                  <span
-                    className={`ai-chats-rail-badge ${badge.className}`}
-                    aria-hidden="true"
-                  >
-                    {badge.short}
-                  </span>
-                  <span className="agent-session-title">{chat.title}</span>
-                  <button
-                    className="agent-session-close"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeSession(wsId, chat.id);
-                    }}
-                    title="Close session"
-                    aria-label={`Close session ${chat.title}`}
-                  >
-                    <Icon name="x" size={10} />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          <AgentTasks chatId={activeChatId} />
-
-          <AgentCustomizations onOpen={(t) => setCustTab(t)} />
-          <button
-            className="agent-exit"
-            onClick={() => setAgentMode(false)}
-            title="Back to editor layout"
-          >
-            <Icon name="chevron-left" size={12} />
-            <span>Editor layout</span>
-          </button>
-        </div>
+        <AIChatsRail
+          placement="agent-sidebar"
+          activeChatId={activeChatId}
+          onSelectChat={selectSession}
+          onNewChat={newSession}
+          onCloseChat={(id, chatId) => {
+            clearTasks(chatId);
+            setSelectedByWs((m) => {
+              if (m[id] !== chatId) return m;
+              const rest = { ...m };
+              delete rest[id];
+              return rest;
+            });
+          }}
+          footer={
+            <>
+              <AgentTasks chatId={activeChatId} />
+              <button
+                className="agent-exit"
+                onClick={() => setAgentMode(false)}
+                title="Back to editor layout"
+              >
+                <Icon name="chevron-left" size={12} />
+                <span>Editor layout</span>
+              </button>
+            </>
+          }
+        />
       </aside>
 
       {railMenu &&
@@ -364,8 +304,10 @@ export function AgentModeShell({ wsId }: Props) {
           );
         })()}
 
-      {/* ── Chat column (primary) ─────────────────────────────── */}
-      <main className="agent-main">
+      {/* ── Chat column (+ optional diff review split) ───────── */}
+      <main className={`agent-main${reviewKey ? " has-review" : ""}`}>
+        <div className="agent-main-inner">
+          <div className="agent-main-chat">
         {ws && activeChatId ? (
           <CompactChat.Provider value={true}>
             <AgentFileOpen.Provider value={setOpenFilePath}>
@@ -396,6 +338,45 @@ export function AgentModeShell({ wsId }: Props) {
             </div>
           </div>
         )}
+          </div>
+          {reviewKey && (
+            <div className="agent-main-review">
+              {reviewTabs.length > 1 && (
+                <div className="agent-review-tabs" role="tablist">
+                  {reviewTabs.map((key) => {
+                    const p = parseKey(key);
+                    const label =
+                      p?.kind === "composeReview"
+                        ? p.path.split(/[\\/]/).pop() ?? p.path
+                        : "Review";
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        role="tab"
+                        className={`agent-review-tab${key === reviewKey ? " active" : ""}`}
+                        aria-selected={key === reviewKey}
+                        onClick={() => {
+                          const pane = editorRoot
+                            ? findTabsPaneByTab(editorRoot, key)
+                            : null;
+                          if (pane) setActiveTab(wsId, pane.id, key);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <ComposeReviewPane
+                wsId={wsId}
+                tabKey={reviewKey}
+                visible
+              />
+            </div>
+          )}
+        </div>
       </main>
 
       {/* ── Context column (Changes / Files) ──────────────────── */}
@@ -445,14 +426,6 @@ export function AgentModeShell({ wsId }: Props) {
           )}
         </div>
       </aside>
-
-      {/* ── Agent Customizations (one tabbed modal) ───────────── */}
-      <CustomizationsModal
-        open={!!custTab}
-        initialTab={custTab ?? "instructions"}
-        onClose={() => setCustTab(null)}
-        root={ws?.meta.root ?? ""}
-      />
 
       {/* ── File popup (Files tab → click) ────────────────────── */}
       <FilePopupModal

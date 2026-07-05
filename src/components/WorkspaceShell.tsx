@@ -10,6 +10,7 @@ import { SidebarStack } from "./SidebarStack";
 import { AIChatPanel } from "./AIChatPanel";
 import { AIIcon } from "./AIIcon";
 import { SubagentTranscriptView } from "./SubagentTranscriptView";
+import { ComposeReviewPane } from "./ComposeReviewPane";
 import { WhiteboardPane } from "./WhiteboardPane";
 import { UsagePanel } from "./UsagePanel";
 import {
@@ -235,15 +236,6 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
             pane={layout.editorRoot}
             registerContainer={registerContainer}
             rootPaneId={layout.editorRoot.id}
-            rightSlotForRoot={
-              <button
-                className="tab-add tab-add-ai"
-                title="New AI chat tab — drag the tab edge to split"
-                onClick={() => useStore.getState().addAIChat(wsId, "editor")}
-              >
-                <AIIcon size={12} /> New AI
-              </button>
-            }
           />
         </div>
         {/*
@@ -325,15 +317,6 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
                       }
                     >
                       + Term ▾
-                    </button>
-                    <button
-                      className="tab-add tab-add-ai"
-                      title="New AI chat tab"
-                      onClick={() =>
-                        useStore.getState().addAIChat(wsId, "bottom")
-                      }
-                    >
-                      <AIIcon size={12} /> New AI
                     </button>
                     <button
                       className="tab-add"
@@ -500,6 +483,50 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
               container={container}
               visible={visible}
             />
+          );
+        });
+      })()}
+
+      {/* Agent edit review — Conductor-style diff tabs (`crev:` keys). */}
+      {(() => {
+        const keys = new Set<string>();
+        const walk = (pane: typeof layout.editorRoot) => {
+          if (pane.kind === "tabs") {
+            pane.tabs.forEach((k) => {
+              if (k.startsWith("crev:")) keys.add(k);
+            });
+          } else {
+            walk(pane.first);
+            walk(pane.second);
+          }
+        };
+        walk(layout.editorRoot);
+        if (layout.bottomRoot) walk(layout.bottomRoot);
+        return [...keys].map((key) => {
+          const parsed = parseKey(key);
+          if (parsed?.kind !== "composeReview") return null;
+          const editorPane = findTabsPaneByTab(layout.editorRoot, key);
+          const bottomPane = layout.bottomRoot
+            ? findTabsPaneByTab(layout.bottomRoot, key)
+            : null;
+          const pane = editorPane ?? bottomPane;
+          const inBottom = !editorPane && !!bottomPane;
+          const container = pane ? (paneContainers[pane.id] ?? null) : null;
+          const visible =
+            isActive &&
+            !!pane &&
+            pane.active === key &&
+            (inBottom ? layout.bottomVisible : true);
+          if (!container) return null;
+          return createPortal(
+            <ComposeReviewPane
+              key={key}
+              wsId={wsId}
+              tabKey={key}
+              visible={visible}
+            />,
+            container,
+            key,
           );
         });
       })()}

@@ -18,6 +18,7 @@ import {
   success as toastSuccess,
 } from "../notify";
 import { useStore } from "../store";
+import { openComposeReviewTab } from "./ComposeReviewPane";
 import { Icon } from "./Icon";
 
 function basename(path: string): string {
@@ -129,11 +130,14 @@ export function ComposeCard({
   chatId,
   msgIndex,
   calls,
+  streaming = false,
 }: {
   wsId: string;
   chatId: string | undefined;
   msgIndex: number;
   calls: ToolCall[];
+  /** True while the turn is still in flight — list grows live. */
+  streaming?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(true);
   const byPath = useMemo(() => {
@@ -147,23 +151,23 @@ export function ComposeCard({
     return Array.from(m.entries());
   }, [calls]);
 
-  const openFile = async (path: string) => {
-    try {
-      await useStore.getState().openFile(wsId, path);
-    } catch {
-      /* file may not exist */
-    }
+  const openReview = (path: string) => {
+    openComposeReviewTab(wsId, chatId, msgIndex, path, calls);
   };
 
-  const openAll = async () => {
-    for (const [path] of byPath) await openFile(path);
+  const openAll = () => {
+    for (const [path] of byPath) openReview(path);
   };
 
   const n = byPath.length;
-  const label = `${n} File${n === 1 ? "" : "s"}`;
+  const label = streaming
+    ? `${n} File${n === 1 ? "" : "s"} · editing…`
+    : `${n} File${n === 1 ? "" : "s"}`;
 
   return (
-    <div className={`ai-compose-cursor${collapsed ? "" : " is-open"}`}>
+    <div
+      className={`ai-compose-cursor${collapsed ? "" : " is-open"}${streaming ? " is-streaming" : ""}`}
+    >
       <div className="ai-compose-bar">
         <button
           type="button"
@@ -172,32 +176,40 @@ export function ComposeCard({
           aria-expanded={!collapsed}
           title={collapsed ? "Show changed files" : "Collapse"}
         >
-          <Icon
-            name={collapsed ? "chevron-right" : "chevron-down"}
-            size={14}
-          />
+          {streaming ? (
+            <span className="ai-spinner ai-spinner-sm" aria-hidden="true" />
+          ) : (
+            <Icon
+              name={collapsed ? "chevron-right" : "chevron-down"}
+              size={14}
+            />
+          )}
           <span>{label}</span>
         </button>
         <div className="ai-compose-bar-actions">
-          <ComposeUndoButton
-            wsId={wsId}
-            chatId={chatId}
-            msgIndex={msgIndex}
-            touchedPaths={byPath.map(([p]) => p)}
-          />
-          <button
-            type="button"
-            className="ai-compose-ghost"
-            onClick={() => setCollapsed(true)}
-            title="Collapse — changes are already saved"
-          >
-            Keep All
-          </button>
+          {!streaming && (
+            <ComposeUndoButton
+              wsId={wsId}
+              chatId={chatId}
+              msgIndex={msgIndex}
+              touchedPaths={byPath.map(([p]) => p)}
+            />
+          )}
+          {!streaming && (
+            <button
+              type="button"
+              className="ai-compose-ghost"
+              onClick={() => setCollapsed(true)}
+              title="Collapse — changes are already saved"
+            >
+              Keep All
+            </button>
+          )}
           <button
             type="button"
             className="ai-compose-review"
             onClick={() => void openAll()}
-            title="Open every modified file in editor tabs"
+            title="Open every modified file in diff review tabs"
           >
             Review
           </button>
@@ -224,7 +236,7 @@ export function ComposeCard({
                 <button
                   type="button"
                   className="ai-compose-row"
-                  onClick={() => void openFile(path)}
+                  onClick={() => openReview(path)}
                   title={path}
                 >
                   <span className="ai-compose-row-icon" aria-hidden>

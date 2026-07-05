@@ -281,19 +281,6 @@ function fileRefOf(call: ToolCall): string {
   return p && p !== "(unknown)" ? p : "";
 }
 
-// Tools that render on their own row (NOT in the wrapping pill cloud): edits
-// (own diff), Task/Agent (subagent chip), AskUserQuestion (summary). Everything
-// else (Read/Grep/Bash/Web…) flows into the compact wrap. EDIT_NAMES is defined
-// below; this runs at render time so it's initialised by then.
-function isWrapStandalone(name: string): boolean {
-  return (
-    EDIT_NAMES.has(name) ||
-    name === "Task" ||
-    name === "Agent" ||
-    name === "AskUserQuestion"
-  );
-}
-
 // Shared head for every tool row (generic + edit). A content-hugging bordered
 // pill: icon · name · detail on a primary button, status in a trailing cluster.
 // The whole pill is one click target → `onPrimary` (open the result drawer, the
@@ -682,140 +669,17 @@ export function InterleavedBlocks({
   /** When true, file edits are summarized in ComposeCard at turn end. */
   hideEdits?: boolean;
 }) {
-  const compact = useContext(CompactChat);
-  // Compact (agent) mode: a distinct, inline render — narration prose with
-  // runs of tool calls collapsed into a row of icon chips (grouped by type)
-  // that reveal their target on hover and expand on click. Task tools are
-  // omitted (the sidebar owns them).
-  if (compact) {
-    return (
-      <CompactBlocks
-        blocks={blocks}
-        callsById={callsById}
-        resultsById={resultsById}
-        erroredIds={erroredIds ?? EMPTY_ID_SET}
-        streaming={streaming}
-        hideEdits={hideEdits}
-      />
-    );
-  }
-  // Claude sometimes retries AskUserQuestion after the redirect deny,
-  // which would render two identical question cards back to back.
-  // Keep only the LAST occurrence of each identical question set.
-  const askDupSkip = new Set<number>();
-  {
-    const seen = new Map<string, number>();
-    blocks.forEach((b, i) => {
-      if (b.kind !== "tool_call") return;
-      const call = callsById.get(b.callId);
-      if (!call || call.function.name !== "AskUserQuestion") return;
-      const sig = JSON.stringify(call.function.arguments?.questions ?? null);
-      const prev = seen.get(sig);
-      if (prev !== undefined) askDupSkip.add(prev);
-      seen.set(sig, i);
-    });
-  }
-  // Drop re-emitted tool_use blocks (same callId twice) — some providers
-  // surface a tool call in both a partial and the final message, which
-  // otherwise renders every row twice. Also covers transcripts saved
-  // before the stream-level dedup landed.
-  const dupCallSkip = new Set<number>();
-  {
-    const seenIds = new Set<string>();
-    blocks.forEach((b, i) => {
-      if (b.kind !== "tool_call") return;
-      if (seenIds.has(b.callId)) dupCallSkip.add(i);
-      else seenIds.add(b.callId);
-    });
-  }
-  // Lay consecutive read-ish tool calls out as a wrapping row of compact pills
-  // ("Read · Glob · Grep" side by side, flowing onto the next line) instead of
-  // a tall stack. Edits and Tasks break out onto their own row — they're
-  // actions that change code / spawn agents, so they stay prominent.
-  const wrapAt = new Map<number, number[]>();
-  const inWrap = new Set<number>();
-  {
-    let run: number[] = [];
-    const flush = () => {
-      if (run.length) {
-        wrapAt.set(run[0], [...run]);
-        for (const k of run.slice(1)) inWrap.add(k);
-      }
-      run = [];
-    };
-    blocks.forEach((b, i) => {
-      const name =
-        b.kind === "tool_call" ? callsById.get(b.callId)?.function.name ?? "" : "";
-      const wrappable =
-        b.kind === "tool_call" &&
-        !askDupSkip.has(i) &&
-        !dupCallSkip.has(i) &&
-        !isWrapStandalone(name);
-      if (wrappable) {
-        run.push(i);
-        return;
-      }
-      // Empty text and skipped dup blocks don't break a run; real text and
-      // standalone tools (edits/tasks) do.
-      if (b.kind === "text" && !b.text) return;
-      if (b.kind === "tool_call" && (askDupSkip.has(i) || dupCallSkip.has(i)))
-        return;
-      flush();
-    });
-    flush();
-  }
+  // Conductor-style inline grouping (`.ai-iarow`) in every chat surface —
+  // docked editor and agent mode share the same chronology + chip runs.
   return (
-    <>
-      {blocks.map((b, i) => {
-        if (b.kind === "text") {
-          if (!b.text) return null;
-          return (
-            <MarkdownPreview
-              key={`t${i}`}
-              content={balanceFences(b.text)}
-            />
-          );
-        }
-        if (askDupSkip.has(i) || dupCallSkip.has(i) || inWrap.has(i))
-          return null;
-        const wrap = wrapAt.get(i);
-        if (wrap) {
-          const items = wrap
-            .map((k) => {
-              const blk = blocks[k];
-              return blk.kind === "tool_call"
-                ? { id: blk.callId, call: callsById.get(blk.callId) }
-                : null;
-            })
-            .filter(
-              (c): c is { id: string; call: ToolCall } => !!c && !!c.call,
-            );
-          if (items.length === 0) return null;
-          return (
-            <div key={`w${i}`} className="ai-tcall-wrap">
-              {items.map((it) => (
-                <ToolCallRow
-                  key={it.id}
-                  call={it.call}
-                  result={resultsById.get(it.id)}
-                />
-              ))}
-            </div>
-          );
-        }
-        const call = callsById.get(b.callId);
-        if (!call) return null;
-        if (hideEdits && extractEditDiffs(call)) return null;
-        return (
-          <div key={`c${i}`} className="ai-tcalls ai-tcalls-inline">
-            <ToolCallRow
-              call={call}
-              result={resultsById.get(b.callId)}
-            />
-          </div>
-        );
-      })}
-    </>
+    <CompactBlocks
+      blocks={blocks}
+      callsById={callsById}
+      resultsById={resultsById}
+      erroredIds={erroredIds ?? EMPTY_ID_SET}
+      streaming={streaming}
+      hideEdits={hideEdits}
+    />
   );
 }
 
@@ -850,7 +714,20 @@ const EXPLORE_NAMES = new Set([
   "WebFetch",
 ]);
 
-// A run of consecutive tool calls, rendered with hierarchy: all the
+function exploreSummaryLabel(
+  reads: number,
+  searches: number,
+  total: number,
+): string {
+  if (reads > 0 && searches > 0) {
+    return `Explored ${reads} file${reads === 1 ? "" : "s"}, ${searches} search${searches === 1 ? "" : "es"}`;
+  }
+  if (reads > 0) return `read ${reads} file${reads === 1 ? "" : "s"}`;
+  if (searches > 0) return `${searches} search${searches === 1 ? "" : "es"}`;
+  return `explored ${total}`;
+}
+
+// A run of consecutive tool calls, rendered with hierarchy:
 // read/search "exploration" collapses into one quiet chip ("read 16
 // files"), while changes (edits/writes) and commands stand out as their
 // own prominent chips. Clicking an edit chip opens that file; any chip
@@ -895,12 +772,7 @@ function InlineActionRow({
     /Read/.test(it.call.function.name),
   ).length;
   const searches = explore.length - reads;
-  const exLabel =
-    searches === 0
-      ? `read ${reads} file${reads === 1 ? "" : "s"}`
-      : reads === 0
-        ? `${searches} search${searches === 1 ? "" : "es"}`
-        : `explored ${explore.length}`;
+  const exLabel = exploreSummaryLabel(reads, searches, explore.length);
 
   return (
     <div className="ai-iarow">
@@ -924,9 +796,11 @@ function InlineActionRow({
             ...new Set(g.calls.map((c) => shortTarget(c.call)).filter(Boolean)),
           ];
           const label =
-            targets.length === 1
-              ? `${verb} ${targets[0]}${n > 1 ? ` ×${n}` : ""}`
-              : verb;
+            n > 1 && targets.length !== 1
+              ? `${n} ${verb}`
+              : targets.length === 1
+                ? `${verb} ${targets[0]}${n > 1 ? ` ×${n}` : ""}`
+                : verb;
           const key = `a${gi}`;
           const tone = EDIT_NAMES.has(g.name) ? "tone-edit" : "tone-action";
           const file = targets.length === 1 ? fullPathOf(g.calls[0].call) : "";
