@@ -2,7 +2,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -91,6 +90,7 @@ import {
   MAX_ATTACHED_IMAGES,
   attachFromBlob,
   attachFromPath,
+  rehydrateAttachment,
   registerChatDropZone,
 } from "../imageAttach";
 import { ClaudePermissionOverlay } from "./ClaudePermissionOverlay";
@@ -117,6 +117,11 @@ import {
   deriveTitle,
   type ChatSession,
 } from "../chatHistory";
+import {
+  draftFromSession,
+  mergeComposerDraft,
+  type ChatComposerDraft,
+} from "../composerDraft";
 import {
   readProviderSessionIds,
   setProviderSessionId,
@@ -156,6 +161,10 @@ import { permissionFor } from "../toolPermissions";
 import { onAIPromptRequest, requestAIPrompt } from "../aiBus";
 import { ComposerQueue } from "./ComposerQueue";
 import { relPath } from "../pathUtils";
+import {
+  MentionSuggestions,
+  type MentionItem,
+} from "./MentionSuggestions";
 import {
   groupChatTurns,
   isNearBottom,
@@ -200,6 +209,32 @@ function parseMention(
   return null;
 }
 
+function draftFromComposerSnap(snap: {
+  input: string;
+  queue: string[];
+  attachTree: boolean;
+  attachTerminal: boolean;
+  attachedAgents: string[];
+  attachedImages: ImageAttachment[];
+}): ChatComposerDraft | undefined {
+  const draft: ChatComposerDraft = {};
+  if (snap.input) draft.input = snap.input;
+  if (snap.queue.length > 0) draft.queue = [...snap.queue];
+  if (snap.attachTree) draft.attachTree = true;
+  if (snap.attachTerminal) draft.attachTerminal = true;
+  if (snap.attachedAgents.length > 0) {
+    draft.attachedAgents = [...snap.attachedAgents];
+  }
+  if (snap.attachedImages.length > 0) {
+    draft.attachedImages = snap.attachedImages.map((i) => ({
+      id: i.id,
+      path: i.path,
+      name: i.name,
+    }));
+  }
+  return Object.keys(draft).length > 0 ? draft : undefined;
+}
+
 interface Props {
   wsId: string;
   root: string;
@@ -226,10 +261,39 @@ const BUDGET_KEY = "lcp.claudeCode.budgetUsd";
 // restarts. Empty / missing = Ask (null). See permModeStore for how the mode
 // reaches the permission overlay.
 const PERM_MODE_KEY = "lcp.claudeCode.permMode";
-// Last-used Claude Code effort level — sticks across tabs and restarts.
+// Default effort for brand-new chats — each saved session stores its own.
 const EFFORT_KEY = "lcp.claudeCode.effort";
 function readEffort(): string {
   return normalizeCcEffort(lsGetString(EFFORT_KEY));
+}
+function readDefaultPermMode(): string | null {
+  const raw = lsGetString(PERM_MODE_KEY);
+  return raw || null;
+}
+function sessionKnobsFrom(
+  session: ChatSession | undefined,
+): { effort: string; thinking: boolean | null; permMode: string | null } {
+  return {
+    effort: session?.ccEffort
+      ? normalizeCcEffort(session.ccEffort)
+      : readEffort(),
+    thinking: session?.ccThinking ?? null,
+    permMode:
+      session?.ccPermMode !== undefined
+        ? session.ccPermMode
+        : readDefaultPermMode(),
+  };
+}
+function defaultSessionKnobs(): {
+  effort: string;
+  thinking: boolean | null;
+  permMode: string | null;
+} {
+  return {
+    effort: readEffort(),
+    thinking: null,
+    permMode: readDefaultPermMode(),
+  };
 }
 function readBudgetUsd(): number {
   const raw = lsGetString(BUDGET_KEY);
@@ -587,6 +651,18 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     Partial<Record<ProviderId, string>>
   >({});
   const claudeSessionId = providerSessionIds["claude-code"];
+  // Per-chat Claude Code session knobs — restored from ChatSession on switch.
+  const [ccEffort, setCcEffort] = useState<string>(() => readEffort());
+  const [effortPulseToken, setEffortPulseToken] = useState(0);
+  const bumpEffortPulse = () => setEffortPulseToken((n) => n + 1);
+  const applyCcEffort = (v: CcEffort, toast = true) => {
+    setCcEffort(v);
+    if (toast) toastInfo(`Effort: ${v} (from your next message)`);
+  };
+  const [ccPermMode, setCcPermMode] = useState<string | null>(
+    () => readDefaultPermMode(),
+  );
+  const [ccThinking, setCcThinking] = useState<boolean | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [attachTree, setAttachTree] = useState(false);
@@ -596,6 +672,52 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   // catalog (project + global .claude/agents) is loaded into `agents`.
   const [agents, setAgents] = useState<SubagentDef[]>([]);
   const [attachedAgents, setAttachedAgents] = useState<string[]>([]);
+  const queueRef = useRef<string[]>([]);
+  const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
+  const syncQueueUi = useCallback(() => {
+    setQueuedMessages([...queueRef.current]);
+  }, []);
+  const composerPersistRef = useRef({
+    sessionId: "",
+    input: "",
+    queue: [] as string[],
+    attachTree: false,
+    attachTerminal: false,
+    attachedAgents: [] as string[],
+    attachedImages: [] as ImageAttachment[],
+  });
+  const applyComposerDraft = useCallback(
+    (draft: ChatComposerDraft) => {
+      setInput(draft.input ?? "");
+      queueRef.current = draft.queue ? [...draft.queue] : [];
+      syncQueueUi();
+      setAttachTree(!!draft.attachTree);
+      setAttachTerminal(!!draft.attachTerminal);
+      setAttachedAgents(draft.attachedAgents ?? []);
+      if (!draft.attachedImages?.length) {
+        setAttachedImages([]);
+        return;
+      }
+      void Promise.all(draft.attachedImages.map(rehydrateAttachment)).then(
+        (imgs) =>
+          setAttachedImages(
+            imgs.filter((x): x is ImageAttachment => x !== null),
+          ),
+      );
+    },
+    [syncQueueUi],
+  );
+  const flushComposerDraft = useCallback(
+    (sid: string) => {
+      if (!sid) return;
+      mergeComposerDraft(
+        wsId,
+        sid,
+        draftFromComposerSnap(composerPersistRef.current) ?? {},
+      );
+    },
+    [wsId],
+  );
   // Skills offered in the `/` menu (Claude Code only) — loaded from
   // <ws>/.claude/skills + ~/.claude/skills alongside the subagent scan.
   const [skills, setSkills] = useState<SkillDef[]>([]);
@@ -625,6 +747,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   const editorState = useEditorState();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const composerShellRef = useRef<HTMLDivElement>(null);
   // Hidden file picker behind the composer "+" button (image attachments).
   const attachInputRef = useRef<HTMLInputElement>(null);
   // Root element ref — its bounding rect is the drop-zone the window-level
@@ -1148,7 +1271,6 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   // - Without `aiChatId` (singleton sidebar mode): keep the legacy
   //   behavior of restoring the most-recently-saved session.
   useEffect(() => {
-    setInput("");
     const list = loadSessions(wsId);
     setSessions(list);
     // Per-switch resets shared by every branch below. Previous code had
@@ -1168,6 +1290,11 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       // empty / non-CC, this stays undefined.
       setProviderSessionIds(readProviderSessionIds(found ?? {}));
       setChatTotalCost(found?.totalCostUsd ?? 0);
+      const knobs = sessionKnobsFrom(found);
+      setCcEffort(knobs.effort);
+      setCcThinking(knobs.thinking);
+      setCcPermMode(knobs.permMode);
+      applyComposerDraft(draftFromSession(found));
       if (found) {
         const msgs = cleanStaleToolMessages(found.messages);
         setMessages(msgs);
@@ -1176,10 +1303,13 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
           const q = parseQualifiedModel(found.model)
             ? found.model
             : makeQualifiedModel("ollama", found.model);
-          setSelected((cur) => cur || q);
+          setSelected(q);
         }
       } else {
         setMessages([]);
+      }
+      if (onHydrated) {
+        requestAnimationFrame(() => requestAnimationFrame(onHydrated));
       }
       return;
     }
@@ -1188,6 +1318,11 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       setSessionId(list[0].id);
       setProviderSessionIds(readProviderSessionIds(list[0]));
       setChatTotalCost(list[0].totalCostUsd ?? 0);
+      const knobs = sessionKnobsFrom(list[0]);
+      setCcEffort(knobs.effort);
+      setCcThinking(knobs.thinking);
+      setCcPermMode(knobs.permMode);
+      applyComposerDraft(draftFromSession(list[0]));
       // Filter out stale "Unknown tool: X" result messages from older
       // sessions where we incorrectly tried to execute the agentic
       // provider's tool calls on our side. They're meaningless garbage.
@@ -1198,22 +1333,20 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
         const q = parseQualifiedModel(list[0].model)
           ? list[0].model
           : makeQualifiedModel("ollama", list[0].model);
-        setSelected((cur) => cur || q);
+        setSelected(q);
       }
     } else {
       setSessionId(newSessionId());
       setProviderSessionIds({});
       setChatTotalCost(0);
       setMessages([]);
+      const knobs = defaultSessionKnobs();
+      setCcEffort(knobs.effort);
+      setCcThinking(knobs.thinking);
+      setCcPermMode(knobs.permMode);
+      applyComposerDraft({});
     }
-  }, [wsId, aiChatId]);
-
-  // Parent overlay (agent-mode chat switch) clears after first paint with
-  // the hydrated session — useLayoutEffect so we don't flash old messages.
-  useLayoutEffect(() => {
-    if (!aiChatId || !onHydrated) return;
-    onHydrated();
-  }, [wsId, aiChatId, sessionId, onHydrated]);
+  }, [wsId, aiChatId, onHydrated, applyComposerDraft]);
 
   // When sessionId changes inside a tabbed panel (e.g. via /new or the
   // history dropdown), persist it back to the descriptor so a reload
@@ -1253,10 +1386,24 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       updatedAt: Date.now(),
       ...writeProviderSessionIds(providerSessionIds),
       totalCostUsd: chatTotalCost > 0 ? chatTotalCost : undefined,
+      ccEffort,
+      ccThinking,
+      ccPermMode,
+      composer: draftFromComposerSnap(composerPersistRef.current),
     };
     saveSession(wsId, session);
     setSessions(loadSessions(wsId));
-  }, [messages, sessionId, wsId, selected, providerSessionIds, chatTotalCost]);
+  }, [
+    messages,
+    sessionId,
+    wsId,
+    selected,
+    providerSessionIds,
+    chatTotalCost,
+    ccEffort,
+    ccThinking,
+    ccPermMode,
+  ]);
 
   // Last-resort flush: if the page is about to close (refresh, tab
   // close), write the current state synchronously even if a streaming
@@ -1283,6 +1430,10 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
         updatedAt: Date.now(),
         ...writeProviderSessionIds(providerSessionIds),
         totalCostUsd: chatTotalCost > 0 ? chatTotalCost : undefined,
+        ccEffort,
+        ccThinking,
+        ccPermMode,
+        composer: draftFromComposerSnap(composerPersistRef.current),
       };
       saveSession(wsId, session);
     };
@@ -1296,15 +1447,100 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     selected,
     providerSessionIds,
     chatTotalCost,
+    ccEffort,
+    ccThinking,
+    ccPermMode,
   ]);
 
-  // Queue of follow-up messages typed while a turn is in flight.
-  // Drains automatically once the active turn finishes.
-  const queueRef = useRef<string[]>([]);
-  const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
-  const syncQueueUi = useCallback(() => {
-    setQueuedMessages([...queueRef.current]);
-  }, []);
+  // Empty chats still need their knobs persisted — the messages effect
+  // above bails when messages.length === 0.
+  useEffect(() => {
+    if (!sessionId || messages.length > 0) return;
+    const existing = loadSessions(wsId).find((s) => s.id === sessionId);
+    saveSession(wsId, {
+      id: sessionId,
+      title: existing?.title ?? "Untitled",
+      messages: [],
+      model: selected || existing?.model,
+      updatedAt: Date.now(),
+      ...writeProviderSessionIds(providerSessionIds),
+      ccEffort,
+      ccThinking,
+      ccPermMode,
+      composer: draftFromComposerSnap(composerPersistRef.current),
+    });
+  }, [
+    sessionId,
+    wsId,
+    messages.length,
+    selected,
+    providerSessionIds,
+    ccEffort,
+    ccThinking,
+    ccPermMode,
+    input,
+    queuedMessages,
+    attachTree,
+    attachTerminal,
+    attachedAgents,
+    attachedImages,
+  ]);
+
+  useEffect(() => {
+    composerPersistRef.current = {
+      sessionId,
+      input,
+      queue: queueRef.current,
+      attachTree,
+      attachTerminal,
+      attachedAgents,
+      attachedImages,
+    };
+  }, [
+    sessionId,
+    input,
+    queuedMessages,
+    attachTree,
+    attachTerminal,
+    attachedAgents,
+    attachedImages,
+  ]);
+
+  const prevSessionIdRef = useRef(sessionId);
+  useEffect(() => {
+    const prev = prevSessionIdRef.current;
+    if (prev && prev !== sessionId) flushComposerDraft(prev);
+    prevSessionIdRef.current = sessionId;
+  }, [sessionId, flushComposerDraft]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    const t = window.setTimeout(() => flushComposerDraft(sessionId), 400);
+    return () => clearTimeout(t);
+  }, [
+    sessionId,
+    flushComposerDraft,
+    input,
+    queuedMessages,
+    attachTree,
+    attachTerminal,
+    attachedAgents,
+    attachedImages,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      const snap = composerPersistRef.current;
+      if (!snap.sessionId) return;
+      mergeComposerDraft(
+        wsId,
+        snap.sessionId,
+        draftFromComposerSnap(snap) ?? {},
+      );
+    };
+  }, [wsId]);
+
+  // drainQueue is a stable useCallback([]), so it MUST call the latest
   const pushQueue = useCallback(
     (text: string) => {
       queueRef.current.push(text);
@@ -1490,29 +1726,8 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   const [ccCommands, setCcCommands] = useState<
     Array<{ name: string; hint: string }>
   >([]);
-  // Per-chat Claude Code session knobs, set via /effort and /mode.
-  // Applied to every subsequent spawn. Persisted globally like perm mode.
-  const [ccEffort, setCcEffort] = useState<string>(() => readEffort());
-  const [effortPulseToken, setEffortPulseToken] = useState(0);
-  const bumpEffortPulse = () => setEffortPulseToken((n) => n + 1);
-  const applyCcEffort = (v: CcEffort, toast = true) => {
-    setCcEffort(v);
-    if (toast) toastInfo(`Effort: ${v} (from your next message)`);
-  };
-  // Per-chat permission mode. null = Ask (card on every edit/command — the
-  // safe default and what a fresh install gets). The chosen mode is the ONLY
-  // thing that drives auto-allow: ClaudePermissionOverlay reads it via
-  // permModeStore. We seed from localStorage so a power user's "Auto" sticks
-  // across restarts. /mode off resets to Ask. Only used for claude-code.
-  const [ccPermMode, setCcPermMode] = useState<string | null>(
-    () => lsGetString(PERM_MODE_KEY),
-  );
-  // Extended thinking: null = CLI default, true = forced on, false = off.
-  const [ccThinking, setCcThinking] = useState<boolean | null>(null);
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
-  // Persist the chosen mode and publish it to the permission overlay's
-  // bridge. Keyed by both the captured CC session id (preferred) and the
-  // workspace root (fallback for the first tool call of a fresh chat).
+  // Persist defaults for brand-new chats + publish mode to the overlay bridge.
   useEffect(() => {
     lsSetString(PERM_MODE_KEY, ccPermMode ?? "");
     setPermMode({ sessionId: claudeSessionId, cwd: root }, ccPermMode);
@@ -1766,9 +1981,6 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   // then workspace files. Agents only appear with Claude Code (the
   // `agents` catalog is empty otherwise). Files match on the workspace-
   // relative path; the whole popover is capped at 8 rows.
-  type MentionItem =
-    | { type: "agent"; agent: SubagentDef }
-    | { type: "file"; abs: string; rel: string };
   const mentionMatches = useMemo<MentionItem[]>(() => {
     if (!mentionState) return [];
     const q = mentionState.query.toLowerCase();
@@ -2892,6 +3104,10 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       messages: prefix,
       model: selected,
       updatedAt: Date.now(),
+      ccEffort,
+      ccThinking,
+      ccPermMode,
+      composer: draftFromComposerSnap(composerPersistRef.current),
       // No claudeSessionId — branching forks the conversation, so
       // we want a fresh Claude Code session not a resumed one.
     };
@@ -2923,7 +3139,11 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     setChatTotalCost(0);
     resetTurnTransients();
     setMessages([]);
-    setInput("");
+    applyComposerDraft({});
+    const knobs = defaultSessionKnobs();
+    setCcEffort(knobs.effort);
+    setCcThinking(knobs.thinking);
+    setCcPermMode(knobs.permMode);
     setHistoryOpen(false);
   };
 
@@ -2945,15 +3165,16 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     // (last-turn usage card, TodoWrite list, budget-warn latch, scrub
     // index) clears via the shared transient-reset helper.
     setChatTotalCost(s.totalCostUsd ?? 0);
+    const knobs = sessionKnobsFrom(s);
+    setCcEffort(knobs.effort);
+    setCcThinking(knobs.thinking);
+    setCcPermMode(knobs.permMode);
     resetTurnTransients();
     setMessages(s.messages);
     rebuildChecklist(s.messages);
-    setInput("");
+    applyComposerDraft(draftFromSession(s));
     setHistoryOpen(false);
-    if (s.model) {
-      const model = s.model;
-      setSelected((cur) => cur || model);
-    }
+    if (s.model) setSelected(s.model);
   };
 
   const runInActiveTerminal = async (text: string) => {
@@ -3432,6 +3653,11 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       setMessages([]);
       setProviderSessionIds({});
       setChatTotalCost(0);
+      const knobs = defaultSessionKnobs();
+      setCcEffort(knobs.effort);
+      setCcThinking(knobs.thinking);
+      setCcPermMode(knobs.permMode);
+      applyComposerDraft({});
       resetTurnTransients();
     }
   };
@@ -4449,38 +4675,13 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
         </div>
       )}
       {mentionState && mentionMatches.length > 0 && streaming === null && (
-        <div className="ai-slash-suggestions ai-mention-suggestions">
-          {mentionMatches.map((m, i) => (
-            <button
-              key={m.type === "agent" ? `agent:${m.agent.name}` : m.abs}
-              className={`ai-slash-item ${i === mentionIndex ? "active" : ""}`}
-              onMouseEnter={() => setMentionIndex(i)}
-              onClick={() => acceptMention(m)}
-            >
-              {m.type === "agent" ? (
-                <>
-                  <img
-                    className="ai-mention-avatar"
-                    src={m.agent.avatar}
-                    alt=""
-                    aria-hidden="true"
-                  />
-                  <span className="ai-slash-name">@{m.agent.name}</span>
-                  <span className="ai-slash-hint">
-                    {m.agent.description
-                      ? m.agent.description.slice(0, 60)
-                      : `subagent · ${m.agent.source}`}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="ai-slash-name">@{m.rel}</span>
-                  <span className="ai-slash-hint">attach file</span>
-                </>
-              )}
-            </button>
-          ))}
-        </div>
+        <MentionSuggestions
+          anchorRef={composerShellRef}
+          matches={mentionMatches}
+          activeIndex={mentionIndex}
+          onPick={acceptMention}
+          onHover={setMentionIndex}
+        />
       )}
       {(() => {
         const isSlash = input.startsWith("/");
@@ -4817,7 +5018,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       {/* Cursor-style composer: one pill. CSS `order` puts the textarea
           row on top and the controls (model/effort/thinking) below;
           permission/queue cards float to the top when present. */}
-      <div className="ai-composer-shell">
+      <div className="ai-composer-shell" ref={composerShellRef}>
       {selectedIsCC && (
         <div className="ai-context-ring-dock">
           <SessionUsageCircle

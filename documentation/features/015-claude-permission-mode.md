@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-03
+last_verified: 2026-07-05
 tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command]
 ---
 
@@ -32,7 +32,7 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 | Bypass | `bypassPermissions` | overlay allows EVERY tool, **before** the privacy gate too → no cards, no guard. Hook stays on (see gotcha) |
 
 ### Data Flow
-- `AIChatPanel` holds `ccPermMode` (seeded from `localStorage["lcp.claudeCode.permMode"]`). A `useEffect` persists it and calls `setPermMode({ sessionId, cwd: root }, mode)` on every change.
+- `AIChatPanel` holds `ccPermMode` per chat. Restored from `ChatSession.ccPermMode` on session switch; global `localStorage["lcp.claudeCode.permMode"]` seeds **new** chats only (feature 040). A `useEffect` still mirrors the active value to storage (default for next new chat) and calls `setPermMode({ sessionId, cwd: root }, mode)` on every change.
 - `permModeStore` records the mode in `bySession` (by CC session id) and `byCwd` (normalized root) — the cwd fallback covers the first tool call of a fresh chat before its session id has streamed back.
 - A `claude:permission-request` arrives → every mounted `ClaudePermissionOverlay` hears it (global event). `isForThisPanel` drops requests that belong to another workspace or another CC session within the same workspace. The surviving overlay runs its gates **in order**: AskUserQuestion redirect → **Bypass allow-all** → privacy exclusion → read-only allow → `modeAutoAllow(req)` → (in Plan mode: stop, show card) → saved/always-allow rules → show card.
 - `modeAutoAllow` calls `getPermModeFor(req)` (session id, then cwd, else `"default"`): `auto` → allow all; `acceptEdits` → allow only `WRITE_TOOLS`; `plan` → allow Bash only when `isReadOnlyBash` (head ∈ `READ_ONLY_BASH`, or `git` + read-only subcommand, and no chain/redirect/pipe/subshell via `BASH_CHAIN_RE`); else → no mode-based allow.
@@ -41,8 +41,9 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 | Where | What | Lifetime |
 |---|---|---|
 | `permModeStore` module Maps | `bySession`, `byCwd` | app session (in-memory) |
-| `localStorage` `lcp.claudeCode.permMode` | last chosen mode | across restarts |
-| `AIChatPanel` `ccPermMode` | per-chat React state | component |
+| `localStorage` `lcp.claudeCode.permMode` | default for **new** chats | across restarts |
+| `ChatSession.ccPermMode` | saved mode per transcript row | localStorage `lcp.ollama.history.{wsId}` |
+| `AIChatPanel` `ccPermMode` | per-chat React state | restored on mount / switch |
 | `ClaudePermissionOverlay` `queue` | pending permission cards for THIS panel's CC session | component (purged on session switch) |
 
 ### Notes / gotchas

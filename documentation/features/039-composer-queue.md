@@ -114,12 +114,14 @@ direction now", not "send my follow-ups after abort". Differs from Send now.
 
 | Store | Scope | Notes |
 |---|---|---|
-| `queueRef` (`string[]`) | Per `AIChatPanel` mount | Source of truth for drain logic |
+| `queueRef` (`string[]`) | Per chat session | Source of truth for drain logic |
 | `queuedMessages` (`useState`) | Mirror of ref | Drives `ComposerQueue` render |
+| `ChatSession.composer.queue` | Persisted | Restored on tab/history switch — see `040-per-session-composer-state.md` |
 | `pushQueue` / `removeQueueAt` / `clearQueue` / `syncQueueUi` | Helpers | Keep ref + state in sync |
 
-Queue is **not** persisted — closing the tab or remounting the panel drops
-pending follow-ups. Same as pre-change behaviour.
+Queue is persisted on the session row (with the composer draft). Agent Mode
+remounts the panel on every rail pick — without persistence, queued
+follow-ups would be lost on switch.
 
 ## Related
 
@@ -127,6 +129,7 @@ pending follow-ups. Same as pre-change behaviour.
 - Cross-component prompt bus: `src/aiBus.ts` (editor "Ask AI" actions)
 - Permission cards stack above queue in the same order slot: `015-claude-permission-mode.md`
 - New chat tab creation: `store.addAIChat` / `001-ai-session-library.md`
+- Per-session persistence: `040-per-session-composer-state.md`
 
 ## Gotchas
 

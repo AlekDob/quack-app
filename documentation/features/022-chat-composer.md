@@ -68,14 +68,14 @@ Claude Code only. Full bridge detail (`--effort` whitelist, spawn wiring): `014-
 | 5 | Max | `--effort max` |
 
 - **No CLI "default" slot** on the slider — the old index-0 `default`/`null` (omit `--effort`) was removed. Quack always sends an explicit level; fresh installs and `/effort off` reset to **medium**.
-- **Persistence:** `localStorage` key `lcp.claudeCode.effort` (same pattern as `lcp.claudeCode.permMode`). Survives tab switches, new chats, and app restarts. `AIChatPanel` seeds `ccEffort` from storage on mount and writes back in a `useEffect`.
+- **Persistence (per session):** each `ChatSession` row stores `ccEffort` (feature 040). Global `localStorage` key `lcp.claudeCode.effort` seeds **new** chats only. `AIChatPanel` restores from the session on tab/history switch and writes back on change. Full flow: **`040-per-session-composer-state.md`**.
 - Shared constants live in `EffortPopover.tsx`: `CC_EFFORTS`, `CC_EFFORT_DEFAULT`, `normalizeCcEffort()`.
 
 ### Popover (`.ai-effort-pop`)
 
 - Portaled with **fixed coordinates** (escapes `.ai-panel { overflow: hidden }`). Position computed from the anchor button via `useLayoutEffect` + `clampPopPos`.
 - **Effort slider** (Claude-desktop-style) Faster→Smarter over the five levels; `accent-color: --fg`.
-- **Extended thinking** segmented `auto / on / off` (`ccThinking`: `null | true | false`).
+- **Extended thinking** segmented `auto / on / off` (`ccThinking`: `null | true | false`); persisted per session on `ChatSession.ccThinking` (feature 040).
 - Replaced the two separate `MetaFlag` pills + the ⚙ tune gate (both removed).
 
 ### Compose reminder (typing + shortcuts)
@@ -163,3 +163,4 @@ Full DOM/CSS detail (turn wrappers, sticky containing block, z-index stacking):
 - Stream reading type + spacing: `003-design-system.md`.
 - Navigation rail (minimap): `021-chat-nav-rail.md`.
 - Follow-up queue while busy: `039-composer-queue.md`.
+- Per-session composer draft + knobs: `040-per-session-composer-state.md`.

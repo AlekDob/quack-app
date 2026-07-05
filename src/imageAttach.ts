@@ -111,6 +111,22 @@ export async function attachFromPath(path: string): Promise<ImageAttachment> {
   return compressAndSave(dataUrl, name);
 }
 
+/** Rebuild preview thumb for a draft image already on disk. */
+export async function rehydrateAttachment(meta: {
+  id: string;
+  path: string;
+  name: string;
+}): Promise<ImageAttachment | null> {
+  try {
+    const dataUrl = await fs.readImageDataUrl(meta.path);
+    const img = await loadImage(dataUrl);
+    const thumb = encode(scaleToCanvas(img, MAX_THUMB_EDGE), 0.7);
+    return { id: meta.id, path: meta.path, name: meta.name, thumb: thumb.dataUrl };
+  } catch {
+    return null;
+  }
+}
+
 // ── Drop routing ──────────────────────────────────────────────────────
 // The window-level Tauri drag-drop listener lives in App.tsx and opens
 // dropped files as editor tabs. The active chat panel registers its

@@ -1,5 +1,6 @@
 import type { ChatMessage } from "./ai";
 import type { ProviderId } from "./providers/types";
+import type { ChatComposerDraft } from "./composerDraft";
 import { getJson, setJson } from "./localStore";
 
 export interface ChatSession {
@@ -31,6 +32,14 @@ export interface ChatSession {
    * budget threshold. Only Claude Code populates this today.
    */
   totalCostUsd?: number;
+  /** Claude Code --effort for this chat (low|medium|high|xhigh|max). */
+  ccEffort?: string;
+  /** Extended thinking: null = CLI default, true = on, false = off. */
+  ccThinking?: boolean | null;
+  /** Permission mode for this chat. null / absent = Ask. */
+  ccPermMode?: string | null;
+  /** Composer draft — input, queue, attach toggles, staged images. */
+  composer?: ChatComposerDraft;
 }
 
 const KEY = (wsId: string) => `lcp.ollama.history.${wsId}`;
