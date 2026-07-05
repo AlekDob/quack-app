@@ -2,6 +2,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -120,6 +121,7 @@ import {
 import {
   draftFromSession,
   mergeComposerDraft,
+  mergeSessionKnobs,
   type ChatComposerDraft,
 } from "../composerDraft";
 import {
@@ -273,15 +275,13 @@ function readDefaultPermMode(): string | null {
 function sessionKnobsFrom(
   session: ChatSession | undefined,
 ): { effort: string; thinking: boolean | null; permMode: string | null } {
+  if (!session) return defaultSessionKnobs();
   return {
-    effort: session?.ccEffort
+    effort: session.ccEffort
       ? normalizeCcEffort(session.ccEffort)
-      : readEffort(),
-    thinking: session?.ccThinking ?? null,
-    permMode:
-      session?.ccPermMode !== undefined
-        ? session.ccPermMode
-        : readDefaultPermMode(),
+      : CC_EFFORT_DEFAULT,
+    thinking: session.ccThinking ?? null,
+    permMode: session.ccPermMode !== undefined ? session.ccPermMode : null,
   };
 }
 function defaultSessionKnobs(): {
@@ -686,6 +686,11 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     attachedAgents: [] as string[],
     attachedImages: [] as ImageAttachment[],
   });
+  const knobsPersistRef = useRef({
+    ccEffort,
+    ccThinking,
+    ccPermMode,
+  });
   const applyComposerDraft = useCallback(
     (draft: ChatComposerDraft) => {
       setInput(draft.input ?? "");
@@ -717,6 +722,14 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       );
     },
     [wsId],
+  );
+  const flushSessionState = useCallback(
+    (sid: string) => {
+      if (!sid) return;
+      flushComposerDraft(sid);
+      mergeSessionKnobs(wsId, sid, knobsPersistRef.current);
+    },
+    [wsId, flushComposerDraft],
   );
   // Skills offered in the `/` menu (Claude Code only) — loaded from
   // <ws>/.claude/skills + ~/.claude/skills alongside the subagent scan.
@@ -1486,7 +1499,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     attachedImages,
   ]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     composerPersistRef.current = {
       sessionId,
       input,
@@ -1496,39 +1509,38 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       attachedAgents,
       attachedImages,
     };
-  }, [
-    sessionId,
-    input,
-    queuedMessages,
-    attachTree,
-    attachTerminal,
-    attachedAgents,
-    attachedImages,
-  ]);
+    knobsPersistRef.current = { ccEffort, ccThinking, ccPermMode };
+  });
 
   const prevSessionIdRef = useRef(sessionId);
   useEffect(() => {
     const prev = prevSessionIdRef.current;
-    if (prev && prev !== sessionId) flushComposerDraft(prev);
+    if (prev && prev !== sessionId) flushSessionState(prev);
     prevSessionIdRef.current = sessionId;
-  }, [sessionId, flushComposerDraft]);
+  }, [sessionId, flushSessionState]);
 
   useEffect(() => {
     if (!sessionId) return;
-    const t = window.setTimeout(() => flushComposerDraft(sessionId), 400);
-    return () => clearTimeout(t);
+    const t = window.setTimeout(() => flushSessionState(sessionId), 400);
+    return () => {
+      window.clearTimeout(t);
+      flushSessionState(sessionId);
+    };
   }, [
     sessionId,
-    flushComposerDraft,
+    flushSessionState,
     input,
     queuedMessages,
     attachTree,
     attachTerminal,
     attachedAgents,
     attachedImages,
+    ccEffort,
+    ccThinking,
+    ccPermMode,
   ]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     return () => {
       const snap = composerPersistRef.current;
       if (!snap.sessionId) return;
@@ -1537,6 +1549,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
         snap.sessionId,
         draftFromComposerSnap(snap) ?? {},
       );
+      mergeSessionKnobs(wsId, snap.sessionId, knobsPersistRef.current);
     };
   }, [wsId]);
 
@@ -4111,7 +4124,10 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   return (
     <SubagentOpen.Provider value={openSubagentTab}>
     <AgentFileOpen.Provider value={fileOpenHandler}>
-    <div className="ai-panel" ref={panelRef}>
+    <div
+      className={`ai-panel${mentionState && mentionMatches.length > 0 && streaming === null ? " ai-mention-open" : ""}`}
+      ref={panelRef}
+    >
       {zoomImage && (
         <div
           className="ai-image-modal"
@@ -4676,7 +4692,6 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       )}
       {mentionState && mentionMatches.length > 0 && streaming === null && (
         <MentionSuggestions
-          anchorRef={composerShellRef}
           matches={mentionMatches}
           activeIndex={mentionIndex}
           onPick={acceptMention}

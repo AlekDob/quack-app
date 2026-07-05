@@ -50,8 +50,7 @@ Stored in `localStorage` `lcp.ollama.history.{wsId}` (max 30). Written by
 | `ccThinking` | `boolean \| null?` | Extended thinking: `null` = CLI auto |
 | `composer` | `ChatComposerDraft?` | Ephemeral composer UI (see below) |
 
-Legacy sessions without these fields fall back to global defaults for knobs
-and empty composer on first restore.
+- Session row **exists** but field missing (legacy): app defaults — effort **medium**, mode **Ask**; never read global `localStorage` (that only seeds brand-new chats).
 
 ## ChatComposerDraft (`composer` on session)
 
@@ -90,10 +89,10 @@ composerPersistRef (latest snap)
 
 | When | Mechanism |
 |---|---|
-| Keystroke / toggle / queue change | Debounced 400ms `flushComposerDraft(sessionId)` |
+| Keystroke / toggle / queue change | Debounced 400ms; **cleanup flushes immediately** (switch/unmount must not cancel the pending save) |
 | `sessionId` changes (`/new`, history) | `prevSessionIdRef` effect flushes **previous** id |
 | Panel unmount (Agent Mode switch) | Cleanup effect — immediate flush |
-| Messages saved | `saveSession` row includes `composer` + knobs from ref |
+| Effort / mode / thinking change | Immediate `mergeSessionKnobs` (no debounce) |
 | `beforeunload` | Same row shape as message persist |
 
 ### New / cleared chat

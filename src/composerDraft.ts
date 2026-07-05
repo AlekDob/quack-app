@@ -48,3 +48,27 @@ export function mergeComposerDraft(
   }
   saveSession(wsId, { ...found, composer, updatedAt: Date.now() });
 }
+
+/** Persist Claude Code knobs without touching messages / composer. */
+export function mergeSessionKnobs(
+  wsId: string,
+  sessionId: string,
+  knobs: {
+    ccEffort?: string;
+    ccThinking?: boolean | null;
+    ccPermMode?: string | null;
+  },
+): void {
+  const found = loadSessions(wsId).find((s) => s.id === sessionId);
+  if (!found) {
+    saveSession(wsId, {
+      id: sessionId,
+      title: "Untitled",
+      messages: [],
+      updatedAt: Date.now(),
+      ...knobs,
+    });
+    return;
+  }
+  saveSession(wsId, { ...found, ...knobs, updatedAt: Date.now() });
+}
