@@ -4,13 +4,14 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
   useStore,
   collectComposeReviewTabs,
-  focusedComposeReviewKey,
+  focusedAgentSidePanelKey,
   findTabsPaneByTab,
   parseKey,
 } from "../store";
 import { AIChatPanel } from "./AIChatPanel";
 import { CompactChat, AgentFileOpen } from "./chatToolRender";
 import { ComposeReviewPane } from "./ComposeReviewPane";
+import { SubagentTranscriptView } from "./SubagentTranscriptView";
 import { SourceControlPanel } from "./SourceControlPanel";
 import { FileTree } from "./FileTree";
 import { AIIcon } from "./AIIcon";
@@ -130,11 +131,13 @@ export function AgentModeShell({ wsId }: Props) {
   const editorRoot = ws?.layout.editorRoot;
   const reviewTabs =
     ws && editorRoot ? collectComposeReviewTabs(wsId, editorRoot) : [];
-  const reviewKey =
+  const sidePanelKey =
     ws && editorRoot
-      ? focusedComposeReviewKey(wsId, ws.layout, editorRoot)
+      ? focusedAgentSidePanelKey(wsId, ws.layout, editorRoot)
       : null;
+  const sideParsed = sidePanelKey ? parseKey(sidePanelKey) : null;
   const setActiveTab = useStore((s) => s.setActiveTab);
+  const closeTab = useStore((s) => s.closeTab);
 
   const chatsFor = (id: string) => {
     const w = loaded[id];
@@ -304,8 +307,8 @@ export function AgentModeShell({ wsId }: Props) {
           );
         })()}
 
-      {/* ── Chat column (+ optional diff review split) ───────── */}
-      <main className={`agent-main${reviewKey ? " has-review" : ""}`}>
+      {/* ── Chat column (+ optional side panel: diff review / subagent) ─ */}
+      <main className={`agent-main${sidePanelKey ? " has-review" : ""}`}>
         <div className="agent-main-inner">
           <div className="agent-main-chat">
         {ws && activeChatId ? (
@@ -339,7 +342,7 @@ export function AgentModeShell({ wsId }: Props) {
           </div>
         )}
           </div>
-          {reviewKey && (
+          {sidePanelKey && sideParsed?.kind === "composeReview" && (
             <div className="agent-main-review">
               {reviewTabs.length > 1 && (
                 <div className="agent-review-tabs" role="tablist">
@@ -354,8 +357,8 @@ export function AgentModeShell({ wsId }: Props) {
                         key={key}
                         type="button"
                         role="tab"
-                        className={`agent-review-tab${key === reviewKey ? " active" : ""}`}
-                        aria-selected={key === reviewKey}
+                        className={`agent-review-tab${key === sidePanelKey ? " active" : ""}`}
+                        aria-selected={key === sidePanelKey}
                         onClick={() => {
                           const pane = editorRoot
                             ? findTabsPaneByTab(editorRoot, key)
@@ -371,8 +374,21 @@ export function AgentModeShell({ wsId }: Props) {
               )}
               <ComposeReviewPane
                 wsId={wsId}
-                tabKey={reviewKey}
+                tabKey={sidePanelKey}
                 visible
+              />
+            </div>
+          )}
+          {sidePanelKey && sideParsed?.kind === "subagent" && ws && (
+            <div className="agent-main-review">
+              <SubagentTranscriptView
+                root={ws.meta.root}
+                sessionId={sideParsed.sessionId}
+                toolUseId={sideParsed.toolUseId}
+                agentType={sideParsed.agentType}
+                visible
+                inline
+                onClose={() => void closeTab(wsId, sidePanelKey)}
               />
             </div>
           )}
@@ -409,7 +425,12 @@ export function AgentModeShell({ wsId }: Props) {
                 className="agent-context-pane"
                 style={{ display: contextTab === "changes" ? "flex" : "none" }}
               >
-                <SourceControlPanel key={`sc:${wsId}`} wsId={wsId} root={ws.meta.root} />
+                <SourceControlPanel
+                  key={`sc:${wsId}`}
+                  wsId={wsId}
+                  root={ws.meta.root}
+                  compact
+                />
               </div>
               <div
                 className="agent-context-pane"

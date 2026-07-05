@@ -257,6 +257,12 @@ function isMarkdownRead(call: ToolCall): boolean {
   return MARKDOWN_EXT.test(pathOf(call));
 }
 
+/** Tool results that should render as Markdown in the drawer, not monospace. */
+function isMarkdownDrawer(call: ToolCall): boolean {
+  if (isMarkdownRead(call)) return true;
+  return call.function.name === "WebFetch" || call.function.name === "web_fetch";
+}
+
 // Tools that point at a single openable file (vs. Grep/Glob which point at a
 // pattern). Clicking such a row opens that file in a new editor tab.
 const FILE_REF_NAMES = new Set([
@@ -891,6 +897,19 @@ function CompactBlocks({
   let run: { id: string; call: ToolCall }[] = [];
   let runKey = 0;
   const flush = () => {
+    if (run.length === 1) {
+      const it = run[0];
+      out.push(
+        <ToolCallRow
+          key={`s${runKey++}`}
+          call={it.call}
+          result={it.id ? resultsById.get(it.id) : undefined}
+          standalone
+        />,
+      );
+      run = [];
+      return;
+    }
     if (run.length) {
       out.push(
         <InlineActionRow
@@ -1416,9 +1435,12 @@ export function AskQuestionCard({
 export function ToolCallRow({
   call,
   result,
+  standalone = false,
 }: {
   call: ToolCall;
   result: string | undefined;
+  /** Inline between prose blocks (not inside `.ai-iarow`) — extra vertical air. */
+  standalone?: boolean;
 }) {
   // Hook before the edit-card early return — a row whose args stream in
   // can flip between the generic and diff renders across re-renders.
@@ -1436,7 +1458,7 @@ export function ToolCallRow({
         : "";
     const canOpen = !!openSubagent && !!call.id;
     return (
-      <div className="ai-tcall ai-tcall-subagent">
+      <div className={`ai-tcall ai-tcall-subagent${standalone ? " ai-tcall-standalone" : ""}`}>
         <button
           type="button"
           className="ai-tcall-head ai-subagent-head"
@@ -1479,7 +1501,7 @@ export function ToolCallRow({
     const summary =
       qs.map((q) => q.header ?? q.question).join(" · ") || "question";
     return (
-      <div className="ai-tcall">
+      <div className={`ai-tcall${standalone ? " ai-tcall-standalone" : ""}`}>
         <div className="ai-tcall-head">
           <span className="ai-tcall-dot" />
           <span className="ai-tcall-name">Question</span>
@@ -1496,7 +1518,14 @@ export function ToolCallRow({
   // row for all other tools.
   const editDiffs = extractEditDiffs(call);
   if (editDiffs && editDiffs.length > 0) {
-    return <EditDiffCard call={call} diffs={editDiffs} result={result} />;
+    return (
+      <EditDiffCard
+        call={call}
+        diffs={editDiffs}
+        result={result}
+        standalone={standalone}
+      />
+    );
   }
   const label = friendlyToolName(call.function.name);
   const detail = primaryToolDetail(call.function.arguments);
@@ -1515,7 +1544,7 @@ export function ToolCallRow({
   const resultIsEmpty = hasResult && result!.trim().length === 0;
   const canShow = hasResult && !resultIsEmpty;
   const fileRef = fileRefOf(call);
-  const markdown = isMarkdownRead(call);
+  const markdown = isMarkdownDrawer(call);
   const onOpenFile = openFile && fileRef ? () => openFile(fileRef) : undefined;
   // Clicking the pill opens the right-side result drawer (read/bash/search
   // output). With no output but a file path it just opens the file in a tab.
@@ -1551,7 +1580,7 @@ export function ToolCallRow({
         ? `Open ${fileRef} in a new tab`
         : undefined;
   return (
-    <div className="ai-tcall">
+    <div className={`ai-tcall${standalone ? " ai-tcall-standalone" : ""}`}>
       <ToolRowHead
         icon={icon}
         name={label}
@@ -1580,9 +1609,10 @@ interface EditDiffCardProps {
   call: ToolCall;
   diffs: EditDiff[];
   result: string | undefined;
+  standalone?: boolean;
 }
 
-function EditDiffCard({ call, diffs, result }: EditDiffCardProps) {
+function EditDiffCard({ call, diffs, result, standalone = false }: EditDiffCardProps) {
   const args = call.function.arguments as Record<string, unknown>;
   const path =
     (typeof args.file_path === "string" && args.file_path) ||
@@ -1611,7 +1641,9 @@ function EditDiffCard({ call, diffs, result }: EditDiffCardProps) {
       language: langOf(path),
     });
   return (
-    <div className={`ai-tcall ai-tcall-edit ${isError ? "errored" : ""}`}>
+    <div
+      className={`ai-tcall ai-tcall-edit${isError ? " errored" : ""}${standalone ? " ai-tcall-standalone" : ""}`}
+    >
       <ToolRowHead
         icon={icon}
         name={label}

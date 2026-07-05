@@ -26,6 +26,18 @@ function basename(path: string): string {
   return parts[parts.length - 1] ?? path;
 }
 
+function composeFileStats(fileCalls: ToolCall[]) {
+  return fileCalls.reduce(
+    (acc, c) => {
+      const d = extractEditDiffs(c);
+      if (!d) return acc;
+      const s = diffStats(d);
+      return { added: acc.added + s.added, removed: acc.removed + s.removed };
+    },
+    { added: 0, removed: 0 },
+  );
+}
+
 function ComposeUndoButton({
   wsId,
   chatId,
@@ -140,7 +152,7 @@ export function ComposeCard({
   streaming?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(true);
-  const byPath = useMemo(() => {
+  const { byPath, totals } = useMemo(() => {
     const m = new Map<string, ToolCall[]>();
     for (const c of calls) {
       const p = pathOf(c);
@@ -148,7 +160,19 @@ export function ComposeCard({
       if (arr) arr.push(c);
       else m.set(p, [c]);
     }
-    return Array.from(m.entries());
+    const entries = Array.from(m.entries()).map(([path, fileCalls]) => ({
+      path,
+      fileCalls,
+      stats: composeFileStats(fileCalls),
+    }));
+    const totals = entries.reduce(
+      (acc, e) => ({
+        added: acc.added + e.stats.added,
+        removed: acc.removed + e.stats.removed,
+      }),
+      { added: 0, removed: 0 },
+    );
+    return { byPath: entries, totals };
   }, [calls]);
 
   const openReview = (path: string) => {
@@ -156,43 +180,59 @@ export function ComposeCard({
   };
 
   const openAll = () => {
-    for (const [path] of byPath) openReview(path);
+    for (const { path } of byPath) openReview(path);
   };
 
   const n = byPath.length;
   const label = streaming
     ? `${n} File${n === 1 ? "" : "s"} · editing…`
     : `${n} File${n === 1 ? "" : "s"}`;
+  const showRecap = totals.added > 0 || totals.removed > 0;
 
   return (
     <div
       className={`ai-compose-cursor${collapsed ? "" : " is-open"}${streaming ? " is-streaming" : ""}`}
     >
       <div className="ai-compose-bar">
-        <button
-          type="button"
-          className="ai-compose-bar-left"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-expanded={!collapsed}
-          title={collapsed ? "Show changed files" : "Collapse"}
-        >
-          {streaming ? (
-            <span className="ai-spinner ai-spinner-sm" aria-hidden="true" />
-          ) : (
-            <Icon
-              name={collapsed ? "chevron-right" : "chevron-down"}
-              size={14}
-            />
+        <div className="ai-compose-bar-main">
+          <button
+            type="button"
+            className="ai-compose-bar-left"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-expanded={!collapsed}
+            title={collapsed ? "Show changed files" : "Collapse"}
+          >
+            {streaming ? (
+              <span className="ai-spinner ai-spinner-sm" aria-hidden="true" />
+            ) : (
+              <Icon
+                name={collapsed ? "chevron-right" : "chevron-down"}
+                size={14}
+              />
+            )}
+            <span>{label}</span>
+          </button>
+          {showRecap && (
+            <span
+              className="ai-compose-bar-recap"
+              aria-label={`${totals.added} lines added, ${totals.removed} lines removed`}
+            >
+              {totals.added > 0 && (
+                <span className="ai-compose-add">+{totals.added}</span>
+              )}
+              {totals.removed > 0 && (
+                <span className="ai-compose-rem">−{totals.removed}</span>
+              )}
+            </span>
           )}
-          <span>{label}</span>
-        </button>
+        </div>
         <div className="ai-compose-bar-actions">
           {!streaming && (
             <ComposeUndoButton
               wsId={wsId}
               chatId={chatId}
               msgIndex={msgIndex}
-              touchedPaths={byPath.map(([p]) => p)}
+              touchedPaths={byPath.map(({ path }) => path)}
             />
           )}
           {!streaming && (
@@ -217,19 +257,7 @@ export function ComposeCard({
       </div>
       {!collapsed && (
         <ul className="ai-compose-list">
-          {byPath.map(([path, fileCalls]) => {
-            const stats = fileCalls.reduce(
-              (acc, c) => {
-                const d = extractEditDiffs(c);
-                if (!d) return acc;
-                const s = diffStats(d);
-                return {
-                  added: acc.added + s.added,
-                  removed: acc.removed + s.removed,
-                };
-              },
-              { added: 0, removed: 0 },
-            );
+          {byPath.map(({ path, stats }) => {
             const name = basename(path);
             return (
               <li key={path}>

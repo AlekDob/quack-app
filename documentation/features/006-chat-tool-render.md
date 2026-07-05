@@ -4,7 +4,7 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
 last_verified: 2026-07-05
-tags: [ai-chat, tool-calls, chatToolRender, cursor-style, conductor-style, drawer, diff-modal, css, presentational, tool-icon-tints]
+tags: [ai-chat, tool-calls, chatToolRender, cursor-style, conductor-style, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap]
 ---
 
 ## Chat Tool-Call Rendering
@@ -25,8 +25,8 @@ Both docked chat and Agent Mode use the **same** chronology renderer:
 | Entry | Implementation | Look |
 |---|---|---|
 | `InterleavedBlocks` | Always delegates to `CompactBlocks` | prose interleaved with tool runs |
-| `CompactBlocks` | Walks `blocks[]`, flushes tool runs | `.ai-iarow` chip rows |
-| `InlineActionRow` | One row per consecutive tool run | Conductor-style grouped chips |
+| `CompactBlocks` | Walks `blocks[]`, flushes tool runs | `.ai-iarow` chip rows or solo `ToolCallRow` |
+| `InlineActionRow` | One row per consecutive tool run (≥2 tools) | Conductor-style grouped chips |
 
 The old non-compact **pill cloud** (`.ai-tcall-wrap` per Read/Grep) was removed —
 editor and agent surfaces now match.
@@ -42,6 +42,10 @@ Consecutive non-task tool calls collapse into one row:
 | Expand on click | Reveals underlying `ToolCallRow` list in `.ai-iaction-detail` |
 
 **Explore set:** `Read`, `NotebookRead`, `Grep`, `Glob`, `ToolSearch`, `WebSearch`, `WebFetch`.
+
+**Single-tool runs:** when a flush has exactly **one** tool, `CompactBlocks` renders a
+standalone `ToolCallRow` directly (no `.ai-iarow` wrapper). The row gets
+`.ai-tcall-standalone` (`margin: 10px 0`) so it keeps the same vertical rhythm as grouped rows.
 
 **Skipped in stream:** `TaskCreate`/`Update`/`List`, `TodoWrite`, `AskUserQuestion` (sidebar / ask-dock).
 
@@ -72,7 +76,15 @@ There is **no inline expansion** in the transcript — clicking opens an overlay
 
 ### Result drawer (`ToolResultDrawer` + `toolDrawer.ts`)
 
-App-level right slide-over (`App.tsx`). Markdown for `.md` reads (`stripReadGutter`), else `<pre>`.
+App-level right slide-over (`App.tsx`).
+
+| Body mode | When |
+|---|---|
+| `MarkdownPreview` | `.md` file reads (`isMarkdownRead` + `stripReadGutter`) |
+| `MarkdownPreview` | **WebFetch** / `web_fetch` results (`isMarkdownDrawer`) |
+| `<pre>` | Bash, Grep, code reads, other plain text |
+| Image | Read of an image path (`imagePath` → data URL) |
+| Terminal chrome | Bash variant (`TerminalResultView`) |
 
 ### Edits → DiffModal vs Compose Review
 
@@ -85,7 +97,8 @@ When ComposeCard is shown, `hideEdits={true}` — no duplicate edit pills in str
 
 ### ComposeCard (live recap)
 
-Cursor-style bar: `N Files` (+ `· editing…` while streaming), expandable list with `+/-` stats.
+Cursor-style bar: `N Files` (+ `· editing…` while streaming), **total diff pill**
+(`+80 −35` in `.ai-compose-bar-recap`, live during stream), expandable per-file list.
 
 | Action | When |
 |---|---|
@@ -93,6 +106,9 @@ Cursor-style bar: `N Files` (+ `· editing…` while streaming), expandable list
 | **Keep All** | Collapses recap |
 | **Review** | Opens compose-review tab per file |
 | File row click | Opens compose-review for that file |
+
+**Prominence:** entrance slide-up + border attention pulse when the turn finishes;
+bar uses `--bg-hi`, `--shadow-sm`, taller min-height. Recap pill animates in separately.
 
 Visible **as soon as the first edit completes** (`showComposeCard && isAssistant`, including mid-stream).
 
@@ -109,9 +125,11 @@ Docked above composer in `.ai-status-dock` (022). Inverted monochrome pill; opti
 
 | Class | Role |
 |---|---|
-| `.ai-iarow` / `.ai-iarow-chips` | Conductor-style grouped tool row |
+| `.ai-iarow` / `.ai-iarow-chips` | Conductor-style grouped tool row (≥2 tools) |
+| `.ai-tcall-standalone` | Solo tool row between prose blocks — extra vertical margin |
 | `.ai-ichip` / `.ai-chip` | Compact category / action chips |
-| `.ai-compose-cursor` / `.is-streaming` | Live changed-files recap |
+| `.ai-compose-cursor` / `.is-streaming` | Live changed-files recap + entrance/attention animations |
+| `.ai-compose-bar-recap` | Total `+/-` pill in compose bar |
 | `.compose-review-*` | Diff review tab (038) |
 | `.tool-drawer` | Read/bash result slide-over |
 

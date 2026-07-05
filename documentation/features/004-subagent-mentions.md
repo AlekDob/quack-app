@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-06-28
-tags: [subagents, agents, mention, composer, claude-code, task-tool, ai-chat, ducks, avatars, transcript, jsonl, read-only-tab]
+last_verified: 2026-07-05
+tags: [subagents, agents, mention, composer, claude-code, task-tool, ai-chat, ducks, avatars, transcript, jsonl, read-only-tab, agent-mode]
 ---
 
 ## Subagent @-Mentions + Transcript Tab
@@ -44,9 +44,10 @@ dependency).
 | Module | `src/subagents.ts` | `loadSubagents(root, homeDir)`, `duckAvatarFor(name, explicit?)`, `SubagentDef` |
 | Component | `src/components/AIChatPanel.tsx` | `agents`/`attachedAgents` state, agent-load effect (CC-only), `@` popover (tagged union agent\|file), delegation injection, reset, chips; `SubagentOpen.Provider` + `openSubagentTab` |
 | Render | `src/components/chatToolRender.tsx` | `SubagentOpen` context, `subagentTypeOf()`, Task→duck-avatar chip (clickable) |
-| Component | `src/components/SubagentTranscriptView.tsx` | read-only transcript viewer (portaled), reuses `ToolCallRow` + `MarkdownPreview` |
+| Component | `src/components/SubagentTranscriptView.tsx` | read-only transcript viewer (portaled in editor, **inline** in agent mode), reuses `ToolCallRow` + `MarkdownPreview` |
 | Host | `src/components/WorkspaceShell.tsx` | walks panes for `sub:` keys, portals one viewer each |
-| Store | `src/store.ts` | `subagent` tab kind (`subKey`/`parseKey`), `openSubagent()` action |
+| Agent host | `src/components/AgentModeShell.tsx` | 50/50 split: mounts `SubagentTranscriptView` inline when focused tab is `sub:` |
+| Store | `src/store.ts` | `subagent` tab kind (`subKey`/`parseKey`), `openSubagent()`, `collectSubagentTabs`, `focusedSubagentKey`, `focusedAgentSidePanelKey` |
 | Backend | `src-tauri/src/claude_code.rs` | `claude_code_load_subagent`, `parse_session_jsonl` (shared) |
 | IPC | `src/ipc.ts` | `claudeCode.loadSubagent`, `LoadedSubagent` |
 | Assets | `public/images/ducks/duck1..35.jpeg` | duck avatars |
@@ -66,12 +67,21 @@ dependency).
    (older versions / other providers use `Task`) — the chip matches BOTH names.
 2. Click → `SubagentOpen` context → `openSubagentTab(call.id, agentType)` → `store.openSubagent`,
    which opens a self-contained `sub:<ccSessionId>|<toolUseId>|<agentType>` tab.
-3. `SubagentTranscriptView` calls `claude_code_load_subagent(cwd, ccSessionId, toolUseId)`.
-4. **On-disk linkage:** Claude Code writes each subagent to
+3. **Editor layout:** `WorkspaceShell` portals `SubagentTranscriptView` into the editor pane container.
+4. **Agent Mode:** `AgentModeShell` reads the focused `sub:` key via `focusedAgentSidePanelKey`
+   and renders `SubagentTranscriptView` **inline** in `.agent-main-review` (50/50 beside chat).
+   Close button calls `closeTab`. Compose-review tabs share the same split via the same helper.
+5. `SubagentTranscriptView` calls `claude_code_load_subagent(cwd, ccSessionId, toolUseId)`.
+6. **On-disk linkage:** Claude Code writes each subagent to
    `~/.claude/projects/<enc-cwd>/<session>/subagents/agent-<id>.jsonl` with a sibling
    `agent-<id>.meta.json` = `{agentType, description, toolUseId}`. The command finds the meta whose
    `toolUseId` matches the Task call id, then parses the sibling jsonl (reuses `parse_session_jsonl`).
-5. Rendered read-only: delegation prompt as a "user" bubble, subagent steps via `ToolCallRow`. **No composer.**
+7. Rendered read-only: delegation prompt as a "user" bubble, subagent steps via `ToolCallRow`. **No composer.**
+
+### Agent Mode gotcha (fixed)
+Previously `openSubagent` added a tab to `layout.editorRoot` but Agent Mode **does not mount**
+`WorkspaceShell` — the tab existed in state with no visible surface. Agent Mode now watches
+`focusedAgentSidePanelKey` and renders the transcript inline, same split chrome as compose review.
 
 ### Inner steps hidden from the main stream
 The subagent's own tool calls (its Read/Glob/Grep/…) arrive in the live stream as records tagged
@@ -92,4 +102,5 @@ Agent chip + its final report. The full inner work lives in the read-only transc
   so they don't survive an app restart (by design — read-only viewers).
 - **Avatar consistency:** chip, tab icon, and view header all derive the duck from the SAME
   `subagent_type` string via `duckAvatarFor`, so they always match (and match the @-mention popover).
-- **Compact (agent) mode** omits Task chips entirely (the sidebar owns them) — this feature lives in the docked chat.
+- **Compact (agent) mode** renders Task/Agent chips in the stream (single-tool runs as
+  standalone `.ai-tcall-subagent`; multi-tool runs inside `.ai-iarow`). Click opens the side panel.

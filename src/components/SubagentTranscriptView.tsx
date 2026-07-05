@@ -11,8 +11,12 @@ interface Props {
   sessionId: string;
   toolUseId: string;
   agentType: string;
-  container: HTMLElement | null;
+  /** Editor pane mount target. Omit when `inline` is true (agent mode split). */
+  container?: HTMLElement | null;
   visible: boolean;
+  /** Render in-place instead of portaling into an editor pane. */
+  inline?: boolean;
+  onClose?: () => void;
 }
 
 type LoadState =
@@ -30,8 +34,10 @@ export function SubagentTranscriptView({
   sessionId,
   toolUseId,
   agentType,
-  container,
+  container = null,
   visible,
+  inline = false,
+  onClose,
 }: Props) {
   const [state, setState] = useState<LoadState>({ phase: "loading" });
 
@@ -58,9 +64,9 @@ export function SubagentTranscriptView({
     };
   }, [root, sessionId, toolUseId]);
 
-  if (!container) return null;
+  if (!inline && !container) return null;
   const desc = state.phase === "ready" ? state.description : "";
-  return createPortal(
+  const body = (
     <div
       className="subagent-view"
       style={{ display: visible ? "flex" : "none" }}
@@ -78,6 +84,17 @@ export function SubagentTranscriptView({
             Subagent · read-only{desc ? ` · ${desc}` : ""}
           </div>
         </div>
+        {onClose && (
+          <button
+            type="button"
+            className="subagent-view-close"
+            onClick={onClose}
+            title="Close"
+            aria-label="Close subagent transcript"
+          >
+            ×
+          </button>
+        )}
       </div>
       <div className="subagent-view-body">
         {state.phase === "loading" && (
@@ -95,9 +112,9 @@ export function SubagentTranscriptView({
           <SubagentMessages messages={state.messages} />
         )}
       </div>
-    </div>,
-    container,
+    </div>
   );
+  return inline ? body : createPortal(body, container!);
 }
 
 function SubagentMessages({ messages }: { messages: LoadedMessage[] }) {

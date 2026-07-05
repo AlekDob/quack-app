@@ -335,6 +335,63 @@ export function focusedComposeReviewKey(
   return tabs[tabs.length - 1] ?? null;
 }
 
+/** Open subagent transcript tab keys for a workspace (agent mode reads these). */
+export function collectSubagentTabs(_wsId: string, root: Pane): string[] {
+  const out: string[] = [];
+  const walk = (p: Pane) => {
+    if (p.kind === "tabs") {
+      for (const t of p.tabs) {
+        if (t.startsWith("sub:")) out.push(t);
+      }
+      return;
+    }
+    walk(p.first);
+    walk(p.second);
+  };
+  walk(root);
+  return out;
+}
+
+export function focusedSubagentKey(
+  _wsId: string,
+  layout: WorkspaceLayout,
+  root: Pane,
+): string | null {
+  const tabs = collectSubagentTabs(_wsId, root);
+  if (!tabs.length) return null;
+  const paneId = layout.activePaneId;
+  if (paneId) {
+    const pane = findPaneById(root, paneId);
+    if (pane?.kind === "tabs" && pane.active?.startsWith("sub:")) {
+      return pane.active;
+    }
+  }
+  return tabs[tabs.length - 1] ?? null;
+}
+
+/** Active compose-review or subagent side tab — agent mode split pane. */
+export function focusedAgentSidePanelKey(
+  wsId: string,
+  layout: WorkspaceLayout,
+  root: Pane,
+): string | null {
+  const paneId = layout.activePaneId;
+  if (paneId) {
+    const pane = findPaneById(root, paneId);
+    if (pane?.kind === "tabs" && pane.active) {
+      if (pane.active.startsWith("crev:")) {
+        const c = parseComposeReviewKey(pane.active);
+        if (c?.wsId === wsId) return pane.active;
+      }
+      if (pane.active.startsWith("sub:")) return pane.active;
+    }
+  }
+  return (
+    focusedComposeReviewKey(wsId, layout, root) ??
+    focusedSubagentKey(wsId, layout, root)
+  );
+}
+
 /** The AI chat id currently focused in a workspace (active pane's active
  *  tab, if it's an `ai:` tab), else null. Shared by the Agent Hub +
  *  watcher to know which chat the user is actually looking at. */
