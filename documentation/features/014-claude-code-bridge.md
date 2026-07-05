@@ -65,8 +65,8 @@ Forwarded from `AIChatPanel` → `claudeCodeProvider.chat()` → `claude_code_ch
 
 | Knob | Frontend state | CLI flag | Default / persistence |
 |---|---|---|---|
-| **Effort** | `ccEffort: string` | `--effort {low\|medium\|high\|xhigh\|max}` | **medium**; per session `ChatSession.ccEffort`; global `lcp.claudeCode.effort` = default for new chats. Rust whitelist drops unknown values. UI: `EffortPopover.tsx` — see `022-chat-composer.md`, `040-per-session-composer-state.md`. |
-| **Permission mode** | `ccPermMode: string \| null` | `--permission-mode …` | Ask (`null`); per session `ChatSession.ccPermMode`; global `lcp.claudeCode.permMode` = default for new chats. See `015`, `040`. |
+| **Effort** | `ccEffort: string` | `--effort {low\|medium\|high\|xhigh\|max}` | **medium**; per session `ChatSession.ccEffort` (legacy row w/o field → medium, not global); global key = new-chat default only. See `040`. |
+| **Permission mode** | `ccPermMode: string \| null` | `--permission-mode …` | Ask (`null`); per session `ChatSession.ccPermMode` (legacy → Ask); global key = new-chat default. See `015`, `040`. |
 | **Extended thinking** | `ccThinking: boolean \| null` | passed when set | `null` = CLI auto; per session `ChatSession.ccThinking`. |
 
 `/effort` slash command and composer `Ctrl+1–5` both write `ccEffort` + session row. `/effort off` resets to **medium**, not CLI default.
