@@ -8,6 +8,7 @@ import {
 import { readEditorMonoFont } from "../editorMonoFont";
 import { useResolvedEditorColorTheme } from "../useResolvedEditorColorTheme";
 import { MarkdownPreview } from "./MarkdownPreview";
+import { MermaidPreview } from "./MermaidPreview";
 import {
   setEditorState,
   clearEditorState,
@@ -50,6 +51,11 @@ import {
   writeEditorMdView,
   type EditorMdView,
 } from "../editorMdView";
+import {
+  isMermaidPath,
+  readEditorMermaidView,
+  writeEditorMermaidView,
+} from "../editorMermaidView";
 import {
   readDiffSideBySide,
   writeDiffSideBySide,
@@ -228,6 +234,7 @@ export function EditorPane({ wsId, path }: Props) {
     null,
   );
   const [mdView, setMdView] = useState<EditorMdView>(readEditorMdView);
+  const [mermaidView, setMermaidView] = useState<EditorMdView>(readEditorMermaidView);
   const [showDiff, setShowDiff] = useState(false);
   const [diffSideBySide, setDiffSideBySide] = useState(readDiffSideBySide);
   const [saving, setSaving] = useState(false);
@@ -256,6 +263,8 @@ export function EditorPane({ wsId, path }: Props) {
 
   const language = file ? langOf(path) : null;
   const isMarkdown = isMarkdownPath(path);
+  const isMermaid = isMermaidPath(path);
+  const diagramView = isMermaid ? mermaidView : mdView;
   const dirty = !!file && file.contents !== file.original;
   const gitDiffPair = useGitDiffPair(
     wsRoot || undefined,
@@ -267,7 +276,12 @@ export function EditorPane({ wsId, path }: Props) {
     setShowDiff(false);
   }, [path]);
 
-  const onMdViewChange = (view: EditorMdView) => {
+  const onDiagramViewChange = (view: EditorMdView) => {
+    if (isMermaid) {
+      setMermaidView(view);
+      writeEditorMermaidView(view);
+      return;
+    }
     setMdView(view);
     writeEditorMdView(view);
   };
@@ -540,17 +554,23 @@ export function EditorPane({ wsId, path }: Props) {
 
   if (!file) return null;
 
-  const showEditor = !showDiff && (!isMarkdown || mdView !== "preview");
-  const showPreview =
+  const showEditor =
+    !showDiff &&
+    (!isMarkdown || mdView !== "preview") &&
+    (!isMermaid || mermaidView !== "preview");
+  const showMarkdownPreview =
     !showDiff && isMarkdown && (mdView === "split" || mdView === "preview");
+  const showMermaidPreview =
+    !showDiff && isMermaid && (mermaidView === "split" || mermaidView === "preview");
+  const showPreview = showMarkdownPreview || showMermaidPreview;
 
   return (
     <div className="editor-host">
       <EditorBreadcrumbs wsId={wsId} root={wsRoot} path={path} />
       <EditorTabToolbar
-        isMarkdown={isMarkdown}
-        mdView={mdView}
-        onMdViewChange={onMdViewChange}
+        showDiagramView={isMarkdown || isMermaid}
+        diagramView={diagramView}
+        onDiagramViewChange={onDiagramViewChange}
         hasGitChanges={!!gitDiffPair}
         showDiff={showDiff}
         onToggleDiff={() => setShowDiff((v) => !v)}
@@ -990,9 +1010,14 @@ export function EditorPane({ wsId, path }: Props) {
       />
               </div>
             )}
-            {showPreview && (
+            {showMarkdownPreview && (
               <div className="preview-half">
                 <MarkdownPreview content={file.contents} interactive={mdView === "split"} />
+              </div>
+            )}
+            {showMermaidPreview && (
+              <div className="preview-half">
+                <MermaidPreview content={file.contents} />
               </div>
             )}
           </>

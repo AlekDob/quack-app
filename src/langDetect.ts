@@ -18,6 +18,7 @@ const EXT_TO_LANG: Record<string, string> = {
   json: "json",
   md: "markdown",
   mdx: "markdown",
+  mmd: "plaintext",
   rs: "rust",
   py: "python",
   html: "html",

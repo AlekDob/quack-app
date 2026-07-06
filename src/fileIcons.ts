@@ -117,7 +117,7 @@ const EXT_TINT: Record<string, FileIconTint> = {
   json: "data", jsonc: "data", json5: "data",
   yaml: "config", yml: "config", toml: "config", ini: "config",
   conf: "config", cfg: "config", properties: "config", plist: "config",
-  md: "doc", mdx: "doc", markdown: "doc", txt: "doc", rst: "doc",
+  md: "doc", mdx: "doc", mmd: "doc", markdown: "doc", txt: "doc", rst: "doc",
   pdf: "doc", doc: "doc", docx: "doc",
   sh: "shell", bash: "shell", zsh: "shell", fish: "shell",
   ps1: "shell", bat: "shell", cmd: "shell",

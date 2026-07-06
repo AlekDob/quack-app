@@ -2,9 +2,9 @@ import { Icon } from "./Icon";
 import type { EditorMdView } from "../editorMdView";
 
 interface Props {
-  isMarkdown: boolean;
-  mdView: EditorMdView;
-  onMdViewChange: (view: EditorMdView) => void;
+  showDiagramView: boolean;
+  diagramView: EditorMdView;
+  onDiagramViewChange: (view: EditorMdView) => void;
   hasGitChanges: boolean;
   showDiff: boolean;
   onToggleDiff: () => void;
@@ -42,9 +42,9 @@ function MdViewBtn({
 }
 
 export function EditorTabToolbar({
-  isMarkdown,
-  mdView,
-  onMdViewChange,
+  showDiagramView,
+  diagramView,
+  onDiagramViewChange,
   hasGitChanges,
   showDiff,
   onToggleDiff,
@@ -94,29 +94,29 @@ export function EditorTabToolbar({
           </button>
         </div>
       ) : (
-        isMarkdown && (
+        showDiagramView && (
           <div
             className="editor-tab-segmented"
             role="group"
-            aria-label="Markdown view"
+            aria-label="Diagram view"
           >
             <MdViewBtn
-              active={mdView === "edit"}
+              active={diagramView === "edit"}
               label="Edit"
               icon="edit"
-              onClick={() => onMdViewChange("edit")}
+              onClick={() => onDiagramViewChange("edit")}
             />
             <MdViewBtn
-              active={mdView === "split"}
+              active={diagramView === "split"}
               label="Split"
               icon="columns-2"
-              onClick={() => onMdViewChange("split")}
+              onClick={() => onDiagramViewChange("split")}
             />
             <MdViewBtn
-              active={mdView === "preview"}
+              active={diagramView === "preview"}
               label="Preview"
               icon="eye"
-              onClick={() => onMdViewChange("preview")}
+              onClick={() => onDiagramViewChange("preview")}
             />
           </div>
         )

@@ -58,7 +58,7 @@ Frontend `src/` (React 19 + TypeScript + Zustand, Monaco, xterm — **no Tailwin
 | Per-provider agent session ids (resume) | `src/providerSession.ts` |
 | Agent Mode toggle (localStorage) | `src/agentMode.ts` |
 | Main chat panel — streaming, tool calls, todos, status | `src/components/AIChatPanel.tsx` |
-| Editor tab toolbar — md Edit/Split/Preview, git Changes, Save | `src/components/EditorTabToolbar.tsx`, `EditorPane.tsx`, `editorMdView.ts`, `editorGitDiff.ts` |
+| Editor tab toolbar — md/mmd Edit/Split/Preview, git Changes, Save | `src/components/EditorTabToolbar.tsx`, `EditorPane.tsx`, `editorMdView.ts`, `editorMermaidView.ts`, `MermaidPreview.tsx`, `editorGitDiff.ts` |
 | Editor color themes (Monaco syntax, per light/dark) | `src/editorColorThemes.ts`, `src/monacoThemeRules.ts`, `src/vscodeThemeBundles.ts`, `src/editorMonoFont.ts`, `src/useResolvedEditorColorTheme.ts` |
 | Tool-call rendering (chips, diffs, running/done state) | `src/components/chatToolRender.tsx` |
 | Agent-centric layout (rail + sessions + tasks) | `src/components/AgentModeShell.tsx` |
@@ -139,7 +139,8 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `024-resume-white-screen-recovery.md` — detect resume from macOS standby (`resumeDebug.ts`), heal the blank webview (Monaco `layout()` / xterm `fit()` + synthetic resize), log every event to console **and** a durable `localStorage` ring (`__resumeLog()`). Gotcha: a Vite compile error also blanks the page but never fires `[resume]` — check the red overlay first.
   - `025-model-selector.md` — composer chip popover (favorites + groups), full ModelBrowser catalog, ManageModelsModal visibility toggles; prefs in `lcp.modelFavorites` / `lcp.modelDisabled`.
   - `026-cursor-cli-bridge.md` — `cursor-agent` spawn/stream/kill + lazy `--list-models`; shared `cliStreamJson` parser.
-  - `027-editor-tab-toolbar.md` — editor tab row under breadcrumb: markdown Edit/Split/Preview, git Changes (HEAD vs buffer), Inline/Split diff layout, Save; shared with `FileEditorPane` modals.
+  - `027-editor-tab-toolbar.md` — editor tab row under breadcrumb: markdown + mermaid Edit/Split/Preview, git Changes (HEAD vs buffer), Inline/Split diff layout, Save; shared with `FileEditorPane` modals.
+  - `042-mermaid-preview.md` — `.mmd` tabs: lazy `mermaid` SVG render, default Preview mode, syntax errors inline; `MermaidPreview`, `editorMermaidView.ts`.
   - `028-opencode-bridge.md` — `opencode serve` sidecar (port 17346), SSE `/global/event`, `providerSessionIds`, lazy startup catalog.
   - `029-session-diff-hub.md` — Agent Hub expanded-row edit subtitles (`Edited foo.ts −N +M`); `chatDiffStore` pub/sub + `summarizeLastTurn`.
   - `030-user-message-bar.md` — user turns as right-aligned markdown cards with hover copy/re-send/branch actions (`UserMessageBar.tsx`).

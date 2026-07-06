@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-06-29
+last_verified: 2026-07-06
 tags: [editor, preview, images, pdf, binary, tabs, file-tree]
 ---
 
@@ -11,7 +11,7 @@ tags: [editor, preview, images, pdf, binary, tabs, file-tree]
 
 **Purpose:** Opening a PNG/JPG/GIF/WebP/BMP/ICO/AVIF or a PDF from the file tree (or palette) used to toast `Can't open …: File appears to be binary.` and do nothing. Now those files open as a read-only **preview tab** — image rendered inline (click to toggle fit ↔ actual size), PDF in the webview's native viewer.
 
-**Scope:** Raster images + PDF only. **SVG stays a text buffer** on purpose (it's editable XML). Any other binary still toasts the original error.
+**Scope:** Raster images + PDF only. **SVG stays a text buffer** on purpose (it's editable XML). **`.mmd` Mermaid diagrams** use the editor preview path (`042-mermaid-preview.md`), not this pane. Any other binary still toasts the original error.
 
 ### Files
 | Type | Path | Exports/Purpose |
@@ -35,3 +35,4 @@ tags: [editor, preview, images, pdf, binary, tabs, file-tree]
 - **PDF via `data:` URL, not the asset protocol:** CSP is `null` so `data:` frames load. Reused `read_image_data_url` (renamed in spirit to "media") rather than enabling the Tauri asset protocol + scope — fewer config moving parts. Trade-off: a large PDF is base64-inflated (~1.33×) into memory for the preview.
 - **No breadcrumb bar:** preview panes mount directly into `pane-content`, not inside `editor-host`, so they fill the pane without the editor chrome.
 - **Room to grow:** SVG-as-image toggle, image zoom/pan beyond fit↔1:1, PDF page controls (native viewer handles this today).
+- **Not for diagrams:** `.mmd` files are text — see `042-mermaid-preview.md`.

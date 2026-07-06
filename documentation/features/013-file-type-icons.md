@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-03
+last_verified: 2026-07-06
 tags: [file-tree, explorer, icons, file-type, tints, brand, design-system, dry]
 ---
 
@@ -32,7 +32,7 @@ tags: [file-tree, explorer, icons, file-type, tints, brand, design-system, dry]
 | Styles | css, scss, sass, less, styl | `hash` |
 | Data | json, jsonc, json5, `package.json` | `braces` |
 | Config | yaml, toml, ini, conf, `Dockerfile`, dotfiles | `settings` |
-| Docs / text | md, mdx, txt, pdf, doc(x), `README.md`, `LICENSE` | `file-text` |
+| Docs / text | md, mdx, mmd, txt, pdf, doc(x), `README.md`, `LICENSE` | `file-text` |
 | Shell | sh, bash, zsh, ps1, bat | `terminal` |
 | Images | png, jpg, gif, svg, webp, ico, avif… | `image` |
 | Secrets / locks | .env, pem, key, `*.lock` files | `lock` |
