@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-06-28
+last_verified: 2026-07-06
 tags: [dock, floating-window, always-on-top, badge, notifications, agent-status, multi-window, macos]
 ---
 
@@ -36,7 +36,8 @@ Counter semantics: `computeDockProjects` counts via the SAME `resolveDisplayStat
 | Routing (`?dock=1` → `<DockWindow/>`), auto-open, focus bridge | `src/App.tsx` (`IS_DOCK`) |
 | Toggle command (`view.toggle_dock`, Ctrl+Shift+D) | `src/actions.ts` |
 | Native badge command | `src-tauri/src/lib.rs` → `set_dock_badge` (uses `WebviewWindow::set_badge_count`) |
-| Window perms (dock label + show/position/always-on-top) | `src-tauri/capabilities/default.json` |
+| Quit teardown (close Dock webview) | `src/appQuit.ts`, `src/dock.ts` (`closeDock`) |
+| Window perms (dock label + show/position/always-on-top + **destroy**) | `src-tauri/capabilities/default.json` |
 | Transparent window enablement | `src-tauri/tauri.conf.json` `app.macOSPrivateApi: true` + Cargo feature `macos-private-api` |
 | Dock styles | `src/App.css` (`.dock-*`) |
 
@@ -57,3 +58,4 @@ The **⟲ toggle button** flips the dock between horizontal and vertical (circle
 - **A separate window survives a main-window reload** (Cmd+R) but NOT a full `tauri dev` restart. A window left in a broken state (failed vertical resize → invisible/off-screen) reappears on reload; `openDock`'s recovery fixes it in place, and a full restart clears it entirely.
 - **`allow-set-size` / `allow-set-position` need a `tauri dev` restart** to take effect — until then orientation/resize/recovery silently no-op (the self-heal keeps the dock horizontal-and-visible).
 - Requires a full `tauri dev` restart to pick up: the new commands, capabilities, window label, notification plugin, and `macOSPrivateApi` (Rust/config changes, not HMR).
+- **Quit must destroy the Dock window.** `WebviewWindow.close()` on secondary webviews maps to `destroy` in Tauri 2 release builds. Without `core:window:allow-destroy` in `capabilities/default.json`, ⌘Q logs `window.destroy not allowed` and the app stays open. `appQuit.ts` closes Dock + popouts before the main window.

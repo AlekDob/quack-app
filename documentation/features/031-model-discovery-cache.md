@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-03
-last_verified: 2026-07-03
+last_verified: 2026-07-06
 tags: [model-discovery, startup, cache, providers, ollama, claude-code, cursor-cli, opencode-cli, performance, lazy-mount]
 ---
 
@@ -14,8 +14,8 @@ tags: [model-discovery, startup, cache, providers, ollama, claude-code, cursor-c
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Store | `src/modelDiscoveryStore.ts` | `ensureModelDiscovery`, `ensureCloudCatalog`, `prefetchModelDiscovery`, `invalidateModelDiscovery`, `mergeLiveCliModelsIntoDiscovery`, `subscribeModelDiscovery`, `getModelDiscovery` |
-| Component | `src/components/AIChatPanel.tsx` | Subscribes to store; `applyDiscoverySnapshot`; `refresh({ force })`; lazy cloud catalog on browser/manage open |
+| Store | `src/modelDiscoveryStore.ts` | `ensureModelDiscovery`, `ensureCloudCatalog`, `cloudCatalogComplete`, `prefetchModelDiscovery`, `invalidateModelDiscovery`, `mergeLiveCliModelsIntoDiscovery`, `subscribeModelDiscovery`, `getModelDiscovery` |
+| Component | `src/components/AIChatPanel.tsx` | `pickerCloudModels` + `browserCloudModels`; subscribes to store; lazy cloud catalog on browser/manage open |
 | Component | `src/components/WorkspaceShell.tsx` | `AIChatHost` lazy-mount + only active workspace mounts chat hosts |
 | Component | `src/App.tsx` | `prefetchModelDiscovery()` in boot effect (parallel with `hydrate()`) |
 | Store | `src/store.ts` | Parallel `Promise.all` workspace hydration during `hydrate()` |
@@ -38,7 +38,7 @@ tags: [model-discovery, startup, cache, providers, ollama, claude-code, cursor-c
 ### Key Functions
 - `prefetchModelDiscovery() → void` — fire-and-forget during splash; overlaps with workspace hydration
 - `ensureModelDiscovery({ force? }) → ModelDiscoverySnapshot` — cache read / deduped inflight fetch / TTL 60s
-- `ensureCloudCatalog() → ProviderModel[]` — lazy full cloud lists for Model Browser (not needed for composer chip)
+- `ensureCloudCatalog() → ProviderModel[]` — lazy full cloud lists for Model Browser; gated by `cloudCatalogComplete` (not merely `cloudCatalog.length`)
 - `invalidateModelDiscovery() → void` — drop cache + cloud inflight; notify subscribers
 - `mergeLiveCliModelsIntoDiscovery(oc, cursor) → void` — merge lazy CLI lists into shared cache
 - `subscribeModelDiscovery(cb) → unsubscribe` — all open panels stay in sync
@@ -61,6 +61,7 @@ tags: [model-discovery, startup, cache, providers, ollama, claude-code, cursor-c
 
 ### Gotchas
 - **Startup lightweight fetch:** initial snapshot skips `listAllCloudModels` — cloud catalog empty until browser/manage opens; composer chip uses `allModels` only.
+- **Picker-before-browser trap (fixed):** lazy OpenCode/Cursor merges used to write into `cloudCatalog` before the full fetch, so `ensureCloudCatalog()` early-returned and Claude Code showed "No models match" in the browser. Live CLI merges now touch `allModels` only until `cloudCatalogComplete`.
 - **Claude availability:** derived from `listAllModels` aggregate (no extra `claude_code_check` on soft fetch); force refresh still invalidates CC cache.
 - **Cursor/OpenCode default row:** unavailable CLIs still expose a default model id — availability flags need separate `isAvailable` probe.
 - **New chat slowness (fixed):** was one full provider probe per `AIChatPanel` mount; now shared cache + lazy tab mount (see `001-ai-session-library.md` gotcha update).

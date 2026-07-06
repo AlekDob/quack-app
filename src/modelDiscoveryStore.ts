@@ -25,6 +25,8 @@ const TTL_MS = 60_000;
 let cache: ModelDiscoverySnapshot | null = null;
 let inflight: Promise<ModelDiscoverySnapshot> | null = null;
 let cloudInflight: Promise<ProviderModel[]> | null = null;
+/** False while cloudCatalog only has lazy CLI slices from the picker. */
+let cloudCatalogComplete = false;
 const listeners = new Set<() => void>();
 
 function notify() {
@@ -72,6 +74,7 @@ async function fetchSnapshot(force: boolean): Promise<ModelDiscoverySnapshot> {
 export function invalidateModelDiscovery(): void {
   cache = null;
   cloudInflight = null;
+  cloudCatalogComplete = false;
   notify();
 }
 
@@ -106,12 +109,17 @@ export function mergeLiveCliModelsIntoDiscovery(
     cache = {
       ...cache,
       allModels: mergeProviderModels(cache.allModels, ocModels, "opencode-cli"),
-      cloudCatalog: mergeProviderModels(
-        cache.cloudCatalog,
-        ocModels,
-        "opencode-cli",
-      ),
     };
+    if (cloudCatalogComplete) {
+      cache = {
+        ...cache,
+        cloudCatalog: mergeProviderModels(
+          cache.cloudCatalog,
+          ocModels,
+          "opencode-cli",
+        ),
+      };
+    }
   }
   if (cursorModels.length > 0) {
     cache = {
@@ -121,12 +129,17 @@ export function mergeLiveCliModelsIntoDiscovery(
         cursorModels,
         "cursor-cli",
       ),
-      cloudCatalog: mergeProviderModels(
-        cache.cloudCatalog,
-        cursorModels,
-        "cursor-cli",
-      ),
     };
+    if (cloudCatalogComplete) {
+      cache = {
+        ...cache,
+        cloudCatalog: mergeProviderModels(
+          cache.cloudCatalog,
+          cursorModels,
+          "cursor-cli",
+        ),
+      };
+    }
   }
   notify();
 }
@@ -153,16 +166,22 @@ export async function ensureModelDiscovery(options?: {
 
 /** Full cloud catalog for Model Browser — deferred until first open. */
 export async function ensureCloudCatalog(): Promise<ProviderModel[]> {
-  if (cache?.cloudCatalog.length) return cache.cloudCatalog;
+  if (cloudCatalogComplete && cache) return cache.cloudCatalog;
   if (cloudInflight) return cloudInflight;
   cloudInflight = listAllCloudModels()
     .then((catalog) => {
       if (cache) {
-        cache = { ...cache, cloudCatalog: catalog };
+        let merged = catalog;
+        for (const pid of ["opencode-cli", "cursor-cli"] as const) {
+          const live = cache!.allModels.filter((m) => m.providerId === pid);
+          if (live.length > 0) merged = mergeProviderModels(merged, live, pid);
+        }
+        cache = { ...cache, cloudCatalog: merged };
+        cloudCatalogComplete = true;
         notify();
       }
       cloudInflight = null;
-      return catalog;
+      return cache?.cloudCatalog ?? catalog;
     })
     .catch((err) => {
       cloudInflight = null;

@@ -123,7 +123,7 @@ export async function closeDock(): Promise<void> {
   try {
     const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
     const w = await WebviewWindow.getByLabel(LABEL);
-    if (w) await w.close();
+    if (w) await w.close().catch(() => {});
   } catch {
     /* ignore */
   }

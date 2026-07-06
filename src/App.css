@@ -5386,10 +5386,9 @@ body.ws-dragging * {
   flex: 0 0 auto;
   align-self: center;
 }
+/* Portaled with fixed coords (escapes .ai-panel overflow:hidden). */
 .model-picker-pop {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
+  position: fixed;
   z-index: 95;
   width: 288px;
   overflow: hidden;

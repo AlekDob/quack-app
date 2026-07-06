@@ -32,6 +32,8 @@ import { IS_MACOS, readStoredTheme, setTheme, type ThemeMode } from "./theme";
 
 const APP_NAME = "Quack";
 
+let appMenu: Menu | null = null;
+
 type ItemOpts =
   | MenuItemOptions
   | SubmenuOptions
@@ -166,7 +168,14 @@ export async function installNativeMenu(): Promise<void> {
       { text: "Help", items: categoryItems("Help") },
     ],
   });
+  appMenu = menu;
   await menu.setAsAppMenu();
+}
+
+/** Re-attach menu callbacks after focus returns to main (Dock/popout gotcha). */
+export async function refreshNativeMenuBinding(): Promise<void> {
+  if (!IS_MACOS || !appMenu) return;
+  await appMenu.setAsAppMenu();
 }
 
 // file.quit moves to the app menu (Quit Quack), so drop it from File.

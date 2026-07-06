@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-01
-last_verified: 2026-07-03
+last_verified: 2026-07-06
 tags: [model-selector, model-browser, model-picker, favorites, visibility, cursor-cli, opencode-cli, composer, lazy-load, free-models, model-discovery-cache]
 ---
 
@@ -14,7 +14,7 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Component | `src/components/ModelPickerPopover.tsx` | Chip-triggered quick picker; `onOpen` triggers lazy CLI catalog fetch |
+| Component | `src/components/ModelPickerPopover.tsx` | Chip-triggered quick picker; **portaled** `position: fixed` popover; `onOpen` triggers lazy CLI catalog fetch |
 | Component | `src/components/ModelPickerRow.tsx` | Row with star toggle + optional `free` tag |
 | Component | `src/components/ModelBrowser.tsx` | Full catalog modal; OpenCode group; `free` tag on cards |
 | Component | `src/components/ManageModelsModal.tsx` | Toggle model visibility in quick picker (reuses `model-browser` shell) |
@@ -44,7 +44,9 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 
 **Lazy CLI catalog:** popover `onOpen` or `browserOpen` → `refreshLiveCliModels()` → `refreshOpenCodeModelsLive()` + `refreshCursorModelsLive()` → merge into shared cache
 
-**Pick:** `buildModelGroups()` → popover filters disabled via `isModelEnabled` → `onSelect(qualified)` → chat provider routing
+**Pick:** `pickerCloudModels` (from `allModels`, non-Ollama) → `buildModelGroups()` → popover filters disabled via `isModelEnabled` → `onSelect(qualified)` → chat provider routing
+
+**Model browser:** `browserOpen` → `ensureCloudCatalog()` + merge with `pickerCloudModels` so Claude Code never disappears after a picker prefetch
 
 ### Key Functions
 - `ensureModelDiscovery({ force? }) → ModelDiscoverySnapshot` — shared cache (`031-model-discovery-cache.md`)
@@ -72,6 +74,8 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 
 ### Gotchas
 - **Shared discovery cache:** one probe serves all open chats; see `031-model-discovery-cache.md`.
+- **Composer picker data source:** uses `allModels` (live discovery), **not** deferred `allCloudCatalog`. Regression from startup perf work (`1d23dc9f`) hid Claude Code until the full browser opened.
+- **Picker popover clipping (Agent Mode):** `.ai-panel { overflow: hidden }` clips in-flow menus. `ModelPickerPopover` portals to `document.body` with fixed coords (same pattern as `EffortPopover`).
 - **Lazy CLI catalogs:** at cold start OpenCode/Cursor show one default model each; full list loads when picker or browser opens (or after first sidecar spawn warms cache).
 - **Favorites star visibility:** star is always visible at 40% opacity (`--warn` when favorited) — was `opacity: 0` until hover (looked broken).
 - **Free badge:** semantic green via `.tag-free` token; not orange accent.

@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri 2 (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-06-28
+last_verified: 2026-07-06
 tags: [menubar, macos, native-menu, tauri-menu, topbar, accelerators, theme, quack-v1]
 ---
 
@@ -20,7 +20,9 @@ have no system menu bar, so they keep the in-window `TopBar` menus unchanged.
 | Concern | File |
 |---|---|
 | Native menu builder (macOS only) | `src/nativeMenu.ts` |
-| Install at boot | `src/App.tsx` (boot `useEffect` → `installNativeMenu()`) |
+| Install at boot + focus re-bind | `src/App.tsx` (`installNativeMenu()`, `refreshNativeMenuBinding()` on `onFocusChanged`) |
+| Quit teardown (Dock + popouts) | `src/appQuit.ts` |
+| Quit command | `src/actions.ts` (`file.quit` → `teardownBeforeQuit` + `closeMainWindow`) |
 | Hide in-window brand/menus/palette on macOS | `src/components/TopBar.tsx` (`IS_MACOS` guards) |
 | Platform flag + imperative theme setter | `src/theme.ts` (`IS_MACOS`, `setTheme`, `onThemeChange`) |
 | Command registry (single source of truth) | `src/actions.ts` (`commands`, `commandsForCategory`, `runCommand`) |
@@ -52,9 +54,18 @@ have no system menu bar, so they keep the in-window `TopBar` menus unchanged.
   adds a Theme submenu (`themeSubmenu()`) that calls `setTheme()` and re-installs the menu to
   refresh the check marks. `setTheme`/`onThemeChange` keep `useTheme()` consumers in sync.
 - **Permissions already granted.** `core:default` → `core:menu:default` already includes
-  `allow-set-as-app-menu`. No capability edit needed in `capabilities/default.json`.
+  `allow-set-as-app-menu`. Quit teardown also needs `core:window:allow-destroy` so Dock/popout
+  `WebviewWindow.close()` succeeds in **release** builds (dev is permissive). See `010-project-dock.md`.
 - **App-menu title.** macOS forces the first submenu's title to the process/bundle name
   (`productName: "Quack"`), so the `"Quack"` text on `appSubmenu()` is cosmetic.
+- **Dock / popout focus kills custom menu callbacks (Tauri 2).** After the Dock or a terminal
+  popout takes focus, JS `action` handlers on custom menu items stop firing — predefined items
+  (Hide, About) still work. Fix: cache the `Menu` in `nativeMenu.ts` and call
+  `refreshNativeMenuBinding()` (`setAsAppMenu()` again) when `main` regains focus and after
+  `openDock()` on boot.
+- **Quit flow:** `file.quit` / window close → `confirmDiscardUnsaved` → `teardownBeforeQuit()`
+  (close Dock + all non-`main` webviews) → `closeMainWindow()`. `onCloseRequested` shares the
+  same teardown via `quitArmed()` to avoid a double confirm.
 
 ### Manual verification (needs a real macOS build)
 1. `npm run tauri dev` on macOS → menu bar shows **Quack / File / Edit / View / Terminal / AI /
@@ -63,3 +74,5 @@ have no system menu bar, so they keep the in-window `TopBar` menus unchanged.
 3. ⌘C/⌘V/⌘X/⌘Z work in Monaco and inputs (predefined Edit items).
 4. View > Theme switches theme and the check mark follows.
 5. On Windows/Linux the in-window `TopBar` menubar is unchanged.
+6. **Release build:** ⌘Q / Quit Quack closes main + Dock (no `window.destroy not allowed` in console).
+7. Click the Dock, return to main, ⌘S / custom File commands still work (menu re-bound).

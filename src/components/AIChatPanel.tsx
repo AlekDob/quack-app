@@ -3818,6 +3818,25 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     [allModels],
   );
 
+  // Composer picker lists live/available providers from discovery — NOT the
+  // deferred full cloud catalog (that's for Model Browser / Manage models).
+  const pickerCloudModels = useMemo(
+    () => allModels.filter((m) => m.providerId !== "ollama"),
+    [allModels],
+  );
+
+  // Model browser / visibility modal: full deferred catalog + live discovery.
+  const browserCloudModels = useMemo(() => {
+    const byKey = new Map<string, ProviderModel>();
+    for (const m of allCloudCatalog) {
+      byKey.set(makeQualifiedModel(m.providerId, m.modelId), m);
+    }
+    for (const m of pickerCloudModels) {
+      byKey.set(makeQualifiedModel(m.providerId, m.modelId), m);
+    }
+    return [...byKey.values()];
+  }, [allCloudCatalog, pickerCloudModels]);
+
   const modelHasKey = useMemo(
     () => ({
       ollama: true,
@@ -3840,7 +3859,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
         selectedQualified={selected}
         dotColor={dotColor}
         onSelect={(q) => setSelected(q)}
-        cloudModels={allCloudCatalog}
+        cloudModels={pickerCloudModels}
         ollamaModels={ollamaModels}
         hasKey={modelHasKey}
         onOpen={() => void refreshLiveCliModels()}
@@ -5680,7 +5699,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
               .map((m) => m.modelId),
           )
         }
-        cloudModels={allCloudCatalog}
+        cloudModels={browserCloudModels}
         hasKey={modelHasKey}
         selectedQualified={selected}
         pullProgressByName={pullProgressMap}
@@ -5723,7 +5742,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       <ManageModelsModal
         open={manageModelsOpen}
         onClose={() => setManageModelsOpen(false)}
-        cloudModels={allCloudCatalog}
+        cloudModels={browserCloudModels}
         ollamaModels={ollamaModels}
         hasKey={modelHasKey}
         onConfigureProviders={() => openSettings("ai-providers")}

@@ -10,8 +10,8 @@ import {
   normalizeAccel,
   parseChordAccel,
 } from "./accelMatch";
-import { bootstrapTheme } from "./theme";
-import { installNativeMenu } from "./nativeMenu";
+import { IS_MACOS, bootstrapTheme } from "./theme";
+import { installNativeMenu, refreshNativeMenuBinding } from "./nativeMenu";
 import { onPaletteOpen } from "./paletteBus";
 import { onFootprintOpen } from "./footprintBus";
 import { basename } from "./pathUtils";
@@ -56,6 +56,7 @@ import { useZenMode } from "./zenMode";
 import { useAgentMode } from "./agentMode";
 import { installResumeDebug } from "./resumeDebug";
 import { prefetchModelDiscovery } from "./modelDiscoveryStore";
+import { teardownBeforeQuit, quitArmed } from "./appQuit";
 import "./App.css";
 
 // When this document was opened as a terminal pop-out window, render only
@@ -221,13 +222,31 @@ function MainApp() {
     let closing = false;
     void getCurrentWindow()
       .onCloseRequested(async (event) => {
-        if (closing) return; // confirm already passed; let it close
+        if (closing || quitArmed()) return;
         const ok = await confirmDiscardUnsaved("Close");
         if (!ok) {
           event.preventDefault();
           return;
         }
         closing = true;
+        await teardownBeforeQuit();
+      })
+      .then((u) => {
+        unlisten = u;
+      })
+      .catch(() => {});
+    return () => unlisten?.();
+  }, []);
+
+  // macOS: re-bind the native app menu when main regains focus. Tauri 2
+  // drops custom menu-item callbacks after another webview (Dock, popout)
+  // took focus — predefined items still work but Quit/commands go silent.
+  useEffect(() => {
+    if (!IS_MACOS) return;
+    let unlisten: (() => void) | undefined;
+    void getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => {
+        if (focused) void refreshNativeMenuBinding();
       })
       .then((u) => {
         unlisten = u;
@@ -357,7 +376,9 @@ function MainApp() {
   // jump to that project's most urgent chat).
   useEffect(() => {
     if (!hydrated) return;
-    if (isDockEnabled()) void openDock();
+    if (isDockEnabled()) {
+      void openDock().then(() => refreshNativeMenuBinding());
+    }
     const offs: Array<() => void> = [];
     void listen(DOCK_REQUEST_EVENT, () => emitDockSummary()).then((u) =>
       offs.push(u),

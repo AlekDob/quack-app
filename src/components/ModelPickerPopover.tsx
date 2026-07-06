@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "./Icon";
 import {
   buildModelGroups,
@@ -18,6 +19,26 @@ import {
   type ProviderId,
   type ProviderModel,
 } from "../providers/types";
+
+const POP_GAP = 6;
+const POP_MARGIN = 8;
+const POP_W = 288;
+const POP_H = 340;
+
+function clampPopPos(
+  btn: DOMRect,
+  popW: number,
+  popH: number,
+): { left: number; top: number } {
+  let left = btn.left;
+  if (left + popW + POP_MARGIN > window.innerWidth) {
+    left = Math.max(POP_MARGIN, btn.right - popW);
+  }
+  left = Math.max(POP_MARGIN, left);
+  let top = btn.top - popH - POP_GAP;
+  if (top < POP_MARGIN) top = btn.bottom + POP_GAP;
+  return { left, top };
+}
 
 interface Props {
   selectedQualified: string;
@@ -53,7 +74,9 @@ export function ModelPickerPopover({
   const setOpen = onOpenChange ?? setOpenInternal;
   const [query, setQuery] = useState("");
   const [prefsTick, setPrefsTick] = useState(0);
-  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [popPos, setPopPos] = useState({ left: 0, top: 0 });
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
 
   const allModels = useMemo(
     () => [...ollamaModels, ...cloudModels],
@@ -85,17 +108,115 @@ export function ModelPickerPopover({
     setQuery("");
   };
 
+  useLayoutEffect(() => {
+    if (!open || !btnRef.current) return;
+    const btn = btnRef.current.getBoundingClientRect();
+    const place = () => {
+      const pop = popRef.current?.getBoundingClientRect();
+      setPopPos(clampPopPos(btn, pop?.width ?? POP_W, pop?.height ?? POP_H));
+    };
+    place();
+    const id = window.requestAnimationFrame(place);
+    return () => window.cancelAnimationFrame(id);
+  }, [open, favorites.length, groupsNoFav.length, query]);
+
+  const toggleOpen = () => {
+    const next = !open;
+    if (next) {
+      onOpen?.();
+      if (btnRef.current) {
+        const btn = btnRef.current.getBoundingClientRect();
+        setPopPos(clampPopPos(btn, POP_W, POP_H));
+      }
+    }
+    setOpen(next);
+  };
+
+  const popover = open ? (
+    <>
+      <div
+        className="ai-flag-menu-overlay"
+        onClick={() => setOpen(false)}
+      />
+      <div
+        ref={popRef}
+        className="model-picker-pop"
+        role="listbox"
+        style={{ left: popPos.left, top: popPos.top }}
+      >
+        <div className="model-picker-pop-head">
+          <div className="model-picker-search-wrap">
+            <Icon name="search" size={14} />
+            <input
+              autoFocus
+              className="model-picker-search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search models"
+            />
+          </div>
+          <button
+            type="button"
+            className="model-picker-icon-btn"
+            title="Configure providers"
+            onClick={() => {
+              setOpen(false);
+              onConfigureProviders();
+            }}
+          >
+            <Icon name="plus" size={14} />
+          </button>
+          <button
+            type="button"
+            className="model-picker-icon-btn"
+            title="Browse all models"
+            onClick={() => {
+              setOpen(false);
+              onOpenFullBrowser();
+            }}
+          >
+            <Icon name="settings" size={14} />
+          </button>
+        </div>
+        <div className="model-picker-scroll">
+          {isEmpty && (
+            <p className="model-picker-empty">
+              No models available. Configure a provider or adjust filters
+              in Manage models.
+            </p>
+          )}
+          {favorites.length > 0 && (
+            <PickerSection
+              title="Favorites"
+              models={favorites}
+              selectedQualified={selectedQualified}
+              onPick={pick}
+              onFavoriteChange={() => setPrefsTick((n) => n + 1)}
+            />
+          )}
+          {groupsNoFav.map((group) => (
+            <PickerSection
+              key={group.id}
+              title={group.name}
+              models={group.models}
+              selectedQualified={selectedQualified}
+              onPick={pick}
+              onFavoriteChange={() => setPrefsTick((n) => n + 1)}
+            />
+          ))}
+        </div>
+      </div>
+    </>
+  ) : null;
+
   return (
     <>
-      <div className="model-picker-wrap" ref={wrapRef}>
+      <div className="model-picker-wrap">
         <button
+          ref={btnRef}
           type="button"
           className="ai-model-chip"
-          onClick={() => {
-            const next = !open;
-            if (next) onOpen?.();
-            setOpen(next);
-          }}
+          onClick={toggleOpen}
           aria-haspopup="listbox"
           aria-expanded={open}
           title={
@@ -118,77 +239,7 @@ export function ModelPickerPopover({
           )}
           <span className="ai-model-btn-caret">▾</span>
         </button>
-        {open && (
-          <>
-            <div
-              className="ai-flag-menu-overlay"
-              onClick={() => setOpen(false)}
-            />
-            <div className="model-picker-pop" role="listbox">
-              <div className="model-picker-pop-head">
-                <div className="model-picker-search-wrap">
-                  <Icon name="search" size={14} />
-                  <input
-                    autoFocus
-                    className="model-picker-search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search models"
-                  />
-                </div>
-                <button
-                  type="button"
-                  className="model-picker-icon-btn"
-                  title="Configure providers"
-                  onClick={() => {
-                    setOpen(false);
-                    onConfigureProviders();
-                  }}
-                >
-                  <Icon name="plus" size={14} />
-                </button>
-                <button
-                  type="button"
-                  className="model-picker-icon-btn"
-                  title="Browse all models"
-                  onClick={() => {
-                    setOpen(false);
-                    onOpenFullBrowser();
-                  }}
-                >
-                  <Icon name="settings" size={14} />
-                </button>
-              </div>
-              <div className="model-picker-scroll">
-                {isEmpty && (
-                  <p className="model-picker-empty">
-                    No models available. Configure a provider or adjust filters
-                    in Manage models.
-                  </p>
-                )}
-                {favorites.length > 0 && (
-                  <PickerSection
-                    title="Favorites"
-                    models={favorites}
-                    selectedQualified={selectedQualified}
-                    onPick={pick}
-                    onFavoriteChange={() => setPrefsTick((n) => n + 1)}
-                  />
-                )}
-                {groupsNoFav.map((group) => (
-                  <PickerSection
-                    key={group.id}
-                    title={group.name}
-                    models={group.models}
-                    selectedQualified={selectedQualified}
-                    onPick={pick}
-                    onFavoriteChange={() => setPrefsTick((n) => n + 1)}
-                  />
-                ))}
-              </div>
-            </div>
-          </>
-        )}
+        {popover && createPortal(popover, document.body)}
       </div>
     </>
   );
