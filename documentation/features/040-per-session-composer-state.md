@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-05
-last_verified: 2026-07-05
+last_verified: 2026-07-06
 tags: [chat, composer, session, persistence, effort, draft, queue, model]
 ---
 
@@ -32,19 +32,28 @@ not bleed settings or half-written text from one chat into another.
 | Effort still “global” on older chats | `sessionKnobsFrom` fell back to `readEffort()` / `readDefaultPermMode()` when the row existed but lacked `ccEffort` — global keys had just been overwritten by another session |
 | Draft lost when switching quickly | Debounce effect `return () => clearTimeout(t)` **cancelled** the pending save; Agent Mode unmount left nothing on disk if switch happened within 400ms |
 
+### Transcript loss (fix Jul 2026 — see `043-chat-transcript-persistence.md`)
+
+| Symptom | Root cause |
+|---|---|
+| Messages missing after switch / reload | Monolithic `saveSession` array — parallel mounted panels overwrote each other |
+| Streaming turn lost on switch | Partial assistant only in React state until turn end |
+| Composer created empty rows | `mergeComposerDraft` wrote `messages: []` when row missing |
+
 ## Components & modules
 
 | File | Role |
 |---|---|
-| `src/chatHistory.ts` | `ChatSession` extended with `ccEffort`, `ccPermMode`, `ccThinking`, `composer` |
-| `src/composerDraft.ts` | `ChatComposerDraft`, `draftFromSession`, `mergeComposerDraft`, `mergeSessionKnobs` |
+| `src/chatHistory.ts` | `ChatSession` fields; `patchSession` for partial writes |
+| `src/composerDraft.ts` | `mergeComposerDraft` / `mergeSessionKnobs` → `patchSession` |
+| `src/chatPersistFlush.ts` | `flushAllChatPersist` before chat switch |
 | `src/imageAttach.ts` | `rehydrateAttachment()` — rebuild thumb from on-disk path on restore |
 | `src/components/AIChatPanel.tsx` | Restore, `sessionKnobsFrom`, refs, flush on change / switch / unmount |
 | `src/permModeStore.ts` | Unchanged — runtime bridge to permission overlay by CC session id |
 
 ## ChatSession fields (transcript row)
 
-Stored in `localStorage` `lcp.ollama.history.{wsId}` (max 30).
+Stored per session key `lcp.ollama.history.{wsId}.s.{sessionId}` (index max 30) — see `043-chat-transcript-persistence.md`.
 
 | Field | Type | Purpose |
 |---|---|---|
@@ -94,8 +103,8 @@ Agent Mode panel mount after rail pick.
 
 ### Persist (session leaves focus or draft/knobs change)
 
-Two merge helpers in `composerDraft.ts` — both upsert the existing
-`ChatSession` row without wiping messages:
+Two merge helpers in `composerDraft.ts` — both call `patchSession` so
+**messages are never reset** when only composer/knobs change:
 
 | Helper | Writes |
 |---|---|
@@ -116,8 +125,8 @@ Two merge helpers in `composerDraft.ts` — both upsert the existing
 |---|---|
 | Keystroke / toggle / queue / knob change | Debounced 400ms `flushSessionState`; **cleanup flushes synchronously** (must not only `clearTimeout`) |
 | `sessionId` changes (`/new`, history) | `prevSessionIdRef` effect → `flushSessionState(previous)` |
-| Panel unmount (Agent Mode switch) | `useLayoutEffect` cleanup → `mergeComposerDraft` + `mergeSessionKnobs` from refs |
-| Messages saved / `beforeunload` | Full `saveSession` row includes `composer` + knobs from refs |
+| Panel unmount / chat switch | `registerChatPersist` cleanup + `pulseChatSwitch` → `flushAllChatPersist` |
+| Messages saved / `beforeunload` / streaming (5s) | Full `saveSession`; toast if `false` |
 
 ### New / cleared chat
 
@@ -129,18 +138,11 @@ Branch (`branchFromHere`) copies current knobs + composer snap into the new
 
 ## Agent Mode gotcha
 
-`AgentModeShell` renders:
+`AgentModeShell` renders one `AgentChatHost` per open chat (CSS `display`
+toggle). Panels **stay mounted** — same as editor `AIChatHost`. Persistence
+on `ChatSession` + `flushAllChatPersist` on switch is **required**.
 
-```tsx
-<AIChatPanel key={`${wsId}:${activeChatId}`} … />
-```
-
-Every rail pick **destroys and recreates** the panel. In-memory React state
-never survives a switch — persistence on `ChatSession` + unmount flush is
-**required**, not optional.
-
-Editor mode (`WorkspaceShell` `AIChatHost`) keeps panels mounted after first
-show; restore still runs on hydration but unmount flush is less critical.
+Editor mode (`WorkspaceShell` `AIChatHost`) uses the same mount-once pattern.
 
 **Requires app reload** after deploying this feature — `npm run tauri dev`
 (not Vite-only `npm run dev` if testing the desktop shell).
@@ -159,7 +161,8 @@ show; restore still runs on hydration but unmount flush is less critical.
 - Permission modes: `015-claude-permission-mode.md`
 - CC spawn flags: `014-claude-code-bridge.md`
 - Session library model: `001-ai-session-library.md`
-- Diary: `documentation/diary/2026-07-05.md` (15:20, 15:45, 15:55)
+- Transcript storage / audit: `043-chat-transcript-persistence.md`
+- Diary: `documentation/diary/2026-07-05.md` (15:20, 15:45, 15:55), `2026-07-06.md` (18:25)
 
 ## Gotchas
 

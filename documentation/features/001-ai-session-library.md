@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-05
+last_verified: 2026-07-06
 tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, workspace, zustand, persistence]
 ---
 
@@ -16,7 +16,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 |---------|-----------|----------------|-------------|
 | Workspace | An open project/folder | `store.ts` (`recent`, `openIds`, `activeId`, `loaded`) | Rust `workspace.rs` → `workspaces.json` + per-ws `state.json` |
 | AIChatDescriptor | An OPEN chat (a live agent) shown in the lists | `WorkspaceData.aiChats` | inside the workspace `state.json` |
-| ChatSession | The HISTORICAL transcript of one chat | `chatHistory.ts` | localStorage `lcp.ollama.history.{wsId}` (max 30) |
+| ChatSession | The HISTORICAL transcript of one chat | `chatHistory.ts` | localStorage per-session keys — see `043-chat-transcript-persistence.md` |
 
 ### Files
 | Type | Path | Exports/Purpose |
@@ -28,8 +28,9 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | Component | `src/components/AIChatPanel.tsx` | The chat panel itself; owns runtime state (streaming, tools, todos) per session |
 | Store/State | `src/store.ts` | `AIChatDescriptor`, `WorkspaceData.aiChats`, `addAIChat`, `closeAIChat`, `reorderAIChat` |
 | Store/State | `src/aiTaskStore.ts` | Module-level task store keyed by chatId; `publishTasks`/`getTasks`/`subscribeTasks` |
-| Service | `src/chatHistory.ts` | `ChatSession` model + `loadSessions`/`saveSession`/`deleteSession`/`deriveTitle` |
-| Service | `src/composerDraft.ts` | `ChatComposerDraft`, `mergeComposerDraft`, `mergeSessionKnobs` — per-session composer + CC knobs on `ChatSession` |
+| Service | `src/chatHistory.ts` | `ChatSession` + `loadSession`/`loadSessions`/`saveSession`/`patchSession`/`deleteSession` |
+| Service | `src/chatPersistFlush.ts` | Flush registry — all mounted panels save before chat switch |
+| Service | `src/composerDraft.ts` | `ChatComposerDraft`, `mergeComposerDraft`, `mergeSessionKnobs` — via `patchSession` |
 | Service | `src/providerSession.ts` | `providerSessionIds` read/write; legacy `claudeSessionId` migration |
 | Model/Type | `src/ai.ts` | `ChatMessage`, `ToolCall`, `ChatStreamEvent` (streaming contract) |
 | Service (Rust) | `src-tauri/src/workspace.rs` | `WorkspaceMeta`, `WorkspacesIndex`, load/save workspace state |
@@ -39,13 +40,15 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 - **Open a session:** `addAIChat(wsId)` → new `AIChatDescriptor` in `ws.aiChats` (createdAt = max+1) → persisted in `state.json` → appears in both lists
 - **Render the lists:** `Object.values(ws.aiChats).sort(by createdAt)` → `AIChatsRail` (editor) / `AgentModeShell` sessions (agent)
 - **Per-chat badge:** `chat.model` → `modelBadge()` → 2-char provider chip (CC/CU/OC/Cl/AI/OL)
-- **Transcript load/save:** `AIChatPanel` ↔ `chatHistory.ts` via `descriptor.sessionId`; agent resume ids in `providerSessionIds` (see `028-opencode-bridge.md`); composer knobs + draft on same row — see `040-per-session-composer-state.md`
+- **Transcript load/save:** `AIChatPanel` ↔ `chatHistory.ts` via `descriptor.sessionId`; atomic per-session keys + flush on switch (`043-chat-transcript-persistence.md`); composer knobs + draft via `patchSession` — see `040-per-session-composer-state.md`
 - **Live tasks:** `AIChatPanel` `publishTasks(chatId, todos)` → `aiTaskStore` → `AgentTasks` in `AgentModeShell`
 - **Reorder:** drag in `AIChatsRail` → `reorderAIChat` rewrites `createdAt` (sort key, no separate order list)
 
 ### Key Functions
-- `loadSessions(wsId) → ChatSession[]` — read + validate + sort transcripts by `updatedAt` desc
-- `saveSession(wsId, session) → void` — upsert, cap at `MAX_SESSIONS` (30)
+- `loadSession(wsId, id) → ChatSession | undefined` — single transcript row
+- `loadSessions(wsId) → ChatSession[]` — all rows for workspace, sorted newest-first
+- `saveSession(wsId, session) → boolean` — atomic write one session + update index (max 30)
+- `patchSession(wsId, id, partial) → boolean` — merge fields without clobbering omitted keys
 - `deriveTitle(messages) → string` — first user line, truncated to 60 chars
 - `modelBadge(model) → {short, className, full}` — provider → chip; **DUPLICATED** in `AIChatsRail.tsx` and `AgentModeShell.tsx` (extract to shared module)
 - `publishTasks(chatId, items|null)` — publish/clear a session's checklist into `aiTaskStore`
@@ -59,9 +62,9 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 - runtime run-state (`streaming`, `runningTools`, `activeToolLabels{status}`, `abortRef`): **local to `AIChatPanel`** (component) — not yet surfaced per-session in the lists
 
 ### Gotcha — mount asymmetry (editor vs agent mode)
-- **Editor mode** (`WorkspaceShell.tsx` `AIChatHost`): only the **active workspace** mounts chat hosts; within it, a tab's panel mounts on **first show** (`mounted` latch) — hidden background tabs do not run until selected. Previously every tab in every open workspace mounted immediately (slow new-chat / cold start).
-- **Agent mode** (`AgentModeShell.tsx:450`): only the selected session mounts an `AIChatPanel` (`key={wsId:activeChatId}`) → background agents are NOT mounted, cannot run or report status.
-- Consequence: any per-session live status (see `decisions/001-agent-status-indicators.md`) needs background panels mounted in Agent Mode too, or it only ever reflects the active session. Cross-workspace status uses `AgentHubWatcher` + `agentStatusStore`, not mounted panels.
+- **Editor mode** (`WorkspaceShell.tsx` `AIChatHost`): one host per `aiChats` descriptor; panels stay mounted after first show (`display:none` when hidden). Background tabs can stream and **save in parallel** — requires per-session storage (`043`).
+- **Agent mode** (`AgentModeShell.tsx` `AgentChatHost`): same pattern — **all open chats** mount one `AIChatPanel` each, toggled with CSS; `pulseChatSwitch` + `flushAllChatPersist` runs before the veil.
+- Consequence: any per-session live status (see `decisions/001-agent-status-indicators.md`) can use mounted background panels. Cross-workspace status uses `AgentHubWatcher` + `agentStatusStore`.
 
 ### AIChatDescriptor
 | Field | Type | Description |
@@ -77,5 +80,6 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | `composer` | `ChatComposerDraft?` | Draft input, queue, attach toggles, staged images |
 
 ### Config
-- `MAX_SESSIONS`: 30 transcripts per workspace (`chatHistory.ts`)
-- localStorage key: `lcp.ollama.history.{wsId}` (legacy prefix kept for back-compat)
+- `MAX_SESSIONS`: 30 transcripts per workspace (`chatHistory.ts` index cap)
+- localStorage keys: `lcp.ollama.history.{wsId}.s.{sessionId}` + `.__idx__` (legacy monolithic array auto-migrated)
+- Audit: `node scripts/audit-chat-persistence.mjs`

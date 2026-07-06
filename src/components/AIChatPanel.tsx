@@ -114,10 +114,12 @@ import {
   loadSessions,
   saveSession,
   deleteSession,
+  patchSession,
   newSessionId,
   deriveTitle,
   type ChatSession,
 } from "../chatHistory";
+import { registerChatPersist } from "../chatPersistFlush";
 import {
   draftFromSession,
   mergeComposerDraft,
@@ -691,6 +693,15 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     ccThinking,
     ccPermMode,
   });
+  const lastSaveWarnAt = useRef(0);
+  const persistTranscriptRef = useRef<() => void>(() => {});
+  const warnSaveFailed = useCallback(() => {
+    if (Date.now() - lastSaveWarnAt.current < 30_000) return;
+    lastSaveWarnAt.current = Date.now();
+    toastError(
+      "Chat not saved — storage may be full. Copy important messages or restart Quack.",
+    );
+  }, []);
   const applyComposerDraft = useCallback(
     (draft: ChatComposerDraft) => {
       setInput(draft.input ?? "");
@@ -1389,22 +1400,37 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   // the old messages, so restore looked broken. Save immediately
   // (writes are localStorage-cheap) AND register a beforeunload
   // hook to flush one last time on page close.
+  useLayoutEffect(() => {
+    persistTranscriptRef.current = () => {
+      const partial = streaming;
+      let finalMessages = messages;
+      if (partial !== null && partial.trim().length > 0) {
+        finalMessages = [
+          ...messages,
+          { role: "assistant" as const, content: partial },
+        ];
+      }
+      if (finalMessages.length === 0) return;
+      const session: ChatSession = {
+        id: sessionId,
+        title: deriveTitle(finalMessages),
+        messages: finalMessages,
+        model: selected,
+        updatedAt: Date.now(),
+        ...writeProviderSessionIds(providerSessionIds),
+        totalCostUsd: chatTotalCost > 0 ? chatTotalCost : undefined,
+        ccEffort,
+        ccThinking,
+        ccPermMode,
+        composer: draftFromComposerSnap(composerPersistRef.current),
+      };
+      if (!saveSession(wsId, session)) warnSaveFailed();
+    };
+  });
+
   useEffect(() => {
     if (messages.length === 0) return;
-    const session: ChatSession = {
-      id: sessionId,
-      title: deriveTitle(messages),
-      messages,
-      model: selected,
-      updatedAt: Date.now(),
-      ...writeProviderSessionIds(providerSessionIds),
-      totalCostUsd: chatTotalCost > 0 ? chatTotalCost : undefined,
-      ccEffort,
-      ccThinking,
-      ccPermMode,
-      composer: draftFromComposerSnap(composerPersistRef.current),
-    };
-    saveSession(wsId, session);
+    persistTranscriptRef.current();
     setSessions(loadSessions(wsId));
   }, [
     messages,
@@ -1417,6 +1443,18 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     ccThinking,
     ccPermMode,
   ]);
+
+  useEffect(() => {
+    const key = `${wsId}:${aiChatId ?? sessionId}`;
+    return registerChatPersist(key, wsId, () => persistTranscriptRef.current());
+  }, [wsId, aiChatId, sessionId]);
+
+  // Checkpoint partial assistant text while streaming (switch / crash).
+  useEffect(() => {
+    if (streaming === null) return;
+    const t = window.setInterval(() => persistTranscriptRef.current(), 5000);
+    return () => window.clearInterval(t);
+  }, [streaming !== null]);
 
   // Last-resort flush: if the page is about to close (refresh, tab
   // close), write the current state synchronously even if a streaming
@@ -1448,7 +1486,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
         ccPermMode,
         composer: draftFromComposerSnap(composerPersistRef.current),
       };
-      saveSession(wsId, session);
+      if (!saveSession(wsId, session)) warnSaveFailed();
     };
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
@@ -1470,12 +1508,10 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   useEffect(() => {
     if (!sessionId || messages.length > 0) return;
     const existing = loadSessions(wsId).find((s) => s.id === sessionId);
-    saveSession(wsId, {
-      id: sessionId,
+    patchSession(wsId, sessionId, {
       title: existing?.title ?? "Untitled",
-      messages: [],
+      messages: existing?.messages ?? [],
       model: selected || existing?.model,
-      updatedAt: Date.now(),
       ...writeProviderSessionIds(providerSessionIds),
       ccEffort,
       ccThinking,
@@ -3125,7 +3161,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       // No claudeSessionId — branching forks the conversation, so
       // we want a fresh Claude Code session not a resumed one.
     };
-    saveSession(wsId, branchedSession);
+    saveSession(wsId, branchedSession) || warnSaveFailed();
     toastInfo(
       "Branched into a new chat tab — the original is untouched",
     );

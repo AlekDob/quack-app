@@ -1,55 +1,33 @@
 import type { ChatMessage } from "./ai";
 import type { ProviderId } from "./providers/types";
 import type { ChatComposerDraft } from "./composerDraft";
-import { getJson, setJson } from "./localStore";
+import { getJson, setJson, remove, getString } from "./localStore";
 
 export interface ChatSession {
   id: string;
   title: string;
   messages: ChatMessage[];
-  /** Qualified provider:model id used for the last turn, or a bare
-   *  Ollama model id from older sessions. Optional because sessions
-   *  saved before the model field was added carry it as undefined,
-   *  and consumers already gate on `if (session.model)`. */
   model?: string;
   updatedAt: number;
-  /**
-   * Per-provider server-side session ids for resume (`--resume`, OpenCode
-   * `ses_*`, Codex `thread_id`, etc.). Cleared when the user starts a new
-   * chat. Prefer this over `claudeSessionId` for new code.
-   */
   providerSessionIds?: Partial<Record<ProviderId, string>>;
-  /**
-   * Legacy Claude Code session id — kept for backward compatibility with
-   * sessions saved before `providerSessionIds`. New writes mirror the
-   * `claude-code` entry from `providerSessionIds`.
-   */
   claudeSessionId?: string;
-  /**
-   * Cumulative USD cost of every Claude Code turn in this chat,
-   * summed from the `cost_usd` field of each `result` event. Lets the
-   * UI show running spend in the footer + warn at a configurable
-   * budget threshold. Only Claude Code populates this today.
-   */
   totalCostUsd?: number;
-  /** Claude Code --effort for this chat (low|medium|high|xhigh|max). */
   ccEffort?: string;
-  /** Extended thinking: null = CLI default, true = on, false = off. */
   ccThinking?: boolean | null;
-  /** Permission mode for this chat. null / absent = Ask. */
   ccPermMode?: string | null;
-  /** Composer draft — input, queue, attach toggles, staged images. */
   composer?: ChatComposerDraft;
 }
 
-const KEY = (wsId: string) => `lcp.ollama.history.${wsId}`;
+const LEGACY_KEY = (wsId: string) => `lcp.ollama.history.${wsId}`;
+const INDEX_KEY = (wsId: string) => `lcp.ollama.history.${wsId}.__idx__`;
+const SESSION_KEY = (wsId: string, sessionId: string) =>
+  `lcp.ollama.history.${wsId}.s.${sessionId}`;
 const MAX_SESSIONS = 30;
 
-export function loadSessions(wsId: string): ChatSession[] {
-  const arr = getJson<unknown[]>(KEY(wsId), [], Array.isArray);
-  return arr
-    .filter(isValidSession)
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+const migratedWs = new Set<string>();
+
+interface SessionIndex {
+  ids: string[];
 }
 
 function isValidSession(s: unknown): s is ChatSession {
@@ -63,15 +41,105 @@ function isValidSession(s: unknown): s is ChatSession {
   );
 }
 
-export function saveSession(wsId: string, session: ChatSession): void {
-  const all = loadSessions(wsId).filter((s) => s.id !== session.id);
-  all.unshift(session);
-  setJson(KEY(wsId), all.slice(0, MAX_SESSIONS));
+function isValidIndex(v: unknown): v is SessionIndex {
+  return (
+    !!v &&
+    typeof v === "object" &&
+    Array.isArray((v as SessionIndex).ids)
+  );
+}
+
+function readIndex(wsId: string): SessionIndex {
+  return getJson(INDEX_KEY(wsId), { ids: [] }, isValidIndex);
+}
+
+function writeIndex(wsId: string, ids: string[]): void {
+  setJson(INDEX_KEY(wsId), { ids });
+}
+
+/** One-time: split the legacy monolithic array into per-session keys. */
+function migrateLegacyIfNeeded(wsId: string): void {
+  if (migratedWs.has(wsId)) return;
+  migratedWs.add(wsId);
+  if (getString(LEGACY_KEY(wsId)) === null) return;
+
+  const legacy = getJson<unknown[]>(LEGACY_KEY(wsId), [], Array.isArray);
+  const valid = legacy.filter(isValidSession);
+  for (const s of valid) {
+    setJson(SESSION_KEY(wsId, s.id), s);
+  }
+  const ids = [...valid]
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .map((s) => s.id)
+    .slice(0, MAX_SESSIONS);
+  writeIndex(wsId, ids);
+  for (const s of valid) {
+    if (!ids.includes(s.id)) remove(SESSION_KEY(wsId, s.id));
+  }
+  remove(LEGACY_KEY(wsId));
+}
+
+export function loadSession(
+  wsId: string,
+  sessionId: string,
+): ChatSession | undefined {
+  migrateLegacyIfNeeded(wsId);
+  const s = getJson(SESSION_KEY(wsId, sessionId), null, isValidSession);
+  return s ?? undefined;
+}
+
+export function loadSessions(wsId: string): ChatSession[] {
+  migrateLegacyIfNeeded(wsId);
+  return readIndex(wsId)
+    .ids.map((id) => loadSession(wsId, id))
+    .filter((s): s is ChatSession => !!s);
+}
+
+/** Atomic per-session write — safe when multiple chats save in parallel. */
+export function saveSession(wsId: string, session: ChatSession): boolean {
+  migrateLegacyIfNeeded(wsId);
+  const ok = setJson(SESSION_KEY(wsId, session.id), session);
+  if (!ok) return false;
+
+  const prev = readIndex(wsId).ids;
+  const ids = [
+    session.id,
+    ...prev.filter((id) => id !== session.id),
+  ].slice(0, MAX_SESSIONS);
+  const evicted = prev.filter((id) => !ids.includes(id));
+  for (const id of evicted) remove(SESSION_KEY(wsId, id));
+  writeIndex(wsId, ids);
+  return true;
+}
+
+/** Merge fields without clobbering messages when absent from the patch. */
+export function patchSession(
+  wsId: string,
+  sessionId: string,
+  patch: Partial<Omit<ChatSession, "id">>,
+): boolean {
+  const existing = loadSession(wsId, sessionId);
+  const base: ChatSession = existing ?? {
+    id: sessionId,
+    title: "Untitled",
+    messages: [],
+    updatedAt: Date.now(),
+  };
+  return saveSession(wsId, {
+    ...base,
+    ...patch,
+    id: sessionId,
+    updatedAt: Date.now(),
+  });
 }
 
 export function deleteSession(wsId: string, id: string): void {
-  const all = loadSessions(wsId).filter((s) => s.id !== id);
-  setJson(KEY(wsId), all);
+  migrateLegacyIfNeeded(wsId);
+  remove(SESSION_KEY(wsId, id));
+  writeIndex(
+    wsId,
+    readIndex(wsId).ids.filter((x) => x !== id),
+  );
 }
 
 export function newSessionId(): string {

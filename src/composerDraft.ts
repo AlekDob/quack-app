@@ -1,5 +1,5 @@
 import type { ChatSession } from "./chatHistory";
-import { loadSessions, saveSession } from "./chatHistory";
+import { patchSession } from "./chatHistory";
 
 /** Ephemeral composer UI restored when returning to a chat session. */
 export interface ChatComposerDraft {
@@ -33,20 +33,9 @@ export function mergeComposerDraft(
   wsId: string,
   sessionId: string,
   draft: ChatComposerDraft,
-): void {
-  const found = loadSessions(wsId).find((s) => s.id === sessionId);
+): boolean {
   const composer = isEmptyDraft(draft) ? undefined : draft;
-  if (!found) {
-    saveSession(wsId, {
-      id: sessionId,
-      title: "Untitled",
-      messages: [],
-      updatedAt: Date.now(),
-      composer,
-    });
-    return;
-  }
-  saveSession(wsId, { ...found, composer, updatedAt: Date.now() });
+  return patchSession(wsId, sessionId, { composer });
 }
 
 /** Persist Claude Code knobs without touching messages / composer. */
@@ -58,17 +47,6 @@ export function mergeSessionKnobs(
     ccThinking?: boolean | null;
     ccPermMode?: string | null;
   },
-): void {
-  const found = loadSessions(wsId).find((s) => s.id === sessionId);
-  if (!found) {
-    saveSession(wsId, {
-      id: sessionId,
-      title: "Untitled",
-      messages: [],
-      updatedAt: Date.now(),
-      ...knobs,
-    });
-    return;
-  }
-  saveSession(wsId, { ...found, ...knobs, updatedAt: Date.now() });
+): boolean {
+  return patchSession(wsId, sessionId, knobs);
 }
