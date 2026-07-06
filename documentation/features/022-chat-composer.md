@@ -54,7 +54,9 @@ Full detail: **`041-mention-file-preview.md`**.
 While streaming or tools are running, Enter enqueues the composer text instead
 of sending immediately. Cards render **inside** the composer pill above the
 textarea (`ComposerQueue`). Full behaviour (drain, Send now, Start
-Multitasking → New chat, Stop clears queue): **`039-composer-queue.md`**.
+Multitasking → New chat, Stop clears queue): **`039-composer-queue.md`**
+(includes the Jul 2026 production-freeze fix — drain one item per turn,
+`liveTurnRef` guard).
 
 ## Subagent pill (feature 004 integration)
 

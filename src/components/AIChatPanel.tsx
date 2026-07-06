@@ -1580,17 +1580,15 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     null,
   );
   const drainQueue = useCallback(async () => {
-    while (queueRef.current.length > 0) {
-      const next = queueRef.current.shift();
-      syncQueueUi();
-      if (!next) continue;
-      // No aborted-check here: the previous turn's controller is
-      // ALWAYS aborted/stale by drain time, and checking it silently
-      // discarded the queue — which made "Send now" (abort current
-      // turn, then drain) look like the app hung. Discarding is the
-      // queue indicator's explicit Clear button, not a side effect.
-      await sendUserTextRef.current?.(next);
-    }
+    if (queueRef.current.length === 0) return;
+    const next = queueRef.current.shift();
+    syncQueueUi();
+    if (!next) return;
+    // One message per drain — the turn's `finally` re-schedules drain
+    // for the rest. A `while` here spun forever when sendUserText
+    // re-queued defensively (stale `streaming === ""` closure) and
+    // immediately returned, pegging WebKit at 100% CPU + GB of RAM.
+    await sendUserTextRef.current?.(next);
   }, [syncQueueUi]);
   // Keep the ref pointing at this render's sendUserText (defined
   // further down; the effect runs post-render so the binding exists).
@@ -2103,15 +2101,17 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     images: ImageAttachment[] = [],
   ) => {
     if ((!text && images.length === 0) || !selected) return;
-    // Mark the live loop as the stream's owner so the attach effect
-    // can't subscribe a duplicate consumer (cleared in the finally).
-    liveTurnRef.current = true;
-    if (streaming !== null || runningTools) {
-      // Defensive: caller shouldn't get here, but if they do, queue
-      // rather than drop.
+    // `liveTurnRef` is cleared synchronously in `finally` before
+    // drainQueue runs — unlike React `streaming` state, which can still
+    // read `""` (between tool rounds) or `null` (stale) in the
+    // closure and re-queue forever inside drainQueue's old `while`.
+    if (liveTurnRef.current) {
       pushQueue(text);
       return;
     }
+    // Mark the live loop as the stream's owner so the attach effect
+    // can't subscribe a duplicate consumer (cleared in the finally).
+    liveTurnRef.current = true;
 
     // Cross-chat hard-cap check. Per-workspace budget takes precedence
     // (if one is set on this workspace), then the global cap. The
@@ -3002,6 +3002,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     // anyway with whatever the agent half-finished."
     clearQueue();
     abortRef.current?.abort();
+    liveTurnRef.current = false;
     // Immediate UI reset — don't wait for the tool-execution loop or
     // provider generator to unwind (OpenCode could sit in runningTools).
     setStreaming(null);

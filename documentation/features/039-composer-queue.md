@@ -2,8 +2,8 @@
 type: feature
 project: quack-desktop
 created: 2026-07-05
-last_verified: 2026-07-05
-tags: [chat, composer, queue, ux, multitasking]
+last_verified: 2026-07-06
+tags: [chat, composer, queue, ux, multitasking, bugfix]
 ---
 
 # 039 — Composer message queue (Cursor-style)
@@ -74,10 +74,50 @@ No toast on enqueue — the card is the feedback.
 ### Drain (automatic)
 
 When `sendUserText` finishes (`finally`), if `queueRef` is non-empty,
-`drainQueue()` shifts messages one at a time and awaits each send.
+`drainQueue()` shifts **one** message and awaits a single send; the
+next item drains when that follow-up turn's `finally` runs.
+
+```
+turn ends (finally)
+  liveTurnRef ← false          // synchronous, before drain
+  if queueRef non-empty:
+    setTimeout(drainQueue, 0)
+      shift one message
+      sendUserTextRef(next)    // starts new turn OR re-queues (see below)
+      turn ends → finally → drain next item …
+```
+
 Uses `sendUserTextRef` so the stable `useCallback([])` closure always
 calls the latest `sendUserText` (stale `messages`/`selected` bug fix
 predates this doc).
+
+#### `liveTurnRef` vs React `streaming`
+
+| Signal | Updated | Used for |
+|---|---|---|
+| `liveTurnRef` | Sync: `true` at `sendUserText` entry, `false` in `finally` / `stop()` | Defensive re-queue guard; drain eligibility |
+| `streaming` (`useState`) | Async React batch | UI spinner / composer placeholder |
+| `runningTools` (`useState`) | Async React batch | Tool-phase UI |
+
+**Enqueue** paths (`send()`, `answerQuestion()`) still gate on
+`streaming !== null || runningTools` — that's correct for the composer.
+
+**Drain** paths must **not** gate on `streaming` in `sendUserText`:
+between multi-round agent turns `streaming` is `""` (empty string), which
+is `!== null`, so the old defensive check re-queued every drained message
+immediately.
+
+#### Production freeze (2026-07-06)
+
+| | |
+|---|---|
+| **Trigger** | User queues a follow-up (`Send follow-up` / Enter while turn active); turn ends; `drainQueue` runs |
+| **Symptoms** | WKWebView `WebContent` ~100% CPU, RAM climbs to many GB, whole app unresponsive; Rust main process idle |
+| **Root cause** | `drainQueue` used `while (queue.length > 0)`. `sendUserText` saw stale `streaming === ""` or `runningTools` in closure → `pushQueue` + instant `return`. `shift` + `push` left length unchanged → **infinite synchronous loop** (`setQueuedMessages`, `flushSessionState`, sparse-array growth in timers) |
+| **Fix** | (1) One message per `drainQueue` call. (2) Defensive guard in `sendUserText` uses `liveTurnRef.current` only. (3) `stop()` clears `liveTurnRef` synchronously |
+
+**Do not** reintroduce a `while` drain loop or a `streaming !== null` guard
+inside `sendUserText` for the drain path.
 
 ### Send now
 
@@ -116,8 +156,10 @@ direction now", not "send my follow-ups after abort". Differs from Send now.
 |---|---|---|
 | `queueRef` (`string[]`) | Per chat session | Source of truth for drain logic |
 | `queuedMessages` (`useState`) | Mirror of ref | Drives `ComposerQueue` render |
+| `liveTurnRef` (`boolean`) | Per `AIChatPanel` mount | Sync turn-in-flight flag; `false` before drain |
 | `ChatSession.composer.queue` | Persisted | Restored on tab/history switch — see `040-per-session-composer-state.md` |
 | `pushQueue` / `removeQueueAt` / `clearQueue` / `syncQueueUi` | Helpers | Keep ref + state in sync |
+| `drainQueue` / `sendUserTextRef` | Drain pipeline | One shift per call; ref → latest `sendUserText` |
 
 Queue is persisted on the session row (with the composer draft). Agent Mode
 remounts the panel on every rail pick — without persistence, queued
@@ -135,8 +177,12 @@ follow-ups would be lost on switch.
 
 - **Do not** call `stop()` from Send now — it wipes the queue.
 - **Do not** reintroduce enqueue toasts; the card is the affordance.
+- **Do not** drain the queue in a `while` loop — see **Production freeze** above.
+- **Do not** use React `streaming` / `runningTools` inside `sendUserText` to
+  decide whether to re-queue when `drainQueue` calls in — use `liveTurnRef`.
 - Multitask **New chat** only sends the **first** queued message; the rest
   stay on the busy panel and drain when that turn ends.
 - Queue + draft persist on `ChatSession.composer` — see `040-per-session-composer-state.md`.
-- `sendUserText` defensive re-queue (if called while busy) uses `pushQueue`
-  silently — callers should prefer `send()` which clears input first.
+- `sendUserText` defensive re-queue (if called while `liveTurnRef` is true)
+  uses `pushQueue` silently — callers should prefer `send()` which clears
+  input first.
