@@ -3,7 +3,7 @@ import { createOpencodeClient } from "@opencode-ai/sdk/client";
 import type { ChatStreamEvent } from "../ai";
 import type { ChatProvider, ProviderModel } from "./types";
 import { getWorkspaceRoot } from "../wsRoot";
-import { flattenMessages, lastUserMessage } from "./cliPrompt";
+import { lastUserMessage, splitCliPrompt } from "./cliPrompt";
 import {
   createOpencodeEventState,
   parseOpencodeEvent,
@@ -177,9 +177,9 @@ export const openCodeProvider: ChatProvider = {
     const client = createOpencodeClient({ baseUrl });
     const cwd = cwdArg ?? getWorkspaceRoot();
     const ocModel = parseOpencodeModel(model);
-    const prompt = resumeSessionId
-      ? lastUserMessage(messages)
-      : flattenMessages(messages);
+    const { system, prompt } = resumeSessionId
+      ? { system: "", prompt: lastUserMessage(messages) }
+      : splitCliPrompt(messages);
 
     let sessionId = resumeSessionId;
     if (!sessionId) {
@@ -251,6 +251,7 @@ export const openCodeProvider: ChatProvider = {
         query: { directory: cwd },
         body: {
           model: ocModel,
+          ...(system ? { system } : {}),
           parts: [{ type: "text", text: prompt }],
         },
       });

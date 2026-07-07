@@ -2688,6 +2688,10 @@ body.ws-dragging * {
   min-width: 0;
   overflow: hidden;
 }
+.ai-tab-host.is-switching > .ai-panel {
+  visibility: hidden;
+  pointer-events: none;
+}
 .ai-tab-host > .ai-panel {
   flex: 1;
   min-height: 0;
@@ -2735,17 +2739,6 @@ body.ws-dragging * {
   display: flex;
   flex-direction: column;
 }
-.show-bottom {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border);
-  font-size: 11px;
-  padding: 2px 8px;
-  z-index: 5;
-}
-
 .pane-content {
   flex: 1;
   position: relative;
@@ -9770,9 +9763,12 @@ body.ws-dragging * {
   height: 100%;
   background: var(--bg);
 }
-.compose-review-host.is-hidden {
-  visibility: hidden;
-  pointer-events: none;
+/* Editor-mode tab portal — same stacking model as .ai-tab-host. */
+.pane-content > .compose-review-host {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-width: 0;
 }
 .compose-review-head {
   display: flex;
@@ -12685,31 +12681,35 @@ body.ws-dragging * {
 }
 
 /* Mermaid diagram preview (.mmd tabs) */
+.preview-half .mermaid-preview {
+  height: 100%;
+  min-height: 0;
+}
 .mermaid-preview {
-  padding: 24px;
-  min-height: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
+  gap: 8px;
   color: var(--fg);
+  padding: 8px 8px 0;
 }
 .mermaid-preview-empty {
+  padding: 24px;
   color: var(--fg-muted);
   font-size: 13px;
 }
+.mermaid-preview-status,
+.mermaid-preview-error {
+  margin: 0 8px;
+  flex-shrink: 0;
+}
 .mermaid-preview-status {
-  margin: 0;
   font-size: 12px;
   color: var(--fg-muted);
 }
 .mermaid-preview-error {
-  margin: 0;
   padding: 10px 12px;
-  max-width: 100%;
-  width: 100%;
-  box-sizing: border-box;
   font-size: 12px;
   line-height: 1.45;
   color: var(--err);
@@ -12719,14 +12719,72 @@ body.ws-dragging * {
   white-space: pre-wrap;
   overflow-x: auto;
 }
-.mermaid-preview-canvas {
-  width: 100%;
+.mermaid-preview-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
   display: flex;
+  flex-direction: column;
+}
+.mermaid-preview-zoom {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg-elev) 88%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.mermaid-preview-zoom-btn,
+.mermaid-preview-zoom-label {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--fg);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.mermaid-preview-zoom-btn:hover,
+.mermaid-preview-zoom-label:hover {
+  background: var(--bg-hi);
+}
+.mermaid-preview-zoom-label {
+  min-width: 44px;
+  font-variant-numeric: tabular-nums;
+}
+.mermaid-preview-viewport {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
   overflow: auto;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.mermaid-preview-stage {
+  transform-origin: 0 0;
+  display: inline-block;
+  padding: 24px;
+}
+.mermaid-preview-canvas {
+  display: block;
 }
 .mermaid-preview-canvas svg {
-  max-width: 100%;
+  display: block;
+  max-width: none;
   height: auto;
 }
 
@@ -14578,6 +14636,31 @@ body.ws-dragging * {
   min-width: 0;
   min-height: 0;
 }
+.agent-main-chat-panels.is-switching {
+  visibility: hidden;
+  pointer-events: none;
+}
+.chat-switch-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: var(--bg);
+}
+.chat-switch-veil-spinner {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
+}
+.chat-switch-veil-label {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-medium);
+  color: var(--fg);
+}
 .agent-chat-host {
   position: absolute;
   inset: 0;
@@ -15174,6 +15257,10 @@ body.ws-dragging * {
   overflow-y: auto;
   border-left: 1px solid var(--border);
   background: var(--bg);
+}
+.cust-editor-preview .mermaid-preview {
+  height: 100%;
+  min-height: 0;
 }
 .cust-editor-loading {
   flex: 1;

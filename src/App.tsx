@@ -92,7 +92,7 @@ const IS_DOCK = (() => {
 function isChordExemptTarget(e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
   if (!t || typeof t.closest !== "function") return false;
-  if (t.closest(".xterm")) return true;
+  if (t.closest(".xterm") || t.closest(".xterm-helper-textarea")) return true;
   if (t.closest(".monaco-editor")) return false;
   const tag = t.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;

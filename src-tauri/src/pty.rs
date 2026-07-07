@@ -8,6 +8,10 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
+#[cfg(not(windows))]
+use std::process::Command;
+#[cfg(not(windows))]
+use std::sync::OnceLock;
 use tauri::{AppHandle, Emitter, State};
 use uuid::Uuid;
 
@@ -135,6 +139,75 @@ fn refreshed_windows_path() -> Option<String> {
     }
 }
 
+/// PTY shells need a real TERM. GUI apps launched from Finder/DMG inherit
+/// no TERM (unlike `tauri dev` from a terminal), so zsh falls back to a
+/// crippled terminfo and line-editing backspace can echo spaces instead of
+/// erasing. PATH is also minimal unless we resolve it from a login shell.
+fn apply_pty_env(cmd: &mut CommandBuilder) {
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("COLORTERM", "truecolor");
+    if std::env::var("LANG").is_err() {
+        cmd.env("LANG", "en_US.UTF-8");
+    }
+    #[cfg(windows)]
+    if let Some(p) = refreshed_windows_path() {
+        cmd.env("PATH", p);
+    }
+    #[cfg(not(windows))]
+    if let Some(p) = login_shell_path() {
+        cmd.env("PATH", p);
+    }
+}
+
+#[cfg(not(windows))]
+static LOGIN_PATH_CACHE: OnceLock<Option<String>> = OnceLock::new();
+
+#[cfg(not(windows))]
+fn login_shell_path() -> Option<String> {
+    LOGIN_PATH_CACHE
+        .get_or_init(resolve_login_shell_path)
+        .clone()
+}
+
+#[cfg(not(windows))]
+fn resolve_login_shell_path() -> Option<String> {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
+    let output = Command::new(&shell)
+        .args(["-ilc", "echo -n \"$PATH\""])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if path.is_empty() {
+        None
+    } else {
+        Some(path)
+    }
+}
+
+fn default_shell_login_args(shell_path: &str) -> Vec<String> {
+    let lower = shell_path.to_lowercase();
+    #[cfg(windows)]
+    {
+        if lower.contains("powershell") || lower.ends_with("pwsh.exe") {
+            return vec!["-NoLogo".into()];
+        }
+        vec![]
+    }
+    #[cfg(not(windows))]
+    {
+        if lower.ends_with("zsh") {
+            vec!["-l".into()]
+        } else if lower.contains("bash") {
+            vec!["--login".into()]
+        } else {
+            vec![]
+        }
+    }
+}
+
 fn default_shell(shell: Option<String>) -> String {
     if let Some(s) = shell {
         return s;
@@ -242,8 +315,8 @@ pub fn available_shells() -> Vec<ShellOption> {
             out.push(ShellOption {
                 id: "default".into(),
                 label: "Default shell".into(),
-                path: sh,
-                args: vec![],
+                path: sh.clone(),
+                args: default_shell_login_args(&sh),
             });
         }
         for cand in &["/bin/bash", "/bin/zsh", "/bin/sh"] {
@@ -252,7 +325,7 @@ pub fn available_shells() -> Vec<ShellOption> {
                     id: cand.trim_start_matches('/').replace('/', "_"),
                     label: cand.split('/').last().unwrap_or(cand).into(),
                     path: (*cand).into(),
-                    args: vec![],
+                    args: default_shell_login_args(cand),
                 });
             }
         }
@@ -288,26 +361,21 @@ pub fn pty_spawn(
 
     let shell_path = default_shell(shell);
     let mut cmd = CommandBuilder::new(&shell_path);
-    if let Some(extra) = args {
+    let custom_args = args.filter(|a| !a.is_empty());
+    if let Some(extra) = custom_args {
         for a in extra {
             cmd.arg(a);
         }
     } else {
-        let lower = shell_path.to_lowercase();
-        if cfg!(windows) && (lower.contains("powershell") || lower.ends_with("pwsh.exe")) {
-            cmd.args(["-NoLogo"]);
+        for a in default_shell_login_args(&shell_path) {
+            cmd.arg(a);
         }
     }
     if let Some(dir) = cwd.as_ref() {
         cmd.cwd(dir);
     }
 
-    #[cfg(windows)]
-    {
-        if let Some(p) = refreshed_windows_path() {
-            cmd.env("PATH", p);
-        }
-    }
+    apply_pty_env(&mut cmd);
 
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
 

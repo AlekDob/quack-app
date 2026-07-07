@@ -33,6 +33,7 @@ import {
   type SessionDiffSummary,
 } from "../chatDiffStore";
 import { fileBase } from "../sessionDiffStats";
+import { pulseChatSwitch } from "../chatSwitch";
 import { AgentCustomizations } from "./AgentCustomizations";
 import {
   CustomizationsModal,
@@ -158,6 +159,9 @@ export function AIChatsRail({
       onSelectChat(wsId, chatId);
       return;
     }
+    const current =
+      activeId && loaded[activeId] ? activeAiChatId(loaded[activeId]) : null;
+    if (chatId !== current || wsId !== activeId) pulseChatSwitch();
     if (wsId !== activeId) await setActiveWorkspace(wsId);
     focusAIChat(wsId, chatId);
   };
@@ -173,6 +177,7 @@ export function AIChatsRail({
       onNewChat(activeId);
       return;
     }
+    pulseChatSwitch();
     addAIChat(activeId, "editor");
   };
 

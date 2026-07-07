@@ -105,6 +105,17 @@ Reads WebKit `localStorage` sqlite + `~/Library/Application Support/codetta/`
 workspace `state.json`. Reports `OK` / `MISSING` / `EMPTY` per open tab.
 Supports legacy array and v2 per-session keys.
 
+## Recovery from Claude Code JSONL
+
+When a `ChatSession` has a `claude-code` provider id but **fewer assistant
+messages than user messages** (incomplete Quack row), `AIChatPanel` auto-calls
+`recoverSessionFromCc` on mount / history open:
+
+1. `claudeCode.loadSession(cwd, ccSessionId)` reads `~/.claude/projects/.../*.jsonl`
+2. If loaded count > saved count → replace messages, `saveSession`, toast
+
+File: `src/chatCcRecovery.ts`. Does not run when transcript is already complete.
+
 ## Gotchas
 
 - **`saveSession` return value** — callers must check; failures are not thrown.

@@ -97,6 +97,11 @@ export function ComposeReviewPane({ wsId, tabKey, visible }: Props) {
 
   useEffect(() => {
     if (!visible) return;
+    requestAnimationFrame(() => diffRef.current?.layout());
+  }, [visible, modified]);
+
+  useEffect(() => {
+    if (!visible) return;
     const onKey = (e: KeyboardEvent) => {
       if (!e.metaKey && !e.ctrlKey) return;
       if (e.key === "y") {
@@ -126,7 +131,10 @@ export function ComposeReviewPane({ wsId, tabKey, visible }: Props) {
   const hasHunks = hunkTotal > 0;
 
   return (
-    <div className={`compose-review-host${visible ? "" : " is-hidden"}`}>
+    <div
+      className="compose-review-host"
+      style={{ display: visible ? "flex" : "none" }}
+    >
       <div className="compose-review-head">
         <Icon name="git-compare" size={14} />
         <span className="compose-review-title">{name}</span>

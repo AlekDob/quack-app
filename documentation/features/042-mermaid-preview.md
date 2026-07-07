@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), mermaid (lazy), plain CSS
 created: 2026-07-06
-last_verified: 2026-07-06
+last_verified: 2026-07-07
 tags: [editor, mermaid, diagram, preview, split, mmd, sequence-diagram]
 ---
 
@@ -24,8 +24,9 @@ tags: [editor, mermaid, diagram, preview, split, mmd, sequence-diagram]
 | Service | `src/editorMdView.ts` | Shared `EditorMdView` type (`edit` \| `split` \| `preview`) |
 | Config | `src/langDetect.ts` | `.mmd` → Monaco `plaintext` (no mermaid grammar) |
 | Config | `src/fileIcons.ts` | `.mmd` → `doc` tint (same as `.md`) |
-| Config | `src/App.css` | `.mermaid-preview`, `-empty`, `-status`, `-error`, `-canvas` |
+| Config | `src/App.css` | `.mermaid-preview`, viewport/stage/canvas, `.mermaid-preview-zoom` controls |
 | Dependency | `package.json` | `mermaid` — code-split chunk, not in main bundle |
+| Service | `src/mermaidZoom.ts` | `clampMermaidZoom`, `wheelMermaidZoomFactor`, `scrollForZoom`, zoom constants |
 
 ### Data flow
 `openFile(.mmd)` → `readFile` → store buffer → `EditorPane` portal → `readEditorMermaidView()` (default `preview`) → `MermaidPreview` → `import("mermaid")` → `mermaid.render(id, source)` → SVG `innerHTML` on canvas.
@@ -60,6 +61,17 @@ Separate from `lcp.editorMdView` (markdown defaults to `"edit"`).
 | Load | `import("mermaid")` on first preview mount |
 | Debounce | 250ms on `content` / theme change |
 | Empty buffer | Placeholder copy, no `render()` call |
+
+### Zoom / pan
+| Input | Behaviour |
+|-------|-----------|
+| Trackpad pinch | `wheel` + `ctrlKey` (macOS maps pinch) → zoom toward pointer; `passive: false` |
+| Two-finger scroll | Native pan on `.mermaid-preview-viewport` |
+| Toolbar `−` / `+` | Step ×1.2 toward viewport center |
+| `%` label / reset | Jump to 100% + scroll top-left |
+| Range | 20%–500% (`MERMAID_ZOOM_MIN` / `MAX`) |
+
+Zoom uses `transform: scale()` on `.mermaid-preview-stage` with explicit stage box so scroll extents track the scaled SVG. Resets to 100% when diagram source changes.
 
 ### Error / loading UI
 | State | Surface |

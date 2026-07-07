@@ -353,8 +353,15 @@ export const commands: CommandSpec[] = [
     accel: "Ctrl+J",
     run: () => {
       const wsId = s().activeId;
-      const ws = wsId ? s().loaded[wsId] : null;
-      if (ws && wsId) s().setBottomVisible(wsId, !ws.layout.bottomVisible);
+      if (!wsId) return;
+      const ws = s().loaded[wsId];
+      if (!ws) return;
+      if (ws.layout.bottomVisible && ws.layout.bottomRoot) {
+        s().setBottomVisible(wsId, false);
+      } else {
+        s().setBottomVisible(wsId, true);
+        if (!ws.layout.bottomRoot) s().addTerminal(wsId, "bottom");
+      }
     },
   },
   {

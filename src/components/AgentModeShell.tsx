@@ -22,6 +22,9 @@ import { FilePopupModal } from "./FilePopupModal";
 import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
 import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
 import { AIChatsRail } from "./AIChatsRail";
+import { ChatSwitchVeil } from "./ChatSwitchVeil";
+import { pulseChatSwitch } from "../chatSwitch";
+import { useChatSwitching } from "../useChatSwitching";
 
 interface Props {
   // Always the active workspace id. The shell is NOT remounted on
@@ -191,14 +194,18 @@ export function AgentModeShell({ wsId }: Props) {
         ? activeChats[activeChats.length - 1].id
         : null;
 
+  const switching = useChatSwitching();
+
   const recentNotOpen = recent.filter((w) => !openIds.includes(w.id));
 
   const selectSession = (id: string, chatId: string) => {
+    if (chatId !== activeChatId || id !== wsId) pulseChatSwitch();
     if (id !== wsId) void setActiveWorkspace(id);
     setSelectedByWs((m) => ({ ...m, [id]: chatId }));
   };
 
   const newSession = (id: string) => {
+    pulseChatSwitch();
     const chatId = addAIChat(id, "editor");
     if (id !== wsId) void setActiveWorkspace(id);
     setSelectedByWs((m) => ({ ...m, [id]: chatId }));
@@ -347,14 +354,16 @@ export function AgentModeShell({ wsId }: Props) {
         <div className="agent-main-inner">
           <div className="agent-main-chat">
             {ws && activeChats.length > 0 ? (
-              <div className="agent-main-chat-panels">
+              <div
+                className={`agent-main-chat-panels${switching ? " is-switching" : ""}`}
+              >
                 {activeChats.map((chat) => (
                   <AgentChatHost
                     key={chat.id}
                     wsId={wsId}
                     root={ws.meta.root}
                     chatId={chat.id}
-                    visible={chat.id === activeChatId}
+                    visible={!switching && chat.id === activeChatId}
                     onOpenFile={setOpenFilePath}
                   />
                 ))}
@@ -378,6 +387,7 @@ export function AgentModeShell({ wsId }: Props) {
                 </div>
               </div>
             )}
+            {switching && <ChatSwitchVeil />}
           </div>
           {sidePanelKey && sideParsed?.kind === "composeReview" && (
             <div className="agent-main-review">

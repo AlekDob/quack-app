@@ -45,6 +45,15 @@ const PATH_LINE_COL_RE =
  *  registry links, CI URLs. Activated via the system browser. */
 const URL_RE = /https?:\/\/[^\s"'<>()[\]]+/g;
 
+/** Release WKWebView can mis-route Backspace via the hidden textarea and
+ *  echo a space; send canonical erase sequences straight to the PTY. */
+function termEditKeySeq(e: KeyboardEvent): string | null {
+  if (e.ctrlKey || e.metaKey || e.altKey) return null;
+  if (e.key === "Backspace") return "\x7f";
+  if (e.key === "Delete") return "\x1b[3~";
+  return null;
+}
+
 const xtermDark = {
   background: "#1e1e1e",
   foreground: "#d4d4d4",
@@ -268,6 +277,11 @@ export function TerminalCore({
 
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
+      const editSeq = termEditKeySeq(e);
+      if (editSeq) {
+        if (ptyIdRef.current) void pty.write(ptyIdRef.current, editSeq);
+        return false;
+      }
       const k = e.key.toLowerCase();
       if (e.ctrlKey && e.shiftKey && k === "c") {
         const sel = term.getSelection();

@@ -121,6 +121,10 @@ import {
 } from "../chatHistory";
 import { registerChatPersist } from "../chatPersistFlush";
 import {
+  recoverSessionFromCc,
+  persistRecoveredSession,
+} from "../chatCcRecovery";
+import {
   draftFromSession,
   mergeComposerDraft,
   mergeSessionKnobs,
@@ -569,6 +573,21 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     }
     setTodos(list.length > 0 ? list : null);
   };
+  const tryCcRecover = useCallback(
+    async (row: ChatSession, gen: number) => {
+      const recovered = await recoverSessionFromCc(root, row);
+      if (!recovered || gen !== ccHydrateGenRef.current) return;
+      const msgs = cleanStaleToolMessages(recovered.messages);
+      setMessages(msgs);
+      rebuildChecklist(msgs);
+      persistRecoveredSession(wsId, { ...recovered, messages: msgs });
+      setSessions(loadSessions(wsId));
+      toastInfo(
+        `Restored ${msgs.length} messages from Claude Code session`,
+      );
+    },
+    [root, wsId],
+  );
   // Cumulative USD spend across every turn in this chat. Persisted
   // alongside the conversation so the running tally survives reloads.
   // Used by the spend chip in the footer + the budget-warning toast.
@@ -694,6 +713,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     ccPermMode,
   });
   const lastSaveWarnAt = useRef(0);
+  const ccHydrateGenRef = useRef(0);
   const persistTranscriptRef = useRef<() => void>(() => {});
   const warnSaveFailed = useCallback(() => {
     if (Date.now() - lastSaveWarnAt.current < 30_000) return;
@@ -1329,6 +1349,8 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
             : makeQualifiedModel("ollama", found.model);
           setSelected(q);
         }
+        const gen = ++ccHydrateGenRef.current;
+        void tryCcRecover(found, gen);
       } else {
         setMessages([]);
       }
@@ -1370,7 +1392,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       setCcPermMode(knobs.permMode);
       applyComposerDraft({});
     }
-  }, [wsId, aiChatId, onHydrated, applyComposerDraft]);
+  }, [wsId, aiChatId, onHydrated, applyComposerDraft, tryCcRecover]);
 
   // When sessionId changes inside a tabbed panel (e.g. via /new or the
   // history dropdown), persist it back to the descriptor so a reload
@@ -3220,11 +3242,14 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     setCcThinking(knobs.thinking);
     setCcPermMode(knobs.permMode);
     resetTurnTransients();
-    setMessages(s.messages);
-    rebuildChecklist(s.messages);
+    const msgs = cleanStaleToolMessages(s.messages);
+    setMessages(msgs);
+    rebuildChecklist(msgs);
     applyComposerDraft(draftFromSession(s));
     setHistoryOpen(false);
     if (s.model) setSelected(s.model);
+    const gen = ++ccHydrateGenRef.current;
+    void tryCcRecover(s, gen);
   };
 
   const runInActiveTerminal = async (text: string) => {

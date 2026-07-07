@@ -26,6 +26,8 @@ import { pty, type ShellOption } from "../ipc";
 import { redockTerminal } from "../terminalPopout";
 import { Icon } from "./Icon";
 import { useZenMode } from "../zenMode";
+import { ChatSwitchVeil } from "./ChatSwitchVeil";
+import { useChatSwitching } from "../useChatSwitching";
 
 interface Props {
   wsId: string;
@@ -330,18 +332,6 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
               />
             </div>
           </>
-        )}
-        {(!layout.bottomVisible || !layout.bottomRoot) && (
-          <button
-            className="show-bottom"
-            onClick={() => {
-              setBottomVisible(wsId, true);
-              if (!layout.bottomRoot) addTerminal(wsId, "bottom");
-            }}
-            title="Show panel"
-          >
-            ▴ Panel
-          </button>
         )}
       </div>
 
@@ -725,19 +715,20 @@ function AIChatHost({
   container,
   visible,
 }: AIChatHostProps) {
-  // Defer mounting until the tab is shown once — hidden background tabs
-  // no longer each spin up a full AIChatPanel at workspace open.
+  const switching = useChatSwitching();
   const [mounted, setMounted] = useState(visible);
   useEffect(() => {
     if (visible) setMounted(true);
   }, [visible]);
   if (!container || !mounted) return null;
+  const showVeil = switching && visible;
   return createPortal(
     <div
-      className="ai-tab-host"
+      className={`ai-tab-host${showVeil ? " is-switching" : ""}`}
       style={{ display: visible ? "flex" : "none" }}
     >
       <AIChatPanel wsId={wsId} root={root} aiChatId={chatId} />
+      {showVeil && <ChatSwitchVeil />}
     </div>,
     container,
   );
