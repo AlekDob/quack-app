@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-06
+last_verified: 2026-07-07
 tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, workspace, zustand, persistence]
 ---
 
@@ -32,6 +32,8 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | Service | `src/chatPersistFlush.ts` | Flush registry — all mounted panels save before chat switch |
 | Service | `src/composerDraft.ts` | `ChatComposerDraft`, `mergeComposerDraft`, `mergeSessionKnobs` — via `patchSession` |
 | Service | `src/providerSession.ts` | `providerSessionIds` read/write; legacy `claudeSessionId` migration |
+| Service | `src/providerSessionChrome.tsx` | Session id chip + CC linked-title helper (feature 044) |
+| Service | `src/providerSessionTerminal.ts` | `claude --resume` in bottom PTY (feature 044) |
 | Model/Type | `src/ai.ts` | `ChatMessage`, `ToolCall`, `ChatStreamEvent` (streaming contract) |
 | Service (Rust) | `src-tauri/src/workspace.rs` | `WorkspaceMeta`, `WorkspacesIndex`, load/save workspace state |
 | Service | `src/ipc.ts` | `workspaces.load/save/loadState/saveState` IPC bridge |
@@ -56,7 +58,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 
 ### State
 - `ws.aiChats`: `Record<id, AIChatDescriptor>` — open sessions (global, persisted)
-- `ChatSession.providerSessionIds`: `Partial<Record<ProviderId, string>>` — per-provider server session for resume (CC/Cursor/OpenCode); legacy `claudeSessionId` kept in sync
+- `ChatSession.providerSessionIds`: `Partial<Record<ProviderId, string>>` — per-provider server session for resume (CC/Cursor/OpenCode); legacy `claudeSessionId` kept in sync. **UI:** copy + terminal bridge in chat header — see `044-provider-session-bridge.md`
 - `ChatSession.ccEffort` / `ccPermMode` / `ccThinking` / `composer`: per-session Claude Code knobs + composer draft (feature 040; legacy rows without fields → medium + Ask, not global)
 - `selectedByWs`: `Record<wsId, chatId>` — which session fills the center column in Agent Mode (component)
 - runtime run-state (`streaming`, `runningTools`, `activeToolLabels{status}`, `abortRef`): **local to `AIChatPanel`** (component) — not yet surfaced per-session in the lists

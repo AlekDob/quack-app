@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-05
+last_verified: 2026-07-07
 tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog, rust, performance]
 ---
 
@@ -29,6 +29,10 @@ tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog
 | `claude_code_active_sessions` | chat-session ids whose pid is still in `children` (powers the hub "working" dot) |
 | `claude_code_kill` | stop a run by stream id → `kill_process_tree(pid)` |
 | `claude_code_clear_session` | drop buffer + reverse mapping for a chat |
+| `claude_code_list_sessions` | scan `~/.claude/projects/<encoded-cwd>/*.jsonl`; summaries for ⟲ Sessions picker |
+| `claude_code_load_session` | parse one JSONL into `LoadedMessage[]` for resume hydrate |
+
+Session id ↔ Quack chat UI (chip, terminal resume, picker badges): `044-provider-session-bridge.md`.
 
 ### Per-run thread model (one spawn → 4 threads)
 | Thread | Job | Touches the `Child`? |

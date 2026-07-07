@@ -135,6 +135,11 @@ import {
   setProviderSessionId,
   writeProviderSessionIds,
 } from "../providerSession";
+import {
+  ccLinkedChatTitles,
+  ProviderSessionChip,
+} from "../providerSessionChrome";
+import { resumeProviderInTerminal } from "../providerSessionTerminal";
 import type { ProviderId } from "../providers/types";
 import {
   buildSessionUsageLocal,
@@ -3780,8 +3785,17 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     anthropic: { label: "anthropic", color: "#d97757" },
   };
 
+  const ccLinkedTitles = useMemo(
+    () => ccLinkedChatTitles(sessions),
+    [sessions],
+  );
+
   const renderHeader = () => {
     const parsed = parseQualifiedModel(selected);
+    const providerSid =
+      parsed && isAgenticProviderId(parsed.providerId)
+        ? providerSessionIds[parsed.providerId]
+        : undefined;
     return (
       <div className="ai-header">
         {rulesSource && rulesPath && (() => {
@@ -3814,9 +3828,22 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
           );
         })()}
         <div className="ai-header-spacer" />
+        {providerSid && parsed && (
+          <ProviderSessionChip
+            providerId={parsed.providerId}
+            sessionId={providerSid}
+            wsId={wsId}
+            cwd={root}
+          />
+        )}
         {parsed?.providerId === "claude-code" && (
           <ClaudeSessionsButton
             cwd={root}
+            currentSessionId={claudeSessionId}
+            linkedTitles={ccLinkedTitles}
+            onOpenInTerminal={(id) =>
+              resumeProviderInTerminal(wsId, root, "claude-code", id)
+            }
             onResume={async (id) => {
               setProviderSessionIds((prev) =>
                 setProviderSessionId(prev, "claude-code", id),

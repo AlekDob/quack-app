@@ -87,6 +87,8 @@ providerSessionIds?: Partial<Record<ProviderId, string>>;
 
 On provider switch: flatten Quack messages to new provider; keep stored ids for return visits.
 
+**UI (feature 044):** after the first turn, the chat header shows a copyable provider session chip (`CC`/`CU`/`OC`) and optional **Open in terminal** (`claude --resume` / `cursor-agent --resume`). Claude Code's ⟲ Sessions picker lists on-disk JSONL sessions with "This chat" / linked Quack title badges.
+
 ---
 
 ## UI contract

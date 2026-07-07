@@ -9520,10 +9520,9 @@ body.ws-dragging * {
   border-radius: 4px;
   cursor: pointer;
   color: var(--fg);
-  border-bottom: 1px solid var(--border);
 }
-.ai-cc-session:last-child {
-  border-bottom: none;
+.ai-cc-session-row:not(:last-child) {
+  border-bottom: 1px solid var(--border);
 }
 .ai-cc-session:hover {
   background: var(--bg-hi);
@@ -9550,6 +9549,109 @@ body.ws-dragging * {
   font-size: 10px;
   font-family: var(--mono);
   color: var(--fg-muted);
+}
+.ai-cc-session-row {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+}
+.ai-cc-session-row.is-current .ai-cc-session {
+  background: var(--bg-hi);
+}
+.ai-cc-session-row .ai-cc-session {
+  flex: 1;
+  border-bottom: none;
+}
+.ai-cc-session-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ai-cc-session-head .ai-cc-session-title {
+  flex: 1;
+  min-width: 0;
+}
+.ai-cc-session-badge {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-family: var(--font);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  color: var(--fg);
+  background: var(--bg-hi);
+}
+.ai-cc-session-badge.linked {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--fg-dim);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-cc-session-id {
+  color: var(--fg-dim);
+}
+.ai-cc-session-term {
+  flex-shrink: 0;
+  align-self: center;
+  margin-right: 4px;
+  padding: 6px 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--fg-dim);
+  cursor: pointer;
+}
+.ai-cc-session-term:hover {
+  color: var(--fg);
+  border-color: var(--border);
+  background: var(--bg-hi);
+}
+
+/* Provider session id chip — copy + terminal bridge */
+.ai-provider-session-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.ai-provider-session-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--fg-dim);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  max-width: 140px;
+}
+.ai-provider-session-chip:hover {
+  color: var(--fg);
+  border-color: var(--border-strong);
+  background: var(--bg-hi);
+}
+.ai-provider-session-chip code {
+  font-family: inherit;
+  font-size: inherit;
+}
+.ai-provider-session-label {
+  font-family: var(--font);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--fg-muted);
+}
+.ai-provider-session-term {
+  flex-shrink: 0;
 }
 
 /* Files-changed — Cursor-style recap at end of turn. Neutral elevated
@@ -10994,6 +11096,24 @@ body.ws-dragging * {
   display: inline-flex;
   align-items: center;
   color: var(--fg-muted);
+}
+.ai-tcall-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+}
+.ai-tcall-preview:hover {
+  color: var(--fg);
+  background: var(--bg-hi);
 }
 /* A run of read/search tools → wrapping cloud of pills (side by side, flowing
    onto the next line) instead of a tall stack. Detail opens in the drawer. */

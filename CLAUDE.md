@@ -154,6 +154,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `039-composer-queue.md` — Cursor-style follow-up queue inside the composer pill: visible preview, `Send follow-up` placeholder, Start Multitasking (new chat parallel send / send now), auto-drain on turn end; `ComposerQueue.tsx`, optional `chatId` on `aiBus`.
   - `040-per-session-composer-state.md` — per-session composer draft (input, queue, images, attach toggles), CC knobs (effort/mode/thinking), model restore; `composerDraft.ts` (`mergeComposerDraft`, `mergeSessionKnobs`), fields on `ChatSession`; legacy knob fallback + debounce-unmount flush gotchas.
   - `043-chat-transcript-persistence.md` — atomic per-session localStorage keys, legacy migrate, `patchSession`, flush on chat switch + streaming checkpoint, save-failure toast, `scripts/audit-chat-persistence.mjs`.
+  - `044-provider-session-bridge.md` — visible provider session id (copy + open in terminal); ⟲ Sessions picker badges (This chat / linked Quack title); `providerSessionChrome.tsx`, `providerSessionTerminal.ts`.
   - `041-mention-file-preview.md` — Cursor-style `@` file autocomplete: basename + parent dir rows, side path tree preview, inline popover above composer, `.ai-mention-open` overflow escape (no portal).
   - `038-compose-review.md` — Conductor-style agent edit review: live ComposeCard recap, `crev:` diff tabs (inline Monaco + Undo/Keep), editor pane + Agent Mode 50/50 split; `composeReview.ts`, `ComposeReviewPane.tsx`.
 - `documentation/design/` — UI style contracts beyond tokens.

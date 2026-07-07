@@ -20,6 +20,7 @@
 
 import { useEffect, useState } from "react";
 import { claudeCode as claudeCodeIpc, type ClaudeSession } from "../ipc";
+import { shortSessionId } from "../providerSessionChrome";
 import { Icon } from "./Icon";
 
 // ---------- TimelineScrubber ----------
@@ -106,12 +107,20 @@ export function TimelineScrubber({
 
 interface ClaudeSessionsButtonProps {
   cwd: string;
+  /** Active CC session id for this Quack chat, if any. */
+  currentSessionId?: string | null;
+  /** CC session id → Quack chat title (other tabs). */
+  linkedTitles?: Map<string, string>;
   onResume: (id: string) => void | Promise<void>;
+  onOpenInTerminal?: (id: string) => void | Promise<void>;
 }
 
 export function ClaudeSessionsButton({
   cwd,
+  currentSessionId = null,
+  linkedTitles,
   onResume,
+  onOpenInTerminal,
 }: ClaudeSessionsButtonProps) {
   const [open, setOpen] = useState(false);
   const [sessions, setSessions] = useState<ClaudeSession[] | null>(null);
@@ -176,29 +185,68 @@ export function ClaudeSessionsButton({
           )}
           {!loading &&
             sessions &&
-            sessions.map((s) => (
-              <button
-                key={s.id}
-                className="ai-cc-session"
-                onClick={() => {
-                  void onResume(s.id);
-                  setOpen(false);
-                }}
-                title={`${s.turn_count} turn${s.turn_count === 1 ? "" : "s"} · ${s.cost_usd > 0 ? `$${s.cost_usd.toFixed(4)} · ` : ""}${formatRelative(s.last_turn_at_ms)}`}
-              >
-                <div className="ai-cc-session-title">{s.title}</div>
-                {s.preview && s.preview !== s.title && (
-                  <div className="ai-cc-session-preview">{s.preview}</div>
-                )}
-                <div className="ai-cc-session-meta">
-                  <span>
-                    {s.turn_count} turn{s.turn_count === 1 ? "" : "s"}
-                  </span>
-                  {s.cost_usd > 0 && <span>${s.cost_usd.toFixed(4)}</span>}
-                  <span>{formatRelative(s.last_turn_at_ms)}</span>
+            sessions.map((s) => {
+              const isCurrent =
+                !!currentSessionId && s.id === currentSessionId;
+              const linked = linkedTitles?.get(s.id);
+              return (
+                <div
+                  key={s.id}
+                  className={`ai-cc-session-row ${isCurrent ? "is-current" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="ai-cc-session"
+                    onClick={() => {
+                      void onResume(s.id);
+                      setOpen(false);
+                    }}
+                    title={`${s.id} · ${s.turn_count} turn${s.turn_count === 1 ? "" : "s"} · ${s.cost_usd > 0 ? `$${s.cost_usd.toFixed(4)} · ` : ""}${formatRelative(s.last_turn_at_ms)}`}
+                  >
+                    <div className="ai-cc-session-head">
+                      <div className="ai-cc-session-title">{s.title}</div>
+                      {isCurrent && (
+                        <span className="ai-cc-session-badge">This chat</span>
+                      )}
+                      {!isCurrent && linked && (
+                        <span className="ai-cc-session-badge linked">
+                          {linked}
+                        </span>
+                      )}
+                    </div>
+                    {s.preview && s.preview !== s.title && (
+                      <div className="ai-cc-session-preview">{s.preview}</div>
+                    )}
+                    <div className="ai-cc-session-meta">
+                      <span className="ai-cc-session-id">
+                        {shortSessionId(s.id)}
+                      </span>
+                      <span>
+                        {s.turn_count} turn{s.turn_count === 1 ? "" : "s"}
+                      </span>
+                      {s.cost_usd > 0 && (
+                        <span>${s.cost_usd.toFixed(4)}</span>
+                      )}
+                      <span>{formatRelative(s.last_turn_at_ms)}</span>
+                    </div>
+                  </button>
+                  {onOpenInTerminal && (
+                    <button
+                      type="button"
+                      className="ai-cc-session-term"
+                      title="Open in terminal (claude --resume)"
+                      aria-label="Open session in terminal"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void onOpenInTerminal(s.id);
+                      }}
+                    >
+                      <Icon name="terminal" size={12} />
+                    </button>
+                  )}
                 </div>
-              </button>
-            ))}
+              );
+            })}
         </div>
       )}
     </div>
