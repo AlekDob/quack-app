@@ -28,6 +28,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Icon } from "./Icon";
 import { peekClosedTabs, subscribeClosedTabs } from "../closedTabsStack";
 import { setAgentMode } from "../agentMode";
+import { htmlPreviewPayload } from "../htmlPreview";
 
 function tabLabel(
   ws: WorkspaceData,
@@ -47,6 +48,8 @@ function tabLabel(
   /** Agent edit review diff tab. */
   isComposeReview?: boolean;
   composeReviewPath?: string;
+  /** Agent HTML preview tab. */
+  isHtmlPreview?: boolean;
 } {
   const parsed = parseKey(key);
   if (parsed?.kind === "terminal") {
@@ -108,6 +111,17 @@ function tabLabel(
       popped: false,
       isComposeReview: true,
       composeReviewPath: parsed.path,
+    };
+  }
+  if (parsed?.kind === "htmlPreview") {
+    const payload = htmlPreviewPayload(key);
+    return {
+      label: payload?.title ?? "HTML preview",
+      dirty: false,
+      isTerminal: false,
+      isAI: false,
+      popped: false,
+      isHtmlPreview: true,
     };
   }
   if (parsed?.kind === "file") {
@@ -649,6 +663,8 @@ function TabsPaneView(
                   <Icon name="chart-bar" size={12} />
                 ) : info.isComposeReview ? (
                   <Icon name="git-compare" size={12} />
+                ) : info.isHtmlPreview ? (
+                  <Icon name="globe" size={12} />
                 ) : info.subAvatar ? (
                   <img
                     className="tab-sub-avatar"

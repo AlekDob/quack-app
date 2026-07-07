@@ -12,6 +12,11 @@ import {
   parseComposeReviewKey,
   stashComposeReviewCalls,
 } from "./composeReview";
+import {
+  htmlPreviewKey,
+  parseHtmlPreviewKey,
+  stashHtmlPreview,
+} from "./htmlPreview";
 import type { ToolCall } from "./ai";
 import { clearChatDiff } from "./chatDiffStore";
 import {
@@ -266,6 +271,12 @@ export function parseKey(
       msgIndex: number;
       path: string;
     }
+  | {
+      kind: "htmlPreview";
+      wsId: string;
+      chatId: string | undefined;
+      previewId: string;
+    }
   | null {
   if (k.startsWith("file:")) return { kind: "file", path: k.slice(5) };
   if (k.startsWith("term:")) return { kind: "terminal", id: k.slice(5) };
@@ -294,6 +305,11 @@ export function parseKey(
     const c = parseComposeReviewKey(k);
     if (!c) return null;
     return { kind: "composeReview", ...c };
+  }
+  if (k.startsWith("prev:")) {
+    const p = parseHtmlPreviewKey(k);
+    if (!p) return null;
+    return { kind: "htmlPreview", ...p };
   }
   return null;
 }
@@ -815,6 +831,14 @@ interface AppState {
     msgIndex: number,
     path: string,
     calls: ToolCall[],
+  ): void;
+  /** Open (or focus) a sandboxed HTML preview tab (agent-generated). */
+  openHtmlPreview(
+    wsId: string,
+    chatId: string | undefined,
+    previewId: string,
+    html: string,
+    title: string,
   ): void;
   /** Open (or focus) the persistent Whiteboard tab for a workspace. */
   wbOpen(wsId: string): void;
@@ -2613,6 +2637,65 @@ export const useStore = create<AppState>((set, get) => {
         };
       });
       autoRevealInTree(wsId, path);
+    },
+
+    openHtmlPreview: (wsId, chatId, previewId, html, title) => {
+      const k = htmlPreviewKey(wsId, chatId, previewId);
+      stashHtmlPreview(k, { html, title });
+      updateWs(wsId, (w) => {
+        let foundPane: PaneId | null = null;
+        mapTree(w.layout.editorRoot, (t) => {
+          if (t.tabs.includes(k)) foundPane = t.id;
+          return t;
+        });
+        if (foundPane) {
+          return {
+            ...w,
+            layout: {
+              ...w.layout,
+              activePaneId: foundPane,
+              editorRoot: mapTree(w.layout.editorRoot, (t) =>
+                t.id === foundPane ? { ...t, active: k } : t,
+              ),
+            },
+          };
+        }
+        let altPane: PaneId | null = null;
+        const activeId = w.layout.activePaneId;
+        const activePane = activeId
+          ? findPaneById(w.layout.editorRoot, activeId)
+          : null;
+        if (
+          activePane?.kind === "tabs" &&
+          activePane.active?.startsWith("ai:")
+        ) {
+          mapTree(w.layout.editorRoot, (t) => {
+            if (t.active && !t.active.startsWith("ai:")) altPane = t.id;
+            return t;
+          });
+        }
+        const targetPaneId: PaneId =
+          altPane ??
+          (activeId && isInTree(w.layout.editorRoot, activeId)
+            ? activeId
+            : firstLeaf(w.layout.editorRoot).id);
+        return {
+          ...w,
+          layout: {
+            ...w.layout,
+            activePaneId: targetPaneId,
+            editorRoot: mapTree(w.layout.editorRoot, (t) =>
+              t.id === targetPaneId
+                ? {
+                    ...t,
+                    tabs: t.tabs.includes(k) ? t.tabs : [...t.tabs, k],
+                    active: k,
+                  }
+                : t,
+            ),
+          },
+        };
+      });
     },
 
     wbOpen: (wsId) => {

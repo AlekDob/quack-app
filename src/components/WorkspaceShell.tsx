@@ -11,6 +11,7 @@ import { AIChatPanel } from "./AIChatPanel";
 import { AIIcon } from "./AIIcon";
 import { SubagentTranscriptView } from "./SubagentTranscriptView";
 import { ComposeReviewPane } from "./ComposeReviewPane";
+import { HtmlPreviewPane } from "./HtmlPreviewPane";
 import { WhiteboardPane } from "./WhiteboardPane";
 import { UsagePanel } from "./UsagePanel";
 import {
@@ -515,6 +516,45 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
               tabKey={key}
               visible={visible}
             />,
+            container,
+            key,
+          );
+        });
+      })()}
+
+      {/* Agent HTML preview tabs (`prev:` keys). */}
+      {(() => {
+        const keys = new Set<string>();
+        const walk = (pane: typeof layout.editorRoot) => {
+          if (pane.kind === "tabs") {
+            pane.tabs.forEach((k) => {
+              if (k.startsWith("prev:")) keys.add(k);
+            });
+          } else {
+            walk(pane.first);
+            walk(pane.second);
+          }
+        };
+        walk(layout.editorRoot);
+        if (layout.bottomRoot) walk(layout.bottomRoot);
+        return [...keys].map((key) => {
+          const parsed = parseKey(key);
+          if (parsed?.kind !== "htmlPreview") return null;
+          const editorPane = findTabsPaneByTab(layout.editorRoot, key);
+          const bottomPane = layout.bottomRoot
+            ? findTabsPaneByTab(layout.bottomRoot, key)
+            : null;
+          const pane = editorPane ?? bottomPane;
+          const inBottom = !editorPane && !!bottomPane;
+          const container = pane ? (paneContainers[pane.id] ?? null) : null;
+          const visible =
+            isActive &&
+            !!pane &&
+            pane.active === key &&
+            (inBottom ? layout.bottomVisible : true);
+          if (!container || !visible) return null;
+          return createPortal(
+            <HtmlPreviewPane key={key} tabKey={key} />,
             container,
             key,
           );

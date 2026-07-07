@@ -5,6 +5,7 @@ import { useModalFocus } from "../useModalFocus";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { Icon } from "./Icon";
 import { TerminalResultView } from "./TerminalResultView";
+import { HtmlPreviewFrame } from "./HtmlPreviewFrame";
 import { fs } from "../ipc";
 
 // Right-side slide-over showing a tool call's full output. Animates IN and OUT:
@@ -65,7 +66,7 @@ export function ToolResultDrawer() {
         tabIndex={-1}
         className={`tool-drawer${shown ? " shown" : ""}${
           data.variant === "terminal" ? " tool-drawer--terminal" : ""
-        }`}
+        }${data.variant === "browser" ? " tool-drawer--browser" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={`${data.title} output`}
@@ -92,6 +93,18 @@ export function ToolResultDrawer() {
               <Icon name="file-text" size={13} /> Open in editor
             </button>
           )}
+          {data.html && data.onOpenInTab && (
+            <button
+              className="tool-drawer-open"
+              onClick={() => {
+                data.onOpenInTab!();
+                close();
+              }}
+              title="Open this preview in a new tab"
+            >
+              <Icon name="globe" size={13} /> Open in tab
+            </button>
+          )}
           <button
             className="tool-drawer-close"
             onClick={close}
@@ -113,6 +126,8 @@ export function ToolResultDrawer() {
             ) : (
               <pre className="ai-tcall-result-body">Loading image…</pre>
             )
+          ) : data.html ? (
+            <HtmlPreviewFrame html={data.html} title={data.title} allowScripts />
           ) : data.markdown ? (
             <div className="ai-tcall-result-md">
               <MarkdownPreview content={data.result} />

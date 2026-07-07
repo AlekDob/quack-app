@@ -3,27 +3,29 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), Monaco, plain CSS
 created: 2026-07-01
-last_verified: 2026-07-06
-tags: [editor, markdown, mermaid, preview, split, git-diff, toolbar, monaco, spaceship-pattern]
+last_verified: 2026-07-07
+tags: [editor, markdown, mermaid, html, preview, split, git-diff, toolbar, monaco, spaceship-pattern]
 ---
 
-## Editor tab toolbar (markdown + mermaid views + git Changes + Save)
-**Purpose:** Replace the floating markdown preview toggle with a dedicated toolbar row under the breadcrumb. Markdown (`.md`/`.mdx`) and Mermaid (`.mmd`) files get **Edit | Split | Preview**; all tracked files get a **Changes** diff (HEAD vs buffer) with **Inline | Split** layout; **Save** is always visible in the tab chrome. Same toolbar is reused in modal inline editors (`FileEditorPane`).
+## Editor tab toolbar (markdown + mermaid + html views + git Changes + Save)
+**Purpose:** Replace the floating markdown preview toggle with a dedicated toolbar row under the breadcrumb. Markdown (`.md`/`.mdx`), Mermaid (`.mmd`), and HTML (`.html`/`.htm`) files get **Edit | Split | Preview**; all tracked files get a **Changes** diff (HEAD vs buffer) with **Inline | Split** layout; **Save** is always visible in the tab chrome. Same toolbar is reused in modal inline editors (`FileEditorPane`).
 **Pattern source:** `spaceship-ai` `EditorPane` toolbar — adapted to Quack neutral chrome (`design/directives.md`).
 
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Component | `src/components/EditorTabToolbar.tsx` | Shared toolbar: diagram segmented control (md/mmd), Changes toggle, diff layout toggle, Save |
+| Component | `src/components/EditorTabToolbar.tsx` | Shared toolbar: diagram segmented control (md/mmd/html), Changes toggle, diff layout toggle, Save |
 | Component | `src/components/EditorPane.tsx` | Main workspace editor tab — wires toolbar, md views, diff, Monaco |
 | Component | `src/components/FileEditorPane.tsx` | Modal/slide-in editor (skills, instructions, agent file popup) |
 | Component | `src/components/SimpleMonacoEditor.tsx` | Lightweight Monaco wrapper for `FileEditorPane` |
 | Component | `src/components/DiffView.tsx` | Monaco `DiffEditor` wrapper (inline vs side-by-side) |
 | Component | `src/components/MarkdownPreview.tsx` | Rendered preview pane for `.md`/`.mdx` (split + preview-only) |
 | Component | `src/components/MermaidPreview.tsx` | Rendered SVG diagram pane for `.mmd` (split + preview-only) |
+| Component | `src/components/HtmlPreviewFrame.tsx` | Sandboxed iframe preview for `.html` (split + preview-only) |
 | Component | `src/components/EditorBreadcrumbs.tsx` | Path + symbol breadcrumb (unchanged; sits above toolbar) |
 | Service | `src/editorMdView.ts` | `readEditorMdView` / `writeEditorMdView` — `edit` \| `split` \| `preview` (markdown) |
 | Service | `src/editorMermaidView.ts` | `isMermaidPath`, `readEditorMermaidView` / `writeEditorMermaidView` — same modes; default `preview` |
+| Service | `src/editorHtmlView.ts` | `isHtmlPath`, `readEditorHtmlView` / `writeEditorHtmlView` — same modes; default `preview` |
 | Service | `src/editorSettings.ts` | Global editor prefs incl. `lightColorTheme` / `darkColorTheme` — see feature 033 |
 | Service | `src/editorMonoFont.ts` | Monaco `fontFamily` from `--mono` (JetBrains Mono stack) |
 | Service | `src/editorDiffPrefs.ts` | `readDiffSideBySide` / `writeDiffSideBySide` — diff layout pref |

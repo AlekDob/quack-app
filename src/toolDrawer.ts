@@ -7,7 +7,7 @@
 // so their before/after reads as a real diff. This drawer is for read-only
 // output (file contents, command output, search hits).
 
-export type ToolDrawerVariant = "default" | "terminal";
+export type ToolDrawerVariant = "default" | "terminal" | "browser";
 
 export interface ToolDrawerData {
   /** Tool name, e.g. "Read" / "Bash" — shown as the drawer title. */
@@ -16,6 +16,8 @@ export interface ToolDrawerData {
   subtitle?: string;
   /** Raw tool result to show in the body. */
   result: string;
+  /** When set, body renders a sandboxed HTML iframe instead of text. */
+  html?: string;
   /** Render the body as Markdown (a `.md` read) instead of monospace. */
   markdown?: boolean;
   /** Terminal-style chrome for Bash / shell output. */
@@ -27,6 +29,8 @@ export interface ToolDrawerData {
   imagePath?: string;
   /** When set, the drawer shows an "Open in editor" action (file-ref tools). */
   onOpenFile?: () => void;
+  /** When set with `html`, opens the preview in a persistent editor tab. */
+  onOpenInTab?: () => void;
 }
 
 type DrawerListener = (data: ToolDrawerData) => void;

@@ -68,10 +68,12 @@ import {
   extractEditDiffs,
   InterleavedBlocks,
   SubagentOpen,
+  HtmlPreviewOpen,
   ToolCallRow,
   toolDetailFor,
 } from "./chatToolRender";
 import { ComposeCard } from "./composeCard";
+import { openHtmlPreviewTab } from "./HtmlPreviewPane";
 import { PermissionCard, PrivacyBanner } from "./aiInlineCards";
 import {
   ClaudeSessionsButton,
@@ -4170,6 +4172,14 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     useStore.getState().openSubagent(wsId, claudeSessionId, toolUseId, agentType);
   };
 
+  const openHtmlPreviewHandler = (
+    previewId: string,
+    html: string,
+    title: string,
+  ) => {
+    openHtmlPreviewTab(wsId, aiChatId, previewId, html, title);
+  };
+
   // Clicking a file-targeted tool row opens that file in a new editor tab.
   // In compact (agent) mode AgentModeShell already provides a handler (the
   // file popup) — forward it so we don't clobber it; in docked chat we open
@@ -4231,6 +4241,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
 
   return (
     <SubagentOpen.Provider value={openSubagentTab}>
+    <HtmlPreviewOpen.Provider value={openHtmlPreviewHandler}>
     <AgentFileOpen.Provider value={fileOpenHandler}>
     <div
       className={`ai-panel${mentionState && mentionMatches.length > 0 && streaming === null ? " ai-mention-open" : ""}`}
@@ -5849,6 +5860,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       }}
     />
     </AgentFileOpen.Provider>
+    </HtmlPreviewOpen.Provider>
     </SubagentOpen.Provider>
   );
 }

@@ -11244,6 +11244,20 @@ body.ws-dragging * {
   flex-direction: column;
   background: var(--term-bg);
 }
+.tool-drawer--browser .tool-drawer-body {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.tool-drawer--browser .html-preview-frame {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--bg);
+}
 /* Simulated terminal inside the Bash tool drawer — mirrors the in-app xterm pane. */
 .term-sim {
   flex: 1;
@@ -12562,6 +12576,32 @@ body.ws-dragging * {
   width: 100%;
   height: 100%;
   border: 0;
+}
+
+/* HTML preview — editor split, agent tab, tool drawer. */
+.html-preview-pane,
+.html-preview-half {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--bg);
+}
+.html-preview-pane-error {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+.html-preview-frame {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  background: var(--bg);
 }
 
 /* Breadcrumb bar — first row in the editor host. */

@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-05
-tags: [ai-chat, tool-calls, chatToolRender, cursor-style, conductor-style, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap]
+last_verified: 2026-07-07
+tags: [ai-chat, tool-calls, chatToolRender, cursor-style, conductor-style, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap, html-preview]
 ---
 
 ## Chat Tool-Call Rendering
@@ -15,7 +15,8 @@ Read/bash/search detail opens in a right-side **drawer**; file edits recap in
 **ComposeCard** + **ComposeReviewPane** (feature 038). Pure presentational React + CSS.
 
 **Files:** `src/components/chatToolRender.tsx`, `src/components/ToolResultDrawer.tsx`,
-`src/toolDrawer.ts`, `src/components/composeCard.tsx`, `src/composeReview.ts`,
+`src/toolDrawer.ts`, `src/htmlPreview.ts`, `src/components/HtmlPreviewFrame.tsx`,
+`src/components/composeCard.tsx`, `src/composeReview.ts`,
 `src/components/ComposeReviewPane.tsx`, styles in `src/App.css`.
 
 ### Unified inline layout (editor + agent)
@@ -68,11 +69,16 @@ There is **no inline expansion** in the transcript — clicking opens an overlay
 | Generic with output | `requestToolDrawer(...)` — right slide-over |
 | Generic, no output but file-ref | `openFile(wsId, path)` — new editor tab |
 | Edit / Write / MultiEdit (pill) | `requestDiff(...)` — centered DiffModal |
+| **HTML preview tool** (`ShowHtmlPreview`, `*html_preview*`) | `requestHtmlPreviewDrawer(...)` — browser drawer; optional **Open in tab** |
+| **Write/Edit `.html`** (EditDiffCard) | Globe button in trail → browser drawer with modified HTML |
 | ComposeCard file row | `openComposeReviewTab(...)` — `crev:` diff tab (038) |
 
 `fileRefOf(call)` — openable path for `Read`/`Edit`/`Write`/`Notebook*` (not Grep/Glob patterns).
 
 `AgentFileOpen` context: docked → `openFile`; agent mode → file popup (non-edit reads).
+
+`HtmlPreviewOpen` context (`AIChatPanel`): `(previewId, html, title) → openHtmlPreviewTab`
+— drawer **Open in tab** and agent HTML tools. See `045-html-preview.md`.
 
 ### Result drawer (`ToolResultDrawer` + `toolDrawer.ts`)
 
@@ -80,6 +86,7 @@ App-level right slide-over (`App.tsx`).
 
 | Body mode | When |
 |---|---|
+| `HtmlPreviewFrame` | `variant: "browser"` + `html` set (agent HTML preview) |
 | `MarkdownPreview` | `.md` file reads (`isMarkdownRead` + `stripReadGutter`) |
 | `MarkdownPreview` | **WebFetch** / `web_fetch` results (`isMarkdownDrawer`) |
 | `<pre>` | Bash, Grep, code reads, other plain text |

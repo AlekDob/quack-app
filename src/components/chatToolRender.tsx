@@ -24,6 +24,13 @@ import { requestToolDrawer } from "../toolDrawer";
 import { requestDiff } from "../editorState";
 import { langOf } from "../langDetect";
 import { isImagePath } from "../imageAttach";
+import {
+  htmlFromToolCall,
+  htmlPreviewTitle,
+  isHtmlPath,
+  isHtmlPreviewTool,
+  requestHtmlPreviewDrawer,
+} from "../htmlPreview";
 
 // Agent mode turns this on to render the chat denser: grouped tool bursts
 // collapse to an icon row by default, expandable on click. The normal
@@ -43,6 +50,11 @@ export const AgentFileOpen = createContext<((path: string) => void) | null>(
 // and the agent type. Null elsewhere → the chip renders but isn't clickable.
 export const SubagentOpen = createContext<
   ((toolUseId: string, agentType: string) => void) | null
+>(null);
+
+// Opens a sandboxed HTML preview tab (agent tool output).
+export const HtmlPreviewOpen = createContext<
+  ((previewId: string, html: string, title: string) => void) | null
 >(null);
 
 // Pull the subagent type out of a Task tool-call's input. Claude Code uses
@@ -1446,6 +1458,7 @@ export function ToolCallRow({
   // can flip between the generic and diff renders across re-renders.
   const openSubagent = useContext(SubagentOpen);
   const openFile = useContext(AgentFileOpen);
+  const openHtmlPreview = useContext(HtmlPreviewOpen);
   // A subagent run. Newer Claude Code names this tool "Agent"; older
   // versions / other providers use "Task". Render it as a duck-avatar chip
   // that opens the subagent's read-only transcript on click (the transcript
@@ -1509,6 +1522,39 @@ export function ToolCallRow({
             {summary}
           </span>
         </div>
+      </div>
+    );
+  }
+  if (isHtmlPreviewTool(call.function.name)) {
+    const html = htmlFromToolCall(call, result);
+    const title = htmlPreviewTitle(call);
+    const previewId = call.id ?? `${Date.now()}`;
+    const onOpenTab =
+      html && openHtmlPreview
+        ? () => openHtmlPreview(previewId, html, title)
+        : undefined;
+    const onPrimary = html
+      ? () => requestHtmlPreviewDrawer(html, title, undefined, onOpenTab)
+      : undefined;
+    return (
+      <div className={`ai-tcall${standalone ? " ai-tcall-standalone" : ""}`}>
+        <ToolRowHead
+          icon="globe"
+          name="HTML preview"
+          detail={title}
+          onPrimary={onPrimary}
+          primaryTitle={html ? "Show HTML preview" : undefined}
+          toolName={call.function.name}
+          extra={
+            !result ? (
+              <span className="ai-spinner ai-spinner-sm" />
+            ) : !html ? (
+              <span className="ai-tcall-done" title="Done">
+                <Icon name="check" size={12} />
+              </span>
+            ) : undefined
+          }
+        />
       </div>
     );
   }
@@ -1632,6 +1678,11 @@ function EditDiffCard({ call, diffs, result, standalone = false }: EditDiffCardP
   // Write/create → empty original → renders as all-added.
   const original = diffs.map((d) => d.oldText).filter(Boolean).join("\n\n");
   const modified = diffs.map((d) => d.newText).filter(Boolean).join("\n\n");
+  const isHtml = isHtmlPath(path);
+  const openPreview =
+    isHtml && modified.trim()
+      ? () => requestHtmlPreviewDrawer(modified, base, path)
+      : undefined;
   const openDiff = () =>
     requestDiff({
       path: base,
@@ -1654,6 +1705,17 @@ function EditDiffCard({ call, diffs, result, standalone = false }: EditDiffCardP
         toolName={call.function.name}
         extra={
           <>
+            {openPreview && (
+              <button
+                type="button"
+                className="ai-tcall-preview"
+                onClick={openPreview}
+                title={`Preview ${base}`}
+                aria-label={`Preview ${base}`}
+              >
+                <Icon name="globe" size={12} />
+              </button>
+            )}
             {removed > 0 && (
               <span className="ai-tcall-edit-rm">−{removed}</span>
             )}
