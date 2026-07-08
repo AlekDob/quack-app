@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import {
   activeAiChatId,
   useStore,
@@ -40,6 +39,7 @@ import {
   type CustomizationTab,
 } from "./CustomizationsModal";
 import { AIIcon } from "./AIIcon";
+import { ContextMenu } from "./ContextMenu";
 import { Icon } from "./Icon";
 
 // One flattened chat across all open workspaces, with its derived status
@@ -308,19 +308,34 @@ export function AIChatsRail({
       />
 
       {menu && (
-        <HubContextMenu
-          entry={menu.entry}
+        <ContextMenu
           x={menu.x}
           y={menu.y}
           onClose={() => setMenu(null)}
-          onRename={() => {
-            setRenaming(menu.entry.chat.id);
-            setMenu(null);
-          }}
-          onLifecycle={(state) => {
-            setAIChatLifecycle(menu.entry.wsId, menu.entry.chat.id, state);
-            setMenu(null);
-          }}
+          items={[
+            {
+              label: "Rename",
+              onClick: () => setRenaming(menu.entry.chat.id),
+            },
+            {
+              label: menu.entry.chat.doneAt ? "Reopen" : "Mark done",
+              onClick: () =>
+                setAIChatLifecycle(
+                  menu.entry.wsId,
+                  menu.entry.chat.id,
+                  menu.entry.chat.doneAt ? "active" : "done",
+                ),
+            },
+            {
+              label: "Archive",
+              onClick: () =>
+                setAIChatLifecycle(
+                  menu.entry.wsId,
+                  menu.entry.chat.id,
+                  "archived",
+                ),
+            },
+          ]}
         />
       )}
     </div>
@@ -525,46 +540,5 @@ function RenameInput({
       }}
       onBlur={(e) => onCommit(e.currentTarget.value)}
     />
-  );
-}
-
-interface MenuProps {
-  entry: HubEntry;
-  x: number;
-  y: number;
-  onClose: () => void;
-  onRename: () => void;
-  onLifecycle: (state: "active" | "done" | "archived") => void;
-}
-
-function HubContextMenu({ entry, x, y, onClose, onRename, onLifecycle }: MenuProps) {
-  const isDone = !!entry.chat.doneAt;
-  return createPortal(
-    <>
-      <div className="ws-color-overlay" onClick={onClose} />
-      <div
-        className="agent-hub-menu liquid-glass"
-        style={{ left: x, top: y }}
-        role="menu"
-        aria-label="Chat actions"
-      >
-        <button className="agent-hub-menu-item" onClick={onRename}>
-          Rename
-        </button>
-        <button
-          className="agent-hub-menu-item"
-          onClick={() => onLifecycle(isDone ? "active" : "done")}
-        >
-          {isDone ? "Reopen" : "Mark done"}
-        </button>
-        <button
-          className="agent-hub-menu-item"
-          onClick={() => onLifecycle("archived")}
-        >
-          Archive
-        </button>
-      </div>
-    </>,
-    document.body,
   );
 }

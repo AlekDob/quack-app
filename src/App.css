@@ -74,6 +74,9 @@
   --tool-web: #36c5d0;
   --tool-task: #e879a8;
   --tool-todo: #a3d645;
+  /* Chat file-path links — light blue pill (distinct from plain inline code). */
+  --file-link-bg: color-mix(in srgb, var(--tool-read) 30%, transparent);
+  --file-link-fg: color-mix(in srgb, var(--tool-read) 42%, #ffffff);
   /* File-tree icon tints — glyph only, confined to the explorer panel. */
   --tree-tint-folder: #8b8f98;
   --tree-tint-folder-src: #6aab73;
@@ -167,6 +170,8 @@
   --tool-web: #0891b2;
   --tool-task: #db2777;
   --tool-todo: #65a30d;
+  --file-link-bg: color-mix(in srgb, var(--tool-read) 22%, var(--bg-alt));
+  --file-link-fg: color-mix(in srgb, var(--tool-read) 88%, var(--fg));
   /* File-tree icon tints — slightly deeper for light backgrounds. */
   --tree-tint-folder: #6b7280;
   --tree-tint-folder-src: #15803d;
@@ -12773,6 +12778,26 @@ body.ws-dragging * {
 }
 .md-preview a:hover {
   text-decoration: underline;
+}
+.md-preview a.md-file-link {
+  cursor: pointer;
+  color: var(--file-link-fg);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--file-link-fg) 55%, transparent);
+  text-underline-offset: 2px;
+}
+.md-preview a.md-file-link:hover {
+  color: var(--tool-read);
+  text-decoration-color: var(--tool-read);
+}
+.md-preview a.md-file-link code {
+  color: var(--file-link-fg);
+  background: var(--file-link-bg);
+  border-color: color-mix(in srgb, var(--tool-read) 40%, var(--border));
+  cursor: pointer;
+}
+.md-preview a.md-file-link:hover code {
+  color: var(--tool-read);
 }
 .md-preview code {
   font-family: var(--mono);

@@ -20,6 +20,8 @@ import {
 import { useStore } from "../store";
 import { openComposeReviewTab } from "./ComposeReviewPane";
 import { Icon } from "./Icon";
+import { isHtmlPath } from "../htmlPreview";
+import { resolveChatFilePath } from "../chatFileLinks";
 
 function basename(path: string): string {
   const parts = path.replace(/\\/g, "/").split("/").filter(Boolean);
@@ -179,6 +181,15 @@ export function ComposeCard({
     openComposeReviewTab(wsId, chatId, msgIndex, path, calls);
   };
 
+  const openRow = (path: string) => {
+    if (isHtmlPath(path)) {
+      const root = useStore.getState().loaded[wsId]?.meta.root ?? "";
+      void useStore.getState().openFile(wsId, resolveChatFilePath(root, path));
+      return;
+    }
+    openReview(path);
+  };
+
   const openAll = () => {
     for (const { path } of byPath) openReview(path);
   };
@@ -264,8 +275,8 @@ export function ComposeCard({
                 <button
                   type="button"
                   className="ai-compose-row"
-                  onClick={() => openReview(path)}
-                  title={path}
+                  onClick={() => openRow(path)}
+                  title={isHtmlPath(path) ? `Open ${name} in preview` : path}
                 >
                   <span className="ai-compose-row-icon" aria-hidden>
                     <Icon name={fileIconName(name)} size={14} />

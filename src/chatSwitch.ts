@@ -21,11 +21,19 @@ export function pulseChatSwitch(): void {
   if (timer) clearTimeout(timer);
   switching = true;
   notify();
-  timer = setTimeout(() => {
-    timer = null;
-    switching = false;
-    notify();
-  }, CHAT_SWITCH_MS);
+  const hideAt = Date.now() + CHAT_SWITCH_MS;
+  // Two rAFs so WKWebView paints the veil before we start the hide timer
+  // (release builds are fast enough to skip a visible frame otherwise).
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const remain = Math.max(0, hideAt - Date.now());
+      timer = setTimeout(() => {
+        timer = null;
+        switching = false;
+        notify();
+      }, remain);
+    });
+  });
 }
 
 export function subscribeChatSwitch(fn: () => void): () => void {

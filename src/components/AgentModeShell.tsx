@@ -387,7 +387,7 @@ export function AgentModeShell({ wsId }: Props) {
                 </div>
               </div>
             )}
-            {switching && <ChatSwitchVeil />}
+            <ChatSwitchVeil />
           </div>
           {sidePanelKey && sideParsed?.kind === "composeReview" && (
             <div className="agent-main-review">

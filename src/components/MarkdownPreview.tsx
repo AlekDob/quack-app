@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { renderMarkdown } from "../markdown";
+import { enrichMarkdownWithFileLinks } from "../chatFileLinks";
 import { onMdPreviewScroll, setEditorGoto } from "../editorState";
 
 interface Props {
@@ -10,10 +11,21 @@ interface Props {
    *  bubbles and tool output, where line numbers refer to a file
    *  the user isn't even editing. */
   interactive?: boolean;
+  /** When set, `foo.html` / `` `bar.md` `` in the text become links
+   *  that open the file in a new editor tab. */
+  onFileOpen?: (path: string) => void;
 }
 
-export function MarkdownPreview({ content, interactive = false }: Props) {
-  const html = useMemo(() => renderMarkdown(content), [content]);
+export function MarkdownPreview({
+  content,
+  interactive = false,
+  onFileOpen,
+}: Props) {
+  const html = useMemo(() => {
+    let out = renderMarkdown(content);
+    if (onFileOpen) out = enrichMarkdownWithFileLinks(out);
+    return out;
+  }, [content, onFileOpen]);
   const ref = useRef<HTMLDivElement>(null);
 
   // Editor-driven scroll-sync. Only meaningful in interactive (split)
@@ -65,8 +77,13 @@ export function MarkdownPreview({ content, interactive = false }: Props) {
   const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement | null;
     if (!target) return;
-    // Copy button: intercept BEFORE the data-source-line walk so a
-    // click on the button doesn't also jump the editor to that block.
+    const fileLink = target.closest<HTMLElement>("[data-file-link]");
+    if (fileLink && onFileOpen) {
+      e.preventDefault();
+      const raw = fileLink.dataset.fileLink;
+      if (raw) onFileOpen(raw);
+      return;
+    }
     const copyBtn = target.closest<HTMLButtonElement>("[data-md-copy]");
     if (copyBtn) {
       const wrapper = copyBtn.closest(".md-code-block");
@@ -94,11 +111,8 @@ export function MarkdownPreview({ content, interactive = false }: Props) {
       return;
     }
     if (!interactive) return;
-    // Headings are flagged with .md-anchor as the primary jump targets;
-    // every block carries data-source-line so users can also click into
-    // paragraphs / code blocks. Links + checkboxes keep their native
-    // behaviour.
-    if (target.closest("a") || target.closest("input")) return;
+    if (target.closest("input")) return;
+    if (target.closest("a") && !target.closest(".md-file-link")) return;
     const el = target.closest<HTMLElement>("[data-source-line]");
     if (!el) return;
     const line = parseInt(el.dataset.sourceLine ?? "0", 10);

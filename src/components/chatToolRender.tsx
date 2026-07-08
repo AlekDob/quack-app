@@ -31,6 +31,7 @@ import {
   isHtmlPreviewTool,
   requestHtmlPreviewDrawer,
 } from "../htmlPreview";
+import { consumeAutoHtmlOpen } from "../chatFileLinks";
 
 // Agent mode turns this on to render the chat denser: grouped tool bursts
 // collapse to an icon row by default, expandable on click. The normal
@@ -56,6 +57,12 @@ export const SubagentOpen = createContext<
 export const HtmlPreviewOpen = createContext<
   ((previewId: string, html: string, title: string) => void) | null
 >(null);
+
+// Opens a workspace file in an editor tab (resolved against project root).
+// Distinct from AgentFileOpen, which in agent mode routes to the file popup.
+export const ChatFileOpen = createContext<((path: string) => void) | null>(
+  null,
+);
 
 // Pull the subagent type out of a Task tool-call's input. Claude Code uses
 // `subagent_type`; we fall back to a couple of aliases just in case.
@@ -675,6 +682,7 @@ export function InterleavedBlocks({
   erroredIds,
   streaming = false,
   hideEdits = false,
+  onFileOpen,
 }: {
   blocks: NonNullable<ChatMessage["blocks"]>;
   callsById: Map<string, ToolCall>;
@@ -686,6 +694,8 @@ export function InterleavedBlocks({
   streaming?: boolean;
   /** When true, file edits are summarized in ComposeCard at turn end. */
   hideEdits?: boolean;
+  /** Clickable `foo.html` / `bar.md` paths inside prose blocks. */
+  onFileOpen?: (path: string) => void;
 }) {
   // Conductor-style inline grouping (`.ai-iarow`) in every chat surface —
   // docked editor and agent mode share the same chronology + chip runs.
@@ -697,6 +707,7 @@ export function InterleavedBlocks({
       erroredIds={erroredIds ?? EMPTY_ID_SET}
       streaming={streaming}
       hideEdits={hideEdits}
+      onFileOpen={onFileOpen}
     />
   );
 }
@@ -896,6 +907,7 @@ function CompactBlocks({
   erroredIds,
   streaming,
   hideEdits = false,
+  onFileOpen,
 }: {
   blocks: NonNullable<ChatMessage["blocks"]>;
   callsById: Map<string, ToolCall>;
@@ -903,6 +915,7 @@ function CompactBlocks({
   erroredIds: Set<string>;
   streaming: boolean;
   hideEdits?: boolean;
+  onFileOpen?: (path: string) => void;
 }) {
   const seen = new Set<string>();
   const out: ReactNode[] = [];
@@ -947,7 +960,11 @@ function CompactBlocks({
           out.push(<ThinkingBlock key={`tk${i}`} text={thinking} />);
         if (visible.trim())
           out.push(
-            <MarkdownPreview key={`t${i}`} content={balanceFences(visible)} />,
+            <MarkdownPreview
+              key={`t${i}`}
+              content={balanceFences(visible)}
+              onFileOpen={onFileOpen}
+            />,
           );
       }
       return;
@@ -957,7 +974,16 @@ function CompactBlocks({
     const call = callsById.get(b.callId);
     if (!call) return;
     if (TASK_NAMES.has(call.function.name)) return; // tasks live in the sidebar
-    if (hideEdits && extractEditDiffs(call)) return;
+    if (hideEdits && extractEditDiffs(call)) {
+      out.push(
+        <AutoOpenHtmlEdit
+          key={`ao${b.callId}`}
+          call={call}
+          result={b.callId ? resultsById.get(b.callId) : undefined}
+        />,
+      );
+      return;
+    }
     run.push({ id: b.callId, call });
   });
   flush();
@@ -1526,36 +1552,13 @@ export function ToolCallRow({
     );
   }
   if (isHtmlPreviewTool(call.function.name)) {
-    const html = htmlFromToolCall(call, result);
-    const title = htmlPreviewTitle(call);
-    const previewId = call.id ?? `${Date.now()}`;
-    const onOpenTab =
-      html && openHtmlPreview
-        ? () => openHtmlPreview(previewId, html, title)
-        : undefined;
-    const onPrimary = html
-      ? () => requestHtmlPreviewDrawer(html, title, undefined, onOpenTab)
-      : undefined;
     return (
-      <div className={`ai-tcall${standalone ? " ai-tcall-standalone" : ""}`}>
-        <ToolRowHead
-          icon="globe"
-          name="HTML preview"
-          detail={title}
-          onPrimary={onPrimary}
-          primaryTitle={html ? "Show HTML preview" : undefined}
-          toolName={call.function.name}
-          extra={
-            !result ? (
-              <span className="ai-spinner ai-spinner-sm" />
-            ) : !html ? (
-              <span className="ai-tcall-done" title="Done">
-                <Icon name="check" size={12} />
-              </span>
-            ) : undefined
-          }
-        />
-      </div>
+      <HtmlPreviewToolRow
+        call={call}
+        result={result}
+        standalone={standalone}
+        openHtmlPreview={openHtmlPreview}
+      />
     );
   }
   // Edit / Write / MultiEdit get a richer view that shows the actual
@@ -1658,7 +1661,81 @@ interface EditDiffCardProps {
   standalone?: boolean;
 }
 
+function AutoOpenHtmlEdit({
+  call,
+  result,
+}: {
+  call: ToolCall;
+  result: string | undefined;
+}) {
+  const openChatFile = useContext(ChatFileOpen);
+  const openAgentFile = useContext(AgentFileOpen);
+  const openFile = openChatFile ?? openAgentFile;
+  useEffect(() => {
+    if (!call.id || typeof result !== "string") return;
+    if (/^Error|error:/i.test(result.trim())) return;
+    const path = pathOf(call);
+    if (!isHtmlPath(path)) return;
+    if (!extractEditDiffs(call)?.length) return;
+    if (!consumeAutoHtmlOpen(`edit:${call.id}`)) return;
+    if (openFile) openFile(path);
+  }, [call, result, openFile]);
+  return null;
+}
+
+function HtmlPreviewToolRow({
+  call,
+  result,
+  standalone = false,
+  openHtmlPreview,
+}: {
+  call: ToolCall;
+  result: string | undefined;
+  standalone?: boolean;
+  openHtmlPreview: ((previewId: string, html: string, title: string) => void) | null;
+}) {
+  const html = htmlFromToolCall(call, result);
+  const title = htmlPreviewTitle(call);
+  const previewId = call.id ?? `${Date.now()}`;
+  const onOpenTab =
+    html && openHtmlPreview
+      ? () => openHtmlPreview(previewId, html, title)
+      : undefined;
+  const onPrimary = html
+    ? () => requestHtmlPreviewDrawer(html, title, undefined, onOpenTab)
+    : undefined;
+  useEffect(() => {
+    if (!call.id || !html || typeof result !== "string") return;
+    if (!consumeAutoHtmlOpen(`tool:${call.id}`)) return;
+    requestHtmlPreviewDrawer(html, title, undefined, onOpenTab);
+  }, [call.id, html, result, title, onOpenTab]);
+  return (
+    <div className={`ai-tcall${standalone ? " ai-tcall-standalone" : ""}`}>
+      <ToolRowHead
+        icon="globe"
+        name="HTML preview"
+        detail={title}
+        onPrimary={onPrimary}
+        primaryTitle={html ? "Show HTML preview" : undefined}
+        toolName={call.function.name}
+        extra={
+          !result ? (
+            <span className="ai-spinner ai-spinner-sm" />
+          ) : !html ? (
+            <span className="ai-tcall-done" title="Done">
+              <Icon name="check" size={12} />
+            </span>
+          ) : undefined
+        }
+      />
+    </div>
+  );
+}
+
 function EditDiffCard({ call, diffs, result, standalone = false }: EditDiffCardProps) {
+  const openChatFile = useContext(ChatFileOpen);
+  const openAgentFile = useContext(AgentFileOpen);
+  const openFile = openChatFile ?? openAgentFile;
   const args = call.function.arguments as Record<string, unknown>;
   const path =
     (typeof args.file_path === "string" && args.file_path) ||
@@ -1683,6 +1760,15 @@ function EditDiffCard({ call, diffs, result, standalone = false }: EditDiffCardP
     isHtml && modified.trim()
       ? () => requestHtmlPreviewDrawer(modified, base, path)
       : undefined;
+  useEffect(() => {
+    if (!call.id || !result || isError || !isHtml || !modified.trim()) return;
+    if (!consumeAutoHtmlOpen(`edit:${call.id}`)) return;
+    if (openFile) {
+      openFile(path);
+      return;
+    }
+    openPreview?.();
+  }, [call.id, result, isError, isHtml, modified, path, openFile, openPreview]);
   const openDiff = () =>
     requestDiff({
       path: base,
@@ -1691,6 +1777,14 @@ function EditDiffCard({ call, diffs, result, standalone = false }: EditDiffCardP
       modifiedContent: modified,
       language: langOf(path),
     });
+  const onPrimary =
+    isHtml && openFile && !isError
+      ? () => openFile(path)
+      : openDiff;
+  const primaryTitle =
+    isHtml && openFile && !isError
+      ? `Open ${base} in editor (preview)`
+      : `Open the diff for ${base}`;
   return (
     <div
       className={`ai-tcall ai-tcall-edit${isError ? " errored" : ""}${standalone ? " ai-tcall-standalone" : ""}`}
@@ -1700,8 +1794,8 @@ function EditDiffCard({ call, diffs, result, standalone = false }: EditDiffCardP
         name={label}
         detail={base}
         detailTitle={path}
-        onPrimary={openDiff}
-        primaryTitle={`Open the diff for ${base}`}
+        onPrimary={onPrimary}
+        primaryTitle={primaryTitle}
         toolName={call.function.name}
         extra={
           <>

@@ -69,11 +69,13 @@ import {
   InterleavedBlocks,
   SubagentOpen,
   HtmlPreviewOpen,
+  ChatFileOpen,
   ToolCallRow,
   toolDetailFor,
 } from "./chatToolRender";
 import { ComposeCard } from "./composeCard";
 import { openHtmlPreviewTab } from "./HtmlPreviewPane";
+import { resolveChatFilePath } from "../chatFileLinks";
 import { PermissionCard, PrivacyBanner } from "./aiInlineCards";
 import {
   ClaudeSessionsButton,
@@ -4186,7 +4188,14 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   // a real tab via the store.
   const fileOpenHandler = compact
     ? parentFileOpen
-    : (path: string) => void useStore.getState().openFile(wsId, path);
+      ? (path: string) => parentFileOpen(resolveChatFilePath(root, path))
+      : null
+    : (path: string) =>
+        void useStore.getState().openFile(wsId, resolveChatFilePath(root, path));
+
+  const openChatFile = (path: string) => {
+    void useStore.getState().openFile(wsId, resolveChatFilePath(root, path));
+  };
 
   // Format a resetsAt ISO timestamp into a human-friendly countdown
   // (e.g. "2h 14m", "35m", "4d"). Used by SessionUsageCircle.
@@ -4242,6 +4251,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   return (
     <SubagentOpen.Provider value={openSubagentTab}>
     <HtmlPreviewOpen.Provider value={openHtmlPreviewHandler}>
+    <ChatFileOpen.Provider value={openChatFile}>
     <AgentFileOpen.Provider value={fileOpenHandler}>
     <div
       className={`ai-panel${mentionState && mentionMatches.length > 0 && streaming === null ? " ai-mention-open" : ""}`}
@@ -4560,6 +4570,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
                   <InterleavedBlocks
                     blocks={m.blocks}
                     hideEdits={showComposeCard}
+                    onFileOpen={openChatFile}
                     callsById={
                       new Map(
                         (m.tool_calls ?? [])
@@ -4588,7 +4599,10 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
                   />
                 ) : isAssistant ? (
                   <>
-                    <MarkdownPreview content={balanceFences(visibleContent)} />
+                    <MarkdownPreview
+                      content={balanceFences(visibleContent)}
+                      onFileOpen={openChatFile}
+                    />
                     {shouldCollapse && (
                       <button
                         className="ai-show-more"
@@ -5860,6 +5874,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       }}
     />
     </AgentFileOpen.Provider>
+    </ChatFileOpen.Provider>
     </HtmlPreviewOpen.Provider>
     </SubagentOpen.Provider>
   );

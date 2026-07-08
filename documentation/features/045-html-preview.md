@@ -29,6 +29,7 @@ out of scope (WebFetch still renders fetched pages as markdown in the drawer).
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Service | `src/htmlPreview.ts` | Key helpers, in-memory stash, tool detection, `requestHtmlPreviewDrawer()` |
+| Service | `src/chatFileLinks.ts` | Clickable file paths in chat markdown, `resolveChatFilePath`, auto-open dedupe |
 | Service | `src/editorHtmlView.ts` | `isHtmlPath`, `readEditorHtmlView`, `writeEditorHtmlView` — view pref + default `preview` |
 | Component | `src/components/HtmlPreviewFrame.tsx` | Reusable sandboxed `<iframe srcDoc>` |
 | Component | `src/components/HtmlPreviewPane.tsx` | Body for `prev:` virtual tabs; `openHtmlPreviewTab()` helper |
@@ -86,8 +87,14 @@ Quack recognises these tool names (case-insensitive):
 **Chat UI:** dedicated chip — globe icon, label **HTML preview**, click → drawer.
 While streaming: spinner; when done with no HTML: check mark.
 
-**Write/Edit `.html`:** existing `EditDiffCard` keeps diff as primary click; a
-**globe** button in `.ai-tcall-trail` opens the drawer with the **modified** content.
+**Write/Edit `.html`:** existing `EditDiffCard` keeps diff available via non-html
+tools; for `.html` the chip **auto-opens the file tab** (preview default) when the
+tool completes. Clicking the chip also opens the tab (not the diff modal). Globe
+button still opens the drawer with live HTML from the tool args.
+
+**Chat prose:** paths like `` `preview-quack.html` ``, `documentation/foo.md`, or
+bare `045-html-preview.md` in assistant messages are **clickable links** that call
+`openFile` (resolved against the workspace root). See `chatFileLinks.ts`.
 
 ### Drawer (`ToolResultDrawer`)
 Extends the existing read/bash drawer (`006-chat-tool-render.md`):
@@ -178,8 +185,10 @@ navigation inside the iframe is not a supported product feature.
 - **Preview default on `.html`:** first open skips Monaco — same rationale as `.mmd`.
 - **`prev:` stash is in-memory:** restarting Quack loses stashed HTML for tabs that
   were open in layout restore (tab key may reopen with empty pane — error state shown).
-- **Agent Mode:** drawer works everywhere; `prev:` tabs open in the workspace editor
-  layout (may be behind Agent Mode shell — use drawer there for quick peek).
+- **Auto-open:** successful Write/Edit on `.html` opens the file tab once per tool
+  call id (`consumeAutoHtmlOpen`). `ShowHtmlPreview` auto-opens the browser drawer.
+- **Relative paths:** chat links and tool `file_path` values are resolved via
+  `resolveChatFilePath(wsRoot, path)` before `openFile`.
 - **Not in `mediaKindOf`:** `.html` stays a text buffer in the store; do not route
   through `MediaPreviewPane`.
 
