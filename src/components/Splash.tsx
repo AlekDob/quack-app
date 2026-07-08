@@ -1,4 +1,5 @@
 import { useStore } from "../store";
+import { IS_DEV } from "../devMode";
 
 // Injected by vite from package.json — see vite.config.ts `define`.
 declare const __APP_VERSION__: string;
@@ -80,6 +81,7 @@ export function Splash() {
         <img src="/quack-icon.png" className="splash-icon" alt="Quack" />
         <div className="splash-wordmark">
           <span className="splash-wordmark-version">{VERSION}</span>
+          {IS_DEV && <span className="dev-badge">DEV</span>}
         </div>
         <div className="splash-tagline">
           A lightweight desktop code editor with first-class AI

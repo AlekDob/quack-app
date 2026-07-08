@@ -13,6 +13,7 @@ import { AIIcon } from "./AIIcon";
 import { useAgentMode, toggleAgentMode } from "../agentMode";
 import { useStore } from "../store";
 import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
+import { IS_DEV } from "../devMode";
 
 // Edit-menu actions delegate to the active Monaco editor when one is
 // focused (its built-in commands handle the editor's undo stack +
@@ -389,6 +390,11 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
           hidden there — the titlebar is just a drag region + Agents. */}
       <div className="topbar-brand" data-tauri-drag-region>
         <span className="topbar-brand-name">Quack</span>
+        {IS_DEV && (
+          <span className="dev-badge" title="Development build (npm run tauri dev)">
+            DEV
+          </span>
+        )}
         {activeWsName && (
           <>
             <span className="topbar-brand-sep" aria-hidden="true">

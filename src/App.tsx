@@ -57,6 +57,7 @@ import { useAgentMode } from "./agentMode";
 import { installResumeDebug } from "./resumeDebug";
 import { prefetchModelDiscovery } from "./modelDiscoveryStore";
 import { teardownBeforeQuit, quitArmed } from "./appQuit";
+import { IS_DEV } from "./devMode";
 import "./App.css";
 
 // When this document was opened as a terminal pop-out window, render only
@@ -262,11 +263,12 @@ function MainApp() {
   const activeWsName = activeId ? loaded[activeId]?.meta.name ?? null : null;
   useEffect(() => {
     const file = editorState.filePath;
-    let title = "Quack";
+    const suffix = IS_DEV ? " — Quack [DEV]" : " — Quack";
+    let title = IS_DEV ? "Quack [DEV]" : "Quack";
     if (activeWsName && file) {
-      title = `${basename(file)} — ${activeWsName} — Quack`;
+      title = `${basename(file)} — ${activeWsName}${suffix}`;
     } else if (activeWsName) {
-      title = `${activeWsName} — Quack`;
+      title = `${activeWsName}${suffix}`;
     }
     getCurrentWindow()
       .setTitle(title)
@@ -740,7 +742,7 @@ function MainApp() {
   }
 
   return (
-    <div className={`app ${zen ? "app-zen" : ""} ${agentMode ? "app-agent" : ""} ${dropOver ? "app-drop-over" : ""}`}>
+    <div className={`app ${IS_DEV ? "app-dev" : ""} ${zen ? "app-zen" : ""} ${agentMode ? "app-agent" : ""} ${dropOver ? "app-drop-over" : ""}`}>
       {!zen && <TopBar onOpenPalette={() => setPaletteOpen(true)} />}
       <div
         className="shell-stack"

@@ -733,6 +733,12 @@ input {
   flex-direction: column;
   height: 100%;
   background: var(--bg);
+  position: relative;
+}
+
+/* Development build — unmistakable when running `npm run tauri dev`. */
+.app-dev {
+  box-shadow: inset 0 0 0 3px var(--warn);
 }
 
 .shell-stack {
@@ -1076,6 +1082,19 @@ body.ws-dragging * {
 }
 .topbar-brand-name {
   flex-shrink: 0;
+}
+.dev-badge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--warn);
+  color: var(--primary-fg);
+  line-height: 15px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 40%, transparent);
 }
 .topbar-brand-sep {
   flex-shrink: 0;
