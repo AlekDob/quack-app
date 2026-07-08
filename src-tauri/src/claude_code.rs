@@ -903,6 +903,26 @@ pub fn claude_code_kill(state: State<'_, ClaudeCodeState>, id: String) -> Result
     Ok(())
 }
 
+/// Kill by chat-tab session id (archive / done / close tab). Looks up the
+/// live stream id from `session_streams` then reuses the process-group kill.
+#[tauri::command]
+pub fn claude_code_kill_session(
+    state: State<'_, ClaudeCodeState>,
+    chat_session_id: String,
+) -> Result<(), String> {
+    let stream_id = state
+        .session_streams
+        .lock()
+        .get(&chat_session_id)
+        .cloned();
+    if let Some(stream_id) = stream_id {
+        if let Some(pid) = state.children.lock().get(&stream_id).copied() {
+            kill_process_tree(pid);
+        }
+    }
+    Ok(())
+}
+
 #[derive(serde::Serialize)]
 pub struct AttachResult {
     /// Stream id the frontend should `listen` on for live events. Same

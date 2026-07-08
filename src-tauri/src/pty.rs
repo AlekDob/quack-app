@@ -566,10 +566,37 @@ pub fn pty_resize(
         .map_err(|e| e.to_string())
 }
 
+/// Reap the whole PTY session tree (zsh + make/node children). Killing
+/// only the shell pid orphans background jobs started from that terminal.
+#[cfg(unix)]
+fn kill_pty_tree(child: &mut Box<dyn portable_pty::Child + Send + Sync>) {
+    if let Some(pid) = child.process_id() {
+        unsafe {
+            libc::kill(-(pid as i32), libc::SIGHUP);
+            libc::kill(-(pid as i32), libc::SIGKILL);
+        }
+    } else {
+        let _ = child.kill();
+    }
+}
+
+#[cfg(windows)]
+fn kill_pty_tree(child: &mut Box<dyn portable_pty::Child + Send + Sync>) {
+    use std::os::windows::process::CommandExt;
+    if let Some(pid) = child.process_id() {
+        let _ = Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .creation_flags(0x0800_0000)
+            .status();
+    } else {
+        let _ = child.kill();
+    }
+}
+
 #[tauri::command]
 pub fn pty_kill(state: State<'_, PtyState>, id: String) -> Result<(), String> {
     if let Some(mut entry) = state.sessions.lock().remove(&id) {
-        let _ = entry.child.kill();
+        kill_pty_tree(&mut entry.child);
     }
     state.scrollbacks.lock().remove(&id);
     Ok(())

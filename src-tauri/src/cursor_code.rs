@@ -587,3 +587,22 @@ pub fn cursor_code_kill(state: State<'_, CursorCodeState>, id: String) -> Result
     }
     Ok(())
 }
+
+/// Kill by chat-tab session id — same lookup pattern as Claude Code.
+#[tauri::command]
+pub fn cursor_code_kill_session(
+    state: State<'_, CursorCodeState>,
+    chat_session_id: String,
+) -> Result<(), String> {
+    let stream_id = state
+        .session_streams
+        .lock()
+        .get(&chat_session_id)
+        .cloned();
+    if let Some(stream_id) = stream_id {
+        if let Some(pid) = state.children.lock().get(&stream_id).copied() {
+            kill_process_tree(pid);
+        }
+    }
+    Ok(())
+}

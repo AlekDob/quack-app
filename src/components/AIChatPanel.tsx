@@ -177,6 +177,7 @@ import { loadSubagents, type SubagentDef } from "../subagents";
 import { loadSkills, type SkillDef } from "../skills";
 import { permissionFor } from "../toolPermissions";
 import { onAIPromptRequest, requestAIPrompt } from "../aiBus";
+import { onChatStopRequest } from "../aiStopBus";
 import { ComposerQueue } from "./ComposerQueue";
 import { relPath } from "../pathUtils";
 import {
@@ -3086,6 +3087,17 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     setTokensPerSec(null);
     setLastStreamEventAt(null);
   };
+
+  // Archive / done / close tab kills CLI subprocesses on the Rust side and
+  // pings this bus so HTTP-stream providers abort locally too.
+  const stopRef = useRef(stop);
+  stopRef.current = stop;
+  useEffect(() => {
+    if (!aiChatId) return;
+    return onChatStopRequest((id) => {
+      if (id === aiChatId) stopRef.current();
+    });
+  }, [aiChatId]);
 
   // Make the "Stop (Esc)" tooltip honest — Esc previously only worked
   // when the chat textarea was focused, so a user reading the streamed

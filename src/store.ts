@@ -19,6 +19,7 @@ import {
 } from "./htmlPreview";
 import type { ToolCall } from "./ai";
 import { clearChatDiff } from "./chatDiffStore";
+import { stopChatAgent } from "./stopChatAgent";
 import { hydrateChatStore } from "./chatHistory";
 import {
   error as toastError,
@@ -1501,6 +1502,9 @@ export const useStore = create<AppState>((set, get) => {
           if (t.ptyId) void ptyApi.kill(t.ptyId).catch(() => {});
           void closePopoutWindow(t.id).catch(() => {});
         }
+        for (const chat of Object.values(ws.aiChats)) {
+          void stopChatAgent(chat);
+        }
         await wsApi.saveState(id, {
           layout: ws.layout,
           terminals: {},
@@ -2858,6 +2862,8 @@ export const useStore = create<AppState>((set, get) => {
     },
 
     closeAIChat: (wsId, id) => {
+      const desc = get().loaded[wsId]?.aiChats[id];
+      if (desc) void stopChatAgent(desc);
       updateWs(wsId, (w) => {
         const k = aiKey(id);
         const { [id]: _drop, ...restAi } = w.aiChats;
@@ -2907,7 +2913,11 @@ export const useStore = create<AppState>((set, get) => {
         };
       }),
 
-    setAIChatLifecycle: (wsId, id, state) =>
+    setAIChatLifecycle: (wsId, id, state) => {
+      if (state === "done" || state === "archived") {
+        const desc = get().loaded[wsId]?.aiChats[id];
+        if (desc) void stopChatAgent(desc);
+      }
       updateWs(wsId, (w) => {
         const desc = w.aiChats[id];
         if (!desc) return w;
@@ -2926,7 +2936,8 @@ export const useStore = create<AppState>((set, get) => {
               ? closeAiTabInLayout(w.layout, id)
               : w.layout,
         };
-      }),
+      });
+    },
 
     setAIChatSession: (wsId, id, sessionId) =>
       updateWs(wsId, (w) => {
