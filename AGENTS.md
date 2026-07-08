@@ -58,7 +58,7 @@ Full rationale: `documentation/decisions/003-git-remote-quack-1.0.md`.
 | Global state | `src/store.ts` |
 | AI types / contracts | `src/ai.ts` |
 | Theme & brand tokens | `src/App.css` |
-| Rust commands / CC bridge | `src-tauri/src/lib.rs`, `src-tauri/src/claude_code.rs` |
+| Rust commands / CC bridge | `src-tauri/src/lib.rs`, `src-tauri/src/claude_code.rs`, `src-tauri/src/sysmon.rs`, `src-tauri/src/pty.rs` |
 | Workspace persistence | `src-tauri/src/workspace.rs` |
 | Product name / icons | `index.html`, `src/App.tsx`, `src-tauri/tauri.conf.json`, `src-tauri/icons/` |
 

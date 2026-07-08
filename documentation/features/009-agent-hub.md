@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-04
+last_verified: 2026-07-08
 tags: [agent-hub, agent-status, sessions, notifications, cross-project, workspace-colors, watcher, mount-asymmetry]
 ---
 
@@ -48,12 +48,15 @@ A single headless `AgentHubWatcher` (mounted once in `App.tsx`) derives status f
 | Backend: live-session list | `src-tauri/src/claude_code.rs` → `claude_code_active_sessions` |
 | Backend: permission-resolved event | `src-tauri/src/claude_perm.rs` → `claude_perm_decide` emits `claude:permission-resolved` |
 | Lifecycle + rename persistence | `src/store.ts` → `AIChatDescriptor.{doneAt,archivedAt,titleLocked}`, `renameAIChat`, `setAIChatLifecycle`, `focusAIChat`, `activeAiChatId` |
+| Agent stop on lifecycle | `src/stopChatAgent.ts`, `src/aiStopBus.ts` → `046-process-cleanup.md` |
 | Mount point | `src/App.tsx` (`<AIChatsRail/>` in `.shell-stack`, `<AgentHubWatcher/>`) |
 | Sound asset | `public/sounds/quack.mp3` (from quack-app) |
 
 ### Right-click lifecycle
 
-Context menu on a row (`HubContextMenu`, clones `WorkspaceColorPopover`): **Rinomina** (inline input, sets `titleLocked` so the auto-title effect in `AIChatPanel` stops overwriting it), **Segna come fatto / Riapri** (toggles `doneAt`), **Archivia** (sets `archivedAt`, hides). Persisted on the descriptor in per-workspace `state.json`.
+Context menu on a row (`ContextMenu`, shared viewport-clamped component): **Rename** (inline input, sets `titleLocked` so the auto-title effect in `AIChatPanel` stops overwriting it), **Mark done / Reopen** (toggles `doneAt`), **Archive** (sets `archivedAt`, hides from hub, closes editor tab via `closeAiTabInLayout`). Persisted on the descriptor in per-workspace `state.json`.
+
+**Process cleanup (2026-07-08):** Mark done, Archive, and close chat tab all call `stopChatAgent` — kills the chat's CLI subprocess (`claude_code_kill_session` / `cursor_code_kill_session`) and aborts HTTP streams via `aiStopBus`. **Does not kill workspace PTY terminals** (e.g. a dev server in Terminal 1). See `046-process-cleanup.md`.
 
 ### Session diff subtitles (expanded hub)
 

@@ -142,6 +142,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `027-editor-tab-toolbar.md` — editor tab row under breadcrumb: markdown + mermaid Edit/Split/Preview, git Changes (HEAD vs buffer), Inline/Split diff layout, Save; shared with `FileEditorPane` modals.
   - `042-mermaid-preview.md` — `.mmd` tabs: lazy `mermaid` SVG render, default Preview mode, syntax errors inline; `MermaidPreview`, `editorMermaidView.ts`.
   - `045-html-preview.md` — HTML browser preview: agent drawer + `prev:` virtual tabs + `.html` Edit/Split/Preview; sandboxed iframe (`HtmlPreviewFrame`, `htmlPreview.ts`).
+  - `046-process-cleanup.md` — Task Manager (Quack-scoped process tree, Ctrl+Alt+U); PTY process-group kill on terminal close; agent stop on archive/done/close chat (`stopChatAgent`, `aiStopBus`).
   - `028-opencode-bridge.md` — `opencode serve` sidecar (port 17346), SSE `/global/event`, `providerSessionIds`, lazy startup catalog.
   - `029-session-diff-hub.md` — Agent Hub expanded-row edit subtitles (`Edited foo.ts −N +M`); `chatDiffStore` pub/sub + `summarizeLastTurn`.
   - `030-user-message-bar.md` — user turns as right-aligned markdown cards with hover copy/re-send/branch actions (`UserMessageBar.tsx`).

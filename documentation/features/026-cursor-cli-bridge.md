@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-01
-last_verified: 2026-07-01
+last_verified: 2026-07-08
 tags: [cursor-cli, bridge, subprocess, streaming, stream-json, rust, cursor-agent, lazy-load]
 ---
 
@@ -30,6 +30,7 @@ tags: [cursor-cli, bridge, subprocess, streaming, stream-json, rust, cursor-agen
 | `cursor_code_list_models` | Parse `cursor-agent --list-models` → `{ id, display_name, is_default }[]` |
 | `cursor_code_chat` | Spawn run; emit `cursor-stream:<id>` `{kind: line\|stderr\|end}` |
 | `cursor_code_kill` | `kill_process_tree(pid)` for stream id |
+| `cursor_code_kill_session` | kill by chat-tab `sessionId` (archive / done / close tab) |
 
 ### Data Flow
 User message → `cursorCliProvider.chat()` → `cursor_code_chat` (stdin prompt, flags) → stdout lines → `parseCliStreamJsonObject` → `ChatStreamEvent[]` → `AIChatPanel` stream
@@ -61,3 +62,4 @@ User message → `cursorCliProvider.chat()` → `cursor_code_chat` (stdin prompt
 - **Parser reuse:** stream-json format matches Claude Code closely; parser lives in `cliStreamJson.ts` — extend there, don't duplicate in `cursorCode.ts`.
 - **Smoke test pending:** mission w11 — verify live chat in `npm run tauri dev` after `cursor-agent login`.
 - **Parallel doc:** spawn/kill/process-group patterns mirror `014-claude-code-bridge.md`.
+- **Lifecycle kill:** `cursor_code_kill_session` — same session-id lookup as Claude Code; see `046-process-cleanup.md`.

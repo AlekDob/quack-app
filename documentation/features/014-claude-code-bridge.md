@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-07
+last_verified: 2026-07-08
 tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog, rust, performance]
 ---
 
@@ -28,6 +28,7 @@ tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog
 | `claude_code_attach` | replay buffered events + `ended` for a chat that just refreshed |
 | `claude_code_active_sessions` | chat-session ids whose pid is still in `children` (powers the hub "working" dot) |
 | `claude_code_kill` | stop a run by stream id → `kill_process_tree(pid)` |
+| `claude_code_kill_session` | stop by chat-tab `sessionId` (archive / done / close tab) → lookup stream → `kill_process_tree` |
 | `claude_code_clear_session` | drop buffer + reverse mapping for a chat |
 | `claude_code_list_sessions` | scan `~/.claude/projects/<encoded-cwd>/*.jsonl`; summaries for ⟲ Sessions picker |
 | `claude_code_load_session` | parse one JSONL into `LoadedMessage[]` for resume hydrate |
@@ -60,6 +61,7 @@ Session id ↔ Quack chat UI (chip, terminal resume, picker badges): `044-provid
   Breadcrumb in code: `// Brain: claude-stop-kills-process-group`.
 - **Process-group caveat:** a grandchild that calls `setsid` itself escapes the group; in practice Claude Code's tool subprocesses stay in-group, so this covers the real cases.
 - **`active_sessions` stays honest:** `claude_code_kill` does NOT remove the map entry — the wait thread removes it on actual exit, so the hub's "working" indicator clears only once the process is truly gone.
+- **Lifecycle kill:** `claude_code_kill_session` mirrors `claude_code_kill` but keyed by chat-tab `sessionId` — used when the user archives/marks done/closes a tab without pressing Stop. Scoped to that chat only; workspace terminals are untouched (`046-process-cleanup.md`).
 - **Watchdog handles the upstream hang** (anthropics/claude-code#1920): a run that streams then goes silent > 600s is force-closed via the same group kill so the frontend never spins forever. Shorter values killed legitimate long Bash/deploy runs with no CLI output.
 - The chat permission mode (Auto / Auto-edit / Bypass) is a separate concern — see [015-claude-permission-mode.md](015-claude-permission-mode.md).
 
