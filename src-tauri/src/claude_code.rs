@@ -489,6 +489,13 @@ fn apply_clean_env(cmd: &mut Command) {
     // Avoid claude-cli's auto-update banner stealing the first stdout
     // line (which would break our JSON parser).
     cmd.env("CLAUDE_SKIP_UPDATE_CHECK", "1");
+    // Let `claude -p` wait for background subagents/workflows whose result
+    // is part of the turn output. Default CLI cap is 10 min; 0 = no cap
+    // (our 600s idle watchdog still reaps true hangs).
+    cmd.env("CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS", "0");
+    // If a prior `-p` run ended mid-turn, the next spawn can pick up where
+    // it left off without the user re-sending context.
+    cmd.env("CLAUDE_CODE_RESUME_INTERRUPTED_TURN", "1");
     // Mark this as a Codetta-spawned session so the PreToolUse hook knows
     // to route permission requests to us. The hook we install lives in the
     // workspace's .claude/settings.local.json forever, so it also fires for

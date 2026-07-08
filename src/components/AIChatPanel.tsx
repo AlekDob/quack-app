@@ -45,6 +45,12 @@ import { useStore, parseKey, findPaneById } from "../store";
 import { useEditorState, getActiveEditor } from "../editorState";
 import { setWorkspaceRoot } from "../wsRoot";
 import {
+  BACKGROUND_WAKE_PROMPT,
+  lastTurnLaunchedBackgroundBash,
+  scheduleBackgroundWake,
+  type BackgroundWakeHandle,
+} from "../backgroundWake";
+import {
   getString as lsGetString,
   setString as lsSetString,
 } from "../localStore";
@@ -1024,6 +1030,14 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   // subscribe a SECOND consumer to the same stream and double every
   // tool row and text delta.
   const liveTurnRef = useRef(false);
+  const bgWakeRef = useRef<BackgroundWakeHandle | null>(null);
+
+  const cancelBackgroundWake = useCallback(() => {
+    bgWakeRef.current?.cancel();
+    bgWakeRef.current = null;
+  }, []);
+
+  useEffect(() => () => cancelBackgroundWake(), [cancelBackgroundWake]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -2182,6 +2196,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       pushQueue(text);
       return;
     }
+    cancelBackgroundWake();
     // Mark the live loop as the stream's owner so the attach effect
     // can't subscribe a duplicate consumer (cleared in the finally).
     liveTurnRef.current = true;
@@ -3060,6 +3075,26 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       clearAttachedFiles();
       setAttachedAgents([]);
       setAttachTerminal(false);
+      // Claude Code `-p` kills background Bash ~5s after stdin closes.
+      // If the model said it would "wake up" but the subprocess already
+      // exited, nudge a --resume continuation once the harness is idle.
+      if (
+        selectedProvider === "claude-code" &&
+        sessionId &&
+        text !== BACKGROUND_WAKE_PROMPT
+      ) {
+        const last = conversation[conversation.length - 1];
+        if (lastTurnLaunchedBackgroundBash(last)) {
+          cancelBackgroundWake();
+          bgWakeRef.current = scheduleBackgroundWake({
+            chatSessionId: sessionId,
+            onWake: () => {
+              bgWakeRef.current = null;
+              void sendUserTextRef.current?.(BACKGROUND_WAKE_PROMPT);
+            },
+          });
+        }
+      }
       // Drain any messages the user typed while this turn was in
       // flight. Fires after a microtask so the React state from the
       // finally block has settled.
@@ -3074,6 +3109,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     // change direction now," not "process my queued follow-ups
     // anyway with whatever the agent half-finished."
     clearQueue();
+    cancelBackgroundWake();
     abortRef.current?.abort();
     liveTurnRef.current = false;
     // Immediate UI reset — don't wait for the tool-execution loop or

@@ -18,6 +18,7 @@ tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog
 |------|------|---------|
 | Bridge | `src-tauri/src/claude_code.rs` | spawn, reader/watchdog/wait threads, `kill_process_tree`, all `claude_code_*` commands |
 | State | `claude_code.rs` → `ClaudeCodeState` | `children: Map<streamId, pid>`, `buffers`, `session_streams` |
+| Background wake | `src/backgroundWake.ts` | auto `--resume` nudge when a `-p` turn ends after `run_in_background` Bash — see [048-background-task-wake.md](048-background-task-wake.md) |
 | Dep | `src-tauri/Cargo.toml` | `[target.'cfg(unix)'.dependencies] libc` |
 
 ### Tauri commands
@@ -63,6 +64,7 @@ Session id ↔ Quack chat UI (chip, terminal resume, picker badges): `044-provid
 - **`active_sessions` stays honest:** `claude_code_kill` does NOT remove the map entry — the wait thread removes it on actual exit, so the hub's "working" indicator clears only once the process is truly gone.
 - **Lifecycle kill:** `claude_code_kill_session` mirrors `claude_code_kill` but keyed by chat-tab `sessionId` — used when the user archives/marks done/closes a tab without pressing Stop. Scoped to that chat only; workspace terminals are untouched (`046-process-cleanup.md`).
 - **Watchdog handles the upstream hang** (anthropics/claude-code#1920): a run that streams then goes silent > 600s is force-closed via the same group kill so the frontend never spins forever. Shorter values killed legitimate long Bash/deploy runs with no CLI output.
+- **Background tasks in `-p` mode:** full design in [048-background-task-wake.md](048-background-task-wake.md). Summary: plain `run_in_background` Bash shells are stopped ~5s after the final result once stdin closes; subagents are waited on with `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` + `CLAUDE_CODE_RESUME_INTERRUPTED_TURN=1` set in `apply_clean_env`. Frontend auto-resume via `backgroundWake.ts` when Bash background ends with no live subprocess.
 - The chat permission mode (Auto / Auto-edit / Bypass) is a separate concern — see [015-claude-permission-mode.md](015-claude-permission-mode.md).
 
 ### Per-turn knobs (effort, permission mode, thinking)
@@ -76,3 +78,12 @@ Forwarded from `AIChatPanel` → `claudeCodeProvider.chat()` → `claude_code_ch
 | **Extended thinking** | `ccThinking: boolean \| null` | passed when set | `null` = CLI auto; per session `ChatSession.ccThinking`. |
 
 `/effort` slash command and composer `Ctrl+1–5` both write `ccEffort` + session row. `/effort off` resets to **medium**, not CLI default.
+
+### Spawn environment (`apply_clean_env`)
+
+Set on every `claude_code_chat` spawn (in addition to `NO_COLOR`, `CI`, `CODETTA_PERM_HOOK`, …):
+
+| Env var | Value | Role |
+|---|---|---|
+| `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` | `0` | Uncapped wait for background subagents in `-p` (see 048) |
+| `CLAUDE_CODE_RESUME_INTERRUPTED_TURN` | `1` | Auto-continue if prior headless run ended mid-turn |

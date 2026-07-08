@@ -144,6 +144,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `045-html-preview.md` — HTML browser preview: agent drawer + `prev:` virtual tabs + `.html` Edit/Split/Preview; sandboxed iframe (`HtmlPreviewFrame`, `htmlPreview.ts`).
   - `046-process-cleanup.md` — Task Manager (Quack-scoped process tree, Ctrl+Alt+U); PTY process-group kill on terminal close; agent stop on archive/done/close chat (`stopChatAgent`, `aiStopBus`).
   - `047-dev-build-indicator.md` — dev-only Dock icon + in-app DEV badge/border/title when running `npm run tauri dev`; debug `build.rs` icon swap via `TAURI_CONFIG`.
+  - `048-background-task-wake.md` — Claude Code `-p` background Bash/subagent wake: spawn env (`PRINT_BG_WAIT_CEILING_MS`, `RESUME_INTERRUPTED_TURN`) + `backgroundWake.ts` auto `--resume` nudge when headless turn ends idle.
   - `028-opencode-bridge.md` — `opencode serve` sidecar (port 17346), SSE `/global/event`, `providerSessionIds`, lazy startup catalog.
   - `029-session-diff-hub.md` — Agent Hub expanded-row edit subtitles (`Edited foo.ts −N +M`); `chatDiffStore` pub/sub + `summarizeLastTurn`.
   - `030-user-message-bar.md` — user turns as right-aligned markdown cards with hover copy/re-send/branch actions (`UserMessageBar.tsx`).
