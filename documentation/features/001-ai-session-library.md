@@ -3,20 +3,20 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-07
+last_verified: 2026-07-08
 tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, workspace, zustand, persistence]
 ---
 
 ## AI Session Library
-**Purpose:** The list of AI chat sessions ("agents") per workspace and their persistence. Surfaced in two places — the right-side rail (editor mode) and the sessions list (Agent Mode). Each session is an open AI conversation that can read/edit the workspace. Historical transcripts persist separately to localStorage.
-**Stack:** React 19, TypeScript strict, Zustand, Tauri v2 invoke, localStorage
+**Purpose:** The list of AI chat sessions ("agents") per workspace and their persistence. Surfaced in two places — the right-side rail (editor mode) and the sessions list (Agent Mode). Each session is an open AI conversation that can read/edit the workspace. Historical transcripts persist on disk via Rust — see `043-chat-transcript-persistence.md`.
+**Stack:** React 19, TypeScript strict, Zustand, Tauri v2 invoke, disk-backed `chat_store.rs`
 
 ### Three distinct concepts (do not conflate)
 | Concept | What it is | Where it lives | Persistence |
 |---------|-----------|----------------|-------------|
 | Workspace | An open project/folder | `store.ts` (`recent`, `openIds`, `activeId`, `loaded`) | Rust `workspace.rs` → `workspaces.json` + per-ws `state.json` |
 | AIChatDescriptor | An OPEN chat (a live agent) shown in the lists | `WorkspaceData.aiChats` | inside the workspace `state.json` |
-| ChatSession | The HISTORICAL transcript of one chat | `chatHistory.ts` | localStorage per-session keys — see `043-chat-transcript-persistence.md` |
+| ChatSession | The HISTORICAL transcript of one chat | `chatHistory.ts` + `chatStoreCache.ts` | Rust `chat_store.rs` → `~/Library/Application Support/codetta/chats/{wsId}/` |
 
 ### Files
 | Type | Path | Exports/Purpose |
@@ -28,21 +28,25 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | Component | `src/components/AIChatPanel.tsx` | The chat panel itself; owns runtime state (streaming, tools, todos) per session |
 | Store/State | `src/store.ts` | `AIChatDescriptor`, `WorkspaceData.aiChats`, `addAIChat`, `closeAIChat`, `reorderAIChat` |
 | Store/State | `src/aiTaskStore.ts` | Module-level task store keyed by chatId; `publishTasks`/`getTasks`/`subscribeTasks` |
-| Service | `src/chatHistory.ts` | `ChatSession` + `loadSession`/`loadSessions`/`saveSession`/`patchSession`/`deleteSession` |
+| Service | `src/chatHistory.ts` | `ChatSession` + sync load/save API (cache-backed) |
+| Service | `src/chatStoreCache.ts` | Hydrate from disk, legacy localStorage migrate, async flush |
+| Service | `src/chatProviderRecovery.ts` | Thin-row recovery from CLI on-disk transcripts |
 | Service | `src/chatPersistFlush.ts` | Flush registry — all mounted panels save before chat switch |
 | Service | `src/composerDraft.ts` | `ChatComposerDraft`, `mergeComposerDraft`, `mergeSessionKnobs` — via `patchSession` |
 | Service | `src/providerSession.ts` | `providerSessionIds` read/write; legacy `claudeSessionId` migration |
-| Service | `src/providerSessionChrome.tsx` | Session id chip + CC linked-title helper (feature 044) |
+| Service | `src/providerSessionChrome.tsx` | Session id chip + multi-provider linked-title maps (feature 044) |
 | Service | `src/providerSessionTerminal.ts` | `claude --resume` in bottom PTY (feature 044) |
 | Model/Type | `src/ai.ts` | `ChatMessage`, `ToolCall`, `ChatStreamEvent` (streaming contract) |
 | Service (Rust) | `src-tauri/src/workspace.rs` | `WorkspaceMeta`, `WorkspacesIndex`, load/save workspace state |
+| Service (Rust) | `src-tauri/src/chat_store.rs` | Disk-backed `ChatSession` rows + `provider-links.json` |
+| Service (Rust) | `src-tauri/src/provider_sessions.rs` | Unified CLI session list/load (CC, Cursor, OpenCode) |
 | Service | `src/ipc.ts` | `workspaces.load/save/loadState/saveState` IPC bridge |
 
 ### Data Flow
 - **Open a session:** `addAIChat(wsId)` → new `AIChatDescriptor` in `ws.aiChats` (createdAt = max+1) → persisted in `state.json` → appears in both lists
 - **Render the lists:** `Object.values(ws.aiChats).sort(by createdAt)` → `AIChatsRail` (editor) / `AgentModeShell` sessions (agent)
 - **Per-chat badge:** `chat.model` → `modelBadge()` → 2-char provider chip (CC/CU/OC/Cl/AI/OL)
-- **Transcript load/save:** `AIChatPanel` ↔ `chatHistory.ts` via `descriptor.sessionId`; atomic per-session keys + flush on switch (`043-chat-transcript-persistence.md`); composer knobs + draft via `patchSession` — see `040-per-session-composer-state.md`
+- **Transcript load/save:** boot `hydrateChatStore(wsId)` → `AIChatPanel` ↔ `chatHistory.ts` via `descriptor.sessionId`; disk flush + flush on switch (`043`); composer via `patchSession` (`040`)
 - **Live tasks:** `AIChatPanel` `publishTasks(chatId, todos)` → `aiTaskStore` → `AgentTasks` in `AgentModeShell`
 - **Reorder:** drag in `AIChatsRail` → `reorderAIChat` rewrites `createdAt` (sort key, no separate order list)
 
@@ -82,6 +86,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | `composer` | `ChatComposerDraft?` | Draft input, queue, attach toggles, staged images |
 
 ### Config
-- `MAX_SESSIONS`: 30 transcripts per workspace (`chatHistory.ts` index cap)
-- localStorage keys: `lcp.ollama.history.{wsId}.s.{sessionId}` + `.__idx__` (legacy monolithic array auto-migrated)
-- Audit: `node scripts/audit-chat-persistence.mjs`
+- `MAX_SESSIONS`: 30 transcripts per workspace (`chat_store.rs` / `chatHistory.ts`)
+- Disk paths: `~/Library/Application Support/codetta/chats/{wsId}/{sessionId}.json`
+- Legacy `localStorage` keys auto-migrated on first hydrate (see `043`)
+- Audit: `node scripts/audit-chat-persistence.mjs` (localStorage only — disk inspect manually until script updated)

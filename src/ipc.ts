@@ -177,6 +177,38 @@ export interface LoadedSubagent {
   messages: LoadedMessage[];
 }
 
+export interface CliSessionSummary {
+  provider: string;
+  id: string;
+  title: string;
+  preview: string;
+  cost_usd: number;
+  turn_count: number;
+  last_turn_at_ms: number;
+}
+
+export const providerSessions = {
+  listSessions: (cwd: string, provider: string) =>
+    invoke<CliSessionSummary[]>("provider_list_sessions", { provider, cwd }),
+  loadSession: (cwd: string, provider: string, sessionId: string) =>
+    invoke<LoadedMessage[]>("provider_load_session", {
+      provider,
+      cwd,
+      sessionId,
+    }),
+};
+
+export const chatStore = {
+  loadWorkspace: (wsId: string) =>
+    invoke<{ ids: string[]; sessions: unknown[] }>("chat_store_load_workspace", {
+      wsId,
+    }),
+  save: (wsId: string, session: unknown) =>
+    invoke<void>("chat_store_save", { wsId, session }),
+  delete: (wsId: string, sessionId: string) =>
+    invoke<void>("chat_store_delete", { wsId, sessionId }),
+};
+
 export const claudeCode = {
   /** List on-disk Claude Code sessions for the given workspace cwd. */
   listSessions: (cwd: string) =>

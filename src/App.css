@@ -9503,6 +9503,32 @@ body.ws-dragging * {
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
   padding: 4px;
 }
+.ai-cc-sessions-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px 4px 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.ai-cc-sessions-filter {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.ai-cc-sessions-filter:hover {
+  color: var(--fg);
+  background: var(--bg-hi);
+}
+.ai-cc-sessions-filter.active {
+  color: var(--fg);
+  background: var(--bg-hi);
+  border-color: var(--border-hi);
+}
 .ai-cc-sessions-empty {
   padding: 16px;
   font-size: 12px;

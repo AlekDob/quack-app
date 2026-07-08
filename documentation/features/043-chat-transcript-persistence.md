@@ -2,131 +2,165 @@
 type: feature
 project: quack-desktop
 created: 2026-07-06
-last_verified: 2026-07-06
-tags: [chat, persistence, localStorage, transcript, multitasking, reliability, audit]
+last_verified: 2026-07-08
+tags: [chat, persistence, disk, rust, transcript, multitasking, reliability, provider-links, audit]
 ---
 
-# 043 — Chat transcript persistence (atomic per-session storage)
+# 043 — Chat transcript persistence (disk-backed per-session storage)
 
 **Purpose:** Keep each workspace chat's message history durable across tab
 switches, parallel multitasking agents, streaming turns, and app reload —
-without read-modify-write races or silent `localStorage` failures.
+without read-modify-write races, WebKit `localStorage` quota failures, or silent
+save drops.
 
 ## Problem solved
 
 Audit on production data (Jul 2026) found **10 open tabs** across 6 workspaces
 with missing or empty transcripts while `state.json` still listed the tab.
-Root causes:
+Root causes (v1/v2):
 
 | Symptom | Root cause |
 |---|---|
-| Messages vanish after reload / switch | `saveSession` rewrote one **monolithic** JSON array per workspace; two mounted `AIChatPanel`s saving in parallel → last write wins |
-| Intermittent saves | WebKit `localStorage` WAL grew to **~7 GB** rewriting a 4+ MB Virgilio blob; `setJson` failed silently |
-| Partial turn lost on switch | Assistant text lived in `streaming` state until turn end; switch did not flush |
+| Messages vanish after reload / switch | Monolithic `localStorage` array; parallel `AIChatPanel`s → last write wins |
+| Intermittent saves | WebKit WAL bloat rewriting 4+ MB blobs; `setJson` failed at ~5 MB quota |
+| Partial turn lost on switch | Assistant text in `streaming` until turn end; switch did not flush |
 | Composer flush wiped messages | `mergeComposerDraft` created `{ messages: [] }` when no row existed yet |
-| Tab open, chat empty | Descriptor in `state.json` with no matching `ChatSession` row (eviction, failed save, or never persisted) |
+| Tab open, chat empty | Descriptor in `state.json` with no matching `ChatSession` row |
 
-## Storage model (v2)
+**v3 fix (Jul 2026):** move transcripts to **Rust disk storage** (no quota).
+Auto-migrate from legacy `localStorage` on first boot hydrate per workspace.
+
+## Storage model (v3 — current)
+
+| Path | Contents |
+|---|---|
+| `~/Library/Application Support/codetta/chats/{wsId}/__idx__.json` | `{ ids: string[] }` — session ids newest-first, max 30 |
+| `~/Library/Application Support/codetta/chats/{wsId}/{sessionId}.json` | Full `ChatSession` row (messages, knobs, composer, `providerSessionIds`, …) |
+| `~/Library/Application Support/codetta/chats/provider-links.json` | Reverse index: `"provider:cliSessionId"` → `{ ws_id, quack_session_id, title }` |
+
+Each `chat_store_save` writes **one** session file atomically (`atomic::write`)
++ updates the small index + upserts provider link rows.
+
+### Legacy (v1/v2 — auto-migrated)
 
 | Key | Contents |
 |---|---|
-| `lcp.ollama.history.{wsId}` | **Legacy** — single JSON array; auto-migrated on first access |
-| `lcp.ollama.history.{wsId}.__idx__` | `{ ids: string[] }` — session ids newest-first, max 30 |
-| `lcp.ollama.history.{wsId}.s.{sessionId}` | Full `ChatSession` row (messages, knobs, composer, …) |
+| `lcp.ollama.history.{wsId}` | Monolithic JSON array |
+| `lcp.ollama.history.{wsId}.__idx__` | Per-session index in `localStorage` |
+| `lcp.ollama.history.{wsId}.s.{sessionId}` | Per-session row in `localStorage` |
 
-Each `saveSession` writes **one** session key + updates the small index —
-parallel chats no longer stomp each other.
+On first `hydrateChatStore(wsId)`: if disk is empty, read legacy keys, write each
+session via `chat_store_save`, then `remove` legacy keys.
 
-### Migration
+### In-memory cache (frontend)
 
-`migrateLegacyIfNeeded(wsId)` runs once per workspace per app boot:
-
-1. Read legacy array at `lcp.ollama.history.{wsId}`
-2. Write each session to `.s.{id}`
-3. Build `.__idx__`, evict beyond `MAX_SESSIONS` (30)
-4. `remove` legacy key
-
-No user action required — first `loadSessions` / `saveSession` triggers it.
+`chatStoreCache.ts` holds a per-workspace `Map<sessionId, ChatSession>` hydrated
+from disk at boot. `chatHistory.ts` APIs remain **sync** against this cache;
+disk writes are async fire-and-forget with failure toast via `registerChatSaveFailed`.
 
 ## Files
 
 | File | Role |
 |---|---|
-| `src/chatHistory.ts` | `loadSession`, `loadSessions`, `saveSession` → `boolean`, `patchSession`, `deleteSession`, legacy migrate |
-| `src/chatPersistFlush.ts` | Module-level registry; `flushAllChatPersist()` before chat switch |
-| `src/chatSwitch.ts` | `pulseChatSwitch()` calls `flushAllChatPersist()` then UI veil |
-| `src/composerDraft.ts` | `mergeComposerDraft` / `mergeSessionKnobs` → `patchSession` (never clobber messages) |
+| `src-tauri/src/chat_store.rs` | `chat_store_load_workspace`, `chat_store_save`, `chat_store_delete`, `chat_store_lookup_link`, `chat_store_all_links` |
+| `src-tauri/src/provider_sessions.rs` | Unified CLI list/load — see `044-provider-session-bridge.md` |
+| `src-tauri/src/session_jsonl.rs` | Shared JSONL parser (CC + Cursor agent-transcripts) |
+| `src-tauri/src/provider_path.rs` | `encode_project_path` — same slug as CC/Cursor on-disk dirs |
+| `src/chatStoreCache.ts` | Hydrate, migrate, in-memory cache, async disk flush |
+| `src/chatHistory.ts` | Public API: `loadSession`, `saveSession`, `patchSession`, `deleteSession` |
+| `src/chatProviderRecovery.ts` | Hydrate thin Quack rows from CLI on-disk transcripts (all agentic providers) |
+| `src/chatCcRecovery.ts` | Thin wrapper → `chatProviderRecovery` (CC-only compat) |
+| `src/chatPersistFlush.ts` | `flushAllChatPersist()` before chat switch |
+| `src/chatSwitch.ts` | `pulseChatSwitch()` calls flush then UI veil |
+| `src/composerDraft.ts` | `mergeComposerDraft` / `mergeSessionKnobs` → `patchSession` |
 | `src/components/AIChatPanel.tsx` | Register flush, streaming checkpoint, save-failure toast |
-| `scripts/audit-chat-persistence.mjs` | Offline audit: open tabs vs localStorage rows |
+| `src/store.ts` | `hydrate()` calls `hydrateChatStore(wsId)` for every open workspace |
+| `scripts/audit-chat-persistence.mjs` | Offline audit — **still reads WebKit localStorage**; use disk paths above for v3 rows until script is updated |
 
 ## API
 
+### TypeScript (sync, cache-backed)
+
 ```ts
+hydrateChatStore(wsId) → Promise<void>   // boot; migrates legacy localStorage once
 loadSession(wsId, sessionId) → ChatSession | undefined
-loadSessions(wsId) → ChatSession[]          // sorted by index
-saveSession(wsId, session) → boolean        // false = quota / disabled storage
-patchSession(wsId, sessionId, partial) → boolean  // merge; preserves messages if omitted
+loadSessions(wsId) → ChatSession[]
+saveSession(wsId, session) → boolean      // cache always ok; disk fail → toast
+patchSession(wsId, sessionId, partial) → boolean
 deleteSession(wsId, id) → void
+```
+
+### Rust (Tauri invoke)
+
+```ts
+chat_store_load_workspace(wsId) → { ids, sessions }
+chat_store_save(wsId, session) → void
+chat_store_delete(wsId, sessionId) → void
+chat_store_lookup_link(provider, cliSessionId) → ProviderLink | null
 ```
 
 ## Persist triggers (`AIChatPanel`)
 
 | When | What |
 |---|---|
-| `messages` change | `persistTranscriptRef()` → immediate `saveSession` |
+| `messages` change | `persistTranscriptRef()` → `saveSession` → disk |
 | Streaming active | Every **5s** checkpoint (partial assistant appended) |
 | Chat switch (`pulseChatSwitch`) | `flushAllChatPersist()` on all mounted panels |
 | Panel unmount | `registerChatPersist` cleanup flushes |
 | `beforeunload` | Partial assistant + messages |
 | `mergeComposerDraft` / knobs | `patchSession` only |
 
-Save failure → toast (max once per 30s):
+Save failure → toast (max once per 30s via `registerChatSaveFailed`):
 
-> Chat not saved — storage may be full. Copy important messages or restart Quack.
+> Chat not saved — disk write failed. Copy important messages or restart Quack.
 
 ## Three concepts (unchanged)
 
 See `001-ai-session-library.md`:
 
 - **AIChatDescriptor** — tab in `state.json` (title, `sessionId` pointer)
-- **ChatSession** — transcript in localStorage (per-session key)
-- **Claude Code `.jsonl`** — separate on-disk log under `~/.claude/projects/`; not auto-synced to Quack UI
+- **ChatSession** — transcript on disk (`chats/{wsId}/{sessionId}.json`)
+- **CLI on-disk session** — authoritative agentic transcript per provider; linked via `providerSessionIds` — see `044`
 
-A tab can exist without a transcript row; Quack shows an empty pane. Recovery
-from CC JSONL is a separate future feature.
+A tab can exist without a transcript row; Quack shows an empty pane.
 
-## Audit script
+## Recovery from CLI on-disk transcripts
 
-```bash
-node scripts/audit-chat-persistence.mjs
+When a `ChatSession` has a provider id but **fewer assistant messages than user
+messages** (incomplete Quack row), `AIChatPanel` auto-calls
+`recoverSessionFromAnyProvider` on mount / history open:
+
+1. For each linked agentic provider (`claude-code`, `cursor-cli`; OpenCode TBD)
+2. `provider_load_session(cwd, provider, cliId)` reads CLI JSONL / transcript
+3. If loaded count > saved count → replace messages, `saveSession`, toast
+
+Files: `src/chatProviderRecovery.ts`, `src-tauri/src/provider_sessions.rs`.
+
+## Boot hydrate
+
+`store.hydrate()` after workspace disk load:
+
+```
+Promise.all(survivingIds.map(hydrateChatStore))
 ```
 
-Reads WebKit `localStorage` sqlite + `~/Library/Application Support/codetta/`
-workspace `state.json`. Reports `OK` / `MISSING` / `EMPTY` per open tab.
-Supports legacy array and v2 per-session keys.
-
-## Recovery from Claude Code JSONL
-
-When a `ChatSession` has a `claude-code` provider id but **fewer assistant
-messages than user messages** (incomplete Quack row), `AIChatPanel` auto-calls
-`recoverSessionFromCc` on mount / history open:
-
-1. `claudeCode.loadSession(cwd, ccSessionId)` reads `~/.claude/projects/.../*.jsonl`
-2. If loaded count > saved count → replace messages, `saveSession`, toast
-
-File: `src/chatCcRecovery.ts`. Does not run when transcript is already complete.
+Splash phase: **"Loading chat history…"** (~92% progress).
 
 ## Gotchas
 
-- **`saveSession` return value** — callers must check; failures are not thrown.
-- **WAL bloat** — per-session keys shrink each write; restart Quack to checkpoint a bloated WAL from the legacy era.
-- **MAX_SESSIONS (30)** — evicts oldest **transcript** ids from index + deletes `.s.{id}` keys; open tabs pointing at evicted ids open empty.
-- **Do not** use monolithic array writes again — always per-session keys.
-- **Agent Mode** mounts one `AIChatPanel` per open chat (CSS visibility); multiple panels can save concurrently — v2 storage is required.
+- **Disk is source of truth** — `localStorage` is legacy only; do not add new chat keys there.
+- **`saveSession` return value** — always `true` for cache; disk failures surface via toast callback.
+- **MAX_SESSIONS (30)** — evicts oldest transcript files + provider-link cleanup for evicted rows.
+- **Do not** use monolithic array writes — always per-session files.
+- **Agent Mode** mounts one `AIChatPanel` per open chat; parallel saves are safe (separate files).
+- **Vite-only dev** (`npm run dev` without Tauri) — `hydrateChatStore` falls back to legacy `localStorage` read.
+- **Audit script** — `audit-chat-persistence.mjs` predates v3; inspect `~/Library/Application Support/codetta/chats/` for ground truth.
 
 ## Related
 
 - Session library model: `001-ai-session-library.md`
+- Provider session bridge: `044-provider-session-bridge.md`
 - Composer / knobs on same row: `040-per-session-composer-state.md`
+- Startup hydrate: `032-startup-hydration.md`
 - Chat switch veil: `chatSwitch.ts`, `ChatSwitchVeil.tsx`, `useChatSwitching.ts`
-- Diary: `documentation/diary/2026-07-06.md` (18:25)
+- Diary: `documentation/diary/2026-07-06.md` (v2), `2026-07-08.md` (v3 disk)

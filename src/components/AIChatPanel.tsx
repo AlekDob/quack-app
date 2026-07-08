@@ -78,7 +78,7 @@ import { openHtmlPreviewTab } from "./HtmlPreviewPane";
 import { resolveChatFilePath } from "../chatFileLinks";
 import { PermissionCard, PrivacyBanner } from "./aiInlineCards";
 import {
-  ClaudeSessionsButton,
+  ProviderSessionsButton,
   HeaderMenu,
   TimelineScrubber,
   TodosCard,
@@ -125,9 +125,10 @@ import {
 } from "../chatHistory";
 import { registerChatPersist } from "../chatPersistFlush";
 import {
-  recoverSessionFromCc,
+  recoverSessionFromAnyProvider,
   persistRecoveredSession,
-} from "../chatCcRecovery";
+} from "../chatProviderRecovery";
+import { registerChatSaveFailed } from "../chatStoreCache";
 import {
   draftFromSession,
   mergeComposerDraft,
@@ -140,9 +141,10 @@ import {
   writeProviderSessionIds,
 } from "../providerSession";
 import {
-  ccLinkedChatTitles,
+  allProviderLinkedTitles,
   ProviderSessionChip,
 } from "../providerSessionChrome";
+import { providerSessions } from "../ipc";
 import { resumeProviderInTerminal } from "../providerSessionTerminal";
 import type { ProviderId } from "../providers/types";
 import {
@@ -165,7 +167,6 @@ import {
   search,
   pty,
   fs,
-  claudeCode as claudeCodeIpc,
 } from "../ipc";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { UserMessageBar } from "./UserMessageBar";
@@ -582,17 +583,17 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     }
     setTodos(list.length > 0 ? list : null);
   };
-  const tryCcRecover = useCallback(
+  const tryProviderRecover = useCallback(
     async (row: ChatSession, gen: number) => {
-      const recovered = await recoverSessionFromCc(root, row);
+      const recovered = await recoverSessionFromAnyProvider(root, row);
       if (!recovered || gen !== ccHydrateGenRef.current) return;
-      const msgs = cleanStaleToolMessages(recovered.messages);
+      const msgs = cleanStaleToolMessages(recovered.session.messages);
       setMessages(msgs);
       rebuildChecklist(msgs);
-      persistRecoveredSession(wsId, { ...recovered, messages: msgs });
+      persistRecoveredSession(wsId, { ...recovered.session, messages: msgs });
       setSessions(loadSessions(wsId));
       toastInfo(
-        `Restored ${msgs.length} messages from Claude Code session`,
+        `Restored ${msgs.length} messages from ${recovered.provider} session`,
       );
     },
     [root, wsId],
@@ -728,9 +729,13 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     if (Date.now() - lastSaveWarnAt.current < 30_000) return;
     lastSaveWarnAt.current = Date.now();
     toastError(
-      "Chat not saved — storage may be full. Copy important messages or restart Quack.",
+      "Chat not saved — disk write failed. Copy important messages or restart Quack.",
     );
   }, []);
+  useEffect(() => {
+    registerChatSaveFailed(warnSaveFailed);
+    return () => registerChatSaveFailed(() => {});
+  }, [warnSaveFailed]);
   const applyComposerDraft = useCallback(
     (draft: ChatComposerDraft) => {
       setInput(draft.input ?? "");
@@ -1359,7 +1364,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
           setSelected(q);
         }
         const gen = ++ccHydrateGenRef.current;
-        void tryCcRecover(found, gen);
+        void tryProviderRecover(found, gen);
       } else {
         setMessages([]);
       }
@@ -1401,7 +1406,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       setCcPermMode(knobs.permMode);
       applyComposerDraft({});
     }
-  }, [wsId, aiChatId, onHydrated, applyComposerDraft, tryCcRecover]);
+  }, [wsId, aiChatId, onHydrated, applyComposerDraft, tryProviderRecover]);
 
   // When sessionId changes inside a tabbed panel (e.g. via /new or the
   // history dropdown), persist it back to the descriptor so a reload
@@ -3258,7 +3263,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     setHistoryOpen(false);
     if (s.model) setSelected(s.model);
     const gen = ++ccHydrateGenRef.current;
-    void tryCcRecover(s, gen);
+    void tryProviderRecover(s, gen);
   };
 
   const runInActiveTerminal = async (text: string) => {
@@ -3789,8 +3794,8 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     anthropic: { label: "anthropic", color: "#d97757" },
   };
 
-  const ccLinkedTitles = useMemo(
-    () => ccLinkedChatTitles(sessions),
+  const providerLinkedTitles = useMemo(
+    () => allProviderLinkedTitles(sessions),
     [sessions],
   );
 
@@ -3840,41 +3845,48 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
             cwd={root}
           />
         )}
-        {parsed?.providerId === "claude-code" && (
-          <ClaudeSessionsButton
+        {parsed && isAgenticProviderId(parsed.providerId) && (
+          <ProviderSessionsButton
             cwd={root}
-            currentSessionId={claudeSessionId}
-            linkedTitles={ccLinkedTitles}
-            onOpenInTerminal={(id) =>
-              resumeProviderInTerminal(wsId, root, "claude-code", id)
+            activeProvider={parsed.providerId}
+            currentIds={providerSessionIds}
+            linkedTitles={providerLinkedTitles}
+            onOpenInTerminal={(p, id) =>
+              resumeProviderInTerminal(wsId, root, p, id)
             }
-            onResume={async (id) => {
+            onResume={async (provider, id) => {
               setProviderSessionIds((prev) =>
-                setProviderSessionId(prev, "claude-code", id),
+                setProviderSessionId(prev, provider, id),
               );
               resetTurnTransients();
-              // Hydrate the full prior transcript from the on-disk
-              // JSONL so the user sees what they're continuing from,
-              // not an empty pane. Best-effort — show a toast + start
-              // empty if the loader fails (the next user turn still
-              // resumes server-side via --resume).
+              if (provider === "opencode-cli") {
+                setMessages([]);
+                toastInfo(
+                  "Resumed OpenCode session — your next message continues the ses_* thread",
+                );
+                return;
+              }
               try {
-                const loaded = await claudeCodeIpc.loadSession(root, id);
+                const loaded = await providerSessions.loadSession(
+                  root,
+                  provider,
+                  id,
+                );
                 const hydrated: ChatMessage[] = loaded.map((m) => ({
-                  role: m.role,
+                  role: m.role as ChatMessage["role"],
                   content: m.content,
                   tool_calls: m.tool_calls,
                   tool_results: m.tool_results,
                 }));
                 setMessages(hydrated);
                 toastInfo(
-                  `Resumed Claude Code session — ${hydrated.length} message${hydrated.length === 1 ? "" : "s"} restored`,
+                  `Resumed ${provider} session — ${hydrated.length} message${hydrated.length === 1 ? "" : "s"} restored`,
                 );
               } catch (err) {
-                console.warn("loadSession failed", err);
+                console.warn("provider loadSession failed", err);
                 setMessages([]);
                 toastInfo(
-                  "Resumed Claude Code session — your next message continues from where you left off",
+                  `Resumed ${provider} session — your next message continues from where you left off`,
                 );
               }
             }}

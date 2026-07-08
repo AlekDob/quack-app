@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-03
-last_verified: 2026-07-03
+last_verified: 2026-07-08
 tags: [startup, splash, hydrate, workspace, performance, parallel-load]
 ---
 
@@ -18,12 +18,13 @@ tags: [startup, splash, hydrate, workspace, performance, parallel-load]
 | Component | `src/components/Splash.tsx` | Brand splash while booting |
 | Store | `src/store.ts` | `hydrate()`, `loadWorkspaceFromDisk()`, `hydrateProgress` |
 | Service (Rust) | `src-tauri/src/workspace.rs` | `workspaces.json` index + per-workspace `state.json` |
+| Store | `src/chatStoreCache.ts` | `hydrateChatStore(wsId)` — disk chat transcripts + legacy migrate (`043`) |
 | Store | `src/modelDiscoveryStore.ts` | `prefetchModelDiscovery()` — see `031-model-discovery-cache.md` |
 
 ### Data Flow
 **Boot:** `MainApp` mount → `bootstrapTheme` + `startFsBusOnce` + `installNativeMenu` → `prefetchModelDiscovery()` ∥ `hydrate()` → splash until `hydrated && splashMinElapsed(700ms)` → render shell
 
-**Hydrate:** `wsApi.load()` index → `ptyApi.listSessions()` live PTYs → `Promise.all(requestedOpen.map(loadWorkspaceFromDisk))` → merge `loaded` + `openIds` + `activeId` → `hydrated: true`
+**Hydrate:** `wsApi.load()` index → `ptyApi.listSessions()` live PTYs → `Promise.all(requestedOpen.map(loadWorkspaceFromDisk))` → `Promise.all(survivingIds.map(hydrateChatStore))` (chat transcripts from disk + legacy migrate) → merge `loaded` + `openIds` + `activeId` → `hydrated: true`
 
 **Per workspace disk load:** `loadState` → normalize layout + aiChats + terminals → parallel `readFile` for open editor tabs → prune dead tabs → return `WorkspaceData`
 

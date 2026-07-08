@@ -1,7 +1,11 @@
 mod atomic;
+mod chat_store;
 mod claude_code;
 mod cursor_code;
 mod opencode_sidecar;
+mod provider_path;
+mod provider_sessions;
+mod session_jsonl;
 mod claude_mcp;
 mod claude_perm;
 mod claude_sessions;
@@ -107,6 +111,13 @@ pub fn run() {
             workspace::workspaces_save,
             workspace::workspace_state_load,
             workspace::workspace_state_save,
+            chat_store::chat_store_load_workspace,
+            chat_store::chat_store_save,
+            chat_store::chat_store_delete,
+            chat_store::chat_store_lookup_link,
+            chat_store::chat_store_all_links,
+            provider_sessions::provider_list_sessions,
+            provider_sessions::provider_load_session,
             watcher::fs_watch_start,
             watcher::fs_watch_stop,
             git::git_is_repo,

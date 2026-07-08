@@ -19,6 +19,7 @@ import {
 } from "./htmlPreview";
 import type { ToolCall } from "./ai";
 import { clearChatDiff } from "./chatDiffStore";
+import { hydrateChatStore } from "./chatHistory";
 import {
   error as toastError,
   errMsg,
@@ -1402,6 +1403,9 @@ export const useStore = create<AppState>((set, get) => {
       if (activeId && !loaded[activeId]) {
         activeId = survivingIds[0] ?? null;
       }
+
+      setProg("Loading chat history…", 92, 100);
+      await Promise.all(survivingIds.map((id) => hydrateChatStore(id)));
 
       setProg("Reattaching terminals…", 95, 100);
       set({

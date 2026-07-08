@@ -87,7 +87,7 @@ providerSessionIds?: Partial<Record<ProviderId, string>>;
 
 On provider switch: flatten Quack messages to new provider; keep stored ids for return visits.
 
-**UI (feature 044):** after the first turn, the chat header shows a copyable provider session chip (`CC`/`CU`/`OC`) and optional **Open in terminal** (`claude --resume` / `cursor-agent --resume`). Claude Code's ⟲ Sessions picker lists on-disk JSONL sessions with "This chat" / linked Quack title badges.
+**UI (feature 044):** after the first turn, the chat header shows a copyable provider session chip (`CC`/`CU`/`OC`) and optional **Open in terminal** (`claude --resume` / `cursor-agent --resume`). The ⟲ Sessions picker lists on-disk sessions for **all agentic providers** (filter All/CC/CU/OC) with "This chat" / linked Quack title badges. Rust: `provider_list_sessions` / `provider_load_session` in `provider_sessions.rs`; disk index in `chat_store.rs` (`provider-links.json`).
 
 ---
 

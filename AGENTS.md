@@ -52,7 +52,9 @@ Full rationale: `documentation/decisions/003-git-remote-quack-1.0.md`.
 |---|---|
 | Chat / streaming / tool calls | `src/components/AIChatPanel.tsx`, `src/components/chatToolRender.tsx` |
 | Agent Mode layout & tasks | `src/components/AgentModeShell.tsx`, `src/agentMode.ts` |
-| Sessions list / "library" | `src/components/AIChatsRail.tsx`, `src/chatHistory.ts` |
+| Sessions list / "library" | `src/components/AIChatsRail.tsx`, `src/chatHistory.ts`, `src/chatStoreCache.ts` |
+| Chat disk persistence | `src-tauri/src/chat_store.rs`, `src/chatStoreCache.ts` — see `043` |
+| CLI session bridge (CC/CU/OC) | `src-tauri/src/provider_sessions.rs`, `src/chatProviderRecovery.ts` — see `044` |
 | Global state | `src/store.ts` |
 | AI types / contracts | `src/ai.ts` |
 | Theme & brand tokens | `src/App.css` |
