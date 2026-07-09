@@ -3479,8 +3479,17 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
         setSessionLimitsError(null);
         setSessionUsage({ ...local, limits, extra });
       } catch (e) {
-        setSessionLimitsError(errMsg(e));
+        const msg = errMsg(e);
         const cache = planCacheRef.current;
+        // The claude.ai usage endpoint rate-limits aggressively (HTTP 429) and
+        // fails transiently — that's not a user-facing problem. Keep the last
+        // known limits and only surface an error when we have nothing to show
+        // AND it isn't a transient rate-limit/network blip. Prevents the scary
+        // "Plan limits: request failed" box from flashing at session start.
+        const transient = /\b429\b|rate.?limit|timed? ?out|network|connection/i.test(
+          msg,
+        );
+        setSessionLimitsError(cache || transient ? null : msg);
         if (cache) {
           setSessionPct(cache.sessionPct);
           setSessionResetsAt(cache.sessionResetsAt);
