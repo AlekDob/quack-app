@@ -149,6 +149,7 @@ provider_load_session(provider, cwd, sessionId) → LoadedMessage[]
 - **Chip after first turn** — no `session_id` until the CLI emits it.
 - **Interactive CLI ≠ headless bridge** — only one should stream at a time.
 - **Duplicate CLI id across Quack tabs** — linked-title badges surface it; last writer wins on next send.
+- **Flattened first-turn prompt on recovery** — the CLI stores the whole `[System]…[User]…` first-turn `-p` packet as its first user message; recovery would render it as a giant `[System]…` user bubble. `stripCliFlattenScaffold` (`chatTextUtils.ts`, called from `cleanStaleToolMessages`) unwraps it to the real user text on load, healing old + new sessions.
 
 ### Future
 

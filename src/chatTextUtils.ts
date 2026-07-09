@@ -95,6 +95,27 @@ export function splitThinking(content: string): {
 // ---------- Stored-history sanitization ----------
 
 /**
+ * Undo the first-turn flatten (`flattenMessages` in providers/cliPrompt +
+ * claudeCode). The CLI stores the whole `[System]\n…\n\n[User]\n…` packet as
+ * its first user message; when we re-import that transcript on recovery the
+ * system prompt would otherwise render as a giant user bubble. Keep only the
+ * real `[User]` text — later `[Assistant]`/`[Tool result]` sections are
+ * rebuilt as their own messages from the transcript, so we cut them off here.
+ */
+export function stripCliFlattenScaffold(content: string): string {
+  if (!content.startsWith("[System]\n")) return content;
+  const marker = "\n[User]\n";
+  const at = content.indexOf(marker);
+  if (at === -1) return content;
+  let rest = content.slice(at + marker.length);
+  for (const later of ["\n[Assistant]\n", "\n[Tool result]\n"]) {
+    const cut = rest.indexOf(later);
+    if (cut !== -1) rest = rest.slice(0, cut);
+  }
+  return rest.trimEnd();
+}
+
+/**
  * Strip messages that should never be rendered or replayed from a
  * persisted chat session:
  *   - role:"system" rows (older versions stored the rebuilt system
@@ -114,12 +135,20 @@ export function splitThinking(content: string): {
  *     one carrying a blocks log) wins.
  */
 export function cleanStaleToolMessages(messages: ChatMessage[]): ChatMessage[] {
-  const filtered = messages.filter((m) => {
-    if (m.role === "system") return false;
-    if (m.role !== "tool") return true;
-    if (/^Unknown tool:/i.test(m.content)) return false;
-    return true;
-  });
+  const filtered = messages
+    .filter((m) => {
+      if (m.role === "system") return false;
+      if (m.role !== "tool") return true;
+      if (/^Unknown tool:/i.test(m.content)) return false;
+      return true;
+    })
+    // Heal recovered CLI transcripts whose first user turn still carries the
+    // flattened `[System]…[User]…` prompt (would render as a giant bubble).
+    .map((m) =>
+      m.role === "user"
+        ? { ...m, content: stripCliFlattenScaffold(m.content) }
+        : m,
+    );
   const out: ChatMessage[] = [];
   for (const m of filtered) {
     const prev = out[out.length - 1];
