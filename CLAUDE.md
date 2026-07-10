@@ -147,7 +147,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `048-background-task-wake.md` — Claude Code `-p` background Bash/subagent wake: spawn env (`PRINT_BG_WAIT_CEILING_MS`, `RESUME_INTERRUPTED_TURN`) + `backgroundWake.ts` auto `--resume` nudge when headless turn ends idle.
   - `028-opencode-bridge.md` — `opencode serve` sidecar (port 17346), SSE `/global/event`, `providerSessionIds`, lazy startup catalog.
   - `029-session-diff-hub.md` — Agent Hub expanded-row edit subtitles (`Edited foo.ts −N +M`); `chatDiffStore` pub/sub + `summarizeLastTurn`.
-  - `030-user-message-bar.md` — user turns as right-aligned markdown cards with hover copy/re-send/branch actions (`UserMessageBar.tsx`).
+  - `030-user-message-bar.md` — user turns as inset cards; sticky pin per turn + tall-prompt collapse while stuck (`UserTurnBar`, `useUserBarSticky.ts`).
   - `031-model-discovery-cache.md` — shared provider/model probe cache (`modelDiscoveryStore`); prefetch at splash; lazy cloud + CLI catalogs; invalidation on API-key edit / force refresh.
   - `032-startup-hydration.md` — splash gate, parallel workspace restore, overlap with model prefetch.
   - `033-editor-color-themes.md` — VS Code bundled Monaco syntax themes; Monaco-compatible token rules (`monacoThemeRules.ts`), live `setTheme`, JetBrains Mono `fontFamily`; per-mode picker + separate light/dark persistence.

@@ -175,7 +175,7 @@ import {
   fs,
 } from "../ipc";
 import { MarkdownPreview } from "./MarkdownPreview";
-import { UserMessageBar } from "./UserMessageBar";
+import { UserTurnBar } from "./UserMessageBar";
 import { ModelPickerPopover } from "./ModelPickerPopover";
 import { ModelBrowser } from "./ModelBrowser";
 import { ManageModelsModal } from "./ManageModelsModal";
@@ -4803,27 +4803,23 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
                 const m = display[i];
                 const dimmed = scrubIndex !== null && i > scrubIndex;
                 return (
-                  <div
-                    className={`ai-msg ai-msg-user${dimmed ? " ai-msg-scrubbed-past" : ""}`}
-                    style={{ zIndex: userTurnByIdx.get(i) ?? 1 }}
-                    data-anchor-idx={i}
-                    data-anchor-role="user"
-                    data-anchor-preview={m.content.slice(0, 120)}
-                  >
-                    <UserMessageBar
-                      content={m.content}
-                      images={m.images}
-                      actionsDisabled={streaming !== null || runningTools}
-                      showBranch={!!aiChatId}
-                      onCopy={() => {
-                        void navigator.clipboard.writeText(m.content);
-                        toastSuccess("Copied to clipboard");
-                      }}
-                      onRegen={() => void regenerateFrom(i)}
-                      onBranch={() => branchFromHere(i)}
-                      onImageClick={(img) => void openZoom(img)}
-                    />
-                  </div>
+                  <UserTurnBar
+                    key={i}
+                    zIndex={userTurnByIdx.get(i) ?? 1}
+                    anchorIdx={i}
+                    dimmed={dimmed}
+                    content={m.content}
+                    images={m.images}
+                    actionsDisabled={streaming !== null || runningTools}
+                    showBranch={!!aiChatId}
+                    onCopy={() => {
+                      void navigator.clipboard.writeText(m.content);
+                      toastSuccess("Copied to clipboard");
+                    }}
+                    onRegen={() => void regenerateFrom(i)}
+                    onBranch={() => branchFromHere(i)}
+                    onImageClick={(img) => void openZoom(img)}
+                  />
                 );
               })()}
               {turn.followIdxs.map((i) => renderAt(i))}

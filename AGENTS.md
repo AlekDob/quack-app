@@ -50,7 +50,7 @@ Full rationale: `documentation/decisions/003-git-remote-quack-1.0.md`.
 
 | Task | Start here |
 |---|---|
-| Chat / streaming / tool calls | `src/components/AIChatPanel.tsx`, `src/components/chatToolRender.tsx` |
+| Chat / streaming / tool calls | `src/components/AIChatPanel.tsx`, `src/components/chatToolRender.tsx`, `src/components/UserMessageBar.tsx`, `src/hooks/useUserBarSticky.ts` |
 | Agent Mode layout & tasks | `src/components/AgentModeShell.tsx`, `src/agentMode.ts` |
 | Sessions list / "library" | `src/components/AIChatsRail.tsx`, `src/chatHistory.ts`, `src/chatStoreCache.ts` |
 | Chat disk persistence | `src-tauri/src/chat_store.rs`, `src/chatStoreCache.ts` — see `043` |

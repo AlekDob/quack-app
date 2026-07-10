@@ -8282,6 +8282,13 @@ body.ws-dragging * {
   /* transform on .ai-msg breaks position:sticky */
   animation: none;
 }
+/* Sentinel sits before the sticky wrapper — scroll past it ⇒ sticky is active. */
+.ai-user-bar-sentinel {
+  height: 0;
+  width: 100%;
+  pointer-events: none;
+  flex-shrink: 0;
+}
 .ai-user-bar {
   display: flex;
   align-items: center;
@@ -8293,12 +8300,43 @@ body.ws-dragging * {
   border-radius: var(--radius-md);
   box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent);
 }
+.ai-user-bar.is-compact,
+.ai-user-bar.is-expanded {
+  align-items: flex-start;
+}
 .ai-user-bar-main {
   flex: 1;
   min-width: 0;
   font-size: 13.5px;
   line-height: 1.45;
   color: var(--fg);
+}
+/* Tall prompts collapse while stuck so the response stays readable. */
+.ai-user-bar.is-compact .ai-user-bar-main {
+  position: relative;
+  max-height: min(35vh, 160px);
+  overflow: hidden;
+}
+.ai-user-bar.is-compact .ai-user-bar-main::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 28px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--user-bar-bg) 75%
+  );
+  pointer-events: none;
+}
+.ai-user-bar.is-expanded .ai-user-bar-main {
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+}
+.ai-user-bar.is-stuck .ai-user-bar-expand {
+  opacity: 0.65;
 }
 .ai-user-bar-actions {
   flex-shrink: 0;
