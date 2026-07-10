@@ -2,7 +2,7 @@ import { UsageRing } from "./UsageRing";
 import { fmtTokenCount } from "../contextUsage";
 
 interface SessionUsageCircleProps {
-  /** Ring fill — context % when known, else plan 5hr %. */
+  /** Ring fill — context window % only. */
   pct: number;
   contextPct: number;
   contextUsed: number;

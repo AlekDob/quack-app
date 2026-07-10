@@ -227,6 +227,13 @@ export const claudeCode = {
       sessionId,
       toolUseId,
     }),
+  /** Last API-call context snapshot from session JSONL (CC /context). */
+  contextUsage: (cwd: string, sessionId: string) =>
+    invoke<{
+      input_tokens: number;
+      cache_read_tokens: number;
+      cache_creation_tokens: number;
+    } | null>("claude_session_context_usage", { cwd, sessionId }),
   /** Chat-tab sessionIds whose subprocess is still running. Powers the
    *  Agent Hub's cross-project "working" indicator without mounting panels. */
   activeSessions: () => invoke<string[]>("claude_code_active_sessions"),

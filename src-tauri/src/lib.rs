@@ -177,6 +177,7 @@ pub fn run() {
             claude_code::claude_code_list_sessions,
             claude_code::claude_code_load_session,
             claude_code::claude_code_load_subagent,
+            claude_code::claude_session_context_usage,
             claude_code::claude_plugin_cmd,
             cursor_code::cursor_code_check,
             cursor_code::cursor_code_list_models,

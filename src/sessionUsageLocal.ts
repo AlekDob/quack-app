@@ -41,11 +41,9 @@ export function normUsagePct(v: number): number {
   return v;
 }
 
-/** Ring / hero %: context window when known, else best plan limit. */
+/** Ring / hero %: context window only — plan limits have their own section. */
 export function sessionHeroPct(data: SessionUsageData): number {
-  if (data.context.pct > 0) return data.context.pct;
-  const five = data.limits.find((l) => l.label.includes("5hr"));
-  return five?.pct ?? data.limits[0]?.pct ?? 0;
+  return data.context.pct;
 }
 
 export function parseUsageLimits(u: UsageApi): SessionLimit[] {

@@ -149,20 +149,14 @@ export function SessionUsageDrawer({
                 <div className="session-drawer-hero-text">
                   <span className="session-drawer-hero-pct">{heroPct}%</span>
                   <span className="session-drawer-hero-sub">
-                    {data.context.pct > 0 ? (
+                    {data.context.pct > 0 || data.context.used > 0 ? (
                       <>
                         {fmtTokenCount(data.context.used)} /{" "}
                         {fmtTokenCount(data.context.window)} context
                         {data.context.estimate ? " (estimated)" : ""}
                       </>
-                    ) : data.limits.length > 0 ? (
-                      "Plan session usage"
                     ) : (
-                      <>
-                        {fmtTokenCount(data.context.used)} /{" "}
-                        {fmtTokenCount(data.context.window)} context
-                        {data.context.estimate ? " (estimated)" : ""}
-                      </>
+                      "Context — waiting for data"
                     )}
                   </span>
                 </div>

@@ -439,14 +439,17 @@ fn ensure_pretooluse_hook(workspace: &str, endpoint: &str) -> Result<(), String>
 /// "permissionDecision":"allow"|"deny"}}` is the documented contract
 /// and works across every CC version we've tested.
 ///
-/// Why fail OPEN (allow) on connection error or timeout:
+/// Why fail OPEN (allow) on connection error, timeout, or foreign session:
 /// the most common reason the script can't reach the endpoint is that
 /// Codetta isn't running — for example, the user installed Codetta
 /// once, the hook was written into `.claude/settings.local.json`, then
 /// they later opened the same workspace from a terminal `claude`
 /// session. Failing closed (deny) would silently break their entire CLI
 /// in that workspace until they hand-deleted the hook config — a real
-/// bug we hit in v0.2.0 dogfooding.
+/// bug we hit in v0.2.0 dogfooding. Foreign sessions (no
+/// `CODETTA_PERM_HOOK`) also fail open: `ask` forced a hook-level prompt
+/// on every gated tool and ignored Claude's own permission-mode and
+/// `permissions.allow` rules — unusable in terminal and Claude Desktop.
 ///
 /// Why a 3-second timeout:
 /// Codetta's server's own DECISION_TIMEOUT is 50s. If Codetta IS
@@ -468,7 +471,7 @@ fn build_hook_command(endpoint: &str) -> String {
     // used e.g. to redirect AskUserQuestion ("ask in plain text") so
     // the agent recovers instead of treating it as a hard failure.
     let js = format!(
-        r#"const http=require('http');let b='';process.stdin.on('data',c=>b+=c).on('end',()=>{{let done=false;function out(d,reason){{if(done)return;done=true;const o={{hookEventName:'PreToolUse',permissionDecision:d}};if(reason)o.permissionDecisionReason=reason;process.stdout.write(JSON.stringify({{hookSpecificOutput:o}}));process.exit(0)}}if(!process.env.CODETTA_PERM_HOOK){{out('ask');return}}const t=setTimeout(()=>out('allow'),3000);try{{const u=new URL('{endpoint}');const r=http.request({{hostname:u.hostname,port:u.port,path:u.pathname+u.search,method:'POST',headers:{{'content-length':Buffer.byteLength(b)}}}},res=>{{let d='';res.on('data',c=>d+=c);res.on('end',()=>{{clearTimeout(t);const s=String(d).trim();if(s[0]==='2'){{const i=s.indexOf(':');out('deny',i>0?s.slice(i+1):undefined)}}else{{out('allow')}}}})}});r.on('error',()=>{{clearTimeout(t);out('allow')}});r.write(b);r.end()}}catch(_){{clearTimeout(t);out('allow')}}}});"#,
+        r#"const http=require('http');let b='';process.stdin.on('data',c=>b+=c).on('end',()=>{{let done=false;function out(d,reason){{if(done)return;done=true;const o={{hookEventName:'PreToolUse',permissionDecision:d}};if(reason)o.permissionDecisionReason=reason;process.stdout.write(JSON.stringify({{hookSpecificOutput:o}}));process.exit(0)}}if(!process.env.CODETTA_PERM_HOOK){{out('allow');return}}const t=setTimeout(()=>out('allow'),3000);try{{const u=new URL('{endpoint}');const r=http.request({{hostname:u.hostname,port:u.port,path:u.pathname+u.search,method:'POST',headers:{{'content-length':Buffer.byteLength(b)}}}},res=>{{let d='';res.on('data',c=>d+=c);res.on('end',()=>{{clearTimeout(t);const s=String(d).trim();if(s[0]==='2'){{const i=s.indexOf(':');out('deny',i>0?s.slice(i+1):undefined)}}else{{out('allow')}}}})}});r.on('error',()=>{{clearTimeout(t);out('allow')}});r.write(b);r.end()}}catch(_){{clearTimeout(t);out('allow')}}}});"#,
         endpoint = endpoint
     );
     format!("node -e \"{}\"", js.replace('"', "\\\""))
@@ -499,10 +502,10 @@ fn apply_clean_env(cmd: &mut Command) {
     // Mark this as a Codetta-spawned session so the PreToolUse hook knows
     // to route permission requests to us. The hook we install lives in the
     // workspace's .claude/settings.local.json forever, so it also fires for
-    // OTHER claude sessions in that folder (a terminal `claude`, another
-    // editor). Those inherit the shell env, NOT this var — so the hook
-    // defers them to Claude Code's native prompt instead of hijacking their
-    // permissions into Codetta's UI. See build_hook_command.
+    // OTHER claude sessions in that folder (a terminal `claude`, Claude
+    // Desktop). Those inherit the shell env, NOT this var — so the hook
+    // is a no-op (`allow`) and Claude's own permission UX applies instead
+    // of hijacking into Codetta's UI. See build_hook_command.
     cmd.env("CODETTA_PERM_HOOK", "1");
 }
 
@@ -1172,6 +1175,90 @@ pub struct LoadedToolResult {
     pub is_error: Option<bool>,
 }
 
+/// Last API-call input snapshot from a session JSONL (matches CC /context).
+#[derive(serde::Serialize, Clone)]
+pub struct SessionContextUsage {
+    pub input_tokens: u64,
+    pub cache_read_tokens: u64,
+    pub cache_creation_tokens: u64,
+}
+
+fn usage_snap_from_value(u: &serde_json::Value) -> SessionContextUsage {
+    SessionContextUsage {
+        input_tokens: u
+            .get("input_tokens")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(0),
+        cache_read_tokens: u
+            .get("cache_read_input_tokens")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(0),
+        cache_creation_tokens: u
+            .get("cache_creation_input_tokens")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(0),
+    }
+}
+
+fn is_sidechain_record(v: &serde_json::Value) -> bool {
+    if v.get("parent_tool_use_id").is_some() {
+        return true;
+    }
+    v.get("isSidechain")
+        .and_then(|x| x.as_bool())
+        .unwrap_or(false)
+}
+
+/// Walk JSONL backwards — prefer the latest non-subagent `assistant`
+/// usage (one API call) over turn-total `result` usage.
+fn last_context_usage_from_jsonl(path: &std::path::Path) -> Option<SessionContextUsage> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let mut result_snap: Option<SessionContextUsage> = None;
+    for line in content.lines().rev() {
+        let v: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if is_sidechain_record(&v) {
+            continue;
+        }
+        let t = match v.get("type").and_then(|x| x.as_str()) {
+            Some(t) => t,
+            None => continue,
+        };
+        if t == "assistant" {
+            if let Some(u) = v.get("message").and_then(|m| m.get("usage")) {
+                return Some(usage_snap_from_value(u));
+            }
+        }
+        if t == "result" && result_snap.is_none() {
+            if let Some(u) = v.get("usage") {
+                result_snap = Some(usage_snap_from_value(u));
+            }
+        }
+    }
+    result_snap
+}
+
+/// Read the latest context-window fill for a Claude Code session from disk.
+#[tauri::command]
+pub fn claude_session_context_usage(
+    cwd: String,
+    session_id: String,
+) -> Result<Option<SessionContextUsage>, String> {
+    let home = dirs::home_dir().ok_or_else(|| "no home dir".to_string())?;
+    let encoded = encode_project_path(&cwd);
+    let path = home
+        .join(".claude")
+        .join("projects")
+        .join(&encoded)
+        .join(format!("{}.jsonl", session_id));
+    if !path.exists() {
+        return Ok(None);
+    }
+    Ok(last_context_usage_from_jsonl(&path))
+}
+
 /// Reconstruct the full message history of a saved Claude Code
 /// session from its JSONL file. Coalesces tool_use blocks into the
 /// assistant message they belong to, and matches tool_result blocks
@@ -1537,6 +1624,14 @@ mod tests {
             out_count >= 3,
             "expected ≥3 out(...) calls (server/error/timeout); got {}",
             out_count
+        );
+        assert!(
+            cmd.contains("out('allow')"),
+            "foreign sessions (no CODETTA_PERM_HOOK) must fail open"
+        );
+        assert!(
+            !cmd.contains("out('ask')"),
+            "ask on foreign sessions breaks Claude Desktop and ignores allow rules"
         );
         // Token query string must be preserved (we use pathname+search,
         // not pathname alone). Otherwise the server returns 403.

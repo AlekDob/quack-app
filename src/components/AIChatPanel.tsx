@@ -182,6 +182,7 @@ import {
   type SessionUsageData,
 } from "./SessionUsageDrawer";
 import {
+  claudeCode,
   search,
   pty,
   fs,
@@ -503,6 +504,9 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   const [liveContextTokens, setLiveContextTokens] = useState<TurnTokens | null>(
     null,
   );
+  // JSONL fallback when CC runs outside Quack's stream (terminal / attach).
+  const [diskContextTokens, setDiskContextTokens] =
+    useState<TurnTokens | null>(null);
   // Last non-empty context ring reading — kept visible while a new turn
   // is in flight so the circle doesn't flash empty before usage arrives.
   const pinnedContextRef = useRef<{
@@ -668,6 +672,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     assistantTurns: 0,
     lastUsage: null as typeof lastUsage,
     liveContextTokens: null as TurnTokens | null,
+    diskContextTokens: null as TurnTokens | null,
     sessionStartTs: Date.now(),
   });
   // Toggle: has the user been warned about the budget for this chat
@@ -3284,6 +3289,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     pinnedContextRef.current = null;
     setLastUsage(null);
     setLiveContextTokens(null);
+    setDiskContextTokens(null);
     setTodos(null);
     // Task-id mapping follows the checklist's lifetime — stale indices
     // from a previous chat would mis-route TaskUpdate calls.
@@ -3506,8 +3512,15 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     assistantTurns: messages.filter((m) => m.role === "assistant").length,
     lastUsage,
     liveContextTokens,
+    diskContextTokens,
     sessionStartTs,
   };
+
+  const resolveContextTokens = (): TurnTokens | undefined =>
+    usageMetricsRef.current.liveContextTokens ??
+    usageMetricsRef.current.lastUsage?.contextTokens ??
+    usageMetricsRef.current.diskContextTokens ??
+    undefined;
 
   const buildUsageFromMetrics = () => {
     const m = usageMetricsRef.current;
@@ -3524,9 +3537,44 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       },
       selectedQualified: m.selected,
       models: m.allModels,
-      contextTokens: m.liveContextTokens ?? m.lastUsage?.contextTokens,
+      contextTokens: resolveContextTokens(),
     });
   };
+
+  // Hydrate context from on-disk CC JSONL when stream snapshot is absent.
+  useEffect(() => {
+    if (!selectedIsCC || !claudeSessionId) {
+      setDiskContextTokens(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      if (liveContextTokens) return;
+      try {
+        const snap = await claudeCode.contextUsage(root, claudeSessionId);
+        if (cancelled || !snap) return;
+        const total =
+          snap.input_tokens +
+          snap.cache_read_tokens +
+          snap.cache_creation_tokens;
+        if (total <= 0) return;
+        setDiskContextTokens({
+          input: snap.input_tokens,
+          output: 0,
+          cacheRead: snap.cache_read_tokens,
+          cacheCreate: snap.cache_creation_tokens,
+        });
+      } catch {
+        /* session file not written yet */
+      }
+    };
+    void poll();
+    const t = window.setInterval(poll, 12_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(t);
+    };
+  }, [selectedIsCC, claudeSessionId, root, liveContextTokens]);
 
   // Refresh local drawer/circle data when chat metrics change — no API.
   useEffect(() => {
@@ -3556,6 +3604,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     cumulativeTurns,
     lastUsage,
     liveContextTokens,
+    diskContextTokens,
     messages.length,
     sessionStartTs,
   ]);
@@ -4412,7 +4461,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   const contextSnap = useMemo(() => {
     const window = resolveContextWindow(selected, allModels);
     const { used, estimate } = estimateContextUsed(
-      liveContextTokens ?? lastUsage?.contextTokens,
+      liveContextTokens ?? lastUsage?.contextTokens ?? diskContextTokens ?? undefined,
       cumulativeTokensIn,
     );
     return {
@@ -4425,6 +4474,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     selected,
     allModels,
     liveContextTokens,
+    diskContextTokens,
     lastUsage,
     cumulativeTokensIn,
   ]);
@@ -4438,14 +4488,22 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   }, [contextSnap]);
 
   const displayRingPct = useMemo(() => {
-    const fresh =
-      displayContextSnap.pct > 0 ? displayContextSnap.pct : sessionPct;
-    if (fresh > 0) {
-      pinnedRingRef.current = fresh;
-      return fresh;
+    if (displayContextSnap.pct > 0) {
+      pinnedRingRef.current = displayContextSnap.pct;
+      return displayContextSnap.pct;
     }
-    return pinnedRingRef.current;
-  }, [displayContextSnap.pct, sessionPct]);
+    if (displayContextSnap.used > 0) {
+      const pct = contextFillPct(
+        displayContextSnap.used,
+        displayContextSnap.window,
+      );
+      if (pct > 0) {
+        pinnedRingRef.current = pct;
+        return pct;
+      }
+    }
+    return pinnedRingRef.current ?? 0;
+  }, [displayContextSnap]);
 
   return (
     <SubagentOpen.Provider value={openSubagentTab}>

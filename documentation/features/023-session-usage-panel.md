@@ -28,14 +28,13 @@ while a new turn streams.
 
 ## Dual metrics (do not mix)
 
-| Metric | Meaning | Source |
-|---|---|---|
-| **Context %** | Input tokens in the model context window now | Last API `contextTokens` snapshot |
-| **Plan %** | Claude.ai subscription utilization (5hr pool) | `claude_usage_limits` OAuth poll |
-| **Billing tokens** | Turn cost accounting (may sum cache reads) | `result.usage` → `lastUsage.tokens` |
+| Metric | Meaning | Source | Hero / ring |
+|---|---|---|---|
+| **Context %** | Input tokens in the model context window now | Stream snapshot → JSONL fallback | **Yes** |
+| **Plan %** | Claude.ai subscription utilization (5hr pool) | `claude_usage_limits` OAuth poll | Plan limits section only |
+| **Billing tokens** | Turn cost accounting (may sum cache reads) | `result.usage` → `lastUsage.tokens` | This chat rows |
 
-Hero ring prefers **context %** when `context.pct > 0`, else **plan 5hr %**.
-See gotcha: `documentation/gotcha/cc-context-ring-result-usage.md`.
+`sessionHeroPct` / composer ring use **context only** — never fall back to plan %.
 
 ## Context window calculation
 
@@ -76,8 +75,9 @@ Subagent `result` events (`parent_tool_use_id`) are ignored for both metrics.
 | `contextFillPct(used, window)` | Clamped 0–100 |
 | `fmtTokenCount(n)` | `1.2k` / `1.0M` labels |
 
-Fallback when no snapshot yet: cumulative `tokensIn` only (never cumulative
-cache read).
+Fallback when no stream snapshot: `claude_session_context_usage` reads the
+session JSONL backwards (latest non-subagent `assistant` usage, else `result`).
+Poll every 12s when `claudeSessionId` is known and stream snapshot is absent.
 
 ## Data flow
 
@@ -96,7 +96,7 @@ cache read).
 |---|---|
 | `src/contextUsage.ts` | Context math + `contextTokensFromApiUsage` |
 | `src/sessionUsageLocal.ts` | `buildSessionUsageLocal`, `sessionHeroPct`, plan limit parsers |
-| `src/providers/claudeCode.ts` | Snapshot tracking; `contextTokens` on `usage` event |
+| `src-tauri/src/claude_code.rs` | `claude_session_context_usage` JSONL reader |
 | `src/ai.ts` | `ChatStreamEvent` — `usage.contextTokens`, `context_snapshot` |
 | `src/components/SessionUsageCircle.tsx` | Ring button + tooltip |
 | `src/components/SessionUsageDrawer.tsx` | Slide-over detail cards |
