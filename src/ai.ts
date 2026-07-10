@@ -120,6 +120,19 @@ export type ChatStreamEvent =
         cacheCreate: number;
       };
       isError?: boolean;
+    }
+  /**
+   * Live context snapshot from stream_event message_start / message_delta.
+   * Emitted mid-turn so the ring updates before the terminal `result`.
+   */
+  | {
+      kind: "context_snapshot";
+      tokens: {
+        input: number;
+        output: number;
+        cacheRead: number;
+        cacheCreate: number;
+      };
     };
 
 import { getProvider, parseQualifiedModel } from "./providers";

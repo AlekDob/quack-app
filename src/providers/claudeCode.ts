@@ -305,13 +305,21 @@ export const claudeCodeProvider: ChatProvider = {
               (ev as { message?: { usage?: Record<string, unknown> } })
                 .message?.usage,
             );
-            if (snap) latestContextTokens = snap;
+            if (snap) {
+              latestContextTokens = snap;
+              queue.push({ kind: "context_snapshot", tokens: snap });
+              wake();
+            }
           } else if (ev.type === "message_delta") {
             const snap = contextTokensFromApiUsage(
               (ev as { usage?: Record<string, unknown> }).usage,
               latestContextTokens ?? undefined,
             );
-            if (snap) latestContextTokens = snap;
+            if (snap) {
+              latestContextTokens = snap;
+              queue.push({ kind: "context_snapshot", tokens: snap });
+              wake();
+            }
           } else if (
             ev.type === "content_block_start" &&
             ev.content_block?.type === "thinking" &&

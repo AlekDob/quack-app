@@ -54,10 +54,13 @@ pct  = round(used / context_window × 100)
 ### Stream-json pipeline (`claudeCode.ts`)
 
 ```
-stream_event.message_start  → fresh latestContextTokens
-stream_event.message_delta  → merge (contextTokensFromApiUsage)
+stream_event.message_start  → fresh latestContextTokens + context_snapshot event
+stream_event.message_delta  → merge + context_snapshot event
 result (non-subagent)       → usage.tokens (billing) + contextTokens (ring)
 ```
+
+`context_snapshot` events update the ring **mid-turn** (before `result`).
+Attach/replay (`claude_code_attach`) parses the same stream_event usage fields.
 
 `--include-partial-messages` required so `stream_event` lines arrive.
 
@@ -94,7 +97,7 @@ cache read).
 | `src/contextUsage.ts` | Context math + `contextTokensFromApiUsage` |
 | `src/sessionUsageLocal.ts` | `buildSessionUsageLocal`, `sessionHeroPct`, plan limit parsers |
 | `src/providers/claudeCode.ts` | Snapshot tracking; `contextTokens` on `usage` event |
-| `src/ai.ts` | `ChatStreamEvent` — `usage.contextTokens` optional field |
+| `src/ai.ts` | `ChatStreamEvent` — `usage.contextTokens`, `context_snapshot` |
 | `src/components/SessionUsageCircle.tsx` | Ring button + tooltip |
 | `src/components/SessionUsageDrawer.tsx` | Slide-over detail cards |
 | `src/components/AIChatPanel.tsx` | Host, poll, cumulative state, `pinnedContextRef` |

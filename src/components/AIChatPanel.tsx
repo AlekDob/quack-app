@@ -11,6 +11,7 @@ import { flushSync } from "react-dom";
 import { Icon } from "./Icon";
 import { SubagentPill } from "./SubagentPill";
 import { ComposerMic, ComposerDictationBar } from "./ComposerMic";
+import type { DictationCapture } from "../dictation";
 import {
   CC_EFFORT_DEFAULT,
   CC_EFFORTS,
@@ -170,8 +171,10 @@ import {
 } from "../sessionUsageLocal";
 import {
   contextFillPct,
+  contextTokensFromApiUsage,
   estimateContextUsed,
   resolveContextWindow,
+  type TurnTokens,
 } from "../contextUsage";
 import { SessionUsageCircle } from "./SessionUsageCircle";
 import {
@@ -406,6 +409,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   const [selected, setSelected] = useState<string>("");
   const [input, setInput] = useState("");
   const [dictating, setDictating] = useState(false);
+  const dictationCaptureRef = useRef<Promise<DictationCapture> | null>(null);
   // Image attachments staged on the composer (Claude Code only). Cleared
   // after each send. The zoom modal holds the full-quality data: URL of
   // whichever thumbnail the user clicked (fetched from disk on demand).
@@ -495,6 +499,10 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       cacheCreate: number;
     };
   } | null>(null);
+  // Live context snapshot — updated on each API message_start/delta mid-turn.
+  const [liveContextTokens, setLiveContextTokens] = useState<TurnTokens | null>(
+    null,
+  );
   // Last non-empty context ring reading — kept visible while a new turn
   // is in flight so the circle doesn't flash empty before usage arrives.
   const pinnedContextRef = useRef<{
@@ -659,6 +667,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     cumulativeTurns: 0,
     assistantTurns: 0,
     lastUsage: null as typeof lastUsage,
+    liveContextTokens: null as TurnTokens | null,
     sessionStartTs: Date.now(),
   });
   // Toggle: has the user been warned about the budget for this chat
@@ -1073,6 +1082,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     // message_start; checked when the wrapping `assistant` event
     // arrives so we don't double-render the same text.
     let replayMsgGotDeltas = false;
+    let replayContextTokens: TurnTokens | null = null;
     // Replay bookkeeping mirrors the live loop: a chronological blocks
     // log + tool calls/results so the resumed bubble renders the SAME
     // interleaved text → tool → text flow as a never-refreshed turn.
@@ -1157,6 +1167,23 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
           if (ev.type === "message_start") {
             replayMsgGotDeltas = false;
             breakNextText = true;
+            const snap = contextTokensFromApiUsage(
+              (ev as { message?: { usage?: Record<string, unknown> } })
+                .message?.usage,
+            );
+            if (snap) {
+              replayContextTokens = snap;
+              setLiveContextTokens(snap);
+            }
+          } else if (ev.type === "message_delta") {
+            const snap = contextTokensFromApiUsage(
+              (ev as { usage?: Record<string, unknown> }).usage,
+              replayContextTokens ?? undefined,
+            );
+            if (snap) {
+              replayContextTokens = snap;
+              setLiveContextTokens(snap);
+            }
           } else if (
             ev.type === "content_block_delta" &&
             ev.delta?.type === "text_delta" &&
@@ -2713,6 +2740,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
               tokens: ev.tokens,
               contextTokens: ev.contextTokens,
             });
+            if (ev.contextTokens) setLiveContextTokens(ev.contextTokens);
             // Append to the cross-chat usage log so the dashboard +
             // monthly hard cap have data to work with. Skipped if
             // the turn was free (Ollama, subscription Claude Code).
@@ -2757,6 +2785,10 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
               setCumulativeCacheRead((p) => p + (ev.tokens?.cacheRead ?? 0));
             }
             setCumulativeTurns((p) => p + 1);
+            continue;
+          }
+          if (ev.kind === "context_snapshot") {
+            setLiveContextTokens(ev.tokens);
             continue;
           }
           if (ev.kind === "content") {
@@ -3251,6 +3283,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   const resetTurnTransients = () => {
     pinnedContextRef.current = null;
     setLastUsage(null);
+    setLiveContextTokens(null);
     setTodos(null);
     // Task-id mapping follows the checklist's lifetime — stale indices
     // from a previous chat would mis-route TaskUpdate calls.
@@ -3472,6 +3505,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     cumulativeTurns,
     assistantTurns: messages.filter((m) => m.role === "assistant").length,
     lastUsage,
+    liveContextTokens,
     sessionStartTs,
   };
 
@@ -3490,7 +3524,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       },
       selectedQualified: m.selected,
       models: m.allModels,
-      contextTokens: m.lastUsage?.contextTokens,
+      contextTokens: m.liveContextTokens ?? m.lastUsage?.contextTokens,
     });
   };
 
@@ -3521,6 +3555,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     cumulativeCacheRead,
     cumulativeTurns,
     lastUsage,
+    liveContextTokens,
     messages.length,
     sessionStartTs,
   ]);
@@ -4377,7 +4412,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   const contextSnap = useMemo(() => {
     const window = resolveContextWindow(selected, allModels);
     const { used, estimate } = estimateContextUsed(
-      lastUsage?.contextTokens,
+      liveContextTokens ?? lastUsage?.contextTokens,
       cumulativeTokensIn,
     );
     return {
@@ -4389,6 +4424,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   }, [
     selected,
     allModels,
+    liveContextTokens,
     lastUsage,
     cumulativeTokensIn,
   ]);
@@ -5472,7 +5508,10 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
           </div>
         )}
         <ComposerMic
-          onStart={() => setDictating(true)}
+          onStart={(capture) => {
+            dictationCaptureRef.current = capture;
+            setDictating(true);
+          }}
           disabled={dictating}
         />
         {streaming !== null || runningTools ? (
@@ -5535,9 +5574,11 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
         </div>
       )}
       <div className="ai-input-row">
-        {dictating ? (
+        {dictating && dictationCaptureRef.current ? (
           <ComposerDictationBar
+            capturePromise={dictationCaptureRef.current}
             onConfirm={(text) => {
+              dictationCaptureRef.current = null;
               setDictating(false);
               if (!text) return;
               setInput((v) =>
@@ -5545,7 +5586,10 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
               );
               requestAnimationFrame(() => inputRef.current?.focus());
             }}
-            onCancel={() => setDictating(false)}
+            onCancel={() => {
+              dictationCaptureRef.current = null;
+              setDictating(false);
+            }}
           />
         ) : (
         <>
