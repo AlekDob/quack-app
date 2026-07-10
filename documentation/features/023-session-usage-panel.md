@@ -97,6 +97,7 @@ Poll every 12s when `claudeSessionId` is known and stream snapshot is absent.
 | `src/contextUsage.ts` | Context math + `contextTokensFromApiUsage` |
 | `src/sessionUsageLocal.ts` | `buildSessionUsageLocal`, `sessionHeroPct`, plan limit parsers |
 | `src-tauri/src/claude_code.rs` | `claude_session_context_usage` JSONL reader |
+| `src/providers/claudeCode.ts` | Stream snapshot + `context_snapshot` events |
 | `src/ai.ts` | `ChatStreamEvent` — `usage.contextTokens`, `context_snapshot` |
 | `src/components/SessionUsageCircle.tsx` | Ring button + tooltip |
 | `src/components/SessionUsageDrawer.tsx` | Slide-over detail cards |
