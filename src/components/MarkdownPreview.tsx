@@ -89,24 +89,19 @@ export function MarkdownPreview({
       const wrapper = copyBtn.closest(".md-code-block");
       const code = wrapper?.querySelector("code");
       const text = code?.textContent ?? "";
-      // navigator.clipboard is async; we don't await — we just flip the
-      // label optimistically. If the write fails (no permission, no
-      // secure context), the worst case is a visual "Copied" with
-      // nothing on the clipboard, which beats blocking the UI on a
-      // promise we have no recovery path for.
       try {
         void navigator.clipboard?.writeText(text);
       } catch {
         // Older / restricted environments — silently no-op.
       }
-      const original = copyBtn.textContent;
-      copyBtn.textContent = "Copied";
+      copyBtn.classList.add("is-copied");
+      copyBtn.setAttribute("aria-label", "Copied");
+      copyBtn.title = "Copied";
       window.setTimeout(() => {
-        // Guard against the node being unmounted/re-rendered: if the
-        // text already changed back, leave it alone.
-        if (copyBtn.isConnected && copyBtn.textContent === "Copied") {
-          copyBtn.textContent = original ?? "Copy";
-        }
+        if (!copyBtn.isConnected) return;
+        copyBtn.classList.remove("is-copied");
+        copyBtn.setAttribute("aria-label", "Copy");
+        copyBtn.title = "Copy";
       }, 1500);
       return;
     }
@@ -120,35 +115,11 @@ export function MarkdownPreview({
   };
 
   return (
-    <>
-      <style>{`
-        .md-code-block { position: relative; margin-bottom: 14px; }
-        .md-code-copy {
-          position: absolute;
-          top: 6px;
-          right: 8px;
-          padding: 2px 8px;
-          font-size: 11px;
-          line-height: 1.4;
-          color: var(--accent, #4ea1ff);
-          background: transparent;
-          border: 1px solid var(--accent, #4ea1ff);
-          border-radius: 3px;
-          cursor: pointer;
-          opacity: 0;
-          transition: opacity 120ms ease;
-          font-family: inherit;
-        }
-        .md-code-block:hover .md-code-copy { opacity: 0.85; }
-        .md-code-copy:hover { opacity: 1; }
-        .md-code-copy:focus-visible { opacity: 1; outline: none; }
-      `}</style>
-      <div
-        ref={ref}
-        className={`md-preview${interactive ? " md-preview-interactive" : ""}`}
-        onClick={handleClick}
-        dangerouslySetInnerHTML={{ __html: html }}
-      />
-    </>
+    <div
+      ref={ref}
+      className={`md-preview${interactive ? " md-preview-interactive" : ""}`}
+      onClick={handleClick}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }

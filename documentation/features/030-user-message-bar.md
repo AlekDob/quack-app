@@ -45,7 +45,7 @@ Flat `display[]` messages are grouped into **turns** before render:
     .ai-user-bar-sentinel       ← 0-height sibling BEFORE sticky (IO target)
     .ai-msg.ai-msg-user         ← position: sticky; top: 0; z-index: N
       .ai-user-bar              ← visual card; state classes below
-        .ai-user-bar-main       ← MarkdownPreview + optional images
+        .ai-user-bar-main       ← MarkdownPreview + optional images (fenced code → copyable pills, `049`)
         .ai-user-bar-actions    ← expand + copy / re-send / branch
     .ai-msg-assistant …
 ```

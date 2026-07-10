@@ -61,6 +61,7 @@ Frontend `src/` (React 19 + TypeScript + Zustand, Monaco, xterm — **no Tailwin
 | Editor tab toolbar — md/mmd Edit/Split/Preview, git Changes, Save | `src/components/EditorTabToolbar.tsx`, `EditorPane.tsx`, `editorMdView.ts`, `editorMermaidView.ts`, `MermaidPreview.tsx`, `editorGitDiff.ts` |
 | Editor color themes (Monaco syntax, per light/dark) | `src/editorColorThemes.ts`, `src/monacoThemeRules.ts`, `src/vscodeThemeBundles.ts`, `src/editorMonoFont.ts`, `src/useResolvedEditorColorTheme.ts` |
 | Tool-call rendering (chips, diffs, running/done state) | `src/components/chatToolRender.tsx` |
+| Markdown renderer + copyable code blocks | `src/markdown.ts`, `src/components/MarkdownPreview.tsx`, `src/chatFileLinks.ts` |
 | Agent-centric layout (rail + sessions + tasks) | `src/components/AgentModeShell.tsx` |
 | Right-side sessions list ("library") | `src/components/AIChatsRail.tsx` |
 | Workspace picker / library entry | `src/components/WorkspacePicker.tsx` |
@@ -145,6 +146,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `046-process-cleanup.md` — Task Manager (Quack-scoped process tree, Ctrl+Alt+U); PTY process-group kill on terminal close; agent stop on archive/done/close chat (`stopChatAgent`, `aiStopBus`).
   - `047-dev-build-indicator.md` — dev-only Dock icon + in-app DEV badge/border/title when running `npm run tauri dev`; debug `build.rs` icon swap via `TAURI_CONFIG`.
   - `048-background-task-wake.md` — Claude Code `-p` background Bash/subagent wake: spawn env (`PRINT_BG_WAIT_CEILING_MS`, `RESUME_INTERRUPTED_TURN`) + `backgroundWake.ts` auto `--resume` nudge when headless turn ends idle.
+  - `049-markdown-renderer.md` — dependency-free Markdown → HTML for chat, editor preview, tool drawers; fenced code blocks as copyable pills (icon row underneath) + single-line shell token coloring.
   - `028-opencode-bridge.md` — `opencode serve` sidecar (port 17346), SSE `/global/event`, `providerSessionIds`, lazy startup catalog.
   - `029-session-diff-hub.md` — Agent Hub expanded-row edit subtitles (`Edited foo.ts −N +M`); `chatDiffStore` pub/sub + `summarizeLastTurn`.
   - `030-user-message-bar.md` — user turns as inset cards; sticky pin per turn + tall-prompt collapse while stuck (`UserTurnBar`, `useUserBarSticky.ts`).

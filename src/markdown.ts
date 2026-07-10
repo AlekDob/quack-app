@@ -464,6 +464,38 @@ function tokenize(md: string): Block[] {
   return blocks;
 }
 
+const COPY_ICON_SVG =
+  '<svg class="md-code-copy-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+
+function isShellLang(lang: string): boolean {
+  return !lang || /^(?:bash|sh|shell|zsh|console)$/i.test(lang);
+}
+
+function highlightShellLine(text: string): string {
+  const m = text.trim().match(/^(\S+)([\s\S]*)$/);
+  if (!m) return escapeHtml(text);
+  const cmd = `<span class="md-tok-cmd">${escapeHtml(m[1])}</span>`;
+  const rest = m[2] ? `<span class="md-tok-arg">${escapeHtml(m[2])}</span>` : "";
+  return cmd + rest;
+}
+
+function renderCodeBlock(b: Block): string {
+  const text = b.text ?? "";
+  const lang = b.lang ?? "";
+  const isSingle = !text.includes("\n");
+  const codeInner =
+    isSingle && isShellLang(lang) ? highlightShellLine(text) : escapeHtml(text);
+  const singleClass = isSingle ? " md-code-block--single" : "";
+  const lineAttr = b.line ? ` data-source-line="${b.line}"` : "";
+  return (
+    `<div class="md-code-block${singleClass}"${lineAttr}>` +
+    `<div class="md-code-pill"><pre><code class="lang-${lang}">${codeInner}</code></pre></div>` +
+    `<div class="md-code-actions"><button class="md-code-copy-btn" type="button" ` +
+    `aria-label="Copy" title="Copy" data-md-copy="true">${COPY_ICON_SVG}</button></div>` +
+    `</div>`
+  );
+}
+
 export function renderMarkdown(md: string): string {
   const blocks = tokenize(md);
   const parts: string[] = [];
@@ -487,18 +519,7 @@ export function renderMarkdown(md: string): string {
         break;
       }
       case "code": {
-        // Wrap the <pre><code> in a relatively-positioned container so a
-        // hover-revealed Copy button can be absolutely positioned in the
-        // top-right corner. The `data-source-line` attribute moves from
-        // <pre> onto the wrapper — the preview's click-to-jump handler
-        // uses `target.closest("[data-source-line]")` so the wrapper
-        // satisfies that lookup just as well as <pre> did. The button
-        // is tagged `data-md-copy="true"` so the click handler can
-        // intercept copy clicks before they fall through to the jump
-        // handler.
-        parts.push(
-          `<div class="md-code-block"${lineAttr(b)}><button class="md-code-copy" type="button" aria-label="Copy code" title="Copy code" data-md-copy="true">Copy</button><pre><code class="lang-${b.lang ?? ""}">${escapeHtml(b.text ?? "")}</code></pre></div>`,
-        );
+        parts.push(renderCodeBlock(b));
         break;
       }
       case "ul": {

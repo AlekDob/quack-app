@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), Monaco, plain CSS
 created: 2026-07-01
-last_verified: 2026-07-07
+last_verified: 2026-07-10
 tags: [editor, markdown, mermaid, html, preview, split, git-diff, toolbar, monaco, spaceship-pattern]
 ---
 
@@ -19,7 +19,7 @@ tags: [editor, markdown, mermaid, html, preview, split, git-diff, toolbar, monac
 | Component | `src/components/FileEditorPane.tsx` | Modal/slide-in editor (skills, instructions, agent file popup) |
 | Component | `src/components/SimpleMonacoEditor.tsx` | Lightweight Monaco wrapper for `FileEditorPane` |
 | Component | `src/components/DiffView.tsx` | Monaco `DiffEditor` wrapper (inline vs side-by-side) |
-| Component | `src/components/MarkdownPreview.tsx` | Rendered preview pane for `.md`/`.mdx` (split + preview-only) |
+| Component | `src/components/MarkdownPreview.tsx` | Rendered preview pane for `.md`/`.mdx` (split + preview-only); copyable fenced code blocks — see `049-markdown-renderer.md` |
 | Component | `src/components/MermaidPreview.tsx` | Rendered SVG diagram pane for `.mmd` (split + preview-only) |
 | Component | `src/components/HtmlPreviewFrame.tsx` | Sandboxed iframe preview for `.html` (split + preview-only) |
 | Component | `src/components/EditorBreadcrumbs.tsx` | Path + symbol breadcrumb (unchanged; sits above toolbar) |

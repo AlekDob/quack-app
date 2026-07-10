@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-07
+last_verified: 2026-07-10
 tags: [ai-chat, tool-calls, chatToolRender, cursor-style, conductor-style, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap, html-preview]
 ---
 
@@ -87,7 +87,7 @@ App-level right slide-over (`App.tsx`).
 | Body mode | When |
 |---|---|
 | `HtmlPreviewFrame` | `variant: "browser"` + `html` set (agent HTML preview) |
-| `MarkdownPreview` | `.md` file reads (`isMarkdownRead` + `stripReadGutter`) |
+| `MarkdownPreview` | `.md` file reads (`isMarkdownRead` + `stripReadGutter`) — fenced blocks use copyable pill UI (`049`) |
 | `MarkdownPreview` | **WebFetch** / `web_fetch` results (`isMarkdownDrawer`) |
 | `<pre>` | Bash, Grep, code reads, other plain text |
 | Image | Read of an image path (`imagePath` → data URL) |
