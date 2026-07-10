@@ -24,7 +24,7 @@ import {
 import {
   getBrainCumulative,
 } from "../brainUsageStore";
-import { error as toastError, success as toastSuccess } from "../notify";
+import { error as toastError, info as toastInfo, success as toastSuccess } from "../notify";
 
 interface BrainPanelProps {
   wsId: string;
@@ -37,7 +37,8 @@ export function BrainPanel({ wsId, root }: BrainPanelProps) {
   const [telemetry, setTelemetry] = useState<PinkyTelemetry | null>(null);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<PinkySearchHit[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [busyKind, setBusyKind] = useState<"setup" | "reindex" | null>(null);
+  const busy = busyKind !== null;
   const [searching, setSearching] = useState(false);
   const [completedQuery, setCompletedQuery] = useState<string | null>(null);
   const [injectOn, setInjectOn] = useState(() => getBrainInjectEnabled(wsId));
@@ -84,7 +85,8 @@ export function BrainPanel({ wsId, root }: BrainPanelProps) {
   };
 
   const runSetup = async () => {
-    setBusy(true);
+    setBusyKind("setup");
+    toastInfo("Setting up Pinky Brain… first index may take up to a minute.");
     try {
       const res = await pinky.setup(root);
       toastSuccess(res.message);
@@ -92,12 +94,13 @@ export function BrainPanel({ wsId, root }: BrainPanelProps) {
     } catch (e) {
       toastError(String(e));
     } finally {
-      setBusy(false);
+      setBusyKind(null);
     }
   };
 
   const runReindex = async () => {
-    setBusy(true);
+    setBusyKind("reindex");
+    toastInfo("Indexing documentation/… first run may take up to a minute.");
     try {
       const res = await pinky.reindex(root);
       toastSuccess(res.message);
@@ -105,7 +108,7 @@ export function BrainPanel({ wsId, root }: BrainPanelProps) {
     } catch (e) {
       toastError(String(e));
     } finally {
-      setBusy(false);
+      setBusyKind(null);
     }
   };
 
@@ -165,8 +168,16 @@ export function BrainPanel({ wsId, root }: BrainPanelProps) {
         <div>
           <h2 className="brain-title">Pinky Brain</h2>
           <p className="brain-sub">
-            {status.entries} entries · {status.chunks} chunks
-            {status.version ? ` · ${status.version}` : ""}
+            {busyKind === "reindex" ? (
+              <span className="brain-search-shimmer">Indexing documentation…</span>
+            ) : busyKind === "setup" ? (
+              <span className="brain-search-shimmer">Setting up Pinky Brain…</span>
+            ) : (
+              <>
+                {status.entries} entries · {status.chunks} chunks
+                {status.version ? ` · ${status.version}` : ""}
+              </>
+            )}
           </p>
         </div>
         <div className="brain-header-actions">
@@ -197,16 +208,23 @@ export function BrainPanel({ wsId, root }: BrainPanelProps) {
       {!status.mcp_installed && (
         <div className="brain-setup">
           <p className="brain-muted">
-            Set up Pinky for this workspace (MCP + Claude Code rule + hooks).
+            Set up Pinky for this workspace (MCP + Claude Code rule).
           </p>
-          <button
-            type="button"
-            className="brain-btn primary"
-            disabled={busy}
-            onClick={() => void runSetup()}
-          >
-            Enable Pinky Brain
-          </button>
+          {busyKind === "setup" ? (
+            <p className="brain-setup-busy" aria-live="polite">
+              <span className="brain-search-shimmer">Setting up Pinky Brain…</span>
+              {" "}
+              First run may take up to a minute while the index loads — you can keep using the app.
+            </p>
+          ) : (
+            <button
+              type="button"
+              className="brain-btn primary"
+              onClick={() => void runSetup()}
+            >
+              Enable Pinky Brain
+            </button>
+          )}
         </div>
       )}
 
@@ -247,15 +265,36 @@ export function BrainPanel({ wsId, root }: BrainPanelProps) {
           </button>
           <button
             type="button"
-            className="brain-btn ghost"
+            className={`brain-btn ghost${busyKind === "reindex" ? " is-busy" : ""}`}
             disabled={busy || !status.documentation_exists}
             onClick={() => void runReindex()}
             title="Reindex documentation/"
           >
-            Reindex
+            {busyKind === "reindex" ? (
+              <span className="brain-search-shimmer">Indexing…</span>
+            ) : (
+              "Reindex"
+            )}
           </button>
         </div>
       </div>
+
+      {busyKind === "reindex" && (
+        <section className="brain-indexing" aria-live="polite">
+          <p className="brain-indexing-label">
+            <span className="brain-search-shimmer">Building brain.db from documentation/</span>
+            {" "}
+            — you can keep using the app. This can take about a minute on first run.
+          </p>
+          <BrainSearchSkeleton />
+        </section>
+      )}
+
+      {!busy && !status.db_exists && status.documentation_exists && (
+        <p className="brain-empty-index">
+          No index yet — click <strong>Reindex</strong> to scan documentation/ into brain.db.
+        </p>
+      )}
 
       {showDashboard && status.db_exists && (
         <BrainDashboard

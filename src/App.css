@@ -18537,6 +18537,47 @@ body.ws-dragging * {
   background: var(--bg-elev);
 }
 
+.brain-setup-busy {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fg-dim);
+}
+
+.brain-indexing {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.brain-indexing-label {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fg-dim);
+}
+
+.brain-empty-index {
+  margin: 12px 0 0;
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--fg-dim);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-elev);
+}
+
+.brain-empty-index strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.brain-btn.ghost.is-busy {
+  pointer-events: none;
+}
+
 .brain-search-zone {
   display: flex;
   flex-wrap: wrap;

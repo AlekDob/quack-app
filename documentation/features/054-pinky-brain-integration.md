@@ -34,7 +34,7 @@ two-level store). Quack wraps the `pinky` CLI — it does not reimplement search
 | `pinky_available` | CLI on PATH? + version |
 | `pinky_workspace_status` | MCP/rule/db flags + entry counts + migration flag |
 | `pinky_search` | `pinky search --json` in workspace cwd |
-| `pinky_setup` | `pinky init --no-model` + write `.mcp.json` + reindex |
+| `pinky_setup` | `pinky init --no-model --no-hooks` + write `.mcp.json` + reindex |
 | `pinky_reindex` | `pinky reindex documentation` |
 | `pinky_migrate_global_brain` | Symlink `~/.pinky/brain` → `~/.quack/brain` when needed |
 | `pinky_stats_value` | `pinky stats --value --json` (dashboard) |
@@ -70,6 +70,8 @@ padding ≤360px, 3-column hero ≥900px. Hero grid uses `auto-fit` +
 | Searching | “Searching knowledge…” shimmer label + 5 skeleton rows with sweep |
 | Results | Staggered fade-in rows; query terms highlighted (`brainHighlight.ts`) |
 | Settled, 0 hits | Centered empty state |
+| Reindex running | Toast + header shimmer + skeleton rows + banner copy |
+| No `brain.db` yet | Dashed callout — click Reindex |
 | Row hover | File path slides in (hidden by default for cleaner list) |
 
 **Open file:** `openBrainDoc()` focuses the pane that owns the Brain tab, then
@@ -77,7 +79,24 @@ padding ≤360px, 3-column hero ≥900px. Hero grid uses `auto-fit` +
 in the wrong pane.
 
 Search bar: pill input + icon, shimmer label while busy, separate `searching`
-vs `busy` (reindex/setup).
+vs `busyKind` (`setup` | `reindex` | idle).
+
+## Setup & reindex UX (`BrainPanel.tsx`)
+
+First `pinky reindex` loads the ONNX embed model (~60s on a cold machine). Until
+`brain.db` exists, entry/chunk counts stay at 0 and the dashboard is hidden — easy
+to misread as “nothing indexed” if there is no progress UI.
+
+| Phase | UI |
+|---|---|
+| No `brain.db`, docs present | Dashed callout: “No index yet — click **Reindex**” |
+| Setup (`busyKind=setup`) | Toast info + setup banner; `pinky init --no-model --no-hooks` |
+| Reindex (`busyKind=reindex`) | Toast info + header shimmer + skeleton rows + banner |
+| Done | Success toast + `refresh()` → chips + dashboard populate |
+
+**Non-blocking IPC:** all `pinky_*` commands are `async` + `spawn_blocking`; the
+user can keep using the app during setup/reindex. Every CLI spawn sets
+`stdin(Stdio::null())` so Pinky cannot block on interactive prompts.
 
 ## Dashboard (`BrainDashboard` + `BrainCharts.tsx`)
 
@@ -111,7 +130,7 @@ Heuristic vs classic Grep + Read tool loops (not provider billing):
 
 1. **Global path:** first `pinky_workspace_status` migrates `~/.quack/brain` →
    `~/.pinky/brain` (symlink on Unix)
-2. **Setup:** `pinky setup` → `pinky init --no-model` + `.mcp.json` + reindex
+2. **Setup:** `pinky setup` → `pinky init --no-model --no-hooks` + `.mcp.json` + reindex
 3. **MCP:** `.mcp.json` `pinky-mcp` entry (Virgilio-compatible env)
 4. **CC rule:** `.claude/rules/use-pinky-brain.md` via `pinky init` (gitignored)
 5. **Legacy skill:** `~/.claude/skills/quack-brain` remains for manual invoke;
@@ -141,9 +160,19 @@ Heuristic vs classic Grep + Read tool loops (not provider billing):
 
 ## Gotchas
 
+- **UI freeze on setup (fixed):** sync Tauri commands ran `pinky reindex` on the main
+  thread; first index loads the embed model (~60s) and froze the whole window.
+  All `pinky_*` commands now use `spawn_blocking` (same as `git.rs` / `search.rs`).
+- **`pinky init` interactive prompt (fixed):** without `--no-hooks`, init asks to install
+  CC hooks on stdin and hangs when spawned from Quack. Setup uses
+  `pinky init --no-model --no-hooks` (Quack already owns CC permission hooks).
+  All spawns also pass `stdin(Stdio::null())` as a belt-and-suspenders guard.
+- **Silent reindex (fixed):** reindex showed 0 entries / no dashboard with no
+  loader until completion. `busyKind` drives toast, header shimmer, skeleton, and
+  empty-index callout.
 - Pinky CLI installed separately (pinkybrain.dev) — not bundled (~21 MB)
 - `brain.db`, `.fastembed_cache/` gitignored; index is local per workspace
-- `pinky init --no-model` in setup skips ONNX download; run Reindex after model fetch
+- `pinky init --no-model --no-hooks` in setup skips ONNX download and interactive hook prompt
 - Pre-turn inject + MCP `brain_search` can overlap on CC turns — complementary
 - `prefers-reduced-motion`: chart/search animations disabled
 - Pinky search paths are relative to `documentation/` — never open without

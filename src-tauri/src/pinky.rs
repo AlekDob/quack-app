@@ -1,9 +1,13 @@
 //! Pinky Brain bridge — wraps the local `pinky` CLI for search, stats,
 //! setup, and Quack Brain → Pinky global path migration.
+//!
+//! Pinky shells out to a Rust CLI; first `reindex` can take ~60s while the
+//! embedding model loads. All commands use spawn_blocking so the UI stays
+//! responsive (same pattern as git.rs / search.rs).
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 const PINKY_DB: &str = "brain.db";
 const PINKY_SAVE: &str = "documentation";
@@ -116,7 +120,8 @@ fn pinky_cmd(root: &Path) -> Result<Command, String> {
     let mut cmd = Command::new(exe);
     cmd.current_dir(root)
         .env("PINKY_DB", PINKY_DB)
-        .env("PINKY_SAVE_DIR", PINKY_SAVE);
+        .env("PINKY_SAVE_DIR", PINKY_SAVE)
+        .stdin(Stdio::null());
     Ok(cmd)
 }
 
@@ -140,6 +145,16 @@ fn run_pinky(root: &Path, args: &[&str]) -> Result<String, String> {
         ));
     }
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+// Tauri runs sync commands on the main thread — a first-time `pinky reindex`
+// blocks the whole window for ~60s while the embed model loads.
+async fn off_thread<T: Send + 'static>(
+    f: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 fn read_stats(root: &Path) -> (u32, u32) {
@@ -234,7 +249,59 @@ fn write_project_mcp(root: &Path) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn pinky_available() -> PinkyAvailability {
+pub async fn pinky_available() -> PinkyAvailability {
+    off_thread(|| {
+        let Some(exe) = resolve_pinky() else {
+            return Ok(PinkyAvailability {
+                ok: false,
+                version: None,
+            });
+        };
+        let version = Command::new(exe)
+            .arg("--version")
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string());
+        Ok(PinkyAvailability {
+            ok: true,
+            version,
+        })
+    })
+    .await
+    .unwrap_or(PinkyAvailability {
+        ok: false,
+        version: None,
+    })
+}
+
+#[tauri::command]
+pub async fn pinky_workspace_status(root: String) -> Result<PinkyWorkspaceStatus, String> {
+    off_thread(move || {
+        let root = PathBuf::from(root);
+        let avail = pinky_available_sync();
+        let migrated = migrate_global_brain().unwrap_or(false);
+        let (entries, chunks) = if avail.ok && root.join(PINKY_DB).exists() {
+            read_stats(&root)
+        } else {
+            (0, 0)
+        };
+        Ok(PinkyWorkspaceStatus {
+            pinky_ok: avail.ok,
+            version: avail.version,
+            documentation_exists: root.join(PINKY_SAVE).is_dir(),
+            mcp_installed: workspace_mcp(&root),
+            rule_installed: workspace_rule(&root),
+            db_exists: root.join(PINKY_DB).exists(),
+            entries,
+            chunks,
+            global_migrated: migrated,
+        })
+    })
+    .await
+}
+
+fn pinky_available_sync() -> PinkyAvailability {
     let Some(exe) = resolve_pinky() else {
         return PinkyAvailability {
             ok: false,
@@ -254,106 +321,98 @@ pub fn pinky_available() -> PinkyAvailability {
 }
 
 #[tauri::command]
-pub fn pinky_workspace_status(root: String) -> Result<PinkyWorkspaceStatus, String> {
-    let root = PathBuf::from(root);
-    let avail = pinky_available();
-    let migrated = migrate_global_brain().unwrap_or(false);
-    let (entries, chunks) = if avail.ok {
-        read_stats(&root)
-    } else {
-        (0, 0)
-    };
-    Ok(PinkyWorkspaceStatus {
-        pinky_ok: avail.ok,
-        version: avail.version,
-        documentation_exists: root.join(PINKY_SAVE).is_dir(),
-        mcp_installed: workspace_mcp(&root),
-        rule_installed: workspace_rule(&root),
-        db_exists: root.join(PINKY_DB).exists(),
-        entries,
-        chunks,
-        global_migrated: migrated,
-    })
-}
-
-#[tauri::command]
-pub fn pinky_search(
+pub async fn pinky_search(
     root: String,
     query: String,
     limit: Option<u32>,
 ) -> Result<PinkySearchResult, String> {
-    let root = PathBuf::from(root);
-    let lim = limit.unwrap_or(5).max(1).min(20);
-    let raw = run_pinky(
-        &root,
-        &["search", &query, "--json", "--limit", &lim.to_string()],
-    )?;
-    let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
-    let results = v
-        .get("results")
-        .and_then(|r| r.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|item| serde_json::from_value::<PinkySearchHit>(item.clone()).ok())
-                .collect()
+    off_thread(move || {
+        let root = PathBuf::from(root);
+        let lim = limit.unwrap_or(5).max(1).min(20);
+        let raw = run_pinky(
+            &root,
+            &["search", &query, "--json", "--limit", &lim.to_string()],
+        )?;
+        let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+        let results = v
+            .get("results")
+            .and_then(|r| r.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|item| serde_json::from_value::<PinkySearchHit>(item.clone()).ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        Ok(PinkySearchResult {
+            query: v
+                .get("query")
+                .and_then(|q| q.as_str())
+                .unwrap_or(&query)
+                .to_string(),
+            results,
         })
-        .unwrap_or_default();
-    Ok(PinkySearchResult {
-        query: v
-            .get("query")
-            .and_then(|q| q.as_str())
-            .unwrap_or(&query)
-            .to_string(),
-        results,
     })
+    .await
 }
 
 #[tauri::command]
-pub fn pinky_reindex(root: String) -> Result<PinkySetupResult, String> {
-    let root = PathBuf::from(root);
-    let doc = root.join(PINKY_SAVE);
-    if !doc.is_dir() {
-        return Err("documentation/ folder not found — run Setup first".to_string());
-    }
-    run_pinky(&root, &["reindex", PINKY_SAVE])?;
-    let (entries, chunks) = read_stats(&root);
-    Ok(PinkySetupResult {
-        ok: true,
-        message: format!("Indexed {entries} entries ({chunks} chunks)"),
+pub async fn pinky_reindex(root: String) -> Result<PinkySetupResult, String> {
+    off_thread(move || {
+        let root = PathBuf::from(root);
+        let doc = root.join(PINKY_SAVE);
+        if !doc.is_dir() {
+            return Err("documentation/ folder not found — run Setup first".to_string());
+        }
+        run_pinky(&root, &["reindex", PINKY_SAVE])?;
+        let (entries, chunks) = read_stats(&root);
+        Ok(PinkySetupResult {
+            ok: true,
+            message: format!("Indexed {entries} entries ({chunks} chunks)"),
+        })
     })
+    .await
 }
 
 #[tauri::command]
-pub fn pinky_setup(root: String) -> Result<PinkySetupResult, String> {
-    let root = PathBuf::from(root);
-    let _ = migrate_global_brain();
-    run_pinky(&root, &["init", "--no-model"])?;
-    write_project_mcp(&root)?;
-    if root.join(PINKY_SAVE).is_dir() {
-        let _ = run_pinky(&root, &["reindex", PINKY_SAVE]);
-    }
-    let (entries, chunks) = read_stats(&root);
-    Ok(PinkySetupResult {
-        ok: true,
-        message: format!("Pinky Brain ready — {entries} entries ({chunks} chunks)"),
+pub async fn pinky_setup(root: String) -> Result<PinkySetupResult, String> {
+    off_thread(move || {
+        let root = PathBuf::from(root);
+        let _ = migrate_global_brain();
+        run_pinky(&root, &["init", "--no-model", "--no-hooks"])?;
+        write_project_mcp(&root)?;
+        if root.join(PINKY_SAVE).is_dir() {
+            let _ = run_pinky(&root, &["reindex", PINKY_SAVE]);
+        }
+        let (entries, chunks) = read_stats(&root);
+        Ok(PinkySetupResult {
+            ok: true,
+            message: format!("Pinky Brain ready — {entries} entries ({chunks} chunks)"),
+        })
     })
+    .await
 }
 
 #[tauri::command]
-pub fn pinky_migrate_global_brain() -> Result<bool, String> {
-    migrate_global_brain()
+pub async fn pinky_migrate_global_brain() -> Result<bool, String> {
+    off_thread(migrate_global_brain).await
 }
 
 #[tauri::command]
-pub fn pinky_stats_value(root: String) -> Result<PinkyValueStats, String> {
-    let root = PathBuf::from(root);
-    let raw = run_pinky(&root, &["stats", "--value", "--json"])?;
-    serde_json::from_str(&raw).map_err(|e| e.to_string())
+pub async fn pinky_stats_value(root: String) -> Result<PinkyValueStats, String> {
+    off_thread(move || {
+        let root = PathBuf::from(root);
+        let raw = run_pinky(&root, &["stats", "--value", "--json"])?;
+        serde_json::from_str(&raw).map_err(|e| e.to_string())
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn pinky_telemetry(root: String) -> Result<PinkyTelemetry, String> {
-    let root = PathBuf::from(root);
-    let raw = run_pinky(&root, &["telemetry", "--json"])?;
-    serde_json::from_str(&raw).map_err(|e| e.to_string())
+pub async fn pinky_telemetry(root: String) -> Result<PinkyTelemetry, String> {
+    off_thread(move || {
+        let root = PathBuf::from(root);
+        let raw = run_pinky(&root, &["telemetry", "--json"])?;
+        serde_json::from_str(&raw).map_err(|e| e.to_string())
+    })
+    .await
 }
