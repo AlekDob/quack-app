@@ -29,10 +29,12 @@ mode/mic/send on the right.
 | `src/components/MentionSuggestions.tsx` | `@` autocomplete popover (agents + files, path preview) |
 | `src/components/ComposerContextBar.tsx` | Cursor-style path + branch selectors at the top of the composer pill |
 | `src/components/AgentCommitDock.tsx` | Agent `git commit` pill above the composer (hash, message, time, push state) — feature 051 |
+| `src/components/ComposerGitActions.tsx` | Changed-files list + Commit & Push split control inside the pill — feature 053 |
+| `src/composerGitOps.ts` | Stage / commit / branch / push orchestration for composer git menu |
 | `src/components/WorkspacePathPicker.tsx` | Workspace path segment — switch open projects or open a folder |
 | `src/components/GitBranchPicker.tsx` | Shared git branch dropdown (composer + Source Control panel) |
 | `src/composerCtxMenu.tsx` | Portaled menu helper for context-bar dropdowns |
-| `src/App.css` | `.ai-composer-*`, `.ai-composer-context-bar`, `.ai-composer-ctx-*`, `.ai-agent-*`, `.ai-mention-*`, `.ai-mic-btn`, `.ai-dictation-*`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-commit-dock*`, `.ai-context-dock*`, `.ai-queue-*` |
+| `src/App.css` | `.ai-composer-*`, `.ai-composer-context-bar`, `.ai-composer-ctx-*`, `.ai-composer-git*`, `.ai-agent-*`, `.ai-mention-*`, `.ai-mic-btn`, `.ai-dictation-*`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-commit-dock*`, `.ai-context-dock*`, `.ai-queue-*` |
 
 ## Context bar (path + branch)
 
@@ -176,6 +178,17 @@ Full detail: **`051-agent-commit-dock.md`**.
 Stays visible after the turn ends. Cleared on new chat and `/clear`. Hydrates from
 saved `tool_results` when reopening a session.
 
+## Composer git actions (feature 053)
+
+Cursor-style **inside** the composer pill (below context bar): changed-file rows with
+per-file `+`/ `−`, aggregate **Changes** pill, and **Commit & Push** split button with
+chevron menu (branch / commit / push variants).
+
+Full detail: **`053-composer-git-actions.md`**.
+
+- Commit message prompt prefills from composer draft text.
+- All commit paths stage non-conflicted files first; push uses publish dialog when no upstream.
+
 ## Per-project context files (right side of status dock)
 
 Moved from the old standalone `ai-context-dock` chip above the composer and
@@ -221,4 +234,5 @@ Full DOM/CSS detail (turn wrappers, sticky containing block, z-index stacking):
 - `@` file path preview popover: `041-mention-file-preview.md`.
 - Composer path + branch bar: `050-composer-context-bar.md`.
 - Agent commit indicator above composer: `051-agent-commit-dock.md`.
+- Composer git actions (inside pill): `053-composer-git-actions.md`.
 - Composer voice dictation: `052-composer-voice-dictation.md`.

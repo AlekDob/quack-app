@@ -342,8 +342,25 @@ export interface GitStash {
   timestamp: number;
 }
 
+export interface GitFileDiffStat {
+  path: string;
+  insertions: number;
+  deletions: number;
+}
+
+export interface GitDiffStat {
+  insertions: number;
+  deletions: number;
+  files: GitFileDiffStat[];
+}
+
 export const git = {
   status: (path: string) => invoke<GitStatus>("git_status", { path }),
+  diffStat: (path: string) => invoke<GitDiffStat>("git_diff_stat", { path }),
+  stage: (path: string, files: string[]) =>
+    invoke<string>("git_stage", { path, files }),
+  commit: (path: string, message: string) =>
+    invoke<string>("git_commit", { path, message }),
   diff: (path: string, file?: string) =>
     invoke<string>("git_diff", { path, file: file ?? null }),
   diffStaged: (path: string, file?: string) =>

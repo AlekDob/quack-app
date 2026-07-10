@@ -72,12 +72,15 @@ python3 scripts/generate-dev-icons.py
 In **debug** builds, `build.rs` sets:
 
 ```json
-{"bundle":{"icon":["icons/32x32-dev.png","icons/128x128-dev.png","icons/128x128@2x-dev.png","icons/icon-dev.icns","icons/icon-dev.ico"]}}
+{"identifier":"dev.getcodetta.app.dev","bundle":{"icon":["icons/32x32-dev.png","icons/128x128-dev.png","icons/128x128@2x-dev.png","icons/icon-dev.icns","icons/icon-dev.ico"]}}
 ```
 
-via `TAURI_CONFIG` before `tauri_build::build()`. On macOS, `tauri-codegen`
-embeds `icon-dev.icns` as `app_icon` when `dev` cfg is active, and Tauri applies
-it to the Dock on `RunEvent::Ready`. Release builds skip the merge entirely.
+via `TAURI_CONFIG` before `tauri_build::build()`. The dev identifier lets
+`npm run tauri dev` launch while `/Applications/Quack.app` is already open
+(single-instance only dedupes within the same identifier). On macOS,
+`tauri-codegen` embeds `icon-dev.icns` as `app_icon` when `dev` cfg is active,
+and Tauri applies it to the Dock on `RunEvent::Ready`. Release builds skip the
+merge entirely.
 
 ## Styling rules
 
@@ -88,6 +91,11 @@ it to the Dock on `RunEvent::Ready`. Release builds skip the merge entirely.
 
 - **Requires a Rust rebuild** after icon or `build.rs` changes — HMR does not
   refresh the Dock icon. Restart `npm run tauri dev`.
+- **`tauri dev` exits immediately** if production Quack is already open and
+  single-instance is active — debug builds now **skip** the single-instance
+  plugin (`lib.rs` `#[cfg(not(debug_assertions))]`) so dev can run beside
+  `/Applications/Quack.app`. A second **dev** window still dedupes only in
+  release builds.
 - **`npm run build` (frontend only)** sets `import.meta.env.DEV = false` — no UI
   badges in the static `dist/` bundle even if served manually.
 - **Release / `tauri build`** uses production icons and no dev chrome.

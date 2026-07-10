@@ -201,14 +201,17 @@ export function AgentHubWatcher() {
       const ws = useStore.getState().loaded[wsId];
       const title = ws?.aiChats[chatId]?.title ?? "Chat";
       const wsName = ws?.meta.name ?? "Workspace";
-      const isQuestion = req.tool_name === "AskUserQuestion";
-      if (isQuestion) {
-        const entry: PendingEntry = { chatId, wsId, kind: "question" };
-        pending.set(req.request_id, entry);
-        showNeedsInput(entry, wsName, title);
-        return;
-      }
-      const entry: PendingEntry = { chatId, wsId, kind: "permission" };
+      // Questions go through the SAME grace timer as permissions: an
+      // AskUserQuestion under -p can't render headless, so the overlay
+      // auto-redirects it (deny "ask in plain text") within ms. Firing
+      // needs-input immediately flashed a purple dot + quack for that
+      // redirect even though nothing was ever pending. The grace lets the
+      // settle land first, so only a question still open past PERM_GRACE_MS
+      // surfaces attention.
+      const kind: "permission" | "question" = req.tool_name === "AskUserQuestion"
+        ? "question"
+        : "permission";
+      const entry: PendingEntry = { chatId, wsId, kind };
       entry.timer = window.setTimeout(
         () => showNeedsInput(entry, wsName, title),
         PERM_GRACE_MS,
@@ -220,8 +223,11 @@ export function AgentHubWatcher() {
       const entry = pending.get(requestId);
       if (!entry) return;
       pending.delete(requestId);
-      if (entry.kind === "question") return; // clears on focus, not on settle
+      // Cancel the grace timer for both kinds: if the request settled
+      // before PERM_GRACE_MS (e.g. the AskUserQuestion redirect), it never
+      // flashes needs-input at all.
       if (entry.timer) window.clearTimeout(entry.timer);
+      if (entry.kind === "question") return; // once shown, clears on focus, not settle
       if (getAgentStatus(entry.chatId)?.derived === "needs-input") {
         publishAgentStatus(entry.chatId, null); // poll re-derives working/idle
       }

@@ -266,6 +266,78 @@ pub async fn git_diff(path: String, file: Option<String>) -> Result<String, Stri
     .await
 }
 
+#[derive(Serialize)]
+pub struct GitFileDiffStat {
+    pub path: String,
+    pub insertions: u32,
+    pub deletions: u32,
+}
+
+#[derive(Serialize)]
+pub struct GitDiffStat {
+    pub insertions: u32,
+    pub deletions: u32,
+    pub files: Vec<GitFileDiffStat>,
+}
+
+fn parse_numstat_line(line: &str) -> Option<GitFileDiffStat> {
+    let parts: Vec<&str> = line.split('\t').collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    let ins = if parts[0] == "-" {
+        0
+    } else {
+        parts[0].parse().unwrap_or(0)
+    };
+    let del = if parts[1] == "-" {
+        0
+    } else {
+        parts[1].parse().unwrap_or(0)
+    };
+    Some(GitFileDiffStat {
+        path: parts[2].to_string(),
+        insertions: ins,
+        deletions: del,
+    })
+}
+
+fn git_diff_stat_blocking(path: String) -> Result<GitDiffStat, String> {
+    if !is_repo(&path) {
+        return Ok(GitDiffStat {
+            insertions: 0,
+            deletions: 0,
+            files: vec![],
+        });
+    }
+    let out = run_git(&path, &["diff", "HEAD", "--numstat"])?;
+    let mut insertions = 0u32;
+    let mut deletions = 0u32;
+    let mut files = Vec::new();
+    for line in out.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let Some(row) = parse_numstat_line(line) else {
+            continue;
+        };
+        insertions += row.insertions;
+        deletions += row.deletions;
+        files.push(row);
+    }
+    Ok(GitDiffStat {
+        insertions,
+        deletions,
+        files,
+    })
+}
+
+#[tauri::command]
+pub async fn git_diff_stat(path: String) -> Result<GitDiffStat, String> {
+    off_thread(move || git_diff_stat_blocking(path)).await
+}
+
 #[tauri::command]
 pub async fn git_diff_staged(path: String, file: Option<String>) -> Result<String, String> {
     off_thread(move || {

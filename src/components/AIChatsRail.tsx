@@ -32,6 +32,7 @@ import {
   type SessionDiffSummary,
 } from "../chatDiffStore";
 import { fileBase } from "../sessionDiffStats";
+import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { pulseChatSwitch } from "../chatSwitch";
 import { AgentCustomizations } from "./AgentCustomizations";
 import {
@@ -82,7 +83,7 @@ interface AIChatsRailProps {
   /** Agent mode: no `ai:` tab — parent owns the focused session id. */
   activeChatId?: string | null;
   onSelectChat?: (wsId: string, chatId: string) => void;
-  onNewChat?: (wsId: string) => void;
+  onNewChat?: (wsId: string, anchor: { x: number; y: number }) => void;
   onCloseChat?: (wsId: string, chatId: string) => void;
   /** Rendered below customizations (tasks, exit, …). */
   footer?: ReactNode;
@@ -104,7 +105,7 @@ export function AIChatsRail({
   );
   const setActiveWorkspace = useStore((s) => s.setActiveWorkspace);
   const focusAIChat = useStore((s) => s.focusAIChat);
-  const addAIChat = useStore((s) => s.addAIChat);
+  const addBtnRef = useRef<HTMLButtonElement>(null);
   const closeAIChat = useStore((s) => s.closeAIChat);
   const renameAIChat = useStore((s) => s.renameAIChat);
   const setAIChatLifecycle = useStore((s) => s.setAIChatLifecycle);
@@ -171,14 +172,14 @@ export function AIChatsRail({
     onCloseChat?.(wsId, chatId);
   };
 
-  const newChat = () => {
+  const newChat = (e?: React.MouseEvent<HTMLButtonElement>) => {
     if (!activeId) return;
+    const anchor = anchorFromElement(e?.currentTarget ?? addBtnRef.current);
     if (onNewChat) {
-      onNewChat(activeId);
+      onNewChat(activeId, anchor);
       return;
     }
-    pulseChatSwitch();
-    addAIChat(activeId, "editor");
+    addNewAIChat(activeId, "editor", anchor);
   };
 
   const totalChats = entries.length;
@@ -197,6 +198,7 @@ export function AIChatsRail({
     >
       <div className="agent-hub-header">
         <button
+          ref={addBtnRef}
           className="agent-hub-add"
           onClick={newChat}
           title="New AI chat"
@@ -266,6 +268,22 @@ export function AIChatsRail({
                 label={label}
                 count={items.length}
                 expanded={expanded}
+                bulkActions={
+                  status === "done"
+                    ? {
+                        onReopenAll: () => {
+                          for (const e of items) {
+                            setAIChatLifecycle(e.wsId, e.chat.id, "active");
+                          }
+                        },
+                        onArchiveAll: () => {
+                          for (const e of items) {
+                            setAIChatLifecycle(e.wsId, e.chat.id, "archived");
+                          }
+                        },
+                      }
+                    : undefined
+                }
               >
                 {items.map((entry) => (
                   <HubRow
@@ -353,10 +371,21 @@ interface SectionProps {
   label: string;
   count: number;
   expanded: boolean;
+  bulkActions?: {
+    onReopenAll: () => void;
+    onArchiveAll: () => void;
+  };
   children: React.ReactNode;
 }
 
-function HubSection({ status, label, count, expanded, children }: SectionProps) {
+function HubSection({
+  status,
+  label,
+  count,
+  expanded,
+  bulkActions,
+  children,
+}: SectionProps) {
   const collapsed = isSectionCollapsed(status);
   if (!expanded) {
     // Collapsed rail: no headers, just the dots stacked by group order.
@@ -364,16 +393,85 @@ function HubSection({ status, label, count, expanded, children }: SectionProps) 
   }
   return (
     <div className={`agent-hub-section status-${status}`}>
-      <button
-        className="agent-hub-section-head"
-        onClick={() => toggleSectionCollapsed(status)}
-        aria-expanded={!collapsed}
-      >
-        <Icon name={collapsed ? "chevron-right" : "chevron-down"} size={11} />
-        <span className="agent-hub-section-label">{label}</span>
+      <div className="agent-hub-section-head-row">
+        <button
+          className="agent-hub-section-head"
+          onClick={() => toggleSectionCollapsed(status)}
+          aria-expanded={!collapsed}
+        >
+          <Icon name={collapsed ? "chevron-right" : "chevron-down"} size={11} />
+          <span className="agent-hub-section-label">{label}</span>
+        </button>
         <span className="agent-hub-section-count">{count}</span>
-      </button>
+        {bulkActions && count > 0 && (
+          <HubSectionBulkMenu actions={bulkActions} />
+        )}
+      </div>
       {!collapsed && children}
+    </div>
+  );
+}
+
+function HubSectionBulkMenu({
+  actions,
+}: {
+  actions: { onReopenAll: () => void; onArchiveAll: () => void };
+}) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest(".agent-hub-section-menu")) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  return (
+    <div className="agent-hub-section-menu-wrap">
+      <button
+        type="button"
+        className={`agent-hub-section-menu-btn ${open ? "active" : ""}`}
+        title="Done section actions"
+        aria-label="Done section actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+      >
+        <Icon name="more-horizontal" size={12} />
+      </button>
+      {open && (
+        <div className="agent-hub-section-menu liquid-glass" role="menu">
+          <button
+            type="button"
+            className="agent-hub-section-menu-item"
+            role="menuitem"
+            onClick={() => {
+              actions.onReopenAll();
+              setOpen(false);
+            }}
+          >
+            Reopen all
+          </button>
+          <button
+            type="button"
+            className="agent-hub-section-menu-item"
+            role="menuitem"
+            onClick={() => {
+              actions.onArchiveAll();
+              setOpen(false);
+            }}
+          >
+            Archive all
+          </button>
+        </div>
+      )}
     </div>
   );
 }

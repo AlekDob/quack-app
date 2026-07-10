@@ -23,6 +23,7 @@ import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
 import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
 import { AIChatsRail } from "./AIChatsRail";
 import { ChatSwitchVeil } from "./ChatSwitchVeil";
+import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { pulseChatSwitch } from "../chatSwitch";
 import { useChatSwitching } from "../useChatSwitching";
 
@@ -139,7 +140,6 @@ export function AgentModeShell({ wsId }: Props) {
   const recent = useStore((s) => s.recent);
   const setActiveWorkspace = useStore((s) => s.setActiveWorkspace);
   const openWorkspace = useStore((s) => s.openWorkspace);
-  const addAIChat = useStore((s) => s.addAIChat);
 
   // Which session fills the center column, tracked PER workspace so
   // switching workspaces (and back) restores what you were looking at.
@@ -158,6 +158,7 @@ export function AgentModeShell({ wsId }: Props) {
     wsId: string;
     x: number;
     y: number;
+    nameAnchor: { x: number; y: number };
   } | null>(null);
   const [, setColorTick] = useState(0);
   useEffect(
@@ -204,9 +205,11 @@ export function AgentModeShell({ wsId }: Props) {
     setSelectedByWs((m) => ({ ...m, [id]: chatId }));
   };
 
-  const newSession = (id: string) => {
-    pulseChatSwitch();
-    const chatId = addAIChat(id, "editor");
+  const newSession = (
+    id: string,
+    anchor: { x: number; y: number },
+  ) => {
+    const chatId = addNewAIChat(id, "editor", anchor);
     if (id !== wsId) void setActiveWorkspace(id);
     setSelectedByWs((m) => ({ ...m, [id]: chatId }));
   };
@@ -234,15 +237,21 @@ export function AgentModeShell({ wsId }: Props) {
                 }
                 role="tab"
                 aria-selected={isActiveWs}
-                title={`${meta.name}\n${meta.root}\nRight-click to set a color`}
+                title={`${meta.name}\n${meta.root}\nRight-click for actions`}
                 aria-label={`Workspace ${meta.name}`}
                 onClick={() => {
                   if (!isActiveWs) void setActiveWorkspace(id);
                 }}
                 onContextMenu={(e) => {
                   e.preventDefault();
-                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                  setColorMenu({ wsId: id, x: r.right + 6, y: r.top });
+                  const el = e.currentTarget as HTMLElement;
+                  const r = el.getBoundingClientRect();
+                  setColorMenu({
+                    wsId: id,
+                    x: r.right + 6,
+                    y: r.top,
+                    nameAnchor: anchorFromElement(el),
+                  });
                 }}
               >
                 <span className="agent-wsrail-text">{initials(meta.name)}</span>
@@ -379,7 +388,9 @@ export function AgentModeShell({ wsId }: Props) {
                   </div>
                   <button
                     className="agent-main-empty-btn"
-                    onClick={() => newSession(wsId)}
+                    onClick={(e) =>
+                      newSession(wsId, anchorFromElement(e.currentTarget))
+                    }
                   >
                     <Icon name="plus" size={12} />
                     <span>New session</span>
@@ -507,7 +518,9 @@ export function AgentModeShell({ wsId }: Props) {
           wsId={colorMenu.wsId}
           x={colorMenu.x}
           y={colorMenu.y}
+          nameAnchor={colorMenu.nameAnchor}
           onClose={() => setColorMenu(null)}
+          onNewChat={newSession}
         />
       )}
     </div>

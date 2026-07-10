@@ -4,22 +4,37 @@ import {
   getWorkspaceColor,
   setWorkspaceColor,
 } from "../workspaceColors";
+import { AIIcon } from "./AIIcon";
 
 interface Props {
   wsId: string;
   /** Screen coords to anchor the popover near (usually the icon's edge). */
   x: number;
   y: number;
+  /** Where to anchor the session-name prompt (the project icon). */
+  nameAnchor: { x: number; y: number };
   onClose: () => void;
+  onNewChat: (wsId: string, anchor: { x: number; y: number }) => void;
 }
 
-// Right-click popover to pick / clear a project's color. Color is the one
-// chromatic touch in an otherwise neutral chrome (see workspaceColors.ts).
-export function WorkspaceColorPopover({ wsId, x, y, onClose }: Props) {
+// Right-click popover on a project icon — new chat + color picker.
+export function WorkspaceColorPopover({
+  wsId,
+  x,
+  y,
+  nameAnchor,
+  onClose,
+  onNewChat,
+}: Props) {
   const current = getWorkspaceColor(wsId);
 
   const pick = (colorId: string | null) => {
     setWorkspaceColor(wsId, colorId);
+    onClose();
+  };
+
+  const startChat = () => {
+    onNewChat(wsId, nameAnchor);
     onClose();
   };
 
@@ -30,8 +45,13 @@ export function WorkspaceColorPopover({ wsId, x, y, onClose }: Props) {
         className="ws-color-popover liquid-glass"
         style={{ left: x, top: y }}
         role="menu"
-        aria-label="Workspace color"
+        aria-label="Workspace actions"
       >
+        <button type="button" className="ws-color-new-chat" onClick={startChat}>
+          <AIIcon size={14} />
+          <span>New chat here</span>
+        </button>
+        <div className="ws-color-divider" role="separator" />
         <div className="ws-color-grid">
           {WORKSPACE_COLORS.map((c) => (
             <button

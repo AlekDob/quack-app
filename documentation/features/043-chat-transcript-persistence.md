@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-06
-last_verified: 2026-07-08
+last_verified: 2026-07-09
 tags: [chat, persistence, disk, rust, transcript, multitasking, reliability, provider-links, audit]
 ---
 
@@ -136,9 +136,9 @@ messages** (incomplete Quack row), `AIChatPanel` auto-calls
 
 Files: `src/chatProviderRecovery.ts`, `src-tauri/src/provider_sessions.rs`.
 
-## Boot hydrate
+## Boot hydrate + on-demand hydrate
 
-`store.hydrate()` after workspace disk load:
+`store.hydrate()` after workspace disk load, for the workspaces open at boot:
 
 ```
 Promise.all(survivingIds.map(hydrateChatStore))
@@ -146,9 +146,18 @@ Promise.all(survivingIds.map(hydrateChatStore))
 
 Splash phase: **"Loading chat history…"** (~92% progress).
 
+**On-demand:** a project opened *after* boot (picker / activity bar / command
+palette / Agent Mode / `actions.ts`) goes through `store.openWorkspace`, which
+`await hydrateChatStore(meta.id)` **before** the `set(...)` that mounts its
+`AIChatHost` panels. Without this the panels mount against a cold cache →
+`loadSessions` returns `[]` → empty transcripts, and the next `saveSession`
+overwrites the real on-disk row. Idempotent (`hydrated` guard) → no cost when
+the workspace was already warmed at boot.
+
 ## Gotchas
 
 - **Disk is source of truth** — `localStorage` is legacy only; do not add new chat keys there.
+- **Always hydrate before mounting a panel** — every code path that makes a workspace live (boot `hydrate()` AND `openWorkspace`) must `await hydrateChatStore(wsId)` first. A panel mounted against a cold cache shows an empty transcript and can overwrite the disk row on its next save.
 - **`saveSession` return value** — always `true` for cache; disk failures surface via toast callback.
 - **MAX_SESSIONS (30)** — evicts oldest transcript files + provider-link cleanup for evicted rows.
 - **Do not** use monolithic array writes — always per-session files.

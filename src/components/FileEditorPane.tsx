@@ -33,6 +33,7 @@ import {
   readEditorHtmlView,
   writeEditorHtmlView,
 } from "../editorHtmlView";
+import { htmlPreviewBaseHref } from "../htmlPreview";
 import {
   readDiffSideBySide,
   writeDiffSideBySide,
@@ -259,6 +260,7 @@ export function FileEditorPane({
                   html={content}
                   title={path ?? "HTML preview"}
                   allowScripts
+                  baseHref={path ? htmlPreviewBaseHref(path) : undefined}
                 />
               </div>
             )}

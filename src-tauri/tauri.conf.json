@@ -44,6 +44,36 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "md",
+          "mdx",
+          "txt",
+          "ts",
+          "tsx",
+          "js",
+          "jsx",
+          "json",
+          "rs",
+          "py",
+          "css",
+          "html",
+          "htm",
+          "yaml",
+          "yml",
+          "toml",
+          "svg",
+          "vue",
+          "svelte",
+          "mmd",
+          "excalidraw"
+        ],
+        "name": "Text document",
+        "description": "Open in Quack",
+        "role": "Editor"
+      }
+    ],
     "macOS": {
       "entitlements": "Entitlements.plist",
       "minimumSystemVersion": "11.0",

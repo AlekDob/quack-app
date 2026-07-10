@@ -1466,6 +1466,13 @@ export const useStore = create<AppState>((set, get) => {
           [meta.id]: { ...loaded[meta.id], meta },
         };
       }
+      // Chat transcripts live in a per-workspace in-memory cache hydrated
+      // from disk. hydrate() only warms the workspaces open at boot, so a
+      // project opened later (picker / activity bar / command palette /
+      // agent mode) would mount its chats against a COLD cache — showing
+      // empty transcripts and, on the next save, overwriting the real
+      // on-disk history. Hydrate before the panels mount. Idempotent.
+      await hydrateChatStore(meta.id);
       set({ recent, openIds, activeId: meta.id, loaded });
       await persistIdx();
     },

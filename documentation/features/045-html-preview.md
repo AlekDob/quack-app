@@ -180,8 +180,12 @@ navigation inside the iframe is not a supported product feature.
 | Classifier | `isHtmlPath` in editor | `isMermaidPath` | `mediaKindOf` |
 
 ### Gotchas
-- **Relative assets in drawer:** agent HTML with `assets/logo.png` won't resolve in
-  `srcDoc` (no base URL). Prefer Write to disk + editor preview, or inline assets.
+- **Relative assets in drawer / agent tab:** agent HTML with `assets/logo.png` won't
+  resolve in `srcDoc` (no base URL). Prefer Write to disk + editor preview, or inline
+  assets.
+- **Editor file preview:** `HtmlPreviewFrame` injects `<base href="file://…/">` from the
+  open file's directory so sibling `theme.css` and `assets/*` resolve. Includes
+  `color-scheme: light` meta so dark Quack chrome doesn't bleed when CSS is slow/missing.
 - **Preview default on `.html`:** first open skips Monaco — same rationale as `.mmd`.
 - **`prev:` stash is in-memory:** restarting Quack loses stashed HTML for tabs that
   were open in layout restore (tab key may reopen with empty pane — error state shown).

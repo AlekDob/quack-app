@@ -8,6 +8,7 @@
 // the row is, and lazily-loaded levels need a few frames to fetch.
 
 import { useStore } from "./store";
+import { openPathSmart } from "./smartFileOpen";
 
 export const REVEAL_IN_TREE_EVENT = "lcp:reveal-in-tree";
 
@@ -38,7 +39,7 @@ export function autoRevealInTree(wsId: string, filePath: string): void {
  * out (whiteboard organigramma, Usage → Context view).
  */
 export async function openFileAndReveal(wsId: string, filePath: string) {
-  await useStore.getState().openFile(wsId, filePath);
+  await openPathSmart(filePath, { wsId });
 }
 
 export function revealInTree(wsId: string, filePath: string) {

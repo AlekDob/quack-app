@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useStore, type SidebarView } from "../store";
 import { getGitStatus, subscribeGitStatus } from "../gitStatusStore";
+import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
 import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
@@ -80,6 +81,7 @@ export function ActivityBar() {
     wsId: string;
     x: number;
     y: number;
+    nameAnchor: { x: number; y: number };
   } | null>(null);
   const [, setColorTick] = useState(0);
   useEffect(
@@ -148,7 +150,7 @@ export function ActivityBar() {
                   ? ({ "--ws-color": color.hex } as React.CSSProperties)
                   : undefined
               }
-              title={`${meta.name}\n${meta.root}\nRight-click to set a color · drag to reorder`}
+              title={`${meta.name}\n${meta.root}\nRight-click for actions · drag to reorder`}
               role="button"
               tabIndex={0}
               aria-label={`Switch to workspace ${meta.name}`}
@@ -162,8 +164,14 @@ export function ActivityBar() {
               onContextMenu={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                setColorMenu({ wsId: id, x: r.right + 6, y: r.top });
+                const el = e.currentTarget as HTMLElement;
+                const r = el.getBoundingClientRect();
+                setColorMenu({
+                  wsId: id,
+                  x: r.right + 6,
+                  y: r.top,
+                  nameAnchor: anchorFromElement(el),
+                });
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -407,7 +415,12 @@ export function ActivityBar() {
           wsId={colorMenu.wsId}
           x={colorMenu.x}
           y={colorMenu.y}
+          nameAnchor={colorMenu.nameAnchor}
           onClose={() => setColorMenu(null)}
+          onNewChat={(wsId, anchor) => {
+            if (activeId !== wsId) void setActive(wsId);
+            addNewAIChat(wsId, "editor", anchor);
+          }}
         />
       )}
     </div>

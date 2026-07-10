@@ -15,6 +15,7 @@ import {
   useDrag,
 } from "../dragState";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { runCommand } from "../actions";
 import { openPalette } from "../paletteBus";
 import { prompt as dialogPrompt } from "../dialog";
@@ -968,7 +969,9 @@ function EmptyPane({ wsId }: { wsId: string }) {
         <div className="pane-empty-primary">
           <button
             className="pane-empty-ai"
-            onClick={() => useStore.getState().addAIChat(wsId, "editor")}
+            onClick={(e) =>
+              addNewAIChat(wsId, "editor", anchorFromElement(e.currentTarget))
+            }
             title="Open a new AI chat tab"
           >
             <AIIcon size={15} />

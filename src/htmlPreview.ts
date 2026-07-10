@@ -1,6 +1,7 @@
 // HTML preview — drawer + virtual tabs for agent-generated pages.
 
 import type { ToolCall } from "./ai";
+import { dirname } from "./pathUtils";
 import { requestToolDrawer } from "./toolDrawer";
 
 export interface HtmlPreviewPayload {
@@ -12,6 +13,47 @@ const stashByKey = new Map<string, HtmlPreviewPayload>();
 
 export function isHtmlPath(path: string): boolean {
   return /\.html?$/i.test(path);
+}
+
+const BASE_TAG_RE = /<base\b[^>]*>/i;
+
+/** Absolute directory of an on-disk HTML file as a `file:` base URL. */
+export function htmlPreviewBaseHref(filePath: string): string {
+  const dir = dirname(filePath).replace(/\\/g, "/");
+  const pathPart = /^[A-Za-z]:/.test(dir)
+    ? dir
+    : dir.startsWith("/")
+      ? dir
+      : `/${dir}`;
+  const url = new URL(
+    /^[A-Za-z]:/.test(dir) ? `file:///${pathPart}` : `file://${pathPart}`,
+  );
+  if (!url.pathname.endsWith("/")) url.pathname = `${url.pathname}/`;
+  return url.href;
+}
+
+/** Inject `<base href>` so relative CSS/images resolve inside `srcDoc`. */
+export function prepareHtmlSrcDoc(html: string, baseHref?: string): string {
+  if (!baseHref) return html;
+  const safeHref = baseHref.replace(/"/g, "&quot;");
+  const headExtras =
+    `<base href="${safeHref}" />\n` +
+    `<meta name="color-scheme" content="light" />`;
+  if (BASE_TAG_RE.test(html)) {
+    return html.replace(BASE_TAG_RE, `<base href="${safeHref}" />`);
+  }
+  const headMatch = /<head(\s[^>]*)?>/i.exec(html);
+  if (headMatch) {
+    const idx = headMatch.index + headMatch[0].length;
+    return `${html.slice(0, idx)}\n${headExtras}${html.slice(idx)}`;
+  }
+  if (/<html[\s>]/i.test(html)) {
+    return html.replace(
+      /<html(\s[^>]*)?>/i,
+      (m) => `${m}<head>${headExtras}</head>`,
+    );
+  }
+  return `<!DOCTYPE html><html><head>${headExtras}</head><body>${html}</body></html>`;
 }
 
 export function htmlPreviewKey(

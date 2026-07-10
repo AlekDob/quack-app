@@ -894,6 +894,28 @@ body.ws-dragging * {
   flex-direction: column;
   gap: 10px;
 }
+.ws-color-new-chat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  text-align: left;
+}
+.ws-color-new-chat:hover {
+  background: var(--bg-hi);
+}
+.ws-color-divider {
+  height: 1px;
+  background: var(--border);
+  margin: -2px 0;
+}
 .ws-color-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -926,6 +948,72 @@ body.ws-dragging * {
 .ws-color-clear:hover {
   color: var(--fg);
   background: var(--bg-hi);
+}
+
+/* New chat session name popover — anchored near the New chat control */
+.new-chat-name-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+.new-chat-name-popover {
+  position: fixed;
+  z-index: 210;
+  width: 280px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.new-chat-name-title {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  color: var(--fg);
+}
+.new-chat-name-hint {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-dim);
+  line-height: var(--lh-tight);
+}
+.new-chat-name-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: var(--fs-base);
+  font-family: var(--font-ui);
+}
+.new-chat-name-input:focus {
+  outline: none;
+  border-color: var(--border-strong);
+}
+.new-chat-name-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.new-chat-name-actions button {
+  font-size: var(--fs-sm);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  color: var(--fg);
+  cursor: pointer;
+}
+.new-chat-name-actions button.primary {
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  border-color: transparent;
+}
+.new-chat-name-actions button.primary:hover {
+  opacity: 0.92;
 }
 .ws-icon-text {
   font-family: var(--font);
@@ -2435,12 +2523,20 @@ body.ws-dragging * {
   flex-direction: column;
   gap: 2px;
 }
+.agent-hub-section-head-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: calc(100% - 8px);
+  margin: 4px 4px 0;
+  min-width: 0;
+}
 .agent-hub-section-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  width: calc(100% - 8px);
-  margin: 4px 4px 0;
+  flex: 1 1 auto;
+  min-width: 0;
   padding: 2px 4px;
   background: transparent;
   border: none;
@@ -2457,8 +2553,12 @@ body.ws-dragging * {
 .agent-hub-section-label {
   flex: 1 1 auto;
   text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .agent-hub-section-count {
+  flex: 0 0 auto;
   font-size: 10px;
   font-weight: 600;
   color: var(--fg-muted);
@@ -2467,6 +2567,55 @@ body.ws-dragging * {
   min-width: 16px;
   padding: 0 5px;
   text-align: center;
+}
+.agent-hub-section-menu-wrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+.agent-hub-section-menu-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.agent-hub-section-menu-btn:hover,
+.agent-hub-section-menu-btn.active {
+  color: var(--fg-dim);
+  background: var(--bg-hover);
+}
+.agent-hub-section-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 50;
+  min-width: 148px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.agent-hub-section-menu-item {
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg);
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+}
+.agent-hub-section-menu-item:hover {
+  background: var(--bg-hover);
 }
 /* --- Row --- */
 .agent-hub-row {
@@ -6081,6 +6230,135 @@ body.ws-dragging * {
   padding: 8px 12px 4px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+}
+/* Cursor-style changed-files list + Commit & Push split control. */
+.ai-composer-git {
+  order: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 12px 4px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.ai-composer-git-files {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ai-composer-git-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  min-width: 0;
+}
+.ai-composer-git-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+  font-weight: 500;
+}
+.ai-composer-git-file-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+}
+.ai-composer-git-add {
+  color: var(--git-added);
+}
+.ai-composer-git-del {
+  color: var(--git-deleted);
+}
+.ai-composer-git-untracked {
+  color: var(--fg-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.ai-composer-git-more {
+  border: none;
+  background: transparent;
+  padding: 2px 0;
+  font-size: 11px;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.ai-composer-git-more:hover {
+  color: var(--fg);
+}
+.ai-composer-git-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ai-composer-git-changes {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg);
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.ai-composer-git-changes-label {
+  font-weight: 500;
+  color: var(--fg);
+}
+.ai-composer-git-split {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--bg-hi);
+}
+.ai-composer-git-main {
+  border: none;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.ai-composer-git-main:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.ai-composer-git-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  border: none;
+  border-left: 1px solid var(--border);
+  background: var(--bg-elev);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.ai-composer-git-menu-btn:hover:not(:disabled) {
+  background: var(--bg-hi);
+  color: var(--fg);
+}
+.ai-composer-git-menu-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 .ai-composer-ctx-seg-wrap {
   position: relative;
@@ -14064,6 +14342,18 @@ body.ws-dragging * {
   flex: 1;
   min-height: 0;
 }
+.popout-editor-host {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.popout-editor-host .cust-editor {
+  flex: 1;
+  min-height: 0;
+}
 .popout-error {
   position: fixed;
   inset: 0;
@@ -14788,7 +15078,7 @@ body.ws-dragging * {
   padding: 0 10px;
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-window);
   color: var(--fg-dim);
   font-size: 12px;
   cursor: pointer;

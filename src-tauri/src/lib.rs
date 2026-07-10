@@ -1,5 +1,6 @@
 mod atomic;
 mod dictation;
+mod open_files;
 mod chat_store;
 mod claude_code;
 mod cursor_code;
@@ -24,7 +25,7 @@ mod workspace;
 use claude_code::ClaudeCodeState;
 use cursor_code::CursorCodeState;
 use opencode_sidecar::OpencodeSidecarState;
-use tauri::Manager;
+use tauri::{Manager, RunEvent};
 use claude_perm::PermState;
 use pty::PtyState;
 use watcher::WatcherState;
@@ -46,10 +47,19 @@ fn set_dock_badge(app: tauri::AppHandle, count: u32) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_notification::init());
+
+    // Release only — debug builds must launch beside /Applications/Quack.app
+    // (same bundle id would otherwise make the dev binary exit immediately).
+    #[cfg(not(debug_assertions))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+        open_files::handle_cli_args(app, &args);
+    }));
+
+    builder
         .manage(PtyState::default())
         .manage(WatcherState::default())
         .manage(ClaudeCodeState::default())
@@ -139,6 +149,7 @@ pub fn run() {
             search::read_cargo_tasks,
             search::read_makefile_targets,
             git::git_diff,
+            git::git_diff_stat,
             git::git_diff_staged,
             git::git_show,
             git::git_discard,
@@ -211,6 +222,30 @@ pub fn run() {
             dictation::dictation_stop,
             dictation::dictation_cancel,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            match event {
+                RunEvent::Ready => {
+                    #[cfg(any(windows, target_os = "linux"))]
+                    {
+                        let files = open_files::startup_file_args();
+                        if !files.is_empty() {
+                            open_files::emit_open_files(app, files);
+                        }
+                    }
+                }
+                #[cfg(any(target_os = "macos", target_os = "ios"))]
+                RunEvent::Opened { urls } => {
+                    let files: Vec<std::path::PathBuf> = urls
+                        .into_iter()
+                        .filter_map(|u| u.to_file_path().ok())
+                        .collect();
+                    if !files.is_empty() {
+                        open_files::emit_open_files(app, files);
+                    }
+                }
+                _ => {}
+            }
+        });
 }

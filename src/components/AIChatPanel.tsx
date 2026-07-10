@@ -22,6 +22,7 @@ import { ChatNavRail } from "./ChatNavRail";
 import { TurnStreamStatus } from "./TurnStreamStatus";
 import { ContextFilesDock } from "./ContextFilesDock";
 import { ComposerContextBar } from "./ComposerContextBar";
+import { ComposerGitActions } from "./ComposerGitActions";
 import { AgentCommitDock } from "./AgentCommitDock";
 import {
   hydrateAgentCommitFromMessages,
@@ -49,6 +50,7 @@ import {
 } from "../providers";
 import { openSettings } from "../settingsBus";
 import { useStore, parseKey, findPaneById } from "../store";
+import { addNewAIChat, defaultNewChatAnchor } from "../addNewAIChat";
 import { useEditorState, getActiveEditor } from "../editorState";
 import { setWorkspaceRoot } from "../wsRoot";
 import {
@@ -1846,8 +1848,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     const text = queueRef.current.shift();
     syncQueueUi();
     if (!text) return;
-    const newChatId = useStore.getState().addAIChat(wsId, "editor");
-    useStore.getState().focusAIChat(wsId, newChatId);
+    const newChatId = addNewAIChat(wsId, "editor", defaultNewChatAnchor());
     queueMicrotask(() => {
       requestAIPrompt({ wsId, chatId: newChatId, text, send: true });
     });
@@ -3290,9 +3291,12 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     // change, so it'd pick up the old (auto-assigned) id and find
     // nothing. The new tab would then open empty.
     const newChatId = useStore.getState().addAIChat(wsId, "editor");
+    const branchTitle = deriveTitle(prefix) + " (branch)";
+    useStore.getState().renameAIChat(wsId, newChatId, branchTitle);
+    useStore.getState().focusAIChat(wsId, newChatId);
     const branchedSession: ChatSession = {
       id: newChatId,
-      title: deriveTitle(prefix) + " (branch)",
+      title: branchTitle,
       messages: prefix,
       model: selected,
       updatedAt: Date.now(),
@@ -5327,6 +5331,11 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
         ref={composerShellRef}
       >
       <ComposerContextBar wsId={wsId} root={root} />
+      <ComposerGitActions
+        wsId={wsId}
+        root={root}
+        suggestedMessage={input.trim() || undefined}
+      />
       {selectedIsCC && (
         <div className="ai-context-ring-dock">
           <SessionUsageCircle

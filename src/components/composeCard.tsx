@@ -21,7 +21,7 @@ import { useStore } from "../store";
 import { openComposeReviewTab } from "./ComposeReviewPane";
 import { Icon } from "./Icon";
 import { isHtmlPath } from "../htmlPreview";
-import { resolveChatFilePath } from "../chatFileLinks";
+import { openPathSmart } from "../smartFileOpen";
 
 function basename(path: string): string {
   const parts = path.replace(/\\/g, "/").split("/").filter(Boolean);
@@ -183,8 +183,7 @@ export function ComposeCard({
 
   const openRow = (path: string) => {
     if (isHtmlPath(path)) {
-      const root = useStore.getState().loaded[wsId]?.meta.root ?? "";
-      void useStore.getState().openFile(wsId, resolveChatFilePath(root, path));
+      void openPathSmart(path, { wsId });
       return;
     }
     openReview(path);

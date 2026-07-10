@@ -16,9 +16,11 @@ fn main() {
 
         // Swap bundle icons in debug so macOS dock + Win/Linux taskbar
         // show the DEV badge (tauri-codegen embeds icon.icns on macOS dev).
+        // Separate identifier so `tauri dev` can run beside the installed
+        // release app — single-instance only dedupes within each build.
         std::env::set_var(
             "TAURI_CONFIG",
-            r#"{"bundle":{"icon":["icons/32x32-dev.png","icons/128x128-dev.png","icons/128x128@2x-dev.png","icons/icon-dev.icns","icons/icon-dev.ico"]}}"#,
+            r#"{"identifier":"dev.getcodetta.app.dev","bundle":{"icon":["icons/32x32-dev.png","icons/128x128-dev.png","icons/128x128@2x-dev.png","icons/icon-dev.icns","icons/icon-dev.ico"]}}"#,
         );
     }
 

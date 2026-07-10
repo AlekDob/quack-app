@@ -43,11 +43,14 @@ import { getRecentFiles } from "./recentFiles";
 import { useEditorState } from "./editorState";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Dialog } from "./components/Dialog";
+import { NewChatNamePopover } from "./components/NewChatNamePopover";
 import { SettingsModal } from "./components/SettingsModal";
 import { WelcomeModal } from "./components/WelcomeModal";
 import { TaskManagerModal } from "./components/TaskManagerModal";
 import { FootprintModal } from "./components/FootprintModal";
 import { TerminalPopoutWindow } from "./components/TerminalPopoutWindow";
+import { FilePopoutWindow } from "./components/FilePopoutWindow";
+import { openPathSmart } from "./smartFileOpen";
 import { ShortcutReferenceModal } from "./components/ShortcutReferenceModal";
 import { onShortcutsOpen } from "./shortcutsBus";
 import { ToastHistoryModal } from "./components/ToastHistoryModal";
@@ -65,6 +68,14 @@ import "./App.css";
 const IS_POPOUT = (() => {
   try {
     return new URLSearchParams(window.location.search).get("popout") === "1";
+  } catch {
+    return false;
+  }
+})();
+
+const IS_FILE = (() => {
+  try {
+    return new URLSearchParams(window.location.search).get("file") === "1";
   } catch {
     return false;
   }
@@ -213,6 +224,19 @@ function MainApp() {
   // call again in StrictMode.
   useEffect(() => installResumeDebug(), []);
 
+  // Files opened from Finder / Explorer or forwarded by a second instance.
+  useEffect(() => {
+    let off: (() => void) | undefined;
+    void listen<string[]>("app:open-files", (e) => {
+      for (const p of e.payload ?? []) {
+        void openPathSmart(p);
+      }
+    }).then((unlisten) => {
+      off = unlisten;
+    });
+    return () => off?.();
+  }, []);
+
   // Guard the OS close button / Alt+F4 / taskbar-close against unsaved
   // edits. The custom titlebar × had its own confirm, but every other
   // close path silently discarded all dirty buffers — the single
@@ -315,12 +339,8 @@ function MainApp() {
             .position;
           if (tryRouteDropToChat(paths, pos)) return;
           for (const p of paths) {
-            // openFile handles "already open" (activates the tab) and
-            // unreadable paths (logs + bails) — caller-side filtering
-            // for directories would race with stat IPC. Let openFile
-            // do its thing.
             try {
-              await useStore.getState().openFile(wsId, p);
+              await openPathSmart(p, { wsId });
             } catch {
               /* ignore individual failures so the rest of a multi-drop
                  still lands */
@@ -805,6 +825,7 @@ function MainApp() {
       <DiffModal />
       <ToolResultDrawer />
       <Dialog />
+      <NewChatNamePopover />
       <SettingsModal />
       <WelcomeModal />
       <TaskManagerModal />
@@ -838,5 +859,6 @@ function MainApp() {
 
 export default function App() {
   if (IS_DOCK) return <DockWindow />;
+  if (IS_FILE) return <FilePopoutWindow />;
   return IS_POPOUT ? <TerminalPopoutWindow /> : <MainApp />;
 }

@@ -4,6 +4,7 @@ import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 // Injected by vite from package.json — same hook the Splash uses.
 declare const __APP_VERSION__: string;
 import { findPaneById, parseKey, useStore } from "./store";
+import { addNewAIChat, defaultNewChatAnchor } from "./addNewAIChat";
 import { openPalette } from "./paletteBus";
 import { openSettings } from "./settingsBus";
 import { openTaskManager } from "./taskManagerBus";
@@ -956,7 +957,7 @@ export const commands: CommandSpec[] = [
     accel: "Ctrl+Alt+N",
     run: () => {
       const wsId = s().activeId;
-      if (wsId) s().addAIChat(wsId, "editor");
+      if (wsId) addNewAIChat(wsId, "editor", defaultNewChatAnchor());
     },
   },
   {

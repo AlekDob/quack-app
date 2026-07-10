@@ -25,7 +25,7 @@ import { warning } from "../notify";
 import { pushRecentFile } from "../recentFiles";
 import { confirm as dialogConfirm } from "../dialog";
 import { langOf } from "../langDetect";
-import { dirname } from "../pathUtils";
+import { dirname, resolveUnderRoot } from "../pathUtils";
 import { EditorBreadcrumbs } from "./EditorBreadcrumbs";
 import { EditorTabToolbar } from "./EditorTabToolbar";
 import { DiffView } from "./DiffView";
@@ -62,6 +62,7 @@ import {
   readEditorHtmlView,
   writeEditorHtmlView,
 } from "../editorHtmlView";
+import { htmlPreviewBaseHref } from "../htmlPreview";
 import {
   readDiffSideBySide,
   writeDiffSideBySide,
@@ -579,6 +580,10 @@ export function EditorPane({ wsId, path }: Props) {
   const showHtmlPreview =
     !showDiff && isHtml && (htmlView === "split" || htmlView === "preview");
   const showPreview = showMarkdownPreview || showMermaidPreview || showHtmlPreview;
+  const htmlBaseHref =
+    isHtml && path
+      ? htmlPreviewBaseHref(resolveUnderRoot(path, wsRoot) ?? path)
+      : undefined;
 
   return (
     <div className="editor-host">
@@ -1042,6 +1047,7 @@ export function EditorPane({ wsId, path }: Props) {
                   html={file.contents}
                   title={path}
                   allowScripts
+                  baseHref={htmlBaseHref}
                 />
               </div>
             )}
