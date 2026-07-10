@@ -116,7 +116,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
 
 - `documentation/features/` — map of the product's durable parts (one doc per component).
   - `001-ai-session-library.md` — sessions/agents lists, persistence, mount-asymmetry gotcha.
-  - `002-workspace-colors.md` — per-project color (right-click popover + palette).
+  - `002-workspace-colors.md` — per-project color (right-click popover + palette); title-bar ambient wash when active project has a color.
   - `003-design-system.md` — tokens, themes, neutral chrome, liquid glass, native window, composer, pill tabs.
   - `004-subagent-mentions.md` — `@`-mention subagents + click a Task chip to open its read-only transcript tab.
   - `005-jack-duck-identity.md` — the assistant IS Jack (duck PM): persona, `AIIcon` duck mark, chat header.

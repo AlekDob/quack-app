@@ -56,6 +56,9 @@
   --ok-bg: rgba(34, 197, 94, 0.12);
   --warn: #f59e0b;
   --warn-bg: rgba(245, 158, 11, 0.1);
+  /* Title-bar ambient wash when a workspace has a project color. */
+  --topbar-ws-tint-left: 0.07;
+  --topbar-ws-tint-right: 0.16;
   --err: #ef4444;
   --err-bg: rgba(239, 68, 68, 0.12);
   --info: #9aa0ad;
@@ -155,6 +158,8 @@
   --ok-bg: rgba(34, 197, 94, 0.14);
   --warn: #b45309;
   --warn-bg: rgba(245, 158, 11, 0.16);
+  --topbar-ws-tint-left: 0.05;
+  --topbar-ws-tint-right: 0.11;
   --err: #dc2626;
   --err-bg: rgba(239, 68, 68, 0.1);
   --info: #6b7280;
@@ -1028,6 +1033,31 @@ body.ws-dragging * {
   padding: 0 0 0 10px;
   gap: 2px;
   flex-shrink: 0;
+  overflow: hidden;
+}
+/* Per-project ambient wash — faint left bloom + stronger right bloom
+   toward the project name. Only when the workspace has a color set. */
+.topbar.has-ws-color::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(
+      ellipse 110% 220% at 10% 50%,
+      rgba(var(--ws-color-rgb), var(--topbar-ws-tint-left)) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 90% 240% at 92% 50%,
+      rgba(var(--ws-color-rgb), var(--topbar-ws-tint-right)) 0%,
+      transparent 62%
+    );
+}
+.topbar > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* macOS: native traffic lights (titleBarStyle: Overlay) sit top-left, so

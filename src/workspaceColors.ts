@@ -83,3 +83,11 @@ export function subscribeWorkspaceColors(cb: () => void): () => void {
     listeners.delete(cb);
   };
 }
+
+/** "r, g, b" channels for CSS `rgba(var(--ws-color-rgb), α)`. */
+export function hexRgbChannels(hex: string): string | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+}

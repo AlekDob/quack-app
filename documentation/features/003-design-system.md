@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS (no Tailwind)
 created: 2026-06-28
-last_verified: 2026-07-05
+last_verified: 2026-07-10
 tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monochrome, macos, window, composer, cursor-style, tool-icon-tints]
 ---
 
@@ -78,7 +78,9 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 ### Top bar & command center
 - Brand (`.topbar-brand`): Quack square logo (`public/quack-logo.png`, 22px) + "Quack",
   shown on ALL platforms (no longer gated to non-macOS). On macOS it sits right of the
-  traffic-light inset.
+  traffic-light inset. Active project name (`.topbar-brand-project.has-color`) uses
+  `--ws-color`; when set, `.topbar.has-ws-color::before` adds a dual radial ambient wash
+  (theme via `--topbar-ws-tint-left` / `--topbar-ws-tint-right`) — see `features/002-workspace-colors.md`.
 - Command center (`.topbar-search`): centered VS-Code-style (`position:absolute; left:50%`),
   visible everywhere, shortcut label ⌘P (mac) / Ctrl+P. Opens the command palette.
 

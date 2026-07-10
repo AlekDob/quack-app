@@ -12,7 +12,11 @@ import { Icon } from "./Icon";
 import { AIIcon } from "./AIIcon";
 import { useAgentMode, toggleAgentMode } from "../agentMode";
 import { useStore } from "../store";
-import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
+import {
+  getWorkspaceColor,
+  hexRgbChannels,
+  subscribeWorkspaceColors,
+} from "../workspaceColors";
 import { IS_DEV } from "../devMode";
 
 // Edit-menu actions delegate to the active Monaco editor when one is
@@ -226,6 +230,16 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
     [],
   );
   const wsColor = activeId ? getWorkspaceColor(activeId) : null;
+  const wsRgb = wsColor ? hexRgbChannels(wsColor.hex) : null;
+  const topbarClass = ["topbar", wsRgb ? "has-ws-color" : ""]
+    .filter(Boolean)
+    .join(" ");
+  const topbarStyle = wsRgb
+    ? ({
+        "--ws-color": wsColor!.hex,
+        "--ws-color-rgb": wsRgb,
+      } as React.CSSProperties)
+    : undefined;
 
   const closeMenu = () => setMenu(null);
   const toggleMenu = (k: string) => setMenu((cur) => (cur === k ? null : k));
@@ -384,7 +398,7 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
   };
 
   return (
-    <div className="topbar" data-tauri-drag-region>
+    <div className={topbarClass} style={topbarStyle} data-tauri-drag-region>
       {/* macOS moves the menubar into the native system menu bar (see
           nativeMenu.ts), so the in-window brand + menus + palette are
           hidden there — the titlebar is just a drag region + Agents. */}
