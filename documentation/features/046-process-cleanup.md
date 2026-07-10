@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-08
-last_verified: 2026-07-08
+last_verified: 2026-07-10
 tags: [task-manager, process-tree, pty, terminal, agent-lifecycle, claude-code, cursor-cli, cleanup, sysmon, footprint]
 ---
 
@@ -19,7 +19,7 @@ tags: [task-manager, process-tree, pty, terminal, agent-lifecycle, claude-code, 
 |---|---|---|
 | **Close terminal tab** (✕ on "Terminal 1") | That PTY's process group only (`zsh` + `make`/`node`/`grep` children **under that shell**) | Other terminal tabs; all chat agents |
 | **Close chat tab** / **Mark done** / **Archive** | That chat's agent subprocess only (`claude` / `cursor-agent` + tools **they** spawned) | All workspace PTY terminals (e.g. dev server in Terminal 1) |
-| **Stop** in composer | Same as row above for the active chat turn | Terminals untouched |
+| **Stop** in composer (button, stale inline, Esc on visible chat) | That chat's turn only (`abortRef` + kill by stream id) | Other chat sessions; terminals untouched |
 | **Close workspace** | All PTYs in that workspace + all its chat agents | Other open workspaces |
 
 PTY terminals and CLI chat agents are **independent trees**. Killing `claude` does not touch a manually opened terminal running `make dev full`.
@@ -48,7 +48,8 @@ PTY terminals and CLI chat agents are **independent trees**. Killing `claude` do
 | Orchestrator | `src/stopChatAgent.ts` | `requestChatStop(chatId)` + provider-specific Rust kill by **chat-tab `sessionId`** |
 | Panel abort bus | `src/aiStopBus.ts` | HTTP providers (Anthropic, OpenAI, OpenCode, Ollama) — `AIChatPanel` aborts `AbortController` |
 | Store hooks | `src/store.ts` | `closeAIChat`, `setAIChatLifecycle(done\|archived)`, `closeWorkspace` → `stopChatAgent` |
-| Panel listener | `src/components/AIChatPanel.tsx` | `onChatStopRequest` → local `stop()` |
+| Panel listener | `src/components/AIChatPanel.tsx` | `onChatStopRequest` → local `stop()`; `chatVisible` gates Esc |
+| Hosts | `WorkspaceShell.tsx` `AIChatHost`, `AgentModeShell.tsx` `AgentChatHost` | Pass `chatVisible={visible}` into `AIChatPanel` |
 | CC kill by session | `src-tauri/src/claude_code.rs` → `claude_code_kill_session` | `session_streams[chatSessionId]` → `kill_process_tree(pid)` |
 | Cursor kill by session | `src-tauri/src/cursor_code.rs` → `cursor_code_kill_session` | same pattern |
 
@@ -98,6 +99,7 @@ PaneNode tab ✕
 - **Agent bash tools vs user terminals:** a `grep` at 99% CPU under `claude` is killed when you archive/stop that chat; a `grep` under your Terminal 1 `zsh` is only killed when you close Terminal 1.
 - **`closeWorkspace` is the nuclear option** — kills every PTY and every agent in that project. Closing a single chat or terminal does not.
 - **Kill button** in Task Manager only works on strict descendants; mis-clicks on unrelated OS processes are refused by Rust.
+- **Multitask + Esc (fixed 2026-07-10):** background `AIChatPanel` instances stay mounted for parallel agents. Stop **click** was always per-panel; **Esc** used to register on every panel with `turnActive` and cancel all in-flight turns. Now only the visible host's panel listens (`chatVisible`). See `022-chat-composer.md` § Stop.
 
 ### Related features
 

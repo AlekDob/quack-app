@@ -3,6 +3,7 @@ type: feature
 project: quack-desktop
 created: 2026-07-01
 last_verified: 2026-07-10
+tags: [composer, stop, multitask, esc, turn-status]
 ---
 
 # 022 — Chat composer (roomier "spaceship" pass)
@@ -153,9 +154,10 @@ Tooltip on the meter button: `Effort: {label} · Thinking: {auto|on|off} — Ctr
 - Same slot family as `ai-ask-dock` and `ai-todos-bar`: operational chrome the
   user should see while typing, even when scrolled up in the transcript.
 - Shows while a turn is in flight: running tools, warming up, waiting for
-  response, generating, tokens/s trail, stream-staleness badge (+ inline Stop
-  after 30s idle). The dock row can also appear when only context files are
-  visible (editor open in this project, no active turn).
+  response, generating, tokens/s trail, stream-staleness badge (`Still working
+  (Ns)` → `Unusually slow (Ns)` + inline Stop after 30s idle via
+  `TurnStreamStatus` / `StaleSuffix`). The dock row can also appear when only
+  context files are visible (editor open in this project, no active turn).
 - `max-height: 40%` + `overflow-y: auto` on the dock — long `RunningToolList`
   stacks scroll internally instead of pushing the composer off-screen.
 - Implementation: `TurnStreamStatus` → `StatusPill` in `chatToolRender.tsx`,
@@ -214,6 +216,39 @@ Full DOM/CSS detail (turn wrappers, sticky containing block, z-index stacking):
 - Levels (semantic colour, meaning only): `ok` ≤2500, `warn` ≤6000, `heavy`
   >6000 tokens. Heavy = "taxes every turn, consider trimming" (tooltip). Click
   still opens the file.
+
+## Stop (per-session, multitask-safe)
+
+**Purpose:** Cancel the in-flight turn for **this chat only** — not every open
+session, not workspace PTYs. See also `046-process-cleanup.md`.
+
+| Control | Scope | Mechanism |
+|---|---|---|
+| Composer **Stop** button (red, replaces Send) | Visible chat only | `AIChatPanel.stop()` → local `abortRef` → provider `onAbort` → `claude_code_kill` / `cursor_code_kill` by **stream id** |
+| **Esc** (window listener while turn active) | Visible chat only | Same `stop()` path; gated by `chatVisible` so background mounted panels don't all fire |
+| Inline Stop in status dock (stale ≥30s) | That panel's turn | `TurnStreamStatus` → `onStop` → `stop()` |
+| Archive / done / close tab | That descriptor | `stopChatAgent` → `requestChatStop(chatId)` + `*_kill_session` by transcript `sessionId` |
+
+### Mount asymmetry + Stop
+
+Editor (`WorkspaceShell` `AIChatHost`) and Agent Mode (`AgentChatHost`) keep
+**every visited chat** mounted (`display:none` / `pointer-events:none` when
+hidden) so background tabs can keep streaming and saving (`001`, `043`). Each
+`AIChatPanel` owns its own `streaming`, `abortRef`, and composer — clicking Stop
+on the visible tab only hits that instance.
+
+**Gotcha (fixed 2026-07-10):** before `chatVisible`, every mounted panel with
+`turnActive` registered a **global** `keydown` listener for Esc. Multitasking
+(two+ agents running in background tabs) meant one Esc stopped **all** of them.
+Fix: hosts pass `chatVisible={visible}`; the Esc effect bails when false.
+`onChatStopRequest` was already filtered by `aiChatId` — lifecycle stop was
+always per-session.
+
+### What Stop does *not* touch
+
+- Other open chat tabs / Agent Mode sessions (unless you Esc'd before the fix)
+- Workspace terminal tabs (`make dev`, etc.) — PTYs are a separate lifecycle
+- Queued follow-ups in **this** chat — Stop clears the queue (`039`)
 
 ## Attach + dictation
 

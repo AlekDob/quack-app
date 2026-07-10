@@ -24,6 +24,39 @@ type Props = {
   onStop: () => void;
 };
 
+function StaleSuffix({
+  idleSec,
+  onStop,
+}: {
+  idleSec: number;
+  onStop: () => void;
+}) {
+  const looksStuck = idleSec >= 30;
+  const label = looksStuck
+    ? `Unusually slow (${idleSec}s)`
+    : `Still working (${idleSec}s)`;
+  return (
+    <span className="ai-stale-suffix">
+      <span
+        className={`ai-stale-shimmer${looksStuck ? " ai-stale-shimmer-stuck" : ""}`}
+      >
+        {label}
+      </span>
+      {looksStuck ? (
+        <button
+          type="button"
+          className="ai-inline-stop"
+          onClick={onStop}
+          title="Cancel this turn"
+        >
+          <Icon name="stop" size={11} />
+          <span>Stop</span>
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
 export function TurnStreamStatus({
   runningTools,
   streaming,
@@ -55,25 +88,28 @@ export function TurnStreamStatus({
 
   if (!runningTools && !planning && !generating && !stale) return null;
 
+  const staleSuffix = stale ? (
+    <StaleSuffix idleSec={idleSec} onStop={onStop} />
+  ) : null;
+  const tpsTrail =
+    streaming !== null && tokensPerSec !== null ? (
+      <span className="ai-inline-tps">{tokensPerSec.toFixed(1)} t/s</span>
+    ) : undefined;
+
   return (
     <>
       {planning && (
-        <div className="ai-turn-hint">
-          <span className="ai-spinner" />
-          <span>{warmingUp ? "Loading model…" : "Planning next moves…"}</span>
+        <div className="ai-inline-status-row">
+          <div className="ai-turn-hint">
+            <span className="ai-spinner" />
+            <span>{warmingUp ? "Loading model…" : "Planning next moves…"}</span>
+          </div>
+          {staleSuffix}
         </div>
       )}
       {runningTools &&
         (activeToolLabels.length === 0 ? (
-          <StatusPill
-            trail={
-              streaming !== null && tokensPerSec !== null ? (
-                <span className="ai-inline-tps">
-                  {tokensPerSec.toFixed(1)} t/s
-                </span>
-              ) : undefined
-            }
-          >
+          <StatusPill trail={tpsTrail} suffix={staleSuffix}>
             <span className="ai-spinner" />
             <span>Running tools…</span>
           </StatusPill>
@@ -95,13 +131,8 @@ export function TurnStreamStatus({
                   : `${done} of ${total} done · ${total - done} running`;
             return (
               <StatusPill
-                trail={
-                  streaming !== null && tokensPerSec !== null ? (
-                    <span className="ai-inline-tps">
-                      {tokensPerSec.toFixed(1)} t/s
-                    </span>
-                  ) : undefined
-                }
+                trail={tpsTrail}
+                suffix={staleSuffix}
                 list={
                   !toolsRenderedInline ? (
                     <RunningToolList entries={activeToolLabels} />
@@ -124,39 +155,13 @@ export function TurnStreamStatus({
           trail={
             <span className="ai-inline-tps">{tokensPerSec!.toFixed(1)} t/s</span>
           }
+          suffix={staleSuffix}
         >
           <span className="ai-spinner" />
           <span>Generating…</span>
         </StatusPill>
       )}
-      {stale && (() => {
-        const looksStuck = idleSec >= 30;
-        return (
-          <StatusPill
-            trail={
-              looksStuck ? (
-                <button
-                  type="button"
-                  className="ai-inline-stop"
-                  onClick={onStop}
-                  title="Cancel this turn"
-                >
-                  <Icon name="stop" size={11} />
-                  <span>Stop</span>
-                </button>
-              ) : undefined
-            }
-          >
-            <span
-              className={`ai-inline-stale${looksStuck ? " ai-inline-stale-stuck" : ""}`}
-            >
-              {looksStuck
-                ? `Unusually slow (${idleSec}s)`
-                : `Still working (${idleSec}s)`}
-            </span>
-          </StatusPill>
-        );
-      })()}
+      {stale && !planning && !runningTools && !generating && staleSuffix}
     </>
   );
 }

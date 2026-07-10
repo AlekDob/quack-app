@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import {
+  beginDictationCapture,
   dictationEngine,
   formatDictationTime,
-  startDictation,
+  type DictationCapture,
   type DictationSession,
 } from "../dictation";
 
 interface ComposerMicProps {
-  onStart: () => void;
+  onStart: (capture: Promise<DictationCapture>) => void;
   disabled?: boolean;
 }
 
@@ -26,7 +27,7 @@ export function ComposerMic({ onStart, disabled }: ComposerMicProps) {
     <button
       type="button"
       className="ai-mic-btn"
-      onClick={onStart}
+      onClick={() => onStart(beginDictationCapture())}
       disabled={disabled}
       aria-label="Dictate"
       title="Dictate"
@@ -37,6 +38,7 @@ export function ComposerMic({ onStart, disabled }: ComposerMicProps) {
 }
 
 interface ComposerDictationBarProps {
+  capturePromise: Promise<DictationCapture>;
   onConfirm: (text: string) => void;
   onCancel: () => void;
 }
@@ -45,6 +47,7 @@ const WAVE_BARS = 28;
 
 /** Cursor-style recording row: waveform, timer, cancel, confirm. */
 export function ComposerDictationBar({
+  capturePromise,
   onConfirm,
   onCancel,
 }: ComposerDictationBarProps) {
@@ -54,6 +57,7 @@ export function ComposerDictationBar({
   );
   const [preview, setPreview] = useState("");
   const sessionRef = useRef<DictationSession | null>(null);
+  const captureRef = useRef<DictationCapture | null>(null);
   const startedAt = useRef(Date.now());
 
   useEffect(() => {
@@ -62,9 +66,14 @@ export function ComposerDictationBar({
       if (alive) setElapsed(Date.now() - startedAt.current);
     }, 200);
 
-    void (async () => {
-      try {
-        const session = await startDictation({
+    void capturePromise
+      .then((capture) => {
+        if (!alive) {
+          capture.dispose();
+          return null;
+        }
+        captureRef.current = capture;
+        return capture.attach({
           onPartial: (text) => {
             if (alive) setPreview(text);
           },
@@ -75,32 +84,37 @@ export function ComposerDictationBar({
             if (!alive) return;
             setLevels((prev) => {
               const next = prev.slice(1);
-              next.push(Math.max(0.06, level));
+              next.push(Math.max(0.08, level));
               return next;
             });
           },
         });
-        if (!alive) {
-          session.cancel();
+      })
+      .then((session) => {
+        if (!session || !alive) {
+          session?.cancel();
           return;
         }
         sessionRef.current = session;
-      } catch {
+      })
+      .catch(() => {
         if (alive) onCancel();
-      }
-    })();
+      });
 
     return () => {
       alive = false;
       clearInterval(tick);
       sessionRef.current?.cancel();
       sessionRef.current = null;
+      captureRef.current?.dispose();
+      captureRef.current = null;
     };
-  }, [onCancel]);
+  }, [capturePromise, onCancel]);
 
   const confirm = () => {
     const session = sessionRef.current;
     sessionRef.current = null;
+    captureRef.current = null;
     if (!session) {
       onCancel();
       return;
@@ -114,6 +128,8 @@ export function ComposerDictationBar({
   const cancel = () => {
     sessionRef.current?.cancel();
     sessionRef.current = null;
+    captureRef.current?.dispose();
+    captureRef.current = null;
     onCancel();
   };
 
@@ -128,30 +144,32 @@ export function ComposerDictationBar({
           />
         ))}
       </div>
-      <span className="ai-dictation-timer">{formatDictationTime(elapsed)}</span>
-      {preview ? (
-        <span className="ai-dictation-preview" title={preview}>
-          {preview}
-        </span>
-      ) : null}
-      <button
-        type="button"
-        className="ai-dictation-btn"
-        onClick={cancel}
-        aria-label="Cancel dictation"
-        title="Cancel"
-      >
-        <Icon name="x" size={14} />
-      </button>
-      <button
-        type="button"
-        className="ai-dictation-btn ai-dictation-confirm"
-        onClick={confirm}
-        aria-label="Insert dictation"
-        title="Insert"
-      >
-        <Icon name="check" size={14} />
-      </button>
+      <div className="ai-dictation-controls">
+        <span className="ai-dictation-timer">{formatDictationTime(elapsed)}</span>
+        {preview ? (
+          <span className="ai-dictation-preview" title={preview}>
+            {preview}
+          </span>
+        ) : null}
+        <button
+          type="button"
+          className="ai-dictation-btn"
+          onClick={cancel}
+          aria-label="Cancel dictation"
+          title="Cancel"
+        >
+          <Icon name="x" size={14} />
+        </button>
+        <button
+          type="button"
+          className="ai-dictation-btn ai-dictation-confirm"
+          onClick={confirm}
+          aria-label="Insert dictation"
+          title="Insert"
+        >
+          <Icon name="check" size={14} />
+        </button>
+      </div>
     </div>
   );
 }

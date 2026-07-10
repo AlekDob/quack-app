@@ -36,6 +36,12 @@ export interface DictationSession {
   cancel(): void;
 }
 
+/** Begin mic capture on the user-gesture stack (required for WKWebView). */
+export interface DictationCapture {
+  attach(cb: DictationCallbacks): DictationSession;
+  dispose(): void;
+}
+
 function webSpeechCtor(): SpeechRecognitionCtor | null {
   const w = window as unknown as {
     SpeechRecognition?: SpeechRecognitionCtor;
@@ -60,119 +66,191 @@ export async function dictationEngine(): Promise<DictationEngine | null> {
   return webSpeechCtor() ? "web" : null;
 }
 
-export async function startDictation(
-  cb: DictationCallbacks,
-): Promise<DictationSession> {
+/** Call synchronously from the mic click handler — do not await before this. */
+export function beginDictationCapture(): Promise<DictationCapture> {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    return Promise.reject(new Error("Microphone unavailable"));
+  }
+  const streamPromise = navigator.mediaDevices.getUserMedia({ audio: true });
+  return finishCaptureSetup(streamPromise);
+}
+
+async function finishCaptureSetup(
+  streamPromise: Promise<MediaStream>,
+): Promise<DictationCapture> {
   const engine = await dictationEngine();
-  if (engine === "native") return startNative(cb);
-  if (engine === "web") return startWeb(cb);
+  const stream = await streamPromise;
+  if (engine === "native") {
+    await invoke("dictation_request_auth");
+    return buildNativeCapture(stream);
+  }
+  if (engine === "web") return buildWebCapture(stream);
+  stream.getTracks().forEach((t) => t.stop());
   throw new Error("Voice dictation is not available on this platform");
 }
 
-async function startNative(cb: DictationCallbacks): Promise<DictationSession> {
-  await invoke("dictation_request_auth");
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+export async function startDictation(
+  cb: DictationCallbacks,
+): Promise<DictationSession> {
+  const capture = await beginDictationCapture();
+  return capture.attach(cb);
+}
+
+function buildNativeCapture(stream: MediaStream): DictationCapture {
   const ctx = new AudioContext();
   const src = ctx.createMediaStreamSource(stream);
-  const chunks: Float32Array[] = [];
-  const processor = ctx.createScriptProcessor(4096, 1, 1);
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 256;
+  src.connect(analyser);
+  const meterBuf = new Uint8Array(analyser.fftSize);
+  const blobs: Blob[] = [];
+  const mime = pickRecorderMime();
+  const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  recorder.ondataavailable = (e) => {
+    if (e.data.size > 0) blobs.push(e.data);
+  };
+  recorder.start(200);
+  const ready = ctx.resume();
+
   let meterRaf = 0;
+  let meterCb: ((level: number) => void) | null = null;
   let meterClosed = false;
 
-  if (cb.onLevel) {
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 64;
-    src.connect(analyser);
-    const buf = new Uint8Array(analyser.frequencyBinCount);
-    const tick = () => {
-      if (meterClosed) return;
-      analyser.getByteFrequencyData(buf);
-      let sum = 0;
-      for (const v of buf) sum += v;
-      cb.onLevel!(sum / buf.length / 255);
-      meterRaf = requestAnimationFrame(tick);
-    };
-    tick();
-  }
-
-  processor.onaudioprocess = (e) => {
-    chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  const tickMeter = () => {
+    if (meterClosed || !meterCb) return;
+    analyser.getByteTimeDomainData(meterBuf);
+    let peak = 0;
+    for (const v of meterBuf) {
+      const amp = Math.abs(v - 128) / 128;
+      if (amp > peak) peak = amp;
+    }
+    meterCb(Math.min(1, peak * 2.2));
+    meterRaf = requestAnimationFrame(tickMeter);
   };
-  src.connect(processor);
-  processor.connect(ctx.destination);
 
   const teardown = () => {
     meterClosed = true;
     cancelAnimationFrame(meterRaf);
-    processor.disconnect();
+    if (recorder.state !== "inactive") recorder.stop();
     stream.getTracks().forEach((t) => t.stop());
+    src.disconnect();
+    analyser.disconnect();
     void ctx.close();
   };
 
+  const stopRecorder = () =>
+    new Promise<Blob>((resolve) => {
+      if (recorder.state === "inactive") {
+        resolve(new Blob(blobs, { type: recorder.mimeType }));
+        return;
+      }
+      recorder.onstop = () => {
+        resolve(new Blob(blobs, { type: recorder.mimeType }));
+      };
+      recorder.stop();
+    });
+
   return {
-    async stop() {
-      const sampleRate = ctx.sampleRate;
-      teardown();
-      const merged = mergeFloat32(chunks);
-      const wav = encodeWav(merged, sampleRate);
-      return invoke<string>("dictation_transcribe_wav", { wav: [...wav] });
+    attach(cb) {
+      meterCb = cb.onLevel ?? null;
+      void ready.then(() => {
+        if (meterCb && !meterClosed) tickMeter();
+      });
+      return {
+        async stop() {
+          const blob = await stopRecorder();
+          teardown();
+          const wav = await blobToWav(blob);
+          const text = await invoke<string>("dictation_transcribe_wav", {
+            wav: [...wav],
+          });
+          if (!text.trim()) throw new Error("No speech detected");
+          return text;
+        },
+        cancel() {
+          teardown();
+        },
+      };
     },
-    cancel() {
+    dispose() {
       teardown();
     },
   };
 }
 
-function startWeb(cb: DictationCallbacks): DictationSession {
+function buildWebCapture(stream: MediaStream): DictationCapture {
   const ctor = webSpeechCtor();
-  if (!ctor) throw new Error("Web Speech API unavailable");
+  if (!ctor) {
+    stream.getTracks().forEach((t) => t.stop());
+    throw new Error("Web Speech API unavailable");
+  }
 
   let transcript = "";
-  const rec = new ctor();
-  rec.lang = navigator.language || "en-US";
-  rec.continuous = true;
-  rec.interimResults = true;
-  rec.onresult = (e) => {
-    let chunk = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      chunk += e.results[i][0].transcript;
-    }
-    transcript = chunk.trim();
-    if (transcript) cb.onPartial(transcript);
-  };
-  rec.onerror = () => cb.onError("dictation failed");
-  rec.start();
-
+  let rec: SpeechRecognitionLike | null = null;
   let stopMeter = () => {};
-  if (cb.onLevel) {
-    void openAudioMeter(cb.onLevel).then((stop) => {
-      stopMeter = stop;
-    });
-  }
+
+  const teardown = () => {
+    rec?.stop();
+    rec = null;
+    stopMeter();
+    stream.getTracks().forEach((t) => t.stop());
+  };
 
   return {
-    async stop() {
-      rec.stop();
-      stopMeter();
-      return transcript;
+    attach(cb) {
+      rec = new ctor();
+      rec.lang = navigator.language || "en-US";
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.onresult = (e) => {
+        let chunk = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          chunk += e.results[i][0].transcript;
+        }
+        transcript = chunk.trim();
+        if (transcript) cb.onPartial(transcript);
+      };
+      rec.onerror = () => cb.onError("dictation failed");
+      rec.start();
+      if (cb.onLevel) {
+        void openAudioMeter(cb.onLevel, stream).then((stop) => {
+          stopMeter = stop;
+        });
+      }
+      return {
+        async stop() {
+          rec?.stop();
+          stopMeter();
+          stream.getTracks().forEach((t) => t.stop());
+          return transcript;
+        },
+        cancel() {
+          transcript = "";
+          teardown();
+        },
+      };
     },
-    cancel() {
-      transcript = "";
-      rec.stop();
-      stopMeter();
+    dispose() {
+      teardown();
     },
   };
 }
 
-function mergeFloat32(chunks: Float32Array[]): Float32Array {
-  const len = chunks.reduce((sum, c) => sum + c.length, 0);
-  const out = new Float32Array(len);
-  let off = 0;
-  for (const c of chunks) {
-    out.set(c, off);
-    off += c.length;
+function pickRecorderMime(): string | undefined {
+  for (const t of ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"]) {
+    if (MediaRecorder.isTypeSupported(t)) return t;
   }
-  return out;
+  return undefined;
+}
+
+async function blobToWav(blob: Blob): Promise<Uint8Array> {
+  if (blob.size < 64) throw new Error("No speech detected");
+  const decodeCtx = new AudioContext();
+  await decodeCtx.resume();
+  const decoded = await decodeCtx.decodeAudioData(await blob.arrayBuffer());
+  const wav = encodeWav(decoded.getChannelData(0), decoded.sampleRate);
+  await decodeCtx.close();
+  return wav;
 }
 
 function encodeWav(samples: Float32Array, sampleRate: number): Uint8Array {
@@ -191,8 +269,6 @@ function encodeWav(samples: Float32Array, sampleRate: number): Uint8Array {
 }
 
 function writeWavHeader(view: DataView, numSamples: number, sampleRate: number) {
-  const byteRate = sampleRate * 2;
-  const blockAlign = 2;
   const dataSize = numSamples * 2;
   writeAscii(view, 0, "RIFF");
   view.setUint32(4, 36 + dataSize, true);
@@ -202,8 +278,8 @@ function writeWavHeader(view: DataView, numSamples: number, sampleRate: number) 
   view.setUint16(20, 1, true);
   view.setUint16(22, 1, true);
   view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
   view.setUint16(34, 16, true);
   writeAscii(view, 36, "data");
   view.setUint32(40, dataSize, true);
@@ -215,31 +291,36 @@ function writeAscii(view: DataView, offset: number, text: string) {
   }
 }
 
-/** Live mic levels for the waveform — best-effort, non-blocking. */
+/** Live mic levels — pass an existing stream to avoid a second getUserMedia. */
 export async function openAudioMeter(
   onLevel: (level: number) => void,
+  existing?: MediaStream,
 ): Promise<() => void> {
-  if (!navigator.mediaDevices?.getUserMedia) return () => {};
+  if (!navigator.mediaDevices?.getUserMedia && !existing) return () => {};
 
-  let stream: MediaStream | null = null;
+  let stream: MediaStream | null = existing ?? null;
   let raf = 0;
   let closed = false;
 
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (!stream) stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const ctx = new AudioContext();
+    await ctx.resume();
     const src = ctx.createMediaStreamSource(stream);
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 64;
+    analyser.fftSize = 256;
     src.connect(analyser);
-    const buf = new Uint8Array(analyser.frequencyBinCount);
+    const buf = new Uint8Array(analyser.fftSize);
 
     const tick = () => {
       if (closed) return;
-      analyser.getByteFrequencyData(buf);
-      let sum = 0;
-      for (const v of buf) sum += v;
-      onLevel(sum / buf.length / 255);
+      analyser.getByteTimeDomainData(buf);
+      let peak = 0;
+      for (const v of buf) {
+        const amp = Math.abs(v - 128) / 128;
+        if (amp > peak) peak = amp;
+      }
+      onLevel(Math.min(1, peak * 2.2));
       raf = requestAnimationFrame(tick);
     };
     tick();
@@ -247,11 +328,12 @@ export async function openAudioMeter(
     return () => {
       closed = true;
       cancelAnimationFrame(raf);
-      stream?.getTracks().forEach((t) => t.stop());
+      if (!existing) stream?.getTracks().forEach((t) => t.stop());
+      src.disconnect();
       void ctx.close();
     };
   } catch {
-    stream?.getTracks().forEach((t) => t.stop());
+    if (!existing) stream?.getTracks().forEach((t) => t.stop());
     return () => {};
   }
 }

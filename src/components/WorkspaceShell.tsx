@@ -767,7 +767,12 @@ function AIChatHost({
       className={`ai-tab-host${showVeil ? " is-switching" : ""}`}
       style={{ display: visible ? "flex" : "none" }}
     >
-      <AIChatPanel wsId={wsId} root={root} aiChatId={chatId} />
+      <AIChatPanel
+        wsId={wsId}
+        root={root}
+        aiChatId={chatId}
+        chatVisible={visible}
+      />
       {showVeil && <ChatSwitchVeil />}
     </div>,
     container,

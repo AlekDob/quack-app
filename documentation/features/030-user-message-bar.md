@@ -97,7 +97,7 @@ offer manual expand.
 |---|---|---|---|
 | At rest / unstuck | (none) | Natural | Hidden |
 | Stuck, short (≤100px) | `.is-stuck` | Natural | Hidden |
-| Stuck, tall, auto | `.is-stuck.is-compact` | `min(35vh, 160px)` + fade | Visible (↓) |
+| Stuck, tall, auto | `.is-stuck.is-compact` | `68px` max; thumb **24px** row + ~2 lines text (horizontal); fade | Visible (↓) |
 | Stuck, tall, manual | `.is-stuck.is-expanded` | `min(60vh, 420px)`, `overflow-y: auto` | Visible (↑) |
 
 Manual expand **resets to compact** when the bar becomes unstuck (`useEffect` on `isStuck`).
@@ -107,7 +107,7 @@ Manual expand **resets to compact** when the bar becomes unstuck (`useEffect` on
 | Constant / signal | Value | Role |
 |---|---|---|
 | `TALL_THRESHOLD_PX` | `100` | `ResizeObserver` on `.ai-user-bar-main`; above → eligible for collapse |
-| `isStuck` | `!sentinel.isIntersecting` | `IntersectionObserver`, `root: .ai-messages`, `threshold: 0` |
+| `isStuck` | sentinel `bottom` vs scroll top + `UNSTICK_GAP_PX` hysteresis | `IntersectionObserver` + scroll sync on `.ai-messages` |
 | `isCompact` | `isStuck && isTall && !expanded` | Drives `.is-compact` |
 | `canToggle` | `isStuck && isTall` | Shows chevron; adds `.is-stuck` for button opacity |
 
@@ -116,8 +116,10 @@ of `.ai-msg-user`, not a child. If the sentinel is inside the sticky element, it
 moves with the pin and `IntersectionObserver` never fires. `UserTurnBar` owns
 this structure.
 
-**Re-measure:** `ResizeObserver` + `content` dependency — edits to the prompt
-or image row resize the bar.
+**Re-measure:** `ResizeObserver` + `content` / `imageCount`. `isTall` seeds from
+`estimateTall` on mount (images ⇒ tall immediately). While `.is-compact`, skip live
+`scrollHeight` — use `tallCacheRef` only. Stuck: sentinel `bottom` vs scroll top +
+`UNSTICK_GAP_PX` hysteresis.
 
 ### CSS gotchas (do not regress)
 
@@ -127,7 +129,8 @@ or image row resize the bar.
 | `.ai-msg-user { animation: none }` | `.ai-msg` entrance `transform` breaks sticky in WebKit |
 | `.ai-msg-user { background: var(--chat-stream-bg) }` | Opaque pin — no bleed-through |
 | `z-index` inline on `.ai-msg-user` | `userTurnByIdx`, 1…N per thread |
-| Fade uses `var(--user-bar-bg)` | Matches card fill in light/dark |
+| Compact shrinks visible bar only | Never read `scrollHeight` while `.is-compact` — clamped layout flips `isTall` false → expand/compact loop |
+| Stuck uses sentinel hysteresis | `UNSTICK_GAP_PX` — avoid 0-height sentinel edge flutter at scroll top |
 | `.ai-user-bar-expand` opacity when `.is-stuck` | Chevron visible while stuck; other actions stay hover-gated |
 
 ### Surface tokens
@@ -142,12 +145,13 @@ Do **not** use `--bg-hi` — too close to `--chat-stream-bg` on dark.
 ### Layout (compact while stuck)
 
 ```
-┌──────────────────────────────────────────────┐  ← sticks at top: 0
-│  [thumbnails, clipped if tall]               │
-│  First lines of prompt…          [↓][⎘][↻]  │  ← fade at bottom when compact
+┌──────────────────────────────────────────────┐  ← sticks at top: 0; ~68px tall
+│ [img][img]  First lines of prompt…  [↓][⎘][↻] │  ← thumbs 24px, text clipped
 └──────────────────────────────────────────────┘
         … assistant response visible below …
 ```
+
+Expanded (`.is-expanded`) restores stacked layout, 44px thumbs, scroll up to `min(60vh, 420px)`.
 
 ### Actions
 

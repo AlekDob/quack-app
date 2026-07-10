@@ -71,6 +71,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 - **Editor mode** (`WorkspaceShell.tsx` `AIChatHost`): one host per `aiChats` descriptor; panels stay mounted after first show (`display:none` when hidden). Background tabs can stream and **save in parallel** — requires per-session storage (`043`).
 - **Agent mode** (`AgentModeShell.tsx` `AgentChatHost`): same pattern — **all open chats** mount one `AIChatPanel` each, toggled with CSS; `pulseChatSwitch` + `flushAllChatPersist` runs before the veil.
 - Consequence: any per-session live status (see `decisions/001-agent-status-indicators.md`) can use mounted background panels. Cross-workspace status uses `AgentHubWatcher` + `agentStatusStore`.
+- **Stop / Esc:** each mounted panel has its own `abortRef` and composer Stop button; hidden hosts use `display:none` (editor) or `pointer-events:none` (agent mode) so clicks can't hit background tabs. Hosts pass `chatVisible` into `AIChatPanel` so the global Esc shortcut only stops the **visible** session during multitask (`022` § Stop, `046`).
 
 ### AIChatDescriptor
 | Field | Type | Description |

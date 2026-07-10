@@ -54,9 +54,17 @@ Markdown string
 | Lists `ul` / `ol` | |
 | Task lists `- [ ]` / `- [x]` | `.md-tasklist` |
 | GFM tables | `.md-table-wrap` horizontal scroll |
-| Blockquotes | Recursive inner render |
+| Blockquotes | Recursive inner render; `.md-callout` (+ `.md-callout-note` when text starts with Nota/Note/…) |
 | HR | `---` / `***` / `___` |
 | Auto-linkify | Bare `https://` and emails in prose (post-escape) |
+
+### Callouts / note blockquotes
+| Class | When | Visual |
+|-------|------|--------|
+| `.md-callout` | Any `>` blockquote | Body-sized text (`inherit`); `--info` left border + `--info-bg` |
+| `.md-callout-note` | Starts with `Nota:` / `Note:` / `Important:` / `Warning:` / `Tip:` (case-insensitive) | `--warn` left border + `--warn-bg` |
+
+Chat scope inherits body scale — no more 11px shrunk blockquotes.
 
 ### Copyable code blocks (2026-07-10)
 Replaces the old hover-revealed top-right **Copy** text button.
@@ -66,15 +74,15 @@ Replaces the old hover-revealed top-right **Copy** text button.
 .md-code-block[.md-code-block--single][data-source-line]
   .md-code-pill
     pre > code.lang-{lang}
-  .md-code-actions
+    button.md-code-copy-btn[data-md-copy]   ← single-line only (inside pill)
+  .md-code-actions                        ← multi-line only
     button.md-code-copy-btn[data-md-copy]
-      svg.md-code-copy-icon
 ```
 
 | Variant | When | Visual |
 |---------|------|--------|
-| Single-line | `text` has no `\n` | Pill: `border-radius: var(--radius-full)`; inline-block width |
-| Multi-line | fenced block with newlines | Card: `border-radius: var(--radius-md)`; full width |
+| Single-line | `text` has no `\n` | Compact chip: `width: fit-content`; copy **inside** pill on the right (Cursor-style); `border-radius: var(--radius-full)` |
+| Multi-line | fenced block with newlines | Full-width card; copy row **below** pill, right-aligned |
 | Shell highlight | single-line + lang empty or `bash`/`sh`/`shell`/`zsh`/`console` | First token `.md-tok-cmd` (`--tool-bash`); rest `.md-tok-arg` (`--tool-search`) |
 
 **Copy interaction:**

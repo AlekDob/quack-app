@@ -137,9 +137,10 @@ export function UserTurnBar({
   anchorIdx,
   dimmed,
   content,
+  images,
   ...barProps
 }: TurnProps) {
-  const sticky = useUserBarSticky(content);
+  const sticky = useUserBarSticky(content, images?.length ?? 0);
 
   return (
     <>
@@ -158,6 +159,6 @@ export function UserTurnBar({
 }
 
 export function UserMessageBar(props: BarProps) {
-  const sticky = useUserBarSticky(props.content);
+  const sticky = useUserBarSticky(props.content, props.images?.length ?? 0);
   return <UserMessageBarInner {...props} sticky={sticky} />;
 }

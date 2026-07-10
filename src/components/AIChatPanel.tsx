@@ -294,6 +294,10 @@ interface Props {
    * just like before.
    */
   aiChatId?: string;
+  /** False when this tab's host is hidden (background multitask). Gates Esc so
+   *  only the visible chat's shortcut fires — other mounted panels may still
+   *  have an in-flight turn. */
+  chatVisible?: boolean;
   /** Fires after the bound tab's session + messages are hydrated (agent-mode switch overlay). */
   onHydrated?: () => void;
 }
@@ -375,7 +379,13 @@ function insertIntoActiveEditor(text: string): boolean {
   return true;
 }
 
-export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
+export function AIChatPanel({
+  wsId,
+  root,
+  aiChatId,
+  chatVisible = true,
+  onHydrated,
+}: Props) {
   // Agent mode supplies this via context to render denser (tool bursts
   // collapse to an icon row, tighter spacing). Default false → the docked
   // chat is unchanged.
@@ -3259,7 +3269,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   const hasWsAttached = attachedFiles.some((f) => isUnderRoot(f, root));
   const showComposerDock = turnActive || editorInWorkspace || hasWsAttached;
   useEffect(() => {
-    if (!turnActive) return;
+    if (!turnActive || !chatVisible) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       const t = e.target as HTMLElement | null;
@@ -3276,7 +3286,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turnActive]);
+  }, [turnActive, chatVisible]);
 
   // Clear the four bits of per-turn transient UI state that aren't
   // tied to a specific session — the last-turn usage card, the

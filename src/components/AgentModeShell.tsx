@@ -127,7 +127,12 @@ function AgentChatHost({
     >
       <CompactChat.Provider value={true}>
         <AgentFileOpen.Provider value={onOpenFile}>
-          <AIChatPanel wsId={wsId} root={root} aiChatId={chatId} />
+          <AIChatPanel
+            wsId={wsId}
+            root={root}
+            aiChatId={chatId}
+            chatVisible={visible}
+          />
         </AgentFileOpen.Provider>
       </CompactChat.Provider>
     </div>

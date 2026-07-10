@@ -522,16 +522,22 @@ export function StatusPill({
   children,
   trail,
   list,
+  suffix,
 }: {
   children: ReactNode;
   trail?: ReactNode;
   list?: ReactNode;
+  /** Shimmer hint beside the pill (e.g. "Still working") — saves a row. */
+  suffix?: ReactNode;
 }) {
   return (
     <div className="ai-tcall ai-tcall-status">
-      <div className="ai-status-pill">
-        <span className="ai-status-pill-main">{children}</span>
-        {trail ? <span className="ai-status-pill-trail">{trail}</span> : null}
+      <div className="ai-status-pill-row">
+        <div className="ai-status-pill">
+          <span className="ai-status-pill-main">{children}</span>
+          {trail ? <span className="ai-status-pill-trail">{trail}</span> : null}
+        </div>
+        {suffix ?? null}
       </div>
       {list ? <div className="ai-status-tools">{list}</div> : null}
     </div>

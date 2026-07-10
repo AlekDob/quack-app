@@ -479,6 +479,14 @@ function highlightShellLine(text: string): string {
   return cmd + rest;
 }
 
+function blockquoteAttrs(text: string, line?: number): string {
+  const stripped = text.replace(/\*\*/g, "").trim();
+  const isNote = /^(?:nota|note|important|avviso|warning|tip)\s*:/i.test(stripped);
+  const cls = isNote ? "md-callout md-callout-note" : "md-callout";
+  const lineAttr = line ? ` data-source-line="${line}"` : "";
+  return ` class="${cls}"${lineAttr}`;
+}
+
 function renderCodeBlock(b: Block): string {
   const text = b.text ?? "";
   const lang = b.lang ?? "";
@@ -487,12 +495,20 @@ function renderCodeBlock(b: Block): string {
     isSingle && isShellLang(lang) ? highlightShellLine(text) : escapeHtml(text);
   const singleClass = isSingle ? " md-code-block--single" : "";
   const lineAttr = b.line ? ` data-source-line="${b.line}"` : "";
+  const copyBtn =
+    `<button class="md-code-copy-btn" type="button" ` +
+    `aria-label="Copy" title="Copy" data-md-copy="true">${COPY_ICON_SVG}</button>`;
+  if (isSingle) {
+    return (
+      `<div class="md-code-block${singleClass}"${lineAttr}>` +
+      `<div class="md-code-pill"><pre><code class="lang-${lang}">${codeInner}</code></pre>${copyBtn}</div>` +
+      `</div>`
+    );
+  }
   return (
     `<div class="md-code-block${singleClass}"${lineAttr}>` +
     `<div class="md-code-pill"><pre><code class="lang-${lang}">${codeInner}</code></pre></div>` +
-    `<div class="md-code-actions"><button class="md-code-copy-btn" type="button" ` +
-    `aria-label="Copy" title="Copy" data-md-copy="true">${COPY_ICON_SVG}</button></div>` +
-    `</div>`
+    `<div class="md-code-actions">${copyBtn}</div></div>`
   );
 }
 
@@ -579,7 +595,7 @@ export function renderMarkdown(md: string): string {
       }
       case "quote": {
         const inner = renderMarkdown(b.text ?? "");
-        parts.push(`<blockquote${lineAttr(b)}>${inner}</blockquote>`);
+        parts.push(`<blockquote${blockquoteAttrs(b.text ?? "", b.line)}>${inner}</blockquote>`);
         break;
       }
       case "hr": {
