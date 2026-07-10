@@ -22,6 +22,12 @@ import { ChatNavRail } from "./ChatNavRail";
 import { TurnStreamStatus } from "./TurnStreamStatus";
 import { ContextFilesDock } from "./ContextFilesDock";
 import { ComposerContextBar } from "./ComposerContextBar";
+import { AgentCommitDock } from "./AgentCommitDock";
+import {
+  hydrateAgentCommitFromMessages,
+  inspectBashToolResult,
+} from "../agentCommitDetect";
+import { clearAgentCommit, commitKey } from "../agentCommitStore";
 import { useWorkspaceChatContext } from "../workspaceChatContext";
 import { isUnderRoot } from "../pathUtils";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -1222,13 +1228,32 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
                 is_error: isError || undefined,
               });
               setStreamingToolResults([...replayResults]);
-              setActiveToolLabels((labels) =>
-                labels.map((l) =>
+              setActiveToolLabels((labels) => {
+                const match = labels.find((l) => l.id === id);
+                const next = labels.map((l) =>
                   l.id === id
-                    ? { ...l, status: isError ? "error" : "done" }
+                    ? {
+                        ...l,
+                        status: (isError ? "error" : "done") as
+                          | "error"
+                          | "done"
+                          | "running",
+                      }
                     : l,
-                ),
-              );
+                );
+                if (match) {
+                  inspectBashToolResult({
+                    wsId,
+                    sessionId,
+                    root,
+                    toolName: match.name,
+                    cmd: match.preview,
+                    output: content,
+                    isError,
+                  });
+                }
+                return next;
+              });
             }
           }
         }
@@ -1373,6 +1398,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
         const msgs = cleanStaleToolMessages(found.messages);
         setMessages(msgs);
         rebuildChecklist(msgs);
+        void hydrateAgentCommitFromMessages(wsId, targetSid, root, msgs);
         if (found.model) {
           const q = parseQualifiedModel(found.model)
             ? found.model
@@ -1405,6 +1431,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       const msgs = cleanStaleToolMessages(list[0].messages);
       setMessages(msgs);
       rebuildChecklist(msgs);
+      void hydrateAgentCommitFromMessages(wsId, list[0].id, root, msgs);
       if (list[0].model) {
         const q = parseQualifiedModel(list[0].model)
           ? list[0].model
@@ -2874,13 +2901,34 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
             // and report the result. Flip the matching activeToolLabels
             // entry to "done" so the user can see WHICH calls actually
             // finished (was a misleading 10-spinners-forever otherwise).
-            setActiveToolLabels((labels) =>
-              labels.map((l) =>
+            setActiveToolLabels((labels) => {
+              const match = labels.find(
+                (l) => l.id && l.id === ev.tool_use_id,
+              );
+              const next = labels.map((l) =>
                 l.id && l.id === ev.tool_use_id
-                  ? { ...l, status: ev.is_error ? "error" : "done" }
+                  ? {
+                      ...l,
+                      status: (ev.is_error ? "error" : "done") as
+                        | "error"
+                        | "done"
+                        | "running",
+                    }
                   : l,
-              ),
-            );
+              );
+              if (match) {
+                inspectBashToolResult({
+                  wsId,
+                  sessionId,
+                  root,
+                  toolName: match.name,
+                  cmd: match.preview,
+                  output: ev.content,
+                  isError: ev.is_error === true,
+                });
+              }
+              return next;
+            });
             // Stash for attachment to the assistant message at end of round.
             toolResultsThisRound.push({
               tool_use_id: ev.tool_use_id,
@@ -3263,6 +3311,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
 
   const startNewChat = () => {
     if (streaming !== null) return;
+    clearAgentCommit(commitKey(wsId, sessionId));
     setSessionId(newSessionId());
     // Forget the prior Claude Code session so the next turn spawns a
     // fresh server-side session instead of resuming an unrelated one.
@@ -3310,6 +3359,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     rebuildChecklist(msgs);
     applyComposerDraft(draftFromSession(s));
     setHistoryOpen(false);
+    void hydrateAgentCommitFromMessages(wsId, s.id, root, msgs);
     if (s.model) setSelected(s.model);
     const gen = ++ccHydrateGenRef.current;
     void tryProviderRecover(s, gen);
@@ -3738,6 +3788,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     }
     if (cmd.action === "clear") {
       setMessages([]);
+      clearAgentCommit(commitKey(wsId, sessionId));
       // Wipe Claude Code session context too — /clear means "forget what
       // we were talking about", and resuming an old CC session would
       // contradict that even if the local message list is empty.
@@ -5232,6 +5283,9 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       {/* Cursor-style composer: one pill. CSS `order` puts the textarea
           row on top and the controls (model/effort/thinking) below;
           permission/queue cards float to the top when present. */}
+      {sessionId ? (
+        <AgentCommitDock wsId={wsId} sessionId={sessionId} root={root} />
+      ) : null}
       <div className="ai-composer-shell" ref={composerShellRef}>
       <ComposerContextBar wsId={wsId} root={root} />
       {selectedIsCC && (

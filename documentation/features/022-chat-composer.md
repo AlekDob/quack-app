@@ -26,10 +26,11 @@ mode/mic/send on the right.
 | `src/components/ComposerQueue.tsx` | Cursor-style follow-up queue cards inside the composer pill |
 | `src/components/MentionSuggestions.tsx` | `@` autocomplete popover (agents + files, path preview) |
 | `src/components/ComposerContextBar.tsx` | Cursor-style path + branch selectors at the top of the composer pill |
+| `src/components/AgentCommitDock.tsx` | Agent `git commit` pill above the composer (hash, message, time, push state) — feature 051 |
 | `src/components/WorkspacePathPicker.tsx` | Workspace path segment — switch open projects or open a folder |
 | `src/components/GitBranchPicker.tsx` | Shared git branch dropdown (composer + Source Control panel) |
 | `src/composerCtxMenu.tsx` | Portaled menu helper for context-bar dropdowns |
-| `src/App.css` | `.ai-composer-*`, `.ai-composer-context-bar`, `.ai-composer-ctx-*`, `.ai-agent-*`, `.ai-mention-*`, `.ai-mic-btn`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-context-dock*`, `.ai-queue-*` |
+| `src/App.css` | `.ai-composer-*`, `.ai-composer-context-bar`, `.ai-composer-ctx-*`, `.ai-agent-*`, `.ai-mention-*`, `.ai-mic-btn`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-commit-dock*`, `.ai-context-dock*`, `.ai-queue-*` |
 
 ## Context bar (path + branch)
 
@@ -156,6 +157,23 @@ Tooltip on the meter button: `Effort: {label} · Thinking: {auto|on|off} — Ctr
 - Implementation: `TurnStreamStatus` → `StatusPill` in `chatToolRender.tsx`,
   `ContextFilesDock.tsx`, wired in `AIChatPanel.tsx`.
 
+## Agent commit dock (feature 051)
+
+Cursor-style pill **between** `.ai-status-dock` and `.ai-composer-shell` when the
+agent's last Bash `git commit` succeeded in this chat session.
+
+Full detail: **`051-agent-commit-dock.md`**.
+
+| Slot | Content |
+|---|---|
+| Hash | Short SHA from stdout or `git log -1` |
+| Message | `-m` / HEREDOC subject |
+| Time | Relative (`just now`, `5m ago`, …) |
+| Push | `Pushed` (`upload-cloud`, `--ok`) vs `Local` / `↑N` (`cloud`) |
+
+Stays visible after the turn ends. Cleared on new chat and `/clear`. Hydrates from
+saved `tool_results` when reopening a session.
+
 ## Per-project context files (right side of status dock)
 
 Moved from the old standalone `ai-context-dock` chip above the composer and
@@ -194,3 +212,5 @@ Full DOM/CSS detail (turn wrappers, sticky containing block, z-index stacking):
 - Follow-up queue while busy: `039-composer-queue.md`.
 - Per-session composer draft + knobs: `040-per-session-composer-state.md`.
 - `@` file path preview popover: `041-mention-file-preview.md`.
+- Composer path + branch bar: `050-composer-context-bar.md`.
+- Agent commit indicator above composer: `051-agent-commit-dock.md`.

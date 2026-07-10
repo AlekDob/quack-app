@@ -6176,6 +6176,74 @@ body.ws-dragging * {
   opacity: 0.55;
   cursor: default;
 }
+/* Agent commit indicator — Cursor-style pill above the composer. */
+.ai-commit-dock {
+  flex-shrink: 0;
+  padding: 4px 10px 2px;
+}
+.ai-commit-dock-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
+  font-size: 11px;
+  color: var(--fg-muted);
+  line-height: 1.35;
+}
+.ai-commit-dock-ico {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--fg-dim);
+}
+.ai-commit-dock-hash {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--fg);
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-hi);
+  border: 1px solid var(--border);
+}
+.ai-commit-dock-msg {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+  font-weight: 500;
+}
+.ai-commit-dock-time {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--fg-dim);
+}
+.ai-commit-dock-push {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 10px;
+  font-weight: 500;
+}
+.ai-commit-dock-push.is-pushed {
+  color: var(--ok);
+  border-color: color-mix(in srgb, var(--ok) 35%, var(--border));
+  background: color-mix(in srgb, var(--ok) 10%, var(--bg));
+}
+.ai-commit-dock-push.is-local {
+  color: var(--fg-muted);
+}
+
 /* Per-project context files — right side of the status dock above composer. */
 .ai-context-dock {
   flex-shrink: 0;
