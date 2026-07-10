@@ -1,7 +1,10 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
 import { useEffect, useRef } from "react";
 import type { editor } from "monaco-editor";
-import { registerMonacoForThemes } from "../editorColorThemes";
+import {
+  ensureEditorColorThemes,
+  registerMonacoForThemes,
+} from "../editorColorThemes";
 import { readEditorMonoFont } from "../editorMonoFont";
 import { useResolvedEditorColorTheme } from "../useResolvedEditorColorTheme";
 import { useEditorSettings } from "../editorSettings";
@@ -42,6 +45,7 @@ export function SimpleMonacoEditor({
       language={langOf(path)}
       value={value}
       theme={theme}
+      beforeMount={ensureEditorColorThemes}
       options={{
         readOnly,
         colorDecorators: true,

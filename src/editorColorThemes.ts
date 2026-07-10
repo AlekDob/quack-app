@@ -77,11 +77,17 @@ export function colorThemeLabel(id: string, mode: "light" | "dark"): string {
 
 let registered = false;
 let monacoApi: Monaco | null = null;
+/** Theme id requested before Monaco mounted — applied on first register. */
+let pendingThemeId: string | null = null;
 
 /** Register custom themes and keep the Monaco handle for live `setTheme`. */
 export function registerMonacoForThemes(monaco: Monaco): void {
   monacoApi = monaco;
   ensureEditorColorThemes(monaco);
+  if (pendingThemeId) {
+    monaco.editor.setTheme(pendingThemeId);
+    pendingThemeId = null;
+  }
 }
 
 /** Register Quack custom Monaco themes once per runtime. */
@@ -95,7 +101,12 @@ export function ensureEditorColorThemes(monaco: Monaco): void {
 
 /** Apply a theme id immediately (built-in or custom). */
 export function applyEditorColorTheme(themeId: string): void {
-  monacoApi?.editor.setTheme(themeId);
+  if (monacoApi) {
+    monacoApi.editor.setTheme(themeId);
+    pendingThemeId = null;
+    return;
+  }
+  pendingThemeId = themeId;
 }
 
 /** All custom theme ids (for JSON settings validation docs). */

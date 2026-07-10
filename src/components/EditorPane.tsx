@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { editor } from "monaco-editor";
 import { useStore } from "../store";
 import {
+  ensureEditorColorThemes,
   registerMonacoForThemes,
 } from "../editorColorThemes";
 import { readEditorMonoFont } from "../editorMonoFont";
@@ -630,6 +631,7 @@ export function EditorPane({ wsId, path }: Props) {
         language={language ?? "plaintext"}
         value={file.contents}
         theme={colorTheme}
+        beforeMount={ensureEditorColorThemes}
         options={{
           fontSize: settings.fontSize,
           fontFamily: readEditorMonoFont(),

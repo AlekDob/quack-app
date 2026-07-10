@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), Monaco, plain CSS
 created: 2026-07-03
-last_verified: 2026-07-03
+last_verified: 2026-07-10
 tags: [editor, monaco, theme, syntax-highlighting, settings, vscode, color-decorators, font]
 ---
 
@@ -15,7 +15,7 @@ tags: [editor, monaco, theme, syntax-highlighting, settings, vscode, color-decor
 ### Files
 | Type | Path | Exports / purpose |
 |------|------|-------------------|
-| Catalog | `src/editorColorThemes.ts` | Theme lists, `normalizeColorTheme`, `ensureEditorColorThemes`, `registerMonacoForThemes`, `applyEditorColorTheme`, legacy aliases |
+| Catalog | `src/editorColorThemes.ts` | Theme lists, `normalizeColorTheme`, `ensureEditorColorThemes`, `registerMonacoForThemes`, `applyEditorColorTheme`, `pendingThemeId` queue, legacy aliases |
 | Bundles | `src/vscodeThemeBundles.ts` | `VS_CODE_THEME_BUNDLES` — hand-crafted themes with `inherit: false` + full Monaco token rules |
 | Rules | `src/monacoThemeRules.ts` | `VS_DARK_RULES`, `ABYSS_RULES`, `KIMBIE_RULES`, … — **Monaco tokenizer names**, not VS Code TextMate scopes |
 | JSON | `src/vscodeThemes/*.json` | Full token rules: Monokai, Solarized light/dark, Tomorrow Night Blue (from [monaco-themes](https://github.com/brijeshb42/monaco-themes), MIT) |
@@ -23,7 +23,7 @@ tags: [editor, monaco, theme, syntax-highlighting, settings, vscode, color-decor
 | Hook | `src/useResolvedEditorColorTheme.ts` | Resolves stored id + calls `applyEditorColorTheme` on change |
 | Settings | `src/editorSettings.ts` | Persistence + `setColorThemeForMode` |
 | UI | `src/components/SettingsModal.tsx` | Settings → Editor → Color theme `<select>` |
-| Surfaces | `EditorPane`, `SimpleMonacoEditor`, `DiffView` | `theme`, `fontFamily`, `colorDecorators: true` |
+| Surfaces | `EditorPane`, `SimpleMonacoEditor`, `DiffView` | `theme`, `beforeMount={ensureEditorColorThemes}`, `fontFamily`, `colorDecorators: true` |
 
 ### Theme catalog (matches VS Code bundled set)
 **Light** (default: `quack-light-modern` = Light Modern)
@@ -60,12 +60,31 @@ Built-in Monaco ids (`vs`, `vs-dark`, `hc-*`) need no `defineTheme`. All `quack-
 lcp.theme → data-theme light|dark
   → useResolvedEditorColorTheme()
     → lightColorTheme | darkColorTheme (lcp.editorSettings)
-    → normalizeColorTheme(id, mode)
-    → applyEditorColorTheme(id)     // monaco.editor.setTheme — live from Settings
-  → <Editor theme={id} fontFamily={readEditorMonoFont()} />
+    → normalizeColorTheme(id, mode)   // rejects cross-mode ids
+    → applyEditorColorTheme(id)       // setTheme now, or queue in pendingThemeId
+  → <Editor beforeMount={ensureEditorColorThemes} theme={id} />
 ```
 
-On first Monaco mount: `registerMonacoForThemes(monaco)` → `defineTheme` for all `quack-*` bundles + stores Monaco handle for later `setTheme`.
+### Monaco mount lifecycle (order matters)
+| Step | When | What |
+|------|------|------|
+| 1 | `beforeMount` | `ensureEditorColorThemes(monaco)` — `defineTheme` for all `quack-*` bundles **before** Monaco applies `theme` |
+| 2 | Monaco init | Applies `theme` prop (`quack-dark-modern`, `vs-dark`, …) |
+| 3 | `onMount` | `registerMonacoForThemes(monaco)` — stores Monaco handle; flushes `pendingThemeId` if `applyEditorColorTheme` ran early |
+| 4 | Settings / mode change | `useResolvedEditorColorTheme` `useEffect` → `applyEditorColorTheme(id)` |
+
+**All three Monaco surfaces** (`EditorPane`, `SimpleMonacoEditor`, `DiffView`) pass `beforeMount={ensureEditorColorThemes}`. `DiffView` had this from day one; main editor + compose-review surfaces were aligned in 2026-07-10.
+
+### Key functions
+| Function | Signature | Purpose |
+|----------|-----------|---------|
+| `ensureEditorColorThemes` | `(monaco) → void` | One-time `defineTheme` for `VS_CODE_THEME_BUNDLES` |
+| `registerMonacoForThemes` | `(monaco) → void` | Store handle + flush `pendingThemeId` |
+| `applyEditorColorTheme` | `(themeId) → void` | Live `setTheme`; queues when Monaco not ready |
+| `normalizeColorTheme` | `(id, mode) → string` | Mode-scoped id + legacy alias + default fallback |
+| `useResolvedEditorColorTheme` | `() → string` | Hook: resolved id + `useEffect` backstop for Settings changes |
+
+On first Monaco mount: `registerMonacoForThemes(monaco)` → `defineTheme` (no-op if `beforeMount` ran) + stores Monaco handle for later `setTheme`.
 
 ### Token coloring (why themes looked “all the same” — fixed)
 Monaco themes use **Monaco tokenizer token names** (`keyword`, `string`, `comment`, `type`, …). VS Code color themes use **TextMate scopes** (`entity.name.function`, …) which Monaco does **not** apply unless converted.
@@ -79,6 +98,8 @@ Monaco themes use **Monaco tokenizer token names** (`keyword`, `string`, `commen
 **Gotcha:** `inherit: true` + a few TextMate scope overrides made every custom theme look like `vs-dark`. Custom bundles now ship complete Monaco rule sets.
 
 **Gotcha:** `@monaco-editor/react` does not always re-apply the `theme` prop when Settings changes — `useResolvedEditorColorTheme` calls `monaco.editor.setTheme` in a `useEffect` as a backstop.
+
+**Gotcha (white editor in dark app mode — fixed 2026-07-10):** Registering custom themes only in `onMount` runs **after** Monaco applies the `theme` prop. Unknown `quack-*` ids fall back to built-in `vs` (white). Symptom: dark chrome + white editor canvas. Light mode looked fine because `vs` is already light. Fix: `beforeMount={ensureEditorColorThemes}` on every surface + `pendingThemeId` queue when `applyEditorColorTheme` fires before `registerMonacoForThemes`.
 
 ### Editor font (separate from color theme)
 | What | Behavior |
@@ -104,12 +125,15 @@ Same as VS Code: “Color Theme” ≠ “Font Family”.
 - **Dark Modern** vs **Dark (Visual Studio)** are intentionally similar (same in VS Code).
 
 ### Verification
-1. Dark mode → **Abyss** → blue-tinted text (`#6688cc`) on navy background.
-2. **Monokai** → yellow strings, pink keywords (JSON rules).
-3. **Red** → `#390000` editor background.
-4. Change theme in Settings with a file open → colors update **without** tab switch.
-5. Editor uses JetBrains Mono (not system Consolas).
-6. `.css` with `#ff0000` → color decorator square.
+1. **Dark app mode** → editor background is **not** white (`quack-dark-modern` default ≈ `#1F1F1F`); matches stored `darkColorTheme`.
+2. **Light app mode** → editor uses stored `lightColorTheme` only (no dark theme leak).
+3. Dark mode → **Abyss** → blue-tinted text (`#6688cc`) on navy background.
+4. **Monokai** → yellow strings, pink keywords (JSON rules).
+5. **Red** → `#390000` editor background.
+6. Change theme in Settings with a file open → colors update **without** tab switch.
+7. Toggle app theme Light ↔ Dark → editor swaps to the remembered theme for that mode.
+8. Editor uses JetBrains Mono (not system Consolas).
+9. `.css` with `#ff0000` → color decorator square.
 
 ### Related
 - `documentation/features/027-editor-tab-toolbar.md` — same Monaco surfaces
