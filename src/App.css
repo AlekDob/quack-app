@@ -6882,6 +6882,87 @@ body.ws-dragging * {
   }
 }
 
+/* Cursor-style voice dictation — replaces the textarea while recording. */
+.ai-composer-shell.dictating .ai-composer-meta {
+  display: none;
+}
+.ai-composer-shell.dictating > .ai-input-row {
+  border-top: none;
+  padding: 10px 12px;
+  align-items: center;
+}
+.ai-dictation-bar {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  min-width: 0;
+}
+.ai-dictation-wave {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  height: 28px;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.ai-dictation-bar .ai-dictation-wave-bar {
+  flex: 1 1 3px;
+  max-width: 4px;
+  min-height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--fg-muted);
+  transform: scaleY(calc(0.25 + var(--lv, 0.1) * 2.2));
+  transform-origin: center;
+  transition: transform 60ms linear;
+}
+.ai-dictation-timer {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-dim);
+  min-width: 2.2em;
+}
+.ai-dictation-preview {
+  flex: 0 1 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.ai-dictation-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-default),
+    color var(--duration-fast) var(--ease-default);
+}
+.ai-dictation-btn:hover {
+  background: var(--bg-hi);
+  color: var(--fg);
+}
+.ai-dictation-confirm {
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+}
+.ai-dictation-confirm:hover {
+  filter: brightness(1.06);
+  color: var(--primary-fg);
+}
+
 /* Subagent target pill — who the next message is addressed to. */
 .ai-agent-wrap {
   position: relative;

@@ -608,6 +608,7 @@ dependencies = [
  "russh-sftp",
  "serde",
  "serde_json",
+ "speech",
  "sysinfo",
  "tauri",
  "tauri-build",
@@ -4819,6 +4820,16 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
+]
+
+[[package]]
+name = "speech"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53fa9ae1dad749477c2b8d2697cf4ab995104b1dd5efab46c466f4f0b99529bf"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

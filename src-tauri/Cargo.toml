@@ -68,6 +68,9 @@ ureq = { version = "3.3.0", features = ["json"] }
 # dir and reads them back as data: URLs for the in-app preview / zoom.
 base64 = "0.22"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+speech = "0.6.0"
+
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
 

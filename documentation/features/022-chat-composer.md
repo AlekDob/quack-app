@@ -20,7 +20,9 @@ mode/mic/send on the right.
 | `src/components/AIChatPanel.tsx` | Composer shell, textarea, hint row, toolbar layout, `renderModelChip`, wiring |
 | `src/components/SubagentPill.tsx` | "Who the message goes to" pill + upward menu (Jack default / discovered subagents) |
 | `src/components/EffortPopover.tsx` | Single control for BOTH reasoning effort (slider) and extended thinking (segmented) |
-| `src/components/ComposerMic.tsx` | Voice dictation (Web Speech API), graceful `null`-render when unavailable |
+| `src/components/ComposerMic.tsx` | Mic button + Cursor-style `ComposerDictationBar` (feature 052) |
+| `src/dictation.ts` | Dictation engine (`native` macOS / `web` Windows), session + audio meter |
+| `src-tauri/src/dictation.rs` | macOS Speech.framework bridge (`dictation_*` commands) |
 | `src/components/Icon.tsx` | Added `arrow-up` (send) + `microphone` icons |
 | `src/components/TurnStreamStatus.tsx` | Composes `StatusPill` rows for planning / tools / generating / stale |
 | `src/components/ComposerQueue.tsx` | Cursor-style follow-up queue cards inside the composer pill |
@@ -30,7 +32,7 @@ mode/mic/send on the right.
 | `src/components/WorkspacePathPicker.tsx` | Workspace path segment — switch open projects or open a folder |
 | `src/components/GitBranchPicker.tsx` | Shared git branch dropdown (composer + Source Control panel) |
 | `src/composerCtxMenu.tsx` | Portaled menu helper for context-bar dropdowns |
-| `src/App.css` | `.ai-composer-*`, `.ai-composer-context-bar`, `.ai-composer-ctx-*`, `.ai-agent-*`, `.ai-mention-*`, `.ai-mic-btn`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-commit-dock*`, `.ai-context-dock*`, `.ai-queue-*` |
+| `src/App.css` | `.ai-composer-*`, `.ai-composer-context-bar`, `.ai-composer-ctx-*`, `.ai-agent-*`, `.ai-mention-*`, `.ai-mic-btn`, `.ai-dictation-*`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-commit-dock*`, `.ai-context-dock*`, `.ai-queue-*` |
 
 ## Context bar (path + branch)
 
@@ -203,7 +205,12 @@ Full DOM/CSS detail (turn wrappers, sticky containing block, z-index stacking):
 ## Attach + dictation
 
 - `+` opens a hidden `<input type=file accept=image/*>` → `appendImages` (same path as paste/drag, feature 016).
-- Mic uses `SpeechRecognition`/`webkitSpeechRecognition`; finalised transcript is appended to the input; pulses while listening. Renders nothing when the API is absent (e.g. WKWebView) — no dead control.
+- **Voice dictation (feature 052):** mic in the toolbar opens a Cursor-style recording
+  row (waveform, timer, ✕ cancel, ✓ insert) that **replaces the textarea** and hides
+  the meta toolbar (`.ai-composer-shell.dictating`). macOS Tauri uses native
+  `SFSpeechRecognizer`; Windows uses Web Speech API in WebView2. Mic button renders
+  `null` when no engine is available — no dead control. Full detail:
+  **`052-composer-voice-dictation.md`**.
 
 ## Related
 
@@ -214,3 +221,4 @@ Full DOM/CSS detail (turn wrappers, sticky containing block, z-index stacking):
 - `@` file path preview popover: `041-mention-file-preview.md`.
 - Composer path + branch bar: `050-composer-context-bar.md`.
 - Agent commit indicator above composer: `051-agent-commit-dock.md`.
+- Composer voice dictation: `052-composer-voice-dictation.md`.

@@ -58,7 +58,9 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 - **Effort + thinking = one control** (`EffortPopover.tsx`, `.ai-effort-pop`): compact **signal-strength meter** (five bars) + chevron; popover holds effort slider (Faster→Smarter, `low`→`max`, default **medium**) and thinking segmented toggle (auto/on/off). Compose reminder: pulse + floating label on first keystroke; `Ctrl+1–5` quick-switch. Persisted in `lcp.claudeCode.effort`. Full detail: `features/022-chat-composer.md`.
 - **Send/Stop** are 28×28 icon buttons (`.ai-send-btn`): send = `arrow-up` on monochrome `--primary-bg`; stop = `stop` icon on red.
 - **Subagent pill** (`SubagentPill.tsx`, `.ai-agent-pill`): "who the message goes to". Default = Jack (`AIIcon` duck) `· PM`; picking a discovered subagent shows its duck avatar `· Agent`. Active target is DERIVED from `attachedAgents` (no parallel state); menu opens upward, resets to Jack via the top item. Menu only when Claude Code + agents exist.
-- **Mic** (`ComposerMic.tsx`, `.ai-mic-btn`): Web Speech API dictation, appends finalised transcript to the input, pulses while listening; renders `null` when the API is absent (e.g. WKWebView) — no dead control.
+- **Mic** (`ComposerMic.tsx`, `.ai-mic-btn`): opens Cursor-style dictation bar
+  (`.ai-dictation-*`, feature 052) — waveform, timer, cancel/confirm; native macOS
+  speech or Web Speech on Windows; `null` when unavailable.
 - **Hint row** (`.ai-composer-hint`): `@ mentions · / commands · Ctrl+1–5 effort` (CC only) · `Shift+Enter for newline · ↑ to recall`, shown only when the input is empty and idle.
 - Neutral chrome preserved end-to-end: colour only on the `+236/-35` diff counts and semantic states — no accent hue introduced. Adapted from `spaceship-ai`'s composer *coreografia*, not its palette.
 

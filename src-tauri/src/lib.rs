@@ -1,4 +1,5 @@
 mod atomic;
+mod dictation;
 mod chat_store;
 mod claude_code;
 mod cursor_code;
@@ -205,6 +206,10 @@ pub fn run() {
             sysmon::process_stats,
             sysmon::process_kill,
             set_dock_badge,
+            dictation::dictation_available,
+            dictation::dictation_start,
+            dictation::dictation_stop,
+            dictation::dictation_cancel,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -10,7 +10,7 @@ import {
 import { flushSync } from "react-dom";
 import { Icon } from "./Icon";
 import { SubagentPill } from "./SubagentPill";
-import { ComposerMic } from "./ComposerMic";
+import { ComposerMic, ComposerDictationBar } from "./ComposerMic";
 import {
   CC_EFFORT_DEFAULT,
   CC_EFFORTS,
@@ -403,6 +403,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   const [rulesBytes, setRulesBytes] = useState<number>(0);
   const [selected, setSelected] = useState<string>("");
   const [input, setInput] = useState("");
+  const [dictating, setDictating] = useState(false);
   // Image attachments staged on the composer (Claude Code only). Cleared
   // after each send. The zoom modal holds the full-quality data: URL of
   // whichever thumbnail the user clicked (fetched from disk on demand).
@@ -5321,7 +5322,10 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       {sessionId ? (
         <AgentCommitDock wsId={wsId} sessionId={sessionId} root={root} />
       ) : null}
-      <div className="ai-composer-shell" ref={composerShellRef}>
+      <div
+        className={`ai-composer-shell${dictating ? " dictating" : ""}`}
+        ref={composerShellRef}
+      >
       <ComposerContextBar wsId={wsId} root={root} />
       {selectedIsCC && (
         <div className="ai-context-ring-dock">
@@ -5453,9 +5457,8 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
           </div>
         )}
         <ComposerMic
-          onTranscript={(text) =>
-            setInput((v) => (v.trim() ? `${v.replace(/\s+$/, "")} ${text}` : text))
-          }
+          onStart={() => setDictating(true)}
+          disabled={dictating}
         />
         {streaming !== null || runningTools ? (
           <button
@@ -5517,6 +5520,20 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
         </div>
       )}
       <div className="ai-input-row">
+        {dictating ? (
+          <ComposerDictationBar
+            onConfirm={(text) => {
+              setDictating(false);
+              if (!text) return;
+              setInput((v) =>
+                v.trim() ? `${v.replace(/\s+$/, "")} ${text}` : text,
+              );
+              requestAnimationFrame(() => inputRef.current?.focus());
+            }}
+            onCancel={() => setDictating(false)}
+          />
+        ) : (
+        <>
         <textarea
           ref={inputRef}
           className="ai-input"
@@ -5860,6 +5877,8 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
               <span>↑ to recall</span>
             </div>
           )}
+        </>
+        )}
         {/* Hidden picker driven by the composer "+" button. */}
         <input
           ref={attachInputRef}
