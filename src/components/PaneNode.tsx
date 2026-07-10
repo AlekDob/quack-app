@@ -46,6 +46,7 @@ function tabLabel(
   isWhiteboard?: boolean;
   /** Usage tab — uses the "chart-bar" SVG icon. */
   isUsage?: boolean;
+  isBrain?: boolean;
   /** Agent edit review diff tab. */
   isComposeReview?: boolean;
   composeReviewPath?: string;
@@ -91,6 +92,16 @@ function tabLabel(
       isAI: false,
       popped: false,
       isUsage: true,
+    };
+  }
+  if (parsed?.kind === "brain") {
+    return {
+      label: "Brain",
+      dirty: false,
+      isTerminal: false,
+      isAI: false,
+      popped: false,
+      isBrain: true,
     };
   }
   if (parsed?.kind === "subagent") {
@@ -662,6 +673,8 @@ function TabsPaneView(
                   <Icon name="whiteboard" size={12} />
                 ) : info.isUsage ? (
                   <Icon name="chart-bar" size={12} />
+                ) : info.isBrain ? (
+                  <Icon name="brain" size={12} />
                 ) : info.isComposeReview ? (
                   <Icon name="git-compare" size={12} />
                 ) : info.isHtmlPreview ? (

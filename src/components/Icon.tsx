@@ -97,6 +97,7 @@ export type IconName =
   | "bot"
   | "whiteboard"
   | "chart-bar"
+  | "brain"
   | "arrow-up"
   | "microphone"
   | "grip-vertical"
@@ -479,6 +480,14 @@ const ICONS: Record<IconName, ReactNode> = {
       <line x1="12" y1="20" x2="12" y2="6" />
       <line x1="18" y1="20" x2="18" y2="15" />
       <line x1="3" y1="20" x2="21" y2="20" />
+    </>
+  ),
+  // Two-lobe brain — knowledge / Pinky Brain tab (reads at 16–20px).
+  brain: (
+    <>
+      <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
+      <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
+      <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" />
     </>
   ),
   // Upward arrow — the send affordance (Cursor / spaceship-style composer).

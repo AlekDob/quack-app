@@ -55,6 +55,21 @@ export interface ChatMessage {
    * bytes stay on disk and are fetched on demand for the zoom modal.
    */
   images?: Array<{ path: string; name: string; thumb: string }>;
+  /** Display-only: Pinky Brain pre-turn inject for this user turn. */
+  brain_usage?: BrainUsageMeta;
+}
+
+/** Metadata shown in chat when pre-turn brain context was injected. */
+export interface BrainUsageMeta {
+  hits: Array<{
+    path: string;
+    title: string;
+    entry_type?: string | null;
+  }>;
+  injectTokens: number;
+  savedTokens: number;
+  searchMs: number;
+  savedMs: number;
 }
 
 export interface ToolDef {

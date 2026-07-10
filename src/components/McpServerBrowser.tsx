@@ -56,6 +56,21 @@ const isAbsPath = (v: string): string | null => {
 
 const CURATED: McpCatalogEntry[] = [
   {
+    name: "pinky",
+    icon: "PB",
+    description:
+      "Pinky Brain — hybrid local knowledge search (BM25 + vector) over documentation/",
+    command: "pinky-mcp",
+    args: [],
+    env: {
+      PINKY_DB: "brain.db",
+      PINKY_SAVE_DIR: "documentation",
+    },
+    postInstallNote:
+      "Requires pinky CLI (pinkybrain.dev). Use the Brain tab → Enable Pinky Brain for full setup.",
+    docsUrl: "https://pinkybrain.dev",
+  },
+  {
     name: "filesystem",
     icon: "📁",
     description: "Read / list files in a sandboxed directory",

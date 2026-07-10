@@ -39,6 +39,7 @@ export function ActivityBar() {
   const aiPanelVisible = ws?.layout.aiPanelVisible ?? false;
   const wbOpen = useStore((s) => s.wbOpen);
   const usageOpen = useStore((s) => s.usageOpen);
+  const brainOpen = useStore((s) => s.brainOpen);
 
   // Key of the focused pane's active tab — drives the "this tab is open
   // and focused" highlight on the Organigramma + Usage icons. Walks the
@@ -64,6 +65,7 @@ export function ActivityBar() {
   })();
   const whiteboardActive = !!activeTabKey && activeTabKey.startsWith("wb:");
   const usageActive = !!activeTabKey && activeTabKey.startsWith("usage:");
+  const brainActive = !!activeTabKey && activeTabKey.startsWith("brain:");
   const hasSection = (v: SidebarView) =>
     sections.some((s) => s.view === v && !s.collapsed);
   const sectionActive = (v: SidebarView) => sidebarVisible && hasSection(v);
@@ -317,6 +319,16 @@ export function ActivityBar() {
           disabled={!activeId}
         >
           <Icon name="chart-bar" size={20} />
+        </button>
+        <button
+          className={`activity-icon ${brainActive ? "active" : ""}`}
+          title="Brain — Pinky knowledge search + pre-turn context (opens as a tab)"
+          aria-label="Pinky Brain"
+          aria-pressed={brainActive}
+          onClick={() => activeId && brainOpen(activeId)}
+          disabled={!activeId}
+        >
+          <Icon name="brain" size={20} />
         </button>
         <button
           className={`activity-icon ${whiteboardActive ? "active" : ""}`}

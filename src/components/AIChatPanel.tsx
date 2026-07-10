@@ -107,6 +107,12 @@ import { summarizeLastTurn } from "../sessionDiffStats";
 import { loadWorkspaceRules } from "../workspaceRules";
 import { appendJackUserPreferences } from "../jackPrefs";
 import {
+  fetchBrainContextForTurn,
+  getBrainInjectEnabled,
+} from "../brainInject";
+import { recordBrainUsage } from "../brainUsageStore";
+import { BrainTurnChip } from "./BrainTurnChip";
+import {
   type ImageAttachment,
   MAX_ATTACHED_IMAGES,
   attachFromBlob,
@@ -2595,6 +2601,23 @@ export function AIChatPanel({
         sysParts.push(investigationPlan);
       }
     }
+    let brainUsage: ChatMessage["brain_usage"];
+    if (getBrainInjectEnabled(wsId)) {
+      try {
+        const brainCtx = await fetchBrainContextForTurn(root, text);
+        if (brainCtx) {
+          brainUsage = brainCtx.usage;
+          recordBrainUsage(wsId, brainCtx.usage.savedTokens, brainCtx.usage.savedMs);
+          if (skipAllInlining || providerRunsOwnTools) {
+            ccTurnContext.push(brainCtx.block);
+          } else {
+            sysParts.push(brainCtx.block);
+          }
+        }
+      } catch {
+        /* Pinky optional — never block the turn */
+      }
+    }
     appendJackUserPreferences(sysParts);
 
     // Display the user's bare text in the chat — but send an augmented
@@ -2603,6 +2626,7 @@ export function AIChatPanel({
     const displayUserMsg: ChatMessage = {
       role: "user",
       content: text,
+      ...(brainUsage ? { brain_usage: brainUsage } : {}),
       // Persist only path + name + tiny thumb (not full bytes) so the chat
       // can re-render the inline preview after reload without bloating
       // localStorage; the zoom modal re-reads full quality from disk.
@@ -5001,23 +5025,32 @@ export function AIChatPanel({
                 const m = display[i];
                 const dimmed = scrubIndex !== null && i > scrubIndex;
                 return (
-                  <UserTurnBar
-                    key={i}
-                    zIndex={userTurnByIdx.get(i) ?? 1}
-                    anchorIdx={i}
-                    dimmed={dimmed}
-                    content={m.content}
-                    images={m.images}
-                    actionsDisabled={streaming !== null || runningTools}
-                    showBranch={!!aiChatId}
-                    onCopy={() => {
-                      void navigator.clipboard.writeText(m.content);
-                      toastSuccess("Copied to clipboard");
-                    }}
-                    onRegen={() => void regenerateFrom(i)}
-                    onBranch={() => branchFromHere(i)}
-                    onImageClick={(img) => void openZoom(img)}
-                  />
+                  <>
+                    <UserTurnBar
+                      key={i}
+                      zIndex={userTurnByIdx.get(i) ?? 1}
+                      anchorIdx={i}
+                      dimmed={dimmed}
+                      content={m.content}
+                      images={m.images}
+                      actionsDisabled={streaming !== null || runningTools}
+                      showBranch={!!aiChatId}
+                      onCopy={() => {
+                        void navigator.clipboard.writeText(m.content);
+                        toastSuccess("Copied to clipboard");
+                      }}
+                      onRegen={() => void regenerateFrom(i)}
+                      onBranch={() => branchFromHere(i)}
+                      onImageClick={(img) => void openZoom(img)}
+                    />
+                    {m.brain_usage && (
+                      <BrainTurnChip
+                        wsId={wsId}
+                        root={root}
+                        usage={m.brain_usage}
+                      />
+                    )}
+                  </>
                 );
               })()}
               {turn.followIdxs.map((i) => renderAt(i))}

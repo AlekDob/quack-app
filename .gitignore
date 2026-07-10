@@ -31,6 +31,12 @@ dist-ssr
 # Claude Code
 .claude/
 
+# Pinky Brain (local index + embedding cache)
+brain.db
+brain.db-shm
+brain.db-wal
+.fastembed_cache/
+
 # Tauri build artifacts (the cargo target dir under src-tauri/ is huge)
 src-tauri/target/
 

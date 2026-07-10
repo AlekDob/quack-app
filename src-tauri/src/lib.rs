@@ -12,6 +12,7 @@ mod claude_mcp;
 mod claude_perm;
 mod claude_sessions;
 mod context_assets;
+mod pinky;
 mod claude_usage;
 mod fs_ops;
 mod git;
@@ -198,6 +199,14 @@ pub fn run() {
             context_assets::claude_context_assets,
             context_assets::claude_set_skill_override,
             context_assets::claude_invalidate_context_cache,
+            pinky::pinky_available,
+            pinky::pinky_workspace_status,
+            pinky::pinky_search,
+            pinky::pinky_reindex,
+            pinky::pinky_setup,
+            pinky::pinky_migrate_global_brain,
+            pinky::pinky_stats_value,
+            pinky::pinky_telemetry,
             claude_mcp::claude_mcp_list,
             claude_mcp::claude_mcp_add,
             claude_mcp::claude_mcp_add_remote,
