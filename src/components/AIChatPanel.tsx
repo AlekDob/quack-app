@@ -21,6 +21,7 @@ import {
 import { ChatNavRail } from "./ChatNavRail";
 import { TurnStreamStatus } from "./TurnStreamStatus";
 import { ContextFilesDock } from "./ContextFilesDock";
+import { ComposerContextBar } from "./ComposerContextBar";
 import { useWorkspaceChatContext } from "../workspaceChatContext";
 import { isUnderRoot } from "../pathUtils";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -5232,6 +5233,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
           row on top and the controls (model/effort/thinking) below;
           permission/queue cards float to the top when present. */}
       <div className="ai-composer-shell" ref={composerShellRef}>
+      <ComposerContextBar wsId={wsId} root={root} />
       {selectedIsCC && (
         <div className="ai-context-ring-dock">
           <SessionUsageCircle

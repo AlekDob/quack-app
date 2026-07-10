@@ -6071,6 +6071,111 @@ body.ws-dragging * {
   border-color: var(--border-strong);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
+/* Cursor-style workspace path + git branch above the composer textarea. */
+.ai-composer-context-bar {
+  order: -1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 8px 12px 4px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.ai-composer-ctx-seg-wrap {
+  position: relative;
+  max-width: 100%;
+  min-width: 0;
+}
+.ai-composer-ctx-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-dim);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-default),
+    color var(--duration-fast) var(--ease-default);
+}
+.ai-composer-ctx-seg:hover {
+  background: var(--bg-hi);
+  color: var(--fg);
+}
+.ai-composer-ctx-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.ai-composer-ctx-caret {
+  flex-shrink: 0;
+  color: var(--fg-muted);
+}
+.ai-composer-ctx-menu {
+  z-index: 95;
+  min-width: 220px;
+  max-width: min(360px, 90vw);
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  padding: 4px 0;
+}
+.ai-composer-ctx-menu--portaled {
+  position: fixed;
+}
+.ai-composer-ctx-menu .menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ai-composer-ctx-menu .menu-item-accel {
+  font-size: 10px;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 55%;
+}
+.ai-composer-ctx-menu .menu-item.ai-composer-ctx-open {
+  justify-content: flex-start;
+}
+.ai-composer-ctx-menu .ai-composer-ctx-open .menu-item-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  white-space: nowrap;
+}
+.ai-composer-ctx-menu .ai-composer-ctx-open .menu-item-label svg {
+  flex-shrink: 0;
+}
+.ai-composer-ctx-menu .git-branch-new {
+  justify-content: flex-start;
+}
+.ai-composer-ctx-menu .git-branch-new .menu-item-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  white-space: nowrap;
+}
+.git-branch--disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 /* Per-project context files — right side of the status dock above composer. */
 .ai-context-dock {
   flex-shrink: 0;

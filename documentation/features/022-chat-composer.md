@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-05
+last_verified: 2026-07-10
 ---
 
 # 022 — Chat composer (roomier "spaceship" pass)
@@ -25,8 +25,22 @@ mode/mic/send on the right.
 | `src/components/TurnStreamStatus.tsx` | Composes `StatusPill` rows for planning / tools / generating / stale |
 | `src/components/ComposerQueue.tsx` | Cursor-style follow-up queue cards inside the composer pill |
 | `src/components/MentionSuggestions.tsx` | `@` autocomplete popover (agents + files, path preview) |
-| `src/components/MentionPathPreview.tsx` | Side path tree for highlighted file `@` row |
-| `src/App.css` | `.ai-composer-*`, `.ai-agent-*`, `.ai-mention-*`, `.ai-mic-btn`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-context-dock*`, `.ai-queue-*` |
+| `src/components/ComposerContextBar.tsx` | Cursor-style path + branch selectors at the top of the composer pill |
+| `src/components/WorkspacePathPicker.tsx` | Workspace path segment — switch open projects or open a folder |
+| `src/components/GitBranchPicker.tsx` | Shared git branch dropdown (composer + Source Control panel) |
+| `src/composerCtxMenu.tsx` | Portaled menu helper for context-bar dropdowns |
+| `src/App.css` | `.ai-composer-*`, `.ai-composer-context-bar`, `.ai-composer-ctx-*`, `.ai-agent-*`, `.ai-mention-*`, `.ai-mic-btn`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-context-dock*`, `.ai-queue-*` |
+
+## Context bar (path + branch)
+
+Full detail: **`050-composer-context-bar.md`**.
+
+Cursor-style selectors at the **top inside** `.ai-composer-shell` (above queue/textarea/meta):
+
+- **Path** — `~/…` label; menu lists open workspaces + **Open folder…**; switching project or opening a folder starts a **new chat** (`addNewAIChat`).
+- **Branch** — checkout/create/delete via shared `GitBranchPicker`. Hidden when not a git repo.
+
+Menus are **portaled** (`ComposerCtxMenu`, fixed coords) so `.ai-panel { overflow: hidden }` does not clip them. Always visible — not gated by `showComposerDock`. No **Run on** target in v1.
 
 ## Layout (single row, uniform)
 

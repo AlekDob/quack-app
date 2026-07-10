@@ -34,6 +34,7 @@ import {
   pickDefaultGitSection,
   type GitSectionId,
 } from "./gitAccordion";
+import { GitBranchPicker } from "./GitBranchPicker";
 
 function authorInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -71,8 +72,6 @@ export function SourceControlPanel({ wsId, root, compact = false }: Props) {
   const [ctx, setCtx] = useState<{ x: number; y: number; file: GitFile } | null>(
     null,
   );
-  const [branches, setBranches] = useState<string[]>([]);
-  const [branchOpen, setBranchOpen] = useState(false);
   const [commits, setCommits] = useState<GitCommit[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [openCommit, setOpenCommit] = useState<GitCommit | null>(null);
@@ -264,19 +263,6 @@ export function SourceControlPanel({ wsId, root, compact = false }: Props) {
     [root],
   );
 
-  const loadBranches = useCallback(async () => {
-    try {
-      const list = await gitApi.branches(root);
-      setBranches(list);
-    } catch {
-      setBranches([]);
-    }
-  }, [root]);
-
-  useEffect(() => {
-    void loadBranches();
-  }, [loadBranches, status?.branch]);
-
   // Load recent commits whenever the History section is expanded OR
   // any local-state change suggests history may have moved (commit /
   // pull / branch switch). Status.branch is in the deps because
@@ -424,85 +410,6 @@ export function SourceControlPanel({ wsId, root, compact = false }: Props) {
     [root, loadStashes],
   );
 
-  const switchBranch = useCallback(
-    async (b: string) => {
-      setBranchOpen(false);
-      try {
-        await gitApi.checkoutBranch(root, b);
-        toastSuccess(`Switched to ${b}`);
-        await refresh();
-      } catch (e) {
-        toastError(`Checkout failed: ${errMsg(e)}`);
-      }
-    },
-    [root, refresh],
-  );
-
-  const createBranch = useCallback(async () => {
-    setBranchOpen(false);
-    const name = await dialogPrompt(
-      "Create branch from " + (status?.branch ?? "HEAD"),
-      "",
-      { title: "New branch", okLabel: "Create" },
-    );
-    if (!name || !name.trim()) return;
-    try {
-      await gitApi.createBranch(root, name.trim(), undefined, true);
-      toastSuccess(`Created branch ${name.trim()} and switched to it`);
-      await refresh();
-      await loadBranches();
-    } catch (e) {
-      toastError(`Create branch failed: ${errMsg(e)}`);
-    }
-  }, [root, status?.branch, refresh, loadBranches]);
-
-  const deleteBranch = useCallback(
-    async (b: string) => {
-      const ok = await dialogConfirm(
-        `Delete branch ${b}?\n\nIf the branch has commits not merged into HEAD, you'll be asked to confirm a force-delete next.`,
-        {
-          title: "Delete branch",
-          okLabel: "Delete",
-          cancelLabel: "Cancel",
-          danger: true,
-        },
-      );
-      if (!ok) return;
-      try {
-        await gitApi.deleteBranch(root, b, false);
-        toastSuccess(`Deleted ${b}`);
-      } catch (e) {
-        const msg = errMsg(e);
-        // git -d refuses if the branch has unmerged commits. Offer a
-        // force delete instead of just surfacing the error.
-        if (/not fully merged|not merged/i.test(msg)) {
-          const force = await dialogConfirm(
-            `${b} has unmerged commits. Force-delete it anyway?\n\nThe commits will be unreachable until the next gc.`,
-            {
-              title: "Force-delete branch",
-              okLabel: "Force delete",
-              cancelLabel: "Cancel",
-              danger: true,
-            },
-          );
-          if (!force) return;
-          try {
-            await gitApi.deleteBranch(root, b, true);
-            toastSuccess(`Force-deleted ${b}`);
-          } catch (e2) {
-            toastError(`Force-delete failed: ${errMsg(e2)}`);
-            return;
-          }
-        } else {
-          toastError(`Delete failed: ${msg}`);
-          return;
-        }
-      }
-      await loadBranches();
-    },
-    [root, loadBranches],
-  );
-
   const discard = useCallback(
     async (f: GitFile) => {
       // Untracked files can't be `checkout HEAD --`-ed (git has no
@@ -628,85 +535,7 @@ export function SourceControlPanel({ wsId, root, compact = false }: Props) {
     <div className={`git-panel${compact ? " git-panel--compact" : ""}`}>
       <div className="git-panel-top">
       <div className="git-header">
-        <div className="git-branch-row">
-          <button
-            className="git-branch"
-            title={
-              status.upstream
-                ? `Tracking ${status.upstream} — click to switch branch`
-                : "No upstream — click to switch branch"
-            }
-            onClick={() => setBranchOpen((v) => !v)}
-          >
-            <Icon name="git-branch" size={12} />
-            <span className="git-branch-name">
-              {status.branch ?? "(detached)"}
-            </span>
-            {status.ahead > 0 ? (
-              <span className="git-ahead"> ↑{status.ahead}</span>
-            ) : null}
-            {status.behind > 0 ? (
-              <span className="git-behind"> ↓{status.behind}</span>
-            ) : null}
-            <Icon name="chevron-down" size={12} className="git-branch-caret" />
-          </button>
-          {branchOpen && (
-            <>
-              <div
-                className="menu-overlay"
-                onMouseDown={() => setBranchOpen(false)}
-              />
-              <div className="git-branch-menu" role="menu">
-                {branches.length === 0 && (
-                  <div
-                    className="menu-section-title"
-                    style={{ padding: 8 }}
-                  >
-                    No branches
-                  </div>
-                )}
-                {branches.map((b) => (
-                  <div key={b} className="git-branch-menu-row">
-                    <button
-                      className={`menu-item ${
-                        b === status.branch ? "active" : ""
-                      }`}
-                      onClick={() => void switchBranch(b)}
-                    >
-                      <span className="menu-item-label">{b}</span>
-                      {b === status.branch && (
-                        <span className="menu-item-accel">current</span>
-                      )}
-                    </button>
-                    {b !== status.branch && (
-                      <button
-                        className="git-branch-menu-delete"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void deleteBranch(b);
-                        }}
-                        title={`Delete branch ${b}`}
-                        aria-label={`Delete branch ${b}`}
-                      >
-                        <Icon name="x" size={11} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <div className="menu-separator" role="separator" />
-                <button
-                  className="menu-item git-branch-new"
-                  onClick={() => void createBranch()}
-                  role="menuitem"
-                >
-                  <span className="menu-item-label">
-                    <Icon name="plus" size={11} /> New branch…
-                  </span>
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+        <GitBranchPicker wsId={wsId} root={root} variant="panel" />
         <div className="git-actions">
           <button
             onClick={() => void refresh()}

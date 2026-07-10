@@ -67,3 +67,13 @@ export function resolveUnderRoot(path: string, root: string): string | null {
   const joined = joinPath(r, p);
   return joined === r || joined.startsWith(`${r}/`) ? joined : null;
 }
+
+/** Display path with home shortened to `~/` (Cursor-style composer label). */
+export function displayTildePath(path: string, home: string | null): string {
+  const norm = path.replace(/\\/g, "/").replace(/\/+$/, "");
+  if (!home) return norm;
+  const h = home.replace(/\\/g, "/").replace(/\/+$/, "");
+  if (norm === h) return "~";
+  if (norm.startsWith(`${h}/`)) return `~${norm.slice(h.length)}`;
+  return norm;
+}
