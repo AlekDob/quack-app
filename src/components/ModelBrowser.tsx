@@ -18,6 +18,10 @@ interface Props {
   cloudModels: ProviderModel[];
   /** Whether each provider has its API key configured (or CLI present). */
   hasKey: Record<ProviderId, boolean>;
+  /** Claude Code CLI OAuth probe — only meaningful when hasKey["claude-code"]. */
+  claudeCodeSignedIn?: boolean;
+  /** Open the guided `claude /login` terminal flow. */
+  onClaudeLogin?: () => void;
   selectedQualified: string;
   pullProgressByName: Record<string, string>;
   onClose: () => void;
@@ -65,6 +69,8 @@ export function ModelBrowser({
   onConfigureKey,
   onInstallClaudeCode,
   onInstallCursorCli,
+  claudeCodeSignedIn = false,
+  onClaudeLogin,
 }: Props) {
   const [query, setQuery] = useState("");
   const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
@@ -238,12 +244,14 @@ export function ModelBrowser({
             <Section
               title="Claude Code (local CLI)"
               subtitle={
-                hasKey["claude-code"]
-                  ? "claude CLI detected ✓ — uses your existing Claude Code login (Pro/Max subscription or API key)."
-                  : "Install Anthropic's Claude Code CLI and run `claude /login`. Then refresh."
+                !hasKey["claude-code"]
+                  ? "Install Anthropic's Claude Code CLI and run `claude /login`. Then refresh."
+                  : claudeCodeSignedIn
+                    ? "Signed in ✓ — uses your Claude Code login (Pro/Max subscription or API key)."
+                    : "CLI detected · not signed in — sign in once to chat."
               }
               right={
-                !hasKey["claude-code"] && (
+                !hasKey["claude-code"] ? (
                   <div style={{ display: "flex", gap: 4 }}>
                     <button
                       className="model-browser-configure"
@@ -265,6 +273,17 @@ export function ModelBrowser({
                       Docs
                     </button>
                   </div>
+                ) : (
+                  !claudeCodeSignedIn &&
+                  onClaudeLogin && (
+                    <button
+                      className="model-browser-configure"
+                      onClick={onClaudeLogin}
+                      title="Open a terminal and run `claude /login`"
+                    >
+                      Sign in
+                    </button>
+                  )
                 )
               }
             >
@@ -272,6 +291,12 @@ export function ModelBrowser({
                 <div className="model-browser-empty">
                   Install Claude Code, log in with{" "}
                   <code>claude /login</code>, then refresh this panel.
+                </div>
+              ) : !claudeCodeSignedIn ? (
+                <div className="model-browser-empty">
+                  Claude Code is installed but not signed in. Click{" "}
+                  <strong>Sign in</strong> above, or run{" "}
+                  <code>claude /login</code> in a terminal.
                 </div>
               ) : filteredCloud.filter((m) => m.providerId === "claude-code")
                   .length === 0 ? (

@@ -19,7 +19,7 @@ import {
   prompt as dialogPrompt,
 } from "./dialog";
 import { addTemplate, getTemplates } from "./aiTemplates";
-import { fs, git as gitApi } from "./ipc";
+import { fs, git as gitApi, pty } from "./ipc";
 import {
   error as toastError,
   errMsg,
@@ -45,6 +45,11 @@ import { revealInTree } from "./revealInTree";
 import { toggleZenMode } from "./zenMode";
 import { toggleAgentMode } from "./agentMode";
 import { toggleDock } from "./dock";
+import {
+  invalidateClaudeAuthCache,
+  scheduleClaudeAuthRecheck,
+} from "./claudeAuthStatus";
+import { beginClaudeLoginWatch } from "./claudeLoginTerminal";
 
 function runEditorAction(actionId: string) {
   const ed = getActiveEditor();
@@ -904,6 +909,44 @@ export const commands: CommandSpec[] = [
             label: "Claude Code",
           };
       s().addTerminal(wsId, "bottom", shell);
+    },
+  },
+  {
+    id: "terminal.claude_login",
+    label: "Sign in to Claude Code",
+    category: "Terminal",
+    run: () => {
+      const wsId = s().activeId;
+      if (!wsId) {
+        toastError("Open a workspace first");
+        return;
+      }
+      const isWin = navigator.userAgent.includes("Windows");
+      const shell = isWin
+        ? { path: "cmd.exe", args: ["/k", "claude"], label: "Claude Code" }
+        : {
+            path: "/bin/sh",
+            args: ["-lc", 'claude; exec "${SHELL:-/bin/sh}"'],
+            label: "Claude Code",
+          };
+      // Taller bottom panel so the interactive /login menu is readable.
+      const LOGIN_TERM_H = 440;
+      s().setBottomVisible(wsId, true);
+      const curH = s().loaded[wsId]?.layout.termH ?? 240;
+      s().setTermH(wsId, Math.max(curH, LOGIN_TERM_H));
+      const termId = s().addTerminal(wsId, "bottom", shell);
+      void beginClaudeLoginWatch(wsId, termId);
+      toastInfo(
+        "Follow the browser prompt in the terminal, then return here.",
+      );
+      invalidateClaudeAuthCache();
+      scheduleClaudeAuthRecheck();
+      setTimeout(() => {
+        const ws = s().loaded[wsId];
+        const t = ws?.terminals[termId];
+        if (!t?.ptyId) return;
+        void pty.write(t.ptyId, "/login\r");
+      }, 1200);
     },
   },
   {

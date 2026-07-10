@@ -10815,6 +10815,85 @@ body.ws-dragging * {
 .ai-slow-banner-btn:hover {
   color: var(--fg);
 }
+/* Claude Code sign-in prompt — shown when the CLI is installed but OAuth
+   credentials are missing or need refresh. */
+.ai-cc-login-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin: 6px 8px 0;
+  background: var(--warn-bg);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-radius: var(--radius-lg);
+  font-size: 12px;
+  color: var(--fg);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+.ai-cc-login-banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 38%,
+    color-mix(in srgb, var(--warn) 22%, transparent) 50%,
+    transparent 62%,
+    transparent 100%
+  );
+  transform: translateX(-120%);
+  animation: cc-login-banner-shimmer 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes cc-login-banner-shimmer {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(120%);
+  }
+}
+.ai-cc-login-banner-icon {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  color: var(--warn);
+}
+.ai-cc-login-banner-copy {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+}
+.ai-cc-login-banner-title {
+  font-weight: 600;
+  line-height: 1.35;
+}
+.ai-cc-login-banner-text {
+  font-size: 11px;
+  color: var(--fg-muted);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+.ai-cc-login-banner-btn {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ai-cc-login-banner-btn:hover {
+  background: var(--bg-hi);
+}
 /* Markdown rendering inside AI chat messages — tighter than the doc preview. */
 .ai-msg-body .md-preview {
   padding: 0;

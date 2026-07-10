@@ -236,9 +236,14 @@ export const claudeCodeProvider: ChatProvider = {
         const isModelError = /model.*(doesn't exist|not found|access)/i.test(
           line,
         );
+        const isAuthError =
+          !isModelError &&
+          /not logged in|run\s+\/?login|oauth|credentials/i.test(line);
         const text = isModelError
           ? `\n\n**Model rejected by Claude Code CLI.** Open ⊕ Models and pick one of the aliases (sonnet / opus / haiku). Your CLI may not recognize dated model IDs.`
-          : `\n[claude] ${line}`;
+          : isAuthError
+            ? `\n\n**Claude Code isn't signed in.** Use the **Sign in** button above the composer, or run \`claude /login\` in a terminal.`
+            : `\n[claude] ${line}`;
         queue.push({ kind: "content", text });
         wake();
         return;

@@ -205,6 +205,90 @@ fn resolve_access_token(home: &Path) -> Result<(String, Value), String> {
     Ok((token, oauth))
 }
 
+fn oauth_subscription(oauth: &Value) -> Value {
+    oauth
+        .get("subscriptionType")
+        .cloned()
+        .unwrap_or(Value::Null)
+}
+
+fn has_non_oauth_cli_auth(cred: &Value) -> bool {
+    for key in ["anthropicApiKey", "apiKey", "api_key"] {
+        if cred
+            .get(key)
+            .and_then(|v| v.as_str())
+            .is_some_and(|s| !s.is_empty())
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// Lightweight auth probe — reads local credentials only (no usage API).
+/// Returns `{ status, reason?, subscriptionType? }` where status is one of
+/// `signed_in`, `signed_out`, or `needs_login`.
+#[tauri::command]
+pub fn claude_auth_status() -> Result<Value, String> {
+    let home = user_home()?;
+    let (mut cred, store) = match load_credentials(&home) {
+        Ok(pair) => pair,
+        Err(_) => {
+            return Ok(json!({
+                "status": "signed_out",
+                "reason": "no_credentials",
+            }));
+        }
+    };
+    if has_non_oauth_cli_auth(&cred) {
+        return Ok(json!({
+            "status": "signed_in",
+            "reason": "api_key",
+        }));
+    }
+    let oauth_snapshot = match cred.get("claudeAiOauth").cloned() {
+        Some(o) => o,
+        None => {
+            return Ok(json!({
+                "status": "signed_out",
+                "reason": "no_oauth",
+            }));
+        }
+    };
+    if !token_expired(&oauth_snapshot) {
+        let has_access = oauth_snapshot
+            .get("accessToken")
+            .and_then(|v| v.as_str())
+            .is_some_and(|s| !s.is_empty());
+        if has_access {
+            return Ok(json!({
+                "status": "signed_in",
+                "subscriptionType": oauth_subscription(&oauth_snapshot),
+            }));
+        }
+        return Ok(json!({
+            "status": "needs_login",
+            "reason": "no_access_token",
+        }));
+    }
+    match refresh_oauth(&store, &mut cred) {
+        Ok(_) => {
+            let oauth = cred
+                .get("claudeAiOauth")
+                .cloned()
+                .unwrap_or(Value::Null);
+            Ok(json!({
+                "status": "signed_in",
+                "subscriptionType": oauth_subscription(&oauth),
+            }))
+        }
+        Err(_) => Ok(json!({
+            "status": "needs_login",
+            "reason": "refresh_failed",
+        })),
+    }
+}
+
 /// Returns `{ usage, profile, subscriptionType, rateLimitTier }`.
 #[tauri::command]
 pub fn claude_usage_limits() -> Result<Value, String> {

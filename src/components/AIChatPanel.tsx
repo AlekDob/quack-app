@@ -192,7 +192,14 @@ import { permissionFor } from "../toolPermissions";
 import { onAIPromptRequest, requestAIPrompt } from "../aiBus";
 import { onChatStopRequest } from "../aiStopBus";
 import { ComposerQueue } from "./ComposerQueue";
+import { ClaudeLoginBanner } from "./ClaudeLoginBanner";
+import {
+  probeClaudeAuth,
+  subscribeClaudeAuth,
+  type ClaudeAuthProbe,
+} from "../claudeAuthStatus";
 import { relPath } from "../pathUtils";
+import { runCommand } from "../actions";
 import {
   MentionSuggestions,
   type MentionItem,
@@ -384,6 +391,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   // users can discover what's available before setting up a key.
   const [allCloudCatalog, setAllCloudCatalog] = useState<ProviderModel[]>([]);
   const [claudeCodeAvailable, setClaudeCodeAvailable] = useState(false);
+  const [claudeAuth, setClaudeAuth] = useState<ClaudeAuthProbe | null>(null);
   const [cursorCliAvailable, setCursorCliAvailable] = useState(false);
   const [openCodeAvailable, setOpenCodeAvailable] = useState(false);
   // Rules-file hint shown in the header. Loaded once per workspace
@@ -3558,6 +3566,29 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     return () => window.clearInterval(t);
   }, [selectedIsCC, wsId]);
 
+  // Probe Claude Code OAuth without hitting the rate-limited usage API.
+  useEffect(() => {
+    if (!selectedIsCC || !claudeCodeAvailable) {
+      setClaudeAuth(null);
+      return;
+    }
+    let cancelled = false;
+    const refresh = async () => {
+      const probe = await probeClaudeAuth();
+      if (!cancelled) setClaudeAuth(probe);
+    };
+    void refresh();
+    const t = window.setInterval(() => void refresh(), 60_000);
+    const unsub = subscribeClaudeAuth((probe) => {
+      if (!cancelled) setClaudeAuth(probe);
+    });
+    return () => {
+      cancelled = true;
+      window.clearInterval(t);
+      unsub();
+    };
+  }, [selectedIsCC, claudeCodeAvailable, wsId]);
+
   const showUsageReport = async () => {
     let cli: NonNullable<typeof usageReport>["cli"] = null;
     try {
@@ -5258,6 +5289,10 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
           <TodosCard items={todos} />
         </div>
       )}
+      {selectedIsCC &&
+        claudeCodeAvailable &&
+        claudeAuth &&
+        claudeAuth.status !== "signed_in" && <ClaudeLoginBanner />}
       {/* Live turn status + per-project context files — docked above composer. */}
       {showComposerDock && (
         <div className="ai-status-dock" aria-live="polite">
@@ -5936,6 +5971,8 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
         }
         cloudModels={browserCloudModels}
         hasKey={modelHasKey}
+        claudeCodeSignedIn={claudeAuth?.status === "signed_in"}
+        onClaudeLogin={() => runCommand("terminal.claude_login")}
         selectedQualified={selected}
         pullProgressByName={pullProgressMap}
         onClose={() => setBrowserOpen(false)}

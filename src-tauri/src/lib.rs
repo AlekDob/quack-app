@@ -177,6 +177,7 @@ pub fn run() {
             opencode_sidecar::opencode_server_restart,
             claude_perm::claude_perm_decide,
             claude_perm::claude_perm_endpoint,
+            claude_usage::claude_auth_status,
             claude_usage::claude_usage_limits,
             claude_sessions::claude_usage_sessions,
             claude_sessions::claude_session_export_markdown,

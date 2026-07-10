@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-08
+last_verified: 2026-07-10
 tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog, rust, performance]
 ---
 
@@ -25,6 +25,7 @@ tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog
 | Command | Role |
 |---|---|
 | `claude_code_check` | resolve & version-probe the `claude` binary (PATH, shell, common install dirs) |
+| `claude_auth_status` | lightweight OAuth/credentials probe — `{ status, reason?, subscriptionType? }`; no usage API call |
 | `claude_code_chat` | spawn a run; returns a `stream id`; emits `claude-stream:<id>` events |
 | `claude_code_attach` | replay buffered events + `ended` for a chat that just refreshed |
 | `claude_code_active_sessions` | chat-session ids whose pid is still in `children` (powers the hub "working" dot) |
@@ -87,3 +88,12 @@ Set on every `claude_code_chat` spawn (in addition to `NO_COLOR`, `CI`, `CODETTA
 |---|---|---|
 | `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` | `0` | Uncapped wait for background subagents in `-p` (see 048) |
 | `CLAUDE_CODE_RESUME_INTERRUPTED_TURN` | `1` | Auto-continue if prior headless run ended mid-turn |
+
+### Auth status + guided sign-in
+
+Full design: **[052-claude-code-login-ux.md](052-claude-code-login-ux.md)**.
+
+Summary: `claude_auth_status` (credentials probe, no usage API) + composer
+`ClaudeLoginBanner` + `terminal.claude_login` (440px terminal, PTY watch,
+success toast, auto-close tab) + ModelBrowser signed-in state + chat stderr
+rewrite in `claudeCode.ts`.
