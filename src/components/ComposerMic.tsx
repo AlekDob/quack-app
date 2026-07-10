@@ -3,7 +3,6 @@ import { Icon } from "./Icon";
 import {
   dictationEngine,
   formatDictationTime,
-  openAudioMeter,
   startDictation,
   type DictationSession,
 } from "../dictation";
@@ -59,14 +58,12 @@ export function ComposerDictationBar({
 
   useEffect(() => {
     let alive = true;
-    let stopMeter = () => {};
     const tick = window.setInterval(() => {
       if (alive) setElapsed(Date.now() - startedAt.current);
     }, 200);
 
     void (async () => {
       try {
-        const engine = await dictationEngine();
         const session = await startDictation({
           onPartial: (text) => {
             if (alive) setPreview(text);
@@ -74,32 +71,20 @@ export function ComposerDictationBar({
           onError: () => {
             if (alive) onCancel();
           },
-        });
-        if (!alive) {
-          session.cancel();
-          return;
-        }
-        sessionRef.current = session;
-        if (engine === "web") {
-          stopMeter = await openAudioMeter((level) => {
+          onLevel: (level) => {
             if (!alive) return;
             setLevels((prev) => {
               const next = prev.slice(1);
               next.push(Math.max(0.06, level));
               return next;
             });
-          });
-        } else {
-          const pulse = window.setInterval(() => {
-            if (!alive) return;
-            setLevels((prev) => {
-              const next = prev.slice(1);
-              next.push(0.12 + Math.random() * 0.35);
-              return next;
-            });
-          }, 90);
-          stopMeter = () => clearInterval(pulse);
+          },
+        });
+        if (!alive) {
+          session.cancel();
+          return;
         }
+        sessionRef.current = session;
       } catch {
         if (alive) onCancel();
       }
@@ -108,7 +93,6 @@ export function ComposerDictationBar({
     return () => {
       alive = false;
       clearInterval(tick);
-      stopMeter();
       sessionRef.current?.cancel();
       sessionRef.current = null;
     };
@@ -121,9 +105,10 @@ export function ComposerDictationBar({
       onCancel();
       return;
     }
-    void session.stop().then((text) => {
-      onConfirm(text.trim());
-    });
+    void session.stop().then(
+      (text) => onConfirm(text.trim()),
+      () => onCancel(),
+    );
   };
 
   const cancel = () => {

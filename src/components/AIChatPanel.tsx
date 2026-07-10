@@ -487,6 +487,13 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       cacheRead: number;
       cacheCreate: number;
     };
+    /** Last API message_start snapshot — true context window fill. */
+    contextTokens?: {
+      input: number;
+      output: number;
+      cacheRead: number;
+      cacheCreate: number;
+    };
   } | null>(null);
   // Last non-empty context ring reading — kept visible while a new turn
   // is in flight so the circle doesn't flash empty before usage arrives.
@@ -2704,6 +2711,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
               durationMs: ev.durationMs,
               model: ev.model,
               tokens: ev.tokens,
+              contextTokens: ev.contextTokens,
             });
             // Append to the cross-chat usage log so the dashboard +
             // monthly hard cap have data to work with. Skipped if
@@ -3482,7 +3490,7 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
       },
       selectedQualified: m.selected,
       models: m.allModels,
-      lastTurnTokens: m.lastUsage?.tokens,
+      contextTokens: m.lastUsage?.contextTokens,
     });
   };
 
@@ -4369,9 +4377,8 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
   const contextSnap = useMemo(() => {
     const window = resolveContextWindow(selected, allModels);
     const { used, estimate } = estimateContextUsed(
-      lastUsage?.tokens,
+      lastUsage?.contextTokens,
       cumulativeTokensIn,
-      cumulativeCacheRead,
     );
     return {
       pct: contextFillPct(used, window),
@@ -4384,7 +4391,6 @@ export function AIChatPanel({ wsId, root, aiChatId, onHydrated }: Props) {
     allModels,
     lastUsage,
     cumulativeTokensIn,
-    cumulativeCacheRead,
   ]);
 
   const displayContextSnap = useMemo(() => {

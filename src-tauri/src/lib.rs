@@ -218,9 +218,8 @@ pub fn run() {
             sysmon::process_kill,
             set_dock_badge,
             dictation::dictation_available,
-            dictation::dictation_start,
-            dictation::dictation_stop,
-            dictation::dictation_cancel,
+            dictation::dictation_request_auth,
+            dictation::dictation_transcribe_wav,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

@@ -9,11 +9,10 @@ import {
   startGitStatusWatch,
   subscribeGitStatus,
 } from "../gitStatusStore";
-import { git, type GitDiffStat, type GitStatus } from "../ipc";
+import { git, type GitDiffStat, type GitFile, type GitStatus } from "../ipc";
+import { openGitFileDiff } from "../gitFileDiff";
 import { ComposerCtxMenu } from "../composerCtxMenu";
 import { Icon } from "./Icon";
-
-const VISIBLE_FILES = 2;
 
 type Props = {
   wsId: string;
@@ -23,7 +22,7 @@ type Props = {
 };
 
 type FileRow = {
-  path: string;
+  gitFile: GitFile;
   insertions: number;
   deletions: number;
   untracked: boolean;
@@ -35,11 +34,12 @@ function buildFileRows(status: GitStatus, diff: GitDiffStat | null): FileRow[] {
   );
   return status.files
     .filter((f) => !f.conflicted)
-    .map((f) => {
-      const stat = byPath.get(f.path);
-      const untracked = f.index_status === "?" && f.worktree_status === "?";
+    .map((gitFile) => {
+      const stat = byPath.get(gitFile.path);
+      const untracked =
+        gitFile.index_status === "?" && gitFile.worktree_status === "?";
       return {
-        path: f.path,
+        gitFile,
         insertions: stat?.insertions ?? 0,
         deletions: stat?.deletions ?? 0,
         untracked,
@@ -60,6 +60,11 @@ function primaryAction(
   if (hasChanges) return "commit-push";
   if (ahead > 0) return "push";
   return "commit-push";
+}
+
+function fileCountLabel(n: number): string {
+  if (n === 1) return "1 file";
+  return `${n} files`;
 }
 
 export function ComposerGitActions({
@@ -129,10 +134,9 @@ export function ComposerGitActions({
 
   if (!show || !status) return null;
 
-  const hiddenN = Math.max(0, fileRows.length - VISIBLE_FILES);
-  const visibleRows = expanded ? fileRows : fileRows.slice(0, VISIBLE_FILES);
   const ins = diff?.insertions ?? 0;
   const del = diff?.deletions ?? 0;
+  const canExpand = fileRows.length > 0;
 
   const menuItems: { id: ComposerGitAction; label: string; disabled?: boolean }[] =
     [
@@ -144,49 +148,60 @@ export function ComposerGitActions({
     ];
 
   return (
-    <div className="ai-composer-git">
-      {fileRows.length > 0 && (
+    <div className={`ai-composer-git${expanded ? " is-expanded" : ""}`}>
+      {expanded && canExpand && (
         <ul className="ai-composer-git-files">
-          {visibleRows.map((f) => (
-            <li key={f.path} className="ai-composer-git-file" title={f.path}>
-              <span className="ai-composer-git-file-name">{basename(f.path)}</span>
-              <span className="ai-composer-git-file-stats">
-                {f.untracked ? (
-                  <span className="ai-composer-git-untracked">new</span>
-                ) : (
-                  <>
-                    {f.insertions > 0 && (
-                      <span className="ai-composer-git-add">+{f.insertions}</span>
-                    )}
-                    {f.deletions > 0 && (
-                      <span className="ai-composer-git-del">−{f.deletions}</span>
-                    )}
-                  </>
-                )}
-              </span>
-            </li>
-          ))}
-          {hiddenN > 0 && !expanded && (
-            <li>
+          {fileRows.map((f) => (
+            <li key={f.gitFile.path}>
               <button
                 type="button"
-                className="ai-composer-git-more"
-                onClick={() => setExpanded(true)}
+                className="ai-composer-git-file"
+                title={`View changes — ${f.gitFile.path}`}
+                onClick={() => void openGitFileDiff(root, f.gitFile)}
               >
-                Show {hiddenN} more
+                <span className="ai-composer-git-file-name">
+                  {basename(f.gitFile.path)}
+                </span>
+                <span className="ai-composer-git-file-stats">
+                  {f.untracked ? (
+                    <span className="ai-composer-git-untracked">new</span>
+                  ) : (
+                    <>
+                      {f.insertions > 0 && (
+                        <span className="ai-composer-git-add">+{f.insertions}</span>
+                      )}
+                      {f.deletions > 0 && (
+                        <span className="ai-composer-git-del">−{f.deletions}</span>
+                      )}
+                    </>
+                  )}
+                </span>
               </button>
             </li>
-          )}
+          ))}
         </ul>
       )}
       <div className="ai-composer-git-actions">
-        {(hasChanges || ins > 0 || del > 0) && (
-          <span className="ai-composer-git-changes">
-            <span className="ai-composer-git-changes-label">Changes</span>
-            {ins > 0 && <span className="ai-composer-git-add">+{ins}</span>}
-            {del > 0 && <span className="ai-composer-git-del">−{del}</span>}
-          </span>
-        )}
+        <div className="ai-composer-git-left">
+          {(hasChanges || ins > 0 || del > 0) && (
+            <span className="ai-composer-git-changes">
+              <span className="ai-composer-git-changes-label">Changes</span>
+              {ins > 0 && <span className="ai-composer-git-add">+{ins}</span>}
+              {del > 0 && <span className="ai-composer-git-del">−{del}</span>}
+            </span>
+          )}
+          {canExpand && (
+            <button
+              type="button"
+              className="ai-composer-git-toggle"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((v) => !v)}
+            >
+              <span>{expanded ? "Less" : fileCountLabel(fileRows.length)}</span>
+              <Icon name={expanded ? "chevron-up" : "chevron-down"} size={11} />
+            </button>
+          )}
+        </div>
         <div className="ai-composer-git-split">
           <button
             type="button"

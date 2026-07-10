@@ -8,20 +8,20 @@ export interface TurnTokens {
   cacheCreate: number;
 }
 
-/** Tokens occupying the context window on the last turn (or estimate). */
+/** Tokens occupying the context window on the last API call (or estimate). */
 export function estimateContextUsed(
-  last: TurnTokens | undefined,
+  context: TurnTokens | undefined,
   fallbackIn: number,
-  fallbackCache: number,
 ): { used: number; estimate: boolean } {
-  if (last) {
+  if (context) {
     return {
-      used: last.input + last.cacheRead + last.cacheCreate,
+      used: context.input + context.cacheRead + context.cacheCreate,
       estimate: false,
     };
   }
-  if (fallbackIn + fallbackCache > 0) {
-    return { used: fallbackIn + fallbackCache, estimate: true };
+  // Never sum cumulative cache reads — each turn re-reads the same prefix.
+  if (fallbackIn > 0) {
+    return { used: fallbackIn, estimate: true };
   }
   return { used: 0, estimate: true };
 }

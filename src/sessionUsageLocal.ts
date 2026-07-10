@@ -89,7 +89,7 @@ interface BuildLocalOpts {
   chat: LocalChatMetrics;
   selectedQualified: string | null;
   models: ProviderModel[];
-  lastTurnTokens?: {
+  contextTokens?: {
     input: number;
     output: number;
     cacheRead: number;
@@ -98,12 +98,11 @@ interface BuildLocalOpts {
 }
 
 export function buildSessionUsageLocal(opts: BuildLocalOpts): SessionUsageData {
-  const { wsId, chat, selectedQualified, models, lastTurnTokens } = opts;
+  const { wsId, chat, selectedQualified, models, contextTokens } = opts;
   const window = resolveContextWindow(selectedQualified, models);
   const { used, estimate } = estimateContextUsed(
-    lastTurnTokens,
+    contextTokens,
     chat.tokensIn,
-    chat.cacheRead,
   );
   const records = loadUsage();
   const todayKey = new Date().toDateString();

@@ -43,7 +43,7 @@ and hides the meta row until cancel or confirm.
 
 | Platform | Engine | Why |
 |---|---|---|
-| macOS (Tauri) | **Native** — `speech` crate → `SFSpeechRecognizer` + `start_microphone_task` | WKWebView has no Web Speech API |
+| macOS (Tauri) | **Native** — WebView `getUserMedia` capture + `SFSpeechRecognizer::recognize_in_path` on a temp WAV | `start_microphone_task` / `AVAudioEngine` tap crashes on the Tauri main thread |
 | Windows (Tauri) | **Web** — `SpeechRecognition` / `webkitSpeechRecognition` in WebView2 | Chromium speech stack |
 | `npm run dev` (Vite only) | **Web** when API present | Same as Windows path |
 
@@ -54,17 +54,16 @@ else Web Speech ctor → `web`; else `null` (mic button not rendered).
 
 1. User clicks **Dictate** (`.ai-mic-btn`) in the composer toolbar.
 2. `ComposerDictationBar` mounts, calls `startDictation()`.
-3. Partial transcript streams into a muted preview label; waveform animates.
+3. Waveform animates from live mic levels. On macOS native, live partial text is
+   **not** streamed — transcript appears after **✓ Insert** (file transcription).
 4. **✓ Insert** — `session.stop()` → append text to composer input (space-join if
    non-empty) → refocus textarea.
 5. **✕ Cancel** — `session.cancel()` → discard, restore normal composer.
 
 ## Waveform
 
-| Engine | Visual |
-|---|---|
-| `web` | Live levels via `getUserMedia` + `AnalyserNode` (`openAudioMeter`) |
-| `native` | Procedural pulse (avoids second mic capture while Speech.framework holds the device) |
+Both engines use live levels via `getUserMedia` + `AnalyserNode` (`onLevel` callback
+in `startDictation`; Windows web may also use `openAudioMeter`).
 
 28 vertical bars (`.ai-dictation-wave-bar`), CSS `scaleY` from `--lv` custom property.
 
@@ -73,19 +72,8 @@ else Web Speech ctor → `web`; else `null` (mic button not rendered).
 | Command | Returns | Action |
 |---|---|---|
 | `dictation_available` | `bool` | `SpeechRecognizer::new().is_available()` |
-| `dictation_start` | `()` | Request auth if needed; `start_microphone_task` |
-| `dictation_stop` | `string` | `task.finish()`; return accumulated transcript |
-| `dictation_cancel` | `()` | `task.cancel()`; clear transcript |
-
-## Tauri events (macOS)
-
-| Event | Payload | When |
-|---|---|---|
-| `dictation-partial` | `{ text }` | `DidHypothesizeTranscription` |
-| `dictation-final` | `{ text }` | `DidFinishRecognition` |
-| `dictation-error` | `{ text }` | Cancel / failed finish |
-
-Frontend listens in `startNative()`; unlistens on stop/cancel.
+| `dictation_request_auth` | `()` | Prompt / check Speech recognition permission |
+| `dictation_transcribe_wav` | `string` | Write temp WAV → `recognize_in_path` → transcript |
 
 ## Permissions (macOS)
 
@@ -119,7 +107,8 @@ Tauri merges `Info.plist` from `src-tauri/` at bundle time (see Tauri 2 macOS bu
 
 - **No dead mic control:** `ComposerMic` returns `null` when `dictationEngine()` is
   `null` (e.g. Linux without Web Speech).
-- **Single session:** Rust rejects `dictation_start` if a task is already active.
+- **AVAudioEngine crash:** Do **not** call `start_microphone_task` from a Tauri IPC
+  handler on the main thread — use WebView capture + `recognize_in_path` instead.
 - **Confirm with empty transcript:** `onConfirm` no-ops append but still exits dictation.
 - **Dev vs release bundle id:** debug builds use `dev.getcodetta.app.dev` (`build.rs`);
   speech auth still requires a proper app bundle in production.

@@ -223,6 +223,18 @@ export const claudeCodeProvider: ChatProvider = {
     // (empty text) on each thinking delta so the staleness timer
     // resets — the user sees "still working" instead of dead silence.
     const thinkingBlocks = new Map<number, string>();
+    // Latest message_start usage — the real context snapshot. The
+    // terminal `result` event sums cache reads across every internal
+    // tool-loop API call, which inflates context % (same prefix
+    // counted N times). Claude Code's /context uses the last call.
+    let latestContextTokens: {
+      input: number;
+      output: number;
+      cacheRead: number;
+      cacheCreate: number;
+    } | null = null;
+    const numTok = (v: unknown) =>
+      typeof v === "number" && Number.isFinite(v) ? v : 0;
 
     const handle = (data: { kind: string; line?: string; code?: number }) => {
       if (data.kind === "end") {
@@ -251,6 +263,9 @@ export const claudeCodeProvider: ChatProvider = {
       if (data.kind !== "line" || !data.line) return;
       try {
         const obj = JSON.parse(data.line);
+        const isSubagentRecord = !!(
+          obj.parent_tool_use_id || obj.parentToolUseID
+        );
         // Claude Code stream-json shape:
         //   {"type":"system","subtype":"init","session_id":"<uuid>",...}
         //   {"type":"assistant","message":{"role":"assistant","content":[
@@ -287,6 +302,16 @@ export const claudeCodeProvider: ChatProvider = {
             // Block indices restart per message; the cross-message
             // anyTextEmitted flag intentionally survives.
             textBlocksStarted.clear();
+            const usage = (ev as { message?: { usage?: Record<string, unknown> } })
+              .message?.usage;
+            if (usage) {
+              latestContextTokens = {
+                input: numTok(usage.input_tokens),
+                output: 0,
+                cacheRead: numTok(usage.cache_read_input_tokens),
+                cacheCreate: numTok(usage.cache_creation_input_tokens),
+              };
+            }
           } else if (
             ev.type === "content_block_start" &&
             ev.content_block?.type === "thinking" &&
@@ -424,9 +449,6 @@ export const claudeCodeProvider: ChatProvider = {
         // id of the parent Agent/Task call. We hide these inner steps from
         // the main transcript: the duck-avatar chip shows the run, and the
         // full subagent transcript lives in its own read-only tab.
-        const isSubagentRecord = !!(
-          obj.parent_tool_use_id || obj.parentToolUseID
-        );
         if (obj.type === "assistant" && obj.message?.content && !isSubagentRecord) {
           // If we've already streamed this message's text via
           // content_block_delta events, suppress the duplicate text
@@ -479,7 +501,7 @@ export const claudeCodeProvider: ChatProvider = {
         // model used. Surface it so the chat UI can show "$0.02 · 1.2k in /
         // 567 out · cached 89% · 3.1s" in the status strip — invaluable for
         // catching the documented resume-cache-miss spend regressions.
-        if (obj.type === "result") {
+        if (obj.type === "result" && !isSubagentRecord) {
           const u = (obj.usage ?? {}) as Record<string, unknown>;
           const num = (v: unknown) =>
             typeof v === "number" && Number.isFinite(v) ? v : 0;
@@ -497,6 +519,7 @@ export const claudeCodeProvider: ChatProvider = {
               cacheRead: num(u.cache_read_input_tokens),
               cacheCreate: num(u.cache_creation_input_tokens),
             },
+            contextTokens: latestContextTokens ?? undefined,
             isError: obj.is_error === true,
           });
           wake();

@@ -18,6 +18,7 @@ Parent composer doc: **`022-chat-composer.md`**.
 | File | Role |
 |---|---|
 | `src/components/ComposerGitActions.tsx` | File rows, diff stats, primary button, chevron menu |
+| `src/gitFileDiff.ts` | `openGitFileDiff` → global `DiffModal` (shared with Source Control) |
 | `src/composerGitOps.ts` | Stage-all → commit prompt → push/publish orchestration |
 | `src-tauri/src/git.rs` | `git_diff_stat` — `git diff HEAD --numstat` aggregate + per-file |
 | `src/ipc.ts` | `GitDiffStat`, `git.diffStat`, `git.stage`, `git.commit` |
@@ -47,8 +48,9 @@ Visible when workspace is a git repo **and** there are local changes, diff stats
 
 | Element | Behaviour |
 |---|---|
-| File row | Basename + `+ins` ( `--git-added` ) / `−del` ( `--git-deleted` ) or `new` for untracked |
-| Collapse | First **2** files; **Show N more** expands full list |
+| Compact (default) | Single bar: `Changes +N −M` · `N files ▾` · **Commit & Push** — no file list |
+| Expand | Click `N files` → scrollable list; **click a row** → `DiffModal` (`openGitFileDiff`, same as Source Control) |
+| Collapse | Click **Less ▴** — returns to compact bar |
 | Changes pill | Total insertions/deletions from `git_diff_stat` |
 | Primary button | **Commit & Push** when dirty; **Push** when only `ahead > 0` |
 | Chevron menu | Create Branch & Commit · Create Branch, Commit & Push · Commit · Commit & Push · Push |

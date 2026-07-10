@@ -105,7 +105,15 @@ export type ChatStreamEvent =
       cost?: number;
       durationMs?: number;
       model?: string;
+      /** Turn-total billing tokens from the `result` event (may sum cache reads). */
       tokens?: {
+        input: number;
+        output: number;
+        cacheRead: number;
+        cacheCreate: number;
+      };
+      /** Last API `message_start` snapshot — true context window fill. */
+      contextTokens?: {
         input: number;
         output: number;
         cacheRead: number;

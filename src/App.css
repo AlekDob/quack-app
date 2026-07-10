@@ -6236,10 +6236,14 @@ body.ws-dragging * {
   order: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 6px 12px 4px;
+  gap: 0;
+  padding: 4px 10px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+}
+.ai-composer-git.is-expanded {
+  gap: 6px;
+  padding: 6px 12px 4px;
 }
 .ai-composer-git-files {
   list-style: none;
@@ -6248,15 +6252,30 @@ body.ws-dragging * {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  max-height: min(160px, 28vh);
+  overflow-y: auto;
 }
 .ai-composer-git-file {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  width: 100%;
+  padding: 3px 6px;
+  margin: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
   font-size: 11px;
   color: var(--fg-muted);
   min-width: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.ai-composer-git-file:hover,
+.ai-composer-git-file:focus-visible {
+  background: var(--bg-hi);
+  color: var(--fg);
 }
 .ai-composer-git-file-name {
   overflow: hidden;
@@ -6285,34 +6304,49 @@ body.ws-dragging * {
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
-.ai-composer-git-more {
-  border: none;
+.ai-composer-git-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
   background: transparent;
-  padding: 2px 0;
-  font-size: 11px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 500;
   color: var(--fg-muted);
   cursor: pointer;
 }
-.ai-composer-git-more:hover {
+.ai-composer-git-toggle:hover {
+  background: var(--bg-hi);
   color: var(--fg);
 }
 .ai-composer-git-actions {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-height: 28px;
+}
+.ai-composer-git-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
 }
 .ai-composer-git-changes {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-right: auto;
-  padding: 4px 10px;
+  flex-shrink: 0;
+  padding: 3px 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
   background: var(--bg);
-  font-size: 11px;
+  font-size: 10px;
   color: var(--fg-muted);
 }
 .ai-composer-git-changes-label {
@@ -6322,6 +6356,7 @@ body.ws-dragging * {
 .ai-composer-git-split {
   display: inline-flex;
   align-items: stretch;
+  flex-shrink: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
   overflow: hidden;
@@ -6332,10 +6367,11 @@ body.ws-dragging * {
   background: var(--primary-bg);
   color: var(--primary-fg);
   font-family: inherit;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  padding: 5px 12px;
+  padding: 4px 10px;
   cursor: pointer;
+  white-space: nowrap;
 }
 .ai-composer-git-main:disabled {
   opacity: 0.55;
@@ -6345,7 +6381,7 @@ body.ws-dragging * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
+  width: 26px;
   border: none;
   border-left: 1px solid var(--border);
   background: var(--bg-elev);

@@ -1,20 +1,18 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
-  fs,
   git as gitApi,
   type GitCommit,
   type GitFile,
   type GitStash,
   type GitStatus,
 } from "../ipc";
-import { requestDiff } from "../editorState";
+import { openGitFileDiff } from "../gitFileDiff";
 import { error as toastError, errMsg, success as toastSuccess } from "../notify";
 import {
   confirm as dialogConfirm,
   prompt as dialogPrompt,
 } from "../dialog";
-import { langOf } from "../langDetect";
 import { joinPath } from "../pathUtils";
 import { useStore } from "../store";
 import { useModalFocus } from "../useModalFocus";
@@ -239,26 +237,8 @@ export function SourceControlPanel({ wsId, root, compact = false }: Props) {
   }, [busy, root, refresh]);
 
   const showDiff = useCallback(
-    async (f: GitFile, staged: boolean) => {
-      const abs = joinPath(root, f.path);
-      try {
-        const original = await gitApi.show(root, "HEAD", f.path);
-        // Empty refspec → git_show builds ":path", the stage-0 index
-        // entry. (":" as the refspec produced "::path", which git
-        // rejects as an ambiguous argument — staged diffs were broken.)
-        const modified = staged
-          ? await gitApi.show(root, "", f.path)
-          : await fs.readFile(abs);
-        requestDiff({
-          path: f.path,
-          refspec: staged ? "HEAD vs index" : "HEAD vs working tree",
-          originalContent: original,
-          modifiedContent: modified,
-          language: langOf(f.path),
-        });
-      } catch (e) {
-        toastError(`Diff failed: ${errMsg(e)}`);
-      }
+    (f: GitFile, staged: boolean) => {
+      void openGitFileDiff(root, { ...f, staged });
     },
     [root],
   );
