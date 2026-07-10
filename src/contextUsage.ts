@@ -8,6 +8,35 @@ export interface TurnTokens {
   cacheCreate: number;
 }
 
+const numTok = (v: unknown) =>
+  typeof v === "number" && Number.isFinite(v) ? v : 0;
+
+/**
+ * Input-side usage from one Anthropic API call (`message_start` or final
+ * `message_delta`). Merges with `prev` when a delta only carries a subset
+ * (e.g. output-only events must not zero out cache fields from message_start).
+ */
+export function contextTokensFromApiUsage(
+  usage: Record<string, unknown> | undefined,
+  prev?: TurnTokens,
+): TurnTokens | undefined {
+  if (!usage) return prev;
+  const hasInput = typeof usage.input_tokens === "number";
+  const hasCacheRead = typeof usage.cache_read_input_tokens === "number";
+  const hasCacheCreate = typeof usage.cache_creation_input_tokens === "number";
+  if (!hasInput && !hasCacheRead && !hasCacheCreate) return prev;
+  return {
+    input: hasInput ? numTok(usage.input_tokens) : (prev?.input ?? 0),
+    output: 0,
+    cacheRead: hasCacheRead
+      ? numTok(usage.cache_read_input_tokens)
+      : (prev?.cacheRead ?? 0),
+    cacheCreate: hasCacheCreate
+      ? numTok(usage.cache_creation_input_tokens)
+      : (prev?.cacheCreate ?? 0),
+  };
+}
+
 /** Tokens occupying the context window on the last API call (or estimate). */
 export function estimateContextUsed(
   context: TurnTokens | undefined,

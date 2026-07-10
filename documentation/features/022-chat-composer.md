@@ -236,3 +236,4 @@ Full DOM/CSS detail (turn wrappers, sticky containing block, z-index stacking):
 - Agent commit indicator above composer: `051-agent-commit-dock.md`.
 - Composer git actions (inside pill): `053-composer-git-actions.md`.
 - Composer voice dictation: `052-composer-voice-dictation.md`.
+- Context & usage ring + drawer (CC): `023-session-usage-panel.md`.

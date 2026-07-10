@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { ChatMessage, ChatStreamEvent, ToolCall } from "../ai";
+import { contextTokensFromApiUsage } from "../contextUsage";
 import type { ChatProvider, ProviderModel } from "./types";
 import { getWorkspaceRoot } from "../wsRoot";
 import { getJson as lsGetJson } from "../localStore";
@@ -233,8 +234,6 @@ export const claudeCodeProvider: ChatProvider = {
       cacheRead: number;
       cacheCreate: number;
     } | null = null;
-    const numTok = (v: unknown) =>
-      typeof v === "number" && Number.isFinite(v) ? v : 0;
 
     const handle = (data: { kind: string; line?: string; code?: number }) => {
       if (data.kind === "end") {
@@ -302,16 +301,17 @@ export const claudeCodeProvider: ChatProvider = {
             // Block indices restart per message; the cross-message
             // anyTextEmitted flag intentionally survives.
             textBlocksStarted.clear();
-            const usage = (ev as { message?: { usage?: Record<string, unknown> } })
-              .message?.usage;
-            if (usage) {
-              latestContextTokens = {
-                input: numTok(usage.input_tokens),
-                output: 0,
-                cacheRead: numTok(usage.cache_read_input_tokens),
-                cacheCreate: numTok(usage.cache_creation_input_tokens),
-              };
-            }
+            const snap = contextTokensFromApiUsage(
+              (ev as { message?: { usage?: Record<string, unknown> } })
+                .message?.usage,
+            );
+            if (snap) latestContextTokens = snap;
+          } else if (ev.type === "message_delta") {
+            const snap = contextTokensFromApiUsage(
+              (ev as { usage?: Record<string, unknown> }).usage,
+              latestContextTokens ?? undefined,
+            );
+            if (snap) latestContextTokens = snap;
           } else if (
             ev.type === "content_block_start" &&
             ev.content_block?.type === "thinking" &&

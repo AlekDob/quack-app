@@ -97,3 +97,17 @@ Summary: `claude_auth_status` (credentials probe, no usage API) + composer
 `ClaudeLoginBanner` + `terminal.claude_login` (440px terminal, PTY watch,
 success toast, auto-close tab) + ModelBrowser signed-in state + chat stderr
 rewrite in `claudeCode.ts`.
+
+### End-of-turn usage + context snapshot
+
+Full design: **[023-session-usage-panel.md](023-session-usage-panel.md)**. Gotcha:
+**[cc-context-ring-result-usage.md](../gotcha/cc-context-ring-result-usage.md)**.
+
+| `result` field | Use |
+|---|---|
+| `usage` (turn total) | Cost chip, cumulative billing, cache-read ledger |
+| `contextTokens` (derived) | Context ring % — last API `message_start` / `message_delta` snapshot |
+
+`claudeCode.ts` parses `stream_event` with `--include-partial-messages`. Do
+**not** use summed `result.usage` cache fields for context window %.
+
