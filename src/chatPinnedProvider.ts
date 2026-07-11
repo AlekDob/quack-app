@@ -51,20 +51,3 @@ export function resolvePinnedPlatform(
   }
   return null;
 }
-
-export function isCrossPlatformPick(
-  pinned: ProviderId | null,
-  target: ProviderId,
-): boolean {
-  return pinned !== null && pinned !== target;
-}
-
-export function crossPlatformSwitchHint(
-  from: ProviderId,
-  to: ProviderId,
-): string {
-  return (
-    `This chat started on ${platformLabel(from)}. Switching to ${platformLabel(to)} ` +
-    "starts a new CLI session — Quack keeps the transcript, but tool context and server-side memory do not transfer."
-  );
-}

@@ -97,7 +97,7 @@ Multitasking → New chat, Stop clears queue): **`039-composer-queue.md`**
 
 ## Effort + thinking (one control)
 
-Claude Code only. Full bridge detail (`--effort` whitelist, spawn wiring): `014-claude-code-bridge.md`.
+Claude Code only (`parseQualifiedModel(selected)?.providerId === "claude-code"`). **Cursor CLI** has no Quack effort knob — effort/speed tiers are separate models in `cursor-agent --list-models` (`026`, `025`). Full bridge detail (`--effort` whitelist, spawn wiring): `014-claude-code-bridge.md`.
 
 ### Visual meter (toolbar pill)
 

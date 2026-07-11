@@ -10,7 +10,7 @@ export { hasApiKey, getApiKey, setApiKey } from "./keys";
 export type { ProviderId, ProviderModel } from "./types";
 export { parseQualifiedModel, makeQualifiedModel, isAgenticProviderId } from "./types";
 export { warmupOllamaModel } from "./ollama";
-export { invalidateClaudeCodeCache } from "./claudeCode";
+export { invalidateClaudeCodeCache, refreshClaudeCodeModelsLive, claudeCodePickerModels } from "./claudeCode";
 export { invalidateCursorCliCache, refreshCursorModelsLive } from "./cursorCode";
 export { invalidateOpenCodeCache, refreshOpenCodeModelsLive } from "./openCode";
 
@@ -37,6 +37,25 @@ export function getProvider(id: ProviderId): ChatProvider {
 }
 // Re-export so dynamic imports can grab it via the index.
 export { REGISTRY as _registry };
+
+/**
+ * Fast picker probe — skips slow CLI spawns (`cursor-agent`, OpenCode sidecar,
+ * Claude `/model` label probes). CLI catalogs load lazily via warmPickerCatalogs().
+ */
+export async function listFastModels(): Promise<ProviderModel[]> {
+  const skip = new Set<ProviderId>(["cursor-cli", "opencode-cli", "claude-code"]);
+  const chunks = await Promise.all(
+    PROVIDERS.filter((p) => !skip.has(p.id)).map(async (p) => {
+      try {
+        if (!(await p.isAvailable())) return [] as ProviderModel[];
+        return await p.listModels();
+      } catch {
+        return [] as ProviderModel[];
+      }
+    }),
+  );
+  return chunks.flat();
+}
 
 /**
  * Aggregate models from every available provider. Ollama is fetched (so the

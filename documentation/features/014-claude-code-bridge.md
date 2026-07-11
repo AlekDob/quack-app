@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-10
+last_verified: 2026-07-11
 tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog, rust, performance]
 ---
 
@@ -16,7 +16,8 @@ tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog
 ### Files
 | Type | Path | Purpose |
 |------|------|---------|
-| Bridge | `src-tauri/src/claude_code.rs` | spawn, reader/watchdog/wait threads, `kill_process_tree`, all `claude_code_*` commands |
+| Bridge | `src-tauri/src/claude_models.rs` | `claude_code_list_models` — dynamic picker catalog (`059`) |
+| Bridge | `src-tauri/src/claude_code.rs` | spawn, reader/watchdog/wait threads, `kill_process_tree`, `claude_print_text`, all `claude_code_*` commands |
 | State | `claude_code.rs` → `ClaudeCodeState` | `children: Map<streamId, pid>`, `buffers`, `session_streams` |
 | Background wake | `src/backgroundWake.ts` | auto `--resume` nudge when a `-p` turn ends after `run_in_background` Bash — see [048-background-task-wake.md](048-background-task-wake.md) |
 | Dep | `src-tauri/Cargo.toml` | `[target.'cfg(unix)'.dependencies] libc` |
@@ -26,6 +27,7 @@ tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog
 |---|---|
 | `claude_code_check` | resolve & version-probe the `claude` binary (PATH, shell, common install dirs) |
 | `claude_auth_status` | lightweight OAuth/credentials probe — `{ status, reason?, subscriptionType? }`; no usage API call |
+| `claude_code_list_models` | dynamic composer catalog from `/model` — **`059-claude-code-model-catalog.md`** |
 | `claude_code_chat` | spawn a run; returns a `stream id`; emits `claude-stream:<id>` events |
 | `claude_code_attach` | replay buffered events + `ended` for a chat that just refreshed |
 | `claude_code_active_sessions` | chat-session ids whose pid is still in `children` (powers the hub "working" dot) |

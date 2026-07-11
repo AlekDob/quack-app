@@ -153,6 +153,11 @@ fn short_project(encoded: &str) -> String {
 }
 
 fn summarise(path: &Path) -> Option<UsageSession> {
+    summarise_jsonl(path)
+}
+
+/// Single-session JSONL rollup (tokens, cost estimate, timestamps).
+pub fn summarise_jsonl(path: &Path) -> Option<UsageSession> {
     let metadata = fs::metadata(path).ok()?;
     let modified_ms = metadata
         .modified()
@@ -1137,4 +1142,60 @@ fn block_events_to_turn(
     }
     turn.text = first_user_text.unwrap_or(text_buf);
     turn
+}
+
+/// Drawer + composer ring hydration when Quack's stream lacks usage events.
+#[derive(Serialize, Clone)]
+pub struct SessionDrawerStats {
+    pub context_input_tokens: u64,
+    pub context_cache_read_tokens: u64,
+    pub context_cache_creation_tokens: u64,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cache_read_tokens: u64,
+    pub cache_creation_tokens: u64,
+    pub estimated_cost_usd: f32,
+    pub turns: u32,
+    pub primary_model: String,
+    pub first_ts_ms: u64,
+    pub last_ts_ms: u64,
+}
+
+#[tauri::command]
+pub fn claude_session_drawer_stats(
+    cwd: String,
+    session_id: String,
+) -> Result<Option<SessionDrawerStats>, String> {
+    let path = crate::session_jsonl::claude_jsonl_path(&cwd, &session_id);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let summary = summarise_jsonl(&path);
+    let context = crate::session_jsonl::last_context_snap(&path);
+    let Some(s) = summary else {
+        return Ok(None);
+    };
+    let (ci, cr, cc) = context
+        .map(|c| {
+            (
+                c.input_tokens,
+                c.cache_read_tokens,
+                c.cache_creation_tokens,
+            )
+        })
+        .unwrap_or((0, 0, 0));
+    Ok(Some(SessionDrawerStats {
+        context_input_tokens: ci,
+        context_cache_read_tokens: cr,
+        context_cache_creation_tokens: cc,
+        input_tokens: s.input_tokens,
+        output_tokens: s.output_tokens,
+        cache_read_tokens: s.cache_read_tokens,
+        cache_creation_tokens: s.cache_creation_tokens,
+        estimated_cost_usd: s.estimated_cost_usd,
+        turns: s.turns,
+        primary_model: s.primary_model,
+        first_ts_ms: s.first_ts_ms,
+        last_ts_ms: s.last_ts_ms,
+    }))
 }

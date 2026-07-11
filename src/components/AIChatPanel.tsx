@@ -1026,8 +1026,23 @@ export function AIChatPanel({
   const refreshLiveCliModels = useCallback(async (force = false) => {
     const snap = getModelDiscovery();
     if (!snap) return;
+    const wantCc = snap.claudeCodeAvailable;
     const wantCursor = snap.cursorCliAvailable;
     const wantOc = snap.openCodeAvailable;
+    if (wantCc) {
+      void import("../providers/claudeCode")
+        .then(({ refreshClaudeCodeModelsLive }) =>
+          refreshClaudeCodeModelsLive(force),
+        )
+        .then((ccModels) => {
+          if (ccModels.length > 0) {
+            mergeLiveCliModelsIntoDiscovery([], [], ccModels);
+            const next = getModelDiscovery();
+            if (next) applyDiscoverySnapshot(next);
+          }
+        })
+        .catch(() => {});
+    }
     if (!wantCursor && !wantOc) return;
     try {
       const [{ refreshOpenCodeModelsLive }, { refreshCursorModelsLive }] =
@@ -4476,6 +4491,7 @@ export function AIChatPanel({
   );
 
   const handlePickerOpen = useCallback(() => {
+    setCatalogWarming(true);
     warmPickerCatalogs();
   }, []);
 
@@ -4513,7 +4529,7 @@ export function AIChatPanel({
         onConfigureProviders={() => openSettings("ai-providers")}
         onOpenFullBrowser={() => setBrowserOpen(true)}
         pinnedProviderId={pinnedPlatform}
-        onPlatformPin={setPinnedProviderId}
+        onNewChat={startNewChat}
       />
     );
   };

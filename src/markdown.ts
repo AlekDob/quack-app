@@ -479,12 +479,25 @@ function highlightShellLine(text: string): string {
   return cmd + rest;
 }
 
-function blockquoteAttrs(text: string, line?: number): string {
+function blockquoteAttrs(text: string): string {
   const stripped = text.replace(/\*\*/g, "").trim();
   const isNote = /^(?:nota|note|important|avviso|warning|tip)\s*:/i.test(stripped);
   const cls = isNote ? "md-callout md-callout-note" : "md-callout";
-  const lineAttr = line ? ` data-source-line="${line}"` : "";
-  return ` class="${cls}"${lineAttr}`;
+  return ` class="${cls}"`;
+}
+
+function renderBlockquote(b: Block): string {
+  const text = b.text ?? "";
+  const inner = renderMarkdown(text);
+  const lineAttr = b.line ? ` data-source-line="${b.line}"` : "";
+  const copyBtn =
+    `<button class="md-code-copy-btn" type="button" ` +
+    `aria-label="Copy" title="Copy" data-md-copy="true">${COPY_ICON_SVG}</button>`;
+  return (
+    `<div class="md-callout-wrap"${lineAttr}>` +
+    `<blockquote${blockquoteAttrs(text)}>${inner}</blockquote>` +
+    `<div class="md-callout-actions">${copyBtn}</div></div>`
+  );
 }
 
 function renderCodeBlock(b: Block): string {
@@ -594,8 +607,7 @@ export function renderMarkdown(md: string): string {
         break;
       }
       case "quote": {
-        const inner = renderMarkdown(b.text ?? "");
-        parts.push(`<blockquote${blockquoteAttrs(b.text ?? "", b.line)}>${inner}</blockquote>`);
+        parts.push(renderBlockquote(b));
         break;
       }
       case "hr": {

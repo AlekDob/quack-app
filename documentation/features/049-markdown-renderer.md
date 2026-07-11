@@ -61,10 +61,11 @@ Markdown string
 ### Callouts / note blockquotes
 | Class | When | Visual |
 |-------|------|--------|
-| `.md-callout` | Any `>` blockquote | Body-sized text (`inherit`); `--info` left border + `--info-bg` |
-| `.md-callout-note` | Starts with `Nota:` / `Note:` / `Important:` / `Warning:` / `Tip:` (case-insensitive) | `--warn` left border + `--warn-bg` |
+| `.md-callout-wrap` | Any `>` blockquote | Wrapper + copy icon row below (`data-md-copy`) |
+| `.md-callout` | Inner blockquote | Body-sized text; `--info` left border + `--info-bg` |
+| `.md-callout-note` | Starts with `Nota:` / `Note:` / `Important:` / `Warning:` / `Tip:` | `--warn` left border + `--warn-bg` |
 
-Chat scope inherits body scale — no more 11px shrunk blockquotes.
+Copy extracts `blockquote.textContent` (plain text, no markdown syntax).
 
 ### Copyable code blocks (2026-07-10)
 Replaces the old hover-revealed top-right **Copy** text button.

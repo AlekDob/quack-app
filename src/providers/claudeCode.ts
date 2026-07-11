@@ -22,39 +22,99 @@ export function getAllowUnguarded(): boolean {
 }
 
 // "default" passes no --model flag, so Claude Code uses whatever your
-// `claude /login` session is configured for. This is the most reliable
-// choice — the aliases (sonnet/opus/haiku) only work if your CLI version
-// recognizes them and your subscription has access.
-const DEFAULT_MODELS: ProviderModel[] = [
+// `claude /login` session is configured for.
+const FALLBACK_MODELS: ProviderModel[] = [
   {
     providerId: "claude-code",
     modelId: "default",
-    displayName: "Default (uses your Claude Code configured model)",
+    displayName: "Default",
     contextWindow: 200_000,
     supportsTools: true,
   },
   {
     providerId: "claude-code",
     modelId: "sonnet",
-    displayName: "Sonnet alias (override — only if your CLI accepts it)",
+    displayName: "Sonnet",
     contextWindow: 1_000_000,
     supportsTools: true,
   },
   {
     providerId: "claude-code",
     modelId: "opus",
-    displayName: "Opus alias (override — only if your CLI accepts it)",
+    displayName: "Opus",
     contextWindow: 1_000_000,
     supportsTools: true,
   },
   {
     providerId: "claude-code",
     modelId: "haiku",
-    displayName: "Haiku alias (override — only if your CLI accepts it)",
+    displayName: "Haiku",
+    contextWindow: 200_000,
+    supportsTools: true,
+  },
+  {
+    providerId: "claude-code",
+    modelId: "fable",
+    displayName: "Fable",
     contextWindow: 200_000,
     supportsTools: true,
   },
 ];
+
+/** Instant picker slice — no CLI spawn. */
+export function claudeCodePickerModels(): ProviderModel[] {
+  return FALLBACK_MODELS;
+}
+
+interface ClaudeModelEntry {
+  id: string;
+  display_name: string;
+  is_default: boolean;
+}
+
+let modelsCache: { models: ProviderModel[]; checkedAt: number } | null = null;
+const MODELS_TTL_MS = 60_000;
+
+async function fetchModels(): Promise<ProviderModel[]> {
+  const entries = await invoke<ClaudeModelEntry[]>("claude_code_list_models");
+  if (entries.length === 0) return FALLBACK_MODELS;
+  return entries.map((e) => ({
+    providerId: "claude-code" as const,
+    modelId: e.id,
+    displayName: e.display_name,
+    contextWindow: e.id.includes("[1m]") ? 1_000_000 : 200_000,
+    supportsTools: true,
+  }));
+}
+
+/** Full catalog — one fast `/model` call; version labels refresh in background. */
+export async function refreshClaudeCodeModelsLive(
+  force = false,
+): Promise<ProviderModel[]> {
+  if (
+    !force &&
+    modelsCache &&
+    Date.now() - modelsCache.checkedAt < MODELS_TTL_MS
+  ) {
+    return modelsCache.models;
+  }
+  if (!force && modelsCache) {
+    void fetchAndCacheModels();
+    return modelsCache.models;
+  }
+  if (!(await checkAvailability())) return FALLBACK_MODELS;
+  return fetchAndCacheModels();
+}
+
+async function fetchAndCacheModels(): Promise<ProviderModel[]> {
+  try {
+    const models = await fetchModels();
+    modelsCache = { models, checkedAt: Date.now() };
+    return models;
+  } catch {
+    return modelsCache?.models ?? FALLBACK_MODELS;
+  }
+}
 
 let availabilityCache: { ok: boolean; checkedAt: number } | null = null;
 const AVAILABILITY_TTL_MS = 5_000;
@@ -79,6 +139,7 @@ async function checkAvailability(): Promise<boolean> {
 /** Force a fresh availability check next time isAvailable is called. */
 export function invalidateClaudeCodeCache(): void {
   availabilityCache = null;
+  modelsCache = null;
 }
 
 /**
@@ -127,7 +188,13 @@ export const claudeCodeProvider: ChatProvider = {
   },
 
   async listModels(): Promise<ProviderModel[]> {
-    return DEFAULT_MODELS;
+    if (
+      modelsCache &&
+      Date.now() - modelsCache.checkedAt < MODELS_TTL_MS
+    ) {
+      return modelsCache.models;
+    }
+    return FALLBACK_MODELS;
   },
 
   async *chat({
@@ -251,7 +318,7 @@ export const claudeCodeProvider: ChatProvider = {
           !isModelError &&
           /not logged in|run\s+\/?login|oauth|credentials/i.test(line);
         const text = isModelError
-          ? `\n\n**Model rejected by Claude Code CLI.** Open ⊕ Models and pick one of the aliases (sonnet / opus / haiku). Your CLI may not recognize dated model IDs.`
+          ? `\n\n**Model rejected by Claude Code CLI.** Open the model picker and choose another model (Sonnet, Opus, Haiku, or Default).`
           : isAuthError
             ? `\n\n**Claude Code isn't signed in.** Use the **Sign in** button above the composer, or run \`claude /login\` in a terminal.`
             : `\n[claude] ${line}`;

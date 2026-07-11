@@ -49,6 +49,19 @@ export function buildModelGroups(
   }));
 }
 
+/** Pin the active provider section to the top of the picker list. */
+export function reorderGroupsFirst(
+  groups: ProviderGroup[],
+  providerId: ProviderId,
+): ProviderGroup[] {
+  const idx = groups.findIndex((g) => g.id === providerId);
+  if (idx <= 0) return groups;
+  const next = groups.slice();
+  const [hit] = next.splice(idx, 1);
+  next.unshift(hit);
+  return next;
+}
+
 export function filterVisibleGroups(
   groups: ProviderGroup[],
   query: string,

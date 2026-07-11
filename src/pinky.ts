@@ -36,6 +36,13 @@ export interface PinkySetupResult {
   message: string;
 }
 
+export interface PinkySaveResult {
+  ok: boolean;
+  path: string;
+  rel_path: string;
+  title: string;
+}
+
 export interface PinkyUsageStats {
   hits: number;
   noise_hits: number;
@@ -82,4 +89,20 @@ export const pinky = {
     invoke<PinkyValueStats>("pinky_stats_value", { root }),
   telemetry: (root: string) =>
     invoke<PinkyTelemetry>("pinky_telemetry", { root }),
+  save: (
+    root: string,
+    opts: {
+      title: string;
+      body: string;
+      entryType: string;
+      tags: string[];
+    },
+  ) =>
+    invoke<PinkySaveResult>("pinky_save", {
+      root,
+      title: opts.title,
+      body: opts.body,
+      entry_type: opts.entryType,
+      tags: opts.tags,
+    }),
 };

@@ -5,6 +5,7 @@ import {
   buildModelGroups,
   filterVisibleGroups,
   modelLabel,
+  reorderGroupsFirst,
   splitFavoriteModels,
 } from "../modelSelectorUtils";
 import {
@@ -14,11 +15,7 @@ import {
 } from "../modelPrefs";
 import { ModelPickerRow } from "./ModelPickerRow";
 import { ModelPickerSkeleton } from "./ModelPickerSkeleton";
-import {
-  ModelPickerPlatformBanner,
-  ModelPickerPlatformConfirm,
-} from "./modelPickerPlatform";
-import { isCrossPlatformPick } from "../chatPinnedProvider";
+import { ModelPickerPlatformBanner } from "./modelPickerPlatform";
 import {
   makeQualifiedModel,
   parseQualifiedModel,
@@ -66,8 +63,8 @@ interface Props {
   loading?: boolean;
   /** When set, default to models on this platform only (044). */
   pinnedProviderId?: ProviderId | null;
-  /** Called when the user confirms a cross-platform model switch. */
-  onPlatformPin?: (providerId: ProviderId) => void;
+  /** Start a fresh chat (switch agentic platform). */
+  onNewChat?: () => void;
 }
 
 export function ModelPickerPopover({
@@ -85,7 +82,7 @@ export function ModelPickerPopover({
   onPrefetch,
   loading: loadingProp,
   pinnedProviderId = null,
-  onPlatformPin,
+  onNewChat,
 }: Props) {
   const [openInternal, setOpenInternal] = useState(false);
   const open = openProp ?? openInternal;
@@ -93,8 +90,8 @@ export function ModelPickerPopover({
   const [query, setQuery] = useState("");
   const [prefsTick, setPrefsTick] = useState(0);
   const [opening, setOpening] = useState(false);
-  const [showAllPlatforms, setShowAllPlatforms] = useState(false);
-  const [pendingModel, setPendingModel] = useState<ProviderModel | null>(null);
+  /** True from click until live CLI catalogs finish — keeps loader up. */
+  const [sessionLoad, setSessionLoad] = useState(false);
   const [popPos, setPopPos] = useState({ left: 0, top: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
@@ -109,10 +106,17 @@ export function ModelPickerPopover({
     [cloudModels, ollamaModels, hasKey],
   );
 
+  const selectedProvider = parseQualifiedModel(selectedQualified)?.providerId;
+
   const scopedGroups = useMemo(() => {
-    if (!pinnedProviderId || showAllPlatforms) return groups;
-    return groups.filter((g) => g.id === pinnedProviderId);
-  }, [groups, pinnedProviderId, showAllPlatforms]);
+    if (pinnedProviderId) {
+      return groups.filter((g) => g.id === pinnedProviderId);
+    }
+    if (selectedProvider) {
+      return reorderGroupsFirst(groups, selectedProvider);
+    }
+    return groups;
+  }, [groups, pinnedProviderId, selectedProvider]);
 
   const visible = useMemo(() => {
     void prefsTick;
@@ -125,43 +129,33 @@ export function ModelPickerPopover({
   }, [visible, prefsTick]);
 
   const isEmpty = favorites.length === 0 && groupsNoFav.length === 0;
-  const busy = opening || (loadingProp ?? false);
-  const showFullSkeleton = busy && isEmpty;
-  const showTailSkeleton = busy && !isEmpty;
+  const busy = sessionLoad || opening || (loadingProp ?? false);
+  const hydrating = open && busy;
+  const showList = !hydrating;
   const parsed = parseQualifiedModel(selectedQualified);
   const label = modelLabel(allModels, selectedQualified);
 
   useEffect(() => {
     if (!open) {
       setOpening(false);
-      setShowAllPlatforms(false);
-      setPendingModel(null);
+      setSessionLoad(false);
       return;
     }
+    if (!loadingProp && sessionLoad) {
+      const t = window.setTimeout(() => setSessionLoad(false), 48);
+      return () => window.clearTimeout(t);
+    }
     if (!loadingProp) setOpening(false);
-  }, [open, loadingProp]);
+  }, [open, loadingProp, sessionLoad]);
 
   const applyPick = (model: ProviderModel) => {
-    const crossPlatform = pendingModel !== null;
     onSelect(makeQualifiedModel(model.providerId, model.modelId));
-    if (crossPlatform) onPlatformPin?.(model.providerId);
     setOpen(false);
     setQuery("");
     setOpening(false);
-    setPendingModel(null);
-    setShowAllPlatforms(false);
   };
 
-  const pick = (model: ProviderModel) => {
-    if (
-      pinnedProviderId &&
-      isCrossPlatformPick(pinnedProviderId, model.providerId)
-    ) {
-      setPendingModel(model);
-      return;
-    }
-    applyPick(model);
-  };
+  const pick = (model: ProviderModel) => applyPick(model);
 
   useLayoutEffect(() => {
     if (!open || !btnRef.current) return;
@@ -180,6 +174,7 @@ export function ModelPickerPopover({
       ? clampPopPos(btnRef.current.getBoundingClientRect(), POP_W, POP_H)
       : popPos;
     flushSync(() => {
+      setSessionLoad(true);
       setOpening(true);
       setPopPos(pos);
       setOpen(true);
@@ -190,9 +185,8 @@ export function ModelPickerPopover({
   const closePicker = () => {
     setOpen(false);
     setOpening(false);
+    setSessionLoad(false);
     setQuery("");
-    setShowAllPlatforms(false);
-    setPendingModel(null);
   };
 
   const toggleOpen = () => {
@@ -205,14 +199,14 @@ export function ModelPickerPopover({
       <div className="ai-flag-menu-overlay" onClick={closePicker} />
       <div
         ref={popRef}
-        className={`model-picker-pop${busy ? " model-picker-pop-busy" : ""}`}
+        className={`model-picker-pop${hydrating ? " is-hydrating" : ""}`}
         role="listbox"
-        aria-busy={busy}
+        aria-busy={hydrating}
         style={{ left: popPos.left, top: popPos.top }}
       >
         <div className="model-picker-pop-head">
           <div className="model-picker-search-wrap">
-            {busy ? (
+            {hydrating ? (
               <span className="ai-spinner ai-spinner-sm model-picker-head-spin" />
             ) : (
               <Icon name="search" size={14} />
@@ -222,7 +216,8 @@ export function ModelPickerPopover({
               className="model-picker-search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={busy ? "Loading models…" : "Search models"}
+              placeholder={hydrating ? "Loading models…" : "Search models"}
+              readOnly={hydrating}
             />
           </div>
           <button
@@ -248,31 +243,24 @@ export function ModelPickerPopover({
             <Icon name="settings" size={14} />
           </button>
         </div>
-        {pinnedProviderId && !pendingModel && (
+        {pinnedProviderId && onNewChat && (
           <ModelPickerPlatformBanner
             pinnedProviderId={pinnedProviderId}
-            showAllPlatforms={showAllPlatforms}
-            onShowAll={() => setShowAllPlatforms(true)}
-            onLockAgain={() => setShowAllPlatforms(false)}
-          />
-        )}
-        {pinnedProviderId && pendingModel && (
-          <ModelPickerPlatformConfirm
-            from={pinnedProviderId}
-            to={pendingModel.providerId}
-            onConfirm={() => applyPick(pendingModel)}
-            onCancel={() => setPendingModel(null)}
+            onNewChat={() => {
+              closePicker();
+              onNewChat();
+            }}
           />
         )}
         <div className="model-picker-scroll">
-          {showFullSkeleton && <ModelPickerSkeleton rows={6} />}
-          {!showFullSkeleton && isEmpty && !busy && (
+          {hydrating && <ModelPickerSkeleton rows={7} />}
+          {showList && isEmpty && (
             <p className="model-picker-empty">
               No models available. Configure a provider or adjust filters
               in Manage models.
             </p>
           )}
-          {favorites.length > 0 && (
+          {showList && favorites.length > 0 && (
             <PickerSection
               title="Favorites"
               models={favorites}
@@ -281,22 +269,17 @@ export function ModelPickerPopover({
               onFavoriteChange={() => setPrefsTick((n) => n + 1)}
             />
           )}
-          {groupsNoFav.map((group) => (
-            <PickerSection
-              key={group.id}
-              title={group.name}
-              models={group.models}
-              selectedQualified={selectedQualified}
-              onPick={pick}
-              onFavoriteChange={() => setPrefsTick((n) => n + 1)}
-            />
-          ))}
-          {showTailSkeleton && (
-            <ModelPickerSkeleton
-              rows={3}
-              label="Loading more providers…"
-            />
-          )}
+          {showList &&
+            groupsNoFav.map((group) => (
+              <PickerSection
+                key={group.id}
+                title={group.name}
+                models={group.models}
+                selectedQualified={selectedQualified}
+                onPick={pick}
+                onFavoriteChange={() => setPrefsTick((n) => n + 1)}
+              />
+            ))}
         </div>
       </div>
     </>
@@ -308,15 +291,15 @@ export function ModelPickerPopover({
         <button
           ref={btnRef}
           type="button"
-          className={`ai-model-chip${busy ? " ai-model-chip-loading" : ""}${
-            opening ? " ai-model-chip-opening" : ""
-          }`}
+          className={`ai-model-chip${
+            (sessionLoad || loadingProp) && !open ? " ai-model-chip-loading" : ""
+          }${opening ? " ai-model-chip-opening" : ""}`}
           onClick={toggleOpen}
           onMouseEnter={() => onPrefetch?.()}
           onFocus={() => onPrefetch?.()}
           aria-haspopup="listbox"
           aria-expanded={open}
-          aria-busy={busy || undefined}
+          aria-busy={(sessionLoad || loadingProp) && !open ? true : undefined}
           title={
             selectedQualified
               ? `${label} — click to switch`
@@ -330,12 +313,12 @@ export function ModelPickerPopover({
                 style={dotColor ? { background: dotColor } : undefined}
                 aria-hidden="true"
               />
-              <span className="ai-model-id">{parsed.modelId}</span>
+              <span className="ai-model-id">{label}</span>
             </>
           ) : (
             <span className="ai-model-btn-empty">Pick a model…</span>
           )}
-          {busy ? (
+          {(sessionLoad || loadingProp) && !open ? (
             <span className="ai-spinner ai-spinner-sm" aria-hidden="true" />
           ) : (
             <span className="ai-model-btn-caret">▾</span>

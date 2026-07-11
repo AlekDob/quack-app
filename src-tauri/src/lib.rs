@@ -3,6 +3,7 @@ mod dictation;
 mod open_files;
 mod chat_store;
 mod claude_code;
+mod claude_models;
 mod cursor_code;
 mod opencode_sidecar;
 mod provider_path;
@@ -169,6 +170,7 @@ pub fn run() {
             git::git_stash_apply,
             git::git_stash_drop,
             claude_code::claude_code_check,
+            claude_models::claude_code_list_models,
             claude_code::claude_code_chat,
             claude_code::claude_code_kill,
             claude_code::claude_code_kill_session,
@@ -196,6 +198,7 @@ pub fn run() {
             claude_sessions::claude_usage_sessions,
             claude_sessions::claude_session_export_markdown,
             claude_sessions::claude_session_load_turns,
+            claude_sessions::claude_session_drawer_stats,
             context_assets::claude_context_assets,
             context_assets::claude_set_skill_override,
             context_assets::claude_invalidate_context_cache,
@@ -207,6 +210,7 @@ pub fn run() {
             pinky::pinky_migrate_global_brain,
             pinky::pinky_stats_value,
             pinky::pinky_telemetry,
+            pinky::pinky_save,
             claude_mcp::claude_mcp_list,
             claude_mcp::claude_mcp_add,
             claude_mcp::claude_mcp_add_remote,

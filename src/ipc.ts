@@ -234,6 +234,12 @@ export const claudeCode = {
       cache_read_tokens: number;
       cache_creation_tokens: number;
     } | null>("claude_session_context_usage", { cwd, sessionId }),
+  /** Full drawer stats from session JSONL (context + billing + duration). */
+  drawerStats: (cwd: string, sessionId: string) =>
+    invoke<import("./sessionDiskHydrate").SessionDrawerStats | null>(
+      "claude_session_drawer_stats",
+      { cwd, sessionId },
+    ),
   /** Chat-tab sessionIds whose subprocess is still running. Powers the
    *  Agent Hub's cross-project "working" indicator without mounting panels. */
   activeSessions: () => invoke<string[]>("claude_code_active_sessions"),

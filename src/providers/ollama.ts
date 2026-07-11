@@ -3,6 +3,41 @@ import type { ChatProvider, ProviderModel } from "./types";
 
 const OLLAMA_BASE = "http://localhost:11434";
 
+let tagsCache: {
+  ok: boolean;
+  models: ProviderModel[];
+  checkedAt: number;
+} | null = null;
+const TAGS_TTL_MS = 5_000;
+
+async function readOllamaTags(): Promise<{
+  ok: boolean;
+  models: ProviderModel[];
+}> {
+  if (tagsCache && Date.now() - tagsCache.checkedAt < TAGS_TTL_MS) {
+    return { ok: tagsCache.ok, models: tagsCache.models };
+  }
+  try {
+    const res = await fetch(`${OLLAMA_BASE}/api/tags`);
+    if (!res.ok) {
+      tagsCache = { ok: false, models: [], checkedAt: Date.now() };
+      return tagsCache;
+    }
+    const j = (await res.json()) as { models?: Array<{ name: string }> };
+    const models = (j.models ?? []).map((m) => ({
+      providerId: "ollama" as const,
+      modelId: m.name,
+      displayName: m.name,
+      supportsTools: true,
+    }));
+    tagsCache = { ok: true, models, checkedAt: Date.now() };
+    return tagsCache;
+  } catch {
+    tagsCache = { ok: false, models: [], checkedAt: Date.now() };
+    return tagsCache;
+  }
+}
+
 /**
  * Pre-load a model into Ollama's memory so the first real chat doesn't pay
  * the cold-start cost. Uses /api/generate with empty prompt — Ollama loads
@@ -27,24 +62,13 @@ export const ollamaProvider: ChatProvider = {
   keyHelpUrl: "https://ollama.com/download",
 
   async isAvailable() {
-    try {
-      const res = await fetch(`${OLLAMA_BASE}/api/tags`);
-      return res.ok;
-    } catch {
-      return false;
-    }
+    return (await readOllamaTags()).ok;
   },
 
   async listModels(): Promise<ProviderModel[]> {
-    const res = await fetch(`${OLLAMA_BASE}/api/tags`);
-    if (!res.ok) throw new Error("Ollama not reachable");
-    const j = (await res.json()) as { models?: Array<{ name: string }> };
-    return (j.models ?? []).map((m) => ({
-      providerId: "ollama",
-      modelId: m.name,
-      displayName: m.name,
-      supportsTools: true,
-    }));
+    const { ok, models } = await readOllamaTags();
+    if (!ok) throw new Error("Ollama not reachable");
+    return models;
   },
 
   async *chat({ model, messages, tools, signal }) {

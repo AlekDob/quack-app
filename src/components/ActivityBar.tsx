@@ -240,7 +240,9 @@ export function ActivityBar() {
           <Icon name="search" size={20} />
         </button>
         <button
-          className={`activity-icon ${sectionActive("git") ? "active" : ""}`}
+          className={`activity-icon activity-icon--git ${sectionActive("git") ? "active" : ""}${
+            gitChangeCount > 0 ? " has-changes" : ""
+          }`}
           title={`Source Control (Ctrl+Shift+G)${
             gitChangeCount > 0
               ? ` — ${gitChangeCount} changed file${gitChangeCount === 1 ? "" : "s"}`

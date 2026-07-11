@@ -23,7 +23,8 @@ two-level store). Quack wraps the `pinky` CLI — it does not reimplement search
 | `BrainPanel` | Editor tab `brain:<wsId>` (activity bar) | Search, dashboard, setup, reindex, inject toggle |
 | `BrainDashboard` | Empty state inside Brain tab | Animated charts + telemetry |
 | `BrainSearchResults` | After Search | Cursor-style rows, shimmer skeleton, highlights |
-| `BrainTurnChip` | Below user message in chat | Inject recap + savings + clickable hits |
+| `BrainTurnChip` | Below user message in chat | Quiet recap: Brain · N hits · ms + slim linked rows |
+| `BrainSaveChip` | Below Jack reply (amber) | Proposed `pinky save` — Save / Dismiss |
 | Pre-turn inject | `AIChatPanel.sendUserText` | Top-3 hits in user turn (CC-safe) |
 | MCP catalog | `McpServerBrowser` | One-click `pinky-mcp` in `.mcp.json` |
 
@@ -39,8 +40,37 @@ two-level store). Quack wraps the `pinky` CLI — it does not reimplement search
 | `pinky_migrate_global_brain` | Symlink `~/.pinky/brain` → `~/.quack/brain` when needed |
 | `pinky_stats_value` | `pinky stats --value --json` (dashboard) |
 | `pinky_telemetry` | `pinky telemetry --json` (most retrieved) |
+| `pinky_save` | `pinky save` stdin body → `documentation/<type>/` + index |
 
 Env on every CLI call: `PINKY_DB=brain.db`, `PINKY_SAVE_DIR=documentation`.
+
+## Brain self-improvement (`BrainSaveChip`)
+
+When Jack discovers something hard-won (many greps, scattered config) not well
+documented, he appends a structured block at the **end** of his reply:
+
+```
+[Brain save]
+title: Coolify studio-staging env vars
+type: gotcha
+tags: coolify, deploy, studio
+reason: Env vars scattered across Docker + inbox note
+---
+## Env vars chiave
+…markdown body…
+[/Brain save]
+```
+
+- Block is **stripped** from rendered prose; `BrainSaveChip` shows amber UI
+- **Save** → `pinky_save` IPC → `documentation/<type>/` + auto-index
+- **Dismiss** hides the chip (persisted on `ChatMessage.brain_save`)
+- Jack system prompt documents the format; Quack does not auto-write without click
+
+## Richer pre-turn inject
+
+When Pinky snippets are thin (&lt;320 chars), Quack **reads the `.md`** for the
+top 1–2 hits (up to ~2.2k chars on #1) and adds:
+`Prefer Read documentation/<path> before broad Explore/Grep.`
 
 ## Brain tab layout
 
@@ -177,6 +207,10 @@ Heuristic vs classic Grep + Read tool loops (not provider billing):
 - `prefers-reduced-motion`: chart/search animations disabled
 - Pinky search paths are relative to `documentation/` — never open without
   `brainDocAbsPath()` / `openBrainDoc()`
+- **Cross-workspace open (fixed):** `openPathSmart` could resolve
+  `documentation/README.md` in a sibling project and switch workspace.
+  `openBrainDoc` now always uses `ws.meta.root` from the chat's `wsId` and
+  `openFile` in-place. Chip shows workspace name (`Kyron · 3 hits`).
 
 ## Related
 

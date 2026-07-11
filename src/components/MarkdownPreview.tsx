@@ -86,9 +86,10 @@ export function MarkdownPreview({
     }
     const copyBtn = target.closest<HTMLButtonElement>("[data-md-copy]");
     if (copyBtn) {
-      const wrapper = copyBtn.closest(".md-code-block");
+      const wrapper = copyBtn.closest(".md-code-block, .md-callout-wrap");
       const code = wrapper?.querySelector("code");
-      const text = code?.textContent ?? "";
+      const callout = wrapper?.querySelector("blockquote");
+      const text = code?.textContent ?? callout?.textContent?.trim() ?? "";
       try {
         void navigator.clipboard?.writeText(text);
       } catch {

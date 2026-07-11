@@ -4,7 +4,7 @@ project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-01
 last_verified: 2026-07-11
-tags: [model-selector, model-browser, model-picker, favorites, visibility, cursor-cli, opencode-cli, composer, lazy-load, free-models, model-discovery-cache, platform-pin]
+tags: [model-selector, model-browser, model-picker, favorites, visibility, cursor-cli, opencode-cli, claude-code, composer, lazy-load, free-models, model-discovery-cache, platform-pin, instant-hydrate]
 ---
 
 ## Model Selector (composer chip + catalog + visibility)
@@ -15,13 +15,14 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Component | `src/components/ModelPickerPopover.tsx` | Chip-triggered quick picker; **portaled** `position: fixed` popover; `onOpen` lazy CLI fetch; **platform pin** filter + banner — see `057-platform-pin.md` |
-| Component | `src/components/modelPickerPlatform.tsx` | Platform pin banner + cross-platform confirm (`057`) |
+| Component | `src/components/modelPickerPlatform.tsx` | Platform pin banner + **New chat** (`057`) |
 | Component | `src/components/ModelPickerSkeleton.tsx` | Shimmer rows while catalogs load |
 | Component | `src/components/ModelPickerRow.tsx` | Row with star toggle + optional `free` tag |
 | Component | `src/components/ModelBrowser.tsx` | Full catalog modal; OpenCode group; `free` tag on cards |
 | Component | `src/components/ManageModelsModal.tsx` | Toggle model visibility in quick picker (reuses `model-browser` shell) |
 | Service | `src/modelPrefs.ts` | Favorites + disabled-model maps in localStorage |
-| Service | `src/modelSelectorUtils.ts` | `buildModelGroups`, `filterVisibleGroups`, `splitFavoriteModels`, `modelLabel` |
+| Service | `src/modelSelectorUtils.ts` | `buildModelGroups`, `filterVisibleGroups`, `splitFavoriteModels`, `modelLabel`, `reorderGroupsFirst` |
+| Service | `src/providers/claudeCode.ts` | `claudeCodePickerModels`, `refreshClaudeCodeModelsLive` — see `059-claude-code-model-catalog.md` |
 | Service | `src/modelDiscoveryStore.ts` | Shared discovery cache — see `031-model-discovery-cache.md` |
 | Service | `src/providers/index.ts` | `listAllModels` / `listAllCloudModels` — underlying provider probes |
 | Component | `src/components/AIChatPanel.tsx` | Subscribes to discovery store; `refreshLiveCliModels`; lazy cloud catalog on browser/manage open |
@@ -44,18 +45,22 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 
 **Lazy cloud catalog:** `browserOpen` or `manageModelsOpen` → `ensureCloudCatalog()` → `listAllCloudModels`
 
-**Lazy CLI catalog:** popover `onOpen` or `browserOpen` → `refreshLiveCliModels()` → `refreshOpenCodeModelsLive()` + `refreshCursorModelsLive()` → merge into shared cache
+**Lazy CLI catalog:** popover `onOpen` or `browserOpen` → `refreshLiveCliModels()` → `refreshClaudeCodeModelsLive()` + `refreshOpenCodeModelsLive()` + `refreshCursorModelsLive()` → merge into shared cache
 
-**Pick:** `pickerCloudModels` (from `allModels`, non-Ollama) → `buildModelGroups()` → optional **platform pin** filter (`scopedGroups`) → popover filters disabled via `isModelEnabled` → cross-platform confirm if pinned → `onSelect(qualified)` → chat provider routing
+**Instant open (2026-07-11):** click chip → popover opens immediately with **full skeleton** (`.is-hydrating`) until live CLI catalogs finish — no partial stale list + tail shimmer. Chip label uses `displayName` (e.g. `Opus 4.8`), not raw `modelId`.
+
+**Pick:** `pickerCloudModels` (from `allModels`, non-Ollama) → `buildModelGroups()` → **platform pin** hard filter OR `reorderGroupsFirst` for unpinned → popover filters disabled via `isModelEnabled` → `onSelect(qualified)` → chat provider routing
 
 **Model browser:** `browserOpen` → `ensureCloudCatalog()` + merge with `pickerCloudModels` so Claude Code never disappears after a picker prefetch
 
 ### Key Functions
 - `ensureModelDiscovery({ force? }) → ModelDiscoverySnapshot` — shared cache (`031-model-discovery-cache.md`)
 - `ensureCloudCatalog() → ProviderModel[]` — deferred full cloud lists for browser/manage modals
-- `refreshLiveCliModels() → void` — `AIChatPanel`; merges live OpenCode + Cursor lists into shared cache
+- `refreshLiveCliModels() → void` — `AIChatPanel`; merges live CC + OpenCode + Cursor lists into shared cache
+- `refreshClaudeCodeModelsLive() → ProviderModel[]` — see `059-claude-code-model-catalog.md`
 - `refreshOpenCodeModelsLive() → ProviderModel[]` — see `028-opencode-bridge.md`
 - `refreshCursorModelsLive() → ProviderModel[]` — see `026-cursor-cli-bridge.md`
+- `reorderGroupsFirst(groups, providerId) → ProviderGroup[]` — active provider section first when unpinned
 - `buildModelGroups(cloud, ollama, hasKey) → ProviderGroup[]` — ordered provider sections
 - `toggleFavoriteModel(qualified) → void` — flip star in popover
 - `resolvePinnedPlatform(session) → ProviderId | null` — platform pin resolver (`057-platform-pin.md`)
@@ -84,5 +89,7 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 - **Free badge:** semantic green via `.tag-free` token; not orange accent.
 - **Qualified key format:** `providerId:modelId` via `makeQualifiedModel` / `modelKey`.
 - **Parallel refresh:** `refresh()` no longer serializes provider checks — startup latency fix post-OpenCode integration.
-- **Platform pin:** agentic chats filter the popover to the starting CLI; cross-platform picks need confirm — `057-platform-pin.md`.
-- **Catalog loading shimmer:** `ModelPickerSkeleton` + chip spinner while CLI catalogs load (`onPrefetch` / `onOpen`).
+- **Platform pin:** agentic chats show only the starting CLI; switch platform via **New chat** — `057-platform-pin.md`.
+- **Instant hydrate:** `.model-picker-pop.is-hydrating` — full skeleton + readonly search until `sessionLoad` clears; disk snapshot from `031` keeps fallbacks warm on reopen.
+- **CC display names:** dynamic Sonnet 5 / Opus 4.8 labels — `059-claude-code-model-catalog.md`.
+- **Cursor effort tiers:** appear as separate model rows (`Opus 4.8 1M Extra High`); CC effort uses `EffortPopover` instead (`022`, `026`).

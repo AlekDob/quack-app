@@ -1,8 +1,9 @@
 //! Shared JSONL transcript parser for Claude Code + Cursor CLI agent sessions.
 //! Both CLIs emit Anthropic-style stream-json lines in on-disk transcripts.
 
+use crate::provider_path::encode_project_path;
 use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(serde::Serialize, Clone)]
 pub struct LoadedMessage {
@@ -227,4 +228,73 @@ fn extract_assistant_blocks(v: &serde_json::Value) -> (String, Vec<LoadedToolCal
         }
     }
     (text, calls)
+}
+
+/// Last API-call input snapshot from a session JSONL (matches CC `/context`).
+#[derive(serde::Serialize, Clone)]
+pub struct SessionContextSnap {
+    pub input_tokens: u64,
+    pub cache_read_tokens: u64,
+    pub cache_creation_tokens: u64,
+}
+
+pub fn claude_jsonl_path(cwd: &str, session_id: &str) -> PathBuf {
+    let home = dirs::home_dir().expect("home dir");
+    home.join(".claude")
+        .join("projects")
+        .join(encode_project_path(cwd))
+        .join(format!("{session_id}.jsonl"))
+}
+
+fn is_sidechain_record(v: &serde_json::Value) -> bool {
+    if v.get("parent_tool_use_id").is_some() {
+        return true;
+    }
+    v.get("isSidechain")
+        .and_then(|x| x.as_bool())
+        .unwrap_or(false)
+}
+
+fn usage_snap_from_value(u: &serde_json::Value) -> SessionContextSnap {
+    SessionContextSnap {
+        input_tokens: u
+            .get("input_tokens")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(0),
+        cache_read_tokens: u
+            .get("cache_read_input_tokens")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(0),
+        cache_creation_tokens: u
+            .get("cache_creation_input_tokens")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(0),
+    }
+}
+
+/// Walk JSONL backwards — prefer latest non-subagent `assistant` usage.
+pub fn last_context_snap(path: &Path) -> Option<SessionContextSnap> {
+    let content = std::fs::read_to_string(path).ok()?;
+    let mut result_snap: Option<SessionContextSnap> = None;
+    for line in content.lines().rev() {
+        let v: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        if is_sidechain_record(&v) {
+            continue;
+        }
+        let t = v.get("type").and_then(|x| x.as_str())?;
+        if t == "assistant" {
+            if let Some(u) = v.get("message").and_then(|m| m.get("usage")) {
+                return Some(usage_snap_from_value(u));
+            }
+        }
+        if t == "result" && result_snap.is_none() {
+            if let Some(u) = v.get("usage") {
+                result_snap = Some(usage_snap_from_value(u));
+            }
+        }
+    }
+    result_snap
 }

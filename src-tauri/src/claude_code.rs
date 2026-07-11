@@ -541,6 +541,73 @@ fn try_run_claude(args: &[&str], explicit_path: Option<&str>) -> Result<String, 
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
+/// Headless `claude -p` for short catalog probes (model picker).
+pub(crate) fn claude_print_text(prompt: &str) -> Result<String, String> {
+    run_claude_print(prompt)
+}
+
+fn run_claude_print(prompt: &str) -> Result<String, String> {
+    if let Some(exe) = resolve_claude_executable() {
+        if let Ok(text) = claude_print_with_exe(&exe, prompt) {
+            return Ok(text);
+        }
+    }
+    claude_print_via_shell(prompt)
+}
+
+fn claude_print_with_exe(exe: &str, prompt: &str) -> Result<String, String> {
+    let mut cmd = Command::new(exe);
+    cmd.args(["-p", prompt, "--output-format", "text"]);
+    cmd.stdin(Stdio::null());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let out = cmd.output().map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        return Err(format!(
+            "claude print failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+fn claude_print_via_shell(prompt: &str) -> Result<String, String> {
+    let quoted = shell_quote(prompt);
+    #[cfg(windows)]
+    {
+        let mut cmd = Command::new("cmd");
+        cmd.args([
+            "/c",
+            &format!("claude -p {quoted} --output-format text <nul"),
+        ]);
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+        let out = cmd.output().map_err(|e| e.to_string())?;
+        if !out.status.success() {
+            return Err("claude CLI not found".to_string());
+        }
+        return Ok(String::from_utf8_lossy(&out.stdout).trim().to_string());
+    }
+    #[cfg(not(windows))]
+    {
+        let mut cmd = Command::new("sh");
+        cmd.args([
+            "-lc",
+            &format!("claude -p {quoted} --output-format text </dev/null"),
+        ]);
+        let out = cmd.output().map_err(|e| e.to_string())?;
+        if !out.status.success() {
+            return Err("claude CLI not found".to_string());
+        }
+        Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+    }
+}
+
 /// Spawn `claude -p <prompt>` with stream-json output. Each output line is
 /// emitted on the event `claude-stream:<id>` as `{ kind: "line", line: "<json>" }`,
 /// and an end event `claude-stream:<id>` with `{ kind: "end", code: <i32> }`
@@ -1183,80 +1250,21 @@ pub struct SessionContextUsage {
     pub cache_creation_tokens: u64,
 }
 
-fn usage_snap_from_value(u: &serde_json::Value) -> SessionContextUsage {
-    SessionContextUsage {
-        input_tokens: u
-            .get("input_tokens")
-            .and_then(|x| x.as_u64())
-            .unwrap_or(0),
-        cache_read_tokens: u
-            .get("cache_read_input_tokens")
-            .and_then(|x| x.as_u64())
-            .unwrap_or(0),
-        cache_creation_tokens: u
-            .get("cache_creation_input_tokens")
-            .and_then(|x| x.as_u64())
-            .unwrap_or(0),
-    }
-}
-
-fn is_sidechain_record(v: &serde_json::Value) -> bool {
-    if v.get("parent_tool_use_id").is_some() {
-        return true;
-    }
-    v.get("isSidechain")
-        .and_then(|x| x.as_bool())
-        .unwrap_or(false)
-}
-
-/// Walk JSONL backwards — prefer the latest non-subagent `assistant`
-/// usage (one API call) over turn-total `result` usage.
-fn last_context_usage_from_jsonl(path: &std::path::Path) -> Option<SessionContextUsage> {
-    let content = std::fs::read_to_string(path).ok()?;
-    let mut result_snap: Option<SessionContextUsage> = None;
-    for line in content.lines().rev() {
-        let v: serde_json::Value = match serde_json::from_str(line) {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-        if is_sidechain_record(&v) {
-            continue;
-        }
-        let t = match v.get("type").and_then(|x| x.as_str()) {
-            Some(t) => t,
-            None => continue,
-        };
-        if t == "assistant" {
-            if let Some(u) = v.get("message").and_then(|m| m.get("usage")) {
-                return Some(usage_snap_from_value(u));
-            }
-        }
-        if t == "result" && result_snap.is_none() {
-            if let Some(u) = v.get("usage") {
-                result_snap = Some(usage_snap_from_value(u));
-            }
-        }
-    }
-    result_snap
-}
-
 /// Read the latest context-window fill for a Claude Code session from disk.
 #[tauri::command]
 pub fn claude_session_context_usage(
     cwd: String,
     session_id: String,
 ) -> Result<Option<SessionContextUsage>, String> {
-    let home = dirs::home_dir().ok_or_else(|| "no home dir".to_string())?;
-    let encoded = encode_project_path(&cwd);
-    let path = home
-        .join(".claude")
-        .join("projects")
-        .join(&encoded)
-        .join(format!("{}.jsonl", session_id));
+    let path = crate::session_jsonl::claude_jsonl_path(&cwd, &session_id);
     if !path.exists() {
         return Ok(None);
     }
-    Ok(last_context_usage_from_jsonl(&path))
+    Ok(crate::session_jsonl::last_context_snap(&path).map(|s| SessionContextUsage {
+        input_tokens: s.input_tokens,
+        cache_read_tokens: s.cache_read_tokens,
+        cache_creation_tokens: s.cache_creation_tokens,
+    }))
 }
 
 /// Reconstruct the full message history of a saved Claude Code

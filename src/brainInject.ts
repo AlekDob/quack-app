@@ -12,6 +12,11 @@ import { openFileAndReveal } from "./revealInTree";
 const DOC_DIR = "documentation";
 const injectKey = (wsId: string) => `lcp.brain.inject.${wsId}`;
 
+/** Workspace root for brain IPC — null when the project is not loaded. */
+export function brainWorkspaceRoot(wsId: string): string | null {
+  return useStore.getState().loaded[wsId]?.meta.root ?? null;
+}
+
 export function getBrainInjectEnabled(wsId: string): boolean {
   return getJson<boolean>(
     injectKey(wsId),

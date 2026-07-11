@@ -7,6 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::io::Write;
 use std::process::{Command, Stdio};
 
 const PINKY_DB: &str = "brain.db";
@@ -52,6 +53,14 @@ pub struct PinkySearchResult {
 pub struct PinkySetupResult {
     pub ok: bool,
     pub message: String,
+}
+
+#[derive(Serialize, Clone, Deserialize)]
+pub struct PinkySaveResult {
+    pub ok: bool,
+    pub path: String,
+    pub rel_path: String,
+    pub title: String,
 }
 
 #[derive(Serialize, Clone, Deserialize, Default)]
@@ -145,6 +154,47 @@ fn run_pinky(root: &Path, args: &[&str]) -> Result<String, String> {
         ));
     }
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+fn run_pinky_stdin(root: &Path, args: &[&str], stdin_body: &str) -> Result<String, String> {
+    let mut child = pinky_cmd(root)?
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("failed to run pinky: {e}"))?;
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(stdin_body.as_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+    let out = child.wait_with_output().map_err(|e| e.to_string())?;
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr);
+        let msg = String::from_utf8_lossy(&out.stdout);
+        return Err(format!(
+            "pinky save failed: {}{}",
+            err.trim(),
+            if msg.trim().is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", msg.trim())
+            }
+        ));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+}
+
+fn save_folder(entry_type: &str) -> &'static str {
+    match entry_type {
+        "gotcha" => "gotchas",
+        "decision" => "decisions",
+        "pattern" => "patterns",
+        "guide" => "guides",
+        "diary" => "diary",
+        _ => "inbox",
+    }
 }
 
 // Tauri runs sync commands on the main thread — a first-time `pinky reindex`
@@ -413,6 +463,59 @@ pub async fn pinky_telemetry(root: String) -> Result<PinkyTelemetry, String> {
         let root = PathBuf::from(root);
         let raw = run_pinky(&root, &["telemetry", "--json"])?;
         serde_json::from_str(&raw).map_err(|e| e.to_string())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn pinky_save(
+    root: String,
+    title: String,
+    body: String,
+    entry_type: String,
+    tags: Vec<String>,
+) -> Result<PinkySaveResult, String> {
+    off_thread(move || {
+        let root = PathBuf::from(root);
+        let folder = save_folder(&entry_type);
+        let dir = root.join(PINKY_SAVE).join(folder);
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        let dir_str = dir.to_string_lossy().to_string();
+        let mut arg_refs: Vec<&str> = vec![
+            "save",
+            "--title",
+            title.as_str(),
+            "--type",
+            entry_type.as_str(),
+            "--json",
+            "--dir",
+            dir_str.as_str(),
+        ];
+        let mut tag_args: Vec<String> = Vec::new();
+        for tag in &tags {
+            tag_args.push("--tag".to_string());
+            tag_args.push(tag.clone());
+        }
+        for t in &tag_args {
+            arg_refs.push(t.as_str());
+        }
+        let raw = run_pinky_stdin(&root, &arg_refs, &body)?;
+        let v: serde_json::Value = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+        let file_name = v
+            .get("rel_path")
+            .and_then(|p| p.as_str())
+            .unwrap_or("");
+        let rel = format!("{folder}/{file_name}");
+        Ok(PinkySaveResult {
+            ok: true,
+            path: v
+                .get("path")
+                .and_then(|p| p.as_str())
+                .unwrap_or("")
+                .to_string(),
+            rel_path: rel,
+            title,
+        })
     })
     .await
 }
