@@ -196,13 +196,17 @@ export function parseCliStreamJsonObject(
       kind: "usage",
       cost: typeof obj.cost_usd === "number" ? obj.cost_usd : undefined,
       durationMs:
-        typeof obj.duration_ms === "number" ? obj.duration_ms : undefined,
+        typeof obj.duration_ms === "number"
+          ? obj.duration_ms
+          : typeof obj.duration_api_ms === "number"
+            ? obj.duration_api_ms
+            : undefined,
       model: typeof obj.model === "string" ? obj.model : undefined,
       tokens: {
-        input: num(u.input_tokens),
-        output: num(u.output_tokens),
-        cacheRead: num(u.cache_read_input_tokens),
-        cacheCreate: num(u.cache_creation_input_tokens),
+        input: num(u.input_tokens ?? u.inputTokens),
+        output: num(u.output_tokens ?? u.outputTokens),
+        cacheRead: num(u.cache_read_input_tokens ?? u.cacheReadTokens),
+        cacheCreate: num(u.cache_creation_input_tokens ?? u.cacheWriteTokens),
       },
       isError: obj.is_error === true,
     });

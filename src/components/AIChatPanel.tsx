@@ -112,11 +112,18 @@ import {
 } from "../brainInject";
 import { recordBrainUsage } from "../brainUsageStore";
 import { BrainTurnChip } from "./BrainTurnChip";
+import { ReasoningTurnChip } from "./ReasoningTurnChip";
+import { BrainSaveChip } from "./BrainSaveChip";
+import {
+  parseBrainSaveProposal,
+  stripBrainSaveBlocks,
+} from "../brainSave";
 import {
   type ImageAttachment,
   MAX_ATTACHED_IMAGES,
   attachFromBlob,
   attachFromPath,
+  providerAcceptsImages,
   rehydrateAttachment,
   registerChatDropZone,
 } from "../imageAttach";
@@ -187,6 +194,11 @@ import {
   resolveContextWindow,
   type TurnTokens,
 } from "../contextUsage";
+import {
+  contextTokensFromDisk,
+  guessClaudeSessionId,
+  mergeDiskBilling,
+} from "../sessionDiskHydrate";
 import { SessionUsageCircle } from "./SessionUsageCircle";
 import {
   SessionUsageDrawer,
@@ -231,8 +243,11 @@ import {
   ensureCloudCatalog,
   ensureModelDiscovery,
   getModelDiscovery,
+  isLiveCliCatalogInflight,
+  isPickerCatalogLoading,
   mergeLiveCliModelsIntoDiscovery,
   subscribeModelDiscovery,
+  warmPickerCatalogs,
   type ModelDiscoverySnapshot,
 } from "../modelDiscoveryStore";
 
@@ -410,17 +425,30 @@ export function AIChatPanel({
   // who don't even use Ollama (they're on Claude Code or a cloud key).
   // Discovery still runs in the background and may flip the state to
   // "missing" / "no-models" if no models exist anywhere.
+  const bootDiscovery = getModelDiscovery();
   const [status, setStatus] = useState<
     "checking" | "missing" | "ready" | "no-models"
-  >("ready");
-  const [allModels, setAllModels] = useState<ProviderModel[]>([]);
+  >(() =>
+    bootDiscovery && bootDiscovery.allModels.length > 0 ? "ready" : "ready",
+  );
+  const [allModels, setAllModels] = useState<ProviderModel[]>(
+    () => bootDiscovery?.allModels ?? [],
+  );
   // Curated cloud models, shown in the browser regardless of key status so
   // users can discover what's available before setting up a key.
-  const [allCloudCatalog, setAllCloudCatalog] = useState<ProviderModel[]>([]);
-  const [claudeCodeAvailable, setClaudeCodeAvailable] = useState(false);
+  const [allCloudCatalog, setAllCloudCatalog] = useState<ProviderModel[]>(
+    () => bootDiscovery?.cloudCatalog ?? [],
+  );
+  const [claudeCodeAvailable, setClaudeCodeAvailable] = useState(
+    () => bootDiscovery?.claudeCodeAvailable ?? false,
+  );
   const [claudeAuth, setClaudeAuth] = useState<ClaudeAuthProbe | null>(null);
-  const [cursorCliAvailable, setCursorCliAvailable] = useState(false);
-  const [openCodeAvailable, setOpenCodeAvailable] = useState(false);
+  const [cursorCliAvailable, setCursorCliAvailable] = useState(
+    () => bootDiscovery?.cursorCliAvailable ?? false,
+  );
+  const [openCodeAvailable, setOpenCodeAvailable] = useState(
+    () => bootDiscovery?.openCodeAvailable ?? false,
+  );
   // Rules-file hint shown in the header. Loaded once per workspace
   // mount + refreshed whenever fs events suggest the file may have
   // changed. Null when no rules file exists.
@@ -433,7 +461,7 @@ export function AIChatPanel({
   const [dictating, setDictating] = useState(false);
   const [fileDropHover, setFileDropHover] = useState(false);
   const dictationCaptureRef = useRef<Promise<DictationCapture> | null>(null);
-  // Image attachments staged on the composer (Claude Code only). Cleared
+  // Image attachments staged on the composer (agentic providers). Cleared
   // after each send. The zoom modal holds the full-quality data: URL of
   // whichever thumbnail the user clicked (fetched from disk on demand).
   const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([]);
@@ -455,6 +483,7 @@ export function AIChatPanel({
   >({});
   const [browserOpen, setBrowserOpen] = useState(false);
   const [manageModelsOpen, setManageModelsOpen] = useState(false);
+  const [catalogWarming, setCatalogWarming] = useState(false);
   const isAnyPulling = Object.keys(pullProgressMap).length > 0;
   const aggregatedPullProgress = isAnyPulling
     ? Object.values(pullProgressMap).join(" · ")
@@ -673,6 +702,7 @@ export function AIChatPanel({
   const [cumulativeTokensOut, setCumulativeTokensOut] = useState(0);
   const [cumulativeCacheRead, setCumulativeCacheRead] = useState(0);
   const [cumulativeTurns, setCumulativeTurns] = useState(0);
+  const [diskSessionDurationMs, setDiskSessionDurationMs] = useState(0);
   const [sessionStartTs] = useState(() => Date.now());
   // Pin the ring fill across in-flight turns (context or plan %).
   const pinnedRingRef = useRef(0);
@@ -691,6 +721,7 @@ export function AIChatPanel({
     cumulativeTokensOut: 0,
     cumulativeCacheRead: 0,
     cumulativeTurns: 0,
+    diskSessionDurationMs: 0,
     assistantTurns: 0,
     lastUsage: null as typeof lastUsage,
     liveContextTokens: null as TurnTokens | null,
@@ -983,7 +1014,12 @@ export function AIChatPanel({
     else setStatus("missing");
   }, []);
 
-  const refreshLiveCliModels = useCallback(async () => {
+  const refreshLiveCliModels = useCallback(async (force = false) => {
+    const snap = getModelDiscovery();
+    if (!snap) return;
+    const wantCursor = snap.cursorCliAvailable;
+    const wantOc = snap.openCodeAvailable;
+    if (!wantCursor && !wantOc) return;
     try {
       const [{ refreshOpenCodeModelsLive }, { refreshCursorModelsLive }] =
         await Promise.all([
@@ -991,12 +1027,21 @@ export function AIChatPanel({
           import("../providers/cursorCode"),
         ]);
       const [ocModels, cursorModels] = await Promise.all([
-        refreshOpenCodeModelsLive().catch(() => [] as ProviderModel[]),
-        refreshCursorModelsLive().catch(() => [] as ProviderModel[]),
+        wantOc
+          ? refreshOpenCodeModelsLive(force).catch(
+              () => [] as ProviderModel[],
+            )
+          : Promise.resolve([] as ProviderModel[]),
+        wantCursor
+          ? refreshCursorModelsLive(force).catch(
+              () => [] as ProviderModel[],
+            )
+          : Promise.resolve([] as ProviderModel[]),
       ]);
+      if (ocModels.length === 0 && cursorModels.length === 0) return;
       mergeLiveCliModelsIntoDiscovery(ocModels, cursorModels);
-      const snap = getModelDiscovery();
-      if (snap) applyDiscoverySnapshot(snap);
+      const next = getModelDiscovery();
+      if (next) applyDiscoverySnapshot(next);
     } catch {
       /* keep lightweight startup catalog */
     }
@@ -1017,7 +1062,9 @@ export function AIChatPanel({
       const snap = getModelDiscovery();
       if (snap) applyDiscoverySnapshot(snap);
       else void refresh({ force: true });
+      setCatalogWarming(isPickerCatalogLoading());
     });
+    setCatalogWarming(isPickerCatalogLoading());
     return unsub;
   }, [applyDiscoverySnapshot]);
 
@@ -1450,6 +1497,11 @@ export function AIChatPanel({
     // PREVIOUS workspace's usage card and TodoWrite checklist stuck
     // on the screen of the new chat.
     resetTurnTransients();
+    setCumulativeTokensIn(0);
+    setCumulativeTokensOut(0);
+    setCumulativeCacheRead(0);
+    setCumulativeTurns(0);
+    setDiskSessionDurationMs(0);
 
     if (aiChatId) {
       const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
@@ -1785,8 +1837,8 @@ export function AIChatPanel({
 
   // Stage image attachments from a Cmd+V paste or a Finder drop. Compresses
   // each (client-side) and persists it to disk; caps at MAX_ATTACHED_IMAGES.
-  // Images are a Claude Code feature (it reads them with its Read tool) — for
-  // any other provider we no-op with a hint instead of silently dropping them.
+  // Agentic providers (Claude Code, Cursor CLI, OpenCode) consume paths or
+  // file parts — other providers no-op with a hint.
   const appendImages = useCallback(
     async (
       sources: Array<
@@ -1795,18 +1847,18 @@ export function AIChatPanel({
       >,
     ) => {
       const providerId = parseQualifiedModel(selected)?.providerId ?? "ollama";
-      if (providerId !== "claude-code") {
-        toastInfo("Le immagini si allegano solo con Claude Code");
+      if (!providerAcceptsImages(providerId)) {
+        toastInfo("Images attach only with Claude Code, Cursor CLI, or OpenCode");
         return;
       }
       const room = MAX_ATTACHED_IMAGES - attachedImages.length;
       if (room <= 0) {
-        toastError(`Massimo ${MAX_ATTACHED_IMAGES} immagini per messaggio`);
+        toastError(`Maximum ${MAX_ATTACHED_IMAGES} images per message`);
         return;
       }
       const slice = sources.slice(0, room);
       if (sources.length > room) {
-        toastInfo(`Allegate ${room} immagini (limite ${MAX_ATTACHED_IMAGES})`);
+        toastInfo(`Attached ${room} images (limit ${MAX_ATTACHED_IMAGES})`);
       }
       for (const s of slice) {
         try {
@@ -2377,6 +2429,22 @@ export function AIChatPanel({
         "- For multi-step work, give brief progress updates between tool batches.",
         "- End with what changed and what's next, in 1-2 sentences. Skip long recaps.",
         "",
+        "BRAIN (Pinky)",
+        "- Pre-turn [Pinky Brain] hits may already answer — Read documentation/<path> before broad Explore/Grep.",
+        "- After non-trivial discovery (many greps, scattered config, infra gotcha) not well documented, propose saving for next time at the END of your reply:",
+        "",
+        "[Brain save]",
+        "title: Short title",
+        "type: gotcha|pattern|decision|note|guide",
+        "tags: comma, separated",
+        "reason: Why this was hard to find (one line)",
+        "---",
+        "## Title",
+        "Markdown body",
+        "[/Brain save]",
+        "",
+        "The UI shows Save/Dismiss — do not write the file yourself unless the user asks.",
+        "",
         "SAFETY",
         "- Confirm before destructive actions (rm, dropping branches, force-push, deleting data).",
         "- Don't push, deploy, or send messages to external systems without explicit user approval.",
@@ -2401,6 +2469,30 @@ export function AIChatPanel({
     //   - ollama: inline the tree (small models often won't tool-call).
     const selectedParsed = parseQualifiedModel(selected);
     const selectedProvider = selectedParsed?.providerId ?? "ollama";
+    if (
+      images.length > 0 &&
+      selectedProvider === "opencode-cli" &&
+      selectedParsed
+    ) {
+      const meta =
+        allModels.find(
+          (m) =>
+            m.providerId === "opencode-cli" &&
+            m.modelId === selectedParsed.modelId,
+        ) ??
+        allCloudCatalog.find(
+          (m) =>
+            m.providerId === "opencode-cli" &&
+            m.modelId === selectedParsed.modelId,
+        );
+      if (meta?.supportsVision === false) {
+        toastError(
+          "This OpenCode model does not support image input. Pick a vision-capable model or remove the attachments.",
+        );
+        liveTurnRef.current = false;
+        return;
+      }
+    }
     const providerRunsOwnTools = isAgenticProviderId(selectedProvider);
     const providerCanReadItself =
       providerRunsOwnTools ||
@@ -2500,14 +2592,26 @@ export function AIChatPanel({
           `The user wants you to look at: ${wsAttached.join(", ")}. Use your Read tool on these.`,
         );
       }
-      // Image attachments: Claude Code's Read tool renders image files
-      // visually, so we just hand it the on-disk paths (kept outside the
-      // workspace — see save_image_attachment).
+      // Image attachments — provider-specific delivery:
+      // CC/Cursor: paths in turn context (Read / file tools).
+      // OpenCode: FilePart via HTTP API (see openCodeProvider.chat).
       if (images.length > 0) {
-        ccTurnContext.push(
-          `The user attached ${images.length} image${images.length === 1 ? "" : "s"} to this message. ` +
-            `View ${images.length === 1 ? "it" : "them"} with your Read tool: ${images.map((i) => i.path).join(", ")}.`,
-        );
+        const paths = images.map((i) => i.path).join(", ");
+        if (selectedProvider === "claude-code") {
+          ccTurnContext.push(
+            `The user attached ${images.length} image${images.length === 1 ? "" : "s"} to this message. ` +
+              `View ${images.length === 1 ? "it" : "them"} with your Read tool: ${paths}.`,
+          );
+        } else if (selectedProvider === "cursor-cli") {
+          ccTurnContext.push(
+            `The user attached ${images.length} image${images.length === 1 ? "" : "s"}. ` +
+              `Analyze ${images.length === 1 ? "it" : "them"} using your tools: ${paths}.`,
+          );
+        } else if (selectedProvider === "opencode-cli") {
+          ccTurnContext.push(
+            `The user attached ${images.length} image${images.length === 1 ? "" : "s"} to this message.`,
+          );
+        }
       }
       // @-mentioned subagents: instruct Claude Code to delegate this turn
       // to them via the Task tool. Only CC reaches this branch, and the
@@ -2644,7 +2748,7 @@ export function AIChatPanel({
     let brainUsage: ChatMessage["brain_usage"];
     if (getBrainInjectEnabled(wsId)) {
       try {
-        const brainCtx = await fetchBrainContextForTurn(root, text);
+        const brainCtx = await fetchBrainContextForTurn(wsId, text);
         if (brainCtx) {
           brainUsage = brainCtx.usage;
           recordBrainUsage(wsId, brainCtx.usage.savedTokens, brainCtx.usage.savedMs);
@@ -2797,6 +2901,9 @@ export function AIChatPanel({
             : undefined,
           selectedProvider === "claude-code"
             ? (ccThinking ?? undefined)
+            : undefined,
+          selectedProvider === "opencode-cli" && images.length > 0
+            ? images.map((i) => ({ path: i.path, name: i.name }))
             : undefined,
         )) {
           // Any event from the provider is a sign of life — reset the
@@ -3587,6 +3694,7 @@ export function AIChatPanel({
     lastUsage,
     liveContextTokens,
     diskContextTokens,
+    diskSessionDurationMs,
     sessionStartTs,
   };
 
@@ -3598,6 +3706,10 @@ export function AIChatPanel({
 
   const buildUsageFromMetrics = () => {
     const m = usageMetricsRef.current;
+    const durationMs =
+      m.diskSessionDurationMs > 0
+        ? m.diskSessionDurationMs
+        : Date.now() - m.sessionStartTs;
     return buildSessionUsageLocal({
       wsId: m.wsId,
       chat: {
@@ -3607,7 +3719,7 @@ export function AIChatPanel({
         cacheRead: m.cumulativeCacheRead,
         turns: m.cumulativeTurns || m.assistantTurns,
         model: m.lastUsage?.model ?? null,
-        durationMs: Date.now() - m.sessionStartTs,
+        durationMs,
       },
       selectedQualified: m.selected,
       models: m.allModels,
@@ -3615,40 +3727,94 @@ export function AIChatPanel({
     });
   };
 
-  // Hydrate context from on-disk CC JSONL when stream snapshot is absent.
+  // Hydrate drawer + ring from CC JSONL when stream usage is absent.
+  const diskHydrateGenRef = useRef(0);
+  const assistantTurnCount = messages.filter((m) => m.role === "assistant").length;
+
   useEffect(() => {
-    if (!selectedIsCC || !claudeSessionId) {
+    if (!selectedIsCC) {
       setDiskContextTokens(null);
+      setDiskSessionDurationMs(0);
       return;
     }
+    const gen = ++diskHydrateGenRef.current;
     let cancelled = false;
+
     const poll = async () => {
-      if (liveContextTokens) return;
+      if (cancelled || gen !== diskHydrateGenRef.current) return;
+      let sid = claudeSessionId;
+      if (!sid && assistantTurnCount > 0) {
+        sid = await guessClaudeSessionId(root, assistantTurnCount);
+        if (sid && !cancelled && gen === diskHydrateGenRef.current) {
+          setProviderSessionIds((prev) =>
+            setProviderSessionId(prev, "claude-code", sid!),
+          );
+        }
+      }
+      if (!sid) return;
       try {
-        const snap = await claudeCode.contextUsage(root, claudeSessionId);
-        if (cancelled || !snap) return;
-        const total =
-          snap.input_tokens +
-          snap.cache_read_tokens +
-          snap.cache_creation_tokens;
-        if (total <= 0) return;
-        setDiskContextTokens({
-          input: snap.input_tokens,
-          output: 0,
-          cacheRead: snap.cache_read_tokens,
-          cacheCreate: snap.cache_creation_tokens,
-        });
+        const stats = await claudeCode.drawerStats(root, sid);
+        if (!stats || cancelled || gen !== diskHydrateGenRef.current) return;
+        if (!liveContextTokens) {
+          const ctx = contextTokensFromDisk(stats);
+          if (ctx) setDiskContextTokens(ctx);
+        }
+        const m = usageMetricsRef.current;
+        const merged = mergeDiskBilling(
+          {
+            tokensIn: m.cumulativeTokensIn,
+            tokensOut: m.cumulativeTokensOut,
+            cacheRead: m.cumulativeCacheRead,
+            turns: m.cumulativeTurns,
+            cost: m.chatTotalCost,
+          },
+          stats,
+        );
+        if (streaming === null) {
+          setCumulativeTokensIn(merged.tokensIn);
+          setCumulativeTokensOut(merged.tokensOut);
+          setCumulativeCacheRead(merged.cacheRead);
+          setCumulativeTurns(merged.turns);
+          if (merged.cost > m.chatTotalCost) setChatTotalCost(merged.cost);
+          if (merged.durationMs > 0) setDiskSessionDurationMs(merged.durationMs);
+        }
+        if (merged.model) {
+          setLastUsage((prev) => {
+            if (prev?.model) return prev;
+            const ctx = contextTokensFromDisk(stats);
+            return {
+              cost: merged.cost,
+              durationMs: merged.durationMs,
+              model: merged.model!,
+              tokens: {
+                input: merged.tokensIn,
+                output: merged.tokensOut,
+                cacheRead: merged.cacheRead,
+                cacheCreate: stats.cache_creation_tokens,
+              },
+              contextTokens: ctx ?? undefined,
+            };
+          });
+        }
       } catch {
         /* session file not written yet */
       }
     };
+
     void poll();
     const t = window.setInterval(poll, 12_000);
     return () => {
       cancelled = true;
       window.clearInterval(t);
     };
-  }, [selectedIsCC, claudeSessionId, root, liveContextTokens]);
+  }, [
+    selectedIsCC,
+    claudeSessionId,
+    root,
+    liveContextTokens,
+    assistantTurnCount,
+    streaming,
+  ]);
 
   // Refresh local drawer/circle data when chat metrics change — no API.
   useEffect(() => {
@@ -3679,6 +3845,7 @@ export function AIChatPanel({
     lastUsage,
     liveContextTokens,
     diskContextTokens,
+    diskSessionDurationMs,
     messages.length,
     sessionStartTs,
   ]);
@@ -4265,6 +4432,14 @@ export function AIChatPanel({
     [claudeCodeAvailable, cursorCliAvailable, openCodeAvailable],
   );
 
+  const handlePickerOpen = useCallback(() => {
+    warmPickerCatalogs();
+  }, []);
+
+  const handlePickerPrefetch = useCallback(() => {
+    warmPickerCatalogs();
+  }, []);
+
   const renderModelChip = () => {
     const parsed = parseQualifiedModel(selected);
     const dotColor = parsed
@@ -4278,7 +4453,9 @@ export function AIChatPanel({
         cloudModels={pickerCloudModels}
         ollamaModels={ollamaModels}
         hasKey={modelHasKey}
-        onOpen={() => void refreshLiveCliModels()}
+        onOpen={handlePickerOpen}
+        onPrefetch={handlePickerPrefetch}
+        loading={catalogWarming}
         onConfigureProviders={() => openSettings("ai-providers")}
         onOpenFullBrowser={() => setBrowserOpen(true)}
       />
@@ -4738,15 +4915,22 @@ export function AIChatPanel({
           const m = display[i];
           const isAssistant = m.role === "assistant";
           const isStreamingThis = isAssistant && i === display.length - 1 && streaming !== null;
-          const blocks = isAssistant ? extractCodeBlocks(m.content) : [];
-          const insertText = blocks.length > 0 ? blocks.join("\n\n") : m.content;
+          const bodyForRender = isAssistant
+            ? stripBrainSaveBlocks(m.content)
+            : m.content;
+          const brainProposal =
+            isAssistant && !isStreamingThis
+              ? (m.brain_save ?? parseBrainSaveProposal(m.content))
+              : null;
+          const blocks = isAssistant ? extractCodeBlocks(bodyForRender) : [];
+          const insertText = blocks.length > 0 ? blocks.join("\n\n") : bodyForRender;
           const taggedBlocks = isAssistant
-            ? extractTaggedCodeBlocks(m.content)
+            ? extractTaggedCodeBlocks(bodyForRender)
             : [];
           const shellBlocks = taggedBlocks.filter((b) => isShellLang(b.lang));
           const shellText = shellBlocks.map((b) => b.code).join("\n");
           const split = isAssistant
-            ? splitThinking(m.content)
+            ? splitThinking(bodyForRender)
             : { thinking: "", visible: m.content };
           const showThinking =
             isStreamingThis && m.content.length === 0 && !m.tool_calls;
@@ -4858,18 +5042,12 @@ export function AIChatPanel({
                   </div>
                 );
               })()}
-              {/* In compact mode, CompactBlocks renders thinking inline
-                  where it happened — but only when the message has a blocks
-                  log. Block-less messages still need this outer panel. */}
-              {!(compact && m.blocks && m.blocks.length > 0) &&
+              {/* InterleavedBlocks renders reasoning inline — skip the outer
+                  duplicate when a blocks log exists (was only gated on compact). */}
+              {!(m.blocks && m.blocks.length > 0) &&
                 isAssistant &&
                 split.thinking.length > 0 && (
-                  <details className="ai-think-block">
-                    <summary>
-                      <span>💭</span> Reasoning
-                    </summary>
-                    <div className="ai-think-body">{split.thinking}</div>
-                  </details>
+                  <ReasoningTurnChip text={split.thinking} />
                 )}
               <div className="ai-msg-body">
                 {m.images && m.images.length > 0 && (
@@ -4967,6 +5145,19 @@ export function AIChatPanel({
                   m.content
                 )}
               </div>
+              {brainProposal && brainProposal.status !== "dismissed" && (
+                <BrainSaveChip
+                  wsId={wsId}
+                  proposal={brainProposal}
+                  onChange={(next) => {
+                    setMessages((msgs) =>
+                      msgs.map((msg, j) =>
+                        j === i ? { ...msg, brain_save: next } : msg,
+                      ),
+                    );
+                  }}
+                />
+              )}
               {showComposeCard && isAssistant && (
                 <div className="ai-compose-foot">
                   <ComposeCard
@@ -5084,11 +5275,7 @@ export function AIChatPanel({
                       onImageClick={(img) => void openZoom(img)}
                     />
                     {m.brain_usage && (
-                      <BrainTurnChip
-                        wsId={wsId}
-                        root={root}
-                        usage={m.brain_usage}
-                      />
+                      <BrainTurnChip wsId={wsId} usage={m.brain_usage} />
                     )}
                   </>
                 );

@@ -47,8 +47,8 @@ export interface ChatMessage {
     | { kind: "tool_call"; callId: string }
   >;
   /**
-   * Image attachments on a user message (Claude Code only — it reads them
-   * via its Read tool from the on-disk `path`). Additive + optional, so
+   * Image attachments on a user message (agentic providers). Paths are read
+   * via provider tools (CC/Cursor) or FilePart (OpenCode). Additive +
    * providers that only consume `content` are unaffected and old saved
    * sessions render fine. We persist only the lightweight `path`/`name`
    * plus a tiny `thumb` data: URL for the inline preview — full-quality
@@ -57,6 +57,20 @@ export interface ChatMessage {
   images?: Array<{ path: string; name: string; thumb: string }>;
   /** Display-only: Pinky Brain pre-turn inject for this user turn. */
   brain_usage?: BrainUsageMeta;
+  /** Display-only: Jack proposal to persist hard-won knowledge. */
+  brain_save?: BrainSaveProposal;
+}
+
+export type BrainSaveStatus = "pending" | "saved" | "dismissed";
+
+export interface BrainSaveProposal {
+  title: string;
+  entry_type: "gotcha" | "pattern" | "decision" | "diary" | "guide" | "note";
+  tags: string[];
+  body: string;
+  reason?: string;
+  status: BrainSaveStatus;
+  saved_path?: string;
 }
 
 /** Metadata shown in chat when pre-turn brain context was injected. */
@@ -189,6 +203,7 @@ export async function* chatStream(
   effort?: string,
   permissionMode?: string,
   thinking?: boolean,
+  imageAttachments?: Array<{ path: string; name: string }>,
 ): AsyncGenerator<ChatStreamEvent, void, unknown> {
   const parsed = parseQualifiedModel(model);
   const providerId: ProviderId = parsed?.providerId ?? "ollama";
@@ -205,6 +220,7 @@ export async function* chatStream(
     effort,
     permissionMode,
     thinking,
+    imageAttachments,
   });
 }
 

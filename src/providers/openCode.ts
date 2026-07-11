@@ -3,6 +3,7 @@ import { createOpencodeClient } from "@opencode-ai/sdk/client";
 import type { ChatStreamEvent } from "../ai";
 import type { ChatProvider, ProviderModel } from "./types";
 import { getWorkspaceRoot } from "../wsRoot";
+import { fileUrlForImagePath, mimeForImagePath } from "../imageAttach";
 import { lastUserMessage, splitCliPrompt } from "./cliPrompt";
 import {
   createOpencodeEventState,
@@ -21,6 +22,7 @@ const DEFAULT_MODEL: ProviderModel = {
   displayName: "big-pickle (OpenCode Zen, free)",
   contextWindow: 128_000,
   supportsTools: true,
+  supportsVision: true,
   isFree: true,
 };
 
@@ -105,6 +107,7 @@ async function fetchModels(): Promise<ProviderModel[]> {
         displayName: m.name ?? modelId,
         contextWindow: m.limit?.context ?? 128_000,
         supportsTools: m.tool_call !== false,
+        supportsVision: m.modalities?.input?.includes("image") ?? false,
         isFree: opencodeModelIsFree(m),
       };
       const prev = seen.get(modelId);
@@ -133,8 +136,16 @@ export function invalidateOpenCodeCache(): void {
 }
 
 /** Full catalog — spawns the sidecar if needed. Use on model browser / picker open. */
-export async function refreshOpenCodeModelsLive(): Promise<ProviderModel[]> {
-  modelsCache = null;
+export async function refreshOpenCodeModelsLive(
+  force = false,
+): Promise<ProviderModel[]> {
+  if (
+    !force &&
+    modelsCache &&
+    Date.now() - modelsCache.checkedAt < MODELS_TTL_MS
+  ) {
+    return modelsCache.models;
+  }
   const models = await fetchModels();
   modelsCache = { models, checkedAt: Date.now() };
   return models;
@@ -172,6 +183,7 @@ export const openCodeProvider: ChatProvider = {
     signal,
     resumeSessionId,
     cwd: cwdArg,
+    imageAttachments,
   }) {
     const baseUrl = await ensureSidecar();
     const client = createOpencodeClient({ baseUrl });
@@ -246,13 +258,26 @@ export const openCodeProvider: ChatProvider = {
     signal?.addEventListener("abort", onAbort);
 
     try {
+      const parts: Array<
+        | { type: "text"; text: string }
+        | { type: "file"; mime: string; filename?: string; url: string }
+      > = [{ type: "text", text: prompt }];
+      for (const img of imageAttachments ?? []) {
+        parts.push({
+          type: "file",
+          mime: mimeForImagePath(img.path),
+          filename: img.name,
+          url: fileUrlForImagePath(img.path),
+        });
+      }
+
       await client.session.promptAsync({
         path: { id: sessionId },
         query: { directory: cwd },
         body: {
           model: ocModel,
           ...(system ? { system } : {}),
-          parts: [{ type: "text", text: prompt }],
+          parts,
         },
       });
 

@@ -17,6 +17,7 @@ import {
 } from "react";
 import type { ChatMessage, ToolCall } from "../ai";
 import { balanceFences, splitThinking } from "../chatTextUtils";
+import { ReasoningTurnChip } from "./ReasoningTurnChip";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { Icon, type IconName } from "./Icon";
 import { duckAvatarFor } from "../subagents";
@@ -888,18 +889,9 @@ function InlineActionRow({
   );
 }
 
-// Foldable extended-thinking block, rendered inline in the compact chat
-// where the model reasoned. Collapsed by default (the answer matters more
-// than the scratch work) but one click away.
+// Foldable extended-thinking — Cursor-style chip (see BrainTurnChip).
 function ThinkingBlock({ text }: { text: string }) {
-  return (
-    <details className="ai-think-block ai-think-inline">
-      <summary>
-        <span>💭</span> Reasoning
-      </summary>
-      <div className="ai-think-body">{text}</div>
-    </details>
-  );
+  return <ReasoningTurnChip text={text} />;
 }
 
 // Compact-mode walk of an assistant turn's blocks: prose between runs of
@@ -924,6 +916,7 @@ function CompactBlocks({
   onFileOpen?: (path: string) => void;
 }) {
   const seen = new Set<string>();
+  const seenThinking = new Set<string>();
   const out: ReactNode[] = [];
   let run: { id: string; call: ToolCall }[] = [];
   let runKey = 0;
@@ -962,8 +955,10 @@ function CompactBlocks({
         // render it as a foldable Reasoning block in place — otherwise it
         // either leaks as raw tags or gets dropped in the compact layout.
         const { thinking, visible } = splitThinking(b.text);
-        if (thinking.trim())
+        if (thinking.trim() && !seenThinking.has(thinking.trim())) {
+          seenThinking.add(thinking.trim());
           out.push(<ThinkingBlock key={`tk${i}`} text={thinking} />);
+        }
         if (visible.trim())
           out.push(
             <MarkdownPreview

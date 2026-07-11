@@ -9,6 +9,8 @@ export interface ProviderModel {
   contextWindow?: number;
   /** Whether the model supports native tool calling. */
   supportsTools?: boolean;
+  /** Whether the model accepts image input (vision / file parts). */
+  supportsVision?: boolean;
   /** Zero-cost model (OpenCode Zen free tier, etc.). Shown with a badge in pickers. */
   isFree?: boolean;
 }
@@ -80,6 +82,8 @@ export interface ChatProvider {
     /** Claude Code extended-thinking toggle (MAX_THINKING_TOKENS env:
      *  true = forced on, false = off, undefined = CLI default). */
     thinking?: boolean;
+    /** On-disk image paths staged on the composer for this turn. */
+    imageAttachments?: Array<{ path: string; name: string }>;
   }): AsyncGenerator<ChatStreamEvent, void, unknown>;
 }
 

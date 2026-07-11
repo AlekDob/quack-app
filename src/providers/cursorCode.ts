@@ -10,6 +10,10 @@ import {
   parseCliStderrLine,
   parseCliStreamJsonObject,
 } from "./cliStreamJson";
+import {
+  createCursorStreamJsonState,
+  parseCursorStreamJsonObject,
+} from "./cursorStreamJson";
 
 /** When true, pass --force so cursor-agent runs tools without prompts. */
 export const CURSOR_FORCE_MODE_KEY = "lcp.cursorCli.forceMode";
@@ -28,6 +32,7 @@ const DEFAULT_MODEL: ProviderModel = {
   displayName: "Default (no --model flag; uses Cursor configured model)",
   contextWindow: 200_000,
   supportsTools: true,
+  supportsVision: true,
 };
 
 interface CursorModelEntry {
@@ -47,6 +52,7 @@ async function fetchModels(): Promise<ProviderModel[]> {
     displayName: e.display_name,
     contextWindow: 200_000,
     supportsTools: true,
+    supportsVision: true,
   }));
   return [DEFAULT_MODEL, ...dynamic];
 }
@@ -77,8 +83,16 @@ export function invalidateCursorCliCache(): void {
 }
 
 /** Full catalog — runs `cursor-agent --list-models`. Defer until picker/browser open. */
-export async function refreshCursorModelsLive(): Promise<ProviderModel[]> {
-  modelsCache = null;
+export async function refreshCursorModelsLive(
+  force = false,
+): Promise<ProviderModel[]> {
+  if (
+    !force &&
+    modelsCache &&
+    Date.now() - modelsCache.checkedAt < MODELS_TTL_MS
+  ) {
+    return modelsCache.models;
+  }
   if (!(await checkAvailability())) return [DEFAULT_MODEL];
   const models = await fetchModels();
   modelsCache = { models, checkedAt: Date.now() };
@@ -144,6 +158,7 @@ export const cursorCliProvider: ChatProvider = {
       }
     };
     const jsonState = createCliStreamJsonState();
+    const cursorState = createCursorStreamJsonState();
 
     const handle = (data: { kind: string; line?: string; code?: number }) => {
       if (data.kind === "end") {
@@ -166,7 +181,12 @@ export const cursorCliProvider: ChatProvider = {
       if (data.kind !== "line" || !data.line) return;
       try {
         const obj = JSON.parse(data.line) as Record<string, unknown>;
-        const events = parseCliStreamJsonObject(obj, jsonState);
+        const cursorEvents = parseCursorStreamJsonObject(obj, cursorState);
+        const ccEvents =
+          cursorEvents.length > 0
+            ? []
+            : parseCliStreamJsonObject(obj, jsonState);
+        const events = [...cursorEvents, ...ccEvents];
         if (events.length > 0) {
           queue.push(...events);
           wake();

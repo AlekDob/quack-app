@@ -278,7 +278,7 @@ fn build_cursor_command(
         Some("default") | Some("") => None,
         other => other,
     };
-    let mut flags = String::from("-p --output-format stream-json");
+    let mut flags = String::from("-p --output-format stream-json --stream-partial-output");
     if force {
         flags.push_str(" --force");
     }
@@ -297,6 +297,7 @@ fn build_cursor_command(
             let mut c = Command::new(exe);
             c.arg("-p");
             c.arg("--output-format").arg("stream-json");
+            c.arg("--stream-partial-output");
             if force {
                 c.arg("--force");
             }

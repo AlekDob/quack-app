@@ -26,7 +26,8 @@ Both docked chat and Agent Mode use the **same** chronology renderer:
 | Entry | Implementation | Look |
 |---|---|---|
 | `InterleavedBlocks` | Always delegates to `CompactBlocks` | prose interleaved with tool runs |
-| `CompactBlocks` | Walks `blocks[]`, flushes tool runs | `.ai-iarow` chip rows or solo `ToolCallRow` |
+| `CompactBlocks` | Walks `blocks[]`, flushes tool runs | prose interleaved with tool runs |
+| `ThinkingBlock` | `splitThinking` on text blocks | `ReasoningTurnChip` (056) — Cursor-style collapsed reasoning |
 | `InlineActionRow` | One row per consecutive tool run (≥2 tools) | Conductor-style grouped chips |
 
 The old non-compact **pill cloud** (`.ai-tcall-wrap` per Read/Grep) was removed —
@@ -145,6 +146,7 @@ shimmer class. Planning-without-pill (`Planning next moves…`) uses the same cl
 | `.ai-tcall-status` | Live turn dock pill shell (inverted monochrome) |
 | `.ai-live-shimmer` | Animated gradient label on active turn status text |
 | `.ai-spinner-live` | Slightly larger spinner beside shimmer labels |
+| `.reasoning-turn-chip*` | Collapsed reasoning recap (056; mirrors brain-turn-chip) |
 | `.compose-review-*` | Diff review tab (038) |
 | `.tool-drawer` | Read/bash result slide-over |
 
@@ -153,3 +155,4 @@ shimmer class. Planning-without-pill (`Planning next moves…`) uses the same cl
 - Drawer/DiffModal are global — compact/subagent views share them.
 - Edit diff in DiffModal uses tool fragments, not full file; compose review uses snapshot vs disk.
 - During streaming with edits: stream shows ComposeCard live + explore/bash chips; edit pills hidden.
+- **Reasoning:** inline via `ReasoningTurnChip` inside `CompactBlocks`; do not duplicate outer `<details>` when `blocks[]` exists — see `056-reasoning-turn-chip.md`.

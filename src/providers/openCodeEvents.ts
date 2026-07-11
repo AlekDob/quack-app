@@ -3,10 +3,15 @@ import type { ChatStreamEvent, ToolCall } from "../ai";
 export interface OpencodeEventState {
   textByPart: Map<string, string>;
   emittedToolIds: Set<string>;
+  completedToolIds: Set<string>;
 }
 
 export function createOpencodeEventState(): OpencodeEventState {
-  return { textByPart: new Map(), emittedToolIds: new Set() };
+  return {
+    textByPart: new Map(),
+    emittedToolIds: new Set(),
+    completedToolIds: new Set(),
+  };
 }
 
 interface RawEvent {
@@ -92,37 +97,47 @@ export function parseOpencodeEvent(
         (typeof part.tool === "string" && part.tool) ||
         (typeof part.name === "string" && part.name) ||
         "tool";
-      const callId = partId || `${toolName}-${state.emittedToolIds.size}`;
+      const callId =
+        (typeof part.callID === "string" && part.callID) ||
+        partId ||
+        `${toolName}-${state.emittedToolIds.size}`;
+      const st =
+        part.state && typeof part.state === "object"
+          ? (part.state as Record<string, unknown>)
+          : null;
+      const stStatus = typeof st?.status === "string" ? st.status : undefined;
+      const stInput =
+        st?.input && typeof st.input === "object"
+          ? (st.input as Record<string, unknown>)
+          : st && typeof st === "object"
+            ? st
+            : {};
+
       if (!state.emittedToolIds.has(callId)) {
         state.emittedToolIds.add(callId);
-        const args =
-          part.state && typeof part.state === "object"
-            ? (part.state as Record<string, unknown>)
-            : {};
         const call: ToolCall = {
           id: callId,
-          function: { name: toolName, arguments: args },
+          function: { name: toolName, arguments: stInput },
         };
         out.push({ kind: "tool_call", call });
       }
-      const status = part.status ?? part.state;
-      const done =
-        status === "completed" ||
-        status === "error" ||
-        (typeof status === "object" &&
-          status !== null &&
-          ((status as { status?: string }).status === "completed" ||
-            (status as { status?: string }).status === "error"));
-      if (done) {
+
+      if (stStatus === "completed" || stStatus === "error") {
+        if (state.completedToolIds.has(callId)) {
+          return { events: out, done: false };
+        }
+        state.completedToolIds.add(callId);
         const content =
-          typeof part.output === "string"
-            ? part.output
-            : JSON.stringify(part.state ?? {});
+          stStatus === "completed" && typeof st?.output === "string"
+            ? st.output
+            : typeof st?.error === "string"
+              ? st.error
+              : JSON.stringify(st ?? {});
         out.push({
           kind: "tool_result",
           tool_use_id: callId,
           content,
-          is_error: status === "error",
+          is_error: stStatus === "error",
         });
       }
     }

@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-01
-last_verified: 2026-07-01
-tags: [opencode-cli, bridge, sidecar, sse, http, rust, opencode-ai, agentic]
+last_verified: 2026-07-11
+tags: [opencode-cli, bridge, sidecar, sse, http, rust, opencode-ai, agentic, images, vision, tool-call]
 ---
 
 ## OpenCode Bridge (sidecar HTTP + SSE)
@@ -15,12 +15,11 @@ tags: [opencode-cli, bridge, sidecar, sse, http, rust, opencode-ai, agentic]
 | Type | Path | Purpose |
 |------|------|---------|
 | Sidecar | `src-tauri/src/opencode_sidecar.rs` | Spawn `opencode serve`, health poll, status/restart |
-| Provider | `src/providers/openCode.ts` | `ChatProvider` id `opencode-cli`; lazy catalog + live refresh |
-| Mapper | `src/providers/openCodeEvents.ts` | SSE payload → `ChatStreamEvent[]` |
+| Provider | `src/providers/openCode.ts` | `ChatProvider` id `opencode-cli`; lazy catalog + live refresh; **FilePart** images |
+| Mapper | `src/providers/openCodeEvents.ts` | SSE payload → `ChatStreamEvent[]` (tools + text) |
 | Session | `src/providerSession.ts` | `providerSessionIds` read/write/migrate (shared with CC/Cursor) |
-| Registry | `src/providers/index.ts` | `listAllModels` / `listAllCloudModels` parallelized |
-| UI | `src/components/ModelBrowser.tsx` | OpenCode provider group + install hint |
-| UI | `src/components/AIChatPanel.tsx` | Agentic gating, resume id, `refreshLiveCliModels` |
+| Images | `src/imageAttach.ts` | `mimeForImagePath`, `fileUrlForImagePath` |
+| UI | `src/components/AIChatPanel.tsx` | Vision gate before send; passes `imageAttachments` to `chatStream` |
 
 ### Tauri commands
 | Command | Role |
@@ -31,40 +30,77 @@ tags: [opencode-cli, bridge, sidecar, sse, http, rust, opencode-ai, agentic]
 | `opencode_server_restart` | Kill + respawn |
 
 ### Data Flow
-**Chat:** `openCodeProvider.chat()` → `ensureSidecar()` → `session.create` (if new) → yield `{ kind: "session", id }` → native `EventSource` on `/global/event` → `parseOpencodeEvent` → `ChatStreamEvent[]` → `session.promptAsync` (204) → abort on Stop
+**Chat:** `openCodeProvider.chat()` → `ensureSidecar()` → `session.create` (if new) → yield `{ kind: "session", id }` → native `EventSource` on `/global/event` → `parseOpencodeEvent` → `ChatStreamEvent[]` → `session.promptAsync` with `parts[]` → abort on Stop
+
+**Prompt parts:**
+```ts
+parts: [
+  { type: "text", text: prompt },
+  ...imageAttachments.map(img => ({
+    type: "file",
+    mime: mimeForImagePath(img.path),
+    filename: img.name,
+    url: fileUrlForImagePath(img.path), // file:///abs/path
+  })),
+]
+```
 
 **Models (lazy):** mount → `listModels()` returns `[DEFAULT_MODEL]` unless sidecar already running or cache warm → picker/browser open → `refreshOpenCodeModelsLive()` → `client.provider.list()` → dedupe by `modelId`, `sortFreeFirst`
 
-**Resume:** `readProviderSessionIds(session)["opencode-cli"]` → `resumeSessionId` on chat → reuse session id; prompt = last user message only
+**Resume:** `readProviderSessionIds(session)["opencode-cli"]` → `resumeSessionId` on chat → reuse session id; prompt = last user message only (images on resumed turns: current message only via `imageAttachments` arg)
 
 ### Key Functions
-- `openCodeProvider.isAvailable() → boolean` — `opencode_server_check` only (binary on PATH; **no sidecar spawn**)
-- `openCodeProvider.listModels() → ProviderModel[]` — lightweight default until sidecar up or cache warm
-- `refreshOpenCodeModelsLive() → ProviderModel[]` — full catalog; spawns sidecar if needed
-- `parseOpencodeEvent(raw, sessionId, state) → { events, done }` — text deltas, tool display-only, `session.idle` / `session.status` idle
-- `readProviderSessionIds(session) → Partial<Record<ProviderId, string>>` — merges legacy `claudeSessionId`
-- `isAgenticProviderId(id) → boolean` — `claude-code` \| `cursor-cli` \| `opencode-cli` (Quack never runs local `aiTools`)
+- `openCodeProvider.chat({ imageAttachments })` — builds `FilePartInput` array for SDK
+- `parseOpencodeEvent(raw, sessionId, state) → { events, done }` — text deltas, tool display-only, idle detection
+- `ProviderModel.supportsVision` — `model.modalities?.input?.includes("image")` from catalog
+
+### Tool SSE mapping (2026-07-11 fix)
+OpenCode `message.part.updated` with `part.type === "tool"`:
+
+| Field | Use |
+|---|---|
+| `part.tool` | Tool name |
+| `part.callID` | Stable call id |
+| `part.state.status` | `pending` / `running` / `completed` / `error` |
+| `part.state.input` | Tool arguments (not the whole state blob) |
+| `part.state.output` | Result text when `completed` |
+| `part.state.error` | Error text when `error` |
+
+Emit `tool_call` once per id; `tool_result` once when status is terminal (`completedToolIds` Set).
+
+### Vision / image gate
+OpenCode **strips** image parts client-side when `capabilities.input.image === false` (often missing `modalities` on custom models).
+
+Before send, if `images.length > 0` and selected model has `supportsVision === false`, Quack toasts an error and aborts the turn.
+
+**Fix for custom providers** — in `opencode.json`:
+```json
+"models": {
+  "my-vision-model": {
+    "modalities": {
+      "input": ["text", "image"],
+      "output": ["text"]
+    }
+  }
+}
+```
+
+See OpenCode issues #20802 / #9897.
 
 ### State
-- `providerSessionIds`: `Partial<Record<ProviderId, string>>` — per-provider server session ids in `ChatSession` (localStorage)
-- `modelsCache` / `availabilityCache`: in-module TTL in `openCode.ts` (60s)
-- Sidecar child pid: `OpencodeSidecarState` (Rust, app lifetime)
+- `providerSessionIds`: per-provider server session ids in `ChatSession`
+- `modelsCache` / `availabilityCache`: TTL 60s in `openCode.ts`
+- `ChatProvider.chat.imageAttachments`: optional `{ path, name }[]` from `AIChatPanel` → `chatStream` → provider
 
 ### External Dependencies
-- Binary: `opencode` on PATH (`npm i -g opencode-ai` or https://opencode.ai/install)
-- Auth: `opencode auth login` (outside Quack)
-- Port: `127.0.0.1:17346` (spaceship uses 17345 — intentional offset)
+- Binary: `opencode` on PATH
+- Auth: `opencode auth login`
+- Port: `127.0.0.1:17346`
 - SDK: `@opencode-ai/sdk` — import **only** from `/client`; events via native `EventSource`
 
-### Config
-- Default model: `opencode-cli:opencode/big-pickle` (free tier placeholder)
-- `ProviderModel.isFree`: `cost.input === 0 && cost.output === 0`, or id/name contains `free`
-
 ### Gotchas
-- **WKWebView SSE:** use native `EventSource` on `/global/event`, not SDK fetch stream — see `design/agent-provider-patterns.md`.
-- **Session id field:** SSE payloads may put `sessionID` under `properties`, not top-level — mapper checks both.
-- **Agentic tools:** OpenCode tool calls are display-only; `isAgenticProviderId` skips Quack `aiTools` loop (fixes "Preparing tool call…" hang).
-- **Startup perf:** never call `opencode_server_start` from `isAvailable()` or cold `listModels()` — defer to first chat or `refreshOpenCodeModelsLive()` (picker/browser). See `025-model-selector.md`.
-- **Workspace scoping:** pass `?directory=<cwd>` on every session API call.
-- **Rules injection:** OpenCode does not load `CLAUDE.md` natively — `AIChatPanel` still inlines workspace rules for this provider.
-- **Smoke test pending:** mission w11 — live chat, stop, resume, favorites in `npm run tauri dev`.
+- **WKWebView SSE:** native `EventSource` on `/global/event` — not SDK fetch stream.
+- **Agentic tools:** display-only; `isAgenticProviderId` skips Quack `aiTools` loop.
+- **Startup perf:** never spawn sidecar from cold `listModels()` — defer to picker or first chat.
+- **Rules injection:** OpenCode does not load `CLAUDE.md` — Quack inlines workspace rules.
+- **Images need vision modality:** without `modalities.input` including `"image"`, attachments are silently dropped inside OpenCode before the HTTP request.

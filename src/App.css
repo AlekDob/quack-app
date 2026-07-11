@@ -1067,22 +1067,34 @@ body.ws-dragging * {
   padding: 0;
   outline: none;
   position: relative; /* anchors the pending-changes badge */
+  isolation: isolate;
+}
+.activity-icon > svg {
+  position: relative;
+  z-index: 0;
 }
 .activity-badge {
   position: absolute;
   top: 2px;
-  right: 2px;
+  right: -3px;
+  z-index: 2;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 14px;
   height: 14px;
-  padding: 0 3px;
+  padding: 0;
   border-radius: 7px;
-  background: var(--accent-soft);
+  background: var(--bg-elev);
   color: var(--accent);
   font-size: 9px;
   font-weight: 700;
-  line-height: 14px;
-  text-align: center;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
   pointer-events: none;
+  border: 1.5px solid var(--bg-alt);
+  box-shadow: 0 0 0 1px var(--bg-alt);
 }
 .activity-icon:hover:not(:disabled) {
   background: var(--bg-hi);
@@ -1096,6 +1108,36 @@ body.ws-dragging * {
 .activity-icon.active {
   color: var(--fg);
   background: var(--bg-hi);
+}
+/* VS Code-style left trace — open sidebar section reads at a glance. */
+.activity-icon.active:not([aria-label="Organigramma"])::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  bottom: 7px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--fg);
+  pointer-events: none;
+  z-index: 0;
+}
+/* Source Control — brighter icon + amber badge when files are pending. */
+.activity-icon--git.has-changes {
+  color: var(--fg);
+}
+.activity-icon--git.has-changes .activity-badge {
+  right: -3px;
+  background: color-mix(in srgb, var(--warn) 22%, var(--bg-elev));
+  color: var(--warn);
+  min-width: 16px;
+  height: 16px;
+  padding: 0 2px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  border: 1.5px solid color-mix(in srgb, var(--warn) 55%, var(--border));
+  box-shadow: 0 0 0 1px var(--bg-alt);
 }
 .activity-icon:disabled {
   opacity: 0.35;
@@ -5592,23 +5634,6 @@ body.ws-dragging * {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-  animation: model-picker-in 140ms ease-out;
-}
-@keyframes model-picker-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.model-picker-pop-busy .model-picker-search::placeholder {
-  color: var(--fg-dim);
-}
-.model-picker-head-spin {
-  flex-shrink: 0;
 }
 .model-picker-pop-head {
   display: flex;
@@ -5754,6 +5779,73 @@ body.ws-dragging * {
   text-align: center;
   font-size: 13px;
   color: var(--fg-muted);
+}
+
+/* Cursor-style shimmer while provider catalogs load */
+.model-picker-loading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0 8px;
+}
+.model-picker-loading-label {
+  margin: 0;
+  padding: 4px 12px 2px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.model-picker-sk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.model-picker-sk-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 8px;
+  padding: 6px 4px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  position: relative;
+}
+.model-picker-sk-row::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 42%,
+    color-mix(in srgb, var(--fg) 4%, transparent) 50%,
+    transparent 58%
+  );
+  transform: translateX(-100%);
+  animation: brain-sk-sweep 1.6s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 90ms);
+  pointer-events: none;
+}
+.model-picker-sk-line.name {
+  flex: 1 1 auto;
+  height: 10px;
+  min-width: 0;
+  max-width: 72%;
+  border-radius: var(--radius-pill);
+  background: var(--bg-hi);
+}
+.model-picker-sk-tag {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-hi);
+}
+.model-picker-sk-star {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hi);
+  margin-right: 4px;
 }
 
 /* Inline permission card — replaces the modal dialogConfirm flow */
@@ -6213,9 +6305,6 @@ body.ws-dragging * {
   background-clip: text;
   color: transparent;
   animation: ai-stale-shimmer 2s ease-in-out infinite;
-}
-.ai-model-chip-opening {
-  background: var(--bg-hi);
 }
 /* Single meta row above the input: model chip + context-attachment
    chip side by side — they used to be two full-width stacked bars. */
@@ -19656,85 +19745,406 @@ body.ws-dragging * {
   }
 }
 
-/* Brain inject chip in chat stream */
+/* Brain inject chip in chat stream — Cursor-style quiet recap */
 .brain-turn-chip {
-  margin: 4px 12px 8px;
-  padding: 8px 10px;
-  border: 1px solid var(--border-subtle, var(--border));
-  border-radius: var(--radius-md, 8px);
-  background: var(--bg-elev);
+  margin: 2px 12px 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  animation: brain-turn-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes brain-turn-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .brain-turn-chip-head {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 6px 10px;
+  gap: 5px;
   font-size: 11px;
+  line-height: 1.3;
+  color: var(--fg-dim);
 }
 
-.brain-turn-chip-title {
-  font-weight: 600;
+.brain-turn-chip-icon {
+  flex-shrink: 0;
+  opacity: 0.72;
+  animation: brain-turn-icon 0.9s ease-out 1;
 }
 
-.brain-turn-chip-savings {
-  color: var(--ok);
-  font-variant-numeric: tabular-nums;
+@keyframes brain-turn-icon {
+  0% {
+    opacity: 0.2;
+    transform: scale(0.88);
+  }
+  55% {
+    opacity: 0.9;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+}
+
+.brain-turn-chip-label {
+  font-weight: 500;
+  color: var(--fg-muted);
 }
 
 .brain-turn-chip-meta {
-  color: var(--fg-dim);
-  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.brain-turn-chip-meta.brain-search-shimmer {
+  animation: brain-turn-meta-shimmer 2.2s ease-in-out 1 forwards;
+}
+
+@keyframes brain-turn-meta-shimmer {
+  0% {
+    background-position: 0% 50%;
+    color: transparent;
+  }
+  65% {
+    background-position: 100% 50%;
+    color: transparent;
+  }
+  100% {
+    color: var(--fg-dim);
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+  }
 }
 
 .brain-turn-chip-hits {
-  margin: 8px 0 0;
-  padding: 0;
+  position: relative;
+  margin: 3px 0 0;
+  padding: 0 0 0 9px;
+  border-left: 1px solid var(--border);
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 1px;
+}
+
+.brain-turn-chip-hits::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--fg) 28%, transparent) 45%,
+    transparent 100%
+  );
+  background-size: 100% 220%;
+  animation: brain-turn-rail 1.1s ease-out 1;
+  pointer-events: none;
+}
+
+@keyframes brain-turn-rail {
+  from {
+    background-position: 0 -120%;
+    opacity: 0;
+  }
+  to {
+    background-position: 0 120%;
+    opacity: 1;
+  }
 }
 
 .brain-turn-hit {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  gap: 0 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
   width: 100%;
-  padding: 6px 8px;
+  min-width: 0;
+  padding: 3px 6px;
+  margin-left: -1px;
   border: none;
   border-radius: var(--radius-sm, 5px);
   background: transparent;
   text-align: left;
   cursor: pointer;
   color: inherit;
+  animation: brain-hit-in 0.36s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 .brain-turn-hit:hover {
   background: var(--bg-hi);
 }
 
-.brain-turn-hit-kind {
-  grid-row: 1 / span 2;
-  align-self: center;
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: var(--radius-pill, 999px);
-  border: 1px solid var(--border-subtle, var(--border));
-  color: var(--fg-dim);
-  text-transform: uppercase;
+.brain-turn-hit-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.brain-turn-hit-title {
-  font-size: 12px;
-  font-weight: 500;
+.brain-turn-hit:hover .brain-turn-hit-title {
+  color: var(--fg);
 }
 
 .brain-turn-hit-path {
-  font-size: 11px;
+  flex: 0 1 42%;
+  min-width: 0;
+  font-size: 10px;
   font-family: var(--font-mono, ui-monospace, monospace);
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 2px;
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
+}
+
+.brain-turn-hit:hover .brain-turn-hit-path {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brain-turn-chip,
+  .brain-turn-chip-icon,
+  .brain-turn-chip-meta.brain-search-shimmer,
+  .brain-turn-chip-hits::before,
+  .brain-turn-hit {
+    animation: none !important;
+  }
+
+  .brain-turn-hit-path {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Reasoning chip — Cursor-style quiet recap (mirrors brain-turn-chip) */
+.reasoning-turn-chip {
+  margin: 2px 12px 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  animation: brain-turn-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.reasoning-turn-chip-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--fg-dim);
+  cursor: pointer;
+  text-align: left;
+}
+
+.reasoning-turn-chip-head:hover {
+  color: var(--fg-muted);
+}
+
+.reasoning-turn-chip-icon {
+  flex-shrink: 0;
+  opacity: 0.72;
+}
+
+.reasoning-turn-chip-label {
+  font-weight: 500;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+
+.reasoning-turn-chip-meta {
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.reasoning-turn-chip-preview {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+.reasoning-turn-chip-caret {
+  flex-shrink: 0;
+  opacity: 0.55;
+  transition: transform 0.14s ease;
+}
+
+.reasoning-turn-chip-caret.is-open {
+  transform: rotate(180deg);
+}
+
+.reasoning-turn-chip-body {
+  margin: 4px 0 0 16px;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--fg-dim);
+  font-style: italic;
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow: auto;
+  border-left: 1px solid var(--border);
+}
+
+/* Brain save proposal — amber semantic, same minimal shell as turn chip */
+.brain-save-chip {
+  margin: 4px 12px 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  animation: brain-turn-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.brain-save-chip.is-done {
+  opacity: 0.88;
+}
+
+.brain-save-chip-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.brain-save-chip-icon {
+  flex-shrink: 0;
+  color: var(--warn);
+  opacity: 0.9;
+  animation: brain-turn-icon 0.9s ease-out 1;
+}
+
+.brain-save-chip-label {
+  font-weight: 500;
+  color: color-mix(in srgb, var(--warn) 72%, var(--fg));
+}
+
+.brain-save-shimmer {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 11px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--warn) 55%, var(--fg-muted)) 0%,
+    color-mix(in srgb, var(--warn) 85%, var(--fg)) 50%,
+    color-mix(in srgb, var(--warn) 55%, var(--fg-muted)) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: brain-turn-meta-shimmer 2.4s ease-in-out 1 forwards;
+}
+
+.brain-save-chip-body {
+  margin: 4px 0 0;
+  padding: 0 0 0 9px;
+  border-left: 1px solid color-mix(in srgb, var(--warn) 35%, var(--border));
+}
+
+.brain-save-chip-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+
+.brain-save-chip-preview {
+  margin: 2px 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--fg-dim);
+}
+
+.brain-save-chip-actions {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 0 9px;
+}
+
+.brain-save-btn {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--border);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--fg-muted);
+}
+
+.brain-save-btn.primary {
+  background: var(--warn-bg);
+  border-color: color-mix(in srgb, var(--warn) 45%, var(--border));
+  color: color-mix(in srgb, var(--warn) 80%, var(--fg));
+}
+
+.brain-save-btn:hover:not(:disabled) {
+  background: var(--bg-hi);
+}
+
+.brain-save-btn.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--warn-bg) 80%, var(--bg-hi));
+}
+
+.brain-save-open {
+  display: block;
+  margin: 4px 0 0 9px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 10px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--fg-dim);
+  cursor: pointer;
+  text-align: left;
+}
+
+.brain-save-open:hover {
+  color: var(--fg-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brain-save-chip,
+  .brain-save-chip-icon,
+  .brain-save-shimmer {
+    animation: none !important;
+  }
+
+  .brain-save-shimmer {
+    color: var(--fg-dim);
+    background: none;
+    -webkit-background-clip: border-box;
+    background-clip: border-box;
+  }
 }

@@ -82,14 +82,25 @@ export function splitThinking(content: string): {
   visible: string;
 } {
   const thinkParts: string[] = [];
-  const visible = content.replace(
-    /<think>([\s\S]*?)<\/think>\s*/gi,
-    (_full, inner) => {
-      thinkParts.push((inner ?? "").trim());
+  let visible = content;
+  const extract = (re: RegExp) => {
+    visible = visible.replace(re, (_full, inner: string) => {
+      const t = (inner ?? "").trim();
+      if (t) thinkParts.push(t);
       return "";
-    },
-  );
-  return { thinking: thinkParts.join("\n\n"), visible };
+    });
+  };
+  extract(/<think>([\s\S]*?)<\/redacted_thinking>\s*/gi);
+  const thinkOpen = "<" + "think>";
+  const thinkClose = "</" + "think>";
+  extract(new RegExp(`${thinkOpen}([\\s\\S]*?)${thinkClose}\\s*`, "gi"));
+  const seen = new Set<string>();
+  const unique = thinkParts.filter((p) => {
+    if (seen.has(p)) return false;
+    seen.add(p);
+    return true;
+  });
+  return { thinking: unique.join("\n\n"), visible };
 }
 
 // ---------- Stored-history sanitization ----------
