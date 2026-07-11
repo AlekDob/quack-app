@@ -101,8 +101,10 @@ export function TurnStreamStatus({
       {planning && (
         <div className="ai-inline-status-row">
           <div className="ai-turn-hint">
-            <span className="ai-spinner" />
-            <span>{warmingUp ? "Loading model…" : "Planning next moves…"}</span>
+            <span className="ai-spinner ai-spinner-live" />
+            <span className="ai-live-shimmer">
+              {warmingUp ? "Loading model…" : "Planning next moves…"}
+            </span>
           </div>
           {staleSuffix}
         </div>
@@ -110,8 +112,8 @@ export function TurnStreamStatus({
       {runningTools &&
         (activeToolLabels.length === 0 ? (
           <StatusPill trail={tpsTrail} suffix={staleSuffix}>
-            <span className="ai-spinner" />
-            <span>Running tools…</span>
+            <span className="ai-spinner ai-spinner-live" />
+            <span className="ai-live-shimmer">Running tools…</span>
           </StatusPill>
         ) : (() => {
             const done = activeToolLabels.filter(
@@ -144,9 +146,15 @@ export function TurnStreamStatus({
                     <Icon name="check" size={12} />
                   </span>
                 ) : (
-                  <span className="ai-spinner" />
+                  <span className="ai-spinner ai-spinner-live" />
                 )}
-                <span>{header}</span>
+                <span
+                  className={
+                    allDone && !streamStillActive ? undefined : "ai-live-shimmer"
+                  }
+                >
+                  {header}
+                </span>
               </StatusPill>
             );
           })())}
@@ -157,8 +165,8 @@ export function TurnStreamStatus({
           }
           suffix={staleSuffix}
         >
-          <span className="ai-spinner" />
-          <span>Generating…</span>
+          <span className="ai-spinner ai-spinner-live" />
+          <span className="ai-live-shimmer">Generating…</span>
         </StatusPill>
       )}
       {stale && !planning && !runningTools && !generating && staleSuffix}

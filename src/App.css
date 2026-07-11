@@ -8743,8 +8743,31 @@ body.ws-dragging * {
   align-items: center;
   gap: 8px;
   padding: 2px 2px 6px;
-  font-size: 12px;
-  color: var(--fg-muted);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+/* Live turn labels — shimmer sweep so planning/generating reads at a glance. */
+.ai-live-shimmer {
+  white-space: nowrap;
+  background: linear-gradient(
+    90deg,
+    var(--fg-muted) 0%,
+    color-mix(in srgb, var(--accent-hover) 28%, var(--fg-dim)) 38%,
+    var(--fg) 50%,
+    color-mix(in srgb, var(--accent-hover) 28%, var(--fg-dim)) 62%,
+    var(--fg-muted) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ai-stale-shimmer 2.2s ease-in-out infinite;
+}
+.ai-spinner-live {
+  width: 11px;
+  height: 11px;
+  border-color: color-mix(in srgb, var(--fg) 16%, transparent);
+  border-top-color: var(--fg-dim);
 }
 /* Floating "back to bottom" affordance — visible only when the user
    has scrolled away from the live tail. Sits inside the relatively-
@@ -11610,6 +11633,20 @@ body.ws-dragging * {
 .ai-tcall-status .ai-status-pill-main .ai-spinner {
   border-color: color-mix(in srgb, var(--primary-fg) 22%, transparent);
   border-top-color: var(--primary-fg);
+}
+.ai-tcall-status .ai-status-pill-main .ai-live-shimmer {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--primary-fg) 42%, transparent) 0%,
+    color-mix(in srgb, var(--primary-fg) 72%, transparent) 38%,
+    var(--primary-fg) 50%,
+    color-mix(in srgb, var(--primary-fg) 72%, transparent) 62%,
+    color-mix(in srgb, var(--primary-fg) 42%, transparent) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .ai-tcall-status .ai-inline-stop {
   border-color: color-mix(in srgb, var(--warn) 55%, var(--primary-fg));

@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-10
+last_verified: 2026-07-11
 tags: [composer, stop, multitask, esc, turn-status]
 ---
 
@@ -35,7 +35,7 @@ mode/mic/send on the right.
 | `src/components/WorkspacePathPicker.tsx` | Workspace path segment — switch open projects or open a folder |
 | `src/components/GitBranchPicker.tsx` | Shared git branch dropdown (composer + Source Control panel) |
 | `src/composerCtxMenu.tsx` | Portaled menu helper for context-bar dropdowns |
-| `src/App.css` | `.ai-composer-*`, `.ai-composer-context-bar`, `.ai-composer-ctx-*`, `.ai-composer-git*`, `.ai-agent-*`, `.ai-mention-*`, `.ai-mic-btn`, `.ai-dictation-*`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-commit-dock*`, `.ai-context-dock*`, `.ai-queue-*` |
+| `src/App.css` | `.ai-composer-*`, `.ai-composer-context-bar`, `.ai-composer-ctx-*`, `.ai-composer-git*`, `.ai-agent-*`, `.ai-mention-*`, `.ai-mic-btn`, `.ai-dictation-*`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-live-shimmer`, `.ai-turn-hint`, `.ai-commit-dock*`, `.ai-context-dock*`, `.ai-queue-*` |
 
 ## Context bar (path + branch)
 
@@ -162,6 +162,33 @@ Tooltip on the meter button: `Effort: {label} · Thinking: {auto|on|off} — Ctr
   stacks scroll internally instead of pushing the composer off-screen.
 - Implementation: `TurnStreamStatus` → `StatusPill` in `chatToolRender.tsx`,
   `ContextFilesDock.tsx`, wired in `AIChatPanel.tsx`.
+
+### Live label shimmer (planning / generating)
+
+Active turn labels use **`.ai-live-shimmer`** so "the agent is working" reads
+at a glance without adding a second color system.
+
+| State | Label | Shimmer? |
+|---|---|---|
+| Planning (no text/tools yet) | `Planning next moves…` | yes — `.ai-turn-hint` row |
+| Model warmup | `Loading model…` | yes |
+| Tools, no rows yet | `Running tools…` | yes — inside inverted `StatusPill` |
+| Tools with progress | `N of M done · …` / `Got N tool results — generating…` | yes while still active; **off** when all done and stream ended |
+| Token stream | `Generating…` | yes |
+| Stale (≥10s idle) | `Still working (Ns)` / `Unusually slow` | separate `.ai-stale-shimmer` (warn tint when stuck) |
+
+**Visual contract**
+
+- Gradient text clip reuses `@keyframes ai-stale-shimmer` (2.2s ease-in-out).
+- Planning row (`.ai-turn-hint`): peak sweeps `--fg-muted` → `--fg` with a
+  subtle `--accent-hover` mix at 38%/62% — neutral chrome, not semantic color.
+- Inverted pill (`.ai-tcall-status`): variant `.ai-tcall-status .ai-status-pill-main .ai-live-shimmer` peaks on `--primary-fg` so shimmer stays legible on the monochrome pill.
+- Spinner: `.ai-spinner-live` — 11px, brighter ring (`--fg-dim` top) beside shimmer labels.
+- Font: 12.5px / weight 500 on the planning row (was 12px muted static grey).
+
+**Files:** `TurnStreamStatus.tsx` (class wiring), `App.css` (`.ai-live-shimmer`,
+`.ai-spinner-live`, `.ai-turn-hint`, pill override). Pill shell unchanged — see
+`006-chat-tool-render.md`.
 
 ## Agent commit dock (feature 051)
 

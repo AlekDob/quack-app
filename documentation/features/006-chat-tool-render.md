@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-10
+last_verified: 2026-07-11
 tags: [ai-chat, tool-calls, chatToolRender, cursor-style, conductor-style, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap, html-preview]
 ---
 
@@ -124,6 +124,11 @@ Visible **as soon as the first edit completes** (`showComposeCard && isAssistant
 Docked above composer in `.ai-status-dock` (022). Inverted monochrome pill; optional
 `RunningToolList` when tools aren't yet in `streamingBlocks`.
 
+Active labels inside `.ai-status-pill-main` use **`.ai-live-shimmer`** (gradient text
+sweep on `--primary-fg`) while the turn is in flight. Finished tool headers drop the
+shimmer class. Planning-without-pill (`Planning next moves…`) uses the same class on
+`.ai-turn-hint` with a neutral `--fg` peak — see 022 § Live label shimmer.
+
 ### Per-tool icon tints
 
 `toolToneOf` / `.ai-tool-tone-*` on icon glyphs — see table in prior revision; unchanged.
@@ -137,6 +142,9 @@ Docked above composer in `.ai-status-dock` (022). Inverted monochrome pill; opti
 | `.ai-ichip` / `.ai-chip` | Compact category / action chips |
 | `.ai-compose-cursor` / `.is-streaming` | Live changed-files recap + entrance/attention animations |
 | `.ai-compose-bar-recap` | Total `+/-` pill in compose bar |
+| `.ai-tcall-status` | Live turn dock pill shell (inverted monochrome) |
+| `.ai-live-shimmer` | Animated gradient label on active turn status text |
+| `.ai-spinner-live` | Slightly larger spinner beside shimmer labels |
 | `.compose-review-*` | Diff review tab (038) |
 | `.tool-drawer` | Read/bash result slide-over |
 
