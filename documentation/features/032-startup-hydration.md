@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-03
-last_verified: 2026-07-08
+last_verified: 2026-07-11
 tags: [startup, splash, hydrate, workspace, performance, parallel-load]
 ---
 
@@ -28,7 +28,7 @@ tags: [startup, splash, hydrate, workspace, performance, parallel-load]
 
 **Per workspace disk load:** `loadState` → normalize layout + aiChats + terminals → parallel `readFile` for open editor tabs → prune dead tabs → return `WorkspaceData`
 
-**Post-hydrate UI:** active `WorkspaceShell` mounts; inactive shells `display:none` but stay mounted (Monaco DOM-move gotcha — see `012-workspace-reorder.md`); only active workspace mounts `AIChatHost` rows
+**Post-hydrate UI:** active `WorkspaceShell` mounts; inactive shells `display:none` but stay mounted (Monaco DOM-move gotcha — see `012-workspace-reorder.md`); only active workspace mounts `AIChatHost` rows; **heavy surfaces** (sidebar, Monaco, tab portals) tear down on blur via `useWorkspaceHeavyMount` — see `058-workspace-switch-performance.md`
 
 ### Key Functions
 - `hydrate() → Promise<void>` — full boot restore; parallel workspace opens
@@ -44,5 +44,5 @@ tags: [startup, splash, hydrate, workspace, performance, parallel-load]
 ### Gotchas
 - **Parallel workspace open:** multiple projects restore concurrently; progress text may jump (last-finishing workspace wins the bar).
 - **Splash minimum:** fast SSD + one workspace still waits ~700 ms for brand display — intentional; prefetch uses that window.
-- **Inactive workspace weight:** shell DOM stays mounted for Monaco stability; chat panels deferred to active workspace + visible tab (031 + 001).
+- **Inactive workspace weight:** shell DOM + tab bar stay mounted for Monaco stability and terminal containers; sidebar/Monaco/tab portals **unmount** when backgrounded (`058-workspace-switch-performance.md`). Chat side panel stays for multitask; usage polls gated to `activeId`.
 - **Corrupt index:** unreadable `workspaces.json` resets to empty index with toast — app no longer stuck on splash forever.

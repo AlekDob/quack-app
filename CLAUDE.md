@@ -159,6 +159,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `030-user-message-bar.md` — user turns as inset cards; sticky pin per turn + tall-prompt collapse while stuck (`UserTurnBar`, `useUserBarSticky.ts`).
   - `031-model-discovery-cache.md` — shared provider/model probe cache (`modelDiscoveryStore`); prefetch at splash; lazy cloud + CLI catalogs; invalidation on API-key edit / force refresh.
   - `032-startup-hydration.md` — splash gate, parallel workspace restore, overlap with model prefetch.
+  - `058-workspace-switch-performance.md` — foreground-only Monaco/sidebar/tab portals (`useWorkspaceHeavyMount`) + `AIChatPanel` usage-poll gates; multitask + terminals preserved.
   - `033-editor-color-themes.md` — VS Code bundled Monaco syntax themes; Monaco-compatible token rules (`monacoThemeRules.ts`), live `setTheme`, JetBrains Mono `fontFamily`; per-mode picker + separate light/dark persistence.
   - `034-explorer-tree.md` — file tree layout (indent guides, overflow/ellipsis), theme-aware git decorations (`--git-*`), auto-reveal on tab switch; pairs with `013-file-type-icons.md` tints.
   - `035-macos-release-notarization.md` — local signed/notarized `.dmg` pipeline (`sign-and-notarize.sh`, `.env`, Entitlements); CI macOS still unsigned.

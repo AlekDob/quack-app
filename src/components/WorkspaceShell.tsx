@@ -30,6 +30,7 @@ import { Icon } from "./Icon";
 import { useZenMode } from "../zenMode";
 import { ChatSwitchVeil } from "./ChatSwitchVeil";
 import { useChatSwitching } from "../useChatSwitching";
+import { useWorkspaceHeavyMount } from "../useWorkspaceHeavyMount";
 
 interface Props {
   wsId: string;
@@ -78,6 +79,7 @@ function ShellDropdown({ anchor, shells, onClose, onPick }: ShellDropdownProps) 
 }
 
 export function WorkspaceShell({ wsId, isActive }: Props) {
+  const { showHeavy, editorsReady } = useWorkspaceHeavyMount(isActive);
   const ws = useStore((s) => s.loaded[wsId]);
   const setTermH = useStore((s) => s.setTermH);
   const setBottomVisible = useStore((s) => s.setBottomVisible);
@@ -157,7 +159,9 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
       data-ws-id={wsId}
       data-sidebar-side={layout.sidebarSide}
     >
-      {layout.sidebarVisible && !zen && <SidebarStack wsId={wsId} ws={ws} />}
+      {showHeavy && layout.sidebarVisible && !zen && (
+        <SidebarStack wsId={wsId} ws={ws} />
+      )}
       {/* The cross-project Agent Hub (was the per-workspace AI rail) now
           mounts once at App root — see App.tsx. */}
       {layout.aiPanelVisible && !zen && (
@@ -347,7 +351,9 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
       )}
 
       {/* File editors: one per pane that has an active file tab. */}
-      {(() => {
+      {showHeavy &&
+        editorsReady &&
+        (() => {
         const overlays: React.ReactNode[] = [];
         const visit = (pane: typeof layout.editorRoot) => {
           if (pane.kind === "tabs") {
@@ -436,7 +442,8 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
       {/* Read-only subagent transcript tabs. Their `sub:` keys live only
           in the layout (no descriptor record), so we walk the pane tree
           to find them and portal one viewer per open key. */}
-      {(() => {
+      {showHeavy &&
+        (() => {
         const keys = new Set<string>();
         const walk = (pane: typeof layout.editorRoot) => {
           if (pane.kind === "tabs") {
@@ -465,6 +472,7 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
             !!pane &&
             pane.active === key &&
             (inBottom ? layout.bottomVisible : true);
+          if (!container || !visible) return null;
           return (
             <SubagentTranscriptView
               key={key}
@@ -480,7 +488,8 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
       })()}
 
       {/* Agent edit review — Conductor-style diff tabs (`crev:` keys). */}
-      {(() => {
+      {showHeavy &&
+        (() => {
         const keys = new Set<string>();
         const walk = (pane: typeof layout.editorRoot) => {
           if (pane.kind === "tabs") {
@@ -509,7 +518,7 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
             !!pane &&
             pane.active === key &&
             (inBottom ? layout.bottomVisible : true);
-          if (!container) return null;
+          if (!container || !visible) return null;
           return createPortal(
             <ComposeReviewPane
               key={key}
@@ -524,7 +533,8 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
       })()}
 
       {/* Agent HTML preview tabs (`prev:` keys). */}
-      {(() => {
+      {showHeavy &&
+        (() => {
         const keys = new Set<string>();
         const walk = (pane: typeof layout.editorRoot) => {
           if (pane.kind === "tabs") {
@@ -564,7 +574,8 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
 
       {/* Whiteboard tab — one persistent per workspace. Walk the pane
           tree for `wb:` keys and portal one WhiteboardPane per key. */}
-      {(() => {
+      {showHeavy &&
+        (() => {
         const keys = new Set<string>();
         const walk = (pane: typeof layout.editorRoot) => {
           if (pane.kind === "tabs") {
@@ -609,7 +620,8 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
           Uses the same portal pattern as Whiteboard; the pane fetches
           turns lazily via `claude_session_load_turns` so a multi-MB
           session never blocks the tab open. */}
-      {(() => {
+      {showHeavy &&
+        (() => {
         const keys = new Set<string>();
         const walk = (pane: typeof layout.editorRoot) => {
           if (pane.kind === "tabs") {
@@ -651,7 +663,8 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
           polls the Rust backend for the live cost monitor. Only mounted
           when its tab is the active one so the 12s poll doesn't run for
           background tabs. */}
-      {(() => {
+      {showHeavy &&
+        (() => {
         const keys = new Set<string>();
         const walk = (pane: typeof layout.editorRoot) => {
           if (pane.kind === "tabs") {
@@ -689,7 +702,8 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
       })()}
 
       {/* Pinky Brain tab — hybrid knowledge search per workspace. */}
-      {(() => {
+      {showHeavy &&
+        (() => {
         const keys = new Set<string>();
         const walk = (pane: typeof layout.editorRoot) => {
           if (pane.kind === "tabs") {
@@ -737,7 +751,7 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
         const inBottom = !editorPane && !!bottomPane;
         const container = pane ? (paneContainers[pane.id] ?? null) : null;
         const visible =
-          isActive &&
+          showHeavy &&
           !!pane &&
           pane.active === tabKeyStr &&
           (inBottom ? layout.bottomVisible : true);

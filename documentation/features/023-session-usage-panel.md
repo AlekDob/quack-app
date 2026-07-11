@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-10
+last_verified: 2026-07-11
 tags: [session, usage, context, progress, claude-code, drawer, monitor, quack-v1]
 ---
 
@@ -75,9 +75,11 @@ Subagent `result` events (`parent_tool_use_id`) are ignored for both metrics.
 | `contextFillPct(used, window)` | Clamped 0–100 |
 | `fmtTokenCount(n)` | `1.2k` / `1.0M` labels |
 
-Fallback when no stream snapshot: `claude_session_context_usage` reads the
-session JSONL backwards (latest non-subagent `assistant` usage, else `result`).
-Poll every 12s when `claudeSessionId` is known and stream snapshot is absent.
+Fallback when no stream snapshot: `claude_session_drawer_stats` (context +
+billing + duration from JSONL) polls every 12s when `claudeSessionId` is known
+(or guessed by turn count). Legacy `claude_session_context_usage` kept for
+context-only reads. **Poll runs only when `wsActive` (`activeId === wsId`)** —
+immediate catch-up on project switch-back; see `058-workspace-switch-performance.md`.
 
 ## Data flow
 
@@ -85,7 +87,7 @@ Poll every 12s when `claudeSessionId` is known and stream snapshot is absent.
 |---|---|---|
 | Context snapshot | `stream_event` via `claudeCode.ts` | Per API call in turn |
 | Context ring / drawer context row | `lastUsage.contextTokens` | End of each turn |
-| Plan limits (5hr, 7day, extra) | `claude_usage_limits` | 30s poll |
+| Plan limits (5hr, 7day, extra) | `claude_usage_limits` | 30s poll (foreground workspace only) |
 | Cumulative billing | `AIChatPanel` per-turn counters | Per `usage` event |
 | Cost / turns / cache-read totals | `aiUsageLog` + drawer **This chat** | Per turn |
 | Monthly spend | `aiUsageLog` aggregates | On drawer open |
@@ -96,7 +98,9 @@ Poll every 12s when `claudeSessionId` is known and stream snapshot is absent.
 |---|---|
 | `src/contextUsage.ts` | Context math + `contextTokensFromApiUsage` |
 | `src/sessionUsageLocal.ts` | `buildSessionUsageLocal`, `sessionHeroPct`, plan limit parsers |
-| `src-tauri/src/claude_code.rs` | `claude_session_context_usage` JSONL reader |
+| `src-tauri/src/claude_sessions.rs` | `claude_session_drawer_stats` + usage rollup |
+| `src-tauri/src/session_jsonl.rs` | Shared `last_context_snap`, `claude_jsonl_path` |
+| `src/sessionDiskHydrate.ts` | JSONL merge helpers + session-id guess |
 | `src/providers/claudeCode.ts` | Stream snapshot + `context_snapshot` events |
 | `src/ai.ts` | `ChatStreamEvent` — `usage.contextTokens`, `context_snapshot` |
 | `src/components/SessionUsageCircle.tsx` | Ring button + tooltip |
@@ -108,7 +112,7 @@ Poll every 12s when `claudeSessionId` is known and stream snapshot is absent.
 
 - **Click** ring → open drawer
 - **Esc** / backdrop / X → close drawer
-- Plan poll runs while CC chat active; stops when provider changes
+- Plan poll runs while CC chat active **and workspace foreground**; stops when provider changes or project blurred
 - **Open Usage Dashboard** → Usage tab (`usage:<wsId>`)
 
 ## Colour thresholds (ring + drawer bars)
@@ -140,3 +144,4 @@ unchanged (`AIChatPanel.tsx` poll `catch`).
 - Usage monitor tab: `019-usage-monitor.md`
 - Context optimizer (skills weight): `020-context-optimizer.md`
 - CC sign-in (usage poll needs OAuth): `052-claude-code-login-ux.md`
+- Workspace switch perf (poll + Monaco gates): `058-workspace-switch-performance.md`
