@@ -28,6 +28,7 @@ mode/mic/send on the right.
 | `src/components/TurnStreamStatus.tsx` | Composes `StatusPill` rows for planning / tools / generating / stale |
 | `src/components/ComposerQueue.tsx` | Cursor-style follow-up queue cards inside the composer pill |
 | `src/components/MentionSuggestions.tsx` | `@` autocomplete popover (agents + files, path preview) |
+| `src/fileComposerDrag.ts` | Pointer drag file-tree row → composer cite (055) |
 | `src/components/ComposerContextBar.tsx` | Cursor-style path + branch selectors at the top of the composer pill |
 | `src/components/AgentCommitDock.tsx` | Agent `git commit` pill above the composer (hash, message, time, push state) — feature 051 |
 | `src/components/ComposerGitActions.tsx` | Changed-files list + Commit & Push split control inside the pill — feature 053 |
@@ -68,6 +69,17 @@ Full detail: **`041-mention-file-preview.md`**.
 - While open, `.ai-panel` gets **`ai-mention-open`** so `overflow: visible` escapes clipping from panel/tab hosts (`:has()` on ancestors).
 - Lazy file index: first `@` keystroke calls `search.listFiles(root, 5000)` once per session.
 - Picking a file → `addAttachedFile`; picking an agent → `attachedAgents` (004).
+
+## File drag from explorer (feature 055)
+
+Full detail: **`055-file-composer-drag.md`**.
+
+- Drag a **file** row from the left tree onto `.ai-composer-shell` to insert
+  `@relative/path` at the cursor (same context queue as `@` pick).
+- Pointer-based DnD (`fileComposerDrag.ts`) — not HTML5; Tauri swallows
+  in-app HTML5 drags.
+- Composer gets `.file-drop-over` while the ghost hovers; source row uses
+  `.tree-row--dragging`.
 
 ## Follow-up queue (feature 039)
 

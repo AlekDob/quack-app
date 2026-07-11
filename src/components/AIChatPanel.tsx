@@ -120,6 +120,11 @@ import {
   rehydrateAttachment,
   registerChatDropZone,
 } from "../imageAttach";
+import {
+  COMPOSER_FILE_DROP_ATTR,
+  registerComposerFileDrop,
+  subscribeComposerFileDropHover,
+} from "../fileComposerDrag";
 import { ClaudePermissionOverlay } from "./ClaudePermissionOverlay";
 import {
   loadUsage,
@@ -426,6 +431,7 @@ export function AIChatPanel({
   const [selected, setSelected] = useState<string>("");
   const [input, setInput] = useState("");
   const [dictating, setDictating] = useState(false);
+  const [fileDropHover, setFileDropHover] = useState(false);
   const dictationCaptureRef = useRef<Promise<DictationCapture> | null>(null);
   // Image attachments staged on the composer (Claude Code only). Cleared
   // after each send. The zoom modal holds the full-quality data: URL of
@@ -2226,6 +2232,40 @@ export function AIChatPanel({
       }
     });
   };
+
+  const citeFileFromDrop = useCallback(
+    (absPath: string) => {
+      const rel = relPath(absPath, root);
+      if (!rel) return;
+      const el = inputRef.current;
+      const cursor = el?.selectionStart ?? input.length;
+      const before = input.slice(0, cursor);
+      const after = input.slice(cursor);
+      const needsSpace = before.length > 0 && !/\s$/.test(before);
+      const prefix = needsSpace ? " " : "";
+      const token = `@${rel} `;
+      setInput(`${before}${prefix}${token}${after}`);
+      addAttachedFile(absPath, root);
+      requestAnimationFrame(() => {
+        const target = inputRef.current;
+        if (!target) return;
+        const pos = cursor + prefix.length + token.length;
+        target.focus();
+        try {
+          target.setSelectionRange(pos, pos);
+        } catch {
+          /* ignore */
+        }
+      });
+    },
+    [input, root, addAttachedFile],
+  );
+
+  useEffect(() => registerComposerFileDrop({ onFile: citeFileFromDrop }), [
+    citeFileFromDrop,
+  ]);
+
+  useEffect(() => subscribeComposerFileDropHover(setFileDropHover), []);
 
   // The subagent pill's "active" target is DERIVED from attachedAgents (the
   // delegation source of truth) — no parallel state. The last-added agent is
@@ -5470,8 +5510,9 @@ export function AIChatPanel({
         <AgentCommitDock wsId={wsId} sessionId={sessionId} root={root} />
       ) : null}
       <div
-        className={`ai-composer-shell${dictating ? " dictating" : ""}`}
+        className={`ai-composer-shell${dictating ? " dictating" : ""}${fileDropHover ? " file-drop-over" : ""}`}
         ref={composerShellRef}
+        {...{ [COMPOSER_FILE_DROP_ATTR]: "" }}
       >
       <ComposerContextBar wsId={wsId} root={root} />
       <ComposerGitActions

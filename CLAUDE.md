@@ -168,6 +168,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `043-chat-transcript-persistence.md` — disk-backed per-session transcripts (`chat_store.rs`), legacy localStorage migrate, `provider-links.json` reverse index, flush on switch + streaming checkpoint, save-failure toast.
   - `044-provider-session-bridge.md` — unified CLI session bridge (CC/CU/OC): chip, multi-provider ⟲ Sessions picker, `provider_sessions.rs`, thin-row recovery via `chatProviderRecovery.ts`.
   - `041-mention-file-preview.md` — Cursor-style `@` file autocomplete: basename + parent dir rows, side path tree preview, inline popover above composer, `.ai-mention-open` overflow escape (no portal).
+  - `055-file-composer-drag.md` — pointer drag a file from the explorer onto the composer to cite it (`@relPath` + context queue); no HTML5 DnD (Tauri 2).
   - `038-compose-review.md` — Conductor-style agent edit review: live ComposeCard recap, `crev:` diff tabs (inline Monaco + Undo/Keep), editor pane + Agent Mode 50/50 split; `composeReview.ts`, `ComposeReviewPane.tsx`.
 - `documentation/design/` — UI style contracts beyond tokens.
   - `directives.md` — hard rules (no emoji, tokens-only, neutral chrome).

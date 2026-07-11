@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-03
-last_verified: 2026-07-03
-tags: [file-tree, explorer, git, indent, layout, light-theme, design-system, cursor-style]
+last_verified: 2026-07-11
+tags: [file-tree, explorer, git, indent, layout, light-theme, design-system, cursor-style, drag-drop]
 ---
 
 ## Explorer file tree (layout + git decorations)
@@ -14,7 +14,7 @@ tags: [file-tree, explorer, git, indent, layout, light-theme, design-system, cur
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Tree UI | `src/components/FileTree.tsx` | Recursive `Node`; `--tree-depth` on each row; git badge/dot |
+| Tree UI | `src/components/FileTree.tsx` | Recursive `Node`; `--tree-depth` on each row; git badge/dot; file-row pointer drag → composer cite (055) |
 | Icons | `src/fileIcons.ts` | `fileIconName()` shape + `fileIconTint()` CSS class suffix |
 | Git palette | `src/gitStatusStore.ts` | `statusTone`, `statusClass`, `statusColor` (CSS vars) |
 | Reveal | `src/revealInTree.ts` | `autoRevealInTree` — expand ancestors + scroll row into view |
@@ -63,3 +63,4 @@ Use `statusClass(f)` at call-sites — never inline `#e2c08d`-style hex (illegib
 - **Flat sibling listing:** after an expanded folder, siblings at the *parent* depth continue the list (VS Code behaviour). `hero-virgilio.png` in `public/` looks “under” `illustrations/` but is a sibling — indent guides make the depth obvious.
 - **Brand:** explorer tints are an intentional exception — color on glyphs + git semantics only, not chrome-wide Seti theme.
 - **DRY:** extension→icon/tint knowledge lives only in `fileIcons.ts`; git tone→class only in `gitStatusStore.ts`.
+- **File → composer cite:** file rows (not folders) support pointer drag to the chat composer (`fileComposerDrag.ts`, feature 055). Threshold 4px; click still opens the file. No HTML5 `draggable` (Tauri 2).

@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-05
-last_verified: 2026-07-05
-tags: [composer, mention, autocomplete, files, path-preview, ai-chat, cursor-style]
+last_verified: 2026-07-11
+tags: [composer, mention, autocomplete, files, path-preview, ai-chat, cursor-style, drag-drop]
 ---
 
 ## @-Mention File Path Preview
@@ -23,7 +23,8 @@ from feature 004.
 |---|---|---|
 | Component | `src/components/MentionSuggestions.tsx` | Two-column popover: match list + optional path preview; exports `MentionItem` |
 | Component | `src/components/MentionPathPreview.tsx` | Mini path tree for the highlighted file row |
-| Host | `src/components/AIChatPanel.tsx` | `parseMention`, `mentionState`/`mentionIndex`, `mentionMatches`, `acceptMention`; toggles `.ai-mention-open` on `.ai-panel` |
+| Host | `src/components/AIChatPanel.tsx` | `parseMention`, `mentionState`/`mentionIndex`, `mentionMatches`, `acceptMention`, `citeFileFromDrop`; toggles `.ai-mention-open` on `.ai-panel` |
+| Service | `src/fileComposerDrag.ts` | Pointer drag from explorer → composer cite (055); shares `addAttachedFile` outcome |
 | Styles | `src/App.css` | `.ai-mention-popover*`, `.ai-mention-path-*`, overflow escape rules |
 | Utils | `src/pathUtils.ts` | `basename`, `dirname`, `relPath` for row labels |
 | Icons | `src/fileIcons.ts` | `fileIconName` per extension in list + preview leaf |
@@ -84,8 +85,24 @@ Same as before (handled in `AIChatPanel` textarea `onKeyDown`):
 
 Takes precedence over `/` slash menu when both could apply.
 
+### Drag from explorer (feature 055)
+
+Full detail: **`055-file-composer-drag.md`**.
+
+Alternate path to the same cite outcome — no `@` popover:
+
+```
+FileTree file row drag → composer drop
+  → citeFileFromDrop(absPath)
+  → @relPath at cursor + addAttachedFile
+```
+
+Keyboard `@` autocomplete and explorer drag are independent entry points;
+both queue the file for the next message via `workspaceChatContext`.
+
 ### Related
 
 - Subagent delegation + Task tool: **`004-subagent-mentions.md`**
 - Composer shell, status dock, hint row: **`022-chat-composer.md`**
 - Per-project `@` file queue on send: **`037-project-context-dock.md`**
+- Drag file from explorer onto composer: **`055-file-composer-drag.md`**

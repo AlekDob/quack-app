@@ -5592,6 +5592,23 @@ body.ws-dragging * {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  animation: model-picker-in 140ms ease-out;
+}
+@keyframes model-picker-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.model-picker-pop-busy .model-picker-search::placeholder {
+  color: var(--fg-dim);
+}
+.model-picker-head-spin {
+  flex-shrink: 0;
 }
 .model-picker-pop-head {
   display: flex;
@@ -6184,6 +6201,22 @@ body.ws-dragging * {
   min-width: 0;
   transition: background 0.15s;
 }
+.ai-model-chip-loading .ai-model-id {
+  background: linear-gradient(
+    90deg,
+    var(--fg-muted) 0%,
+    var(--fg-dim) 42%,
+    var(--fg-muted) 84%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ai-stale-shimmer 2s ease-in-out infinite;
+}
+.ai-model-chip-opening {
+  background: var(--bg-hi);
+}
 /* Single meta row above the input: model chip + context-attachment
    chip side by side — they used to be two full-width stacked bars. */
 /* Unified controls bar: spacer pushes mode + Send to the right. */
@@ -6219,6 +6252,11 @@ body.ws-dragging * {
 .ai-composer-shell:focus-within {
   border-color: var(--border-strong);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+.ai-composer-shell.file-drop-over {
+  border-color: var(--border-strong);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  background: var(--bg-hi);
 }
 /* Cursor-style workspace path + git branch above the composer textarea. */
 .ai-composer-context-bar {
@@ -12853,6 +12891,10 @@ body.ws-dragging * {
   color: var(--fg);
   box-shadow: inset 2px 0 0 var(--selection-trace);
 }
+.tree-row--dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
 .tree-row.active .tree-name {
   font-weight: 600;
 }
@@ -17336,6 +17378,29 @@ body.ws-dragging * {
   transform: translate(-50%, -50%) scale(0.9);
   transition: opacity 120ms var(--ease-default),
     transform 120ms var(--ease-default);
+}
+
+/* File-tree → composer cite drag ghost */
+.file-composer-drag-ghost {
+  position: fixed !important;
+  pointer-events: none !important;
+  z-index: 9999 !important;
+  transform: translate(-50%, -50%);
+  max-width: 280px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--fg);
+  background: var(--bg-elev);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: opacity 120ms var(--ease-default);
+}
+.file-composer-drag-ghost--fading {
+  opacity: 0;
 }
 
 /* Free skills pool at the bottom */

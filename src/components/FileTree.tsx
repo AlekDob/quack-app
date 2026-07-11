@@ -50,6 +50,10 @@ import {
 import { FileHistoryModal } from "./FileHistoryModal";
 import { Icon } from "./Icon";
 import { fileIconName, fileIconTint } from "../fileIcons";
+import {
+  FILE_TREE_DRAG_THRESHOLD_PX,
+  startFileTreeDrag,
+} from "../fileComposerDrag";
 
 interface MenuTarget {
   x: number;
@@ -133,10 +137,53 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
   }, [entry, wsId, expanded, refresh]);
 
   const openOverride = useContext(FileOpenOverride);
+  const suppressClickRef = useRef(false);
   const onClick = () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
     if (entry.is_dir) toggleDir(wsId, entry.path);
     else if (openOverride) openOverride(wsId, entry.path);
     else void openFile(wsId, entry.path);
+  };
+
+  const onFileMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (entry.is_dir || e.button !== 0) return;
+    e.preventDefault();
+    const sourceEl = e.currentTarget;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let didDrag = false;
+    let cleanupDrag: ((endX: number, endY: number) => void) | undefined;
+
+    const onMove = (moveE: MouseEvent) => {
+      const dx = moveE.clientX - startX;
+      const dy = moveE.clientY - startY;
+      if (
+        !didDrag &&
+        Math.hypot(dx, dy) >= FILE_TREE_DRAG_THRESHOLD_PX
+      ) {
+        didDrag = true;
+        suppressClickRef.current = true;
+        cleanupDrag = startFileTreeDrag(
+          entry.path,
+          entry.name,
+          startX,
+          startY,
+          sourceEl,
+        );
+      }
+    };
+    const onUp = (upE: MouseEvent) => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      if (didDrag && cleanupDrag) {
+        cleanupDrag(upE.clientX, upE.clientY);
+      }
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
   };
 
   const renameInPlace = async () => {
@@ -238,6 +285,7 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
         aria-expanded={entry.is_dir ? expanded : undefined}
         aria-label={entry.is_dir ? `${entry.name} folder` : entry.name}
         onClick={onClick}
+        onMouseDown={entry.is_dir ? undefined : onFileMouseDown}
         onKeyDown={onKeyDown}
         onContextMenu={(e) => {
           e.preventDefault();
