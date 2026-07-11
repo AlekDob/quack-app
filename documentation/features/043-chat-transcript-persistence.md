@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-06
-last_verified: 2026-07-09
+last_verified: 2026-07-11
 tags: [chat, persistence, disk, rust, transcript, multitasking, reliability, provider-links, audit]
 ---
 
@@ -35,7 +35,7 @@ Auto-migrate from legacy `localStorage` on first boot hydrate per workspace.
 | Path | Contents |
 |---|---|
 | `~/Library/Application Support/codetta/chats/{wsId}/__idx__.json` | `{ ids: string[] }` — session ids newest-first, max 30 |
-| `~/Library/Application Support/codetta/chats/{wsId}/{sessionId}.json` | Full `ChatSession` row (messages, knobs, composer, `providerSessionIds`, …) |
+| `~/Library/Application Support/codetta/chats/{wsId}/{sessionId}.json` | Full `ChatSession` row (messages, knobs, composer, `providerSessionIds`, `pinnedProviderId`, …) |
 | `~/Library/Application Support/codetta/chats/provider-links.json` | Reverse index: `"provider:cliSessionId"` → `{ ws_id, quack_session_id, title }` |
 
 Each `chat_store_save` writes **one** session file atomically (`atomic::write`)

@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-07
-last_verified: 2026-07-08
+last_verified: 2026-07-11
 tags: [sessions, claude-code, cursor-cli, opencode-cli, resume, terminal, provider-session, bridge, disk, quack-v1]
 ---
 
@@ -72,7 +72,8 @@ Lookup: `chat_store_lookup_link(provider, cliSessionId)`.
 | JSONL parser (shared) | `src-tauri/src/session_jsonl.rs` |
 | CC list/load (legacy invoke) | `claude_code_list_sessions`, `claude_code_load_session` — still available |
 | Thin-row recovery | `src/chatProviderRecovery.ts` |
-| Styles | `src/App.css` → `.ai-provider-session-*`, `.ai-cc-sessions-filter`, session rows |
+| Platform pin (model picker) | `src/chatPinnedProvider.ts`, `src/components/modelPickerPlatform.tsx` — see **`057-platform-pin.md`** |
+| Styles | `src/App.css` → `.ai-provider-session-*`, `.model-picker-platform-*`, session rows |
 
 ### UI
 
@@ -115,6 +116,20 @@ Mount with thin Quack row (users > assistants)
   → recoverSessionFromAnyProvider → first richer CLI transcript wins
 ```
 
+### Platform pin (one CLI per chat)
+
+Once a chat has started on an **agentic** provider (`claude-code`, `cursor-cli`,
+`opencode-cli`), Quack **pins** that platform:
+
+| Field | `ChatSession.pinnedProviderId` — set on first agentic user turn |
+| Resolve | `resolvePinnedPlatform()` — falls back to model / `providerSessionIds` for legacy rows |
+| Picker | `ModelPickerPopover` filters to pinned platform; banner + confirm on cross-platform switch |
+| Persist | Saved with transcript; cleared on **New chat** |
+
+Cross-platform model picks show a Cursor-style warning: Quack keeps the transcript,
+but each CLI owns a separate server-side session — tool context does not transfer.
+Confirming a switch updates `pinnedProviderId` to the new platform.
+
 ### Terminal resume commands
 
 | Provider | Command written to PTY |
@@ -140,6 +155,7 @@ provider_load_session(provider, cwd, sessionId) → LoadedMessage[]
 - CC bridge: `014-claude-code-bridge.md`
 - Cursor bridge: `026-cursor-cli-bridge.md`
 - OpenCode bridge: `028-opencode-bridge.md`
+- Platform pin (model picker): `057-platform-pin.md`
 - Provider patterns: `design/agent-provider-patterns.md`
 
 ### Gotchas
@@ -149,6 +165,7 @@ provider_load_session(provider, cwd, sessionId) → LoadedMessage[]
 - **Chip after first turn** — no `session_id` until the CLI emits it.
 - **Interactive CLI ≠ headless bridge** — only one should stream at a time.
 - **Duplicate CLI id across Quack tabs** — linked-title badges surface it; last writer wins on next send.
+- **Platform pin** — switching CLI mid-chat starts a fresh server-side session; use "Change platform…" only when you mean it.
 - **Flattened first-turn prompt on recovery** — the CLI stores the whole `[System]…[User]…` first-turn `-p` packet as its first user message; recovery would render it as a giant `[System]…` user bubble. `stripCliFlattenScaffold` (`chatTextUtils.ts`, called from `cleanStaleToolMessages`) unwraps it to the real user text on load, healing old + new sessions.
 
 ### Future

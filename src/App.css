@@ -5642,6 +5642,103 @@ body.ws-dragging * {
   padding: 8px;
   border-bottom: 1px solid var(--border);
 }
+/* Platform pin — quiet Cursor-style banner when a chat is tied to one CLI. */
+.model-picker-platform-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--fg-muted);
+}
+.model-picker-platform-banner.is-warn {
+  background: var(--warn-bg);
+  color: var(--fg);
+  border-bottom-color: color-mix(in srgb, var(--warn) 28%, var(--border));
+}
+.model-picker-platform-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--fg-muted);
+}
+.model-picker-platform-banner.is-warn .model-picker-platform-icon {
+  color: var(--warn);
+}
+.model-picker-platform-copy {
+  flex: 1;
+  min-width: 0;
+}
+.model-picker-platform-copy p {
+  margin: 0;
+}
+.model-picker-platform-copy strong {
+  font-weight: 600;
+  color: var(--fg);
+}
+.model-picker-platform-action {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 2px 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.model-picker-platform-action:hover {
+  background: var(--bg-hi);
+}
+.model-picker-platform-banner.is-warn .model-picker-platform-action:hover {
+  background: color-mix(in srgb, var(--warn) 12%, transparent);
+}
+.model-picker-platform-confirm {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--warn-bg);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--fg);
+}
+.model-picker-platform-confirm p {
+  margin: 0 0 8px;
+}
+.model-picker-platform-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.model-picker-platform-cancel,
+.model-picker-platform-ok {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.model-picker-platform-cancel {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-muted);
+}
+.model-picker-platform-cancel:hover {
+  background: var(--bg-hi);
+  color: var(--fg);
+}
+.model-picker-platform-ok {
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border));
+  background: var(--bg-elev);
+  color: var(--fg);
+}
+.model-picker-platform-ok:hover {
+  background: var(--bg-hi);
+}
 .model-picker-search-wrap {
   flex: 1 1 auto;
   display: flex;

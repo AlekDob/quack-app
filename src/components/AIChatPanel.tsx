@@ -214,6 +214,7 @@ import { MarkdownPreview } from "./MarkdownPreview";
 import { UserTurnBar } from "./UserMessageBar";
 import { ModelPickerPopover } from "./ModelPickerPopover";
 import { ModelBrowser } from "./ModelBrowser";
+import { resolvePinnedPlatform } from "../chatPinnedProvider";
 import { ManageModelsModal } from "./ManageModelsModal";
 import { loadSubagents, type SubagentDef } from "../subagents";
 import { loadSkills, type SkillDef } from "../skills";
@@ -243,7 +244,6 @@ import {
   ensureCloudCatalog,
   ensureModelDiscovery,
   getModelDiscovery,
-  isLiveCliCatalogInflight,
   isPickerCatalogLoading,
   mergeLiveCliModelsIntoDiscovery,
   subscribeModelDiscovery,
@@ -412,6 +412,10 @@ export function AIChatPanel({
   chatVisible = true,
   onHydrated,
 }: Props) {
+  // Gate expensive usage/discovery polls to the foreground workspace.
+  // Background panels stay mounted (multitask + mount-asymmetry) but
+  // catch up with one poll when the user switches back.
+  const wsActive = useStore((s) => s.activeId === wsId);
   // Agent mode supplies this via context to render denser (tool bursts
   // collapse to an icon row, tighter spacing). Default false → the docked
   // chat is unchanged.
@@ -780,6 +784,9 @@ export function AIChatPanel({
   const [providerSessionIds, setProviderSessionIds] = useState<
     Partial<Record<ProviderId, string>>
   >({});
+  const [pinnedProviderId, setPinnedProviderId] = useState<
+    ProviderId | undefined
+  >();
   const claudeSessionId = providerSessionIds["claude-code"];
   // Per-chat Claude Code session knobs — restored from ChatSession on switch.
   const [ccEffort, setCcEffort] = useState<string>(() => readEffort());
@@ -930,9 +937,11 @@ export function AIChatPanel({
   // bumping a tick — that way users editing CLAUDE.md mid-session see
   // the indicator come/go without restarting.
   useEffect(() => {
-    if (!root) {
-      setRulesSource(null);
-      setRulesPath(null);
+    if (!root || !wsActive) {
+      if (!root) {
+        setRulesSource(null);
+        setRulesPath(null);
+      }
       return;
     }
     let cancelled = false;
@@ -952,7 +961,7 @@ export function AIChatPanel({
     return () => {
       cancelled = true;
     };
-  }, [root]);
+  }, [root, wsActive]);
 
   // Auto-grow the prompt textarea up to ~8 lines so multi-paragraph
   // questions don't get cropped behind a tiny scrollbar. Falls back to
@@ -1057,7 +1066,6 @@ export function AIChatPanel({
   useEffect(() => {
     const warm = getModelDiscovery();
     if (warm) applyDiscoverySnapshot(warm);
-    void refresh({ showChecking: !warm, force: false });
     const unsub = subscribeModelDiscovery(() => {
       const snap = getModelDiscovery();
       if (snap) applyDiscoverySnapshot(snap);
@@ -1067,6 +1075,12 @@ export function AIChatPanel({
     setCatalogWarming(isPickerCatalogLoading());
     return unsub;
   }, [applyDiscoverySnapshot]);
+
+  useEffect(() => {
+    if (!wsActive) return;
+    const warm = getModelDiscovery();
+    void refresh({ showChecking: !warm, force: false });
+  }, [wsActive, applyDiscoverySnapshot]);
 
   useEffect(() => {
     if (!browserOpen && !manageModelsOpen) return;
@@ -1085,6 +1099,7 @@ export function AIChatPanel({
   //   - Next 6 attempts: 30s interval
   //   - After that: stop entirely until the user clicks Refresh
   useEffect(() => {
+    if (!wsActive) return;
     if (status === "ready" || status === "checking") return;
     if (isAnyPulling) return;
     // Don't keep probing localhost:11434 when the user isn't even on
@@ -1108,15 +1123,16 @@ export function AIChatPanel({
     return () => {
       if (timer != null) window.clearTimeout(timer);
     };
-  }, [status, isAnyPulling, selected]);
+  }, [wsActive, status, isAnyPulling, selected]);
 
   // Expose workspace root globally so the Claude Code provider can spawn
   // its CLI subprocess with the right cwd. Stored via the typed
   // setWorkspaceRoot helper instead of an inline window cast so the
   // shape is declared in exactly one place.
   useEffect(() => {
+    if (!wsActive) return;
     setWorkspaceRoot(root);
-  }, [root]);
+  }, [root, wsActive]);
 
   // Refresh-resume: on mount, ask Rust if there's an in-flight (or
   // recently-completed-since-app-start) Claude Code stream for this
@@ -1626,6 +1642,7 @@ export function AIChatPanel({
         ccThinking,
         ccPermMode,
         composer: draftFromComposerSnap(composerPersistRef.current),
+        pinnedProviderId,
       };
       if (!saveSession(wsId, session)) warnSaveFailed();
     };
@@ -1645,6 +1662,7 @@ export function AIChatPanel({
     ccEffort,
     ccThinking,
     ccPermMode,
+    pinnedProviderId,
   ]);
 
   useEffect(() => {
@@ -1688,6 +1706,7 @@ export function AIChatPanel({
         ccThinking,
         ccPermMode,
         composer: draftFromComposerSnap(composerPersistRef.current),
+        pinnedProviderId,
       };
       if (!saveSession(wsId, session)) warnSaveFailed();
     };
@@ -1704,6 +1723,7 @@ export function AIChatPanel({
     ccEffort,
     ccThinking,
     ccPermMode,
+    pinnedProviderId,
   ]);
 
   // Empty chats still need their knobs persisted — the messages effect
@@ -1720,6 +1740,7 @@ export function AIChatPanel({
       ccThinking,
       ccPermMode,
       composer: draftFromComposerSnap(composerPersistRef.current),
+      pinnedProviderId,
     });
   }, [
     sessionId,
@@ -1730,6 +1751,7 @@ export function AIChatPanel({
     ccEffort,
     ccThinking,
     ccPermMode,
+    pinnedProviderId,
     input,
     queuedMessages,
     attachTree,
@@ -2469,6 +2491,14 @@ export function AIChatPanel({
     //   - ollama: inline the tree (small models often won't tool-call).
     const selectedParsed = parseQualifiedModel(selected);
     const selectedProvider = selectedParsed?.providerId ?? "ollama";
+    const isFirstUserTurn = !baseMessages.some((m) => m.role === "user");
+    if (
+      isAgenticProviderId(selectedProvider) &&
+      isFirstUserTurn &&
+      !pinnedProviderId
+    ) {
+      setPinnedProviderId(selectedProvider);
+    }
     if (
       images.length > 0 &&
       selectedProvider === "opencode-cli" &&
@@ -3561,6 +3591,7 @@ export function AIChatPanel({
     setProviderSessionIds((prev) =>
       setProviderSessionId(prev, provider, undefined),
     );
+    setPinnedProviderId(undefined);
     setChatTotalCost(0);
     resetTurnTransients();
     setMessages([]);
@@ -3584,6 +3615,16 @@ export function AIChatPanel({
     // first turn will start a fresh CC session — the next stream-init
     // event will populate it.
     setProviderSessionIds(readProviderSessionIds(s));
+    setPinnedProviderId(
+      s.pinnedProviderId ??
+        resolvePinnedPlatform({
+          pinnedProviderId: s.pinnedProviderId,
+          model: s.model,
+          messages: s.messages,
+          providerSessionIds: s.providerSessionIds,
+        }) ??
+        undefined,
+    );
     // The cumulative cost IS persisted across reloads, so restore it
     // from the session — the running total in the footer should reflect
     // the chat's full history of spend, not reset to 0. Everything else
@@ -3737,6 +3778,7 @@ export function AIChatPanel({
       setDiskSessionDurationMs(0);
       return;
     }
+    if (!wsActive) return;
     const gen = ++diskHydrateGenRef.current;
     let cancelled = false;
 
@@ -3809,6 +3851,7 @@ export function AIChatPanel({
     };
   }, [
     selectedIsCC,
+    wsActive,
     claudeSessionId,
     root,
     liveContextTokens,
@@ -3852,7 +3895,7 @@ export function AIChatPanel({
 
   // Poll plan limits every 30s — deps stay minimal so we don't 429.
   useEffect(() => {
-    if (!selectedIsCC) return;
+    if (!selectedIsCC || !wsActive) return;
 
     const poll = async () => {
       const local = buildUsageFromMetrics();
@@ -3902,12 +3945,12 @@ export function AIChatPanel({
     poll();
     const t = window.setInterval(poll, 30_000);
     return () => window.clearInterval(t);
-  }, [selectedIsCC, wsId]);
+  }, [selectedIsCC, wsActive, wsId]);
 
   // Probe Claude Code OAuth without hitting the rate-limited usage API.
   useEffect(() => {
-    if (!selectedIsCC || !claudeCodeAvailable) {
-      setClaudeAuth(null);
+    if (!selectedIsCC || !claudeCodeAvailable || !wsActive) {
+      if (!selectedIsCC || !claudeCodeAvailable) setClaudeAuth(null);
       return;
     }
     let cancelled = false;
@@ -3925,7 +3968,7 @@ export function AIChatPanel({
       window.clearInterval(t);
       unsub();
     };
-  }, [selectedIsCC, claudeCodeAvailable, wsId]);
+  }, [selectedIsCC, claudeCodeAvailable, wsActive, wsId]);
 
   const showUsageReport = async () => {
     let cli: NonNullable<typeof usageReport>["cli"] = null;
@@ -4440,6 +4483,17 @@ export function AIChatPanel({
     warmPickerCatalogs();
   }, []);
 
+  const pinnedPlatform = useMemo(
+    () =>
+      resolvePinnedPlatform({
+        pinnedProviderId,
+        model: selected,
+        messages,
+        providerSessionIds,
+      }),
+    [pinnedProviderId, selected, messages, providerSessionIds],
+  );
+
   const renderModelChip = () => {
     const parsed = parseQualifiedModel(selected);
     const dotColor = parsed
@@ -4458,6 +4512,8 @@ export function AIChatPanel({
         loading={catalogWarming}
         onConfigureProviders={() => openSettings("ai-providers")}
         onOpenFullBrowser={() => setBrowserOpen(true)}
+        pinnedProviderId={pinnedPlatform}
+        onPlatformPin={setPinnedProviderId}
       />
     );
   };
@@ -5275,7 +5331,7 @@ export function AIChatPanel({
                       onImageClick={(img) => void openZoom(img)}
                     />
                     {m.brain_usage && (
-                      <BrainTurnChip wsId={wsId} usage={m.brain_usage} />
+                      <BrainTurnChip wsId={wsId} root={root} usage={m.brain_usage} />
                     )}
                   </>
                 );

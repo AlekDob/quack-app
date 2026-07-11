@@ -25,6 +25,8 @@ export interface ChatSession {
   ccThinking?: boolean | null;
   ccPermMode?: string | null;
   composer?: ChatComposerDraft;
+  /** First agentic platform used in this chat — locks the model picker (044). */
+  pinnedProviderId?: ProviderId;
 }
 
 const LEGACY_SESSION_KEY = (wsId: string, sessionId: string) =>

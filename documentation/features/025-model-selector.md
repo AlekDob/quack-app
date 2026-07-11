@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-01
-last_verified: 2026-07-06
-tags: [model-selector, model-browser, model-picker, favorites, visibility, cursor-cli, opencode-cli, composer, lazy-load, free-models, model-discovery-cache]
+last_verified: 2026-07-11
+tags: [model-selector, model-browser, model-picker, favorites, visibility, cursor-cli, opencode-cli, composer, lazy-load, free-models, model-discovery-cache, platform-pin]
 ---
 
 ## Model Selector (composer chip + catalog + visibility)
@@ -14,7 +14,9 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Component | `src/components/ModelPickerPopover.tsx` | Chip-triggered quick picker; **portaled** `position: fixed` popover; `onOpen` triggers lazy CLI catalog fetch |
+| Component | `src/components/ModelPickerPopover.tsx` | Chip-triggered quick picker; **portaled** `position: fixed` popover; `onOpen` lazy CLI fetch; **platform pin** filter + banner — see `057-platform-pin.md` |
+| Component | `src/components/modelPickerPlatform.tsx` | Platform pin banner + cross-platform confirm (`057`) |
+| Component | `src/components/ModelPickerSkeleton.tsx` | Shimmer rows while catalogs load |
 | Component | `src/components/ModelPickerRow.tsx` | Row with star toggle + optional `free` tag |
 | Component | `src/components/ModelBrowser.tsx` | Full catalog modal; OpenCode group; `free` tag on cards |
 | Component | `src/components/ManageModelsModal.tsx` | Toggle model visibility in quick picker (reuses `model-browser` shell) |
@@ -44,7 +46,7 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 
 **Lazy CLI catalog:** popover `onOpen` or `browserOpen` → `refreshLiveCliModels()` → `refreshOpenCodeModelsLive()` + `refreshCursorModelsLive()` → merge into shared cache
 
-**Pick:** `pickerCloudModels` (from `allModels`, non-Ollama) → `buildModelGroups()` → popover filters disabled via `isModelEnabled` → `onSelect(qualified)` → chat provider routing
+**Pick:** `pickerCloudModels` (from `allModels`, non-Ollama) → `buildModelGroups()` → optional **platform pin** filter (`scopedGroups`) → popover filters disabled via `isModelEnabled` → cross-platform confirm if pinned → `onSelect(qualified)` → chat provider routing
 
 **Model browser:** `browserOpen` → `ensureCloudCatalog()` + merge with `pickerCloudModels` so Claude Code never disappears after a picker prefetch
 
@@ -56,6 +58,7 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 - `refreshCursorModelsLive() → ProviderModel[]` — see `026-cursor-cli-bridge.md`
 - `buildModelGroups(cloud, ollama, hasKey) → ProviderGroup[]` — ordered provider sections
 - `toggleFavoriteModel(qualified) → void` — flip star in popover
+- `resolvePinnedPlatform(session) → ProviderId | null` — platform pin resolver (`057-platform-pin.md`)
 
 ### State
 - `lcp.modelFavorites`: `Record<string, boolean>` — starred models (global)
@@ -81,3 +84,5 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 - **Free badge:** semantic green via `.tag-free` token; not orange accent.
 - **Qualified key format:** `providerId:modelId` via `makeQualifiedModel` / `modelKey`.
 - **Parallel refresh:** `refresh()` no longer serializes provider checks — startup latency fix post-OpenCode integration.
+- **Platform pin:** agentic chats filter the popover to the starting CLI; cross-platform picks need confirm — `057-platform-pin.md`.
+- **Catalog loading shimmer:** `ModelPickerSkeleton` + chip spinner while CLI catalogs load (`onPrefetch` / `onOpen`).
