@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-11
+last_verified: 2026-07-12
 tags: [composer, stop, multitask, esc, turn-status]
 ---
 
@@ -310,4 +310,4 @@ always per-session.
 - Agent commit indicator above composer: `051-agent-commit-dock.md`.
 - Composer git actions (inside pill): `053-composer-git-actions.md`.
 - Composer voice dictation: `052-composer-voice-dictation.md`.
-- Context & usage ring + drawer (CC): `023-session-usage-panel.md`.
+- Context & usage ring + popover (CC): `023-session-usage-panel.md`.

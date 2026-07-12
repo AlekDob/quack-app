@@ -234,10 +234,7 @@ import {
   mergeDiskBilling,
 } from "../sessionDiskHydrate";
 import { SessionUsageCircle } from "./SessionUsageCircle";
-import {
-  SessionUsageDrawer,
-  type SessionUsageData,
-} from "./SessionUsageDrawer";
+import type { SessionUsageData } from "../sessionUsageLocal";
 import {
   claudeCode,
   search,
@@ -747,7 +744,7 @@ export function AIChatPanel({
   // alongside the conversation so the running tally survives reloads.
   // Used by the spend chip in the footer + the budget-warning toast.
   const [chatTotalCost, setChatTotalCost] = useState<number>(0);
-  // Cumulative token counters for the session usage drawer.
+  // Cumulative token counters for session usage / Usage tab.
   const [cumulativeTokensIn, setCumulativeTokensIn] = useState(0);
   const [cumulativeTokensOut, setCumulativeTokensOut] = useState(0);
   const [cumulativeCacheRead, setCumulativeCacheRead] = useState(0);
@@ -3895,14 +3892,10 @@ export function AIChatPanel({
   const [sessionUsage, setSessionUsage] = useState<SessionUsageData | null>(
     null,
   );
-  const [sessionLimitsError, setSessionLimitsError] = useState<string | null>(
-    null,
-  );
   // Cache the five_hour pct + resetsAt separately for the circle (avoids
   // re-parsing the full SessionUsageData on every 30s tick).
   const [sessionPct, setSessionPct] = useState(0);
   const [sessionResetsAt, setSessionResetsAt] = useState<string | null>(null);
-  const [_sdOpen, setSessionDrawerOpen] = useState(false);
 
   usageMetricsRef.current = {
     wsId,
@@ -4045,7 +4038,6 @@ export function AIChatPanel({
   useEffect(() => {
     if (!selectedIsCC) {
       setSessionUsage(null);
-      setSessionLimitsError(null);
       setSessionPct(0);
       setSessionResetsAt(null);
       planCacheRef.current = null;
@@ -4098,20 +4090,9 @@ export function AIChatPanel({
         planCacheRef.current = { sessionPct: pct, sessionResetsAt: resetsAt, limits, extra };
         setSessionPct(pct);
         setSessionResetsAt(resetsAt);
-        setSessionLimitsError(null);
         setSessionUsage({ ...local, limits, extra });
-      } catch (e) {
-        const msg = errMsg(e);
+      } catch {
         const cache = planCacheRef.current;
-        // The claude.ai usage endpoint rate-limits aggressively (HTTP 429) and
-        // fails transiently — that's not a user-facing problem. Keep the last
-        // known limits and only surface an error when we have nothing to show
-        // AND it isn't a transient rate-limit/network blip. Prevents the scary
-        // "Plan limits: request failed" box from flashing at session start.
-        const transient = /\b429\b|rate.?limit|timed? ?out|network|connection/i.test(
-          msg,
-        );
-        setSessionLimitsError(cache || transient ? null : msg);
         if (cache) {
           setSessionPct(cache.sessionPct);
           setSessionResetsAt(cache.sessionResetsAt);
@@ -5993,7 +5974,9 @@ export function AIChatPanel({
             contextEstimate={displayContextSnap.estimate}
             planPct={sessionPct}
             planResetsIn={fmtResetsIn(sessionResetsAt)}
-            onClick={() => setSessionDrawerOpen(true)}
+            data={sessionUsage}
+            root={root}
+            onOpenDashboard={() => openSettings("ai-usage-cross-chat-dashboard")}
           />
         </div>
       )}
@@ -6720,17 +6703,6 @@ export function AIChatPanel({
         onConfigureProviders={() => openSettings("ai-providers")}
       />
     </div>
-    {/* Live session usage drawer (click on the ProgressCircle). */}
-    <SessionUsageDrawer
-      open={_sdOpen}
-      data={sessionUsage}
-      limitsError={sessionLimitsError}
-      onClose={() => setSessionDrawerOpen(false)}
-      onOpenDashboard={() => {
-        setSessionDrawerOpen(false);
-        openSettings("ai-usage-cross-chat-dashboard");
-      }}
-    />
     </AgentFileOpen.Provider>
     </ChatFileOpen.Provider>
     </HtmlPreviewOpen.Provider>

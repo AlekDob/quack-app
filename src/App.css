@@ -19455,8 +19455,158 @@ body.ab-dragging * {
   color: var(--text-secondary);
   transition: background var(--duration-fast) var(--ease-default);
 }
-.session-circle-btn:hover {
+.session-circle-btn:hover,
+.session-circle-btn.open {
   background: var(--bg-hover, rgba(255,255,255,0.06));
+}
+
+/* ── Context usage popover (composer ring) ───────────────────────── */
+.session-usage-pop {
+  position: fixed;
+  z-index: 1200;
+  width: min(340px, calc(100vw - 16px));
+  padding: 12px 14px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+}
+.session-usage-pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.session-usage-pop-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.session-usage-pop-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.session-usage-pop-close:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.session-usage-pop-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+.session-usage-pop-pct {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.session-usage-pop-tokens {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.session-usage-pop-bar {
+  display: flex;
+  height: 8px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--border);
+  margin-bottom: 10px;
+}
+.session-usage-pop-bar-seg {
+  height: 100%;
+  min-width: 2px;
+  transition: width 0.25s ease;
+}
+.session-usage-pop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.session-usage-pop-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.session-usage-pop-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.session-usage-pop-label {
+  flex: 1;
+  min-width: 0;
+  color: var(--fg-dim);
+}
+.session-usage-pop-count {
+  color: var(--fg);
+  font-size: 11px;
+}
+.session-usage-pop-empty {
+  padding: 12px 2px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  text-align: center;
+}
+.session-usage-pop-foot {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+.session-usage-pop-dash {
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+.session-usage-pop-dash:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+
+/* Context breakdown segment colors */
+.ctx-seg-system,
+.session-usage-pop-bar-seg.ctx-seg-system { background: var(--fg-muted); }
+.ctx-seg-tools,
+.session-usage-pop-bar-seg.ctx-seg-tools {
+  background: color-mix(in srgb, var(--fg) 55%, var(--bg-hi));
+}
+.ctx-seg-rules,
+.session-usage-pop-bar-seg.ctx-seg-rules { background: var(--ok); }
+.ctx-seg-skills,
+.session-usage-pop-bar-seg.ctx-seg-skills { background: var(--warn); }
+.ctx-seg-mcp,
+.session-usage-pop-bar-seg.ctx-seg-mcp {
+  background: color-mix(in srgb, var(--warn) 45%, var(--fg-muted));
+}
+.ctx-seg-subagents,
+.session-usage-pop-bar-seg.ctx-seg-subagents {
+  background: color-mix(in srgb, var(--fg) 75%, var(--bg));
+}
+.ctx-seg-conversation,
+.session-usage-pop-bar-seg.ctx-seg-conversation {
+  background: color-mix(in srgb, var(--fg) 85%, var(--bg-hi));
 }
 .usage-ring {
   display: block;

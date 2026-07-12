@@ -13,7 +13,7 @@ billing tokens. On agentic turns (many internal tool-loop API calls), it
 same cached prefix — so the sum counts that prefix N times (e.g. 243k × several
 loops → ~32% context while CC `/context` shows ~6%).
 
-**Impact:** Quack's composer ring + Context & Usage drawer hero % were wrong
+**Impact:** Quack's composer ring + Context Usage popover hero % were wrong
 for any CC chat with heavy tool use. Cost / "Cache read" in **This chat** were
 still correct (billing totals).
 
@@ -37,7 +37,7 @@ total_input_tokens =
 
 | Concern | Source | Field |
 |---|---|---|
-| Context ring / drawer % | Last API call snapshot | `usage.contextTokens` |
+| Context ring / popover % | Last API call snapshot | `usage.contextTokens` |
 | Cost chip / cumulative ledger | Turn total | `usage.tokens` from `result` |
 
 Pipeline:
@@ -48,7 +48,7 @@ Pipeline:
    `contextTokens`. Ignore subagent `result` events.
 2. `contextUsage.ts` — `estimateContextUsed(contextTokens, fallbackIn)`; never
    sum cumulative cache reads for context %.
-3. `AIChatPanel.tsx` — ring + drawer use `lastUsage.contextTokens`; billing
+3. `AIChatPanel.tsx` — ring + popover use `lastUsage.contextTokens`; billing
    still uses `lastUsage.tokens` + cumulative counters.
 
 ## Merge rule (`message_delta`)

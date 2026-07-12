@@ -154,7 +154,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `047-dev-build-indicator.md` — dev-only Dock icon + in-app DEV badge/border/title when running `npm run tauri dev`; debug `build.rs` icon swap via `TAURI_CONFIG`.
   - `048-background-task-wake.md` — Claude Code `-p` background Bash/subagent wake: spawn env (`PRINT_BG_WAIT_CEILING_MS`, `RESUME_INTERRUPTED_TURN`) + `backgroundWake.ts` auto `--resume` nudge when headless turn ends idle.
   - `049-markdown-renderer.md` — dependency-free Markdown → HTML for chat, editor preview, tool drawers; fenced code blocks as copyable pills (icon row underneath) + single-line shell token coloring.
-  - `023-session-usage-panel.md` — composer context ring + Context & Usage drawer (CC): last-API `contextTokens` snapshot vs turn-total billing; plan limits poll; `contextUsage.ts`, `SessionUsageCircle`, `SessionUsageDrawer`.
+  - `023-session-usage-panel.md` — composer context ring + Context Usage popover (CC): last-API `contextTokens` snapshot, Cursor-style segmented breakdown, Usage tab for plan limits + billing; `contextUsage.ts`, `contextBreakdown.ts`, `SessionUsageCircle`, `SessionUsagePopover`.
   - `050-composer-context-bar.md` — Cursor-style path + git branch inside the composer pill; portaled menus, project switch, shared `GitBranchPicker`.
   - `051-agent-commit-dock.md` — agent Bash `git commit` pill above the composer (hash, message, time, pushed/local); `agentCommitDetect.ts`, `agentCommitStore.ts`, `AgentCommitDock.tsx`.
   - `053-composer-git-actions.md` — Cursor-style changed-files + Commit & Push split control inside the composer pill; `git_diff_stat`, `ComposerGitActions.tsx`, `composerGitOps.ts`.

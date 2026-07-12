@@ -3,17 +3,48 @@ import {
   thisMonthTotal,
   thisMonthWorkspaceTotal,
 } from "./aiUsageLog";
-import type {
-  SessionExtra,
-  SessionLimit,
-  SessionUsageData,
-} from "./components/SessionUsageDrawer";
 import {
   contextFillPct,
   estimateContextUsed,
   resolveContextWindow,
 } from "./contextUsage";
 import type { ProviderModel } from "./providers/types";
+
+export interface SessionLimit {
+  label: string;
+  pct: number;
+  resetsAt: string | null;
+}
+
+export interface SessionExtra {
+  used: number;
+  limit: number;
+  pct: number;
+  currency: string;
+}
+
+export interface SessionUsageData {
+  context: {
+    pct: number;
+    used: number;
+    window: number;
+    estimate: boolean;
+  };
+  limits: SessionLimit[];
+  extra: SessionExtra | null;
+  chat: {
+    cost: number;
+    tokensIn: number;
+    tokensOut: number;
+    cacheRead: number;
+    turns: number;
+    model: string | null;
+    durationMs: number;
+  };
+  wsMonth: number;
+  month: number;
+  today: number;
+}
 
 type UsageApi = Record<
   string,
