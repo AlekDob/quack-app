@@ -19,7 +19,7 @@
   --user-bar-border: color-mix(in srgb, var(--fg) 16%, transparent);
   /* ComposeCard — lifted recap bar at end of agent turns. */
   --compose-card-bg: color-mix(in srgb, var(--fg) 14%, var(--chat-stream-bg));
-  --compose-bar-bg: color-mix(in srgb, var(--fg) 22%, var(--chat-stream-bg));
+  --compose-bar-bg: color-mix(in srgb, var(--fg) 10%, var(--chat-stream-bg));
   --compose-card-border: color-mix(in srgb, var(--fg) 18%, transparent);
   --fg: #f2f3f5;
   --fg-dim: rgba(242, 243, 245, 0.58);
@@ -128,7 +128,7 @@
   --user-bar-bg: color-mix(in srgb, var(--fg) 5%, var(--bg-alt));
   --user-bar-border: color-mix(in srgb, var(--fg) 10%, transparent);
   --compose-card-bg: color-mix(in srgb, var(--fg) 7%, var(--bg-alt));
-  --compose-bar-bg: color-mix(in srgb, var(--fg) 11%, var(--bg-hi));
+  --compose-bar-bg: color-mix(in srgb, var(--fg) 5%, var(--bg-hi));
   --compose-card-border: color-mix(in srgb, var(--fg) 14%, transparent);
   --fg: #14151a;
   --fg-dim: rgba(20, 21, 26, 0.62);
@@ -10900,8 +10900,8 @@ body.ab-dragging * {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 10px 12px 10px 8px;
-  min-height: 44px;
+  padding: 6px 12px 6px 8px;
+  min-height: 32px;
   background: var(--compose-bar-bg);
 }
 .ai-compose-bar-main {
@@ -13936,6 +13936,41 @@ body.ab-dragging * {
   min-height: 0;
   border: 0;
   background: var(--bg);
+}
+
+/* Claude Code plan — editor split tab (Cursor-style). */
+.plan-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--bg);
+  overflow: auto;
+}
+.plan-pane-error {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+.plan-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.plan-pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px;
 }
 
 /* Breadcrumb bar — first row in the editor host. */
