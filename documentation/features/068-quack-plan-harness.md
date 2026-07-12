@@ -3,8 +3,8 @@ type: feature
 project: quack-desktop
 created: 2026-07-12
 last_verified: 2026-07-12
-related: [054-works-layer.md, 066-works-cycles-stories.md, 061-plan-mode-tab.md, 022-chat-composer.md, 005-jack-duck-identity.md]
-tags: [works, plan, story, jack, composer, claude-code, virtual-tab]
+related: [054-works-layer.md, 066-works-cycles-stories.md, 061-plan-mode-tab.md, 022-chat-composer.md, 005-jack-duck-identity.md, 064-agent-hub-drawer-and-chat-tab-switch.md]
+tags: [works, plan, story, jack, composer, claude-code, drawer, hover-peek]
 ---
 
 # 068 — Quack Plan harness
@@ -36,27 +36,42 @@ Persisted with chat session; restored on app reload.
 
 | Function | When |
 |---|---|
-| `enterPlanning(wsId, chatId, root, title?)` | Composer **Plan a feature** or CC plan mode with no story yet → `ensurePlanStory`, set `storyId` + `planning`, open `StoryPlanPane` |
+| `enterPlanning(wsId, chatId, root, title?)` | Composer **Plan a feature** or CC plan mode with no story yet → `ensurePlanStory`, set `storyId` + `planning`, pin story drawer |
 | `onNativePlanReady(..., storyId, planText)` | CC `ExitPlanMode` with plan body → `mergePlanIntoStory` |
 | `approvePlanning(...)` | User approves plan → `approvePlanStory` (status `active`), clears `planning` |
 | `exitPlanning(...)` | Exit planning without approve → clears `planning`, unlinks chat from story |
 | `unlinkStoryFromChat` / `unlinkWorkFromChat` | Composer unlink; bidirectional `linkedChats` cleanup |
 
-## Story plan panel (Cursor-style)
+## Story plan drawer (hover soffietto)
 
-Virtual tab key (`storyPlanTab.ts`):
+Anchored to the **chat column** — not an editor split tab. Same peek model as Agent Hub (`064`): overlay, zero layout shift.
 
-```
-story:{wsId}|{chatId}|{storyId}
-```
+| State | Behaviour |
+|---|---|
+| **Strip** (44px) | Right edge of chat when `storyId` set; icon + vertical `S‑NNN` + `K/N` acceptance (`space-evenly` along strip height) |
+| **Hover peek** | Panel **440px** overlays chat to the left |
+| **Pinned** | Click strip or chevron in panel head; `storyPlanDrawerStore` per `wsId\|chatId` |
+| **Open from menu** | Composer **Open story panel** → `pinStoryPlanDrawer` |
 
 | File | Role |
 |---|---|
-| `src/components/StoryPlanPane.tsx` | Reads `works/stories/S-NNN.md` live via `worksWatch` |
-| `src/storyPlanTab.ts` | `storyPlanKey`, `parseStoryPlanKey` |
-| `WorkspaceShell.tsx`, `TabContentHost.tsx`, `PaneNode.tsx`, `AgentModeShell.tsx` | Portal + tab label ("Story plan") |
+| `src/components/StoryPlanDrawer.tsx` | Strip + peek panel; embeds `StoryPlanPane` (`embedded` — no duplicate header) |
+| `src/storyPlanDrawerStore.ts` | In-memory pin state (`pin` / `unpin` / `toggle` / `subscribe`) |
+| `src/components/AIChatPanel.tsx` | `.ai-chat-with-story` wrapper mounts drawer beside `.ai-panel` |
+| `src/store.ts` | `openStoryPlan` → `pinStoryPlanDrawer` only (no `dropTabAt`) |
 
-`openStoryPlanTab` forces split-right (same rationale as `061` plan tab).
+**Strip typography:** `writing-mode: vertical-rl` per label slot; non-breaking hyphen in `S‑NNN` so the id never wraps. Planning state tints id with `--warn`.
+
+**Agent Mode:** drawer lives in the chat column; story no longer opens in `agent-main-review` side split.
+
+### Legacy `story:` editor tab
+
+`story:{wsId}|{chatId}|{storyId}` tabs still portal from `WorkspaceShell` / `TabContentHost` if present in a saved layout, but new opens never create them.
+
+| File | Role |
+|---|---|
+| `src/components/StoryPlanPane.tsx` | Markdown body from `works/stories/S-NNN.md` via `worksWatch` |
+| `src/storyPlanTab.ts` | Key parse/build |
 
 ## Plan merge (`planStoryMerge.ts`)
 
@@ -73,7 +88,9 @@ Intent-first work menu:
 | **Blank task** | Empty work link |
 | Planning submenu | Open story panel, Start implementation, Exit planning |
 
-Breadcrumb chip: `S-003` or `S-003 › W-008`. Chips: **N docs** (refs), **K/N** acceptance progress.
+**Segmented cluster** (Cursor-style): `S-003 › W-008` | `N docs` | `K/N` in one pill (`ai-composer-work-cluster`).
+
+**Context docs chip** — `ComposerDocsChip.tsx`: hover popover (liquid glass) listing Brain refs by Feature / Story / Related / Added; file-type icons + basename + parent path. No full-screen overlay (prevents flicker); 280ms leave debounce; slight overlap with anchor. See `054-works-layer.md`.
 
 CC plan mode auto-calls `enterPlanning` when chat has no `storyId`/`workItemId`.
 
@@ -81,7 +98,7 @@ CC plan mode auto-calls `enterPlanning` when chat has no `storyId`/`workItemId`.
 
 | Event | Story-linked chat | Legacy (work-only / no story) |
 |---|---|---|
-| `onPlanReady` | `onNativePlanReady` → merge + `StoryPlanPane` | `openPlanTab` (`061`) |
+| `onPlanReady` | `onNativePlanReady` → merge + refresh drawer | `openPlanTab` (`061`) |
 | `onPlanApproved` | `approvePlanning` | `approvePlanWork` (old plan-draft flow) |
 
 Context inject (`worksTurnContext.ts`):
@@ -105,11 +122,11 @@ Bidirectional link: chat descriptor `storyId` ↔ story `.md` `linkedChats: [<ch
 Composer "Plan a feature" OR CC permMode plan (no story yet)
   → enterPlanning → ensurePlanStory → S-NNN draft on disk
   → setAIChatStory + setAIChatPlanning
-  → openStoryPlanTab (split right)
+  → pinStoryPlanDrawer → StoryPlanDrawer strip visible
 
 Jack / CC proposes plan
   → CC ExitPlanMode → onNativePlanReady → mergePlanIntoStory
-  → StoryPlanPane refreshes via worksWatch
+  → StoryPlanPane in drawer refreshes via worksWatch
 
 User Approve
   → approvePlanning → story status active, planning false
@@ -123,12 +140,15 @@ User Approve
 
 - `061-plan-mode-tab.md` — ephemeral `plan:` tab (fallback when no story)
 - `066-works-cycles-stories.md` — story entity + `S-NNN` files
-- `054-works-layer.md` — composer work bar, inject manifest, hub badge
+- `054-works-layer.md` — composer work bar, docs chip, inject manifest
+- `064-agent-hub-drawer-and-chat-tab-switch.md` — hover peek pattern this clones
 - Bundled skill `quack-works` v8 — agent PM loop step 9
 
 ## Gotchas
 
 - **TodoWrite ≠ plan** — session todos do not replace story acceptance on disk.
-- **Story panel is disk-backed** — survives restart; `plan:` stash does not (`061`).
+- **Story drawer is disk-backed** — survives restart; `plan:` stash does not (`061`).
+- **Hover + pin** — peek alone is not enough for long reads; pin via strip click or panel chevron.
+- **Docs popover** — no `ai-flag-menu-overlay` on hover; overlay caused flicker crossing the gap to the popover.
 - **Jack default** — `enterPlanning` resets composer to Jack (`onPickJack`); other agents execute linked work.
 - **Legacy path** — chats with `workItemId` + `origin: plan` but no `storyId` still use `PlanPane` + `approvePlanWork` until migrated manually.

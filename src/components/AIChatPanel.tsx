@@ -25,6 +25,7 @@ import { ContextFilesDock } from "./ContextFilesDock";
 import { ComposerContextBar } from "./ComposerContextBar";
 import { ComposerGitActions } from "./ComposerGitActions";
 import { ComposerWorkBar } from "./ComposerWorkBar";
+import { StoryPlanDrawer } from "./StoryPlanDrawer";
 import { AgentCommitDock } from "./AgentCommitDock";
 import {
   hydrateAgentCommitFromMessages,
@@ -5098,6 +5099,9 @@ export function AIChatPanel({
     <ChatFileOpen.Provider value={openChatFile}>
     <AgentFileOpen.Provider value={fileOpenHandler}>
     <div
+      className={`ai-chat-with-story${storyId ? " has-story-drawer" : ""}`}
+    >
+    <div
       className={`ai-panel${mentionState && mentionMatches.length > 0 && streaming === null ? " ai-mention-open" : ""}`}
       ref={panelRef}
     >
@@ -6792,6 +6796,16 @@ export function AIChatPanel({
         hasKey={modelHasKey}
         onConfigureProviders={() => openSettings("ai-providers")}
       />
+    </div>
+    {aiChatId && storyId ? (
+      <StoryPlanDrawer
+        wsId={wsId}
+        chatId={aiChatId}
+        root={root}
+        storyId={storyId}
+        planning={planning}
+      />
+    ) : null}
     </div>
     </AgentFileOpen.Provider>
     </ChatFileOpen.Provider>

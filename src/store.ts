@@ -18,7 +18,8 @@ import {
   stashHtmlPreview,
 } from "./htmlPreview";
 import { planKey, parsePlanKey, stashPlan } from "./plan";
-import { parseStoryPlanKey, storyPlanKey } from "./storyPlanTab";
+import { parseStoryPlanKey } from "./storyPlanTab";
+import { pinStoryPlanDrawer } from "./storyPlanDrawerStore";
 import {
   clampEditorDrawerW,
   defaultEditorDrawerW,
@@ -457,7 +458,6 @@ export function focusedAgentSidePanelKey(
         if (c?.wsId === wsId) return pane.active;
       }
       if (pane.active.startsWith("sub:")) return pane.active;
-      if (pane.active.startsWith("story:")) return pane.active;
     }
   }
   return (
@@ -3308,42 +3308,8 @@ export const useStore = create<AppState>((set, get) => {
         return { ...w, aiChats: { ...w.aiChats, [id]: next } };
       }),
 
-    openStoryPlan: (wsId, chatId, storyId) => {
-      const k = storyPlanKey(wsId, chatId, storyId);
-      updateWs(wsId, (w) => {
-        let foundPane: PaneId | null = null;
-        mapTree(w.layout.editorRoot, (t) => {
-          if (t.tabs.includes(k)) foundPane = t.id;
-          return t;
-        });
-        if (foundPane) {
-          return {
-            ...w,
-            layout: {
-              ...w.layout,
-              activePaneId: foundPane,
-              editorRoot: mapTree(w.layout.editorRoot, (t) =>
-                t.id === foundPane ? { ...t, active: k } : t,
-              ),
-            },
-          };
-        }
-        const activeId = w.layout.activePaneId;
-        const targetPaneId =
-          activeId && isInTree(w.layout.editorRoot, activeId)
-            ? activeId
-            : firstLeaf(w.layout.editorRoot).id;
-        const { tree, activePaneId } = dropTabAt(
-          w.layout.editorRoot,
-          targetPaneId,
-          "right",
-          k,
-        );
-        return {
-          ...w,
-          layout: { ...w.layout, editorRoot: tree, activePaneId },
-        };
-      });
+    openStoryPlan: (wsId, chatId, _storyId) => {
+      if (chatId) pinStoryPlanDrawer(wsId, chatId);
     },
 
     renameAIChat: (wsId, id, title) =>

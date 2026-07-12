@@ -9,9 +9,11 @@ import { MarkdownPreview } from "./MarkdownPreview";
 interface Props {
   tabKey: string;
   visible?: boolean;
+  /** Inside StoryPlanDrawer — hide duplicate header. */
+  embedded?: boolean;
 }
 
-export function StoryPlanPane({ tabKey, visible = true }: Props) {
+export function StoryPlanPane({ tabKey, visible = true, embedded = false }: Props) {
   const parsed = parseStoryPlanKey(tabKey);
   const ws = useStore((s) =>
     parsed ? s.loaded[parsed.wsId] : undefined,
@@ -44,12 +46,14 @@ export function StoryPlanPane({ tabKey, visible = true }: Props) {
   }
 
   return (
-    <div className="story-plan-pane">
-      <div className="story-plan-pane-head">
-        <Icon name="check-square" size={14} />
-        <span>{shortId || "Story"}</span>
-        {title ? <span className="story-plan-pane-title">{title}</span> : null}
-      </div>
+    <div className={`story-plan-pane${embedded ? " story-plan-pane--embedded" : ""}`}>
+      {!embedded ? (
+        <div className="story-plan-pane-head">
+          <Icon name="check-square" size={14} />
+          <span>{shortId || "Story"}</span>
+          {title ? <span className="story-plan-pane-title">{title}</span> : null}
+        </div>
+      ) : null}
       <div className="story-plan-pane-body">
         {body ? (
           <MarkdownPreview content={body} />
@@ -61,10 +65,13 @@ export function StoryPlanPane({ tabKey, visible = true }: Props) {
   );
 }
 
+import { pinStoryPlanDrawer } from "../storyPlanDrawerStore";
+
 export function openStoryPlanTab(
   wsId: string,
   chatId: string | undefined,
-  storyId: string,
+  _storyId: string,
 ): void {
-  useStore.getState().openStoryPlan(wsId, chatId, storyId);
+  if (!chatId) return;
+  pinStoryPlanDrawer(wsId, chatId);
 }

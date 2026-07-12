@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ComposerCtxMenu } from "../composerCtxMenu";
-import { openFeatureDocDrawer } from "../featureDocDrawer";
-import { openBrainDoc } from "../brainInject";
 import { errMsg, error as toastError } from "../notify";
 import {
   enterPlanning,
@@ -29,9 +27,9 @@ import {
   type WorksSnapshot,
 } from "../works";
 import { acceptanceFromMarkdown } from "../worksBlocks";
-import type { BrainRef } from "../worksBrainRefs";
 import { getWorkspaceColor } from "../workspaceColors";
 import { useStore } from "../store";
+import { ComposerDocsChip } from "./ComposerDocsChip";
 import { openStoryPlanTab } from "./StoryPlanPane";
 import { Icon } from "./Icon";
 import { openWorksTab } from "./works/WorksPane";
@@ -54,23 +52,6 @@ const DEPTH_LABEL: Record<WorksInjectDepth, string> = {
   outline: "Paths + outline",
   pinky: "Paths + outline + Pinky",
 };
-
-function openDocRef(wsId: string, root: string, ref: BrainRef): void {
-  if (ref.role === "story") {
-    void useStore.getState().openFile(wsId, `${root}/${ref.path}`.replace(/\\/g, "/"));
-    return;
-  }
-  if (ref.role === "primary" || ref.path.includes("/features/")) {
-    openFeatureDocDrawer({
-      wsId,
-      root,
-      featurePath: ref.path,
-      title: ref.title ?? ref.path.split("/").pop() ?? ref.path,
-    });
-    return;
-  }
-  void openBrainDoc(wsId, root, ref.path.replace(/^documentation\//, ""));
-}
 
 function chipText(
   storyShortId: string | undefined,
@@ -96,12 +77,10 @@ export function ComposerWorkBar({
 }: Props) {
   const [snap, setSnap] = useState<WorksSnapshot | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [docsOpen, setDocsOpen] = useState(false);
   const [injectDepth, setInjectDepth] = useState<WorksInjectDepth>(() =>
     getWorksInjectDepth(wsId),
   );
   const chipRef = useRef<HTMLButtonElement>(null);
-  const docsRef = useRef<HTMLButtonElement>(null);
   const setWork = useStore((s) => s.setAIChatWorkItem);
   const setPlanning = useStore((s) => s.setAIChatPlanning);
   const wsColor = getWorkspaceColor(wsId);
@@ -230,10 +209,13 @@ export function ComposerWorkBar({
 
   return (
     <div className="ai-composer-work-wrap">
+      <div
+        className={`ai-composer-work-cluster${docRefs.length > 0 ? " has-docs" : ""}${acc.total > 0 ? " has-acc" : ""}`}
+      >
       <button
         ref={chipRef}
         type="button"
-        className={`ai-agent-pill ai-composer-work-chip${planningOnly ? " ai-composer-work-chip--planning" : ""}`}
+        className={`ai-composer-work-chip${planningOnly ? " ai-composer-work-chip--planning" : ""}`}
         onClick={() => setMenuOpen((o) => !o)}
         aria-expanded={menuOpen}
         title={chipTitle}
@@ -254,23 +236,13 @@ export function ComposerWorkBar({
         <span className="ai-agent-name">{chipLabel}</span>
         <Icon name="chevron-down" size={13} />
       </button>
-      {docRefs.length > 0 && (
-        <button
-          ref={docsRef}
-          type="button"
-          className="ai-composer-work-docs-chip"
-          onClick={() => setDocsOpen((o) => !o)}
-          aria-expanded={docsOpen}
-          title="Linked documentation"
-        >
-          {docRefs.length} docs
-        </button>
-      )}
-      {acc.total > 0 && (
+      <ComposerDocsChip wsId={wsId} root={root} refs={docRefs} />
+      {acc.total > 0 ? (
         <span className="ai-composer-work-acc-chip" title="Acceptance progress">
           {acc.done}/{acc.total}
         </span>
-      )}
+      ) : null}
+      </div>
       <ComposerCtxMenu
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
@@ -405,27 +377,6 @@ export function ComposerWorkBar({
             </button>
           </>
         )}
-      </ComposerCtxMenu>
-      <ComposerCtxMenu
-        open={docsOpen}
-        onClose={() => setDocsOpen(false)}
-        anchorRef={docsRef}
-        estimateHeight={Math.min(280, 48 + docRefs.length * 36)}
-      >
-        {docRefs.map((ref) => (
-          <button
-            key={`${ref.role}:${ref.path}`}
-            type="button"
-            className="menu-item ai-composer-docs-item"
-            onClick={() => {
-              setDocsOpen(false);
-              openDocRef(wsId, root, ref);
-            }}
-          >
-            <span className="ai-composer-docs-role">{ref.role}</span>
-            <span className="ai-composer-docs-path">{ref.path}</span>
-          </button>
-        ))}
       </ComposerCtxMenu>
     </div>
   );

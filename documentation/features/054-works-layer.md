@@ -139,9 +139,23 @@ Bus: `featureDocDrawer.ts`.
 
 | Piece | Role |
 |---|---|
-| `ComposerWorkBar` | Intent menu (Plan a feature / Hotfix / Blank task); breadcrumb `S › W`; planning chip; **N docs** + **K/N** acceptance chips; inject depth toggle |
+| `ComposerWorkBar` | Intent menu (Plan a feature / Hotfix / Blank task); segmented cluster `S › W` \| docs \| acceptance |
+| `ComposerDocsChip` | Hover popover for linked Brain refs (Feature / Story / Related / Added); file icons + paths |
 
-See **`068-quack-plan-harness.md`** for the Quack Plan flow (story-owned plan, `StoryPlanPane`).
+See **`068-quack-plan-harness.md`** for Quack Plan flow + **StoryPlanDrawer** (hover soffietto on chat column).
+
+### Composer docs chip (`ComposerDocsChip.tsx`)
+
+Cursor-style segment inside `ai-composer-work-cluster` (shared border with work pill).
+
+| Concern | Detail |
+|---|---|
+| Data | `useComposerBrainRefs` → `worksBrainRefs.ts` (primary / story / related / extra) |
+| Open | Hover (primary) or click toggle; portaled popover above chip |
+| Rows | File-type icon, basename, parent path mono; click → feature drawer / Brain / story file |
+| Anti-flicker | No fullscreen overlay; popover overlaps anchor ~6px; `is-placed` fade-in after layout; 280ms leave debounce |
+
+CSS: `.ai-composer-work-cluster`, `.ai-composer-docs-popover` in `App.css`.
 
 ## Chat linkage
 
@@ -241,7 +255,7 @@ Mirror copies in `documentation/skills/`. Upgrades via `quack-bundled-version`.
 | List catalog | `WorksItemsList.tsx`, `worksUi.ts` |
 | Drawers | `WorkItemDrawer.tsx`, `FeatureDocDrawer.tsx`, `editorDrawerStack.ts` |
 | Kanban / timeline | `WorksKanbanView.tsx`, `WorksTimelineView.tsx`, `TimelineBar.tsx` |
-| Composer | `ComposerWorkBar.tsx` |
+| Composer | `ComposerWorkBar.tsx`, `ComposerDocsChip.tsx` |
 | Hub badge | `WorkHubBadge.tsx` |
 | Plan bridge | `ClaudePermissionOverlay.tsx` (`onPlanApproved`) |
 | Surface mode | `surfaceViewPrefs.ts` — drawer default; see `063-surface-view-prefs.md` |
