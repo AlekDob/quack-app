@@ -20547,6 +20547,10 @@ body.ab-dragging * {
   pointer-events: none;
 }
 
+.store-row.is-error {
+  border-color: var(--warn);
+}
+
 .store-row-icon {
   position: relative;
   width: 32px;

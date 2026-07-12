@@ -257,6 +257,7 @@ export const sessionKey = (project: string, sessionId: string) =>
 // the Rust backend on mount, so it survives restart with no descriptor.
 export const usageKey = (wsId: string) => `usage:${wsId}`;
 export const brainKey = (wsId: string) => `brain:${wsId}`;
+export const storeKey = (wsId: string) => `store:${wsId}`;
 export function parseKey(
   k: string,
 ):
@@ -266,6 +267,7 @@ export function parseKey(
   | { kind: "whiteboard"; wsId: string }
   | { kind: "usage"; wsId: string }
   | { kind: "brain"; wsId: string }
+  | { kind: "store"; wsId: string }
   | { kind: "subagent"; sessionId: string; toolUseId: string; agentType: string }
   | { kind: "session"; project: string; sessionId: string }
   | {
@@ -288,6 +290,7 @@ export function parseKey(
   if (k.startsWith("wb:")) return { kind: "whiteboard", wsId: k.slice(3) };
   if (k.startsWith("usage:")) return { kind: "usage", wsId: k.slice(6) };
   if (k.startsWith("brain:")) return { kind: "brain", wsId: k.slice(6) };
+  if (k.startsWith("store:")) return { kind: "store", wsId: k.slice(6) };
   if (k.startsWith("sub:")) {
     const [sessionId, toolUseId, ...rest] = k.slice(4).split("|");
     return {
@@ -851,6 +854,7 @@ interface AppState {
    *  workspace. One tab per workspace, mirrors wbOpen. */
   usageOpen(wsId: string): void;
   brainOpen(wsId: string): void;
+  storeOpen(wsId: string): void;
   /** Open (or focus) a session transcript tab in the active editor pane.
    *  The pane renders a lazy chunked loader for the given Claude Code
    *  session. Re-clicking the same row focuses the existing tab. */
@@ -1248,6 +1252,7 @@ async function loadWorkspaceFromDisk(
         // survives cleanup like the whiteboard tab.
         if (k.startsWith("usage:")) return true;
         if (k.startsWith("brain:")) return true;
+        if (k.startsWith("store:")) return true;
         return false;
       });
       if (tabs.length === 0) return null;
@@ -2802,6 +2807,46 @@ export const useStore = create<AppState>((set, get) => {
 
     brainOpen: (wsId) => {
       const k = brainKey(wsId);
+      updateWs(wsId, (w) => {
+        let foundPane: PaneId | null = null;
+        mapTree(w.layout.editorRoot, (t) => {
+          if (t.tabs.includes(k)) foundPane = t.id;
+          return t;
+        });
+        if (foundPane) {
+          return {
+            ...w,
+            layout: {
+              ...w.layout,
+              activePaneId: foundPane,
+              editorRoot: mapTree(w.layout.editorRoot, (t) =>
+                t.id === foundPane ? { ...t, active: k } : t,
+              ),
+            },
+          };
+        }
+        const targetPaneId =
+          (w.layout.activePaneId &&
+            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
+            w.layout.activePaneId) ||
+          firstLeaf(w.layout.editorRoot).id;
+        return {
+          ...w,
+          layout: {
+            ...w.layout,
+            activePaneId: targetPaneId,
+            editorRoot: mapTree(w.layout.editorRoot, (t) =>
+              t.id === targetPaneId
+                ? { ...t, tabs: [...t.tabs, k], active: k }
+                : t,
+            ),
+          },
+        };
+      });
+    },
+
+    storeOpen: (wsId) => {
+      const k = storeKey(wsId);
       updateWs(wsId, (w) => {
         let foundPane: PaneId | null = null;
         mapTree(w.layout.editorRoot, (t) => {

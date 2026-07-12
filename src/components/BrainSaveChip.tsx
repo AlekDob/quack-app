@@ -22,7 +22,7 @@ export function BrainSaveChip({ wsId, proposal, onChange }: Props) {
     try {
       const res = await commitBrainSave(wsId, proposal);
       onChange(withBrainSaveStatus(proposal, "saved", res.relPath));
-      toastSuccess(`Saved to brain — ${res.relPath}`);
+      toastSuccess(`Saved to Quack Brain — ${res.relPath}`);
     } catch (e) {
       toastError(String(e));
     } finally {
@@ -45,7 +45,7 @@ export function BrainSaveChip({ wsId, proposal, onChange }: Props) {
       <div className="brain-save-chip-head">
         <Icon name="brain" size={11} className="brain-save-chip-icon" />
         <span className="brain-save-chip-label">
-          {proposal.status === "saved" ? "Saved to brain" : "Save to brain"}
+          {proposal.status === "saved" ? "Saved to Quack Brain" : "Save to Quack Brain"}
         </span>
         <span className="brain-save-chip-meta brain-save-shimmer">
           {proposal.entry_type}

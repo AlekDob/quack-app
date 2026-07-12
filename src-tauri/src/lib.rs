@@ -14,6 +14,7 @@ mod claude_perm;
 mod claude_sessions;
 mod context_assets;
 mod pinky;
+mod quack_modules;
 mod claude_usage;
 mod fs_ops;
 mod git;
@@ -211,6 +212,11 @@ pub fn run() {
             pinky::pinky_stats_value,
             pinky::pinky_telemetry,
             pinky::pinky_save,
+            quack_modules::quack_extensions_status,
+            quack_modules::quack_extensions_install,
+            quack_modules::skillopt_sleep_status,
+            quack_modules::skillopt_sleep_dry_run,
+            quack_modules::skillopt_sleep_adopt,
             claude_mcp::claude_mcp_list,
             claude_mcp::claude_mcp_add,
             claude_mcp::claude_mcp_add_remote,

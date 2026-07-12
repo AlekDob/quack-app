@@ -114,10 +114,14 @@ import { recordBrainUsage } from "../brainUsageStore";
 import { BrainTurnChip } from "./BrainTurnChip";
 import { ReasoningTurnChip } from "./ReasoningTurnChip";
 import { BrainSaveChip } from "./BrainSaveChip";
+import { SkillProposalChip } from "./SkillProposalChip";
 import {
   parseBrainSaveProposal,
   stripBrainSaveBlocks,
 } from "../brainSave";
+import { jackSystemPrompt } from "../brainPrompt";
+import { installedIds, quackExtensions } from "../quackExtensions";
+import { isExtensionInstalled } from "../extensionGate";
 import {
   type ImageAttachment,
   MAX_ATTACHED_IMAGES,
@@ -416,6 +420,15 @@ export function AIChatPanel({
   // Background panels stay mounted (multitask + mount-asymmetry) but
   // catch up with one poll when the user switches back.
   const wsActive = useStore((s) => s.activeId === wsId);
+  const [pinkyBrainExt, setPinkyBrainExt] = useState(false);
+  const [skillTrainerExt, setSkillTrainerExt] = useState(false);
+  useEffect(() => {
+    void quackExtensions.status(root).then((rows) => {
+      const ids = installedIds(rows);
+      setPinkyBrainExt(ids.has("pinky-brain"));
+      setSkillTrainerExt(ids.has("skill-trainer"));
+    });
+  }, [root]);
   // Agent mode supplies this via context to render denser (tool bursts
   // collapse to an icon row, tighter spacing). Default false → the docked
   // chat is unchanged.
@@ -2445,48 +2458,7 @@ export function AIChatPanel({
       : null;
     const activeKey = ap && ap.kind === "tabs" ? ap.active : null;
     const parsed = activeKey ? parseKey(activeKey) : null;
-    const sysParts: string[] = [
-      [
-        // Jack = il PM-papero, persona con cui Alek dialoga (Quack v1 identity)
-        "You are Jack, the project manager and coding agent embedded in Quack, a desktop code editor.",
-        "Speak as Jack — warm, direct, hands-on. When you greet or introduce yourself, do so as Jack (never invent another name).",
-        "The user has a workspace open and you are running with the workspace root as the current working directory.",
-        "",
-        "OPERATING PRINCIPLES",
-        "- Investigate before answering. Ground every claim in real code — never guess at file paths, function names, or APIs.",
-        "- Read enough context to be useful. For non-trivial questions read 5+ relevant files before responding; for quick questions one file is fine.",
-        "- Run tools in parallel whenever they're independent (multiple reads, multiple greps in one turn).",
-        "- When changing code, keep edits minimal and focused on what the user asked. Don't refactor surrounding code, don't add speculative features, don't invent new abstractions.",
-        "- Default to no comments. Add a comment only when WHY is non-obvious.",
-        "- If something isn't in the codebase or you don't know it, say so — don't fabricate.",
-        "",
-        "COMMUNICATION",
-        "- Reply in concise prose with markdown formatting. Reference files using `path:line` format so they're clickable.",
-        "- Match response length to the question: a one-line question gets a one-line answer, not headers and sections.",
-        "- For multi-step work, give brief progress updates between tool batches.",
-        "- End with what changed and what's next, in 1-2 sentences. Skip long recaps.",
-        "",
-        "BRAIN (Pinky)",
-        "- Pre-turn [Pinky Brain] hits may already answer — Read documentation/<path> before broad Explore/Grep.",
-        "- After non-trivial discovery (many greps, scattered config, infra gotcha) not well documented, propose saving for next time at the END of your reply:",
-        "",
-        "[Brain save]",
-        "title: Short title",
-        "type: gotcha|pattern|decision|note|guide",
-        "tags: comma, separated",
-        "reason: Why this was hard to find (one line)",
-        "---",
-        "## Title",
-        "Markdown body",
-        "[/Brain save]",
-        "",
-        "The UI shows Save/Dismiss — do not write the file yourself unless the user asks.",
-        "",
-        "SAFETY",
-        "- Confirm before destructive actions (rm, dropping branches, force-push, deleting data).",
-        "- Don't push, deploy, or send messages to external systems without explicit user approval.",
-      ].join("\n"),
-    ];
+    const sysParts: string[] = [jackSystemPrompt(pinkyBrainExt)];
     // Auto-attach the project tree when:
     //   1. The user explicitly typed /tree (attachTree flag), OR
     //   2. This is the first message of a new chat (so the model gets oriented), OR
@@ -2791,9 +2763,13 @@ export function AIChatPanel({
       }
     }
     let brainUsage: ChatMessage["brain_usage"];
-    if (getBrainInjectEnabled(wsId)) {
+    const brainInject =
+      pinkyBrainExt &&
+      getBrainInjectEnabled(wsId) &&
+      (await isExtensionInstalled(root, "pinky-brain"));
+    if (brainInject) {
       try {
-        const brainCtx = await fetchBrainContextForTurn(wsId, text);
+        const brainCtx = await fetchBrainContextForTurn(root, text);
         if (brainCtx) {
           brainUsage = brainCtx.usage;
           recordBrainUsage(wsId, brainCtx.usage.savedTokens, brainCtx.usage.savedMs);
@@ -5217,7 +5193,9 @@ export function AIChatPanel({
                   m.content
                 )}
               </div>
-              {brainProposal && brainProposal.status !== "dismissed" && (
+              {pinkyBrainExt &&
+                brainProposal &&
+                brainProposal.status !== "dismissed" && (
                 <BrainSaveChip
                   wsId={wsId}
                   proposal={brainProposal}
@@ -5346,7 +5324,7 @@ export function AIChatPanel({
                       onBranch={() => branchFromHere(i)}
                       onImageClick={(img) => void openZoom(img)}
                     />
-                    {m.brain_usage && (
+                    {pinkyBrainExt && m.brain_usage && (
                       <BrainTurnChip wsId={wsId} root={root} usage={m.brain_usage} />
                     )}
                   </>
@@ -5768,6 +5746,7 @@ export function AIChatPanel({
       {sessionId ? (
         <AgentCommitDock wsId={wsId} sessionId={sessionId} root={root} />
       ) : null}
+      <SkillProposalChip enabled={skillTrainerExt} foreground={wsActive && chatVisible} />
       <div
         className={`ai-composer-shell${dictating ? " dictating" : ""}${fileDropHover ? " file-drop-over" : ""}`}
         ref={composerShellRef}

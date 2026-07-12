@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-10
-last_verified: 2026-07-10
+last_verified: 2026-07-12
 tags: [brain, pinky, knowledge, mcp, search, integration, dashboard, quack-v1]
 ---
 
@@ -10,8 +10,9 @@ tags: [brain, pinky, knowledge, mcp, search, integration, dashboard, quack-v1]
 
 **Purpose:** Native Quack integration for [Pinky Brain](https://pinkybrain.dev) —
 hybrid local knowledge search (BM25 + vector) over `documentation/` + global
-`~/.pinky/brain/`, with a Brain editor tab, animated dashboard, Cursor-style
-search, pre-turn chat injection, and Quack Brain → Pinky global path migration.
+`~/.pinky/brain/`. Surfaced as the **Knowledge** segment inside **Quack Brain**
+(editor tab) when the `pinky-brain` extension is installed via **Quack Store**
+(see `059-quack-brain-store.md`).
 
 Pinky is a Rust fork/evolution of the Quack Brain skill model (markdown-as-truth,
 two-level store). Quack wraps the `pinky` CLI — it does not reimplement search.
@@ -20,7 +21,7 @@ two-level store). Quack wraps the `pinky` CLI — it does not reimplement search
 
 | Surface | Location | Role |
 |---|---|---|
-| `BrainPanel` | Editor tab `brain:<wsId>` (activity bar) | Search, dashboard, setup, reindex, inject toggle |
+| `BrainPanel` | Editor tab `brain:<wsId>` (activity bar) | Quack Brain hub — Knowledge segment when `pinky-brain` installed |
 | `BrainDashboard` | Empty state inside Brain tab | Animated charts + telemetry |
 | `BrainSearchResults` | After Search | Cursor-style rows, shimmer skeleton, highlights |
 | `BrainTurnChip` | Below user message in chat | Quiet recap: Brain · N hits · ms + slim linked rows |

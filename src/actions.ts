@@ -422,6 +422,16 @@ export const commands: CommandSpec[] = [
     },
   },
   {
+    id: "view.quack_store",
+    label: "Quack Store",
+    category: "View",
+    run: () => {
+      const wsId = s().activeId;
+      if (!wsId) return;
+      s().storeOpen(wsId);
+    },
+  },
+  {
     id: "view.search",
     label: "Search Files…",
     category: "View",
