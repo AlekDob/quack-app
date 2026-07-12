@@ -3,7 +3,7 @@ type: feature
 project: quack-desktop
 created: 2026-07-12
 last_verified: 2026-07-12
-related: [063-surface-view-prefs.md, 065-works-drawer-ux.md]
+related: [063-surface-view-prefs.md, 065-works-drawer-ux.md, 066-works-cycles-stories.md, 068-quack-plan-harness.md]
 tags: [works, plan-mode, tickets, kanban, timeline, modules, plane, drawer, brain, markdown]
 ---
 
@@ -11,13 +11,16 @@ tags: [works, plan-mode, tickets, kanban, timeline, modules, plane, drawer, brai
 
 **Purpose:** Native project-management tickets per workspace — Plane-style **views** sidebar, list/kanban/timeline, **Modules** feature catalog (Brain UI), app-level work + feature drawers, composer quick actions, Plan mode → Work ticket, cross-session context inject, optional Plane sync.
 
-## Storage (hybrid — v4 markdown)
+## Storage (hybrid — v3 markdown)
 
 | Path | Role |
 |---|---|
-| `{workspace}/.codetta/works/snapshot.json` | **Index** — modules, labels, item metadata, `viewPrefs`, `nextSeq` (schema `version: 2`; no body text) |
-| `{workspace}/.codetta/works/items/W-NNN.md` | **One markdown file per work item** — YAML frontmatter + `# title` + body (agent Read/Write target) |
-| `{workspace}/.codetta/works/events.jsonl` | Append-only audit log |
+| `{workspace}/works/snapshot.json` | **Index** — modules, labels, cycles, stories meta, item metadata, `viewPrefs`, `nextSeq`, `nextStorySeq` (`version: 3`) |
+| `{workspace}/works/items/W-NNN.md` | **One markdown file per work item** — YAML frontmatter + `# title` + body |
+| `{workspace}/works/stories/S-NNN.md` | **User story** — Scrum-style narrative + acceptance criteria |
+| `{workspace}/works/events.jsonl` | Append-only audit log |
+
+Legacy `.quack/works/` migrates to `works/` on hydrate (`worksDir.ts`). See **`066-works-cycles-stories.md`** for cycles + stories.
 
 Rust: `works_store.rs` — `works_load`, `works_save`, `works_append_event` (index only).
 
@@ -77,6 +80,8 @@ Left rail is a **collection of views**, not module filters. Persisted in `viewPr
 | `backlog` | Backlog | Same |
 | `done` | Completed | Same |
 | `cancelled` | Cancelled | Same |
+| `cycles` | Cycles | **Cycle dashboard** — progress, burndown, priority items (`066`) |
+| `stories` | Stories | Story catalog + `StoryDrawer` |
 | `modules` | Modules | **Feature catalog** (not work items) |
 
 | File | Role |
@@ -134,20 +139,39 @@ Bus: `featureDocDrawer.ts`.
 
 | Piece | Role |
 |---|---|
-| `ComposerWorkBar` | Colored work pill inside composer input (workspace tint); status, meta, link/unlink |
+| `ComposerWorkBar` | Intent menu (Plan a feature / Hotfix / Blank task); breadcrumb `S › W`; planning chip; **N docs** + **K/N** acceptance chips; inject depth toggle |
+
+See **`068-quack-plan-harness.md`** for the Quack Plan flow (story-owned plan, `StoryPlanPane`).
 
 ## Chat linkage
 
 | Mechanism | Detail |
 |---|---|
-| `AIChatDescriptor.workItemId` | Optional FK |
-| `setAIChatWorkItem` | Bind chat ↔ work |
-| `workContextInject.ts` | Prepends `[Quack Work — …]` with **work file path** + feature doc path on send |
-| `@W-001` | Mention in composer links chat to work |
+| `AIChatDescriptor.workItemId` | Optional FK to `W-NNN` |
+| `AIChatDescriptor.storyId` | Optional FK to `S-NNN` (planning or story-linked) |
+| `AIChatDescriptor.planning` | `true` while Jack/CC plan mode active |
+| `setAIChatWorkItem` / `setAIChatStory` / `setAIChatPlanning` | Bind chat ↔ work/story |
+| `linkedChats` on story/work `.md` | Bidirectional with chat ids (`worksCache.ts`) |
+| `worksTurnContext.ts` | Token-efficient manifest: work/story paths, module feature doc, `related:` + `refs:`, outline, acceptance summary |
+| `worksBrainRefs.ts` | Resolve `primary` / `story` / `related` / `extra` doc paths |
+| Inject depth | `lcp.works.injectDepth.{wsId}` — `pointers` \| `outline` \| `pinky` (composer work menu) |
+| `@W-001` / `@S-001` | Mention in composer links chat to work/story |
+
+### Work / story frontmatter `refs:`
+
+```yaml
+refs:
+  - documentation/decisions/003-git-remote.md
+  - documentation/gotchas/foo.md
+```
+
+UI: **Documentation** section in work/story drawer; **N docs** chip in composer when linked.
+
+Pinky on linked work: query = ticket title + module (not user message); skips paths already in manifest.
 
 ## Agent Hub
 
-`WorkHubBadge` on `AIChatsRail` when `chat.workItemId` is set.
+`WorkHubBadge` on `AIChatsRail` when `workItemId` and/or `storyId` set — shows `S-003 › W-008` or story-only while `planning`.
 
 ## Plane sync (optional)
 
@@ -166,7 +190,7 @@ Modules sync from `documentation/features/*.md` on hydrate + Works tab open:
 | Scan + stable ids | `worksFeatureModules.ts` — `feat:{slug}`, title from first `#` / `##` |
 | Hydrate | `worksCache.ts` → `syncFeatureModules`, `refreshWorksModules` |
 | Fields | `WorkModule.featureSlug`, `featurePath`, `featureNum` |
-| Context inject | `workContextInject.ts` includes `documentation/features/…` path |
+| Context inject | `workContextInject.ts` + `worksTurnContext.ts` — manifest with feature doc path + outline |
 
 Fallback generic modules (Bug, Feature…) only when features directory is missing.
 
@@ -174,8 +198,8 @@ Fallback generic modules (Bug, Feature…) only when features directory is missi
 
 Agents work on **markdown files**, not raw JSON:
 
-1. **List** — read `snapshot.json` for metadata or glob `.codetta/works/items/*.md`
-2. **Read / Write** — `Read .codetta/works/items/W-042.md` (same as feature docs)
+1. **List** — read `snapshot.json` for metadata or glob `.quack/works/items/*.md`
+2. **Read / Write** — `Read .quack/works/items/W-042.md` (same as feature docs)
 3. **Feature context** — read linked `documentation/features/{slug}.md` before coding
 4. **Create** — add `items/W-NNN.md` with frontmatter; Quack imports on next hydrate/watch
 5. **Link chat** — set `linkedChats` in frontmatter or `@W-001` in composer
@@ -192,12 +216,16 @@ Agents work on **markdown files**, not raw JSON:
 
 ## Skills (pre-installed)
 
-Bundled in `documentation/skills/` — `/` slash menu via `loadSkills` (`source: bundled`):
+App-bundled in `src/bundledSkills/` — **two skills only** (`quack-works`, `quack-brain`). Synced to `<workspace>/.claude/skills/` on workspace open and Works hydrate:
 
 | Skill | Role |
 |---|---|
-| `quack-brain` | Brain + Works PM loop |
-| `quack-works` | Ticket CRUD, views, Plane sync, module ↔ feature doc |
+| `quack-works` | Feature docs `NNN-slug.md` + Works modules + stories + tickets + cycles (feature-creator merged here) |
+| `quack-brain` | Search documentation, diary, Pinky save — after implementation |
+
+**PM loop:** `/quack-works` → implement → `/quack-brain`.
+
+Mirror copies in `documentation/skills/`. Upgrades via `quack-bundled-version`.
 
 ## Key files
 
@@ -208,7 +236,7 @@ Bundled in `documentation/skills/` — `/` slash menu via `loadSkills` (`source:
 | Feature modules | `src/worksFeatureModules.ts` |
 | Preview strip | `src/featureDocPreview.ts` |
 | Cache + CRUD | `src/worksCache.ts` |
-| Markdown I/O | `src/workItemMd.ts`, `src/worksItemFiles.ts`, `src/worksWatch.ts` |
+| Markdown I/O | `src/workItemMd.ts`, `src/worksItemFiles.ts`, `src/worksWatch.ts`, `src/quackDir.ts` |
 | Shell | `src/components/works/WorksPane.tsx` |
 | List catalog | `WorksItemsList.tsx`, `worksUi.ts` |
 | Drawers | `WorkItemDrawer.tsx`, `FeatureDocDrawer.tsx`, `editorDrawerStack.ts` |

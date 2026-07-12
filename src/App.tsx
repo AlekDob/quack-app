@@ -39,6 +39,7 @@ import { Toasts } from "./components/Toast";
 import { DiffModal } from "./components/DiffModal";
 import { WorkItemDrawer } from "./components/works/WorkItemDrawer";
 import { FeatureDocDrawer } from "./components/works/FeatureDocDrawer";
+import { StoryDrawer } from "./components/works/StoryDrawer";
 import { ToolResultDrawer } from "./components/ToolResultDrawer";
 import { Splash } from "./components/Splash";
 import { RecentFilesOverlay } from "./components/RecentFilesOverlay";
@@ -125,7 +126,6 @@ const HANDLED_BY_MANUAL_BRANCHES = new Set<string>([
   "view.source_control",
   "view.search",
   "view.search_palette",
-  "view.todos",
   "view.goto_symbol",
   "edit.goto_symbol",
   "view.reload",
@@ -829,6 +829,7 @@ function MainApp() {
       <DiffModal />
       <ToolResultDrawer />
       <WorkItemDrawer />
+      <StoryDrawer />
       <FeatureDocDrawer />
       <Dialog />
       <NewChatNamePopover />

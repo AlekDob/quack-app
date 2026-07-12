@@ -95,6 +95,7 @@ Quack flow (016):
 
 ### Gotchas
 - **Two stream formats:** Composer uses native `tool_call`/`thinking`, not Claude `stream_event`. Extend **`cursorStreamJson.ts`**, not only `cliStreamJson.ts`.
+- **Doubled reply (`--stream-partial-output`):** Cursor emits each token as its own `assistant` message, then a FINAL `assistant` message repeating the whole text. The Claude-shaped anti-dup guard (`currentMsgGotDeltas`) never fires here (no `stream_event`/`text_delta`), so the reply rendered twice. Fix: `cliStreamJson.ts` accumulates streamed assistant text in `partialAssistantBuf` and drops the trailing full-text snapshot (reset on `message_start`/`result`).
 - **Lazy model list:** defer `--list-models` to picker/browser (025).
 - **Effort tiers in catalog:** Cursor exposes Low/Medium/High/xHigh/Max/Fast as **separate model ids** in `--list-models` (e.g. `Opus 4.8 1M Extra High`). Quack has **no** `EffortPopover` for Cursor — pick the tier as the model. Claude Code uses a separate effort knob + `--effort` (`022`, `059`).
 - **Lifecycle kill:** `cursor_code_kill_session` — see `046-process-cleanup.md`.

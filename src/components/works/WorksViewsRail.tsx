@@ -1,5 +1,5 @@
 import { Fragment } from "react";
-import type { WorkItem } from "../../works";
+import type { WorksSnapshot } from "../../works";
 import {
   WORKS_SIDEBAR_VIEWS,
   countForView,
@@ -8,11 +8,11 @@ import {
 
 type Props = {
   active: WorksSidebarView;
-  items: WorkItem[];
+  snap: WorksSnapshot | null;
   onSelect: (view: WorksSidebarView) => void;
 };
 
-export function WorksViewsRail({ active, items, onSelect }: Props) {
+export function WorksViewsRail({ active, snap, onSelect }: Props) {
   return (
     <aside className="works-module-rail" aria-label="Views">
       <div className="works-rail-title">Views</div>
@@ -29,7 +29,7 @@ export function WorksViewsRail({ active, items, onSelect }: Props) {
             <span className="works-module-item-label">{v.label}</span>
             {v.id !== "modules" && (
               <span className="works-module-count">
-                {countForView(items, v.id)}
+                {countForView(snap, v.id)}
               </span>
             )}
           </button>

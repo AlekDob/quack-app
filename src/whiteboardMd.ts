@@ -1,7 +1,7 @@
 // Generate the .md operational document for the Whiteboard tab. Pure
 // function: takes the discovered agents + skills and returns a markdown
 // string with a "Workflow" section per agent. Used both by the live
-// MarkdownPreview and by the "Save to .codetta/whiteboard.md" action.
+// MarkdownPreview and by the "Save to .quack/whiteboard.md" action.
 //
 // The generated document is structured like a runbook so it's useful as
 // a real "how do I work with this org?" reference, not just a dump.
@@ -131,7 +131,7 @@ export function renderWhiteboardMd({
 
   out.push("---");
   out.push(
-    "_Regenerate this file from the Whiteboard tab → Workflows → Save to .codetta/whiteboard.md_",
+    "_Regenerate this file from the Whiteboard tab → Workflows → Save to .quack/whiteboard.md_",
   );
   out.push("");
   return out.join("\n");

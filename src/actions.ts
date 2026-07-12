@@ -519,15 +519,18 @@ export const commands: CommandSpec[] = [
     },
   },
   {
-    id: "view.todos",
-    label: "Show TODO / FIXME",
+    id: "view.open_works",
+    label: "Open Works",
     category: "View",
     accel: "Ctrl+Alt+T",
+    hint: "Project work items — modules, kanban, tickets",
     run: () => {
       const wsId = s().activeId;
-      if (!wsId) return;
-      s().setSidebarVisible(wsId, true);
-      s().setSidebarView(wsId, "todos");
+      if (!wsId) {
+        toastError("Open a workspace first");
+        return;
+      }
+      s().worksOpen(wsId);
     },
   },
   {
@@ -1066,21 +1069,7 @@ export const commands: CommandSpec[] = [
     },
   },
   {
-    id: "view.open_works",
-    label: "Open Works",
-    category: "View",
-    hint: "Project work items — modules, kanban, tickets",
-    run: () => {
-      const wsId = s().activeId;
-      if (!wsId) {
-        toastError("Open a workspace first");
-        return;
-      }
-      s().worksOpen(wsId);
-    },
-  },
-  {
-    id: "help.shortcuts",
+    id: "edit.reopen_closed_tab",
     label: "Keyboard Shortcuts",
     category: "Help",
     accel: "F1",

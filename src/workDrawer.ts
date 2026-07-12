@@ -1,6 +1,7 @@
 // App-level work-item drawer — same pattern as toolDrawer.ts / ToolResultDrawer.
 
 import { closeFeatureDocDrawer } from "./featureDocDrawer";
+import { closeStoryDrawer } from "./storyDrawer";
 import type { WorkOrigin, WorkPriority, WorkStatus } from "./works";
 
 export interface WorkCreateDraft {
@@ -38,6 +39,7 @@ export function openWorkDrawer(
   req: Extract<WorkDrawerRequest, { workId: string }>,
 ): void {
   closeFeatureDocDrawer();
+  closeStoryDrawer();
   current = req;
   emit();
 }
@@ -46,6 +48,7 @@ export function openWorkCreateDrawer(
   req: Omit<Extract<WorkDrawerRequest, { create: true }>, "create">,
 ): void {
   closeFeatureDocDrawer();
+  closeStoryDrawer();
   current = { ...req, create: true };
   emit();
 }

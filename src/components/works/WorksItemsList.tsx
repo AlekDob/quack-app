@@ -1,46 +1,88 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { highlightBrainText } from "../../brainHighlight";
 import {
+  buildWorksListGroups,
+  countVisibleWorks,
+  type WorksListGroup,
+} from "../../worksListGroups";
+import {
   formatModuleLabel,
   formatWorkHitTitle,
   modulePathLine,
 } from "../../worksUi";
-import { priorityDotClass, statusLabel, type WorkItem, type WorkModule } from "../../works";
+import {
+  priorityDotClass,
+  statusLabel,
+  storyLabel,
+  type WorkItem,
+  type WorkModule,
+  type WorkStory,
+} from "../../works";
 import { BrainSearchSkeleton } from "../brain/BrainSearchResults";
 import { Icon } from "../Icon";
 
 type Props = {
   items: WorkItem[];
+  stories: WorkStory[];
   modules: WorkModule[];
   selectedId: string | null;
+  selectedStoryId: string | null;
   onOpen: (id: string) => void;
+  onOpenStory: (id: string) => void;
   onContextMenu: (id: string, e: React.MouseEvent) => void;
 };
 
-function filterItems(items: WorkItem[], modules: WorkModule[], query: string): WorkItem[] {
-  const terms = query
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (!terms.length) return items;
-  const modById = new Map(modules.map((m) => [m.id, m]));
-  return items.filter((w) => {
-    const mod = modById.get(w.moduleId);
-    const hay = [
-      w.shortId,
-      w.title,
-      w.status,
-      w.priority,
-      mod?.name,
-      mod?.featurePath,
-      mod?.featureSlug,
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-    return terms.every((t) => hay.includes(t));
-  });
+function StoryHitRow({
+  story,
+  module,
+  childCount,
+  index,
+  query,
+  active,
+  onOpen,
+}: {
+  story: WorkStory;
+  module?: WorkModule;
+  childCount: number;
+  index: number;
+  query: string;
+  active: boolean;
+  onOpen: () => void;
+}) {
+  const title = `${story.shortId} · ${story.title}`;
+  const path = modulePathLine(module);
+  return (
+    <li className="works-list-story-wrap">
+      <button
+        type="button"
+        className={`brain-hit-row works-story-hit-row${active ? " active" : ""}`}
+        style={{ "--i": index } as CSSProperties}
+        onClick={onOpen}
+        title={path}
+      >
+        <span className="brain-hit-icon works-story-hit-icon" aria-hidden>
+          <Icon name="users" size={15} />
+        </span>
+        <span className="brain-hit-body">
+          <span className="brain-hit-top">
+            <span className="brain-hit-title">
+              {highlightBrainText(title, query)}
+            </span>
+            <span className={`works-story-pill works-story-pill--${story.status}`}>
+              {storyLabel(story.status)}
+            </span>
+          </span>
+          <span className="brain-hit-path">
+            {module ? formatModuleLabel(module) : "No module"}
+            {childCount > 0
+              ? ` · ${childCount} work item${childCount === 1 ? "" : "s"}`
+              : " · No linked work items"}
+          </span>
+        </span>
+        <Icon name="chevron-right" size={14} className="brain-hit-chevron" />
+      </button>
+    </li>
+  );
 }
 
 function WorkHitRow({
@@ -49,6 +91,7 @@ function WorkHitRow({
   index,
   query,
   active,
+  nested,
   onOpen,
   onContextMenu,
 }: {
@@ -57,22 +100,25 @@ function WorkHitRow({
   index: number;
   query: string;
   active: boolean;
+  nested?: boolean;
   onOpen: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const title = formatWorkHitTitle(item);
   const path = modulePathLine(module);
   return (
-    <li>
+    <li className={nested ? "works-list-child-wrap" : undefined}>
       <button
         type="button"
-        className={`brain-hit-row${active ? " active" : ""}`}
+        className={`brain-hit-row works-work-hit-row${active ? " active" : ""}${
+          nested ? " works-work-hit-row--nested" : ""
+        }`}
         style={{ "--i": index } as CSSProperties}
         onClick={onOpen}
         onContextMenu={onContextMenu}
         title={path}
       >
-        <span className="brain-hit-icon" aria-hidden>
+        <span className="brain-hit-icon works-work-hit-icon" aria-hidden>
           <Icon name="check-square" size={15} />
         </span>
         <span className="brain-hit-body">
@@ -99,11 +145,76 @@ function WorkHitRow({
   );
 }
 
+function renderGroup(
+  group: WorksListGroup,
+  startIndex: number,
+  ctx: {
+    modById: Map<string, WorkModule>;
+    query: string;
+    selectedId: string | null;
+    selectedStoryId: string | null;
+    onOpen: (id: string) => void;
+    onOpenStory: (id: string) => void;
+    onContextMenu: (id: string, e: React.MouseEvent) => void;
+  },
+): { nodes: React.ReactNode[]; nextIndex: number } {
+  const nodes: React.ReactNode[] = [];
+  let i = startIndex;
+
+  if (group.kind === "story") {
+    nodes.push(
+      <StoryHitRow
+        key={`story-${group.story.id}`}
+        story={group.story}
+        module={ctx.modById.get(group.story.moduleId)}
+        childCount={group.children.length}
+        index={i++}
+        query={ctx.query}
+        active={ctx.selectedStoryId === group.story.id}
+        onOpen={() => ctx.onOpenStory(group.story.id)}
+      />,
+    );
+    for (const child of group.children) {
+      nodes.push(
+        <WorkHitRow
+          key={child.id}
+          item={child}
+          module={ctx.modById.get(child.moduleId)}
+          index={i++}
+          query={ctx.query}
+          active={ctx.selectedId === child.id}
+          nested
+          onOpen={() => ctx.onOpen(child.id)}
+          onContextMenu={(e) => ctx.onContextMenu(child.id, e)}
+        />,
+      );
+    }
+    return { nodes, nextIndex: i };
+  }
+
+  nodes.push(
+    <WorkHitRow
+      key={group.item.id}
+      item={group.item}
+      module={ctx.modById.get(group.item.moduleId)}
+      index={i++}
+      query={ctx.query}
+      active={ctx.selectedId === group.item.id}
+      onOpen={() => ctx.onOpen(group.item.id)}
+      onContextMenu={(e) => ctx.onContextMenu(group.item.id, e)}
+    />,
+  );
+  return { nodes, nextIndex: i };
+}
+
 export function WorksItemsList({
   items,
+  stories,
   modules,
   selectedId,
+  selectedStoryId,
   onOpen,
+  onOpenStory,
   onContextMenu,
 }: Props) {
   const [query, setQuery] = useState("");
@@ -116,12 +227,42 @@ export function WorksItemsList({
     return () => window.clearTimeout(t);
   }, []);
 
-  const filtered = useMemo(
-    () => filterItems(items, modules, query),
-    [items, modules, query],
+  const groups = useMemo(
+    () => buildWorksListGroups(stories, items, modules, query),
+    [stories, items, modules, query],
   );
 
-  const showEmpty = !mounting && query.trim() && filtered.length === 0;
+  const workCount = useMemo(() => countVisibleWorks(groups), [groups]);
+  const showEmpty = !mounting && query.trim() && groups.length === 0;
+
+  const rows = useMemo(() => {
+    const ctx = {
+      modById,
+      query,
+      selectedId,
+      selectedStoryId,
+      onOpen,
+      onOpenStory,
+      onContextMenu,
+    };
+    const out: React.ReactNode[] = [];
+    let idx = 0;
+    for (const g of groups) {
+      const { nodes, nextIndex } = renderGroup(g, idx, ctx);
+      out.push(...nodes);
+      idx = nextIndex;
+    }
+    return out;
+  }, [
+    groups,
+    modById,
+    query,
+    selectedId,
+    selectedStoryId,
+    onOpen,
+    onOpenStory,
+    onContextMenu,
+  ]);
 
   return (
     <div className="works-items-catalog">
@@ -132,33 +273,25 @@ export function WorksItemsList({
             className="brain-search-input"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search work items…"
-            aria-label="Search work items"
+            placeholder="Search work items and stories…"
+            aria-label="Search work items and stories"
           />
         </div>
       </div>
 
       {mounting && <BrainSearchSkeleton rows={6} />}
 
-      {!mounting && filtered.length > 0 && (
+      {!mounting && groups.length > 0 && (
         <section className="brain-results-section">
           <p className="brain-results-head">
-            {filtered.length} work item{filtered.length === 1 ? "" : "s"}
+            {workCount} work item{workCount === 1 ? "" : "s"}
+            {stories.length > 0
+              ? ` · ${groups.filter((g) => g.kind === "story").length} stor${
+                  groups.filter((g) => g.kind === "story").length === 1 ? "y" : "ies"
+                }`
+              : ""}
           </p>
-          <ul className="brain-results">
-            {filtered.map((w, i) => (
-              <WorkHitRow
-                key={w.id}
-                item={w}
-                module={modById.get(w.moduleId)}
-                index={i}
-                query={query}
-                active={selectedId === w.id}
-                onOpen={() => onOpen(w.id)}
-                onContextMenu={(e) => onContextMenu(w.id, e)}
-              />
-            ))}
-          </ul>
+          <ul className="brain-results works-grouped-results">{rows}</ul>
         </section>
       )}
 

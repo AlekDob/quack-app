@@ -15,6 +15,7 @@ import {
 } from "../../works";
 import {
   filterItemsByView,
+  isCatalogView,
   worksViewLabel,
   type WorksSidebarView,
 } from "../../worksViews";
@@ -26,6 +27,11 @@ import {
   subscribeWorkDrawer,
 } from "../../workDrawer";
 import {
+  openStoryCreateDrawer,
+  openStoryDrawer,
+  subscribeStoryDrawer,
+} from "../../storyDrawer";
+import {
   openFeatureDocDrawer,
   subscribeFeatureDocDrawer,
 } from "../../featureDocDrawer";
@@ -35,6 +41,8 @@ import { WorksTimelineView } from "./WorksTimelineView";
 import { WorksViewsRail } from "./WorksViewsRail";
 import { WorksItemsList } from "./WorksItemsList";
 import { WorksFeaturesCatalog } from "./WorksFeaturesCatalog";
+import { WorksCyclesPanel } from "./WorksCyclesPanel";
+import { WorksStoriesList } from "./WorksStoriesList";
 
 type Props = {
   wsId: string;
@@ -58,6 +66,7 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
   const [snap, setSnap] = useState<WorksSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedStoryId, setSelectedStoryId] = useState<string | null>(null);
   const [activeFeaturePath, setActiveFeaturePath] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -85,11 +94,24 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
   }, [root]);
 
   useEffect(() => {
+    return subscribeStoryDrawer((req) => {
+      if (req?.root === root) {
+        setSelectedStoryId("storyId" in req ? req.storyId : null);
+      } else setSelectedStoryId(null);
+    });
+  }, [root]);
+
+  useEffect(() => {
     return subscribeFeatureDocDrawer((req) => {
       if (req?.root === root) setActiveFeaturePath(req.featurePath);
       else setActiveFeaturePath(null);
     });
   }, [root]);
+
+  const openStory = (id: string) => {
+    openStoryDrawer({ wsId, root, storyId: id });
+    setSelectedStoryId(id);
+  };
 
   const openWork = (id: string) => {
     openWorkDrawer({ wsId, root, workId: id });
@@ -121,6 +143,13 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
   const sidebarView: WorksSidebarView =
     snap?.viewPrefs.sidebarView ?? "all";
   const isModulesView = sidebarView === "modules";
+  const isCyclesView = sidebarView === "cycles";
+  const isStoriesView = sidebarView === "stories";
+  const isCatalog = isCatalogView(sidebarView);
+  const activeCycleId =
+    snap?.viewPrefs.activeCycleId ??
+    snap?.cycles.find((c) => c.status === "active")?.id ??
+    null;
 
   const allItems = useMemo(() => {
     if (!snap) return [];
@@ -131,6 +160,15 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
     () => filterItemsByView(allItems, sidebarView),
     [allItems, sidebarView],
   );
+
+  const storyChildCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const w of snap?.items ?? []) {
+      if (!w.parentId) continue;
+      counts.set(w.parentId, (counts.get(w.parentId) ?? 0) + 1);
+    }
+    return counts;
+  }, [snap?.items]);
 
   const moduleCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -164,6 +202,18 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
     });
   };
 
+  const setActiveCycle = async (cycleId: string) => {
+    if (!snap) return;
+    await saveWorks(root, {
+      ...snap,
+      viewPrefs: { ...snap.viewPrefs, activeCycleId: cycleId },
+    });
+  };
+
+  const onNewStory = () => {
+    openStoryCreateDrawer({ wsId, root, draft: { title: "As a user I want…" } });
+  };
+
   const onNewWork = () => {
     openWorkCreateDrawer({ wsId, root, draft: { title: "New work", origin: "manual" } });
   };
@@ -193,12 +243,15 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
             <span className="works-crumb-seg works-crumb-active">
               {crumbActive}
             </span>
-            {!isModulesView && (
+            {!isCatalog && (
               <span className="works-count">{items.length}</span>
+            )}
+            {isStoriesView && snap && (
+              <span className="works-count">{snap.stories.length}</span>
             )}
           </div>
           <div className="works-toolbar-actions">
-            {!isModulesView && (
+            {!isCatalog && (
               <>
                 <div
                   className="works-view-icons"
@@ -226,7 +279,12 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
               </>
             )}
             <WorksPlanePanel wsId={wsId} root={root} snap={snap} />
-            {!isModulesView && (
+            {isStoriesView && (
+              <button type="button" className="works-new-btn" onClick={onNewStory}>
+                <Icon name="plus" size={12} /> Add story
+              </button>
+            )}
+            {!isCatalog && (
               <button
                 type="button"
                 className="works-new-btn"
@@ -241,20 +299,20 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
         <div className="works-stage">
           <WorksViewsRail
             active={sidebarView}
-            items={allItems}
+            snap={snap}
             onSelect={(v) => void setSidebarView(v)}
           />
 
           <main
             className={`works-main${
-              layout === "timeline" && !isModulesView
+              layout === "timeline" && !isCatalog
                 ? " works-main--timeline"
                 : ""
             }${
-              isModulesView || layout === "list"
+              isCatalog || layout === "list"
                 ? " works-main--catalog"
                 : ""
-            }`}
+            }${isCyclesView ? " works-main--cycles" : ""}`}
           >
             {isModulesView && (
               <WorksFeaturesCatalog
@@ -265,10 +323,29 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
               />
             )}
 
-            {!isModulesView && loading && (
+            {isCyclesView && snap && (
+              <WorksCyclesPanel
+                snap={snap}
+                selectedId={activeCycleId}
+                onSelect={(id) => void setActiveCycle(id)}
+                onOpenWork={openWork}
+              />
+            )}
+
+            {isStoriesView && snap && (
+              <WorksStoriesList
+                stories={snap.stories}
+                modules={snap.modules}
+                childCounts={storyChildCounts}
+                selectedId={selectedStoryId}
+                onOpen={openStory}
+              />
+            )}
+
+            {!isCatalog && loading && (
               <div className="works-status">Loading…</div>
             )}
-            {!isModulesView && !loading && items.length === 0 && (
+            {!isCatalog && !loading && items.length === 0 && (
               <div className="works-empty works-empty--center">
                 <div className="works-empty-title">No work items</div>
                 <div className="works-empty-hint">
@@ -283,16 +360,19 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
                 </button>
               </div>
             )}
-            {!isModulesView && !loading && items.length > 0 && layout === "list" && (
+            {!isCatalog && !loading && items.length > 0 && layout === "list" && (
               <WorksItemsList
                 items={items}
+                stories={snap?.stories ?? []}
                 modules={snap?.modules ?? []}
                 selectedId={selectedId}
+                selectedStoryId={selectedStoryId}
                 onOpen={openWork}
+                onOpenStory={openStory}
                 onContextMenu={onItemContextMenu}
               />
             )}
-            {!isModulesView && !loading && items.length > 0 && layout === "kanban" && (
+            {!isCatalog && !loading && items.length > 0 && layout === "kanban" && (
               <WorksKanbanView
                 items={items}
                 onOpen={openWork}
@@ -300,7 +380,7 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
                 onItemContextMenu={onItemContextMenu}
               />
             )}
-            {!isModulesView && !loading && items.length > 0 && layout === "timeline" && (
+            {!isCatalog && !loading && items.length > 0 && layout === "timeline" && (
               <WorksTimelineView
                 items={items}
                 selectedId={selectedId}

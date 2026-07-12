@@ -18,6 +18,7 @@ import {
   stashHtmlPreview,
 } from "./htmlPreview";
 import { planKey, parsePlanKey, stashPlan } from "./plan";
+import { parseStoryPlanKey, storyPlanKey } from "./storyPlanTab";
 import {
   clampEditorDrawerW,
   defaultEditorDrawerW,
@@ -30,6 +31,7 @@ import type { ToolCall } from "./ai";
 import { clearChatDiff } from "./chatDiffStore";
 import { stopChatAgent } from "./stopChatAgent";
 import { hydrateChatStore } from "./chatHistory";
+import { ensureAppBundledSkills } from "./bundledSkills/sync";
 import {
   error as toastError,
   errMsg,
@@ -168,6 +170,10 @@ export interface AIChatDescriptor {
   titleLocked?: boolean;
   /** Active Works ticket linked to this chat (feature 054). */
   workItemId?: string;
+  /** Story linked while planning or executing under a parent story. */
+  storyId?: string;
+  /** Quack Plan harness — Jack PM planning session. */
+  planning?: boolean;
 }
 
 export type SidebarView =
@@ -175,7 +181,6 @@ export type SidebarView =
   | "search"
   | "git"
   | "tasks"
-  | "todos"
   | "outline"
   | "bookmarks"
   | "ai"
@@ -310,6 +315,12 @@ export function parseKey(
       chatId: string | undefined;
       planId: string;
     }
+  | {
+      kind: "storyPlan";
+      wsId: string;
+      chatId: string | undefined;
+      storyId: string;
+    }
   | null {
   if (k.startsWith("file:")) return { kind: "file", path: k.slice(5) };
   if (k.startsWith("term:")) return { kind: "terminal", id: k.slice(5) };
@@ -351,6 +362,11 @@ export function parseKey(
     const p = parsePlanKey(k);
     if (!p) return null;
     return { kind: "plan", ...p };
+  }
+  if (k.startsWith("story:")) {
+    const p = parseStoryPlanKey(k);
+    if (!p) return null;
+    return { kind: "storyPlan", ...p };
   }
   return null;
 }
@@ -441,6 +457,7 @@ export function focusedAgentSidePanelKey(
         if (c?.wsId === wsId) return pane.active;
       }
       if (pane.active.startsWith("sub:")) return pane.active;
+      if (pane.active.startsWith("story:")) return pane.active;
     }
   }
   return (
@@ -940,6 +957,14 @@ interface AppState {
   setAIChatTitle(wsId: string, id: string, title: string): void;
   /** Link or unlink a Works ticket on a chat tab. */
   setAIChatWorkItem(wsId: string, chatId: string, workItemId: string | null): void;
+  setAIChatStory(wsId: string, chatId: string, storyId: string | null): void;
+  setAIChatPlanning(wsId: string, chatId: string, planning: boolean): void;
+  /** Open (or focus) a story plan tab, side-by-side with the chat. */
+  openStoryPlan(
+    wsId: string,
+    chatId: string | undefined,
+    storyId: string,
+  ): void;
   /** User-driven rename from the Agent Hub — locks the title against the
    *  auto-title effect. */
   renameAIChat(wsId: string, id: string, title: string): void;
@@ -1028,6 +1053,10 @@ function parseAIChatsRaw(raw: unknown): Record<string, AIChatDescriptor> {
     const archivedAt =
       typeof v.archivedAt === "number" ? v.archivedAt : undefined;
     const titleLocked = v.titleLocked === true ? true : undefined;
+    const workItemId =
+      typeof v.workItemId === "string" ? v.workItemId : undefined;
+    const storyId = typeof v.storyId === "string" ? v.storyId : undefined;
+    const planning = v.planning === true ? true : undefined;
     out[id] = {
       id: v.id,
       title: v.title,
@@ -1037,6 +1066,9 @@ function parseAIChatsRaw(raw: unknown): Record<string, AIChatDescriptor> {
       doneAt,
       archivedAt,
       titleLocked,
+      workItemId,
+      storyId,
+      planning,
     };
   }
   return out;
@@ -1078,7 +1110,7 @@ function commonLayoutFields(
   "editorRoot" | "bottomRoot" | "activePaneId"
 > {
   const validViews: SidebarView[] = [
-    "files", "search", "git", "tasks", "todos", "outline", "bookmarks", "ai", "remote", "usage",
+    "files", "search", "git", "tasks", "outline", "bookmarks", "ai", "remote", "usage",
   ];
   const view = validViews.includes(r.sidebarView as SidebarView)
     ? (r.sidebarView as SidebarView)
@@ -1185,7 +1217,6 @@ function parseSidebarSections(
     "files",
     "git",
     "tasks",
-    "todos",
     "remote",
   ];
   if (Array.isArray(raw)) {
@@ -1637,7 +1668,10 @@ export const useStore = create<AppState>((set, get) => {
       // agent mode) would mount its chats against a COLD cache — showing
       // empty transcripts and, on the next save, overwriting the real
       // on-disk history. Hydrate before the panels mount. Idempotent.
-      await hydrateChatStore(meta.id);
+      await Promise.all([
+        hydrateChatStore(meta.id),
+        ensureAppBundledSkills(root),
+      ]);
       set({ recent, openIds, activeId: meta.id, loaded });
       await persistIdx();
     },
@@ -3253,6 +3287,64 @@ export const useStore = create<AppState>((set, get) => {
         else delete next.workItemId;
         return { ...w, aiChats: { ...w.aiChats, [id]: next } };
       }),
+
+    setAIChatStory: (wsId, id, storyId) =>
+      updateWs(wsId, (w) => {
+        const desc = w.aiChats[id];
+        if (!desc) return w;
+        const next = { ...desc };
+        if (storyId) next.storyId = storyId;
+        else delete next.storyId;
+        return { ...w, aiChats: { ...w.aiChats, [id]: next } };
+      }),
+
+    setAIChatPlanning: (wsId, id, planning) =>
+      updateWs(wsId, (w) => {
+        const desc = w.aiChats[id];
+        if (!desc) return w;
+        const next = { ...desc };
+        if (planning) next.planning = true;
+        else delete next.planning;
+        return { ...w, aiChats: { ...w.aiChats, [id]: next } };
+      }),
+
+    openStoryPlan: (wsId, chatId, storyId) => {
+      const k = storyPlanKey(wsId, chatId, storyId);
+      updateWs(wsId, (w) => {
+        let foundPane: PaneId | null = null;
+        mapTree(w.layout.editorRoot, (t) => {
+          if (t.tabs.includes(k)) foundPane = t.id;
+          return t;
+        });
+        if (foundPane) {
+          return {
+            ...w,
+            layout: {
+              ...w.layout,
+              activePaneId: foundPane,
+              editorRoot: mapTree(w.layout.editorRoot, (t) =>
+                t.id === foundPane ? { ...t, active: k } : t,
+              ),
+            },
+          };
+        }
+        const activeId = w.layout.activePaneId;
+        const targetPaneId =
+          activeId && isInTree(w.layout.editorRoot, activeId)
+            ? activeId
+            : firstLeaf(w.layout.editorRoot).id;
+        const { tree, activePaneId } = dropTabAt(
+          w.layout.editorRoot,
+          targetPaneId,
+          "right",
+          k,
+        );
+        return {
+          ...w,
+          layout: { ...w.layout, editorRoot: tree, activePaneId },
+        };
+      });
+    },
 
     renameAIChat: (wsId, id, title) =>
       updateWs(wsId, (w) => {

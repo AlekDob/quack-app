@@ -96,7 +96,7 @@ export interface BrainTurnContext {
 }
 
 /** Hybrid search via local pinky CLI; null when unavailable or empty. */
-export async function fetchBrainContextForTurn(
+export async function fetchBrainContextForQuery(
   root: string,
   query: string,
   limit = 3,
@@ -114,4 +114,40 @@ export async function fetchBrainContextForTurn(
   } catch {
     return null;
   }
+}
+
+/** Pinky search with path dedup against an existing work manifest. */
+export async function fetchBrainContextDeduped(
+  root: string,
+  query: string,
+  excludePaths: Set<string>,
+  limit = 2,
+): Promise<BrainTurnContext | null> {
+  const q = query.trim();
+  if (!q || q.length < 8) return null;
+  const t0 = performance.now();
+  try {
+    const res = await pinky.search(root, q.slice(0, 400), limit + 3);
+    const searchMs = Math.round(performance.now() - t0);
+    const filtered = res.results.filter((h) => {
+      const p = h.path.replace(/\\/g, "/").toLowerCase();
+      const base = p.split("/").pop() ?? p;
+      return !excludePaths.has(p) && !excludePaths.has(base);
+    }).slice(0, limit);
+    if (filtered.length === 0) return null;
+    const block = formatBrainBlock(q, filtered);
+    const savings = estimateBrainSavings(filtered, block.length, searchMs);
+    return { block, usage: toUsageMeta(filtered, savings) };
+  } catch {
+    return null;
+  }
+}
+
+/** Hybrid search via local pinky CLI; null when unavailable or empty. */
+export async function fetchBrainContextForTurn(
+  root: string,
+  query: string,
+  limit = 3,
+): Promise<BrainTurnContext | null> {
+  return fetchBrainContextForQuery(root, query, limit);
 }

@@ -335,7 +335,7 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
     "view.source_control",
     "view.ai",
     "view.tasks",
-    "view.todos",
+    "view.open_works",
     "view.notifications",
     "view.footprint",
     "view.close_tab",
@@ -557,7 +557,7 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
               "view.source_control",
               "view.ai",
               "view.tasks",
-              "view.todos",
+              "view.open_works",
               "view.notifications",
               "view.footprint",
             ])}

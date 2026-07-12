@@ -1,10 +1,11 @@
 // Discovery for user-created presets: markdown files with YAML frontmatter
-// living in `<workspace>/.codetta/presets/` — deliberately NOT
+// living in `<workspace>/.quack/presets/` — deliberately NOT
 // `.claude/agents/`, so custom presets never show up in the @-mention menu
 // or get delegated as a Task (a preset shapes the CURRENT session; it is
 // not a subagent). Mirrors subagents.ts's parser/discovery shape.
 import { fs, type DirEntry } from "../ipc";
 import { frontmatterField } from "../subagents";
+import { migrateLegacyQuackSubpath, quackAbs } from "../quackDir";
 import { defaultPresetAvatar } from "./avatarStore";
 import type { EffortLevel, ModelTier, OutputStyle, PresetDefinition } from "./types";
 
@@ -58,7 +59,8 @@ function parseCustomPreset(src: string, fileName: string, path: string): PresetD
 /** Preset .md files never carry a `skills:` list — that field is specific
  *  to delegable subagents. Nothing to filter: this dir is presets-only. */
 export async function loadCustomPresets(root: string): Promise<PresetDefinition[]> {
-  const dir = `${root}/.codetta/presets`;
+  await migrateLegacyQuackSubpath(root, "presets");
+  const dir = quackAbs(root, "presets");
   let entries: DirEntry[];
   try {
     entries = await fs.listDir(dir);

@@ -1,14 +1,15 @@
 import { basename, dirname } from "../pathUtils";
 import { fileIconName } from "../fileIcons";
 import type { SubagentDef } from "../subagents";
-import type { WorkItem } from "../works";
+import type { WorkItem, WorkStory } from "../works";
 import { Icon } from "./Icon";
 import { MentionPathPreview } from "./MentionPathPreview";
 
 export type MentionItem =
   | { type: "agent"; agent: SubagentDef }
   | { type: "file"; abs: string; rel: string }
-  | { type: "work"; work: WorkItem };
+  | { type: "work"; work: WorkItem }
+  | { type: "story"; story: WorkStory };
 
 type Props = {
   matches: MentionItem[];
@@ -36,7 +37,9 @@ export function MentionSuggestions({
                 ? `agent:${m.agent.name}`
                 : m.type === "work"
                   ? `work:${m.work.id}`
-                  : m.abs
+                  : m.type === "story"
+                    ? `story:${m.story.id}`
+                    : m.abs
             }
             type="button"
             className={`ai-slash-item ai-mention-item ${i === activeIndex ? "active" : ""}`}
@@ -66,6 +69,16 @@ export function MentionSuggestions({
                 <span className="ai-mention-file-label">
                   <span className="ai-mention-file-name">@{m.work.shortId}</span>
                   <span className="ai-mention-file-dir">{m.work.title}</span>
+                </span>
+              </>
+            ) : m.type === "story" ? (
+              <>
+                <span className="ai-mention-file-icon">
+                  <Icon name="file-text" size={14} />
+                </span>
+                <span className="ai-mention-file-label">
+                  <span className="ai-mention-file-name">@{m.story.shortId}</span>
+                  <span className="ai-mention-file-dir">{m.story.title}</span>
                 </span>
               </>
             ) : (

@@ -82,7 +82,7 @@ export function CustomizationsModal({ open, onClose, root, initialTab }: Props) 
     void (async () => {
       const rules = await loadWorkspaceRules(root);
       if (!alive) return;
-      setRulesPath(rules?.absolutePath ?? joinPath(root, ".codetta", "rules.md"));
+      setRulesPath(rules?.absolutePath ?? joinPath(root, ".quack", "rules.md"));
     })();
     return () => {
       alive = false;

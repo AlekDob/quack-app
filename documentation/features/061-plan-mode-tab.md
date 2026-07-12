@@ -16,6 +16,11 @@ card (`ClaudePermissionOverlay`). This opens it as a real editor tab, forced
 into a split next to the chat (Cursor-style), the moment the plan lands —
 independent of approve/deny.
 
+> **Since `068-quack-plan-harness`:** when the chat has `storyId` set, plan text
+> merges into `works/stories/S-NNN.md` and opens **`StoryPlanPane`** (`story:`)
+> instead. The ephemeral `plan:` tab below is the **fallback** for chats without a
+> linked story (legacy work-only plan drafts).
+
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
@@ -67,6 +72,7 @@ ExitPlanMode permission request arrives (tool_input.plan non-empty)
   `claude_perm_decide` exactly as before.
 
 ### Related docs
+- `068-quack-plan-harness.md` — story-owned plan (primary path when `storyId` set)
 - `045-html-preview.md` — `prev:` virtual tab pattern this clones
 - `038-compose-review.md` — original `crev:` virtual-tab registration pattern
 - `015-claude-permission-mode.md` — `ClaudePermissionOverlay` / permission flow

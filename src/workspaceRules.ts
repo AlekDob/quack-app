@@ -10,13 +10,12 @@
 // regardless of which provider the user picks.
 //
 // File search order (first hit wins):
-//   1. .codetta/rules.md   — explicitly Codetta's, takes precedence so
-//                            users can override CLAUDE.md per-editor
-//   2. CLAUDE.md           — shared with the Claude Code CLI; common
-//                            case for users who already authored it
-//   3. .cursorrules        — Cursor-style; lets users migrating from
+//   1. .quack/rules.md      — Quack workspace rules (preferred)
+//   2. .codetta/rules.md    — legacy pre-rebrand path
+//   3. CLAUDE.md            — shared with the Claude Code CLI
+//   4. .cursorrules        — Cursor-style; lets users migrating from
 //                            Cursor reuse what they had
-//   4. .cursor/rules.md    — newer Cursor convention (multi-file rules
+//   5. .cursor/rules.md    — newer Cursor convention (multi-file rules
 //                            collapse to the first one found)
 //
 // Truncated to MAX_RULES_BYTES so a runaway rules file can't blow up
@@ -26,6 +25,7 @@ import { fs } from "./ipc";
 import { matchExclusion } from "./aiPrivacy";
 
 const RULES_PATHS = [
+  ".quack/rules.md",
   ".codetta/rules.md",
   "CLAUDE.md",
   ".cursorrules",

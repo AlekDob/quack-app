@@ -1,4 +1,4 @@
-//! Workspace-scoped Works store — `.codetta/works/snapshot.json` + `events.jsonl`.
+//! Workspace-scoped Works store — `works/snapshot.json` + `events.jsonl`.
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -9,7 +9,7 @@ fn works_dir(ws_root: &str) -> Result<PathBuf, String> {
     if !root.is_absolute() {
         return Err("workspace root must be absolute".into());
     }
-    let dir = root.join(".codetta").join("works");
+    let dir = root.join("works");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }

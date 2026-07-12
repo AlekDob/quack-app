@@ -1,4 +1,4 @@
-import type { WorkItem, WorkStatus } from "./works";
+import type { WorkItem, WorkStatus, WorksSnapshot } from "./works";
 
 export type WorksSidebarView =
   | "all"
@@ -7,6 +7,8 @@ export type WorksSidebarView =
   | "in_progress"
   | "done"
   | "cancelled"
+  | "cycles"
+  | "stories"
   | "modules";
 
 export interface WorksSidebarViewDef {
@@ -23,6 +25,8 @@ export const WORKS_SIDEBAR_VIEWS: WorksSidebarViewDef[] = [
   { id: "backlog", label: "Backlog", status: "backlog" },
   { id: "done", label: "Completed", status: "done" },
   { id: "cancelled", label: "Cancelled", status: "cancelled" },
+  { id: "cycles", label: "Cycles", separatorBefore: true },
+  { id: "stories", label: "Stories" },
   { id: "modules", label: "Modules", separatorBefore: true },
 ];
 
@@ -40,9 +44,16 @@ export function filterItemsByView(
 }
 
 export function countForView(
-  items: WorkItem[],
+  snap: WorksSnapshot | null,
   view: WorksSidebarView,
 ): number {
+  if (!snap) return 0;
   if (view === "modules") return 0;
-  return filterItemsByView(items, view).length;
+  if (view === "cycles") return snap.cycles.length;
+  if (view === "stories") return snap.stories.length;
+  return filterItemsByView(snap.items, view).length;
+}
+
+export function isCatalogView(view: WorksSidebarView): boolean {
+  return view === "modules" || view === "cycles" || view === "stories";
 }

@@ -124,22 +124,29 @@ import {
 import { PERM_MODE_OPTIONS } from "../presets/permModes";
 import {
   fetchBrainContextForTurn,
+  fetchBrainContextDeduped,
   getBrainInjectEnabled,
 } from "../brainInject";
 import {
-  formatWorkBlock,
+  approvePlanning,
+  onNativePlanReady,
+} from "../quackPlanHarness";
+import {
+  buildStoryTurnContext,
+  buildSiblingSummaries,
+  buildWorksTurnContext,
   getWorkInjectEnabled,
+  getWorksInjectDepth,
+  manifestDocPaths,
 } from "../workContextInject";
 import {
-  approvePlanWork,
-  createWorkItem,
   getWorksSnapshot,
   hydrateWorks,
+  linkChatToStory,
   linkChatToWork,
   subscribeWorks,
-  updateWorkItem,
 } from "../worksCache";
-import { type WorksSnapshot } from "../works";
+import { findStory, findWork, type WorksSnapshot } from "../works";
 import { recordBrainUsage } from "../brainUsageStore";
 import { BrainTurnChip } from "./BrainTurnChip";
 import { ReasoningTurnChip } from "./ReasoningTurnChip";
@@ -449,6 +456,12 @@ export function AIChatPanel({
   const wsActive = useStore((s) => s.activeId === wsId);
   const workItemId = useStore((s) =>
     aiChatId ? s.loaded[wsId]?.aiChats[aiChatId]?.workItemId : undefined,
+  );
+  const storyId = useStore((s) =>
+    aiChatId ? s.loaded[wsId]?.aiChats[aiChatId]?.storyId : undefined,
+  );
+  const planning = useStore((s) =>
+    aiChatId ? !!s.loaded[wsId]?.aiChats[aiChatId]?.planning : false,
   );
   const [pinkyBrainExt, setPinkyBrainExt] = useState(false);
   const [skillTrainerExt, setSkillTrainerExt] = useState(false);
@@ -898,7 +911,7 @@ export function AIChatPanel({
   // catalog (project + global .claude/agents) is loaded into `agents`.
   const [agents, setAgents] = useState<SubagentDef[]>([]);
   // Presets shown as "primary agents" in the composer picker (built-ins are
-  // always present; custom ones load from .codetta/presets/, same dir the
+  // always present; custom ones load from .quack/presets/, same dir the
   // organigramma reads/writes). Unlike subagents, available on ANY backend.
   const [customPresets, setCustomPresets] = useState<PresetDefinition[]>([]);
   // Bumped whenever preset overrides change (editing a built-in from the
@@ -2423,6 +2436,16 @@ export function AIChatPanel({
       }
     }
     if (worksSnap) {
+      for (const s of worksSnap.stories) {
+        if (
+          q === "" ||
+          s.shortId.toLowerCase().includes(q) ||
+          s.title.toLowerCase().includes(q)
+        ) {
+          out.push({ type: "story", story: s });
+          if (out.length >= 8) break;
+        }
+      }
       for (const w of worksSnap.items) {
         if (
           q === "" ||
@@ -2453,7 +2476,9 @@ export function AIChatPanel({
         ? pick.agent.name
         : pick.type === "work"
           ? pick.work.shortId
-          : pick.rel;
+          : pick.type === "story"
+            ? pick.story.shortId
+            : pick.rel;
     const before = input.slice(0, mentionState.start);
     const after = input.slice(mentionState.end);
     const next = `${before}@${token}${after.startsWith(" ") ? "" : " "}${after}`;
@@ -2467,6 +2492,10 @@ export function AIChatPanel({
     } else if (pick.type === "work" && aiChatId) {
       void linkChatToWork(root, pick.work.id, aiChatId);
       useStore.getState().setAIChatWorkItem(wsId, aiChatId, pick.work.id);
+    } else if (pick.type === "story" && aiChatId) {
+      void linkChatToStory(root, pick.story.id, aiChatId).then(() => {
+        useStore.getState().setAIChatStory(wsId, aiChatId, pick.story.id);
+      });
     } else if (pick.type === "file") {
       addAttachedFile(pick.abs, root);
     }
@@ -2598,8 +2627,19 @@ export function AIChatPanel({
       toastError(
         `🛑 ${scope} reached: $${cap.current.toFixed(2)} / $${cap.cap.toFixed(2)}. Raise it in Settings → AI Usage Dashboard to send.`,
       );
+      liveTurnRef.current = false;
       return;
     }
+
+    // Flip the turn-status dock on immediately, before the (potentially
+    // slow, first-turn-only) system-prompt assembly below — workspace
+    // rules, Pinky Brain extension check, Works context hydration. Those
+    // awaits used to run silently before `setStreaming("")`, so a brand
+    // new chat's first message could sit for a couple of seconds with no
+    // visible feedback at all. The "Planning next moves…" spinner now
+    // shows first; the user's message bubble still lands once assembly
+    // finishes.
+    flushSync(() => setStreaming(""));
 
     // Compose context: active file path + (when reasonable) its content.
     const ws = useStore.getState().loaded[wsId];
@@ -2913,11 +2953,69 @@ export function AIChatPanel({
       }
     }
     let brainUsage: ChatMessage["brain_usage"];
-    const brainInject =
+    const pinkyReady =
       pinkyBrainExt &&
       getBrainInjectEnabled(wsId) &&
       (await isExtensionInstalled(root, "pinky-brain"));
-    if (brainInject) {
+    let linkedWorkId: string | undefined;
+    let linkedStoryId: string | undefined;
+    if (aiChatId && getWorkInjectEnabled(wsId)) {
+      const chatDesc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
+      linkedWorkId = chatDesc?.workItemId;
+      linkedStoryId = chatDesc?.storyId;
+    }
+    if (linkedWorkId || linkedStoryId) {
+      try {
+        const snap = getWorksSnapshot(root) ?? (await hydrateWorks(root));
+        const chatIds = new Set<string>();
+        if (linkedWorkId) {
+          for (const id of findWork(snap, linkedWorkId)?.linkedChatIds ?? []) {
+            chatIds.add(id);
+          }
+        }
+        if (linkedStoryId) {
+          for (const id of findStory(snap, linkedStoryId)?.linkedChatIds ?? []) {
+            chatIds.add(id);
+          }
+        }
+        const siblings = buildSiblingSummaries(snap, [...chatIds], aiChatId);
+        const worksCtx = linkedWorkId
+          ? await buildWorksTurnContext(
+              root,
+              snap,
+              linkedWorkId,
+              wsId,
+              siblings,
+            )
+          : linkedStoryId
+            ? await buildStoryTurnContext(
+                root,
+                snap,
+                linkedStoryId,
+                wsId,
+                siblings,
+              )
+            : null;
+        if (worksCtx) {
+          ccTurnContext.push(worksCtx.block);
+          if (pinkyReady && getWorksInjectDepth(wsId) === "pinky" && worksCtx.pinkyQuery) {
+            const brainCtx = await fetchBrainContextDeduped(
+              root,
+              worksCtx.pinkyQuery,
+              manifestDocPaths(worksCtx.refs),
+              2,
+            );
+            if (brainCtx) {
+              brainUsage = brainCtx.usage;
+              recordBrainUsage(wsId, brainCtx.usage.savedTokens, brainCtx.usage.savedMs);
+              ccTurnContext.push(brainCtx.block);
+            }
+          }
+        }
+      } catch {
+        /* Works context optional */
+      }
+    } else if (pinkyReady) {
       try {
         const brainCtx = await fetchBrainContextForTurn(root, text);
         if (brainCtx) {
@@ -2931,19 +3029,6 @@ export function AIChatPanel({
         }
       } catch {
         /* Pinky optional — never block the turn */
-      }
-    }
-    if (aiChatId && getWorkInjectEnabled(wsId)) {
-      try {
-        const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
-        const wid = desc?.workItemId;
-        if (wid) {
-          const snap = getWorksSnapshot(root) ?? (await hydrateWorks(root));
-          const block = formatWorkBlock(snap, wid, []);
-          if (block) ccTurnContext.push(block);
-        }
-      } catch {
-        /* Works context optional */
       }
     }
     appendJackUserPreferences(sysParts);
@@ -2963,7 +3048,7 @@ export function AIChatPanel({
       if (body) {
         sysParts.push(
           activeDef.source === "custom"
-            ? `[Preset "${activeDef.label}" — from this workspace's .codetta/presets/, not verified by Quack]\n${body}`
+            ? `[Preset "${activeDef.label}" — from this workspace's .quack/presets/, not verified by Quack]\n${body}`
             : body,
         );
       }
@@ -4906,6 +4991,13 @@ export function AIChatPanel({
   };
 
   const openPlanHandler = (requestId: string, plan: string) => {
+    const desc = aiChatId
+      ? useStore.getState().loaded[wsId]?.aiChats[aiChatId]
+      : undefined;
+    if (desc?.storyId && aiChatId) {
+      void onNativePlanReady(wsId, aiChatId, root, desc.storyId, plan);
+      return;
+    }
     openPlanTab(wsId, aiChatId, requestId, plan);
   };
 
@@ -4913,24 +5005,16 @@ export function AIChatPanel({
     if (!aiChatId) return;
     try {
       const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
-      const title =
-        plan.split("\n").find((l) => l.trim())?.trim().slice(0, 120) ??
-        "Approved plan";
+      if (desc?.storyId) {
+        await approvePlanning(wsId, aiChatId, root, desc.storyId, plan);
+        return;
+      }
       if (desc?.workItemId) {
+        const { approvePlanWork } = await import("../worksCache");
         await approvePlanWork(root, desc.workItemId, plan);
-        await updateWorkItem(root, desc.workItemId, { title });
-      } else {
-        const item = await createWorkItem(root, {
-          title,
-          origin: "plan",
-          status: "in_progress",
-          bodyMd: plan,
-        });
-        await linkChatToWork(root, item.id, aiChatId);
-        useStore.getState().setAIChatWorkItem(wsId, aiChatId, item.id);
       }
     } catch (e) {
-      console.warn("plan work approve failed", e);
+      console.warn("plan approve failed", e);
     }
   };
 
@@ -6004,7 +6088,13 @@ export function AIChatPanel({
             root={root}
             chatId={aiChatId}
             workItemId={workItemId}
+            storyId={storyId}
+            planning={planning}
             ccPermMode={ccPermMode}
+            onPickJack={() => applyPreset(null, { silent: true })}
+            onSetPlanMode={
+              selectedIsCC ? () => setCcPermMode("plan") : undefined
+            }
           />
         ) : null}
         <div className="ai-composer-spacer" />

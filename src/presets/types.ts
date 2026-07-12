@@ -32,7 +32,7 @@ export interface PresetDefaults {
 }
 
 // Definizione completa di un preset (metadati + defaults).
-// Built-in: vivono in builtins.ts (source "builtin"). Custom: da .codetta/presets/*.md
+// Built-in: vivono in builtins.ts (source "builtin"). Custom: da .quack/presets/*.md
 // (source "custom", path = file per il write-back frontmatter).
 export interface PresetDefinition {
   id: string; // built-in = PresetId; custom = slug del file

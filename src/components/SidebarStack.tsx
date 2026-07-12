@@ -8,7 +8,6 @@ import { FileTree } from "./FileTree";
 import { SearchPanel } from "./SearchPanel";
 import { SourceControlPanel } from "./SourceControlPanel";
 import { TasksPanel } from "./TasksPanel";
-import { TodosPanel } from "./TodosPanel";
 import { UsagePanel } from "./UsagePanel";
 import { AIChatPanel } from "./AIChatPanel";
 import { OutlinePanel } from "./OutlinePanel";
@@ -23,7 +22,6 @@ const VIEW_LABEL: Record<SidebarView, string> = {
   search: "Search",
   git: "Source Control",
   tasks: "Tasks",
-  todos: "TODO / FIXME",
   outline: "Outline",
   bookmarks: "Bookmarks",
   ai: "AI Chat",
@@ -132,8 +130,6 @@ export function SidebarStack({ wsId, ws }: Props) {
         return <SourceControlPanel wsId={wsId} root={ws.meta.root} />;
       case "tasks":
         return <TasksPanel wsId={wsId} root={ws.meta.root} />;
-      case "todos":
-        return <TodosPanel wsId={wsId} root={ws.meta.root} />;
       case "outline":
         // Outline + Diagnostics share the "navigate to a line in the
         // workspace" purpose, so the Problems panel rides inside the

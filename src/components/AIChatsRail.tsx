@@ -608,7 +608,12 @@ function HubRow({
           <span className="agent-hub-row-title">{chat.title}</span>
         ))}
       {expanded && (
-        <WorkHubBadge root={ws.meta.root} workItemId={chat.workItemId} />
+        <WorkHubBadge
+          root={ws.meta.root}
+          workItemId={chat.workItemId}
+          storyId={chat.storyId}
+          planning={chat.planning}
+        />
       )}
       {expanded && !renaming && (
         <button

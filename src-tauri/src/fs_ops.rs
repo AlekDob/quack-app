@@ -194,7 +194,7 @@ pub fn save_image_attachment(filename: String, data_b64: String) -> Result<Strin
 }
 
 /// Persist an image to a durable, caller-chosen directory (e.g. a preset's
-/// `.codetta/avatars/`) rather than the ephemeral OS temp dir used by
+/// `.quack/avatars/`) rather than the ephemeral OS temp dir used by
 /// `save_image_attachment`. Same decode + filename-sanitize logic; the
 /// directory is created if missing.
 #[tauri::command]

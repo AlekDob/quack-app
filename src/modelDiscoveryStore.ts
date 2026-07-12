@@ -362,8 +362,14 @@ export async function ensureCloudCatalog(): Promise<ProviderModel[]> {
 }
 
 async function warmLiveCliCatalogs(force = false): Promise<void> {
-  const snap = getModelDiscovery();
-  if (!snap) return;
+  let snap = getModelDiscovery();
+  if (!snap) {
+    // First run (no disk snapshot yet): wait for the base discovery fetch
+    // so we know which CLIs are available, instead of silently skipping
+    // the CC/Cursor/OpenCode warm-up (which used to leave the picker
+    // loader stuck off on the very first open).
+    snap = await ensureModelDiscovery({ force: false });
+  }
   const wantCc = snap.claudeCodeAvailable;
   const wantCursor = snap.cursorCliAvailable;
   const wantOc = snap.openCodeAvailable;

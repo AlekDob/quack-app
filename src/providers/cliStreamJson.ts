@@ -8,6 +8,10 @@ export interface CliStreamJsonState {
   toolUseBlocks: Map<number, { id?: string; name?: string; jsonBuf: string }>;
   emittedToolUseIds: Set<string>;
   thinkingBlocks: Map<number, string>;
+  // Cursor --stream-partial-output emits each token as its own `assistant`
+  // message, then a final `assistant` message repeating the FULL text. Track
+  // what we've streamed so we can drop that trailing full-text snapshot.
+  partialAssistantBuf: string;
 }
 
 export function createCliStreamJsonState(): CliStreamJsonState {
@@ -18,6 +22,7 @@ export function createCliStreamJsonState(): CliStreamJsonState {
     toolUseBlocks: new Map(),
     emittedToolUseIds: new Set(),
     thinkingBlocks: new Map(),
+    partialAssistantBuf: "",
   };
 }
 
@@ -49,6 +54,7 @@ export function parseCliStreamJsonObject(
 
     if (ev.type === "message_start") {
       state.currentMsgGotDeltas = false;
+      state.partialAssistantBuf = "";
       state.toolUseBlocks.clear();
       state.thinkingBlocks.clear();
       state.textBlocksStarted.clear();
@@ -168,7 +174,16 @@ export function parseCliStreamJsonObject(
       const b = block as Record<string, unknown>;
       if (alreadyStreamed && b.type === "text") continue;
       if (b.type === "text" && typeof b.text === "string") {
-        out.push({ kind: "content", text: b.text });
+        const t = b.text;
+        // Cursor sends token-by-token `assistant` messages, then a final one
+        // repeating the whole text. Drop that trailing snapshot instead of
+        // rendering the reply twice.
+        if (t.length > 0 && t === state.partialAssistantBuf) {
+          state.partialAssistantBuf = "";
+          continue;
+        }
+        state.partialAssistantBuf += t;
+        out.push({ kind: "content", text: t });
       } else if (b.type === "tool_use") {
         const id = typeof b.id === "string" ? b.id : undefined;
         if (id && state.emittedToolUseIds.has(id)) continue;
@@ -189,6 +204,7 @@ export function parseCliStreamJsonObject(
   }
 
   if (obj.type === "result") {
+    state.partialAssistantBuf = "";
     const u = (obj.usage ?? {}) as Record<string, unknown>;
     const num = (v: unknown) =>
       typeof v === "number" && Number.isFinite(v) ? v : 0;

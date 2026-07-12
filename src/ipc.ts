@@ -23,7 +23,7 @@ export const fs = {
   saveImageAttachment: (filename: string, dataB64: string) =>
     invoke<string>("save_image_attachment", { filename, dataB64 }),
   /** Persist an image to a durable, caller-chosen directory (e.g. a
-   *  preset's `.codetta/avatars/`) — unlike saveImageAttachment, this
+   *  preset's `.quack/avatars/`) — unlike saveImageAttachment, this
    *  survives beyond the OS temp dir. */
   savePersistentImage: (dir: string, filename: string, dataB64: string) =>
     invoke<string>("save_persistent_image", { dir, filename, dataB64 }),

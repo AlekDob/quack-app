@@ -18,12 +18,14 @@ distinct from the built-in slash commands. Picking one invokes the skill.
 
 ### Where skills come from
 Skills are **folders** containing a `SKILL.md` (vs subagents, which are single
-`.md` files). Scanned from two roots, project wins name collisions:
+`.md` files). Scanned from four roots; project wins name collisions:
 
 | Source | Path |
 |---|---|
 | Project | `<workspace>/.claude/skills/<name>/SKILL.md` |
 | User-global | `~/.claude/skills/<name>/SKILL.md` |
+| Repo mirror | `<workspace>/documentation/skills/<name>/SKILL.md` |
+| **App-bundled** | `src/bundledSkills/` → `quack-works` (PM + feature docs) and `quack-brain` (search/save) |
 
 `loadSkills(root, home)` (mirrors `loadSubagents`) reads each folder's `SKILL.md`,
 takes `name`/`description` from YAML frontmatter (shared `frontmatterField` from

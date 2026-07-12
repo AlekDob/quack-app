@@ -6,6 +6,7 @@ import { SubagentTranscriptView } from "./SubagentTranscriptView";
 import { ComposeReviewPane } from "./ComposeReviewPane";
 import { HtmlPreviewPane } from "./HtmlPreviewPane";
 import { PlanPane } from "./PlanPane";
+import { StoryPlanPane } from "./StoryPlanPane";
 import { WhiteboardPane } from "./WhiteboardPane";
 import { WorksPane } from "./works/WorksPane";
 import { UsagePanel } from "./UsagePanel";
@@ -106,6 +107,9 @@ export function TabContentHost({
   }
   if (parsed.kind === "plan") {
     return createPortal(<PlanPane tabKey={tabKey} />, container, tabKey);
+  }
+  if (parsed.kind === "storyPlan") {
+    return createPortal(<StoryPlanPane tabKey={tabKey} />, container, tabKey);
   }
   if (parsed.kind === "whiteboard") {
     return (

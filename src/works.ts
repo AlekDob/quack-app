@@ -46,6 +46,32 @@ export interface WorkCycle {
   name: string;
   startDate: string;
   endDate: string;
+  status: CycleStatus;
+  /** Auto-generated ISO week cycles vs user-created. */
+  auto: boolean;
+}
+
+export type CycleStatus = "upcoming" | "active" | "completed";
+
+export type StoryStatus = "draft" | "active" | "done";
+
+export interface WorkStory {
+  id: string;
+  shortId: string;
+  /** Workspace-relative path, e.g. works/stories/S-001.md */
+  filePath: string;
+  title: string;
+  moduleId: string;
+  cycleId?: string;
+  status: StoryStatus;
+  /** Markdown body — loaded from filePath; omitted in persisted snapshot. */
+  bodyMd?: string;
+  /** Extra Brain doc paths from frontmatter `refs:` (loaded from .md). */
+  brainRefs?: string[];
+  /** Chat sessions linked while planning this story. */
+  linkedChatIds: string[];
+  createdAt: number;
+  updatedAt: number;
 }
 
 export interface WorkComment {
@@ -60,7 +86,7 @@ export interface WorkComment {
 export interface WorkItem {
   id: string;
   shortId: string;
-  /** Workspace-relative path, e.g. .codetta/works/items/W-001.md */
+  /** Workspace-relative path, e.g. works/items/W-001.md */
   filePath: string;
   moduleId: string;
   parentId?: string;
@@ -83,6 +109,8 @@ export interface WorkItem {
   comments: WorkComment[];
   createdAt: number;
   updatedAt: number;
+  /** Extra Brain doc paths from frontmatter `refs:` (loaded from .md). */
+  brainRefs?: string[];
 }
 
 export interface WorksViewPrefs {
@@ -91,16 +119,20 @@ export interface WorksViewPrefs {
   activeModuleId?: string;
   /** Plane-style sidebar view (status filters + modules catalog). */
   sidebarView?: WorksSidebarView;
+  /** Selected cycle in the Cycles view. */
+  activeCycleId?: string;
 }
 
 export interface WorksSnapshot {
-  version: 1 | 2;
+  version: 1 | 2 | 3;
   labels: WorkLabel[];
   modules: WorkModule[];
   cycles: WorkCycle[];
+  stories: WorkStory[];
   items: WorkItem[];
   viewPrefs: WorksViewPrefs;
   nextSeq: number;
+  nextStorySeq: number;
 }
 
 export const DEFAULT_MODULES: Omit<WorkModule, "id">[] = [
@@ -120,15 +152,17 @@ export function newId(): string {
 
 export function emptySnapshot(): WorksSnapshot {
   return {
-    version: 2,
+    version: 3,
     labels: [
       { id: newId(), name: HOTFIX_LABEL, color: "semantic-warning" },
     ],
     modules: [],
     cycles: [],
+    stories: [],
     items: [],
     viewPrefs: { layout: "list", groupBy: "status" },
     nextSeq: 1,
+    nextStorySeq: 1,
   };
 }
 
@@ -198,12 +232,59 @@ export function nextShortId(snap: WorksSnapshot): string {
   return `W-${String(n).padStart(3, "0")}`;
 }
 
+export function nextStoryShortId(snap: WorksSnapshot): string {
+  const n = snap.nextStorySeq;
+  return `S-${String(n).padStart(3, "0")}`;
+}
+
+export function bumpStorySeq(snap: WorksSnapshot): WorksSnapshot {
+  return { ...snap, nextStorySeq: snap.nextStorySeq + 1 };
+}
+
 export function bumpSeq(snap: WorksSnapshot): WorksSnapshot {
   return { ...snap, nextSeq: snap.nextSeq + 1 };
 }
 
+export function findStoryByShortId(
+  snap: WorksSnapshot,
+  shortId: string,
+): WorkStory | undefined {
+  const q = shortId.toUpperCase();
+  return snap.stories.find((s) => s.shortId.toUpperCase() === q);
+}
+
 export function findWork(snap: WorksSnapshot, id: string): WorkItem | undefined {
   return snap.items.find((w) => w.id === id);
+}
+
+export function findStory(snap: WorksSnapshot, id: string): WorkStory | undefined {
+  return snap.stories.find((s) => s.id === id);
+}
+
+export function findCycle(snap: WorksSnapshot, id: string): WorkCycle | undefined {
+  return snap.cycles.find((c) => c.id === id);
+}
+
+export function childrenOfStory(snap: WorksSnapshot, storyId: string): WorkItem[] {
+  return snap.items.filter((w) => w.parentId === storyId);
+}
+
+export function storyLabel(status: StoryStatus): string {
+  const map: Record<StoryStatus, string> = {
+    draft: "Draft",
+    active: "Active",
+    done: "Done",
+  };
+  return map[status];
+}
+
+export function cycleStatusLabel(status: CycleStatus): string {
+  const map: Record<CycleStatus, string> = {
+    upcoming: "Upcoming",
+    active: "Active",
+    completed: "Completed",
+  };
+  return map[status];
 }
 
 export function statusLabel(status: WorkStatus): string {

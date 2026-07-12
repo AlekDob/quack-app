@@ -3,6 +3,12 @@
 import { fs } from "./ipc";
 import { joinPath, basename } from "./pathUtils";
 import {
+  migrateLegacyWorksWorkspace,
+  rewriteLegacyWorksPath,
+  worksAbs,
+} from "./worksDir";
+import { WORKS_STORIES_DIR } from "./storyMd";
+import {
   blocksToBodyMd,
   parseWorkItemMd,
   serializeWorkItemMd,
@@ -29,8 +35,10 @@ export function isPendingWorkWrite(absPath: string): boolean {
 }
 
 export async function ensureWorksDirs(root: string): Promise<void> {
-  await fs.createDir(joinPath(root, ".codetta", "works"));
+  await migrateLegacyWorksWorkspace(root);
+  await fs.createDir(worksAbs(root));
   await fs.createDir(joinPath(root, WORKS_ITEMS_DIR));
+  await fs.createDir(joinPath(root, WORKS_STORIES_DIR));
 }
 
 export function slimSnapshot(snap: WorksSnapshot): WorksSnapshot {
@@ -40,10 +48,26 @@ export function slimSnapshot(snap: WorksSnapshot): WorksSnapshot {
     };
     return {
       ...rest,
-      filePath: rest.filePath || workItemRelPath(rest.shortId),
+      filePath: rewriteLegacyWorksPath(
+        rest.filePath || workItemRelPath(rest.shortId),
+      ),
     };
   });
-  return { ...snap, version: 2, items };
+  const stories = (snap.stories ?? []).map((s) => {
+    const { bodyMd: _b, ...rest } = s;
+    return {
+      ...rest,
+      filePath: rewriteLegacyWorksPath(
+        rest.filePath || `works/stories/${rest.shortId}.md`,
+      ),
+    };
+  });
+  const cycles = (snap.cycles ?? []).map((c) => ({
+    ...c,
+    status: c.status ?? "completed",
+    auto: c.auto ?? false,
+  }));
+  return { ...snap, version: 3, items, stories, cycles, nextStorySeq: snap.nextStorySeq ?? 1 };
 }
 
 function labelIdsFromNames(snap: WorksSnapshot, names: string[]): string[] {
@@ -86,7 +110,7 @@ export async function hydrateItemFromFile(
   item: WorkItem,
   snap: WorksSnapshot,
 ): Promise<WorkItem> {
-  const rel = item.filePath || workItemRelPath(item.shortId);
+  const rel = rewriteLegacyWorksPath(item.filePath || workItemRelPath(item.shortId));
   const abs = joinPath(root, rel);
   if (!(await fs.exists(abs))) {
     return { ...item, filePath: rel, bodyMd: item.bodyMd ?? "" };
@@ -118,6 +142,7 @@ export async function hydrateItemFromFile(
     createdAt: parsed.createdAt ?? item.createdAt,
     updatedAt: parsed.updatedAt ?? item.updatedAt,
     bodyMd: parsed.bodyMd,
+    brainRefs: parsed.brainRefs.length ? parsed.brainRefs : item.brainRefs,
   };
 }
 
@@ -207,6 +232,7 @@ export async function importOrphanMdFiles(
       planeIssueId: parsed.planeIssueId,
       parentId: parsed.parentId,
       cycleId: parsed.cycleId,
+      brainRefs: parsed.brainRefs,
     };
     items.push(item);
     known.add(item.shortId.toUpperCase());

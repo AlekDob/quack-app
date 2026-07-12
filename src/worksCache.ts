@@ -1,23 +1,41 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
   bumpSeq,
+  bumpStorySeq,
+  childrenOfStory,
   emptySnapshot,
+  findStory,
   findWork,
   moduleByFeatureSlug,
   moduleByName,
   newId,
   nextShortId,
+  nextStoryShortId,
   normalizeWorksSnapshot,
   type WorkComment,
+  type WorkCycle,
   type WorkItem,
   type WorkOrigin,
   type WorkPriority,
+  type WorkStory,
   type WorksSnapshot,
   type WorkStatus,
+  type StoryStatus,
 } from "./works";
 import { workItemRelPath } from "./workItemMd";
+import { defaultStoryBody, storyRelPath } from "./storyMd";
+import { mergePlanIntoStoryBody, titleFromPlanText } from "./planStoryMerge";
+import { ensureAppBundledSkills } from "./bundledSkills/sync";
+import {
+  deleteStoryFile,
+  importOrphanStoryFiles,
+  loadAllStoryBodies,
+  writeStoryFile,
+} from "./worksStoryFiles";
+import { ensureWeeklyCycles, activeCycle } from "./worksCycles";
 import {
   deleteWorkItemFile,
+  ensureWorksDirs,
   hydrateItemFromFile,
   importOrphanMdFiles,
   loadAllItemBodies,
@@ -28,6 +46,7 @@ import {
 import { syncFeatureModules } from "./worksFeatureModules";
 import { refreshAllWorkProgress } from "./workProgressStore";
 import { closeWorkDrawer, getWorkDrawer } from "./workDrawer";
+import { closeStoryDrawer, getStoryDrawer } from "./storyDrawer";
 import { joinPath } from "./pathUtils";
 
 type Listener = (snap: WorksSnapshot) => void;
@@ -64,12 +83,36 @@ function notify(e: WsWorks): void {
 function isSnapshot(v: unknown): v is WorksSnapshot {
   if (!v || typeof v !== "object") return false;
   const o = v as Record<string, unknown>;
-  return (o.version === 1 || o.version === 2) && Array.isArray(o.items);
+  return (
+    (o.version === 1 || o.version === 2 || o.version === 3) &&
+    Array.isArray(o.items)
+  );
+}
+
+function migrateSnapshotV3(snap: WorksSnapshot): WorksSnapshot {
+  const cycles = (snap.cycles ?? []).map((c) => ({
+    ...c,
+    status: c.status ?? "completed",
+    auto: c.auto ?? false,
+  }));
+  return {
+    ...snap,
+    version: 3,
+    cycles,
+    stories: (snap.stories ?? []).map((s) => ({
+      ...s,
+      linkedChatIds: s.linkedChatIds ?? [],
+    })),
+    nextStorySeq: snap.nextStorySeq ?? 1,
+  };
 }
 
 async function persist(root: string, snap: WorksSnapshot): Promise<void> {
   for (const item of snap.items) {
     await writeWorkItemFile(root, item, snap);
+  }
+  for (const story of snap.stories) {
+    await writeStoryFile(root, story, snap);
   }
   await invoke("works_save", { wsRoot: root, snapshot: slimSnapshot(snap) });
 }
@@ -86,14 +129,26 @@ async function finalizeHydrate(
   snap: WorksSnapshot,
   persistNeeded: boolean,
 ): Promise<WorksSnapshot> {
-  const { snap: migrated, changed: migChanged } = await migrateV1ItemsToMd(root, snap);
+  let next = migrateSnapshotV3(snap);
+  const { snap: withCycles, changed: cyclesChanged } = ensureWeeklyCycles(next);
+  next = withCycles;
+  const { snap: migrated, changed: migChanged } = await migrateV1ItemsToMd(root, next);
   const withBodies = await loadAllItemBodies(root, migrated);
+  const withStoryBodies = await loadAllStoryBodies(root, withBodies);
   const { snap: withOrphans, changed: orphanChanged } =
-    await importOrphanMdFiles(root, withBodies);
-  if (persistNeeded || migChanged || orphanChanged) {
-    await persist(root, withOrphans);
+    await importOrphanMdFiles(root, withStoryBodies);
+  const { snap: withStoryOrphans, changed: storyOrphanChanged } =
+    await importOrphanStoryFiles(root, withOrphans);
+  if (
+    persistNeeded ||
+    migChanged ||
+    orphanChanged ||
+    storyOrphanChanged ||
+    cyclesChanged
+  ) {
+    await persist(root, withStoryOrphans);
   }
-  return withOrphans;
+  return withStoryOrphans;
 }
 
 export async function hydrateWorks(root: string): Promise<WorksSnapshot> {
@@ -101,6 +156,7 @@ export async function hydrateWorks(root: string): Promise<WorksSnapshot> {
   if (e.hydrated) return e.snapshot;
   if (e.hydrating) return e.hydrating.then(() => e.snapshot);
   e.hydrating = (async () => {
+    await Promise.all([ensureWorksDirs(root), ensureAppBundledSkills(root)]);
     const raw = await invoke<unknown>("works_load", { wsRoot: root });
     const loaded = isSnapshot(raw) ? raw : emptySnapshot();
     const { snap: normalized, changed: labelsChanged } =
@@ -128,11 +184,14 @@ export async function refreshWorksFromDisk(root: string): Promise<void> {
     return;
   }
   const withBodies = await loadAllItemBodies(root, e.snapshot);
-  const { snap: withOrphans, changed } = await importOrphanMdFiles(root, withBodies);
-  e.snapshot = withOrphans;
+  const withStories = await loadAllStoryBodies(root, withBodies);
+  const { snap: withOrphans, changed } = await importOrphanMdFiles(root, withStories);
+  const { snap: withStoryOrphans, changed: storyChanged } =
+    await importOrphanStoryFiles(root, withOrphans);
+  e.snapshot = withStoryOrphans;
   notify(e);
-  refreshAllWorkProgress(withOrphans);
-  if (changed) await persist(root, withOrphans);
+  refreshAllWorkProgress(withStoryOrphans);
+  if (changed || storyChanged) await persist(root, withStoryOrphans);
 }
 
 export async function refreshWorksModules(root: string): Promise<void> {
@@ -193,6 +252,8 @@ export async function createWorkItem(
     status?: WorkStatus;
     bodyMd?: string;
     labelNames?: string[];
+    parentId?: string;
+    cycleId?: string;
   },
 ): Promise<WorkItem> {
   const e = getEntry(root);
@@ -220,11 +281,14 @@ export async function createWorkItem(
   }
   const now = Date.now();
   const shortId = nextShortId(snap);
+  const parentStory = opts.parentId ? findStory(snap, opts.parentId) : undefined;
   const item: WorkItem = {
     id: newId(),
     shortId,
     filePath: workItemRelPath(shortId),
-    moduleId: mod?.id ?? snap.modules[0]?.id ?? "",
+    moduleId: mod?.id ?? parentStory?.moduleId ?? snap.modules[0]?.id ?? "",
+    parentId: opts.parentId,
+    cycleId: opts.cycleId ?? parentStory?.cycleId,
     title: opts.title.trim() || "Untitled work",
     origin: opts.origin,
     bodyMd: opts.bodyMd ?? "",
@@ -269,6 +333,106 @@ export async function linkChatToWork(
   const linked = [...w.linkedChatIds, chatId];
   await updateWorkItem(root, workId, { linkedChatIds: linked });
   await appendEvent(root, { kind: "link_chat", workId, chatId });
+}
+
+export async function unlinkChatFromWork(
+  root: string,
+  workId: string,
+  chatId: string,
+): Promise<void> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const w = findWork(e.snapshot, workId);
+  if (!w || !w.linkedChatIds.includes(chatId)) return;
+  const linked = w.linkedChatIds.filter((id) => id !== chatId);
+  await updateWorkItem(root, workId, { linkedChatIds: linked });
+}
+
+export async function linkChatToStory(
+  root: string,
+  storyId: string,
+  chatId: string,
+): Promise<void> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const s = findStory(e.snapshot, storyId);
+  if (!s || s.linkedChatIds.includes(chatId)) return;
+  const linked = [...s.linkedChatIds, chatId];
+  await updateStory(root, storyId, { linkedChatIds: linked });
+}
+
+export async function unlinkChatFromStory(
+  root: string,
+  storyId: string,
+  chatId: string,
+): Promise<void> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const s = findStory(e.snapshot, storyId);
+  if (!s || !s.linkedChatIds.includes(chatId)) return;
+  const linked = s.linkedChatIds.filter((id) => id !== chatId);
+  await updateStory(root, storyId, { linkedChatIds: linked });
+}
+
+export async function approvePlanStory(
+  root: string,
+  storyId: string,
+  planText: string,
+  title?: string,
+): Promise<WorkStory | null> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const prev = findStory(e.snapshot, storyId);
+  if (!prev) return null;
+  const nextTitle = title?.trim() || titleFromPlanText(planText) || prev.title;
+  const bodyMd = mergePlanIntoStoryBody(planText, nextTitle);
+  return updateStory(root, storyId, {
+    title: nextTitle,
+    bodyMd: bodyMd || prev.bodyMd,
+    status: "active",
+  });
+}
+
+export async function mergePlanIntoStory(
+  root: string,
+  storyId: string,
+  planText: string,
+): Promise<WorkStory | null> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const prev = findStory(e.snapshot, storyId);
+  if (!prev) return null;
+  const bodyMd = mergePlanIntoStoryBody(planText, prev.title);
+  const title = titleFromPlanText(planText);
+  return updateStory(root, storyId, {
+    ...(title ? { title } : {}),
+    bodyMd: bodyMd || prev.bodyMd,
+  });
+}
+
+export async function ensurePlanStory(
+  root: string,
+  chatId: string,
+  title?: string,
+): Promise<WorkStory> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const linked = e.snapshot.stories.find(
+    (s) =>
+      s.status === "draft" &&
+      s.linkedChatIds.includes(chatId),
+  );
+  if (linked) return linked;
+  const cycle = activeCycle(e.snapshot);
+  const draftTitle = title?.trim() || "Untitled plan";
+  const story = await createStory(root, {
+    title: draftTitle,
+    status: "draft",
+    cycleId: cycle?.id,
+    bodyMd: defaultStoryBody(draftTitle),
+  });
+  await linkChatToStory(root, story.id, chatId);
+  return story;
 }
 
 export async function approvePlanWork(
@@ -361,6 +525,169 @@ export async function deleteWorkItem(
     closeWorkDrawer();
   }
 }
+
+function patchStory(
+  snap: WorksSnapshot,
+  id: string,
+  patch: Partial<WorkStory>,
+): WorksSnapshot {
+  return {
+    ...snap,
+    stories: snap.stories.map((s) =>
+      s.id === id ? { ...s, ...patch, updatedAt: Date.now() } : s,
+    ),
+  };
+}
+
+export async function createStory(
+  root: string,
+  opts: {
+    title: string;
+    moduleId?: string;
+    cycleId?: string;
+    status?: StoryStatus;
+    bodyMd?: string;
+  },
+): Promise<WorkStory> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  let snap = e.snapshot;
+  const now = Date.now();
+  const shortId = nextStoryShortId(snap);
+  const title = opts.title.trim() || "Untitled story";
+  const story: WorkStory = {
+    id: newId(),
+    shortId,
+    filePath: storyRelPath(shortId),
+    moduleId: opts.moduleId ?? snap.modules.find((m) => m.featurePath)?.id ?? snap.modules[0]?.id ?? "",
+    cycleId: opts.cycleId,
+    title,
+    status: opts.status ?? "draft",
+    bodyMd: opts.bodyMd ?? defaultStoryBody(title),
+    linkedChatIds: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+  snap = bumpStorySeq({ ...snap, stories: [...snap.stories, story] });
+  await saveWorks(root, snap);
+  await appendEvent(root, { kind: "story_create", storyId: story.id });
+  return story;
+}
+
+export async function updateStory(
+  root: string,
+  id: string,
+  patch: Partial<WorkStory>,
+): Promise<WorkStory | null> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const prev = findStory(e.snapshot, id);
+  if (!prev) return null;
+  const snap = patchStory(e.snapshot, id, patch);
+  await saveWorks(root, snap);
+  await appendEvent(root, { kind: "story_update", storyId: id });
+  return findStory(snap, id) ?? null;
+}
+
+export async function deleteStory(
+  root: string,
+  id: string,
+): Promise<void> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const hit = findStory(e.snapshot, id);
+  if (hit) await deleteStoryFile(root, hit);
+  const snap = {
+    ...e.snapshot,
+    stories: e.snapshot.stories.filter((s) => s.id !== id),
+    items: e.snapshot.items.map((w) =>
+      w.parentId === id ? { ...w, parentId: undefined, updatedAt: Date.now() } : w,
+    ),
+  };
+  await saveWorks(root, snap);
+  await appendEvent(root, { kind: "story_delete", storyId: id });
+  const open = getStoryDrawer();
+  if (open && open.root === root && !("create" in open) && open.storyId === id) {
+    closeStoryDrawer();
+  }
+}
+
+export async function createWorkFromStory(
+  root: string,
+  storyId: string,
+  opts: { title: string; priority?: WorkPriority; bodyMd?: string },
+): Promise<WorkItem | null> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const story = findStory(e.snapshot, storyId);
+  if (!story) return null;
+  return createWorkItem(root, {
+    title: opts.title,
+    origin: "manual",
+    moduleId: story.moduleId,
+    parentId: storyId,
+    cycleId: story.cycleId,
+    status: "backlog",
+    priority: opts.priority,
+    bodyMd: opts.bodyMd,
+  });
+}
+
+export async function createCustomCycle(
+  root: string,
+  opts: { name: string; startDate: string; endDate: string },
+): Promise<WorkCycle> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const cycle: WorkCycle = {
+    id: newId(),
+    name: opts.name.trim() || "Custom cycle",
+    startDate: opts.startDate,
+    endDate: opts.endDate,
+    status: "upcoming",
+    auto: false,
+  };
+  const snap = { ...e.snapshot, cycles: [...e.snapshot.cycles, cycle] };
+  await saveWorks(root, snap);
+  return cycle;
+}
+
+export async function updateCycle(
+  root: string,
+  id: string,
+  patch: Partial<WorkCycle>,
+): Promise<WorkCycle | null> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const hit = e.snapshot.cycles.find((c) => c.id === id);
+  if (!hit) return null;
+  const snap = {
+    ...e.snapshot,
+    cycles: e.snapshot.cycles.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+  };
+  await saveWorks(root, snap);
+  return snap.cycles.find((c) => c.id === id) ?? null;
+}
+
+export async function deleteCycle(root: string, id: string): Promise<void> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const hit = e.snapshot.cycles.find((c) => c.id === id);
+  if (!hit || hit.auto) return;
+  const snap = {
+    ...e.snapshot,
+    cycles: e.snapshot.cycles.filter((c) => c.id !== id),
+    items: e.snapshot.items.map((w) =>
+      w.cycleId === id ? { ...w, cycleId: undefined, updatedAt: Date.now() } : w,
+    ),
+    stories: e.snapshot.stories.map((s) =>
+      s.cycleId === id ? { ...s, cycleId: undefined, updatedAt: Date.now() } : s,
+    ),
+  };
+  await saveWorks(root, snap);
+}
+
+export { childrenOfStory };
 
 export async function duplicateWorkItem(
   root: string,

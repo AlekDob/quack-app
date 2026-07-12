@@ -40,6 +40,7 @@ import { useStore } from "../../store";
 import { Icon } from "../Icon";
 import { WorkComments } from "./WorkComments";
 import { WorkItemEditor } from "./WorkItemEditor";
+import { WorksDocRefsSection } from "./WorksDocRefsSection";
 import { useResizableWorkDrawerWidth } from "../../useResizableWorkDrawerWidth";
 
 export function WorkItemDrawer() {
@@ -55,6 +56,9 @@ export function WorkItemDrawer() {
   const [targetDate, setTargetDate] = useState("");
   const [origin, setOrigin] = useState<WorkOrigin>("manual");
   const [moduleId, setModuleId] = useState("");
+  const [parentId, setParentId] = useState("");
+  const [cycleId, setCycleId] = useState("");
+  const [brainRefs, setBrainRefs] = useState<string[]>([]);
   const [comment, setComment] = useState("");
   const [planeBusy, setPlaneBusy] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
@@ -88,6 +92,8 @@ export function WorkItemDrawer() {
     setTargetDate(d?.targetDate ?? "");
     setOrigin(d?.origin ?? "manual");
     setModuleId(d?.moduleId ?? "");
+    setParentId("");
+    setCycleId("");
     setComment("");
   }, []);
 
@@ -116,6 +122,9 @@ export function WorkItemDrawer() {
         if (w) {
           setTitle(w.title);
           setBlocks(markdownToBlocks(w.bodyMd ?? ""));
+          setParentId(w.parentId ?? "");
+          setCycleId(w.cycleId ?? "");
+          setBrainRefs(w.brainRefs ?? []);
         }
       }
       requestAnimationFrame(() => setShown(true));
@@ -136,6 +145,9 @@ export function WorkItemDrawer() {
     setStatus(item.status);
     setLabelIds(item.labelIds);
     setModuleId(item.moduleId);
+    setParentId(item.parentId ?? "");
+    setCycleId(item.cycleId ?? "");
+    setBrainRefs(item.brainRefs ?? []);
     setBlocks(markdownToBlocks(item.bodyMd ?? ""));
   }, [item, isCreate]);
 
@@ -198,6 +210,8 @@ export function WorkItemDrawer() {
         priority,
         bodyMd: blocksToMarkdown(blocks),
         moduleId: moduleId || undefined,
+        parentId: parentId || undefined,
+        cycleId: cycleId || undefined,
       });
       const patch: Partial<WorkItem> = {};
       if (labelIds.length) patch.labelIds = labelIds;
@@ -243,6 +257,8 @@ export function WorkItemDrawer() {
   const portal = drawerPortalTarget(req.wsId);
   const nested = isNestedDrawerPortal(portal);
   const labels = snap?.labels ?? [];
+  const stories = snap?.stories ?? [];
+  const cycles = snap?.cycles ?? [];
   const heroId = isCreate ? "Draft" : item!.shortId;
   const heroTitle = isCreate ? "New work" : item!.title;
 
@@ -387,6 +403,54 @@ export function WorkItemDrawer() {
               </select>
             </div>
           )}
+          {stories.length > 0 && (
+            <div className="work-drawer-field work-drawer-field--wide">
+              <span className="work-drawer-field-label">Story</span>
+              <div className="work-drawer-field-control">
+              <select
+                className="work-drawer-field-select"
+                value={parentId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setParentId(next);
+                  if (!isCreate && item) void onUpdate({ parentId: next || undefined });
+                }}
+                aria-label="Parent story"
+              >
+                <option value="">None</option>
+                {stories.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.shortId} — {s.title}
+                  </option>
+                ))}
+              </select>
+              </div>
+            </div>
+          )}
+          {cycles.length > 0 && (
+            <div className="work-drawer-field work-drawer-field--wide">
+              <span className="work-drawer-field-label">Cycle</span>
+              <div className="work-drawer-field-control">
+              <select
+                className="work-drawer-field-select"
+                value={cycleId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setCycleId(next);
+                  if (!isCreate && item) void onUpdate({ cycleId: next || undefined });
+                }}
+                aria-label="Cycle"
+              >
+                <option value="">None</option>
+                {cycles.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              </div>
+            </div>
+          )}
           <WorkDrawerField label="Status">
             <select
               className="work-drawer-field-select"
@@ -469,6 +533,19 @@ export function WorkItemDrawer() {
                 ))}
               </div>
             </div>
+          )}
+          {!isCreate && item && snap && (
+            <WorksDocRefsSection
+              wsId={req.wsId}
+              root={req.root}
+              snap={snap}
+              work={item}
+              extraRefs={brainRefs}
+              onExtraRefsChange={(refs) => {
+                setBrainRefs(refs);
+                void onUpdate({ brainRefs: refs });
+              }}
+            />
           )}
         </section>
 

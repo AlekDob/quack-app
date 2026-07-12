@@ -57,6 +57,9 @@ function tabLabel(
   isHtmlPreview?: boolean;
   /** Claude Code plan tab. */
   isPlan?: boolean;
+  /** Works story plan tab. */
+  isStoryPlan?: boolean;
+  storyShortId?: string;
 } {
   const parsed = parseKey(key);
   if (parsed?.kind === "terminal") {
@@ -169,6 +172,18 @@ function tabLabel(
       isAI: false,
       popped: false,
       isPlan: true,
+    };
+  }
+  if (parsed?.kind === "storyPlan") {
+    const story = ws.aiChats[parsed.chatId ?? ""]?.storyId;
+    return {
+      label: "Story",
+      dirty: false,
+      isTerminal: false,
+      isAI: false,
+      popped: false,
+      isStoryPlan: true,
+      storyShortId: story,
     };
   }
   if (parsed?.kind === "file") {
@@ -721,6 +736,8 @@ function TabsPaneView(
                   <Icon name="globe" size={12} />
                 ) : info.isPlan ? (
                   <Icon name="check-square" size={12} />
+                ) : info.isStoryPlan ? (
+                  <Icon name="file-text" size={12} />
                 ) : info.subAvatar ? (
                   <img
                     className="tab-sub-avatar"

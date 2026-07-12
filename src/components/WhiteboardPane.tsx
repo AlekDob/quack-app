@@ -35,7 +35,6 @@ import {
 import { renderWhiteboardMd } from "../whiteboardMd";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { success as toastSuccess, error as toastError, errMsg } from "../notify";
-import { joinPath } from "../pathUtils";
 import { WhiteboardOrganigramma } from "./WhiteboardOrganigramma";
 
 interface Props {
@@ -52,7 +51,7 @@ type SubTab = "overview" | "organigramma" | "workflows";
 export interface WhiteboardData {
   agents: SubagentDef[];
   skills: SkillDef[];
-  /** Built-in presets (always present) + custom ones from .codetta/presets/. */
+  /** Built-in presets (always present) + custom ones from .quack/presets/. */
   presets: PresetDefinition[];
 }
 
@@ -305,7 +304,7 @@ function WhiteboardLegend() {
         </li>
         <li>
           <strong>Workflows</strong> — preview the operational .md, copy it to
-          your clipboard, or save it to <code>.codetta/whiteboard.md</code>.
+          your clipboard, or save it to <code>.quack/whiteboard.md</code>.
         </li>
         <li>
           Preset edits persist as overrides (built-ins) or write the agent's{" "}
@@ -337,11 +336,13 @@ function WhiteboardWorkflows({
   };
   const onSave = async () => {
     try {
-      const dir = joinPath(root, ".codetta");
+      const { migrateLegacyQuackFile, quackAbs } = await import("../quackDir");
+      await migrateLegacyQuackFile(root, "whiteboard.md");
+      const dir = quackAbs(root);
       if (!(await (await import("../ipc")).fs.exists(dir))) {
         await (await import("../ipc")).fs.createDir(dir);
       }
-      const filePath = joinPath(root, ".codetta", "whiteboard.md");
+      const filePath = quackAbs(root, "whiteboard.md");
       await (await import("../ipc")).fs.writeFile(filePath, md);
       savedAtRef.current = new Date().toISOString();
       toastSuccess(`Saved to ${filePath}`);
@@ -364,7 +365,7 @@ function WhiteboardWorkflows({
             className="cust-btn primary"
             onClick={() => void onSave()}
           >
-            <Icon name="save" size={12} /> Save to .codetta/whiteboard.md
+            <Icon name="save" size={12} /> Save to .quack/whiteboard.md
           </button>
         </div>
       </div>

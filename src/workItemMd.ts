@@ -1,8 +1,9 @@
-// Work item markdown — one file per ticket under .codetta/works/items/.
+// Work item markdown — one file per ticket under works/items/.
 // Agents Read/Write these like feature docs; Quack syncs frontmatter ↔ index.
 
 import { frontmatterField, frontmatterList } from "./subagents";
 import { joinPath } from "./pathUtils";
+import { worksRel } from "./worksDir";
 import { blocksToMarkdown } from "./worksBlocks";
 import type {
   WorkItem,
@@ -14,7 +15,7 @@ import type {
 } from "./works";
 import { moduleByFeatureSlug } from "./works";
 
-export const WORKS_ITEMS_DIR = ".codetta/works/items";
+export const WORKS_ITEMS_DIR = worksRel("items");
 
 export function workItemRelPath(shortId: string): string {
   return joinPath(WORKS_ITEMS_DIR, `${shortId}.md`);
@@ -39,6 +40,7 @@ export interface ParsedWorkMd {
   updatedAt?: number;
   title: string;
   bodyMd: string;
+  brainRefs: string[];
 }
 
 const STATUSES = new Set<WorkStatus>([
@@ -129,6 +131,7 @@ export function parseWorkItemMd(
     updatedAt: parseNum(frontmatterField(src, "updatedAt")),
     title,
     bodyMd,
+    brainRefs: frontmatterList(src, "refs").map((r) => r.trim()).filter(Boolean),
   };
 }
 
@@ -178,6 +181,7 @@ export function serializeWorkItemMd(
     fmLine("planeIssueId", item.planeIssueId),
     fmLine("parentId", item.parentId),
     fmLine("cycleId", item.cycleId),
+    fmList("refs", item.brainRefs ?? []),
     fmLine("createdAt", item.createdAt),
     fmLine("updatedAt", item.updatedAt),
     "---",

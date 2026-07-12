@@ -1,19 +1,22 @@
 // Skill discovery for the `/`-command composer. Claude Code skills are
 // folders containing a `SKILL.md` (with YAML frontmatter) under
 // `.claude/skills/` — both project-local (<workspace>/.claude/skills) and
-// user-global (~/.claude/skills). We surface them in the slash menu so the
-// user can pick one with `/skill-name`, the same way the CLI invokes it.
+// user-global (~/.claude/skills). Quack also ships app-bundled skills
+// (`src/bundledSkills/`) synced into `.claude/skills/` on load.
 //
 // Parallel to subagents.ts (the @-mention loader); reuses its frontmatter
 // reader so there's one place that parses `.claude/` asset metadata.
+import { APP_BUNDLED_SKILLS } from "./bundledSkills";
+import { ensureAppBundledSkills } from "./bundledSkills/sync";
 import { fs, type DirEntry } from "./ipc";
+import { joinPath } from "./pathUtils";
 import { frontmatterField } from "./subagents";
 
 export interface SkillDef {
   /** Slug used as `/name`, e.g. "code" / "feature-creator". */
   name: string;
   description: string;
-  source: "project" | "user" | "bundled";
+  source: "project" | "user" | "bundled" | "app";
   /** Absolute path to the SKILL.md backing this skill. Used by the
    *  whiteboard click-to-open action. */
   path: string;
@@ -44,6 +47,17 @@ function parseSkill(
   return { name, description: description.slice(0, 120), source, path };
 }
 
+function appSkillDefs(root: string): SkillDef[] {
+  return APP_BUNDLED_SKILLS.map((s) =>
+    parseSkill(
+      s.content,
+      s.dirName,
+      "app",
+      joinPath(root, ".claude", "skills", s.dirName, "SKILL.md"),
+    ),
+  );
+}
+
 async function readSkillsDir(
   dir: string,
   source: SkillDef["source"],
@@ -69,12 +83,13 @@ async function readSkillsDir(
 
 /**
  * Load all available skills. Project skills win name collisions over
- * user-global ones; bundled repo skills (`documentation/skills/`) are lowest.
+ * user-global ones; repo `documentation/skills/` and app-bundled are lowest.
  */
 export async function loadSkills(
   root: string,
   homeDir: string | null,
 ): Promise<SkillDef[]> {
+  await ensureAppBundledSkills(root);
   const proj = await readSkillsDir(`${root}/.claude/skills`, "project");
   const user = homeDir
     ? await readSkillsDir(`${homeDir}/.claude/skills`, "user")
@@ -84,5 +99,7 @@ export async function loadSkills(
   const userFiltered = user.filter((s) => !seen.has(s.name));
   for (const s of userFiltered) seen.add(s.name);
   const bundledFiltered = bundled.filter((s) => !seen.has(s.name));
-  return [...proj, ...userFiltered, ...bundledFiltered];
+  for (const s of bundledFiltered) seen.add(s.name);
+  const appFiltered = appSkillDefs(root).filter((s) => !seen.has(s.name));
+  return [...proj, ...userFiltered, ...bundledFiltered, ...appFiltered];
 }

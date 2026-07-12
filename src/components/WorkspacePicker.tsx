@@ -16,7 +16,7 @@ const TIPS: Tip[] = [
   { keys: ["Ctrl", "P"], label: "Quick-open files & commands" },
   { keys: ["Ctrl", "Shift", "F"], label: "Search file contents" },
   { keys: ["Ctrl", "Shift", "G"], label: "Source control" },
-  { keys: ["Ctrl", "Shift", "T"], label: "TODO / FIXME panel" },
+  { keys: ["Ctrl", "Alt", "T"], label: "Works board" },
   { keys: ["Ctrl", "B"], label: "Toggle sidebar" },
   { keys: ["Ctrl", "J"], label: "Toggle bottom panel" },
   { keys: ["Ctrl", "`"], label: "New terminal" },

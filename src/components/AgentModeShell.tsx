@@ -11,6 +11,7 @@ import {
 import { AIChatPanel } from "./AIChatPanel";
 import { CompactChat, AgentFileOpen } from "./chatToolRender";
 import { ComposeReviewPane } from "./ComposeReviewPane";
+import { StoryPlanPane } from "./StoryPlanPane";
 import { SubagentTranscriptView } from "./SubagentTranscriptView";
 import { SourceControlPanel } from "./SourceControlPanel";
 import { FileTree } from "./FileTree";
@@ -452,6 +453,11 @@ export function AgentModeShell({ wsId }: Props) {
             )}
             <ChatSwitchVeil />
           </div>
+          {sidePanelKey && sideParsed?.kind === "storyPlan" && (
+            <div className="agent-main-review">
+              <StoryPlanPane tabKey={sidePanelKey} visible />
+            </div>
+          )}
           {sidePanelKey && sideParsed?.kind === "composeReview" && (
             <div className="agent-main-review">
               {reviewTabs.length > 1 && (

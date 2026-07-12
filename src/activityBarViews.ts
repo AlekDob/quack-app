@@ -6,15 +6,14 @@ export type ActivityBarIconId =
   | "search"
   | "git"
   | "tasks"
-  | "todos"
+  | "works"
   | "outline"
   | "bookmarks"
   | "remote"
   | "store"
   | "usage"
   | "brain"
-  | "whiteboard"
-  | "works";
+  | "whiteboard";
 
 export type ActivityBarIconKind = "sidebar" | "tab";
 
@@ -36,7 +35,7 @@ export const ACTIVITY_BAR_ICON_IDS: ActivityBarIconId[] = [
   "search",
   "git",
   "tasks",
-  "todos",
+  "works",
   "outline",
   "bookmarks",
   "remote",
@@ -44,7 +43,6 @@ export const ACTIVITY_BAR_ICON_IDS: ActivityBarIconId[] = [
   "usage",
   "brain",
   "whiteboard",
-  "works",
 ];
 
 export const DEFAULT_ACTIVITY_BAR_ORDER: ActivityBarIconId[] = [
@@ -86,14 +84,6 @@ export const ACTIVITY_BAR_VIEWS: Record<ActivityBarIconId, ActivityBarViewDef> =
     icon: "play",
     kind: "sidebar",
     sidebarView: "tasks",
-  },
-  todos: {
-    id: "todos",
-    label: "TODO / FIXME",
-    title: "TODO / FIXME (Ctrl+Shift+T) — click to toggle section",
-    icon: "check-square",
-    kind: "sidebar",
-    sidebarView: "todos",
   },
   outline: {
     id: "outline",
@@ -154,8 +144,8 @@ export const ACTIVITY_BAR_VIEWS: Record<ActivityBarIconId, ActivityBarViewDef> =
   works: {
     id: "works",
     label: "Works",
-    title: "Works — project tickets, kanban & timeline (⌘P → Open Works)",
-    icon: "columns-2",
+    title: "Works — project tickets, kanban & timeline (Ctrl+Alt+T)",
+    icon: "check-square",
     kind: "tab",
     tabPrefix: "works:",
   },
@@ -185,8 +175,17 @@ export function barIconSegments(ids: ActivityBarIconId[]): BarIconSegment[] {
 const isIconId = (v: unknown): v is ActivityBarIconId =>
   typeof v === "string" && v in ACTIVITY_BAR_VIEWS;
 
+const LEGACY_ICON_IDS: Record<string, ActivityBarIconId> = {
+  todos: "works",
+};
+
 export function normalizeActivityBarOrder(order: unknown): ActivityBarIconId[] {
-  const raw = Array.isArray(order) ? order.filter(isIconId) : [];
+  const raw = Array.isArray(order)
+    ? order
+        .filter((v): v is string => typeof v === "string")
+        .map((v) => LEGACY_ICON_IDS[v] ?? v)
+        .filter(isIconId)
+    : [];
   const seen = new Set<ActivityBarIconId>();
   const next: ActivityBarIconId[] = [];
   for (const id of raw) {

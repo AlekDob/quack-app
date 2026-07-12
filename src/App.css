@@ -14789,6 +14789,63 @@ body.ab-dragging * {
   padding: 16px 20px;
 }
 
+/* Works story plan — persistent split tab beside chat. */
+.story-plan-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--bg);
+  overflow: auto;
+}
+.story-plan-pane-error {
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+.story-plan-pane-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.story-plan-pane-title {
+  color: var(--fg);
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.story-plan-pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px 20px;
+}
+.story-plan-pane-empty {
+  color: var(--fg-muted);
+  font-size: 13px;
+}
+.ai-composer-work-chip--planning .ai-agent-name {
+  font-weight: 500;
+}
+.ai-composer-work-acc-chip {
+  font-size: 11px;
+  color: var(--fg-muted);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  line-height: 1.4;
+}
+
 /* Breadcrumb bar — first row in the editor host. */
 .editor-breadcrumbs {
   position: relative;

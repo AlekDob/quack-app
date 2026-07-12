@@ -3,6 +3,7 @@
 // agents before (feature 018 is edit-only). Lives next to
 // loadCustomPresets.ts, which reads back what these write.
 import { fs } from "../ipc";
+import { quackAbs } from "../quackDir";
 import type { EffortLevel, ModelTier, OutputStyle } from "./types";
 
 function slugify(label: string): string {
@@ -54,9 +55,9 @@ function renderPresetMd(input: NewPresetInput): string {
   ].join("\n");
 }
 
-/** Create `<root>/.codetta/presets/<slug>.md` and return its slug (= preset id). */
+/** Create `<root>/.quack/presets/<slug>.md` and return its slug (= preset id). */
 export async function createPreset(root: string, input: NewPresetInput): Promise<string> {
-  const dir = `${root}/.codetta/presets`;
+  const dir = quackAbs(root, "presets");
   if (!(await fs.exists(dir))) await fs.createDir(dir);
   const slug = await uniqueSlug(dir, input.label);
   await fs.writeFile(`${dir}/${slug}.md`, renderPresetMd(input));

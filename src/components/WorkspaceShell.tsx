@@ -13,6 +13,7 @@ import { SubagentTranscriptView } from "./SubagentTranscriptView";
 import { ComposeReviewPane } from "./ComposeReviewPane";
 import { HtmlPreviewPane } from "./HtmlPreviewPane";
 import { PlanPane } from "./PlanPane";
+import { StoryPlanPane } from "./StoryPlanPane";
 import { WhiteboardPane } from "./WhiteboardPane";
 import { WorksPane } from "./works/WorksPane";
 import { UsagePanel } from "./UsagePanel";
@@ -641,6 +642,46 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
           if (!container || !visible) return null;
           return createPortal(
             <PlanPane key={key} tabKey={key} />,
+            container,
+            key,
+          );
+        });
+      })()}
+
+      {/* Story plan tabs (`story:` keys). */}
+      {showHeavy &&
+        (() => {
+        const keys = new Set<string>();
+        const walk = (pane: typeof layout.editorRoot) => {
+          if (pane.kind === "tabs") {
+            pane.tabs.forEach((k) => {
+              if (k.startsWith("story:")) keys.add(k);
+            });
+          } else {
+            walk(pane.first);
+            walk(pane.second);
+          }
+        };
+        walk(layout.editorRoot);
+        if (layout.bottomRoot) walk(layout.bottomRoot);
+        return [...keys].map((key) => {
+          const parsed = parseKey(key);
+          if (parsed?.kind !== "storyPlan") return null;
+          const editorPane = findTabsPaneByTab(layout.editorRoot, key);
+          const bottomPane = layout.bottomRoot
+            ? findTabsPaneByTab(layout.bottomRoot, key)
+            : null;
+          const pane = editorPane ?? bottomPane;
+          const inBottom = !editorPane && !!bottomPane;
+          const container = pane ? (paneContainers[pane.id] ?? null) : null;
+          const visible =
+            isActive &&
+            !!pane &&
+            pane.active === key &&
+            (inBottom ? layout.bottomVisible : true);
+          if (!container || !visible) return null;
+          return createPortal(
+            <StoryPlanPane key={key} tabKey={key} />,
             container,
             key,
           );
