@@ -18,9 +18,10 @@ import {
   type ModelTier,
 } from "../presets";
 
-type DynamicBackendId = "cursor-cli" | "opencode-cli";
+type DynamicBackendId = "claude-code" | "cursor-cli" | "opencode-cli";
 
 const DYNAMIC_BACKENDS: { id: DynamicBackendId; label: string }[] = [
+  { id: "claude-code", label: "Claude Code" },
   { id: "cursor-cli", label: "Cursor CLI" },
   { id: "opencode-cli", label: "OpenCode" },
 ];
@@ -35,10 +36,12 @@ export function TierModelSettings() {
   return (
     <div className="settings-row settings-row-col">
       <div className="settings-row-hint">
-        Cursor CLI and OpenCode discover their model list live, so Quack
-        can't ship fixed model names for them. Map each tier below to a
-        real model so switching agents (Milo/Nora/Vera) actually changes
-        the model — otherwise these backends keep using their own default.
+        Map each tier to a real model per backend so switching agents
+        (Milo/Nora/Vera) actually changes the model. Claude Code already
+        ships sensible defaults (Opus/Sonnet/Haiku) — override only if you
+        want something else. Cursor CLI and OpenCode discover their model
+        list live, so Quack can't ship fixed names for them and defaults to
+        "Use &lt;backend&gt; default" until you map one here.
       </div>
       {DYNAMIC_BACKENDS.map((b) => (
         <BackendTierRow key={b.id} backendId={b.id} label={b.label} />

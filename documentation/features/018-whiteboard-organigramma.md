@@ -3,9 +3,19 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-06-29
-tags: [whiteboard, organigramma, subagents, skills, frontmatter, drag-and-drop, runbook, markdown-export, quack-v1]
+last_verified: 2026-07-12
+tags: [whiteboard, organigramma, subagents, skills, frontmatter, drag-and-drop, runbook, markdown-export, quack-v1, team]
 ---
+
+> **2026-07-12 update:** renamed "Organigramma"/"Whiteboard" to **"Team"** everywhere
+> user-facing (activity bar, command palette, tab labels, sub-tab pill, legend copy) — internal
+> identifiers (`WhiteboardPane`, `wb:` tab kind, `WhiteboardOrganigramma.tsx`) were left
+> untouched, no reason to churn file/type names for a label change. Also fixed the tab actually
+> not being full width: `.whiteboard-org` had `max-width: 920px; margin: 0 auto`, centering the
+> org-chart in a narrow column regardless of pane width — now `width: 100%`. New `"users"` icon
+> (`src/components/Icon.tsx`) replaces the old `"whiteboard"` icon at every render site. The
+> skill-linking drag-and-drop described below was already removed in an earlier round (see
+> `062-presets.md`'s "Skill linking was removed" note) — this doc's DnD sections are historical.
 
 ## Whiteboard Tab (Organigramma Agente↔Skill)
 

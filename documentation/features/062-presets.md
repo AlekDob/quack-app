@@ -4,7 +4,7 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-12
 last_verified: 2026-07-12
-tags: [presets, agents, model-selection, effort, organigramma, avatar, backend-agnostic, prompt-injection]
+tags: [presets, agents, model-selection, effort, organigramma, avatar, backend-agnostic, prompt-injection, settings, chat-identity]
 ---
 
 ## Presets
@@ -31,6 +31,8 @@ existing chat send flow, composer, and the Whiteboard organigramma.
 | Custom preset discovery (`.codetta/presets/*.md`) | `loadCustomPresets.ts` |
 | Custom preset write-path (create + update `.md` in place) | `createPreset.ts` |
 | Avatar (duck pool default + durable upload) | `avatarStore.ts` |
+| Shared Claude Code permission-mode options (Ask/Plan/Auto-edit/Auto/Bypass) | `permModes.ts` |
+| User tier→model overrides for dynamic-catalog backends | `tierModelOverrides.ts` |
 | Barrel | `index.ts` |
 
 **Key separation:** shipped defaults (`PresetDefinition.defaults`) vs. user overrides
@@ -53,6 +55,36 @@ user's concrete model override always wins over the tier.
 
 `resolvePresetConfig` degrades gracefully per-capability and returns `warnings: string[]`
 describing what was skipped — nothing silently fails.
+
+### User tier→model overrides (Settings)
+
+**Problem it fixes:** switching preset never changed the model on Cursor CLI/OpenCode. Root
+cause: `capabilities.ts`'s `modelForTier` mapped every tier for those two backends to the same
+`:default` sentinel — their model catalogs are discovered LIVE (CLI/SDK probe), so Quack can't
+ship fixed model names for them the way it does for Claude Code (opus/sonnet/haiku).
+
+Rather than hardcode guesses, the user maps tiers to real models themselves:
+
+| Concern | Path |
+|---|---|
+| Override store (`lcp.tierModelMap.v1`) | `src/presets/tierModelOverrides.ts` |
+| Settings UI (3 cards: Claude Code, Cursor CLI, OpenCode) | `src/components/TierModelSettings.tsx` |
+| Mounted in | `src/components/SettingsModal.tsx` → `Section title="Preset model tiers"` (right after "AI Providers (Bring Your Own Key)") |
+
+- Same map/pub-sub pattern as `settings.ts`: `{ [backendId]: { reasoning?, balanced?, fast?: ModelId } }`,
+  `getTierModelOverride`/`setTierModelOverride`/`subscribeTierModelOverrides`.
+- **Resolution precedence** in `resolveModel` (`resolvePresetConfig.ts`): explicit per-preset
+  model pin (`UserPresetOverrides.model`) > this tier override > the static capability default.
+- Each `TierModelSettings` card calls `getProvider(backendId).listModels()` — the SAME live
+  catalog discovery Quack already uses for the model picker, no new discovery code — and writes
+  a qualified `"<backend>:<modelId>"` string via `makeQualifiedModel`.
+- Claude Code is included too (even though its static defaults are already sensible) so all 3
+  agentic backends get one consistent settings surface; overriding it is optional.
+- **UI note:** native `<select>` elements size to their selected option's text by default, which
+  made the 3 cards visually misaligned (each select a different width). Fixed with
+  `.settings-tier-select-row .settings-select { flex: 0 0 260px }` — always verify a repeated-row
+  UI like this with more than one populated option before calling it done; auto-sizing form
+  controls are an easy miss.
 
 ### Live wiring (chat session)
 
@@ -82,6 +114,38 @@ describing what was skipped — nothing silently fails.
 - Instructions are backend-agnostic text (no `BackendId` needed); model/effort/thinking
   resolution does need one, so `applyPreset` only touches those knobs for the 3 known agentic
   providers.
+
+### Composer keyboard shortcuts
+
+In `AIChatPanel.tsx`'s textarea `onKeyDown`, placed AFTER the `@`-mention and slash-command
+autocomplete blocks so those popovers keep first claim on Tab when open:
+
+- **Tab** (no modifiers) cycles the active primary agent: Jack → Milo → Nora → Vera → back to
+  Jack, calling the same `applyPreset` the composer picker uses.
+- **Shift+Tab** cycles the Claude Code permission mode (Ask → Plan → Auto-edit → Auto → Bypass),
+  reading/writing `PERM_MODE_OPTIONS` (`src/presets/permModes.ts`) — the same list backing the
+  mode menu and `AgentCreateDrawer`'s "Mode" segmented control, so there's one source of truth
+  for the 5-value scale everywhere it appears.
+- The composer's hint row advertises both ("Tab agent" / "Shift+Tab mode").
+
+### Chat message identity (avatar + name per message)
+
+Every assistant message used to render a hardcoded `<img src="/jack.jpeg">` + "Jack", even after
+switching to Milo/Nora/Vera — nothing snapshotted which agent was active when a message was
+sent, so the header never reflected preset switches mid-conversation.
+
+- `ChatMessage.agentId?: string | null` (`src/ai.ts`) — display-only field, the live `presetId`
+  at the moment an assistant message is committed (`null`/`undefined` = Jack). Set at every
+  commit site in `AIChatPanel.tsx`: the unified streaming-loop commit (works for every provider —
+  Ollama, Claude Code, Cursor CLI, OpenCode all funnel through the same `assistantMsg` push),
+  the process-replay finalize (reattaching to a running CC/Cursor/OpenCode subprocess after
+  reload), and the in-progress streaming bubble (so it's correct even before the turn commits).
+- `msgIdentityFor(agentId)` in `AIChatPanel.tsx` resolves an `agentId` to `{ name, role, avatar }`:
+  `null`/`undefined` → `effectivePresetDefinition(getJackDefinition())`; otherwise looks it up in
+  `presetChoices` (falls back to Jack if the preset was since deleted). Same resolution the
+  composer picker already uses — one lookup, not a second copy.
+- Old saved sessions have no `agentId` on their messages — they render as Jack, which is
+  correct (presets didn't exist yet when those messages were sent).
 
 ### Configurable + creatable agents (organigramma)
 
@@ -215,3 +279,5 @@ in a workspace you don't fully trust.
   of; `SubagentPill` now hosts both concerns in one merged picker.
 - `016-image-attachments.md` — the compress/encode pipeline `avatarStore.ts` reuses.
 - `022-chat-composer.md` — composer row hosting the merged `SubagentPill`.
+- `031-model-discovery-cache.md` — the live model catalog `TierModelSettings` reads via
+  `getProvider(id).listModels()` for Cursor CLI/OpenCode/Claude Code.
