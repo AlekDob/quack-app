@@ -53,6 +53,8 @@ function tabLabel(
   composeReviewPath?: string;
   /** Agent HTML preview tab. */
   isHtmlPreview?: boolean;
+  /** Claude Code plan tab. */
+  isPlan?: boolean;
 } {
   const parsed = parseKey(key);
   if (parsed?.kind === "terminal") {
@@ -145,6 +147,16 @@ function tabLabel(
       isAI: false,
       popped: false,
       isHtmlPreview: true,
+    };
+  }
+  if (parsed?.kind === "plan") {
+    return {
+      label: "Plan",
+      dirty: false,
+      isTerminal: false,
+      isAI: false,
+      popped: false,
+      isPlan: true,
     };
   }
   if (parsed?.kind === "file") {
@@ -692,6 +704,8 @@ function TabsPaneView(
                   <Icon name="git-compare" size={12} />
                 ) : info.isHtmlPreview ? (
                   <Icon name="globe" size={12} />
+                ) : info.isPlan ? (
+                  <Icon name="check-square" size={12} />
                 ) : info.subAvatar ? (
                   <img
                     className="tab-sub-avatar"

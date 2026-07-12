@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-05
-tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command]
+last_verified: 2026-07-12
+tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command, plan-mode]
 ---
 
 ## Claude Code Permission Mode (Ask / Plan / Auto-edit / Auto / Bypass)
@@ -20,6 +20,7 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 | Enforcer | `src/components/ClaudePermissionOverlay.tsx` | `isForThisPanel(req)` route guard; `modeAutoAllow(req)` + `WRITE_TOOLS`; auto-allows after the safety gates |
 | Producer | `src/components/AIChatPanel.tsx` | `ccPermMode` state, `/mode` handler, mode menu; publishes via `setPermMode`; passes `ownerRoot` / `ownerSessionId` / `ownerStreaming` to the overlay |
 | Slash hint | `src/slashCommands.ts` | `/mode ask\|plan\|auto-edit\|auto\|bypass` |
+| Plan tab trigger | `src/components/ClaudePermissionOverlay.tsx` | `onPlanReady(requestId, plan)` prop — fires once per `ExitPlanMode` request as soon as `tool_input.plan` lands, deduped by `request_id`; see [061-plan-mode-tab.md](061-plan-mode-tab.md) |
 | Hook gate (backend) | `src-tauri/src/claude_code.rs` | `apply_clean_env` sets `CODETTA_PERM_HOOK=1`; `build_hook_command` emits `permissionDecision:'allow'` when that env is absent (no-op for foreign sessions) |
 
 ### Modes
@@ -65,3 +66,4 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
   **Queue purge:** a `useEffect` on `[ownerRoot, ownerSessionId, ownerStreaming]` filters the overlay queue through `isForThisPanel` so stale cards disappear when the user switches chat or the CC session id lands. Pattern mirrors `AgentHubWatcher.resolveChat`, which already preferred `claudeSessionId` over cwd for hub status — the overlay was the missing piece.
   **Decision order inside `isForThisPanel`:** (1) reject different `cwd`; (2) if `req.session_id` present → match `ownerSessionId`, or require `ownerStreaming` when the panel hasn't captured init yet; (3) cwd-only fallback when `session_id` absent (shouldn't happen); (4) default `false` — never accept orphan requests.
 - The overlay/cards themselves are documented alongside the bridge — see [014-claude-code-bridge.md](014-claude-code-bridge.md).
+- **Plan tab opens independently of the decision:** `onPlanReady` fires as soon as the plan text is non-empty, regardless of whether the user later Approves or "Keep planning"s the card — reading the plan shouldn't require deciding first. This does not change `respond()`/`claude_perm_decide` at all. See [061-plan-mode-tab.md](061-plan-mode-tab.md).

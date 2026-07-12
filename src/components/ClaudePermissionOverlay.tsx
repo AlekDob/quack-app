@@ -278,6 +278,7 @@ export function ClaudePermissionOverlay({
   ownerSessionId,
   ownerStreaming,
   onAllowAll,
+  onPlanReady,
 }: {
   /** Workspace cwd this overlay's panel drives — used to route cards. */
   ownerRoot: string;
@@ -288,6 +289,10 @@ export function ClaudePermissionOverlay({
   /** Flip this chat to "stop asking" (Auto mode). Wired by AIChatPanel to
    *  setCcPermMode("auto") so the composer chip + persistence stay in sync. */
   onAllowAll?: () => void;
+  /** Fired once per ExitPlanMode request, as soon as its plan text lands —
+   *  opens the plan in a side-by-side tab (Cursor-style) while the card
+   *  is still pending approval. */
+  onPlanReady?: (requestId: string, plan: string) => void;
 }) {
   const [queue, setQueue] = useState<PermissionRequest[]>([]);
 
@@ -463,6 +468,18 @@ export function ClaudePermissionOverlay({
   // the previous render") the instant the FIRST permission card
   // arrives.
   const req: PermissionRequest | null = queue[0] ?? null;
+
+  // Open the plan tab as soon as it lands — don't wait for the user to
+  // approve/deny, since reading the plan is the whole point of the card.
+  const lastPlanRequestId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!req || req.tool_name !== "ExitPlanMode") return;
+    if (lastPlanRequestId.current === req.request_id) return;
+    const plan = typeof req.tool_input.plan === "string" ? req.tool_input.plan : "";
+    if (!plan) return;
+    lastPlanRequestId.current = req.request_id;
+    onPlanReady?.(req.request_id, plan);
+  }, [req, onPlanReady]);
 
   const respond = async (decision: "allow" | "deny") => {
     if (!req) return;

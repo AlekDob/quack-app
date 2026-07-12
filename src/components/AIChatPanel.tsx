@@ -91,6 +91,7 @@ import {
 } from "./chatToolRender";
 import { ComposeCard } from "./composeCard";
 import { openHtmlPreviewTab } from "./HtmlPreviewPane";
+import { openPlanTab } from "./PlanPane";
 import { resolveChatFilePath } from "../chatFileLinks";
 import { PermissionCard, PrivacyBanner } from "./aiInlineCards";
 import {
@@ -4730,6 +4731,10 @@ export function AIChatPanel({
     openHtmlPreviewTab(wsId, aiChatId, previewId, html, title);
   };
 
+  const openPlanHandler = (requestId: string, plan: string) => {
+    openPlanTab(wsId, aiChatId, requestId, plan);
+  };
+
   // Clicking a file-targeted tool row opens that file in a new editor tab.
   // In compact (agent) mode AgentModeShell already provides a handler (the
   // file popup) — forward it so we don't clobber it; in docked chat we open
@@ -5924,6 +5929,7 @@ export function AIChatPanel({
         ownerSessionId={claudeSessionId}
         ownerStreaming={streaming !== null || runningTools}
         onAllowAll={() => setCcPermMode("auto")}
+        onPlanReady={openPlanHandler}
       />
       <ComposerQueue
         messages={queuedMessages}

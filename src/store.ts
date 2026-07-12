@@ -17,6 +17,7 @@ import {
   parseHtmlPreviewKey,
   stashHtmlPreview,
 } from "./htmlPreview";
+import { planKey, parsePlanKey, stashPlan } from "./plan";
 import type { ToolCall } from "./ai";
 import { clearChatDiff } from "./chatDiffStore";
 import { stopChatAgent } from "./stopChatAgent";
@@ -283,6 +284,12 @@ export function parseKey(
       chatId: string | undefined;
       previewId: string;
     }
+  | {
+      kind: "plan";
+      wsId: string;
+      chatId: string | undefined;
+      planId: string;
+    }
   | null {
   if (k.startsWith("file:")) return { kind: "file", path: k.slice(5) };
   if (k.startsWith("term:")) return { kind: "terminal", id: k.slice(5) };
@@ -318,6 +325,11 @@ export function parseKey(
     const p = parseHtmlPreviewKey(k);
     if (!p) return null;
     return { kind: "htmlPreview", ...p };
+  }
+  if (k.startsWith("plan:")) {
+    const p = parsePlanKey(k);
+    if (!p) return null;
+    return { kind: "plan", ...p };
   }
   return null;
 }
@@ -847,6 +859,13 @@ interface AppState {
     previewId: string,
     html: string,
     title: string,
+  ): void;
+  /** Open (or focus) a Claude Code plan tab, side-by-side with the chat. */
+  openPlan(
+    wsId: string,
+    chatId: string | undefined,
+    planId: string,
+    plan: string,
   ): void;
   /** Open (or focus) the persistent Whiteboard tab for a workspace. */
   wbOpen(wsId: string): void;
@@ -2719,6 +2738,48 @@ export const useStore = create<AppState>((set, get) => {
                 : t,
             ),
           },
+        };
+      });
+    },
+
+    openPlan: (wsId, chatId, planId, plan) => {
+      const k = planKey(wsId, chatId, planId);
+      stashPlan(k, { plan });
+      updateWs(wsId, (w) => {
+        let foundPane: PaneId | null = null;
+        mapTree(w.layout.editorRoot, (t) => {
+          if (t.tabs.includes(k)) foundPane = t.id;
+          return t;
+        });
+        if (foundPane) {
+          return {
+            ...w,
+            layout: {
+              ...w.layout,
+              activePaneId: foundPane,
+              editorRoot: mapTree(w.layout.editorRoot, (t) =>
+                t.id === foundPane ? { ...t, active: k } : t,
+              ),
+            },
+          };
+        }
+        // Always land the plan in a real split next to the chat — a plan
+        // is meant to be read side-by-side (Cursor-style), not buried
+        // behind the current tab.
+        const activeId = w.layout.activePaneId;
+        const targetPaneId =
+          activeId && isInTree(w.layout.editorRoot, activeId)
+            ? activeId
+            : firstLeaf(w.layout.editorRoot).id;
+        const { tree, activePaneId } = dropTabAt(
+          w.layout.editorRoot,
+          targetPaneId,
+          "right",
+          k,
+        );
+        return {
+          ...w,
+          layout: { ...w.layout, editorRoot: tree, activePaneId },
         };
       });
     },
