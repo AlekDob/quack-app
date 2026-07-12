@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { useStore, type SidebarView } from "../store";
+import { useStore } from "../store";
 import { getGitStatus, subscribeGitStatus } from "../gitStatusStore";
 import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
-import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
 import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
+import { ActivityBarViewIcons } from "./ActivityBarViewIcons";
 import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
 import { useWorkspaceReorder } from "../useWorkspaceReorder";
+import { useActivityBarViewHeight } from "../useActivityBarViewHeight";
 
 function initials(name: string): string {
   const parts = name.split(/[\s\-_.]+/).filter(Boolean);
@@ -35,22 +36,16 @@ export function ActivityBar() {
   const sidebarSide = ws?.layout.sidebarSide ?? "left";
   const toggleSidebarSection = useStore((s) => s.toggleSidebarSection);
   const setSidebarSide = useStore((s) => s.setSidebarSide);
-  const setAIPanelVisible = useStore((s) => s.setAIPanelVisible);
-  const aiPanelVisible = ws?.layout.aiPanelVisible ?? false;
   const wbOpen = useStore((s) => s.wbOpen);
   const usageOpen = useStore((s) => s.usageOpen);
   const brainOpen = useStore((s) => s.brainOpen);
+  const storeOpen = useStore((s) => s.storeOpen);
 
-  // Key of the focused pane's active tab — drives the "this tab is open
-  // and focused" highlight on the Organigramma + Usage icons. Walks the
-  // pane tree to find the active pane.
   const activeTabKey: string | null = ((): string | null => {
     if (!ws) return null;
     const root = ws.layout.editorRoot;
     const activePaneId = ws.layout.activePaneId;
     if (!activePaneId) return null;
-    // Holder object so the closure assignment doesn't trip TS's control
-    // flow narrowing (which kept collapsing the result to `never`).
     const holder: { tab: string | null } = { tab: null };
     const walk = (p: typeof root): void => {
       if (p.kind === "tabs") {
@@ -63,22 +58,28 @@ export function ActivityBar() {
     walk(root);
     return holder.tab;
   })();
-  const whiteboardActive = !!activeTabKey && activeTabKey.startsWith("wb:");
-  const usageActive = !!activeTabKey && activeTabKey.startsWith("usage:");
-  const brainActive = !!activeTabKey && activeTabKey.startsWith("brain:");
-  const hasSection = (v: SidebarView) =>
+
+  const hasSection = (v: Parameters<typeof toggleSidebarSection>[1]) =>
     sections.some((s) => s.view === v && !s.collapsed);
-  const sectionActive = (v: SidebarView) => sidebarVisible && hasSection(v);
+  const sectionActive = (v: Parameters<typeof toggleSidebarSection>[1]) =>
+    sidebarVisible && hasSection(v);
 
   const [addOpen, setAddOpen] = useState(false);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
   const addBtnRef = useRef<HTMLButtonElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const wsListRef = useRef<HTMLDivElement>(null);
+  const sepRef = useRef<HTMLDivElement>(null);
+  const viewIconsRef = useRef<HTMLDivElement>(null);
+  const viewIconsHeight = useActivityBarViewHeight(
+    barRef,
+    wsListRef,
+    sepRef,
+    openIds.length,
+  );
 
-  // Drag-to-reorder the open-workspace icons (pointer-based — HTML5 DnD is
-  // broken in Tauri/WKWebView; see useWorkspaceReorder).
   const { drag, onPointerDown, shouldSuppressClick } = useWorkspaceReorder();
 
-  // Right-click color popover for a workspace icon. Re-render on color
-  // change so the tint updates live across the activity bar.
   const [colorMenu, setColorMenu] = useState<{
     wsId: string;
     x: number;
@@ -91,11 +92,6 @@ export function ActivityBar() {
     [],
   );
 
-  // Pending-changes badge on the Source Control icon. Piggybacks on the
-  // shared gitStatusStore watch the FileTree/SourceControlPanel start —
-  // we only SUBSCRIBE here (no startGitStatusWatch) so the badge costs
-  // zero extra `git status` runs and simply reads whatever the cache
-  // last published for the active workspace.
   const [, setGitTick] = useState(0);
   useEffect(() => {
     if (!activeId) return;
@@ -105,20 +101,14 @@ export function ActivityBar() {
     ? (getGitStatus(activeId).status?.files.length ?? 0)
     : 0;
 
-  const switchView = (v: SidebarView) => {
+  const switchView = (v: Parameters<typeof toggleSidebarSection>[1]) => {
     if (!activeId) return;
-    // If the sidebar is hidden (e.g. Ctrl+B, or auto-hidden because the
-    // last section was removed), the click should *reveal* the panel, not
-    // toggle the section away. Only add the section if it isn't already
-    // there; if it is, the existing one just becomes visible again.
     if (!sidebarVisible) {
       setSidebarVisible(activeId, true);
       const present = sections.some((s) => s.view === v);
       if (!present) toggleSidebarSection(activeId, v);
       return;
     }
-    // Sidebar is visible — standard toggle. Removing the only remaining
-    // section auto-hides the sidebar (handled in the store action).
     toggleSidebarSection(activeId, v);
   };
 
@@ -126,6 +116,7 @@ export function ActivityBar() {
 
   return (
     <div
+      ref={barRef}
       className="activity-bar"
       onContextMenu={(e) => {
         e.preventDefault();
@@ -134,7 +125,7 @@ export function ActivityBar() {
       }}
       title="Right-click to flip sidebar to the other side"
     >
-      <div className="activity-section ws-list">
+      <div ref={wsListRef} className="activity-section ws-list">
         {openIds.map((id, index) => {
           const meta = loaded[id]?.meta;
           if (!meta) return null;
@@ -159,7 +150,6 @@ export function ActivityBar() {
               aria-pressed={isActive}
               onPointerDown={(e) => onPointerDown(e, index)}
               onClick={() => {
-                // Suppress the click that trails a real drag.
                 if (shouldSuppressClick()) return;
                 void setActive(id);
               }}
@@ -216,145 +206,23 @@ export function ActivityBar() {
         </button>
       </div>
 
-      <div className="activity-sep" />
+      <div ref={sepRef} className="activity-sep" />
 
-      <div className="activity-section view-icons" role="toolbar" aria-label="Sidebar sections">
-        <button
-          className={`activity-icon ${sectionActive("files") ? "active" : ""}`}
-          title="Explorer (Ctrl+Shift+E) — click to toggle section"
-          aria-label="Explorer"
-          aria-pressed={sectionActive("files")}
-          onClick={() => switchView("files")}
-          disabled={!activeId}
-        >
-          <Icon name="folder" size={20} />
-        </button>
-        <button
-          className={`activity-icon ${sectionActive("search") ? "active" : ""}`}
-          title="Search (Ctrl+Shift+F) — full text search across the workspace"
-          aria-label="Search"
-          aria-pressed={sectionActive("search")}
-          onClick={() => switchView("search")}
-          disabled={!activeId}
-        >
-          <Icon name="search" size={20} />
-        </button>
-        <button
-          className={`activity-icon activity-icon--git ${sectionActive("git") ? "active" : ""}${
-            gitChangeCount > 0 ? " has-changes" : ""
-          }`}
-          title={`Source Control (Ctrl+Shift+G)${
-            gitChangeCount > 0
-              ? ` — ${gitChangeCount} changed file${gitChangeCount === 1 ? "" : "s"}`
-              : ""
-          } — click to toggle section`}
-          aria-label={`Source Control${
-            gitChangeCount > 0 ? `, ${gitChangeCount} pending changes` : ""
-          }`}
-          aria-pressed={sectionActive("git")}
-          onClick={() => switchView("git")}
-          disabled={!activeId}
-        >
-          <Icon name="git-branch" size={20} />
-          {gitChangeCount > 0 && (
-            <span className="activity-badge" aria-hidden="true">
-              {gitChangeCount > 99 ? "99+" : gitChangeCount}
-            </span>
-          )}
-        </button>
-        <button
-          className={`activity-icon ${sectionActive("tasks") ? "active" : ""}`}
-          title="Tasks (npm scripts) — click to toggle section"
-          aria-label="Tasks"
-          aria-pressed={sectionActive("tasks")}
-          onClick={() => switchView("tasks")}
-          disabled={!activeId}
-        >
-          <Icon name="play" size={20} />
-        </button>
-        <button
-          className={`activity-icon ${sectionActive("todos") ? "active" : ""}`}
-          title="TODO / FIXME (Ctrl+Shift+T) — click to toggle section"
-          aria-label="TODO and FIXME"
-          aria-pressed={sectionActive("todos")}
-          onClick={() => switchView("todos")}
-          disabled={!activeId}
-        >
-          <Icon name="check-square" size={20} />
-        </button>
-        <button
-          className={`activity-icon ${sectionActive("outline") ? "active" : ""}`}
-          title="Outline — symbols defined in the active editor file"
-          aria-label="Outline"
-          aria-pressed={sectionActive("outline")}
-          onClick={() => switchView("outline")}
-          disabled={!activeId}
-        >
-          <Icon name="file-text" size={20} />
-        </button>
-        <button
-          className={`activity-icon ${sectionActive("bookmarks") ? "active" : ""}`}
-          title="Bookmarks — pinned files for quick access"
-          aria-label="Bookmarks"
-          aria-pressed={sectionActive("bookmarks")}
-          onClick={() => switchView("bookmarks")}
-          disabled={!activeId}
-        >
-          <Icon name="star" size={20} />
-        </button>
-        <button
-          className={`activity-icon ${sectionActive("remote") ? "active" : ""}`}
-          title="Remote (SFTP) — click to toggle section. Manage connections in Settings."
-          aria-label="Remote SFTP"
-          aria-pressed={sectionActive("remote")}
-          onClick={() => switchView("remote")}
-          disabled={!activeId}
-        >
-          <Icon name="cloud" size={20} />
-        </button>
-        <button
-          className={`activity-icon ${usageActive ? "active" : ""}`}
-          title="Usage — live Claude Code session + cost monitor (opens as a tab)"
-          aria-label="Usage"
-          aria-pressed={usageActive}
-          onClick={() => activeId && usageOpen(activeId)}
-          disabled={!activeId}
-        >
-          <Icon name="chart-bar" size={20} />
-        </button>
-        <button
-          className={`activity-icon ${brainActive ? "active" : ""}`}
-          title="Brain — Pinky knowledge search + pre-turn context (opens as a tab)"
-          aria-label="Pinky Brain"
-          aria-pressed={brainActive}
-          onClick={() => activeId && brainOpen(activeId)}
-          disabled={!activeId}
-        >
-          <Icon name="brain" size={20} />
-        </button>
-        <button
-          className={`activity-icon ${whiteboardActive ? "active" : ""}`}
-          title="Organigramma — agents + skills runbook (⌘P → Open Organigramma)"
-          aria-label="Organigramma"
-          aria-pressed={whiteboardActive}
-          onClick={() => activeId && wbOpen(activeId)}
-          disabled={!activeId}
-        >
-          <Icon name="whiteboard" size={20} />
-        </button>
-        <button
-          className={`activity-icon ${aiPanelVisible ? "active" : ""}`}
-          title="AI Chat (Claude Code · Anthropic · OpenAI · Ollama) — opens on the right"
-          aria-label="AI chat panel"
-          aria-pressed={aiPanelVisible}
-          onClick={() => activeId && setAIPanelVisible(activeId, !aiPanelVisible)}
-          disabled={!activeId}
-        >
-          <AIIcon size={20} />
-        </button>
-      </div>
-
-      <div className="activity-spacer" />
+      <ActivityBarViewIcons
+        activeId={activeId}
+        activeTabKey={activeTabKey}
+        availableHeight={viewIconsHeight}
+        gitChangeCount={gitChangeCount}
+        sectionActive={sectionActive}
+        onSwitchView={switchView}
+        onStoreOpen={() => activeId && storeOpen(activeId)}
+        onUsageOpen={() => activeId && usageOpen(activeId)}
+        onBrainOpen={() => activeId && brainOpen(activeId)}
+        onWhiteboardOpen={() => activeId && wbOpen(activeId)}
+        customizeOpen={customizeOpen}
+        onCustomizeOpenChange={setCustomizeOpen}
+        sectionRef={viewIconsRef}
+      />
 
       {addOpen &&
         addBtnRef.current &&
