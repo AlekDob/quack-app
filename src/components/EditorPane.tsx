@@ -228,9 +228,11 @@ function replaceFileFromDisk(wsId: string, path: string, onDisk: string) {
 interface Props {
   wsId: string;
   path: string;
+  /** False when another tab in the same pane is active — relayout on show. */
+  paneVisible?: boolean;
 }
 
-export function EditorPane({ wsId, path }: Props) {
+export function EditorPane({ wsId, path, paneVisible = true }: Props) {
   const file = useStore((s) => s.loaded[wsId]?.files[path]);
   const update = useStore((s) => s.updateFileContents);
   const colorTheme = useResolvedEditorColorTheme();
@@ -265,6 +267,20 @@ export function EditorPane({ wsId, path }: Props) {
       cancelled = true;
     };
   }, [path, wsRoot]);
+  // Tab became visible again — nudge Monaco after visibility toggle
+  // (we keep editors mounted hidden to avoid pane resize on ai ↔ file).
+  useEffect(() => {
+    if (!paneVisible) return;
+    const ed = editorRef.current;
+    if (!ed) return;
+    requestAnimationFrame(() => {
+      try {
+        ed.layout();
+      } catch {
+        /* ignore */
+      }
+    });
+  }, [paneVisible]);
   // Mirror of "the markdown split preview is currently active" so the
   // editor's scroll listener (registered once in onMount) can read
   // the current value without re-registering on every state change.

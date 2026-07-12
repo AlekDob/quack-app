@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-08
+last_verified: 2026-07-12
 tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, workspace, zustand, persistence]
 ---
 
@@ -58,7 +58,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 - `deriveTitle(messages) → string` — first user line, truncated to 60 chars
 - `modelBadge(model) → {short, className, full}` — provider → chip; **DUPLICATED** in `AIChatsRail.tsx` and `AgentModeShell.tsx` (extract to shared module)
 - `publishTasks(chatId, items|null)` — publish/clear a session's checklist into `aiTaskStore`
-- `AIChatHost({chatId, container, visible})` — portals `AIChatPanel` into the active pane; lazy-mount on first `visible`; only rendered when workspace `isActive` (see `031-model-discovery-cache.md`)
+- `AIChatHost({chatId, container, visible})` — portals `AIChatPanel` into the active pane; lazy-mount on first `visible`; only rendered when workspace `isActive` (see `031-model-discovery-cache.md`). Hidden tabs use **visibility stacking** (`.ai-tab-host.is-visible`), not `display:none` — see `064-agent-hub-drawer-and-chat-tab-switch.md`.
 
 ### State
 - `ws.aiChats`: `Record<id, AIChatDescriptor>` — open sessions (global, persisted)
@@ -68,10 +68,10 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 - runtime run-state (`streaming`, `runningTools`, `activeToolLabels{status}`, `abortRef`): **local to `AIChatPanel`** (component) — not yet surfaced per-session in the lists
 
 ### Gotcha — mount asymmetry (editor vs agent mode)
-- **Editor mode** (`WorkspaceShell.tsx` `AIChatHost`): one host per `aiChats` descriptor; panels stay mounted after first show (`display:none` when hidden). Background tabs can stream and **save in parallel** — requires per-session storage (`043`).
-- **Agent mode** (`AgentModeShell.tsx` `AgentChatHost`): same pattern — **all open chats** mount one `AIChatPanel` each, toggled with CSS; `pulseChatSwitch` + `flushAllChatPersist` runs before the veil.
+- **Editor mode** (`WorkspaceShell.tsx` `AIChatHost` + `FileTabHost`): one host per open chat / visited file tab; panels stay mounted after first show (**`visibility:hidden`** when inactive, not `display:none`). File editors are no longer torn down when switching to an AI tab — Monaco `layout()` on `paneVisible`. See `064-agent-hub-drawer-and-chat-tab-switch.md`.
+- **Agent mode** (`AgentModeShell.tsx` `AgentChatHost`): same pattern — **all open chats** mount one `AIChatPanel` each, toggled with visibility (no opacity fade). Same-project switches skip the chat veil; cross-workspace still use it (`chatSwitch.ts`).
 - Consequence: any per-session live status (see `decisions/001-agent-status-indicators.md`) can use mounted background panels. Cross-workspace status uses `AgentHubWatcher` + `agentStatusStore`.
-- **Stop / Esc:** each mounted panel has its own `abortRef` and composer Stop button; hidden hosts use `display:none` (editor) or `pointer-events:none` (agent mode) so clicks can't hit background tabs. Hosts pass `chatVisible` into `AIChatPanel` so the global Esc shortcut only stops the **visible** session during multitask (`022` § Stop, `046`).
+- **Stop / Esc:** each mounted panel has its own `abortRef` and composer Stop button; hidden hosts use `visibility:hidden` + `pointer-events:none` so clicks can't hit background tabs. Hosts pass `chatVisible` into `AIChatPanel` so the global Esc shortcut only stops the **visible** session during multitask (`022` § Stop, `046`).
 
 ### AIChatDescriptor
 | Field | Type | Description |

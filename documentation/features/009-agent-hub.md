@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-08
-tags: [agent-hub, agent-status, sessions, notifications, cross-project, workspace-colors, watcher, mount-asymmetry]
+last_verified: 2026-07-12
+tags: [agent-hub, agent-status, sessions, notifications, cross-project, workspace-colors, watcher, mount-asymmetry, collapsed-rail, hover-drawer]
 ---
 
 ## Agent Hub (cross-project status rail)
@@ -50,6 +50,7 @@ A single headless `AgentHubWatcher` (mounted once in `App.tsx`) derives status f
 | Lifecycle + rename persistence | `src/store.ts` → `AIChatDescriptor.{doneAt,archivedAt,titleLocked}`, `renameAIChat`, `setAIChatLifecycle`, `focusAIChat`, `activeAiChatId` |
 | Agent stop on lifecycle | `src/stopChatAgent.ts`, `src/aiStopBus.ts` → `046-process-cleanup.md` |
 | Mount point | `src/App.tsx` (`<AIChatsRail/>` in `.shell-stack`, `<AgentHubWatcher/>`) |
+| Collapsed rail + hover drawer + switch perf | `064-agent-hub-drawer-and-chat-tab-switch.md` |
 | Sound asset | `public/sounds/quack.mp3` (from quack-app) |
 
 ### Right-click lifecycle
@@ -86,7 +87,17 @@ status groups — same placement as Agent Mode's agents column (feature **036**)
 | `.agent-custom` | Fixed footer (`flex-shrink: 0`, `margin-top: auto`) |
 | `CustomizationsModal` | Opens at the clicked tab; scoped to **active workspace** `root` |
 
-Hidden when the hub is collapsed (36px rail).
+Hidden when the hub is collapsed (44px rail). See **Collapsed rail + hover drawer**
+in `064-agent-hub-drawer-and-chat-tab-switch.md`.
+
+### Collapsed rail + hover drawer (2026-07-12)
+
+When **not** pinned expanded (`hubPrefs`), the stack rail is a **44px** strip of
+status chips (chat-title initial on project-color square + corner status dot).
+**Hover** opens a **240px overlay drawer** (`z-index:80`) over the editor — no
+layout reflow. **Chevron** pins the hub at 240px in-flow. Implementation:
+`AIChatsRail.tsx` (`useHubPeek`, `.agent-hub-shell`), `App.css`. Full detail:
+`064-agent-hub-drawer-and-chat-tab-switch.md`.
 
 ### Notifications
 

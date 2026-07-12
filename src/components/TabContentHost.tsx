@@ -16,7 +16,8 @@ import { ChatSwitchVeil } from "./ChatSwitchVeil";
 import { mediaKindOf } from "../mediaPreview";
 import { parseKey, type WorkspaceData } from "../store";
 import { useChatSwitching } from "../useChatSwitching";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { endChatSwitch } from "../chatSwitch";
 
 interface Props {
   wsId: string;
@@ -172,6 +173,7 @@ function DrawerAIChatHost({
 }) {
   const switching = useChatSwitching();
   const [mounted, setMounted] = useState(visible);
+  const onHydrated = useCallback(() => endChatSwitch(), []);
   useEffect(() => {
     if (visible) setMounted(true);
   }, [visible]);
@@ -179,14 +181,14 @@ function DrawerAIChatHost({
   const showVeil = switching && visible;
   return createPortal(
     <div
-      className={`ai-tab-host${showVeil ? " is-switching" : ""}`}
-      style={{ display: visible ? "flex" : "none" }}
+      className={`ai-tab-host${visible ? " is-visible" : ""}${showVeil ? " is-switching" : ""}`}
     >
       <AIChatPanel
         wsId={wsId}
         root={root}
         aiChatId={chatId}
         chatVisible={visible}
+        onHydrated={onHydrated}
       />
       {showVeil && <ChatSwitchVeil />}
     </div>,

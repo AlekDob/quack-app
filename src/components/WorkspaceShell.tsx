@@ -24,6 +24,7 @@ import {
   parseKey,
   termKey,
   useStore,
+  type EditorDrawerState,
   type PaneId,
   type TerminalLocation,
 } from "../store";
@@ -33,6 +34,7 @@ import { Icon } from "./Icon";
 import { useZenMode } from "../zenMode";
 import { ChatSwitchVeil } from "./ChatSwitchVeil";
 import { useChatSwitching } from "../useChatSwitching";
+import { endChatSwitch } from "../chatSwitch";
 import { useWorkspaceHeavyMount } from "../useWorkspaceHeavyMount";
 import { EditorTabDrawer } from "./EditorTabDrawer";
 import { EditorDrawerDropHint } from "./EditorDrawerDropHint";
@@ -102,6 +104,9 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
   const [drawerContainer, setDrawerContainer] = useState<HTMLElement | null>(
     null,
   );
+  const [drawerLinger, setDrawerLinger] = useState<EditorDrawerState | null>(
+    null,
+  );
   const [shells, setShells] = useState<ShellOption[]>([]);
   const [addOpen, setAddOpen] = useState<"bottom" | null>(null);
   const bottomAddBtnRef = useRef<HTMLButtonElement>(null);
@@ -125,6 +130,20 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
   const registerDrawerContainer = useCallback((node: HTMLElement | null) => {
     setDrawerContainer(node);
   }, []);
+
+  const drawerLive = ws?.layout.editorDrawer;
+  const drawerOpen = !!(drawerLive?.tabKey && isActive);
+
+  useEffect(() => {
+    if (drawerLive?.tabKey && isActive) {
+      setDrawerLinger(drawerLive);
+    }
+  }, [drawerLive?.tabKey, drawerLive?.width, isActive]);
+
+  const onDrawerExited = useCallback(() => {
+    const cur = useStore.getState().loaded[wsId]?.layout.editorDrawer;
+    if (!cur?.tabKey) setDrawerLinger(null);
+  }, [wsId]);
 
   useEffect(() => {
     let alive = true;
@@ -252,9 +271,7 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
         </>
       )}
       <div className="main-col">
-        <div
-          className={`editor-area${layout.editorDrawer?.tabKey ? " has-tab-drawer" : ""}`}
-        >
+        <div className="editor-area">
           <div className="editor-area-main">
             <PaneNode
               wsId={wsId}
@@ -265,17 +282,6 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
             />
             <EditorDrawerDropHint wsId={wsId} />
           </div>
-          {layout.editorDrawer?.tabKey && (
-            <EditorTabDrawer
-              wsId={wsId}
-              ws={ws}
-              tabKey={layout.editorDrawer.tabKey}
-              width={layout.editorDrawer.width}
-              registerContainer={registerDrawerContainer}
-              onResize={(w) => setEditorDrawerW(wsId, w)}
-              onDock={() => dockEditorDrawer(wsId)}
-            />
-          )}
         </div>
         {/*
           Bottom panel: kept mounted (just visually hidden via display:none)
@@ -388,41 +394,27 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
         const overlays: React.ReactNode[] = [];
         const visit = (pane: typeof layout.editorRoot) => {
           if (pane.kind === "tabs") {
-            const active = pane.active;
-            if (active && active.startsWith("file:")) {
-              const path = active.slice(5);
-              const container = paneContainers[pane.id];
+            const container = paneContainers[pane.id];
+            if (!container) return;
+            for (const tabKey of pane.tabs) {
+              if (!tabKey.startsWith("file:")) continue;
+              const path = tabKey.slice(5);
               const media = mediaKindOf(path);
-              // Media panes (image / pdf) render without a backing
-              // ws.files entry — they read bytes themselves. Session
-              // tabs are handled by the separate portal below; we skip
-              // them here so they don't double-mount.
               const isSessionTab = media === "session-transcript";
               const canRender =
-                container && !isSessionTab &&
-                (media !== null || ws.files[path]);
-              if (canRender) {
-                overlays.push(
-                  createPortal(
-                    media ? (
-                      <MediaPreviewPane
-                        key={pane.id + ":" + path}
-                        wsId={wsId}
-                        path={path}
-                        kind={media}
-                      />
-                    ) : (
-                      <EditorPane
-                        key={pane.id + ":" + path}
-                        wsId={wsId}
-                        path={path}
-                      />
-                    ),
-                    container,
-                    pane.id + ":" + path,
-                  ),
-                );
-              }
+                !isSessionTab && (media !== null || ws.files[path]);
+              if (!canRender) continue;
+              const visible = pane.active === tabKey;
+              overlays.push(
+                <FileTabHost
+                  key={pane.id + ":" + path}
+                  wsId={wsId}
+                  path={path}
+                  media={media}
+                  container={container}
+                  visible={visible}
+                />,
+              );
             }
           } else {
             visit(pane.first);
@@ -436,13 +428,13 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
         return <>{overlays}</>;
       })()}
 
-      {layout.editorDrawer?.tabKey && drawerContainer && (
+      {drawerLinger?.tabKey && drawerContainer && (
         <TabContentHost
           wsId={wsId}
           ws={ws}
-          tabKey={layout.editorDrawer.tabKey}
+          tabKey={drawerLinger.tabKey}
           container={drawerContainer}
-          visible={isActive}
+          visible={drawerOpen}
           showHeavy={showHeavy}
           editorsReady={editorsReady}
         />
@@ -953,7 +945,54 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
           />
         );
       })}
+
+      {drawerLinger?.tabKey && (
+        <EditorTabDrawer
+          wsId={wsId}
+          ws={ws}
+          tabKey={drawerLinger.tabKey}
+          width={drawerLinger.width}
+          open={drawerOpen}
+          registerContainer={registerDrawerContainer}
+          onResize={(w) => setEditorDrawerW(wsId, w)}
+          onDock={() => dockEditorDrawer(wsId)}
+          onExited={onDrawerExited}
+        />
+      )}
     </div>
+  );
+}
+
+interface FileTabHostProps {
+  wsId: string;
+  path: string;
+  media: ReturnType<typeof mediaKindOf>;
+  container: HTMLElement;
+  visible: boolean;
+}
+
+function FileTabHost({
+  wsId,
+  path,
+  media,
+  container,
+  visible,
+}: FileTabHostProps) {
+  const [mounted, setMounted] = useState(visible);
+  useEffect(() => {
+    if (visible) setMounted(true);
+  }, [visible]);
+  if (!mounted) return null;
+  return createPortal(
+    <div className={`file-tab-host${visible ? " is-visible" : ""}`}>
+      {media ? (
+        <MediaPreviewPane wsId={wsId} path={path} kind={media} />
+      ) : (
+        <EditorPane wsId={wsId} path={path} paneVisible={visible} />
+      )}
+    </div>,
+    container,
+    path,
   );
 }
 
@@ -974,6 +1013,7 @@ function AIChatHost({
 }: AIChatHostProps) {
   const switching = useChatSwitching();
   const [mounted, setMounted] = useState(visible);
+  const onHydrated = useCallback(() => endChatSwitch(), []);
   useEffect(() => {
     if (visible) setMounted(true);
   }, [visible]);
@@ -981,14 +1021,14 @@ function AIChatHost({
   const showVeil = switching && visible;
   return createPortal(
     <div
-      className={`ai-tab-host${showVeil ? " is-switching" : ""}`}
-      style={{ display: visible ? "flex" : "none" }}
+      className={`ai-tab-host${visible ? " is-visible" : ""}${showVeil ? " is-switching" : ""}`}
     >
       <AIChatPanel
         wsId={wsId}
         root={root}
         aiChatId={chatId}
         chatVisible={visible}
+        onHydrated={onHydrated}
       />
       {showVeil && <ChatSwitchVeil />}
     </div>,

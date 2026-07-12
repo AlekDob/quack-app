@@ -196,8 +196,11 @@ export function AIChatsRail({
     }
     const current =
       activeId && loaded[activeId] ? activeAiChatId(loaded[activeId]) : null;
-    if (chatId !== current || wsId !== activeId) pulseChatSwitch();
-    if (wsId !== activeId) await setActiveWorkspace(wsId);
+    const crossWs = wsId !== activeId;
+    if (chatId !== current || crossWs) {
+      pulseChatSwitch({ veil: crossWs, flushWsId: activeId ?? undefined });
+    }
+    if (crossWs) await setActiveWorkspace(wsId);
     focusAIChat(wsId, chatId);
   };
 

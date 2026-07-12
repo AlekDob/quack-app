@@ -739,6 +739,10 @@ input {
   height: 100%;
   background: var(--bg);
   position: relative;
+  --editor-drawer-top: var(--topbar-h);
+}
+.app-zen {
+  --editor-drawer-top: 0;
 }
 
 /* Development build — unmistakable when running `npm run tauri dev`. */
@@ -2656,22 +2660,51 @@ body.ab-dragging * {
   flex-direction: column;
   min-height: 0;
   z-index: 30;
-  transition:
-    flex-basis 180ms var(--ease-default, ease),
-    width 180ms var(--ease-default, ease),
-    min-width 180ms var(--ease-default, ease),
-    max-width 180ms var(--ease-default, ease);
 }
-.agent-hub-shell.is-expanded,
-.agent-hub-shell.is-peeking:not(.is-expanded) {
+.agent-hub-shell.is-expanded {
   flex: 0 0 240px;
   width: 240px;
   min-width: 240px;
   max-width: 240px;
 }
-/* Hover peek: rail grows in-flow (Cursor-style) — full panel is hoverable. */
+/* Hover peek: drawer overlay — expands over the editor, zero layout shift. */
+.agent-hub-shell.is-peeking:not(.is-expanded) {
+  z-index: 80;
+}
 .agent-hub-shell.is-peeking:not(.is-expanded) .agent-hub {
-  box-shadow: var(--shadow-md);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 240px;
+  max-width: 240px;
+  box-shadow: var(--shadow-lg);
+  animation: agent-hub-drawer-in 180ms var(--ease-default, ease);
+}
+.agent-hub-shell[data-rail-side="left"].is-peeking:not(.is-expanded) .agent-hub {
+  right: auto;
+  left: 0;
+  animation-name: agent-hub-drawer-in-left;
+}
+@keyframes agent-hub-drawer-in {
+  from {
+    opacity: 0.97;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes agent-hub-drawer-in-left {
+  from {
+    opacity: 0.97;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 .agent-hub {
   flex: 1 1 auto;
@@ -3289,15 +3322,42 @@ body.ab-dragging * {
   min-width: 0;
 }
 /* Wrapper around an AIChatPanel that's been portaled into a pane tab.
-   Mirrors .ai-side-panel-body so the inner panel fills the available
-   area; uses display:none to hide non-active tabs without unmounting. */
+   Stacked absolute hosts — visibility toggle avoids display:none reflow
+   and Monaco/chat resize jank when switching tabs. */
 .ai-tab-host {
   position: absolute;
   inset: 0;
+  display: flex;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.ai-tab-host.is-visible {
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 1;
+}
+/* File / media editors in pane tabs — same stacking model as AI hosts. */
+.file-tab-host {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.file-tab-host.is-visible {
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 1;
 }
 .ai-tab-host.is-switching > .ai-panel {
   visibility: hidden;
@@ -3366,15 +3426,63 @@ body.ab-dragging * {
   z-index: 12;
 }
 .editor-tab-drawer {
-  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
   background: var(--bg);
   border-left: 1px solid var(--border);
-  box-shadow: var(--shadow-md);
-  position: relative;
-  z-index: 10;
+  box-shadow: var(--shadow-lg);
+}
+.editor-tab-drawer--overlay {
+  position: fixed;
+  top: var(--editor-drawer-top, 0);
+  right: 0;
+  bottom: 0;
+  z-index: 900;
+  transform: translateX(100%);
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+  will-change: transform;
+}
+.editor-tab-drawer--overlay.shown {
+  transform: translateX(0);
+  pointer-events: auto;
+}
+.editor-tab-drawer-scrim {
+  position: fixed;
+  top: var(--editor-drawer-top, 0);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 899;
+  appearance: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin: 0;
+  cursor: default;
+  background: color-mix(in srgb, var(--bg) 22%, transparent);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  transition:
+    opacity 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    background 0.15s ease;
+  pointer-events: none;
+}
+.editor-tab-drawer-scrim.shown {
+  opacity: 1;
+  pointer-events: auto;
+}
+.editor-tab-drawer-scrim:hover,
+.editor-tab-drawer-scrim:focus-visible {
+  background: color-mix(in srgb, var(--bg) 30%, transparent);
+  border-color: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  .editor-tab-drawer--overlay,
+  .editor-tab-drawer-scrim {
+    transition: none;
+  }
 }
 .editor-tab-drawer-resize {
   position: absolute;
@@ -5625,6 +5733,43 @@ body.ab-dragging * {
   font-size: 10px;
   color: var(--fg-muted);
 }
+.settings-row-col {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 10px 0;
+  min-height: 0;
+}
+.settings-row-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.settings-tier-backend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-alt);
+}
+.settings-tier-backend-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg);
+}
+.settings-tier-select-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.settings-tier-select-label {
+  font-size: 12px;
+  color: var(--fg-dim);
+}
 /* Model browser modal — Cursor-style: soft glass, neutral chrome, pill filters. */
 .model-browser {
   width: min(760px, 92vw);
@@ -6876,7 +7021,7 @@ body.ab-dragging * {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 4px 10px;
+  padding: 2px 10px 4px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -6979,18 +7124,18 @@ body.ab-dragging * {
 .ai-composer-git-changes {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   flex-shrink: 0;
-  padding: 3px 8px;
+  padding: 2px 7px;
   border: 1px solid var(--border);
   border-radius: var(--radius-full);
-  background: var(--bg);
+  background: transparent;
   font-size: 10px;
+  font-family: var(--font-mono);
   color: var(--fg-muted);
 }
 .ai-composer-git-changes-label {
-  font-weight: 500;
-  color: var(--fg);
+  display: none;
 }
 .ai-composer-git-split {
   display: inline-flex;
@@ -16827,15 +16972,11 @@ body.ab-dragging * {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition:
-    opacity var(--duration-fast) var(--ease-default),
-    visibility var(--duration-fast) var(--ease-default);
+  z-index: 0;
 }
 .agent-chat-host[data-visible] {
-  opacity: 1;
   visibility: visible;
   pointer-events: auto;
   z-index: 1;
@@ -18014,8 +18155,7 @@ body.ab-dragging * {
 
 /* ── Organigramma ──────────────────────────────────────────────── */
 .whiteboard-org {
-  max-width: 920px;
-  margin: 0 auto;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -23059,68 +23199,21 @@ body.ab-dragging * {
   cursor: pointer;
 }
 
-.ai-composer-work-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px 0;
-  order: -1;
+.ai-composer-work-wrap {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
-.ai-composer-work-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  height: 26px;
-  padding: 0 8px;
+.ai-composer-work-dot {
+  width: 8px;
+  height: 8px;
   border-radius: var(--radius-full);
-  border: 1px solid var(--border);
-  background: var(--bg-alt);
-  color: var(--fg);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-
-.ai-composer-work-pill--empty {
-  color: var(--fg-muted);
-}
-
-.ai-composer-work-id {
-  font-family: var(--font-mono);
-  color: var(--fg-muted);
-}
-
-.ai-composer-work-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 200px;
-}
-
-.ai-composer-work-chip {
-  height: 24px;
-  padding: 0 8px;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--fg-muted);
-  font-size: var(--fs-xs);
-  cursor: pointer;
-}
-
-.ai-composer-work-chip:hover {
-  background: var(--bg-hi);
-  color: var(--fg);
+  flex-shrink: 0;
 }
 
 .ai-composer-work-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 2px 10px 0;
-  order: -2;
+  display: none;
 }
 
 .ai-composer-work-meta {

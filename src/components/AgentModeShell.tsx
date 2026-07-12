@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
@@ -24,7 +24,7 @@ import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors"
 import { AIChatsRail } from "./AIChatsRail";
 import { ChatSwitchVeil } from "./ChatSwitchVeil";
 import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
-import { pulseChatSwitch } from "../chatSwitch";
+import { endChatSwitch, pulseChatSwitch } from "../chatSwitch";
 import { useChatSwitching } from "../useChatSwitching";
 
 interface Props {
@@ -115,6 +115,7 @@ function AgentChatHost({
   onOpenFile: (path: string | null) => void;
 }) {
   const [mounted, setMounted] = useState(visible);
+  const onHydrated = useCallback(() => endChatSwitch(), []);
   useEffect(() => {
     if (visible) setMounted(true);
   }, [visible]);
@@ -132,6 +133,7 @@ function AgentChatHost({
             root={root}
             aiChatId={chatId}
             chatVisible={visible}
+            onHydrated={onHydrated}
           />
         </AgentFileOpen.Provider>
       </CompactChat.Provider>
@@ -205,8 +207,11 @@ export function AgentModeShell({ wsId }: Props) {
   const recentNotOpen = recent.filter((w) => !openIds.includes(w.id));
 
   const selectSession = (id: string, chatId: string) => {
-    if (chatId !== activeChatId || id !== wsId) pulseChatSwitch();
-    if (id !== wsId) void setActiveWorkspace(id);
+    const crossWs = id !== wsId;
+    if (chatId !== activeChatId || crossWs) {
+      pulseChatSwitch({ veil: crossWs, flushWsId: wsId });
+    }
+    if (crossWs) void setActiveWorkspace(id);
     setSelectedByWs((m) => ({ ...m, [id]: chatId }));
   };
 

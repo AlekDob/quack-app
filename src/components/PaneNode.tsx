@@ -81,7 +81,7 @@ function tabLabel(
   }
   if (parsed?.kind === "whiteboard") {
     return {
-      label: "Organigramma",
+      label: "Team",
       dirty: false,
       isTerminal: false,
       isAI: false,
@@ -342,7 +342,7 @@ function TabsPaneView(
     const el = tabBarRef.current.querySelector(
       `[data-tab-key="${CSS.escape(pane.active)}"]`,
     ) as HTMLElement | null;
-    el?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    el?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
   }, [pane.active]);
 
   const tabMenuItems: (ContextMenuItem | "separator")[] = (() => {
@@ -706,7 +706,7 @@ function TabsPaneView(
                 ) : info.isAI ? (
                   <AIIcon size={12} />
                 ) : info.isWhiteboard ? (
-                  <Icon name="whiteboard" size={12} />
+                  <Icon name="users" size={12} />
                 ) : info.isWorks ? (
                   <Icon name="columns-2" size={12} />
                 ) : info.isUsage ? (

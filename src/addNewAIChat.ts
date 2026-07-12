@@ -24,7 +24,7 @@ export function addNewAIChat(
   location: TerminalLocation = "editor",
   anchor?: { x: number; y: number },
 ): string {
-  pulseChatSwitch();
+  pulseChatSwitch({ veil: false, flushWsId: wsId });
   const chatId = useStore.getState().addAIChat(wsId, location);
   useStore.getState().focusAIChat(wsId, chatId);
   openNewChatNamePrompt({

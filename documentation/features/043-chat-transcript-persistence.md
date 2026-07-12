@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-06
-last_verified: 2026-07-11
+last_verified: 2026-07-12
 tags: [chat, persistence, disk, rust, transcript, multitasking, reliability, provider-links, audit]
 ---
 
@@ -70,8 +70,8 @@ disk writes are async fire-and-forget with failure toast via `registerChatSaveFa
 | `src/chatHistory.ts` | Public API: `loadSession`, `saveSession`, `patchSession`, `deleteSession` |
 | `src/chatProviderRecovery.ts` | Hydrate thin Quack rows from CLI on-disk transcripts (all agentic providers) |
 | `src/chatCcRecovery.ts` | Thin wrapper → `chatProviderRecovery` (CC-only compat) |
-| `src/chatPersistFlush.ts` | `flushAllChatPersist()` before chat switch |
-| `src/chatSwitch.ts` | `pulseChatSwitch()` calls flush then UI veil |
+| `src/chatPersistFlush.ts` | `flushAllChatPersist()` / `flushWorkspaceChatPersist(wsId)` before chat switch |
+| `src/chatSwitch.ts` | `pulseChatSwitch({ veil?, flushWsId? })`, `endChatSwitch()` on hydrate |
 | `src/composerDraft.ts` | `mergeComposerDraft` / `mergeSessionKnobs` → `patchSession` |
 | `src/components/AIChatPanel.tsx` | Register flush, streaming checkpoint, save-failure toast |
 | `src/store.ts` | `hydrate()` calls `hydrateChatStore(wsId)` for every open workspace |
@@ -105,7 +105,7 @@ chat_store_lookup_link(provider, cliSessionId) → ProviderLink | null
 |---|---|
 | `messages` change | `persistTranscriptRef()` → `saveSession` → disk |
 | Streaming active | Every **5s** checkpoint (partial assistant appended) |
-| Chat switch (`pulseChatSwitch`) | `flushAllChatPersist()` on all mounted panels |
+| Chat switch (`pulseChatSwitch`) | `flushWorkspaceChatPersist` when `flushWsId` set; else all mounted panels. Veil optional — see `064`. |
 | Panel unmount | `registerChatPersist` cleanup flushes |
 | `beforeunload` | Partial assistant + messages |
 | `mergeComposerDraft` / knobs | `patchSession` only |
