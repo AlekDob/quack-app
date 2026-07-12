@@ -41,6 +41,12 @@ interface Props {
 function AgentTasks({ chatId }: { chatId: string | null }) {
   const [, setTick] = useState(0);
   useEffect(() => subscribeTasks(() => setTick((t) => t + 1)), []);
+  // Cursor-style: collapsed by default, showing only the current task +
+  // progress; the user expands to see the full checklist. Re-collapses
+  // whenever the session changes so a new chat doesn't inherit the
+  // previous one's expanded state.
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => setExpanded(false), [chatId]);
   const raw = getTasks(chatId);
   // The checklist builder can emit the same task twice (TaskCreate +
   // TodoWrite both feeding one list). Collapse by content, keeping the
@@ -54,23 +60,28 @@ function AgentTasks({ chatId }: { chatId: string | null }) {
   const tasks = [...byContent.values()];
   if (tasks.length === 0) return null;
   const done = tasks.filter((t) => t.status === "completed").length;
+  const current =
+    tasks.find((t) => t.status === "in_progress") ??
+    tasks.find((t) => t.status === "pending") ??
+    tasks[tasks.length - 1];
   return (
     <div className="agent-tasks">
-      <div className="agent-tasks-head">
-        <span className="agent-tasks-title">Tasks</span>
-        <span className="agent-tasks-count">
-          {done}/{tasks.length}
-        </span>
-      </div>
-      <div className="agent-tasks-list">
-        {tasks.map((t, i) => (
-          <div key={i} className={`agent-task status-${t.status}`}>
+      <button
+        type="button"
+        className="agent-tasks-head"
+        onClick={() => setExpanded((e) => !e)}
+        aria-expanded={expanded}
+      >
+        {expanded ? (
+          <span className="agent-tasks-title">Tasks</span>
+        ) : (
+          <span className={`agent-tasks-current status-${current.status}`}>
             <span className="agent-task-icon" aria-hidden="true">
               <Icon
                 name={
-                  t.status === "completed"
+                  current.status === "completed"
                     ? "check-circle"
-                    : t.status === "in_progress"
+                    : current.status === "in_progress"
                       ? "arrow-down-circle"
                       : "circle"
                 }
@@ -78,13 +89,44 @@ function AgentTasks({ chatId }: { chatId: string | null }) {
               />
             </span>
             <span className="agent-task-text">
-              {t.status === "in_progress" && t.activeForm
-                ? t.activeForm
-                : t.content}
+              {current.status === "in_progress" && current.activeForm
+                ? current.activeForm
+                : current.content}
             </span>
-          </div>
-        ))}
-      </div>
+          </span>
+        )}
+        <span className="agent-tasks-head-trail">
+          <span className="agent-tasks-count">
+            {done}/{tasks.length}
+          </span>
+          <Icon name={expanded ? "chevron-up" : "chevron-down"} size={12} />
+        </span>
+      </button>
+      {expanded && (
+        <div className="agent-tasks-list">
+          {tasks.map((t, i) => (
+            <div key={i} className={`agent-task status-${t.status}`}>
+              <span className="agent-task-icon" aria-hidden="true">
+                <Icon
+                  name={
+                    t.status === "completed"
+                      ? "check-circle"
+                      : t.status === "in_progress"
+                        ? "arrow-down-circle"
+                        : "circle"
+                  }
+                  size={12}
+                />
+              </span>
+              <span className="agent-task-text">
+                {t.status === "in_progress" && t.activeForm
+                  ? t.activeForm
+                  : t.content}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
