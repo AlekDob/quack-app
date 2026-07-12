@@ -10,6 +10,8 @@ export interface ActiveDrag {
   overPaneId: string | null;
   edge: DropEdge | null;
   tabInsertIndex: number | null;
+  /** Far-right editor strip — opens tab in the resizable drawer. */
+  drawerDrop: boolean;
 }
 
 let _drag: ActiveDrag | null = null;
@@ -31,6 +33,7 @@ export function startDrag(d: {
     overPaneId: null,
     edge: null,
     tabInsertIndex: null,
+    drawerDrop: false,
   };
   notify();
 }
@@ -41,9 +44,10 @@ export function updateDrag(
   overPaneId: string | null,
   edge: DropEdge | null,
   tabInsertIndex: number | null = null,
+  drawerDrop = false,
 ) {
   if (!_drag) return;
-  _drag = { ..._drag, x, y, overPaneId, edge, tabInsertIndex };
+  _drag = { ..._drag, x, y, overPaneId, edge, tabInsertIndex, drawerDrop };
   notify();
 }
 

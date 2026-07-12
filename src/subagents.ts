@@ -22,7 +22,7 @@ export interface SubagentDef {
 }
 
 // Number of duck avatars shipped in public/images/ducks/ (duck1..duckN).
-const DUCK_COUNT = 35;
+export const DUCK_COUNT = 35;
 
 // Stable string hash → duck index. Same agent name always maps to the same
 // duck, so an avatar never shuffles between sessions.

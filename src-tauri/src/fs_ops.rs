@@ -193,6 +193,31 @@ pub fn save_image_attachment(filename: String, data_b64: String) -> Result<Strin
     Ok(path.to_string_lossy().into_owned())
 }
 
+/// Persist an image to a durable, caller-chosen directory (e.g. a preset's
+/// `.codetta/avatars/`) rather than the ephemeral OS temp dir used by
+/// `save_image_attachment`. Same decode + filename-sanitize logic; the
+/// directory is created if missing.
+#[tauri::command]
+pub fn save_persistent_image(
+    dir: String,
+    filename: String,
+    data_b64: String,
+) -> Result<String, String> {
+    let dir_path = PathBuf::from(&dir);
+    std::fs::create_dir_all(&dir_path).map_err(|e| e.to_string())?;
+    let safe = Path::new(&filename)
+        .file_name()
+        .ok_or_else(|| "invalid filename".to_string())?
+        .to_string_lossy()
+        .into_owned();
+    let bytes = STANDARD
+        .decode(data_b64.as_bytes())
+        .map_err(|e| e.to_string())?;
+    let path = dir_path.join(safe);
+    std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
+
 /// Read a binary media file (image or PDF) back as a `data:` URL. Used by
 /// the chat zoom modal AND by the in-tab media preview (MediaPreviewPane).
 /// Keeps base64 OUT of localStorage — callers ask for full quality on

@@ -14,6 +14,7 @@ import { ComposeReviewPane } from "./ComposeReviewPane";
 import { HtmlPreviewPane } from "./HtmlPreviewPane";
 import { PlanPane } from "./PlanPane";
 import { WhiteboardPane } from "./WhiteboardPane";
+import { WorksPane } from "./works/WorksPane";
 import { UsagePanel } from "./UsagePanel";
 import { BrainPanel } from "./BrainPanel";
 import { QuackStorePanel } from "./QuackStorePanel";
@@ -33,6 +34,9 @@ import { useZenMode } from "../zenMode";
 import { ChatSwitchVeil } from "./ChatSwitchVeil";
 import { useChatSwitching } from "../useChatSwitching";
 import { useWorkspaceHeavyMount } from "../useWorkspaceHeavyMount";
+import { EditorTabDrawer } from "./EditorTabDrawer";
+import { EditorDrawerDropHint } from "./EditorDrawerDropHint";
+import { TabContentHost } from "./TabContentHost";
 
 interface Props {
   wsId: string;
@@ -88,11 +92,16 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
   const addTerminal = useStore((s) => s.addTerminal);
   const setAIPanelW = useStore((s) => s.setAIPanelW);
   const setAIPanelVisible = useStore((s) => s.setAIPanelVisible);
+  const dockEditorDrawer = useStore((s) => s.dockEditorDrawer);
+  const setEditorDrawerW = useStore((s) => s.setEditorDrawerW);
   const zen = useZenMode();
 
   const [paneContainers, setPaneContainers] = useState<
     Record<PaneId, HTMLElement>
   >({});
+  const [drawerContainer, setDrawerContainer] = useState<HTMLElement | null>(
+    null,
+  );
   const [shells, setShells] = useState<ShellOption[]>([]);
   const [addOpen, setAddOpen] = useState<"bottom" | null>(null);
   const bottomAddBtnRef = useRef<HTMLButtonElement>(null);
@@ -112,6 +121,10 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
     },
     [],
   );
+
+  const registerDrawerContainer = useCallback((node: HTMLElement | null) => {
+    setDrawerContainer(node);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -239,14 +252,30 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
         </>
       )}
       <div className="main-col">
-        <div className="editor-area">
-          <PaneNode
-            wsId={wsId}
-            ws={ws}
-            pane={layout.editorRoot}
-            registerContainer={registerContainer}
-            rootPaneId={layout.editorRoot.id}
-          />
+        <div
+          className={`editor-area${layout.editorDrawer?.tabKey ? " has-tab-drawer" : ""}`}
+        >
+          <div className="editor-area-main">
+            <PaneNode
+              wsId={wsId}
+              ws={ws}
+              pane={layout.editorRoot}
+              registerContainer={registerContainer}
+              rootPaneId={layout.editorRoot.id}
+            />
+            <EditorDrawerDropHint wsId={wsId} />
+          </div>
+          {layout.editorDrawer?.tabKey && (
+            <EditorTabDrawer
+              wsId={wsId}
+              ws={ws}
+              tabKey={layout.editorDrawer.tabKey}
+              width={layout.editorDrawer.width}
+              registerContainer={registerDrawerContainer}
+              onResize={(w) => setEditorDrawerW(wsId, w)}
+              onDock={() => dockEditorDrawer(wsId)}
+            />
+          )}
         </div>
         {/*
           Bottom panel: kept mounted (just visually hidden via display:none)
@@ -406,6 +435,18 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
         }
         return <>{overlays}</>;
       })()}
+
+      {layout.editorDrawer?.tabKey && drawerContainer && (
+        <TabContentHost
+          wsId={wsId}
+          ws={ws}
+          tabKey={layout.editorDrawer.tabKey}
+          container={drawerContainer}
+          visible={isActive}
+          showHeavy={showHeavy}
+          editorsReady={editorsReady}
+        />
+      )}
 
       {/* AI chats: one AIChatHost per descriptor. Internally portals an
           AIChatPanel into the pane container that currently owns the
@@ -648,6 +689,48 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
             (inBottom ? layout.bottomVisible : true);
           return (
             <WhiteboardPane
+              key={key}
+              wsId={wsId}
+              root={ws.meta.root}
+              container={container}
+              visible={visible}
+            />
+          );
+        });
+      })()}
+
+      {showHeavy &&
+        (() => {
+        const keys = new Set<string>();
+        const walk = (pane: typeof layout.editorRoot) => {
+          if (pane.kind === "tabs") {
+            pane.tabs.forEach((k) => {
+              if (k.startsWith("works:")) keys.add(k);
+            });
+          } else {
+            walk(pane.first);
+            walk(pane.second);
+          }
+        };
+        walk(layout.editorRoot);
+        if (layout.bottomRoot) walk(layout.bottomRoot);
+        return [...keys].map((key) => {
+          const parsed = parseKey(key);
+          if (parsed?.kind !== "works") return null;
+          const editorPane = findTabsPaneByTab(layout.editorRoot, key);
+          const bottomPane = layout.bottomRoot
+            ? findTabsPaneByTab(layout.bottomRoot, key)
+            : null;
+          const pane = editorPane ?? bottomPane;
+          const inBottom = !editorPane && !!bottomPane;
+          const container = pane ? (paneContainers[pane.id] ?? null) : null;
+          const visible =
+            isActive &&
+            !!pane &&
+            pane.active === key &&
+            (inBottom ? layout.bottomVisible : true);
+          return (
+            <WorksPane
               key={key}
               wsId={wsId}
               root={ws.meta.root}

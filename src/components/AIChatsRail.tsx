@@ -42,6 +42,7 @@ import {
 import { AIIcon } from "./AIIcon";
 import { ContextMenu } from "./ContextMenu";
 import { Icon } from "./Icon";
+import { WorkHubBadge } from "./works/WorkHubBadge";
 
 // One flattened chat across all open workspaces, with its derived status
 // and project color — the unit the hub groups and renders.
@@ -75,6 +76,34 @@ function initials(name: string): string {
   if (parts.length === 0) return "··";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[1][0]).toUpperCase();
+}
+
+// Collapsed chip: first chat-title letter so same-project rows differ.
+function chipLetter(title: string, wsName: string): string {
+  const t = title.trim();
+  if (t.length > 0) return t[0]!.toUpperCase();
+  return initials(wsName)[0] ?? "?";
+}
+
+function useHubPeek(enabled: boolean) {
+  const [peeking, setPeeking] = useState(false);
+  const leaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onEnter = () => {
+    if (!enabled) return;
+    if (leaveRef.current) clearTimeout(leaveRef.current);
+    setPeeking(true);
+  };
+  const onLeave = () => {
+    if (!enabled) return;
+    leaveRef.current = setTimeout(() => setPeeking(false), 320);
+  };
+  useEffect(
+    () => () => {
+      if (leaveRef.current) clearTimeout(leaveRef.current);
+    },
+    [],
+  );
+  return { peeking, onEnter, onLeave };
 }
 
 interface AIChatsRailProps {
@@ -111,6 +140,11 @@ export function AIChatsRail({
   const setAIChatLifecycle = useStore((s) => s.setAIChatLifecycle);
   const hubExpanded = useHubExpanded();
   const expanded = inSidebar || hubExpanded;
+  const peekEnabled = !inSidebar && !hubExpanded;
+  const { peeking, onEnter: onPeekEnter, onLeave: onPeekLeave } =
+    useHubPeek(peekEnabled);
+  const showExpanded = expanded || peeking;
+  const railSide = inSidebar ? "left" : sidebarSide === "left" ? "right" : "left";
 
   // Re-render on status / color / section changes (module-level stores).
   const [, setTick] = useState(0);
@@ -191,10 +225,12 @@ export function AIChatsRail({
     }
   }, [totalChats, activeId, loaded]);
 
-  return (
+  const hubBody = (
     <div
-      className={`agent-hub ${expanded ? "expanded" : ""}${inSidebar ? " agent-hub--sidebar" : ""}`}
-      data-rail-side={inSidebar ? "left" : sidebarSide === "left" ? "right" : "left"}
+      className={`agent-hub ${showExpanded ? "expanded" : ""}${peeking && !expanded ? " peeking" : ""}${inSidebar ? " agent-hub--sidebar" : ""}`}
+      data-rail-side={railSide}
+      onMouseEnter={peekEnabled ? onPeekEnter : undefined}
+      onMouseLeave={peekEnabled ? onPeekLeave : undefined}
     >
       <div className="agent-hub-header">
         <button
@@ -205,14 +241,14 @@ export function AIChatsRail({
           aria-label="New AI chat"
           disabled={!activeId}
         >
-          <AIIcon size={expanded ? 14 : 22} />
-          {!expanded && (
+          <AIIcon size={showExpanded ? 14 : 20} />
+          {!showExpanded && (
             <span className="agent-hub-plus" aria-hidden="true">
               <Icon name="plus" size={10} />
             </span>
           )}
-          {expanded && <span className="agent-hub-add-label">New chat</span>}
-          {expanded && (
+          {showExpanded && <span className="agent-hub-add-label">New chat</span>}
+          {showExpanded && (
             <span className="agent-hub-add-hint" aria-hidden="true">
               <Icon name="plus" size={12} />
             </span>
@@ -222,14 +258,14 @@ export function AIChatsRail({
           <button
             className="agent-hub-toggle"
             onClick={() => setHubExpanded(!hubExpanded)}
-            title={expanded ? "Collapse hub" : "Expand hub"}
-            aria-label={expanded ? "Collapse agent hub" : "Expand agent hub"}
-            aria-expanded={expanded}
+            title={hubExpanded ? "Collapse hub" : "Expand hub — or hover the rail"}
+            aria-label={hubExpanded ? "Collapse agent hub" : "Expand agent hub"}
+            aria-expanded={hubExpanded}
           >
             <Icon
               name={
-                (expanded && sidebarSide === "left") ||
-                (!expanded && sidebarSide !== "left")
+                (showExpanded && sidebarSide === "left") ||
+                (!showExpanded && sidebarSide !== "left")
                   ? "chevron-right"
                   : "chevron-left"
               }
@@ -243,7 +279,7 @@ export function AIChatsRail({
         <div className="agent-hub-list-body">
           {totalChats === 0 && (
             <div className="agent-hub-empty" title="No AI chats yet">
-              {expanded ? (
+              {showExpanded ? (
                 <>
                   <AIIcon size={32} className="agent-hub-empty-mark" />
                   <span className="agent-hub-empty-title">No chats yet</span>
@@ -267,7 +303,7 @@ export function AIChatsRail({
                 status={status}
                 label={label}
                 count={items.length}
-                expanded={expanded}
+                expanded={showExpanded}
                 bulkActions={
                   status === "done"
                     ? {
@@ -289,7 +325,7 @@ export function AIChatsRail({
                   <HubRow
                     key={entry.chat.id}
                     entry={entry}
-                    expanded={expanded}
+                    expanded={showExpanded}
                     active={
                       entry.wsId === activeId && entry.chat.id === activeChatId
                     }
@@ -312,7 +348,7 @@ export function AIChatsRail({
             );
           })}
         </div>
-        {expanded && (
+        {showExpanded && (
           <AgentCustomizations onOpen={(t) => setCustTab(t)} />
         )}
         {footer}
@@ -356,6 +392,17 @@ export function AIChatsRail({
           ]}
         />
       )}
+    </div>
+  );
+
+  if (inSidebar) return hubBody;
+
+  return (
+    <div
+      className={`agent-hub-shell${expanded ? " is-expanded" : ""}${peeking ? " is-peeking" : ""}`}
+      data-rail-side={railSide}
+    >
+      {hubBody}
     </div>
   );
 }
@@ -501,16 +548,18 @@ function HubRow({
 }: RowProps) {
   const { chat, ws, color, status } = entry;
   const badge = initials(ws.meta.name);
+  const chip = expanded ? badge : chipLetter(chat.title, ws.meta.name);
   const diff = expanded ? getChatDiff(chat.id) : undefined;
+  const collapsedTip = `${chat.title} · ${ws.meta.name}`;
   return (
     <div
-      className={`agent-hub-row ${active ? "active" : ""}${diff ? " has-diff" : ""}`}
+      className={`agent-hub-row ${active ? "active" : ""}${diff ? " has-diff" : ""}${chat.workItemId ? " has-work" : ""}`}
       data-status={status}
       role="tab"
       tabIndex={0}
       aria-selected={active}
       aria-label={`${chat.title} — ${ws.meta.name}`}
-      title={`${chat.title}\n${ws.meta.name} · ${status}`}
+      title={expanded ? undefined : collapsedTip}
       onClick={onClick}
       onContextMenu={onContextMenu}
       onKeyDown={(e) => {
@@ -536,9 +585,9 @@ function HubRow({
             : undefined
         }
         title={ws.meta.name}
-        aria-hidden="true"
+        aria-hidden={expanded ? true : undefined}
       >
-        {badge}
+        {chip}
       </span>
       {expanded &&
         (renaming ? (
@@ -555,6 +604,9 @@ function HubRow({
         ) : (
           <span className="agent-hub-row-title">{chat.title}</span>
         ))}
+      {expanded && (
+        <WorkHubBadge root={ws.meta.root} workItemId={chat.workItemId} />
+      )}
       {expanded && !renaming && (
         <button
           className="agent-hub-row-close"

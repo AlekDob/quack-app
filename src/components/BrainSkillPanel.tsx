@@ -1,7 +1,11 @@
 // Skills segment — SkillOpt-Sleep trainer (dry-run, adopt proposals).
 
 import { useCallback, useEffect, useState } from "react";
-import { skilloptSleep, type SkillOptSleepStatus } from "../skilloptSleep";
+import {
+  parseSkillOptOutput,
+  skilloptSleep,
+  type SkillOptSleepStatus,
+} from "../skilloptSleep";
 import { openQuackStore } from "./QuackStorePanel";
 import { error as toastError, info as toastInfo, success as toastSuccess } from "../notify";
 import { invoke } from "@tauri-apps/api/core";
@@ -12,33 +16,50 @@ interface Props {
   active: boolean;
 }
 
+type LastRun = {
+  at: number;
+  hasProposal: boolean;
+};
+
 const dismissKey = (id: string) => `lcp.skillopt.dismissed.${id}`;
 
 function proposalId(st: SkillOptSleepStatus): string {
-  return (st.proposal_summary ?? st.raw_output ?? "default").slice(0, 80);
+  return (st.proposal_summary ?? st.proposal_skill_path ?? "default").slice(0, 80);
+}
+
+function runSummary(st: SkillOptSleepStatus): string {
+  if (st.has_proposal) {
+    return "Proposal ready — review and adopt below.";
+  }
+  return "No new proposals from this dry-run.";
 }
 
 export function BrainSkillPanel({ wsId, active }: Props) {
   const [status, setStatus] = useState<SkillOptSleepStatus | null>(null);
   const [busy, setBusy] = useState<"dry-run" | "adopt" | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [lastRun, setLastRun] = useState<LastRun | null>(null);
+
+  const applyStatus = useCallback((st: SkillOptSleepStatus) => {
+    setStatus(st);
+    const pid = proposalId(st);
+    const wasDismissed = getJson<boolean>(
+      dismissKey(pid),
+      false,
+      (v): v is boolean => typeof v === "boolean",
+    );
+    setDismissed(wasDismissed && st.has_proposal);
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!active) return;
     try {
       const st = await skilloptSleep.status();
-      setStatus(st);
-      const pid = proposalId(st);
-      const wasDismissed = getJson<boolean>(
-        dismissKey(pid),
-        false,
-        (v): v is boolean => typeof v === "boolean",
-      );
-      setDismissed(wasDismissed && st.has_proposal);
+      applyStatus(st);
     } catch (e) {
       toastError(String(e));
     }
-  }, [active]);
+  }, [active, applyStatus]);
 
   useEffect(() => {
     void refresh();
@@ -46,21 +67,18 @@ export function BrainSkillPanel({ wsId, active }: Props) {
 
   const runDryRun = async () => {
     setBusy("dry-run");
+    setLastRun(null);
     toastInfo("Running dry-run — this may take a few minutes.");
     try {
       const res = await skilloptSleep.dryRun();
-      toastSuccess("Dry-run finished");
-      setStatus((s) => ({
-        ...(s ?? {
-          available: true,
-          has_proposal: false,
-          proposal_summary: null,
-          proposal_skill_path: null,
-          proposal_body: null,
-          raw_output: null,
-        }),
-        raw_output: res.output,
-      }));
+      const parsed = parseSkillOptOutput(res.output);
+      applyStatus(parsed);
+      setLastRun({ at: Date.now(), hasProposal: parsed.has_proposal });
+      toastSuccess(
+        parsed.has_proposal
+          ? "Dry-run finished — proposal ready"
+          : "Dry-run finished — no new proposals",
+      );
     } catch (e) {
       toastError(String(e));
     } finally {
@@ -74,18 +92,9 @@ export function BrainSkillPanel({ wsId, active }: Props) {
       const res = await skilloptSleep.adopt();
       toastSuccess("Skill proposal adopted");
       setDismissed(false);
-      setStatus((s) => ({
-        ...(s ?? {
-          available: true,
-          has_proposal: false,
-          proposal_summary: null,
-          proposal_skill_path: null,
-          proposal_body: null,
-          raw_output: null,
-        }),
-        has_proposal: false,
-        raw_output: res.output,
-      }));
+      setLastRun(null);
+      const parsed = parseSkillOptOutput(res.output);
+      applyStatus({ ...parsed, has_proposal: false });
       try {
         await invoke("claude_invalidate_context_cache");
       } catch {
@@ -144,6 +153,23 @@ export function BrainSkillPanel({ wsId, active }: Props) {
         </button>
       </div>
 
+      {busy === "dry-run" && (
+        <p className="brain-skill-running" aria-live="polite">
+          Dry-run in progress — the button shows a shimmer until it finishes. You will
+          also get a toast notification.
+        </p>
+      )}
+
+      {lastRun && !busy && (
+        <div
+          className={`brain-skill-result${lastRun.hasProposal ? " has-proposal" : ""}`}
+          role="status"
+        >
+          <span className="brain-skill-result-label">Dry-run complete</span>
+          <span className="brain-skill-result-text">{runSummary(status)}</span>
+        </div>
+      )}
+
       {showProposal && (
         <div className="brain-skill-proposal">
           <p className="brain-skill-proposal-head">Staged skill proposal</p>
@@ -185,7 +211,7 @@ export function BrainSkillPanel({ wsId, active }: Props) {
         <pre className="brain-skill-output">{previewBody(status.raw_output, 1200)}</pre>
       )}
 
-      {!showProposal && !status.raw_output && (
+      {!showProposal && !status.raw_output && !lastRun && (
         <p className="brain-empty-index">
           No staged proposal. Run <strong>dry-run</strong> or schedule nightly cycles via
           the SkillOpt CLI.

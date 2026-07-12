@@ -24,6 +24,8 @@ import { TurnStreamStatus } from "./TurnStreamStatus";
 import { ContextFilesDock } from "./ContextFilesDock";
 import { ComposerContextBar } from "./ComposerContextBar";
 import { ComposerGitActions } from "./ComposerGitActions";
+import { ComposerWorkActions } from "./ComposerWorkActions";
+import { ComposerWorkBar } from "./ComposerWorkBar";
 import { AgentCommitDock } from "./AgentCommitDock";
 import {
   hydrateAgentCommitFromMessages,
@@ -108,9 +110,37 @@ import { summarizeLastTurn } from "../sessionDiffStats";
 import { loadWorkspaceRules } from "../workspaceRules";
 import { appendJackUserPreferences } from "../jackPrefs";
 import {
+  BUILTIN_PRESETS,
+  JACK_PRESET_ID,
+  PRESET_ORDER,
+  effectivePresetDefinition,
+  getJackDefinition,
+  getPresetInstructionsFor,
+  getPresetOverrides,
+  loadCustomPresets,
+  resolvePresetConfigFor,
+  subscribePresetSettings,
+  type PresetDefinition,
+} from "../presets";
+import { PERM_MODE_OPTIONS } from "../presets/permModes";
+import {
   fetchBrainContextForTurn,
   getBrainInjectEnabled,
 } from "../brainInject";
+import {
+  formatWorkBlock,
+  getWorkInjectEnabled,
+} from "../workContextInject";
+import {
+  approvePlanWork,
+  createWorkItem,
+  getWorksSnapshot,
+  hydrateWorks,
+  linkChatToWork,
+  subscribeWorks,
+  updateWorkItem,
+} from "../worksCache";
+import { findWork, planTextToBlocks, type WorksSnapshot } from "../works";
 import { recordBrainUsage } from "../brainUsageStore";
 import { BrainTurnChip } from "./BrainTurnChip";
 import { ReasoningTurnChip } from "./ReasoningTurnChip";
@@ -421,6 +451,9 @@ export function AIChatPanel({
   // Background panels stay mounted (multitask + mount-asymmetry) but
   // catch up with one poll when the user switches back.
   const wsActive = useStore((s) => s.activeId === wsId);
+  const workItemId = useStore((s) =>
+    aiChatId ? s.loaded[wsId]?.aiChats[aiChatId]?.workItemId : undefined,
+  );
   const [pinkyBrainExt, setPinkyBrainExt] = useState(false);
   const [skillTrainerExt, setSkillTrainerExt] = useState(false);
   useEffect(() => {
@@ -814,6 +847,52 @@ export function AIChatPanel({
     () => readDefaultPermMode(),
   );
   const [ccThinking, setCcThinking] = useState<boolean | null>(null);
+  // Active preset for this session — shapes instructions/model/effort but
+  // is NOT a subagent (no isolated context). Built-in OR custom, so the id
+  // is a plain string, not the narrower PresetId literal union.
+  const [presetId, setPresetId] = useState<string | null>(null);
+  // id === null means "Jack" — he's not in presetChoices (that list is only
+  // the PRESETS group), but he's configurable the exact same way (see
+  // getJackDefinition): no backing file, edits persist as an override layer.
+  // `silent` skips the toast — used to apply a configured Jack's mode/model
+  // at new-chat time without narrating it every time a fresh tab opens.
+  const applyPreset = (id: string | null, opts: { silent?: boolean } = {}) => {
+    setPresetId(id);
+    const def = id
+      ? presetChoices.find((p) => p.id === id)
+      : effectivePresetDefinition(getJackDefinition());
+    if (!def) return; // stale id (e.g. a deleted custom preset) — no-op
+    const selectedParsed = parseQualifiedModel(selected);
+    const provider = selectedParsed?.providerId;
+    // Effort/thinking/model/mode only apply to backends the preset system
+    // knows about (claude-code/cursor-cli/opencode-cli today) — non-agentic
+    // providers (ollama/openai/anthropic) still get the instructions text.
+    if (
+      provider === "claude-code" ||
+      provider === "cursor-cli" ||
+      provider === "opencode-cli"
+    ) {
+      const cfg = resolvePresetConfigFor(def, provider);
+      if (cfg.effort) setCcEffort(cfg.effort);
+      setCcThinking(cfg.thinking);
+      setSelected(cfg.model);
+      // Permission mode is a Claude Code-only concept (the overlay bridge).
+      if (provider === "claude-code") setCcPermMode(cfg.permMode);
+    }
+    if (!opts.silent) toastInfo(`Preset: ${def.label} (from your next message)`);
+  };
+  // Applies Jack's saved mode/model/effort at "fresh chat" time — but ONLY
+  // if the user has actually configured him (getPresetOverrides non-empty).
+  // Without this guard, every brand-new chat would silently force Jack's
+  // shipped neutral defaults over whatever effort/mode the user last picked
+  // manually — a regression for anyone who's never touched the organigramma.
+  const applyJackDefaultsIfConfigured = () => {
+    if (Object.keys(getPresetOverrides(JACK_PRESET_ID)).length > 0) {
+      applyPreset(null, { silent: true });
+    } else {
+      setPresetId(null);
+    }
+  };
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [attachTree, setAttachTree] = useState(false);
@@ -822,6 +901,23 @@ export function AIChatPanel({
   // the turn to them via the Task tool (Claude Code only). The full
   // catalog (project + global .claude/agents) is loaded into `agents`.
   const [agents, setAgents] = useState<SubagentDef[]>([]);
+  // Presets shown as "primary agents" in the composer picker (built-ins are
+  // always present; custom ones load from .codetta/presets/, same dir the
+  // organigramma reads/writes). Unlike subagents, available on ANY backend.
+  const [customPresets, setCustomPresets] = useState<PresetDefinition[]>([]);
+  // Bumped whenever preset overrides change (editing a built-in from the
+  // organigramma's drawer) so the composer picker reflects it without a
+  // full remount — presetChoices below recomputes from localStorage.
+  const [presetOverridesTick, setPresetOverridesTick] = useState(0);
+  useEffect(
+    () => subscribePresetSettings(() => setPresetOverridesTick((n) => n + 1)),
+    [],
+  );
+  const presetChoices: PresetDefinition[] = [
+    ...PRESET_ORDER.map((id) => effectivePresetDefinition(BUILTIN_PRESETS[id])),
+    ...customPresets,
+  ];
+  void presetOverridesTick; // read only to trigger the recompute above
   const [attachedAgents, setAttachedAgents] = useState<string[]>([]);
   const queueRef = useRef<string[]>([]);
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
@@ -841,6 +937,7 @@ export function AIChatPanel({
     ccEffort,
     ccThinking,
     ccPermMode,
+    presetId: presetId ?? undefined,
   });
   const lastSaveWarnAt = useRef(0);
   const ccHydrateGenRef = useRef(0);
@@ -914,6 +1011,11 @@ export function AIChatPanel({
   // the first @ keystroke so we don't pay the IPC cost in every
   // chat session whether the user mentions files or not.
   const [mentionFiles, setMentionFiles] = useState<string[] | null>(null);
+  const [worksSnap, setWorksSnap] = useState<WorksSnapshot | null>(null);
+  useEffect(() => {
+    void hydrateWorks(root).then(setWorksSnap);
+    return subscribeWorks(root, setWorksSnap);
+  }, [root]);
   // Shell-style prompt history. historyIdx counts backwards through
   // the user-message stream (0 = most recent); null means we're not
   // in history mode. historyDraft snapshots whatever the user was
@@ -1562,6 +1664,7 @@ export function AIChatPanel({
       setCcEffort(knobs.effort);
       setCcThinking(knobs.thinking);
       setCcPermMode(knobs.permMode);
+      setPresetId(found?.presetId ?? null);
       applyComposerDraft(draftFromSession(found));
       if (found) {
         const msgs = cleanStaleToolMessages(found.messages);
@@ -1593,6 +1696,7 @@ export function AIChatPanel({
       setCcEffort(knobs.effort);
       setCcThinking(knobs.thinking);
       setCcPermMode(knobs.permMode);
+      setPresetId(list[0].presetId ?? null);
       applyComposerDraft(draftFromSession(list[0]));
       // Filter out stale "Unknown tool: X" result messages from older
       // sessions where we incorrectly tried to execute the agentic
@@ -1616,6 +1720,7 @@ export function AIChatPanel({
       setCcEffort(knobs.effort);
       setCcThinking(knobs.thinking);
       setCcPermMode(knobs.permMode);
+      applyJackDefaultsIfConfigured();
       applyComposerDraft({});
     }
   }, [wsId, aiChatId, onHydrated, applyComposerDraft, tryProviderRecover]);
@@ -1672,6 +1777,7 @@ export function AIChatPanel({
         ccPermMode,
         composer: draftFromComposerSnap(composerPersistRef.current),
         pinnedProviderId,
+        presetId: presetId ?? undefined,
       };
       if (!saveSession(wsId, session)) warnSaveFailed();
     };
@@ -1692,6 +1798,7 @@ export function AIChatPanel({
     ccThinking,
     ccPermMode,
     pinnedProviderId,
+    presetId,
   ]);
 
   useEffect(() => {
@@ -1736,6 +1843,7 @@ export function AIChatPanel({
         ccPermMode,
         composer: draftFromComposerSnap(composerPersistRef.current),
         pinnedProviderId,
+        presetId: presetId ?? undefined,
       };
       if (!saveSession(wsId, session)) warnSaveFailed();
     };
@@ -1753,6 +1861,7 @@ export function AIChatPanel({
     ccThinking,
     ccPermMode,
     pinnedProviderId,
+    presetId,
   ]);
 
   // Empty chats still need their knobs persisted — the messages effect
@@ -1770,6 +1879,7 @@ export function AIChatPanel({
       ccPermMode,
       composer: draftFromComposerSnap(composerPersistRef.current),
       pinnedProviderId,
+      presetId: presetId ?? undefined,
     });
   }, [
     sessionId,
@@ -1781,6 +1891,7 @@ export function AIChatPanel({
     ccThinking,
     ccPermMode,
     pinnedProviderId,
+    presetId,
     input,
     queuedMessages,
     attachTree,
@@ -1799,7 +1910,12 @@ export function AIChatPanel({
       attachedAgents,
       attachedImages,
     };
-    knobsPersistRef.current = { ccEffort, ccThinking, ccPermMode };
+    knobsPersistRef.current = {
+      ccEffort,
+      ccThinking,
+      ccPermMode,
+      presetId: presetId ?? undefined,
+    };
   });
 
   const prevSessionIdRef = useRef(sessionId);
@@ -1828,6 +1944,7 @@ export function AIChatPanel({
     ccEffort,
     ccThinking,
     ccPermMode,
+    presetId,
   ]);
 
   useLayoutEffect(() => {
@@ -2165,12 +2282,14 @@ export function AIChatPanel({
   }, [selectedIsCC, root]);
 
   // Subagent catalog for @-mentions. Only Claude Code can dispatch
-  // subagents (via its Task tool), so we skip the scan for other
-  // providers and clear any stale list.
+  // subagents (via its Task tool), so we skip that scan for other
+  // providers — but presets shape the session on ANY backend, so they
+  // load regardless of selectedIsCC.
   useEffect(() => {
-    if (!selectedIsCC || !root) {
+    if (!root) {
       setAgents([]);
       setSkills([]);
+      setCustomPresets([]);
       return;
     }
     let cancelled = false;
@@ -2182,13 +2301,15 @@ export function AIChatPanel({
       } catch {
         /* home unavailable — project agents/skills still load */
       }
-      const [agentList, skillList] = await Promise.all([
-        loadSubagents(root, home),
-        loadSkills(root, home),
+      const [agentList, skillList, customList] = await Promise.all([
+        selectedIsCC ? loadSubagents(root, home) : Promise.resolve([]),
+        selectedIsCC ? loadSkills(root, home) : Promise.resolve([]),
+        loadCustomPresets(root),
       ]);
       if (cancelled) return;
       setAgents(agentList);
       setSkills(skillList);
+      setCustomPresets(customList);
     })();
     return () => {
       cancelled = true;
@@ -2291,6 +2412,18 @@ export function AIChatPanel({
         if (out.length >= 4) break;
       }
     }
+    if (worksSnap) {
+      for (const w of worksSnap.items) {
+        if (
+          q === "" ||
+          w.shortId.toLowerCase().includes(q) ||
+          w.title.toLowerCase().includes(q)
+        ) {
+          out.push({ type: "work", work: w });
+          if (out.length >= 8) break;
+        }
+      }
+    }
     if (mentionFiles && root) {
       for (const f of mentionFiles) {
         const rel = relPath(f, root);
@@ -2301,13 +2434,16 @@ export function AIChatPanel({
       }
     }
     return out;
-  }, [mentionState, mentionFiles, root, agents]);
+  }, [mentionState, mentionFiles, root, agents, worksSnap]);
 
   const acceptMention = (pick: MentionItem) => {
     if (!mentionState) return;
-    // Splice the chosen token in place of the @query, leave a trailing
-    // space so the user can keep typing without closing the segment.
-    const token = pick.type === "agent" ? pick.agent.name : pick.rel;
+    const token =
+      pick.type === "agent"
+        ? pick.agent.name
+        : pick.type === "work"
+          ? pick.work.shortId
+          : pick.rel;
     const before = input.slice(0, mentionState.start);
     const after = input.slice(mentionState.end);
     const next = `${before}@${token}${after.startsWith(" ") ? "" : " "}${after}`;
@@ -2318,7 +2454,10 @@ export function AIChatPanel({
       setAttachedAgents((prev) =>
         prev.includes(pick.agent.name) ? prev : [...prev, pick.agent.name],
       );
-    } else {
+    } else if (pick.type === "work" && aiChatId) {
+      void linkChatToWork(root, pick.work.id, aiChatId);
+      useStore.getState().setAIChatWorkItem(wsId, aiChatId, pick.work.id);
+    } else if (pick.type === "file") {
       addAttachedFile(pick.abs, root);
     }
     // Restore focus + place cursor after the inserted token so the
@@ -2784,7 +2923,41 @@ export function AIChatPanel({
         /* Pinky optional — never block the turn */
       }
     }
+    if (aiChatId && getWorkInjectEnabled(wsId)) {
+      try {
+        const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
+        const wid = desc?.workItemId;
+        if (wid) {
+          const snap = getWorksSnapshot(root) ?? (await hydrateWorks(root));
+          const block = formatWorkBlock(snap, wid, []);
+          if (block) ccTurnContext.push(block);
+        }
+      } catch {
+        /* Works context optional */
+      }
+    }
     appendJackUserPreferences(sysParts);
+    // Preset instructions shape THIS session's behavior — not a subagent,
+    // no isolated context. Appended every turn (not just the first) so a
+    // preset picked mid-chat still takes effect for CC's flattened prompt.
+    // Custom presets are workspace FILES — same trust level as workspace
+    // rules (loadWorkspaceRules above), so a repo you didn't author could
+    // ship one. Label it explicitly as workspace-provided, non-privileged
+    // context rather than a verified system directive, so it can't silently
+    // pass as an authoritative instruction (basic prompt-injection hygiene).
+    const activeDef = presetId
+      ? presetChoices.find((p) => p.id === presetId)
+      : effectivePresetDefinition(getJackDefinition());
+    if (activeDef) {
+      const body = getPresetInstructionsFor(activeDef).trim();
+      if (body) {
+        sysParts.push(
+          activeDef.source === "custom"
+            ? `[Preset "${activeDef.label}" — from this workspace's .codetta/presets/, not verified by Quack]\n${body}`
+            : body,
+        );
+      }
+    }
 
     // Display the user's bare text in the chat — but send an augmented
     // version (with the inline tree / per-turn editor context) to the
@@ -3554,6 +3727,7 @@ export function AIChatPanel({
       ccThinking,
       ccPermMode,
       composer: draftFromComposerSnap(composerPersistRef.current),
+      presetId: presetId ?? undefined,
       // No claudeSessionId — branching forks the conversation, so
       // we want a fresh Claude Code session not a resumed one.
     };
@@ -3592,6 +3766,7 @@ export function AIChatPanel({
     setCcEffort(knobs.effort);
     setCcThinking(knobs.thinking);
     setCcPermMode(knobs.permMode);
+    applyJackDefaultsIfConfigured();
     setHistoryOpen(false);
   };
 
@@ -3627,6 +3802,7 @@ export function AIChatPanel({
     setCcEffort(knobs.effort);
     setCcThinking(knobs.thinking);
     setCcPermMode(knobs.permMode);
+    setPresetId(s.presetId ?? null);
     resetTurnTransients();
     const msgs = cleanStaleToolMessages(s.messages);
     setMessages(msgs);
@@ -4259,6 +4435,7 @@ export function AIChatPanel({
       setCcEffort(knobs.effort);
       setCcThinking(knobs.thinking);
       setCcPermMode(knobs.permMode);
+      applyJackDefaultsIfConfigured();
       applyComposerDraft({});
       resetTurnTransients();
     }
@@ -4733,6 +4910,31 @@ export function AIChatPanel({
 
   const openPlanHandler = (requestId: string, plan: string) => {
     openPlanTab(wsId, aiChatId, requestId, plan);
+  };
+
+  const onPlanApproved = async (_requestId: string, plan: string) => {
+    if (!aiChatId) return;
+    try {
+      const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
+      const title =
+        plan.split("\n").find((l) => l.trim())?.trim().slice(0, 120) ??
+        "Approved plan";
+      if (desc?.workItemId) {
+        await approvePlanWork(root, desc.workItemId, plan);
+        await updateWorkItem(root, desc.workItemId, { title });
+      } else {
+        const item = await createWorkItem(root, {
+          title,
+          origin: "plan",
+          status: "in_progress",
+          blocks: planTextToBlocks(plan),
+        });
+        await linkChatToWork(root, item.id, aiChatId);
+        useStore.getState().setAIChatWorkItem(wsId, aiChatId, item.id);
+      }
+    } catch (e) {
+      console.warn("plan work approve failed", e);
+    }
   };
 
   // Clicking a file-targeted tool row opens that file in a new editor tab.
@@ -5758,6 +5960,24 @@ export function AIChatPanel({
         {...{ [COMPOSER_FILE_DROP_ATTR]: "" }}
       >
       <ComposerContextBar wsId={wsId} root={root} />
+      {aiChatId ? (
+        <>
+          <ComposerWorkActions
+            work={
+              workItemId && worksSnap
+                ? findWork(worksSnap, workItemId)
+                : undefined
+            }
+          />
+          <ComposerWorkBar
+          wsId={wsId}
+          root={root}
+          chatId={aiChatId}
+          workItemId={workItemId}
+          ccPermMode={ccPermMode}
+        />
+        </>
+      ) : null}
       <ComposerGitActions
         wsId={wsId}
         root={root}
@@ -5791,7 +6011,9 @@ export function AIChatPanel({
           agents={agents}
           active={activeAgent}
           onSelect={selectAgent}
-          disabled={!selectedIsCC}
+          presets={presetChoices}
+          activePresetId={presetId}
+          onSelectPreset={applyPreset}
         />
         <div className="ai-composer-spacer" />
         {renderModelChip()}
@@ -5822,35 +6044,7 @@ export function AIChatPanel({
                   onClick={() => setModeMenuOpen(false)}
                 />
                 <div className="ai-mode-menu" role="menu">
-                  {(
-                    [
-                      {
-                        v: null,
-                        label: "Ask",
-                        desc: "Confirm each edit / command",
-                      },
-                      {
-                        v: "plan",
-                        label: "Plan",
-                        desc: "Plan only — no edits",
-                      },
-                      {
-                        v: "acceptEdits",
-                        label: "Auto-edit",
-                        desc: "Auto-accept file edits, ask for the rest",
-                      },
-                      {
-                        v: "auto",
-                        label: "Auto",
-                        desc: "Run everything without asking (privacy guard stays)",
-                      },
-                      {
-                        v: "bypassPermissions",
-                        label: "Bypass",
-                        desc: "Skip all permission checks — no cards, no guard",
-                      },
-                    ] as Array<{ v: string | null; label: string; desc: string }>
-                  ).map((o) => (
+                  {PERM_MODE_OPTIONS.map((o) => (
                     <button
                       key={o.label}
                       type="button"
@@ -5877,17 +6071,9 @@ export function AIChatPanel({
               type="button"
               className="ai-mode-btn"
               onClick={() => setModeMenuOpen((v) => !v)}
-              title="Claude Code permission mode (also /mode)"
+              title="Claude Code permission mode (also /mode, Shift+Tab to cycle)"
             >
-              {ccPermMode === "plan"
-                ? "Plan"
-                : ccPermMode === "acceptEdits"
-                  ? "Auto-edit"
-                  : ccPermMode === "auto"
-                    ? "Auto"
-                    : ccPermMode === "bypassPermissions"
-                      ? "Bypass"
-                      : "Ask"}{" "}
+              {PERM_MODE_OPTIONS.find((o) => o.v === ccPermMode)?.label ?? "Ask"}{" "}
               ▾
             </button>
           </div>
@@ -5930,6 +6116,7 @@ export function AIChatPanel({
         ownerStreaming={streaming !== null || runningTools}
         onAllowAll={() => setCcPermMode("auto")}
         onPlanReady={openPlanHandler}
+        onPlanApproved={onPlanApproved}
       />
       <ComposerQueue
         messages={queuedMessages}
@@ -6257,6 +6444,44 @@ export function AIChatPanel({
                 return;
               }
             }
+            // Tab cycles the active primary agent (Jack -> preset 1 -> 2 ->
+            // ... -> back to Jack); Shift+Tab cycles the Claude Code
+            // permission mode. Only fires once the mention/slash popovers
+            // above have had first claim on Tab (autocomplete wins there).
+            if (
+              e.key === "Tab" &&
+              !e.shiftKey &&
+              !e.ctrlKey &&
+              !e.metaKey &&
+              !e.altKey
+            ) {
+              e.preventDefault();
+              const order: Array<string | null> = [
+                null,
+                ...presetChoices.map((p) => p.id),
+              ];
+              const curIdx = order.indexOf(presetId);
+              const next = order[(Math.max(curIdx, 0) + 1) % order.length];
+              applyPreset(next);
+              return;
+            }
+            if (
+              e.key === "Tab" &&
+              e.shiftKey &&
+              !e.ctrlKey &&
+              !e.metaKey &&
+              !e.altKey &&
+              selectedIsCC
+            ) {
+              e.preventDefault();
+              const order = PERM_MODE_OPTIONS.map((o) => o.v);
+              const curIdx = order.indexOf(ccPermMode);
+              const next = order[(Math.max(curIdx, 0) + 1) % order.length];
+              setCcPermMode(next);
+              const label = PERM_MODE_OPTIONS.find((o) => o.v === next)?.label;
+              toastInfo(`Mode: ${label} (applies from the next message)`);
+              return;
+            }
             // Shell-style prompt history. ArrowUp on empty input or
             // already in history mode steps backward through past
             // user messages; ArrowDown steps forward and restores the
@@ -6318,6 +6543,8 @@ export function AIChatPanel({
               <span>@ mentions</span>
               <span>/ commands</span>
               {selectedIsCC && <span>Ctrl+1–5 effort</span>}
+              <span>Tab agent</span>
+              {selectedIsCC && <span>Shift+Tab mode</span>}
               <span>Shift+Enter for newline</span>
               <span>↑ to recall</span>
             </div>

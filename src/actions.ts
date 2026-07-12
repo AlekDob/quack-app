@@ -1066,6 +1066,20 @@ export const commands: CommandSpec[] = [
     },
   },
   {
+    id: "view.open_works",
+    label: "Open Works",
+    category: "View",
+    hint: "Project work items — modules, kanban, tickets",
+    run: () => {
+      const wsId = s().activeId;
+      if (!wsId) {
+        toastError("Open a workspace first");
+        return;
+      }
+      s().worksOpen(wsId);
+    },
+  },
+  {
     id: "help.shortcuts",
     label: "Keyboard Shortcuts",
     category: "Help",

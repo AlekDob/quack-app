@@ -22,6 +22,11 @@ export const fs = {
    *  returns the absolute path Claude Code reads back with its Read tool. */
   saveImageAttachment: (filename: string, dataB64: string) =>
     invoke<string>("save_image_attachment", { filename, dataB64 }),
+  /** Persist an image to a durable, caller-chosen directory (e.g. a
+   *  preset's `.codetta/avatars/`) — unlike saveImageAttachment, this
+   *  survives beyond the OS temp dir. */
+  savePersistentImage: (dir: string, filename: string, dataB64: string) =>
+    invoke<string>("save_persistent_image", { dir, filename, dataB64 }),
   /** Read a binary media file (image or PDF) back as a data: URL — used by
    *  the chat zoom modal and the in-tab media preview. */
   readImageDataUrl: (path: string) =>
@@ -207,6 +212,14 @@ export const chatStore = {
     invoke<void>("chat_store_save", { wsId, session }),
   delete: (wsId: string, sessionId: string) =>
     invoke<void>("chat_store_delete", { wsId, sessionId }),
+};
+
+export const worksStore = {
+  load: (wsRoot: string) => invoke<unknown>("works_load", { wsRoot }),
+  save: (wsRoot: string, snapshot: unknown) =>
+    invoke<void>("works_save", { wsRoot, snapshot }),
+  appendEvent: (wsRoot: string, event: unknown) =>
+    invoke<void>("works_append_event", { wsRoot, event }),
 };
 
 export const claudeCode = {

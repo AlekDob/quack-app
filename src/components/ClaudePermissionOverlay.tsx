@@ -279,6 +279,7 @@ export function ClaudePermissionOverlay({
   ownerStreaming,
   onAllowAll,
   onPlanReady,
+  onPlanApproved,
 }: {
   /** Workspace cwd this overlay's panel drives — used to route cards. */
   ownerRoot: string;
@@ -293,6 +294,8 @@ export function ClaudePermissionOverlay({
    *  opens the plan in a side-by-side tab (Cursor-style) while the card
    *  is still pending approval. */
   onPlanReady?: (requestId: string, plan: string) => void;
+  /** Fired when the user approves ExitPlanMode — promotes linked Work ticket. */
+  onPlanApproved?: (requestId: string, plan: string) => void;
 }) {
   const [queue, setQueue] = useState<PermissionRequest[]>([]);
 
@@ -483,6 +486,11 @@ export function ClaudePermissionOverlay({
 
   const respond = async (decision: "allow" | "deny") => {
     if (!req) return;
+    if (decision === "allow" && req.tool_name === "ExitPlanMode") {
+      const plan =
+        typeof req.tool_input.plan === "string" ? req.tool_input.plan : "";
+      onPlanApproved?.(req.request_id, plan);
+    }
     try {
       await invoke("claude_perm_decide", {
         requestId: req.request_id,

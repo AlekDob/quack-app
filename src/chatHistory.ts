@@ -27,6 +27,9 @@ export interface ChatSession {
   composer?: ChatComposerDraft;
   /** First agentic platform used in this chat — locks the model picker (044). */
   pinnedProviderId?: ProviderId;
+  /** Active preset shaping this session (built-in or custom) — not a
+   *  subagent, no isolated context. See src/presets/. */
+  presetId?: string;
 }
 
 const LEGACY_SESSION_KEY = (wsId: string, sessionId: string) =>

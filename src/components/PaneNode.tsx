@@ -27,6 +27,7 @@ import { basename, relPath } from "../pathUtils";
 import { revealInTree } from "../revealInTree";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Icon } from "./Icon";
+import { isEditorDrawerDropZone } from "../editorDrawer";
 import { peekClosedTabs, subscribeClosedTabs } from "../closedTabsStack";
 import { setAgentMode } from "../agentMode";
 import { htmlPreviewPayload } from "../htmlPreview";
@@ -44,6 +45,7 @@ function tabLabel(
   subAvatar?: string;
   /** Whiteboard tab — uses the dedicated "whiteboard" SVG icon. */
   isWhiteboard?: boolean;
+  isWorks?: boolean;
   /** Usage tab — uses the "chart-bar" SVG icon. */
   isUsage?: boolean;
   isBrain?: boolean;
@@ -85,6 +87,16 @@ function tabLabel(
       isAI: false,
       popped: false,
       isWhiteboard: true,
+    };
+  }
+  if (parsed?.kind === "works") {
+    return {
+      label: "Works",
+      dirty: false,
+      isTerminal: false,
+      isAI: false,
+      popped: false,
+      isWorks: true,
     };
   }
   if (parsed?.kind === "usage") {
@@ -296,6 +308,7 @@ function TabsPaneView(
   const setActivePane = useStore((s) => s.setActivePane);
   const closeTab = useStore((s) => s.closeTab);
   const moveTab = useStore((s) => s.moveTab);
+  const moveTabToDrawer = useStore((s) => s.moveTabToDrawer);
 
   const isFocused = ws.layout.activePaneId === pane.id;
   const drag = useDrag();
@@ -322,13 +335,6 @@ function TabsPaneView(
     },
     [pane.id, registerContainer],
   );
-
-  useEffect(() => {
-    const id = pane.id;
-    return () => {
-      registerContainer(id, null);
-    };
-  }, [pane.id, registerContainer]);
 
   // Auto-scroll the active tab into view when it changes.
   useEffect(() => {
@@ -618,7 +624,12 @@ function TabsPaneView(
                       overPaneId,
                       null,
                       insertIndex,
+                      false,
                     );
+                    return;
+                  }
+                  if (isEditorDrawerDropZone(ev.clientX, targetWsId)) {
+                    updateDrag(ev.clientX, ev.clientY, null, null, null, true);
                     return;
                   }
                   // Otherwise fall back to edge-zone detection on pane content.
@@ -630,7 +641,7 @@ function TabsPaneView(
                   if (paneEl) {
                     edge = computeEdgeForPoint(paneEl, ev.clientX, ev.clientY);
                   }
-                  updateDrag(ev.clientX, ev.clientY, overPaneId, edge, null);
+                  updateDrag(ev.clientX, ev.clientY, overPaneId, edge, null, false);
                 };
 
                 const finish = (
@@ -642,7 +653,9 @@ function TabsPaneView(
                   document.removeEventListener("pointercancel", onCancel);
                   if (dragStarted) {
                     const cur = getDrag();
-                    if (applyDrop && cur?.overPaneId) {
+                    if (applyDrop && cur?.drawerDrop) {
+                      moveTabToDrawer(targetWsId, targetKey);
+                    } else if (applyDrop && cur?.overPaneId) {
                       if (cur.tabInsertIndex != null) {
                         moveTab(targetWsId, targetKey, {
                           paneId: cur.overPaneId,
@@ -694,6 +707,8 @@ function TabsPaneView(
                   <AIIcon size={12} />
                 ) : info.isWhiteboard ? (
                   <Icon name="whiteboard" size={12} />
+                ) : info.isWorks ? (
+                  <Icon name="columns-2" size={12} />
                 ) : info.isUsage ? (
                   <Icon name="chart-bar" size={12} />
                 ) : info.isBrain ? (
@@ -1154,7 +1169,7 @@ function EmptyPane({ wsId }: { wsId: string }) {
           </div>
         )}
         <div className="pane-empty-foot">
-          Tip: drag any tab onto an edge to split this pane.
+          Tip: drag any tab onto an edge to split, or to the far right to open a drawer.
         </div>
       </div>
     </div>

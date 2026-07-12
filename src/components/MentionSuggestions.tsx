@@ -1,12 +1,14 @@
 import { basename, dirname } from "../pathUtils";
 import { fileIconName } from "../fileIcons";
 import type { SubagentDef } from "../subagents";
+import type { WorkItem } from "../works";
 import { Icon } from "./Icon";
 import { MentionPathPreview } from "./MentionPathPreview";
 
 export type MentionItem =
   | { type: "agent"; agent: SubagentDef }
-  | { type: "file"; abs: string; rel: string };
+  | { type: "file"; abs: string; rel: string }
+  | { type: "work"; work: WorkItem };
 
 type Props = {
   matches: MentionItem[];
@@ -29,7 +31,13 @@ export function MentionSuggestions({
       <div className="ai-mention-list ai-slash-suggestions">
         {matches.map((m, i) => (
           <button
-            key={m.type === "agent" ? `agent:${m.agent.name}` : m.abs}
+            key={
+              m.type === "agent"
+                ? `agent:${m.agent.name}`
+                : m.type === "work"
+                  ? `work:${m.work.id}`
+                  : m.abs
+            }
             type="button"
             className={`ai-slash-item ai-mention-item ${i === activeIndex ? "active" : ""}`}
             onMouseEnter={() => onHover(i)}
@@ -48,6 +56,16 @@ export function MentionSuggestions({
                   {m.agent.description
                     ? m.agent.description.slice(0, 60)
                     : `subagent · ${m.agent.source}`}
+                </span>
+              </>
+            ) : m.type === "work" ? (
+              <>
+                <span className="ai-mention-file-icon">
+                  <Icon name="check-square" size={14} />
+                </span>
+                <span className="ai-mention-file-label">
+                  <span className="ai-mention-file-name">@{m.work.shortId}</span>
+                  <span className="ai-mention-file-dir">{m.work.title}</span>
                 </span>
               </>
             ) : (

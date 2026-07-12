@@ -13,7 +13,8 @@ export type ActivityBarIconId =
   | "store"
   | "usage"
   | "brain"
-  | "whiteboard";
+  | "whiteboard"
+  | "works";
 
 export type ActivityBarIconKind = "sidebar" | "tab";
 
@@ -43,6 +44,7 @@ export const ACTIVITY_BAR_ICON_IDS: ActivityBarIconId[] = [
   "usage",
   "brain",
   "whiteboard",
+  "works",
 ];
 
 export const DEFAULT_ACTIVITY_BAR_ORDER: ActivityBarIconId[] = [
@@ -148,6 +150,14 @@ export const ACTIVITY_BAR_VIEWS: Record<ActivityBarIconId, ActivityBarViewDef> =
     icon: "whiteboard",
     kind: "tab",
     tabPrefix: "wb:",
+  },
+  works: {
+    id: "works",
+    label: "Works",
+    title: "Works — project tickets, kanban & timeline (⌘P → Open Works)",
+    icon: "columns-2",
+    kind: "tab",
+    tabPrefix: "works:",
   },
 };
 

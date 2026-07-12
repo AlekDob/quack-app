@@ -13,7 +13,7 @@ export interface SkillDef {
   /** Slug used as `/name`, e.g. "code" / "feature-creator". */
   name: string;
   description: string;
-  source: "project" | "user";
+  source: "project" | "user" | "bundled";
   /** Absolute path to the SKILL.md backing this skill. Used by the
    *  whiteboard click-to-open action. */
   path: string;
@@ -69,7 +69,7 @@ async function readSkillsDir(
 
 /**
  * Load all available skills. Project skills win name collisions over
- * user-global ones (same precedence as Claude Code's own resolution).
+ * user-global ones; bundled repo skills (`documentation/skills/`) are lowest.
  */
 export async function loadSkills(
   root: string,
@@ -79,6 +79,10 @@ export async function loadSkills(
   const user = homeDir
     ? await readSkillsDir(`${homeDir}/.claude/skills`, "user")
     : [];
+  const bundled = await readSkillsDir(`${root}/documentation/skills`, "bundled");
   const seen = new Set(proj.map((s) => s.name));
-  return [...proj, ...user.filter((s) => !seen.has(s.name))];
+  const userFiltered = user.filter((s) => !seen.has(s.name));
+  for (const s of userFiltered) seen.add(s.name);
+  const bundledFiltered = bundled.filter((s) => !seen.has(s.name));
+  return [...proj, ...userFiltered, ...bundledFiltered];
 }

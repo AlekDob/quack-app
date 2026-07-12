@@ -36,6 +36,8 @@ import { DragGhost } from "./components/DragGhost";
 import { StatusBar } from "./components/StatusBar";
 import { Toasts } from "./components/Toast";
 import { DiffModal } from "./components/DiffModal";
+import { WorkItemDrawer } from "./components/works/WorkItemDrawer";
+import { FeatureDocDrawer } from "./components/works/FeatureDocDrawer";
 import { ToolResultDrawer } from "./components/ToolResultDrawer";
 import { Splash } from "./components/Splash";
 import { RecentFilesOverlay } from "./components/RecentFilesOverlay";
@@ -824,6 +826,8 @@ function MainApp() {
       <AgentHubWatcher />
       <DiffModal />
       <ToolResultDrawer />
+      <WorkItemDrawer />
+      <FeatureDocDrawer />
       <Dialog />
       <NewChatNamePopover />
       <SettingsModal />

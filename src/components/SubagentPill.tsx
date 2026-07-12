@@ -2,77 +2,82 @@ import { useState } from "react";
 import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
 import type { SubagentDef } from "../subagents";
+import type { PresetDefinition } from "../presets";
 
 // Composer pill that shows who the next message is addressed to. Default is
-// Jack (the built-in assistant, feature 005); picking a discovered subagent
-// delegates the turn to it. The active agent is DERIVED from the composer's
-// attachedAgents set upstream — this component owns no delegation state, it
-// just renders the choice and reports selections back.
+// Jack (the built-in assistant, feature 005). The dropdown lists ONLY
+// primary agents — Jack + presets (Milo/Nora/Vera + custom), which shape
+// THIS session (model/effort/instructions), no isolated context. Real
+// Claude Code subagents are deliberately NOT listed here (that turned this
+// into a technical catalog dump) — delegate to one by typing `@name` in the
+// composer instead (MentionSuggestions, feature 004); `active`/`onSelect`
+// stay wired so the pill face still reflects a text-delegated subagent.
 
 interface SubagentPillProps {
   agents: SubagentDef[];
-  /** The subagent the turn is currently addressed to, or null for Jack. */
+  /** The subagent the turn is currently addressed to (via @-mention), or
+   *  null for Jack/preset. Not selectable from this dropdown anymore. */
   active: SubagentDef | null;
   /** null = reset to Jack (clear delegation). */
   onSelect: (agent: SubagentDef | null) => void;
-  disabled?: boolean;
+  presets: PresetDefinition[];
+  activePresetId: string | null;
+  onSelectPreset: (id: string | null) => void;
 }
 
 export function SubagentPill({
-  agents,
   active,
   onSelect,
-  disabled,
+  presets,
+  activePresetId,
+  onSelectPreset,
 }: SubagentPillProps) {
   const [open, setOpen] = useState(false);
-  // No subagents discovered (non-Claude-Code, or none defined): the pill is
-  // pure Jack branding with no menu to open.
-  const hasMenu = agents.length > 0 && !disabled;
+  const activePreset = activePresetId
+    ? (presets.find((p) => p.id === activePresetId) ?? null)
+    : null;
 
-  const pick = (agent: SubagentDef | null) => {
-    onSelect(agent);
+  const pickJack = () => {
+    onSelect(null);
+    onSelectPreset(null);
+    setOpen(false);
+  };
+  const pickPreset = (id: string) => {
+    onSelectPreset(id);
+    onSelect(null);
     setOpen(false);
   };
 
   return (
     <div className="ai-agent-wrap">
-      {open && hasMenu && (
+      {open && (
         <>
           <div className="ai-mode-backdrop" onClick={() => setOpen(false)} />
           <div className="ai-agent-menu" role="menu">
             <button
               type="button"
-              className={`ai-agent-item ${active === null ? "active" : ""}`}
-              onClick={() => pick(null)}
+              className={`ai-agent-item ${!active && !activePreset ? "active" : ""}`}
+              onClick={pickJack}
             >
               <span className="ai-agent-item-mark">
                 <AIIcon size={18} />
               </span>
               <span className="ai-agent-item-text">
                 <span className="ai-agent-item-name">Jack</span>
-                <span className="ai-agent-item-role">Default assistant</span>
+                <span className="ai-agent-item-role">Default assistant · Planner</span>
               </span>
             </button>
-            {agents.map((a) => (
+            {presets.map((p) => (
               <button
-                key={a.name}
+                key={p.id}
                 type="button"
-                className={`ai-agent-item ${active?.name === a.name ? "active" : ""}`}
-                onClick={() => pick(a)}
+                className={`ai-agent-item ${activePresetId === p.id ? "active" : ""}`}
+                onClick={() => pickPreset(p.id)}
               >
-                <img
-                  className="ai-agent-item-mark"
-                  src={a.avatar}
-                  alt=""
-                  aria-hidden="true"
-                />
+                <img className="ai-agent-item-mark" src={p.avatar} alt="" aria-hidden="true" />
                 <span className="ai-agent-item-text">
-                  <span className="ai-agent-item-name">{a.name}</span>
-                  <span className="ai-agent-item-role">
-                    {a.description
-                      ? a.description.slice(0, 48)
-                      : `subagent · ${a.source}`}
-                  </span>
+                  <span className="ai-agent-item-name">{p.label}</span>
+                  <span className="ai-agent-item-role">{p.role}</span>
                 </span>
               </button>
             ))}
@@ -82,25 +87,25 @@ export function SubagentPill({
       <button
         type="button"
         className="ai-agent-pill"
-        onClick={() => hasMenu && setOpen((v) => !v)}
-        disabled={!hasMenu}
-        title={hasMenu ? "Address this message to a subagent" : "Jack"}
+        onClick={() => setOpen((v) => !v)}
+        title="Choose a primary agent — @-mention in the composer to delegate to a subagent"
       >
-        {active ? (
-          <img
-            className="ai-agent-avatar"
-            src={active.avatar}
-            alt=""
-            aria-hidden="true"
-          />
+        {activePreset ? (
+          <img className="ai-agent-avatar" src={activePreset.avatar} alt="" aria-hidden="true" />
+        ) : active ? (
+          <img className="ai-agent-avatar" src={active.avatar} alt="" aria-hidden="true" />
         ) : (
           <span className="ai-agent-avatar ai-agent-avatar-jack">
             <AIIcon size={16} />
           </span>
         )}
-        <span className="ai-agent-name">{active ? active.name : "Jack"}</span>
-        <span className="ai-agent-role">· {active ? "Agent" : "PM"}</span>
-        {hasMenu && <Icon name="chevron-down" size={13} />}
+        <span className="ai-agent-name">
+          {activePreset ? activePreset.label : active ? active.name : "Jack"}
+        </span>
+        <span className="ai-agent-role">
+          · {activePreset ? activePreset.role : active ? "Agent" : "PM"}
+        </span>
+        <Icon name="chevron-down" size={13} />
       </button>
     </div>
   );

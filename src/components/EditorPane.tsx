@@ -730,6 +730,17 @@ export function EditorPane({ wsId, path }: Props) {
             }
           }
           prevPathRef.current = path;
+          // Flex splits often commit at 0×0; nudge layout once the pane
+          // has real dimensions so Monaco doesn't stick on a white canvas.
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              try {
+                ed.layout();
+              } catch {
+                /* ignore */
+              }
+            });
+          });
           // Mark file as touched on mount + on every focus, so the
           // idle-buffer-unload sweeper knows this buffer is in use.
           useStore.getState().touchFile(wsId, path);

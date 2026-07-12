@@ -38,7 +38,7 @@ export function mergeComposerDraft(
   return patchSession(wsId, sessionId, { composer });
 }
 
-/** Persist Claude Code knobs without touching messages / composer. */
+/** Persist Claude Code knobs (+ active preset) without touching messages / composer. */
 export function mergeSessionKnobs(
   wsId: string,
   sessionId: string,
@@ -46,6 +46,7 @@ export function mergeSessionKnobs(
     ccEffort?: string;
     ccThinking?: boolean | null;
     ccPermMode?: string | null;
+    presetId?: string;
   },
 ): boolean {
   return patchSession(wsId, sessionId, knobs);

@@ -37,6 +37,7 @@ export function ActivityBar() {
   const toggleSidebarSection = useStore((s) => s.toggleSidebarSection);
   const setSidebarSide = useStore((s) => s.setSidebarSide);
   const wbOpen = useStore((s) => s.wbOpen);
+  const worksOpen = useStore((s) => s.worksOpen);
   const usageOpen = useStore((s) => s.usageOpen);
   const brainOpen = useStore((s) => s.brainOpen);
   const storeOpen = useStore((s) => s.storeOpen);
@@ -219,6 +220,7 @@ export function ActivityBar() {
         onUsageOpen={() => activeId && usageOpen(activeId)}
         onBrainOpen={() => activeId && brainOpen(activeId)}
         onWhiteboardOpen={() => activeId && wbOpen(activeId)}
+        onWorksOpen={() => activeId && worksOpen(activeId)}
         customizeOpen={customizeOpen}
         onCustomizeOpenChange={setCustomizeOpen}
         sectionRef={viewIconsRef}

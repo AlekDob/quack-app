@@ -68,7 +68,7 @@ export function isImagePath(path: string): boolean {
 }
 
 /** Load any image src (object URL or data: URL) into a decoded element. */
-function loadImage(src: string): Promise<HTMLImageElement> {
+export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
@@ -78,7 +78,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 /** Draw `img` onto a canvas scaled to fit `maxEdge`, return its 2D context. */
-function scaleToCanvas(img: HTMLImageElement, maxEdge: number): HTMLCanvasElement {
+export function scaleToCanvas(img: HTMLImageElement, maxEdge: number): HTMLCanvasElement {
   const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(img.width * scale);
@@ -89,14 +89,14 @@ function scaleToCanvas(img: HTMLImageElement, maxEdge: number): HTMLCanvasElemen
 
 // Prefer WebP (smaller, keeps alpha, supported by Claude Code + WKWebView);
 // fall back to JPEG when the runtime can't encode WebP.
-function encode(canvas: HTMLCanvasElement, quality: number): { dataUrl: string; ext: string } {
+export function encode(canvas: HTMLCanvasElement, quality: number): { dataUrl: string; ext: string } {
   const webp = canvas.toDataURL("image/webp", quality);
   if (webp.startsWith("data:image/webp")) return { dataUrl: webp, ext: "webp" };
   return { dataUrl: canvas.toDataURL("image/jpeg", quality), ext: "jpg" };
 }
 
 /** Strip the `data:...;base64,` prefix so Rust gets raw base64. */
-function stripDataUrl(dataUrl: string): string {
+export function stripDataUrl(dataUrl: string): string {
   return dataUrl.slice(dataUrl.indexOf(",") + 1);
 }
 

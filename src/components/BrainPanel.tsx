@@ -58,7 +58,7 @@ export function BrainPanel({ wsId, root }: BrainPanelProps) {
     return (
       <div className="brain-panel">
         <div className="brain-panel-inner">
-          <div className="usage-tabs brain-hub-tabs">
+          <div className="brain-hub-tabs">
             <span className="brain-result-skeleton usage-tab" style={{ width: 88 }} />
             <span className="brain-result-skeleton usage-tab" style={{ width: 72 }} />
           </div>
@@ -99,7 +99,7 @@ export function BrainPanel({ wsId, root }: BrainPanelProps) {
         </header>
 
         {showTabs && (
-          <div className="usage-tabs brain-hub-tabs" role="tablist">
+          <div className="brain-hub-tabs" role="tablist" aria-label="Quack Brain segments">
             {segments.map((seg) => (
               <button
                 key={seg.id}

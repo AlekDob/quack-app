@@ -26,6 +26,7 @@ interface Props {
   onUsageOpen: () => void;
   onBrainOpen: () => void;
   onWhiteboardOpen: () => void;
+  onWorksOpen: () => void;
   customizeOpen: boolean;
   onCustomizeOpenChange: (open: boolean) => void;
   sectionRef: React.RefObject<HTMLDivElement | null>;
@@ -59,6 +60,7 @@ export function ActivityBarViewIcons({
   onUsageOpen,
   onBrainOpen,
   onWhiteboardOpen,
+  onWorksOpen,
   customizeOpen,
   onCustomizeOpenChange,
   sectionRef,
@@ -97,6 +99,7 @@ export function ActivityBarViewIcons({
     else if (def.id === "usage") onUsageOpen();
     else if (def.id === "brain") onBrainOpen();
     else if (def.id === "whiteboard") onWhiteboardOpen();
+    else if (def.id === "works") onWorksOpen();
   };
 
   const openCustomize = (from: HTMLElement | null) => {

@@ -25,6 +25,13 @@ import { Icon } from "./Icon";
 import { useStore } from "../store";
 import { loadSkills, type SkillDef } from "../skills";
 import { loadSubagents, type SubagentDef } from "../subagents";
+import {
+  BUILTIN_PRESETS,
+  PRESET_ORDER,
+  effectivePresetDefinition,
+  loadCustomPresets,
+  type PresetDefinition,
+} from "../presets";
 import { renderWhiteboardMd } from "../whiteboardMd";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { success as toastSuccess, error as toastError, errMsg } from "../notify";
@@ -45,6 +52,8 @@ type SubTab = "overview" | "organigramma" | "workflows";
 export interface WhiteboardData {
   agents: SubagentDef[];
   skills: SkillDef[];
+  /** Built-in presets (always present) + custom ones from .codetta/presets/. */
+  presets: PresetDefinition[];
 }
 
 export function WhiteboardPane({ wsId, root, container, visible }: Props) {
@@ -52,6 +61,7 @@ export function WhiteboardPane({ wsId, root, container, visible }: Props) {
   const [data, setData] = useState<WhiteboardData>({
     agents: [],
     skills: [],
+    presets: PRESET_ORDER.map((id) => effectivePresetDefinition(BUILTIN_PRESETS[id])),
   });
   const [loading, setLoading] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -66,11 +76,16 @@ export function WhiteboardPane({ wsId, root, container, visible }: Props) {
     try {
       const pathMod = await import("@tauri-apps/api/path");
       const home = await pathMod.homeDir();
-      const [agents, skills] = await Promise.all([
+      const [agents, skills, customPresets] = await Promise.all([
         loadSubagents(root, home),
         loadSkills(root, home),
+        loadCustomPresets(root),
       ]);
-      setData({ agents, skills });
+      const presets = [
+        ...PRESET_ORDER.map((id) => effectivePresetDefinition(BUILTIN_PRESETS[id])),
+        ...customPresets,
+      ];
+      setData({ agents, skills, presets });
     } catch (e) {
       toastError(`Couldn't load whiteboard data: ${errMsg(e)}`);
     } finally {

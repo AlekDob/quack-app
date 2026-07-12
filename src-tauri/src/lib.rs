@@ -24,6 +24,7 @@ mod sftp;
 mod sysmon;
 mod watcher;
 mod workspace;
+mod works_store;
 
 use claude_code::ClaudeCodeState;
 use cursor_code::CursorCodeState;
@@ -112,6 +113,7 @@ pub fn run() {
             fs_ops::path_exists,
             fs_ops::create_file,
             fs_ops::save_image_attachment,
+            fs_ops::save_persistent_image,
             fs_ops::read_image_data_url,
             pty::pty_spawn,
             pty::pty_write,
@@ -130,6 +132,9 @@ pub fn run() {
             chat_store::chat_store_delete,
             chat_store::chat_store_lookup_link,
             chat_store::chat_store_all_links,
+            works_store::works_load,
+            works_store::works_save,
+            works_store::works_append_event,
             provider_sessions::provider_list_sessions,
             provider_sessions::provider_load_session,
             watcher::fs_watch_start,

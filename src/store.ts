@@ -18,6 +18,10 @@ import {
   stashHtmlPreview,
 } from "./htmlPreview";
 import { planKey, parsePlanKey, stashPlan } from "./plan";
+import {
+  clampEditorDrawerW,
+  DEFAULT_EDITOR_DRAWER_W,
+} from "./editorDrawer";
 import type { ToolCall } from "./ai";
 import { clearChatDiff } from "./chatDiffStore";
 import { stopChatAgent } from "./stopChatAgent";
@@ -158,6 +162,8 @@ export interface AIChatDescriptor {
   /** True once the user renamed the chat by hand — stops the auto-title
    *  effect (derives a title from the first message) from clobbering it. */
   titleLocked?: boolean;
+  /** Active Works ticket linked to this chat (feature 054). */
+  workItemId?: string;
 }
 
 export type SidebarView =
@@ -201,10 +207,17 @@ export interface SplitPane {
 
 export type Pane = TabsPane | SplitPane;
 
+export interface EditorDrawerState {
+  tabKey: string | null;
+  width: number;
+}
+
 export interface WorkspaceLayout {
   editorRoot: Pane;
   bottomRoot: Pane | null;
   activePaneId: PaneId | null;
+  /** Tab torn out of the pane tree into the right resizable drawer. */
+  editorDrawer: EditorDrawerState;
   bottomVisible: boolean;
   sidebarVisible: boolean;
   expandedDirs: string[];
@@ -246,6 +259,8 @@ export const subKey = (sessionId: string, toolUseId: string, agentType: string) 
 // per-workspace ai: chats) — survives restart because the data it shows
 // is reloaded from the filesystem on mount.
 export const wbKey = (wsId: string) => `wb:${wsId}`;
+// Works tab — per-workspace project management board (feature 054).
+export const worksKey = (wsId: string) => `works:${wsId}`;
 // Tab key for an inline Claude Code session transcript. The `project`
 // segment encodes the on-disk encoded-cwd; the sessionId is the CLI
 // session uuid. Two tabs with the same key are the same session —
@@ -266,6 +281,7 @@ export function parseKey(
   | { kind: "terminal"; id: string }
   | { kind: "ai"; id: string }
   | { kind: "whiteboard"; wsId: string }
+  | { kind: "works"; wsId: string }
   | { kind: "usage"; wsId: string }
   | { kind: "brain"; wsId: string }
   | { kind: "store"; wsId: string }
@@ -295,6 +311,7 @@ export function parseKey(
   if (k.startsWith("term:")) return { kind: "terminal", id: k.slice(5) };
   if (k.startsWith("ai:")) return { kind: "ai", id: k.slice(3) };
   if (k.startsWith("wb:")) return { kind: "whiteboard", wsId: k.slice(3) };
+  if (k.startsWith("works:")) return { kind: "works", wsId: k.slice(6) };
   if (k.startsWith("usage:")) return { kind: "usage", wsId: k.slice(6) };
   if (k.startsWith("brain:")) return { kind: "brain", wsId: k.slice(6) };
   if (k.startsWith("store:")) return { kind: "store", wsId: k.slice(6) };
@@ -604,6 +621,34 @@ function closeAiTabInLayout(
   return { ...layout, editorRoot, bottomRoot, activePaneId };
 }
 
+function dockTabToPane(root: Pane, paneId: PaneId, key: string): Pane {
+  return mapTree(root, (t) =>
+    t.id === paneId
+      ? {
+          ...t,
+          tabs: t.tabs.includes(key) ? t.tabs : [...t.tabs, key],
+          active: key,
+        }
+      : t,
+  );
+}
+
+function defaultEditorDrawer(): EditorDrawerState {
+  return { tabKey: null, width: DEFAULT_EDITOR_DRAWER_W };
+}
+
+function parseEditorDrawer(raw: unknown): EditorDrawerState {
+  if (!raw || typeof raw !== "object") return defaultEditorDrawer();
+  const o = raw as Record<string, unknown>;
+  return {
+    tabKey: typeof o.tabKey === "string" ? o.tabKey : null,
+    width:
+      typeof o.width === "number"
+        ? clampEditorDrawerW(o.width)
+        : DEFAULT_EDITOR_DRAWER_W,
+  };
+}
+
 export function dropTabAt(
   root: Pane,
   targetPaneId: PaneId,
@@ -794,6 +839,9 @@ interface AppState {
       | { paneId: PaneId; edge: DropEdge }
       | { paneId: PaneId; insertIndex: number },
   ): void;
+  moveTabToDrawer(wsId: string, key: string): void;
+  dockEditorDrawer(wsId: string): void;
+  setEditorDrawerW(wsId: string, width: number): void;
   setSplitRatio(wsId: string, splitId: PaneId, ratio: number): void;
   updateFileContents(wsId: string, path: string, contents: string): void;
   /** Resolves true when the buffer hit the disk (or was already
@@ -869,6 +917,8 @@ interface AppState {
   ): void;
   /** Open (or focus) the persistent Whiteboard tab for a workspace. */
   wbOpen(wsId: string): void;
+  /** Open (or focus) the Works board tab for a workspace. */
+  worksOpen(wsId: string): void;
   /** Open (or focus) the Usage tab (live Claude Code cost monitor) for a
    *  workspace. One tab per workspace, mirrors wbOpen. */
   usageOpen(wsId: string): void;
@@ -884,6 +934,8 @@ interface AppState {
    *  if its tab was closed). Used by the Agent Hub to jump to a chat. */
   focusAIChat(wsId: string, id: string): void;
   setAIChatTitle(wsId: string, id: string, title: string): void;
+  /** Link or unlink a Works ticket on a chat tab. */
+  setAIChatWorkItem(wsId: string, chatId: string, workItemId: string | null): void;
   /** User-driven rename from the Agent Hub — locks the title against the
    *  auto-title effect. */
   renameAIChat(wsId: string, id: string, title: string): void;
@@ -918,6 +970,7 @@ const defaultLayout = (): WorkspaceLayout => {
     editorRoot,
     bottomRoot: null,
     activePaneId: editorRoot.id,
+    editorDrawer: defaultEditorDrawer(),
     bottomVisible: true,
     sidebarVisible: true,
     expandedDirs: [],
@@ -1016,7 +1069,10 @@ function sanitizePane(p: unknown): Pane {
 // migration path from drifting again every time we add a new field.
 function commonLayoutFields(
   r: Record<string, unknown>,
-): Omit<WorkspaceLayout, "editorRoot" | "bottomRoot" | "activePaneId"> {
+): Omit<
+  WorkspaceLayout,
+  "editorRoot" | "bottomRoot" | "activePaneId"
+> {
   const validViews: SidebarView[] = [
     "files", "search", "git", "tasks", "todos", "outline", "bookmarks", "ai", "remote", "usage",
   ];
@@ -1045,6 +1101,7 @@ function commonLayoutFields(
         ? Math.max(220, Math.min(800, r.aiPanelW))
         : 380,
     aiRailExpanded: r.aiRailExpanded === true,
+    editorDrawer: parseEditorDrawer(r.editorDrawer),
   };
 }
 
@@ -1267,6 +1324,7 @@ async function loadWorkspaceFromDisk(
         // re-loaded from disk on mount). Always survives layout cleanup
         // so an active whiteboard tab is never silently dropped.
         if (k.startsWith("wb:")) return true;
+        if (k.startsWith("works:")) return true;
         // Usage is self-contained too (polls the backend on mount), so it
         // survives cleanup like the whiteboard tab.
         if (k.startsWith("usage:")) return true;
@@ -1723,6 +1781,10 @@ export const useStore = create<AppState>((set, get) => {
         pushClosedTab(wsId, parsed.path);
       }
       updateWs(wsId, (w) => {
+        let editorDrawer = w.layout.editorDrawer ?? defaultEditorDrawer();
+        if (editorDrawer.tabKey === key) {
+          editorDrawer = { ...editorDrawer, tabKey: null };
+        }
         const er = removeTabFromTree(w.layout.editorRoot, key);
         const editorRoot: Pane = er.tree ?? emptyTabsPane();
         let bottomRoot = w.layout.bottomRoot;
@@ -1749,6 +1811,7 @@ export const useStore = create<AppState>((set, get) => {
             editorRoot,
             bottomRoot,
             activePaneId,
+            editorDrawer,
           },
         };
       });
@@ -1835,6 +1898,7 @@ export const useStore = create<AppState>((set, get) => {
         }
         if (parsed.kind === "subagent") return parsed.agentType || key;
         if (parsed.kind === "whiteboard") return "Organigramma";
+        if (parsed.kind === "works") return "Works";
         if (parsed.kind === "usage") return "Usage";
         if (parsed.kind === "session") {
           return `Session ${parsed.sessionId.slice(0, 8)}`;
@@ -1913,6 +1977,7 @@ export const useStore = create<AppState>((set, get) => {
         }
         if (parsed.kind === "subagent") return Number.POSITIVE_INFINITY;
         if (parsed.kind === "whiteboard") return Number.POSITIVE_INFINITY;
+        if (parsed.kind === "works") return Number.POSITIVE_INFINITY;
         if (parsed.kind === "usage") return Number.POSITIVE_INFINITY;
         if (parsed.kind === "session") return Number.POSITIVE_INFINITY;
         if (parsed.kind === "composeReview") return Number.POSITIVE_INFINITY;
@@ -1950,6 +2015,10 @@ export const useStore = create<AppState>((set, get) => {
 
     moveTab: (wsId, key, target) => {
       updateWs(wsId, (w) => {
+        let editorDrawer = w.layout.editorDrawer ?? defaultEditorDrawer();
+        if (editorDrawer.tabKey === key) {
+          editorDrawer = { ...editorDrawer, tabKey: null };
+        }
         const inEditor = isInTree(w.layout.editorRoot, target.paneId);
         const inBottom =
           !!w.layout.bottomRoot && isInTree(w.layout.bottomRoot, target.paneId);
@@ -2000,10 +2069,83 @@ export const useStore = create<AppState>((set, get) => {
         }
         return {
           ...w,
-          layout: { ...w.layout, editorRoot, bottomRoot, activePaneId },
+          layout: { ...w.layout, editorRoot, bottomRoot, activePaneId, editorDrawer },
         };
       });
     },
+
+    moveTabToDrawer: (wsId, key) => {
+      updateWs(wsId, (w) => {
+        const prevDrawer = w.layout.editorDrawer?.tabKey ?? null;
+        let editorRoot = w.layout.editorRoot;
+        let bottomRoot = w.layout.bottomRoot;
+        const targetPaneId =
+          (w.layout.activePaneId &&
+            isInTree(editorRoot, w.layout.activePaneId) &&
+            w.layout.activePaneId) ||
+          firstLeaf(editorRoot).id;
+
+        if (prevDrawer && prevDrawer !== key) {
+          editorRoot = dockTabToPane(editorRoot, targetPaneId, prevDrawer);
+        }
+
+        const er = removeTabFromTree(editorRoot, key);
+        editorRoot = er.tree ?? emptyTabsPane();
+        if (bottomRoot) {
+          const br = removeTabFromTree(bottomRoot, key);
+          bottomRoot = pruneEmptyTabsPanes(br.tree);
+        }
+
+        const width =
+          w.layout.editorDrawer?.width ?? DEFAULT_EDITOR_DRAWER_W;
+        return {
+          ...w,
+          layout: {
+            ...w.layout,
+            editorRoot,
+            bottomRoot,
+            activePaneId: targetPaneId,
+            editorDrawer: { tabKey: key, width },
+          },
+        };
+      });
+    },
+
+    dockEditorDrawer: (wsId) => {
+      updateWs(wsId, (w) => {
+        const key = w.layout.editorDrawer?.tabKey;
+        if (!key) return w;
+        const targetPaneId =
+          (w.layout.activePaneId &&
+            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
+            w.layout.activePaneId) ||
+          firstLeaf(w.layout.editorRoot).id;
+        return {
+          ...w,
+          layout: {
+            ...w.layout,
+            editorRoot: dockTabToPane(w.layout.editorRoot, targetPaneId, key),
+            activePaneId: targetPaneId,
+            editorDrawer: {
+              tabKey: null,
+              width: w.layout.editorDrawer?.width ?? DEFAULT_EDITOR_DRAWER_W,
+            },
+          },
+        };
+      });
+    },
+
+    setEditorDrawerW: (wsId, width) =>
+      updateWs(wsId, (w) => ({
+        ...w,
+        layout: {
+          ...w.layout,
+          editorDrawer: {
+            tabKey: w.layout.editorDrawer?.tabKey ?? null,
+            width: clampEditorDrawerW(width),
+          },
+        },
+      })),
 
     setSplitRatio: (wsId, splitId, ratio) =>
       updateWs(wsId, (w) => {
@@ -2825,6 +2967,46 @@ export const useStore = create<AppState>((set, get) => {
       });
     },
 
+    worksOpen: (wsId) => {
+      const k = worksKey(wsId);
+      updateWs(wsId, (w) => {
+        let foundPane: PaneId | null = null;
+        mapTree(w.layout.editorRoot, (t) => {
+          if (t.tabs.includes(k)) foundPane = t.id;
+          return t;
+        });
+        if (foundPane) {
+          return {
+            ...w,
+            layout: {
+              ...w.layout,
+              activePaneId: foundPane,
+              editorRoot: mapTree(w.layout.editorRoot, (t) =>
+                t.id === foundPane ? { ...t, active: k } : t,
+              ),
+            },
+          };
+        }
+        const targetPaneId =
+          (w.layout.activePaneId &&
+            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
+            w.layout.activePaneId) ||
+          firstLeaf(w.layout.editorRoot).id;
+        return {
+          ...w,
+          layout: {
+            ...w.layout,
+            activePaneId: targetPaneId,
+            editorRoot: mapTree(w.layout.editorRoot, (t) =>
+              t.id === targetPaneId
+                ? { ...t, tabs: [...t.tabs, k], active: k }
+                : t,
+            ),
+          },
+        };
+      });
+    },
+
     // Same focus-or-append shape as wbOpen (singleton per-workspace tab).
     usageOpen: (wsId) => {
       const k = usageKey(wsId);
@@ -3056,6 +3238,16 @@ export const useStore = create<AppState>((set, get) => {
           ...w,
           aiChats: { ...w.aiChats, [id]: { ...desc, title } },
         };
+      }),
+
+    setAIChatWorkItem: (wsId, id, workItemId) =>
+      updateWs(wsId, (w) => {
+        const desc = w.aiChats[id];
+        if (!desc) return w;
+        const next = { ...desc };
+        if (workItemId) next.workItemId = workItemId;
+        else delete next.workItemId;
+        return { ...w, aiChats: { ...w.aiChats, [id]: next } };
       }),
 
     renameAIChat: (wsId, id, title) =>

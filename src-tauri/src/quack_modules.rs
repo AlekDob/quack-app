@@ -204,11 +204,21 @@ fn run_skillopt(args: &[&str]) -> Result<String, String> {
     }
 }
 
-fn parse_skillopt_status(raw: &str) -> SkillOptSleepStatus {
+fn has_staged_proposal(raw: &str) -> bool {
     let lower = raw.to_lowercase();
-    let has_proposal = lower.contains("proposal")
-        || lower.contains("staged")
-        || lower.contains("pending");
+    if lower.contains("no staged proposal") || lower.contains("no proposal") {
+        return false;
+    }
+    if extract_path(raw).is_some() {
+        return true;
+    }
+    lower.contains("staged proposal:")
+        || lower.contains("proposal ready")
+        || lower.contains("pending proposal")
+}
+
+fn parse_skillopt_status(raw: &str) -> SkillOptSleepStatus {
+    let has_proposal = has_staged_proposal(raw);
     SkillOptSleepStatus {
         available: true,
         has_proposal,
