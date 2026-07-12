@@ -158,12 +158,12 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `050-composer-context-bar.md` — Cursor-style path + git branch inside the composer pill; portaled menus, project switch, shared `GitBranchPicker`.
   - `051-agent-commit-dock.md` — agent Bash `git commit` pill above the composer (hash, message, time, pushed/local); `agentCommitDetect.ts`, `agentCommitStore.ts`, `AgentCommitDock.tsx`.
   - `053-composer-git-actions.md` — Cursor-style changed-files + Commit & Push split control inside the composer pill; `git_diff_stat`, `ComposerGitActions.tsx`, `composerGitOps.ts`.
-  - `054-works-layer.md` — Plane-inspired Works: views sidebar, list/kanban/timeline, Modules catalog; **`works/items/W-NNN.md`** + **`works/stories/S-NNN.md`** + slim `snapshot.json` (v3); **opens in side drawer by default** (`063`).
+  - `054-works-layer.md` — Plane-inspired Works: views sidebar, list/kanban/timeline (story groups in all three), Modules catalog; **`works/items/W-NNN.md`** + **`works/stories/S-NNN.md`** + slim `snapshot.json` (v3); **opens in side drawer by default** (`063`).
   - `067-agent-tasks-checklist.md` — Cursor-style collapsible task checklist (`AgentTasks` in `AgentModeShell.tsx`) below the sessions list, sourced from `aiTaskStore.ts` (TodoWrite/TaskCreate items published by `AIChatPanel.tsx`); collapsed by default, resets on `chatId` change.
   - `066-works-cycles-stories.md` — auto weekly **Cycles** (progress + burndown charts), Scrum **Stories** spawning backlog work items; storage at workspace `works/` (not `.quack/`).
   - `068-quack-plan-harness.md` — product-owned plan on stories (`S-NNN`): Jack PM, **StoryPlanDrawer** (hover peek + pin on chat column), composer segmented cluster + **ComposerDocsChip**; `plan:` tab (`061`) is fallback without `storyId`.
   - `063-surface-view-prefs.md` — per-surface tab vs drawer default (Works / Brain / Team); Settings → Views; nested child-drawer stack.
-  - `065-works-drawer-ux.md` — catalog list, draft create, Notion editor in drawer, module picker, nested drawer stack.
+  - `065-works-drawer-ux.md` — catalog list, draft create, Notion editor in drawer, module picker, nested drawer stack, overlay z-index (ctx menu + confirm).
   - `052-composer-voice-dictation.md` — Cursor-style composer mic: waveform row, native macOS `SFSpeechRecognizer` + Web Speech on Windows; `dictation.ts`, `dictation.rs`, `ComposerMic.tsx`.
   - `028-opencode-bridge.md` — `opencode serve` sidecar (port 17346), SSE `/global/event`, `providerSessionIds`, lazy startup catalog.
   - `029-session-diff-hub.md` — Agent Hub expanded-row edit subtitles (`Edited foo.ts −N +M`); `chatDiffStore` pub/sub + `summarizeLastTurn`.

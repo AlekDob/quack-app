@@ -8,6 +8,7 @@ import {
   updateWorkItem,
 } from "../../worksCache";
 import { useWorkItemContextMenu } from "./useWorkItemContextMenu";
+import { useStoryContextMenu } from "./useStoryContextMenu";
 import {
   type WorkItem,
   type WorksLayout,
@@ -43,6 +44,7 @@ import { WorksItemsList } from "./WorksItemsList";
 import { WorksFeaturesCatalog } from "./WorksFeaturesCatalog";
 import { WorksCyclesPanel } from "./WorksCyclesPanel";
 import { WorksStoriesList } from "./WorksStoriesList";
+import { getWorkspaceColor } from "../../workspaceColors";
 
 type Props = {
   wsId: string;
@@ -185,6 +187,12 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
     snap,
     openWork,
   );
+  const { onStoryContextMenu, menuNode: storyMenuNode } = useStoryContextMenu(
+    root,
+    snap,
+    openStory,
+  );
+  const storyAccent = getWorkspaceColor(wsId)?.hex ?? null;
 
   const setLayout = async (nextLayout: WorksLayout) => {
     if (!snap) return;
@@ -339,6 +347,8 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
                 childCounts={storyChildCounts}
                 selectedId={selectedStoryId}
                 onOpen={openStory}
+                onContextMenu={onStoryContextMenu}
+                storyAccent={storyAccent}
               />
             )}
 
@@ -370,22 +380,36 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
                 onOpen={openWork}
                 onOpenStory={openStory}
                 onContextMenu={onItemContextMenu}
+                onStoryContextMenu={onStoryContextMenu}
+                storyAccent={storyAccent}
               />
             )}
             {!isCatalog && !loading && items.length > 0 && layout === "kanban" && (
               <WorksKanbanView
                 items={items}
+                stories={snap?.stories ?? []}
+                modules={snap?.modules ?? []}
+                selectedStoryId={selectedStoryId}
+                storyAccent={storyAccent}
                 onOpen={openWork}
+                onOpenStory={openStory}
                 onDropStatus={(id, s) => void onDropStatus(id, s)}
                 onItemContextMenu={onItemContextMenu}
+                onStoryContextMenu={onStoryContextMenu}
               />
             )}
             {!isCatalog && !loading && items.length > 0 && layout === "timeline" && (
               <WorksTimelineView
                 items={items}
+                stories={snap?.stories ?? []}
+                modules={snap?.modules ?? []}
                 selectedId={selectedId}
+                selectedStoryId={selectedStoryId}
+                storyAccent={storyAccent}
                 onOpen={openWork}
+                onOpenStory={openStory}
                 onItemContextMenu={onItemContextMenu}
+                onStoryContextMenu={onStoryContextMenu}
                 onDatesChange={(id, startDate, targetDate) =>
                   void updateWorkItem(root, id, { startDate, targetDate })
                 }
@@ -395,6 +419,7 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
         </div>
       </div>
       {menuNode}
+      {storyMenuNode}
     </>,
     container,
   );

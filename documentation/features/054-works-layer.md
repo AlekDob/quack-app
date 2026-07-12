@@ -3,6 +3,7 @@ type: feature
 project: quack-desktop
 created: 2026-07-12
 last_verified: 2026-07-12
+status: active
 related: [063-surface-view-prefs.md, 065-works-drawer-ux.md, 066-works-cycles-stories.md, 068-quack-plan-harness.md]
 tags: [works, plan-mode, tickets, kanban, timeline, modules, plane, drawer, brain, markdown]
 ---
@@ -97,13 +98,31 @@ Left rail is a **collection of views**, not module filters. Persisted in `viewPr
 
 ## Main layouts (work views)
 
-| Layout | Component | Notes |
-|---|---|---|
-| List | `WorksPane` | Default; sorted by `updatedAt` |
-| Kanban | `WorksKanbanView` | HTML5 DnD → `updateWorkItem` status |
-| Timeline | `WorksTimelineView` | Week columns; `TimelineBar` drag move + resize handles → dates |
+All three work layouts share **`buildWorksListGroups`** (`worksListGroups.ts`): stories with linked `W-NNN` children render as a **story group**; unparented items are **orphans**. Group order = stories by `updatedAt` desc, then orphans.
 
-Context menu (`useWorkItemContextMenu.tsx`): Rename, Duplicate, Delete on list/kanban/timeline rows.
+| Layout | Component | Story grouping |
+|---|---|---|
+| List | `WorksItemsList` | Story row (`.works-story-hit-row`) + indented children (`.works-list-story-children` + elbow guides) |
+| Kanban | `WorksKanbanView` | Per column: **story lane** header + nested cards for children in that status; empty story → lane in **Backlog** only |
+| Timeline | `WorksTimelineView` | Left list: story header row (no Gantt bar) + nested work rows; chart: spacer row per story, bars on children only |
+
+| Layout | Interaction |
+|---|---|
+| Kanban | HTML5 DnD on work cards only → `updateWorkItem` status; story headers not draggable |
+| Timeline | Week nav; `TimelineBar` drag move + resize → `startDate` / `targetDate` |
+
+### Context menus
+
+| Hook | Targets | Actions |
+|---|---|---|
+| `useWorkItemContextMenu.tsx` | `W-NNN` rows (list / kanban / timeline) | Rename, Duplicate, Delete |
+| `useStoryContextMenu.tsx` | `S-NNN` rows (list / kanban / timeline / Stories view) | Open, Rename, Delete |
+
+Both portal `ContextMenu` to `document.body`. In **drawer mode** the menu must sit above `.editor-tab-drawer` (900) — see z-index table in `065-works-drawer-ux.md`.
+
+### Story row chrome
+
+Accent comes from **workspace project color** (`getWorkspaceColor` → CSS var `--works-story-accent` via `worksStoryRowStyle.ts`). Only the **icon + icon background** are tinted — no full-row purple fill or colored border. Child work rows use neutral icons + tree **indent guides** (vertical rail + horizontal elbow).
 
 ## App-level drawers
 
@@ -252,7 +271,9 @@ Mirror copies in `documentation/skills/`. Upgrades via `quack-bundled-version`.
 | Cache + CRUD | `src/worksCache.ts` |
 | Markdown I/O | `src/workItemMd.ts`, `src/worksItemFiles.ts`, `src/worksWatch.ts`, `src/quackDir.ts` |
 | Shell | `src/components/works/WorksPane.tsx` |
+| List groups | `worksListGroups.ts` — `buildWorksListGroups`, `WorksListGroup` |
 | List catalog | `WorksItemsList.tsx`, `worksUi.ts` |
+| Story menus | `useStoryContextMenu.tsx`, `worksStoryRowStyle.ts` |
 | Drawers | `WorkItemDrawer.tsx`, `FeatureDocDrawer.tsx`, `editorDrawerStack.ts` |
 | Kanban / timeline | `WorksKanbanView.tsx`, `WorksTimelineView.tsx`, `TimelineBar.tsx` |
 | Composer | `ComposerWorkBar.tsx`, `ComposerDocsChip.tsx` |

@@ -3,6 +3,7 @@ type: feature
 project: quack-desktop
 created: 2026-07-12
 last_verified: 2026-07-12
+status: active
 related: [054-works-layer.md, 065-works-drawer-ux.md, 068-quack-plan-harness.md]
 tags: [works, cycles, stories, plane, burndown, scrum]
 ---
@@ -49,9 +50,21 @@ Persisted selection: `viewPrefs.activeCycleId`.
 
 ### UI — Views sidebar → **Stories**
 
-- `WorksStoriesList` — Brain-style catalog rows
+- `WorksStoriesList` — Brain-style catalog rows; right-click → Open / Rename / Delete (`useStoryContextMenu`)
 - `StoryDrawer` — create/edit, module + cycle pickers, child work list, **Add work item**
 - `WorkItemDrawer` — optional **Story** (parent) and **Cycle** selects
+
+### UI — Story groups in work layouts (All / status filters)
+
+When viewing work items (not the dedicated Stories catalog), linked stories surface in **List**, **Kanban**, and **Timeline** via `buildWorksListGroups`:
+
+| Surface | Story presentation |
+|---|---|
+| **List** (`WorksItemsList`) | `S-NNN` hit row + pill; children indented under `.works-list-story-children` |
+| **Kanban** (`WorksKanbanView`) | Story lane per column (header + nested cards); story without children appears in Backlog |
+| **Timeline** (`WorksTimelineView`) | Story row in left column (duration column shows status pill); Gantt chart has matching spacer row |
+
+Visual: workspace color tints **story icon only** (`--works-story-accent`); work items keep neutral checkbox icon. Tree elbows match List (`works-list-child-wrap` / timeline nested row CSS).
 
 ## Key files
 

@@ -4,6 +4,7 @@ import { formatModuleLabel, modulePathLine } from "../../worksUi";
 import { storyLabel, type WorkModule, type WorkStory } from "../../works";
 import { BrainSearchSkeleton } from "../brain/BrainSearchResults";
 import { Icon } from "../Icon";
+import { worksStoryAccentStyle } from "./worksStoryRowStyle";
 
 type Props = {
   stories: WorkStory[];
@@ -11,6 +12,8 @@ type Props = {
   childCounts: Map<string, number>;
   selectedId: string | null;
   onOpen: (id: string) => void;
+  onContextMenu: (id: string, e: React.MouseEvent) => void;
+  storyAccent?: string | null;
 };
 
 function filterStories(
@@ -37,10 +40,13 @@ export function WorksStoriesList({
   childCounts,
   selectedId,
   onOpen,
+  onContextMenu,
+  storyAccent,
 }: Props) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
   const modById = useMemo(() => new Map(modules.map((m) => [m.id, m])), [modules]);
+  const accentStyle = worksStoryAccentStyle(storyAccent);
 
   useEffect(() => {
     const t = window.setTimeout(() => setDebounced(query), 120);
@@ -53,7 +59,7 @@ export function WorksStoriesList({
   );
 
   return (
-    <div className="works-stories-catalog">
+    <div className="works-stories-catalog" style={accentStyle}>
       <div className="works-catalog-search">
         <Icon name="search" size={14} />
         <input
@@ -76,17 +82,21 @@ export function WorksStoriesList({
         </div>
       )}
       {debounced === query && filtered.length > 0 && (
-        <ul className="brain-hit-list">
+        <ul className="brain-hit-list works-stories-hit-list">
           {filtered.map((s, i) => {
             const mod = modById.get(s.moduleId);
             const kids = childCounts.get(s.id) ?? 0;
+            const title = `${s.shortId} · ${s.title}`;
             return (
-              <li key={s.id}>
+              <li key={s.id} className="works-list-story-wrap" style={accentStyle}>
                 <button
                   type="button"
-                  className={`brain-hit-row${selectedId === s.id ? " active" : ""}`}
+                  className={`brain-hit-row works-story-hit-row${
+                    selectedId === s.id ? " active" : ""
+                  }`}
                   style={{ "--i": i } as CSSProperties}
                   onClick={() => onOpen(s.id)}
+                  onContextMenu={(e) => onContextMenu(s.id, e)}
                   title={modulePathLine(mod)}
                 >
                   <span className="brain-hit-icon works-story-hit-icon" aria-hidden>
@@ -94,17 +104,21 @@ export function WorksStoriesList({
                   </span>
                   <span className="brain-hit-body">
                     <span className="brain-hit-top">
-                      <span className="brain-hit-id">{s.shortId}</span>
                       <span className="brain-hit-title">
-                        {highlightBrainText(s.title, debounced)}
+                        {highlightBrainText(title, debounced)}
+                      </span>
+                      <span className={`works-story-pill works-story-pill--${s.status}`}>
+                        {storyLabel(s.status)}
                       </span>
                     </span>
-                    <span className="brain-hit-meta">
-                      {storyLabel(s.status)}
-                      {mod ? ` · ${formatModuleLabel(mod)}` : ""}
-                      {kids > 0 ? ` · ${kids} work item${kids === 1 ? "" : "s"}` : ""}
+                    <span className="brain-hit-path">
+                      {mod ? formatModuleLabel(mod) : "No module"}
+                      {kids > 0
+                        ? ` · ${kids} work item${kids === 1 ? "" : "s"}`
+                        : " · No linked work items"}
                     </span>
                   </span>
+                  <Icon name="chevron-right" size={14} className="brain-hit-chevron" />
                 </button>
               </li>
             );

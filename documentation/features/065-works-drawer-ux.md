@@ -3,6 +3,7 @@ type: feature
 project: quack-desktop
 created: 2026-07-12
 last_verified: 2026-07-12
+status: active
 tags: [works, drawer, modules, notion-editor, create-flow, nested-stack]
 ---
 
@@ -84,6 +85,19 @@ EditorTabDrawer (fixed, z-index 900)
 Feature doc drawer opens immediately (shell visible) while markdown loads.
 
 Mutual exclusion unchanged: `openWorkDrawer` closes feature drawer; `openFeatureDocDrawer` closes work drawer.
+
+## Overlay z-index (drawer mode gotcha)
+
+Works in the side drawer still uses **portaled** global overlays for right-click menus and confirm dialogs. If their z-index is below the drawer stack, `preventDefault` runs but the UI is invisible behind the panel.
+
+| Layer | Class | z-index | Notes |
+|---|---|---:|---|
+| Editor tab drawer | `.editor-tab-drawer--overlay` | 900 | Works surface host |
+| Tool / work drawers | `.tool-drawer-scrim` | 1000 | Nested stack inside drawer |
+| Context menu | `.ctx-overlay` / `.ctx-menu` | 1100 / 1101 | Work + story row menus |
+| Confirm / prompt | `.dialog-backdrop` | 1500 | Delete work item, rename prompt, etc. |
+
+Symptoms before fix: right-click “does nothing”; delete confirm appears but content bleeds through / sits under drawer.
 
 ## Related
 

@@ -20,6 +20,7 @@ import {
 } from "../../works";
 import { BrainSearchSkeleton } from "../brain/BrainSearchResults";
 import { Icon } from "../Icon";
+import { worksStoryAccentStyle } from "./worksStoryRowStyle";
 
 type Props = {
   items: WorkItem[];
@@ -30,6 +31,8 @@ type Props = {
   onOpen: (id: string) => void;
   onOpenStory: (id: string) => void;
   onContextMenu: (id: string, e: React.MouseEvent) => void;
+  onStoryContextMenu: (id: string, e: React.MouseEvent) => void;
+  storyAccent?: string | null;
 };
 
 function StoryHitRow({
@@ -40,6 +43,7 @@ function StoryHitRow({
   query,
   active,
   onOpen,
+  onContextMenu,
 }: {
   story: WorkStory;
   module?: WorkModule;
@@ -48,40 +52,40 @@ function StoryHitRow({
   query: string;
   active: boolean;
   onOpen: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const title = `${story.shortId} · ${story.title}`;
   const path = modulePathLine(module);
   return (
-    <li className="works-list-story-wrap">
-      <button
-        type="button"
-        className={`brain-hit-row works-story-hit-row${active ? " active" : ""}`}
-        style={{ "--i": index } as CSSProperties}
-        onClick={onOpen}
-        title={path}
-      >
-        <span className="brain-hit-icon works-story-hit-icon" aria-hidden>
-          <Icon name="users" size={15} />
-        </span>
-        <span className="brain-hit-body">
-          <span className="brain-hit-top">
-            <span className="brain-hit-title">
-              {highlightBrainText(title, query)}
-            </span>
-            <span className={`works-story-pill works-story-pill--${story.status}`}>
-              {storyLabel(story.status)}
-            </span>
+    <button
+      type="button"
+      className={`brain-hit-row works-story-hit-row${active ? " active" : ""}`}
+      style={{ "--i": index } as CSSProperties}
+      onClick={onOpen}
+      onContextMenu={onContextMenu}
+      title={path}
+    >
+      <span className="brain-hit-icon works-story-hit-icon" aria-hidden>
+        <Icon name="users" size={15} />
+      </span>
+      <span className="brain-hit-body">
+        <span className="brain-hit-top">
+          <span className="brain-hit-title">
+            {highlightBrainText(title, query)}
           </span>
-          <span className="brain-hit-path">
-            {module ? formatModuleLabel(module) : "No module"}
-            {childCount > 0
-              ? ` · ${childCount} work item${childCount === 1 ? "" : "s"}`
-              : " · No linked work items"}
+          <span className={`works-story-pill works-story-pill--${story.status}`}>
+            {storyLabel(story.status)}
           </span>
         </span>
-        <Icon name="chevron-right" size={14} className="brain-hit-chevron" />
-      </button>
-    </li>
+        <span className="brain-hit-path">
+          {module ? formatModuleLabel(module) : "No module"}
+          {childCount > 0
+            ? ` · ${childCount} work item${childCount === 1 ? "" : "s"}`
+            : " · No linked work items"}
+        </span>
+      </span>
+      <Icon name="chevron-right" size={14} className="brain-hit-chevron" />
+    </button>
   );
 }
 
@@ -156,6 +160,8 @@ function renderGroup(
     onOpen: (id: string) => void;
     onOpenStory: (id: string) => void;
     onContextMenu: (id: string, e: React.MouseEvent) => void;
+    onStoryContextMenu: (id: string, e: React.MouseEvent) => void;
+    storyAccent?: string | null;
   },
 ): { nodes: React.ReactNode[]; nextIndex: number } {
   const nodes: React.ReactNode[] = [];
@@ -163,32 +169,43 @@ function renderGroup(
 
   if (group.kind === "story") {
     nodes.push(
-      <StoryHitRow
+      <li
         key={`story-${group.story.id}`}
-        story={group.story}
-        module={ctx.modById.get(group.story.moduleId)}
-        childCount={group.children.length}
-        index={i++}
-        query={ctx.query}
-        active={ctx.selectedStoryId === group.story.id}
-        onOpen={() => ctx.onOpenStory(group.story.id)}
-      />,
-    );
-    for (const child of group.children) {
-      nodes.push(
-        <WorkHitRow
-          key={child.id}
-          item={child}
-          module={ctx.modById.get(child.moduleId)}
+        className="works-list-story-group"
+        style={worksStoryAccentStyle(ctx.storyAccent)}
+      >
+        <StoryHitRow
+          story={group.story}
+          module={ctx.modById.get(group.story.moduleId)}
+          childCount={group.children.length}
           index={i++}
           query={ctx.query}
-          active={ctx.selectedId === child.id}
-          nested
-          onOpen={() => ctx.onOpen(child.id)}
-          onContextMenu={(e) => ctx.onContextMenu(child.id, e)}
-        />,
-      );
-    }
+          active={ctx.selectedStoryId === group.story.id}
+          onOpen={() => ctx.onOpenStory(group.story.id)}
+          onContextMenu={(e) => ctx.onStoryContextMenu(group.story.id, e)}
+        />
+        {group.children.length > 0 ? (
+          <ul className="works-list-story-children">
+            {group.children.map((child) => {
+              const row = (
+                <WorkHitRow
+                  key={child.id}
+                  item={child}
+                  module={ctx.modById.get(child.moduleId)}
+                  index={i++}
+                  query={ctx.query}
+                  active={ctx.selectedId === child.id}
+                  nested
+                  onOpen={() => ctx.onOpen(child.id)}
+                  onContextMenu={(e) => ctx.onContextMenu(child.id, e)}
+                />
+              );
+              return row;
+            })}
+          </ul>
+        ) : null}
+      </li>,
+    );
     return { nodes, nextIndex: i };
   }
 
@@ -216,6 +233,8 @@ export function WorksItemsList({
   onOpen,
   onOpenStory,
   onContextMenu,
+  onStoryContextMenu,
+  storyAccent,
 }: Props) {
   const [query, setQuery] = useState("");
   const [mounting, setMounting] = useState(true);
@@ -244,6 +263,8 @@ export function WorksItemsList({
       onOpen,
       onOpenStory,
       onContextMenu,
+      onStoryContextMenu,
+      storyAccent,
     };
     const out: React.ReactNode[] = [];
     let idx = 0;
@@ -262,6 +283,8 @@ export function WorksItemsList({
     onOpen,
     onOpenStory,
     onContextMenu,
+    onStoryContextMenu,
+    storyAccent,
   ]);
 
   return (

@@ -3780,15 +3780,17 @@ body.ab-dragging * {
   transition: all 0.06s ease;
 }
 
-/* Context menu (right-click) */
+/* Context menu (right-click) — must outrank .editor-tab-drawer (900) and
+   .tool-drawer (1000); otherwise right-click in Works drawer mode calls
+   preventDefault but the menu renders invisibly behind the panel. */
 .ctx-overlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 1100;
 }
 .ctx-menu {
   position: fixed;
-  z-index: 210;
+  z-index: 1101;
   min-width: 200px;
   background: var(--bg-elev);
   border: 1px solid var(--border);
@@ -6743,7 +6745,9 @@ body.ab-dragging * {
   transform: translateX(16px);
 }
 
-/* Themed alert / confirm / prompt dialogs (replaces native window.*) */
+/* Themed alert / confirm / prompt dialogs (replaces native window.*).
+   Must outrank .editor-tab-drawer (900), .tool-drawer (1000), and
+   .ctx-menu (1101) — e.g. delete confirm from Works in drawer mode. */
 .dialog-backdrop {
   position: fixed;
   left: 0;
@@ -6751,7 +6755,7 @@ body.ab-dragging * {
   top: var(--topbar-h);
   bottom: var(--statusbar-h);
   background: rgba(0, 0, 0, 0.5);
-  z-index: 300;
+  z-index: 1500;
   display: grid;
   place-items: center;
   animation: dialog-fade 0.1s ease-out;
@@ -22819,6 +22823,54 @@ body.ab-dragging * {
   margin-top: 4px;
 }
 
+.works-kanban-story-lane {
+  margin-bottom: 8px;
+}
+
+.works-kanban-story {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.works-kanban-story:hover,
+.works-kanban-story.active {
+  background: var(--bg-hi);
+}
+
+.works-kanban-story-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--works-story-accent, var(--fg)) 22%, var(--bg-alt));
+  color: var(--works-story-accent, var(--fg));
+  border: 1px solid color-mix(in srgb, var(--works-story-accent, var(--fg)) 28%, var(--border));
+}
+
+.works-kanban-story-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.works-kanban-card--nested {
+  margin-left: 12px;
+  width: calc(100% - 12px);
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
 .works-timeline-plane {
   display: flex;
   flex: 1;
@@ -22867,6 +22919,36 @@ body.ab-dragging * {
 
 .works-timeline-list-row:hover,
 .works-timeline-list-row.active { background: var(--bg-hi); }
+
+.works-timeline-list-row--story {
+  font-weight: var(--fw-medium);
+}
+
+.works-timeline-list-row--story .works-story-hit-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.works-timeline-list-row--nested {
+  padding-left: 28px;
+  position: relative;
+}
+
+.works-timeline-list-row--nested::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 10px;
+  border-top: 1px solid var(--border-strong);
+  pointer-events: none;
+}
+
+.works-timeline-chart-row--story {
+  border-bottom: 1px solid var(--border);
+  box-sizing: border-box;
+}
 
 .works-timeline-item-title {
   display: flex;
@@ -24409,18 +24491,48 @@ body.ab-dragging * {
 }
 
 /* Story groups inside work-item list */
-.works-list-child-wrap .works-work-hit-row--nested {
-  margin-left: 18px;
-  width: calc(100% - 18px);
+.works-list-story-group {
+  list-style: none;
+  margin: 0 0 10px;
 }
 
-.works-story-hit-row {
-  border-left: 3px solid var(--works-story-accent, color-mix(in srgb, var(--fg) 28%, transparent));
+.works-list-story-wrap {
+  list-style: none;
+  margin: 0 0 4px;
+}
+
+.works-list-story-children {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  margin-left: 13px;
+  border-left: 1px solid var(--border-strong);
+}
+
+.works-list-child-wrap {
+  position: relative;
+  padding-left: 14px;
+}
+
+.works-list-child-wrap::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 12px;
+  border-top: 1px solid var(--border-strong);
+  pointer-events: none;
+}
+
+.works-list-child-wrap .works-work-hit-row--nested {
+  margin-left: 0;
+  width: 100%;
 }
 
 .works-story-hit-icon {
-  background: color-mix(in srgb, var(--works-story-accent, var(--fg)) 14%, var(--bg-alt));
+  background: color-mix(in srgb, var(--works-story-accent, var(--fg)) 22%, var(--bg-alt));
   color: var(--works-story-accent, var(--fg));
+  border: 1px solid color-mix(in srgb, var(--works-story-accent, var(--fg)) 28%, var(--border));
   border-radius: var(--radius-md);
 }
 
@@ -24455,8 +24567,6 @@ body.ab-dragging * {
 
 .works-story-pill--active {
   color: var(--fg);
-  border-color: color-mix(in srgb, var(--works-story-accent, var(--fg)) 35%, var(--border));
-  background: color-mix(in srgb, var(--works-story-accent, var(--fg)) 10%, var(--bg-alt));
 }
 
 .works-story-pill--done {

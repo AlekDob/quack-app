@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { WorkItem } from "../../works";
+import { buildWorksListGroups } from "../../worksListGroups";
+import type { WorkItem, WorkModule, WorkStory } from "../../works";
+import { storyLabel } from "../../works";
 import {
   DAY_MS,
   durationLabel,
@@ -10,23 +12,71 @@ import {
 } from "../../worksTimelineDates";
 import { Icon } from "../Icon";
 import { TimelineBar } from "./TimelineBar";
+import { worksStoryAccentStyle } from "./worksStoryRowStyle";
 
 type Props = {
   items: WorkItem[];
+  stories: WorkStory[];
+  modules: WorkModule[];
   selectedId: string | null;
+  selectedStoryId: string | null;
+  storyAccent?: string | null;
   onOpen: (id: string) => void;
+  onOpenStory: (id: string) => void;
   onItemContextMenu: (id: string, e: React.MouseEvent) => void;
+  onStoryContextMenu: (id: string, e: React.MouseEvent) => void;
   onDatesChange: (id: string, startDate: string, targetDate: string) => void;
 };
+
+type TimelineRow =
+  | { kind: "story"; story: WorkStory }
+  | {
+      kind: "work";
+      item: WorkItem;
+      start: number;
+      end: number;
+      nested: boolean;
+    };
 
 const LIST_W = 300;
 const ROW_H = 40;
 
+function buildTimelineRows(
+  groups: ReturnType<typeof buildWorksListGroups>,
+  dated: Map<string, { start: number; end: number }>,
+): TimelineRow[] {
+  const rows: TimelineRow[] = [];
+  for (const g of groups) {
+    if (g.kind === "story") {
+      rows.push({ kind: "story", story: g.story });
+      const kids = [...g.children].sort(
+        (a, b) =>
+          (dated.get(a.id)?.start ?? a.createdAt) -
+          (dated.get(b.id)?.start ?? b.createdAt),
+      );
+      for (const w of kids) {
+        const range = dated.get(w.id) ?? itemRange(w);
+        rows.push({ kind: "work", item: w, ...range, nested: true });
+      }
+      continue;
+    }
+    const range = dated.get(g.item.id) ?? itemRange(g.item);
+    rows.push({ kind: "work", item: g.item, ...range, nested: false });
+  }
+  return rows;
+}
+
 export function WorksTimelineView({
   items,
+  stories,
+  modules,
   selectedId,
+  selectedStoryId,
+  storyAccent,
   onOpen,
+  onOpenStory,
   onItemContextMenu,
+  onStoryContextMenu,
   onDatesChange,
 }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
@@ -34,20 +84,18 @@ export function WorksTimelineView({
   const chartBodyRef = useRef<HTMLDivElement>(null);
   const syncing = useRef(false);
   const [chartW, setChartW] = useState(600);
-  const [weekAnchor, setWeekAnchor] = useState(() =>
-    startOfWeek(Date.now()),
-  );
+  const [weekAnchor, setWeekAnchor] = useState(() => startOfWeek(Date.now()));
 
-  const dated = useMemo(
-    () =>
-      items
-        .map((w) => {
-          const { start, end } = itemRange(w);
-          return { w, start, end };
-        })
-        .sort((a, b) => a.start - b.start),
-    [items],
-  );
+  const dated = useMemo(() => {
+    const map = new Map<string, { start: number; end: number }>();
+    for (const w of items) map.set(w.id, itemRange(w));
+    return map;
+  }, [items]);
+
+  const rows = useMemo(() => {
+    const groups = buildWorksListGroups(stories, items, modules, "");
+    return buildTimelineRows(groups, dated);
+  }, [stories, items, modules, dated]);
 
   const weekOfToday = startOfWeek(Date.now());
   const todayDay = (() => {
@@ -81,7 +129,7 @@ export function WorksTimelineView({
     });
   };
 
-  if (dated.length === 0) {
+  if (rows.length === 0) {
     return (
       <div className="works-empty works-empty--center">
         <div className="works-empty-title">No timeline data</div>
@@ -94,12 +142,13 @@ export function WorksTimelineView({
 
   const weekDays = Array.from({ length: 7 }, (_, i) => weekAnchor + i * DAY_MS);
   const isCurrentWeek = weekAnchor === weekOfToday;
+  const accentStyle = worksStoryAccentStyle(storyAccent);
 
   return (
     <div className="works-timeline-plane">
       <div className="works-timeline-list" style={{ width: LIST_W }}>
         <div className="works-table-head">
-          <span>Work items</span>
+          <span>Stories & work</span>
           <span>Duration</span>
         </div>
         <div
@@ -107,26 +156,55 @@ export function WorksTimelineView({
           className="works-timeline-list-body"
           onScroll={(e) => syncScroll("list", e.currentTarget.scrollTop)}
         >
-          {dated.map(({ w, start, end }) => (
-            <button
-              key={w.id}
-              type="button"
-              className={`works-timeline-list-row${
-                selectedId === w.id ? " active" : ""
-              }`}
-              style={{ height: ROW_H }}
-              onClick={() => onOpen(w.id)}
-              onContextMenu={(e) => onItemContextMenu(w.id, e)}
-            >
-              <span className="works-timeline-item-title">
-                <span className="works-list-id">{w.shortId}</span>
-                <span className="works-list-title">{w.title}</span>
-              </span>
-              <span className="works-timeline-duration">
-                {durationLabel(start, end)}
-              </span>
-            </button>
-          ))}
+          {rows.map((row) =>
+            row.kind === "story" ? (
+              <button
+                key={`story-${row.story.id}`}
+                type="button"
+                className={`works-timeline-list-row works-timeline-list-row--story${
+                  selectedStoryId === row.story.id ? " active" : ""
+                }`}
+                style={{ height: ROW_H, ...accentStyle }}
+                onClick={() => onOpenStory(row.story.id)}
+                onContextMenu={(e) => onStoryContextMenu(row.story.id, e)}
+              >
+                <span className="works-timeline-item-title">
+                  <span
+                    className="brain-hit-icon works-story-hit-icon"
+                    aria-hidden
+                  >
+                    <Icon name="users" size={13} />
+                  </span>
+                  <span className="works-list-id">{row.story.shortId}</span>
+                  <span className="works-list-title">{row.story.title}</span>
+                </span>
+                <span
+                  className={`works-story-pill works-story-pill--${row.story.status}`}
+                >
+                  {storyLabel(row.story.status)}
+                </span>
+              </button>
+            ) : (
+              <button
+                key={row.item.id}
+                type="button"
+                className={`works-timeline-list-row${
+                  row.nested ? " works-timeline-list-row--nested" : ""
+                }${selectedId === row.item.id ? " active" : ""}`}
+                style={{ height: ROW_H }}
+                onClick={() => onOpen(row.item.id)}
+                onContextMenu={(e) => onItemContextMenu(row.item.id, e)}
+              >
+                <span className="works-timeline-item-title">
+                  <span className="works-list-id">{row.item.shortId}</span>
+                  <span className="works-list-title">{row.item.title}</span>
+                </span>
+                <span className="works-timeline-duration">
+                  {durationLabel(row.start, row.end)}
+                </span>
+              </button>
+            ),
+          )}
         </div>
       </div>
 
@@ -186,21 +264,30 @@ export function WorksTimelineView({
               aria-hidden
             />
           )}
-          {dated.map(({ w, start, end }) => (
-            <TimelineBar
-              key={w.id}
-              item={w}
-              start={start}
-              end={end}
-              weekStart={weekAnchor}
-              dayW={dayW}
-              rowH={ROW_H}
-              active={selectedId === w.id}
-              onOpen={() => onOpen(w.id)}
-              onContextMenu={(e) => onItemContextMenu(w.id, e)}
-              onDatesChange={(s, t) => onDatesChange(w.id, s, t)}
-            />
-          ))}
+          {rows.map((row) =>
+            row.kind === "story" ? (
+              <div
+                key={`chart-story-${row.story.id}`}
+                className="works-timeline-chart-row works-timeline-chart-row--story"
+                style={{ height: ROW_H }}
+                aria-hidden
+              />
+            ) : (
+              <TimelineBar
+                key={row.item.id}
+                item={row.item}
+                start={row.start}
+                end={row.end}
+                weekStart={weekAnchor}
+                dayW={dayW}
+                rowH={ROW_H}
+                active={selectedId === row.item.id}
+                onOpen={() => onOpen(row.item.id)}
+                onContextMenu={(e) => onItemContextMenu(row.item.id, e)}
+                onDatesChange={(s, t) => onDatesChange(row.item.id, s, t)}
+              />
+            ),
+          )}
         </div>
       </div>
     </div>
