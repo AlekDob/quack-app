@@ -1,30 +1,40 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Icon } from "../Icon";
 import { highlightBrainText } from "../../brainHighlight";
-import type { WorkModule } from "../../works";
-import { formatModuleLabel } from "../../worksUi";
+import {
+  formatModuleLabel,
+  formatWorkHitTitle,
+  modulePathLine,
+} from "../../worksUi";
+import { priorityDotClass, statusLabel, type WorkItem, type WorkModule } from "../../works";
 import { BrainSearchSkeleton } from "../brain/BrainSearchResults";
+import { Icon } from "../Icon";
 
 type Props = {
+  items: WorkItem[];
   modules: WorkModule[];
-  workCounts: Map<string, number>;
-  activePath: string | null;
-  onOpen: (m: WorkModule) => void;
+  selectedId: string | null;
+  onOpen: (id: string) => void;
+  onContextMenu: (id: string, e: React.MouseEvent) => void;
 };
 
-function filterModules(modules: WorkModule[], query: string): WorkModule[] {
+function filterItems(items: WorkItem[], modules: WorkModule[], query: string): WorkItem[] {
   const terms = query
     .trim()
     .toLowerCase()
     .split(/\s+/)
     .filter(Boolean);
-  if (!terms.length) return modules;
-  return modules.filter((m) => {
+  if (!terms.length) return items;
+  const modById = new Map(modules.map((m) => [m.id, m]));
+  return items.filter((w) => {
+    const mod = modById.get(w.moduleId);
     const hay = [
-      m.name,
-      m.featureSlug,
-      m.featurePath,
-      m.featureNum != null ? String(m.featureNum) : "",
+      w.shortId,
+      w.title,
+      w.status,
+      w.priority,
+      mod?.name,
+      mod?.featurePath,
+      mod?.featureSlug,
     ]
       .filter(Boolean)
       .join(" ")
@@ -33,22 +43,25 @@ function filterModules(modules: WorkModule[], query: string): WorkModule[] {
   });
 }
 
-function FeatureRow({
-  mod,
+function WorkHitRow({
+  item,
+  module,
   index,
   query,
-  workCount,
   active,
   onOpen,
+  onContextMenu,
 }: {
-  mod: WorkModule;
+  item: WorkItem;
+  module?: WorkModule;
   index: number;
   query: string;
-  workCount: number;
   active: boolean;
   onOpen: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
 }) {
-  const title = formatModuleLabel(mod);
+  const title = formatWorkHitTitle(item);
+  const path = modulePathLine(module);
   return (
     <li>
       <button
@@ -56,39 +69,46 @@ function FeatureRow({
         className={`brain-hit-row${active ? " active" : ""}`}
         style={{ "--i": index } as CSSProperties}
         onClick={onOpen}
-        title={mod.featurePath ?? mod.name}
+        onContextMenu={onContextMenu}
+        title={path}
       >
         <span className="brain-hit-icon" aria-hidden>
-          <Icon name="file-text" size={15} />
+          <Icon name="check-square" size={15} />
         </span>
         <span className="brain-hit-body">
           <span className="brain-hit-top">
+            <span
+              className={`works-priority-dot ${priorityDotClass(item.priority)}`}
+              aria-hidden
+            />
             <span className="brain-hit-title">
               {highlightBrainText(title, query)}
             </span>
-            <span className="brain-hit-type">feature</span>
+            <span className={`works-state-pill works-state-${item.status}`}>
+              {statusLabel(item.status)}
+            </span>
           </span>
-          {mod.featurePath && (
-            <span className="brain-hit-path">{mod.featurePath}</span>
-          )}
+          <span className="brain-hit-path">
+            {module ? formatModuleLabel(module) : "No module"}
+            {module?.featurePath ? ` — ${module.featurePath}` : ""}
+          </span>
         </span>
-        {workCount > 0 && (
-          <span className="works-feature-work-count">{workCount}</span>
-        )}
         <Icon name="chevron-right" size={14} className="brain-hit-chevron" />
       </button>
     </li>
   );
 }
 
-export function WorksFeaturesCatalog({
+export function WorksItemsList({
+  items,
   modules,
-  workCounts,
-  activePath,
+  selectedId,
   onOpen,
+  onContextMenu,
 }: Props) {
   const [query, setQuery] = useState("");
   const [mounting, setMounting] = useState(true);
+  const modById = useMemo(() => new Map(modules.map((m) => [m.id, m])), [modules]);
 
   useEffect(() => {
     setMounting(true);
@@ -97,14 +117,14 @@ export function WorksFeaturesCatalog({
   }, []);
 
   const filtered = useMemo(
-    () => filterModules(modules, query),
-    [modules, query],
+    () => filterItems(items, modules, query),
+    [items, modules, query],
   );
 
   const showEmpty = !mounting && query.trim() && filtered.length === 0;
 
   return (
-    <div className="works-features-catalog">
+    <div className="works-items-catalog">
       <div className="brain-search-zone works-features-search">
         <div className={`brain-search-bar${query.trim() ? " is-searching" : ""}`}>
           <Icon name="search" size={14} className="brain-search-icon" />
@@ -112,8 +132,8 @@ export function WorksFeaturesCatalog({
             className="brain-search-input"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search features…"
-            aria-label="Search features"
+            placeholder="Search work items…"
+            aria-label="Search work items"
           />
         </div>
       </div>
@@ -123,18 +143,19 @@ export function WorksFeaturesCatalog({
       {!mounting && filtered.length > 0 && (
         <section className="brain-results-section">
           <p className="brain-results-head">
-            {filtered.length} feature{filtered.length === 1 ? "" : "s"}
+            {filtered.length} work item{filtered.length === 1 ? "" : "s"}
           </p>
           <ul className="brain-results">
-            {filtered.map((m, i) => (
-              <FeatureRow
-                key={m.id}
-                mod={m}
+            {filtered.map((w, i) => (
+              <WorkHitRow
+                key={w.id}
+                item={w}
+                module={modById.get(w.moduleId)}
                 index={i}
                 query={query}
-                workCount={workCounts.get(m.id) ?? 0}
-                active={activePath === m.featurePath}
-                onOpen={() => onOpen(m)}
+                active={selectedId === w.id}
+                onOpen={() => onOpen(w.id)}
+                onContextMenu={(e) => onContextMenu(w.id, e)}
               />
             ))}
           </ul>
@@ -145,15 +166,6 @@ export function WorksFeaturesCatalog({
         <div className="brain-search-empty">
           <Icon name="search" size={20} />
           <p>No matches for &ldquo;{query.trim()}&rdquo;</p>
-        </div>
-      )}
-
-      {!mounting && !query.trim() && modules.length === 0 && (
-        <div className="works-empty works-empty--center">
-          <div className="works-empty-title">No feature modules</div>
-          <div className="works-empty-hint">
-            Add markdown files under documentation/features/.
-          </div>
         </div>
       )}
     </div>

@@ -10,6 +10,7 @@ import {
   updateWorkItem,
 } from "../worksCache";
 import { findWork, statusLabel, type WorkItem, type WorksSnapshot } from "../works";
+import { getWorkspaceColor } from "../workspaceColors";
 import { useStore } from "../store";
 import { Icon } from "./Icon";
 import { openWorksTab } from "./works/WorksPane";
@@ -30,11 +31,10 @@ export function ComposerWorkBar({
   ccPermMode,
 }: Props) {
   const [snap, setSnap] = useState<WorksSnapshot | null>(null);
-  const [newOpen, setNewOpen] = useState(false);
-  const [pickOpen, setPickOpen] = useState(false);
-  const newRef = useRef<HTMLButtonElement>(null);
-  const pickRef = useRef<HTMLButtonElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const chipRef = useRef<HTMLButtonElement>(null);
   const setWork = useStore((s) => s.setAIChatWorkItem);
+  const wsColor = getWorkspaceColor(wsId);
 
   useEffect(() => {
     void hydrateWorks(root).then(setSnap);
@@ -63,7 +63,7 @@ export function ComposerWorkBar({
   );
 
   const createAndLink = async (origin: "hotfix" | "manual" | "plan") => {
-    setNewOpen(false);
+    setMenuOpen(false);
     try {
       const item = await createWorkItem(root, {
         title: origin === "hotfix" ? "Hotfix" : "New work",
@@ -76,111 +76,126 @@ export function ComposerWorkBar({
     }
   };
 
-  const cycleStatus = async () => {
-    if (!work) return;
+  const cycleStatus = async (item: WorkItem) => {
     const order: WorkItem["status"][] = [
       "backlog",
       "todo",
       "in_progress",
       "done",
     ];
-    const i = order.indexOf(work.status);
+    const i = order.indexOf(item.status);
     const next = order[(i + 1) % order.length] ?? "todo";
     try {
-      await updateWorkItem(root, work.id, { status: next });
+      await updateWorkItem(root, item.id, { status: next });
     } catch (e) {
       toastError(`Couldn't update status: ${errMsg(e)}`);
     }
   };
 
+  const chipLabel = work ? work.shortId : "Work";
+  const chipTitle = work
+    ? `${work.shortId} · ${work.title} · ${statusLabel(work.status)}`
+    : "Link or create work";
+
   return (
-    <div className="ai-composer-work-bar">
-      {work ? (
-        <>
-          <button
-            type="button"
-            className="ai-composer-work-pill"
-            onClick={() => openWorksTab(wsId)}
-            title="Open Works board"
-          >
-            <span className="ai-composer-work-id">{work.shortId}</span>
-            <span className="ai-composer-work-title">{work.title}</span>
-          </button>
-          <button
-            type="button"
-            className="ai-composer-work-chip"
-            onClick={() => void cycleStatus()}
-            title="Cycle status"
-          >
-            {statusLabel(work.status)}
-          </button>
-          <button
-            ref={pickRef}
-            type="button"
-            className="ai-composer-work-chip"
-            onClick={() => setPickOpen((o) => !o)}
-            title="Switch work"
-            aria-expanded={pickOpen}
-          >
-            <Icon name="chevron-down" size={10} />
-          </button>
-          <button
-            type="button"
-            className="ai-composer-work-chip"
-            onClick={() => setWork(wsId, chatId, null)}
-            title="Unlink work"
-          >
-            Unlink
-          </button>
-        </>
-      ) : (
-        <button
-          ref={newRef}
-          type="button"
-          className="ai-composer-work-pill ai-composer-work-pill--empty"
-          onClick={() => setNewOpen((o) => !o)}
-          aria-expanded={newOpen}
-        >
-          <Icon name="plus" size={12} /> Work
-        </button>
-      )}
-      <ComposerCtxMenu
-        open={newOpen}
-        onClose={() => setNewOpen(false)}
-        anchorRef={newRef}
+    <div className="ai-composer-work-wrap">
+      <button
+        ref={chipRef}
+        type="button"
+        className="ai-agent-pill ai-composer-work-chip"
+        onClick={() => setMenuOpen((o) => !o)}
+        aria-expanded={menuOpen}
+        title={chipTitle}
       >
-        <button type="button" className="menu-item" onClick={() => void createAndLink("plan")}>
-          Plan work
-        </button>
-        <button type="button" className="menu-item" onClick={() => void createAndLink("hotfix")}>
-          Hotfix
-        </button>
-        <button type="button" className="menu-item" onClick={() => void createAndLink("manual")}>
-          Blank work
-        </button>
-        <button type="button" className="menu-item" onClick={() => openWorksTab(wsId)}>
-          Open Works board
-        </button>
-      </ComposerCtxMenu>
+        <span className="ai-agent-avatar ai-agent-avatar-jack">
+          {work && wsColor ? (
+            <span
+              className="ai-composer-work-dot"
+              style={{ background: wsColor.hex }}
+              aria-hidden
+            />
+          ) : (
+            <Icon name="columns-2" size={14} />
+          )}
+        </span>
+        <span className="ai-agent-name">{chipLabel}</span>
+        <Icon name="chevron-down" size={13} />
+      </button>
       <ComposerCtxMenu
-        open={pickOpen}
-        onClose={() => setPickOpen(false)}
-        anchorRef={pickRef}
-        estimateHeight={280}
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        anchorRef={chipRef}
+        estimateHeight={work ? 320 : 180}
       >
-        {(snap?.items ?? []).slice(0, 12).map((w) => (
-          <button
-            key={w.id}
-            type="button"
-            className="menu-item"
-            onClick={() => {
-              setPickOpen(false);
-              void linkWork(w.id);
-            }}
-          >
-            {w.shortId} · {w.title}
-          </button>
-        ))}
+        {work ? (
+          <>
+            <button
+              type="button"
+              className="menu-item"
+              onClick={() => void cycleStatus(work)}
+            >
+              Status: {statusLabel(work.status)}
+            </button>
+            <button
+              type="button"
+              className="menu-item"
+              onClick={() => {
+                setMenuOpen(false);
+                openWorksTab(wsId);
+              }}
+            >
+              Open Works board
+            </button>
+            <button
+              type="button"
+              className="menu-item"
+              onClick={() => {
+                setMenuOpen(false);
+                setWork(wsId, chatId, null);
+              }}
+            >
+              Unlink work
+            </button>
+            {(snap?.items ?? [])
+              .filter((w) => w.id !== work.id)
+              .slice(0, 8)
+              .map((w) => (
+                <button
+                  key={w.id}
+                  type="button"
+                  className="menu-item"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void linkWork(w.id);
+                  }}
+                >
+                  Switch to {w.shortId}
+                </button>
+              ))}
+          </>
+        ) : (
+          <>
+            <button type="button" className="menu-item" onClick={() => void createAndLink("plan")}>
+              Plan work
+            </button>
+            <button type="button" className="menu-item" onClick={() => void createAndLink("hotfix")}>
+              Hotfix
+            </button>
+            <button type="button" className="menu-item" onClick={() => void createAndLink("manual")}>
+              Blank work
+            </button>
+            <button
+              type="button"
+              className="menu-item"
+              onClick={() => {
+                setMenuOpen(false);
+                openWorksTab(wsId);
+              }}
+            >
+              Open Works board
+            </button>
+          </>
+        )}
       </ComposerCtxMenu>
     </div>
   );

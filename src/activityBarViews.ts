@@ -145,9 +145,9 @@ export const ACTIVITY_BAR_VIEWS: Record<ActivityBarIconId, ActivityBarViewDef> =
   },
   whiteboard: {
     id: "whiteboard",
-    label: "Organigramma",
-    title: "Organigramma — agents + skills runbook (⌘P → Open Organigramma)",
-    icon: "whiteboard",
+    label: "Team",
+    title: "Team — agents + skills runbook (⌘P → Open Team)",
+    icon: "users",
     kind: "tab",
     tabPrefix: "wb:",
   },

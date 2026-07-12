@@ -1,4 +1,3 @@
-import { blocksToMarkdown } from "./worksBlocks";
 import type { WorkItem, WorksSnapshot } from "./works";
 import { getPlaneConfig, getPlaneToken } from "./worksPlaneSettings";
 import { updateWorkItem } from "./worksCache";
@@ -24,7 +23,7 @@ export async function pushWorkToPlane(
   if (!cfg.enabled || !token || !cfg.projectId) return null;
   const body = {
     name: item.title,
-    description_html: `<p>${blocksToMarkdown(item.descriptionBlocks).replace(/\n/g, "<br>")}</p>`,
+    description_html: `<p>${(item.bodyMd ?? "").replace(/\n/g, "<br>")}</p>`,
     priority: item.priority,
   };
   const base = projectBase(cfg);

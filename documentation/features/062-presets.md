@@ -168,6 +168,28 @@ mislead a user into clicking it) — it's the same residual risk workspace rules
 already carry. Treat it accordingly: review a new custom preset's instructions before selecting it
 in a workspace you don't fully trust.
 
+### Permission mode + Jack is an agent too
+
+- `PresetDefaults.permMode` / `UserPresetOverrides.permMode` (`string | null`, `null` = "Ask")
+  force the Claude Code permission mode whenever the preset is active — same 5-value scale as the
+  composer's mode menu, sourced from one shared constant: `src/presets/permModes.ts`
+  (`PERM_MODE_OPTIONS`), imported by both `AgentCreateDrawer` (the "Mode" segmented control) and
+  `AIChatPanel`'s mode menu/Shift+Tab cycle.
+- **Jack is not a `PresetDefinition` in `PRESET_ORDER`** (he's the organigramma root,
+  `presetId === null`), but he's editable through the exact same drawer:
+  `getJackDefinition()` / `JACK_PRESET_ID = "jack"` (`builtins.ts`) synthesize a definition with no
+  backing file; editing him persists to the override store precisely like Milo/Nora/Vera
+  (`setPresetOverrides("jack", {...})`). His root card in `WhiteboardOrganigramma.tsx` opens the
+  same `AgentCreateDrawer` (state now lives in that component, shared with `WhiteboardPresetGroup`
+  via `onEdit`/`onCreate` callbacks rather than each owning its own drawer).
+- `applyPreset(id, opts?)` resolves either a real preset (`presetChoices.find`) or Jack's
+  definition when `id` is `null` — one code path for both, including the CC-only `permMode` apply
+  (gated the same way as effort/thinking: only when the resolved provider is `claude-code`).
+- **New chats silently apply Jack's saved config** via `applyJackDefaultsIfConfigured()` — but
+  ONLY when `getPresetOverrides("jack")` is non-empty, so a user who's never touched Jack in the
+  organigramma sees zero behavior change (still falls back to the pre-existing
+  `readEffort()`/`readDefaultPermMode()` localStorage defaults).
+
 ### Gotchas
 
 - **Storage split is load-bearing.** `.codetta/presets/` vs `.claude/agents/` is not

@@ -61,7 +61,7 @@ Full rationale: `documentation/decisions/003-git-remote-quack-1.0.md`.
 | Dev vs production visual delta | `src/devMode.ts`, `src-tauri/build.rs`, `documentation/features/047-dev-build-indicator.md` |
 | Rust commands / CC bridge | `src-tauri/src/lib.rs`, `src-tauri/src/claude_code.rs`, `src-tauri/src/sysmon.rs`, `src-tauri/src/pty.rs` |
 | Workspace persistence | `src-tauri/src/workspace.rs` |
-| Works / tickets / Modules | `src/components/works/`, `src/worksCache.ts`, `src/worksViews.ts` — see `054` |
+| Works / tickets / Modules | `src/components/works/`, `src/worksCache.ts`, `src/workItemMd.ts`, `src/surfaceViewPrefs.ts`, `src/editorDrawerStack.ts` — see `054`, `063`, `065` |
 | Product name / icons | `index.html`, `src/App.tsx`, `src-tauri/tauri.conf.json`, `src-tauri/icons/` |
 
 ## Rules (hard constraints)

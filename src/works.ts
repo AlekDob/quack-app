@@ -60,11 +60,16 @@ export interface WorkComment {
 export interface WorkItem {
   id: string;
   shortId: string;
+  /** Workspace-relative path, e.g. .codetta/works/items/W-001.md */
+  filePath: string;
   moduleId: string;
   parentId?: string;
   title: string;
   origin: WorkOrigin;
-  descriptionBlocks: WorkBlock[];
+  /** Markdown body — loaded from filePath; omitted in persisted snapshot. */
+  bodyMd?: string;
+  /** @deprecated v1 — migrated to bodyMd on hydrate. */
+  descriptionBlocks?: WorkBlock[];
   status: WorkStatus;
   priority: WorkPriority;
   labelIds: string[];
@@ -89,7 +94,7 @@ export interface WorksViewPrefs {
 }
 
 export interface WorksSnapshot {
-  version: 1;
+  version: 1 | 2;
   labels: WorkLabel[];
   modules: WorkModule[];
   cycles: WorkCycle[];
@@ -115,7 +120,7 @@ export function newId(): string {
 
 export function emptySnapshot(): WorksSnapshot {
   return {
-    version: 1,
+    version: 2,
     labels: [
       { id: newId(), name: HOTFIX_LABEL, color: "semantic-warning" },
     ],

@@ -60,6 +60,8 @@ export function ActivityBar() {
     return holder.tab;
   })();
 
+  const drawerTabKey = ws?.layout.editorDrawer?.tabKey ?? null;
+
   const hasSection = (v: Parameters<typeof toggleSidebarSection>[1]) =>
     sections.some((s) => s.view === v && !s.collapsed);
   const sectionActive = (v: Parameters<typeof toggleSidebarSection>[1]) =>
@@ -212,6 +214,7 @@ export function ActivityBar() {
       <ActivityBarViewIcons
         activeId={activeId}
         activeTabKey={activeTabKey}
+        drawerTabKey={drawerTabKey}
         availableHeight={viewIconsHeight}
         gitChangeCount={gitChangeCount}
         sectionActive={sectionActive}

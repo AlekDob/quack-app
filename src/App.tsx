@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useStore } from "./store";
 import { startFsBusOnce } from "./fsBus";
+import { startWorksWatchOnce } from "./worksWatch";
 import { commands, confirmDiscardUnsaved, runCommand } from "./actions";
 import {
   accelMatches,
@@ -212,6 +213,7 @@ function MainApp() {
   useEffect(() => {
     bootstrapTheme();
     startFsBusOnce();
+    startWorksWatchOnce();
     // macOS: move the menubar into the native system menu bar (no-op on
     // Win/Linux, which keep the in-window TopBar menus).
     void installNativeMenu();

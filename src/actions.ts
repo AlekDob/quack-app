@@ -1053,9 +1053,9 @@ export const commands: CommandSpec[] = [
   },
   {
     id: "view.open_whiteboard",
-    label: "Open Whiteboard",
+    label: "Open Team",
     category: "View",
-    hint: "Organize subagents (Jack + skills) per workspace",
+    hint: "Organize agents, presets, and skills per workspace",
     run: () => {
       const wsId = s().activeId;
       if (!wsId) {

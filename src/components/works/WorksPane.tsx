@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { errMsg, error as toastError } from "../../notify";
 import {
-  createWorkItem,
   refreshWorksModules,
   saveWorks,
   subscribeWorks,
@@ -10,8 +9,6 @@ import {
 } from "../../worksCache";
 import { useWorkItemContextMenu } from "./useWorkItemContextMenu";
 import {
-  priorityDotClass,
-  statusLabel,
   type WorkItem,
   type WorksLayout,
   type WorksSnapshot,
@@ -23,7 +20,11 @@ import {
 } from "../../worksViews";
 import { useStore } from "../../store";
 import { Icon } from "../Icon";
-import { openWorkDrawer, subscribeWorkDrawer } from "../../workDrawer";
+import {
+  openWorkCreateDrawer,
+  openWorkDrawer,
+  subscribeWorkDrawer,
+} from "../../workDrawer";
 import {
   openFeatureDocDrawer,
   subscribeFeatureDocDrawer,
@@ -32,6 +33,7 @@ import { WorksKanbanView } from "./WorksKanbanView";
 import { WorksPlanePanel } from "./WorksPlanePanel";
 import { WorksTimelineView } from "./WorksTimelineView";
 import { WorksViewsRail } from "./WorksViewsRail";
+import { WorksItemsList } from "./WorksItemsList";
 import { WorksFeaturesCatalog } from "./WorksFeaturesCatalog";
 
 type Props = {
@@ -76,8 +78,9 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
 
   useEffect(() => {
     return subscribeWorkDrawer((req) => {
-      if (req?.root === root) setSelectedId(req.workId);
-      else setSelectedId(null);
+      if (req?.root === root) {
+        setSelectedId("workId" in req ? req.workId : null);
+      } else setSelectedId(null);
     });
   }, [root]);
 
@@ -161,16 +164,8 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
     });
   };
 
-  const onNewWork = async () => {
-    try {
-      const item = await createWorkItem(root, {
-        title: "New work",
-        origin: "manual",
-      });
-      openWork(item.id);
-    } catch (e) {
-      toastError(`Couldn't create work: ${errMsg(e)}`);
-    }
+  const onNewWork = () => {
+    openWorkCreateDrawer({ wsId, root, draft: { title: "New work", origin: "manual" } });
   };
 
   const onDropStatus = async (id: string, status: WorkItem["status"]) => {
@@ -235,7 +230,7 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
               <button
                 type="button"
                 className="works-new-btn"
-                onClick={() => void onNewWork()}
+                onClick={onNewWork}
               >
                 <Icon name="plus" size={12} /> Add work item
               </button>
@@ -255,7 +250,11 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
               layout === "timeline" && !isModulesView
                 ? " works-main--timeline"
                 : ""
-            }${isModulesView ? " works-main--catalog" : ""}`}
+            }${
+              isModulesView || layout === "list"
+                ? " works-main--catalog"
+                : ""
+            }`}
           >
             {isModulesView && (
               <WorksFeaturesCatalog
@@ -278,33 +277,20 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
                 <button
                   type="button"
                   className="works-new-btn"
-                  onClick={() => void onNewWork()}
+                  onClick={onNewWork}
                 >
                   <Icon name="plus" size={12} /> Add work item
                 </button>
               </div>
             )}
             {!isModulesView && !loading && items.length > 0 && layout === "list" && (
-              <div className="works-list-table">
-                <div className="works-table-head works-table-head--list">
-                  <span>Work items</span>
-                  <span>Module</span>
-                  <span>State</span>
-                  <span>Priority</span>
-                </div>
-                <ul className="works-list">
-                  {items.map((w) => (
-                    <WorkRow
-                      key={w.id}
-                      item={w}
-                      active={selectedId === w.id}
-                      module={snap!.modules.find((m) => m.id === w.moduleId)}
-                      onOpen={() => openWork(w.id)}
-                      onContextMenu={(e) => onItemContextMenu(w.id, e)}
-                    />
-                  ))}
-                </ul>
-              </div>
+              <WorksItemsList
+                items={items}
+                modules={snap?.modules ?? []}
+                selectedId={selectedId}
+                onOpen={openWork}
+                onContextMenu={onItemContextMenu}
+              />
             )}
             {!isModulesView && !loading && items.length > 0 && layout === "kanban" && (
               <WorksKanbanView
@@ -331,53 +317,6 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
       {menuNode}
     </>,
     container,
-  );
-}
-
-function moduleLabel(m: { name: string; featureNum?: number }): string {
-  if (m.featureNum != null) {
-    return `${String(m.featureNum).padStart(3, "0")} · ${m.name}`;
-  }
-  return m.name;
-}
-
-function WorkRow({
-  item,
-  module,
-  active,
-  onOpen,
-  onContextMenu,
-}: {
-  item: WorkItem;
-  module?: { name: string; featureNum?: number };
-  active: boolean;
-  onOpen: () => void;
-  onContextMenu: (e: React.MouseEvent) => void;
-}) {
-  return (
-    <li>
-      <button
-        type="button"
-        className={`works-list-row${active ? " active" : ""}`}
-        onClick={onOpen}
-        onContextMenu={onContextMenu}
-      >
-        <span className="works-list-item-title">
-          <span
-            className={`works-priority-dot ${priorityDotClass(item.priority)}`}
-          />
-          <span className="works-list-id">{item.shortId}</span>
-          <span className="works-list-title">{item.title}</span>
-        </span>
-        <span className="works-list-module">
-          {module ? moduleLabel(module) : "—"}
-        </span>
-        <span className={`works-state-pill works-state-${item.status}`}>
-          {statusLabel(item.status)}
-        </span>
-        <span className="works-list-priority">{item.priority}</span>
-      </button>
-    </li>
   );
 }
 

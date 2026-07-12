@@ -1,6 +1,11 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { endDrag, getDrag, startDrag, updateDrag } from "../dragState";
-import { isEditorDrawerDropZone } from "../editorDrawer";
+import {
+  EDITOR_DRAWER_ANIM_MS,
+  isEditorDrawerDropZone,
+} from "../editorDrawer";
+import { registerEditorDrawerStack } from "../editorDrawerStack";
 import { parseKey, useStore, type WorkspaceData } from "../store";
 import { basename } from "../pathUtils";
 import { Icon } from "./Icon";
@@ -11,9 +16,12 @@ interface Props {
   ws: WorkspaceData;
   tabKey: string;
   width: number;
+  /** When false, plays close animation then calls onExited. */
+  open: boolean;
   registerContainer: (node: HTMLElement | null) => void;
   onResize: (width: number) => void;
   onDock: () => void;
+  onExited: () => void;
 }
 
 function drawerTabLabel(ws: WorkspaceData, key: string): string {
@@ -22,7 +30,7 @@ function drawerTabLabel(ws: WorkspaceData, key: string): string {
   if (parsed.kind === "file") return basename(parsed.path);
   if (parsed.kind === "ai") return ws.aiChats[parsed.id]?.title ?? "AI Chat";
   if (parsed.kind === "terminal") return ws.terminals[parsed.id]?.title ?? "Terminal";
-  if (parsed.kind === "whiteboard") return "Organigramma";
+  if (parsed.kind === "whiteboard") return "Team";
   if (parsed.kind === "works") return "Works";
   if (parsed.kind === "usage") return "Usage";
   if (parsed.kind === "brain") return "Quack Brain";
@@ -36,18 +44,38 @@ export function EditorTabDrawer({
   ws,
   tabKey,
   width,
+  open,
   registerContainer,
   onResize,
   onDock,
+  onExited,
 }: Props) {
   const moveTab = useStore((s) => s.moveTab);
   const closeTab = useStore((s) => s.closeTab);
+  const [shown, setShown] = useState(false);
+  const onStackRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      registerEditorDrawerStack(wsId, shown ? node : null);
+    },
+    [shown, wsId],
+  );
+
   const onContentRef = useCallback(
     (node: HTMLDivElement | null) => {
       registerContainer(node);
     },
     [registerContainer],
   );
+
+  useEffect(() => {
+    if (open) {
+      const id = window.requestAnimationFrame(() => setShown(true));
+      return () => window.cancelAnimationFrame(id);
+    }
+    setShown(false);
+    const t = window.setTimeout(onExited, EDITOR_DRAWER_ANIM_MS);
+    return () => window.clearTimeout(t);
+  }, [open, onExited]);
 
   const label = drawerTabLabel(ws, tabKey);
   const parsed = parseKey(tabKey);
@@ -125,46 +153,63 @@ export function EditorTabDrawer({
     window.addEventListener("mouseup", onUp);
   };
 
-  return (
-    <aside
-      className="editor-tab-drawer"
-      style={{ width }}
-      aria-label="Editor drawer"
-    >
-      <div
-        className="editor-tab-drawer-resize"
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize drawer"
-        onMouseDown={onResizeDown}
+  return createPortal(
+    <>
+      <button
+        type="button"
+        className={`editor-tab-drawer-scrim${shown ? " shown" : ""}`}
+        aria-label="Close drawer"
+        tabIndex={shown ? 0 : -1}
+        onClick={() => void closeTab(wsId, tabKey)}
       />
-      <div
-        className="editor-tab-drawer-head"
-        onPointerDown={onHeaderPointerDown}
-        title="Drag to dock back into the editor"
+      <aside
+        className={`editor-tab-drawer editor-tab-drawer--overlay${shown ? " shown" : ""}`}
+        style={{ width }}
+        aria-label="Editor drawer"
+        aria-hidden={!shown}
       >
-        {isAi ? <AIIcon size={14} /> : <Icon name="file-text" size={14} />}
-        <span className="editor-tab-drawer-title">{label}</span>
-        <button
-          type="button"
-          className="editor-tab-drawer-dock"
-          onClick={onDock}
-          title="Dock into editor"
-          aria-label="Dock into editor"
+        <div
+          className="editor-tab-drawer-resize"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize drawer"
+          onMouseDown={onResizeDown}
+        />
+        <div
+          className="editor-tab-drawer-head"
+          onPointerDown={onHeaderPointerDown}
+          title="Drag to dock back into the editor"
         >
-          <Icon name="chevron-left" size={12} />
-        </button>
-        <button
-          type="button"
-          className="editor-tab-drawer-close"
-          onClick={() => void closeTab(wsId, tabKey)}
-          title="Close"
-          aria-label="Close tab"
-        >
-          ×
-        </button>
-      </div>
-      <div ref={onContentRef} className="editor-tab-drawer-body pane-content" />
-    </aside>
+          {isAi ? <AIIcon size={14} /> : <Icon name="file-text" size={14} />}
+          <span className="editor-tab-drawer-title">{label}</span>
+          <button
+            type="button"
+            className="editor-tab-drawer-dock"
+            onClick={onDock}
+            title="Dock into editor"
+            aria-label="Dock into editor"
+          >
+            <Icon name="chevron-left" size={12} />
+          </button>
+          <button
+            type="button"
+            className="editor-tab-drawer-close"
+            onClick={() => void closeTab(wsId, tabKey)}
+            title="Close"
+            aria-label="Close tab"
+          >
+            ×
+          </button>
+        </div>
+        <div ref={onContentRef} className="editor-tab-drawer-body pane-content" />
+        <div
+          ref={onStackRef}
+          className="editor-drawer-nested-stack"
+          data-editor-drawer-stack={wsId}
+          aria-hidden="true"
+        />
+      </aside>
+    </>,
+    document.body,
   );
 }

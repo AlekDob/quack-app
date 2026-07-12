@@ -24,7 +24,6 @@ import { TurnStreamStatus } from "./TurnStreamStatus";
 import { ContextFilesDock } from "./ContextFilesDock";
 import { ComposerContextBar } from "./ComposerContextBar";
 import { ComposerGitActions } from "./ComposerGitActions";
-import { ComposerWorkActions } from "./ComposerWorkActions";
 import { ComposerWorkBar } from "./ComposerWorkBar";
 import { AgentCommitDock } from "./AgentCommitDock";
 import {
@@ -140,7 +139,7 @@ import {
   subscribeWorks,
   updateWorkItem,
 } from "../worksCache";
-import { findWork, planTextToBlocks, type WorksSnapshot } from "../works";
+import { type WorksSnapshot } from "../works";
 import { recordBrainUsage } from "../brainUsageStore";
 import { BrainTurnChip } from "./BrainTurnChip";
 import { ReasoningTurnChip } from "./ReasoningTurnChip";
@@ -918,6 +917,19 @@ export function AIChatPanel({
     ...customPresets,
   ];
   void presetOverridesTick; // read only to trigger the recompute above
+  // Resolves a message's snapshotted agentId (or the live active preset,
+  // for the in-progress streaming bubble) to its display name/avatar/role.
+  const msgIdentityFor = useCallback(
+    (agentId: string | null | undefined) => {
+      const def =
+        agentId == null
+          ? effectivePresetDefinition(getJackDefinition())
+          : presetChoices.find((p) => p.id === agentId);
+      if (!def) return { name: "Jack", role: "Project Manager", avatar: "/jack.jpeg" };
+      return { name: def.label, role: def.role, avatar: def.avatar };
+    },
+    [presetChoices],
+  );
   const [attachedAgents, setAttachedAgents] = useState<string[]>([]);
   const queueRef = useRef<string[]>([]);
   const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
@@ -1347,6 +1359,7 @@ export function AIChatPanel({
             tool_results:
               replayResults.length > 0 ? [...replayResults] : undefined,
             blocks: replayBlocks.length > 0 ? [...replayBlocks] : undefined,
+            agentId: presetId,
           };
           setMessages((m) => [...m, msg]);
         }
@@ -3405,6 +3418,7 @@ export function AIChatPanel({
           // present (for new messages); old saved sessions without
           // blocks fall back to the legacy combined render.
           blocks: blocksThisRound.length > 0 ? blocksThisRound : undefined,
+          agentId: presetId,
         };
         conversation.push(assistantMsg);
         setMessages((m) => [...m, assistantMsg]);
@@ -4746,11 +4760,13 @@ export function AIChatPanel({
         tool_results:
           streamingToolResults.length > 0 ? streamingToolResults : undefined,
         blocks: hasStreamingBlocks ? streamingBlocks : undefined,
+        agentId: presetId,
       });
     }
     return arr;
   }, [
     messages,
+    presetId,
     streaming,
     streamingBlocks,
     streamingToolCalls,
@@ -4927,7 +4943,7 @@ export function AIChatPanel({
           title,
           origin: "plan",
           status: "in_progress",
-          blocks: planTextToBlocks(plan),
+          bodyMd: plan,
         });
         await linkChatToWork(root, item.id, aiChatId);
         useStore.getState().setAIChatWorkItem(wsId, aiChatId, item.id);
@@ -5258,21 +5274,23 @@ export function AIChatPanel({
               data-anchor-preview={undefined}
             >
               <span className="ai-msg-role">
-                {
-                  // Jack: il PM-papero con cui Alek dialoga (Quack v1 identity)
-                  <>
-                    <img
-                      className="ai-msg-avatar"
-                      src="/jack.jpeg"
-                      alt=""
-                      aria-hidden="true"
-                    />
-                    <span className="ai-msg-identity">
-                      <span className="ai-msg-name">Jack</span>
-                      <span className="ai-msg-title">Project Manager</span>
-                    </span>
-                  </>
-                }
+                {(() => {
+                  const identity = msgIdentityFor(m.agentId);
+                  return (
+                    <>
+                      <img
+                        className="ai-msg-avatar"
+                        src={identity.avatar}
+                        alt=""
+                        aria-hidden="true"
+                      />
+                      <span className="ai-msg-identity">
+                        <span className="ai-msg-name">{identity.name}</span>
+                        <span className="ai-msg-title">{identity.role}</span>
+                      </span>
+                    </>
+                  );
+                })()}
               </span>
               {m.tool_calls && m.tool_calls.length > 0 && (() => {
                 if (msgHasBlocks && !showComposeCard) return null;
@@ -5960,24 +5978,6 @@ export function AIChatPanel({
         {...{ [COMPOSER_FILE_DROP_ATTR]: "" }}
       >
       <ComposerContextBar wsId={wsId} root={root} />
-      {aiChatId ? (
-        <>
-          <ComposerWorkActions
-            work={
-              workItemId && worksSnap
-                ? findWork(worksSnap, workItemId)
-                : undefined
-            }
-          />
-          <ComposerWorkBar
-          wsId={wsId}
-          root={root}
-          chatId={aiChatId}
-          workItemId={workItemId}
-          ccPermMode={ccPermMode}
-        />
-        </>
-      ) : null}
       <ComposerGitActions
         wsId={wsId}
         root={root}
@@ -6015,6 +6015,15 @@ export function AIChatPanel({
           activePresetId={presetId}
           onSelectPreset={applyPreset}
         />
+        {aiChatId ? (
+          <ComposerWorkBar
+            wsId={wsId}
+            root={root}
+            chatId={aiChatId}
+            workItemId={workItemId}
+            ccPermMode={ccPermMode}
+          />
+        ) : null}
         <div className="ai-composer-spacer" />
         {renderModelChip()}
         {parseQualifiedModel(selected)?.providerId === "claude-code" && (

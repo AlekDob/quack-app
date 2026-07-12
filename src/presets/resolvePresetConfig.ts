@@ -10,6 +10,7 @@ import { getPreset, isBuiltinPresetId } from "./builtins";
 import { getCapabilities } from "./capabilities";
 import { buildPresetInstructions, getBuiltinInstructionBlock } from "./instructions";
 import { getPresetOverrides } from "./settings";
+import { getTierModelOverride } from "./tierModelOverrides";
 
 function baseInstructionsFor(def: PresetDefinition): string {
   if (def.source === "builtin" && isBuiltinPresetId(def.id)) {
@@ -60,7 +61,14 @@ function resolveModel(
     warnings.push(`Backend "${caps.backendId}" ignores per-session model — using CLI default.`);
     return caps.defaultModelSentinel;
   }
-  return ov.model ?? caps.modelForTier[def.defaults.modelTier];
+  // Precedence: explicit per-preset model pin > user's global tier->model
+  // mapping (Settings → Providers, for dynamic-catalog backends like
+  // cursor-cli/opencode-cli) > the shipped static default for this tier.
+  return (
+    ov.model ??
+    getTierModelOverride(caps.backendId, def.defaults.modelTier) ??
+    caps.modelForTier[def.defaults.modelTier]
+  );
 }
 
 function resolveEffort(

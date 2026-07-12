@@ -16,7 +16,7 @@ Access chain: `CLAUDE.md` → `documentation/features/` → `documentation/{deci
 | `documentation/features/NNN-slug.md` | Durable feature map — **also a Works module** |
 | `documentation/decisions/` | Architectural rationales |
 | `documentation/diary/` | Changelog entries |
-| `.codetta/works/snapshot.json` | Work tickets (W-001…) linked to feature modules |
+| `.codetta/works/snapshot.json` | Work index (metadata) — bodies live in `items/W-NNN.md` |
 
 When Pinky Brain is installed (Quack Store → `pinky-brain`), use `pinky search` / Brain tab for hybrid BM25+vector search. Otherwise read feature docs and `map.md` directly.
 
@@ -26,7 +26,8 @@ Each workspace keeps tickets in `.codetta/works/`:
 
 | File | Role |
 |---|---|
-| `snapshot.json` | Modules (from feature docs), labels, work items, view prefs |
+| `snapshot.json` | Index — modules, labels, item metadata, view prefs |
+| `items/W-NNN.md` | One markdown file per ticket (frontmatter + body) |
 | `events.jsonl` | Append-only audit log |
 
 ### Module ↔ feature doc mapping
@@ -38,18 +39,18 @@ Each workspace keeps tickets in `.codetta/works/`:
 ### Agent workflow
 
 1. **Orient** — read `documentation/features/NNN-*.md` for the area you're changing
-2. **Ticket** — find or create work `W-NNN` in `snapshot.json` under the matching feature module
-3. **Link** — attach chat via `linkedChatIds` or `@W-001` mention; context inject prepends work block on send
-4. **Execute** — implement; update description blocks + status (`todo` → `in_progress` → `done`)
+2. **Ticket** — find or create `W-NNN` in `.codetta/works/items/W-NNN.md` under the matching feature module
+3. **Link** — add chat to `linkedChats` in frontmatter or `@W-001` mention; context inject prepends work block on send
+4. **Execute** — implement; update work `.md` body + frontmatter `status` (`todo` → `in_progress` → `done`)
 5. **Save** — append diary entry; use Pinky `save` / BrainSaveChip for durable gotchas
 
 ### Work item fields
 
-`shortId`, `title`, `status`, `priority`, `descriptionBlocks`, `linkedChatIds`, optional `planeIssueId`. Types in `src/works.ts`.
+`shortId`, `title`, `status`, `priority`, markdown **body** in `items/W-NNN.md`; comments in index. Types in `src/works.ts`, I/O in `src/workItemMd.ts`.
 
 ### Plan mode
 
-Entering Plan auto-creates a draft work (module `054-works-layer`). Approving copies plan into description and sets `in_progress`.
+Entering Plan auto-creates a draft work (module `054-works-layer`). Approving copies plan into the work `.md` body and sets `in_progress`.
 
 ## Writing discoveries
 

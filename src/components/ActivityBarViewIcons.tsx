@@ -18,6 +18,7 @@ import { Icon } from "./Icon";
 interface Props {
   activeId: string | null;
   activeTabKey: string | null;
+  drawerTabKey: string | null;
   availableHeight: number;
   gitChangeCount: number;
   sectionActive: (v: SidebarView) => boolean;
@@ -37,6 +38,7 @@ function isIconActive(
   ctx: {
     sectionActive: (v: SidebarView) => boolean;
     activeTabKey: string | null;
+    drawerTabKey: string | null;
   },
 ): boolean {
   const def = getActivityBarView(id);
@@ -44,7 +46,10 @@ function isIconActive(
     return ctx.sectionActive(def.sidebarView);
   }
   if (def.kind === "tab" && def.tabPrefix) {
-    return !!ctx.activeTabKey?.startsWith(def.tabPrefix);
+    return (
+      !!ctx.activeTabKey?.startsWith(def.tabPrefix) ||
+      !!ctx.drawerTabKey?.startsWith(def.tabPrefix)
+    );
   }
   return false;
 }
@@ -52,6 +57,7 @@ function isIconActive(
 export function ActivityBarViewIcons({
   activeId,
   activeTabKey,
+  drawerTabKey,
   availableHeight,
   gitChangeCount,
   sectionActive,
@@ -78,10 +84,10 @@ export function ActivityBarViewIcons({
   const barIds = order.slice(0, effectiveVisible);
   const overflowIds = order.slice(effectiveVisible);
 
-  const activeCtx = { sectionActive, activeTabKey };
+  const activeCtx = { sectionActive, activeTabKey, drawerTabKey };
   const iconActive = useCallback(
     (id: ActivityBarIconId) => isIconActive(id, activeCtx),
-    [sectionActive, activeTabKey],
+    [sectionActive, activeTabKey, drawerTabKey],
   );
 
   const overflowHasActive = overflowIds.some((id) => iconActive(id));

@@ -1,11 +1,11 @@
-// Whiteboard tab — the per-workspace org-chart view. One persistent tab
-// per workspace, mounted via portal into the active pane by
-// WorkspaceShell (mirrors how SubagentTranscriptView is mounted).
+// Team tab — the per-workspace org-chart view (Jack + presets + subagents).
+// One persistent tab per workspace, mounted via portal into the active
+// pane by WorkspaceShell (mirrors how SubagentTranscriptView is mounted).
 //
-// Three sub-tabs share the same agent+skill data:
+// Three sub-tabs share the same agent+preset+skill data:
 //   1. Overview — counters + entry points (Open Instructions, create agent).
-//   2. Organigramma — vertical tree, drag a skill chip onto an agent to
-//      write `skills:` into its .md frontmatter; × on a chip to unlink.
+//   2. Team — vertical tree; click Jack/a preset to edit it, click a
+//      subagent to open its .md.
 //   3. Workflows — live preview of the operational .md + Copy / Save.
 //
 // All state is local (no global store). On mount + on data invalidation
@@ -113,7 +113,7 @@ export function WhiteboardPane({ wsId, root, container, visible }: Props) {
   if (!container || !visible) return null;
 
   const tabs: { id: SubTab; label: string }[] = [
-    { id: "organigramma", label: "Organigramma" },
+    { id: "organigramma", label: "Team" },
     { id: "overview", label: "Overview" },
     { id: "workflows", label: "Workflows" },
   ];
@@ -216,7 +216,7 @@ function WhiteboardOverview({
               className="cust-btn primary"
               onClick={onJumpOrganigramma}
             >
-              <Icon name="whiteboard" size={12} /> Open Organigramma
+              <Icon name="users" size={12} /> Open Team
             </button>
           </div>
         </div>
@@ -279,7 +279,7 @@ function WhiteboardOverview({
 
           <div className="whiteboard-overview-actions">
             <button className="cust-btn" onClick={onJumpOrganigramma}>
-              <Icon name="git-branch" size={12} /> View organigramma
+              <Icon name="git-branch" size={12} /> View Team
             </button>
             <button className="cust-btn" onClick={onJumpWorkflows}>
               <Icon name="file-text" size={12} /> Open workflows .md
@@ -299,16 +299,17 @@ function WhiteboardLegend() {
       <div className="whiteboard-legend-title">How to use this tab</div>
       <ul>
         <li>
-          <strong>Organigramma</strong> — drag a skill chip onto an agent to
-          link them. Click the <code>×</code> on a chip to unlink.
+          <strong>Team</strong> — click Jack or a preset to edit its model,
+          effort, mode, and instructions. Click a subagent to open its{" "}
+          <code>.md</code> file.
         </li>
         <li>
           <strong>Workflows</strong> — preview the operational .md, copy it to
           your clipboard, or save it to <code>.codetta/whiteboard.md</code>.
         </li>
         <li>
-          All edits write the <code>skills:</code> frontmatter of the agent's{" "}
-          <code>.md</code> file — reviewable in git, easy to hand-edit.
+          Preset edits persist as overrides (built-ins) or write the agent's{" "}
+          <code>.md</code> file directly (custom) — reviewable in git.
         </li>
       </ul>
     </div>

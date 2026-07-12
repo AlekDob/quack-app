@@ -20,8 +20,12 @@ import {
 import { planKey, parsePlanKey, stashPlan } from "./plan";
 import {
   clampEditorDrawerW,
-  DEFAULT_EDITOR_DRAWER_W,
+  defaultEditorDrawerW,
 } from "./editorDrawer";
+import {
+  readSurfaceViewMode,
+  type SurfaceViewId,
+} from "./surfaceViewPrefs";
 import type { ToolCall } from "./ai";
 import { clearChatDiff } from "./chatDiffStore";
 import { stopChatAgent } from "./stopChatAgent";
@@ -634,7 +638,7 @@ function dockTabToPane(root: Pane, paneId: PaneId, key: string): Pane {
 }
 
 function defaultEditorDrawer(): EditorDrawerState {
-  return { tabKey: null, width: DEFAULT_EDITOR_DRAWER_W };
+  return { tabKey: null, width: defaultEditorDrawerW() };
 }
 
 function parseEditorDrawer(raw: unknown): EditorDrawerState {
@@ -645,7 +649,7 @@ function parseEditorDrawer(raw: unknown): EditorDrawerState {
     width:
       typeof o.width === "number"
         ? clampEditorDrawerW(o.width)
-        : DEFAULT_EDITOR_DRAWER_W,
+        : defaultEditorDrawerW(),
   };
 }
 
@@ -1362,6 +1366,80 @@ async function loadWorkspaceFromDisk(
   };
 }
 
+function findPaneForTabKey(root: Pane, key: string): PaneId | null {
+  let found: PaneId | null = null;
+  mapTree(root, (t) => {
+    if (t.tabs.includes(key)) found = t.id;
+    return t;
+  });
+  return found;
+}
+
+interface SurfaceOpenApi {
+  updateWs: (wsId: string, fn: (w: WorkspaceData) => WorkspaceData) => void;
+  moveTabToDrawer: (wsId: string, key: string) => void;
+  dockEditorDrawer: (wsId: string) => void;
+  loaded: (wsId: string) => WorkspaceData | undefined;
+}
+
+function openSingletonSurface(
+  api: SurfaceOpenApi,
+  wsId: string,
+  tabKey: string,
+  viewId: SurfaceViewId,
+): void {
+  const mode = readSurfaceViewMode(viewId);
+  const w = api.loaded(wsId);
+  if (!w) return;
+
+  const drawerKey = w.layout.editorDrawer?.tabKey ?? null;
+  const foundPane = findPaneForTabKey(w.layout.editorRoot, tabKey);
+
+  if (mode === "drawer") {
+    if (drawerKey === tabKey) return;
+    api.moveTabToDrawer(wsId, tabKey);
+    return;
+  }
+
+  if (drawerKey === tabKey) {
+    api.dockEditorDrawer(wsId);
+    return;
+  }
+  if (foundPane) {
+    api.updateWs(wsId, (ws) => ({
+      ...ws,
+      layout: {
+        ...ws.layout,
+        activePaneId: foundPane,
+        editorRoot: mapTree(ws.layout.editorRoot, (t) =>
+          t.id === foundPane ? { ...t, active: tabKey } : t,
+        ),
+      },
+    }));
+    return;
+  }
+
+  api.updateWs(wsId, (ws) => {
+    const targetPaneId =
+      (ws.layout.activePaneId &&
+        isInTree(ws.layout.editorRoot, ws.layout.activePaneId) &&
+        ws.layout.activePaneId) ||
+      firstLeaf(ws.layout.editorRoot).id;
+    return {
+      ...ws,
+      layout: {
+        ...ws.layout,
+        activePaneId: targetPaneId,
+        editorRoot: mapTree(ws.layout.editorRoot, (t) =>
+          t.id === targetPaneId
+            ? { ...t, tabs: [...t.tabs, tabKey], active: tabKey }
+            : t,
+        ),
+      },
+    };
+  });
+}
+
 export const useStore = create<AppState>((set, get) => {
   // Debounce per-workspace layout persistence so rapid actions (typing,
   // tab switches, splitter drags) don't spam the disk. Each workspace
@@ -1897,7 +1975,7 @@ export const useStore = create<AppState>((set, get) => {
           return ws.terminals[parsed.id]?.title ?? key;
         }
         if (parsed.kind === "subagent") return parsed.agentType || key;
-        if (parsed.kind === "whiteboard") return "Organigramma";
+        if (parsed.kind === "whiteboard") return "Team";
         if (parsed.kind === "works") return "Works";
         if (parsed.kind === "usage") return "Usage";
         if (parsed.kind === "session") {
@@ -2097,7 +2175,9 @@ export const useStore = create<AppState>((set, get) => {
         }
 
         const width =
-          w.layout.editorDrawer?.width ?? DEFAULT_EDITOR_DRAWER_W;
+          prevDrawer != null
+            ? (w.layout.editorDrawer?.width ?? defaultEditorDrawerW())
+            : defaultEditorDrawerW();
         return {
           ...w,
           layout: {
@@ -2128,7 +2208,7 @@ export const useStore = create<AppState>((set, get) => {
             activePaneId: targetPaneId,
             editorDrawer: {
               tabKey: null,
-              width: w.layout.editorDrawer?.width ?? DEFAULT_EDITOR_DRAWER_W,
+              width: w.layout.editorDrawer?.width ?? defaultEditorDrawerW(),
             },
           },
         };
@@ -2927,84 +3007,33 @@ export const useStore = create<AppState>((set, get) => {
     },
 
     wbOpen: (wsId) => {
-      const k = wbKey(wsId);
-      updateWs(wsId, (w) => {
-        // Already open? Focus the pane + tab instead of duping.
-        let foundPane: PaneId | null = null;
-        mapTree(w.layout.editorRoot, (t) => {
-          if (t.tabs.includes(k)) foundPane = t.id;
-          return t;
-        });
-        if (foundPane) {
-          return {
-            ...w,
-            layout: {
-              ...w.layout,
-              activePaneId: foundPane,
-              editorRoot: mapTree(w.layout.editorRoot, (t) =>
-                t.id === foundPane ? { ...t, active: k } : t,
-              ),
-            },
-          };
-        }
-        const targetPaneId =
-          (w.layout.activePaneId &&
-            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
-            w.layout.activePaneId) ||
-          firstLeaf(w.layout.editorRoot).id;
-        return {
-          ...w,
-          layout: {
-            ...w.layout,
-            activePaneId: targetPaneId,
-            editorRoot: mapTree(w.layout.editorRoot, (t) =>
-              t.id === targetPaneId
-                ? { ...t, tabs: [...t.tabs, k], active: k }
-                : t,
-            ),
-          },
-        };
-      });
+      const s = get();
+      openSingletonSurface(
+        {
+          updateWs,
+          moveTabToDrawer: s.moveTabToDrawer,
+          dockEditorDrawer: s.dockEditorDrawer,
+          loaded: (id) => get().loaded[id],
+        },
+        wsId,
+        wbKey(wsId),
+        "whiteboard",
+      );
     },
 
     worksOpen: (wsId) => {
-      const k = worksKey(wsId);
-      updateWs(wsId, (w) => {
-        let foundPane: PaneId | null = null;
-        mapTree(w.layout.editorRoot, (t) => {
-          if (t.tabs.includes(k)) foundPane = t.id;
-          return t;
-        });
-        if (foundPane) {
-          return {
-            ...w,
-            layout: {
-              ...w.layout,
-              activePaneId: foundPane,
-              editorRoot: mapTree(w.layout.editorRoot, (t) =>
-                t.id === foundPane ? { ...t, active: k } : t,
-              ),
-            },
-          };
-        }
-        const targetPaneId =
-          (w.layout.activePaneId &&
-            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
-            w.layout.activePaneId) ||
-          firstLeaf(w.layout.editorRoot).id;
-        return {
-          ...w,
-          layout: {
-            ...w.layout,
-            activePaneId: targetPaneId,
-            editorRoot: mapTree(w.layout.editorRoot, (t) =>
-              t.id === targetPaneId
-                ? { ...t, tabs: [...t.tabs, k], active: k }
-                : t,
-            ),
-          },
-        };
-      });
+      const s = get();
+      openSingletonSurface(
+        {
+          updateWs,
+          moveTabToDrawer: s.moveTabToDrawer,
+          dockEditorDrawer: s.dockEditorDrawer,
+          loaded: (id) => get().loaded[id],
+        },
+        wsId,
+        worksKey(wsId),
+        "works",
+      );
     },
 
     // Same focus-or-append shape as wbOpen (singleton per-workspace tab).
@@ -3049,43 +3078,18 @@ export const useStore = create<AppState>((set, get) => {
     },
 
     brainOpen: (wsId) => {
-      const k = brainKey(wsId);
-      updateWs(wsId, (w) => {
-        let foundPane: PaneId | null = null;
-        mapTree(w.layout.editorRoot, (t) => {
-          if (t.tabs.includes(k)) foundPane = t.id;
-          return t;
-        });
-        if (foundPane) {
-          return {
-            ...w,
-            layout: {
-              ...w.layout,
-              activePaneId: foundPane,
-              editorRoot: mapTree(w.layout.editorRoot, (t) =>
-                t.id === foundPane ? { ...t, active: k } : t,
-              ),
-            },
-          };
-        }
-        const targetPaneId =
-          (w.layout.activePaneId &&
-            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
-            w.layout.activePaneId) ||
-          firstLeaf(w.layout.editorRoot).id;
-        return {
-          ...w,
-          layout: {
-            ...w.layout,
-            activePaneId: targetPaneId,
-            editorRoot: mapTree(w.layout.editorRoot, (t) =>
-              t.id === targetPaneId
-                ? { ...t, tabs: [...t.tabs, k], active: k }
-                : t,
-            ),
-          },
-        };
-      });
+      const s = get();
+      openSingletonSurface(
+        {
+          updateWs,
+          moveTabToDrawer: s.moveTabToDrawer,
+          dockEditorDrawer: s.dockEditorDrawer,
+          loaded: (id) => get().loaded[id],
+        },
+        wsId,
+        brainKey(wsId),
+        "brain",
+      );
     },
 
     storeOpen: (wsId) => {

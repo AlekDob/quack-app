@@ -47,7 +47,16 @@ import {
 } from "./claudeCodeSettings";
 import { CursorCliForceEditor } from "./cursorCodeSettings";
 import { SftpProfilesEditor } from "./sftpProfilesEditor";
+import { TierModelSettings } from "./TierModelSettings";
 import { Icon } from "./Icon";
+import {
+  readSurfaceViewMode,
+  surfaceViewLabel,
+  SURFACE_VIEW_IDS,
+  subscribeSurfaceViewPrefs,
+  writeSurfaceViewMode,
+  type SurfaceViewId,
+} from "../surfaceViewPrefs";
 // Canonical templates store — same module the palette commands
 // (`ai.save_template` / `ai.run_template`) read from, so saves here
 // surface there and vice versa.
@@ -58,6 +67,28 @@ import {
   removeTemplate,
   subscribeTemplates,
 } from "../aiTemplates";
+
+function SurfaceViewRow({ id }: { id: SurfaceViewId }) {
+  const [, tick] = useState(0);
+  useEffect(() => subscribeSurfaceViewPrefs(() => tick((n) => n + 1)), []);
+  const mode = readSurfaceViewMode(id);
+  return (
+    <Row label={surfaceViewLabel(id)}>
+      <div className="settings-segmented">
+        {(["drawer", "tab"] as const).map((m) => (
+          <button
+            key={m}
+            type="button"
+            className={`segmented-btn ${mode === m ? "active" : ""}`}
+            onClick={() => writeSurfaceViewMode(id, m)}
+          >
+            {m === "drawer" ? "Side drawer" : "Editor tab"}
+          </button>
+        ))}
+      </div>
+    </Row>
+  );
+}
 
 // Default-shell picker. The backend's available_shells detection feeds
 // the list; "" = let the OS default win. New-terminal spawn paths all
@@ -528,6 +559,16 @@ export function SettingsModal() {
             </Row>
           </Section>
 
+          <Section title="Views" id="views">
+            <div className="settings-row settings-row-note">
+              Choose whether Works, Brain, and Team open in an editor tab or
+              the resizable right drawer (drag tabs to the drawer edge anytime).
+            </div>
+            {SURFACE_VIEW_IDS.map((id) => (
+              <SurfaceViewRow key={id} id={id} />
+            ))}
+          </Section>
+
           <Section title="Editor">
             <Row label="Color theme">
               <select
@@ -778,6 +819,10 @@ export function SettingsModal() {
               directly from the app to the provider. Ollama runs locally and needs
               no key.
             </div>
+          </Section>
+
+          <Section title="Preset model tiers" id="preset-model-tiers">
+            <TierModelSettings />
           </Section>
 
           <Section title="Terminal">

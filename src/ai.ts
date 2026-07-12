@@ -16,6 +16,12 @@ export interface ToolCall {
 export interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
+  /**
+   * Display-only: the preset id active when this assistant message was
+   * sent (null/undefined = Jack). Lets the chat header show the right
+   * name/avatar even after the session's active agent later changes.
+   */
+  agentId?: string | null;
   tool_calls?: ToolCall[];
   /** Display-only: an opaque tag to associate a tool message with a call. */
   tool_call_id?: string;

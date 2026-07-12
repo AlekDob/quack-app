@@ -1,4 +1,4 @@
-import { acceptanceFromBlocks } from "./worksBlocks";
+import { acceptanceFromMarkdown } from "./worksBlocks";
 import { findWork, type WorksSnapshot } from "./works";
 import { getTasks, subscribeTasks } from "./aiTaskStore";
 import { getChatDiff, subscribeChatDiff } from "./chatDiffStore";
@@ -25,7 +25,7 @@ export function deriveWorkProgress(
 ): WorkProgress | null {
   const w = findWork(snap, workId);
   if (!w) return null;
-  const acc = acceptanceFromBlocks(w.descriptionBlocks);
+  const acc = acceptanceFromMarkdown(w.bodyMd ?? "");
   let activeTasks = 0;
   let hasEdits = false;
   for (const chatId of w.linkedChatIds) {

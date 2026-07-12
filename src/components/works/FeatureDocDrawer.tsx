@@ -15,12 +15,18 @@ import { Icon } from "../Icon";
 import { MarkdownPreview } from "../MarkdownPreview";
 import { useResizableWorkDrawerWidth } from "../../useResizableWorkDrawerWidth";
 import { featureDocPreviewBody, featureDisplayTitle, featureFileLabel } from "../../featureDocPreview";
+import {
+  drawerPortalTarget,
+  isNestedDrawerPortal,
+  subscribeDrawerPortal,
+} from "../../editorDrawerStack";
 
 export function FeatureDocDrawer() {
   const [req, setReq] = useState<FeatureDocDrawerRequest | null>(
     getFeatureDocDrawer(),
   );
   const [shown, setShown] = useState(false);
+  const [, bumpPortal] = useState(0);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -28,6 +34,7 @@ export function FeatureDocDrawer() {
   useModalFocus(panelRef, shown && !!req);
 
   useEffect(() => subscribeFeatureDocDrawer(setReq), []);
+  useEffect(() => subscribeDrawerPortal(() => bumpPortal((n) => n + 1)), []);
 
   useEffect(() => {
     if (!req) {
@@ -37,13 +44,13 @@ export function FeatureDocDrawer() {
     }
     let alive = true;
     setLoading(true);
+    requestAnimationFrame(() => setShown(true));
     const abs = joinPath(req.root, req.featurePath);
     void fs
       .readFile(abs)
       .then((md) => {
         if (!alive) return;
         setContent(md);
-        requestAnimationFrame(() => setShown(true));
       })
       .catch((e) => {
         if (!alive) return;
@@ -86,12 +93,16 @@ export function FeatureDocDrawer() {
 
   if (!req) return null;
 
+  const portal = drawerPortalTarget(req.wsId);
+  const nested = isNestedDrawerPortal(portal);
   const displayTitle = featureDisplayTitle(req.title, req.featureNum);
   const fileLabel = featureFileLabel(req.featurePath, req.featureNum);
 
   return createPortal(
     <div
-      className={`tool-drawer-scrim work-drawer-scrim${shown ? " shown" : ""}`}
+      className={`tool-drawer-scrim work-drawer-scrim${
+        nested ? " tool-drawer-scrim--nested" : ""
+      }${shown ? " shown" : ""}`}
       onMouseDown={close}
     >
       <div
@@ -162,6 +173,6 @@ export function FeatureDocDrawer() {
         </div>
       </div>
     </div>,
-    document.body,
+    portal,
   );
 }

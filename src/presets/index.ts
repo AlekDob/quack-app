@@ -42,3 +42,9 @@ export {
   uploadPresetAvatar,
   uploadPresetAvatarFromPath,
 } from "./avatarStore";
+export {
+  getTierModelOverride,
+  getTierModelOverrides,
+  setTierModelOverride,
+  subscribeTierModelOverrides,
+} from "./tierModelOverrides";

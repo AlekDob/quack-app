@@ -8,7 +8,6 @@ import {
   newId,
   nextShortId,
   normalizeWorksSnapshot,
-  planTextToBlocks,
   type WorkComment,
   type WorkItem,
   type WorkOrigin,
@@ -16,9 +15,20 @@ import {
   type WorksSnapshot,
   type WorkStatus,
 } from "./works";
+import { workItemRelPath } from "./workItemMd";
+import {
+  deleteWorkItemFile,
+  hydrateItemFromFile,
+  importOrphanMdFiles,
+  loadAllItemBodies,
+  migrateV1ItemsToMd,
+  slimSnapshot,
+  writeWorkItemFile,
+} from "./worksItemFiles";
 import { syncFeatureModules } from "./worksFeatureModules";
 import { refreshAllWorkProgress } from "./workProgressStore";
 import { closeWorkDrawer, getWorkDrawer } from "./workDrawer";
+import { joinPath } from "./pathUtils";
 
 type Listener = (snap: WorksSnapshot) => void;
 
@@ -32,13 +42,8 @@ interface WsWorks {
 
 const byRoot = new Map<string, WsWorks>();
 
-function cacheKey(root: string): string {
-  return root;
-}
-
 function getEntry(root: string): WsWorks {
-  const k = cacheKey(root);
-  let e = byRoot.get(k);
+  let e = byRoot.get(root);
   if (!e) {
     e = {
       root,
@@ -47,7 +52,7 @@ function getEntry(root: string): WsWorks {
       hydrating: null,
       listeners: new Set(),
     };
-    byRoot.set(k, e);
+    byRoot.set(root, e);
   }
   return e;
 }
@@ -59,11 +64,14 @@ function notify(e: WsWorks): void {
 function isSnapshot(v: unknown): v is WorksSnapshot {
   if (!v || typeof v !== "object") return false;
   const o = v as Record<string, unknown>;
-  return o.version === 1 && Array.isArray(o.items) && Array.isArray(o.modules);
+  return (o.version === 1 || o.version === 2) && Array.isArray(o.items);
 }
 
 async function persist(root: string, snap: WorksSnapshot): Promise<void> {
-  await invoke("works_save", { wsRoot: root, snapshot: snap });
+  for (const item of snap.items) {
+    await writeWorkItemFile(root, item, snap);
+  }
+  await invoke("works_save", { wsRoot: root, snapshot: slimSnapshot(snap) });
 }
 
 async function appendEvent(root: string, event: Record<string, unknown>): Promise<void> {
@@ -71,6 +79,21 @@ async function appendEvent(root: string, event: Record<string, unknown>): Promis
     wsRoot: root,
     event: { ...event, at: Date.now() },
   });
+}
+
+async function finalizeHydrate(
+  root: string,
+  snap: WorksSnapshot,
+  persistNeeded: boolean,
+): Promise<WorksSnapshot> {
+  const { snap: migrated, changed: migChanged } = await migrateV1ItemsToMd(root, snap);
+  const withBodies = await loadAllItemBodies(root, migrated);
+  const { snap: withOrphans, changed: orphanChanged } =
+    await importOrphanMdFiles(root, withBodies);
+  if (persistNeeded || migChanged || orphanChanged) {
+    await persist(root, withOrphans);
+  }
+  return withOrphans;
 }
 
 export async function hydrateWorks(root: string): Promise<WorksSnapshot> {
@@ -82,18 +105,34 @@ export async function hydrateWorks(root: string): Promise<WorksSnapshot> {
     const loaded = isSnapshot(raw) ? raw : emptySnapshot();
     const { snap: normalized, changed: labelsChanged } =
       normalizeWorksSnapshot(loaded);
-    const { snap, changed: modulesChanged } = await syncFeatureModules(
+    const { snap: withModules, changed: modulesChanged } =
+      await syncFeatureModules(root, normalized);
+    const snap = await finalizeHydrate(
       root,
-      normalized,
+      withModules,
+      labelsChanged || modulesChanged,
     );
     e.snapshot = snap;
     e.hydrated = true;
     e.hydrating = null;
-    if (labelsChanged || modulesChanged) await persist(root, snap);
     notify(e);
   })();
   await e.hydrating;
   return e.snapshot;
+}
+
+export async function refreshWorksFromDisk(root: string): Promise<void> {
+  const e = getEntry(root);
+  if (!e.hydrated) {
+    await hydrateWorks(root);
+    return;
+  }
+  const withBodies = await loadAllItemBodies(root, e.snapshot);
+  const { snap: withOrphans, changed } = await importOrphanMdFiles(root, withBodies);
+  e.snapshot = withOrphans;
+  notify(e);
+  refreshAllWorkProgress(withOrphans);
+  if (changed) await persist(root, withOrphans);
 }
 
 export async function refreshWorksModules(root: string): Promise<void> {
@@ -107,7 +146,7 @@ export async function refreshWorksModules(root: string): Promise<void> {
 }
 
 export function getWorksSnapshot(root: string): WorksSnapshot | null {
-  const e = byRoot.get(cacheKey(root));
+  const e = byRoot.get(root);
   return e?.hydrated ? e.snapshot : null;
 }
 
@@ -148,10 +187,11 @@ export async function createWorkItem(
     title: string;
     origin: WorkOrigin;
     moduleName?: string;
+    moduleId?: string;
     featureSlug?: string;
     priority?: WorkPriority;
     status?: WorkStatus;
-    blocks?: WorkItem["descriptionBlocks"];
+    bodyMd?: string;
     labelNames?: string[];
   },
 ): Promise<WorkItem> {
@@ -159,6 +199,9 @@ export async function createWorkItem(
   if (!e.hydrated) await hydrateWorks(root);
   let snap = e.snapshot;
   const mod =
+    (opts.moduleId
+      ? snap.modules.find((m) => m.id === opts.moduleId)
+      : undefined) ??
     (opts.featureSlug
       ? moduleByFeatureSlug(snap, opts.featureSlug)
       : undefined) ??
@@ -176,13 +219,15 @@ export async function createWorkItem(
     if (hot && !labelIds.includes(hot.id)) labelIds.push(hot.id);
   }
   const now = Date.now();
+  const shortId = nextShortId(snap);
   const item: WorkItem = {
     id: newId(),
-    shortId: nextShortId(snap),
+    shortId,
+    filePath: workItemRelPath(shortId),
     moduleId: mod?.id ?? snap.modules[0]?.id ?? "",
     title: opts.title.trim() || "Untitled work",
     origin: opts.origin,
-    descriptionBlocks: opts.blocks ?? [],
+    bodyMd: opts.bodyMd ?? "",
     status: opts.status ?? (opts.origin === "plan" ? "backlog" : "todo"),
     priority: opts.priority ?? (opts.origin === "hotfix" ? "urgent" : "medium"),
     labelIds,
@@ -231,9 +276,8 @@ export async function approvePlanWork(
   workId: string,
   planText: string,
 ): Promise<WorkItem | null> {
-  const blocks = planTextToBlocks(planText);
   return updateWorkItem(root, workId, {
-    descriptionBlocks: blocks,
+    bodyMd: planText.trim(),
     status: "in_progress",
     planApprovedAt: Date.now(),
   });
@@ -299,6 +343,8 @@ export async function deleteWorkItem(
 ): Promise<void> {
   const e = getEntry(root);
   if (!e.hydrated) await hydrateWorks(root);
+  const hit = findWork(e.snapshot, id);
+  if (hit) await deleteWorkItemFile(root, hit);
   const snap = {
     ...e.snapshot,
     items: e.snapshot.items.filter((w) => w.id !== id),
@@ -306,7 +352,14 @@ export async function deleteWorkItem(
   await saveWorks(root, snap);
   await appendEvent(root, { kind: "work_delete", workId: id });
   const open = getWorkDrawer();
-  if (open?.workId === id && open.root === root) closeWorkDrawer();
+  if (
+    open &&
+    open.root === root &&
+    !("create" in open) &&
+    open.workId === id
+  ) {
+    closeWorkDrawer();
+  }
 }
 
 export async function duplicateWorkItem(
@@ -326,12 +379,14 @@ export async function duplicateWorkItem(
 }
 
 function cloneWorkItem(src: WorkItem, now: number, snap: WorksSnapshot): WorkItem {
+  const shortId = nextShortId(snap);
   return {
     ...src,
     id: newId(),
-    shortId: nextShortId(snap),
+    shortId,
+    filePath: workItemRelPath(shortId),
     title: `${src.title} (copy)`,
-    descriptionBlocks: structuredClone(src.descriptionBlocks),
+    bodyMd: src.bodyMd,
     labelIds: [...src.labelIds],
     linkedChatIds: [],
     comments: [],
@@ -340,4 +395,23 @@ function cloneWorkItem(src: WorkItem, now: number, snap: WorksSnapshot): WorkIte
     createdAt: now,
     updatedAt: now,
   };
+}
+
+export function workItemAbsPath(root: string, item: WorkItem): string {
+  return joinPath(root, item.filePath || workItemRelPath(item.shortId));
+}
+
+export async function reloadWorkItem(
+  root: string,
+  workId: string,
+): Promise<WorkItem | null> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const hit = findWork(e.snapshot, workId);
+  if (!hit) return null;
+  const next = await hydrateItemFromFile(root, hit, e.snapshot);
+  const snap = patchItem(e.snapshot, workId, next);
+  e.snapshot = snap;
+  notify(e);
+  return findWork(snap, workId) ?? null;
 }
