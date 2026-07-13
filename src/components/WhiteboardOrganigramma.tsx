@@ -11,7 +11,8 @@
 import { useState } from "react";
 import type { SubagentDef } from "../subagents";
 import type { WhiteboardData } from "./WhiteboardPane";
-import { openFileAndReveal } from "../revealInTree";
+import { fileKey, useStore } from "../store";
+import { writeEditorMdView } from "../editorMdView";
 import { error as toastError } from "../notify";
 import { AIIcon } from "./AIIcon";
 import { WhiteboardPresetGroup } from "./WhiteboardPresets";
@@ -124,29 +125,35 @@ function OrgGroup({
   );
 }
 
-// ── Single agent node — click to open its .md ────────────────────────
+// ── Single agent node — click to preview its .md in the right drawer ──
 function AgentNode({ wsId, agent }: { wsId: string; agent: SubagentDef }) {
-  const openAgentFile = () => {
+  const openAgentFile = async () => {
     if (!agent.path) {
       toastError(`${agent.name} has no known file path.`);
       return;
     }
-    void openFileAndReveal(wsId, agent.path);
+    // Open the subagent .md rendered (preview) and pop it into the right
+    // drawer instead of a full editor tab — a quick read-only peek at the
+    // agent's definition without leaving the Team surface.
+    writeEditorMdView("preview");
+    const st = useStore.getState();
+    await st.openFile(wsId, agent.path);
+    st.moveTabToDrawer(wsId, fileKey(agent.path));
   };
 
   return (
     <div
       className="whiteboard-org-agent"
-      onClick={openAgentFile}
+      onClick={() => void openAgentFile()}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          openAgentFile();
+          void openAgentFile();
         }
       }}
-      title={agent.path ?? `${agent.name} — click to open its .md file`}
+      title={agent.path ?? `${agent.name} — click to preview its .md file`}
     >
       <div className="whiteboard-org-agent-head">
         <img

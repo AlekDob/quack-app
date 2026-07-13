@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { buildWorksListGroups } from "../../worksListGroups";
 import type { WorkItem, WorkModule, WorkStory } from "../../works";
 import { storyLabel } from "../../works";
@@ -145,12 +145,61 @@ export function WorksTimelineView({
   const accentStyle = worksStoryAccentStyle(storyAccent);
 
   return (
-    <div className="works-timeline-plane">
-      <div className="works-timeline-list" style={{ width: LIST_W }}>
-        <div className="works-table-head">
-          <span>Stories & work</span>
-          <span>Duration</span>
-        </div>
+    <div
+      className="works-timeline-plane"
+      style={{ "--works-timeline-list-w": `${LIST_W}px` } as CSSProperties}
+    >
+      <div className="works-timeline-list-corner" aria-hidden />
+
+      <div className="works-timeline-week-nav">
+        <button
+          type="button"
+          className="works-timeline-nav-btn"
+          aria-label="Previous week"
+          onClick={() => setWeekAnchor((w) => w - 7 * DAY_MS)}
+        >
+          <Icon name="chevron-left" size={14} />
+        </button>
+        <span className="works-timeline-week-nav-label">
+          {weekLabel(weekAnchor)}
+        </span>
+        <button
+          type="button"
+          className="works-timeline-nav-btn"
+          aria-label="Next week"
+          onClick={() => setWeekAnchor((w) => w + 7 * DAY_MS)}
+        >
+          <Icon name="chevron-right" size={14} />
+        </button>
+        {!isCurrentWeek && (
+          <button
+            type="button"
+            className="works-timeline-nav-today"
+            onClick={() => setWeekAnchor(weekOfToday)}
+          >
+            Today
+          </button>
+        )}
+      </div>
+
+      <div className="works-timeline-list-head works-table-head">
+        <span>Stories & work</span>
+        <span>Duration</span>
+      </div>
+
+      <div className="works-timeline-week-head">
+        {weekDays.map((d) => (
+          <span
+            key={d}
+            className={`works-timeline-day${d === todayDay ? " today" : ""}`}
+            style={{ width: `${100 / 7}%` }}
+          >
+            {fmtDay(d)}
+          </span>
+        ))}
+      </div>
+
+      <div className="works-timeline-list">
         <div
           ref={listBodyRef}
           className="works-timeline-list-body"
@@ -208,50 +257,7 @@ export function WorksTimelineView({
         </div>
       </div>
 
-      <div ref={chartRef} className="works-timeline-chart works-timeline-chart--week">
-        <div className="works-timeline-week-nav">
-          <button
-            type="button"
-            className="works-timeline-nav-btn"
-            aria-label="Previous week"
-            onClick={() => setWeekAnchor((w) => w - 7 * DAY_MS)}
-          >
-            <Icon name="chevron-left" size={14} />
-          </button>
-          <span className="works-timeline-week-nav-label">
-            {weekLabel(weekAnchor)}
-          </span>
-          <button
-            type="button"
-            className="works-timeline-nav-btn"
-            aria-label="Next week"
-            onClick={() => setWeekAnchor((w) => w + 7 * DAY_MS)}
-          >
-            <Icon name="chevron-right" size={14} />
-          </button>
-          {!isCurrentWeek && (
-            <button
-              type="button"
-              className="works-timeline-nav-today"
-              onClick={() => setWeekAnchor(weekOfToday)}
-            >
-              Today
-            </button>
-          )}
-        </div>
-
-        <div className="works-timeline-week-head">
-          {weekDays.map((d) => (
-            <span
-              key={d}
-              className={`works-timeline-day${d === todayDay ? " today" : ""}`}
-              style={{ width: `${100 / 7}%` }}
-            >
-              {fmtDay(d)}
-            </span>
-          ))}
-        </div>
-
+      <div ref={chartRef} className="works-timeline-chart-area">
         <div
           ref={chartBodyRef}
           className="works-timeline-chart-body"

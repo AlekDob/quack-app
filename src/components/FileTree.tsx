@@ -54,6 +54,19 @@ import {
   FILE_TREE_DRAG_THRESHOLD_PX,
   startFileTreeDrag,
 } from "../fileComposerDrag";
+import {
+  buildTreeFilter,
+  collectAllDirs,
+  type TreeFilter,
+} from "../fileTreeWalk";
+import { FileTreeToolbar } from "./FileTreeToolbar";
+
+interface TreeFilterCtx {
+  visiblePaths: Set<string>;
+  matchPaths: Set<string>;
+}
+
+const TreeFilterContext = createContext<TreeFilterCtx | null>(null);
 
 interface MenuTarget {
   x: number;
@@ -76,14 +89,20 @@ interface NodeProps {
 }
 
 function Node({ wsId, entry, depth, onContext }: NodeProps) {
+  const filterCtx = useContext(TreeFilterContext);
+  const filterActive = filterCtx !== null;
   // Normalize-aware match: reveal-in-tree stores forward-slash paths
   // while entry.path is OS-native (backslashes on Windows). Exact
   // string compare made "Reveal in Explorer" a silent no-op there.
-  const expanded = useStore((s) =>
+  const storeExpanded = useStore((s) =>
     (s.loaded[wsId]?.layout.expandedDirs ?? []).some((d) =>
       pathsEqual(d, entry.path),
     ),
   );
+  const expanded =
+    filterActive && entry.is_dir
+      ? filterCtx.visiblePaths.has(entry.path)
+      : storeExpanded;
   const toggleDir = useStore((s) => s.toggleDir);
   const openFile = useStore((s) => s.openFile);
   const isActive = useStore((s) => {
@@ -143,8 +162,10 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
       suppressClickRef.current = false;
       return;
     }
-    if (entry.is_dir) toggleDir(wsId, entry.path);
-    else if (openOverride) openOverride(wsId, entry.path);
+    if (entry.is_dir) {
+      if (filterActive) return;
+      toggleDir(wsId, entry.path);
+    } else if (openOverride) openOverride(wsId, entry.path);
     else void openFile(wsId, entry.path);
   };
 
@@ -271,6 +292,13 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
   const gitDirDot =
     entry.is_dir && gitSnap.changedDirs.has(normalizeGitPath(entry.path));
 
+  if (filterActive && !filterCtx.visiblePaths.has(entry.path)) {
+    return null;
+  }
+
+  const isFilterMatch =
+    filterActive && filterCtx.matchPaths.has(entry.path);
+
   const rowStyle = { "--tree-depth": depth } as React.CSSProperties;
 
   return (
@@ -308,6 +336,7 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
         <span
           className={[
             "tree-name",
+            isFilterMatch ? "tree-name--filter-match" : "",
             gitFile ? statusClass(gitFile) : "",
             gitDirDot ? "tree-name--dirty-dir" : "",
           ]
@@ -329,7 +358,12 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
       </div>
       {entry.is_dir && expanded && children && (
         <>
-          {children.map((c) => (
+          {children
+            .filter(
+              (c) =>
+                !filterActive || filterCtx.visiblePaths.has(c.path),
+            )
+            .map((c) => (
             <Node
               key={c.path}
               wsId={wsId}
@@ -355,7 +389,11 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
   const [entries, setEntries] = useState<DirEntry[]>([]);
   const [menu, setMenu] = useState<MenuTarget | null>(null);
   const [historyFile, setHistoryFile] = useState<string | null>(null);
+  const [filterQuery, setFilterQuery] = useState("");
+  const [filter, setFilter] = useState<TreeFilter | null>(null);
+  const [filterBusy, setFilterBusy] = useState(false);
   const treeRef = useRef<HTMLDivElement | null>(null);
+  const setExpandedDirs = useStore((s) => s.setExpandedDirs);
 
   // Shared git status: one watcher feeds every Node's badge. The tick
   // only forces a re-render — Nodes read the cache directly.
@@ -422,17 +460,62 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
   }, [refresh]);
 
   useEffect(() => {
+    const q = filterQuery.trim();
+    if (!q) {
+      setFilter(null);
+      setFilterBusy(false);
+      return;
+    }
+    setFilterBusy(true);
+    const timer = window.setTimeout(() => {
+      void buildTreeFilter(root, q).then((next) => {
+        setFilter(next);
+        setFilterBusy(false);
+      });
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [filterQuery, root]);
+
+  const onExpandAll = () => {
+    void collectAllDirs(root).then((dirs) => setExpandedDirs(wsId, dirs));
+  };
+
+  const onCollapseAll = () => {
+    setExpandedDirs(wsId, []);
+    setFilterQuery("");
+  };
+
+  const filterCtx =
+    filter && filterQuery.trim()
+      ? {
+          visiblePaths: filter.visiblePaths,
+          matchPaths: filter.matchPaths,
+        }
+      : null;
+
+  const visibleEntries =
+    filterCtx === null
+      ? entries
+      : entries.filter((e) => filterCtx.visiblePaths.has(e.path));
+
+  useEffect(() => {
     const handler = (ev: Event) => {
       const detail = (ev as CustomEvent).detail as {
         wsId: string;
         dir: string;
       };
       if (detail.wsId !== wsId) return;
-      if (pathsEqual(detail.dir, root)) refresh();
+      if (pathsEqual(detail.dir, root)) {
+        refresh();
+        const q = filterQuery.trim();
+        if (q) {
+          void buildTreeFilter(root, q).then(setFilter);
+        }
+      }
     };
     fsBus.addEventListener("dir", handler);
     return () => fsBus.removeEventListener("dir", handler);
-  }, [wsId, root, refresh]);
+  }, [wsId, root, refresh, filterQuery]);
 
   const items: (ContextMenuItem | "separator")[] = (() => {
     const target = menu?.entry ?? null;
@@ -793,21 +876,32 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
 
   return (
     <FileOpenOverride.Provider value={onOpenFile ?? null}>
-    <div
-      ref={treeRef}
-      className="tree"
-      role="tree"
-      onContextMenu={(e) => {
-        e.preventDefault();
-        setMenu({ x: e.clientX, y: e.clientY, entry: null });
-      }}
-    >
-      {entries.length === 0 ? (
+    <div className="tree-shell">
+      <FileTreeToolbar
+        query={filterQuery}
+        busy={filterBusy}
+        onQueryChange={setFilterQuery}
+        onExpandAll={onExpandAll}
+        onCollapseAll={onCollapseAll}
+      />
+      <TreeFilterContext.Provider value={filterCtx}>
+      <div
+        ref={treeRef}
+        className="tree"
+        role="tree"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenu({ x: e.clientX, y: e.clientY, entry: null });
+        }}
+      >
+      {visibleEntries.length === 0 ? (
         <div className="tree-empty">
-          Empty folder. Right-click to create a file or folder.
+          {filterCtx
+            ? "No matching files."
+            : "Empty folder. Right-click to create a file or folder."}
         </div>
       ) : (
-        entries.map((e) => (
+        visibleEntries.map((e) => (
           <Node
             key={e.path}
             wsId={wsId}
@@ -832,6 +926,8 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
           onClose={() => setHistoryFile(null)}
         />
       )}
+      </div>
+      </TreeFilterContext.Provider>
     </div>
     </FileOpenOverride.Provider>
   );

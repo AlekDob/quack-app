@@ -34,6 +34,7 @@ import { openStoryPlanTab } from "./StoryPlanPane";
 import { Icon } from "./Icon";
 import { openWorksTab } from "./works/WorksPane";
 import { useComposerBrainRefs } from "./works/WorksDocRefsSection";
+import { openWorkDrawer } from "../workDrawer";
 
 type Props = {
   wsId: string;
@@ -247,7 +248,7 @@ export function ComposerWorkBar({
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         anchorRef={chipRef}
-        estimateHeight={planningOnly ? 280 : work ? 360 : 200}
+        estimateHeight={planningOnly ? 280 : work ? 400 : 200}
       >
         {planningOnly ? (
           <>
@@ -304,6 +305,19 @@ export function ComposerWorkBar({
               onClick={() => void cycleStatus(work)}
             >
               Status: {statusLabel(work.status)}
+            </button>
+            <button
+              type="button"
+              className="menu-item ai-composer-ctx-open"
+              onClick={() => {
+                setMenuOpen(false);
+                openWorkDrawer({ wsId, root, workId: work.id });
+              }}
+            >
+              <span className="menu-item-label">
+                <Icon name="file-text" size={11} />
+                Open work item
+              </span>
             </button>
             {story ? (
               <button

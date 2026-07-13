@@ -877,6 +877,7 @@ interface AppState {
   saveAllFiles(wsId: string): Promise<void>;
 
   toggleDir(wsId: string, path: string): void;
+  setExpandedDirs(wsId: string, paths: string[]): void;
   setSidebarW(wsId: string, w: number): void;
   setTermH(wsId: string, h: number): void;
   setBottomVisible(wsId: string, v: boolean): void;
@@ -2474,6 +2475,12 @@ export const useStore = create<AppState>((set, get) => {
           : [...cur, path];
         return { ...w, layout: { ...w.layout, expandedDirs: next } };
       }),
+
+    setExpandedDirs: (wsId, paths) =>
+      updateWs(wsId, (w) => ({
+        ...w,
+        layout: { ...w.layout, expandedDirs: paths },
+      })),
 
     setSidebarW: (wsId, w) =>
       updateWs(wsId, (x) => ({ ...x, layout: { ...x.layout, sidebarW: w } })),

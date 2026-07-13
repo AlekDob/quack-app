@@ -9768,7 +9768,7 @@ body.ab-dragging * {
 .ai-user-bar-main {
   flex: 1;
   min-width: 0;
-  font-size: 13.5px;
+  font-size: 12.5px;
   line-height: 1.45;
   color: var(--fg);
 }
@@ -9879,7 +9879,7 @@ body.ab-dragging * {
 .ai-user-bar-main .md-preview {
   padding: 0;
   max-width: none;
-  font-size: 13.5px;
+  font-size: 12.5px;
   line-height: 1.45;
 }
 .ai-user-bar-main .md-preview h1 { font-size: 17px; }
@@ -11601,7 +11601,8 @@ body.ab-dragging * {
    without disturbing the current conversation. The "no wrapper has
    this" moat-builder per the roadmap. */
 .ai-scrubber {
-  display: flex;
+  /* Temporarily hidden — TimelineScrubber stays mounted in AIChatPanel. */
+  display: none;
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
@@ -14068,6 +14069,85 @@ body.ab-dragging * {
 .git-status--renamed { color: var(--git-renamed); }
 .tree-name--dirty-dir { color: var(--warn); }
 
+/* File tree shell + filter toolbar */
+.tree-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.tree-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tree-filter-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.tree-filter-wrap:focus-within {
+  border-color: var(--accent);
+}
+.tree-filter-icon {
+  flex-shrink: 0;
+  color: var(--fg-muted);
+}
+.tree-filter-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-size: 12px;
+  outline: none;
+}
+.tree-filter-input::placeholder {
+  color: var(--fg-muted);
+}
+.tree-filter-busy {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: tree-filter-pulse 0.9s ease-in-out infinite;
+}
+@keyframes tree-filter-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+.tree-toolbar-btn {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  outline: none;
+}
+.tree-toolbar-btn:hover,
+.tree-toolbar-btn:focus-visible {
+  color: var(--fg);
+  background: var(--bg-hi);
+  border-color: var(--accent);
+}
+
 /* File tree */
 .tree {
   overflow-x: hidden;
@@ -14182,6 +14262,10 @@ body.ab-dragging * {
   margin-left: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.tree-name--filter-match {
+  font-weight: 600;
+  color: var(--fg);
 }
 /* Git decorations on tree rows: a colored status letter for files, a
    muted dot for folders with changes somewhere underneath. */
@@ -22872,7 +22956,9 @@ body.ab-dragging * {
 }
 
 .works-timeline-plane {
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--works-timeline-list-w, 300px) minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   flex: 1;
   min-height: 0;
   width: 100%;
@@ -22880,7 +22966,50 @@ body.ab-dragging * {
   overflow: hidden;
 }
 
+.works-timeline-list-corner {
+  grid-column: 1;
+  grid-row: 1;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+}
+
+.works-timeline-week-nav {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+  flex-shrink: 0;
+  min-height: 45px;
+  box-sizing: border-box;
+}
+
+.works-timeline-list-head {
+  grid-column: 1;
+  grid-row: 2;
+  position: static;
+  border-right: 1px solid var(--border);
+}
+
+.works-timeline-week-head {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-alt);
+  min-height: 32px;
+  box-sizing: border-box;
+  align-items: stretch;
+}
+
 .works-timeline-list {
+  grid-column: 1;
+  grid-row: 3;
   flex-shrink: 0;
   border-right: 1px solid var(--border);
   display: flex;
@@ -22889,15 +23018,29 @@ body.ab-dragging * {
   background: var(--bg-alt);
 }
 
-.works-timeline-list .works-table-head {
+.works-timeline-chart-area {
+  grid-column: 2;
+  grid-row: 3;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.works-timeline-list-head.works-table-head {
   grid-template-columns: 1fr 72px;
   flex-shrink: 0;
+  min-height: 32px;
+  box-sizing: border-box;
 }
 
 .works-timeline-list-body {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+  min-height: 0;
 }
 
 .works-timeline-list-row {
@@ -22963,29 +23106,6 @@ body.ab-dragging * {
   text-align: right;
 }
 
-.works-timeline-chart {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--bg);
-}
-
-.works-timeline-chart--week {
-  overflow: hidden;
-}
-
-.works-timeline-week-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-alt);
-  flex-shrink: 0;
-}
-
 .works-timeline-week-nav-label {
   flex: 1;
   text-align: center;
@@ -23030,15 +23150,11 @@ body.ab-dragging * {
   color: var(--fg);
 }
 
-.works-timeline-week-head {
-  display: flex;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-alt);
-}
-
 .works-timeline-day {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   font-size: 10px;
   color: var(--fg-muted);

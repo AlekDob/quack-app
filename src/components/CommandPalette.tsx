@@ -6,6 +6,7 @@ import { setEditorGoto } from "../editorState";
 import { relPath } from "../pathUtils";
 import { recordCommand, scoreCommand } from "../commandHistory";
 import { Icon } from "./Icon";
+import { fuzzyMatch as fuzzy } from "../fuzzyMatch";
 
 // Map a result's category to a leading icon (Cursor-style rows). Falls back
 // to the generic command glyph for menu commands.
@@ -36,19 +37,6 @@ interface Props {
    * pre-fills "? " for text-search).
    */
   initialQuery?: string;
-}
-
-function fuzzy(query: string, text: string): boolean {
-  if (!query) return true;
-  const q = query.toLowerCase();
-  const t = text.toLowerCase();
-  let i = 0;
-  for (const ch of q) {
-    const idx = t.indexOf(ch, i);
-    if (idx === -1) return false;
-    i = idx + 1;
-  }
-  return true;
 }
 
 export function CommandPalette({ open, onClose, initialQuery }: Props) {
