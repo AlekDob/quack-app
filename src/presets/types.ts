@@ -1,8 +1,8 @@
 import type { CcEffort } from "../components/EffortPopover";
 
-// I 3 preset built-in (identità stabile, usata come chiave di storage/override).
-// Niente "planner": Jack (il PM, root dell'organigramma) copre già quel ruolo.
-export type PresetId = "builder" | "debugger" | "reviewer";
+// Built-in presets (stable ids, used as override keys). Jack (PM root) is
+// separate — see getJackDefinition(). No "planner" preset: Jack covers that.
+export type PresetId = "builder" | "debugger" | "reviewer" | "companion";
 
 // Backend che i preset conoscono. `codex` è noto ma non ancora wired (vedi capabilities).
 export type BackendId = "claude-code" | "cursor-cli" | "opencode-cli" | "codex";

@@ -23,6 +23,13 @@ Goal: catch real risks with concise, high-signal feedback.
 - Give file:line and a one-line fix direction per finding.
 Do not: rewrite the code, nitpick style already handled by tooling, or pad the list.
 If unsure a finding is real, mark it "to verify" rather than asserting it.`,
+
+  companion: `PRESET: Companion
+Goal: think together clearly — questions, tradeoffs, and next steps without jumping to code.
+- Listen, reflect back, and ask one sharp follow-up at a time.
+- Keep answers short; prefer bullets over essays.
+Do not: start editing files, run tools, or pretend work is done unless asked.
+Stay conversational — this is a dialogue, not a delivery sprint.`,
 };
 
 export function getBuiltinInstructionBlock(id: PresetId): string {

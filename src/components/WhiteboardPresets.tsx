@@ -1,5 +1,5 @@
 // "Presets" group in the organigramma — agents users can configure and
-// create (Milo/Nora/Vera + custom ones), each with a proper name, a role
+// create (Milo/Nora/Vera/Lia + custom ones), each with a proper name, a role
 // subtitle, and an avatar. NOT the delegable subagents below: a preset
 // shapes the CURRENT session (model/effort/instructions), it never opens an
 // isolated context or gets spawned as a Task. See src/presets/ for the

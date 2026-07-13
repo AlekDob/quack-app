@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-12
-last_verified: 2026-07-12
-tags: [presets, agents, model-selection, effort, organigramma, avatar, backend-agnostic, prompt-injection, settings, chat-identity]
+last_verified: 2026-07-13
+tags: [presets, agents, model-selection, effort, organigramma, avatar, backend-agnostic, prompt-injection, settings, chat-identity, companion, team-sync]
 ---
 
 ## Presets
@@ -23,7 +23,7 @@ existing chat send flow, composer, and the Whiteboard organigramma.
 | Concern | File |
 |---|---|
 | Types — `PresetId`, `BackendId`, `ModelTier`, `PresetDefinition`, `EffectivePresetConfig`, `BackendCapabilities` | `types.ts` |
-| 3 built-in presets: Milo (Builder), Nora (Debugger), Vera (Reviewer) | `builtins.ts` |
+| 4 built-in presets: Milo, Nora, Vera, Lia (+ Jack as organigramma root) | `builtins.ts` |
 | Append-style instruction blocks (with "Do not" sections) | `instructions.ts` |
 | Per-backend capability + tier→model map, degradation | `capabilities.ts` |
 | User override store (`lcp.presets.v1`) | `settings.ts` |
@@ -55,6 +55,30 @@ user's concrete model override always wins over the tier.
 
 `resolvePresetConfig` degrades gracefully per-capability and returns `warnings: string[]`
 describing what was skipped — nothing silently fails.
+
+### Shipped defaults (built-ins + Jack)
+
+Jack is **not** in `PRESET_ORDER` (`presetId === null` in chat) but shares the same override
+mechanism (`JACK_PRESET_ID = "jack"`). The four presets below are non-deletable built-ins; users
+may override any field via Team → edit → Save, or **Reset to default** to revert.
+
+| Identity | id | Model tier | Effort | Output | Mode (`permMode`) | Avatar |
+|---|---|---|---|---|---|---|
+| Jack (root) | `jack` | reasoning | high | structured | plan | `/jack.jpeg` |
+| Milo · Builder | `builder` | balanced | medium | concise | Agent (`bypassPermissions`) | `duck3` |
+| Nora · Debugger | `debugger` | balanced | medium | structured | auto | `duck16` (pinned feminine) |
+| Vera · Reviewer | `reviewer` | balanced | medium | terse-review | auto | `duck28` (pinned feminine) |
+| Lia · Companion | `companion` | balanced | low | terse-review | auto | `duck22` |
+
+**Lia** (`companion`) is the dialogue preset — brainstorm and clarify goals without shipping
+code. Instruction block in `instructions.ts` (`PRESET: Companion`). Escalation hint: hand off to
+Jack (plan) or Milo (build) once the path is clear.
+
+**Avatars:** `BUILTIN_AVATARS` in `builtins.ts` pins duck numbers via `duckAvatarFor(id, "duckN")`
+so Nora/Vera stay visibly feminine and Milo/Lia keep stable faces across releases (hash-derived
+avatars are only a fallback for custom presets and subagents).
+
+**Jack thinking:** shipped default `thinking: true` (pairs with reasoning/high for planning).
 
 ### User tier→model overrides (Settings)
 
@@ -99,12 +123,13 @@ Rather than hardcode guesses, the user maps tiers to real models themselves:
   earlier `PresetPopover` component was deleted once this merged).
 - No "Planner" preset — Jack (the PM, root of the organigramma) already covers planning;
   splitting that into a 4th preset would duplicate his job.
-- On pick (`applyPreset` in `AIChatPanel.tsx`): looks up the `PresetDefinition` from
-  `presetChoices` (built-ins + workspace's custom ones, loaded via `loadCustomPresets`), then sets
-  `ccEffort`/`ccThinking`/`selected` model from `resolvePresetConfigFor(def, provider)` — only for
-  agentic backends (claude-code/cursor-cli/opencode-cli). Custom presets load independent of
-  `selectedIsCC` (unlike the subagent catalog) since a preset's instructions apply to every
-  backend, not just Claude Code.
+- On pick (`applyPreset` in `AIChatPanel.tsx`): resolves the active `PresetDefinition` via
+  `resolveActivePresetDef(id, customPresets)` — built-ins and Jack always re-read
+  `effectivePresetDefinition` from `localStorage` overrides, not a stale `presetChoices` cache —
+  then sets `ccEffort`/`ccThinking`/`selected` model from `resolvePresetConfigFor(def, provider)`
+  — only for agentic backends (claude-code/cursor-cli/opencode-cli). Custom presets load
+  independent of `selectedIsCC` (unlike the subagent catalog) since a preset's instructions apply
+  to every backend, not just Claude Code.
 - On every turn: `getPresetInstructionsFor(def)` is appended to `sysParts` — **every turn, not
   just the first**, because Claude Code only flattens the system message into the prompt on the
   first turn (`src/providers/claudeCode.ts`); re-appending keeps a preset changed mid-chat
@@ -120,8 +145,8 @@ Rather than hardcode guesses, the user maps tiers to real models themselves:
 In `AIChatPanel.tsx`'s textarea `onKeyDown`, placed AFTER the `@`-mention and slash-command
 autocomplete blocks so those popovers keep first claim on Tab when open:
 
-- **Tab** (no modifiers) cycles the active primary agent: Jack → Milo → Nora → Vera → back to
-  Jack, calling the same `applyPreset` the composer picker uses.
+- **Tab** (no modifiers) cycles the active primary agent: Jack → Milo → Nora → Vera → Lia → back
+  to Jack, calling the same `applyPreset` the composer picker uses.
 - **Shift+Tab** cycles the Claude Code permission mode (Ask → Plan → Auto-edit → Auto → Agent),
   reading/writing `PERM_MODE_OPTIONS` (`src/presets/permModes.ts`) — the same list backing the
   mode menu and `AgentCreateDrawer`'s "Mode" segmented control, so there's one source of truth
@@ -176,15 +201,18 @@ presets are fully editable** from the same drawer:
   - **custom** → `updatePreset(path, input)` rewrites the `.md` in place (the slug/filename never
     changes even if the display name does, so `lcp.presets.v1` overrides keyed on that id and any
     `ChatSession.presetId` referencing it stay valid).
-  - **builtin** (Milo/Nora/Vera have no backing file) → `setPresetOverrides(id, {...})` persists
-    an override layer in `lcp.presets.v1` instead. A "Reset to default" button (builtin edits
-    only) calls `clearPresetOverrides(id)` to drop the layer and revert to the shipped values.
+  - **builtin** (Milo/Nora/Vera/Lia have no backing file) → `setPresetOverrides(id, {...})`
+    persists an override layer in `lcp.presets.v1` instead (returns `boolean` — drawer toasts on
+    storage failure). A "Reset to default" button (builtin edits only) calls
+    `clearPresetOverrides(id)` to drop the layer and revert to the shipped values.
 - `effectivePresetDefinition(def, overrides?)` (`resolvePresetConfig.ts`) is the single merge
   point both the UI and the resolver read through — it folds label/role/avatar/modelTier/
-  effort/thinking/outputStyle/instructions overrides onto the base definition. Both
-  `AIChatPanel`'s `presetChoices` and `WhiteboardPane`'s `data.presets` map built-ins through it,
-  and `AIChatPanel` subscribes to `subscribePresetSettings` so an edit made from the organigramma
-  shows up in the composer picker without a remount.
+  effort/thinking/outputStyle/permMode/instructions overrides onto the base definition. Both
+  `AIChatPanel`'s `presetChoices` and `WhiteboardPane`'s `data.presets` map built-ins through it.
+  **Team → chat sync:** `subscribePresetSettings` in `AIChatPanel` bumps `presetOverridesTick`
+  and silently re-runs `applyPreset` for the active `presetId` (including Jack when `null`) so
+  effort/mode/model knobs update immediately after Save in the organigramma drawer. `WhiteboardOrganigramma`
+  also subscribes so Jack's root card and preset chips re-render without waiting for a disk refresh.
 - **Avatar** — defaults to the same deterministic duck pool subagents use (`duckAvatarFor`,
   `src/subagents.ts`, `DUCK_COUNT` exported for reuse); click any custom preset's avatar (or the
   one being drafted in the drawer) to open `AvatarPicker` — a grid of the 35 shipped ducks plus an
@@ -246,8 +274,8 @@ in a workspace you don't fully trust.
   (`setPresetOverrides("jack", {...})`). His root card in `WhiteboardOrganigramma.tsx` opens the
   same `AgentCreateDrawer` (state now lives in that component, shared with `WhiteboardPresetGroup`
   via `onEdit`/`onCreate` callbacks rather than each owning its own drawer).
-- `applyPreset(id, opts?)` resolves either a real preset (`presetChoices.find`) or Jack's
-  definition when `id` is `null` — one code path for both, including the CC-only `permMode` apply
+- `applyPreset(id, opts?)` resolves via `resolveActivePresetDef` — Jack when `id` is `null`, or a
+  built-in/custom preset by id — one code path for both, including the CC-only `permMode` apply
   (gated the same way as effort/thinking: only when the resolved provider is `claude-code`).
 - **New chats silently apply Jack's saved config** via `applyJackDefaultsIfConfigured()` — but
   ONLY when `getPresetOverrides("jack")` is non-empty, so a user who's never touched Jack in the
@@ -270,6 +298,11 @@ in a workspace you don't fully trust.
   `createPreset()` runs — avoids two open drawers colliding on the same temp file.
 - **`ModelTier`, not model name**, is the only thing a preset's shipped default may specify —
   keeps the whole system usable on any future backend without touching `types.ts`.
+- **Stale user overrides.** Shipped defaults can change between releases; users who edited a
+  built-in before the update still have their `lcp.presets.v1` layer until they hit **Reset to
+  default** in the Team drawer.
+- **Team save without Save.** Clicking the drawer scrim or Cancel discards edits — only **Save
+  changes** writes overrides / `.md` files.
 
 ### Related docs
 
