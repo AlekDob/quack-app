@@ -3,12 +3,12 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-11
-last_verified: 2026-07-11
+last_verified: 2026-07-13
 tags: [claude-code, model-selector, model-catalog, composer, rust, performance, lazy-load]
 ---
 
 ## Claude Code dynamic model catalog
-**Purpose:** Replace static alias labels (`Sonnet`, `Opus`) with live version names from the CLI (`Sonnet 5`, `Opus 4.8`, `Fable 5`) while keeping the composer model picker **instant** on first open — one fast `/model` probe, version labels refreshed in the background and cached 1h.
+**Purpose:** Probe live version names from the CLI (`Sonnet 5`, `Opus 4.8`, `Fable 5`) into the catalog while keeping the picker **instant** — one fast `/model` probe, version labels refreshed in background (1h cache). **UI chip/picker show alias only** (`sonnet`); probed names surface in post-turn usage feedback — `071-honest-model-labels.md`.
 **Stack:** Rust `claude_models.rs` + `claude_print_text` helper; TS `claudeCode.ts` stale-while-revalidate; shared discovery store (`031`).
 
 ### Files
@@ -18,7 +18,8 @@ tags: [claude-code, model-selector, model-catalog, composer, rust, performance, 
 | Rust | `src-tauri/src/claude_code.rs` | `claude_print_text(prompt)` — shared `-p` text helper for probes |
 | Provider | `src/providers/claudeCode.ts` | `claudeCodePickerModels()`, `refreshClaudeCodeModelsLive()`, `FALLBACK_MODELS` |
 | Store | `src/modelDiscoveryStore.ts` | `listFastModels` + merge CC live list (`ccCliInflight`) |
-| Picker | `src/components/ModelPickerPopover.tsx` | Chip shows `displayName`; instant hydrate skeleton |
+| Picker | `src/components/ModelPickerPopover.tsx` | Chip shows alias via `composerChipLabel`; instant hydrate skeleton |
+| Service | `src/modelDisplay.ts` | Honest alias vs resolved labels — `071-honest-model-labels.md` |
 | Config | `src/App.css` | `.model-picker-pop.is-hydrating` |
 
 ### Tauri command
@@ -63,7 +64,7 @@ tags: [claude-code, model-selector, model-catalog, composer, rust, performance, 
 ### Gotchas
 - **Effort is separate** — CC effort uses `EffortPopover` + `--effort` (`022`); catalog rows are model aliases only.
 - **Not Cursor** — Cursor CLI lists effort/speed tiers as distinct models via `--list-models` (`026`); no Quack effort knob there.
-- **Chip label** — composer shows `displayName` (e.g. `Opus 4.8`), not raw `modelId` (`opus`).
+- **Chip label** — composer shows alias `modelId` (`opus`, `sonnet`), not probed `displayName` — `071-honest-model-labels.md`.
 - **First open skeleton** — popover sets `sessionLoad` + `is-hydrating` until live CLI catalogs finish; no partial stale list + tail shimmer.
 - **Force refresh** — `invalidateClaudeCodeCache()` clears TS cache; Rust label cache survives until TTL (acceptable — aliases rarely change mid-hour).
 

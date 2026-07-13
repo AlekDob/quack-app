@@ -8,6 +8,7 @@
 // Brain: claude-usage-spike
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { formatResolvedModel } from "../modelDisplay";
 import { useStore } from "../store";
 import { ContextPanel } from "./ContextPanel";
 
@@ -391,7 +392,7 @@ function SessionRow(props: {
           </span>
         )}
         <span className="usage-row-model" title={s.primary_model}>
-          {shortModel(s.primary_model)}
+          {formatResolvedModel(s.primary_model) ?? "—"}
         </span>
         <span className="usage-row-cost">{fmtCost(s.estimated_cost_usd)}</span>
       </div>
@@ -425,20 +426,4 @@ function SessionRow(props: {
       </div>
     </li>
   );
-}
-
-function shortModel(m: string): string {
-  if (!m) return "—";
-  if (m.includes("opus-4-8")) return "opus 4.8";
-  if (m.includes("opus-4-7")) return "opus 4.7";
-  if (m.includes("opus-4-6")) return "opus 4.6";
-  if (m.includes("opus-4-5")) return "opus 4.5";
-  if (m.includes("opus")) return "opus";
-  if (m.includes("sonnet-5")) return "sonnet 5";
-  if (m.includes("sonnet-4-6")) return "sonnet 4.6";
-  if (m.includes("sonnet")) return "sonnet";
-  if (m.includes("haiku")) return "haiku";
-  if (m.includes("fable")) return "fable";
-  if (m.includes("mythos")) return "mythos";
-  return m.split("-").slice(0, 2).join("-");
 }

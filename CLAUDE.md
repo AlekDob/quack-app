@@ -164,6 +164,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `068-quack-plan-harness.md` — product-owned plan on stories (`S-NNN`): Jack PM, **StoryPlanDrawer** (hover peek + pin on chat column), composer segmented cluster + **ComposerDocsChip**; `plan:` tab (`061`) is fallback without `storyId`.
   - `069-smooth-streaming.md` — Cursor-style smooth assistant stream: rAF-coalesced paint + `StreamingPlainText` live tail (no per-delta markdown); full `MarkdownPreview` on turn commit.
   - `070-workspace-doc-open.md` — resolve `documentation/features/` paths from chat links and Works refs; friendly missing-doc UX (`workspaceDocOpen.ts`).
+  - `071-honest-model-labels.md` — composer chip shows CC alias (`sonnet`); post-turn usage strip shows resolved billed model (`Sonnet 5`); `modelDisplay.ts`.
   - `063-surface-view-prefs.md` — per-surface tab vs drawer default (Works / Brain / Team); Settings → Views; nested child-drawer stack.
   - `065-works-drawer-ux.md` — catalog list, draft create, Notion editor in drawer, module picker, nested drawer stack, overlay z-index (ctx menu + confirm).
   - `052-composer-voice-dictation.md` — Cursor-style composer mic: waveform row, native macOS `SFSpeechRecognizer` + Web Speech on Windows; `dictation.ts`, `dictation.rs`, `ComposerMic.tsx`.

@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-12
+last_verified: 2026-07-13
 tags: [session, usage, context, progress, claude-code, popover, monitor, quack-v1]
 ---
 
@@ -20,7 +20,7 @@ Claude Code only for the ring + live context data. Other providers: ring absent.
 |---|---|---|
 | `SessionUsageCircle` | Composer (`.ai-context-ring-dock`, above meta row) | Ring % — context when known, else plan 5hr % |
 | `SessionUsagePopover` | Popover above ring (click toggle) | Hero %, segmented bar, per-category token rows, **plan limit bars** |
-| `UsageChip` | Transcript footer (optional) | Last turn cost + in/out + cache hit % |
+| `UsageChip` | `.ai-usage-strip` above composer (idle, post-turn) | Cost + in/out + cache % + duration + **resolved model** (`formatResolvedModel`) — `071-honest-model-labels.md` |
 | Usage tab (`usage:<wsId>`) | Activity bar / Settings | Plan limits (5hr / 7day), This chat, Quack spend |
 
 Ring stays pinned between turns (`pinnedContextRef`) so it does not flash empty

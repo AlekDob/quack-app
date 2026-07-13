@@ -1,4 +1,5 @@
 import { Icon } from "./Icon";
+import { pickerRowLabel } from "../modelDisplay";
 import {
   isFavoriteModel,
   modelKey,
@@ -25,7 +26,7 @@ export function ModelPickerRow({
   return (
     <div className="model-picker-row">
       <button type="button" className="model-picker-row-main" onClick={onPick}>
-        <span className="model-picker-row-name">{model.displayName}</span>
+        <span className="model-picker-row-name">{pickerRowLabel(model)}</span>
         {model.isFree && (
           <span className="model-picker-row-tag tag-free">free</span>
         )}

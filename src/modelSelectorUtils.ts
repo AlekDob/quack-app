@@ -1,3 +1,4 @@
+import { composerChipLabel } from "./modelDisplay";
 import { makeQualifiedModel, type ProviderId, type ProviderModel } from "./providers/types";
 import { modelKey } from "./modelPrefs";
 
@@ -102,12 +103,5 @@ export function modelLabel(
   models: ProviderModel[],
   selectedQualified: string,
 ): string {
-  const parsed = selectedQualified;
-  const hit = models.find(
-    (m) => makeQualifiedModel(m.providerId, m.modelId) === parsed,
-  );
-  if (hit) return hit.displayName || hit.modelId;
-  const colon = selectedQualified.indexOf(":");
-  if (colon > 0) return selectedQualified.slice(colon + 1);
-  return "Pick a model…";
+  return composerChipLabel(selectedQualified, models);
 }
