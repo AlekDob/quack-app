@@ -163,6 +163,19 @@ Bus: `featureDocDrawer.ts`.
 
 See **`068-quack-plan-harness.md`** for Quack Plan flow + **StoryPlanDrawer** (hover soffietto on chat column).
 
+### Composer ↔ disk auto-link (`worksChatAutoLink.ts`)
+
+When agents create Works files on disk, Quack keeps the composer **Work chip** in sync (`saveWorks` + `refreshWorksFromDisk` → `afterWorksSaved`).
+
+| Artifact | Auto-link to focused / `working` chat? |
+|---|---|
+| `W-NNN` (new, no `linkedChats`) | Yes |
+| `S-NNN` **draft** (new, no `linkedChats`) | **No** — planning is explicit (`068`) |
+| `S-NNN` **active** (new, no `linkedChats`) | Yes |
+| Any file with `linkedChats: [<chatId>]` | Always mirrored to `storyId` / `workItemId` |
+
+Never overrides an existing chat link. Bulk hydrate guard skips mass-link when many orphans appear at once.
+
 ### Composer docs chip (`ComposerDocsChip.tsx`)
 
 Cursor-style segment inside `ai-composer-work-cluster` (shared border with work pill).
@@ -273,6 +286,7 @@ Mirror copies in `documentation/skills/`. Upgrades via `quack-bundled-version`.
 | Feature modules | `src/worksFeatureModules.ts` |
 | Preview strip | `src/featureDocPreview.ts` |
 | Cache + CRUD | `src/worksCache.ts` |
+| Chat auto-link | `src/worksChatAutoLink.ts` — `afterWorksSaved`, `syncLinkedChatsToStore` |
 | Markdown I/O | `src/workItemMd.ts`, `src/worksItemFiles.ts`, `src/worksWatch.ts`, `src/quackDir.ts` |
 | Shell | `src/components/works/WorksPane.tsx` |
 | List groups | `worksListGroups.ts` — `buildWorksListGroups`, `WorksListGroup` |

@@ -183,6 +183,7 @@ export async function refreshWorksFromDisk(root: string): Promise<void> {
     await hydrateWorks(root);
     return;
   }
+  const prev = e.snapshot;
   const withBodies = await loadAllItemBodies(root, e.snapshot);
   const withStories = await loadAllStoryBodies(root, withBodies);
   const { snap: withOrphans, changed } = await importOrphanMdFiles(root, withStories);
@@ -191,7 +192,12 @@ export async function refreshWorksFromDisk(root: string): Promise<void> {
   e.snapshot = withStoryOrphans;
   notify(e);
   refreshAllWorkProgress(withStoryOrphans);
-  if (changed || storyChanged) await persist(root, withStoryOrphans);
+  if (changed || storyChanged) {
+    await persist(root, withStoryOrphans);
+    void import("./worksChatAutoLink").then((m) =>
+      m.afterWorksSaved(root, prev, withStoryOrphans),
+    );
+  }
 }
 
 export async function refreshWorksModules(root: string): Promise<void> {
@@ -220,11 +226,15 @@ export async function saveWorks(
   snap: WorksSnapshot,
 ): Promise<void> {
   const e = getEntry(root);
+  const prev = e.snapshot;
   e.snapshot = snap;
   e.hydrated = true;
   await persist(root, snap);
   notify(e);
   refreshAllWorkProgress(snap);
+  void import("./worksChatAutoLink").then((m) =>
+    m.afterWorksSaved(root, prev, snap),
+  );
 }
 
 function patchItem(

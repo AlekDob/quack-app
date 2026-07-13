@@ -44,7 +44,6 @@ type Props = {
   workItemId?: string;
   storyId?: string;
   planning?: boolean;
-  ccPermMode: string | null;
   onPickJack: () => void;
   onSetPlanMode?: () => void;
 };
@@ -73,7 +72,6 @@ export function ComposerWorkBar({
   workItemId,
   storyId,
   planning,
-  ccPermMode,
   onPickJack,
   onSetPlanMode,
 }: Props) {
@@ -90,24 +88,6 @@ export function ComposerWorkBar({
     void hydrateWorks(root).then(setSnap);
     return subscribeWorks(root, setSnap);
   }, [root]);
-
-  useEffect(() => {
-    if (ccPermMode !== "plan" || workItemId || storyId) return;
-    onPickJack();
-    onSetPlanMode?.();
-    void enterPlanning(wsId, chatId, root).catch((e) =>
-      console.warn("plan story failed", e),
-    );
-  }, [
-    ccPermMode,
-    workItemId,
-    storyId,
-    root,
-    chatId,
-    wsId,
-    onPickJack,
-    onSetPlanMode,
-  ]);
 
   const work = workItemId && snap ? findWork(snap, workItemId) : undefined;
   const story =

@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-06-28
+last_verified: 2026-07-13
 tags: [branding, jack, duck, mascot, avatar, persona, ai-chat, agents, quack-v1, system-prompt]
 ---
 
@@ -19,6 +19,9 @@ This is the single place that defines the persona, the brand mark, and where duc
   *"You are Jack, the project manager and coding agent embedded in Quack… Speak as Jack… never invent another name."*
 - Reaches **all** providers: for Claude Code it's flattened into the `[System]` block on turn 1
   (`providers/claudeCode.ts` `flattenMessages`); other providers get it as the `system` message.
+- **Works / planning** (`brainPrompt.ts`, 2026-07-13): Jack does **not** open a user story (`S-NNN`) or plan
+  at chat start. Quick Q&A and hotfixes stay chat-only; stories appear only when the user clicks **Plan a feature**
+  or planning is explicitly agreed. See `068-quack-plan-harness.md` (**Explicit planning gate**).
 - **Gotcha:** the "Agent Alex" greeting seen in some screenshots came from a *different project's*
   `CLAUDE.md` (Astronave), not from Quack — Quack's persona is Jack.
 
@@ -40,6 +43,7 @@ This is the single place that defines the persona, the brand mark, and where duc
 |---|---|---|
 | Component | `src/components/AIIcon.tsx` | Duck brand mark used across all agent/chat surfaces |
 | Component | `src/components/AIChatPanel.tsx` | Jack persona in system prompt + assistant identity header |
+| Module | `src/brainPrompt.ts` | Jack system prompt (`jackSystemPrompt`) — persona + Works/planning gate |
 | Asset | `public/jack.jpeg` | Jack's avatar (duck in a blazer = the PM); swap to restyle the mark everywhere |
 | Assets | `public/images/ducks/duck1..35.jpeg` | duck pool for per-subagent avatars (see `features/004`) |
 | Styles | `src/App.css` | `.ai-msg-identity`, `.ai-msg-name`, `.ai-msg-title`, `.ai-msg-avatar` |

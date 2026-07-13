@@ -1,7 +1,7 @@
 ---
 name: quack-works
 description: Quack PM + Works — document product components (documentation/features/NNN-slug.md), sync Works modules, user stories S-NNN, tickets W-NNN, cycles, kanban. Use whenever the user mentions tickets, work items, stories, sprints, cycles, feature docs, feature-doc, modules, plan approval, W-NNN, S-NNN, or project task tracking in Quack — even if they don't say "Works".
-quack-bundled-version: 9
+quack-bundled-version: 10
 ---
 
 # Quack Works
@@ -151,10 +151,12 @@ Inject depth (composer work menu): `pointers` | `outline` (default) | `pinky` (s
 
 Product-owned plan mode — **story is the artifact**, not ephemeral CC plan text.
 
+**Do not** create a story at chat start. Stories open only when the user clicks **Plan a feature** or you and the user explicitly agree it's planning time (multi-step scope, unclear path). Quick Q&A and hotfixes need no story.
+
 | Step | What |
 |---|---|
 | Enter Plan / Plan a feature | `ensurePlanStory` → `S-NNN` draft, `storyId` on chat, `StoryPlanPane` opens right |
-| CC ExitPlanMode | `mergePlanIntoStory` — body + acceptance checklist |
+| CC ExitPlanMode | `mergePlanIntoStory` — body + acceptance checklist (into linked story, or legacy `plan:` tab if none) |
 | Approve | `approvePlanStory` → status `active` |
 | Implement | `createWorkFromStory` → link `W-NNN`, composer shows `S › W` |
 
@@ -180,12 +182,12 @@ cycleId: <cycle-uuid>
 
 1. **Map** — create or update `documentation/features/{NNN}-{slug}.md` (Part A)
 2. **Find** — glob `works/items/*.md`, `works/stories/*.md`, or read `snapshot.json`
-3. **Story** — `works/stories/S-NNN.md` when scope needs user-facing acceptance criteria
+3. **Story** — `works/stories/S-NNN.md` only when scope needs user-facing acceptance criteria **and** planning is explicit (not on first message)
 4. **Tickets** — `works/items/W-NNN.md` with `module`, optional `parentId`, `cycleId`
 5. **Read** — feature doc + linked work/story `.md` before editing code
 6. **Implement** — update code; work `status` todo → in_progress → done; bump `last_verified` on feature doc
-8. **Link session** — `linkedChats` on story/work; `@S-001` / `@W-001`; manifest inject
-9. **Quack Plan** (Jack PM) — `enterPlanning` → `S-NNN` draft + `StoryPlanPane` split-right; CC `ExitPlanMode` merges into story; approve → `active`; **Start implementation** → `W-NNN` with `parentId`
+8. **Link session** — `linkedChats` on story/work; `@S-001` / `@W-001`; manifest inject. Quack **auto-links** new **work items** (not draft stories) to the active/working chat when `linkedChats` is omitted (`worksChatAutoLink.ts`).
+9. **Quack Plan** (Jack PM) — user **Plan a feature** or agreed planning moment → `enterPlanning` → `S-NNN` draft + story drawer; CC `ExitPlanMode` merges into story; approve → `active`; **Start implementation** → `W-NNN` with `parentId`
 
 Bodies live in `.md` files only — not in `snapshot.json`.
 
