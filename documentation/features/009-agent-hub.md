@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-12
-tags: [agent-hub, agent-status, sessions, notifications, cross-project, workspace-colors, watcher, mount-asymmetry, collapsed-rail, hover-drawer]
+last_verified: 2026-07-13
+tags: [agent-hub, agent-status, sessions, notifications, cross-project, workspace-colors, watcher, mount-asymmetry, collapsed-rail, hover-drawer, archived]
 ---
 
 ## Agent Hub (cross-project status rail)
@@ -23,8 +23,9 @@ UI labels are English (app language). Dot colors are vivid + glowing — the dot
 | Working | `working` | sessionId present in `claude_code_active_sessions` | `#eab308` yellow + glow, pulsing |
 | Ready | `ready` | resting state — anything not running/blocked/done | `#22c55e` green + glow |
 | Done | `done` | manual (right-click) | neutral dim |
+| Archived | `archived` | manual (right-click) | neutral dim (muted title) |
 
-`archived` chats (manual) are filtered out of the hub entirely. **"Ready" is the resting baseline** — there is no separate "idle" group; a chat that isn't actively running, blocked, or marked done is Ready (waiting for the user). Priority on collision: archived → error → needs-input → working → done → ready (`resolveDisplayStatus`).
+`archived` chats are **hidden from the live status groups** (Error → Done) but surfaced in a separate **Archived** section when the hub is expanded — see below. **"Ready" is the resting baseline** — there is no separate "idle" group; a chat that isn't actively running, blocked, or marked done is Ready (waiting for the user). Priority on collision: archived → error → needs-input → working → done → ready (`resolveDisplayStatus`).
 
 ### Architecture — single producer, no panel coupling
 
@@ -43,7 +44,7 @@ A single headless `AgentHubWatcher` (mounted once in `App.tsx`) derives status f
 | Customizations footer + modal (expanded hub) | `src/components/AgentCustomizations.tsx`, `CustomizationsModal` → feature 036 |
 | Session diff subtitles (expanded rows) | `src/chatDiffStore.ts`, `src/sessionDiffStats.ts` → feature 029 |
 | OS notification + toast + quack sound (60s dedup, focus gate) | `src/notifications.ts` |
-| View prefs (expanded, collapsed sections) — global | `src/hubPrefs.ts` |
+| View prefs (expanded, collapsed sections) — global | `src/hubPrefs.ts` — first-run collapses `done` + `archived` |
 | Shared provider badge (DRY extract) | `src/modelBadge.ts` |
 | Backend: live-session list | `src-tauri/src/claude_code.rs` → `claude_code_active_sessions` |
 | Backend: permission-resolved event | `src-tauri/src/claude_perm.rs` → `claude_perm_decide` emits `claude:permission-resolved` |
@@ -55,9 +56,29 @@ A single headless `AgentHubWatcher` (mounted once in `App.tsx`) derives status f
 
 ### Right-click lifecycle
 
-Context menu on a row (`ContextMenu`, shared viewport-clamped component): **Rename** (inline input, sets `titleLocked` so the auto-title effect in `AIChatPanel` stops overwriting it), **Mark done / Reopen** (toggles `doneAt`), **Archive** (sets `archivedAt`, hides from hub, closes editor tab via `closeAiTabInLayout`). Persisted on the descriptor in per-workspace `state.json`.
+Context menu on a row (`ContextMenu`, shared viewport-clamped component): **Rename** (inline input, sets `titleLocked` so the auto-title effect in `AIChatPanel` stops overwriting it), **Mark done / Reopen** (toggles `doneAt`), **Archive** (sets `archivedAt`, hides from live groups, closes editor tab via `closeAiTabInLayout`). Archived rows show **Unarchive** instead of Mark done / Archive. Persisted on the descriptor in per-workspace `state.json`.
 
 **Process cleanup (2026-07-08):** Mark done, Archive, and close chat tab all call `stopChatAgent` — kills the chat's CLI subprocess (`claude_code_kill_session` / `cursor_code_kill_session`) and aborts HTTP streams via `aiStopBus`. **Does not kill workspace PTY terminals** (e.g. a dev server in Terminal 1). See `046-process-cleanup.md`.
+
+### Archived section (expanded hub, 2026-07-13)
+
+When the hub is **expanded** and at least one chat has `archivedAt`, a sixth collapsible group **Archived** appears below Done. Speed-first: archived rows skip live status polling and session-diff hydration.
+
+| Concern | Behavior |
+|---|---|
+| Default visibility | Latest **10** chats by `createdAt` desc |
+| Search | Inline filter on chat title + workspace name; max **30** matches |
+| Hint | *Latest 10 of N — search for more* when `N > 10` and search empty |
+| Open row | `setAIChatLifecycle(…, "active")` then `focusAIChat` — unarchives + reopens tab |
+| Collapsed by default | `hubPrefs` first-run default includes `"archived"` (with `"done"`) |
+| Collapsed rail | Section hidden when hub is not expanded (44px chip mode) |
+
+| Constant | Value | File |
+|---|---|---|
+| `ARCHIVED_PREVIEW` | 10 | `AIChatsRail.tsx` |
+| `ARCHIVED_SEARCH_CAP` | 30 | `AIChatsRail.tsx` |
+
+CSS: `.agent-hub-section.status-archived`, `.agent-hub-archived-search`, `.agent-hub-archived-hint`, `.agent-hub-dot.archived`.
 
 ### Session diff subtitles (expanded hub)
 

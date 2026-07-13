@@ -24,7 +24,7 @@ const isStringArray = (v: unknown): v is string[] =>
 // their explicit choice is persisted and wins.
 let _collapsed = new Set(
   lsGetString(KEY_COLLAPSED) === null
-    ? ["done"]
+    ? ["done", "archived"]
     : lsGetJson<string[]>(KEY_COLLAPSED, [], isStringArray),
 );
 const expandedListeners = new Set<(v: boolean) => void>();

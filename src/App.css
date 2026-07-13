@@ -3213,9 +3213,56 @@ body.ab-dragging * {
   box-shadow: 0 0 6px 1px rgba(239, 68, 68, 0.65);
 }
 .agent-hub-dot.idle,
-.agent-hub-dot.done {
+.agent-hub-dot.done,
+.agent-hub-dot.archived {
   background: var(--fg-muted);
   opacity: 0.5;
+}
+.agent-hub-section.status-archived .agent-hub-row-title {
+  color: var(--fg-muted);
+}
+.agent-hub-archived-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 8px 4px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-hi);
+  color: var(--fg-muted);
+}
+.agent-hub-archived-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-size: 11px;
+  outline: none;
+}
+.agent-hub-archived-search-input::placeholder {
+  color: var(--fg-muted);
+}
+.agent-hub-archived-search-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.agent-hub-archived-search-clear:hover {
+  color: var(--fg-dim);
+}
+.agent-hub-archived-hint {
+  margin: 0 12px 4px;
+  font-size: 10px;
+  color: var(--fg-muted);
+  line-height: 1.35;
 }
 @keyframes agent-hub-pulse {
   0%,

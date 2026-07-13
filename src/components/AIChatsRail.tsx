@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   activeAiChatId,
   useStore,
@@ -54,8 +54,11 @@ interface HubEntry {
   color: WorkspaceColor | null;
 }
 
-// Status groups, in attention order (top = most urgent). `archived` is not
-// a group — those chats are filtered out entirely.
+// Status groups, in attention order (top = most urgent). Archived chats
+// live in a separate lazy section (preview + search) below Done.
+const ARCHIVED_PREVIEW = 10;
+const ARCHIVED_SEARCH_CAP = 30;
+
 const GROUPS: Array<{ status: DisplayStatus; label: string }> = [
   { status: "error", label: "Error" },
   { status: "needs-input", label: "Needs input" },
@@ -164,6 +167,7 @@ export function AIChatsRail({
   );
   const [renaming, setRenaming] = useState<string | null>(null);
   const [custTab, setCustTab] = useState<CustomizationTab | null>(null);
+  const [archivedSearch, setArchivedSearch] = useState("");
 
   // The chat the user is currently looking at (for highlight).
   const activeChatId =
@@ -173,20 +177,51 @@ export function AIChatsRail({
         ? activeAiChatId(loaded[activeId])
         : null;
 
-  // Flatten every open workspace's chats, drop archived, attach status.
+  // Flatten every open workspace's chats; archived memoized (no live status).
+  const archivedSorted = useMemo(() => {
+    const archived: HubEntry[] = [];
+    for (const [wsId, ws] of Object.entries(loaded)) {
+      const color = getWorkspaceColor(wsId);
+      for (const chat of Object.values(ws.aiChats)) {
+        if (!chat.archivedAt) continue;
+        archived.push({ wsId, ws, chat, status: "archived", color });
+      }
+    }
+    return archived.sort((a, b) => b.chat.createdAt - a.chat.createdAt);
+  }, [loaded]);
+
   const entries: HubEntry[] = [];
   for (const [wsId, ws] of Object.entries(loaded)) {
     const color = getWorkspaceColor(wsId);
     for (const chat of Object.values(ws.aiChats)) {
+      if (chat.archivedAt) continue;
       const status = resolveDisplayStatus({
         lifecycle: lifecycleOf(chat),
         live: getAgentStatus(chat.id),
         seen: isSeen(chat.id),
       });
-      if (status === "archived") continue;
       entries.push({ wsId, ws, chat, status, color });
     }
   }
+
+  const archivedVisible = useMemo(() => {
+    const q = archivedSearch.trim().toLowerCase();
+    if (q) {
+      return archivedSorted
+        .filter(
+          (e) =>
+            e.chat.title.toLowerCase().includes(q) ||
+            e.ws.meta.name.toLowerCase().includes(q),
+        )
+        .slice(0, ARCHIVED_SEARCH_CAP);
+    }
+    return archivedSorted.slice(0, ARCHIVED_PREVIEW);
+  }, [archivedSorted, archivedSearch]);
+
+  const focusArchivedChat = async (wsId: string, chatId: string) => {
+    setAIChatLifecycle(wsId, chatId, "active");
+    await focusChat(wsId, chatId);
+  };
 
   const focusChat = async (wsId: string, chatId: string) => {
     markSeen(chatId);
@@ -350,6 +385,83 @@ export function AIChatsRail({
               </HubSection>
             );
           })}
+          {showExpanded && archivedSorted.length > 0 && (
+            <HubSection
+              status="archived"
+              label="Archived"
+              count={archivedSorted.length}
+              expanded={showExpanded}
+            >
+              {!isSectionCollapsed("archived") && (
+                <>
+                  <div className="agent-hub-archived-search">
+                    <Icon name="search" size={12} aria-hidden="true" />
+                    <input
+                      className="agent-hub-archived-search-input"
+                      value={archivedSearch}
+                      onChange={(e) => setArchivedSearch(e.target.value)}
+                      placeholder="Search archived…"
+                      aria-label="Search archived chats"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    {archivedSearch && (
+                      <button
+                        type="button"
+                        className="agent-hub-archived-search-clear"
+                        title="Clear search"
+                        aria-label="Clear search"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setArchivedSearch("");
+                        }}
+                      >
+                        <Icon name="x" size={10} />
+                      </button>
+                    )}
+                  </div>
+                  {archivedSorted.length > ARCHIVED_PREVIEW &&
+                    !archivedSearch.trim() && (
+                      <div className="agent-hub-archived-hint">
+                        Latest {ARCHIVED_PREVIEW} of {archivedSorted.length} —
+                        search for more
+                      </div>
+                    )}
+                  {archivedSearch.trim() &&
+                    archivedVisible.length === 0 && (
+                      <div className="agent-hub-archived-hint">
+                        No archived chats match
+                      </div>
+                    )}
+                </>
+              )}
+              {!isSectionCollapsed("archived") &&
+                archivedVisible.map((entry) => (
+                  <HubRow
+                    key={entry.chat.id}
+                    entry={entry}
+                    expanded={showExpanded}
+                    active={
+                      entry.wsId === activeId && entry.chat.id === activeChatId
+                    }
+                    renaming={renaming === entry.chat.id}
+                    onClick={() =>
+                      focusArchivedChat(entry.wsId, entry.chat.id)
+                    }
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      setMenu({ entry, x: e.clientX, y: e.clientY });
+                    }}
+                    onClose={() => closeChat(entry.wsId, entry.chat.id)}
+                    onRename={(title) => {
+                      if (title.trim())
+                        renameAIChat(entry.wsId, entry.chat.id, title.trim());
+                      setRenaming(null);
+                    }}
+                    onRenameCancel={() => setRenaming(null)}
+                  />
+                ))}
+            </HubSection>
+          )}
         </div>
         {showExpanded && (
           <AgentCustomizations onOpen={(t) => setCustTab(t)} />
@@ -374,24 +486,38 @@ export function AIChatsRail({
               label: "Rename",
               onClick: () => setRenaming(menu.entry.chat.id),
             },
-            {
-              label: menu.entry.chat.doneAt ? "Reopen" : "Mark done",
-              onClick: () =>
-                setAIChatLifecycle(
-                  menu.entry.wsId,
-                  menu.entry.chat.id,
-                  menu.entry.chat.doneAt ? "active" : "done",
-                ),
-            },
-            {
-              label: "Archive",
-              onClick: () =>
-                setAIChatLifecycle(
-                  menu.entry.wsId,
-                  menu.entry.chat.id,
-                  "archived",
-                ),
-            },
+            ...(menu.entry.chat.archivedAt
+              ? [
+                  {
+                    label: "Unarchive",
+                    onClick: () =>
+                      setAIChatLifecycle(
+                        menu.entry.wsId,
+                        menu.entry.chat.id,
+                        "active",
+                      ),
+                  },
+                ]
+              : [
+                  {
+                    label: menu.entry.chat.doneAt ? "Reopen" : "Mark done",
+                    onClick: () =>
+                      setAIChatLifecycle(
+                        menu.entry.wsId,
+                        menu.entry.chat.id,
+                        menu.entry.chat.doneAt ? "active" : "done",
+                      ),
+                  },
+                  {
+                    label: "Archive",
+                    onClick: () =>
+                      setAIChatLifecycle(
+                        menu.entry.wsId,
+                        menu.entry.chat.id,
+                        "archived",
+                      ),
+                  },
+                ]),
           ]}
         />
       )}

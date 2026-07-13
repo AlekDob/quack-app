@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-12
+last_verified: 2026-07-13
 tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, workspace, zustand, persistence]
 ---
 
@@ -21,7 +21,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Component | `src/components/AIChatsRail.tsx` | Cross-project Agent Hub (editor mode): status groups, diff subtitles, Customizations footer when expanded |
+| Component | `src/components/AIChatsRail.tsx` | Cross-project Agent Hub: status groups, archived preview+search, diff subtitles, Customizations footer when expanded → `009-agent-hub.md` |
 | Component | `src/components/AgentModeShell.tsx` | Agent-mode layout: workspace rail + sessions list + live Tasks + Customizations |
 | Component | `src/components/AgentCustomizations.tsx` | Shared Customizations footer menu → `CustomizationsModal` (feature 036) |
 | Component | `src/components/WorkspacePicker.tsx` | Library entry / recent-workspaces picker on first run |
@@ -85,6 +85,8 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | `ccPermMode` | `string \| null?` | Permission mode for this chat |
 | `ccThinking` | `boolean \| null?` | Extended thinking knob |
 | `composer` | `ChatComposerDraft?` | Draft input, queue, attach toggles, staged images |
+| `doneAt` | `number?` | Manual "done" — shown in Done group (`009`) |
+| `archivedAt` | `number?` | Manual archive — hidden from live groups; preview in Archived section (`009`) |
 
 ### Config
 - `MAX_SESSIONS`: 30 transcripts per workspace (`chat_store.rs` / `chatHistory.ts`)
