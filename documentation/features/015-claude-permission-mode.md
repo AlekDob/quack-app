@@ -4,7 +4,7 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
 last_verified: 2026-07-13
-tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command, plan-mode, exit-plan-mode, build-handoff]
+tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command, plan-mode, exit-plan-mode, build-handoff, ask-user-question]
 ---
 
 ## Claude Code Permission Mode (Ask / Plan / Auto-edit / Auto / Agent)
@@ -17,6 +17,7 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Bridge store | `src/permModeStore.ts` | `setPermMode(opts, mode)`, `getPermModeFor(req)` — mode keyed by CC session id (+ cwd fallback) |
+| Ask cache | `src/askQuestionStore.ts` | `publishAskInput(sessionId, tool_input)` — full question payload before deny-redirect (073) |
 | Enforcer | `src/components/ClaudePermissionOverlay.tsx` | `isForThisPanel(req)` route guard; `modeAutoAllow(req)` + `WRITE_TOOLS`; auto-allows after the safety gates |
 | Producer | `src/components/AIChatPanel.tsx` | `ccPermMode` state, `/mode` handler; publishes via `setPermMode`; passes owner props to overlay |
 | Composer chip | `src/components/ComposerPermMode.tsx` | Cursor-style tinted mode pill + portaled menu (`document.body`) |
@@ -53,7 +54,7 @@ Cursor-style **semantic tint + icon** on the active mode pill; dropdown rows sho
 ### Data Flow
 - `AIChatPanel` holds `ccPermMode` per chat. Restored from `ChatSession.ccPermMode` on session switch; global `localStorage["lcp.claudeCode.permMode"]` seeds **new** chats only (feature 040). Legacy rows without the field restore to **Ask** (`null`), not global. See `040-per-session-composer-state.md`.
 - `permModeStore` records the mode in `bySession` (by CC session id) and `byCwd` (normalized root) — the cwd fallback covers the first tool call of a fresh chat before its session id has streamed back.
-- A `claude:permission-request` arrives → every mounted `ClaudePermissionOverlay` hears it (global event). `isForThisPanel` drops requests that belong to another workspace or another CC session within the same workspace. The surviving overlay runs its gates **in order**: AskUserQuestion redirect → **Agent (`bypassPermissions`) allow-all** → privacy exclusion → read-only allow → `modeAutoAllow(req)` → (in Plan mode: stop, show card) → saved/always-allow rules → show card.
+- A `claude:permission-request` arrives → every mounted `ClaudePermissionOverlay` hears it (global event). `isForThisPanel` drops requests that belong to another workspace or another CC session within the same workspace. The surviving overlay runs its gates **in order**: **AskUserQuestion** → `publishAskInput` + deny redirect (073) → **Agent (`bypassPermissions`) allow-all** → privacy exclusion → read-only allow → `modeAutoAllow(req)` → (in Plan mode: stop, show card) → saved/always-allow rules → show card.
 - `modeAutoAllow` calls `getPermModeFor(req)` (session id, then cwd, else `"default"`): `auto` → allow all; `acceptEdits` → allow only `WRITE_TOOLS`; `plan` → allow `PLAN_EXPLORE_TOOLS` (`Task`/`Agent`/`TaskCreate`/`TaskUpdate`/`TaskList`/`TodoWrite`) **or** Bash when `isReadOnlyBash` (head ∈ `READ_ONLY_BASH`, or `git` + read-only subcommand, and no chain/redirect/pipe/subshell via `BASH_CHAIN_RE`); else → no mode-based allow.
 
 ### State

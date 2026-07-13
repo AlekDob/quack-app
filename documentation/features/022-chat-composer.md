@@ -176,6 +176,22 @@ Claude Code only. Full behaviour table: **`015-claude-permission-mode.md`**.
   (reuses `.ai-todos-list` / `.ai-todo-*`). Backdrop closes it. Skipped in
   compact/agent mode (the checklist lives in the sidebar there).
 
+## Ask question dock (feature 073)
+
+When the last assistant turn ends on `AskUserQuestion`, **`.ai-ask-dock`**
+renders `AskQuestionCard` immediately above `.ai-composer-shell` (same chrome
+family as `.ai-status-dock` / `.ai-todos-bar`).
+
+| Behaviour | Detail |
+|---|---|
+| Pending detection | Last message = assistant with `AskUserQuestion`; not streaming |
+| Args | `mergeAskQuestionArgs(stream args, askQuestionStore hook snapshot)` |
+| Answer | Option click or typed reply → `sendUserText` resumes CC session |
+| Dismiss | Esc / ✕ — hides card; composer still accepts free-form answer |
+| While busy | `answerQuestion` enqueues like composer send (039) |
+
+Full detail: **`073-ask-user-question-dock.md`**.
+
 ## Live turn status dock
 
 - `StatusPill` / `ai-inline-status` live in **`.ai-status-dock`** — a flex slot

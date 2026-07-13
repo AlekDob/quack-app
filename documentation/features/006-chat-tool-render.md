@@ -4,7 +4,7 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
 last_verified: 2026-07-13
-tags: [ai-chat, tool-calls, chatToolRender, cursor-style, conductor-style, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap, html-preview]
+tags: [ai-chat, tool-calls, chatToolRender, cursor-style, conductor-style, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap, html-preview, ask-user-question]
 ---
 
 ## Chat Tool-Call Rendering
@@ -50,7 +50,21 @@ Consecutive non-task tool calls collapse into one row:
 standalone `ToolCallRow` directly (no `.ai-iarow` wrapper). The row gets
 `.ai-tcall-standalone` (`margin: 10px 0`) so it keeps the same vertical rhythm as grouped rows.
 
-**Skipped in stream:** `TaskCreate`/`Update`/`List`, `TodoWrite`, `AskUserQuestion` (sidebar / ask-dock).
+**Skipped in stream:** `TaskCreate`/`Update`/`List`, `TodoWrite`, `AskUserQuestion` (sidebar / ask-dock — full UX in **`073-ask-user-question-dock.md`**).
+
+### AskUserQuestion (transcript row only)
+
+Interactive card lives in `.ai-ask-dock` above the composer (`AIChatPanel`).
+`ToolCallRow` renders a **compact** one-liner (`Question` + summary) so options
+are not duplicated in the scrollable transcript.
+
+| Export | Role |
+|---|---|
+| `AskQuestionCard` | Docked interactive card (options, Other…, Esc dismiss) |
+| `parseAskQuestions` / `coerceToolArgs` / `mergeAskQuestionArgs` | Defensive parse + hook-args merge |
+| `isAskUserQuestionTool` | Name matcher (`AskUserQuestion`, `askUserQuestion`, …) |
+
+See **`073-ask-user-question-dock.md`** for data flow, hook cache, and gotchas.
 
 Edits in the chip row are hidden when `hideEdits` (ComposeCard owns the recap).
 
@@ -150,6 +164,7 @@ shimmer class. Planning-without-pill (`Planning next moves…`) uses the same cl
 | `.reasoning-turn-chip*` | Collapsed reasoning recap (056; mirrors brain-turn-chip) |
 | `.compose-review-*` | Diff review tab (038) |
 | `.tool-drawer` | Read/bash result slide-over |
+| `.ai-ask-card` / `.ai-ask-dock` | AskUserQuestion dock (073) |
 
 ### Gotchas
 

@@ -164,6 +164,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `066-works-cycles-stories.md` — auto weekly **Cycles** (progress + burndown charts), Scrum **Stories** spawning backlog work items; storage at workspace `works/` (not `.quack/`).
   - `068-quack-plan-harness.md` — product-owned plan on stories (`S-NNN`): Jack PM, **StoryPlanDrawer** (hover peek + pin on chat column), composer segmented cluster + **ComposerDocsChip**; `plan:` tab (`061`) is fallback without `storyId`.
   - `069-smooth-streaming.md` — Cursor-style smooth assistant stream: rAF-coalesced paint + `StreamingPlainText` live tail (no per-delta markdown); full `MarkdownPreview` on turn commit.
+  - `073-ask-user-question-dock.md` — Claude Code `AskUserQuestion`: Cursor-style interactive card above composer; hook `tool_input` cache + lenient parse; deny-redirect flow (015).
   - `070-workspace-doc-open.md` — resolve `documentation/features/` paths from chat links and Works refs; friendly missing-doc UX (`workspaceDocOpen.ts`).
   - `071-honest-model-labels.md` — composer chip shows CC alias (`sonnet`); post-turn usage strip shows resolved billed model (`Sonnet 5`); `modelDisplay.ts`.
   - `063-surface-view-prefs.md` — per-surface tab vs drawer default (Works / Brain / Team); Settings → Views; nested child-drawer stack.
