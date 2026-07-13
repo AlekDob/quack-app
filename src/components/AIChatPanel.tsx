@@ -118,14 +118,17 @@ import {
   PRESET_ORDER,
   effectivePresetDefinition,
   getJackDefinition,
+  getPreset,
   getPresetInstructionsFor,
   getPresetOverrides,
+  isBuiltinPresetId,
   loadCustomPresets,
   resolvePresetConfigFor,
   subscribePresetSettings,
   type PresetDefinition,
 } from "../presets";
-import { PERM_MODE_OPTIONS } from "../presets/permModes";
+import { ComposerPermMode } from "./ComposerPermMode";
+import { PERM_MODE_OPTIONS, permModeOption } from "../presets/permModes";
 import {
   fetchBrainContextForTurn,
   fetchBrainContextDeduped,
@@ -493,6 +496,16 @@ const STORAGE_KEY = "lcp.ollama.lastModel";
 // etc.) live in chatTextUtils.ts so the chat panel doesn't have to host
 // 250 lines of regex / brace-walking that's reusable elsewhere.
 
+/** Resolve the live preset definition — always re-reads built-in overrides
+ *  from localStorage so Team-tab edits apply without waiting for a re-render. */
+function resolveActivePresetDef(
+  id: string | null,
+  customPresets: PresetDefinition[],
+): PresetDefinition | undefined {
+  if (id === null) return effectivePresetDefinition(getJackDefinition());
+  if (isBuiltinPresetId(id)) return effectivePresetDefinition(getPreset(id));
+  return customPresets.find((p) => p.id === id);
+}
 
 function insertIntoActiveEditor(text: string): boolean {
   const ed = getActiveEditor();
@@ -940,9 +953,7 @@ export function AIChatPanel({
   // at new-chat time without narrating it every time a fresh tab opens.
   const applyPreset = (id: string | null, opts: { silent?: boolean } = {}) => {
     setPresetId(id);
-    const def = id
-      ? presetChoices.find((p) => p.id === id)
-      : effectivePresetDefinition(getJackDefinition());
+    const def = resolveActivePresetDef(id, customPresets);
     if (!def) return; // stale id (e.g. a deleted custom preset) — no-op
     const selectedParsed = parseQualifiedModel(selected);
     const provider = selectedParsed?.providerId;
@@ -991,8 +1002,17 @@ export function AIChatPanel({
   // organigramma's drawer) so the composer picker reflects it without a
   // full remount — presetChoices below recomputes from localStorage.
   const [presetOverridesTick, setPresetOverridesTick] = useState(0);
+  const applyPresetRef = useRef(applyPreset);
+  applyPresetRef.current = applyPreset;
+  const presetIdRef = useRef(presetId);
+  presetIdRef.current = presetId;
   useEffect(
-    () => subscribePresetSettings(() => setPresetOverridesTick((n) => n + 1)),
+    () =>
+      subscribePresetSettings(() => {
+        setPresetOverridesTick((n) => n + 1);
+        // Team-tab edits should immediately shape the active session knobs.
+        applyPresetRef.current(presetIdRef.current, { silent: true });
+      }),
     [],
   );
   const presetChoices: PresetDefinition[] = [
@@ -2304,7 +2324,6 @@ export function AIChatPanel({
   const [ccCommands, setCcCommands] = useState<
     Array<{ name: string; hint: string }>
   >([]);
-  const [modeMenuOpen, setModeMenuOpen] = useState(false);
   // Persist defaults for brand-new chats + publish mode to the overlay bridge.
   useEffect(() => {
     lsSetString(PERM_MODE_KEY, ccPermMode ?? "");
@@ -2348,7 +2367,7 @@ export function AIChatPanel({
         ["plan", "plan", "Plan only — no edits"],
         ["auto-edit", "acceptEdits", "Auto-accept file edits, ask for the rest"],
         ["auto", "auto", "Run everything without asking (privacy guard stays)"],
-        ["bypass", "bypassPermissions", "Skip all checks — no cards, no guard"],
+        ["agent", "bypassPermissions", "Full autonomy — no cards, no guard"],
       ];
       return opts
         .filter(([o]) => o.startsWith(partial))
@@ -4616,6 +4635,8 @@ export function AIChatPanel({
         "accept-edits": "acceptEdits",
         acceptedits: "acceptEdits",
         auto: "auto",
+        agent: "bypassPermissions",
+        holo: "bypassPermissions",
         bypass: "bypassPermissions",
         yolo: "bypassPermissions",
       };
@@ -4633,7 +4654,7 @@ export function AIChatPanel({
       const mode = map[arg];
       if (!mode) {
         toastError(
-          `Unknown mode "${arg}" — use ask, plan, auto-edit, auto, or bypass`,
+          `Unknown mode "${arg}" — use ask, plan, auto-edit, auto, or agent`,
         );
         return;
       }
@@ -6327,49 +6348,17 @@ export function AIChatPanel({
             }}
           />
         )}
-        {selectedIsCC && (
-          <div className="ai-mode-wrap">
-            {modeMenuOpen && (
-              <>
-                <div
-                  className="ai-mode-backdrop"
-                  onClick={() => setModeMenuOpen(false)}
-                />
-                <div className="ai-mode-menu" role="menu">
-                  {PERM_MODE_OPTIONS.map((o) => (
-                    <button
-                      key={o.label}
-                      type="button"
-                      className={`ai-mode-item ${ccPermMode === o.v ? "active" : ""}`}
-                      onClick={() => {
-                        setCcPermMode(o.v);
-                        setModeMenuOpen(false);
-                        toastInfo(
-                          `Mode: ${o.label} (applies from the next message)`,
-                        );
-                      }}
-                    >
-                      <span className="ai-mode-item-label">
-                        {ccPermMode === o.v ? "● " : ""}
-                        {o.label}
-                      </span>
-                      <span className="ai-mode-item-desc">{o.desc}</span>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-            <button
-              type="button"
-              className="ai-mode-btn"
-              onClick={() => setModeMenuOpen((v) => !v)}
-              title="Claude Code permission mode (also /mode, Shift+Tab to cycle)"
-            >
-              {PERM_MODE_OPTIONS.find((o) => o.v === ccPermMode)?.label ?? "Ask"}{" "}
-              ▾
-            </button>
-          </div>
-        )}
+        {selectedIsCC ? (
+          <ComposerPermMode
+            value={ccPermMode}
+            onChange={(v) => {
+              setCcPermMode(v);
+              toastInfo(
+                `Mode: ${permModeOption(v).label} (applies from the next message)`,
+              );
+            }}
+          />
+        ) : null}
         <ComposerMic
           onStart={(capture) => {
             dictationCaptureRef.current = capture;
@@ -6826,7 +6815,7 @@ export function AIChatPanel({
               const curIdx = order.indexOf(ccPermMode);
               const next = order[(Math.max(curIdx, 0) + 1) % order.length];
               setCcPermMode(next);
-              const label = PERM_MODE_OPTIONS.find((o) => o.v === next)?.label;
+              const label = permModeOption(next).label;
               toastInfo(`Mode: ${label} (applies from the next message)`);
               return;
             }

@@ -8085,12 +8085,24 @@ button.composer-mention-chip-label:hover {
   font-weight: 500;
   gap: 5px;
 }
+.ai-composer-shell .ai-mode-btn {
+  padding: 0 8px 0 6px;
+}
+.ai-composer-shell .ai-mode-btn[class*="ai-mode-tone--"] {
+  background: var(--mode-bg);
+  border-color: color-mix(in srgb, var(--mode-fg) 34%, var(--border));
+  color: var(--mode-fg);
+}
 .ai-composer-shell .ai-model-chip:hover,
 .ai-composer-shell .ai-effort-btn:hover,
-.ai-composer-shell .ai-mode-btn:hover {
+.ai-composer-shell .ai-mode-btn:hover:not([class*="ai-mode-tone--"]) {
   background: var(--bg-hi);
   color: var(--fg);
   border-color: var(--border-strong);
+}
+.ai-composer-shell .ai-mode-btn[class*="ai-mode-tone--"]:hover {
+  filter: brightness(1.06);
+  border-color: color-mix(in srgb, var(--mode-fg) 48%, var(--border-strong));
 }
 /* Upward popover (the composer sits at the bottom of the panel). */
 .ai-flag-menu-overlay {
@@ -8161,7 +8173,31 @@ button.composer-mention-chip-label:hover {
   align-self: stretch;
   display: flex;
 }
+/* CC permission mode — semantic tint per mode (Cursor-style chip + menu dots). */
+.ai-mode-tone--ask {
+  --mode-fg: var(--info);
+  --mode-bg: var(--info-bg);
+}
+.ai-mode-tone--plan {
+  --mode-fg: var(--warn);
+  --mode-bg: var(--warn-bg);
+}
+.ai-mode-tone--auto-edit {
+  --mode-fg: var(--tool-edit);
+  --mode-bg: color-mix(in srgb, var(--tool-edit) 16%, var(--bg-alt));
+}
+.ai-mode-tone--auto {
+  --mode-fg: var(--ok);
+  --mode-bg: var(--ok-bg);
+}
+.ai-mode-tone--agent {
+  --mode-fg: var(--tool-task);
+  --mode-bg: color-mix(in srgb, var(--tool-task) 16%, var(--bg-alt));
+}
 .ai-mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   height: 30px;
   align-self: flex-end;
   border: 1px solid var(--border);
@@ -8169,13 +8205,31 @@ button.composer-mention-chip-label:hover {
   background: transparent;
   color: var(--fg-muted);
   font-size: 12px;
-  padding: 0 10px;
+  padding: 0 8px 0 6px;
   cursor: pointer;
   white-space: nowrap;
 }
+.ai-mode-btn[class*="ai-mode-tone--"] {
+  background: var(--mode-bg);
+  border-color: color-mix(in srgb, var(--mode-fg) 34%, var(--border));
+  color: var(--mode-fg);
+}
 .ai-mode-btn:hover {
-  color: var(--fg);
-  border-color: var(--border-strong, var(--border));
+  border-color: color-mix(in srgb, var(--mode-fg, var(--fg)) 48%, var(--border-strong, var(--border)));
+  filter: brightness(1.06);
+}
+.ai-mode-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.ai-mode-btn-label {
+  font-weight: 500;
+}
+.ai-mode-btn-chevron {
+  opacity: 0.72;
+  flex-shrink: 0;
 }
 .ai-mode-backdrop {
   position: fixed;
@@ -8187,7 +8241,7 @@ button.composer-mention-chip-label:hover {
   bottom: calc(100% + 6px);
   right: 0;
   z-index: 95;
-  min-width: 230px;
+  min-width: 248px;
   display: flex;
   flex-direction: column;
   background: var(--bg-elev);
@@ -8196,10 +8250,16 @@ button.composer-mention-chip-label:hover {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   padding: 4px;
 }
+.ai-mode-menu--portaled {
+  position: fixed;
+  bottom: auto;
+  right: auto;
+  z-index: 95;
+}
 .ai-mode-item {
   display: flex;
-  flex-direction: column;
-  gap: 1px;
+  align-items: flex-start;
+  gap: 8px;
   text-align: left;
   background: transparent;
   border: none;
@@ -8211,8 +8271,30 @@ button.composer-mention-chip-label:hover {
 .ai-mode-item:hover {
   background: var(--bg-alt);
 }
+.ai-mode-item.active {
+  background: var(--bg-hi);
+}
+.ai-mode-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: var(--radius-full);
+  background: var(--mode-bg);
+  color: var(--mode-fg);
+  border: 1px solid color-mix(in srgb, var(--mode-fg) 28%, transparent);
+}
+.ai-mode-item-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
 .ai-mode-item.active .ai-mode-item-label {
-  color: var(--accent);
+  color: var(--mode-fg, var(--fg));
 }
 .ai-mode-item-label {
   font-size: 12px;
@@ -8221,6 +8303,7 @@ button.composer-mention-chip-label:hover {
 .ai-mode-item-desc {
   font-size: 10.5px;
   color: var(--fg-muted);
+  line-height: 1.35;
 }
 
 /* ── Composer toolbar: attach button, subagent pill, mic, hint row ──

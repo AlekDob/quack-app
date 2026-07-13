@@ -31,7 +31,7 @@ existing chat send flow, composer, and the Whiteboard organigramma.
 | Custom preset discovery (`.codetta/presets/*.md`) | `loadCustomPresets.ts` |
 | Custom preset write-path (create + update `.md` in place) | `createPreset.ts` |
 | Avatar (duck pool default + durable upload) | `avatarStore.ts` |
-| Shared Claude Code permission-mode options (Ask/Plan/Auto-edit/Auto/Bypass) | `permModes.ts` |
+| Shared Claude Code permission-mode options (Ask/Plan/Auto-edit/Auto/Agent) | `permModes.ts` |
 | User tier→model overrides for dynamic-catalog backends | `tierModelOverrides.ts` |
 | Barrel | `index.ts` |
 
@@ -122,7 +122,7 @@ autocomplete blocks so those popovers keep first claim on Tab when open:
 
 - **Tab** (no modifiers) cycles the active primary agent: Jack → Milo → Nora → Vera → back to
   Jack, calling the same `applyPreset` the composer picker uses.
-- **Shift+Tab** cycles the Claude Code permission mode (Ask → Plan → Auto-edit → Auto → Bypass),
+- **Shift+Tab** cycles the Claude Code permission mode (Ask → Plan → Auto-edit → Auto → Agent),
   reading/writing `PERM_MODE_OPTIONS` (`src/presets/permModes.ts`) — the same list backing the
   mode menu and `AgentCreateDrawer`'s "Mode" segmented control, so there's one source of truth
   for the 5-value scale everywhere it appears.

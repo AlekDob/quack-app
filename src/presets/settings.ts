@@ -27,7 +27,7 @@ export function getPresetOverrides(id: string): UserPresetOverrides {
   return readMap()[id] ?? {};
 }
 
-export function setPresetOverrides(id: string, ov: UserPresetOverrides): void {
+export function setPresetOverrides(id: string, ov: UserPresetOverrides): boolean {
   const map = readMap();
   // Drop empty/undefined keys so storage doesn't bloat over time.
   const clean = Object.fromEntries(
@@ -35,8 +35,9 @@ export function setPresetOverrides(id: string, ov: UserPresetOverrides): void {
   );
   if (Object.keys(clean).length) map[id] = clean as UserPresetOverrides;
   else delete map[id];
-  setJson(KEY, map);
-  notify();
+  const ok = setJson(KEY, map);
+  if (ok) notify();
+  return ok;
 }
 
 export function clearPresetOverrides(id: string): void {

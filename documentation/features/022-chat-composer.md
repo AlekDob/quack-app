@@ -35,6 +35,8 @@ mode/mic/send on the right.
 | `src/composerGitOps.ts` | Stage / commit / branch / push orchestration for composer git menu |
 | `src/components/WorkspacePathPicker.tsx` | Workspace path segment — switch open projects or open a folder |
 | `src/components/GitBranchPicker.tsx` | Shared git branch dropdown (composer + Source Control panel) |
+| `src/components/EffortPopover.tsx` | Effort + thinking popover (portaled) |
+| `src/components/ComposerPermMode.tsx` | CC permission-mode pill + portaled menu (015) |
 | `src/composerCtxMenu.tsx` | Portaled menu helper for context-bar dropdowns |
 | `src/App.css` | `.ai-composer-*`, `.ai-composer-context-bar`, `.ai-composer-ctx-*`, `.ai-composer-git*`, `.ai-agent-*`, `.ai-mention-*`, `.ai-mic-btn`, `.ai-dictation-*`, `.ai-attach-btn`, `.ai-effort-*`, `.ai-composer-hint`, `.ai-status-dock-row`, `.ai-live-shimmer`, `.ai-turn-hint`, `.ai-commit-dock*`, `.ai-context-dock*`, `.ai-queue-*` |
 
@@ -156,6 +158,14 @@ Tooltip on the meter button: `Effort: {label} · Thinking: {auto|on|off} — Ctr
 - `/effort low|medium|high|xhigh|max` — sets level + toast.
 - `/effort off` or `/effort default` — resets to **medium** (not CLI default).
 - Value submenu when typing `/effort ` (no arg typing needed).
+
+## Permission mode chip (`ComposerPermMode`)
+
+Claude Code only. Full behaviour table: **`015-claude-permission-mode.md`**.
+
+- **Pill** — tinted by mode (`ai-mode-tone--*`): Ask (grey), Plan (amber), Auto-edit (green), Auto (green), Agent (pink `bot` icon). Same 28px uniform pill as model/effort.
+- **Menu** — portaled to `document.body` with fixed coords (never clips under sidebar or `.ai-panel` overflow).
+- **Cycle** — `Shift+Tab` in composer; `/mode agent|plan|…`; stored per session (`ccPermMode`, feature 040).
 
 ## Plan chip (todos)
 

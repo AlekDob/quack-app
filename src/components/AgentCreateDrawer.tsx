@@ -128,7 +128,7 @@ export function AgentCreateDrawer({ open, root, editing, onClose, onCreated }: P
         // Built-ins have no backing file — persist as an override layer on
         // top of the shipped definition (effectivePresetDefinition merges
         // it back in everywhere the preset is displayed/resolved).
-        setPresetOverrides(editing.id, {
+        const ok = setPresetOverrides(editing.id, {
           label: input.label,
           role: input.role,
           description: input.description,
@@ -139,6 +139,10 @@ export function AgentCreateDrawer({ open, root, editing, onClose, onCreated }: P
           permMode: input.permMode,
           instructions: input.instructions,
         });
+        if (!ok) {
+          toastError("Couldn't save agent settings — storage may be full or disabled.");
+          return;
+        }
         toastSuccess(`Updated ${label.trim()}`);
       } else {
         await createPreset(root, input);

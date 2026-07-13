@@ -8,7 +8,7 @@
 // Skills still exist as a concept (Overview counters, Workflows .md export)
 // but no longer render here.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { SubagentDef } from "../subagents";
 import type { WhiteboardData } from "./WhiteboardPane";
 import { fileKey, useStore } from "../store";
@@ -17,7 +17,12 @@ import { error as toastError } from "../notify";
 import { AIIcon } from "./AIIcon";
 import { WhiteboardPresetGroup } from "./WhiteboardPresets";
 import { AgentCreateDrawer } from "./AgentCreateDrawer";
-import { effectivePresetDefinition, getJackDefinition, type PresetDefinition } from "../presets";
+import {
+  effectivePresetDefinition,
+  getJackDefinition,
+  subscribePresetSettings,
+  type PresetDefinition,
+} from "../presets";
 
 interface Props {
   wsId: string;
@@ -35,6 +40,12 @@ export function WhiteboardOrganigramma({ wsId, root, data, onMutated }: Props) {
   // both are "agents" in the same override-backed sense (see src/presets/).
   const [creating, setCreating] = useState(false);
   const [editingAgent, setEditingAgent] = useState<PresetDefinition | null>(null);
+  const [presetOverridesTick, setPresetOverridesTick] = useState(0);
+  useEffect(
+    () => subscribePresetSettings(() => setPresetOverridesTick((n) => n + 1)),
+    [],
+  );
+  void presetOverridesTick;
   const jackDef = effectivePresetDefinition(getJackDefinition());
 
   return (
