@@ -53,7 +53,7 @@ export function BrainSearchHitRow({ hit, index, query, onOpen }: HitProps) {
         title={`Open ${hit.path}`}
       >
         <span className="brain-hit-icon" aria-hidden>
-          <Icon name="file" size={15} />
+          <Icon name="brain" size={15} />
         </span>
         <span className="brain-hit-body">
           <span className="brain-hit-top">

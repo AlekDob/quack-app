@@ -38,8 +38,12 @@ Keystroke in textarea
   → lazy search.listFiles(root, 5000) → mentionFiles cache
   → mentionMatches: agents (≤4) then files (≤8 total)
   → MentionSuggestions (keyboard/mouse pick)
-  → acceptMention: splice @token, addAttachedFile or attachedAgents
+  → acceptMention: file → addAttachedFile + composer chip (072); agent → attachedAgents + chip; work/story → @token in text
 ```
+
+Committed picks render as **Cursor-style chips inside** `.ai-input-row`
+(`.composer-mention-chips`) — not raw `@path` / `@agent` tokens in the textarea.
+Full chip matrix: **`072-composer-mention-chips.md`**.
 
 ### Popover layout
 
@@ -96,7 +100,7 @@ Alternate path to the same cite outcome — no `@` popover:
 ```
 FileTree file row drag → composer drop
   → citeFileFromDrop(absPath)
-  → @relPath at cursor + addAttachedFile
+  → addAttachedFile + composer file chip (072)
 ```
 
 Keyboard `@` autocomplete and explorer drag are independent entry points;
@@ -105,6 +109,8 @@ both queue the file for the next message via `workspaceChatContext`.
 ### Related
 
 - Subagent delegation + Task tool: **`004-subagent-mentions.md`**
+- Composer mention chips: **`072-composer-mention-chips.md`**
 - Composer shell, status dock, hint row: **`022-chat-composer.md`**
 - Per-project `@` file queue on send: **`037-project-context-dock.md`**
 - Drag file from explorer onto composer: **`055-file-composer-drag.md`**
+- Pinky `#` brain cites: **`054-pinky-brain-integration.md`**

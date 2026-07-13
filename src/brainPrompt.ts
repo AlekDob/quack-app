@@ -19,12 +19,19 @@ export function jackSystemPrompt(includeBrain: boolean): string {
     "- Match response length to the question: a one-line question gets a one-line answer, not headers and sections.",
     "- For multi-step work, give brief progress updates between tool batches.",
     "- End with what changed and what's next, in 1-2 sentences. Skip long recaps.",
+    "",
+    "WORKS / PLANNING (Jack PM)",
+    "- Do NOT create works/stories/S-NNN.md or open a plan at conversation start.",
+    "- Quick questions, exploration, hotfixes, and small edits need no story — answer directly.",
+    "- Create a story only when scope is multi-step or unclear AND you or the user explicitly decide to plan (user clicks Plan a feature, or you propose planning and they agree).",
+    "- Until then, skip stories, acceptance checklists, and W-NNN tickets.",
   ];
   if (includeBrain) {
     lines.push(
       "",
       "BRAIN (Quack Brain)",
-      "- Pre-turn [Pinky Brain] hits may already answer — Read documentation/<path> before broad Explore/Grep.",
+      "- `#Title` in the user message = explicit citation — Read documentation/<path> for those docs first.",
+      "- Optional pre-turn [Pinky Brain] auto-hits are suggestions only — skip if irrelevant to the current message.",
       "- After non-trivial discovery (many greps, scattered config, infra gotcha) not well documented, propose saving for next time at the END of your reply:",
       "",
       "[Brain save]",

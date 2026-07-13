@@ -64,7 +64,7 @@ FileTree file row mousedown
 
 | Priority | Target | Action |
 |----------|--------|--------|
-| 1 | `[data-composer-file-drop]` | `@relPath` + `addAttachedFile` |
+| 1 | `[data-composer-file-drop]` | `addAttachedFile` + file chip in composer (072) |
 | 2 | Right-edge drawer strip | `openFile` → `moveTabToDrawer` |
 | 3 | Tab bar between tabs | `openFileAt` with `insertIndex` |
 | 4 | Pane content edge zones | `openFileAt` with `edge` → split pane |

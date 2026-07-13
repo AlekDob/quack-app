@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-12
+last_verified: 2026-07-13
 tags: [composer, stop, multitask, esc, turn-status]
 ---
 
@@ -56,8 +56,16 @@ Menus are **portaled** (`ComposerCtxMenu`, fixed coords) so `.ai-panel { overflo
 - **Left group:** `+` attach (`.ai-attach-btn`) + subagent pill. `.ai-composer-spacer` splits.
 - **Right group:** model chip · effort · permission mode · mic · send.
 - **Uniform pills** (`.ai-composer-shell` scope): model chip / effort / mode / context indicator all 28px height, `radius-full`, 11px, weight 500, shared hover. Send + stop are 28×28 icon buttons (send = `arrow-up` on monochrome `--primary-bg`, stop = `stop` on red).
-- **Hint row** (`.ai-composer-hint`): `@ mentions · / commands · Ctrl+1–5 effort` (Claude Code only) · `Shift+Enter for newline · ↑ to recall`, shown only when the input is empty and idle.
+- **Hint row** (`.ai-composer-hint`): `@ files · # brain · / commands · Ctrl+1–5 effort` (Claude Code only) · `Shift+Enter for newline · ↑ to recall`, shown only when the input is empty, idle, and **no mention chips** are staged.
 - Placeholder is dynamic: `Message {activeAgent?.name ?? "Jack"}…` when idle; **`Send follow-up`** while a turn is in flight.
+
+## Mention chips inside composer (feature 072)
+
+Full detail: **`072-composer-mention-chips.md`**.
+
+Colored pills in `.ai-input-row` for brain (`#`), files (`@`), agents (`@`), and
+leading skills (`/`). Popovers stay above the shell; committed picks become chips
+with per-kind icon + tint. File/agent picks no longer insert raw `@tokens` in the textarea.
 
 ## @-mention autocomplete (feature 041)
 
@@ -312,4 +320,5 @@ always per-session.
 - Agent commit indicator above composer: `051-agent-commit-dock.md`.
 - Composer git actions (inside pill): `053-composer-git-actions.md`.
 - Composer voice dictation: `052-composer-voice-dictation.md`.
+- Composer mention chips (`#` / `@` / `/`): `072-composer-mention-chips.md`.
 - Context & usage ring + popover (CC): `023-session-usage-panel.md`.

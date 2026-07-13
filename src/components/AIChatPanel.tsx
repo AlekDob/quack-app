@@ -129,8 +129,22 @@ import { PERM_MODE_OPTIONS } from "../presets/permModes";
 import {
   fetchBrainContextForTurn,
   fetchBrainContextDeduped,
+  fetchBrainContextForPaths,
   getBrainInjectEnabled,
 } from "../brainInject";
+import {
+  dedupeAttachedHits,
+  hitToAttached,
+  parseBrainMention,
+  type AttachedBrainHit,
+} from "../brainMention";
+import { useBrainMentionSearch } from "../useBrainMentionSearch";
+import { BrainMentionSuggestions } from "./BrainMentionSuggestions";
+import {
+  ComposerMentionChips,
+  parseLeadingSkill,
+  stripLeadingSkill,
+} from "./ComposerMentionChips";
 import {
   approvePlanning,
   onNativePlanReady,
@@ -151,6 +165,7 @@ import {
   subscribeWorks,
 } from "../worksCache";
 import { findStory, findWork, type WorksSnapshot } from "../works";
+import { pinky, type PinkySearchHit } from "../pinky";
 import { recordBrainUsage } from "../brainUsageStore";
 import { BrainTurnChip } from "./BrainTurnChip";
 import { ReasoningTurnChip } from "./ReasoningTurnChip";
@@ -372,6 +387,7 @@ function draftFromComposerSnap(snap: {
   attachTree: boolean;
   attachTerminal: boolean;
   attachedAgents: string[];
+  attachedBrainHits: AttachedBrainHit[];
   attachedImages: ImageAttachment[];
 }): ChatComposerDraft | undefined {
   const draft: ChatComposerDraft = {};
@@ -381,6 +397,9 @@ function draftFromComposerSnap(snap: {
   if (snap.attachTerminal) draft.attachTerminal = true;
   if (snap.attachedAgents.length > 0) {
     draft.attachedAgents = [...snap.attachedAgents];
+  }
+  if (snap.attachedBrainHits.length > 0) {
+    draft.attachedBrainHits = [...snap.attachedBrainHits];
   }
   if (snap.attachedImages.length > 0) {
     draft.attachedImages = snap.attachedImages.map((i) => ({
@@ -600,6 +619,7 @@ export function AIChatPanel({
     attachContext,
     attachedFiles,
     addAttachedFile,
+    setAttachedFiles,
     clearAttachedFiles,
   } = useWorkspaceChatContext(wsId);
   const [runningTools, setRunningTools] = useState(false);
@@ -994,6 +1014,10 @@ export function AIChatPanel({
     [presetChoices],
   );
   const [attachedAgents, setAttachedAgents] = useState<string[]>([]);
+  const [attachedBrainHits, setAttachedBrainHits] = useState<AttachedBrainHit[]>(
+    [],
+  );
+  const [brainRecentHits, setBrainRecentHits] = useState<PinkySearchHit[]>([]);
   const queueRef = useRef<QueuedComposerMessage[]>([]);
   const [queuedMessages, setQueuedMessages] = useState<QueuedComposerMessage[]>(
     [],
@@ -1008,6 +1032,7 @@ export function AIChatPanel({
     attachTree: false,
     attachTerminal: false,
     attachedAgents: [] as string[],
+    attachedBrainHits: [] as AttachedBrainHit[],
     attachedImages: [] as ImageAttachment[],
   });
   const knobsPersistRef = useRef({
@@ -1045,6 +1070,7 @@ export function AIChatPanel({
       setAttachTree(!!draft.attachTree);
       setAttachTerminal(!!draft.attachTerminal);
       setAttachedAgents(draft.attachedAgents ?? []);
+      setAttachedBrainHits(draft.attachedBrainHits ?? []);
       if (!draft.attachedImages?.length) {
         setAttachedImages([]);
         return;
@@ -1091,6 +1117,12 @@ export function AIChatPanel({
     end: number; // cursor position
   } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const [brainMentionState, setBrainMentionState] = useState<{
+    query: string;
+    start: number;
+    end: number;
+  } | null>(null);
+  const [brainMentionIndex, setBrainMentionIndex] = useState(0);
   const [slashState, setSlashState] = useState<{
     query: string;
     start: number;
@@ -1101,6 +1133,30 @@ export function AIChatPanel({
   // the first @ keystroke so we don't pay the IPC cost in every
   // chat session whether the user mentions files or not.
   const [mentionFiles, setMentionFiles] = useState<string[] | null>(null);
+  const brainMentionSearch = useBrainMentionSearch(
+    root,
+    brainMentionState?.query ?? "",
+    brainRecentHits,
+    !!brainMentionState && pinkyBrainExt,
+  );
+  const brainMentionMatches = brainMentionSearch.matches;
+  useEffect(() => {
+    if (!pinkyBrainExt || brainRecentHits.length > 0) return;
+    void pinky
+      .telemetry(root)
+      .then((t) => {
+        const hits: PinkySearchHit[] = t.most_used.slice(0, 8).map((e) => ({
+          id: e.path,
+          path: e.path,
+          title: e.title,
+          snippet: "",
+          entry_type: null,
+          score: 1,
+        }));
+        setBrainRecentHits(hits);
+      })
+      .catch(() => {});
+  }, [pinkyBrainExt, root, brainRecentHits.length]);
   const [worksSnap, setWorksSnap] = useState<WorksSnapshot | null>(null);
   useEffect(() => {
     void hydrateWorks(root).then(setWorksSnap);
@@ -1994,6 +2050,7 @@ export function AIChatPanel({
     attachTree,
     attachTerminal,
     attachedAgents,
+    attachedBrainHits,
     attachedImages,
   ]);
 
@@ -2005,6 +2062,7 @@ export function AIChatPanel({
       attachTree,
       attachTerminal,
       attachedAgents,
+      attachedBrainHits,
       attachedImages,
     };
     knobsPersistRef.current = {
@@ -2037,6 +2095,7 @@ export function AIChatPanel({
     attachTree,
     attachTerminal,
     attachedAgents,
+    attachedBrainHits,
     attachedImages,
     ccEffort,
     ccThinking,
@@ -2555,18 +2614,6 @@ export function AIChatPanel({
 
   const acceptMention = (pick: MentionItem) => {
     if (!mentionState) return;
-    const token =
-      pick.type === "agent"
-        ? pick.agent.name
-        : pick.type === "work"
-          ? pick.work.shortId
-          : pick.type === "story"
-            ? pick.story.shortId
-            : pick.rel;
-    const before = input.slice(0, mentionState.start);
-    const after = input.slice(mentionState.end);
-    const next = `${before}@${token}${after.startsWith(" ") ? "" : " "}${after}`;
-    setInput(next);
     setMentionState(null);
     setMentionIndex(0);
     if (pick.type === "agent") {
@@ -2574,28 +2621,38 @@ export function AIChatPanel({
         prev.includes(pick.agent.name) ? prev : [...prev, pick.agent.name],
       );
     } else if (pick.type === "work" && aiChatId) {
+      const token = pick.work.shortId;
+      const before = input.slice(0, mentionState.start);
+      const after = input.slice(mentionState.end);
+      setInput(`${before}@${token}${after.startsWith(" ") ? "" : " "}${after}`);
       void linkChatToWork(root, pick.work.id, aiChatId);
       useStore.getState().setAIChatWorkItem(wsId, aiChatId, pick.work.id);
     } else if (pick.type === "story" && aiChatId) {
+      const token = pick.story.shortId;
+      const before = input.slice(0, mentionState.start);
+      const after = input.slice(mentionState.end);
+      setInput(`${before}@${token}${after.startsWith(" ") ? "" : " "}${after}`);
       void linkChatToStory(root, pick.story.id, aiChatId).then(() => {
         useStore.getState().setAIChatStory(wsId, aiChatId, pick.story.id);
       });
     } else if (pick.type === "file") {
       addAttachedFile(pick.abs, root);
     }
-    // Restore focus + place cursor after the inserted token so the
-    // user can keep typing without clicking back into the textarea.
-    requestAnimationFrame(() => {
-      const el = inputRef.current;
-      if (!el) return;
-      const cursor = mentionState.start + 1 + token.length + 1;
-      el.focus();
-      try {
-        el.setSelectionRange(cursor, cursor);
-      } catch {
-        /* ignore */
-      }
-    });
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const acceptBrainMention = (hit: PinkySearchHit) => {
+    if (!brainMentionState) return;
+    setBrainMentionState(null);
+    setBrainMentionIndex(0);
+    setAttachedBrainHits((prev) =>
+      dedupeAttachedHits([...prev, hitToAttached(hit)]),
+    );
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const removeAttachedBrainHit = (path: string) => {
+    setAttachedBrainHits((prev) => prev.filter((h) => h.path !== path));
   };
 
   const clearSlashSegment = useCallback(() => {
@@ -2632,30 +2689,10 @@ export function AIChatPanel({
 
   const citeFileFromDrop = useCallback(
     (absPath: string) => {
-      const rel = relPath(absPath, root);
-      if (!rel) return;
-      const el = inputRef.current;
-      const cursor = el?.selectionStart ?? input.length;
-      const before = input.slice(0, cursor);
-      const after = input.slice(cursor);
-      const needsSpace = before.length > 0 && !/\s$/.test(before);
-      const prefix = needsSpace ? " " : "";
-      const token = `@${rel} `;
-      setInput(`${before}${prefix}${token}${after}`);
       addAttachedFile(absPath, root);
-      requestAnimationFrame(() => {
-        const target = inputRef.current;
-        if (!target) return;
-        const pos = cursor + prefix.length + token.length;
-        target.focus();
-        try {
-          target.setSelectionRange(pos, pos);
-        } catch {
-          /* ignore */
-        }
-      });
+      requestAnimationFrame(() => inputRef.current?.focus());
     },
-    [input, root, addAttachedFile],
+    [root, addAttachedFile],
   );
 
   useEffect(() => registerComposerFileDrop({ onFile: citeFileFromDrop }), [
@@ -3083,10 +3120,26 @@ export function AIChatPanel({
       }
     }
     let brainUsage: ChatMessage["brain_usage"];
-    const pinkyReady =
-      pinkyBrainExt &&
-      getBrainInjectEnabled(wsId) &&
-      (await isExtensionInstalled(root, "pinky-brain"));
+    const pinkyInstalled = pinkyBrainExt && (await isExtensionInstalled(root, "pinky-brain"));
+    const pinkyReady = pinkyInstalled && getBrainInjectEnabled(wsId);
+    const explicitBrain = attachedBrainHits.length > 0;
+    if (pinkyInstalled && explicitBrain) {
+      try {
+        const brainCtx = await fetchBrainContextForPaths(root, attachedBrainHits);
+        if (brainCtx) {
+          brainUsage = brainCtx.usage;
+          recordBrainUsage(wsId, brainCtx.usage.savedTokens, brainCtx.usage.savedMs);
+          if (skipAllInlining || providerRunsOwnTools) {
+            ccTurnContext.push(brainCtx.block);
+          } else {
+            sysParts.push(brainCtx.block);
+          }
+        }
+      } catch {
+        /* Pinky optional */
+      }
+      setAttachedBrainHits([]);
+    }
     let linkedWorkId: string | undefined;
     let linkedStoryId: string | undefined;
     if (aiChatId && getWorkInjectEnabled(wsId)) {
@@ -3131,6 +3184,7 @@ export function AIChatPanel({
           if (pinkyReady && getWorksInjectDepth(wsId) === "pinky" && worksCtx.pinkyQuery) {
             const brainCtx = await fetchBrainContextDeduped(
               root,
+              wsId,
               worksCtx.pinkyQuery,
               manifestDocPaths(worksCtx.refs),
               2,
@@ -3145,9 +3199,13 @@ export function AIChatPanel({
       } catch {
         /* Works context optional */
       }
-    } else if (pinkyReady) {
+    } else if (pinkyReady && !explicitBrain) {
       try {
-        const brainCtx = await fetchBrainContextForTurn(root, text);
+        const brainCtx = await fetchBrainContextForTurn(root, {
+          wsId,
+          messages: baseMessages,
+          text,
+        });
         if (brainCtx) {
           brainUsage = brainCtx.usage;
           recordBrainUsage(wsId, brainCtx.usage.savedTokens, brainCtx.usage.savedMs);
@@ -3868,6 +3926,19 @@ export function AIChatPanel({
   const editorInWorkspace =
     !!editorState.filePath && !!root && isUnderRoot(editorState.filePath, root);
   const hasWsAttached = attachedFiles.some((f) => isUnderRoot(f, root));
+  const wsAttachedFiles = useMemo(
+    () => attachedFiles.filter((f) => isUnderRoot(f, root)),
+    [attachedFiles, root],
+  );
+  const leadingSkill = useMemo(
+    () => parseLeadingSkill(input, skills),
+    [input, skills],
+  );
+  const hasComposerMentions =
+    attachedBrainHits.length > 0 ||
+    wsAttachedFiles.length > 0 ||
+    attachedAgents.length > 0 ||
+    leadingSkill !== null;
   const showComposerDock = turnActive || editorInWorkspace || hasWsAttached;
   useEffect(() => {
     if (!turnActive || !chatVisible) return;
@@ -5247,7 +5318,12 @@ export function AIChatPanel({
       className={`ai-chat-with-story${storyId ? " has-story-drawer" : ""}`}
     >
     <div
-      className={`ai-panel${mentionState && mentionMatches.length > 0 ? " ai-mention-open" : ""}`}
+      className={`ai-panel${
+        (mentionState && mentionMatches.length > 0) ||
+        (brainMentionState && brainMentionMatches.length > 0)
+          ? " ai-mention-open"
+          : ""
+      }`}
       ref={panelRef}
     >
       {zoomImage && (
@@ -5809,36 +5885,19 @@ export function AIChatPanel({
           <span className="ai-context-toggle">cancel</span>
         </div>
       )}
-      {attachedAgents.length > 0 && (
-        <div className="ai-agent-chips" role="status">
-          {attachedAgents.map((name) => {
-            const def = agents.find((a) => a.name === name);
-            return (
-              <span key={name} className="ai-agent-chip" title={def?.description}>
-                {def && (
-                  <img
-                    className="ai-agent-chip-avatar"
-                    src={def.avatar}
-                    alt=""
-                    aria-hidden="true"
-                  />
-                )}
-                {name}
-                <button
-                  className="ai-agent-chip-x"
-                  onClick={() =>
-                    setAttachedAgents((prev) => prev.filter((n) => n !== name))
-                  }
-                  title={`Don't delegate to ${name}`}
-                  aria-label={`Remove ${name}`}
-                >
-                  <Icon name="x" size={10} />
-                </button>
-              </span>
-            );
-          })}
-        </div>
-      )}
+      {brainMentionState &&
+        brainMentionMatches.length > 0 &&
+        streaming === null &&
+        pinkyBrainExt && (
+          <BrainMentionSuggestions
+            query={brainMentionState.query}
+            matches={brainMentionMatches}
+            searching={brainMentionSearch.searching}
+            activeIndex={brainMentionIndex}
+            onPick={acceptBrainMention}
+            onHover={setBrainMentionIndex}
+          />
+        )}
       {mentionState && mentionMatches.length > 0 && (
         <MentionSuggestions
           matches={mentionMatches}
@@ -6242,7 +6301,6 @@ export function AIChatPanel({
             workItemId={workItemId}
             storyId={storyId}
             planning={planning}
-            ccPermMode={ccPermMode}
             onPickJack={() => applyPreset(null, { silent: true })}
             onSetPlanMode={
               selectedIsCC ? () => setCcPermMode("plan") : undefined
@@ -6400,6 +6458,28 @@ export function AIChatPanel({
           />
         ) : (
         <>
+        {(pinkyBrainExt || hasComposerMentions) && (
+          <ComposerMentionChips
+            wsId={wsId}
+            root={root}
+            brainHits={pinkyBrainExt ? attachedBrainHits : []}
+            files={wsAttachedFiles}
+            agents={agents}
+            attachedAgentNames={attachedAgents}
+            skill={leadingSkill}
+            onRemoveBrain={removeAttachedBrainHit}
+            onRemoveFile={(abs) =>
+              setAttachedFiles((prev) => prev.filter((p) => p !== abs))
+            }
+            onRemoveAgent={(name) =>
+              setAttachedAgents((prev) => prev.filter((n) => n !== name))
+            }
+            onRemoveSkill={() => {
+              if (!leadingSkill) return;
+              setInput((v) => stripLeadingSkill(v, leadingSkill.name));
+            }}
+          />
+        )}
         <textarea
           ref={inputRef}
           className="ai-input"
@@ -6499,7 +6579,10 @@ export function AIChatPanel({
             const m = parseMention(v, cursor);
             setMentionState(m);
             setMentionIndex(0);
-            const s = m ? null : parseSlash(v, cursor);
+            const bm = m ? null : parseBrainMention(v, cursor);
+            setBrainMentionState(bm);
+            setBrainMentionIndex(0);
+            const s = m || bm ? null : parseSlash(v, cursor);
             setSlashState(s);
             setSlashIndex(0);
             if (m && mentionFiles === null && root) {
@@ -6515,7 +6598,10 @@ export function AIChatPanel({
             const m = parseMention(input, cursor);
             setMentionState(m);
             setMentionIndex(0);
-            setSlashState(m ? null : parseSlash(input, cursor));
+            const bm = m ? null : parseBrainMention(input, cursor);
+            setBrainMentionState(bm);
+            setBrainMentionIndex(0);
+            setSlashState(m || bm ? null : parseSlash(input, cursor));
             setSlashIndex(0);
           }}
           onKeyDown={(e) => {
@@ -6553,6 +6639,35 @@ export function AIChatPanel({
                 e.preventDefault();
                 applyCcEffort(CC_EFFORTS[slot - 1]);
                 bumpEffortPulse();
+                return;
+              }
+            }
+            // `#` brain mention popover — before `@` and slash menus.
+            if (brainMentionState && brainMentionMatches.length > 0) {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setBrainMentionIndex((i) =>
+                  Math.min(brainMentionMatches.length - 1, i + 1),
+                );
+                return;
+              }
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setBrainMentionIndex((i) => Math.max(0, i - 1));
+                return;
+              }
+              if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+                e.preventDefault();
+                const idx = Math.max(
+                  0,
+                  Math.min(brainMentionIndex, brainMentionMatches.length - 1),
+                );
+                acceptBrainMention(brainMentionMatches[idx]);
+                return;
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setBrainMentionState(null);
                 return;
               }
             }
@@ -6770,10 +6885,12 @@ export function AIChatPanel({
           }}
         />
         {input.trim().length === 0 &&
+          !hasComposerMentions &&
           streaming === null &&
           !runningTools && (
             <div className="ai-composer-hint" aria-hidden="true">
-              <span>@ mentions</span>
+              <span>@ files</span>
+              <span># brain</span>
               <span>/ commands</span>
               {selectedIsCC && <span>Ctrl+1–5 effort</span>}
               <span>Tab agent</span>

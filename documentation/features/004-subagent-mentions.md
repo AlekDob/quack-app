@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-05
+last_verified: 2026-07-13
 
 **Purpose:** Let the user delegate a chat turn to a Claude Code **subagent** by
 typing `@` in the composer — the same affordance that already attaches files.
@@ -54,7 +54,8 @@ dependency).
 ### Flow — mention & delegate
 1. `agents` loads when the provider is Claude Code (`selectedIsCC`) — project + global.
 2. Typing `@` opens **`MentionSuggestions`** (041): **agents first** (≤4, avatar + description), then **files** (≤8 total — basename + parent dir; side path tree when a file row is active).
-3. Accepting an agent inserts `@name` and tracks it in `attachedAgents` (chips shown above composer).
+3. Accepting an agent tracks it in `attachedAgents` and shows a **composer chip**
+   (duck avatar, inside `.ai-input-row`) — no `@name` token in the textarea (072).
 4. On send (`sendUserText`), if `attachedAgents` is non-empty a directive is pushed into
    `ccTurnContext`: *"Delegate this task to the following subagent(s)… use your Task tool…"*.
 5. `attachedAgents` resets after the turn goes out (alongside `attachedFiles`).
@@ -102,3 +103,4 @@ Agent chip + its final report. The full inner work lives in the read-only transc
   `subagent_type` string via `duckAvatarFor`, so they always match (and match the @-mention popover).
 - **Compact (agent) mode** renders Task/Agent chips in the stream (single-tool runs as
   standalone `.ai-tcall-subagent`; multi-tool runs inside `.ai-iarow`). Click opens the side panel.
+- **Composer chips:** delegated agents show as pills inside the input row (072), not `@name` text.

@@ -91,3 +91,10 @@ and `ToolRowHead` gets `skill` → `.ai-tcall-skill` (orange pill: `--skill-bg` 
   scrolls (`max-height` on `.ai-slash-suggestions`); skills sort after commands.
 - **Browse / edit / create** skills in Agent Customizations → Skills (`036`,
   `SkillsPane`) — fuzzy search on folder name + scope when the list is long.
+
+### Composer skill chip (072)
+
+When the input starts with `/skill-name` matching a loaded skill, an orange
+**skill chip** appears inside `.composer-mention-chips` (same row as brain/file
+chips). Remove (`×`) strips the prefix. Dispatch on Enter unchanged.
+See **`072-composer-mention-chips.md`**.

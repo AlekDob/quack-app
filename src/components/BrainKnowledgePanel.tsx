@@ -20,6 +20,8 @@ import {
   openBrainDoc,
   setBrainInjectEnabled,
 } from "../brainInject";
+import { getBrainGatePrefs } from "../brainGates";
+import { BrainInjectGates } from "./BrainInjectGates";
 import { getBrainCumulative } from "../brainUsageStore";
 import { error as toastError, info as toastInfo, success as toastSuccess } from "../notify";
 
@@ -39,6 +41,7 @@ export function BrainKnowledgePanel({ wsId, root }: Props) {
   const [searching, setSearching] = useState(false);
   const [completedQuery, setCompletedQuery] = useState<string | null>(null);
   const [injectOn, setInjectOn] = useState(() => getBrainInjectEnabled(wsId));
+  const [gatePrefs, setGatePrefs] = useState(() => getBrainGatePrefs(wsId));
   const [cumulative, setCumulative] = useState(() => getBrainCumulative(wsId));
 
   const refresh = useCallback(async () => {
@@ -159,6 +162,13 @@ export function BrainKnowledgePanel({ wsId, root }: Props) {
           )}
         </p>
       </div>
+
+      <BrainInjectGates
+        wsId={wsId}
+        injectOn={injectOn}
+        prefs={gatePrefs}
+        onPrefsChange={setGatePrefs}
+      />
 
       {status.global_migrated && (
         <p className="brain-banner">
