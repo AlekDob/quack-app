@@ -25,6 +25,22 @@ This is the single place that defines the persona, the brand mark, and where duc
 - **Gotcha:** the "Agent Alex" greeting seen in some screenshots came from a *different project's*
   `CLAUDE.md` (Astronave), not from Quack — Quack's persona is Jack.
 
+### Customizing Jack (user instructions)
+
+Jack's **core persona** (PM duck, safety rules, Works planning gate) is product-owned —
+`brainPrompt.ts` / the first `sysParts` block in `AIChatPanel`. **How you like Jack to work**
+(language, tone, PR style, stack habits) is user-editable like any other agent:
+
+| Step | Where |
+|---|---|
+| Open Team tab | Whiteboard organigramma (`018`) |
+| Click Jack's root card | Opens `AgentCreateDrawer` in edit mode |
+| Edit **Instructions** | Saved to `lcp.presets.v1` under id `"jack"` (`062`) |
+| Effect | Appended to `sysParts` every turn via `getPresetInstructionsFor` |
+
+There is **no** Settings → "Jack — Your preferences" section anymore (removed 2026-07-13;
+superseded by Team/presets). Migrate any legacy `lcp.jack.customInstructions` text manually.
+
 ### The brand mark (`AIIcon`)
 - `src/components/AIIcon.tsx` is the **single source of truth** for the AI/agent/chat mark. It renders
   Jack's duck avatar (`/jack.jpeg`) as a rounded square that scales 12px→28px.
@@ -44,11 +60,14 @@ This is the single place that defines the persona, the brand mark, and where duc
 | Component | `src/components/AIIcon.tsx` | Duck brand mark used across all agent/chat surfaces |
 | Component | `src/components/AIChatPanel.tsx` | Jack persona in system prompt + assistant identity header |
 | Module | `src/brainPrompt.ts` | Jack system prompt (`jackSystemPrompt`) — persona + Works/planning gate |
+| Presets | `src/presets/` + `AgentCreateDrawer.tsx` | User instruction overrides for Jack (`lcp.presets.v1`, id `"jack"`) — see `062` |
 | Asset | `public/jack.jpeg` | Jack's avatar (duck in a blazer = the PM); swap to restyle the mark everywhere |
 | Assets | `public/images/ducks/duck1..35.jpeg` | duck pool for per-subagent avatars (see `features/004`) |
 | Styles | `src/App.css` | `.ai-msg-identity`, `.ai-msg-name`, `.ai-msg-title`, `.ai-msg-avatar` |
 
 ### Related
+- Per-agent instructions (Jack + Milo/Nora/Vera/Lia/custom): `features/062-presets.md`
+  (**User instructions** — Team drawer, not Settings).
 - Per-subagent duck avatars + the `@`-mention/transcript flow: `features/004-subagent-mentions.md`
   (`subagents.ts` `duckAvatarFor` assigns a stable duck per agent name).
 - Tab/composer styling that frames all this: `features/003-design-system.md`.
@@ -57,3 +76,5 @@ This is the single place that defines the persona, the brand mark, and where duc
 - **One avatar, one file:** `AIIcon` and the chat header both point at `/jack.jpeg`. Replace that file
   to rebrand Jack everywhere; no code change needed.
 - **`sparkle` prop** on `AIIcon` is kept for API compatibility but ignored (the duck needs no accent badge).
+- **Persona vs instructions:** built-in Jack identity is not editable in UI; user "how I work"
+  notes go in Team → Jack → Instructions (`062`), not a second Settings pane.

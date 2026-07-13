@@ -118,7 +118,6 @@ import {
 import { publishChatDiff } from "../chatDiffStore";
 import { summarizeLastTurn } from "../sessionDiffStats";
 import { loadWorkspaceRules } from "../workspaceRules";
-import { appendJackUserPreferences } from "../jackPrefs";
 import {
   BUILTIN_PRESETS,
   JACK_PRESET_ID,
@@ -3260,7 +3259,6 @@ export function AIChatPanel({
         /* Pinky optional — never block the turn */
       }
     }
-    appendJackUserPreferences(sysParts);
     // Preset instructions shape THIS session's behavior — not a subagent,
     // no isolated context. Appended every turn (not just the first) so a
     // preset picked mid-chat still takes effect for CC's flattened prompt.

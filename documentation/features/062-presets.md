@@ -4,7 +4,7 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-12
 last_verified: 2026-07-13
-tags: [presets, agents, model-selection, effort, organigramma, avatar, backend-agnostic, prompt-injection, settings, chat-identity, companion, team-sync]
+tags: [presets, agents, model-selection, effort, organigramma, avatar, backend-agnostic, prompt-injection, settings, chat-identity, companion, team-sync, user-instructions]
 ---
 
 ## Presets
@@ -79,6 +79,38 @@ so Nora/Vera stay visibly feminine and Milo/Lia keep stable faces across release
 avatars are only a fallback for custom presets and subagents).
 
 **Jack thinking:** shipped default `thinking: true` (pairs with reasoning/high for planning).
+
+### User instructions (all agents, including Jack)
+
+**Where users tune behavior:** per-agent free-form instructions live in the **Team** tab
+(Whiteboard organigramma), not in Settings. Click any agent card — Jack at the root, or
+Milo/Nora/Vera/Lia/custom presets — → **Edit** → **Instructions** textarea → **Save changes**.
+
+| Concern | Path |
+|---|---|
+| Team UI | `WhiteboardOrganigramma.tsx` (Jack root) + `WhiteboardPresets.tsx` + `AgentCreateDrawer.tsx` |
+| Built-in override store | `lcp.presets.v1` via `setPresetOverrides(id, { instructions })` (`settings.ts`) |
+| Custom preset body | `.codetta/presets/<slug>.md` markdown body (`createPreset.ts` / `updatePreset`) |
+| Prompt injection | `AIChatPanel.sendUserText` → `getPresetInstructionsFor(def)` appended to `sysParts` **every turn** |
+| Merge | `effectivePresetDefinition` + `buildPresetInstructions` (`resolvePresetConfig.ts`, `instructions.ts`) |
+
+**Jack specifically:** `presetId === null` in chat, but overrides use `JACK_PRESET_ID = "jack"`.
+Editing Jack in Team persists the same way as Milo/Nora — one drawer, one store, one injection
+path. `applyJackDefaultsIfConfigured()` applies Jack's saved knobs on new chats when overrides
+exist.
+
+**Removed (2026-07-13):** Settings → "Jack — Your preferences" duplicated this surface.
+Deleted `src/jackPrefs.ts`, `src/components/jackSettings.tsx`, `appendJackUserPreferences` in
+`AIChatPanel`, JSON editor key `lcp.jack.customInstructions`, and `.jack-prefs-*` CSS. Legacy
+`lcp.jack.customInstructions` in `localStorage` is **inert** — copy any text into Team → Jack →
+Instructions.
+
+**Precedence on each turn** (assistant system prompt assembly in `AIChatPanel`):
+
+1. Jack persona line (`sysParts[0]`, see `005-jack-duck-identity.md`)
+2. Workspace rules / brain / Works context (when applicable)
+3. **Active preset instructions** (`getPresetInstructionsFor` — includes Jack when no preset picked)
+4. No separate global "user preferences" block anymore
 
 ### User tier→model overrides (Settings)
 
@@ -303,6 +335,9 @@ in a workspace you don't fully trust.
   default** in the Team drawer.
 - **Team save without Save.** Clicking the drawer scrim or Cancel discards edits — only **Save
   changes** writes overrides / `.md` files.
+- **No Settings instructions pane.** Per-agent instructions are Team-only (`062` — User
+  instructions). Do not reintroduce a parallel `lcp.jack.*` store; Jack uses `lcp.presets.v1`
+  like every other built-in.
 
 ### Related docs
 
@@ -312,5 +347,6 @@ in a workspace you don't fully trust.
   of; `SubagentPill` now hosts both concerns in one merged picker.
 - `016-image-attachments.md` — the compress/encode pipeline `avatarStore.ts` reuses.
 - `022-chat-composer.md` — composer row hosting the merged `SubagentPill`.
+- `005-jack-duck-identity.md` — Jack persona line vs per-user instruction overrides (Team).
 - `031-model-discovery-cache.md` — the live model catalog `TierModelSettings` reads via
   `getProvider(id).listModels()` for Cursor CLI/OpenCode/Claude Code.

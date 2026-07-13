@@ -30,7 +30,6 @@ export const SETTINGS_KEYS = [
   "lcp.footprintSettings",
   "lcp.toolPolicy",
   "lcp.aiTemplates",
-  "lcp.jack.customInstructions",
   "lcp.claudeCode.alwaysAllow",
   "lcp.claudeCode.budgetUsd",
   "lcp.claudeCode.allowUnguarded",
