@@ -24,7 +24,7 @@ type TurnProps = BarProps & {
 
 type StickyState = ReturnType<typeof useUserBarSticky>;
 
-function UserMessageImageStrip({
+function UserMessageImageDeck({
   images,
   onImageClick,
 }: {
@@ -32,13 +32,18 @@ function UserMessageImageStrip({
   onImageClick: (img: ChatImage) => void;
 }) {
   return (
-    <div className="ai-user-msg-images" aria-label="Attached images">
+    <div
+      className="ai-user-msg-images"
+      aria-label={`${images.length} attached image${images.length === 1 ? "" : "s"}`}
+      data-count={images.length}
+    >
       {images.map((img, idx) =>
         img.thumb ? (
           <button
             key={`${img.path}:${idx}`}
             type="button"
             className="ai-user-msg-image"
+            style={{ "--fan-index": idx } as React.CSSProperties}
             title={img.name}
             aria-label={img.name}
             onClick={() => onImageClick(img)}
@@ -49,10 +54,11 @@ function UserMessageImageStrip({
           <span
             key={`${img.path}:${idx}`}
             className="ai-user-msg-image ai-user-msg-image--placeholder"
+            style={{ "--fan-index": idx } as React.CSSProperties}
             title={img.name}
             aria-hidden
           >
-            <Icon name="image" size={14} />
+            <Icon name="image" size={12} />
           </span>
         ),
       )}
@@ -125,14 +131,16 @@ function UserBarActions({
 
 function UserMessageBarInner({
   content,
-  imageCount,
+  images,
   sticky,
   ...barProps
-}: Omit<BarProps, "images"> & { imageCount: number; sticky: StickyState }) {
+}: BarProps & { sticky: StickyState }) {
   const { mainRef, isCompact, canToggle, expanded, toggleExpanded } = sticky;
+  const imageCount = images?.length ?? 0;
   const displayText = userMessageDisplayText(content, imageCount);
   const barClass = [
     "ai-user-bar",
+    imageCount > 0 ? "has-images" : "",
     isCompact ? "is-compact" : "",
     expanded ? "is-expanded" : "",
     canToggle ? "is-stuck" : "",
@@ -145,12 +153,20 @@ function UserMessageBarInner({
       <div ref={mainRef} className="ai-user-bar-main">
         {displayText ? <MarkdownPreview content={displayText} /> : null}
       </div>
-      <UserBarActions
-        {...barProps}
-        canToggle={canToggle}
-        expanded={expanded}
-        onToggleExpand={toggleExpanded}
-      />
+      <div className="ai-user-bar-aside">
+        {imageCount > 0 && images && (
+          <UserMessageImageDeck
+            images={images}
+            onImageClick={barProps.onImageClick}
+          />
+        )}
+        <UserBarActions
+          {...barProps}
+          canToggle={canToggle}
+          expanded={expanded}
+          onToggleExpand={toggleExpanded}
+        />
+      </div>
     </div>
   );
 }
@@ -164,7 +180,6 @@ export function UserTurnBar({
   images,
   ...barProps
 }: TurnProps) {
-  const imageCount = images?.length ?? 0;
   const sticky = useUserBarSticky(content);
 
   return (
@@ -177,15 +192,9 @@ export function UserTurnBar({
         data-anchor-role="user"
         data-anchor-preview={content.slice(0, 120)}
       >
-        {imageCount > 0 && images && (
-          <UserMessageImageStrip
-            images={images}
-            onImageClick={barProps.onImageClick}
-          />
-        )}
         <UserMessageBarInner
           content={content}
-          imageCount={imageCount}
+          images={images}
           sticky={sticky}
           {...barProps}
         />
@@ -195,27 +204,6 @@ export function UserTurnBar({
 }
 
 export function UserMessageBar(props: BarProps) {
-  const imageCount = props.images?.length ?? 0;
   const sticky = useUserBarSticky(props.content);
-  return (
-    <>
-      {imageCount > 0 && props.images && (
-        <UserMessageImageStrip
-          images={props.images}
-          onImageClick={props.onImageClick}
-        />
-      )}
-      <UserMessageBarInner
-        imageCount={imageCount}
-        sticky={sticky}
-        actionsDisabled={props.actionsDisabled}
-        showBranch={props.showBranch}
-        onCopy={props.onCopy}
-        onRegen={props.onRegen}
-        onBranch={props.onBranch}
-        onImageClick={props.onImageClick}
-        content={props.content}
-      />
-    </>
-  );
+  return <UserMessageBarInner {...props} sticky={sticky} />;
 }

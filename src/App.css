@@ -14,9 +14,14 @@
   /* Chat stream column — slightly lifted from chrome so the center reads
      as the primary surface between side rails/panels. */
   --chat-stream-bg: #181818;
-  /* User prompt card — lifted above stream so turns read at a glance. */
-  --user-bar-bg: color-mix(in srgb, var(--fg) 12%, var(--chat-stream-bg));
-  --user-bar-border: color-mix(in srgb, var(--fg) 16%, transparent);
+  /* User prompt card — liquid glass over the stream (translucent + blur). */
+  --user-bar-glass-from: color-mix(in srgb, var(--fg) 10%, transparent);
+  --user-bar-glass-to: color-mix(in srgb, var(--fg) 3%, transparent);
+  --user-bar-bg: var(--user-bar-glass-from);
+  --user-bar-border: color-mix(in srgb, var(--fg) 20%, transparent);
+  --user-bar-shadow:
+    0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent),
+    0 4px 14px rgba(0, 0, 0, 0.22);
   /* ComposeCard — lifted recap bar at end of agent turns. */
   --compose-card-bg: color-mix(in srgb, var(--fg) 14%, var(--chat-stream-bg));
   --compose-bar-bg: color-mix(in srgb, var(--fg) 10%, var(--chat-stream-bg));
@@ -129,8 +134,11 @@
   --bg-elev: #fdfdfd;
   --bg-hi: #e8e8eb;
   --chat-stream-bg: var(--bg);
-  --user-bar-bg: color-mix(in srgb, var(--fg) 5%, var(--bg-alt));
-  --user-bar-border: color-mix(in srgb, var(--fg) 10%, transparent);
+  --user-bar-glass-from: color-mix(in srgb, var(--bg-elev) 94%, transparent);
+  --user-bar-glass-to: color-mix(in srgb, var(--bg-elev) 76%, transparent);
+  --user-bar-bg: var(--user-bar-glass-from);
+  --user-bar-border: color-mix(in srgb, var(--fg) 14%, transparent);
+  --user-bar-shadow: 0 1px 2px rgba(0, 0, 0, 0.07);
   --compose-card-bg: color-mix(in srgb, var(--fg) 7%, var(--bg-alt));
   --compose-bar-bg: color-mix(in srgb, var(--fg) 5%, var(--bg-hi));
   --compose-card-border: color-mix(in srgb, var(--fg) 14%, transparent);
@@ -9998,27 +10006,51 @@ button.composer-mention-chip-label:hover {
   width: 100%;
   flex-shrink: 0;
   padding-bottom: 6px;
-  background: var(--chat-stream-bg);
+  background: transparent;
   /* transform on .ai-msg breaks position:sticky */
   animation: none;
 }
 .ai-user-msg-images {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 4px;
+  position: absolute;
+  right: 12px;
+  bottom: 40px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  z-index: 3;
+  pointer-events: auto;
 }
 .ai-user-msg-image {
+  position: absolute;
+  right: 0;
+  bottom: 0;
   display: inline-flex;
-  width: 52px;
-  height: 52px;
+  width: 32px;
+  height: 32px;
   padding: 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--user-bar-border);
   border-radius: var(--radius-xs);
   background: var(--bg-alt);
   overflow: hidden;
   cursor: zoom-in;
   flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+  --fan-index: 0;
+  transform: translate(
+      calc(var(--fan-index) * -3px),
+      calc(var(--fan-index) * -1px)
+    )
+    rotate(calc(var(--fan-index) * -2deg));
+  z-index: calc(20 - var(--fan-index));
+  transition:
+    transform var(--duration-fast) var(--ease-default),
+    box-shadow var(--duration-fast) var(--ease-default);
+}
+.ai-user-msg-images:hover .ai-user-msg-image,
+.ai-user-msg-images:focus-within .ai-user-msg-image {
+  transform: translate(calc(var(--fan-index) * -36px), 0) rotate(0deg);
+  z-index: calc(10 + var(--fan-index));
+  box-shadow: var(--shadow-md);
 }
 .ai-user-msg-image img {
   width: 100%;
@@ -10040,16 +10072,62 @@ button.composer-mention-chip-label:hover {
   flex-shrink: 0;
 }
 .ai-user-bar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
   min-height: 42px;
   padding: 11px 12px 11px 14px;
-  background: var(--user-bar-bg);
+  background: linear-gradient(
+    135deg,
+    var(--user-bar-glass-from) 0%,
+    var(--user-bar-glass-to) 100%
+  );
+  backdrop-filter: blur(var(--blur-medium)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--blur-medium)) saturate(160%);
   border: 1px solid var(--user-bar-border);
   border-radius: var(--radius-md);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent);
+  box-shadow: var(--user-bar-shadow);
+  overflow: visible;
+}
+.ai-user-bar-aside {
+  flex-shrink: 0;
+  align-self: flex-end;
+  display: flex;
+  align-items: flex-end;
+  min-width: 24px;
+}
+.ai-user-bar::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--fg) 18%, transparent),
+    transparent
+  );
+  pointer-events: none;
+}
+:root[data-theme="light"] .ai-user-bar::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--bg-elev) 90%, transparent),
+    transparent
+  );
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ai-user-bar {
+    background: color-mix(in srgb, var(--fg) 10%, var(--chat-stream-bg));
+  }
+  :root[data-theme="light"] .ai-user-bar {
+    background: var(--bg-elev);
+  }
 }
 .ai-user-bar.is-compact,
 .ai-user-bar.is-expanded {
@@ -10082,7 +10160,7 @@ button.composer-mention-chip-label:hover {
   background: linear-gradient(
     to bottom,
     transparent,
-    var(--user-bar-bg) 80%
+    var(--user-bar-glass-from) 85%
   );
   pointer-events: none;
 }

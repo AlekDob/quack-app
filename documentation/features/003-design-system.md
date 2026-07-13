@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS (no Tailwind)
 created: 2026-06-28
-last_verified: 2026-07-10
+last_verified: 2026-07-13
 tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monochrome, macos, window, composer, cursor-style, tool-icon-tints]
 ---
 
@@ -23,7 +23,7 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 ### Token groups (`App.css` `:root`)
 | Group | Tokens |
 |-------|--------|
-| Surfaces | `--bg`, `--bg-alt`, `--bg-elev`, `--bg-hi`, `--bg-hover`, `--chat-stream-bg`, `--user-bar-bg`, `--user-bar-border`, `--glass-bg` |
+| Surfaces | `--bg`, `--bg-alt`, `--bg-elev`, `--bg-hi`, `--bg-hover`, `--chat-stream-bg`, `--user-bar-glass-from/to`, `--user-bar-border`, `--user-bar-shadow`, `--user-bar-bg`, `--glass-bg` |
 | Text | `--fg`, `--fg-dim`, `--fg-muted` |
 | Borders | `--border`, `--border-strong` |
 | Accent (NEUTRAL) | `--accent` (#9aa0ad dark / #6b7280 light), `--accent-rgb`, `--accent-hover`, `--accent-soft`, `--accent-fg` |
@@ -46,6 +46,7 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 
 ### Liquid glass
 - `.liquid-glass` utility (`@supports` fallback + reduced-motion) for STATIC surfaces only. Applied to topbar, `.menu-dropdown`, `.palette`, `WorkspaceColorPopover`, **model catalog/visibility modals** (`.model-browser.liquid-glass`). Never on scrollable lists.
+- **User message bar** (`.ai-user-bar`) uses the same visual language with a lighter blur (`--blur-medium`) because it sits in the scroll stream — see `features/030-user-message-bar.md`. Light theme pairs translucent fill with `--user-bar-shadow` (composer-style resting elevation).
 
 ### Native window (macOS)
 - `titleBarStyle: "Overlay"` + `hiddenTitle: true` → native rounded corners + shadow + traffic lights. `data-os="macos"` insets the topbar (78px) for the lights and hides custom window controls. **Gotcha:** Overlay is macOS-only; `lib.rs` strips decorations on Win/Linux to avoid a double title bar. Earlier `transparent:true` + CSS `border-radius` did NOT work (borderless window has no native rounding/shadow).

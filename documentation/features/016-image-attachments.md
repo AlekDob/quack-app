@@ -19,7 +19,7 @@ tags: [claude-code, cursor-cli, opencode-cli, chat, images, attachments, paste, 
 | Logic + bus | `src/imageAttach.ts` | `compressAndSave`, `attachFromBlob`, `rehydrateMessageImages`, `userMessageDisplayText`, `providerAcceptsImages` |
 | Queue | `src/composerQueue.ts` | `QueuedComposerMessage`, `queueItemFromSend`, `queueImagesAsAttachments`, persist strip |
 | Composer | `src/components/AIChatPanel.tsx` | `attachedImages`, `appendImages`, queue drain with images |
-| User bubble | `src/components/UserMessageBar.tsx` | `UserMessageImageStrip` above the sticky bar |
+| User bubble | `src/components/UserMessageBar.tsx` | `UserMessageImageDeck` in bar aside (32px pile, fan on hover) |
 | Provider types | `src/providers/types.ts` | `supportsVision?` on `ProviderModel`; `imageAttachments?` on `chat()` |
 | Router | `src/ai.ts` | `chatStream(..., imageAttachments?)` passthrough |
 | OpenCode | `src/providers/openCode.ts` | `FilePartInput` in `promptAsync` body |
@@ -43,7 +43,7 @@ tags: [claude-code, cursor-cli, opencode-cli, chat, images, attachments, paste, 
 - **Send (busy):** same attachments enqueue via `pushQueue(text, images)` — see **`039-composer-queue.md`**.
 - **Reload:** `rehydrateMessageImages` rebuilds thumbs from disk paths on saved user messages.
 - **OpenCode gate:** if model catalog says `supportsVision === false`, toast + abort before spawn.
-- **Render:** 52px thumbs in `.ai-user-msg-images` above the user bar (`030`); agent Read → image tool chip (unchanged).
+- **Render:** 32px **card deck** in `.ai-user-msg-images` — absolute on `.ai-user-bar` right edge, stacked at rest, fans left on hover (`030`); composer staging strip stays 56px (`ai-attach-thumb`). Agent Read → image tool chip (unchanged).
 
 ### Limits & defaults
 | Knob | Value | Where |
