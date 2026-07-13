@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), mermaid (lazy), plain CSS
 created: 2026-07-06
-last_verified: 2026-07-07
-tags: [editor, mermaid, diagram, preview, split, mmd, sequence-diagram]
+last_verified: 2026-07-13
+tags: [editor, mermaid, diagram, preview, split, mmd, sequence-diagram, zoom, pan]
 ---
 
 ## Mermaid diagram preview (`.mmd` tabs)
@@ -16,7 +16,8 @@ tags: [editor, mermaid, diagram, preview, split, mmd, sequence-diagram]
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Component | `src/components/MermaidPreview.tsx` | Lazy-loads `mermaid`, debounced `render()` → SVG in `.mermaid-preview-canvas`; theme-aware; syntax errors inline |
+| Component | `src/components/MermaidPreview.tsx` | Lazy-loads `mermaid`, debounced `render()` → SVG in `.mermaid-preview-canvas`; theme-aware; zoom/pan viewport; syntax errors inline |
+| Service | `src/mermaidZoom.ts` | SVG sizing normalization, scroll-sizer sync, fit-to-viewport, pinch zoom math, `scrollForZoom` |
 | Service | `src/editorMermaidView.ts` | `isMermaidPath`, `readEditorMermaidView`, `writeEditorMermaidView` — view pref + default `preview` |
 | Component | `src/components/EditorPane.tsx` | Wires `.mmd` → `MermaidPreview` in `preview-half`; skips Monaco in preview-only |
 | Component | `src/components/FileEditorPane.tsx` | Same split/preview for modal editors (skills popup, etc.) |
@@ -24,12 +25,11 @@ tags: [editor, mermaid, diagram, preview, split, mmd, sequence-diagram]
 | Service | `src/editorMdView.ts` | Shared `EditorMdView` type (`edit` \| `split` \| `preview`) |
 | Config | `src/langDetect.ts` | `.mmd` → Monaco `plaintext` (no mermaid grammar) |
 | Config | `src/fileIcons.ts` | `.mmd` → `doc` tint (same as `.md`) |
-| Config | `src/App.css` | `.mermaid-preview`, viewport/stage/canvas, `.mermaid-preview-zoom` controls |
+| Config | `src/App.css` | `.mermaid-preview-*` viewport / sizer / stage / canvas / zoom toolbar |
 | Dependency | `package.json` | `mermaid` — code-split chunk, not in main bundle |
-| Service | `src/mermaidZoom.ts` | `clampMermaidZoom`, `wheelMermaidZoomFactor`, `scrollForZoom`, zoom constants |
 
 ### Data flow
-`openFile(.mmd)` → `readFile` → store buffer → `EditorPane` portal → `readEditorMermaidView()` (default `preview`) → `MermaidPreview` → `import("mermaid")` → `mermaid.render(id, source)` → SVG `innerHTML` on canvas.
+`openFile(.mmd)` → `readFile` → store buffer → `EditorPane` portal → `readEditorMermaidView()` (default `preview`) → `MermaidPreview` → `import("mermaid")` → `mermaid.render(id, source)` → SVG `innerHTML` on canvas → `normalizeMermaidSvg()` → `fitMermaidScale()` (if oversized) → `syncMermaidScrollSizer()`.
 
 Split mode: Monaco left (`file.contents` live) + `MermaidPreview` right (re-renders on `onChange` after 250ms debounce).
 
@@ -41,16 +41,34 @@ Split mode: Monaco left (`file.contents` live) + `MermaidPreview` right (re-rend
 | `preview` | hidden | full width | — |
 
 ### Key functions
-- `isMermaidPath(path) → boolean` — `/\.mmd$/i`
-- `readEditorMermaidView() → EditorMdView` — default `"preview"`
-- `MermaidPreview({ content })` — debounced async render, cancels on unmount/theme change
+| Function | File | Role |
+|----------|------|------|
+| `isMermaidPath(path)` | `editorMermaidView.ts` | `/\.mmd$/i` gate |
+| `readEditorMermaidView()` | `editorMermaidView.ts` | default `"preview"` |
+| `normalizeMermaidSvg(svg)` | `mermaidZoom.ts` | Pin explicit px size from `viewBox`; strip `width="100%"` |
+| `readMermaidSvgSize(svg)` | `mermaidZoom.ts` | `viewBox` → `getBBox()` fallback |
+| `syncMermaidScrollSizer(sizer, stage, base, scale)` | `mermaidZoom.ts` | Scroll extents on sizer; transform-only on stage |
+| `fitMermaidScale(viewport, base)` | `mermaidZoom.ts` | Shrink-to-fit when diagram exceeds viewport (never zooms past 100%) |
+| `wheelMermaidZoomFactor(deltaY)` | `mermaidZoom.ts` | `exp(-deltaY * 0.006)` for macOS pinch |
+| `scrollForZoom(viewport, x, y, old, new)` | `mermaidZoom.ts` | Pointer-anchored scroll correction on zoom |
+| `MermaidPreview({ content })` | `MermaidPreview.tsx` | Debounced async render; cancels on unmount/theme change |
+
+### DOM layout (zoom)
+```
+.mermaid-preview-viewport     ← overflow:auto; native two-finger pan
+  .mermaid-preview-sizer      ← explicit width/height = layout × scale (scroll box)
+    .mermaid-preview-stage    ← position:absolute; transform:scale(z); unscaled layout box
+      .mermaid-preview-canvas ← injected <svg>
+```
+
+**Why the sizer wrapper:** CSS `transform` does not expand the scrollable layout box. The sizer owns scroll extents; the stage only scales visually. Applying both scaled dimensions **and** `transform: scale()` on the same node double-scales and breaks pan (diagram “vanishes” after pinch).
 
 ### State / persistence
 | Key | Type | Default |
 |-----|------|---------|
 | `lcp.editorMermaidView` | `"edit" \| "split" \| "preview"` | `"preview"` |
 
-Separate from `lcp.editorMdView` (markdown defaults to `"edit"`).
+Zoom level is **session-only** (resets on source change; toolbar reset → 100% + scroll origin). Separate from `lcp.editorMdView` (markdown defaults to `"edit"`).
 
 ### Mermaid runtime
 | Setting | Value |
@@ -61,6 +79,7 @@ Separate from `lcp.editorMdView` (markdown defaults to `"edit"`).
 | Load | `import("mermaid")` on first preview mount |
 | Debounce | 250ms on `content` / theme change |
 | Empty buffer | Placeholder copy, no `render()` call |
+| Stage padding | `MERMAID_STAGE_PADDING` = 48px (24px per side) |
 
 ### Zoom / pan
 | Input | Behaviour |
@@ -68,10 +87,9 @@ Separate from `lcp.editorMdView` (markdown defaults to `"edit"`).
 | Trackpad pinch | `wheel` + `ctrlKey` (macOS maps pinch) → zoom toward pointer; `passive: false` |
 | Two-finger scroll | Native pan on `.mermaid-preview-viewport` |
 | Toolbar `−` / `+` | Step ×1.2 toward viewport center |
-| `%` label / reset | Jump to 100% + scroll top-left |
+| `%` label / ⟳ reset | Jump to 100% + scroll top-left |
 | Range | 20%–500% (`MERMAID_ZOOM_MIN` / `MAX`) |
-
-Zoom uses `transform: scale()` on `.mermaid-preview-stage` with explicit stage box so scroll extents track the scaled SVG. Resets to 100% when diagram source changes.
+| First paint | `fitMermaidScale()` when diagram larger than viewport; otherwise 100% |
 
 ### Error / loading UI
 | State | Surface |
@@ -90,6 +108,8 @@ Zoom uses `transform: scale()` on `.mermaid-preview-stage` with explicit stage b
 
 ### Gotchas
 - **Preview default:** first open skips Monaco — fixes reported freeze/blank webview on large sequence diagrams before reload.
+- **`width="100%"` SVG collapse:** Mermaid often emits responsive SVG width; inside a shrink-to-fit flex child the diagram renders tiny at “100%”. Always run `normalizeMermaidSvg()` after `innerHTML` — never trust `getBoundingClientRect()` for intrinsic size on first paint.
+- **No double-scale:** never set the stage layout box to `base × scale` **and** `transform: scale(scale)` on the same element. Sizer = scroll extents; stage = transform only.
 - **No scroll-sync:** unlike markdown split, editor scroll does not drive the diagram pane.
 - **Bundle size:** mermaid + diagram parsers are a large lazy chunk (~100KB–700KB per diagram type); acceptable for desktop, loaded only when a `.mmd` tab renders.
 - **`<br/>` in participants:** Mermaid HTML labels (e.g. `participant UI as Client<br/>(Module)`) are supported by the library; syntax errors surface in the error panel.

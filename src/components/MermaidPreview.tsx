@@ -3,9 +3,13 @@ import { errMsg } from "../notify";
 import {
   MERMAID_ZOOM_BTN,
   MERMAID_ZOOM_DEFAULT,
+  type MermaidBaseSize,
   clampMermaidZoom,
+  fitMermaidScale,
   formatMermaidZoom,
+  normalizeMermaidSvg,
   scrollForZoom,
+  syncMermaidScrollSizer,
   wheelMermaidZoomFactor,
 } from "../mermaidZoom";
 import { useResolvedTheme } from "../theme";
@@ -23,20 +27,6 @@ function initMermaid(mermaid: MermaidApi, theme: "light" | "dark"): void {
   });
 }
 
-function syncStageBox(
-  stage: HTMLDivElement | null,
-  canvas: HTMLDivElement | null,
-  scale: number,
-): void {
-  const svg = canvas?.querySelector("svg");
-  if (!stage || !svg) return;
-  const w = svg.getBoundingClientRect().width / scale;
-  const h = svg.getBoundingClientRect().height / scale;
-  if (w <= 0 || h <= 0) return;
-  stage.style.width = `${w * scale}px`;
-  stage.style.height = `${h * scale}px`;
-}
-
 interface Props {
   content: string;
 }
@@ -44,12 +34,23 @@ interface Props {
 export function MermaidPreview({ content }: Props) {
   const theme = useResolvedTheme();
   const viewportRef = useRef<HTMLDivElement>(null);
+  const sizerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const baseSizeRef = useRef<MermaidBaseSize | null>(null);
   const scaleRef = useRef(MERMAID_ZOOM_DEFAULT);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [scale, setScale] = useState(MERMAID_ZOOM_DEFAULT);
+
+  const syncLayout = useCallback((nextScale: number) => {
+    syncMermaidScrollSizer(
+      sizerRef.current,
+      stageRef.current,
+      baseSizeRef.current,
+      nextScale,
+    );
+  }, []);
 
   const applyScale = useCallback((next: number, anchor?: { x: number; y: number }) => {
     const viewport = viewportRef.current;
@@ -59,27 +60,41 @@ export function MermaidPreview({ content }: Props) {
     scaleRef.current = clamped;
     setScale(clamped);
     requestAnimationFrame(() => {
-      syncStageBox(stageRef.current, canvasRef.current, clamped);
+      syncLayout(clamped);
       if (viewport && anchor) {
         scrollForZoom(viewport, anchor.x, anchor.y, prev, clamped);
       }
     });
-  }, []);
+  }, [syncLayout]);
 
   const resetZoom = useCallback(() => {
     const viewport = viewportRef.current;
     scaleRef.current = MERMAID_ZOOM_DEFAULT;
     setScale(MERMAID_ZOOM_DEFAULT);
     requestAnimationFrame(() => {
-      syncStageBox(stageRef.current, canvasRef.current, MERMAID_ZOOM_DEFAULT);
+      syncLayout(MERMAID_ZOOM_DEFAULT);
       viewport?.scrollTo({ top: 0, left: 0 });
     });
-  }, []);
+  }, [syncLayout]);
 
-  useEffect(() => {
-    scaleRef.current = MERMAID_ZOOM_DEFAULT;
-    setScale(MERMAID_ZOOM_DEFAULT);
-  }, [content]);
+  const afterSvgPaint = useCallback((fitToView: boolean) => {
+    const canvas = canvasRef.current;
+    const svg = canvas?.querySelector("svg");
+    if (!svg || !(svg instanceof SVGSVGElement)) return;
+    const base = normalizeMermaidSvg(svg);
+    baseSizeRef.current = base;
+    if (!base) return;
+    const viewport = viewportRef.current;
+    const initial = fitToView && viewport
+      ? fitMermaidScale(viewport, base)
+      : scaleRef.current;
+    scaleRef.current = initial;
+    setScale(initial);
+    requestAnimationFrame(() => {
+      syncLayout(initial);
+      viewport?.scrollTo({ top: 0, left: 0 });
+    });
+  }, [syncLayout]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -88,12 +103,16 @@ export function MermaidPreview({ content }: Props) {
     const trimmed = content.trim();
     if (!trimmed) {
       canvas.innerHTML = "";
+      baseSizeRef.current = null;
       setError(null);
       setBusy(false);
       return;
     }
 
     let cancelled = false;
+    scaleRef.current = MERMAID_ZOOM_DEFAULT;
+    setScale(MERMAID_ZOOM_DEFAULT);
+
     const timer = window.setTimeout(() => {
       void (async () => {
         setBusy(true);
@@ -107,11 +126,12 @@ export function MermaidPreview({ content }: Props) {
           if (cancelled) return;
           canvas.innerHTML = svg;
           requestAnimationFrame(() => {
-            syncStageBox(stageRef.current, canvasRef.current, scaleRef.current);
+            if (!cancelled) afterSvgPaint(true);
           });
         } catch (e) {
           if (!cancelled) {
             canvas.innerHTML = "";
+            baseSizeRef.current = null;
             setError(errMsg(e));
           }
         } finally {
@@ -124,11 +144,11 @@ export function MermaidPreview({ content }: Props) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [content, theme]);
+  }, [content, theme, afterSvgPaint]);
 
   useEffect(() => {
-    syncStageBox(stageRef.current, canvasRef.current, scale);
-  }, [scale, busy]);
+    syncLayout(scale);
+  }, [scale, busy, syncLayout]);
 
   useEffect(() => {
     const viewport = viewportRef.current;
@@ -187,12 +207,14 @@ export function MermaidPreview({ content }: Props) {
           </button>
         </div>
         <div ref={viewportRef} className="mermaid-preview-viewport">
-          <div
-            ref={stageRef}
-            className="mermaid-preview-stage"
-            style={{ transform: `scale(${scale})` }}
-          >
-            <div ref={canvasRef} className="mermaid-preview-canvas" />
+          <div ref={sizerRef} className="mermaid-preview-sizer">
+            <div
+              ref={stageRef}
+              className="mermaid-preview-stage"
+              style={{ transform: `scale(${scale})` }}
+            >
+              <div ref={canvasRef} className="mermaid-preview-canvas" />
+            </div>
           </div>
         </div>
       </div>

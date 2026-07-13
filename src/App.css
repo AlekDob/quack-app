@@ -15583,10 +15583,17 @@ body.ab-dragging * {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
 }
+.mermaid-preview-sizer {
+  position: relative;
+  flex-shrink: 0;
+}
 .mermaid-preview-stage {
   transform-origin: 0 0;
-  display: inline-block;
+  position: absolute;
+  top: 0;
+  left: 0;
   padding: 24px;
+  box-sizing: border-box;
 }
 .mermaid-preview-canvas {
   display: block;
