@@ -15,6 +15,7 @@ import { QuackStorePanel } from "./QuackStorePanel";
 import { AIChatPanel } from "./AIChatPanel";
 import { ChatSwitchVeil } from "./ChatSwitchVeil";
 import { mediaKindOf } from "../mediaPreview";
+import { isMarkdownPath } from "../editorMdView";
 import { parseKey, type WorkspaceData } from "../store";
 import { useChatSwitching } from "../useChatSwitching";
 import { useCallback, useEffect, useState } from "react";
@@ -45,7 +46,7 @@ export function TabContentHost({
   if (!parsed) return null;
 
   if (parsed.kind === "file") {
-    if (!showHeavy || !editorsReady) return null;
+    if (!showHeavy) return null;
     const path = parsed.path;
     const media = mediaKindOf(path);
     if (media === "session-transcript") {
@@ -55,18 +56,21 @@ export function TabContentHost({
         tabKey,
       );
     }
-    if (media !== null || ws.files[path]) {
-      return createPortal(
-        media ? (
-          <MediaPreviewPane wsId={wsId} path={path} kind={media} />
-        ) : (
-          <EditorPane wsId={wsId} path={path} />
-        ),
-        container,
-        tabKey,
-      );
-    }
-    return null;
+    const canRender = media !== null || ws.files[path];
+    if (!canRender) return null;
+    // Drawer hosts may mount before `editorsReady`; markdown preview and
+    // media panes do not need Monaco. Defer only the Monaco editor path.
+    const needsMonaco = !media && !editorsReady;
+    if (needsMonaco && !isMarkdownPath(path)) return null;
+    return createPortal(
+      media ? (
+        <MediaPreviewPane wsId={wsId} path={path} kind={media} />
+      ) : (
+        <EditorPane wsId={wsId} path={path} />
+      ),
+      container,
+      tabKey,
+    );
   }
 
   if (parsed.kind === "ai") {

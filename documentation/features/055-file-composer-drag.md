@@ -26,7 +26,7 @@ tags: [composer, file-tree, drag-drop, mention, cite, ai-chat, pointer-dnd, edit
 | Ghost | `src/components/DragGhost.tsx` | Portal label pill (same as tab drag) |
 | Tree UI | `src/components/FileTree.tsx` | `onFileMouseDown` on file rows; passes `wsId` |
 | Pane UI | `src/components/PaneNode.tsx` | Tab drag + drop overlays; uses `resolveTabDropTarget` |
-| Store | `src/store.ts` | `openFileAt`, `moveTab`, `moveTabToDrawer`, `openFile` |
+| Store | `src/store.ts` | `openFileAt`, `openFileInDrawer`, `moveTab`, `moveTabToDrawer`, `openFile` |
 | Composer | `src/components/AIChatPanel.tsx` | `citeFileFromDrop`, `data-composer-file-drop` |
 | Context | `src/workspaceChatContext.ts` | `addAttachedFile` (037) |
 | Drawer zone | `src/editorDrawer.ts` | `isEditorDrawerDropZone` |
@@ -45,7 +45,7 @@ FileTree file row mousedown
       → DragGhost + PaneNode drop overlays (same as tab drag)
   → mouseup:
       composer hit? → registerComposerFileDrop.onFile → citeFileFromDrop
-      drawer hit?   → openFile + moveTabToDrawer
+      drawer hit?   → openFileInDrawer(wsId, path)
       pane hit?     → openFileAt(wsId, path, { paneId, edge | insertIndex })
       → endDrag()
 ```
@@ -56,6 +56,7 @@ FileTree file row mousedown
 |----------|------|
 | `startFileTreeDrag(wsId, absPath, label, …) → cleanup` | Pointer drag lifecycle |
 | `resolveTabDropTarget(x, y, wsId) → TabDropTarget` | Tab bar insert / pane edge / drawer zone |
+| `openFileInDrawer(wsId, path)` | Buffer + `moveTabToDrawer` without main-pane tab switch |
 | `openFileAt(wsId, path, target)` | Load buffer if needed, `dropTabAt` / `dropTabAtIndex` |
 | `registerComposerFileDrop({ onFile })` | Active chat panel drop handler |
 | `subscribeComposerFileDropHover(cb)` | Composer `.file-drop-over` highlight |
@@ -65,7 +66,7 @@ FileTree file row mousedown
 | Priority | Target | Action |
 |----------|--------|--------|
 | 1 | `[data-composer-file-drop]` | `addAttachedFile` + file chip in composer (072) |
-| 2 | Right-edge drawer strip | `openFile` → `moveTabToDrawer` |
+| 2 | Right-edge drawer strip | `openFileInDrawer` |
 | 3 | Tab bar between tabs | `openFileAt` with `insertIndex` |
 | 4 | Pane content edge zones | `openFileAt` with `edge` → split pane |
 | 5 | Pane center | `openFileAt` with `edge: "center"` |
@@ -106,4 +107,5 @@ FileTree file row mousedown
 - `@` autocomplete: [041-mention-file-preview.md](041-mention-file-preview.md)
 - Composer shell: [022-chat-composer.md](022-chat-composer.md)
 - Context files dock: [037-project-context-dock.md](037-project-context-dock.md)
-- Editor drawer: `editorDrawer.ts`, `EditorTabDrawer.tsx`
+- Editor drawer API + peek flow: [063-surface-view-prefs.md](063-surface-view-prefs.md)
+- Editor drawer chrome: `editorDrawer.ts`, `EditorTabDrawer.tsx`

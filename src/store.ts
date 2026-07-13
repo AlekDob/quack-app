@@ -658,6 +658,34 @@ function defaultEditorDrawer(): EditorDrawerState {
   return { tabKey: null, width: defaultEditorDrawerW() };
 }
 
+/** Hydrate `ws.files[path]` when missing. Media kinds get an empty sentinel. */
+async function bufferFileIfNeeded(
+  wsId: string,
+  path: string,
+  ws: WorkspaceData,
+  patch: (wsId: string, fn: (w: WorkspaceData) => WorkspaceData) => void,
+): Promise<boolean> {
+  if (ws.files[path]) return true;
+  if (mediaKindOf(path)) {
+    patch(wsId, (w) => ({
+      ...w,
+      files: { ...w.files, [path]: { contents: "", original: "" } },
+    }));
+    return true;
+  }
+  try {
+    const contents = await fsApi.readFile(path);
+    patch(wsId, (w) => ({
+      ...w,
+      files: { ...w.files, [path]: { contents, original: contents } },
+    }));
+    return true;
+  } catch (e) {
+    toastError(`Can't open ${basename(path)}: ${errMsg(e)}`);
+    return false;
+  }
+}
+
 function parseEditorDrawer(raw: unknown): EditorDrawerState {
   if (!raw || typeof raw !== "object") return defaultEditorDrawer();
   const o = raw as Record<string, unknown>;
@@ -838,6 +866,8 @@ interface AppState {
   reorderWorkspaces(fromIndex: number, toIndex: number): void;
 
   openFile(wsId: string, path: string): Promise<void>;
+  /** Open a file in the right drawer without stealing the editor's active tab. */
+  openFileInDrawer(wsId: string, path: string): Promise<void>;
   /** Open (or move) a file tab at a pane edge / tab index — used by tree drag. */
   openFileAt(
     wsId: string,
@@ -1860,6 +1890,17 @@ export const useStore = create<AppState>((set, get) => {
           },
         };
       });
+      autoRevealInTree(wsId, path);
+    },
+
+    openFileInDrawer: async (wsId, path) => {
+      const ws = get().loaded[wsId];
+      if (!ws) return;
+      forgetClosedTab(wsId, path);
+      const k = fileKey(path);
+      if (ws.layout.editorDrawer?.tabKey === k && ws.files[path]) return;
+      if (!(await bufferFileIfNeeded(wsId, path, ws, updateWs))) return;
+      get().moveTabToDrawer(wsId, k);
       autoRevealInTree(wsId, path);
     },
 

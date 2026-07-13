@@ -2,13 +2,13 @@
 type: feature
 project: quack-desktop
 created: 2026-07-12
-last_verified: 2026-07-12
-tags: [works, brain, team, drawer, activity-bar, settings]
+last_verified: 2026-07-13
+tags: [works, brain, team, drawer, activity-bar, settings, files]
 ---
 
 # 063 — Surface view prefs (tab vs drawer)
 
-**Purpose:** Activity-bar surfaces that open editor tabs (Works, Quack Brain, Team) can open in the **editor tab row** or the **right tab drawer** by default. User picks per surface in Settings → Views.
+**Purpose:** Activity-bar surfaces that open editor tabs (Works, Quack Brain, Team) can open in the **editor tab row** or the **right tab drawer** by default. User picks per surface in Settings → Views. File opens from Team subagent cards and tree → drawer drops use the same drawer host without stealing the main pane's active tab.
 
 ## Defaults
 
@@ -29,6 +29,20 @@ Stored in `localStorage` key `lcp.surfaceView` (global, not per-workspace).
 3. **Tab** — focus existing pane tab, dock from drawer if needed, or append to active pane
 
 `worksOpen`, `brainOpen`, `wbOpen` all delegate here.
+
+## File open in drawer (peek without tab switch)
+
+`store.ts` → `openFileInDrawer(wsId, path)`:
+
+| Step | Behaviour |
+|---|---|
+| 1 | `forgetClosedTab`; no-op if same key already in drawer with buffer |
+| 2 | `bufferFileIfNeeded` — `readFile` into `ws.files` (or empty sentinel for media kinds) |
+| 3 | `moveTabToDrawer(wsId, fileKey(path))` — never appends/activates in the main pane |
+
+**Call sites:** `WhiteboardOrganigramma` (subagent card click → markdown preview), `fileComposerDrag` (explorer drop on right-edge drawer zone). Prefer this over `openFile` + `moveTabToDrawer` — the two-step sequence briefly activates the file in the editor tab row and caused a black main pane (Team hidden, file host not mounted yet).
+
+**Drawer render gate:** `TabContentHost` no longer requires `editorsReady` for markdown files in the drawer (preview uses `MarkdownPreview`, not Monaco). Non-markdown files still defer until Monaco is ready.
 
 ## Settings UI
 
@@ -61,10 +75,10 @@ See `065-works-drawer-ux.md` for full behaviour.
 | File | Role |
 |---|---|
 | `src/surfaceViewPrefs.ts` | Read/write prefs, defaults, hook |
-| `src/store.ts` | `openSingletonSurface`, `*Open` actions |
+| `src/store.ts` | `openSingletonSurface`, `openFileInDrawer`, `bufferFileIfNeeded`, `moveTabToDrawer`, `*Open` actions |
 | `src/components/SettingsModal.tsx` | Views section |
 | `src/components/ActivityBarViewIcons.tsx` | Drawer-aware active icon |
-| `src/components/TabContentHost.tsx` | Renders drawer tab content (unchanged) |
+| `src/components/TabContentHost.tsx` | Renders drawer tab content; relaxed `editorsReady` for markdown preview |
 | `src/components/EditorTabDrawer.tsx` | Drawer chrome + nested stack host |
 | `src/editorDrawerStack.ts` | Child-drawer portal target when parent drawer open |
 
@@ -72,4 +86,4 @@ See `065-works-drawer-ux.md` for full behaviour.
 
 - Works layer: `054-works-layer.md`
 - Works drawer UX: `065-works-drawer-ux.md`
-- Editor tab drawer (drag): diary `2026-07-12.md`
+- Team organigramma subagent click: `018-whiteboard-organigramma.md`

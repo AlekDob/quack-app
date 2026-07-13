@@ -11,7 +11,7 @@
 import { useEffect, useState } from "react";
 import type { SubagentDef } from "../subagents";
 import type { WhiteboardData } from "./WhiteboardPane";
-import { fileKey, useStore } from "../store";
+import { useStore } from "../store";
 import { writeEditorMdView } from "../editorMdView";
 import { error as toastError } from "../notify";
 import { AIIcon } from "./AIIcon";
@@ -147,9 +147,7 @@ function AgentNode({ wsId, agent }: { wsId: string; agent: SubagentDef }) {
     // drawer instead of a full editor tab — a quick read-only peek at the
     // agent's definition without leaving the Team surface.
     writeEditorMdView("preview");
-    const st = useStore.getState();
-    await st.openFile(wsId, agent.path);
-    st.moveTabToDrawer(wsId, fileKey(agent.path));
+    await useStore.getState().openFileInDrawer(wsId, agent.path);
   };
 
   return (

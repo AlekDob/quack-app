@@ -52,9 +52,7 @@ function applyEditorDrop(wsId: string, absPath: string): void {
   if (!cur) return;
   const st = useStore.getState();
   if (cur.drawerDrop) {
-    void st.openFile(wsId, absPath).then(() => {
-      st.moveTabToDrawer(wsId, fileKey(absPath));
-    });
+    void st.openFileInDrawer(wsId, absPath);
     return;
   }
   if (!cur.overPaneId) return;

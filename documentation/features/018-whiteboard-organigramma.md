@@ -3,9 +3,17 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-12
-tags: [whiteboard, organigramma, subagents, skills, frontmatter, drag-and-drop, runbook, markdown-export, quack-v1, team]
+last_verified: 2026-07-13
+tags: [whiteboard, organigramma, subagents, skills, frontmatter, drag-and-drop, runbook, markdown-export, quack-v1, team, editor-drawer]
 ---
+
+> **2026-07-13 update:** fixed **black screen** when clicking a subagent card on the Team
+> tab. Root cause: `openFile()` briefly made the `.md` the **active editor tab** (hiding Team)
+> before `moveTabToDrawer()` ran; the file host often rendered nothing on that frame
+> (`editorsReady` gate + preview-only path). Fix: `store.openFileInDrawer()` hydrates the
+> buffer and opens **directly in the right drawer** without stealing the main pane's active
+> tab; `WhiteboardOrganigramma.AgentNode` calls it after `writeEditorMdView("preview")`.
+> See `063-surface-view-prefs.md` (drawer open API) and diary `2026-07-13.md`.
 
 > **2026-07-12 update:** renamed "Organigramma"/"Whiteboard" to **"Team"** everywhere
 > user-facing (activity bar, command palette, tab labels, sub-tab pill, legend copy) — internal
@@ -118,12 +126,12 @@ target via `document.elementFromPoint(x, y)` + `closest("[data-wb-agent]")`.
 - **Visual cue** — the target agent gets `--accent` border + `--bg-hover`
   background while a drag is over it (`is-drop-target` class, controlled
   by `hoverAgent` state).
-- **Click on agent** — opens its `.md` file in an editor tab **and, if the
-  file is inside the project, reveals + highlights it in the left file tree**
-  via `openFileAndReveal(wsId, agent.path)` (`src/revealInTree.ts`). The
-  wrapper's `onClick` guards against double-opening when the click landed on
-  a child skill chip (`e.target.closest("[data-wb-skill]")` → bail).
-  `role="button" tabIndex={0}` for keyboard accessibility (Enter/Space open it).
+- **Click on agent** — opens its `.md` in the **right editor drawer** in **Preview**
+  mode (`writeEditorMdView("preview")` then `openFileInDrawer(wsId, agent.path)`).
+  Team stays visible in the main pane; no tab switch, no reload. Global agents
+  (e.g. `~/.claude/agents/code-explorer.md`) open the same way. Keyboard:
+  `role="button" tabIndex={0}` — Enter/Space trigger the same handler.
+  If `agent.path` is null, toast error (no silent no-op).
 - **Click on any skill chip** — opens its `SKILL.md` (same `openFileAndReveal`,
   so project skills are revealed in the tree too). Works for both free chips
   (pool) and linked chips (inside an agent), by the chip's `data-wb-skill` attr.
@@ -211,9 +219,9 @@ Same string feeds:
 | Module | `src/frontmatter.ts` | `setFrontmatterList` / `patchFrontmatterList` (read + write, no YAML dep) |
 | Module | `src/whiteboardMd.ts` | `renderWhiteboardMd` (pure function, runbook doc) |
 | Module | `src/subagents.ts` | +`skills` field, +`path` field, +`frontmatterList` parser |
-| Module | `src/store.ts` | `wbKey`, `parseKey` whiteboard case, `wbOpen` action, `clean()` whitelist |
+| Module | `src/store.ts` | `wbKey`, `parseKey` whiteboard case, `wbOpen`, `openFileInDrawer`, `clean()` whitelist |
 | Component | `src/components/WhiteboardPane.tsx` | Tab shell + 3 sub-tabs + load/persist lifecycle |
-| Component | `src/components/WhiteboardOrganigramma.tsx` | Tree + DnD + click-to-unlink |
+| Component | `src/components/WhiteboardOrganigramma.tsx` | Tree + preset group; `AgentNode` → drawer preview |
 | Component | `src/components/Icon.tsx` | +`whiteboard` icon |
 | Component | `src/components/WorkspaceShell.tsx` | portal-mount of `WhiteboardPane` (parallel to SubagentTranscriptView) |
 | Component | `src/components/PaneNode.tsx` | `tabLabel` + icon dispatch (new `isWhiteboard` branch) |
@@ -270,6 +278,10 @@ Three ways, all open-or-focus the existing tab:
 - **`SubagentDef.path` may be `null`** when the loader can't resolve a path —
   the organigramma treats this as "read-only" (no write possible), surfaces a
   toast error rather than silently no-op'ing.
+- **Subagent click must not call `openFile` + `moveTabToDrawer` in sequence** —
+  `openFile` always appends/activates in the main pane first → black frame while
+  Team is hidden and the file host is not ready. Use `openFileInDrawer` instead
+  (also used by tree → drawer drop in `055`).
 - **Whitelist `wb:` keys** — without the `clean()` whitelist, restart would
   drop the tab because there's no backing record (unlike `ai:` chats).
 - **Already-open behaviour** — `wbOpen` focuses the existing tab/pane instead
