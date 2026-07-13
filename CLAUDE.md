@@ -162,6 +162,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `067-agent-tasks-checklist.md` — Cursor-style collapsible task checklist (`AgentTasks` in `AgentModeShell.tsx`) below the sessions list, sourced from `aiTaskStore.ts` (TodoWrite/TaskCreate items published by `AIChatPanel.tsx`); collapsed by default, resets on `chatId` change.
   - `066-works-cycles-stories.md` — auto weekly **Cycles** (progress + burndown charts), Scrum **Stories** spawning backlog work items; storage at workspace `works/` (not `.quack/`).
   - `068-quack-plan-harness.md` — product-owned plan on stories (`S-NNN`): Jack PM, **StoryPlanDrawer** (hover peek + pin on chat column), composer segmented cluster + **ComposerDocsChip**; `plan:` tab (`061`) is fallback without `storyId`.
+  - `069-smooth-streaming.md` — Cursor-style smooth assistant stream: rAF-coalesced paint + `StreamingPlainText` live tail (no per-delta markdown); full `MarkdownPreview` on turn commit.
   - `063-surface-view-prefs.md` — per-surface tab vs drawer default (Works / Brain / Team); Settings → Views; nested child-drawer stack.
   - `065-works-drawer-ux.md` — catalog list, draft create, Notion editor in drawer, module picker, nested drawer stack, overlay z-index (ctx menu + confirm).
   - `052-composer-voice-dictation.md` — Cursor-style composer mic: waveform row, native macOS `SFSpeechRecognizer` + Web Speech on Windows; `dictation.ts`, `dictation.rs`, `ComposerMic.tsx`.

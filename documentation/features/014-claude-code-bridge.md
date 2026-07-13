@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-11
+last_verified: 2026-07-13
 tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog, rust, performance]
 ---
 
@@ -112,4 +112,10 @@ Full design: **[023-session-usage-panel.md](023-session-usage-panel.md)**. Gotch
 
 `claudeCode.ts` parses `stream_event` with `--include-partial-messages`. Do
 **not** use summed `result.usage` cache fields for context window %.
+
+### Frontend streaming UX
+
+Token deltas surface as `content` events in `AIChatPanel`. UI coalescing + plain
+tail rendering (no per-delta markdown parse) live in **`069-smooth-streaming.md`**
+— bridge Rust/TS contract unchanged; only the chat paint path improved.
 

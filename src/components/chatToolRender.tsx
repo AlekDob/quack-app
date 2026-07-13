@@ -19,6 +19,7 @@ import type { ChatMessage, ToolCall } from "../ai";
 import { balanceFences, splitThinking } from "../chatTextUtils";
 import { ReasoningTurnChip } from "./ReasoningTurnChip";
 import { MarkdownPreview } from "./MarkdownPreview";
+import { StreamingPlainText } from "./StreamingPlainText";
 import { Icon, type IconName } from "./Icon";
 import { duckAvatarFor } from "../subagents";
 import { requestToolDrawer } from "../toolDrawer";
@@ -917,6 +918,10 @@ function CompactBlocks({
 }) {
   const seen = new Set<string>();
   const seenThinking = new Set<string>();
+  const lastTextIdx = blocks.reduce(
+    (last, b, i) => (b.kind === "text" ? i : last),
+    -1,
+  );
   const out: ReactNode[] = [];
   let run: { id: string; call: ToolCall }[] = [];
   let runKey = 0;
@@ -959,14 +964,20 @@ function CompactBlocks({
           seenThinking.add(thinking.trim());
           out.push(<ThinkingBlock key={`tk${i}`} text={thinking} />);
         }
-        if (visible.trim())
+        if (visible.trim()) {
+          const isLiveTail = streaming && i === lastTextIdx;
           out.push(
-            <MarkdownPreview
-              key={`t${i}`}
-              content={balanceFences(visible)}
-              onFileOpen={onFileOpen}
-            />,
+            isLiveTail ? (
+              <StreamingPlainText key={`t${i}`} text={visible} />
+            ) : (
+              <MarkdownPreview
+                key={`t${i}`}
+                content={balanceFences(visible)}
+                onFileOpen={onFileOpen}
+              />
+            ),
           );
+        }
       }
       return;
     }

@@ -95,6 +95,10 @@ import { ComposeCard } from "./composeCard";
 import { openHtmlPreviewTab } from "./HtmlPreviewPane";
 import { openPlanTab } from "./PlanPane";
 import { resolveChatFilePath } from "../chatFileLinks";
+import {
+  openWorkspaceDocPath,
+  resolveWorkspaceDocPath,
+} from "../workspaceDocOpen";
 import { PermissionCard, PrivacyBanner } from "./aiInlineCards";
 import {
   ProviderSessionsButton,
@@ -250,6 +254,8 @@ import {
   fs,
 } from "../ipc";
 import { MarkdownPreview } from "./MarkdownPreview";
+import { StreamingPlainText } from "./StreamingPlainText";
+import { createStreamPainter } from "../streamPaint";
 import { UserTurnBar } from "./UserMessageBar";
 import { ModelPickerPopover } from "./ModelPickerPopover";
 import { ModelBrowser } from "./ModelBrowser";
@@ -1047,6 +1053,9 @@ export function AIChatPanel({
   const [historyIdx, setHistoryIdx] = useState<number | null>(null);
   const historyDraftRef = useRef("");
   const abortRef = useRef<AbortController | null>(null);
+  const streamPainterRef = useRef<ReturnType<typeof createStreamPainter> | null>(
+    null,
+  );
   const editorState = useEditorState();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -1343,6 +1352,10 @@ export function AIChatPanel({
     // Start a fresh text block (= paragraph) for each new assistant
     // message so narration bursts don't glue mid-sentence.
     let breakNextText = false;
+    const paintReplay = createStreamPainter(() => {
+      setStreamingBlocks([...replayBlocks]);
+      setStreaming(replayAcc);
+    });
     const appendReplayText = (t: string) => {
       if (!t) return;
       const last = replayBlocks[replayBlocks.length - 1];
@@ -1353,8 +1366,7 @@ export function AIChatPanel({
       }
       breakNextText = false;
       replayAcc += t;
-      setStreamingBlocks([...replayBlocks]);
-      setStreaming(replayAcc);
+      paintReplay.schedule();
     };
 
     const replayLine = (line: { kind?: string; line?: string; code?: number }) => {
@@ -1378,6 +1390,7 @@ export function AIChatPanel({
         replayCalls.length = 0;
         replayResults.length = 0;
         replayAcc = "";
+        paintReplay.cancel();
         setStreaming(null);
         setStreamingBlocks([]);
         setStreamingToolCalls([]);
@@ -1601,6 +1614,7 @@ export function AIChatPanel({
 
     return () => {
       cancelled = true;
+      paintReplay.cancel();
       if (unlisten) unlisten();
     };
     // We deliberately depend ONLY on sessionId (the chat-tab id), not on
@@ -3145,6 +3159,13 @@ export function AIChatPanel({
         // TaskCreate/TaskUpdate twice (the duplicated checklist). Track
         // ids we've already handled this round and skip repeats.
         const seenToolCallIds = new Set<string>();
+        const paintStreamUi = createStreamPainter(() => {
+          setStreaming(acc);
+          if (blocksThisRound.length > 0) {
+            setStreamingBlocks([...blocksThisRound]);
+          }
+        });
+        streamPainterRef.current = paintStreamUi;
         const appendTextBlock = (text: string) => {
           if (!text) return;
           const last = blocksThisRound[blocksThisRound.length - 1];
@@ -3153,8 +3174,7 @@ export function AIChatPanel({
           } else {
             blocksThisRound.push({ kind: "text", text });
           }
-          // Mirror to React state so the live bubble re-renders.
-          setStreamingBlocks([...blocksThisRound]);
+          paintStreamUi.schedule();
         };
         // Tool results emitted by an agentic provider (Claude Code) for
         // calls it executed itself. Paired with toolCallsThisRound by
@@ -3281,7 +3301,6 @@ export function AIChatPanel({
             }
             acc += ev.text;
             appendTextBlock(ev.text);
-            setStreaming(acc);
             // Approximate tokens/sec: ~4 chars per token on average.
             const elapsedSec = (performance.now() - firstTokenAt) / 1000;
             if (elapsedSec > 0.5) {
@@ -3505,6 +3524,8 @@ export function AIChatPanel({
         };
         conversation.push(assistantMsg);
         setMessages((m) => [...m, assistantMsg]);
+        paintStreamUi.flush();
+        paintStreamUi.cancel();
         setStreaming(null);
         setStreamingBlocks([]);
         setStreamingToolCalls([]);
@@ -3623,6 +3644,8 @@ export function AIChatPanel({
         toastError(`Chat failed: ${errMsg(e)}`);
       }
     } finally {
+      streamPainterRef.current?.cancel();
+      streamPainterRef.current = null;
       setStreaming(null);
       setStreamingBlocks([]);
       setStreamingToolCalls([]);
@@ -5025,13 +5048,17 @@ export function AIChatPanel({
   // a real tab via the store.
   const fileOpenHandler = compact
     ? parentFileOpen
-      ? (path: string) => parentFileOpen(resolveChatFilePath(root, path))
+      ? (path: string) => {
+          void resolveWorkspaceDocPath(root, path).then((abs) => {
+            if (abs) parentFileOpen(abs);
+            else void openWorkspaceDocPath(wsId, root, path);
+          });
+        }
       : null
-    : (path: string) =>
-        void useStore.getState().openFile(wsId, resolveChatFilePath(root, path));
+    : (path: string) => void openWorkspaceDocPath(wsId, root, path);
 
   const openChatFile = (path: string) => {
-    void useStore.getState().openFile(wsId, resolveChatFilePath(root, path));
+    void openWorkspaceDocPath(wsId, root, path);
   };
 
   // Format a resetsAt ISO timestamp into a human-friendly countdown
@@ -5450,10 +5477,14 @@ export function AIChatPanel({
                   />
                 ) : isAssistant ? (
                   <>
-                    <MarkdownPreview
-                      content={balanceFences(visibleContent)}
-                      onFileOpen={openChatFile}
-                    />
+                    {isStreamingThis ? (
+                      <StreamingPlainText text={visibleContent} />
+                    ) : (
+                      <MarkdownPreview
+                        content={balanceFences(visibleContent)}
+                        onFileOpen={openChatFile}
+                      />
+                    )}
                     {shouldCollapse && (
                       <button
                         className="ai-show-more"

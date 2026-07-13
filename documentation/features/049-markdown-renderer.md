@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-10
-last_verified: 2026-07-10
+last_verified: 2026-07-13
 tags: [markdown, md-preview, copy, code-block, chat, shell, syntax, cursor-style]
 ---
 
@@ -22,7 +22,8 @@ tags: [markdown, md-preview, copy, code-block, chat, shell, syntax, cursor-style
 ### Surfaces (who mounts `MarkdownPreview`)
 | Surface | `interactive` | `onFileOpen` |
 |---------|---------------|--------------|
-| Assistant chat (`AIChatPanel`) | `false` | yes — open file tab |
+| Assistant chat (`AIChatPanel`) — **committed** turns | `false` | yes — open file tab |
+| Assistant chat — **live tail** (`StreamingPlainText`, `069`) | n/a — no markdown parse | n/a — plain text until turn ends |
 | User turns (`UserMessageBar`) | `false` | no |
 | Editor split / preview (`EditorPane`) | `true` | no — click-to-jump source line |
 | Tool drawer — `.md` reads, WebFetch (`ToolResultDrawer`) | `false` | no |
@@ -121,6 +122,7 @@ Chat scope (`.ai-msg-body .md-preview`) uses tighter padding on pills — see `0
 | `003-design-system.md` | Chat vs document type scale |
 | `006-chat-tool-render.md` | Drawer mounts `MarkdownPreview` for `.md` reads + WebFetch |
 | `030-user-message-bar.md` | User prompts rendered via same renderer |
+| `069-smooth-streaming.md` | In-flight assistant prose skips `renderMarkdown` |
 | `041-mention-file-preview.md` | `@` autocomplete is composer-only; not markdown |
 | `045-html-preview.md` | Raw agent HTML never routed through this renderer |
 

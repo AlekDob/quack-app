@@ -12184,6 +12184,24 @@ body.ab-dragging * {
   background: var(--bg-hi);
 }
 /* Markdown rendering inside AI chat messages — tighter than the doc preview. */
+.ai-stream-plain {
+  font-size: 13.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.ai-stream-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--fg-muted);
+  animation: ai-stream-caret-blink 1.05s steps(2, start) infinite;
+}
+@keyframes ai-stream-caret-blink {
+  50% { opacity: 0; }
+}
 .ai-msg-body .md-preview {
   padding: 0;
   max-width: none;
