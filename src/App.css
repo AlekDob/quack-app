@@ -18348,6 +18348,10 @@ body.ab-dragging * {
   gap: 12px;
   padding: 14px 16px 10px;
 }
+.cust-pane-search {
+  flex-shrink: 0;
+  padding: 0 16px 8px;
+}
 .cust-pane-intro {
   font-size: 12.5px;
   color: var(--fg-muted);

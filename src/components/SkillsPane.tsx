@@ -2,11 +2,12 @@
 // skills (.claude/skills/<name>/SKILL.md, project + user scope), creates
 // new ones, and edits a skill's SKILL.md inline via FileEditorPane.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { fs } from "../ipc";
 import { joinPath } from "../pathUtils";
 import { prompt as dialogPrompt } from "../dialog";
 import { error as toastError, errMsg } from "../notify";
+import { fuzzyMatch, normalizeFilterQuery } from "../fuzzyMatch";
 import { Icon } from "./Icon";
 import { FileEditorPane } from "./FileEditorPane";
 
@@ -44,6 +45,7 @@ function slugify(s: string): string {
 
 export function SkillsPane({ root, onDirtyChange }: Props) {
   const [skills, setSkills] = useState<SkillEntry[]>([]);
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState<{
     path: string;
@@ -117,6 +119,16 @@ export function SkillsPane({ root, onDirtyChange }: Props) {
     });
   };
 
+  const filterQuery = normalizeFilterQuery(query);
+  const filtered = useMemo(
+    () =>
+      skills.filter(
+        (sk) =>
+          fuzzyMatch(filterQuery, sk.name) || fuzzyMatch(filterQuery, sk.scope),
+      ),
+    [skills, filterQuery],
+  );
+
   if (editing) {
     return (
       <FileEditorPane
@@ -139,7 +151,7 @@ export function SkillsPane({ root, onDirtyChange }: Props) {
       <div className="cust-pane-head">
         <div className="cust-pane-intro">
           Reusable workflows Claude can invoke. Stored in{" "}
-          <code>.claude/skills/&lt;name&gt;/SKILL.md</code> and loaded by Claude
+          <code>{".claude/skills/<name>/SKILL.md"}</code> and loaded by Claude
           Code.
         </div>
         <button className="cust-btn primary" onClick={() => void createSkill()}>
@@ -147,6 +159,28 @@ export function SkillsPane({ root, onDirtyChange }: Props) {
           <span>New skill</span>
         </button>
       </div>
+      {!loading && skills.length > 0 && (
+        <div className="cust-pane-search">
+          <div className="mcp-search">
+            <Icon name="search" size={13} />
+            <input
+              type="text"
+              placeholder="Fuzzy search skills…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            {query && (
+              <button
+                className="mcp-search-clear"
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+              >
+                <Icon name="x" size={11} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <div className="cust-list">
         {loading && <div className="cust-empty">Loading…</div>}
         {!loading && skills.length === 0 && (
@@ -154,8 +188,11 @@ export function SkillsPane({ root, onDirtyChange }: Props) {
             No skills yet. Create one to teach Claude a reusable workflow.
           </div>
         )}
+        {!loading && skills.length > 0 && filtered.length === 0 && (
+          <div className="cust-empty">No skills match your search.</div>
+        )}
         {!loading &&
-          skills.map((sk) => (
+          filtered.map((sk) => (
             <button
               key={`${sk.scope}:${sk.path}`}
               className="cust-row"

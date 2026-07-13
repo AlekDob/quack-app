@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-06-28
+last_verified: 2026-07-13
 tags: [ai-chat, skills, slash-menu, claude-code, composer, claude-skills, discovery]
 ---
 
@@ -80,3 +80,5 @@ and `ToolRowHead` gets `skill` → `.ai-tcall-skill` (orange pill: `--skill-bg` 
   Skill tool (auto-trigger on description). **Verify live** with a known skill.
 - There can be 100+ user skills — the menu filters as you type and the dropdown
   scrolls (`max-height` on `.ai-slash-suggestions`); skills sort after commands.
+- **Browse / edit / create** skills in Agent Customizations → Skills (`036`,
+  `SkillsPane`) — fuzzy search on folder name + scope when the list is long.

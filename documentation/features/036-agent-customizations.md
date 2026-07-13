@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-04
-last_verified: 2026-07-04
+last_verified: 2026-07-13
 tags: [agent-customizations, instructions, skills, mcp, providers, privacy, modal, agent-hub, agent-mode]
 ---
 
@@ -57,6 +57,22 @@ Single tabbed dialog opened from any entry row. Left nav tabs, content on the ri
 Modal uses `.cust-modal` shell (liquid glass). Instructions tab gets Edit/Split/Preview
 via `FileEditorPane` + `EditorTabToolbar` (see `027-editor-tab-toolbar.md`).
 
+### Skills tab (`SkillsPane`)
+
+Lists Claude Code skills from **project** (`<workspace>/.claude/skills/<name>/SKILL.md`)
+and **user** (`~/.claude/skills/<name>/SKILL.md`). Row click opens `FileEditorPane` on
+`SKILL.md`; **+ New skill** scaffolds a folder + starter frontmatter under the project tree.
+
+**Fuzzy search (2026-07-13):** When the list is non-empty, a search bar appears between
+the intro header and the scrollable list (`.cust-pane-search` + reused `.mcp-search` chrome).
+Filtering uses shared `fuzzyMatch` / `normalizeFilterQuery` from `src/fuzzyMatch.ts` (same
+subsequence matcher as the command palette and explorer filter). Matches **skill folder name**
+and **scope** tag (`project` / `user`). Empty filter result: *No skills match your search.*
+Clear control reuses `.mcp-search-clear`.
+
+Intro path hint renders as `{".claude/skills/<name>/SKILL.md"}` inside `<code>` — not HTML
+entities (`&lt;name&gt;`), which JSX would show literally on screen.
+
 ### Key files
 
 | Concern | File |
@@ -65,7 +81,10 @@ via `FileEditorPane` + `EditorTabToolbar` (see `027-editor-tab-toolbar.md`).
 | Tabbed modal | `src/components/CustomizationsModal.tsx` |
 | Hub mount + modal state | `src/components/AIChatsRail.tsx` |
 | Agent-mode mount + modal state | `src/components/AgentModeShell.tsx` |
+| Skills list + fuzzy filter | `src/components/SkillsPane.tsx` |
+| Shared fuzzy matcher | `src/fuzzyMatch.ts` |
 | Footer + hub scroll layout | `src/App.css` → `.agent-custom`, `.agent-hub-list`, `.agent-hub-list-body` |
+| Skills search chrome | `src/App.css` → `.cust-pane-search` (wraps `.mcp-search`) |
 
 ### Data / scope
 
@@ -85,6 +104,8 @@ via `FileEditorPane` + `EditorTabToolbar` (see `027-editor-tab-toolbar.md`).
 
 ### Related docs
 
+- `008-skill-slash-menu.md` — composer `/` skill picker (read-only discovery); Skills tab is the CRUD surface
 - `009-agent-hub.md` — cross-project hub; Customizations footer when expanded
 - `001-ai-session-library.md` — Agent Mode sessions column
-- `027-editor-tab-toolbar.md` — markdown preview inside Instructions tab
+- `027-editor-tab-toolbar.md` — markdown preview inside Instructions + Skills `SKILL.md` editor
+- `011-command-palette.md` — shares `fuzzyMatch` implementation
