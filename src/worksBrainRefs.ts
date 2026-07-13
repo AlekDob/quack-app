@@ -31,6 +31,16 @@ function normKey(path: string): string {
   return path.replace(/\\/g, "/").toLowerCase();
 }
 
+export function brainRefPathKey(path: string): string {
+  return normKey(path);
+}
+
+function withoutExcluded(refs: BrainRef[], excluded: string[]): BrainRef[] {
+  if (!excluded.length) return refs;
+  const ex = new Set(excluded.map(normKey));
+  return refs.filter((r) => !ex.has(normKey(r.path)));
+}
+
 function pushRef(
   out: BrainRef[],
   seen: Set<string>,
@@ -79,7 +89,11 @@ export function resolveBrainRefs(
     pushRef(out, seen, normalizeBrainDocPath(raw), "extra");
   }
 
-  return out.slice(0, MAX_BRAIN_REFS);
+  const excluded = [
+    ...(work.contextExcludedRefs ?? []),
+    ...(story?.contextExcludedRefs ?? []),
+  ];
+  return withoutExcluded(out, excluded).slice(0, MAX_BRAIN_REFS);
 }
 
 export function resolveBrainRefsForStory(
@@ -102,6 +116,7 @@ export function resolveBrainRefsForStory(
     createdAt: story.createdAt,
     updatedAt: story.updatedAt,
     brainRefs: story.brainRefs,
+    contextExcludedRefs: story.contextExcludedRefs,
     cycleId: story.cycleId,
   };
   return resolveBrainRefs(snap, stub, undefined, relatedFromFeature);

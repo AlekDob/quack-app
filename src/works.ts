@@ -68,6 +68,8 @@ export interface WorkStory {
   bodyMd?: string;
   /** Extra Brain doc paths from frontmatter `refs:` (loaded from .md). */
   brainRefs?: string[];
+  /** Docs opted out of context inject (still on disk; module unchanged). */
+  contextExcludedRefs?: string[];
   /** Chat sessions linked while planning this story. */
   linkedChatIds: string[];
   createdAt: number;
@@ -111,6 +113,8 @@ export interface WorkItem {
   updatedAt: number;
   /** Extra Brain doc paths from frontmatter `refs:` (loaded from .md). */
   brainRefs?: string[];
+  /** Docs opted out of context inject (still on disk; module unchanged). */
+  contextExcludedRefs?: string[];
 }
 
 export interface WorksViewPrefs {

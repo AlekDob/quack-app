@@ -94,7 +94,6 @@ import {
 import { ComposeCard } from "./composeCard";
 import { openHtmlPreviewTab } from "./HtmlPreviewPane";
 import { openPlanTab } from "./PlanPane";
-import { resolveChatFilePath } from "../chatFileLinks";
 import {
   openWorkspaceDocPath,
   resolveWorkspaceDocPath,

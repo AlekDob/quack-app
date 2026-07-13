@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { openFeatureDocDrawer } from "../../featureDocDrawer";
-import { openBrainDoc } from "../../brainInject";
-import { joinPath } from "../../pathUtils";
-import { useStore } from "../../store";
+import { updateStory, updateWorkItem } from "../../worksCache";
 import {
   loadBrainRefsForStory,
   loadBrainRefsForWork,
   normalizeBrainDocPath,
   type BrainRef,
 } from "../../worksBrainRefs";
+import { brainRefGroupLabel } from "../../worksBrainRefUi";
+import { openBrainRef } from "../../workspaceDocOpen";
 import type { WorkItem, WorkStory, WorksSnapshot } from "../../works";
 import { Icon } from "../Icon";
 
@@ -22,13 +21,6 @@ type Props = {
   onExtraRefsChange: (refs: string[]) => void;
   readOnly?: boolean;
 };
-
-function roleLabel(role: BrainRef["role"]): string {
-  if (role === "primary") return "Feature";
-  if (role === "story") return "Story";
-  if (role === "related") return "Related";
-  return "Extra";
-}
 
 export function WorksDocRefsSection({
   wsId,
@@ -46,12 +38,20 @@ export function WorksDocRefsSection({
 
   const reload = useCallback(async () => {
     if (work) {
-      const w = { ...work, brainRefs: extraRefs };
+      const w = {
+        ...work,
+        brainRefs: extraRefs,
+        contextExcludedRefs: work.contextExcludedRefs,
+      };
       setRefs(await loadBrainRefsForWork(root, snap, w));
       return;
     }
     if (story) {
-      const s = { ...story, brainRefs: extraRefs };
+      const s = {
+        ...story,
+        brainRefs: extraRefs,
+        contextExcludedRefs: story.contextExcludedRefs,
+      };
       setRefs(await loadBrainRefsForStory(root, snap, s));
     }
   }, [root, snap, work, story, extraRefs]);
@@ -61,20 +61,7 @@ export function WorksDocRefsSection({
   }, [reload]);
 
   const openRef = (ref: BrainRef) => {
-    if (ref.role === "story") {
-      void useStore.getState().openFile(wsId, joinPath(root, ref.path));
-      return;
-    }
-    if (ref.role === "primary" || ref.path.includes("/features/")) {
-      openFeatureDocDrawer({
-        wsId,
-        root,
-        featurePath: ref.path,
-        title: ref.title ?? ref.path.split("/").pop() ?? ref.path,
-      });
-      return;
-    }
-    void openBrainDoc(wsId, root, ref.path.replace(/^documentation\//, ""));
+    openBrainRef(wsId, root, ref);
   };
 
   const addRef = () => {
@@ -87,6 +74,29 @@ export function WorksDocRefsSection({
 
   const removeExtra = (path: string) => {
     onExtraRefsChange(extraRefs.filter((r) => r !== path));
+  };
+
+  const removeRef = async (ref: BrainRef) => {
+    const path = normalizeBrainDocPath(ref.path);
+    if (ref.role === "extra") {
+      removeExtra(path);
+      return;
+    }
+    try {
+      if (work) {
+        const contextExcludedRefs = [
+          ...new Set([...(work.contextExcludedRefs ?? []), path]),
+        ];
+        await updateWorkItem(root, work.id, { contextExcludedRefs });
+      } else if (story) {
+        const contextExcludedRefs = [
+          ...new Set([...(story.contextExcludedRefs ?? []), path]),
+        ];
+        await updateStory(root, story.id, { contextExcludedRefs });
+      }
+    } catch {
+      /* toast from cache */
+    }
   };
 
   if (refs.length === 0 && readOnly) return null;
@@ -114,16 +124,16 @@ export function WorksDocRefsSection({
               onClick={() => openRef(ref)}
             >
               <span className={`work-drawer-docs-role work-drawer-docs-role--${ref.role}`}>
-                {roleLabel(ref.role)}
+                {brainRefGroupLabel(ref.role)}
               </span>
               <span className="work-drawer-docs-path">{ref.path}</span>
             </button>
-            {ref.role === "extra" && !readOnly && (
+            {!readOnly && (
               <button
                 type="button"
                 className="work-drawer-docs-remove"
-                aria-label="Remove reference"
-                onClick={() => removeExtra(ref.path)}
+                aria-label="Remove from context"
+                onClick={() => void removeRef(ref)}
               >
                 <Icon name="x" size={12} />
               </button>

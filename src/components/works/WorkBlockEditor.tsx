@@ -116,6 +116,7 @@ export function WorkBlockEditor({ blocks, onChange }: Props) {
           }}
           onSlash={(q) => setSlash({ idx, query: q })}
           onFocus={() => setFocusIdx(idx)}
+          onBlur={() => setFocusIdx(null)}
         />
       ))}
     </div>

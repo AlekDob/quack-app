@@ -1,7 +1,7 @@
 ---
 name: quack-works
 description: Quack PM + Works — document product components (documentation/features/NNN-slug.md), sync Works modules, user stories S-NNN, tickets W-NNN, cycles, kanban. Use whenever the user mentions tickets, work items, stories, sprints, cycles, feature docs, feature-doc, modules, plan approval, W-NNN, S-NNN, or project task tracking in Quack — even if they don't say "Works".
-quack-bundled-version: 8
+quack-bundled-version: 9
 ---
 
 # Quack Works
@@ -131,6 +131,8 @@ refs:
   - documentation/gotchas/context-breakdown-estimates.md
 ---
 ```
+
+Body (after frontmatter): normal markdown — `##` headings, `-` lists, `- [ ]` acceptance checklists, fenced code. Use `**bold**`, `` `paths` ``, and `[label](url)` for inline emphasis; Quack renders these in the drawer. Keep feature-doc bodies in `refs:` only (paths), not pasted into the ticket body.
 
 ### Brain documentation refs
 

@@ -19,7 +19,7 @@ Claude Code only for the ring + live context data. Other providers: ring absent.
 | Surface | Location | Shows |
 |---|---|---|
 | `SessionUsageCircle` | Composer (`.ai-context-ring-dock`, above meta row) | Ring % — context when known, else plan 5hr % |
-| `SessionUsagePopover` | Popover above ring (click toggle) | Hero %, segmented bar, per-category token rows |
+| `SessionUsagePopover` | Popover above ring (click toggle) | Hero %, segmented bar, per-category token rows, **plan limit bars** |
 | `UsageChip` | Transcript footer (optional) | Last turn cost + in/out + cache hit % |
 | Usage tab (`usage:<wsId>`) | Activity bar / Settings | Plan limits (5hr / 7day), This chat, Quack spend |
 
@@ -40,6 +40,12 @@ while a new turn streams.
 │ ■ MCP & dynamic tools       ~600    │
 │ ■ Subagent definitions    ~1.3k     │
 │ ■ Conversation            14.6k     │
+│ ─ Plan limits ───────────────────── │
+│ Session (5hr)              45%       │
+│ ████████░░░░░░░░░░░░░░░░  (bar)     │
+│ Resets in 2h 14m                    │
+│ Weekly (7 day)             12%       │
+│ ██░░░░░░░░░░░░░░░░░░░░░░  (bar)     │
 │                    Usage dashboard →│
 └─────────────────────────────────────┘
 ```
@@ -49,8 +55,8 @@ while a new turn streams.
 - **Backdrop** — `.ai-flag-menu-overlay` (same dismiss pattern as
   `EffortPopover`).
 - **Esc** / backdrop / X close the popover.
-- **Usage dashboard →** closes popover and opens Settings → Usage (plan limits,
-  billing, monthly spend — formerly in the removed slide-over drawer).
+- **Usage dashboard →** closes popover and opens Settings → Usage (billing,
+  monthly spend — full account detail beyond the inline plan bars).
 
 ## Dual metrics (do not mix)
 

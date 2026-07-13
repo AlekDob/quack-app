@@ -20,7 +20,6 @@ import {
 } from "../../worksCache";
 import {
   findWork,
-  statusLabel,
   type WorkBlock,
   type WorkItem,
   type WorkOrigin,
@@ -28,7 +27,6 @@ import {
   type WorksSnapshot,
 } from "../../works";
 import { blocksToMarkdown, markdownToBlocks } from "../../worksBlocks";
-import { formatModuleLabel, sortWorkModules } from "../../worksUi";
 import {
   drawerPortalTarget,
   isNestedDrawerPortal,
@@ -37,9 +35,14 @@ import {
 import { openFeatureDocDrawer } from "../../featureDocDrawer";
 import { joinPath } from "../../pathUtils";
 import { useStore } from "../../store";
-import { Icon } from "../Icon";
+import { Icon, type IconName } from "../Icon";
 import { WorkComments } from "./WorkComments";
+import {
+  WorkPriorityPicker,
+  WorkStatusPicker,
+} from "./WorkDrawerChipPickers";
 import { WorkItemEditor } from "./WorkItemEditor";
+import { WorkModulePicker } from "./WorkModulePicker";
 import { WorksDocRefsSection } from "./WorksDocRefsSection";
 import { useResizableWorkDrawerWidth } from "../../useResizableWorkDrawerWidth";
 
@@ -143,6 +146,7 @@ export function WorkItemDrawer() {
     if (!item || isCreate || blocksDirty.current) return;
     setTitle(item.title);
     setStatus(item.status);
+    setPriority(item.priority);
     setLabelIds(item.labelIds);
     setModuleId(item.moduleId);
     setParentId(item.parentId ?? "");
@@ -307,17 +311,6 @@ export function WorkItemDrawer() {
           <div className="work-drawer-hero-top">
             <div className="work-drawer-hero-meta">
               <span className="work-drawer-id">{heroId}</span>
-              {!isCreate && module && (
-                <span className="work-drawer-module">
-                  {module.featureNum != null
-                    ? `${String(module.featureNum).padStart(3, "0")} · `
-                    : ""}
-                  {module.name}
-                </span>
-              )}
-              {isCreate && module && (
-                <span className="work-drawer-module">{formatModuleLabel(module)}</span>
-              )}
             </div>
             <div className="work-drawer-hero-actions">
               {!isCreate && (
@@ -382,25 +375,20 @@ export function WorkItemDrawer() {
 
         <section className="work-drawer-fields" aria-label="Properties">
           {modules.length > 0 && (
-            <div className="work-drawer-field work-drawer-field--wide">
-              <span className="work-drawer-field-label">Module</span>
-              <select
-                className="work-drawer-field-select"
+            <div className="work-drawer-field work-drawer-field--wide work-drawer-field--module">
+              <span className="work-drawer-field-label work-drawer-field-label--module">
+                <Icon name="columns-2" size={12} />
+                Module
+              </span>
+              <WorkModulePicker
+                modules={modules}
                 value={moduleId}
-                onChange={(e) => {
-                  const next = e.target.value;
+                allowClear
+                onChange={(next) => {
                   setModuleId(next);
                   if (!isCreate && item) void onUpdate({ moduleId: next });
                 }}
-                aria-label="Module"
-              >
-                {sortWorkModules(modules).map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {formatModuleLabel(m)}
-                    {m.featurePath ? ` — ${m.featurePath}` : ""}
-                  </option>
-                ))}
-              </select>
+              />
             </div>
           )}
           {stories.length > 0 && (
@@ -451,43 +439,23 @@ export function WorkItemDrawer() {
               </div>
             </div>
           )}
-          <WorkDrawerField label="Status">
-            <select
-              className="work-drawer-field-select"
+          <WorkDrawerField label="Status" icon="play">
+            <WorkStatusPicker
               value={status}
-              onChange={(e) => {
-                const next = e.target.value as WorkItem["status"];
+              onChange={(next) => {
                 setStatus(next);
                 if (!isCreate && item) void onUpdate({ status: next });
               }}
-              aria-label="Status"
-            >
-              {(
-                ["backlog", "todo", "in_progress", "done", "cancelled"] as const
-              ).map((s) => (
-                <option key={s} value={s}>
-                  {statusLabel(s)}
-                </option>
-              ))}
-            </select>
+            />
           </WorkDrawerField>
-          <WorkDrawerField label="Priority">
-            {isCreate ? (
-              <select
-                className="work-drawer-field-select"
-                value={priority}
-                onChange={(e) => setPriority(e.target.value as WorkPriority)}
-                aria-label="Priority"
-              >
-                {(["urgent", "high", "medium", "low"] as const).map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <span className="work-drawer-field-text">{item!.priority}</span>
-            )}
+          <WorkDrawerField label="Priority" icon="zap">
+            <WorkPriorityPicker
+              value={priority}
+              onChange={(next) => {
+                setPriority(next);
+                if (!isCreate && item) void onUpdate({ priority: next });
+              }}
+            />
           </WorkDrawerField>
           <WorkDrawerField label="Start">
             <input
@@ -517,20 +485,28 @@ export function WorkItemDrawer() {
           </WorkDrawerField>
           {labels.length > 0 && (
             <div className="work-drawer-field work-drawer-field--wide">
-              <span className="work-drawer-field-label">Labels</span>
+              <span className="work-drawer-field-label work-drawer-field-label--meta">
+                <Icon name="hash" size={12} />
+                Labels
+              </span>
               <div className="work-drawer-labels">
-                {labels.map((l) => (
-                  <button
-                    key={l.id}
-                    type="button"
-                    className={`work-drawer-label${
-                      labelIds.includes(l.id) ? " active" : ""
-                    }`}
-                    onClick={() => toggleLabel(l.id)}
-                  >
-                    {l.name}
-                  </button>
-                ))}
+                {labels.map((l) => {
+                  const active = labelIds.includes(l.id);
+                  return (
+                    <button
+                      key={l.id}
+                      type="button"
+                      className={`work-drawer-meta-chip work-drawer-meta-chip--label${
+                        active ? " active" : ""
+                      }`}
+                      style={labelChipStyle(l, active)}
+                      onClick={() => toggleLabel(l.id)}
+                    >
+                      <Icon name="hash" size={11} />
+                      {l.name}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -588,16 +564,34 @@ export function WorkItemDrawer() {
   );
 }
 
+function labelChipStyle(
+  label: { color: string },
+  active: boolean,
+): React.CSSProperties | undefined {
+  if (!label.color) return undefined;
+  const mix = active ? 22 : 12;
+  return {
+    borderColor: `color-mix(in srgb, ${label.color} 40%, var(--border))`,
+    background: `color-mix(in srgb, ${label.color} ${mix}%, var(--bg-alt))`,
+    color: label.color,
+  };
+}
+
 function WorkDrawerField({
   label,
+  icon,
   children,
 }: {
   label: string;
+  icon?: IconName;
   children: ReactNode;
 }) {
   return (
     <div className="work-drawer-field">
-      <span className="work-drawer-field-label">{label}</span>
+      <span className="work-drawer-field-label work-drawer-field-label--meta">
+        {icon ? <Icon name={icon} size={12} /> : null}
+        {label}
+      </span>
       <div className="work-drawer-field-control">{children}</div>
     </div>
   );

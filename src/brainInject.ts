@@ -6,6 +6,9 @@ import { getJson, setJson } from "./localStore";
 import { pinky, type PinkySearchHit } from "./pinky";
 import { estimateBrainSavings, type BrainSavings } from "./brainSavings";
 import type { BrainUsageMeta } from "./ai";
+import { fs } from "./ipc";
+import { warning } from "./notify";
+import { basename } from "./pathUtils";
 import { brainKey, findTabsPaneByTab, useStore } from "./store";
 import { openFileAndReveal } from "./revealInTree";
 
@@ -47,6 +50,16 @@ export async function openBrainDoc(
   const st = useStore.getState();
   const ws = st.loaded[wsId];
   if (!ws) return;
+  const abs = brainDocAbsPath(root, relPath);
+  try {
+    if (!(await fs.exists(abs))) {
+      warning(`${basename(abs)} doesn't exist yet`);
+      return;
+    }
+  } catch {
+    warning(`${basename(abs)} doesn't exist yet`);
+    return;
+  }
   const key = brainKey(wsId);
   const pane =
     findTabsPaneByTab(ws.layout.editorRoot, key) ??
@@ -54,7 +67,7 @@ export async function openBrainDoc(
       ? findTabsPaneByTab(ws.layout.bottomRoot, key)
       : null);
   if (pane) st.setActivePane(wsId, pane.id);
-  await openFileAndReveal(wsId, brainDocAbsPath(root, relPath));
+  await openFileAndReveal(wsId, abs);
 }
 
 function formatHit(hit: PinkySearchHit, index: number): string {

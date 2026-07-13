@@ -4,6 +4,8 @@ import { errMsg, error as toastError } from "../notify";
 import {
   enterPlanning,
   exitPlanning,
+  linkStoryToChat,
+  linkWorkToChat,
   unlinkWorkFromChat,
 } from "../quackPlanHarness";
 import {
@@ -15,7 +17,6 @@ import {
   createWorkFromStory,
   createWorkItem,
   hydrateWorks,
-  linkChatToWork,
   subscribeWorks,
   updateWorkItem,
 } from "../worksCache";
@@ -28,8 +29,8 @@ import {
 } from "../works";
 import { acceptanceFromMarkdown } from "../worksBlocks";
 import { getWorkspaceColor } from "../workspaceColors";
-import { useStore } from "../store";
 import { ComposerDocsChip } from "./ComposerDocsChip";
+import { ComposerWorkLinkPanel } from "./ComposerWorkLinkPanel";
 import { openStoryPlanTab } from "./StoryPlanPane";
 import { Icon } from "./Icon";
 import { openWorksTab } from "./works/WorksPane";
@@ -82,8 +83,6 @@ export function ComposerWorkBar({
     getWorksInjectDepth(wsId),
   );
   const chipRef = useRef<HTMLButtonElement>(null);
-  const setWork = useStore((s) => s.setAIChatWorkItem);
-  const setPlanning = useStore((s) => s.setAIChatPlanning);
   const wsColor = getWorkspaceColor(wsId);
   const docRefs = useComposerBrainRefs(root, snap, workItemId, storyId);
 
@@ -121,15 +120,34 @@ export function ComposerWorkBar({
   const linkWork = useCallback(
     async (id: string) => {
       try {
-        await linkChatToWork(root, id, chatId);
-        setWork(wsId, chatId, id);
-        setPlanning(wsId, chatId, false);
+        await linkWorkToChat(wsId, chatId, root, id);
       } catch (e) {
         toastError(`Couldn't link work: ${errMsg(e)}`);
       }
     },
-    [root, chatId, wsId, setWork, setPlanning],
+    [root, chatId, wsId],
   );
+
+  const linkStory = useCallback(
+    async (id: string) => {
+      try {
+        await linkStoryToChat(wsId, chatId, root, id);
+      } catch (e) {
+        toastError(`Couldn't link story: ${errMsg(e)}`);
+      }
+    },
+    [root, chatId, wsId],
+  );
+
+  const pickWork = (id: string) => {
+    setMenuOpen(false);
+    void linkWork(id);
+  };
+
+  const pickStory = (id: string) => {
+    setMenuOpen(false);
+    void linkStory(id);
+  };
 
   const startPlanning = async () => {
     setMenuOpen(false);
@@ -150,9 +168,7 @@ export function ComposerWorkBar({
         title: story.title,
       });
       if (!item) return;
-      await linkChatToWork(root, item.id, chatId);
-      setWork(wsId, chatId, item.id);
-      setPlanning(wsId, chatId, false);
+      await linkWorkToChat(wsId, chatId, root, item.id);
     } catch (e) {
       toastError(`Couldn't spawn work: ${errMsg(e)}`);
     }
@@ -165,9 +181,7 @@ export function ComposerWorkBar({
         title: origin === "hotfix" ? "Hotfix" : "New work",
         origin,
       });
-      await linkChatToWork(root, item.id, chatId);
-      setWork(wsId, chatId, item.id);
-      setPlanning(wsId, chatId, false);
+      await linkWorkToChat(wsId, chatId, root, item.id);
     } catch (e) {
       toastError(`Couldn't create work: ${errMsg(e)}`);
     }
@@ -211,7 +225,7 @@ export function ComposerWorkBar({
   return (
     <div className="ai-composer-work-wrap">
       <div
-        className={`ai-composer-work-cluster${docRefs.length > 0 ? " has-docs" : ""}${acc.total > 0 ? " has-acc" : ""}`}
+        className={`ai-composer-work-cluster${docRefs.length > 0 || work || story ? " has-docs" : ""}${acc.total > 0 ? " has-acc" : ""}`}
       >
       <button
         ref={chipRef}
@@ -237,7 +251,13 @@ export function ComposerWorkBar({
         <span className="ai-agent-name">{chipLabel}</span>
         <Icon name="chevron-down" size={13} />
       </button>
-      <ComposerDocsChip wsId={wsId} root={root} refs={docRefs} />
+      <ComposerDocsChip
+        wsId={wsId}
+        root={root}
+        refs={docRefs}
+        work={work}
+        story={story}
+      />
       {acc.total > 0 ? (
         <span className="ai-composer-work-acc-chip" title="Acceptance progress">
           {acc.done}/{acc.total}
@@ -248,10 +268,19 @@ export function ComposerWorkBar({
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         anchorRef={chipRef}
-        estimateHeight={planningOnly ? 280 : work ? 400 : 200}
+        estimateHeight={planningOnly ? 320 : work ? 400 : 380}
+        className={!work && !planningOnly ? "ai-composer-ctx-menu--work-link" : undefined}
       >
         {planningOnly ? (
           <>
+            <ComposerWorkLinkPanel
+              snap={snap}
+              excludeStoryId={story?.id}
+              storiesOnly
+              onPickWork={pickWork}
+              onPickStory={pickStory}
+            />
+            <div className="menu-separator" role="separator" />
             <button
               type="button"
               className="menu-item"
@@ -351,25 +380,22 @@ export function ComposerWorkBar({
             >
               Unlink work
             </button>
-            {(snap?.items ?? [])
-              .filter((w) => w.id !== work.id)
-              .slice(0, 8)
-              .map((w) => (
-                <button
-                  key={w.id}
-                  type="button"
-                  className="menu-item"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    void linkWork(w.id);
-                  }}
-                >
-                  Switch to {w.shortId}
-                </button>
-              ))}
+            <div className="menu-separator" role="separator" />
+            <ComposerWorkLinkPanel
+              snap={snap}
+              excludeWorkId={work.id}
+              onPickWork={pickWork}
+              onPickStory={pickStory}
+            />
           </>
         ) : (
           <>
+            <ComposerWorkLinkPanel
+              snap={snap}
+              onPickWork={pickWork}
+              onPickStory={pickStory}
+            />
+            <div className="menu-separator" role="separator" />
             <button type="button" className="menu-item" onClick={() => void startPlanning()}>
               Plan a feature
             </button>

@@ -77,6 +77,17 @@ export function sessionHeroPct(data: SessionUsageData): number {
   return data.context.pct;
 }
 
+/** Human countdown until a plan window resets (e.g. "2h 14m", "4d"). */
+export function fmtLimitResetsIn(resetsAt: string | null): string | null {
+  if (!resetsAt) return null;
+  const ms = new Date(resetsAt).getTime() - Date.now();
+  if (ms <= 0) return null;
+  const h = ms / 3_600_000;
+  if (h < 1) return `${Math.ceil(ms / 60_000)}m`;
+  if (h < 48) return `${Math.floor(h)}h ${Math.ceil((h % 1) * 60)}m`;
+  return `${Math.ceil(h / 24)}d`;
+}
+
 export function parseUsageLimits(u: UsageApi): SessionLimit[] {
   const limits: SessionLimit[] = [];
   for (const [key, label] of LIMIT_WINDOWS) {

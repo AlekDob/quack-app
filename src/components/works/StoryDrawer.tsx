@@ -27,7 +27,6 @@ import {
   type WorksSnapshot,
 } from "../../works";
 import { blocksToMarkdown, markdownToBlocks } from "../../worksBlocks";
-import { formatModuleLabel, sortWorkModules } from "../../worksUi";
 import {
   drawerPortalTarget,
   isNestedDrawerPortal,
@@ -37,6 +36,7 @@ import { joinPath } from "../../pathUtils";
 import { useStore } from "../../store";
 import { Icon } from "../Icon";
 import { WorkItemEditor } from "./WorkItemEditor";
+import { WorkModulePicker } from "./WorkModulePicker";
 import { WorksDocRefsSection } from "./WorksDocRefsSection";
 import { useResizableWorkDrawerWidth } from "../../useResizableWorkDrawerWidth";
 
@@ -274,22 +274,15 @@ export function StoryDrawer() {
 
         <section className="work-drawer-fields" aria-label="Properties">
           {modules.length > 0 && (
-            <StoryField label="Module" wide>
-              <select
-                className="work-drawer-field-select"
+            <StoryField label="Module" wide module>
+              <WorkModulePicker
+                modules={modules}
                 value={moduleId}
-                onChange={(e) => {
-                  const next = e.target.value;
+                onChange={(next) => {
                   setModuleId(next);
                   if (!isCreate && story) void onUpdate({ moduleId: next });
                 }}
-              >
-                {sortWorkModules(modules).map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {formatModuleLabel(m)}
-                  </option>
-                ))}
-              </select>
+              />
             </StoryField>
           )}
           <StoryField label="Cycle">
@@ -421,15 +414,28 @@ export function StoryDrawer() {
 function StoryField({
   label,
   wide,
+  module: isModule,
   children,
 }: {
   label: string;
   wide?: boolean;
+  module?: boolean;
   children: ReactNode;
 }) {
   return (
-    <div className={`work-drawer-field${wide ? " work-drawer-field--wide" : ""}`}>
-      <span className="work-drawer-field-label">{label}</span>
+    <div
+      className={`work-drawer-field${wide ? " work-drawer-field--wide" : ""}${
+        isModule ? " work-drawer-field--module" : ""
+      }`}
+    >
+      <span
+        className={`work-drawer-field-label${
+          isModule ? " work-drawer-field-label--module" : ""
+        }`}
+      >
+        {isModule ? <Icon name="columns-2" size={12} /> : null}
+        {label}
+      </span>
       <div className="work-drawer-field-control">{children}</div>
     </div>
   );

@@ -52,7 +52,8 @@ function repairItemModules(
   if (!fallback) return { items: snap.items, changed: false };
   let changed = false;
   const items = snap.items.map((w) => {
-    if (w.moduleId && valid.has(w.moduleId)) return w;
+    if (!w.moduleId) return w;
+    if (valid.has(w.moduleId)) return w;
     changed = true;
     return { ...w, moduleId: fallback.id };
   });

@@ -86,11 +86,14 @@ Intent-first work menu:
 | **Plan a feature** | `enterPlanning`, Jack picker, planning chip CSS |
 | **Hotfix** | Work only (`W-NNN`), no story required |
 | **Blank task** | Empty work link |
-| Planning submenu | Open story panel, Start implementation, Exit planning |
+| **Link existing…** | `ComposerWorkLinkPanel` — searchable stories + work items (`linkStoryToChat`, `linkWorkToChat`) |
+| Planning submenu | Open story panel, Start implementation, Exit planning, switch linked work/story |
 
 **Segmented cluster** (Cursor-style): `S-003 › W-008` | `N docs` | `K/N` in one pill (`ai-composer-work-cluster`).
 
-**Context docs chip** — `ComposerDocsChip.tsx`: hover popover (liquid glass) listing Brain refs by Feature / Story / Related / Added; file-type icons + basename + parent path. No full-screen overlay (prevents flicker); 280ms leave debounce; slight overlap with anchor. See `054-works-layer.md`.
+**Link panel** — when the chat has no `workItemId` / `storyId`, the Work chip menu offers **Link existing…** → portaled `ComposerWorkLinkPanel` (`.ai-composer-ctx-menu--work-link`): filter by id/title, pick story or work item, excludes current link. When already linked, menu can switch to another ticket.
+
+**Context docs chip** — `ComposerDocsChip.tsx`: hover popover (liquid glass) listing Brain refs by Feature / Story / Related / Added; file-type icons + basename + parent path. Opens via `openBrainRef` (`070`). No full-screen overlay (prevents flicker); 280ms leave debounce; slight overlap with anchor. See `054-works-layer.md`.
 
 CC plan mode auto-calls `enterPlanning` when chat has no `storyId`/`workItemId`.
 

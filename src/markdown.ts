@@ -525,6 +525,11 @@ function renderCodeBlock(b: Block): string {
   );
 }
 
+/** Safe inline subset: bold, italic, code, links, images, auto-URLs. */
+export function renderInlineMarkdown(s: string): string {
+  return inlineMd(s);
+}
+
 export function renderMarkdown(md: string): string {
   const blocks = tokenize(md);
   const parts: string[] = [];

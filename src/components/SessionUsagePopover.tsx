@@ -1,12 +1,16 @@
 // Cursor-style context usage popover — anchored above the composer ring.
-// Shows a segmented bar + per-category token rows. Plan limits and billing
-// live in the Usage dashboard (link in the footer).
+// Context breakdown + Claude Code plan-limit bars (OAuth poll from parent).
 
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { buildContextBreakdown, type ContextSegment } from "../contextBreakdown";
 import { fmtTokenCount } from "../contextUsage";
-import { sessionHeroPct, type SessionUsageData } from "../sessionUsageLocal";
+import {
+  fmtLimitResetsIn,
+  sessionHeroPct,
+  type SessionLimit,
+  type SessionUsageData,
+} from "../sessionUsageLocal";
 import { Icon } from "./Icon";
 
 const POP_GAP = 8;
@@ -23,6 +27,31 @@ function clampPopPos(btn: DOMRect, popW: number, popH: number) {
 function fmtSegCount(seg: ContextSegment): string {
   const n = fmtTokenCount(seg.tokens);
   return seg.estimate ? `~${n}` : n;
+}
+
+function LimitRow({ limit }: { limit: SessionLimit }) {
+  const hot = limit.pct >= 80;
+  const resetsIn = fmtLimitResetsIn(limit.resetsAt);
+  const pct = Math.min(100, Math.max(0, limit.pct));
+  return (
+    <div className="session-usage-pop-limit">
+      <div className="session-usage-pop-limit-head">
+        <span>{limit.label}</span>
+        <span className={`session-usage-pop-limit-pct${hot ? " hot" : ""}`}>
+          {Math.round(limit.pct)}%
+        </span>
+      </div>
+      <div className="session-usage-pop-limit-bar">
+        <div
+          className={`session-usage-pop-limit-fill${hot ? " hot" : ""}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {resetsIn && (
+        <div className="session-usage-pop-limit-reset">Resets in {resetsIn}</div>
+      )}
+    </div>
+  );
 }
 
 interface SessionUsagePopoverProps {
@@ -61,7 +90,7 @@ export function SessionUsagePopover({
     place();
     const id = window.requestAnimationFrame(place);
     return () => window.cancelAnimationFrame(id);
-  }, [open, anchorRef, segments.length, loading]);
+  }, [open, anchorRef, segments.length, loading, data?.limits.length, data?.extra]);
 
   useEffect(() => {
     if (!open || !data) {
@@ -162,6 +191,34 @@ export function SessionUsagePopover({
                 </ul>
               </>
             ) : null}
+
+            {(data.limits.length > 0 || data.extra) && (
+              <div className="session-usage-pop-limits">
+                <div className="session-usage-pop-section-title">Plan limits</div>
+                {data.limits.map((w) => (
+                  <LimitRow key={w.label} limit={w} />
+                ))}
+                {data.extra && (
+                  <div className="session-usage-pop-limit">
+                    <div className="session-usage-pop-limit-head">
+                      <span>Extra usage (monthly)</span>
+                      <span className="session-usage-pop-limit-pct mono">
+                        ${(data.extra.used / 100).toFixed(2)} / $
+                        {(data.extra.limit / 100).toFixed(2)} {data.extra.currency}
+                      </span>
+                    </div>
+                    <div className="session-usage-pop-limit-bar">
+                      <div
+                        className={`session-usage-pop-limit-fill${data.extra.pct >= 80 ? " hot" : ""}`}
+                        style={{
+                          width: `${Math.min(100, Math.max(0, data.extra.pct))}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="session-usage-pop-foot">
               <button

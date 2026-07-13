@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { errMsg, error as toastError } from "../../notify";
 import { useModalFocus } from "../../useModalFocus";
 import { fs } from "../../ipc";
 import { joinPath } from "../../pathUtils";
 import { useStore } from "../../store";
+import {
+  openWorkspaceDocPath,
+  resolveWorkspaceDocPath,
+} from "../../workspaceDocOpen";
 import {
   closeFeatureDocDrawer,
   getFeatureDocDrawer,
@@ -29,6 +32,7 @@ export function FeatureDocDrawer() {
   const [, bumpPortal] = useState(0);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
+  const [missing, setMissing] = useState(false);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const { width, onResizeDown } = useResizableWorkDrawerWidth();
   useModalFocus(panelRef, shown && !!req);
@@ -40,10 +44,12 @@ export function FeatureDocDrawer() {
     if (!req) {
       setShown(false);
       setContent("");
+      setMissing(false);
       return;
     }
     let alive = true;
     setLoading(true);
+    setMissing(false);
     requestAnimationFrame(() => setShown(true));
     const abs = joinPath(req.root, req.featurePath);
     void fs
@@ -52,10 +58,10 @@ export function FeatureDocDrawer() {
         if (!alive) return;
         setContent(md);
       })
-      .catch((e) => {
+      .catch(() => {
         if (!alive) return;
-        toastError(`Couldn't load feature doc: ${errMsg(e)}`);
-        closeFeatureDocDrawer();
+        setContent("");
+        setMissing(true);
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -80,11 +86,12 @@ export function FeatureDocDrawer() {
   }, [req, close]);
 
   const openInEditor = () => {
-    if (!req) return;
-    void useStore
-      .getState()
-      .openFile(req.wsId, joinPath(req.root, req.featurePath));
-    close();
+    if (!req || missing) return;
+    void resolveWorkspaceDocPath(req.root, req.featurePath).then(async (abs) => {
+      if (!abs) return;
+      await useStore.getState().openFile(req.wsId, abs);
+      close();
+    });
   };
 
   const previewBody = content
@@ -141,6 +148,7 @@ export function FeatureDocDrawer() {
                 onClick={openInEditor}
                 title="Open in editor"
                 aria-label="Open in editor"
+                disabled={missing}
               >
                 <Icon name="edit" size={14} />
               </button>
@@ -158,15 +166,17 @@ export function FeatureDocDrawer() {
         </header>
         <div className="tool-drawer-body work-feature-body">
           {loading && <div className="works-status">Loading…</div>}
-          {!loading && previewBody && (
+          {!loading && missing && (
+            <div className="works-status">
+              This document hasn&apos;t been created yet.
+            </div>
+          )}
+          {!loading && !missing && previewBody && (
             <MarkdownPreview
               content={previewBody}
               onFileOpen={(path) => {
                 if (!req) return;
-                const abs = path.startsWith("/")
-                  ? path
-                  : joinPath(req.root, path);
-                void useStore.getState().openFile(req.wsId, abs);
+                void openWorkspaceDocPath(req.wsId, req.root, path);
               }}
             />
           )}

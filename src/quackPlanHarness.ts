@@ -1,9 +1,13 @@
 // Quack-owned plan harness — story artifact, provider adapters optional.
 
 import { useStore } from "./store";
+import { findStory, findWork } from "./works";
 import {
   approvePlanStory,
   ensurePlanStory,
+  hydrateWorks,
+  linkChatToStory,
+  linkChatToWork,
   mergePlanIntoStory,
   unlinkChatFromStory,
   unlinkChatFromWork,
@@ -78,6 +82,36 @@ export async function unlinkStoryFromChat(
   const store = useStore.getState();
   store.setAIChatStory(wsId, chatId, null);
   store.setAIChatPlanning(wsId, chatId, false);
+}
+
+export async function linkWorkToChat(
+  wsId: string,
+  chatId: string,
+  root: string,
+  workId: string,
+): Promise<void> {
+  await linkChatToWork(root, workId, chatId);
+  const snap = await hydrateWorks(root);
+  const parentId = findWork(snap, workId)?.parentId;
+  const store = useStore.getState();
+  store.setAIChatWorkItem(wsId, chatId, workId);
+  store.setAIChatPlanning(wsId, chatId, false);
+  store.setAIChatStory(wsId, chatId, parentId ?? null);
+}
+
+export async function linkStoryToChat(
+  wsId: string,
+  chatId: string,
+  root: string,
+  storyId: string,
+): Promise<void> {
+  await linkChatToStory(root, storyId, chatId);
+  const snap = await hydrateWorks(root);
+  const story = findStory(snap, storyId);
+  const store = useStore.getState();
+  store.setAIChatWorkItem(wsId, chatId, null);
+  store.setAIChatStory(wsId, chatId, storyId);
+  store.setAIChatPlanning(wsId, chatId, story?.status === "draft");
 }
 
 const PLAN_HINT_RE =

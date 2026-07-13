@@ -34,6 +34,7 @@ interface ComposerCtxMenuProps {
   anchorRef: RefObject<HTMLElement | null>;
   children: ReactNode;
   estimateHeight?: number;
+  className?: string;
 }
 
 /** Portaled menu for composer context segments (escapes .ai-panel overflow). */
@@ -43,6 +44,7 @@ export function ComposerCtxMenu({
   anchorRef,
   children,
   estimateHeight = 220,
+  className,
 }: ComposerCtxMenuProps) {
   const popRef = useRef<HTMLDivElement>(null);
   const [popPos, setPopPos] = useState({ left: 0, top: 0 });
@@ -72,7 +74,9 @@ export function ComposerCtxMenu({
       <div className="ai-flag-menu-overlay" onMouseDown={onClose} />
       <div
         ref={popRef}
-        className="ai-composer-ctx-menu ai-composer-ctx-menu--portaled"
+        className={`ai-composer-ctx-menu ai-composer-ctx-menu--portaled${
+          className ? ` ${className}` : ""
+        }`}
         role="menu"
         style={{ left: popPos.left, top: popPos.top }}
       >

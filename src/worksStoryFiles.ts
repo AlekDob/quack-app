@@ -66,6 +66,9 @@ export async function hydrateStoryFromFile(
     updatedAt: parsed.updatedAt ?? story.updatedAt,
     bodyMd: parsed.bodyMd,
     brainRefs: parsed.brainRefs.length ? parsed.brainRefs : story.brainRefs,
+    contextExcludedRefs: parsed.contextExcludedRefs.length
+      ? parsed.contextExcludedRefs
+      : story.contextExcludedRefs,
     linkedChatIds: parsed.linkedChatIds.length
       ? parsed.linkedChatIds
       : story.linkedChatIds ?? [],
@@ -117,6 +120,7 @@ export async function importOrphanStoryFiles(
       bodyMd: parsed.bodyMd,
       cycleId: parsed.cycleId,
       brainRefs: parsed.brainRefs,
+      contextExcludedRefs: parsed.contextExcludedRefs,
       linkedChatIds: parsed.linkedChatIds,
       createdAt: parsed.createdAt ?? now,
       updatedAt: parsed.updatedAt ?? now,

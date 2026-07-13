@@ -118,7 +118,9 @@ export async function hydrateItemFromFile(
   const src = await fs.readFile(abs);
   const parsed = parseWorkItemMd(src, snap);
   if (!parsed) return { ...item, filePath: rel, bodyMd: item.bodyMd ?? "" };
-  const moduleId = moduleIdFromSlug(snap, parsed.moduleSlug) ?? item.moduleId;
+  const moduleId = parsed.moduleSlug
+    ? moduleIdFromSlug(snap, parsed.moduleSlug) ?? item.moduleId
+    : "";
   return {
     ...item,
     filePath: rel,
@@ -143,6 +145,9 @@ export async function hydrateItemFromFile(
     updatedAt: parsed.updatedAt ?? item.updatedAt,
     bodyMd: parsed.bodyMd,
     brainRefs: parsed.brainRefs.length ? parsed.brainRefs : item.brainRefs,
+    contextExcludedRefs: parsed.contextExcludedRefs.length
+      ? parsed.contextExcludedRefs
+      : item.contextExcludedRefs,
   };
 }
 

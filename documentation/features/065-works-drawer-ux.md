@@ -2,14 +2,14 @@
 type: feature
 project: quack-desktop
 created: 2026-07-12
-last_verified: 2026-07-12
+last_verified: 2026-07-13
 status: active
-tags: [works, drawer, modules, notion-editor, create-flow, nested-stack]
+tags: [works, drawer, modules, notion-editor, create-flow, nested-stack, markdown, module-picker]
 ---
 
 # 065 — Works drawer UX (list catalog, draft create, nested stack)
 
-**Purpose:** Polish the Works surface after v4 markdown storage and side-drawer default (`063`): homogenize the work-items list with the Modules catalog, restore in-drawer Notion editing, defer persistence until **Create**, let every ticket pick a module, and stack child drawers (feature preview, work detail) above the editor tab drawer.
+**Purpose:** Polish the Works surface after v4 markdown storage and side-drawer default (`063`): homogenize the work-items list with the Modules catalog, restore in-drawer Notion editing, defer persistence until **Create**, let every ticket pick a module, stack child drawers above the editor tab drawer, and render agent-written markdown in descriptions.
 
 ## Work list — same UI as Modules
 
@@ -24,6 +24,18 @@ tags: [works, drawer, modules, notion-editor, create-flow, nested-stack]
 | Shell wiring | `WorksPane.tsx` — list layout uses `works-main--catalog` padding |
 
 Each row shows: `W-NNN · title`, status pill, priority dot, module path on hover, chevron. Context menu unchanged (`useWorkItemContextMenu`).
+
+### Full-width catalog (2026-07-13)
+
+Catalog panes previously capped at `max-width: 720px`, leaving empty space on wide monitors.
+
+| Class | Change |
+|---|---|
+| `.works-features-catalog`, `.works-items-catalog` | `width: 100%` (removed `max-width: 720px`) |
+| `.works-stories-catalog` | `width: 100%` |
+| `.brain-results-section`, `.brain-results` | `width: 100%` |
+
+Applies to **All work items**, **Modules**, and **Stories** list views (`works-main--catalog`). Board and Timeline were already fluid.
 
 ## Draft create flow
 
@@ -54,13 +66,41 @@ Drawer body uses `WorkItemEditor` → `WorkBlockEditor` (slash menu, headings, l
 
 `blocksDirty` ref prevents external watch reload from clobbering mid-edit state.
 
+### Inline markdown preview (2026-07-13)
+
+Agents write normal markdown in `works/items/W-NNN.md` (`**bold**`, `` `paths` ``, links). Structural blocks (lists, `##` headings, fenced code) round-trip via `markdownToBlocks`; **inline** syntax used to show as raw text in `contentEditable`.
+
+| Piece | Role |
+|---|---|
+| `renderInlineMarkdown` | Exported from `markdown.ts` — same safe subset as chat (`049`) |
+| `WorkBlockInlineText.tsx` | View: rendered HTML (`.md-preview`); click → edit source; blur → preview |
+| `WorkBlockRow.tsx` | Paragraphs, headings, list items, checklist lines use inline text |
+| `WorkBlockEditor.tsx` | Clears `focusIdx` on blur so preview restores |
+
+CSS: `.work-block-rendered` + inherited `.md-preview` code/strong/link styles.
+
+Skill `quack-works` v9 documents body markdown conventions for agents.
+
+## Drawer properties polish (2026-07-13)
+
+| Field | UI |
+|---|---|
+| **Title** | Larger hero input (`.work-drawer-title`) |
+| **Module** | `WorkModulePicker` — searchable portaled popover (420px), colored icon only, **No module** clears `moduleId` |
+| **Status** | `WorkStatusPicker` — icon + chip (`WorkDrawerChipPickers.tsx`, `workDrawerMeta.ts`) |
+| **Priority** | `WorkPriorityPicker` — icon + chip |
+| **Labels** | Hash chips with workspace label colors |
+| **Documentation** | `WorksDocRefsSection` — grouped refs, friendly open via `workspaceDocOpen.ts` (`070`) |
+
+Module unlink persists empty `module:` in frontmatter (`worksFeatureModules.ts`, `workItemMd.ts`, `worksItemFiles.ts`).
+
 ## Module association
 
-Every work item has `moduleId` (index + frontmatter `module: feat:{slug}`).
+Every work item **may** have `moduleId` (index + frontmatter `module: feat:{slug}`). Empty module is valid.
 
 | Surface | Behaviour |
 |---|---|
-| Work drawer | **Module** select (full width) — all `snap.modules`, sorted by feature num |
+| Work drawer | **Module** picker (full width) — all `snap.modules`, sorted by feature num; clear → no module |
 | Create | `createWorkItem({ moduleId })` when set; else legacy name inference |
 | List row | Subtitle: `NNN · name — documentation/features/…` on hover |
 
@@ -103,4 +143,7 @@ Symptoms before fix: right-click “does nothing”; delete confirm appears but 
 
 - Works storage & views: `054-works-layer.md`
 - Tab vs drawer default: `063-surface-view-prefs.md`
+- Composer link existing work/story: `068-quack-plan-harness.md`
+- Safe doc open from refs: `070-workspace-doc-open.md`
+- Inline markdown API: `049-markdown-renderer.md`
 - Skill: `documentation/skills/quack-works/SKILL.md`

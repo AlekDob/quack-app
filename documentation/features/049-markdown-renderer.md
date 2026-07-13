@@ -99,10 +99,11 @@ Replaces the old hover-revealed top-right **Copy** text button.
 
 ### Key functions (`markdown.ts`)
 - `renderMarkdown(md: string) → string` — main entry; emits safe escaped HTML
+- `renderInlineMarkdown(s: string) → string` — exported inline subset (bold, italic, code, links, auto-URLs); used by Works drawer `WorkBlockInlineText` (`065`)
 - `tokenize(md: string) → Block[]` — block parser (not CommonMark-complete)
 - `renderCodeBlock(b: Block) → string` — pill + copy row HTML
 - `highlightShellLine(text: string) → string` — first-token + rest spans
-- `inlineMd(s: string) → string` — inline transforms inside paragraphs
+- `inlineMd(s: string) → string` — internal; same as `renderInlineMarkdown`
 
 ### CSS tokens (code blocks)
 | Class | Role |
@@ -123,6 +124,7 @@ Chat scope (`.ai-msg-body .md-preview`) uses tighter padding on pills — see `0
 | `006-chat-tool-render.md` | Drawer mounts `MarkdownPreview` for `.md` reads + WebFetch |
 | `030-user-message-bar.md` | User prompts rendered via same renderer |
 | `069-smooth-streaming.md` | In-flight assistant prose skips `renderMarkdown` |
+| `065-works-drawer-ux.md` | Work/story description blocks use `renderInlineMarkdown` in view mode |
 | `041-mention-file-preview.md` | `@` autocomplete is composer-only; not markdown |
 | `045-html-preview.md` | Raw agent HTML never routed through this renderer |
 

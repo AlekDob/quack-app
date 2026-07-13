@@ -41,6 +41,7 @@ export interface ParsedWorkMd {
   title: string;
   bodyMd: string;
   brainRefs: string[];
+  contextExcludedRefs: string[];
 }
 
 const STATUSES = new Set<WorkStatus>([
@@ -132,6 +133,9 @@ export function parseWorkItemMd(
     title,
     bodyMd,
     brainRefs: frontmatterList(src, "refs").map((r) => r.trim()).filter(Boolean),
+    contextExcludedRefs: frontmatterList(src, "refsExcluded")
+      .map((r) => r.trim())
+      .filter(Boolean),
   };
 }
 
@@ -146,6 +150,7 @@ function fmList(key: string, items: string[]): string {
 }
 
 function moduleSlugForItem(item: WorkItem, snap: WorksSnapshot): string {
+  if (!item.moduleId) return "";
   const mod = snap.modules.find((m) => m.id === item.moduleId);
   if (mod?.featureSlug) return `feat:${mod.featureSlug}`;
   return item.moduleId;
@@ -182,6 +187,7 @@ export function serializeWorkItemMd(
     fmLine("parentId", item.parentId),
     fmLine("cycleId", item.cycleId),
     fmList("refs", item.brainRefs ?? []),
+    fmList("refsExcluded", item.contextExcludedRefs ?? []),
     fmLine("createdAt", item.createdAt),
     fmLine("updatedAt", item.updatedAt),
     "---",

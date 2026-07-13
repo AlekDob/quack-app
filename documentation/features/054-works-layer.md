@@ -244,6 +244,10 @@ Agents work on **markdown files**, not raw JSON:
 |---|---|
 | `workBlockEditor.ts` | Slash commands, block merge/split |
 | `WorkBlockEditor.tsx` / `WorkItemEditor.tsx` | Notion-style in-drawer description editor |
+| `WorkBlockInlineText.tsx` | Inline markdown preview in description blocks (`065`, `049`) |
+| `WorkModulePicker.tsx` | Searchable module popover; optional clear |
+| `WorkDrawerChipPickers.tsx` | Status / priority chip pickers |
+| `workDrawerMeta.ts` | Icons + labels for drawer meta chips |
 | `worksBlocks.ts` | `blocksToMarkdown`, `markdownToBlocks` (round-trip for drawer) |
 | `WorkComments.tsx` | Activity feed + comment composer (⌘↵ send) |
 
@@ -276,11 +280,14 @@ Mirror copies in `documentation/skills/`. Upgrades via `quack-bundled-version`.
 | Story menus | `useStoryContextMenu.tsx`, `worksStoryRowStyle.ts` |
 | Drawers | `WorkItemDrawer.tsx`, `FeatureDocDrawer.tsx`, `editorDrawerStack.ts` |
 | Kanban / timeline | `WorksKanbanView.tsx`, `WorksTimelineView.tsx`, `TimelineBar.tsx` |
-| Composer | `ComposerWorkBar.tsx`, `ComposerDocsChip.tsx` |
+| Composer | `ComposerWorkBar.tsx`, `ComposerDocsChip.tsx`, `ComposerWorkLinkPanel.tsx` |
+| Doc open | `workspaceDocOpen.ts` — see `070-workspace-doc-open.md` |
+| Brain ref UI | `worksBrainRefUi.ts` |
 | Hub badge | `WorkHubBadge.tsx` |
 | Plan bridge | `ClaudePermissionOverlay.tsx` (`onPlanApproved`) |
 | Surface mode | `surfaceViewPrefs.ts` — drawer default; see `063-surface-view-prefs.md` |
-| Drawer UX | `065-works-drawer-ux.md` — list catalog, draft create, nested stack |
+| Drawer UX | `065-works-drawer-ux.md` — list catalog, draft create, nested stack, inline markdown, module picker |
+| Doc open | `070-workspace-doc-open.md` — friendly path resolution from refs and chat links |
 | CSS | `App.css` — `.works-*`, `.work-drawer-*`, `.work-comments-*`, `.tool-drawer-scrim--nested` |
 
 ## Not yet

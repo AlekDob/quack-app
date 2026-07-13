@@ -23,6 +23,7 @@ export interface ParsedStoryMd {
   title: string;
   bodyMd: string;
   brainRefs: string[];
+  contextExcludedRefs: string[];
   linkedChatIds: string[];
 }
 
@@ -63,6 +64,9 @@ export function parseStoryMd(src: string): ParsedStoryMd | null {
     title,
     bodyMd,
     brainRefs: frontmatterList(src, "refs").map((r) => r.trim()).filter(Boolean),
+    contextExcludedRefs: frontmatterList(src, "refsExcluded")
+      .map((r) => r.trim())
+      .filter(Boolean),
     linkedChatIds: frontmatterList(src, "linkedChats"),
   };
 }
@@ -98,6 +102,7 @@ export function serializeStoryMd(
     fmLine("module", moduleSlugForStory(story, snap)),
     fmLine("cycleId", story.cycleId),
     fmList("refs", story.brainRefs ?? []),
+    fmList("refsExcluded", story.contextExcludedRefs ?? []),
     fmList("linkedChats", story.linkedChatIds ?? []),
     fmLine("createdAt", story.createdAt),
     fmLine("updatedAt", story.updatedAt),
