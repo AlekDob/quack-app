@@ -838,6 +838,14 @@ interface AppState {
   reorderWorkspaces(fromIndex: number, toIndex: number): void;
 
   openFile(wsId: string, path: string): Promise<void>;
+  /** Open (or move) a file tab at a pane edge / tab index — used by tree drag. */
+  openFileAt(
+    wsId: string,
+    path: string,
+    target:
+      | { paneId: PaneId; edge: DropEdge }
+      | { paneId: PaneId; insertIndex: number },
+  ): Promise<void>;
   closeTab(wsId: string, key: string): Promise<void>;
   reopenClosedTab(wsId: string): Promise<boolean>;
   setActiveTab(wsId: string, paneId: PaneId, key: string): void;
@@ -1849,6 +1857,78 @@ export const useStore = create<AppState>((set, get) => {
             ...w.layout,
             editorRoot,
             activePaneId: targetPaneId,
+          },
+        };
+      });
+      autoRevealInTree(wsId, path);
+    },
+
+    openFileAt: async (wsId, path, target) => {
+      const ws = get().loaded[wsId];
+      if (!ws) return;
+      const k = fileKey(path);
+      const existingPane =
+        findTabsPaneByTab(ws.layout.editorRoot, k) ??
+        (ws.layout.bottomRoot
+          ? findTabsPaneByTab(ws.layout.bottomRoot, k)
+          : null);
+      if (existingPane && (ws.files[path] || mediaKindOf(path))) {
+        get().moveTab(wsId, k, target);
+        autoRevealInTree(wsId, path);
+        return;
+      }
+      forgetClosedTab(wsId, path);
+      let contents = "";
+      if (!mediaKindOf(path)) {
+        try {
+          contents = await fsApi.readFile(path);
+        } catch (e) {
+          toastError(`Can't open ${basename(path)}: ${errMsg(e)}`);
+          return;
+        }
+      }
+      updateWs(wsId, (w) => {
+        let editorRoot = w.layout.editorRoot;
+        let bottomRoot = w.layout.bottomRoot;
+        let activePaneId = w.layout.activePaneId;
+        const applyToTree = (tree: Pane): { tree: Pane; activePaneId: PaneId } => {
+          if ("insertIndex" in target) {
+            return dropTabAtIndex(tree, target.paneId, target.insertIndex, k);
+          }
+          return dropTabAt(tree, target.paneId, target.edge, k);
+        };
+        const inEditor = isInTree(editorRoot, target.paneId);
+        const inBottom = !!bottomRoot && isInTree(bottomRoot, target.paneId);
+        if (inEditor) {
+          if (bottomRoot) {
+            const br = removeTabFromTree(bottomRoot, k);
+            bottomRoot = br.tree;
+          }
+          const result = applyToTree(editorRoot);
+          editorRoot = result.tree;
+          activePaneId = result.activePaneId;
+        } else if (inBottom && bottomRoot) {
+          const er = removeTabFromTree(editorRoot, k);
+          editorRoot = er.tree ?? emptyTabsPane();
+          const result = applyToTree(bottomRoot);
+          bottomRoot = result.tree;
+          activePaneId = result.activePaneId;
+        } else {
+          const result = applyToTree(editorRoot);
+          editorRoot = result.tree;
+          activePaneId = result.activePaneId;
+        }
+        return {
+          ...w,
+          files: {
+            ...w.files,
+            [path]: { contents, original: contents },
+          },
+          layout: {
+            ...w.layout,
+            editorRoot,
+            bottomRoot,
+            activePaneId,
           },
         };
       });

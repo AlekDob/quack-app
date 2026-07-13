@@ -11,3 +11,16 @@ export function fuzzyMatch(query: string, text: string): boolean {
   }
   return true;
 }
+
+/** Strip optional wrapping quotes pasted from other tools. */
+export function normalizeFilterQuery(query: string): string {
+  let q = query.trim();
+  if (
+    q.length >= 2 &&
+    ((q.startsWith('"') && q.endsWith('"')) ||
+      (q.startsWith("'") && q.endsWith("'")))
+  ) {
+    q = q.slice(1, -1).trim();
+  }
+  return q;
+}

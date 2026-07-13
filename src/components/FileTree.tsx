@@ -59,6 +59,7 @@ import {
   collectAllDirs,
   type TreeFilter,
 } from "../fileTreeWalk";
+import { normalizeFilterQuery } from "../fuzzyMatch";
 import { FileTreeToolbar } from "./FileTreeToolbar";
 
 interface TreeFilterCtx {
@@ -188,6 +189,7 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
         didDrag = true;
         suppressClickRef.current = true;
         cleanupDrag = startFileTreeDrag(
+          wsId,
           entry.path,
           entry.name,
           startX,
@@ -460,7 +462,7 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
   }, [refresh]);
 
   useEffect(() => {
-    const q = filterQuery.trim();
+    const q = normalizeFilterQuery(filterQuery);
     if (!q) {
       setFilter(null);
       setFilterBusy(false);
@@ -486,7 +488,7 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
   };
 
   const filterCtx =
-    filter && filterQuery.trim()
+    filter && normalizeFilterQuery(filterQuery)
       ? {
           visiblePaths: filter.visiblePaths,
           matchPaths: filter.matchPaths,
@@ -507,7 +509,7 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
       if (detail.wsId !== wsId) return;
       if (pathsEqual(detail.dir, root)) {
         refresh();
-        const q = filterQuery.trim();
+        const q = normalizeFilterQuery(filterQuery);
         if (q) {
           void buildTreeFilter(root, q).then(setFilter);
         }

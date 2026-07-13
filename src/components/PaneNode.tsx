@@ -27,7 +27,7 @@ import { basename, relPath } from "../pathUtils";
 import { revealInTree } from "../revealInTree";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Icon } from "./Icon";
-import { isEditorDrawerDropZone } from "../editorDrawer";
+import { resolveTabDropTarget } from "../tabDropTarget";
 import { peekClosedTabs, subscribeClosedTabs } from "../closedTabsStack";
 import { setAgentMode } from "../agentMode";
 import { htmlPreviewPayload } from "../htmlPreview";
@@ -203,26 +203,6 @@ function tabLabel(
     isAI: false,
     popped: false,
   };
-}
-
-function computeEdgeForPoint(
-  el: HTMLElement,
-  clientX: number,
-  clientY: number,
-): DropEdge {
-  const rect = el.getBoundingClientRect();
-  const x = (clientX - rect.left) / rect.width;
-  const y = (clientY - rect.top) / rect.height;
-  if (x > 0.25 && x < 0.75 && y > 0.25 && y < 0.75) return "center";
-  const dLeft = x;
-  const dRight = 1 - x;
-  const dTop = y;
-  const dBottom = 1 - y;
-  const min = Math.min(dLeft, dRight, dTop, dBottom);
-  if (min === dLeft) return "left";
-  if (min === dRight) return "right";
-  if (min === dTop) return "top";
-  return "bottom";
 }
 
 interface PaneNodeProps {
@@ -615,48 +595,34 @@ function TabsPaneView(
                     ev.clientX,
                     ev.clientY,
                   ) as HTMLElement | null;
-                  // Tab-bar insertion mode: drop between existing tabs.
-                  const tabBarEl = el?.closest(
-                    "[data-pane-tab-bar]",
-                  ) as HTMLElement | null;
-                  if (tabBarEl) {
-                    const overPaneId =
-                      tabBarEl.dataset.paneTabBar ?? null;
-                    const tabEls = Array.from(
-                      tabBarEl.querySelectorAll("[data-tab-index]"),
-                    ) as HTMLElement[];
-                    let insertIndex = tabEls.length;
-                    for (let i = 0; i < tabEls.length; i++) {
-                      const r = tabEls[i].getBoundingClientRect();
-                      if (ev.clientX < r.left + r.width / 2) {
-                        insertIndex = i;
-                        break;
-                      }
-                    }
+                  const t = resolveTabDropTarget(
+                    ev.clientX,
+                    ev.clientY,
+                    targetWsId,
+                  );
+                  if (t.tabInsertIndex != null && el?.closest("[data-pane-tab-bar]")) {
                     updateDrag(
                       ev.clientX,
                       ev.clientY,
-                      overPaneId,
+                      t.overPaneId,
                       null,
-                      insertIndex,
+                      t.tabInsertIndex,
                       false,
                     );
                     return;
                   }
-                  if (isEditorDrawerDropZone(ev.clientX, targetWsId)) {
+                  if (t.drawerDrop) {
                     updateDrag(ev.clientX, ev.clientY, null, null, null, true);
                     return;
                   }
-                  // Otherwise fall back to edge-zone detection on pane content.
-                  const paneEl = el?.closest("[data-pane-id]") as
-                    | HTMLElement
-                    | null;
-                  const overPaneId = paneEl?.dataset.paneId ?? null;
-                  let edge: DropEdge | null = null;
-                  if (paneEl) {
-                    edge = computeEdgeForPoint(paneEl, ev.clientX, ev.clientY);
-                  }
-                  updateDrag(ev.clientX, ev.clientY, overPaneId, edge, null, false);
+                  updateDrag(
+                    ev.clientX,
+                    ev.clientY,
+                    t.overPaneId,
+                    t.edge,
+                    null,
+                    false,
+                  );
                 };
 
                 const finish = (
@@ -1186,7 +1152,7 @@ function EmptyPane({ wsId }: { wsId: string }) {
           </div>
         )}
         <div className="pane-empty-foot">
-          Tip: drag any tab onto an edge to split, or to the far right to open a drawer.
+          Tip: drag a tab or explorer file onto an edge to split, or to the far right to open a drawer.
         </div>
       </div>
     </div>

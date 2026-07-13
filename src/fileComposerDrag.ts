@@ -1,7 +1,15 @@
-// Pointer-based drag from the file tree into the chat composer.
-// Tauri 2 swallows in-app HTML5 drags, so we mirror the whiteboard
-// skill-chip flow: mousedown on a tree row → document mousemove/mouseup
-// → elementFromPoint hit-test on the composer drop target.
+// Pointer-based drag from the file tree into the chat composer or editor
+// panes. Tauri 2 swallows in-app HTML5 drags, so we mirror the tab-drag
+// flow: mousedown on a tree row → document mousemove/mouseup → hit-test.
+
+import {
+  endDrag,
+  getDrag,
+  startDrag,
+  updateDrag,
+} from "./dragState";
+import { resolveTabDropTarget } from "./tabDropTarget";
+import { fileKey, useStore } from "./store";
 
 export const COMPOSER_FILE_DROP_ATTR = "data-composer-file-drop";
 export const FILE_TREE_DRAG_THRESHOLD_PX = 4;
@@ -33,19 +41,41 @@ function notifyHover(over: boolean): void {
   for (const cb of hoverListeners) cb(over);
 }
 
-function isOverDropTarget(clientX: number, clientY: number): boolean {
+function isOverComposerDrop(clientX: number, clientY: number): boolean {
   const el = document.elementFromPoint(clientX, clientY);
   if (!el) return false;
   return !!el.closest(`[${COMPOSER_FILE_DROP_ATTR}]`);
 }
 
-function placeGhost(ghost: HTMLElement, x: number, y: number): void {
-  ghost.style.left = `${x}px`;
-  ghost.style.top = `${y}px`;
+function applyEditorDrop(wsId: string, absPath: string): void {
+  const cur = getDrag();
+  if (!cur) return;
+  const st = useStore.getState();
+  if (cur.drawerDrop) {
+    void st.openFile(wsId, absPath).then(() => {
+      st.moveTabToDrawer(wsId, fileKey(absPath));
+    });
+    return;
+  }
+  if (!cur.overPaneId) return;
+  if (cur.tabInsertIndex != null) {
+    void st.openFileAt(wsId, absPath, {
+      paneId: cur.overPaneId,
+      insertIndex: cur.tabInsertIndex,
+    });
+    return;
+  }
+  if (cur.edge) {
+    void st.openFileAt(wsId, absPath, {
+      paneId: cur.overPaneId,
+      edge: cur.edge,
+    });
+  }
 }
 
-/** Begin a file-tree → composer drag. Returns cleanup for mouseup. */
+/** Begin a file-tree drag. Returns cleanup for mouseup. */
 export function startFileTreeDrag(
+  wsId: string,
   absPath: string,
   label: string,
   startX: number,
@@ -53,21 +83,39 @@ export function startFileTreeDrag(
   sourceEl: HTMLElement,
 ): (endX: number, endY: number) => void {
   let active = true;
+  let dragStarted = false;
   sourceEl.classList.add("tree-row--dragging");
-
-  const ghost = document.createElement("div");
-  ghost.className = "file-composer-drag-ghost";
-  ghost.textContent = label;
-  placeGhost(ghost, startX, startY);
-  document.body.appendChild(ghost);
 
   const onMove = (e: MouseEvent) => {
     if (!active) return;
-    placeGhost(ghost, e.clientX, e.clientY);
     const dx = e.clientX - startX;
     const dy = e.clientY - startY;
-    if (Math.hypot(dx, dy) < FILE_TREE_DRAG_THRESHOLD_PX) return;
-    notifyHover(isOverDropTarget(e.clientX, e.clientY));
+    if (!dragStarted) {
+      if (Math.hypot(dx, dy) < FILE_TREE_DRAG_THRESHOLD_PX) return;
+      dragStarted = true;
+      startDrag({
+        wsId,
+        key: fileKey(absPath),
+        label,
+        x: e.clientX,
+        y: e.clientY,
+      });
+    }
+    const overComposer = isOverComposerDrop(e.clientX, e.clientY);
+    notifyHover(overComposer);
+    if (!overComposer) {
+      const t = resolveTabDropTarget(e.clientX, e.clientY, wsId);
+      updateDrag(
+        e.clientX,
+        e.clientY,
+        t.overPaneId,
+        t.edge,
+        t.tabInsertIndex,
+        t.drawerDrop,
+      );
+    } else {
+      updateDrag(e.clientX, e.clientY, null, null, null, false);
+    }
   };
 
   window.addEventListener("mousemove", onMove);
@@ -78,13 +126,11 @@ export function startFileTreeDrag(
     window.removeEventListener("mousemove", onMove);
     notifyHover(false);
     sourceEl.classList.remove("tree-row--dragging");
-    placeGhost(ghost, endX, endY);
-    ghost.classList.add("file-composer-drag-ghost--fading");
-    window.setTimeout(() => {
-      ghost.remove();
-    }, 120);
-    if (isOverDropTarget(endX, endY) && dropZone) {
+    if (isOverComposerDrop(endX, endY) && dropZone) {
       dropZone.onFile(absPath);
+    } else if (dragStarted) {
+      applyEditorDrop(wsId, absPath);
     }
+    if (dragStarted) endDrag();
   };
 }

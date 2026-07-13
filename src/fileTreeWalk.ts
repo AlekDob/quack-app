@@ -1,12 +1,19 @@
 import { fs, type DirEntry } from "./ipc";
 import { pathsEqual } from "./fsBus";
 import { dirname } from "./pathUtils";
-import { fuzzyMatch } from "./fuzzyMatch";
+import { fuzzyMatch, normalizeFilterQuery } from "./fuzzyMatch";
 import { isHeavyDir } from "./heavyDirs";
 
 export interface TreeFilter {
   visiblePaths: Set<string>;
   matchPaths: Set<string>;
+}
+
+function entryMatchesFilter(query: string, name: string): boolean {
+  // Match on the entry name only — never the full relative path. A path
+  // like apps/client/.../trailing-slash.md can subsequence-match
+  // unrelated queries ("schools") by stitching letters across segments.
+  return fuzzyMatch(query, name);
 }
 
 async function listDirSafe(path: string): Promise<DirEntry[]> {
@@ -44,28 +51,27 @@ export async function buildTreeFilter(
   root: string,
   query: string,
 ): Promise<TreeFilter> {
-  const q = query.trim();
+  const q = normalizeFilterQuery(query);
   const visiblePaths = new Set<string>();
   const matchPaths = new Set<string>();
   if (!q) return { visiblePaths, matchPaths };
 
-  const walk = async (dir: string, relPrefix: string): Promise<void> => {
+  const walk = async (dir: string): Promise<void> => {
     const entries = await listDirSafe(dir);
     for (const e of entries) {
-      const rel = relPrefix ? `${relPrefix}/${e.name}` : e.name;
-      const matches = fuzzyMatch(q, e.name) || fuzzyMatch(q, rel);
+      const matches = entryMatchesFilter(q, e.name);
       if (matches) {
         matchPaths.add(e.path);
         addAncestors(visiblePaths, e.path, root);
         if (e.is_dir) await addDescendants(visiblePaths, e.path);
       }
       if (e.is_dir && !isHeavyDir(e.name)) {
-        await walk(e.path, rel);
+        await walk(e.path);
       }
     }
   };
 
-  await walk(root, "");
+  await walk(root);
   return { visiblePaths, matchPaths };
 }
 
