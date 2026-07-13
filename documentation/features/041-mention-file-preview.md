@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-05
-last_verified: 2026-07-11
+last_verified: 2026-07-13
 tags: [composer, mention, autocomplete, files, path-preview, ai-chat, cursor-style, drag-drop]
 ---
 
@@ -68,7 +68,9 @@ box (including a tall mention menu above the composer). While the menu is open:
 | `.ai-tab-host:has(.ai-mention-open)` | `overflow: visible` |
 | `.ai-side-panel-body:has(.ai-mention-open)` | `overflow: visible` |
 
-`AIChatPanel` adds `ai-mention-open` when `mentionState && mentionMatches.length > 0 && streaming === null`. Scrolling stays on `.ai-messages { overflow-y: auto }` — only the panel chrome escape hatch changes.
+`AIChatPanel` adds `ai-mention-open` when `mentionState && mentionMatches.length > 0`
+(including during an active turn / follow-up queue). Scrolling stays on
+`.ai-messages { overflow-y: auto }` — only the panel chrome escape hatch changes.
 
 **Do not** portal this menu to `document.body` for clipping alone — it breaks
 width alignment and the list/preview flex row.

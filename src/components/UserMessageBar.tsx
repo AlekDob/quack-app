@@ -1,6 +1,7 @@
 import { Icon } from "./Icon";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { useUserBarSticky } from "../hooks/useUserBarSticky";
+import { userMessageDisplayText } from "../imageAttach";
 
 type ChatImage = { path: string; name: string; thumb: string };
 
@@ -22,6 +23,42 @@ type TurnProps = BarProps & {
 };
 
 type StickyState = ReturnType<typeof useUserBarSticky>;
+
+function UserMessageImageStrip({
+  images,
+  onImageClick,
+}: {
+  images: ChatImage[];
+  onImageClick: (img: ChatImage) => void;
+}) {
+  return (
+    <div className="ai-user-msg-images" aria-label="Attached images">
+      {images.map((img, idx) =>
+        img.thumb ? (
+          <button
+            key={`${img.path}:${idx}`}
+            type="button"
+            className="ai-user-msg-image"
+            title={img.name}
+            aria-label={img.name}
+            onClick={() => onImageClick(img)}
+          >
+            <img src={img.thumb} alt="" />
+          </button>
+        ) : (
+          <span
+            key={`${img.path}:${idx}`}
+            className="ai-user-msg-image ai-user-msg-image--placeholder"
+            title={img.name}
+            aria-hidden
+          >
+            <Icon name="image" size={14} />
+          </span>
+        ),
+      )}
+    </div>
+  );
+}
 
 function UserBarActions({
   actionsDisabled,
@@ -88,11 +125,12 @@ function UserBarActions({
 
 function UserMessageBarInner({
   content,
-  images,
+  imageCount,
   sticky,
   ...barProps
-}: BarProps & { sticky: StickyState }) {
+}: Omit<BarProps, "images"> & { imageCount: number; sticky: StickyState }) {
   const { mainRef, isCompact, canToggle, expanded, toggleExpanded } = sticky;
+  const displayText = userMessageDisplayText(content, imageCount);
   const barClass = [
     "ai-user-bar",
     isCompact ? "is-compact" : "",
@@ -105,21 +143,7 @@ function UserMessageBarInner({
   return (
     <div className={barClass}>
       <div ref={mainRef} className="ai-user-bar-main">
-        {images && images.length > 0 && (
-          <div className="ai-msg-images">
-            {images.map((img, idx) => (
-              <img
-                key={idx}
-                className="ai-msg-image"
-                src={img.thumb}
-                alt={img.name}
-                title={img.name}
-                onClick={() => barProps.onImageClick(img)}
-              />
-            ))}
-          </div>
-        )}
-        <MarkdownPreview content={content} />
+        {displayText ? <MarkdownPreview content={displayText} /> : null}
       </div>
       <UserBarActions
         {...barProps}
@@ -140,7 +164,8 @@ export function UserTurnBar({
   images,
   ...barProps
 }: TurnProps) {
-  const sticky = useUserBarSticky(content, images?.length ?? 0);
+  const imageCount = images?.length ?? 0;
+  const sticky = useUserBarSticky(content);
 
   return (
     <>
@@ -152,13 +177,45 @@ export function UserTurnBar({
         data-anchor-role="user"
         data-anchor-preview={content.slice(0, 120)}
       >
-        <UserMessageBarInner content={content} sticky={sticky} {...barProps} />
+        {imageCount > 0 && images && (
+          <UserMessageImageStrip
+            images={images}
+            onImageClick={barProps.onImageClick}
+          />
+        )}
+        <UserMessageBarInner
+          content={content}
+          imageCount={imageCount}
+          sticky={sticky}
+          {...barProps}
+        />
       </div>
     </>
   );
 }
 
 export function UserMessageBar(props: BarProps) {
-  const sticky = useUserBarSticky(props.content, props.images?.length ?? 0);
-  return <UserMessageBarInner {...props} sticky={sticky} />;
+  const imageCount = props.images?.length ?? 0;
+  const sticky = useUserBarSticky(props.content);
+  return (
+    <>
+      {imageCount > 0 && props.images && (
+        <UserMessageImageStrip
+          images={props.images}
+          onImageClick={props.onImageClick}
+        />
+      )}
+      <UserMessageBarInner
+        imageCount={imageCount}
+        sticky={sticky}
+        actionsDisabled={props.actionsDisabled}
+        showBranch={props.showBranch}
+        onCopy={props.onCopy}
+        onRegen={props.onRegen}
+        onBranch={props.onBranch}
+        onImageClick={props.onImageClick}
+        content={props.content}
+      />
+    </>
+  );
 }

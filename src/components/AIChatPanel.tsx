@@ -170,6 +170,7 @@ import {
   attachFromPath,
   providerAcceptsImages,
   rehydrateAttachment,
+  rehydrateMessageImages,
   registerChatDropZone,
 } from "../imageAttach";
 import {
@@ -214,6 +215,15 @@ import {
   mergeSessionKnobs,
   type ChatComposerDraft,
 } from "../composerDraft";
+import {
+  normalizeQueuedDraft,
+  queueImagesAsAttachments,
+  queueItemFromSend,
+  queuePromptText,
+  rehydrateQueue,
+  stripQueueForPersist,
+  type QueuedComposerMessage,
+} from "../composerQueue";
 import {
   readProviderSessionIds,
   setProviderSessionId,
@@ -325,9 +335,40 @@ function parseMention(
   return null;
 }
 
+/** Active `/command` segment at the cursor — works mid-message, not only at col 0. */
+function parseSlash(
+  input: string,
+  cursor: number,
+): { query: string; start: number; end: number; firstWord: string } | null {
+  if (cursor <= 0 || cursor > input.length) return null;
+  let i = cursor - 1;
+  while (i >= 0) {
+    const ch = input[i];
+    if (ch === "/") {
+      if (i === 0 || /\s/.test(input[i - 1])) {
+        const firstWord = input.slice(i).split(/\s+/)[0];
+        return {
+          query: input.slice(i + 1, cursor),
+          start: i,
+          end: cursor,
+          firstWord,
+        };
+      }
+      return null;
+    }
+    if (/\s/.test(ch)) return null;
+    i--;
+  }
+  return null;
+}
+
+function slashSegmentTail(input: string, start: number, firstWord: string): string {
+  return input.slice(start + firstWord.length).trim();
+}
+
 function draftFromComposerSnap(snap: {
   input: string;
-  queue: string[];
+  queue: QueuedComposerMessage[];
   attachTree: boolean;
   attachTerminal: boolean;
   attachedAgents: string[];
@@ -335,7 +376,7 @@ function draftFromComposerSnap(snap: {
 }): ChatComposerDraft | undefined {
   const draft: ChatComposerDraft = {};
   if (snap.input) draft.input = snap.input;
-  if (snap.queue.length > 0) draft.queue = [...snap.queue];
+  if (snap.queue.length > 0) draft.queue = stripQueueForPersist(snap.queue);
   if (snap.attachTree) draft.attachTree = true;
   if (snap.attachTerminal) draft.attachTerminal = true;
   if (snap.attachedAgents.length > 0) {
@@ -745,20 +786,25 @@ export function AIChatPanel({
     }
     setTodos(list.length > 0 ? list : null);
   };
+  const applyLoadedMessages = useCallback(async (raw: ChatMessage[]) => {
+    const cleaned = cleanStaleToolMessages(raw);
+    const hydrated = await rehydrateMessageImages(cleaned);
+    setMessages(hydrated);
+    rebuildChecklist(hydrated);
+    return hydrated;
+  }, []);
   const tryProviderRecover = useCallback(
     async (row: ChatSession, gen: number) => {
       const recovered = await recoverSessionFromAnyProvider(root, row);
       if (!recovered || gen !== ccHydrateGenRef.current) return;
-      const msgs = cleanStaleToolMessages(recovered.session.messages);
-      setMessages(msgs);
-      rebuildChecklist(msgs);
+      const msgs = await applyLoadedMessages(recovered.session.messages);
       persistRecoveredSession(wsId, { ...recovered.session, messages: msgs });
       setSessions(loadSessions(wsId));
       toastInfo(
         `Restored ${msgs.length} messages from ${recovered.provider} session`,
       );
     },
-    [root, wsId],
+    [root, wsId, applyLoadedMessages],
   );
   // Cumulative USD spend across every turn in this chat. Persisted
   // alongside the conversation so the running tally survives reloads.
@@ -948,15 +994,17 @@ export function AIChatPanel({
     [presetChoices],
   );
   const [attachedAgents, setAttachedAgents] = useState<string[]>([]);
-  const queueRef = useRef<string[]>([]);
-  const [queuedMessages, setQueuedMessages] = useState<string[]>([]);
+  const queueRef = useRef<QueuedComposerMessage[]>([]);
+  const [queuedMessages, setQueuedMessages] = useState<QueuedComposerMessage[]>(
+    [],
+  );
   const syncQueueUi = useCallback(() => {
     setQueuedMessages([...queueRef.current]);
   }, []);
   const composerPersistRef = useRef({
     sessionId: "",
     input: "",
-    queue: [] as string[],
+    queue: [] as QueuedComposerMessage[],
     attachTree: false,
     attachTerminal: false,
     attachedAgents: [] as string[],
@@ -985,8 +1033,15 @@ export function AIChatPanel({
   const applyComposerDraft = useCallback(
     (draft: ChatComposerDraft) => {
       setInput(draft.input ?? "");
-      queueRef.current = draft.queue ? [...draft.queue] : [];
+      const normalized = normalizeQueuedDraft(draft.queue);
+      queueRef.current = normalized;
       syncQueueUi();
+      if (normalized.some((item) => item.images?.some((img) => !img.thumb))) {
+        void rehydrateQueue(normalized).then((hydrated) => {
+          queueRef.current = hydrated;
+          syncQueueUi();
+        });
+      }
       setAttachTree(!!draft.attachTree);
       setAttachTerminal(!!draft.attachTerminal);
       setAttachedAgents(draft.attachedAgents ?? []);
@@ -1036,6 +1091,12 @@ export function AIChatPanel({
     end: number; // cursor position
   } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+  const [slashState, setSlashState] = useState<{
+    query: string;
+    start: number;
+    end: number;
+    firstWord: string;
+  } | null>(null);
   // Workspace-file cache for the autocomplete. Populated lazily on
   // the first @ keystroke so we don't pay the IPC cost in every
   // chat session whether the user mentions files or not.
@@ -1705,10 +1766,9 @@ export function AIChatPanel({
       setPresetId(found?.presetId ?? null);
       applyComposerDraft(draftFromSession(found));
       if (found) {
-        const msgs = cleanStaleToolMessages(found.messages);
-        setMessages(msgs);
-        rebuildChecklist(msgs);
-        void hydrateAgentCommitFromMessages(wsId, targetSid, root, msgs);
+        void applyLoadedMessages(found.messages).then((msgs) => {
+          void hydrateAgentCommitFromMessages(wsId, targetSid, root, msgs);
+        });
         if (found.model) {
           const q = parseQualifiedModel(found.model)
             ? found.model
@@ -1739,10 +1799,9 @@ export function AIChatPanel({
       // Filter out stale "Unknown tool: X" result messages from older
       // sessions where we incorrectly tried to execute the agentic
       // provider's tool calls on our side. They're meaningless garbage.
-      const msgs = cleanStaleToolMessages(list[0].messages);
-      setMessages(msgs);
-      rebuildChecklist(msgs);
-      void hydrateAgentCommitFromMessages(wsId, list[0].id, root, msgs);
+      void applyLoadedMessages(list[0].messages).then((msgs) => {
+        void hydrateAgentCommitFromMessages(wsId, list[0].id, root, msgs);
+      });
       if (list[0].model) {
         const q = parseQualifiedModel(list[0].model)
           ? list[0].model
@@ -1761,7 +1820,7 @@ export function AIChatPanel({
       applyJackDefaultsIfConfigured();
       applyComposerDraft({});
     }
-  }, [wsId, aiChatId, onHydrated, applyComposerDraft, tryProviderRecover]);
+  }, [wsId, aiChatId, onHydrated, applyComposerDraft, tryProviderRecover, applyLoadedMessages]);
 
   // When sessionId changes inside a tabbed panel (e.g. via /new or the
   // history dropdown), persist it back to the descriptor so a reload
@@ -2000,8 +2059,10 @@ export function AIChatPanel({
 
   // drainQueue is a stable useCallback([]), so it MUST call the latest
   const pushQueue = useCallback(
-    (text: string) => {
-      queueRef.current.push(text);
+    (text: string, images: ImageAttachment[] = []) => {
+      const item = queueItemFromSend(text, images);
+      if (!item) return;
+      queueRef.current.push(item);
       syncQueueUi();
     },
     [syncQueueUi],
@@ -2021,24 +2082,26 @@ export function AIChatPanel({
   // sendUserText through a ref — the empty-deps closure captured the
   // very first render's sendUserText, whose stale `messages`/`selected`
   // silently dropped queued follow-ups.
-  const sendUserTextRef = useRef<((text: string) => Promise<void>) | null>(
-    null,
-  );
+  const sendUserTextRef = useRef<
+    ((text: string, images?: ImageAttachment[]) => Promise<void>) | null
+  >(null);
   const drainQueue = useCallback(async () => {
     if (queueRef.current.length === 0) return;
     const next = queueRef.current.shift();
     syncQueueUi();
     if (!next) return;
+    const imgs = await queueImagesAsAttachments(next);
+    const prompt = queuePromptText(next);
     // One message per drain — the turn's `finally` re-schedules drain
     // for the rest. A `while` here spun forever when sendUserText
     // re-queued defensively (stale `streaming === ""` closure) and
     // immediately returned, pegging WebKit at 100% CPU + GB of RAM.
-    await sendUserTextRef.current?.(next);
+    await sendUserTextRef.current?.(prompt, imgs);
   }, [syncQueueUi]);
   // Keep the ref pointing at this render's sendUserText (defined
   // further down; the effect runs post-render so the binding exists).
   useEffect(() => {
-    sendUserTextRef.current = (t: string) => sendUserText(t);
+    sendUserTextRef.current = (t, imgs) => sendUserText(t, messages, imgs ?? []);
   });
 
   // Stage image attachments from a Cmd+V paste or a Finder drop. Compresses
@@ -2125,25 +2188,20 @@ export function AIChatPanel({
     const imgs = attachedImages;
     if (!text && imgs.length === 0) return;
     if (streaming !== null || runningTools) {
-      // Active turn — queue the text. The queue is text-only, so hold
-      // images back rather than silently dropping them.
-      if (imgs.length > 0) {
-        toastInfo("Attendi la fine del turno per inviare le immagini");
-        return;
-      }
       setInput("");
       setHistoryIdx(null);
       historyDraftRef.current = "";
-      pushQueue(text);
+      const queuedImgs = [...imgs];
+      setAttachedImages([]);
+      pushQueue(text, queuedImgs);
       return;
     }
     setInput("");
     setHistoryIdx(null);
     historyDraftRef.current = "";
     setAttachedImages([]);
-    // A message that's images-only still needs a prompt for the model.
     const prompt =
-      text || (imgs.length > 0 ? "Guarda le immagini allegate." : text);
+      text || (imgs.length > 0 ? "See the attached images." : text);
     await sendUserText(prompt, messages, imgs);
   };
 
@@ -2164,12 +2222,18 @@ export function AIChatPanel({
   };
 
   const multitaskQueued = () => {
-    const text = queueRef.current.shift();
+    const item = queueRef.current.shift();
     syncQueueUi();
-    if (!text) return;
+    if (!item) return;
     const newChatId = addNewAIChat(wsId, "editor", defaultNewChatAnchor());
     queueMicrotask(() => {
-      requestAIPrompt({ wsId, chatId: newChatId, text, send: true });
+      requestAIPrompt({
+        wsId,
+        chatId: newChatId,
+        text: queuePromptText(item),
+        images: item.images?.map(({ id, path, name }) => ({ id, path, name })),
+        send: true,
+      });
     });
   };
 
@@ -2197,8 +2261,10 @@ export function AIChatPanel({
   const slashArgMenu = ():
     | Array<{ name: string; hint: string; run: () => void }>
     | null => {
-    if (!input.startsWith("/") || !input.includes(" ")) return null;
-    const parts = input.split(/\s+/);
+    if (!slashState) return null;
+    const tail = input.slice(slashState.start);
+    if (!tail.includes(" ")) return null;
+    const parts = tail.split(/\s+/);
     const fw = parts[0].toLowerCase();
     const partial = (parts[1] ?? "").toLowerCase();
     if (fw === "/effort") {
@@ -2408,10 +2474,13 @@ export function AIChatPanel({
   // Send a Claude Code slash command through as the prompt — the CLI
   // expands it. Keeps any arguments the user typed after the name.
   const sendCcCommand = (name: string) => {
-    const text = input.trim().toLowerCase().startsWith(name.toLowerCase())
-      ? input.trim()
+    const segment = slashState
+      ? input.slice(slashState.start).trim()
+      : input.trim();
+    const text = segment.toLowerCase().startsWith(name.toLowerCase())
+      ? segment
       : name;
-    setInput("");
+    clearSlashSegment();
     answerQuestion(text);
   };
 
@@ -2529,6 +2598,38 @@ export function AIChatPanel({
     });
   };
 
+  const clearSlashSegment = useCallback(() => {
+    if (!slashState) {
+      setInput("");
+      setSlashState(null);
+      return;
+    }
+    const next = `${input.slice(0, slashState.start)}${input.slice(slashState.end)}`
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    setInput(next);
+    setSlashState(null);
+  }, [input, slashState]);
+
+  const replaceSlashSegment = useCallback(
+    (replacement: string) => {
+      if (!slashState) {
+        setInput(replacement);
+        setSlashState(parseSlash(replacement, replacement.length));
+        return;
+      }
+      const before = input.slice(0, slashState.start);
+      const after = input.slice(slashState.end);
+      const glueBefore = before.length > 0 && !before.endsWith(" ") ? " " : "";
+      const glueAfter = after.length > 0 && !after.startsWith(" ") ? " " : "";
+      const next = `${before}${glueBefore}${replacement}${glueAfter}${after}`.trim();
+      const cursor = slashState.start + glueBefore.length + replacement.length;
+      setInput(next);
+      setSlashState(parseSlash(next, cursor));
+    },
+    [input, slashState],
+  );
+
   const citeFileFromDrop = useCallback(
     (absPath: string) => {
       const rel = relPath(absPath, root);
@@ -2587,27 +2688,41 @@ export function AIChatPanel({
   // focus, and optionally fire it. Held in a ref so the subscription
   // sees the latest sendUserText / queue state on every event without
   // having to re-subscribe each render.
-  const handleExternalPromptRef = useRef<(text: string, immediate: boolean) => void>(() => {});
-  handleExternalPromptRef.current = (text: string, immediate: boolean) => {
+  const handleExternalPromptRef = useRef<
+    (text: string, immediate: boolean, images?: ImageAttachment[]) => void
+  >(() => {});
+  handleExternalPromptRef.current = (
+    text: string,
+    immediate: boolean,
+    images: ImageAttachment[] = [],
+  ) => {
     if (!immediate) {
       setInput(text);
-      // Wait a frame so React has rendered the textarea before we focus.
+      if (images.length > 0) setAttachedImages(images);
       requestAnimationFrame(() => inputRef.current?.focus());
       return;
     }
     setInput("");
+    setAttachedImages([]);
     if (streaming !== null || runningTools) {
-      pushQueue(text);
+      pushQueue(text, images);
       return;
     }
-    void sendUserText(text);
+    void sendUserText(
+      text || (images.length > 0 ? "See the attached images." : text),
+      messages,
+      images,
+    );
   };
 
   useEffect(() => {
-    return onAIPromptRequest((req) => {
+    return onAIPromptRequest(async (req) => {
       if (req.wsId !== wsId) return;
       if (req.chatId && req.chatId !== aiChatId) return;
-      handleExternalPromptRef.current(req.text, req.send);
+      const imgs = req.images?.length
+        ? await queueImagesAsAttachments({ text: req.text, images: req.images })
+        : [];
+      handleExternalPromptRef.current(req.text, req.send, imgs);
     });
   }, [wsId, aiChatId]);
 
@@ -2622,7 +2737,7 @@ export function AIChatPanel({
     // read `""` (between tool rounds) or `null` (stale) in the
     // closure and re-queue forever inside drainQueue's old `while`.
     if (liveTurnRef.current) {
-      pushQueue(text);
+      pushQueue(text, images);
       return;
     }
     cancelBackgroundWake();
@@ -3924,12 +4039,11 @@ export function AIChatPanel({
     setCcPermMode(knobs.permMode);
     setPresetId(s.presetId ?? null);
     resetTurnTransients();
-    const msgs = cleanStaleToolMessages(s.messages);
-    setMessages(msgs);
-    rebuildChecklist(msgs);
+    void applyLoadedMessages(s.messages).then((msgs) => {
+      void hydrateAgentCommitFromMessages(wsId, s.id, root, msgs);
+    });
     applyComposerDraft(draftFromSession(s));
     setHistoryOpen(false);
-    void hydrateAgentCommitFromMessages(wsId, s.id, root, msgs);
     if (s.model) setSelected(s.model);
     const gen = ++ccHydrateGenRef.current;
     void tryProviderRecover(s, gen);
@@ -4379,23 +4493,27 @@ export function AIChatPanel({
   }, [usageReport]);
 
   const runSlashCommand = (cmd: SlashCommand) => {
+    const slashArg = (slashState
+      ? slashSegmentTail(input, slashState.start, slashState.firstWord)
+      : input.split(/\s+/).slice(1).join(" ")
+    )
+      .split(/\s+/)[0]
+      ?.toLowerCase() ?? "";
     if (cmd.action === "new") {
       startNewChat();
       return;
     }
     if (cmd.action === "usage") {
-      setInput("");
+      clearSlashSegment();
       void showUsageReport();
       return;
     }
     if (cmd.action === "effort") {
-      const arg = input.split(/\s+/)[1]?.toLowerCase() ?? "";
-      setInput("");
+      const arg = slashArg;
+      clearSlashSegment();
       const levels = [...CC_EFFORTS];
       if (!arg) {
-        // No argument — reopen as the value submenu so the user picks
-        // from a list instead of reading a syntax toast.
-        setInput("/effort ");
+        replaceSlashSegment("/effort ");
         setSlashIndex(0);
         inputRef.current?.focus();
         return;
@@ -4414,8 +4532,8 @@ export function AIChatPanel({
       return;
     }
     if (cmd.action === "mode") {
-      const arg = input.split(/\s+/)[1]?.toLowerCase() ?? "";
-      setInput("");
+      const arg = slashArg;
+      clearSlashSegment();
       // Friendly aliases → permission-mode values. "bypass" maps to Claude
       // Code's real bypassPermissions: the backend runs it with the hook
       // OFF — zero cards, no privacy gate. Everything else keeps the hook.
@@ -4431,7 +4549,7 @@ export function AIChatPanel({
         yolo: "bypassPermissions",
       };
       if (!arg) {
-        setInput("/mode ");
+        replaceSlashSegment("/mode ");
         setSlashIndex(0);
         inputRef.current?.focus();
         return;
@@ -4455,8 +4573,8 @@ export function AIChatPanel({
       return;
     }
     if (cmd.action === "thinking") {
-      const arg = input.split(/\s+/)[1]?.toLowerCase() ?? "";
-      setInput("");
+      const arg = slashArg;
+      clearSlashSegment();
       let next: boolean | null;
       if (arg === "on") next = true;
       else if (arg === "off") next = false;
@@ -4495,20 +4613,20 @@ export function AIChatPanel({
       return;
     }
     if (cmd.action === "file") {
-      // Parse trailing path from current input ("/file src/foo.ts" -> "src/foo.ts")
-      const rest = input.replace(/^\/file\s*/i, "").trim();
+      const rest = slashState
+        ? slashSegmentTail(input, slashState.start, slashState.firstWord)
+        : input.replace(/^\/file\s*/i, "").trim();
       if (!rest) {
-        // Don't have a path yet — just complete the command and wait for the user.
-        setInput("/file ");
+        replaceSlashSegment("/file ");
         return;
       }
       addAttachedFile(rest, root);
-      setInput("");
+      clearSlashSegment();
       toastInfo(`Attached ${rest} to next message`);
       return;
     }
     if (cmd.prompt) {
-      setInput(cmd.prompt);
+      replaceSlashSegment(cmd.prompt);
       setSlashIndex(0);
     }
   };
@@ -5129,7 +5247,7 @@ export function AIChatPanel({
       className={`ai-chat-with-story${storyId ? " has-story-drawer" : ""}`}
     >
     <div
-      className={`ai-panel${mentionState && mentionMatches.length > 0 && streaming === null ? " ai-mention-open" : ""}`}
+      className={`ai-panel${mentionState && mentionMatches.length > 0 ? " ai-mention-open" : ""}`}
       ref={panelRef}
     >
       {zoomImage && (
@@ -5721,7 +5839,7 @@ export function AIChatPanel({
           })}
         </div>
       )}
-      {mentionState && mentionMatches.length > 0 && streaming === null && (
+      {mentionState && mentionMatches.length > 0 && (
         <MentionSuggestions
           matches={mentionMatches}
           activeIndex={mentionIndex}
@@ -5730,8 +5848,7 @@ export function AIChatPanel({
         />
       )}
       {(() => {
-        const isSlash = input.startsWith("/");
-        if (!isSlash || streaming !== null) return null;
+        if (!slashState) return null;
         // Value submenu ("/effort " → pick low/medium/…) wins over the
         // command list once the command name is complete.
         const argMenu = slashArgMenu();
@@ -5746,7 +5863,7 @@ export function AIChatPanel({
                   className={`ai-slash-item ${i === aidx ? "active" : ""}`}
                   onMouseEnter={() => setSlashIndex(i)}
                   onClick={() => {
-                    setInput("");
+                    clearSlashSegment();
                     c.run();
                   }}
                 >
@@ -5757,7 +5874,7 @@ export function AIChatPanel({
             </div>
           );
         }
-        const q = input.split(/\s+/)[0].slice(1).toLowerCase();
+        const q = slashState.firstWord.slice(1).toLowerCase();
         const matches = slashMatchesFor(q);
         if (matches.length === 0) return null;
         const idx = Math.max(0, Math.min(slashIndex, matches.length - 1));
@@ -6253,8 +6370,8 @@ export function AIChatPanel({
               />
               <button
                 className="ai-attach-remove"
-                aria-label="Rimuovi immagine"
-                title="Rimuovi"
+                aria-label="Remove image"
+                title="Remove"
                 onClick={() => removeImage(att.id)}
               >
                 <Icon name="x" size={10} />
@@ -6382,12 +6499,24 @@ export function AIChatPanel({
             const m = parseMention(v, cursor);
             setMentionState(m);
             setMentionIndex(0);
+            const s = m ? null : parseSlash(v, cursor);
+            setSlashState(s);
+            setSlashIndex(0);
             if (m && mentionFiles === null && root) {
               void search
                 .listFiles(root, 5000)
                 .then((list) => setMentionFiles(list))
                 .catch(() => setMentionFiles([]));
             }
+          }}
+          onSelect={(e) => {
+            const el = e.currentTarget;
+            const cursor = el.selectionStart ?? input.length;
+            const m = parseMention(input, cursor);
+            setMentionState(m);
+            setMentionIndex(0);
+            setSlashState(m ? null : parseSlash(input, cursor));
+            setSlashIndex(0);
           }}
           onKeyDown={(e) => {
             // Esc while a request is in flight = stop. Always wins so the
@@ -6428,8 +6557,7 @@ export function AIChatPanel({
               }
             }
             // @-mention popover navigation takes precedence over the
-            // slash-command popover (they can't both be active — slash
-            // requires the input to start with /).
+            // slash-command popover (they can't both be active).
             if (mentionState && mentionMatches.length > 0) {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
@@ -6456,23 +6584,16 @@ export function AIChatPanel({
                 return;
               }
             }
-            const isSlash = input.startsWith("/");
-            const firstWord = isSlash ? input.split(/\s+/)[0] : "";
-            const exactCmd = isSlash
-              ? SLASH_COMMANDS.find(
-                  (c) => c.name.toLowerCase() === firstWord.toLowerCase(),
-                )
-              : undefined;
-            // Exact Claude Code passthrough ("/compact", "/mycmd args")
-            // typed in full — send it through on Enter even when the
-            // suggestion list isn't showing.
-            const exactCc =
-              isSlash && !exactCmd
+            if (slashState) {
+              const firstWord = slashState.firstWord;
+              const exactCmd = SLASH_COMMANDS.find(
+                (c) => c.name.toLowerCase() === firstWord.toLowerCase(),
+              );
+              const exactCc = !exactCmd
                 ? ccCommands.find(
                     (c) => c.name.toLowerCase() === firstWord.toLowerCase(),
                   )
                 : undefined;
-            if (isSlash) {
               // Value submenu has priority — arrows pick a value,
               // Enter/Tab applies it immediately.
               const argMenu = slashArgMenu();
@@ -6493,13 +6614,13 @@ export function AIChatPanel({
                     0,
                     Math.min(slashIndex, argMenu.length - 1),
                   );
-                  setInput("");
+                  clearSlashSegment();
                   argMenu[aidx].run();
                   return;
                 }
                 if (e.key === "Escape") {
                   e.preventDefault();
-                  setInput("");
+                  clearSlashSegment();
                   return;
                 }
               }
@@ -6523,17 +6644,13 @@ export function AIChatPanel({
                   Math.min(slashIndex, matches.length - 1),
                 );
                 const m = matches[idx];
-                // Tab = autocomplete the command/skill name into the input
-                // (keeping any args already typed) so the user can keep
-                // typing the skill's argument — it does NOT run.
                 if (e.key === "Tab") {
                   e.preventDefault();
-                  const after = input.slice(firstWord.length).trimStart();
-                  setInput(after ? `${m.name} ${after}` : `${m.name} `);
+                  const tail = input.slice(slashState.end).trimStart();
+                  replaceSlashSegment(tail ? `${m.name} ${tail}` : `${m.name} `);
                   setSlashIndex(0);
                   return;
                 }
-                // Enter = run it (local action / prompt) or send it (cc / skill).
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   if (m.kind === "local") runSlashCommand(m.cmd);
@@ -6542,11 +6659,10 @@ export function AIChatPanel({
                 }
                 if (e.key === "Escape") {
                   e.preventDefault();
-                  setInput("");
+                  clearSlashSegment();
                   return;
                 }
               }
-              // Exact-match command typed with arguments (e.g. "/file foo.ts")
               if (
                 exactCmd &&
                 (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey))

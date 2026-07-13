@@ -1,22 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 
 /** Natural height above which we collapse while the bar is stuck. */
-const TALL_THRESHOLD_PX = 100;
+const TALL_THRESHOLD_PX = 160;
 /** Pixels sentinel must clear the scroll top before we unstick (anti-flicker). */
 const UNSTICK_GAP_PX = 10;
 
-function estimateTall(content: string, imageCount: number): boolean {
-  if (imageCount > 0) return true;
-  if (content.length > 320) return true;
-  return (content.match(/\n/g)?.length ?? 0) >= 5;
+function estimateTall(content: string): boolean {
+  if (content.length > 500) return true;
+  return (content.match(/\n/g)?.length ?? 0) >= 7;
 }
 
-export function useUserBarSticky(content: string, imageCount = 0) {
+export function useUserBarSticky(content: string) {
   const sentinelRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
-  const tallCacheRef = useRef(estimateTall(content, imageCount));
+  const tallCacheRef = useRef(estimateTall(content));
   const [isStuck, setIsStuck] = useState(false);
-  const [isTall, setIsTall] = useState(() => estimateTall(content, imageCount));
+  const [isTall, setIsTall] = useState(() => estimateTall(content));
   const [expanded, setExpanded] = useState(false);
 
   const isCompact = isStuck && isTall && !expanded;
@@ -24,7 +23,7 @@ export function useUserBarSticky(content: string, imageCount = 0) {
 
   const measureNatural = (main: HTMLElement): boolean => {
     const tall =
-      main.scrollHeight > TALL_THRESHOLD_PX || estimateTall(content, imageCount);
+      main.scrollHeight > TALL_THRESHOLD_PX || estimateTall(content);
     tallCacheRef.current = tall;
     return tall;
   };
@@ -56,7 +55,7 @@ export function useUserBarSticky(content: string, imageCount = 0) {
   }, []);
 
   useEffect(() => {
-    tallCacheRef.current = estimateTall(content, imageCount);
+    tallCacheRef.current = estimateTall(content);
     const main = mainRef.current;
     if (!main) {
       setIsTall(tallCacheRef.current);
@@ -75,7 +74,7 @@ export function useUserBarSticky(content: string, imageCount = 0) {
     const ro = new ResizeObserver(applyMeasure);
     ro.observe(main);
     return () => ro.disconnect();
-  }, [content, imageCount]);
+  }, [content]);
 
   useEffect(() => {
     if (!isStuck) setExpanded(false);

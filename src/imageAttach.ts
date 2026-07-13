@@ -7,6 +7,8 @@
 
 import { fs } from "./ipc";
 
+import type { ChatMessage } from "./ai";
+
 export interface ImageAttachment {
   /** Stable id for React keys + removal. */
   id: string;
@@ -146,7 +148,7 @@ export async function attachFromPath(path: string): Promise<ImageAttachment> {
 
 /** Rebuild preview thumb for a draft image already on disk. */
 export async function rehydrateAttachment(meta: {
-  id: string;
+  id?: string;
   path: string;
   name: string;
 }): Promise<ImageAttachment | null> {
@@ -154,10 +156,53 @@ export async function rehydrateAttachment(meta: {
     const dataUrl = await fs.readImageDataUrl(meta.path);
     const img = await loadImage(dataUrl);
     const thumb = encode(scaleToCanvas(img, MAX_THUMB_EDGE), 0.7);
-    return { id: meta.id, path: meta.path, name: meta.name, thumb: thumb.dataUrl };
+    return {
+      id: meta.id ?? meta.path,
+      path: meta.path,
+      name: meta.name,
+      thumb: thumb.dataUrl,
+    };
   } catch {
     return null;
   }
+}
+
+const IMAGES_ONLY_PROMPTS = new Set([
+  "See the attached images.",
+  "Guarda le immagini allegate.",
+]);
+
+/** Hide the synthetic prompt when the bubble already shows thumbnails. */
+export function userMessageDisplayText(
+  content: string,
+  imageCount: number,
+): string {
+  if (imageCount > 0 && IMAGES_ONLY_PROMPTS.has(content.trim())) return "";
+  return content;
+}
+
+/** Rebuild missing thumbs on saved user messages after reload. */
+export async function rehydrateMessageImages(
+  messages: ChatMessage[],
+): Promise<ChatMessage[]> {
+  let changed = false;
+  const out = await Promise.all(
+    messages.map(async (m) => {
+      if (m.role !== "user" || !m.images?.length) return m;
+      if (m.images.every((img) => img.thumb)) return m;
+      const images = await Promise.all(
+        m.images.map(async (img) => {
+          if (img.thumb) return img;
+          const att = await rehydrateAttachment(img);
+          if (!att) return img;
+          changed = true;
+          return { path: img.path, name: img.name, thumb: att.thumb };
+        }),
+      );
+      return { ...m, images };
+    }),
+  );
+  return changed ? out : messages;
 }
 
 // ── Drop routing ──────────────────────────────────────────────────────

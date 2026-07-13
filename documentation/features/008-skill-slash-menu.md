@@ -13,8 +13,8 @@ tags: [ai-chat, skills, slash-menu, claude-code, composer, claude-skills, discov
 same affordance pattern as `@`-mention subagents (see `004`), but for skills.
 Each skill row gets a dedicated **command icon** + **violet colour** so it reads
 distinct from the built-in slash commands. Picking one invokes the skill.
-**Files:** `src/skills.ts` (loader), `src/components/AIChatPanel.tsx` (menu wiring),
-`src/App.css` (`--skill` token + row styling).
+**Files:** `src/skills.ts` (loader), `src/components/AIChatPanel.tsx` (`parseSlash`,
+`slashState`, menu wiring), `src/App.css` (`--skill` token + row styling).
 
 ### Where skills come from
 Skills are **folders** containing a `SKILL.md` (vs subagents, which are single
@@ -39,9 +39,15 @@ concept, so the list is cleared for them. One shared `homeDir` resolution,
 `Promise.all([loadSubagents, loadSkills])`.
 
 ### Menu wiring (`slashMatchesFor`)
-The `/` menu already merged **local** commands + **cc** passthroughs. Skills are
-a third group appended **last** (built-ins stay on top), tagged `kind: "skill"`,
-de-duped against local/cc names:
+
+The `/` menu merges **local** commands + **cc** passthroughs + **skills**.
+Activation uses `parseSlash(input, cursor)` — the slash token can appear
+**anywhere** in the composer (after whitespace), not only at column 0.
+Example: `also run /refactor on this file`.
+
+`slashState` drives the dropdown; `mentionState` wins when both could apply.
+The menu stays available **during an active turn** (follow-up queue mode) —
+do not gate on `streaming !== null`.
 
 | kind | dispatch | row style |
 |---|---|---|
@@ -49,13 +55,16 @@ de-duped against local/cc names:
 | `cc` | `sendCcCommand` (send `/name` as the prompt) | default |
 | `skill` | `sendCcCommand` (same — CLI runs the skill) | `zap` icon + `--skill` orange, name only (no description) |
 
+**Segment-aware edits:** `replaceSlashSegment` / `clearSlashSegment` splice the
+active `/…` token only — prefix/suffix text in the composer is preserved when a
+command runs or autocompletes.
+
 Dispatch (applies to commands AND skills):
-- **Tab** = autocomplete — inserts `/name ` into the input (preserving any args
-  already typed past the first word) and does NOT run, so the user can keep
-  typing the skill's argument.
-- **Enter** = run (`runSlashCommand` for local) / send (`sendCcCommand` for
-  cc + skill — `/code fix the bug` sends the full input).
+- **Tab** = autocomplete — replaces the active slash segment with `/name ` (preserving trailing text).
+- **Enter** = run (`runSlashCommand` for local) / send (`sendCcCommand` for cc + skill).
 - **Click** = run/send (unchanged).
+
+`textarea.onSelect` re-parses mention/slash when the caret moves without a keystroke.
 
 Skill rows show the **name only** (no description) — a single inline row with the
 `zap` glyph + orange `/name` (`white-space:nowrap`).

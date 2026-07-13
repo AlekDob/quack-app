@@ -8639,7 +8639,7 @@ body.ab-dragging * {
 /* Inline action chips — a run of tool calls rendered as Conductor-style
    grouped chips (`.ai-iarow`). Used in docked editor and agent mode. */
 .ai-iarow {
-  margin: 10px 0;
+  margin: 12px 0;
 }
 .ai-iarow-chips {
   display: flex;
@@ -9376,10 +9376,33 @@ body.ab-dragging * {
 }
 .ai-queue-text {
   margin: 0;
-  font-size: 13px;
-  line-height: 1.45;
-  color: var(--fg);
-  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-queue-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.ai-queue-thumb {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.ai-queue-thumb--placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elev);
+  color: var(--fg-dim);
 }
 .ai-queue-card-foot {
   display: flex;
@@ -9852,19 +9875,52 @@ body.ab-dragging * {
 .ai-turn {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 18px;
   min-width: 0;
 }
 .ai-msg-user {
   position: sticky;
   top: 0;
+  display: flex;
+  flex-direction: column;
   align-items: stretch;
+  gap: 8px;
   width: 100%;
   flex-shrink: 0;
-  padding-bottom: 2px;
+  padding-bottom: 6px;
   background: var(--chat-stream-bg);
   /* transform on .ai-msg breaks position:sticky */
   animation: none;
+}
+.ai-user-msg-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 4px;
+}
+.ai-user-msg-image {
+  display: inline-flex;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-alt);
+  overflow: hidden;
+  cursor: zoom-in;
+  flex-shrink: 0;
+}
+.ai-user-msg-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ai-user-msg-image--placeholder {
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-dim);
+  cursor: default;
 }
 /* Sentinel sits before the sticky wrapper — scroll past it ⇒ sticky is active. */
 .ai-user-bar-sentinel {
@@ -9876,9 +9932,10 @@ body.ab-dragging * {
 .ai-user-bar {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   width: 100%;
-  padding: 8px 10px 8px 12px;
+  min-height: 42px;
+  padding: 11px 12px 11px 14px;
   background: var(--user-bar-bg);
   border: 1px solid var(--user-bar-border);
   border-radius: var(--radius-md);
@@ -9889,23 +9946,20 @@ body.ab-dragging * {
   align-items: flex-start;
 }
 .ai-user-bar.is-compact {
-  padding: 4px 8px 4px 10px;
+  padding: 8px 10px 8px 12px;
+  min-height: 36px;
 }
 .ai-user-bar-main {
   flex: 1;
   min-width: 0;
-  font-size: 12.5px;
-  line-height: 1.45;
+  font-size: 13.5px;
+  line-height: 1.55;
   color: var(--fg);
 }
 /* Tall prompts collapse while stuck so the response stays readable. */
 .ai-user-bar.is-compact .ai-user-bar-main {
   position: relative;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  max-height: 68px;
+  max-height: 92px;
   overflow: hidden;
 }
 .ai-user-bar.is-compact .ai-user-bar-main::after {
@@ -9922,29 +9976,13 @@ body.ab-dragging * {
   );
   pointer-events: none;
 }
-.ai-user-bar.is-compact .ai-msg-images {
-  flex-direction: row;
-  flex-wrap: nowrap;
-  gap: 4px;
-  margin-bottom: 0;
-  flex-shrink: 0;
-  max-width: 80px;
-  overflow: hidden;
-}
-.ai-user-bar.is-compact .ai-msg-image {
-  width: 24px;
-  height: 24px;
-  max-width: 24px;
-  max-height: 24px;
-  border-radius: 4px;
-}
 .ai-user-bar.is-compact .md-preview {
   flex: 1;
   min-width: 0;
-  max-height: 2.8em;
+  max-height: 4.2em;
   overflow: hidden;
-  font-size: 12.5px;
-  line-height: 1.35;
+  font-size: 13px;
+  line-height: 1.5;
 }
 .ai-user-bar.is-expanded .ai-user-bar-main {
   max-height: min(60vh, 420px);
@@ -9990,23 +10028,11 @@ body.ab-dragging * {
   opacity: 0.25 !important;
   cursor: not-allowed;
 }
-.ai-user-bar-main .ai-msg-images {
-  gap: 4px;
-  margin-bottom: 4px;
-}
-.ai-user-bar-main .ai-msg-image {
-  width: 44px;
-  height: 44px;
-  max-width: 44px;
-  max-height: 44px;
-  border-radius: var(--radius-xs);
-  object-fit: cover;
-}
 .ai-user-bar-main .md-preview {
   padding: 0;
   max-width: none;
-  font-size: 12.5px;
-  line-height: 1.45;
+  font-size: 13.5px;
+  line-height: 1.55;
 }
 .ai-user-bar-main .md-preview h1 { font-size: 17px; }
 .ai-user-bar-main .md-preview h2 { font-size: 15px; }
@@ -15227,6 +15253,13 @@ body.ab-dragging * {
   min-height: 0;
   border: 0;
   background: var(--bg);
+}
+.html-preview-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-dim);
+  font-size: 13px;
 }
 
 /* Claude Code plan — editor split tab (Cursor-style). */
@@ -21900,7 +21933,7 @@ body.ab-dragging * {
 
 /* Brain inject chip in chat stream — Cursor-style quiet recap */
 .brain-turn-chip {
-  margin: 2px 12px 6px;
+  margin: 4px 12px 8px;
   padding: 0;
   border: none;
   background: transparent;
@@ -22093,7 +22126,7 @@ body.ab-dragging * {
 
 /* Reasoning chip — Cursor-style quiet recap (mirrors brain-turn-chip) */
 .reasoning-turn-chip {
-  margin: 2px 12px 6px;
+  margin: 4px 12px 8px;
   padding: 0;
   border: none;
   background: transparent;

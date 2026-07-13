@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-05
-last_verified: 2026-07-06
+last_verified: 2026-07-13
 tags: [chat, composer, queue, ux, multitasking, bugfix]
 ---
 
@@ -31,7 +31,8 @@ Before this pass:
 
 | File | Role |
 |---|---|
-| `src/components/ComposerQueue.tsx` | In-pill queue cards: badge, hint, preview, multitask menu, remove |
+| `src/composerQueue.ts` | `QueuedComposerMessage` type, persist strip, rehydrate, drain helpers |
+| `src/components/ComposerQueue.tsx` | In-pill queue cards: badge, hint, preview, image thumbs, multitask menu, remove |
 | `src/components/AIChatPanel.tsx` | Queue ref + UI state, `send`/`drainQueue`/`stop`, multitask wiring |
 | `src/aiBus.ts` | Optional `chatId` on `AIPromptRequest` for targeted parallel send |
 | `src/App.css` | `.ai-queue-*` inside `.ai-composer-shell` (order 0, above textarea) |
@@ -50,7 +51,7 @@ CSS flex `order` stack (see `003-design-system.md`):
 Each queued message renders as `.ai-queue-card`:
 
 - **Header** (first card only): `{N} Queued` · `↵ to Send` · **Start Multitasking ▾** · remove (×)
-- **Body:** truncated one-line preview of the message text
+- **Body:** truncated one-line preview of the message text; optional **image thumb row** (`.ai-queue-thumbs`, 36px) when the item has attachments
 - **Footer** (2+ cards): inline Remove on subsequent cards
 
 Styling uses design tokens only (`--bg-alt`, `--border`, `--fg-muted`) —
@@ -63,8 +64,8 @@ no hardcoded accent purple/green from the old banner.
 | Condition | Action |
 |---|---|
 | Turn idle | Enter → send immediately (unchanged) |
-| `streaming !== null` or `runningTools` | Enter → push text to queue, clear input, show card(s) |
-| Images attached while busy | Block with toast — queue is **text-only** |
+| `streaming !== null` or `runningTools` | Enter → push text + attached images to queue, clear composer |
+| Images attached while busy | Same enqueue path — images persist on disk and drain with the message |
 | AskUserQuestion answer while busy | Same enqueue path as composer send |
 
 Placeholder while busy: **`Send follow-up`** (was the long "Type to queue…" string).
@@ -74,16 +75,18 @@ No toast on enqueue — the card is the feedback.
 ### Drain (automatic)
 
 When `sendUserText` finishes (`finally`), if `queueRef` is non-empty,
-`drainQueue()` shifts **one** message and awaits a single send; the
-next item drains when that follow-up turn's `finally` runs.
+`drainQueue()` shifts **one** `QueuedComposerMessage`, rehydrates image
+attachments from disk if needed, and awaits a single send; the next item
+drains when that follow-up turn's `finally` runs.
 
 ```
 turn ends (finally)
   liveTurnRef ← false          // synchronous, before drain
   if queueRef non-empty:
     setTimeout(drainQueue, 0)
-      shift one message
-      sendUserTextRef(next)    // starts new turn OR re-queues (see below)
+      shift one QueuedComposerMessage
+      queueImagesAsAttachments(next)   // rebuild thumbs from disk paths
+      sendUserTextRef(prompt, imgs)  // starts new turn OR re-queues
       turn ends → finally → drain next item …
 ```
 
@@ -133,7 +136,7 @@ Parallel path (Cursor-style bypass):
 
 1. Shift first queued message off the ref.
 2. `addAIChat(wsId)` + `focusAIChat(wsId, newChatId)`.
-3. `requestAIPrompt({ wsId, chatId: newChatId, text, send: true })`.
+3. `requestAIPrompt({ wsId, chatId: newChatId, text, images?, send: true })`.
 4. Current turn keeps running in the original tab.
 
 `AIChatPanel` filters bus events: `req.chatId && req.chatId !== aiChatId`
@@ -154,12 +157,29 @@ direction now", not "send my follow-ups after abort". Differs from Send now.
 
 | Store | Scope | Notes |
 |---|---|---|
-| `queueRef` (`string[]`) | Per chat session | Source of truth for drain logic |
+| `queueRef` (`QueuedComposerMessage[]`) | Per chat session | Source of truth for drain logic |
 | `queuedMessages` (`useState`) | Mirror of ref | Drives `ComposerQueue` render |
+| `QueuedComposerMessage` | `{ text, images? }` | `images` = disk `{ id, path, name, thumb? }`; thumbs stripped before persist |
 | `liveTurnRef` (`boolean`) | Per `AIChatPanel` mount | Sync turn-in-flight flag; `false` before drain |
-| `ChatSession.composer.queue` | Persisted | Restored on tab/history switch — see `040-per-session-composer-state.md` |
-| `pushQueue` / `removeQueueAt` / `clearQueue` / `syncQueueUi` | Helpers | Keep ref + state in sync |
-| `drainQueue` / `sendUserTextRef` | Drain pipeline | One shift per call; ref → latest `sendUserText` |
+| `ChatSession.composer.queue` | Persisted | `QueuedComposerMessage[]`; legacy `string[]` normalized on load |
+| `pushQueue(text, images?)` | Helper | Builds item via `queueItemFromSend`; no-op if empty |
+| `removeQueueAt` / `clearQueue` / `syncQueueUi` | Helpers | Keep ref + state in sync |
+| `drainQueue` / `sendUserTextRef` | Drain pipeline | One shift per call; ref → latest `sendUserText(text, msgs, imgs)` |
+
+### Image queue (2026-07-13)
+
+Previously the queue was **text-only**: attaching images during an active turn
+showed an Italian toast and dropped the send. Now images ride along:
+
+| Step | Behaviour |
+|---|---|
+| Enqueue | `pushQueue(text, attachedImages)` — copies disk paths + inline thumbs |
+| Persist | `stripQueueForPersist` — only `{ id, path, name }` on `ChatSession.composer.queue` |
+| Restore | `normalizeQueuedDraft` accepts legacy `string[]`; `rehydrateQueue` rebuilds thumbs |
+| Drain | `queueImagesAsAttachments` → `sendUserText(prompt, messages, imgs)` |
+| Multitask | `AIPromptRequest.images` → target panel rehydrates and sends |
+
+Images-only follow-ups use prompt `"See the attached images."` (same as immediate send).
 
 Queue is persisted on the session row (with the composer draft). Agent Mode
 remounts the panel on every rail pick — without persistence, queued
@@ -184,5 +204,7 @@ follow-ups would be lost on switch.
   stay on the busy panel and drain when that turn ends.
 - Queue + draft persist on `ChatSession.composer` — see `040-per-session-composer-state.md`.
 - `sendUserText` defensive re-queue (if called while `liveTurnRef` is true)
-  uses `pushQueue` silently — callers should prefer `send()` which clears
-  input first.
+  uses `pushQueue(text, images)` silently — callers should prefer `send()` which
+  clears input first.
+- **Do not** block image enqueue during an active turn — the queue card is the
+  feedback; there is no toast.

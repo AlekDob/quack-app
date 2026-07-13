@@ -19,6 +19,12 @@
 // open). Each AIChatPanel instance subscribes and discards events
 // targeting other workspaces.
 
+export interface AIPromptImageMeta {
+  id: string;
+  path: string;
+  name: string;
+}
+
 export interface AIPromptRequest {
   /** Workspace this request is targeting; chat panels in other
    *  workspaces ignore the event. */
@@ -29,6 +35,8 @@ export interface AIPromptRequest {
   chatId?: string;
   /** Pre-composed prompt body to drop into the composer. */
   text: string;
+  /** Disk paths for queued image follow-ups (multitask / external send). */
+  images?: AIPromptImageMeta[];
   /** When true, immediately dispatch the message after filling.
    *  When false, leave it in the composer so the user can edit
    *  before sending. */

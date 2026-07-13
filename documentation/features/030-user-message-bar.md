@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-03
-last_verified: 2026-07-10
+last_verified: 2026-07-13
 tags: [chat, user-message, markdown, actions, sticky, scroll, collapse, ux]
 ---
 
@@ -20,8 +20,9 @@ messages.
 
 | File | Role |
 |---|---|
-| `src/components/UserMessageBar.tsx` | `UserTurnBar` (turn shell), `UserMessageBarInner` (card), actions |
+| `src/components/UserMessageBar.tsx` | `UserTurnBar`, `UserMessageImageStrip`, `UserMessageBarInner`, actions |
 | `src/hooks/useUserBarSticky.ts` | Stuck sentinel IO, tall measure, compact/expand state |
+| `src/imageAttach.ts` | `userMessageDisplayText`, `rehydrateMessageImages` (reload thumbs) |
 | `src/components/AIChatPanel.tsx` | Turn grouping; renders `<UserTurnBar>` per user message |
 | `src/chatScroll.ts` | `groupChatTurns`, `pinUserTurnToTop`, tail-follow helpers |
 | `src/App.css` | `.ai-turn`, `.ai-msg-user`, `.ai-user-bar*`, collapse tokens |
@@ -44,9 +45,10 @@ Flat `display[]` messages are grouped into **turns** before render:
   .ai-turn                      ← sticky containing block (prompt + response height)
     .ai-user-bar-sentinel       ← 0-height sibling BEFORE sticky (IO target)
     .ai-msg.ai-msg-user         ← position: sticky; top: 0; z-index: N
-      .ai-user-bar              ← visual card; state classes below
-        .ai-user-bar-main       ← MarkdownPreview + optional images (fenced code → copyable pills, `049`)
-        .ai-user-bar-actions    ← expand + copy / re-send / branch
+      .ai-user-msg-images        ← 52px thumbs ABOVE the bar (2026-07-13)
+      .ai-user-bar               ← visual card; state classes below
+        .ai-user-bar-main        ← MarkdownPreview only (fenced code → copyable pills, `049`)
+        .ai-user-bar-actions     ← expand + copy / re-send / branch
     .ai-msg-assistant …
 ```
 
@@ -95,9 +97,9 @@ offer manual expand.
 
 | State | CSS classes | Height | Expand chevron |
 |---|---|---|---|
-| At rest / unstuck | (none) | Natural | Hidden |
-| Stuck, short (≤100px) | `.is-stuck` | Natural | Hidden |
-| Stuck, tall, auto | `.is-stuck.is-compact` | `68px` max; thumb **24px** row + ~2 lines text (horizontal); fade | Visible (↓) |
+| At rest / unstuck | (none) | Natural (`min-height: 42px`, 13.5px text) | Hidden |
+| Stuck, short (≤160px) | `.is-stuck` | Natural | Hidden |
+| Stuck, tall, auto | `.is-stuck.is-compact` | `92px` max on text; ~4 lines + fade | Visible (↓) |
 | Stuck, tall, manual | `.is-stuck.is-expanded` | `min(60vh, 420px)`, `overflow-y: auto` | Visible (↑) |
 
 Manual expand **resets to compact** when the bar becomes unstuck (`useEffect` on `isStuck`).
@@ -106,7 +108,8 @@ Manual expand **resets to compact** when the bar becomes unstuck (`useEffect` on
 
 | Constant / signal | Value | Role |
 |---|---|---|
-| `TALL_THRESHOLD_PX` | `100` | `ResizeObserver` on `.ai-user-bar-main`; above → eligible for collapse |
+| `TALL_THRESHOLD_PX` | `160` | `ResizeObserver` on `.ai-user-bar-main`; above → eligible for collapse |
+| `estimateTall` | `>500` chars or `≥7` newlines | Seeds `isTall` without waiting for layout |
 | `isStuck` | sentinel `bottom` vs scroll top + `UNSTICK_GAP_PX` hysteresis | `IntersectionObserver` + scroll sync on `.ai-messages` |
 | `isCompact` | `isStuck && isTall && !expanded` | Drives `.is-compact` |
 | `canToggle` | `isStuck && isTall` | Shows chevron; adds `.is-stuck` for button opacity |
@@ -116,10 +119,13 @@ of `.ai-msg-user`, not a child. If the sentinel is inside the sticky element, it
 moves with the pin and `IntersectionObserver` never fires. `UserTurnBar` owns
 this structure.
 
-**Re-measure:** `ResizeObserver` + `content` / `imageCount`. `isTall` seeds from
-`estimateTall` on mount (images ⇒ tall immediately). While `.is-compact`, skip live
+**Re-measure:** `ResizeObserver` + `content`. While `.is-compact`, skip live
 `scrollHeight` — use `tallCacheRef` only. Stuck: sentinel `bottom` vs scroll top +
 `UNSTICK_GAP_PX` hysteresis.
+
+**Spacing pass (2026-07-13):** Default bar padding/font increased; image thumbs
+moved **outside** the compact clamp so they stay visible while stuck. Turn gap
+`18px`; user wrapper `gap: 8px`.
 
 ### CSS gotchas (do not regress)
 
@@ -145,13 +151,15 @@ Do **not** use `--bg-hi` — too close to `--chat-stream-bg` on dark.
 ### Layout (compact while stuck)
 
 ```
-┌──────────────────────────────────────────────┐  ← sticks at top: 0; ~68px tall
-│ [img][img]  First lines of prompt…  [↓][⎘][↻] │  ← thumbs 24px, text clipped
+  [img][img]   ← .ai-user-msg-images (52px), always above the bar
+┌──────────────────────────────────────────────┐  ← sticks at top: 0
+│ First lines of prompt…              [↓][⎘][↻] │  ← ~92px text clamp + fade
 └──────────────────────────────────────────────┘
         … assistant response visible below …
 ```
 
-Expanded (`.is-expanded`) restores stacked layout, 44px thumbs, scroll up to `min(60vh, 420px)`.
+Expanded (`.is-expanded`) restores full text scroll up to `min(60vh, 420px)`.
+Thumbs stay above the bar in all states.
 
 ### Actions
 
@@ -166,7 +174,16 @@ Copy / re-send / branch disabled while `streaming !== null || runningTools`.
 
 ### Images
 
-`.ai-msg-images` / `.ai-msg-image` inside `.ai-user-bar-main`; click → zoom modal (`openZoom`). Included in `scrollHeight` for tall detection; clipped with text when compact.
+`UserMessageImageStrip` (`.ai-user-msg-images` / `.ai-user-msg-image`) renders
+**above** `.ai-user-bar`, not inside the compact clamp. Click → zoom modal
+(`openZoom`). On session load, `rehydrateMessageImages` rebuilds missing thumbs
+from disk paths (`applyLoadedMessages` in `AIChatPanel`).
+
+Images-only user turns hide the synthetic prompt `"See the attached images."`
+via `userMessageDisplayText` — the thumb row is sufficient context.
+
+See also **`016-image-attachments.md`** (attach + queue) and **`039-composer-queue.md`**
+(queued image preview cards).
 
 ### Test plan
 

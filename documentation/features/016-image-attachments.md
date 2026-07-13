@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-11
+last_verified: 2026-07-13
 tags: [claude-code, cursor-cli, opencode-cli, chat, images, attachments, paste, drag-drop, compression, modal, vision]
 ---
 
@@ -16,8 +16,10 @@ tags: [claude-code, cursor-cli, opencode-cli, chat, images, attachments, paste, 
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Logic + bus | `src/imageAttach.ts` | `compressAndSave`, `attachFromBlob`, `providerAcceptsImages`, `mimeForImagePath`, `fileUrlForImagePath`, `MAX_ATTACHED_IMAGES` |
-| Composer | `src/components/AIChatPanel.tsx` | `attachedImages`, `appendImages`, provider-specific turn context + OpenCode vision gate |
+| Logic + bus | `src/imageAttach.ts` | `compressAndSave`, `attachFromBlob`, `rehydrateMessageImages`, `userMessageDisplayText`, `providerAcceptsImages` |
+| Queue | `src/composerQueue.ts` | `QueuedComposerMessage`, `queueItemFromSend`, `queueImagesAsAttachments`, persist strip |
+| Composer | `src/components/AIChatPanel.tsx` | `attachedImages`, `appendImages`, queue drain with images |
+| User bubble | `src/components/UserMessageBar.tsx` | `UserMessageImageStrip` above the sticky bar |
 | Provider types | `src/providers/types.ts` | `supportsVision?` on `ProviderModel`; `imageAttachments?` on `chat()` |
 | Router | `src/ai.ts` | `chatStream(..., imageAttachments?)` passthrough |
 | OpenCode | `src/providers/openCode.ts` | `FilePartInput` in `promptAsync` body |
@@ -37,9 +39,11 @@ tags: [claude-code, cursor-cli, opencode-cli, chat, images, attachments, paste, 
 
 ### Data flow
 - **Paste / drop:** → `appendImages` → `providerAcceptsImages(providerId)` guard → compress → `save_image_attachment`.
-- **Send:** paths/provider-specific delivery (table above); display message keeps `{ path, name, thumb }`; composer strip clears.
+- **Send (idle):** paths/provider-specific delivery (table above); `ChatMessage.images` keeps `{ path, name, thumb }`; composer strip clears.
+- **Send (busy):** same attachments enqueue via `pushQueue(text, images)` — see **`039-composer-queue.md`**.
+- **Reload:** `rehydrateMessageImages` rebuilds thumbs from disk paths on saved user messages.
 - **OpenCode gate:** if model catalog says `supportsVision === false`, toast + abort before spawn.
-- **Render:** user bubble thumbnails; agent Read → image tool chip (unchanged).
+- **Render:** 52px thumbs in `.ai-user-msg-images` above the user bar (`030`); agent Read → image tool chip (unchanged).
 
 ### Limits & defaults
 | Knob | Value | Where |

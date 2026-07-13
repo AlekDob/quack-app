@@ -83,12 +83,14 @@ Full detail: **`055-file-composer-drag.md`**.
 
 ## Follow-up queue (feature 039)
 
-While streaming or tools are running, Enter enqueues the composer text instead
-of sending immediately. Cards render **inside** the composer pill above the
-textarea (`ComposerQueue`). Full behaviour (drain, Send now, Start
-Multitasking → New chat, Stop clears queue): **`039-composer-queue.md`**
-(includes the Jul 2026 production-freeze fix — drain one item per turn,
-`liveTurnRef` guard).
+While streaming or tools are running, Enter enqueues the composer text (and any
+staged images) instead of sending immediately. Cards render **inside** the
+composer pill above the textarea (`ComposerQueue`). **`@` mentions and `/`
+commands remain fully usable** in follow-up mode — see `008` and `041`.
+
+Full behaviour (drain, images, Send now, Start Multitasking → New chat, Stop
+clears queue): **`039-composer-queue.md`** (includes the Jul 2026 production-freeze
+fix — drain one item per turn, `liveTurnRef` guard).
 
 ## Subagent pill (feature 004 integration)
 

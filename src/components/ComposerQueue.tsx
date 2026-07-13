@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
+import type { QueuedComposerMessage } from "../composerQueue";
+import { queuePromptText } from "../composerQueue";
 
 type Props = {
-  messages: string[];
+  messages: QueuedComposerMessage[];
   turnActive: boolean;
   onSendNow: () => void;
   onMultitask: () => void;
@@ -13,6 +15,15 @@ function previewText(text: string, max = 240): string {
   const oneLine = text.replace(/\s+/g, " ").trim();
   if (oneLine.length <= max) return oneLine;
   return `${oneLine.slice(0, max - 1)}…`;
+}
+
+function cardPreview(item: QueuedComposerMessage): string {
+  const text = previewText(item.text);
+  if (text) return text;
+  const n = item.images?.length ?? 0;
+  if (n === 1) return "1 image";
+  if (n > 1) return `${n} images`;
+  return "";
 }
 
 export function ComposerQueue({
@@ -42,7 +53,10 @@ export function ComposerQueue({
   return (
     <div className="ai-queue-stack" aria-live="polite">
       {messages.map((msg, i) => (
-        <div key={`${i}:${msg.slice(0, 24)}`} className="ai-queue-card">
+        <div
+          key={`${i}:${queuePromptText(msg).slice(0, 24)}:${msg.images?.[0]?.id ?? ""}`}
+          className="ai-queue-card"
+        >
           {i === 0 && (
             <div className="ai-queue-card-head">
               <span className="ai-queue-badge">{label}</span>
@@ -110,7 +124,25 @@ export function ComposerQueue({
               </button>
             </div>
           )}
-          <p className="ai-queue-text">{previewText(msg)}</p>
+          <p className="ai-queue-text">{cardPreview(msg)}</p>
+          {msg.images && msg.images.length > 0 && (
+            <div className="ai-queue-thumbs" aria-hidden="true">
+              {msg.images.map((img) =>
+                img.thumb ? (
+                  <img
+                    key={img.id}
+                    className="ai-queue-thumb"
+                    src={img.thumb}
+                    alt={img.name}
+                  />
+                ) : (
+                  <span key={img.id} className="ai-queue-thumb ai-queue-thumb--placeholder">
+                    <Icon name="image" size={14} />
+                  </span>
+                ),
+              )}
+            </div>
+          )}
           {i > 0 && (
             <div className="ai-queue-card-foot">
               <button
