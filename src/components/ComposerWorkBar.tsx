@@ -4,6 +4,7 @@ import { errMsg, error as toastError } from "../notify";
 import {
   enterPlanning,
   exitPlanning,
+  handoffStoryToBuilder,
   linkStoryToChat,
   linkWorkToChat,
   unlinkWorkFromChat,
@@ -14,8 +15,8 @@ import {
   type WorksInjectDepth,
 } from "../workContextInject";
 import {
-  createWorkFromStory,
   createWorkItem,
+  createStory,
   hydrateWorks,
   subscribeWorks,
   updateWorkItem,
@@ -31,6 +32,7 @@ import { acceptanceFromMarkdown } from "../worksBlocks";
 import { getWorkspaceColor } from "../workspaceColors";
 import { ComposerDocsChip } from "./ComposerDocsChip";
 import { ComposerWorkLinkPanel } from "./ComposerWorkLinkPanel";
+import { ComposerWorkQuickActions } from "./ComposerWorkQuickActions";
 import { openStoryPlanTab } from "./StoryPlanPane";
 import { Icon } from "./Icon";
 import { openWorksTab } from "./works/WorksPane";
@@ -46,6 +48,7 @@ type Props = {
   planning?: boolean;
   onPickJack: () => void;
   onSetPlanMode?: () => void;
+  onHandoffToBuilder?: () => void;
 };
 
 const DEPTH_LABEL: Record<WorksInjectDepth, string> = {
@@ -74,6 +77,7 @@ export function ComposerWorkBar({
   planning,
   onPickJack,
   onSetPlanMode,
+  onHandoffToBuilder,
 }: Props) {
   const [snap, setSnap] = useState<WorksSnapshot | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -144,11 +148,9 @@ export function ComposerWorkBar({
     if (!story) return;
     setMenuOpen(false);
     try {
-      const item = await createWorkFromStory(root, story.id, {
-        title: story.title,
-      });
+      const item = await handoffStoryToBuilder(wsId, chatId, root, story.id);
       if (!item) return;
-      await linkWorkToChat(wsId, chatId, root, item.id);
+      onHandoffToBuilder?.();
     } catch (e) {
       toastError(`Couldn't spawn work: ${errMsg(e)}`);
     }
@@ -165,6 +167,24 @@ export function ComposerWorkBar({
     } catch (e) {
       toastError(`Couldn't create work: ${errMsg(e)}`);
     }
+  };
+
+  const createStoryAndLink = async () => {
+    setMenuOpen(false);
+    try {
+      const s = await createStory(root, {
+        title: "New story",
+        status: "active",
+      });
+      await linkStoryToChat(wsId, chatId, root, s.id);
+    } catch (e) {
+      toastError(`Couldn't create story: ${errMsg(e)}`);
+    }
+  };
+
+  const openBoard = () => {
+    setMenuOpen(false);
+    openWorksTab(wsId);
   };
 
   const cycleStatus = async (item: WorkItem) => {
@@ -201,6 +221,18 @@ export function ComposerWorkBar({
       : "Link or create work";
 
   const planningOnly = !!planning && story && !work;
+
+  const quickActions = (
+    <ComposerWorkQuickActions
+      onNewWork={() => void createAndLink("manual")}
+      onNewStory={() => void createStoryAndLink()}
+      onOpenBoard={openBoard}
+      onPlanFeature={
+        !work && !planningOnly ? () => void startPlanning() : undefined
+      }
+      onHotfix={!work && !planningOnly ? () => void createAndLink("hotfix") : undefined}
+    />
+  );
 
   return (
     <div className="ai-composer-work-wrap">
@@ -253,13 +285,7 @@ export function ComposerWorkBar({
       >
         {planningOnly ? (
           <>
-            <ComposerWorkLinkPanel
-              snap={snap}
-              excludeStoryId={story?.id}
-              storiesOnly
-              onPickWork={pickWork}
-              onPickStory={pickStory}
-            />
+            {quickActions}
             <div className="menu-separator" role="separator" />
             <button
               type="button"
@@ -276,7 +302,7 @@ export function ComposerWorkBar({
               className="menu-item"
               onClick={() => void startImplementation()}
             >
-              Start implementation
+              Build with Milo
             </button>
             <button
               type="button"
@@ -288,19 +314,19 @@ export function ComposerWorkBar({
             >
               Exit planning
             </button>
-            <button
-              type="button"
-              className="menu-item"
-              onClick={() => {
-                setMenuOpen(false);
-                openWorksTab(wsId);
-              }}
-            >
-              Open Works board
-            </button>
+            <div className="menu-separator" role="separator" />
+            <ComposerWorkLinkPanel
+              snap={snap}
+              excludeStoryId={story?.id}
+              storiesOnly
+              onPickWork={pickWork}
+              onPickStory={pickStory}
+            />
           </>
         ) : work ? (
           <>
+            {quickActions}
+            <div className="menu-separator" role="separator" />
             <button
               type="button"
               className="menu-item"
@@ -345,16 +371,6 @@ export function ComposerWorkBar({
               className="menu-item"
               onClick={() => {
                 setMenuOpen(false);
-                openWorksTab(wsId);
-              }}
-            >
-              Open Works board
-            </button>
-            <button
-              type="button"
-              className="menu-item"
-              onClick={() => {
-                setMenuOpen(false);
                 void unlinkWorkFromChat(wsId, chatId, root, work.id);
               }}
             >
@@ -370,31 +386,13 @@ export function ComposerWorkBar({
           </>
         ) : (
           <>
+            {quickActions}
+            <div className="menu-separator" role="separator" />
             <ComposerWorkLinkPanel
               snap={snap}
               onPickWork={pickWork}
               onPickStory={pickStory}
             />
-            <div className="menu-separator" role="separator" />
-            <button type="button" className="menu-item" onClick={() => void startPlanning()}>
-              Plan a feature
-            </button>
-            <button type="button" className="menu-item" onClick={() => void createAndLink("hotfix")}>
-              Hotfix
-            </button>
-            <button type="button" className="menu-item" onClick={() => void createAndLink("manual")}>
-              Blank task
-            </button>
-            <button
-              type="button"
-              className="menu-item"
-              onClick={() => {
-                setMenuOpen(false);
-                openWorksTab(wsId);
-              }}
-            >
-              Open Works board
-            </button>
           </>
         )}
       </ComposerCtxMenu>

@@ -39,6 +39,7 @@ Persisted with chat session; restored on app reload.
 | `enterPlanning(wsId, chatId, root, title?)` | Composer **Plan a feature** (explicit) → `ensurePlanStory`, set `storyId` + `planning`, pin story drawer |
 | `onNativePlanReady(..., storyId, planText)` | CC `ExitPlanMode` with plan body → `mergePlanIntoStory` |
 | `approvePlanning(...)` | User approves plan → `approvePlanStory` (status `active`), clears `planning` |
+| `handoffStoryToBuilder(...)` | **Build** path — approve draft story (if needed), `createWorkFromStory`, `linkWorkToChat`; caller switches preset to Milo + Agent mode |
 | `exitPlanning(...)` | Exit planning without approve → clears `planning`, unlinks chat from story |
 | `unlinkStoryFromChat` / `unlinkWorkFromChat` | Composer unlink; bidirectional `linkedChats` cleanup |
 
@@ -87,13 +88,17 @@ Intent-first work menu:
 | **Hotfix** | Work only (`W-NNN`), no story required |
 | **Blank task** | Empty work link |
 | **Link existing…** | `ComposerWorkLinkPanel` — searchable stories + work items (`linkStoryToChat`, `linkWorkToChat`) |
-| Planning submenu | Open story panel, Start implementation, Exit planning, switch linked work/story |
+| Planning submenu | Open story panel, **Build with Milo**, Exit planning, switch linked work/story |
 
 **Segmented cluster** (Cursor-style): `S-003 › W-008` | `N docs` | `K/N` in one pill (`ai-composer-work-cluster`).
 
 **Link panel** — when the chat has no `workItemId` / `storyId`, the Work chip menu offers **Link existing…** → portaled `ComposerWorkLinkPanel` (`.ai-composer-ctx-menu--work-link`): filter by id/title, pick story or work item, excludes current link. When already linked, menu can switch to another ticket.
 
 **Context docs chip** — `ComposerDocsChip.tsx`: hover popover (liquid glass) listing Brain refs by Feature / Story / Related / Added; file-type icons + basename + parent path. Opens via `openBrainRef` (`070`). No full-screen overlay (prevents flicker); 280ms leave debounce; slight overlap with anchor. See `054-works-layer.md`.
+
+**Story drawer Build button (2026-07-13):** when `planning` is true, `StoryPlanDrawer` panel head shows a primary **Build** control (`.story-drawer-build`) — same handoff as the `ExitPlanMode` card without waiting for CC to call `ExitPlanMode` again. Useful when the story body already merged from a prior `onPlanReady`.
+
+**Agent handoff:** Build never leaves Jack implementing. `AIChatPanel.handoffToMiloBuilder()` → `applyPreset("builder")` + `setCcPermMode("bypassPermissions")` (Milo's shipped default). Toast: "Handed off to Milo — build from your next message". User sends the implementation prompt; linked `W-NNN` + work context inject ride along (`worksTurnContext.ts`).
 
 CC plan mode no longer auto-calls `enterPlanning` — story opens only via **Plan a feature** or explicit `linkedChats` / `@S-NNN`.
 
@@ -129,7 +134,32 @@ CC plan mode no longer auto-calls `enterPlanning` — story opens only via **Pla
 | Event | Story-linked chat | Legacy (work-only / no story) |
 |---|---|---|
 | `onPlanReady` | `onNativePlanReady` → merge + refresh drawer | `openPlanTab` (`061`) |
-| `onPlanApproved` | `approvePlanning` | `approvePlanWork` (old plan-draft flow) |
+| `onPlanBuild` | `handoffStoryToBuilder` + Milo preset + Agent mode | `approvePlanWork` + Milo handoff |
+
+`onPlanBuild` replaces the old `onPlanApproved` → `approvePlanning` only path on the `ExitPlanMode` card. Approving without building is no longer a first-class button — use **Keep discussing** to iterate with Jack, then **Build** when ready.
+
+## Build handoff flow (Cursor-style, 2026-07-13)
+
+```
+Jack in Plan mode explores (Task/subagent auto-allowed — see 015)
+  → ExitPlanMode lands → onPlanReady merges into S-NNN + drawer updates
+
+User reads plan in drawer / card
+  ├─ Keep discussing → deny ExitPlanMode → Jack stays in Plan
+  └─ Build (card, drawer, or Work menu "Build with Milo")
+        → handoffStoryToBuilder
+             → approvePlanning (draft → active) if needed
+             → createWorkFromStory → W-NNN linked
+        → applyPreset("builder") + bypassPermissions
+        → allow ExitPlanMode (card path only) so CC exits plan mode
+  → User messages Milo to implement W-NNN
+```
+
+| Surface | File | Trigger |
+|---|---|---|
+| `ExitPlanMode` card | `ClaudePermissionOverlay.tsx` | **Build** / Enter |
+| Story drawer head | `StoryPlanDrawer.tsx` | **Build** when `planning` |
+| Work chip menu | `ComposerWorkBar.tsx` | **Build with Milo** |
 
 Context inject (`worksTurnContext.ts`):
 
@@ -174,12 +204,10 @@ Jack / CC proposes plan
   → CC ExitPlanMode → onNativePlanReady → mergePlanIntoStory
   → StoryPlanPane in drawer refreshes via worksWatch
 
-User Approve
-  → approvePlanning → story status active, planning false
-
-"Start implementation"
-  → createWorkFromStory → W-NNN + parentId
+User Build
+  → handoffStoryToBuilder → W-NNN + parentId
   → setAIChatWorkItem, composer S › W breadcrumb
+  → Milo · Agent preset active
 ```
 
 ## Related docs
@@ -198,4 +226,5 @@ User Approve
 - **Docs popover** — no `ai-flag-menu-overlay` on hover; overlay caused flicker crossing the gap to the popover.
 - **Jack default** — `enterPlanning` resets composer to Jack (`onPickJack`); other agents execute linked work.
 - **No auto-story** — CC plan mode and orphan draft stories do not open the harness; see **Explicit planning gate** above.
-- **Legacy path** — chats with `workItemId` + `origin: plan` but no `storyId` still use `PlanPane` + `approvePlanWork` until migrated manually.
+- **Legacy path** — chats with `workItemId` + `origin: plan` but no `storyId` still use `PlanPane` + `approvePlanWork` on Build until migrated manually.
+- **Don't use Allow all during planning** — flips Plan → Auto and Jack may skip `ExitPlanMode`; use per-tool "This session" if a specific Bash prefix keeps carding (see `015`).

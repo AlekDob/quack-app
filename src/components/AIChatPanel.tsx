@@ -90,6 +90,8 @@ import {
   ChatFileOpen,
   ToolCallRow,
   toolDetailFor,
+  isAskUserQuestionTool,
+  mergeAskQuestionArgs,
 } from "./chatToolRender";
 import { ComposeCard } from "./composeCard";
 import { openHtmlPreviewTab } from "./HtmlPreviewPane";
@@ -108,6 +110,11 @@ import {
 } from "./chatPanelChrome";
 import { matchExclusion } from "../aiPrivacy";
 import { publishTasks } from "../aiTaskStore";
+import {
+  clearAskInput,
+  getAskInput,
+  subscribeAskInput,
+} from "../askQuestionStore";
 import { publishChatDiff } from "../chatDiffStore";
 import { summarizeLastTurn } from "../sessionDiffStats";
 import { loadWorkspaceRules } from "../workspaceRules";
@@ -149,7 +156,7 @@ import {
   stripLeadingSkill,
 } from "./ComposerMentionChips";
 import {
-  approvePlanning,
+  handoffStoryToBuilder,
   onNativePlanReady,
 } from "../quackPlanHarness";
 import {
@@ -2288,6 +2295,7 @@ export function AIChatPanel({
   // goes out as a regular user message, which resumes the session.
   const answerQuestion = (text: string) => {
     if (!text) return;
+    if (claudeSessionId) clearAskInput(claudeSessionId);
     if (streaming !== null || runningTools) {
       pushQueue(text);
       return;
@@ -2571,17 +2579,31 @@ export function AIChatPanel({
   // Keyed by call id so dismissing one question doesn't suppress the
   // next one Claude asks.
   const [dismissedAskId, setDismissedAskId] = useState<string | null>(null);
+  const [askInputRev, setAskInputRev] = useState(0);
+  useEffect(() => subscribeAskInput(() => setAskInputRev((n) => n + 1)), []);
   const pendingAskCall = useMemo(() => {
     if (streaming !== null || runningTools) return null;
     const last = messages[messages.length - 1];
     if (!last || last.role !== "assistant" || !last.tool_calls) return null;
-    const asks = last.tool_calls.filter(
-      (c) => c.function.name === "AskUserQuestion",
+    const asks = last.tool_calls.filter((c) =>
+      isAskUserQuestionTool(c.function.name),
     );
     const call = asks.length > 0 ? asks[asks.length - 1] : null;
     if (call && (call.id ?? "ask") === dismissedAskId) return null;
     return call;
   }, [messages, streaming, runningTools, dismissedAskId]);
+  const dockedAskCall = useMemo(() => {
+    if (!pendingAskCall) return null;
+    void askInputRev;
+    const merged = mergeAskQuestionArgs(
+      pendingAskCall.function.arguments,
+      getAskInput(claudeSessionId),
+    );
+    return {
+      ...pendingAskCall,
+      function: { ...pendingAskCall.function, arguments: merged },
+    };
+  }, [pendingAskCall, claudeSessionId, askInputRev]);
 
   // @-mention candidates: subagents first (short, high-signal list),
   // then workspace files. Agents only appear with Claude Code (the
@@ -5240,7 +5262,7 @@ export function AIChatPanel({
     try {
       const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
       if (desc?.storyId) {
-        await approvePlanning(wsId, aiChatId, root, desc.storyId, plan);
+        await handoffStoryToBuilder(wsId, aiChatId, root, desc.storyId, plan);
         return;
       }
       if (desc?.workItemId) {
@@ -5249,6 +5271,29 @@ export function AIChatPanel({
       }
     } catch (e) {
       console.warn("plan approve failed", e);
+    }
+  };
+
+  const handoffToMiloBuilder = () => {
+    applyPreset("builder", { silent: true });
+    setCcPermMode("bypassPermissions");
+    toastInfo("Handed off to Milo — build from your next message");
+  };
+
+  const onPlanBuild = async (_requestId: string, plan: string) => {
+    if (!aiChatId) return;
+    try {
+      const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
+      if (desc?.storyId) {
+        await handoffStoryToBuilder(wsId, aiChatId, root, desc.storyId, plan);
+        handoffToMiloBuilder();
+        return;
+      }
+      await onPlanApproved(_requestId, plan);
+      handoffToMiloBuilder();
+    } catch (e) {
+      console.warn("plan build failed", e);
+      toastError("Couldn't hand off to Milo");
     }
   };
 
@@ -6217,14 +6262,17 @@ export function AIChatPanel({
           AskUserQuestion, the interactive radio/checkbox card sits
           right above the composer where the user is already looking —
           not floating over the conversation. */}
-      {pendingAskCall && (
+      {dockedAskCall && (
         <div className="ai-ask-dock">
           <AskQuestionCard
-            key={pendingAskCall.id ?? "ask"}
-            call={pendingAskCall}
+            key={dockedAskCall.id ?? "ask"}
+            call={dockedAskCall}
             onAnswer={answerQuestion}
             onOther={() => inputRef.current?.focus()}
-            onDismiss={() => setDismissedAskId(pendingAskCall.id ?? "ask")}
+            onDismiss={() => {
+              if (claudeSessionId) clearAskInput(claudeSessionId);
+              setDismissedAskId(dockedAskCall.id ?? "ask");
+            }}
           />
         </div>
       )}
@@ -6326,6 +6374,7 @@ export function AIChatPanel({
             onSetPlanMode={
               selectedIsCC ? () => setCcPermMode("plan") : undefined
             }
+            onHandoffToBuilder={handoffToMiloBuilder}
           />
         ) : null}
         <div className="ai-composer-spacer" />
@@ -6397,7 +6446,7 @@ export function AIChatPanel({
         ownerStreaming={streaming !== null || runningTools}
         onAllowAll={() => setCcPermMode("auto")}
         onPlanReady={openPlanHandler}
-        onPlanApproved={onPlanApproved}
+        onPlanBuild={onPlanBuild}
       />
       <ComposerQueue
         messages={queuedMessages}
@@ -7057,6 +7106,26 @@ export function AIChatPanel({
         root={root}
         storyId={storyId}
         planning={planning}
+        onBuild={
+          planning
+            ? () => {
+                void (async () => {
+                  try {
+                    await handoffStoryToBuilder(
+                      wsId,
+                      aiChatId,
+                      root,
+                      storyId,
+                    );
+                    handoffToMiloBuilder();
+                  } catch (e) {
+                    console.warn("story drawer build failed", e);
+                    toastError("Couldn't hand off to Milo");
+                  }
+                })();
+              }
+            : undefined
+        }
       />
     ) : null}
     </div>

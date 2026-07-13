@@ -379,9 +379,17 @@ export function toolDetailFor(
   // AskUserQuestion carries its content in a nested questions array —
   // show the actual question text so the chip isn't a blank
   // "AskUserQuestion" row the user can't act on.
-  if (name === "AskUserQuestion" && Array.isArray(args.questions)) {
-    const q = args.questions[0] as Record<string, unknown> | undefined;
-    if (q && typeof q.question === "string") return q.question.slice(0, 200);
+  if (isAskUserQuestionTool(name)) {
+    const root = coerceToolArgs(args);
+    const qs = root.questions;
+    if (Array.isArray(qs) && qs.length > 0) {
+      const q = qs[0] as Record<string, unknown> | undefined;
+      const text =
+        (q && typeof q.question === "string" && q.question) ||
+        (q && typeof q.text === "string" && q.text) ||
+        "";
+      if (text) return text.slice(0, 200);
+    }
   }
   for (const key of [
     // `skill` first: surface which skill the Skill tool runs, so the live
@@ -1025,6 +1033,8 @@ const TASK_NAMES = new Set([
   "TaskList",
   "TodoWrite",
   "AskUserQuestion",
+  "askUserQuestion",
+  "ask_user_question",
 ]);
 
 export type ToolTone =
@@ -1182,41 +1192,105 @@ interface AskQuestionSpec {
   options: { label: string; description?: string }[];
 }
 
+/** Claude Code + Cursor CLI name variants for the same tool. */
+export function isAskUserQuestionTool(name: string): boolean {
+  return name.toLowerCase().replace(/[_-]/g, "") === "askuserquestion";
+}
+
+/** Normalize tool args that may arrive as JSON strings or wrapped objects. */
+export function coerceToolArgs(
+  args: unknown,
+): Record<string, unknown> {
+  if (typeof args === "string") {
+    try {
+      const parsed = JSON.parse(args) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return coerceToolArgs(parsed);
+      }
+    } catch {
+      return {};
+    }
+    return {};
+  }
+  if (!args || typeof args !== "object" || Array.isArray(args)) return {};
+  const rec = args as Record<string, unknown>;
+  if (
+    rec.input &&
+    typeof rec.input === "object" &&
+    !Array.isArray(rec.input)
+  ) {
+    return rec.input as Record<string, unknown>;
+  }
+  if (
+    rec.tool_input &&
+    typeof rec.tool_input === "object" &&
+    !Array.isArray(rec.tool_input)
+  ) {
+    return rec.tool_input as Record<string, unknown>;
+  }
+  return rec;
+}
+
+function optionFromRaw(o: unknown): { label: string; description?: string } | null {
+  if (typeof o === "string" && o.length > 0) return { label: o };
+  if (!o || typeof o !== "object") return null;
+  const oo = o as Record<string, unknown>;
+  const label =
+    (typeof oo.label === "string" && oo.label) ||
+    (typeof oo.name === "string" && oo.name) ||
+    (typeof oo.value === "string" && oo.value) ||
+    (typeof oo.text === "string" && oo.text) ||
+    "";
+  if (!label) return null;
+  const description =
+    typeof oo.description === "string"
+      ? oo.description
+      : typeof oo.detail === "string"
+        ? oo.detail
+        : undefined;
+  return { label, description };
+}
+
 /** Defensive parse of AskUserQuestion's tool input. */
-function parseAskQuestions(args: Record<string, unknown>): AskQuestionSpec[] {
-  if (!Array.isArray(args.questions)) return [];
+export function parseAskQuestions(args: Record<string, unknown>): AskQuestionSpec[] {
+  const root = coerceToolArgs(args);
+  if (!Array.isArray(root.questions)) return [];
   const out: AskQuestionSpec[] = [];
-  for (const raw of args.questions) {
+  for (const raw of root.questions) {
     if (!raw || typeof raw !== "object") continue;
     const q = raw as Record<string, unknown>;
-    if (typeof q.question !== "string" || !Array.isArray(q.options)) continue;
+    const question =
+      (typeof q.question === "string" && q.question) ||
+      (typeof q.text === "string" && q.text) ||
+      (typeof q.title === "string" && q.title) ||
+      (typeof q.prompt === "string" && q.prompt) ||
+      "";
+    if (!question || !Array.isArray(q.options)) continue;
     const options = q.options
-      .map((o) => {
-        if (typeof o === "string") return { label: o };
-        if (o && typeof o === "object") {
-          const oo = o as Record<string, unknown>;
-          if (typeof oo.label === "string") {
-            return {
-              label: oo.label,
-              description:
-                typeof oo.description === "string"
-                  ? oo.description
-                  : undefined,
-            };
-          }
-        }
-        return null;
-      })
+      .map(optionFromRaw)
       .filter((o): o is { label: string; description?: string } => !!o);
     if (options.length === 0) continue;
     out.push({
-      question: q.question,
+      question,
       header: typeof q.header === "string" ? q.header : undefined,
       multiSelect: q.multiSelect === true,
       options,
     });
   }
   return out;
+}
+
+/** Prefer parsed call args; fall back to the hook snapshot when empty. */
+export function mergeAskQuestionArgs(
+  callArgs: Record<string, unknown>,
+  hookArgs: Record<string, unknown> | null,
+): Record<string, unknown> {
+  const fromCall = coerceToolArgs(callArgs);
+  if (parseAskQuestions(fromCall).length > 0) return fromCall;
+  if (!hookArgs) return fromCall;
+  const fromHook = coerceToolArgs(hookArgs);
+  if (parseAskQuestions(fromHook).length > 0) return fromHook;
+  return { ...fromHook, ...fromCall };
 }
 
 /** Interactive question card for Claude Code's AskUserQuestion. The
@@ -1240,7 +1314,7 @@ export function AskQuestionCard({
   /** ✕ / Esc — hide the card and let the user just keep chatting. */
   onDismiss?: () => void;
 }) {
-  const questions = parseAskQuestions(call.function.arguments);
+  const questions = parseAskQuestions(coerceToolArgs(call.function.arguments));
   const [picked, setPicked] = useState<Map<number, Set<string>>>(new Map());
   const [activeIdx, setActiveIdx] = useState(0);
   const [sent, setSent] = useState(false);
@@ -1268,15 +1342,50 @@ export function AskQuestionCard({
   }, [onDismiss, interactive]);
 
   if (questions.length === 0) {
-    // Args still streaming in (or unexpected shape) — placeholder row.
+    const raw = coerceToolArgs(call.function.arguments);
+    const fallback =
+      (typeof raw.question === "string" && raw.question) ||
+      (typeof raw.prompt === "string" && raw.prompt) ||
+      "";
     return (
-      <div className="ai-tcall">
-        <div className="ai-tcall-head">
-          <span className="ai-tcall-dot" />
-          <span className="ai-tcall-name">Question</span>
-          <span className="ai-tcall-pending">
-            <span className="ai-spinner" />
-          </span>
+      <div className="ai-ask-card ai-ask-card-fallback">
+        <div className="ai-ask-head">
+          <span className="ai-ask-head-label">Question</span>
+          {onDismiss && interactive && (
+            <button
+              type="button"
+              className="ai-ask-close"
+              onClick={onDismiss}
+              title="Dismiss (Esc)"
+              aria-label="Dismiss question card"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {fallback ? (
+          <div className="ai-ask-qtext">{fallback}</div>
+        ) : (
+          <div className="ai-ask-qtext ai-ask-qtext-muted">
+            Waiting for options…
+          </div>
+        )}
+        <div className="ai-ask-foot">
+          {interactive && onOther && (
+            <button
+              type="button"
+              className="ai-ask-reply-btn"
+              onClick={onOther}
+            >
+              Reply in message box
+            </button>
+          )}
+          {interactive && (
+            <span className="ai-ask-hint">
+              Type your answer below to continue.
+              {onDismiss ? " Esc to dismiss." : ""}
+            </span>
+          )}
         </div>
       </div>
     );
@@ -1339,15 +1448,13 @@ export function AskQuestionCard({
 
   return (
     <div className={`ai-ask-card ${sent ? "ai-ask-card-sent" : ""}`}>
-      <div className="ai-ask-title">
-        <span className="ai-ask-title-icon" aria-hidden="true">
-          ?
-        </span>
-        {questions.length === 1
-          ? "Claude needs your input"
-          : `Claude needs your input — ${
-              questions.filter((_, i) => answered(i)).length
-            }/${questions.length} answered`}
+      <div className="ai-ask-head">
+        <span className="ai-ask-head-label">Question</span>
+        {questions.length > 1 && (
+          <span className="ai-ask-progress">
+            {questions.filter((_, i) => answered(i)).length}/{questions.length}
+          </span>
+        )}
         {onDismiss && interactive && (
           <button
             type="button"
@@ -1547,8 +1654,8 @@ export function ToolCallRow({
   // ask-dock) while the question is pending — rendering full option
   // lists here too duplicated the whole card. The deny reason in
   // `result` is plumbing (the redirect instruction), never shown.
-  if (call.function.name === "AskUserQuestion") {
-    const qs = parseAskQuestions(call.function.arguments);
+  if (isAskUserQuestionTool(call.function.name)) {
+    const qs = parseAskQuestions(coerceToolArgs(call.function.arguments));
     const summary =
       qs.map((q) => q.header ?? q.question).join(" · ") || "question";
     return (

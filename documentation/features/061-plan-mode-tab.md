@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: React 19, Zustand store (split-pane layout)
 created: 2026-07-12
-last_verified: 2026-07-12
-tags: [chat, plan-mode, claude-code, virtual-tab, split, permission-overlay]
+last_verified: 2026-07-13
+tags: [chat, plan-mode, claude-code, virtual-tab, split, permission-overlay, build-handoff]
 ---
 
 ## Claude Code plan mode — side-by-side plan tab
@@ -26,8 +26,8 @@ independent of approve/deny.
 |------|------|-----------------|
 | Service | `src/plan.ts` | `planKey`, `parsePlanKey`, in-memory stash (`stashPlan`/`planPayload`) |
 | Component | `src/components/PlanPane.tsx` | Body for `plan:` virtual tabs (`MarkdownPreview`); `openPlanTab()` helper |
-| Component | `src/components/ClaudePermissionOverlay.tsx` | `onPlanReady(requestId, plan)` — fires once per `ExitPlanMode` request as soon as `tool_input.plan` is non-empty |
-| Component | `src/components/AIChatPanel.tsx` | Wires `onPlanReady` → `openPlanTab(wsId, aiChatId, requestId, plan)` |
+| Component | `src/components/ClaudePermissionOverlay.tsx` | `onPlanReady(requestId, plan)` — fires once per `ExitPlanMode` request as soon as `tool_input.plan` is non-empty; **`onPlanBuild`** on user Build — see [068-quack-plan-harness.md](068-quack-plan-harness.md) |
+| Component | `src/components/AIChatPanel.tsx` | Wires `onPlanReady` → `openPlanHandler`; `onPlanBuild` → `handoffStoryToBuilder` + Milo |
 | Component | `src/components/WorkspaceShell.tsx` | Portals `PlanPane` for open `plan:` keys |
 | Component | `src/components/PaneNode.tsx` | Tab label ("Plan") + `check-square` icon for `plan:` tabs |
 | Store | `src/store.ts` | `parseKey` → `plan`; `openPlan()` |
@@ -67,9 +67,7 @@ ExitPlanMode permission request arrives (tool_input.plan non-empty)
 - **Dedup key is `request_id`**, not plan content — a brand-new plan proposed
   later in the same turn gets its own tab; re-renders of the same request
   don't reopen/refocus the tab repeatedly.
-- **Approval is untouched:** this only affects *where the plan text is
-  displayed*. The permission card (Approve/Keep planning) still drives
-  `claude_perm_decide` exactly as before.
+- **Approval (2026-07-13):** the `ExitPlanMode` card no longer offers "Approve & start" (Jack implementing). **Keep discussing** denies; **Build** approves + hands off to Milo via `onPlanBuild` then `claude_perm_decide: allow`. Plan text display (`onPlanReady`) is unchanged — merge into story/drawer still happens before the user decides.
 
 ### Related docs
 - `068-quack-plan-harness.md` — story-owned plan (primary path when `storyId` set)

@@ -4,6 +4,7 @@ import { useStore } from "./store";
 import { findStory, findWork } from "./works";
 import {
   approvePlanStory,
+  createWorkFromStory,
   ensurePlanStory,
   hydrateWorks,
   linkChatToStory,
@@ -12,6 +13,7 @@ import {
   unlinkChatFromStory,
   unlinkChatFromWork,
 } from "./worksCache";
+import type { WorkItem } from "./works";
 import { openStoryPlanTab } from "./components/StoryPlanPane";
 import type { WorkStory } from "./works";
 
@@ -50,6 +52,34 @@ export async function approvePlanning(
   const story = await approvePlanStory(root, storyId, planText);
   useStore.getState().setAIChatPlanning(wsId, chatId, false);
   return story;
+}
+
+/** Approve the story plan, spawn `W-NNN`, and link it — Cursor-style handoff
+ *  target before switching the composer to Milo (Builder). */
+export async function handoffStoryToBuilder(
+  wsId: string,
+  chatId: string,
+  root: string,
+  storyId: string,
+  planText?: string,
+): Promise<WorkItem | null> {
+  const snap = await hydrateWorks(root);
+  const story = findStory(snap, storyId);
+  if (!story) return null;
+
+  const plan = planText?.trim() || story.bodyMd || "";
+  let title = story.title;
+  if (story.status === "draft") {
+    const approved = await approvePlanning(wsId, chatId, root, storyId, plan);
+    if (approved) title = approved.title;
+  } else {
+    useStore.getState().setAIChatPlanning(wsId, chatId, false);
+  }
+
+  const item = await createWorkFromStory(root, storyId, { title });
+  if (!item) return null;
+  await linkWorkToChat(wsId, chatId, root, item.id);
+  return item;
 }
 
 export async function exitPlanning(

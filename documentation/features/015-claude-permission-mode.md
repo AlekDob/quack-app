@@ -4,7 +4,7 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
 last_verified: 2026-07-13
-tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command, plan-mode]
+tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command, plan-mode, exit-plan-mode, build-handoff]
 ---
 
 ## Claude Code Permission Mode (Ask / Plan / Auto-edit / Auto / Agent)
@@ -22,14 +22,14 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 | Composer chip | `src/components/ComposerPermMode.tsx` | Cursor-style tinted mode pill + portaled menu (`document.body`) |
 | Mode catalog | `src/presets/permModes.ts` | `PERM_MODE_OPTIONS` — label, desc, `icon`, `tone` per mode; `permModeOption()` |
 | Slash hint | `src/slashCommands.ts` | `/mode ask\|plan\|auto-edit\|auto\|agent` |
-| Plan tab trigger | `src/components/ClaudePermissionOverlay.tsx` | `onPlanReady(requestId, plan)` prop — fires once per `ExitPlanMode` request as soon as `tool_input.plan` lands, deduped by `request_id`; see [061-plan-mode-tab.md](061-plan-mode-tab.md) |
+| Plan tab trigger | `src/components/ClaudePermissionOverlay.tsx` | `onPlanReady(requestId, plan)` — fires once per `ExitPlanMode` request as soon as `tool_input.plan` lands; `onPlanBuild(requestId, plan)` — Build handoff (see below) |
 | Hook gate (backend) | `src-tauri/src/claude_code.rs` | `apply_clean_env` sets `CODETTA_PERM_HOOK=1`; `build_hook_command` emits `permissionDecision:'allow'` when that env is absent (no-op for foreign sessions) |
 
 ### Modes
 | UI label | Stored value | Effect |
 |---|---|---|
 | Ask (default) | `null` | card on every gated tool; the safe default a fresh install gets |
-| Plan | `plan` | plan only, no edits; Read/Grep/Glob auto + **read-only Bash auto** (`ls`/`cat`/`grep`/`sort`/`du`/`git status`…); writing Bash still cards |
+| Plan | `plan` | plan only, no edits; Read/Grep/Glob auto + **read-only Bash auto** + **Task/subagent delegation auto** (`Task`/`Agent`/`TaskCreate`/`TaskUpdate`/`TaskList`/`TodoWrite`); writing Bash + file edits still card; `ExitPlanMode` always cards |
 | Auto-edit | `acceptEdits` | auto-allow file-edit tools (`Edit`/`MultiEdit`/`Write`/`NotebookEdit`); Bash & rest still card |
 | Auto | `auto` | auto-allow everything (Bash included); privacy gate + AskUserQuestion redirect still apply |
 | Agent | `bypassPermissions` | overlay allows EVERY tool, **before** the privacy gate too → no cards, no guard. Hook stays on (see gotcha). UI was **Bypass** until 2026-07-13. |
@@ -54,7 +54,7 @@ Cursor-style **semantic tint + icon** on the active mode pill; dropdown rows sho
 - `AIChatPanel` holds `ccPermMode` per chat. Restored from `ChatSession.ccPermMode` on session switch; global `localStorage["lcp.claudeCode.permMode"]` seeds **new** chats only (feature 040). Legacy rows without the field restore to **Ask** (`null`), not global. See `040-per-session-composer-state.md`.
 - `permModeStore` records the mode in `bySession` (by CC session id) and `byCwd` (normalized root) — the cwd fallback covers the first tool call of a fresh chat before its session id has streamed back.
 - A `claude:permission-request` arrives → every mounted `ClaudePermissionOverlay` hears it (global event). `isForThisPanel` drops requests that belong to another workspace or another CC session within the same workspace. The surviving overlay runs its gates **in order**: AskUserQuestion redirect → **Agent (`bypassPermissions`) allow-all** → privacy exclusion → read-only allow → `modeAutoAllow(req)` → (in Plan mode: stop, show card) → saved/always-allow rules → show card.
-- `modeAutoAllow` calls `getPermModeFor(req)` (session id, then cwd, else `"default"`): `auto` → allow all; `acceptEdits` → allow only `WRITE_TOOLS`; `plan` → allow Bash only when `isReadOnlyBash` (head ∈ `READ_ONLY_BASH`, or `git` + read-only subcommand, and no chain/redirect/pipe/subshell via `BASH_CHAIN_RE`); else → no mode-based allow.
+- `modeAutoAllow` calls `getPermModeFor(req)` (session id, then cwd, else `"default"`): `auto` → allow all; `acceptEdits` → allow only `WRITE_TOOLS`; `plan` → allow `PLAN_EXPLORE_TOOLS` (`Task`/`Agent`/`TaskCreate`/`TaskUpdate`/`TaskList`/`TodoWrite`) **or** Bash when `isReadOnlyBash` (head ∈ `READ_ONLY_BASH`, or `git` + read-only subcommand, and no chain/redirect/pipe/subshell via `BASH_CHAIN_RE`); else → no mode-based allow.
 
 ### State
 | Where | What | Lifetime |
@@ -69,7 +69,8 @@ Cursor-style **semantic tint + icon** on the active mode pill; dropdown rows sho
 - **Why a module store, not a prop:** the overlay registers its `claude:permission-request` listener once and lives for the whole app — it can't read a panel's React state without closure-staleness. Pattern cloned from `aiTaskStore.ts`.
 - **Order matters:** mode auto-allow runs AFTER the privacy gate and read-only allow so those safety checks always win, and BEFORE saved always-allow rules since the mode is the broader intent.
 - **Agent mode is enforced by the overlay, NOT by the CLI (gotcha):** `--dangerously-skip-permissions` does NOT disable PreToolUse hooks — the hook still fires and still POSTs, so running bypass "hook-off" on the backend left a stale hook in `settings.local.json` carding everything. So EVERY mode (Agent included) keeps the hook on; `bypassPermissions` is allowed in the listener **before** the privacy gate. Bonus: reading the mode live from `permModeStore` means flipping to Agent mid-run takes effect on the next tool call.
-- **Plan mode ignores saved always-allow rules:** otherwise a persisted "always allow Edit on .ts" would slip an edit past plan mode (the hook's `allow` overrides the CLI's plan block). In plan mode only read-only allows fire; everything else cards.
+- **Plan-mode explore auto-allow (2026-07-13):** `PLAN_EXPLORE_TOOLS` lets Jack delegate via Task/subagent and maintain TodoWrite checklists without permission cards, while **file edits, writing Bash, and `ExitPlanMode` still card**. Rationale: Plan mode exploration with subagents was unusable (dozens of cards); Jack must still call `ExitPlanMode` before the user can Build. `AskUserQuestion` is **not** in the set — user answers stay interactive.
+- **Plan mode ignores saved always-allow rules:** otherwise a persisted "always allow Edit on .ts" would slip an edit past plan mode (the hook's `allow` overrides the CLI's plan block). In plan mode only read-only + explore allows fire; everything else cards.
 - **Plan-mode read-only Bash:** `READ_ONLY_BASH` lists provably-read commands only (`ls cat head tail wc pwd echo grep rg tree stat file which type date whoami uname hostname du df printenv sort uniq cut basename dirname realpath`); `git` is gated separately on `GIT_RO_SUBCMDS` (`status log diff show blame ls-files rev-parse describe`). Deliberately excluded: runners (`env`/`xargs`/`sudo`/`nohup`), in-place editors (`sed -i`), and `git branch/tag/config/remote` (mutating forms exist). Any redirect/pipe/chain/subshell (`;`/`&`/`|`/`` ` ``/`<`/`>`/newline/`$(`) rejects the command via `BASH_CHAIN_RE` first, so a safelisted head can't smuggle a second command. Read/Grep/Glob never reach `modeAutoAllow` — they auto-allow upstream as `READ_ONLY_HOOK_TOOLS`.
 - **`NEVER_BLANKET_ALLOW` (`Bash`, `ExitPlanMode`):** even if the user clicks a bare-name "always allow", these are refused a blanket rule — `Bash` because one name would allow arbitrary commands, `ExitPlanMode` because it's a per-plan approval that blanket-allowing would defeat.
 - **`/mode off` resets to Ask (`null`)**, not to a permissive default — the safe direction.
@@ -84,4 +85,9 @@ Cursor-style **semantic tint + icon** on the active mode pill; dropdown rows sho
   **Queue purge:** a `useEffect` on `[ownerRoot, ownerSessionId, ownerStreaming]` filters the overlay queue through `isForThisPanel` so stale cards disappear when the user switches chat or the CC session id lands. Pattern mirrors `AgentHubWatcher.resolveChat`, which already preferred `claudeSessionId` over cwd for hub status — the overlay was the missing piece.
   **Decision order inside `isForThisPanel`:** (1) reject different `cwd`; (2) if `req.session_id` present → match `ownerSessionId`, or require `ownerStreaming` when the panel hasn't captured init yet; (3) cwd-only fallback when `session_id` absent (shouldn't happen); (4) default `false` — never accept orphan requests.
 - The overlay/cards themselves are documented alongside the bridge — see [014-claude-code-bridge.md](014-claude-code-bridge.md).
-- **Plan tab opens independently of the decision:** `onPlanReady` fires as soon as the plan text is non-empty, regardless of whether the user later Approves or "Keep planning"s the card — reading the plan shouldn't require deciding first. This does not change `respond()`/`claude_perm_decide` at all. See [061-plan-mode-tab.md](061-plan-mode-tab.md).
+- **Plan tab opens independently of the decision:** `onPlanReady` fires as soon as the plan text is non-empty, regardless of whether the user later Builds or "Keep discussing"s the card — reading the plan shouldn't require deciding first. This does not change `respond()`/`claude_perm_decide` at all. See [061-plan-mode-tab.md](061-plan-mode-tab.md).
+- **`ExitPlanMode` card — Cursor-style Build handoff (2026-07-13):** when `tool_name === "ExitPlanMode"`, the card is a plan-review variant (`.cc-perm-plan-card`), not a generic tool gate. Actions:
+  - **Keep discussing** (`deny`) — Jack stays in Plan mode; user can refine the plan in chat. `Esc` shortcut.
+  - **Build** (`allow` after handoff) — primary action (`Enter`). Calls `onPlanBuild(requestId, plan)` wired by `AIChatPanel` → `handoffStoryToBuilder` + `applyPreset("builder")` + `setCcPermMode("bypassPermissions")` (Milo · Agent). Then `claude_perm_decide: allow` so CC exits plan mode. **No "Allow all"** on this card — that shortcut would flip to Auto and let Jack implement without a formal handoff.
+  - Title copy: "Plan ready — build with Milo or keep discussing with Jack".
+  - See [068-quack-plan-harness.md](068-quack-plan-harness.md) for story/work side effects.

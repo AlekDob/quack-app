@@ -24,6 +24,7 @@ interface Props {
   root: string;
   storyId: string;
   planning?: boolean;
+  onBuild?: () => void;
 }
 
 function useDrawerPinned(wsId: string, chatId: string): boolean {
@@ -61,6 +62,7 @@ export function StoryPlanDrawer({
   root,
   storyId,
   planning = false,
+  onBuild,
 }: Props) {
   const pinned = useDrawerPinned(wsId, chatId);
   const peekEnabled = !pinned;
@@ -127,6 +129,17 @@ export function StoryPlanDrawer({
       <div className="story-drawer-panel" role="complementary">
         <div className="story-drawer-panel-head">
           <span className="story-drawer-panel-label">Story plan</span>
+          {planning && onBuild ? (
+            <button
+              type="button"
+              className="story-drawer-build"
+              title="Approve the plan and hand off to Milo (Builder) in Agent mode"
+              onClick={onBuild}
+            >
+              <Icon name="zap" size={12} />
+              <span>Build</span>
+            </button>
+          ) : null}
           <button
             type="button"
             className="story-drawer-panel-pin"

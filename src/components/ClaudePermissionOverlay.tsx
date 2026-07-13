@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { matchExclusion } from "../aiPrivacy";
+import { publishAskInput } from "../askQuestionStore";
 import { getPermModeFor } from "../permModeStore";
 import { error as toastError } from "../notify";
 import { getJson as lsGetJson, setJson as lsSetJson } from "../localStore";
@@ -114,6 +115,17 @@ function extFromPath(path: string): string | null {
  *  Read/Grep/Glob are NOT here — they auto-allow as read-only regardless. */
 const WRITE_TOOLS = new Set(["Edit", "MultiEdit", "Write", "NotebookEdit"]);
 
+/** Jack can delegate exploration (Task/subagent, todos) while still in CC
+ *  plan mode — only ExitPlanMode + file writes should card. */
+const PLAN_EXPLORE_TOOLS = new Set([
+  "Task",
+  "Agent",
+  "TaskCreate",
+  "TaskUpdate",
+  "TaskList",
+  "TodoWrite",
+]);
+
 /** Bash command names that only ever READ — safe to auto-allow during Plan
  *  mode (where the CLI already forbids edits, so the only residual risk is a
  *  Bash side-effect). Deliberately tight: runners (env/xargs/sudo/nohup) and
@@ -154,9 +166,9 @@ function isReadOnlyBash(input: Record<string, unknown>): boolean {
  *                     "stop asking"; privacy exclusions + AskUserQuestion
  *                     redirect still apply (handled before this).
  *   - "acceptEdits" → allow file-edit tools only; Bash & the rest still card.
- *   - "plan"        → allow read-only Bash (Read/Grep/Glob already auto-allow
- *                     upstream). The CLI blocks edits in plan mode, so safe
- *                     exploration flows without cards; writing Bash still cards.
+ *   - "plan"        → allow read-only Bash + Task/subagent delegation
+ *                     (Read/Grep/Glob already auto-allow upstream). The CLI
+ *                     blocks edits in plan mode; ExitPlanMode still cards.
  *   - anything else → no mode-based allow (Ask shows the card).
  * ("bypassPermissions" is handled earlier in the listener — it allows before
  *  the privacy gate — so it never reaches here.)
@@ -166,6 +178,7 @@ function modeAutoAllow(req: PermissionRequest): boolean {
   if (mode === "auto") return true;
   if (mode === "acceptEdits") return WRITE_TOOLS.has(req.tool_name);
   if (mode === "plan") {
+    if (PLAN_EXPLORE_TOOLS.has(req.tool_name)) return true;
     return req.tool_name === "Bash" && isReadOnlyBash(req.tool_input);
   }
   return false;
@@ -279,7 +292,7 @@ export function ClaudePermissionOverlay({
   ownerStreaming,
   onAllowAll,
   onPlanReady,
-  onPlanApproved,
+  onPlanBuild,
 }: {
   /** Workspace cwd this overlay's panel drives — used to route cards. */
   ownerRoot: string;
@@ -294,8 +307,9 @@ export function ClaudePermissionOverlay({
    *  opens the plan in a side-by-side tab (Cursor-style) while the card
    *  is still pending approval. */
   onPlanReady?: (requestId: string, plan: string) => void;
-  /** Fired when the user approves ExitPlanMode — promotes linked Work ticket. */
-  onPlanApproved?: (requestId: string, plan: string) => void;
+  /** Fired when the user clicks Build — hand off to Milo before allowing
+   *  ExitPlanMode so Jack exits plan mode without implementing himself. */
+  onPlanBuild?: (requestId: string, plan: string) => void | Promise<void>;
 }) {
   const [queue, setQueue] = useState<PermissionRequest[]>([]);
 
@@ -364,6 +378,9 @@ export function ClaudePermissionOverlay({
       // model to ask in plain text; the question then arrives as a
       // normal assistant message the user can answer in the input.
       if (req.tool_name === "AskUserQuestion") {
+        if (req.session_id && req.tool_input) {
+          publishAskInput(req.session_id, req.tool_input);
+        }
         void invoke("claude_perm_decide", {
           requestId: req.request_id,
           decision: "deny",
@@ -486,11 +503,6 @@ export function ClaudePermissionOverlay({
 
   const respond = async (decision: "allow" | "deny") => {
     if (!req) return;
-    if (decision === "allow" && req.tool_name === "ExitPlanMode") {
-      const plan =
-        typeof req.tool_input.plan === "string" ? req.tool_input.plan : "";
-      onPlanApproved?.(req.request_id, plan);
-    }
     try {
       await invoke("claude_perm_decide", {
         requestId: req.request_id,
@@ -500,6 +512,18 @@ export function ClaudePermissionOverlay({
       console.warn("claude_perm_decide failed", e);
     }
     setQueue((q) => q.slice(1));
+  };
+
+  const buildPlan = async () => {
+    if (!req || req.tool_name !== "ExitPlanMode") return;
+    const plan =
+      typeof req.tool_input.plan === "string" ? req.tool_input.plan : "";
+    try {
+      await onPlanBuild?.(req.request_id, plan);
+    } catch (e) {
+      console.warn("plan build handoff failed", e);
+    }
+    await respond("allow");
   };
 
   // Keyboard shortcuts on the active request: Esc denies, Enter allows
@@ -521,7 +545,8 @@ export function ClaudePermissionOverlay({
         void respond("deny");
       } else if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        void respond("allow");
+        if (req.tool_name === "ExitPlanMode") void buildPlan();
+        else void respond("allow");
       }
     };
     window.addEventListener("keydown", onKey);
@@ -693,25 +718,32 @@ export function ClaudePermissionOverlay({
               onClick={() => void respond("deny")}
               title={
                 isPlan
-                  ? "Don't start yet — Claude keeps planning and you can refine it."
+                  ? "Keep discussing with Jack — refine the plan before building."
                   : "Block this tool call. The agent treats it as a failure and may try a different approach."
               }
             >
               <Icon name="x" size={12} />
-              <span>{isPlan ? "Keep planning" : "Deny"}</span>
+              <span>{isPlan ? "Keep discussing" : "Deny"}</span>
             </button>
-            <button
-              className="cc-perm-btn cc-perm-allow"
-              onClick={() => void respond("allow")}
-              title={
-                isPlan
-                  ? "Approve the plan — Claude exits plan mode and starts building."
-                  : "Run this single call. You'll be prompted again next time."
-              }
-            >
-              <Icon name="check" size={12} />
-              <span>{isPlan ? "Approve & start" : "Allow once"}</span>
-            </button>
+            {isPlan ? (
+              <button
+                className="cc-perm-btn cc-perm-allow-all"
+                onClick={() => void buildPlan()}
+                title="Approve the plan, spawn a work item, and hand off to Milo (Builder) in Agent mode."
+              >
+                <Icon name="zap" size={12} />
+                <span>Build</span>
+              </button>
+            ) : (
+              <button
+                className="cc-perm-btn cc-perm-allow"
+                onClick={() => void respond("allow")}
+                title="Run this single call. You'll be prompted again next time."
+              >
+                <Icon name="check" size={12} />
+                <span>Allow once</span>
+              </button>
+            )}
             {!isPlan && (
               <button
                 className="cc-perm-btn cc-perm-allow-all"
@@ -725,8 +757,8 @@ export function ClaudePermissionOverlay({
           </div>
         </div>
         <div className="cc-perm-shortcut-hint">
-          <kbd>Enter</kbd> {isPlan ? "Approve" : "Allow once"} ·{" "}
-          <kbd>Esc</kbd> {isPlan ? "Keep planning" : "Deny"}
+          <kbd>Enter</kbd> {isPlan ? "Build" : "Allow once"} ·{" "}
+          <kbd>Esc</kbd> {isPlan ? "Keep discussing" : "Deny"}
           {!isPlan && <span className="cc-perm-hint-all"> · Allow all stops the prompts</span>}
           {queue.length > 1 && (
             <span className="cc-perm-queue-inline">
@@ -752,7 +784,7 @@ function PermissionCardBody({ req }: { req: PermissionRequest }) {
         </span>
         <span className="cc-perm-title">
           {isPlan ? (
-            <>Claude has a plan — ready to start</>
+            <>Plan ready — build with Milo or keep discussing with Jack</>
           ) : (
             <>
               Claude Code wants to use <code>{tool}</code>
