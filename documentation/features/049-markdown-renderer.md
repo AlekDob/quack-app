@@ -23,7 +23,7 @@ tags: [markdown, md-preview, copy, code-block, chat, shell, syntax, cursor-style
 | Surface | `interactive` | `onFileOpen` |
 |---------|---------------|--------------|
 | Assistant chat (`AIChatPanel`) — **committed** turns | `false` | yes — open file tab |
-| Assistant chat — **live tail** (`StreamingPlainText`, `069`) | n/a — no markdown parse | n/a — plain text until turn ends |
+| Assistant chat — **live tail** (`StreamingPlainText` + `useTypewriterReveal`, `069`) | n/a — no markdown parse | n/a — char reveal until turn ends |
 | User turns (`UserMessageBar`) | `false` | no |
 | Editor split / preview (`EditorPane`) | `true` | no — click-to-jump source line |
 | Tool drawer — `.md` reads, WebFetch (`ToolResultDrawer`) | `false` | no |

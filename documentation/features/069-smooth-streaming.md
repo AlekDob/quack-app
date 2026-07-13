@@ -4,15 +4,15 @@ project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-13
 last_verified: 2026-07-13
-tags: [ai-chat, streaming, ux, claude-code, markdown, raf, cursor-style, performance]
+tags: [ai-chat, streaming, ux, claude-code, markdown, raf, typewriter, cursor-style, performance]
 ---
 
-## Smooth assistant streaming (plain tail + rAF paint)
+## Smooth assistant streaming (char reveal + rAF paint)
 
-**Purpose:** Make in-flight assistant prose feel continuous instead of jerky
-“word blocks,” especially with Claude Code where token deltas arrive in bursts.
-Matches the Cursor/Codex pattern: **plain text while streaming**, full markdown
-only after the turn commits.
+**Purpose:** Make in-flight assistant prose feel like steady typing instead of
+jerky blocks — especially with Claude Code bursts. Two layers: rAF-coalesced React
+updates + **char-by-char reveal** capped at 2 glyphs/frame. Plain text while
+streaming; full markdown on turn commit.
 
 **Problem (before):** Every `content_block_delta` called `setStreaming` +
 `setStreamingBlocks`, which re-ran `renderMarkdown()` on the **entire** growing
@@ -24,10 +24,12 @@ jumps, worse when tool calls split the turn into multiple text blocks.
 | Type | Path | Role |
 |------|------|------|
 | Utility | `src/streamPaint.ts` | `createStreamPainter` — coalesce UI commits to one per animation frame |
-| Component | `src/components/StreamingPlainText.tsx` | Live tail: `pre-wrap` prose + blinking caret |
+| Utility | `src/typewriterReveal.ts` | `charsToReveal` — time-based budget, max 2 chars/frame |
+| Hook | `src/useTypewriterReveal.ts` | rAF reveal loop (~54 chars/s, gentle catch-up) |
+| Component | `src/components/StreamingPlainText.tsx` | Inline char reveal + thin pulsing caret |
 | Panel | `src/components/AIChatPanel.tsx` | Live loop + attach-replay use rAF painter; legacy bubble path uses plain tail |
 | Render | `src/components/chatToolRender.tsx` | `CompactBlocks` — stable text blocks → markdown; live tail → plain |
-| Styles | `src/App.css` | `.ai-stream-plain`, `.ai-stream-caret`, `@keyframes ai-stream-caret-blink` |
+| Styles | `src/App.css` | `.ai-stream-plain`, `.ai-stream-caret` (inline pulse) |
 
 ### Data flow
 
@@ -48,16 +50,52 @@ Provider delta (claudeCode.ts → content event)
 Attach-replay (`claude_code_attach` after refresh) uses the same `createStreamPainter`
 pattern so resumed turns don't stutter either.
 
-### Rendering rules (`CompactBlocks`)
+### Char-by-char reveal
 
-| Block | `streaming` | Renderer |
-|-------|-------------|----------|
-| Text block before last | any | `MarkdownPreview` |
-| Last text block | `true` | `StreamingPlainText` + caret |
-| Any text block | `false` (committed) | `MarkdownPreview` |
+Inspired by Vercel AI SDK [`smoothStream`](https://ai-sdk.dev/docs/reference/ai-sdk-core/smooth-stream)
+(server-side word buffering) — ported **client-side** because Quack streams from
+Claude Code CLI, not `streamText()`.
 
-Legacy path (assistant message **without** `blocks[]`, e.g. Ollama): `AIChatPanel`
-uses `StreamingPlainText` when `isStreamingThis`, else `MarkdownPreview`.
+`useTypewriterReveal(target, active)` trails the buffered `target` with `posRef`:
+
+```
+CLI burst (50–200 chars) → streamPaint → setStreaming(target grows)
+                              ↓
+                    useTypewriterReveal rAF loop
+                              ↓
+              visible = target.slice(0, pos)   // max +2 chars/frame
+                              ↓
+              StreamingPlainText + inline caret
+```
+
+| Constant | Default | Role |
+|----------|---------|------|
+| `BASE_CHARS_PER_SEC` | 54 | Steady reading pace |
+| `MAX_CHARS_PER_FRAME` | 2 | Hard cap — prevents visible “word blocks” |
+| catch-up boost | `1 + min(3, lag/140)` | Speed up when buffer runs ahead; still char-limited |
+
+**Iteration history (why char-by-char):**
+
+| Pass | Approach | Problem |
+|------|----------|---------|
+| v1 | Plain text + per-delta `renderMarkdown` | Full re-parse jank |
+| v2 | rAF `streamPaint` only | Bursts still visible |
+| v3 | Word `Intl.Segmenter` + 2–6 words/tick catch-up | Felt like blocks |
+| **v4** | **Char reveal, max 2/frame** | Current — smooth typewriter |
+
+`charsToReveal(lag, elapsedMs)` is pure (unit-testable). Hook effect depends only
+on `active` — reads `targetRef` so parent rAF batching does not restart the loop.
+
+### Visual contract
+
+| Token / class | Value |
+|---------------|-------|
+| `.ai-stream-plain` | 13.5px / 1.55 lh — matches `.ai-msg-body .md-preview` |
+| `.ai-stream-plain-text` | `pre-wrap` + **inline** caret after last glyph |
+| `.ai-stream-caret` | 1.5px `currentColor`, soft opacity pulse (not step-blink) |
+
+No bold, links, or code pills **during** the live tail — intentional trade-off.
+Turn commit swaps to full markdown in one frame.
 
 ### `createStreamPainter` API
 
@@ -71,16 +109,16 @@ paint.cancel();    // drop pending rAF (abort / unmount)
 `streamPainterRef` on `AIChatPanel` cancels any in-flight painter in `finally` so
 an aborted turn cannot paint stale text after `setStreaming(null)`.
 
-### Visual contract
+### Rendering rules (`CompactBlocks`)
 
-| Token / class | Value |
-|---------------|-------|
-| `.ai-stream-plain` | 13.5px / 1.55 lh — matches `.ai-msg-body .md-preview` |
-| `.ai-stream-plain-text` | `white-space: pre-wrap; word-break: break-word` |
-| `.ai-stream-caret` | 2px × 1.05em bar, `--fg-muted`, step blink 1.05s |
+| Block | `streaming` | Renderer |
+|-------|-------------|----------|
+| Text block before last | any | `MarkdownPreview` |
+| Last text block | `true` | `StreamingPlainText` + caret |
+| Any text block | `false` (committed) | `MarkdownPreview` |
 
-No bold, links, or code pills **during** the live tail — intentional trade-off
-(same as Cursor). Turn commit swaps to full markdown in one frame.
+Legacy path (assistant message **without** `blocks[]`, e.g. Ollama): `AIChatPanel`
+uses `StreamingPlainText` when `isStreamingThis`, else `MarkdownPreview`.
 
 ### Provider notes
 
@@ -115,3 +153,4 @@ UI bug — this feature removes **render** stutter, not generation latency.
   `finally` cancels via `streamPainterRef`.
 - Re-enabling live markdown (bold-as-you-type) needs incremental parsing — out of
   scope; measure before adding complexity.
+- Tuning: `BASE_CHARS_PER_SEC` / `MAX_CHARS_PER_FRAME` in `typewriterReveal.ts`.
