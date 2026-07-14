@@ -38,6 +38,7 @@ dependency).
 | Type | Path | Purpose |
 |---|---|---|
 | Module | `src/subagents.ts` | `loadSubagents(root, homeDir)`, `duckAvatarFor(name, explicit?)`, `SubagentDef` |
+| Prompt | `src/brainPrompt.ts` | `quackClaudeCodeEditorPrompt()` — subagent cannot surface AskUserQuestion |
 | Component | `src/components/MentionSuggestions.tsx` | `@` popover UI (agent + file rows, path preview) — see **`041-mention-file-preview.md`** |
 | Component | `src/components/MentionPathPreview.tsx` | Side tree for highlighted file row (041) |
 | Component | `src/components/AIChatPanel.tsx` | `agents`/`attachedAgents` state, agent-load effect (CC-only), `@` match logic + `acceptMention`, delegation injection, reset, chips; `SubagentOpen.Provider` + `openSubagentTab`; `.ai-mention-open` overflow toggle |
@@ -112,6 +113,19 @@ still hit the PreToolUse hook. The hook JSON carries `parent_tool_use_id` (same 
 filter above). `claude_perm.rs` forwards it on `claude:permission-request`; `ClaudePermissionOverlay`
 auto-allows sidechain reads/explore in Plan without permission cards. File writes and non-read-only
 Bash from subagents still card. See [015-claude-permission-mode.md](015-claude-permission-mode.md).
+
+### AskUserQuestion — orchestrator only (2026-07-14)
+Subagents run in an isolated sidechain. Their inner tool calls (including `AskUserQuestion`) are
+filtered out of the parent stream (`claudeCode.ts` + `parent_tool_use_id`) and **do not** mount
+`.ai-ask-dock` on the main composer ([073](073-ask-user-question-dock.md)).
+
+**Contract:**
+1. Subagent hits ambiguity → states the question + options in its **final report** to the orchestrator.
+2. Orchestrator (Jack / parent chat) calls `AskUserQuestion` — user sees clickable options.
+3. User answer resumes the orchestrator; orchestrator can re-delegate with the choice.
+
+Delegation inject in `AIChatPanel` and `quackClaudeCodeEditorPrompt()` encode this rule on every
+`@`-mention send and every CC turn.
 
 ### Gotchas
 - **Tool name is `Agent`, not `Task`:** current Claude Code emits the subagent dispatch tool as

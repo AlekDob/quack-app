@@ -1,7 +1,7 @@
 ---
 name: quack-works
 description: Quack PM + Works — document product components (documentation/features/NNN-slug.md), sync Works modules, user stories S-NNN, tickets W-NNN, cycles, kanban. Use whenever the user mentions tickets, work items, stories, sprints, cycles, feature docs, feature-doc, modules, plan approval, W-NNN, S-NNN, or project task tracking in Quack — even if they don't say "Works".
-quack-bundled-version: 10
+quack-bundled-version: 11
 ---
 
 # Quack Works
@@ -156,11 +156,12 @@ Product-owned plan mode — **story is the artifact**, not ephemeral CC plan tex
 | Step | What |
 |---|---|
 | Enter Plan / Plan a feature | `ensurePlanStory` → `S-NNN` draft, `storyId` on chat, `StoryPlanPane` opens right |
+| Clarifying choices | **Orchestrator chat** on Claude Code: call `AskUserQuestion` — Quack renders clickable options above the composer (`073`). **Subagents** (`Task`/`Agent` sidechains) cannot — they return the question in their report; orchestrator asks via `AskUserQuestion`. |
 | CC ExitPlanMode | `mergePlanIntoStory` — body + acceptance checklist (into linked story, or legacy `plan:` tab if none) |
 | Approve | `approvePlanStory` → status `active` |
 | Implement | `createWorkFromStory` → link `W-NNN`, composer shows `S › W` |
 
-Other providers (Cursor CLI, OpenCode, API): same story panel; Jack updates `works/stories/S-NNN.md` via Write — no `ExitPlanMode`.
+Other providers (Cursor CLI, OpenCode, API): same story panel; Jack updates `works/stories/S-NNN.md` via Write — no `ExitPlanMode` or `AskUserQuestion`.
 
 Files: `quackPlanHarness.ts`, `planStoryMerge.ts`, `StoryPlanPane.tsx`, `storyPlanTab.ts`.
 

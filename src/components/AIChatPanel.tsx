@@ -184,7 +184,7 @@ import {
   parseBrainSaveProposal,
   stripBrainSaveBlocks,
 } from "../brainSave";
-import { jackSystemPrompt } from "../brainPrompt";
+import { jackSystemPrompt, quackClaudeCodeEditorPrompt } from "../brainPrompt";
 import { installedIds, quackExtensions } from "../quackExtensions";
 import { isExtensionInstalled } from "../extensionGate";
 import {
@@ -3033,7 +3033,8 @@ export function AIChatPanel({
       if (attachedAgents.length > 0) {
         ccTurnContext.push(
           `Delegate this task to the following subagent(s): ${attachedAgents.join(", ")}. ` +
-            `Use your Task tool with the matching subagent_type for each — prefer them over handling it yourself.`,
+            `Use your Agent/Task tool with the matching subagent_type. ` +
+            `Subagents cannot surface Quack's AskUserQuestion UI — if they need a user choice, they must request it in their return message (question + options); you ask the user via AskUserQuestion in this chat.`,
         );
       }
       // /terminal for Claude Code: it can't see Codetta's terminal
@@ -3137,7 +3138,11 @@ export function AIChatPanel({
       // its own internal rules. Our "tools available" section would only
       // confuse it. Just orient it briefly.
       sysParts.push(
-        "You are running inside Quack, a code editor. The user has the workspace open as your current working directory. Use your normal tools (Read, Glob, Grep, Edit, Bash, etc.) to investigate and modify files as needed. Be thorough and substantive.",
+        [
+          "You are running inside Quack, a code editor. The user has the workspace open as your current working directory.",
+          "Use your normal tools (Read, Glob, Grep, Edit, Bash, etc.) to investigate and modify files as needed. Be thorough and substantive.",
+          quackClaudeCodeEditorPrompt(),
+        ].join("\n\n"),
       );
     } else {
       sysParts.push(

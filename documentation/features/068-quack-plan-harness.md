@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-12
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 related: [054-works-layer.md, 066-works-cycles-stories.md, 061-plan-mode-tab.md, 022-chat-composer.md, 005-jack-duck-identity.md, 064-agent-hub-drawer-and-chat-tab-switch.md]
 tags: [works, plan, story, jack, composer, claude-code, drawer, hover-peek]
 ---
@@ -216,7 +216,18 @@ User Build
 - `066-works-cycles-stories.md` — story entity + `S-NNN` files
 - `054-works-layer.md` — composer work bar, docs chip, inject manifest
 - `064-agent-hub-drawer-and-chat-tab-switch.md` — hover peek pattern this clones
-- Bundled skill `quack-works` v10 — agent PM loop step 9
+- Bundled skill `quack-works` v11 — agent PM loop step 9; AskUserQuestion orchestrator-only note
+
+## CC tools in Quack Plan (2026-07-14)
+
+The story-on-disk harness does **not** replace Claude Code's interactive tools in the parent chat:
+
+| Tool | Orchestrator (this chat) | Subagent sidechain |
+|---|---|---|
+| `AskUserQuestion` | Call for multiple-choice — Quack dock (`073`) | ❌ return question in final report |
+| `ExitPlanMode` | Call when plan ready — merges into `S-NNN` | N/A (parent only) |
+
+System prompt: `quackClaudeCodeEditorPrompt()` in `brainPrompt.ts`, injected every CC turn via `AIChatPanel`.
 
 ## Gotchas
 
@@ -228,3 +239,4 @@ User Build
 - **No auto-story** — CC plan mode and orphan draft stories do not open the harness; see **Explicit planning gate** above.
 - **Legacy path** — chats with `workItemId` + `origin: plan` but no `storyId` still use `PlanPane` + `approvePlanWork` on Build until migrated manually.
 - **Don't use Allow all during planning** — flips Plan → Auto and Jack may skip `ExitPlanMode`; use per-tool "This session" if a specific Bash prefix keeps carding (see `015`).
+- **Harness ≠ no CC tools** — story-on-disk is the durable artifact, but Jack still calls `AskUserQuestion` (choices) and `ExitPlanMode` (plan merge) in the parent chat (`073`, `quackClaudeCodeEditorPrompt`).

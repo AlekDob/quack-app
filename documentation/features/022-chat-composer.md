@@ -189,6 +189,8 @@ family as `.ai-status-dock` / `.ai-todos-bar`).
 | Answer | Option click or typed reply → `sendUserText` resumes CC session |
 | Dismiss | Esc / ✕ — hides card; composer still accepts free-form answer |
 | While busy | `answerQuestion` enqueues like composer send (039) |
+| Who calls the tool | **Orchestrator / presets only** — subagents must hand off via final report ([073](073-ask-user-question-dock.md), [004](004-subagent-mentions.md)) |
+| System prompt | `quackClaudeCodeEditorPrompt()` injected every CC turn (`brainPrompt.ts` → `AIChatPanel`) |
 
 Full detail: **`073-ask-user-question-dock.md`**.
 

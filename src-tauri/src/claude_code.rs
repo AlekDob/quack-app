@@ -120,7 +120,7 @@ pub fn claude_code_check() -> Result<String, String> {
 /// AskUserQuestion is gated so the overlay can redirect it: in -p
 /// (headless) mode the CLI has no question UI, so the call would just
 /// fail opaquely. The overlay denies it with a reason telling the
-/// model to ask in plain text and end its turn.
+/// model Quack is showing clickable options above the composer.
 const PERMISSION_GATED_TOOLS: &str =
     "Bash|Edit|MultiEdit|Write|NotebookEdit|WebFetch|WebSearch|Read|Grep|Glob|AskUserQuestion|ExitPlanMode";
 

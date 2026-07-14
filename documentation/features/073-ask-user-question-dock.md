@@ -3,13 +3,14 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-13
-last_verified: 2026-07-13
-tags: [claude-code, ask-user-question, composer-dock, interactive, cursor-style, permission-hook, askQuestionStore]
+last_verified: 2026-07-14
+related: [015-claude-permission-mode.md, 004-subagent-mentions.md, 022-chat-composer.md, 068-quack-plan-harness.md, 039-composer-queue.md]
+tags: [claude-code, ask-user-question, composer-dock, interactive, cursor-style, permission-hook, askQuestionStore, system-prompt, orchestrator, subagent]
 ---
 
 ## AskUserQuestion Dock (interactive question card)
 
-**Purpose:** When Claude Code calls `AskUserQuestion`, render a **Cursor-style**
+**Purpose:** When Claude Code calls `AskUserQuestion` in the **parent (orchestrator) chat**, render a **Cursor-style**
 interactive card docked above the composer — radio/checkbox options the user
 clicks to answer. The CLI's native question UI does not exist under `-p`, so
 Quack denies the hook call (redirect) and answers via the next user message.
@@ -17,17 +18,29 @@ Quack denies the hook call (redirect) and answers via the next user message.
 **Stack:** React 19 + TS strict, module-level pub/sub store (pattern:
 `aiTaskStore.ts`).
 
+### Who can surface the dock
+
+| Caller | Same chat as composer? | `.ai-ask-dock` |
+|---|---|---|
+| Orchestrator (Jack / any preset on CC) | yes | ✅ |
+| Preset switch (Milo, Nora, Vera, Lia, custom) | yes — presets are not subagents | ✅ |
+| Subagent sidechain (`Agent`/`Task`, `parent_tool_use_id`) | no — inner steps hidden from parent stream | ❌ |
+
+**Subagent contract:** sidechain runs must return "needs user input: …" in their **final report**; the orchestrator then calls `AskUserQuestion` here. See [004-subagent-mentions.md](004-subagent-mentions.md).
+
 ### Files
 
 | Type | Path | Role |
 |---|---|---|
 | Card UI | `src/components/chatToolRender.tsx` | `AskQuestionCard`, `parseAskQuestions`, `coerceToolArgs`, `mergeAskQuestionArgs`, `isAskUserQuestionTool` |
-| Host | `src/components/AIChatPanel.tsx` | `pendingAskCall` / `dockedAskCall`, `answerQuestion`, `.ai-ask-dock` mount |
+| Host | `src/components/AIChatPanel.tsx` | `pendingAskCall` / `dockedAskCall`, `answerQuestion`, `.ai-ask-dock` mount; CC system inject + `@` delegation hint |
 | Hook cache | `src/askQuestionStore.ts` | `publishAskInput`, `getAskInput`, `clearAskInput`, `subscribeAskInput` |
 | Permission | `src/components/ClaudePermissionOverlay.tsx` | Publishes `tool_input` on `AskUserQuestion` before deny-redirect |
+| System prompt | `src/brainPrompt.ts` | `quackClaudeCodeEditorPrompt()` — orchestrator vs subagent rules |
 | Styles | `src/App.css` | `.ai-ask-dock`, `.ai-ask-card`, `.ai-ask-option`, `.ai-ask-reply-btn` |
+| Stream filter | `src/providers/claudeCode.ts` | Hides `parent_tool_use_id` records from main transcript |
 
-### Data flow
+### Data flow (orchestrator)
 
 | Step | What happens |
 |---|---|
@@ -39,6 +52,31 @@ Quack denies the hook call (redirect) and answers via the next user message.
 | 6 | `dockedAskCall` = merge `call.function.arguments` + `getAskInput(claudeSessionId)` |
 | 7 | `AskQuestionCard` renders options; click → `answerQuestion(text)` → `sendUserText` resumes session |
 | 8 | Answer or dismiss → `clearAskInput(claudeSessionId)` |
+
+### Subagent → orchestrator flow (2026-07-14)
+
+```
+Subagent (sidechain)                    Orchestrator (this chat)
+─────────────────────                   ─────────────────────────
+Read/Grep/… (hidden)                    
+…                                       
+Report: "Need user input: A|B|C"  ──►   AskUserQuestion({ options })
+                                        .ai-ask-dock shows card
+User clicks B                     ──►   sendUserText("…: B")
+                                        re-delegate or continue
+```
+
+### System prompt (2026-07-14)
+
+After the 2026-07-13 UI fix, models still skipped `AskUserQuestion` (inferred CC `-p` / Quack Plan harness limitations). Fix: explicit inject every CC turn.
+
+| Source | When | Content |
+|---|---|---|
+| `quackClaudeCodeEditorPrompt()` | Every Claude Code turn in `AIChatPanel` `sysParts` | AskUserQuestion + ExitPlanMode for orchestrator; subagent handoff rule |
+| `@` delegation inject | `attachedAgents.length > 0` on send | Subagents cannot surface dock — orchestrator must `AskUserQuestion` |
+| `bundledSkills/quack-works.md` v11 | Skill `/quack-works` | Quack Plan table row for clarifying choices |
+
+`jackSystemPrompt()` stays Jack-specific (Works gate, persona) — **does not** duplicate CC tool rules.
 
 ### Dual-source args (why both)
 
@@ -114,13 +152,22 @@ Multi-question: one line per question, newline-separated.
 | Queue while busy | `039-composer-queue.md` — `answerQuestion` enqueues if streaming |
 | Agent hub needs-input | `009-agent-hub.md` — 600ms grace; redirect settles before flash |
 | Composer dock family | `022-chat-composer.md` § Ask question dock |
+| Subagent delegation | `004-subagent-mentions.md` § AskUserQuestion — orchestrator only |
+| Quack Plan + ExitPlanMode | `068-quack-plan-harness.md` |
 
 ### Gotchas
 
 - **Stuck spinner (fixed 2026-07-13):** parsing only stream args → empty `questions[]`
   → old placeholder showed perpetual `Question ⟳`. Fix: hook cache + lenient parse +
   fallback "Reply in message box".
+- **Plain-text fallback (fixed 2026-07-14):** models said tools "unavailable in this harness"
+  and pasted options in prose. Fix: `quackClaudeCodeEditorPrompt()` + delegation inject.
 - **Dismiss is per call id:** `dismissedAskId` — dismissing Q1 does not block Q2.
 - **Hook deny is required:** allowing `AskUserQuestion` headless fails opaquely under `-p`.
-- **Not in subagents:** CC contract — inner Task runs don't surface this dock.
+  Deny reason tells the model Quack is showing clickable options (not "ask in plain text").
+- **Not in subagents:** CC sidechain runs (`parent_tool_use_id`) are hidden from the main stream —
+  `pendingAskCall` only watches this chat's last assistant turn. A subagent's `AskUserQuestion`
+  never surfaces `.ai-ask-dock`. **Pattern:** subagent returns "needs user input: …" in its final
+  report → orchestrator calls `AskUserQuestion` in the parent chat.
 - **Agent mode:** redirect still runs; interactive card is the answer path regardless of `bypassPermissions`.
+- **Presets ≠ subagents:** Milo/Nora/Lia share the orchestrator chat — they call `AskUserQuestion` directly.

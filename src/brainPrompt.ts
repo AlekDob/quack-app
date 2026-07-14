@@ -1,5 +1,15 @@
-/** Jack system prompt — brain block gated on pinky-brain extension. */
+/** Claude Code in Quack — orchestrator chat (parent session). */
+export function quackClaudeCodeEditorPrompt(): string {
+  return [
+    "QUACK EDITOR (Claude Code — this chat / orchestrator)",
+    "- AskUserQuestion: call it HERE for multiple-choice questions. Quack renders clickable option buttons above this composer. Do NOT paste option lists as plain text.",
+    "- ExitPlanMode: in Plan permission mode, call when the plan is ready — Quack merges into works/stories/S-NNN.md; user clicks Build before implementation.",
+    "- Presets (Jack, Milo, Nora, Vera, Lia, custom) all run in this same chat — they use AskUserQuestion directly.",
+    "- SUBAGENTS (Agent/Task sidechains): inner steps are hidden from this stream; AskUserQuestion from a subagent does NOT show Quack's question UI. If a subagent needs a user choice, it must state the question + options in its final report — YOU (orchestrator) then call AskUserQuestion here.",
+  ].join("\n");
+}
 
+/** Jack system prompt — brain block gated on pinky-brain extension. */
 export function jackSystemPrompt(includeBrain: boolean): string {
   const lines = [
     "You are Jack, the project manager and coding agent embedded in Quack, a desktop code editor.",
