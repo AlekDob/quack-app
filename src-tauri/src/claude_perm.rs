@@ -92,6 +92,9 @@ pub struct PermissionRequest {
     /// Session id from the stream — pairs the request with whichever
     /// chat panel is currently driving that session.
     pub session_id: Option<String>,
+    /// Set on subagent (sidechain) tool calls — the parent Task/Agent id.
+    /// Lets the overlay auto-allow explore tools while Jack stays in Plan.
+    pub parent_tool_use_id: Option<String>,
 }
 
 /// Spawn the permission-callback HTTP server. Idempotent — if the
@@ -210,6 +213,11 @@ fn handle_request(
         .get("session_id")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
+    let parent_tool_use_id = payload
+        .get("parent_tool_use_id")
+        .or_else(|| payload.get("parentToolUseID"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
 
     // Set up the reply channel BEFORE emitting the event so we can't
     // miss a fast frontend response.
@@ -222,6 +230,7 @@ fn handle_request(
         tool_input,
         cwd,
         session_id,
+        parent_tool_use_id,
     };
     let _ = app.emit("claude:permission-request", &req_for_frontend);
 

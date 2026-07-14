@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 
 **Purpose:** Let the user delegate a chat turn to a Claude Code **subagent** by
 typing `@` in the composer — the same affordance that already attaches files.
@@ -42,7 +42,8 @@ dependency).
 | Component | `src/components/MentionPathPreview.tsx` | Side tree for highlighted file row (041) |
 | Component | `src/components/AIChatPanel.tsx` | `agents`/`attachedAgents` state, agent-load effect (CC-only), `@` match logic + `acceptMention`, delegation injection, reset, chips; `SubagentOpen.Provider` + `openSubagentTab`; `.ai-mention-open` overflow toggle |
 | Render | `src/components/chatToolRender.tsx` | `SubagentOpen` context, `subagentTypeOf()`, Task→duck-avatar chip (clickable) |
-| Component | `src/components/SubagentTranscriptView.tsx` | read-only transcript viewer (portaled in editor, **inline** in agent mode), reuses `ToolCallRow` + `MarkdownPreview` |
+| Component | `src/components/SubagentTranscriptView.tsx` | read-only transcript viewer (portaled in editor/drawer, **inline** in agent mode when pref = tab), reuses `TranscriptTurnRows` + `ToolCallRow` |
+| Render | `src/components/TranscriptTurnRows.tsx` | shared read-only turn markup (`.ai-msg`, `.ai-tcalls`, `UserTurnBar` shell) |
 | Host | `src/components/WorkspaceShell.tsx` | walks panes for `sub:` keys, portals one viewer each |
 | Agent host | `src/components/AgentModeShell.tsx` | 50/50 split: mounts `SubagentTranscriptView` inline when focused tab is `sub:` |
 | Store | `src/store.ts` | `subagent` tab kind (`subKey`/`parseKey`), `openSubagent()`, `collectSubagentTabs`, `focusedSubagentKey`, `focusedAgentSidePanelKey` |
@@ -65,11 +66,11 @@ dependency).
    avatar from `duckAvatarFor(subagent_type)`. **The tool is named `Agent` in current Claude Code**
    (older versions / other providers use `Task`) — the chip matches BOTH names.
 2. Click → `SubagentOpen` context → `openSubagentTab(call.id, agentType)` → `store.openSubagent`,
-   which opens a self-contained `sub:<ccSessionId>|<toolUseId>|<agentType>` tab.
-3. **Editor layout:** `WorkspaceShell` portals `SubagentTranscriptView` into the editor pane container.
-4. **Agent Mode:** `AgentModeShell` reads the focused `sub:` key via `focusedAgentSidePanelKey`
-   and renders `SubagentTranscriptView` **inline** in `.agent-main-review` (50/50 beside chat).
-   Close button calls `closeTab`. Compose-review tabs share the same split via the same helper.
+   which opens a self-contained `sub:<ccSessionId>|<toolUseId>|<agentType>` tab or drawer per Settings → Views → **Subagent transcripts**.
+3. **Editor layout:** `WorkspaceShell` portals `SubagentTranscriptView` into the editor pane container or `EditorTabDrawer`.
+4. **Agent Mode:** when pref = tab, `AgentModeShell` reads the focused `sub:` key via `focusedAgentSidePanelKey`
+   and renders `SubagentTranscriptView` **inline** in `.agent-main-review` (50/50 beside chat). When pref = drawer,
+   `AgentModeShell` mounts the same overlay drawer host as `WorkspaceShell`.
 5. `SubagentTranscriptView` calls `claude_code_load_subagent(cwd, ccSessionId, toolUseId)`.
 6. **On-disk linkage:** Claude Code writes each subagent to
    `~/.claude/projects/<enc-cwd>/<session>/subagents/agent-<id>.jsonl` with a sibling
@@ -88,6 +89,13 @@ with `parent_tool_use_id` (and aren't persisted to the main session jsonl — th
 file). `providers/claudeCode.ts` skips emitting any `assistant`/`user` record where
 `parent_tool_use_id` (or `parentToolUseID`) is set, so the main transcript shows **only** the
 Agent chip + its final report. The full inner work lives in the read-only transcript tab.
+
+### Plan mode — sidechain permission auto-allow (2026-07-14)
+When Jack is in CC **Plan** mode and delegates via `Task`/`Agent`, the subagent's inner tool calls
+still hit the PreToolUse hook. The hook JSON carries `parent_tool_use_id` (same id as the stream
+filter above). `claude_perm.rs` forwards it on `claude:permission-request`; `ClaudePermissionOverlay`
+auto-allows sidechain reads/explore in Plan without permission cards. File writes and non-read-only
+Bash from subagents still card. See [015-claude-permission-mode.md](015-claude-permission-mode.md).
 
 ### Gotchas
 - **Tool name is `Agent`, not `Task`:** current Claude Code emits the subagent dispatch tool as

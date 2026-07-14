@@ -6442,6 +6442,7 @@ export function AIChatPanel({
         ownerRoot={root}
         ownerSessionId={claudeSessionId}
         ownerStreaming={streaming !== null || runningTools}
+        ownerPermMode={ccPermMode}
         onAllowAll={() => setCcPermMode("auto")}
         onPlanReady={openPlanHandler}
         onPlanBuild={onPlanBuild}

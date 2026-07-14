@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: React 19, Zustand store (split-pane layout)
 created: 2026-07-12
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 tags: [chat, plan-mode, claude-code, virtual-tab, split, permission-overlay, build-handoff]
 ---
 
@@ -68,6 +68,7 @@ ExitPlanMode permission request arrives (tool_input.plan non-empty)
   later in the same turn gets its own tab; re-renders of the same request
   don't reopen/refocus the tab repeatedly.
 - **Approval (2026-07-13):** the `ExitPlanMode` card no longer offers "Approve & start" (Jack implementing). **Keep discussing** denies; **Build** approves + hands off to Milo via `onPlanBuild` then `claude_perm_decide: allow`. Plan text display (`onPlanReady`) is unchanged — merge into story/drawer still happens before the user decides.
+- **Plan explore permissions (2026-07-14):** parallel `Task` subagents in Plan mode auto-allow via `parent_tool_use_id` sidechain routing + `PLAN_READ_TOOLS` — see [015-claude-permission-mode.md](015-claude-permission-mode.md). Generic permission cards in Plan show **Allow exploration** (stays Plan) instead of **Allow all** (would flip to Auto).
 
 ### Related docs
 - `068-quack-plan-harness.md` — story-owned plan (primary path when `storyId` set)

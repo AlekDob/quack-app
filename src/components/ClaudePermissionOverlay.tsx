@@ -34,6 +34,7 @@ const PATH_TOOLS = new Set([
   "Write",
   "Read",
   "NotebookEdit",
+  "NotebookRead",
   "Grep",
   "Glob",
 ]);
@@ -45,7 +46,12 @@ const PATH_TOOLS = new Set([
  *  `path` argument; a workspace-wide Grep that merely matches lines
  *  inside an excluded file can't be filtered at this layer. Read — the
  *  high-bandwidth leak — is fully covered.) */
-const READ_ONLY_HOOK_TOOLS = new Set(["Read", "Grep", "Glob"]);
+const READ_ONLY_HOOK_TOOLS = new Set([
+  "Read",
+  "Grep",
+  "Glob",
+  "NotebookRead",
+]);
 
 interface ExtRule {
   ext: string; // ".ts" lowercased, leading dot
@@ -126,6 +132,13 @@ const PLAN_EXPLORE_TOOLS = new Set([
   "TodoWrite",
 ]);
 
+/** Read/search tools Jack and explore subagents use while planning. */
+const PLAN_READ_TOOLS = new Set([
+  "ToolSearch",
+  "WebSearch",
+  "WebFetch",
+]);
+
 /** Bash command names that only ever READ — safe to auto-allow during Plan
  *  mode (where the CLI already forbids edits, so the only residual risk is a
  *  Bash side-effect). Deliberately tight: runners (env/xargs/sudo/nohup) and
@@ -135,7 +148,7 @@ const READ_ONLY_BASH = new Set([
   "ls", "cat", "head", "tail", "wc", "pwd", "echo", "grep", "rg", "tree",
   "stat", "file", "which", "type", "date", "whoami", "uname", "hostname",
   "du", "df", "printenv", "sort", "uniq", "cut", "basename", "dirname",
-  "realpath",
+  "realpath", "sleep", "find", "test", "true", "false", "cd",
 ]);
 
 /** git subcommands that are read-only even with arguments. `branch`, `tag`,
@@ -145,16 +158,50 @@ const GIT_RO_SUBCMDS = new Set([
   "describe",
 ]);
 
-/** True when a Bash command is provably read-only: no chaining / redirect /
- *  pipe / command-substitution (BASH_CHAIN_RE), and its head is a read-only
- *  command (git gated on a read-only subcommand). */
+/** True when a Bash command is provably read-only: no pipe / redirect /
+ *  command-substitution, and every `;` / `&&` segment is a read-only head.
+ *  Allows harmless chains like `sleep 1; echo done` while blocking
+ *  `git status; rm -rf ~`. */
 function isReadOnlyBash(input: Record<string, unknown>): boolean {
   const cmd = typeof input.command === "string" ? input.command : "";
-  if (!cmd || BASH_CHAIN_RE.test(cmd)) return false;
-  const tokens = cmd.trim().split(/\s+/);
-  const first = tokens[0] ?? "";
-  if (first === "git") return GIT_RO_SUBCMDS.has(tokens[1] ?? "");
-  return READ_ONLY_BASH.has(first);
+  if (!cmd || /[|`<>\n]|\$\(/.test(cmd)) return false;
+  const segments = cmd
+    .split(/[;&]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (segments.length === 0) return false;
+  return segments.every((seg) => {
+    const tokens = seg.split(/\s+/);
+    const first = tokens[0] ?? "";
+    if (first === "git") return GIT_RO_SUBCMDS.has(tokens[1] ?? "");
+    return READ_ONLY_BASH.has(first);
+  });
+}
+
+/** Sidechain (Task subagent) explore — auto in Plan unless it's a write. */
+function isPlanSidechainExplore(req: PermissionRequest): boolean {
+  if (!req.parent_tool_use_id) return false;
+  if (WRITE_TOOLS.has(req.tool_name) || req.tool_name === "ExitPlanMode") {
+    return false;
+  }
+  if (req.tool_name === "Bash") return isReadOnlyBash(req.tool_input);
+  return true;
+}
+
+function planModeAutoAllow(
+  req: PermissionRequest,
+  sessionExplore: boolean,
+): boolean {
+  if (sessionExplore) {
+    if (req.tool_name === "ExitPlanMode") return false;
+    if (WRITE_TOOLS.has(req.tool_name)) return false;
+    if (req.tool_name === "Bash") return isReadOnlyBash(req.tool_input);
+    return true;
+  }
+  if (isPlanSidechainExplore(req)) return true;
+  if (PLAN_EXPLORE_TOOLS.has(req.tool_name)) return true;
+  if (PLAN_READ_TOOLS.has(req.tool_name)) return true;
+  return req.tool_name === "Bash" && isReadOnlyBash(req.tool_input);
 }
 
 /**
@@ -173,15 +220,25 @@ function isReadOnlyBash(input: Record<string, unknown>): boolean {
  * ("bypassPermissions" is handled earlier in the listener — it allows before
  *  the privacy gate — so it never reaches here.)
  */
-function modeAutoAllow(req: PermissionRequest): boolean {
-  const mode = getPermModeFor(req);
+function modeAutoAllow(
+  req: PermissionRequest,
+  planSessionExplore: boolean,
+  mode: string,
+): boolean {
   if (mode === "auto") return true;
   if (mode === "acceptEdits") return WRITE_TOOLS.has(req.tool_name);
-  if (mode === "plan") {
-    if (PLAN_EXPLORE_TOOLS.has(req.tool_name)) return true;
-    return req.tool_name === "Bash" && isReadOnlyBash(req.tool_input);
-  }
+  if (mode === "plan") return planModeAutoAllow(req, planSessionExplore);
   return false;
+}
+
+/** Composer mode for THIS panel — authoritative over permModeStore lookups
+ *  that can miss when subagent cwd/session diverges from the chat root. */
+function panelPermMode(
+  ownerPermMode: string | null | undefined,
+  req: PermissionRequest,
+): string {
+  if (ownerPermMode !== undefined) return ownerPermMode ?? "default";
+  return getPermModeFor(req);
 }
 
 /** Tools we refuse to add as bare-name always-allow even if user clicks.
@@ -207,6 +264,7 @@ interface PermissionRequest {
   tool_input: Record<string, unknown>;
   cwd?: string | null;
   session_id?: string | null;
+  parent_tool_use_id?: string | null;
 }
 
 /** Normalize a path for owner-matching: forward slashes, no trailing
@@ -290,6 +348,7 @@ export function ClaudePermissionOverlay({
   ownerRoot,
   ownerSessionId,
   ownerStreaming,
+  ownerPermMode,
   onAllowAll,
   onPlanReady,
   onPlanBuild,
@@ -300,6 +359,9 @@ export function ClaudePermissionOverlay({
   ownerSessionId?: string;
   /** True while this panel has an in-flight turn (pre-init session routing). */
   ownerStreaming: boolean;
+  /** Composer permission mode for this chat — wins over permModeStore lookups
+   *  when subagent cwd/session diverges from the panel root. */
+  ownerPermMode?: string | null;
   /** Flip this chat to "stop asking" (Auto mode). Wired by AIChatPanel to
    *  setCcPermMode("auto") so the composer chip + persistence stay in sync. */
   onAllowAll?: () => void;
@@ -320,14 +382,16 @@ export function ClaudePermissionOverlay({
     root: ownerRoot,
     sessionId: ownerSessionId,
     streaming: ownerStreaming,
+    permMode: ownerPermMode,
   });
   useEffect(() => {
     ownerRef.current = {
       root: ownerRoot,
       sessionId: ownerSessionId,
       streaming: ownerStreaming,
+      permMode: ownerPermMode,
     };
-  }, [ownerRoot, ownerSessionId, ownerStreaming]);
+  }, [ownerRoot, ownerSessionId, ownerStreaming, ownerPermMode]);
 
   // Drop stale cards when the user switches chat or the CC session id lands.
   useEffect(() => {
@@ -354,6 +418,13 @@ export function ClaudePermissionOverlay({
     bashPrefixes: new Set(),
     exts: [],
   });
+  // Plan mode: user clicked "Allow exploration" — stop carding reads and
+  // subagent tools for this run but keep the composer on Plan (not Auto).
+  const planSessionExploreRef = useRef(false);
+
+  useEffect(() => {
+    planSessionExploreRef.current = false;
+  }, [ownerRoot, ownerSessionId]);
 
   useEffect(() => {
     let offReq: (() => void) | undefined;
@@ -397,7 +468,8 @@ export function ClaudePermissionOverlay({
       // live from permModeStore, so flipping to Bypass mid-run takes effect
       // on the very next tool call. AskUserQuestion is handled above — it
       // can't work headless regardless of mode.
-      if (getPermModeFor(req) === "bypassPermissions") {
+      const mode = panelPermMode(owner.permMode, req);
+      if (mode === "bypassPermissions") {
         void invoke("claude_perm_decide", {
           requestId: req.request_id,
           decision: "allow",
@@ -436,7 +508,7 @@ export function ClaudePermissionOverlay({
       // Permission-mode auto-allow (Auto / Auto-edit). Comes after the
       // privacy + read-only gates so those always win, before the saved
       // always-allow rules since the mode is the broader intent.
-      if (modeAutoAllow(req)) {
+      if (modeAutoAllow(req, planSessionExploreRef.current, mode)) {
         void invoke("claude_perm_decide", {
           requestId: req.request_id,
           decision: "allow",
@@ -448,7 +520,7 @@ export function ClaudePermissionOverlay({
       // hook's allow overrides the CLI's plan-mode block), defeating the
       // whole point of planning. Read-only allows already happened above; a
       // writing tool here just cards.
-      if (getPermModeFor(req) === "plan") {
+      if (mode === "plan") {
         setQueue((q) => [...q, req]);
         return;
       }
@@ -558,6 +630,7 @@ export function ClaudePermissionOverlay({
 
   if (!req) return null;
   const isPlan = req.tool_name === "ExitPlanMode";
+  const inPlanMode = panelPermMode(ownerPermMode, req) === "plan";
   const isBash = req.tool_name === "Bash";
   const bashCmd =
     isBash && typeof req.tool_input.command === "string"
@@ -613,12 +686,16 @@ export function ClaudePermissionOverlay({
 
   // "Allow all — stop asking": flip THIS chat into Auto mode (via the
   // AIChatPanel callback, so the composer mode chip + localStorage stay in
-  // sync) and resolve everything already queued. Future tool calls then
-  // auto-allow through modeAutoAllow — no more cards for this run. This is
-  // the answer to "otherwise it asks me 100 times". Auto keeps the privacy
-  // gate + AskUserQuestion redirect; only Bypass would drop those.
+  // sync) and resolve everything already queued. In Plan mode we instead
+  // set planSessionExploreRef so reads/subagents stop carding but the
+  // composer stays on Plan and ExitPlanMode still cards.
   const allowAll = async () => {
-    onAllowAll?.();
+    const mode = req ? panelPermMode(ownerPermMode, req) : "default";
+    if (mode === "plan") {
+      planSessionExploreRef.current = true;
+    } else {
+      onAllowAll?.();
+    }
     const pending = queue;
     setQueue([]);
     await Promise.all(
@@ -748,10 +825,14 @@ export function ClaudePermissionOverlay({
               <button
                 className="cc-perm-btn cc-perm-allow-all"
                 onClick={() => void allowAll()}
-                title="Switch this chat to Auto — allow every tool for the rest of the run without asking. Change it anytime from the composer mode menu."
+                title={
+                  inPlanMode
+                    ? "Allow reads and subagent exploration for this run — stay in Plan mode. File edits and ExitPlanMode still ask."
+                    : "Switch this chat to Auto — allow every tool for the rest of the run without asking. Change it anytime from the composer mode menu."
+                }
               >
                 <Icon name="zap" size={12} />
-                <span>Allow all</span>
+                <span>{inPlanMode ? "Allow exploration" : "Allow all"}</span>
               </button>
             )}
           </div>
@@ -759,7 +840,14 @@ export function ClaudePermissionOverlay({
         <div className="cc-perm-shortcut-hint">
           <kbd>Enter</kbd> {isPlan ? "Build" : "Allow once"} ·{" "}
           <kbd>Esc</kbd> {isPlan ? "Keep discussing" : "Deny"}
-          {!isPlan && <span className="cc-perm-hint-all"> · Allow all stops the prompts</span>}
+          {!isPlan && (
+            <span className="cc-perm-hint-all">
+              {" · "}
+              {inPlanMode
+                ? "Allow exploration stops prompts but keeps Plan"
+                : "Allow all stops the prompts"}
+            </span>
+          )}
           {queue.length > 1 && (
             <span className="cc-perm-queue-inline">
               {" · "}+{queue.length - 1} more pending
