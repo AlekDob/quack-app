@@ -3,11 +3,14 @@
 // each project can carry its own tint to tell them apart at a glance.
 // Color is used as an accent (side trace + faint tint), never a full fill.
 //
-// Persisted in localStorage as a { wsId: colorId } map. A tiny pub/sub
+// Persisted in localStorage keyed by normalized workspace root (stable across
+// re-imports). Legacy wsId keys are still read for migration. A tiny pub/sub
 // (same shape as aiTaskStore) lets the activity bar + agent rail re-render
 // when a color changes, without threading state through the store.
 
 import { getJson, setJson } from "./localStore";
+import { normalizeWorkspaceRoot } from "./pathUtils";
+import { useStore } from "./store";
 
 export interface WorkspaceColor {
   id: string;
@@ -61,9 +64,28 @@ function notify() {
   for (const l of listeners) l();
 }
 
+function workspaceRoot(wsId: string): string | null {
+  const state = useStore.getState();
+  const fromLoaded = state.loaded[wsId]?.meta.root;
+  if (fromLoaded) return fromLoaded;
+  const fromRecent = state.recent.find((w) => w.id === wsId)?.root;
+  return fromRecent ?? null;
+}
+
+/** Stable localStorage key — normalized root, not ephemeral wsId. */
+function colorStorageKey(wsId: string): string {
+  const root = workspaceRoot(wsId);
+  return root ? normalizeWorkspaceRoot(root) : wsId;
+}
+
+function resolveColorId(map: Record<string, string>, wsId: string): string | undefined {
+  const key = colorStorageKey(wsId);
+  return map[key] ?? map[wsId];
+}
+
 /** Resolve a workspace's color object, or null if none / unknown id. */
 export function getWorkspaceColor(wsId: string): WorkspaceColor | null {
-  const id = readMap()[wsId];
+  const id = resolveColorId(readMap(), wsId);
   if (!id) return null;
   return WORKSPACE_COLORS.find((c) => c.id === id) ?? null;
 }
@@ -71,8 +93,10 @@ export function getWorkspaceColor(wsId: string): WorkspaceColor | null {
 /** Set (colorId) or clear (null) a workspace's color, then notify. */
 export function setWorkspaceColor(wsId: string, colorId: string | null): void {
   const map = readMap();
-  if (colorId) map[wsId] = colorId;
-  else delete map[wsId];
+  const key = colorStorageKey(wsId);
+  if (colorId) map[key] = colorId;
+  else delete map[key];
+  if (key !== wsId) delete map[wsId];
   setJson(KEY, map);
   notify();
 }

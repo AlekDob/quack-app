@@ -139,18 +139,6 @@ const PLAN_READ_TOOLS = new Set([
   "WebFetch",
 ]);
 
-/** Bash command names that only ever READ — safe to auto-allow during Plan
- *  mode (where the CLI already forbids edits, so the only residual risk is a
- *  Bash side-effect). Deliberately tight: runners (env/xargs/sudo/nohup) and
- *  in-place editors (sed -i) are excluded, and any redirect / pipe / chain /
- *  subshell is rejected separately via BASH_CHAIN_RE — so these can't write. */
-const READ_ONLY_BASH = new Set([
-  "ls", "cat", "head", "tail", "wc", "pwd", "echo", "grep", "rg", "tree",
-  "stat", "file", "which", "type", "date", "whoami", "uname", "hostname",
-  "du", "df", "printenv", "sort", "uniq", "cut", "basename", "dirname",
-  "realpath", "sleep", "find", "test", "true", "false", "cd",
-]);
-
 /** git subcommands that are read-only even with arguments. `branch`, `tag`,
  *  `config`, `remote` are excluded — they all have mutating forms. */
 const GIT_RO_SUBCMDS = new Set([
@@ -158,24 +146,64 @@ const GIT_RO_SUBCMDS = new Set([
   "describe",
 ]);
 
-/** True when a Bash command is provably read-only: no pipe / redirect /
- *  command-substitution, and every `;` / `&&` segment is a read-only head.
- *  Allows harmless chains like `sleep 1; echo done` while blocking
- *  `git status; rm -rf ~`. */
-function isReadOnlyBash(input: Record<string, unknown>): boolean {
+/** Mutating / risky Bash — never auto-allow, even in Plan explore. */
+const PLAN_DANGEROUS_BASH_RE =
+  /\b(rm|rmdir|mv|cp|chmod|chown|mkdir|touch|truncate|tee|sudo|kill|pkill|eval|exec)\b|\bsed\s+-i\b|\b(npm|pnpm|yarn)\s+(install|add|remove|publish)\b|\bpip\s+install\b|\bgit\s+(add|commit|push|merge|checkout|reset|revert|stash|clean)\b/;
+
+function stripStderrRedirects(part: string): string {
+  return part.replace(/\s*2>\s*(&\d+|\/dev\/null|\S+)/g, "");
+}
+
+function hasStdoutRedirect(part: string): boolean {
+  const bare = stripStderrRedirects(part);
+  return /(^|[^\d])>{1,2}/.test(bare);
+}
+
+function skipEnvAssigns(segment: string): string {
+  let s = segment.trim();
+  const envRe = /^(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=/;
+  while (envRe.test(s)) {
+    s = s
+      .replace(/^(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|'[^']*'|\S+)\s*/, "")
+      .trim();
+  }
+  return s;
+}
+
+function bashHead(part: string): string {
+  const rest = skipEnvAssigns(part);
+  if (!rest) return "";
+  return rest.split(/\s+/)[0] ?? "";
+}
+
+function isPlanExploreBashPart(part: string): boolean {
+  const p = stripStderrRedirects(part.trim());
+  if (!p) return true;
+  if (hasStdoutRedirect(p) || /\$\(|`/.test(p)) return false;
+  if (PLAN_DANGEROUS_BASH_RE.test(p)) return false;
+  const head = bashHead(p);
+  if (!head) return true;
+  if (head === "git") return GIT_RO_SUBCMDS.has(p.split(/\s+/)[1] ?? "");
+  return true;
+}
+
+function planExplorePipe(link: string): boolean {
+  const pipes = link.split(/\|/).map((s) => s.trim()).filter(Boolean);
+  return pipes.length > 0 && pipes.every(isPlanExploreBashPart);
+}
+
+function planExploreChain(seg: string): boolean {
+  const chains = seg.split(/&&/).map((s) => s.trim()).filter(Boolean);
+  return chains.length > 0 && chains.every(planExplorePipe);
+}
+
+/** Plan-mode explore Bash — pipes, env assigns, stderr redirect; block writes. */
+function isPlanExploreBash(input: Record<string, unknown>): boolean {
   const cmd = typeof input.command === "string" ? input.command : "";
-  if (!cmd || /[|`<>\n]|\$\(/.test(cmd)) return false;
-  const segments = cmd
-    .split(/[;&]+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (segments.length === 0) return false;
-  return segments.every((seg) => {
-    const tokens = seg.split(/\s+/);
-    const first = tokens[0] ?? "";
-    if (first === "git") return GIT_RO_SUBCMDS.has(tokens[1] ?? "");
-    return READ_ONLY_BASH.has(first);
-  });
+  if (!cmd.trim()) return false;
+  const flat = cmd.replace(/\n+/g, ";").trim();
+  const segments = flat.split(/[;&]+/).map((s) => s.trim()).filter(Boolean);
+  return segments.length > 0 && segments.every(planExploreChain);
 }
 
 /** Sidechain (Task subagent) explore — auto in Plan unless it's a write. */
@@ -184,7 +212,7 @@ function isPlanSidechainExplore(req: PermissionRequest): boolean {
   if (WRITE_TOOLS.has(req.tool_name) || req.tool_name === "ExitPlanMode") {
     return false;
   }
-  if (req.tool_name === "Bash") return isReadOnlyBash(req.tool_input);
+  if (req.tool_name === "Bash") return isPlanExploreBash(req.tool_input);
   return true;
 }
 
@@ -195,13 +223,13 @@ function planModeAutoAllow(
   if (sessionExplore) {
     if (req.tool_name === "ExitPlanMode") return false;
     if (WRITE_TOOLS.has(req.tool_name)) return false;
-    if (req.tool_name === "Bash") return isReadOnlyBash(req.tool_input);
+    if (req.tool_name === "Bash") return isPlanExploreBash(req.tool_input);
     return true;
   }
   if (isPlanSidechainExplore(req)) return true;
   if (PLAN_EXPLORE_TOOLS.has(req.tool_name)) return true;
   if (PLAN_READ_TOOLS.has(req.tool_name)) return true;
-  return req.tool_name === "Bash" && isReadOnlyBash(req.tool_input);
+  return req.tool_name === "Bash" && isPlanExploreBash(req.tool_input);
 }
 
 /**
@@ -508,7 +536,9 @@ export function ClaudePermissionOverlay({
       // Permission-mode auto-allow (Auto / Auto-edit). Comes after the
       // privacy + read-only gates so those always win, before the saved
       // always-allow rules since the mode is the broader intent.
-      if (modeAutoAllow(req, planSessionExploreRef.current, mode)) {
+      // Plan mode = explore bypass by default (reads, pipes, subagents).
+      const planExplore = mode === "plan" || planSessionExploreRef.current;
+      if (modeAutoAllow(req, planExplore, mode)) {
         void invoke("claude_perm_decide", {
           requestId: req.request_id,
           decision: "allow",

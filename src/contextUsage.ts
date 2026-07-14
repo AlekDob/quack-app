@@ -58,18 +58,31 @@ export function estimateContextUsed(
 const OPUS_CTX = 1_000_000;
 const DEFAULT_CTX = 200_000;
 
+/** Claude Code picker alias → advertised context window for ring + browser. */
+export function ccAliasContextWindow(modelId: string): number {
+  const id = modelId.toLowerCase();
+  if (id === "haiku" || id === "fable") return DEFAULT_CTX;
+  if (id.includes("sonnet") || id.includes("opus")) return OPUS_CTX;
+  return id.includes("[1m]") ? OPUS_CTX : DEFAULT_CTX;
+}
+
 export function resolveContextWindow(
   selectedQualified: string | null,
   models: ProviderModel[],
 ): number {
   const parsed = parseQualifiedModel(selectedQualified ?? "");
   if (!parsed) return DEFAULT_CTX;
+  const id = parsed.modelId.toLowerCase();
+  // CC aliases (`sonnet`, `opus`) map to 1M models even without a `[1m]`
+  // suffix — must beat the dynamic catalog, which used to assign 200k.
+  if (parsed.providerId === "claude-code") {
+    return ccAliasContextWindow(parsed.modelId);
+  }
   const hit = models.find(
     (m) =>
       m.providerId === parsed.providerId && m.modelId === parsed.modelId,
   );
   if (hit?.contextWindow) return hit.contextWindow;
-  const id = parsed.modelId.toLowerCase();
   if (id.includes("opus") || id.includes("sonnet")) return OPUS_CTX;
   return DEFAULT_CTX;
 }

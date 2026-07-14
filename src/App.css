@@ -891,8 +891,8 @@ input {
 /* Per-project color (right-click → popover). Inactive = faint tint;
    active = full fill with white initials. */
 .ws-icon.has-color {
-  background: color-mix(in srgb, var(--ws-color) 13%, var(--bg-elev));
-  border-color: color-mix(in srgb, var(--ws-color) 30%, var(--border));
+  background: color-mix(in srgb, var(--ws-color) 20%, var(--bg-elev));
+  border-color: color-mix(in srgb, var(--ws-color) 38%, var(--border));
 }
 .ws-icon.has-color .ws-icon-text {
   color: var(--ws-color);
@@ -938,11 +938,11 @@ body.ws-dragging * {
 .ws-color-overlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 1190;
 }
 .ws-color-popover {
   position: fixed;
-  z-index: 210;
+  z-index: 1200;
   width: 156px;
   padding: 10px;
   border-radius: var(--radius-md);
@@ -7377,6 +7377,15 @@ body.ab-dragging * {
   justify-content: space-between;
   gap: 8px;
 }
+.ai-composer-ctx-menu .menu-item-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ai-composer-ctx-menu .menu-item-label svg {
+  flex-shrink: 0;
+}
 .ai-composer-ctx-menu .menu-item-accel {
   font-size: 10px;
   color: var(--fg-muted);
@@ -7388,25 +7397,8 @@ body.ab-dragging * {
 .ai-composer-ctx-menu .menu-item.ai-composer-ctx-open {
   justify-content: flex-start;
 }
-.ai-composer-ctx-menu .ai-composer-ctx-open .menu-item-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-  white-space: nowrap;
-}
-.ai-composer-ctx-menu .ai-composer-ctx-open .menu-item-label svg {
-  flex-shrink: 0;
-}
 .ai-composer-ctx-menu .git-branch-new {
   justify-content: flex-start;
-}
-.ai-composer-ctx-menu .git-branch-new .menu-item-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: none;
-  white-space: nowrap;
 }
 .git-branch--disabled {
   opacity: 0.55;
@@ -12620,6 +12612,21 @@ button.composer-mention-chip-label:hover {
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* Light inline markdown during typewriter (069) — mirrors .md-preview chips. */
+.ai-stream-plain-md code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  padding: 1px 5px;
+  background: var(--bg-alt);
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+.ai-stream-plain-md strong {
+  font-weight: 600;
+}
+.ai-stream-plain-md em {
+  font-style: italic;
+}
 /* Inline caret — thin pulse, not a blocky step-blink bar. */
 .ai-stream-caret {
   display: inline-block;
@@ -17668,8 +17675,8 @@ button.composer-mention-chip-label:hover {
 }
 /* Per-project color in the agent rail (mirrors .ws-icon.has-color) */
 .agent-wsrail-icon.has-color {
-  background: color-mix(in srgb, var(--ws-color) 13%, var(--bg-elev));
-  border-color: color-mix(in srgb, var(--ws-color) 30%, var(--border));
+  background: color-mix(in srgb, var(--ws-color) 20%, var(--bg-elev));
+  border-color: color-mix(in srgb, var(--ws-color) 38%, var(--border));
 }
 .agent-wsrail-icon.has-color .agent-wsrail-text {
   color: var(--ws-color);

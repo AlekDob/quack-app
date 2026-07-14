@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   WORKSPACE_COLORS,
@@ -26,16 +27,28 @@ export function WorkspaceColorPopover({
   onClose,
   onNewChat,
 }: Props) {
-  const current = getWorkspaceColor(wsId);
+  const [currentId, setCurrentId] = useState(
+    () => getWorkspaceColor(wsId)?.id ?? null,
+  );
+
+  useEffect(() => {
+    setCurrentId(getWorkspaceColor(wsId)?.id ?? null);
+  }, [wsId]);
 
   const pick = (colorId: string | null) => {
     setWorkspaceColor(wsId, colorId);
-    onClose();
+    setCurrentId(colorId);
+    requestAnimationFrame(onClose);
   };
 
   const startChat = () => {
     onNewChat(wsId, nameAnchor);
     onClose();
+  };
+
+  const stopBubble = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   return createPortal(
@@ -46,8 +59,13 @@ export function WorkspaceColorPopover({
         style={{ left: x, top: y }}
         role="menu"
         aria-label="Workspace actions"
+        onPointerDown={stopBubble}
       >
-        <button type="button" className="ws-color-new-chat" onClick={startChat}>
+        <button
+          type="button"
+          className="ws-color-new-chat"
+          onClick={startChat}
+        >
           <AIIcon size={14} />
           <span>New chat here</span>
         </button>
@@ -56,15 +74,21 @@ export function WorkspaceColorPopover({
           {WORKSPACE_COLORS.map((c) => (
             <button
               key={c.id}
-              className={`ws-color-swatch ${current?.id === c.id ? "active" : ""}`}
+              type="button"
+              className={`ws-color-swatch ${currentId === c.id ? "active" : ""}`}
               style={{ background: c.hex }}
               title={c.label}
               aria-label={c.label}
+              onPointerDown={stopBubble}
               onClick={() => pick(c.id)}
             />
           ))}
         </div>
-        <button className="ws-color-clear" onClick={() => pick(null)}>
+        <button
+          type="button"
+          className="ws-color-clear"
+          onClick={() => pick(null)}
+        >
           No color
         </button>
       </div>

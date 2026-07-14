@@ -3,7 +3,7 @@ export function quackClaudeCodeEditorPrompt(): string {
   return [
     "QUACK EDITOR (Claude Code — this chat / orchestrator)",
     "- AskUserQuestion: call it HERE for multiple-choice questions. Quack renders clickable option buttons above this composer. Do NOT paste option lists as plain text.",
-    "- ExitPlanMode: in Plan permission mode, call when the plan is ready — Quack merges into works/stories/S-NNN.md; user clicks Build before implementation.",
+    "- ExitPlanMode: in Plan permission mode, call when the plan is ready — Quack merges into works/stories/S-NNN.md; user clicks Build before implementation. Never write ~/.claude/plans/* — that path is outside Quack Works.",
     "- Presets (Jack, Milo, Nora, Vera, Lia, custom) all run in this same chat — they use AskUserQuestion directly.",
     "- SUBAGENTS (Agent/Task sidechains): inner steps are hidden from this stream; AskUserQuestion from a subagent does NOT show Quack's question UI. If a subagent needs a user choice, it must state the question + options in its final report — YOU (orchestrator) then call AskUserQuestion here.",
   ].join("\n");

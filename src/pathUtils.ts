@@ -10,6 +10,11 @@
 // "C:\Users\me\proj\", "C:/Users/me/proj/", and "C:/Users/me/proj" all
 // produce the same basename.
 
+/** Canonical workspace root — forward slashes, no trailing slash. */
+export function normalizeWorkspaceRoot(root: string): string {
+  return root.replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
 /** Basename of a file or directory path. Strips trailing slashes first
  *  so basename("/a/b/") returns "b". */
 export function basename(p: string): string {

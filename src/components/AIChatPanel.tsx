@@ -1183,11 +1183,20 @@ export function AIChatPanel({
       })
       .catch(() => {});
   }, [pinkyBrainExt, root, brainRecentHits.length]);
-  const [worksSnap, setWorksSnap] = useState<WorksSnapshot | null>(null);
+  // Works catalog for @-mention only — avoid panel-wide re-renders on every
+  // works/ disk write (ComposerWorkBar keeps its own subscription).
+  const [mentionWorksSnap, setMentionWorksSnap] =
+    useState<WorksSnapshot | null>(null);
   useEffect(() => {
-    void hydrateWorks(root).then(setWorksSnap);
-    return subscribeWorks(root, setWorksSnap);
-  }, [root]);
+    if (!mentionState) {
+      setMentionWorksSnap(null);
+      return;
+    }
+    const cached = getWorksSnapshot(root);
+    if (cached) setMentionWorksSnap(cached);
+    void hydrateWorks(root).then(setMentionWorksSnap);
+    return subscribeWorks(root, setMentionWorksSnap);
+  }, [mentionState, root]);
   // Shell-style prompt history. historyIdx counts backwards through
   // the user-message stream (0 = most recent); null means we're not
   // in history mode. historyDraft snapshots whatever the user was
@@ -2618,8 +2627,8 @@ export function AIChatPanel({
         if (out.length >= 4) break;
       }
     }
-    if (worksSnap) {
-      for (const s of worksSnap.stories) {
+    if (mentionWorksSnap) {
+      for (const s of mentionWorksSnap.stories) {
         if (
           q === "" ||
           s.shortId.toLowerCase().includes(q) ||
@@ -2629,7 +2638,7 @@ export function AIChatPanel({
           if (out.length >= 8) break;
         }
       }
-      for (const w of worksSnap.items) {
+      for (const w of mentionWorksSnap.items) {
         if (
           q === "" ||
           w.shortId.toLowerCase().includes(q) ||
@@ -2650,7 +2659,7 @@ export function AIChatPanel({
       }
     }
     return out;
-  }, [mentionState, mentionFiles, root, agents, worksSnap]);
+  }, [mentionState, mentionFiles, root, agents, mentionWorksSnap]);
 
   const acceptMention = (pick: MentionItem) => {
     if (!mentionState) return;
@@ -3136,14 +3145,27 @@ export function AIChatPanel({
     if (skipAllInlining) {
       // Claude Code has its own Read / Glob / Grep / Edit / Bash tools and
       // its own internal rules. Our "tools available" section would only
-      // confuse it. Just orient it briefly.
+      // confuse it. Just orient it briefly on the first flattened prompt.
       sysParts.push(
         [
           "You are running inside Quack, a code editor. The user has the workspace open as your current working directory.",
           "Use your normal tools (Read, Glob, Grep, Edit, Bash, etc.) to investigate and modify files as needed. Be thorough and substantive.",
-          quackClaudeCodeEditorPrompt(),
         ].join("\n\n"),
       );
+      // Resumed CC turns send only the latest user message — sysParts vanish
+      // after turn one. Orchestrator tool contract must ride in ccTurnContext.
+      ccTurnContext.push(quackClaudeCodeEditorPrompt());
+      if (planning) {
+        ccTurnContext.push(
+          [
+            "[Quack Plan — active]",
+            "Planning session: when the plan is ready call ExitPlanMode with the full markdown plan.",
+            "Do NOT write plans to ~/.claude/plans/ or paste a plan-only summary — ExitPlanMode merges into the linked works/stories/S-NNN.md and Quack shows Build for Milo handoff.",
+            "Use AskUserQuestion for multiple-choice clarifications (not plain-text option lists).",
+            "[/Quack Plan]",
+          ].join("\n"),
+        );
+      }
     } else {
       sysParts.push(
         [

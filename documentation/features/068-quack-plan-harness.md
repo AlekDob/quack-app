@@ -92,7 +92,9 @@ Intent-first work menu:
 
 **Segmented cluster** (Cursor-style): `S-003 › W-008` | `N docs` | `K/N` in one pill (`ai-composer-work-cluster`).
 
-**Link panel** — when the chat has no `workItemId` / `storyId`, the Work chip menu offers **Link existing…** → portaled `ComposerWorkLinkPanel` (`.ai-composer-ctx-menu--work-link`): filter by id/title, pick story or work item, excludes current link. When already linked, menu can switch to another ticket.
+**Link panel** — when the chat has no `workItemId` / `storyId`, the Work chip menu offers quick actions (`ComposerWorkQuickActions`) + searchable stories/work (`ComposerWorkLinkPanel`, `.ai-composer-ctx-menu--work-link`): filter by id/title, pick story or work item, excludes current link. Panel mounts only while the menu is open. Icon rows (`+ New work item`, `Open Works board`) use `.menu-item-label` `inline-flex` — `Icon` SVGs are block-level and stack vertically without it (`022`).
+
+**Works pub/sub:** `ComposerWorkBar` subscribes to `worksCache` for chip label, docs, acceptance. `AIChatPanel` does **not** duplicate that subscription — `@` mention hydrates works lazily (`mentionWorksSnap`) so agent disk writes do not re-render the 7k-line panel.
 
 **Context docs chip** — `ComposerDocsChip.tsx`: hover popover (liquid glass) listing Brain refs by Module / Story / Related / Added; file-type icons + basename + parent path. Row click → `openBrainRef` (`070`): story file opens **Story drawer**, feature paths open **feature preview drawer**, other docs open editor tab (or **tab drawer** in Agent Mode). No full-screen overlay (prevents flicker); 280ms leave debounce; slight overlap with anchor. See `054-works-layer.md`.
 

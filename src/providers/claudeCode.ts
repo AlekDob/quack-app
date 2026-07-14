@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { ChatMessage, ChatStreamEvent, ToolCall } from "../ai";
-import { contextTokensFromApiUsage } from "../contextUsage";
+import { ccAliasContextWindow, contextTokensFromApiUsage } from "../contextUsage";
 import type { ChatProvider, ProviderModel } from "./types";
 import { getWorkspaceRoot } from "../wsRoot";
 import { getJson as lsGetJson } from "../localStore";
@@ -82,7 +82,7 @@ async function fetchModels(): Promise<ProviderModel[]> {
     providerId: "claude-code" as const,
     modelId: e.id,
     displayName: e.display_name,
-    contextWindow: e.id.includes("[1m]") ? 1_000_000 : 200_000,
+    contextWindow: ccAliasContextWindow(e.id),
     supportsTools: true,
   }));
 }

@@ -80,7 +80,9 @@ pct  = round(used / context_window × 100)
 - **Input-only** — `output_tokens` excluded (same as CC statusline).
 - **Per API call** — not summed across tool-loop calls in one user turn.
 - **Window size** — `resolveContextWindow(selectedModel, catalog)`; Opus/Sonnet
-  default 1M, else 200k from model metadata.
+  default 1M, else 200k from model metadata. CC aliases `sonnet`/`opus` (no
+  `[1m]` suffix) also map to 1M via `ccAliasContextWindow` — the dynamic
+  catalog used to wrongly assign 200k and show a false "100% Full" ring.
 
 ### Stream-json pipeline (`claudeCode.ts`)
 

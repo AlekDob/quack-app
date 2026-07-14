@@ -294,7 +294,7 @@ Mirror copies in `documentation/skills/`. Upgrades via `quack-bundled-version`.
 | Story menus | `useStoryContextMenu.tsx`, `worksStoryRowStyle.ts` |
 | Drawers | `WorkItemDrawer.tsx`, `FeatureDocDrawer.tsx`, `editorDrawerStack.ts` |
 | Kanban / timeline | `WorksKanbanView.tsx`, `WorksTimelineView.tsx`, `TimelineBar.tsx` |
-| Composer | `ComposerWorkBar.tsx`, `ComposerDocsChip.tsx`, `ComposerWorkLinkPanel.tsx` |
+| Composer | `ComposerWorkBar.tsx`, `ComposerDocsChip.tsx`, `ComposerWorkLinkPanel.tsx`, `ComposerWorkQuickActions.tsx` |
 | Doc open | `workspaceDocOpen.ts` — see `070-workspace-doc-open.md` |
 | Brain ref UI | `worksBrainRefUi.ts` |
 | Hub badge | `WorkHubBadge.tsx` |

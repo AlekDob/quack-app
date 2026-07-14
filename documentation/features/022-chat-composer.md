@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-13
+last_verified: 2026-07-14
 tags: [composer, stop, multitask, esc, turn-status]
 ---
 
@@ -337,6 +337,17 @@ always per-session.
   `null` when no engine is available — no dead control. Full detail:
   **`052-composer-voice-dictation.md`**.
 
+## Performance (2026-07-14)
+
+| Hot path | Rule |
+|---|---|
+| **Works catalog** | `ComposerWorkBar` owns `subscribeWorks` — isolated to the work-chip subtree. `AIChatPanel` must **not** mirror that subscription; `@` mention uses lazy `mentionWorksSnap` only while `mentionState` is open (`getWorksSnapshot` + hydrate on first `@`). |
+| **Work link menu** | `ComposerWorkLinkPanel` mounts only when the Work chip menu is open (`ComposerCtxMenu` returns `null` when closed). |
+| **Menu row icons** | `Icon` SVGs are `display: block`. All `.ai-composer-ctx-menu .menu-item-label` rows use `inline-flex` + `gap: 6px` so `+ New work item` stays on one line (`ComposerWorkQuickActions`). |
+| **Streaming + typing** | Typewriter RAF parks when caught up (`069`); nav rail must not observe `characterData` (`021`). |
+
+Full thread perf (virtual list, memoized turns) remains TODO — see `064` / `058`.
+
 ## Related
 
 - Stream reading type + spacing: `003-design-system.md`.
@@ -349,4 +360,5 @@ always per-session.
 - Composer git actions (inside pill): `053-composer-git-actions.md`.
 - Composer voice dictation: `052-composer-voice-dictation.md`.
 - Composer mention chips (`#` / `@` / `/`): `072-composer-mention-chips.md`.
+- Quack Plan work chip + menu: `068-quack-plan-harness.md`.
 - Context & usage ring + popover (CC): `023-session-usage-panel.md`.

@@ -48,7 +48,7 @@ import {
 import { choice as dialogChoice } from "./dialog";
 import { getEditorSettings } from "./editorSettings";
 import { getFootprintSettings } from "./footprintSettings";
-import { basename, dirname } from "./pathUtils";
+import { basename, dirname, normalizeWorkspaceRoot } from "./pathUtils";
 import { mediaKindOf } from "./mediaPreview";
 import { fsBus, pathsEqual } from "./fsBus";
 import { pushClosedTab, popClosedTab, forgetClosedTab } from "./closedTabsStack";
@@ -1664,13 +1664,16 @@ export const useStore = create<AppState>((set, get) => {
     },
 
     openWorkspace: async (root) => {
-      const existing = get().recent.find((w) => w.root === root);
+      const norm = normalizeWorkspaceRoot(root);
+      const existing = get().recent.find(
+        (w) => normalizeWorkspaceRoot(w.root) === norm,
+      );
       const meta: WorkspaceMeta = existing
-        ? { ...existing, last_opened: Date.now() }
+        ? { ...existing, root: norm, last_opened: Date.now() }
         : {
-            id: makeWsId(root),
-            name: basename(root) || root,
-            root,
+            id: makeWsId(norm),
+            name: basename(norm) || norm,
+            root: norm,
             last_opened: Date.now(),
           };
       const recent = [

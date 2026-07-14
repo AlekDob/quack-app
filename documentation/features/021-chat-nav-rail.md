@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-05
+last_verified: 2026-07-14
 tags: [chat, navigation, minimap, ux, long-threads]
 ---
 
@@ -26,7 +26,11 @@ endless scrolling. Preview opens leftward so it never covers the messages.
 
 - **Decoupled via DOM data-attributes.** Each user turn's anchor div carries `data-anchor-idx`, `data-anchor-role="user"`, and `data-anchor-preview` (first 120 chars). Anchors live on `.ai-msg-user` inside `.ai-turn` wrappers; a zero-height `.ai-user-bar-sentinel` precedes each anchor (see `030-user-message-bar.md` — collapse IO only, nav ignores it). The rail never imports the message model — it queries `[data-anchor-role="user"]`.
 - **Minimap positioning (compact overview).** Each tick's `top` = `el.offsetTop / scrollHeight` (0..1) → proportional to its place in the WHOLE thread, so all turns stay visible as a compact overview you can click to jump anywhere. `offsetTop` is honest because `.ai-messages` is `position: relative` (else offsetParent bubbles to `.ai-messages-wrap` and values drift on scroll). Chosen over live per-message tracking, which spread the ticks out and lost the overview.
-- **Freshness.** Rescans on `version` (turn count) + a rAF-throttled `MutationObserver` on the scroll container (streaming growth / reflow).
+- **Freshness.** Rescans on `version` (turn count) + rAF-throttled observers on the scroll container:
+  - `MutationObserver` — `childList` + `subtree` only (new turns / structural changes).
+  - `ResizeObserver` — scroll-area height growth during streaming.
+  - **Do not** observe `characterData` — each typewriter glyph fired a rescan and
+    competed with `069` smooth streaming (2026-07-14 fix).
 - **Active tick.** A `scroll` listener marks the last user anchor above the viewport's upper third (`scrollTop + clientHeight * 0.35`).
 - **Jump.** Click → `element.scrollIntoView({ behavior: "smooth", block: "start" })`.
 

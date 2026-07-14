@@ -41,19 +41,24 @@ export function ChatNavRail({ scrollRef, version }: ChatNavRailProps) {
     );
   }, [scrollRef]);
 
-  // Rescan on turn-count change + on content growth/reflow (streaming).
+  // Rescan on turn-count change + structural/height growth (streaming).
+  // ResizeObserver replaces characterData — avoids per-glyph rescans (069).
   useEffect(() => {
     rescan();
     const sc = scrollRef.current;
     if (!sc) return;
     let raf = 0;
-    const obs = new MutationObserver(() => {
+    const bump = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(rescan);
-    });
-    obs.observe(sc, { childList: true, subtree: true, characterData: true });
+    };
+    const obs = new MutationObserver(bump);
+    obs.observe(sc, { childList: true, subtree: true });
+    const ro = new ResizeObserver(bump);
+    ro.observe(sc);
     return () => {
       obs.disconnect();
+      ro.disconnect();
       cancelAnimationFrame(raf);
     };
   }, [rescan, version, scrollRef]);
