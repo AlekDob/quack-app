@@ -94,7 +94,7 @@ Intent-first work menu:
 
 **Link panel** — when the chat has no `workItemId` / `storyId`, the Work chip menu offers **Link existing…** → portaled `ComposerWorkLinkPanel` (`.ai-composer-ctx-menu--work-link`): filter by id/title, pick story or work item, excludes current link. When already linked, menu can switch to another ticket.
 
-**Context docs chip** — `ComposerDocsChip.tsx`: hover popover (liquid glass) listing Brain refs by Feature / Story / Related / Added; file-type icons + basename + parent path. Opens via `openBrainRef` (`070`). No full-screen overlay (prevents flicker); 280ms leave debounce; slight overlap with anchor. See `054-works-layer.md`.
+**Context docs chip** — `ComposerDocsChip.tsx`: hover popover (liquid glass) listing Brain refs by Module / Story / Related / Added; file-type icons + basename + parent path. Row click → `openBrainRef` (`070`): story file opens **Story drawer**, feature paths open **feature preview drawer**, other docs open editor tab (or **tab drawer** in Agent Mode). No full-screen overlay (prevents flicker); 280ms leave debounce; slight overlap with anchor. See `054-works-layer.md`.
 
 **Story drawer Build button (2026-07-13):** when `planning` is true, `StoryPlanDrawer` panel head shows a primary **Build** control (`.story-drawer-build`) — same handoff as the `ExitPlanMode` card without waiting for CC to call `ExitPlanMode` again. Useful when the story body already merged from a prior `onPlanReady`.
 

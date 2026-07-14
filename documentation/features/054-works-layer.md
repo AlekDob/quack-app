@@ -184,7 +184,7 @@ Cursor-style segment inside `ai-composer-work-cluster` (shared border with work 
 |---|---|
 | Data | `useComposerBrainRefs` → `worksBrainRefs.ts` (primary / story / related / extra) |
 | Open | Hover (primary) or click toggle; portaled popover above chip |
-| Rows | File-type icon, basename, parent path mono; click → feature drawer / Brain / story file |
+| Rows | File-type icon, basename, parent path mono; click → `openBrainRef` — story drawer, feature preview drawer, or editor/drawer file (`070`) |
 | Anti-flicker | No fullscreen overlay; popover overlaps anchor ~6px; `is-placed` fade-in after layout; 280ms leave debounce |
 
 CSS: `.ai-composer-work-cluster`, `.ai-composer-docs-popover` in `App.css`.

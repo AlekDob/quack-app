@@ -166,7 +166,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `068-quack-plan-harness.md` — product-owned plan on stories (`S-NNN`): Jack PM, **StoryPlanDrawer** (hover peek + pin on chat column), composer segmented cluster + **ComposerDocsChip**; `plan:` tab (`061`) is fallback without `storyId`.
   - `069-smooth-streaming.md` — smooth assistant stream: rAF paint + char-by-char `useTypewriterReveal` (max 2 chars/frame); inline pulsing caret; full `MarkdownPreview` on turn commit.
   - `073-ask-user-question-dock.md` — Claude Code `AskUserQuestion`: Cursor-style interactive card above composer; hook `tool_input` cache + lenient parse; deny-redirect flow (015); `quackClaudeCodeEditorPrompt()` tells all CC agents to call the tool; subagents hand off to orchestrator (004).
-  - `070-workspace-doc-open.md` — resolve `documentation/features/` paths from chat links and Works refs; friendly missing-doc UX (`workspaceDocOpen.ts`).
+  - `070-workspace-doc-open.md` — resolve doc paths from chat links and Context docs; route story → drawer, features → preview drawer, Agent Mode → tab drawer (`workspaceDocOpen.ts`).
   - `071-honest-model-labels.md` — composer chip shows CC alias (`sonnet`); post-turn usage strip shows resolved billed model (`Sonnet 5`); `modelDisplay.ts`.
   - `063-surface-view-prefs.md` — per-surface tab vs drawer default (Works / Brain / Team / **subagent transcripts**); Settings → Views; nested child-drawer stack.
   - `065-works-drawer-ux.md` — catalog list, draft create, Notion editor in drawer, module picker, nested drawer stack, overlay z-index (ctx menu + confirm).
