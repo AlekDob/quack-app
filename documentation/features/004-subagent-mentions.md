@@ -45,12 +45,13 @@ dependency).
 | Component | `src/components/SubagentTranscriptView.tsx` | read-only transcript viewer (portaled in editor/drawer, **inline** in agent mode when pref = tab), reuses `TranscriptTurnRows` + `ToolCallRow` |
 | Render | `src/components/TranscriptTurnRows.tsx` | shared read-only turn markup (`.ai-msg`, `.ai-tcalls`, `UserTurnBar` shell) |
 | Host | `src/components/WorkspaceShell.tsx` | walks panes for `sub:` keys, portals one viewer each |
-| Agent host | `src/components/AgentModeShell.tsx` | 50/50 split: mounts `SubagentTranscriptView` inline when focused tab is `sub:` |
-| Store | `src/store.ts` | `subagent` tab kind (`subKey`/`parseKey`), `openSubagent()`, `collectSubagentTabs`, `focusedSubagentKey`, `focusedAgentSidePanelKey` |
+| Agent host | `src/components/AgentModeShell.tsx` | Tab pref: inline `SubagentTranscriptView` in `.agent-main-review`. Drawer pref: `EditorTabDrawer` + `TabContentHost` overlay |
+| Store | `src/store.ts` | `subagent` tab kind (`subKey`/`parseKey`), `openSubagent()` → `openSingletonSurface`, `focusedAgentSidePanelKey` (skips drawer-only `sub:`), `collectSubagentTabs`, `focusedSubagentKey` |
 | Backend | `src-tauri/src/claude_code.rs` | `claude_code_load_subagent`, `parse_session_jsonl` (shared) |
 | IPC | `src/ipc.ts` | `claudeCode.loadSubagent`, `LoadedSubagent` |
 | Assets | `public/images/ducks/duck1..35.jpeg` | duck avatars |
-| Styles | `src/App.css` | `.ai-mention-*`, `.ai-agent-chip*`, `.ai-tcall-subagent`, `.subagent-view*`, `.tab-sub-avatar` |
+| Prefs | `src/surfaceViewPrefs.ts` | `SurfaceViewId` includes `subagent`; default **drawer** — see **`063-surface-view-prefs.md`** |
+| Styles | `src/App.css` | `.ai-mention-*`, `.ai-agent-chip*`, `.ai-tcall-subagent`, `.subagent-view*`, `.tab-sub-avatar`, `.editor-tab-drawer-sub-avatar` |
 
 ### Flow — mention & delegate
 1. `agents` loads when the provider is Claude Code (`selectedIsCC`) — project + global.
@@ -81,7 +82,22 @@ dependency).
 ### Agent Mode gotcha (fixed)
 Previously `openSubagent` added a tab to `layout.editorRoot` but Agent Mode **does not mount**
 `WorkspaceShell` — the tab existed in state with no visible surface. Agent Mode now watches
-`focusedAgentSidePanelKey` and renders the transcript inline, same split chrome as compose review.
+`focusedAgentSidePanelKey` and renders the transcript inline (tab pref), same split chrome as compose review.
+**2026-07-14:** drawer pref mounts `EditorTabDrawer` inside `AgentModeShell` so the overlay works without `WorkspaceShell`.
+
+### Transcript rendering — shared chat markup (2026-07-14)
+Before this change, `SubagentTranscriptView` used bespoke `.subagent-msg-*` classes (smaller type, left border on assistant turns, custom user bubble). That diverged from the main chat stream spacing and tool pills.
+
+**DRY fix:** `TranscriptTurnRows.tsx` renders loaded jsonl turns with the **same DOM** as `AIChatPanel`:
+
+| Turn | Markup |
+|---|---|
+| User (delegation prompt) | `.ai-turn` → `.ai-msg-user` → `.ai-user-bar.is-expanded` → `MarkdownPreview` |
+| Assistant | `.ai-msg-assistant` → `.ai-msg-role` (duck avatar + name) → `.ai-tcalls` → `ToolCallRow` → `.ai-msg-body` |
+
+`SubagentTranscriptView` wraps the list in `.ai-panel.compact` + `.ai-messages` so gutters, gap, and tool-row rhythm match compact agent chat. Header (avatar, agent type, description, close) stays in `.subagent-view-header` above the stream.
+
+**Verify:** Settings → Views → Subagent transcripts → Side drawer; click an Explore chip; confirm Read/Bash pills match the parent chat and user delegation uses the inset user-bar card.
 
 ### Inner steps hidden from the main stream
 The subagent's own tool calls (its Read/Glob/Grep/…) arrive in the live stream as records tagged
@@ -111,4 +127,4 @@ Bash from subagents still card. See [015-claude-permission-mode.md](015-claude-p
   `subagent_type` string via `duckAvatarFor`, so they always match (and match the @-mention popover).
 - **Compact (agent) mode** renders Task/Agent chips in the stream (single-tool runs as
   standalone `.ai-tcall-subagent`; multi-tool runs inside `.ai-iarow`). Click opens the side panel.
-- **Composer chips:** delegated agents show as pills inside the input row (072), not `@name` text.
+- **View pref:** Settings → Views → **Subagent transcripts** (`lcp.surfaceView.subagent`). Default drawer; Editor tab restores pre-2026-07-14 inline split in Agent Mode. Manual override: drag any `sub:` tab to the drawer edge anytime (`063`).

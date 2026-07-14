@@ -14533,35 +14533,22 @@ button.composer-mention-chip-label:hover {
 }
 .subagent-view-body {
   flex: 1;
-  overflow-y: auto;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  scrollbar-width: thin;
+  min-height: 0;
+  padding: 0;
+}
+.subagent-view-body .ai-messages {
+  flex: 1;
 }
 .subagent-view-note {
   color: var(--fg-muted);
   font-size: 13px;
 }
-.subagent-msg {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  min-width: 0;
-}
-/* The delegation prompt reads as the "user" turn to the subagent */
-.subagent-msg-user {
-  align-self: flex-start;
-  max-width: 90%;
-  background: var(--bg-hi);
-  border-radius: var(--radius-md);
-  padding: 8px 12px;
-}
-.subagent-msg-assistant {
-  border-left: 1px solid var(--border);
-  padding-left: 12px;
+.editor-tab-drawer-sub-avatar {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-xs);
+  object-fit: cover;
+  flex-shrink: 0;
 }
 /* Tab icon for a subagent transcript tab */
 .tab-sub-avatar {

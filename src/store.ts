@@ -443,6 +443,10 @@ export function focusedSubagentKey(
   return tabs[tabs.length - 1] ?? null;
 }
 
+function subagentTabInDrawer(layout: WorkspaceLayout, key: string): boolean {
+  return layout.editorDrawer?.tabKey === key;
+}
+
 /** Active compose-review or subagent side tab — agent mode split pane. */
 export function focusedAgentSidePanelKey(
   wsId: string,
@@ -457,13 +461,17 @@ export function focusedAgentSidePanelKey(
         const c = parseComposeReviewKey(pane.active);
         if (c?.wsId === wsId) return pane.active;
       }
-      if (pane.active.startsWith("sub:")) return pane.active;
+      if (
+        pane.active.startsWith("sub:") &&
+        !subagentTabInDrawer(layout, pane.active)
+      ) {
+        return pane.active;
+      }
     }
   }
-  return (
-    focusedComposeReviewKey(wsId, layout, root) ??
-    focusedSubagentKey(wsId, layout, root)
-  );
+  const sub = focusedSubagentKey(wsId, layout, root);
+  if (sub && !subagentTabInDrawer(layout, sub)) return sub;
+  return focusedComposeReviewKey(wsId, layout, root);
 }
 
 /** The AI chat id currently focused in a workspace (active pane's active
@@ -2968,43 +2976,18 @@ export const useStore = create<AppState>((set, get) => {
 
     openSubagent: (wsId, sessionId, toolUseId, agentType) => {
       const k = subKey(sessionId, toolUseId, agentType);
-      updateWs(wsId, (w) => {
-        // Already open somewhere? Focus that pane + tab instead of duping.
-        let foundPane: PaneId | null = null;
-        mapTree(w.layout.editorRoot, (t) => {
-          if (t.tabs.includes(k)) foundPane = t.id;
-          return t;
-        });
-        if (foundPane) {
-          return {
-            ...w,
-            layout: {
-              ...w.layout,
-              activePaneId: foundPane,
-              editorRoot: mapTree(w.layout.editorRoot, (t) =>
-                t.id === foundPane ? { ...t, active: k } : t,
-              ),
-            },
-          };
-        }
-        const targetPaneId =
-          (w.layout.activePaneId &&
-            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
-            w.layout.activePaneId) ||
-          firstLeaf(w.layout.editorRoot).id;
-        return {
-          ...w,
-          layout: {
-            ...w.layout,
-            activePaneId: targetPaneId,
-            editorRoot: mapTree(w.layout.editorRoot, (t) =>
-              t.id === targetPaneId
-                ? { ...t, tabs: [...t.tabs, k], active: k }
-                : t,
-            ),
-          },
-        };
-      });
+      const s = get();
+      openSingletonSurface(
+        {
+          updateWs,
+          moveTabToDrawer: s.moveTabToDrawer,
+          dockEditorDrawer: s.dockEditorDrawer,
+          loaded: (id) => get().loaded[id],
+        },
+        wsId,
+        k,
+        "subagent",
+      );
     },
 
     openComposeReview: (wsId, chatId, msgIndex, path, calls) => {

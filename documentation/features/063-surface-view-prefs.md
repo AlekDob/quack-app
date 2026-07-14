@@ -2,13 +2,13 @@
 type: feature
 project: quack-desktop
 created: 2026-07-12
-last_verified: 2026-07-13
-tags: [works, brain, team, drawer, activity-bar, settings, files]
+last_verified: 2026-07-14
+tags: [works, brain, team, subagent, drawer, activity-bar, settings, files]
 ---
 
 # 063 — Surface view prefs (tab vs drawer)
 
-**Purpose:** Activity-bar surfaces that open editor tabs (Works, Quack Brain, Team) can open in the **editor tab row** or the **right tab drawer** by default. User picks per surface in Settings → Views. File opens from Team subagent cards and tree → drawer drops use the same drawer host without stealing the main pane's active tab.
+**Purpose:** Surfaces that open as editor tabs (Works, Quack Brain, Team, subagent transcripts) can open in the **editor tab row** or the **right tab drawer** by default. User picks per surface in Settings → Views. File opens from Team subagent cards and tree → drawer drops use the same drawer host without stealing the main pane's active tab.
 
 ## Defaults
 
@@ -17,6 +17,7 @@ tags: [works, brain, team, drawer, activity-bar, settings, files]
 | Works | `works` | **Drawer** | `works:{wsId}` |
 | Quack Brain | `brain` | Editor tab | `brain:{wsId}` |
 | Team | `whiteboard` | Editor tab | `wb:{wsId}` |
+| Subagent transcripts | — (Task chip click) | **Drawer** | `sub:{ccSessionId}\|{toolUseId}\|{agentType}` |
 
 Stored in `localStorage` key `lcp.surfaceView` (global, not per-workspace).
 
@@ -28,7 +29,20 @@ Stored in `localStorage` key `lcp.surfaceView` (global, not per-workspace).
 2. **Drawer** — `moveTabToDrawer(wsId, tabKey)` (creates drawer slot if tab not in tree)
 3. **Tab** — focus existing pane tab, dock from drawer if needed, or append to active pane
 
-`worksOpen`, `brainOpen`, `wbOpen` all delegate here.
+`worksOpen`, `brainOpen`, `wbOpen`, and **`openSubagent`** all delegate here.
+
+### Subagent transcripts (`subagent`)
+
+Not an activity-bar surface — opened by clicking a **Task/Agent** chip in the chat stream (`AIChatPanel` → `openSubagentTab` → `store.openSubagent`).
+
+| Pref | Editor layout | Agent Mode |
+|---|---|---|
+| **Drawer** (default) | `EditorTabDrawer` overlay via `WorkspaceShell` | Same overlay — `AgentModeShell` mounts `EditorTabDrawer` + `TabContentHost` (Agent Mode does not mount `WorkspaceShell`) |
+| **Editor tab** | `sub:` tab in the pane tree; `SubagentTranscriptView` portaled into the active pane | 50/50 inline split in `.agent-main-review` via `focusedAgentSidePanelKey` |
+
+`focusedAgentSidePanelKey` skips `sub:` keys that live only in `layout.editorDrawer` so drawer mode does not also render the inline split.
+
+Drawer chrome for `sub:` tabs: duck avatar + agent type label (`EditorTabDrawer` → `drawerTabLabel`, `.editor-tab-drawer-sub-avatar`).
 
 ## File open in drawer (peek without tab switch)
 
@@ -80,10 +94,13 @@ See `065-works-drawer-ux.md` for full behaviour.
 | `src/components/ActivityBarViewIcons.tsx` | Drawer-aware active icon |
 | `src/components/TabContentHost.tsx` | Renders drawer tab content; relaxed `editorsReady` for markdown preview |
 | `src/components/EditorTabDrawer.tsx` | Drawer chrome + nested stack host |
+| `src/components/AgentModeShell.tsx` | Drawer host when pref = drawer (mirrors `WorkspaceShell` linger pattern) |
+| `src/components/SubagentTranscriptView.tsx` | Drawer/tab body for `sub:` keys |
 | `src/editorDrawerStack.ts` | Child-drawer portal target when parent drawer open |
 
 ## Related
 
+- Subagent chip → transcript: `004-subagent-mentions.md`
 - Works layer: `054-works-layer.md`
 - Works drawer UX: `065-works-drawer-ux.md`
 - Team organigramma subagent click: `018-whiteboard-organigramma.md`

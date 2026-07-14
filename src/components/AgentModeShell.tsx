@@ -7,11 +7,14 @@ import {
   focusedAgentSidePanelKey,
   findTabsPaneByTab,
   parseKey,
+  type EditorDrawerState,
 } from "../store";
 import { AIChatPanel } from "./AIChatPanel";
 import { CompactChat, AgentFileOpen } from "./chatToolRender";
 import { ComposeReviewPane } from "./ComposeReviewPane";
 import { SubagentTranscriptView } from "./SubagentTranscriptView";
+import { EditorTabDrawer } from "./EditorTabDrawer";
+import { TabContentHost } from "./TabContentHost";
 import { SourceControlPanel } from "./SourceControlPanel";
 import { FileTree } from "./FileTree";
 import { AIIcon } from "./AIIcon";
@@ -226,6 +229,29 @@ export function AgentModeShell({ wsId }: Props) {
   const sideParsed = sidePanelKey ? parseKey(sidePanelKey) : null;
   const setActiveTab = useStore((s) => s.setActiveTab);
   const closeTab = useStore((s) => s.closeTab);
+  const dockEditorDrawer = useStore((s) => s.dockEditorDrawer);
+  const setEditorDrawerW = useStore((s) => s.setEditorDrawerW);
+  const [drawerContainer, setDrawerContainer] = useState<HTMLElement | null>(
+    null,
+  );
+  const [drawerLinger, setDrawerLinger] = useState<EditorDrawerState | null>(
+    null,
+  );
+  const drawerLive = ws?.layout.editorDrawer;
+  const drawerOpen = !!drawerLive?.tabKey;
+
+  useEffect(() => {
+    if (drawerLive?.tabKey) setDrawerLinger(drawerLive);
+  }, [drawerLive?.tabKey, drawerLive?.width]);
+
+  const registerDrawerContainer = useCallback((node: HTMLElement | null) => {
+    setDrawerContainer(node);
+  }, []);
+
+  const onDrawerExited = useCallback(() => {
+    const cur = useStore.getState().loaded[wsId]?.layout.editorDrawer;
+    if (!cur?.tabKey) setDrawerLinger(null);
+  }, [wsId]);
 
   const chatsFor = (id: string) => {
     const w = loaded[id];
@@ -573,6 +599,31 @@ export function AgentModeShell({ wsId }: Props) {
           nameAnchor={colorMenu.nameAnchor}
           onClose={() => setColorMenu(null)}
           onNewChat={newSession}
+        />
+      )}
+
+      {drawerLinger?.tabKey && drawerContainer && ws && (
+        <TabContentHost
+          wsId={wsId}
+          ws={ws}
+          tabKey={drawerLinger.tabKey}
+          container={drawerContainer}
+          visible={drawerOpen}
+          showHeavy
+          editorsReady
+        />
+      )}
+      {drawerLinger?.tabKey && ws && (
+        <EditorTabDrawer
+          wsId={wsId}
+          ws={ws}
+          tabKey={drawerLinger.tabKey}
+          width={drawerLinger.width}
+          open={drawerOpen}
+          registerContainer={registerDrawerContainer}
+          onResize={(w) => setEditorDrawerW(wsId, w)}
+          onDock={() => dockEditorDrawer(wsId)}
+          onExited={onDrawerExited}
         />
       )}
     </div>

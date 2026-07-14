@@ -6,7 +6,7 @@ import { getJson, setJson } from "./localStore";
 
 export type SurfaceMode = "tab" | "drawer";
 
-export type SurfaceViewId = "works" | "brain" | "whiteboard";
+export type SurfaceViewId = "works" | "brain" | "whiteboard" | "subagent";
 
 const STORAGE_KEY = "lcp.surfaceView";
 
@@ -14,12 +14,14 @@ const DEFAULTS: Record<SurfaceViewId, SurfaceMode> = {
   works: "drawer",
   brain: "tab",
   whiteboard: "tab",
+  subagent: "drawer",
 };
 
 const LABELS: Record<SurfaceViewId, string> = {
   works: "Works",
   brain: "Quack Brain",
   whiteboard: "Team",
+  subagent: "Subagent transcripts",
 };
 
 type Prefs = Partial<Record<SurfaceViewId, SurfaceMode>>;
@@ -72,4 +74,5 @@ export const SURFACE_VIEW_IDS: SurfaceViewId[] = [
   "works",
   "brain",
   "whiteboard",
+  "subagent",
 ];

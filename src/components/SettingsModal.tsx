@@ -560,8 +560,9 @@ export function SettingsModal() {
 
           <Section title="Views" id="views">
             <div className="settings-row settings-row-note">
-              Choose whether Works, Brain, and Team open in an editor tab or
-              the resizable right drawer (drag tabs to the drawer edge anytime).
+              Choose whether Works, Brain, Team, and subagent transcripts open
+              in an editor tab or the resizable right drawer (drag tabs to the
+              drawer edge anytime).
             </div>
             {SURFACE_VIEW_IDS.map((id) => (
               <SurfaceViewRow key={id} id={id} />

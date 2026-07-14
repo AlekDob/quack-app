@@ -118,7 +118,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `001-ai-session-library.md` — sessions/agents lists, persistence, mount-asymmetry gotcha.
   - `002-workspace-colors.md` — per-project color (right-click popover + palette); title-bar ambient wash when active project has a color.
   - `003-design-system.md` — tokens, themes, neutral chrome, liquid glass, native window, composer, pill tabs.
-  - `004-subagent-mentions.md` — `@`-mention subagents + click a Task chip to open its read-only transcript tab.
+  - `004-subagent-mentions.md` — `@`-mention subagents + click a Task chip to open its read-only transcript (tab or drawer; `TranscriptTurnRows` shares main-chat markup).
   - `005-jack-duck-identity.md` — the assistant IS Jack (duck PM): persona, `AIIcon` duck mark, chat header.
   - `009-agent-hub.md` — the cross-project status hub (right rail): groups, `AgentHubWatcher`, notifications, lifecycle.
   - `064-agent-hub-drawer-and-chat-tab-switch.md` — collapsed hover drawer, chat switch perf, pane tab visibility stacking.
@@ -167,7 +167,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `073-ask-user-question-dock.md` — Claude Code `AskUserQuestion`: Cursor-style interactive card above composer; hook `tool_input` cache + lenient parse; deny-redirect flow (015).
   - `070-workspace-doc-open.md` — resolve `documentation/features/` paths from chat links and Works refs; friendly missing-doc UX (`workspaceDocOpen.ts`).
   - `071-honest-model-labels.md` — composer chip shows CC alias (`sonnet`); post-turn usage strip shows resolved billed model (`Sonnet 5`); `modelDisplay.ts`.
-  - `063-surface-view-prefs.md` — per-surface tab vs drawer default (Works / Brain / Team); Settings → Views; nested child-drawer stack.
+  - `063-surface-view-prefs.md` — per-surface tab vs drawer default (Works / Brain / Team / **subagent transcripts**); Settings → Views; nested child-drawer stack.
   - `065-works-drawer-ux.md` — catalog list, draft create, Notion editor in drawer, module picker, nested drawer stack, overlay z-index (ctx menu + confirm).
   - `052-composer-voice-dictation.md` — Cursor-style composer mic: waveform row, native macOS `SFSpeechRecognizer` + Web Speech on Windows; `dictation.ts`, `dictation.rs`, `ComposerMic.tsx`.
   - `028-opencode-bridge.md` — `opencode serve` sidecar (port 17346), SSE `/global/event`, `providerSessionIds`, lazy startup catalog.

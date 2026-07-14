@@ -8,6 +8,7 @@ import {
 import { registerEditorDrawerStack } from "../editorDrawerStack";
 import { parseKey, useStore, type WorkspaceData } from "../store";
 import { basename } from "../pathUtils";
+import { duckAvatarFor } from "../subagents";
 import { Icon } from "./Icon";
 import { AIIcon } from "./AIIcon";
 
@@ -36,6 +37,7 @@ function drawerTabLabel(ws: WorkspaceData, key: string): string {
   if (parsed.kind === "brain") return "Quack Brain";
   if (parsed.kind === "store") return "Quack Store";
   if (parsed.kind === "plan") return "Plan";
+  if (parsed.kind === "subagent") return parsed.agentType || "Subagent";
   return key;
 }
 
@@ -80,6 +82,10 @@ export function EditorTabDrawer({
   const label = drawerTabLabel(ws, tabKey);
   const parsed = parseKey(tabKey);
   const isAi = parsed?.kind === "ai";
+  const subAvatar =
+    parsed?.kind === "subagent"
+      ? duckAvatarFor(parsed.agentType)
+      : null;
 
   const onHeaderPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
@@ -180,7 +186,18 @@ export function EditorTabDrawer({
           onPointerDown={onHeaderPointerDown}
           title="Drag to dock back into the editor"
         >
-          {isAi ? <AIIcon size={14} /> : <Icon name="file-text" size={14} />}
+          {isAi ? (
+            <AIIcon size={14} />
+          ) : subAvatar ? (
+            <img
+              className="editor-tab-drawer-sub-avatar"
+              src={subAvatar}
+              alt=""
+              aria-hidden="true"
+            />
+          ) : (
+            <Icon name="file-text" size={14} />
+          )}
           <span className="editor-tab-drawer-title">{label}</span>
           <button
             type="button"
