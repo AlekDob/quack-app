@@ -116,7 +116,7 @@ import {
   subscribeAskInput,
 } from "../askQuestionStore";
 import { publishChatDiff } from "../chatDiffStore";
-import { summarizeLastTurn } from "../sessionDiffStats";
+import { summarizeLastTurn, summarizeEdits } from "../sessionDiffStats";
 import { loadWorkspaceRules } from "../workspaceRules";
 import {
   BUILTIN_PRESETS,
@@ -163,9 +163,16 @@ import {
   buildSiblingSummaries,
   buildWorksTurnContext,
   getWorkInjectEnabled,
+  manifestForTurn,
   getWorksInjectDepth,
   manifestDocPaths,
 } from "../workContextInject";
+import {
+  hasWorksDirectives,
+  parseWorksDirectives,
+  applyWorksDirectives,
+  formatOpenItemsIndex,
+} from "../worksAgentDirectives";
 import {
   getWorksSnapshot,
   hydrateWorks,
@@ -232,7 +239,7 @@ import {
   recoverSessionFromAnyProvider,
   persistRecoveredSession,
 } from "../chatProviderRecovery";
-import { registerChatSaveFailed } from "../chatStoreCache";
+import { registerChatSaveFailed, getCachedSession } from "../chatStoreCache";
 import {
   draftFromSession,
   mergeComposerDraft,
@@ -513,6 +520,23 @@ function resolveActivePresetDef(
   return customPresets.find((p) => p.id === id);
 }
 
+// Flywheel scope: union of files already edited across a work/story's linked
+// sessions (read-only, from the in-memory cache). Surfaced in the manifest so
+// the agent Reads these first instead of re-exploring. See decisions/004.
+function collectStoryScopeFiles(
+  wsId: string,
+  chatIds: string[],
+  max = 6,
+): string[] {
+  const files = new Set<string>();
+  for (const id of chatIds) {
+    const s = getCachedSession(wsId, id);
+    const sum = s ? summarizeEdits(s.messages) : null;
+    for (const f of sum?.files ?? []) files.add(f);
+  }
+  return [...files].slice(0, max);
+}
+
 function insertIntoActiveEditor(text: string): boolean {
   const ed = getActiveEditor();
   if (!ed) return false;
@@ -743,6 +767,48 @@ export function AIChatPanel({
       messages.length > 0 ? summarizeLastTurn(messages) : null,
     );
   }, [messages, aiChatId]);
+
+  // Works auto-tracking: after a completed assistant turn, apply any Works
+  // directives the agent emitted (link/create/update) so the user files nothing
+  // by hand. Deduped on the message content; every action is surfaced as a
+  // toast and shows up on the Works board (the persistent overview). See
+  // feature docs / decisions/004.
+  const lastWorksTextRef = useRef<string>("");
+  const lastWorksChatRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!aiChatId || !root || !getWorkInjectEnabled(wsId)) return;
+    const lastAsst = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant" && !!m.content);
+    const text = lastAsst?.content ?? "";
+    // Chat switch / first mount: adopt the current tail as the baseline and
+    // never re-apply directives already present in loaded history (that would
+    // duplicate stories on reload). Only genuinely new text from a live turn
+    // triggers an apply.
+    if (lastWorksChatRef.current !== aiChatId) {
+      lastWorksChatRef.current = aiChatId;
+      lastWorksTextRef.current = text;
+      return;
+    }
+    if (!text || text === lastWorksTextRef.current) return;
+    lastWorksTextRef.current = text;
+    if (!hasWorksDirectives(text)) return;
+    void applyWorksDirectives(wsId, aiChatId, root, parseWorksDirectives(text))
+      .then((actions) => {
+        for (const a of actions) {
+          const verb =
+            a.kind === "linked"
+              ? "Linked to"
+              : a.kind === "updated"
+                ? "Updated"
+                : "Created";
+          toastInfo(`Works: ${verb} ${a.shortId} — ${a.title}`);
+        }
+      })
+      .catch(() => {
+        /* Works optional — never block the chat */
+      });
+  }, [messages, aiChatId, root, wsId]);
 
   // Rebuild the sticky checklist from saved history. The checklist is
   // normally driven by LIVE tool_call events, so a reload or chat
@@ -3162,7 +3228,8 @@ export function AIChatPanel({
       // "be thorough" mandate here (that tripled per-turn cost — decisions/004).
       // Resumed CC turns send only the latest user message — sysParts vanish
       // after turn one. Orchestrator tool contract must ride in ccTurnContext.
-      ccTurnContext.push(quackClaudeCodeEditorPrompt());
+      // Works protocol rides along only when Works tracking is on.
+      ccTurnContext.push(quackClaudeCodeEditorPrompt(getWorkInjectEnabled(wsId)));
       if (planning) {
         ccTurnContext.push(
           [
@@ -3237,6 +3304,9 @@ export function AIChatPanel({
           }
         }
         const siblings = buildSiblingSummaries(snap, [...chatIds], aiChatId);
+        // Flywheel: files already edited across this work/story's sessions
+        // become the scope the agent Reads first (decisions/004).
+        const scopeFiles = collectStoryScopeFiles(wsId, [...chatIds]);
         const worksCtx = linkedWorkId
           ? await buildWorksTurnContext(
               root,
@@ -3244,6 +3314,7 @@ export function AIChatPanel({
               linkedWorkId,
               wsId,
               siblings,
+              scopeFiles,
             )
           : linkedStoryId
             ? await buildStoryTurnContext(
@@ -3252,10 +3323,17 @@ export function AIChatPanel({
                 linkedStoryId,
                 wsId,
                 siblings,
+                scopeFiles,
               )
             : null;
         if (worksCtx) {
-          ccTurnContext.push(worksCtx.block);
+          // Full manifest only on first-seen/changed; compact pointer after
+          // (it rides every --resume turn — decisions/004).
+          ccTurnContext.push(
+            aiChatId
+              ? manifestForTurn(aiChatId, worksCtx.block, worksCtx.pointer)
+              : worksCtx.block,
+          );
           if (pinkyReady && getWorksInjectDepth(wsId) === "pinky" && worksCtx.pinkyQuery) {
             const brainCtx = await fetchBrainContextDeduped(
               root,
@@ -3274,24 +3352,41 @@ export function AIChatPanel({
       } catch {
         /* Works context optional */
       }
-    } else if (pinkyReady && !explicitBrain) {
-      try {
-        const brainCtx = await fetchBrainContextForTurn(root, {
-          wsId,
-          messages: baseMessages,
-          text,
-        });
-        if (brainCtx) {
-          brainUsage = brainCtx.usage;
-          recordBrainUsage(wsId, brainCtx.usage.savedTokens, brainCtx.usage.savedMs);
-          if (skipAllInlining || providerRunsOwnTools) {
-            ccTurnContext.push(brainCtx.block);
-          } else {
-            sysParts.push(brainCtx.block);
+    } else {
+      // Unlinked chat: offer the open-items index ONCE (when Works is on) so the
+      // agent can associate or create, and still allow a Pinky knowledge hit.
+      // Both are gated so neither rides every turn (decisions/004).
+      if (getWorkInjectEnabled(wsId) && aiChatId) {
+        try {
+          const snap = getWorksSnapshot(root) ?? (await hydrateWorks(root));
+          const idx = formatOpenItemsIndex(snap);
+          if (idx) {
+            const gated = manifestForTurn(`${aiChatId}:openidx`, idx, "");
+            if (gated) ccTurnContext.push(gated);
           }
+        } catch {
+          /* Works optional */
         }
-      } catch {
-        /* Pinky optional — never block the turn */
+      }
+      if (pinkyReady && !explicitBrain) {
+        try {
+          const brainCtx = await fetchBrainContextForTurn(root, {
+            wsId,
+            messages: baseMessages,
+            text,
+          });
+          if (brainCtx) {
+            brainUsage = brainCtx.usage;
+            recordBrainUsage(wsId, brainCtx.usage.savedTokens, brainCtx.usage.savedMs);
+            if (skipAllInlining || providerRunsOwnTools) {
+              ccTurnContext.push(brainCtx.block);
+            } else {
+              sysParts.push(brainCtx.block);
+            }
+          }
+        } catch {
+          /* Pinky optional — never block the turn */
+        }
       }
     }
     // Preset instructions shape THIS session's behavior — not a subagent,

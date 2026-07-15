@@ -4,6 +4,7 @@ import { getJson } from "./localStore";
 
 export { buildWorksTurnContext, buildStoryTurnContext, buildSiblingSummaries, getWorksInjectDepth, setWorksInjectDepth, manifestDocPaths } from "./worksTurnContext";
 export type { WorksInjectDepth, WorksTurnContext } from "./worksTurnContext";
+export { manifestForTurn, resetManifestGate } from "./worksManifestGate";
 
 const injectKey = (wsId: string) => `lcp.works.inject.${wsId}`;
 

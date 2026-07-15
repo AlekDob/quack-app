@@ -42,8 +42,41 @@ export function setWorksInjectDepth(wsId: string, depth: WorksInjectDepth): void
 
 export interface WorksTurnContext {
   block: string;
+  /** One-line recap sent on turns after the full block already rode context. */
+  pointer: string;
   refs: BrainRef[];
   pinkyQuery?: string;
+}
+
+/** Compact scope basenames for the pointer line (docs only, story ref aside). */
+function scopeBasenames(refs: BrainRef[], max = 3): string {
+  const docs = refs
+    .filter((r) => r.role !== "story")
+    .map((r) => r.path.split("/").pop() ?? r.path);
+  const shown = docs.slice(0, max).join(", ");
+  return docs.length > max ? `${shown} +${docs.length - max}` : shown;
+}
+
+/** Flywheel: files already edited across this work/story's sessions. The agent
+ *  Reads these first instead of re-exploring — the more it's worked, the tighter
+ *  the scope. Derived read-only from linked transcripts; nothing is written. */
+function formatScopeSection(scopeFiles: string[]): string {
+  if (scopeFiles.length === 0) return "";
+  const lines = scopeFiles.map((f) => `  - ${f}`).join("\n");
+  return `Files in scope (already edited in this work — Read these first):\n${lines}\n`;
+}
+
+/** One-liner reminding the agent the full manifest is already in this session. */
+function formatManifestPointer(
+  shortId: string,
+  title: string,
+  refs: BrainRef[],
+  pending: number,
+): string {
+  const scope = scopeBasenames(refs);
+  const scopePart = scope ? ` · scope: ${scope}` : "";
+  const pendPart = pending > 0 ? ` · ${pending} pending` : "";
+  return `[Works ${shortId}: ${title}${scopePart}${pendPart} — full manifest already in this session; Read the scope paths, don't re-Explore]`;
 }
 
 function uncheckedPreview(md: string, max: number): string[] {
@@ -79,6 +112,7 @@ function formatWorkManifest(
   refs: BrainRef[],
   outlineBlock: string,
   siblingSummaries: string[],
+  scopeFiles: string[] = [],
 ): string | null {
   const w = findWork(snap, workId);
   if (!w) return null;
@@ -120,6 +154,7 @@ function formatWorkManifest(
     `Status: ${w.status} · Priority: ${w.priority} · ${primary}\n` +
     cycleLine +
     (refsSec ? `${refsSec}\n` : "") +
+    formatScopeSection(scopeFiles) +
     `Prefer Read paths above before Explore/Grep.` +
     pending +
     outline +
@@ -161,6 +196,7 @@ function formatStoryManifest(
   refs: BrainRef[],
   outlineBlock: string,
   siblingSummaries: string[],
+  scopeFiles: string[] = [],
 ): string | null {
   const story = findStory(snap, storyId);
   if (!story) return null;
@@ -192,6 +228,7 @@ function formatStoryManifest(
     `Status: ${story.status} · ${primary}\n` +
     cycleLine +
     (refsSec ? `${refsSec}\n` : "") +
+    formatScopeSection(scopeFiles) +
     `Prefer Read paths above before Explore/Grep.` +
     pending +
     outline +
@@ -206,6 +243,7 @@ export async function buildStoryTurnContext(
   storyId: string,
   wsId: string,
   siblingSummaries: string[] = [],
+  scopeFiles: string[] = [],
 ): Promise<WorksTurnContext | null> {
   const story = findStory(snap, storyId);
   if (!story) return null;
@@ -233,13 +271,21 @@ export async function buildStoryTurnContext(
     refs,
     outlineBlock,
     siblingSummaries,
+    scopeFiles,
   );
   if (!block) return null;
+  const { done, total } = acceptanceFromMarkdown(story.bodyMd ?? "");
+  const pointer = formatManifestPointer(
+    story.shortId,
+    story.title,
+    refs,
+    total - done,
+  );
   const pinkyQuery =
     depth === "pinky"
       ? [story.title, mod?.name].filter(Boolean).join(" ").slice(0, 200) || undefined
       : undefined;
-  return { block, refs, pinkyQuery };
+  return { block, pointer, refs, pinkyQuery };
 }
 
 export async function buildWorksTurnContext(
@@ -248,6 +294,7 @@ export async function buildWorksTurnContext(
   workId: string,
   wsId: string,
   siblingSummaries: string[] = [],
+  scopeFiles: string[] = [],
 ): Promise<WorksTurnContext | null> {
   const w = findWork(snap, workId);
   if (!w) return null;
@@ -269,11 +316,20 @@ export async function buildWorksTurnContext(
     }
   }
   const refs = resolveBrainRefs(snap, w, story, related);
-  const block = formatWorkManifest(snap, workId, refs, outlineBlock, siblingSummaries);
+  const block = formatWorkManifest(
+    snap,
+    workId,
+    refs,
+    outlineBlock,
+    siblingSummaries,
+    scopeFiles,
+  );
   if (!block) return null;
+  const { done, total } = acceptanceFromMarkdown(w.bodyMd ?? "");
+  const pointer = formatManifestPointer(w.shortId, w.title, refs, total - done);
   const pinkyQuery =
     depth === "pinky" ? buildPinkyQueryForWork(snap, workId) ?? undefined : undefined;
-  return { block, refs, pinkyQuery };
+  return { block, pointer, refs, pinkyQuery };
 }
 
 /** Paths already covered by the work manifest (for Pinky dedup). */
