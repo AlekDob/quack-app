@@ -184,7 +184,7 @@ import {
   parseBrainSaveProposal,
   stripBrainSaveBlocks,
 } from "../brainSave";
-import { jackSystemPrompt, quackClaudeCodeEditorPrompt } from "../brainPrompt";
+import { quackAgentCorePrompt, quackClaudeCodeEditorPrompt } from "../brainPrompt";
 import { installedIds, quackExtensions } from "../quackExtensions";
 import { isExtensionInstalled } from "../extensionGate";
 import {
@@ -2864,7 +2864,19 @@ export function AIChatPanel({
       : null;
     const activeKey = ap && ap.kind === "tabs" ? ap.active : null;
     const parsed = activeKey ? parseKey(activeKey) : null;
-    const sysParts: string[] = [jackSystemPrompt(pinkyBrainExt)];
+    // Persona-aware core: the active preset (Jack when none) supplies the
+    // identity, so switching agents in the composer actually changes who
+    // "speaks". Resolved once here and reused for the role-instructions
+    // append below. Role behavior lives in the preset block, not the core.
+    const activeDef = presetId
+      ? presetChoices.find((p) => p.id === presetId)
+      : effectivePresetDefinition(getJackDefinition());
+    const coreIdentity = activeDef
+      ? { label: activeDef.label, role: activeDef.role }
+      : { label: "Jack", role: "Project Manager · Planner" };
+    const sysParts: string[] = [
+      quackAgentCorePrompt(coreIdentity, pinkyBrainExt),
+    ];
     // Auto-attach the project tree when:
     //   1. The user explicitly typed /tree (attachTree flag), OR
     //   2. This is the first message of a new chat (so the model gets oriented), OR
@@ -3146,12 +3158,8 @@ export function AIChatPanel({
       // Claude Code has its own Read / Glob / Grep / Edit / Bash tools and
       // its own internal rules. Our "tools available" section would only
       // confuse it. Just orient it briefly on the first flattened prompt.
-      sysParts.push(
-        [
-          "You are running inside Quack, a code editor. The user has the workspace open as your current working directory.",
-          "Use your normal tools (Read, Glob, Grep, Edit, Bash, etc.) to investigate and modify files as needed. Be thorough and substantive.",
-        ].join("\n\n"),
-      );
+      // Core prompt already sets identity + tools + the EFFICIENCY rule; no
+      // "be thorough" mandate here (that tripled per-turn cost — decisions/004).
       // Resumed CC turns send only the latest user message — sysParts vanish
       // after turn one. Orchestrator tool contract must ride in ccTurnContext.
       ccTurnContext.push(quackClaudeCodeEditorPrompt());
@@ -3294,9 +3302,7 @@ export function AIChatPanel({
     // ship one. Label it explicitly as workspace-provided, non-privileged
     // context rather than a verified system directive, so it can't silently
     // pass as an authoritative instruction (basic prompt-injection hygiene).
-    const activeDef = presetId
-      ? presetChoices.find((p) => p.id === presetId)
-      : effectivePresetDefinition(getJackDefinition());
+    // Reuse the hoisted activeDef (resolved with sysParts[0] above).
     if (activeDef) {
       const body = getPresetInstructionsFor(activeDef).trim();
       if (body) {

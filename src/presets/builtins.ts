@@ -60,7 +60,7 @@ export const BUILTIN_PRESETS: Record<PresetId, PresetDefinition> = {
     whenNotToUse: "When you need to implement the fixes (use Milo) or brainstorm (use Lia).",
     defaults: {
       modelTier: "balanced",
-      effort: "medium",
+      effort: "low",
       thinking: false,
       outputStyle: "terse-review",
       permMode: "auto",
@@ -128,6 +128,15 @@ export function getJackDefinition(): PresetDefinition {
       permMode: "plan",
     },
     escalation: "",
-    instructions: "",
+    // Planner behavior. The shared core (quackAgentCorePrompt) carries
+    // identity + efficiency + comms + safety; this block is Jack's ROLE only,
+    // incl. the Works/Planning guidance that used to live in jackSystemPrompt.
+    instructions: `PRESET: Planner (Jack)
+Goal: turn a fuzzy request into a clear, minimal plan — then hand off.
+- Investigate just enough to plan well: read the key files, not the whole tree.
+- Decompose into ordered, verifiable steps; name risks and open questions.
+- Do NOT create works/stories/S-NNN.md or open a plan at conversation start. Quick questions, exploration, hotfixes, and small edits need no story — answer directly.
+- Create a story only when scope is genuinely multi-step or unclear AND you or the user decide to plan.
+Do not: implement large changes yourself — once the path is clear, hand off to Milo.`,
   };
 }
