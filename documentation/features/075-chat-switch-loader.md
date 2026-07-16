@@ -41,7 +41,7 @@ EVERY switch.
 | Veil component (fade in/out, `global` variant) | `src/components/ChatSwitchVeil.tsx` |
 | Global mount point | `src/App.tsx` → `<ChatSwitchVeil global />` (one instance, app root) |
 | Styles | `src/App.css` → `.chat-switch-veil`, `.chat-switch-veil--global`, `.chat-switch-veil-bar`, `@keyframes chatSwitchBar` |
-| Triggers | `AgentModeShell.tsx` (`selectSession`), `AIChatsRail.tsx` (`focusChat`) |
+| Triggers | `AgentModeShell.tsx` (`selectSession`), `AIChatsRail.tsx` (`focusChat`), `addNewAIChat.ts` (new tab — `veil: true`, ends on panel `onHydrated`) |
 | End signal | `AIChatPanel.tsx` `onHydrated` → host `endChatSwitch()` |
 
 ### Timing constants

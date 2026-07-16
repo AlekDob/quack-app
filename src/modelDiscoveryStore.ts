@@ -434,6 +434,9 @@ function warmCcCatalog(force: boolean): void {
 
 /** Hover / picker open — never blocks UI; uses disk + in-memory cache first. */
 export function warmPickerCatalogs(): void {
+  void import("./providers/claudeCode");
+  void import("./providers/openCode");
+  void import("./providers/cursorCode");
   void ensureModelDiscovery({ force: false });
   void warmLiveCliCatalogs(false);
 }

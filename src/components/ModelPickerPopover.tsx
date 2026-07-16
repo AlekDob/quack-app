@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal, flushSync } from "react-dom";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon } from "./Icon";
 import {
   buildModelGroups,
@@ -89,9 +89,6 @@ export function ModelPickerPopover({
   const setOpen = onOpenChange ?? setOpenInternal;
   const [query, setQuery] = useState("");
   const [prefsTick, setPrefsTick] = useState(0);
-  const [opening, setOpening] = useState(false);
-  /** True from click until live CLI catalogs finish — keeps loader up. */
-  const [sessionLoad, setSessionLoad] = useState(false);
   const [popPos, setPopPos] = useState({ left: 0, top: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
@@ -129,30 +126,19 @@ export function ModelPickerPopover({
   }, [visible, prefsTick]);
 
   const isEmpty = favorites.length === 0 && groupsNoFav.length === 0;
-  const busy = sessionLoad || opening || (loadingProp ?? false);
-  const hydrating = open && busy;
+  const hasModels = !isEmpty;
+  const busy = loadingProp ?? false;
+  /** Full skeleton only when catalogs are empty — cached rows stay visible. */
+  const hydrating = open && busy && !hasModels;
+  const refreshing = open && busy && hasModels;
   const showList = !hydrating;
   const parsed = parseQualifiedModel(selectedQualified);
   const label = modelLabel(allModels, selectedQualified);
-
-  useEffect(() => {
-    if (!open) {
-      setOpening(false);
-      setSessionLoad(false);
-      return;
-    }
-    if (!loadingProp && sessionLoad) {
-      const t = window.setTimeout(() => setSessionLoad(false), 48);
-      return () => window.clearTimeout(t);
-    }
-    if (!loadingProp) setOpening(false);
-  }, [open, loadingProp, sessionLoad]);
 
   const applyPick = (model: ProviderModel) => {
     onSelect(makeQualifiedModel(model.providerId, model.modelId));
     setOpen(false);
     setQuery("");
-    setOpening(false);
   };
 
   const pick = (model: ProviderModel) => applyPick(model);
@@ -170,22 +156,17 @@ export function ModelPickerPopover({
   }, [open, favorites.length, groupsNoFav.length, query, busy]);
 
   const openPicker = () => {
-    const pos = btnRef.current
-      ? clampPopPos(btnRef.current.getBoundingClientRect(), POP_W, POP_H)
-      : popPos;
-    flushSync(() => {
-      setSessionLoad(true);
-      setOpening(true);
-      setPopPos(pos);
-      setOpen(true);
-    });
+    if (btnRef.current) {
+      setPopPos(
+        clampPopPos(btnRef.current.getBoundingClientRect(), POP_W, POP_H),
+      );
+    }
+    setOpen(true);
     onOpen?.();
   };
 
   const closePicker = () => {
     setOpen(false);
-    setOpening(false);
-    setSessionLoad(false);
     setQuery("");
   };
 
@@ -199,14 +180,14 @@ export function ModelPickerPopover({
       <div className="ai-flag-menu-overlay" onClick={closePicker} />
       <div
         ref={popRef}
-        className={`model-picker-pop${hydrating ? " is-hydrating" : ""}`}
+        className={`model-picker-pop${hydrating ? " is-hydrating" : ""}${refreshing ? " is-refreshing" : ""}`}
         role="listbox"
-        aria-busy={hydrating}
+        aria-busy={busy}
         style={{ left: popPos.left, top: popPos.top }}
       >
         <div className="model-picker-pop-head">
           <div className="model-picker-search-wrap">
-            {hydrating ? (
+            {busy ? (
               <span className="ai-spinner ai-spinner-sm model-picker-head-spin" />
             ) : (
               <Icon name="search" size={14} />
@@ -216,7 +197,9 @@ export function ModelPickerPopover({
               className="model-picker-search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={hydrating ? "Loading models…" : "Search models"}
+              placeholder={
+                hydrating ? "Loading models…" : "Search models"
+              }
               readOnly={hydrating}
             />
           </div>
@@ -292,14 +275,14 @@ export function ModelPickerPopover({
           ref={btnRef}
           type="button"
           className={`ai-model-chip${
-            (sessionLoad || loadingProp) && !open ? " ai-model-chip-loading" : ""
-          }${opening ? " ai-model-chip-opening" : ""}`}
+            loadingProp && !open ? " ai-model-chip-loading" : ""
+          }`}
           onClick={toggleOpen}
           onMouseEnter={() => onPrefetch?.()}
           onFocus={() => onPrefetch?.()}
           aria-haspopup="listbox"
           aria-expanded={open}
-          aria-busy={(sessionLoad || loadingProp) && !open ? true : undefined}
+          aria-busy={loadingProp && !open ? true : undefined}
           title={
             selectedQualified
               ? `${label} — click to switch`
@@ -318,7 +301,7 @@ export function ModelPickerPopover({
           ) : (
             <span className="ai-model-btn-empty">Pick a model…</span>
           )}
-          {(sessionLoad || loadingProp) && !open ? (
+          {loadingProp && !open ? (
             <span className="ai-spinner ai-spinner-sm" aria-hidden="true" />
           ) : (
             <span className="ai-model-btn-caret">▾</span>

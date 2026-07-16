@@ -6450,6 +6450,10 @@ body.ab-dragging * {
 .model-picker-pop.is-hydrating .model-picker-search {
   pointer-events: none;
 }
+.model-picker-pop.is-refreshing .model-picker-scroll {
+  opacity: 0.92;
+}
+.model-picker-empty {
   margin: 0;
   padding: 16px 12px;
   text-align: center;

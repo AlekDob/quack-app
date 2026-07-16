@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-13
-tags: [agent-hub, agent-status, sessions, notifications, cross-project, workspace-colors, watcher, mount-asymmetry, collapsed-rail, hover-drawer, archived]
+last_verified: 2026-07-16
+tags: [agent-hub, agent-status, sessions, notifications, cross-project, workspace-colors, watcher, mount-asymmetry, collapsed-rail, hover-drawer, archived, delete, lifecycle]
 ---
 
 ## Agent Hub (cross-project status rail)
@@ -22,8 +22,8 @@ UI labels are English (app language). Dot colors are vivid + glowing — the dot
 | Needs input | `needs-input` | `claude:permission-request` (permission or AskUserQuestion) | `#a855f7` purple + glow, pulsing |
 | Working | `working` | sessionId present in `claude_code_active_sessions` | `#eab308` yellow + glow, pulsing |
 | Ready | `ready` | resting state — anything not running/blocked/done | `#22c55e` green + glow |
-| Done | `done` | manual (right-click) | neutral dim |
-| Archived | `archived` | manual (right-click) | neutral dim (muted title) |
+| Done | `done` | manual (right-click **Mark done**) | neutral dim |
+| Archived | `archived` | legacy (`archivedAt` on descriptor) | neutral dim (muted title) |
 
 `archived` chats are **hidden from the live status groups** (Error → Done) but surfaced in a separate **Archived** section when the hub is expanded — see below. **"Ready" is the resting baseline** — there is no separate "idle" group; a chat that isn't actively running, blocked, or marked done is Ready (waiting for the user). Priority on collision: archived → error → needs-input → working → done → ready (`resolveDisplayStatus`).
 
@@ -54,11 +54,28 @@ A single headless `AgentHubWatcher` (mounted once in `App.tsx`) derives status f
 | Collapsed rail + hover drawer + switch perf | `064-agent-hub-drawer-and-chat-tab-switch.md` |
 | Sound asset | `public/sounds/quack.mp3` (from quack-app) |
 
-### Right-click lifecycle
+### Right-click lifecycle (2026-07-16)
 
-Context menu on a row (`ContextMenu`, shared viewport-clamped component): **Rename** (inline input, sets `titleLocked` so the auto-title effect in `AIChatPanel` stops overwriting it), **Mark done / Reopen** (toggles `doneAt`), **Archive** (sets `archivedAt`, hides from live groups, closes editor tab via `closeAiTabInLayout`). Archived rows show **Unarchive** instead of Mark done / Archive. Persisted on the descriptor in per-workspace `state.json`.
+Context menu on a row (`ContextMenu`, shared viewport-clamped component):
 
-**Process cleanup (2026-07-08):** Mark done, Archive, and close chat tab all call `stopChatAgent` — kills the chat's CLI subprocess (`claude_code_kill_session` / `cursor_code_kill_session`) and aborts HTTP streams via `aiStopBus`. **Does not kill workspace PTY terminals** (e.g. a dev server in Terminal 1). See `046-process-cleanup.md`.
+| Item | When | Effect |
+|---|---|---|
+| **Rename** | always | Inline input; sets `titleLocked` so `AIChatPanel` auto-title stops overwriting |
+| **Mark done** / **Reopen** | not archived | Toggles `doneAt` — finished but still in hub |
+| **Unarchive** | `archivedAt` set (legacy) | `setAIChatLifecycle(…, "active")` |
+| **Delete** | always (separator above) | Confirm dialog → `deleteSession` (disk transcript) + `closeAIChat` (tab + descriptor) |
+
+**Archive removed from the menu (2026-07-16):** Done + Archive overlapped ("finished" vs "hide"). New workflow: **Mark done** to park a session, **Delete** to remove it permanently. The **Archived** section and `archivedAt` field remain for chats archived before this change; no new archives are created from the hub UI.
+
+**Done section bulk menu:** **Reopen all** only — **Archive all** removed with the menu simplification.
+
+**Archived row click (2026-07-16):** clicking an archived row now **focuses** the chat (`focusChat`) without auto-unarchiving. Sending a message unarchives (`AIChatPanel.sendUserText` → `setAIChatLifecycle(…, "active")` when `desc.archivedAt` is set). Use **Unarchive** in the context menu to restore explicitly.
+
+Persisted lifecycle fields on `AIChatDescriptor` in per-workspace `state.json`: `doneAt`, `archivedAt` (legacy), `titleLocked`.
+
+**Process cleanup:** Mark done, unarchive, delete, and close chat tab all call `stopChatAgent` where a live agent subprocess exists — kills the chat's CLI subprocess (`claude_code_kill_session` / `cursor_code_kill_session`) and aborts HTTP streams via `aiStopBus`. **Does not kill workspace PTY terminals** (e.g. a dev server in Terminal 1). See `046-process-cleanup.md`.
+
+**Delete vs close tab:** the row **×** / `closeAIChat` closes the editor tab but keeps the descriptor + transcript on disk (chat can reappear if reopened from history). **Delete** is destructive — removes `ChatSession` from disk (`chatHistory.deleteSession` → `chat_store.rs`) and drops the tab descriptor.
 
 ### Archived section (expanded hub, 2026-07-13)
 
@@ -69,7 +86,7 @@ When the hub is **expanded** and at least one chat has `archivedAt`, a sixth col
 | Default visibility | Latest **10** chats by `createdAt` desc |
 | Search | Inline filter on chat title + workspace name; max **30** matches |
 | Hint | *Latest 10 of N — search for more* when `N > 10` and search empty |
-| Open row | `setAIChatLifecycle(…, "active")` then `focusAIChat` — unarchives + reopens tab |
+| Open row | `focusChat` — focuses without unarchive; **Unarchive** in menu or send a message to restore |
 | Collapsed by default | `hubPrefs` first-run default includes `"archived"` (with `"done"`) |
 | Collapsed rail | Section hidden when hub is not expanded (44px chip mode) |
 

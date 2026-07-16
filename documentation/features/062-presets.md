@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-12
-last_verified: 2026-07-13
+last_verified: 2026-07-16
 tags: [presets, agents, model-selection, effort, organigramma, avatar, backend-agnostic, prompt-injection, settings, chat-identity, companion, team-sync, user-instructions]
 ---
 
@@ -314,6 +314,27 @@ in a workspace you don't fully trust.
   organigramma sees zero behavior change (still falls back to the pre-existing
   `readEffort()`/`readDefaultPermMode()` localStorage defaults).
 
+### Fresh-chat bootstrap (2026-07-16)
+
+Jack's model tier (e.g. Team → Jack → **Reasoning** → `claude-code:opus`) must land on every
+"empty" chat surface, not only `/new` inside an existing tab.
+
+| Entry point | Bootstrap |
+|---|---|
+| `/new` / `startNewChat()` | `applyJackDefaultsIfConfigured()` (existing) |
+| First workspace with no saved sessions | same (existing) |
+| **New AI chat tab** (`addNewAIChat` → fresh `AIChatPanel` mount, no `ChatSession` yet) | **fixed 2026-07-16** — `useEffect([wsId, aiChatId])` `else` branch now calls `applyJackDefaultsIfConfigured()` |
+
+**Root cause fixed:** `applyPreset` used to read the agentic backend only from the composer's
+current `selected` model. A brand-new tab mounts with `selected === ""` until model discovery
+hydrates, so the model/effort block was skipped and discovery then pinned **Sonnet** (balanced /
+last catalog row). `agenticProviderForPresetApply()` (`AIChatPanel.tsx`) now falls back to the
+first available agentic CLI (Claude Code → Cursor → OpenCode) when the picker is still empty.
+
+**Precedence reminder** (`resolveModel` in `resolvePresetConfig.ts`): per-preset `model` pin >
+Settings tier map (`lcp.tierModelMap.v1`) > `capabilities.modelForTier` (Jack shipped =
+`reasoning` → `claude-code:opus`).
+
 ### Gotchas
 
 - **Storage split is load-bearing.** `.codetta/presets/` vs `.claude/agents/` is not
@@ -338,6 +359,9 @@ in a workspace you don't fully trust.
 - **No Settings instructions pane.** Per-agent instructions are Team-only (`062` — User
   instructions). Do not reintroduce a parallel `lcp.jack.*` store; Jack uses `lcp.presets.v1`
   like every other built-in.
+- **Empty picker on new tab.** If Jack's model still shows Sonnet after a new chat, confirm Jack
+  was saved in Team (`lcp.presets.v1` key `jack` non-empty) and that Claude Code is available —
+  `applyPreset` only sets model knobs for agentic CLIs.
 
 ### Related docs
 

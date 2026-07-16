@@ -34,6 +34,8 @@ import {
 import { fileBase } from "../sessionDiffStats";
 import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { pulseChatSwitch } from "../chatSwitch";
+import { deleteSession } from "../chatHistory";
+import { confirm as dialogConfirm } from "../dialog";
 import { AgentCustomizations } from "./AgentCustomizations";
 import {
   CustomizationsModal,
@@ -218,11 +220,6 @@ export function AIChatsRail({
     return archivedSorted.slice(0, ARCHIVED_PREVIEW);
   }, [archivedSorted, archivedSearch]);
 
-  const focusArchivedChat = async (wsId: string, chatId: string) => {
-    setAIChatLifecycle(wsId, chatId, "active");
-    await focusChat(wsId, chatId);
-  };
-
   const focusChat = async (wsId: string, chatId: string) => {
     markSeen(chatId);
     if (onSelectChat) {
@@ -243,6 +240,17 @@ export function AIChatsRail({
   const closeChat = (wsId: string, chatId: string) => {
     closeAIChat(wsId, chatId);
     onCloseChat?.(wsId, chatId);
+  };
+
+  const deleteChat = async (entry: HubEntry) => {
+    const title = entry.chat.title.trim() || "Untitled";
+    const ok = await dialogConfirm(
+      `Delete "${title}"? The transcript will be removed permanently.`,
+      { title: "Delete chat", okLabel: "Delete", danger: true },
+    );
+    if (!ok) return;
+    deleteSession(entry.wsId, entry.chat.sessionId);
+    closeChat(entry.wsId, entry.chat.id);
   };
 
   const newChat = (e?: React.MouseEvent<HTMLButtonElement>) => {
@@ -351,11 +359,6 @@ export function AIChatsRail({
                             setAIChatLifecycle(e.wsId, e.chat.id, "active");
                           }
                         },
-                        onArchiveAll: () => {
-                          for (const e of items) {
-                            setAIChatLifecycle(e.wsId, e.chat.id, "archived");
-                          }
-                        },
                       }
                     : undefined
                 }
@@ -445,9 +448,7 @@ export function AIChatsRail({
                       entry.wsId === activeId && entry.chat.id === activeChatId
                     }
                     renaming={renaming === entry.chat.id}
-                    onClick={() =>
-                      focusArchivedChat(entry.wsId, entry.chat.id)
-                    }
+                    onClick={() => focusChat(entry.wsId, entry.chat.id)}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       setMenu({ entry, x: e.clientX, y: e.clientY });
@@ -509,16 +510,13 @@ export function AIChatsRail({
                         menu.entry.chat.doneAt ? "active" : "done",
                       ),
                   },
-                  {
-                    label: "Archive",
-                    onClick: () =>
-                      setAIChatLifecycle(
-                        menu.entry.wsId,
-                        menu.entry.chat.id,
-                        "archived",
-                      ),
-                  },
                 ]),
+            "separator",
+            {
+              label: "Delete",
+              danger: true,
+              onClick: () => void deleteChat(menu.entry),
+            },
           ]}
         />
       )}
@@ -550,7 +548,6 @@ interface SectionProps {
   expanded: boolean;
   bulkActions?: {
     onReopenAll: () => void;
-    onArchiveAll: () => void;
   };
   children: React.ReactNode;
 }
@@ -592,7 +589,7 @@ function HubSection({
 function HubSectionBulkMenu({
   actions,
 }: {
-  actions: { onReopenAll: () => void; onArchiveAll: () => void };
+  actions: { onReopenAll: () => void };
 }) {
   const [open, setOpen] = useState(false);
 
@@ -635,17 +632,6 @@ function HubSectionBulkMenu({
             }}
           >
             Reopen all
-          </button>
-          <button
-            type="button"
-            className="agent-hub-section-menu-item"
-            role="menuitem"
-            onClick={() => {
-              actions.onArchiveAll();
-              setOpen(false);
-            }}
-          >
-            Archive all
           </button>
         </div>
       )}

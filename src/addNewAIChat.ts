@@ -24,7 +24,9 @@ export function addNewAIChat(
   location: TerminalLocation = "editor",
   anchor?: { x: number; y: number },
 ): string {
-  pulseChatSwitch({ veil: false, flushWsId: wsId });
+  // Show the switch loader on new-chat too — mounting a fresh panel isn't free,
+  // and a silent stall reads as "stuck". Ends via the panel's onHydrated.
+  pulseChatSwitch({ veil: true, flushWsId: wsId });
   const chatId = useStore.getState().addAIChat(wsId, location);
   useStore.getState().focusAIChat(wsId, chatId);
   openNewChatNamePrompt({

@@ -520,6 +520,29 @@ function resolveActivePresetDef(
   return customPresets.find((p) => p.id === id);
 }
 
+type AgenticProviderId = "claude-code" | "cursor-cli" | "opencode-cli";
+
+// Fresh chats mount with `selected === ""` until model discovery hydrates.
+// Preset model/effort still need a backend — prefer the current picker
+// provider, else the first available agentic CLI (CC first).
+function agenticProviderForPresetApply(
+  selected: string,
+  availability: {
+    claudeCode: boolean;
+    cursorCli: boolean;
+    openCode: boolean;
+  },
+): AgenticProviderId | null {
+  const fromSelected = parseQualifiedModel(selected)?.providerId;
+  if (fromSelected && isAgenticProviderId(fromSelected)) {
+    return fromSelected as AgenticProviderId;
+  }
+  if (availability.claudeCode) return "claude-code";
+  if (availability.cursorCli) return "cursor-cli";
+  if (availability.openCode) return "opencode-cli";
+  return null;
+}
+
 // Flywheel scope: union of files already edited across a work/story's linked
 // sessions (read-only, from the in-memory cache). Surfaced in the manifest so
 // the agent Reads these first instead of re-exploring. See decisions/004.
@@ -1027,16 +1050,14 @@ export function AIChatPanel({
     setPresetId(id);
     const def = resolveActivePresetDef(id, customPresets);
     if (!def) return; // stale id (e.g. a deleted custom preset) — no-op
-    const selectedParsed = parseQualifiedModel(selected);
-    const provider = selectedParsed?.providerId;
-    // Effort/thinking/model/mode only apply to backends the preset system
-    // knows about (claude-code/cursor-cli/opencode-cli today) — non-agentic
+    const provider = agenticProviderForPresetApply(selected, {
+      claudeCode: claudeCodeAvailable,
+      cursorCli: cursorCliAvailable,
+      openCode: openCodeAvailable,
+    });
+    // Effort/thinking/model/mode only apply to agentic CLIs — non-agentic
     // providers (ollama/openai/anthropic) still get the instructions text.
-    if (
-      provider === "claude-code" ||
-      provider === "cursor-cli" ||
-      provider === "opencode-cli"
-    ) {
+    if (provider) {
       const cfg = resolvePresetConfigFor(def, provider);
       if (cfg.effort) setCcEffort(cfg.effort);
       setCcThinking(cfg.thinking);
@@ -1461,6 +1482,8 @@ export function AIChatPanel({
     if (!wsActive) return;
     const warm = getModelDiscovery();
     void refresh({ showChecking: !warm, force: false });
+    warmPickerCatalogs();
+    setCatalogWarming(isPickerCatalogLoading());
   }, [wsActive, applyDiscoverySnapshot]);
 
   useEffect(() => {
@@ -1936,6 +1959,9 @@ export function AIChatPanel({
         void tryProviderRecover(found, gen);
       } else {
         setMessages([]);
+        // Brand-new tab: no saved session yet — same Jack/preset model
+        // bootstrap as /new or the empty-workspace path below.
+        applyJackDefaultsIfConfigured();
       }
       if (onHydrated) {
         requestAnimationFrame(() => requestAnimationFrame(onHydrated));
@@ -2884,6 +2910,13 @@ export function AIChatPanel({
     images: ImageAttachment[] = [],
   ) => {
     if ((!text && images.length === 0) || !selected) return;
+    // Sending revives an archived chat; opening it from the hub does not.
+    if (aiChatId) {
+      const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
+      if (desc?.archivedAt) {
+        useStore.getState().setAIChatLifecycle(wsId, aiChatId, "active");
+      }
+    }
     // `liveTurnRef` is cleared synchronously in `finally` before
     // drainQueue runs — unlike React `streaming` state, which can still
     // read `""` (between tool rounds) or `null` (stale) in the
@@ -5119,12 +5152,13 @@ export function AIChatPanel({
   );
 
   const handlePickerOpen = useCallback(() => {
-    setCatalogWarming(true);
     warmPickerCatalogs();
+    setCatalogWarming(isPickerCatalogLoading());
   }, []);
 
   const handlePickerPrefetch = useCallback(() => {
     warmPickerCatalogs();
+    setCatalogWarming(isPickerCatalogLoading());
   }, []);
 
   const pinnedPlatform = useMemo(
