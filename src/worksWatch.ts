@@ -12,6 +12,24 @@ import { useStore } from "./store";
 
 let started = false;
 
+// Debounce per root: an agent editing several works files fires a burst of
+// `dir` events; without this each one ran a full refreshWorksFromDisk (re-read
+// every file). Collapse the burst into one trailing refresh.
+const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const REFRESH_DEBOUNCE_MS = 250;
+
+function scheduleWorksRefresh(root: string): void {
+  const prev = refreshTimers.get(root);
+  if (prev) clearTimeout(prev);
+  const t = setTimeout(() => {
+    refreshTimers.delete(root);
+    // Re-check at fire time: a persist() may have started during the window.
+    if (isWorksSelfWriting(root)) return;
+    void refreshWorksFromDisk(root);
+  }, REFRESH_DEBOUNCE_MS);
+  refreshTimers.set(root, t);
+}
+
 function rootForWs(wsId: string): string | null {
   return useStore.getState().loaded[wsId]?.meta.root ?? null;
 }
@@ -33,7 +51,7 @@ export function startWorksWatchOnce(): void {
     // mis-named S-NNN/W-NNN file that orphan import keeps resurfacing drives
     // refresh → persist → refresh forever (CPU pegged).
     if (isWorksSelfWriting(root)) return;
-    void refreshWorksFromDisk(root);
+    scheduleWorksRefresh(root);
   });
   fsBus.addEventListener("file", (ev) => {
     const { wsId, path } = (ev as CustomEvent<{ wsId: string; path: string }>).detail;

@@ -16,10 +16,19 @@ import {
   type WorkStory,
   type WorksSnapshot,
 } from "./works";
-import { isPendingWorkWrite, markWorkWrite } from "./worksItemFiles";
+import {
+  contentChangedSinceWrite,
+  forgetWriteSignature,
+  isPendingWorkWrite,
+  markWorkWrite,
+} from "./worksItemFiles";
+
+const ensuredStoryDirs = new Set<string>();
 
 export async function ensureStoriesDir(root: string): Promise<void> {
+  if (ensuredStoryDirs.has(root)) return;
   await fs.createDir(joinPath(root, WORKS_STORIES_DIR));
+  ensuredStoryDirs.add(root);
 }
 
 export async function writeStoryFile(
@@ -31,13 +40,16 @@ export async function writeStoryFile(
   const rel = rewriteLegacyWorksPath(story.filePath || storyRelPath(story.shortId));
   const abs = joinPath(root, rel);
   const body = story.bodyMd ?? "";
+  const content = serializeStoryMd(story, snap, body);
+  if (!contentChangedSinceWrite(abs, content)) return;
   markWorkWrite(abs);
-  await fs.writeFile(abs, serializeStoryMd(story, snap, body));
+  await fs.writeFile(abs, content);
 }
 
 export async function deleteStoryFile(root: string, story: WorkStory): Promise<void> {
   const rel = rewriteLegacyWorksPath(story.filePath || storyRelPath(story.shortId));
   const abs = joinPath(root, rel);
+  forgetWriteSignature(abs);
   if (await fs.exists(abs)) await fs.delete(abs);
 }
 

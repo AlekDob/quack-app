@@ -37,11 +37,37 @@ export function isPendingWorkWrite(absPath: string): boolean {
   return pendingWrites.has(absPath.toLowerCase());
 }
 
+// Skip redundant disk writes: persist() loops every item + story, but only
+// files whose serialized content actually changed need writing. Keyed by abs
+// path → the last content WE wrote (seeded only by our writes, never by reads,
+// so on-disk formatting differences can't cause false skips).
+const lastWrittenContent = new Map<string, string>();
+
+/** True (and records the new content) when `content` differs from our last
+ *  write to `abs`. Returns false when unchanged, so the caller can skip fs. */
+export function contentChangedSinceWrite(abs: string, content: string): boolean {
+  if (lastWrittenContent.get(abs) === content) return false;
+  lastWrittenContent.set(abs, content);
+  return true;
+}
+
+/** Forget a path's write signature (call on delete so a same-content
+ *  recreate isn't skipped). */
+export function forgetWriteSignature(abs: string): void {
+  lastWrittenContent.delete(abs);
+}
+
+// migrateLegacyWorksWorkspace + createDir are idempotent but were being run
+// once PER file written (N items + N stories per persist). Memoize per root.
+const ensuredRoots = new Set<string>();
+
 export async function ensureWorksDirs(root: string): Promise<void> {
+  if (ensuredRoots.has(root)) return;
   await migrateLegacyWorksWorkspace(root);
   await fs.createDir(worksAbs(root));
   await fs.createDir(joinPath(root, WORKS_ITEMS_DIR));
   await fs.createDir(joinPath(root, WORKS_STORIES_DIR));
+  ensuredRoots.add(root);
 }
 
 export function slimSnapshot(snap: WorksSnapshot): WorksSnapshot {
@@ -98,6 +124,7 @@ export async function writeWorkItemFile(
   const abs = joinPath(root, rel);
   const body = item.bodyMd ?? "";
   const content = serializeWorkItemMd(item, snap, body);
+  if (!contentChangedSinceWrite(abs, content)) return;
   markWorkWrite(abs);
   await fs.writeFile(abs, content);
 }
@@ -105,6 +132,7 @@ export async function writeWorkItemFile(
 export async function deleteWorkItemFile(root: string, item: WorkItem): Promise<void> {
   const rel = item.filePath || workItemRelPath(item.shortId);
   const abs = joinPath(root, rel);
+  forgetWriteSignature(abs);
   if (await fs.exists(abs)) await fs.delete(abs);
 }
 
