@@ -34,6 +34,7 @@ import {
 import { getAgentStatus, markSeen } from "./agentStatusStore";
 import { CommandPalette } from "./components/CommandPalette";
 import { DragGhost } from "./components/DragGhost";
+import { ChatSwitchVeil } from "./components/ChatSwitchVeil";
 import { StatusBar } from "./components/StatusBar";
 import { Toasts } from "./components/Toast";
 import { DiffModal } from "./components/DiffModal";
@@ -824,6 +825,9 @@ function MainApp() {
         onClose={() => setPaletteOpen(false)}
       />
       <DragGhost />
+      {/* One global switch loader — shows on EVERY chat/session switch,
+          including cross-project (per-host veils miss that case). */}
+      <ChatSwitchVeil global />
       <Toasts />
       <AgentHubWatcher />
       <DiffModal />

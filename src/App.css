@@ -18233,10 +18233,17 @@ button.composer-mention-chip-label:hover {
   -webkit-backdrop-filter: blur(10px) saturate(120%);
   backdrop-filter: blur(10px) saturate(120%);
   opacity: 0;
-  transition: opacity 240ms ease;
+  transition: opacity 160ms ease;
 }
 .chat-switch-veil.is-shown {
   opacity: 1;
+}
+/* Global variant: one instance at the app root, full window. Shows on EVERY
+   switch (same-project AND cross-project) — a per-host veil misses the
+   cross-project case where no chat host is mounted+visible mid-switch. */
+.chat-switch-veil--global {
+  position: fixed;
+  z-index: 300;
 }
 /* Slim indeterminate progress sweep at the top edge — the "loading" motion. */
 .chat-switch-veil-bar {

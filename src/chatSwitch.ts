@@ -17,9 +17,10 @@ import {
   flushWorkspaceChatPersist,
 } from "./chatPersistFlush";
 
-// Graceful floor: keep the veil up at least this long so a fast switch still
-// reads as a smooth transition. Kept short — the freeze is fixed, this is polish.
-const MIN_VISIBLE_MS = 240;
+// Graceful floor: keep the veil up at least this long so even an instant switch
+// clearly shows the loader (the user wants a minimum always visible). The freeze
+// is fixed, so this is pure perceived-smoothness polish.
+const MIN_VISIBLE_MS = 320;
 // Hard fallback: drop the veil after this even if `endChatSwitch` never fires.
 const CAP_MS = 1000;
 

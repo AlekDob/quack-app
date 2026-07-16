@@ -19,10 +19,18 @@ transition); the actual switch is already fast after the freeze fix (`044`).
 | Phase | What happens |
 |---|---|
 | Pulse | On any chat/session switch, `pulseChatSwitch({ veil: true })` sets `switching = true` immediately |
-| Fade in | Veil fades in over ~240ms — translucent glass + blur over the chat host (context stays faintly visible) |
-| Min floor | Stays up at least **240ms** even if hydration is instant, so a fast switch still fades gently (no flash) |
+| Fade in | Veil fades in over ~160ms — translucent glass + blur over the **whole window** (context stays faintly visible) |
+| Min floor | Stays up at least **320ms** even if hydration is instant, so the loader is **always clearly visible** (the explicit ask), never a flash |
 | End | `endChatSwitch()` (from the panel's `onHydrated`) ends the pulse after the floor; veil fades out and unmounts |
 | Cap | A **1000ms** fallback ends the pulse even if `onHydrated` never fires |
+
+**One global overlay, not per-host.** Mounted once at the app root with
+`global` (`position: fixed`, full window), driven by the global `switching`
+pulse. Earlier it was per-host (`active={switching && visible}`), which showed
+on same-project switches but **missed cross-project switches** — mid-switch the
+old workspace host unmounts and the new one isn't `visible` yet, so no host
+rendered the veil and the app felt "stuck". A single root overlay shows on
+EVERY switch.
 
 ### Where it lives
 
@@ -30,19 +38,19 @@ transition); the actual switch is already fast after the freeze fix (`044`).
 |---|---|
 | Pulse store (timing, min floor, cap) | `src/chatSwitch.ts` → `pulseChatSwitch`, `endChatSwitch`, `isChatSwitching`, `subscribeChatSwitch` |
 | Subscribe hook | `src/useChatSwitching.ts` (`useSyncExternalStore`) |
-| Veil component (fade in/out) | `src/components/ChatSwitchVeil.tsx` |
-| Styles | `src/App.css` → `.chat-switch-veil`, `.chat-switch-veil-bar`, `@keyframes chatSwitchBar` |
+| Veil component (fade in/out, `global` variant) | `src/components/ChatSwitchVeil.tsx` |
+| Global mount point | `src/App.tsx` → `<ChatSwitchVeil global />` (one instance, app root) |
+| Styles | `src/App.css` → `.chat-switch-veil`, `.chat-switch-veil--global`, `.chat-switch-veil-bar`, `@keyframes chatSwitchBar` |
 | Triggers | `AgentModeShell.tsx` (`selectSession`), `AIChatsRail.tsx` (`focusChat`) |
-| Hosts (mount points) | `AgentModeShell.tsx`, `TabContentHost.tsx`, `WorkspaceShell.tsx` |
 | End signal | `AIChatPanel.tsx` `onHydrated` → host `endChatSwitch()` |
 
 ### Timing constants
 
 | Constant | Value | File |
 |---|---|---|
-| `MIN_VISIBLE_MS` | 240 | `chatSwitch.ts` |
+| `MIN_VISIBLE_MS` | 320 | `chatSwitch.ts` |
 | `CAP_MS` | 1000 | `chatSwitch.ts` |
-| `FADE_MS` (opacity transition) | 240 | `ChatSwitchVeil.tsx` + `.chat-switch-veil` CSS (must match) |
+| `FADE_MS` (opacity transition) | 160 | `ChatSwitchVeil.tsx` + `.chat-switch-veil` CSS (must match) |
 
 ### Visual
 
@@ -53,7 +61,7 @@ transition); the actual switch is already fast after the freeze fix (`044`).
 
 ### Design notes / gotchas
 
-- **Always mounted, self-fading** — hosts render `<ChatSwitchVeil active={showVeil} />` unconditionally (not `{showVeil && …}`); the component keeps itself mounted through the fade-OUT (`FADE_MS`) so there's no instant pop-out. `active` defaults to the global `useChatSwitching()`; hosts pass a **foreground-gated** flag (`switching && visible`) so a background/non-visible panel never flashes the veil.
+- **Global overlay, self-fading** — mounted once at the app root as `<ChatSwitchVeil global />`; the component keeps itself mounted through the fade-OUT (`FADE_MS`) so there's no instant pop-out. Driven by the global `useChatSwitching()`. (An `active` prop still exists for scoping to a container, but the shipped design is the single global veil — a per-host veil missed cross-project switches.)
 - **Min floor lives in `chatSwitch.ts`, not the component** — `endChatSwitch` defers the end to `max(0, MIN_VISIBLE_MS - elapsed)`. Without it, the now-fast hydration would drop the veil in <100ms → a flash.
 - **`.is-switching` (raw `switching`) hides stale chat content** during the switch (`visibility: hidden`) so the old transcript isn't seen under the blur; it clears at `finish()` while the veil is still fading out → content reveals smoothly under the fading veil.
 - **Veil ≠ freeze fix** — this is cosmetic. The switch was made actually fast by the provider-session JSONL-parse fix in `044`.

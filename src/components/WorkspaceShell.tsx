@@ -33,7 +33,6 @@ import { pty, type ShellOption } from "../ipc";
 import { redockTerminal } from "../terminalPopout";
 import { Icon } from "./Icon";
 import { useZenMode } from "../zenMode";
-import { ChatSwitchVeil } from "./ChatSwitchVeil";
 import { useChatSwitching } from "../useChatSwitching";
 import { endChatSwitch } from "../chatSwitch";
 import { useWorkspaceHeavyMount } from "../useWorkspaceHeavyMount";
@@ -1071,8 +1070,6 @@ function AIChatHost({
         chatVisible={visible}
         onHydrated={onHydrated}
       />
-      {/* Always mounted — the veil fades itself out on `active` false. */}
-      <ChatSwitchVeil active={showVeil} />
     </div>,
     container,
   );

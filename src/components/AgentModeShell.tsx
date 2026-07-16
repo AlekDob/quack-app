@@ -25,7 +25,6 @@ import { FilePopupModal } from "./FilePopupModal";
 import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
 import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
 import { AIChatsRail } from "./AIChatsRail";
-import { ChatSwitchVeil } from "./ChatSwitchVeil";
 import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { endChatSwitch, pulseChatSwitch } from "../chatSwitch";
 import { useChatSwitching } from "../useChatSwitching";
@@ -478,7 +477,6 @@ export function AgentModeShell({ wsId }: Props) {
                 </div>
               </div>
             )}
-            <ChatSwitchVeil />
           </div>
           {sidePanelKey && sideParsed?.kind === "composeReview" && (
             <div className="agent-main-review">

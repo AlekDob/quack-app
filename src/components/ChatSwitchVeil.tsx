@@ -3,15 +3,24 @@ import { useChatSwitching } from "../useChatSwitching";
 
 // Fade duration — must match the `.chat-switch-veil` opacity transition in CSS
 // so the node unmounts exactly when the fade-out ends (no flicker, no leftover).
-const FADE_MS = 240;
+const FADE_MS = 160;
 
 /** Gradual translucent loader shown while a chat / session switch hydrates.
  *  Fades IN on `active`, then lingers mounted through a fade-OUT so the
- *  transition reads smooth instead of a hard content pop. `active` defaults to
- *  the global switch pulse; hosts pass their own foreground-gated flag so a
- *  background (non-visible) panel never flashes the veil. Mount inside any
- *  chat host with `position: relative`. */
-export function ChatSwitchVeil({ active }: { active?: boolean }) {
+ *  transition reads smooth instead of a hard content pop.
+ *
+ *  Mounted ONCE at the app root with `global` (driven by the global switch
+ *  pulse, `position: fixed` full-window): this way it shows on EVERY switch —
+ *  including cross-project switches, where the old host unmounts and the new
+ *  one isn't visible yet, so a per-host veil would leave a "stuck" gap.
+ *  `active` can still be passed to scope it to a container. */
+export function ChatSwitchVeil({
+  active,
+  global = false,
+}: {
+  active?: boolean;
+  global?: boolean;
+}) {
   const auto = useChatSwitching();
   const on = active ?? auto;
   const [mounted, setMounted] = useState(on);
@@ -32,7 +41,9 @@ export function ChatSwitchVeil({ active }: { active?: boolean }) {
   if (!mounted) return null;
   return (
     <div
-      className={`chat-switch-veil${shown ? " is-shown" : ""}`}
+      className={`chat-switch-veil${global ? " chat-switch-veil--global" : ""}${
+        shown ? " is-shown" : ""
+      }`}
       role="status"
       aria-live="polite"
     >

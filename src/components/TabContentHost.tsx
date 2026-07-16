@@ -13,7 +13,6 @@ import { UsagePanel } from "./UsagePanel";
 import { BrainPanel } from "./BrainPanel";
 import { QuackStorePanel } from "./QuackStorePanel";
 import { AIChatPanel } from "./AIChatPanel";
-import { ChatSwitchVeil } from "./ChatSwitchVeil";
 import { mediaKindOf } from "../mediaPreview";
 import { isMarkdownPath } from "../editorMdView";
 import { parseKey, type WorkspaceData } from "../store";
@@ -198,8 +197,6 @@ function DrawerAIChatHost({
         chatVisible={visible}
         onHydrated={onHydrated}
       />
-      {/* Always mounted — the veil fades itself out on `active` false. */}
-      <ChatSwitchVeil active={showVeil} />
     </div>,
     container,
   );
