@@ -62,10 +62,15 @@ Jack is **not** in `PRESET_ORDER` (`presetId === null` in chat) but shares the s
 mechanism (`JACK_PRESET_ID = "jack"`). The four presets below are non-deletable built-ins; users
 may override any field via Team → edit → Save, or **Reset to default** to revert.
 
+**Default agent for new chats = Milo** (`DEFAULT_PRESET_ID = "builder"`), not Jack. Every fresh
+chat / reset silently calls `applyDefaultPreset()` → `applyPreset("builder")` (3 sites in
+`AIChatPanel.tsx`), forcing Milo's model/effort/mode. Legacy sessions with no saved `presetId`
+still fall back to `null`/Jack on load (`?? null`), so old chats aren't retroactively rewritten.
+
 | Identity | id | Model tier | Effort | Output | Mode (`permMode`) | Avatar |
 |---|---|---|---|---|---|---|
 | Jack (root) | `jack` | reasoning | high | structured | plan | `/jack.jpeg` |
-| Milo · Builder | `builder` | balanced | medium | concise | Agent (`bypassPermissions`) | `duck3` |
+| Milo · Builder (default) | `builder` | reasoning (Opus) | medium | concise | Agent (`bypassPermissions`) | `duck3` |
 | Nora · Debugger | `debugger` | balanced | medium | structured | auto | `duck16` (pinned feminine) |
 | Vera · Reviewer | `reviewer` | balanced | medium | terse-review | auto | `duck28` (pinned feminine) |
 | Lia · Companion | `companion` | balanced | low | terse-review | auto | `duck22` |
@@ -91,13 +96,12 @@ Milo/Nora/Vera/Lia/custom presets — → **Edit** → **Instructions** textarea
 | Team UI | `WhiteboardOrganigramma.tsx` (Jack root) + `WhiteboardPresets.tsx` + `AgentCreateDrawer.tsx` |
 | Built-in override store | `lcp.presets.v1` via `setPresetOverrides(id, { instructions })` (`settings.ts`) |
 | Custom preset body | `.codetta/presets/<slug>.md` markdown body (`createPreset.ts` / `updatePreset`) |
-| Prompt injection | `AIChatPanel.sendUserText` → `getPresetInstructionsFor(def)` appended to `sysParts` **every turn** |
+| Prompt injection | `AIChatPanel.sendUserText` → `getPresetInstructionsFor(def)`; non-CC → `sysParts`, Claude Code → `ccTurnContext` (survives resume, see "Default agent + identity") |
 | Merge | `effectivePresetDefinition` + `buildPresetInstructions` (`resolvePresetConfig.ts`, `instructions.ts`) |
 
 **Jack specifically:** `presetId === null` in chat, but overrides use `JACK_PRESET_ID = "jack"`.
 Editing Jack in Team persists the same way as Milo/Nora — one drawer, one store, one injection
-path. `applyJackDefaultsIfConfigured()` applies Jack's saved knobs on new chats when overrides
-exist.
+path. New chats no longer default to Jack — see "Default agent + identity survives resume".
 
 **Removed (2026-07-13):** Settings → "Jack — Your preferences" duplicated this surface.
 Deleted `src/jackPrefs.ts`, `src/components/jackSettings.tsx`, `appendJackUserPreferences` in
@@ -107,7 +111,9 @@ Instructions.
 
 **Precedence on each turn** (assistant system prompt assembly in `AIChatPanel`):
 
-1. Jack persona line (`sysParts[0]`, see `005-jack-duck-identity.md`)
+1. Active-agent persona line — `quackAgentCorePrompt(coreIdentity)` in `sysParts[0]`, where
+   `coreIdentity` is the active preset's `{ label, role }` (Milo by default), Jack only when
+   `presetId === null` (see `005-jack-duck-identity.md`)
 2. Workspace rules / brain / Works context (when applicable)
 3. **Active preset instructions** (`getPresetInstructionsFor` — includes Jack when no preset picked)
 4. No separate global "user preferences" block anymore
@@ -162,12 +168,18 @@ Rather than hardcode guesses, the user maps tiers to real models themselves:
   — only for agentic backends (claude-code/cursor-cli/opencode-cli). Custom presets load
   independent of `selectedIsCC` (unlike the subagent catalog) since a preset's instructions apply
   to every backend, not just Claude Code.
-- On every turn: `getPresetInstructionsFor(def)` is appended to `sysParts` — **every turn, not
-  just the first**, because Claude Code only flattens the system message into the prompt on the
-  first turn (`src/providers/claudeCode.ts`); re-appending keeps a preset changed mid-chat
-  effective on the next message. When `def.source === "custom"` the block is wrapped with
-  `[Preset "X" — from this workspace's .codetta/presets/, not verified by Quack]` — see Security
-  note below.
+- On every turn: `getPresetInstructionsFor(def)` is injected — but the channel depends on the
+  backend, because Claude Code **resumes send only the latest user message**, so `sysParts` (the
+  system message) vanishes after turn one:
+  - **Non-CC** (Ollama/OpenAI/Anthropic/Cursor/OpenCode resend the full system each turn) →
+    appended to `sysParts`.
+  - **Claude Code** (`skipAllInlining`) → an `[Agent identity]` block (identity line + role
+    instructions) is pushed into `ccTurnContext`, which is prepended to every user message
+    (`ccPrefix`) and therefore survives resume. This is what keeps a preset changed mid-chat — and
+    the agent's very identity — effective on turn 2+ (see "Default agent + identity survives resume").
+  - When `def.source === "custom"` the block is wrapped with
+    `[Preset "X" — from this workspace's .codetta/presets/, not verified by Quack]` — see Security
+    note below.
 - Instructions are backend-agnostic text (no `BackendId` needed); model/effort/thinking
   resolution does need one, so `applyPreset` only touches those knobs for the 3 known agentic
   providers.
@@ -314,25 +326,43 @@ in a workspace you don't fully trust.
   organigramma sees zero behavior change (still falls back to the pre-existing
   `readEffort()`/`readDefaultPermMode()` localStorage defaults).
 
-### Fresh-chat bootstrap (2026-07-16)
+### Default agent + identity survives resume (2026-07-16)
 
-Jack's model tier (e.g. Team → Jack → **Reasoning** → `claude-code:opus`) must land on every
-"empty" chat surface, not only `/new` inside an existing tab.
+Two coupled fixes so new chats start **and stay** on the right agent.
 
-| Entry point | Bootstrap |
+**1. Default agent = Milo (not Jack).** `DEFAULT_PRESET_ID = "builder"` (`builtins.ts`) is the
+baseline for every fresh chat. The old `applyJackDefaultsIfConfigured()` is replaced by
+`applyDefaultPreset()` (`AIChatPanel.tsx`) which silently `applyPreset("builder")` at the 3
+fresh-chat / reset sites (`/new`, new-tab mount `else` branch, delete-session reset). Milo's
+shipped `modelTier` was also bumped `balanced` → `reasoning`, so the default is **Opus**.
+Legacy sessions with no saved `presetId` still fall back to `null`/Jack on load (`?? null`) — old
+chats are not retroactively rewritten.
+
+**2. Identity survives CC resume ("Milo speaks as Jack" bug).** The active agent's identity
+(`quackAgentCorePrompt(coreIdentity)`) and preset role-instructions used to live only in
+`sysParts` (the system message). Claude Code resumes send **only the latest user message**, so
+after turn 1 the system message — identity included — vanished; a resumed CC turn (or a preset
+switched mid-chat) kept the turn-1 identity and answered as the wrong agent even though the
+message header showed the new one. Fix: for CC (`skipAllInlining`), push an `[Agent identity]`
+block into `ccTurnContext` (prepended to every user message via `ccPrefix`), the same channel
+already used for the orchestrator contract + Works protocol. Non-CC providers keep the plain
+`sysParts` append.
+
+| Concern | Where |
 |---|---|
-| `/new` / `startNewChat()` | `applyJackDefaultsIfConfigured()` (existing) |
-| First workspace with no saved sessions | same (existing) |
-| **New AI chat tab** (`addNewAIChat` → fresh `AIChatPanel` mount, no `ChatSession` yet) | **fixed 2026-07-16** — `useEffect([wsId, aiChatId])` `else` branch now calls `applyJackDefaultsIfConfigured()` |
+| Default preset id | `DEFAULT_PRESET_ID = "builder"` (`src/presets/builtins.ts`, exported via barrel) |
+| Fresh-chat apply | `applyDefaultPreset()` → 3 sites in `AIChatPanel.tsx` (`/new`, new-tab mount, delete-reset) |
+| Milo shipped tier | `builtins.ts` `builder.defaults.modelTier: "reasoning"` (→ `claude-code:opus`) |
+| CC identity injection | `AIChatPanel.sendUserText` — `[Agent identity]` block in `ccTurnContext` when `skipAllInlining` |
 
-**Root cause fixed:** `applyPreset` used to read the agentic backend only from the composer's
-current `selected` model. A brand-new tab mounts with `selected === ""` until model discovery
-hydrates, so the model/effort block was skipped and discovery then pinned **Sonnet** (balanced /
-last catalog row). `agenticProviderForPresetApply()` (`AIChatPanel.tsx`) now falls back to the
-first available agentic CLI (Claude Code → Cursor → OpenCode) when the picker is still empty.
+**Prior root cause still relevant** (`applyPreset` + empty picker): `applyPreset` reads the
+agentic backend from the composer's `selected` model; a brand-new tab mounts with `selected === ""`
+until discovery hydrates, so `agenticProviderForPresetApply()` (`AIChatPanel.tsx`) falls back to
+the first available agentic CLI (Claude Code → Cursor → OpenCode). Without it the model/effort
+block was skipped and discovery pinned the balanced tier.
 
 **Precedence reminder** (`resolveModel` in `resolvePresetConfig.ts`): per-preset `model` pin >
-Settings tier map (`lcp.tierModelMap.v1`) > `capabilities.modelForTier` (Jack shipped =
+Settings tier map (`lcp.tierModelMap.v1`) > `capabilities.modelForTier` (Milo/Jack shipped =
 `reasoning` → `claude-code:opus`).
 
 ### Gotchas
@@ -341,8 +371,12 @@ Settings tier map (`lcp.tierModelMap.v1`) > `capabilities.modelForTier` (Jack sh
   incidental — it's what keeps "preset" (session-shaping) and "subagent" (delegable, isolated
   Task) from merging into one runtime concept. Don't point the preset loader at
   `.claude/agents/`.
-- **First-turn flattening (Claude Code).** Preset instructions are re-appended every turn
-  specifically to survive this; don't move the injection to a "first message only" branch.
+- **CC resume drops `sysParts` — identity too.** Claude Code resumes send only the latest user
+  message, so anything in the system message (`sysParts`) — including the `You are {label}`
+  identity line — is gone from turn 2 on. Anything that must persist across a CC session
+  (identity, preset role-instructions, orchestrator contract, Works protocol) belongs in
+  `ccTurnContext` (the `ccPrefix` on every user message), **never** in a "first message only"
+  branch. This is the "Milo speaks as Jack" bug — see "Default agent + identity survives resume".
 - **Built-ins have no `.path`.** `PresetDefinition.path` is `null`/absent for built-ins — the
   organigramma and any edit UI must gate on `preset.source === "custom"` before writing
   frontmatter.

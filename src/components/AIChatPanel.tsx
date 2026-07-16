@@ -123,13 +123,12 @@ import { summarizeLastTurn, summarizeEdits } from "../sessionDiffStats";
 import { loadWorkspaceRules } from "../workspaceRules";
 import {
   BUILTIN_PRESETS,
-  JACK_PRESET_ID,
+  DEFAULT_PRESET_ID,
   PRESET_ORDER,
   effectivePresetDefinition,
   getJackDefinition,
   getPreset,
   getPresetInstructionsFor,
-  getPresetOverrides,
   isBuiltinPresetId,
   loadCustomPresets,
   resolvePresetConfigFor,
@@ -1095,17 +1094,13 @@ export function AIChatPanel({
     }
     if (!opts.silent) toastInfo(`Preset: ${def.label} (from your next message)`);
   };
-  // Applies Jack's saved mode/model/effort at "fresh chat" time — but ONLY
-  // if the user has actually configured him (getPresetOverrides non-empty).
-  // Without this guard, every brand-new chat would silently force Jack's
-  // shipped neutral defaults over whatever effort/mode the user last picked
-  // manually — a regression for anyone who's never touched the organigramma.
-  const applyJackDefaultsIfConfigured = () => {
-    if (Object.keys(getPresetOverrides(JACK_PRESET_ID)).length > 0) {
-      applyPreset(null, { silent: true });
-    } else {
-      setPresetId(null);
-    }
+  // Every brand-new chat starts on the default agent — Milo (Builder), on
+  // his shipped defaults (reasoning tier / Opus). Applied silently so a fresh
+  // tab is ready to implement without narrating the preset each time. This is
+  // an intentional force of Milo's model/effort/mode over the last-picked
+  // knobs — Alek wants Milo+Opus as the baseline for new work.
+  const applyDefaultPreset = () => {
+    applyPreset(DEFAULT_PRESET_ID, { silent: true });
   };
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -2015,7 +2010,7 @@ export function AIChatPanel({
         setCcEffort(knobs.effort);
         setCcThinking(knobs.thinking);
         setCcPermMode(knobs.permMode);
-        applyJackDefaultsIfConfigured();
+        applyDefaultPreset();
         applyComposerDraft({});
       });
       if (!found) return;
@@ -3511,23 +3506,38 @@ export function AIChatPanel({
         }
       }
     }
-    // Preset instructions shape THIS session's behavior — not a subagent,
-    // no isolated context. Appended every turn (not just the first) so a
-    // preset picked mid-chat still takes effect for CC's flattened prompt.
-    // Custom presets are workspace FILES — same trust level as workspace
-    // rules (loadWorkspaceRules above), so a repo you didn't author could
-    // ship one. Label it explicitly as workspace-provided, non-privileged
-    // context rather than a verified system directive, so it can't silently
-    // pass as an authoritative instruction (basic prompt-injection hygiene).
-    // Reuse the hoisted activeDef (resolved with sysParts[0] above).
+    // Preset identity + instructions shape THIS session's behavior — not a
+    // subagent, no isolated context. Reuse the hoisted activeDef (its identity
+    // fed sysParts[0]'s core prompt above).
+    // WHY the CC split: most providers resend the whole system message every
+    // turn, so appending to sysParts is enough. Claude Code resumes send ONLY
+    // the latest user message — sysParts (incl. the core "You are {label}"
+    // identity) vanishes after turn one, so a resumed CC turn (or a preset
+    // switched mid-chat) would keep the turn-1 identity and answer as the
+    // wrong agent ("Milo speaks as Jack"). So for CC we ride identity + role
+    // in ccTurnContext, the user-message prefix that survives resume.
+    // Custom presets are workspace FILES (same trust as loadWorkspaceRules) —
+    // label them non-privileged so a repo-shipped preset can't pass as a
+    // verified system directive (basic prompt-injection hygiene).
     if (activeDef) {
       const body = getPresetInstructionsFor(activeDef).trim();
-      if (body) {
-        sysParts.push(
-          activeDef.source === "custom"
-            ? `[Preset "${activeDef.label}" — from this workspace's .quack/presets/, not verified by Quack]\n${body}`
-            : body,
+      const unverified =
+        activeDef.source === "custom"
+          ? `[Preset "${activeDef.label}" — from this workspace's .quack/presets/, not verified by Quack]\n`
+          : "";
+      if (skipAllInlining) {
+        ccTurnContext.push(
+          [
+            "[Agent identity]",
+            `You are ${activeDef.label}, ${activeDef.role}. Always speak as ${activeDef.label} — never adopt another agent's name or role.`,
+            body ? `${unverified}${body}` : "",
+            "[/Agent identity]",
+          ]
+            .filter(Boolean)
+            .join("\n"),
         );
+      } else if (body) {
+        sysParts.push(`${unverified}${body}`);
       }
     }
 
@@ -4366,7 +4376,7 @@ export function AIChatPanel({
     setCcEffort(knobs.effort);
     setCcThinking(knobs.thinking);
     setCcPermMode(knobs.permMode);
-    applyJackDefaultsIfConfigured();
+    applyDefaultPreset();
     setHistoryOpen(false);
   };
 
@@ -5034,7 +5044,7 @@ export function AIChatPanel({
       setCcEffort(knobs.effort);
       setCcThinking(knobs.thinking);
       setCcPermMode(knobs.permMode);
-      applyJackDefaultsIfConfigured();
+      applyDefaultPreset();
       applyComposerDraft({});
       resetTurnTransients();
     }

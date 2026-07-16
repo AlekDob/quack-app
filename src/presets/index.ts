@@ -15,6 +15,7 @@ export type {
 export {
   BUILTIN_PRESETS,
   JACK_PRESET_ID,
+  DEFAULT_PRESET_ID,
   PRESET_ORDER,
   getJackDefinition,
   getPreset,
@@ -25,6 +26,7 @@ export { BACKEND_CAPABILITIES, getCapabilities } from "./capabilities";
 export {
   clearPresetOverrides,
   getPresetOverrides,
+  hydratePresetOverrides,
   setPresetOverrides,
   subscribePresetSettings,
 } from "./settings";

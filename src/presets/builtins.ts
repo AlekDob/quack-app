@@ -23,7 +23,9 @@ export const BUILTIN_PRESETS: Record<PresetId, PresetDefinition> = {
     whenToUse: "The plan is clear: write/modify code in small, verifiable steps.",
     whenNotToUse: "When the path isn't decided (ask Jack), something is broken (use Nora), or you just want to talk (use Lia).",
     defaults: {
-      modelTier: "balanced",
+      // Milo is the default agent for new chats — Alek wants him on the
+      // reasoning tier (Opus) out of the box, not the balanced Sonnet.
+      modelTier: "reasoning",
       effort: "medium",
       thinking: false,
       outputStyle: "concise",
@@ -109,6 +111,10 @@ export function isBuiltinPresetId(id: string): id is PresetId {
 // definition, so e.g. forcing Plan mode "for Jack" is just another
 // UserPresetOverrides entry, same mechanism as Milo/Nora/Vera/Lia.
 export const JACK_PRESET_ID = "jack";
+
+// Default agent for brand-new chats. Alek wants Milo (Builder), not Jack —
+// so a fresh tab starts ready to implement, on Milo's shipped defaults.
+export const DEFAULT_PRESET_ID: PresetId = "builder";
 
 export function getJackDefinition(): PresetDefinition {
   return {
