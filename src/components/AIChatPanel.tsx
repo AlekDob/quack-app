@@ -4546,7 +4546,9 @@ export function AIChatPanel({
       setDiskSessionDurationMs(0);
       return;
     }
-    if (!wsActive) return;
+    // Only the foreground (visible) panel polls: hidden multitask tabs stay
+    // mounted for fast switch but must not each run their own disk poll.
+    if (!wsActive || !chatVisible) return;
     const gen = ++diskHydrateGenRef.current;
     let cancelled = false;
 
@@ -4622,6 +4624,7 @@ export function AIChatPanel({
   }, [
     selectedIsCC,
     wsActive,
+    chatVisible,
     claudeSessionId,
     root,
     liveContextTokens,
@@ -4664,7 +4667,7 @@ export function AIChatPanel({
 
   // Poll plan limits every 30s — deps stay minimal so we don't 429.
   useEffect(() => {
-    if (!selectedIsCC || !wsActive) return;
+    if (!selectedIsCC || !wsActive || !chatVisible) return;
 
     const poll = async () => {
       const local = buildUsageFromMetrics();
@@ -4703,11 +4706,11 @@ export function AIChatPanel({
     poll();
     const t = window.setInterval(poll, 30_000);
     return () => window.clearInterval(t);
-  }, [selectedIsCC, wsActive, wsId]);
+  }, [selectedIsCC, wsActive, chatVisible, wsId]);
 
   // Probe Claude Code OAuth without hitting the rate-limited usage API.
   useEffect(() => {
-    if (!selectedIsCC || !claudeCodeAvailable || !wsActive) {
+    if (!selectedIsCC || !claudeCodeAvailable || !wsActive || !chatVisible) {
       if (!selectedIsCC || !claudeCodeAvailable) setClaudeAuth(null);
       return;
     }
@@ -4726,7 +4729,7 @@ export function AIChatPanel({
       window.clearInterval(t);
       unsub();
     };
-  }, [selectedIsCC, claudeCodeAvailable, wsActive, wsId]);
+  }, [selectedIsCC, claudeCodeAvailable, wsActive, chatVisible, wsId]);
 
   const showUsageReport = async () => {
     let cli: NonNullable<typeof usageReport>["cli"] = null;

@@ -4,7 +4,7 @@ import { fsBus } from "./fsBus";
 import { joinPath } from "./pathUtils";
 import { isWorksPath } from "./worksDir";
 import { WORKS_STORIES_DIR } from "./storyMd";
-import { refreshWorksFromDisk } from "./worksCache";
+import { refreshWorksFromDisk, isWorksSelfWriting } from "./worksCache";
 import { reloadStoryFromPath } from "./worksStoryFiles";
 import { reloadWorkItemFromPath } from "./worksItemFiles";
 import { getWorksSnapshot, saveWorks } from "./worksCache";
@@ -29,6 +29,10 @@ export function startWorksWatchOnce(): void {
     if (!isWorksDataDir(dir)) return;
     const root = rootForWs(wsId);
     if (!root) return;
+    // Skip the echo of our own persist() writes — otherwise a duplicate/
+    // mis-named S-NNN/W-NNN file that orphan import keeps resurfacing drives
+    // refresh → persist → refresh forever (CPU pegged).
+    if (isWorksSelfWriting(root)) return;
     void refreshWorksFromDisk(root);
   });
   fsBus.addEventListener("file", (ev) => {

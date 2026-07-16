@@ -5,12 +5,15 @@ import {
   childrenOfStory,
   emptySnapshot,
   findStory,
+  findStoryByShortId,
   findWork,
   moduleByFeatureSlug,
   moduleByName,
   newId,
   nextShortId,
   nextStoryShortId,
+  dedupeStoriesByShortId,
+  mergeDuplicateStoriesInSnapshot,
   normalizeWorksSnapshot,
   type WorkComment,
   type WorkCycle,
@@ -48,6 +51,8 @@ import { refreshAllWorkProgress } from "./workProgressStore";
 import { closeWorkDrawer, getWorkDrawer } from "./workDrawer";
 import { closeStoryDrawer, getStoryDrawer } from "./storyDrawer";
 import { joinPath } from "./pathUtils";
+import { useStore } from "./store";
+import { wsIdForRoot } from "./worksChatAutoLink";
 
 type Listener = (snap: WorksSnapshot) => void;
 
@@ -80,6 +85,41 @@ function notify(e: WsWorks): void {
   for (const fn of e.listeners) fn(e.snapshot);
 }
 
+// Echo suppression for the LIVE watch path. The FS watcher only ever emits
+// `dir` events (see fsBus.ts) → worksWatch calls refreshWorksFromDisk. But
+// persist() itself writes into works/items + works/stories, so its own writes
+// fire `dir` events that would re-enter refreshWorksFromDisk → (if anything
+// still reads as "changed", e.g. a duplicate/mis-named S-NNN file that orphan
+// import keeps resurrecting) persist again → infinite CPU/disk storm.
+// While we're persisting (and for a short cooldown covering the 200ms watcher
+// debounce), worksWatch skips the refresh so our own writes never bounce back.
+const selfWriting = new Set<string>();
+const selfWriteTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const SELF_WRITE_COOLDOWN_MS = 500;
+
+export function isWorksSelfWriting(root: string): boolean {
+  return selfWriting.has(root);
+}
+
+function beginSelfWrite(root: string): void {
+  selfWriting.add(root);
+  const prev = selfWriteTimers.get(root);
+  if (prev) {
+    clearTimeout(prev);
+    selfWriteTimers.delete(root);
+  }
+}
+
+function endSelfWrite(root: string): void {
+  const prev = selfWriteTimers.get(root);
+  if (prev) clearTimeout(prev);
+  const t = setTimeout(() => {
+    selfWriting.delete(root);
+    selfWriteTimers.delete(root);
+  }, SELF_WRITE_COOLDOWN_MS);
+  selfWriteTimers.set(root, t);
+}
+
 function isSnapshot(v: unknown): v is WorksSnapshot {
   if (!v || typeof v !== "object") return false;
   const o = v as Record<string, unknown>;
@@ -108,13 +148,18 @@ function migrateSnapshotV3(snap: WorksSnapshot): WorksSnapshot {
 }
 
 async function persist(root: string, snap: WorksSnapshot): Promise<void> {
-  for (const item of snap.items) {
-    await writeWorkItemFile(root, item, snap);
+  beginSelfWrite(root);
+  try {
+    for (const item of snap.items) {
+      await writeWorkItemFile(root, item, snap);
+    }
+    for (const story of snap.stories) {
+      await writeStoryFile(root, story, snap);
+    }
+    await invoke("works_save", { wsRoot: root, snapshot: slimSnapshot(snap) });
+  } finally {
+    endSelfWrite(root);
   }
-  for (const story of snap.stories) {
-    await writeStoryFile(root, story, snap);
-  }
-  await invoke("works_save", { wsRoot: root, snapshot: slimSnapshot(snap) });
 }
 
 async function appendEvent(root: string, event: Record<string, unknown>): Promise<void> {
@@ -139,16 +184,23 @@ async function finalizeHydrate(
     await importOrphanMdFiles(root, withStoryBodies);
   const { snap: withStoryOrphans, changed: storyOrphanChanged } =
     await importOrphanStoryFiles(root, withOrphans);
+  const { stories: dedupedStories, changed: dedupeChanged } =
+    dedupeStoriesByShortId(withStoryOrphans.stories);
+  const finalized =
+    dedupeChanged
+      ? { ...withStoryOrphans, stories: dedupedStories }
+      : withStoryOrphans;
   if (
     persistNeeded ||
     migChanged ||
     orphanChanged ||
     storyOrphanChanged ||
+    dedupeChanged ||
     cyclesChanged
   ) {
-    await persist(root, withStoryOrphans);
+    await persist(root, finalized);
   }
-  return withStoryOrphans;
+  return finalized;
 }
 
 export async function hydrateWorks(root: string): Promise<WorksSnapshot> {
@@ -189,13 +241,18 @@ export async function refreshWorksFromDisk(root: string): Promise<void> {
   const { snap: withOrphans, changed } = await importOrphanMdFiles(root, withStories);
   const { snap: withStoryOrphans, changed: storyChanged } =
     await importOrphanStoryFiles(root, withOrphans);
-  e.snapshot = withStoryOrphans;
+  const { stories: dedupedStories, changed: dedupeChanged } =
+    dedupeStoriesByShortId(withStoryOrphans.stories);
+  const next = dedupeChanged
+    ? { ...withStoryOrphans, stories: dedupedStories }
+    : withStoryOrphans;
+  e.snapshot = next;
   notify(e);
-  refreshAllWorkProgress(withStoryOrphans);
-  if (changed || storyChanged) {
-    await persist(root, withStoryOrphans);
+  refreshAllWorkProgress(next);
+  if (changed || storyChanged || dedupeChanged) {
+    await persist(root, next);
     void import("./worksChatAutoLink").then((m) =>
-      m.afterWorksSaved(root, prev, withStoryOrphans),
+      m.afterWorksSaved(root, prev, next),
     );
   }
 }
@@ -227,13 +284,15 @@ export async function saveWorks(
 ): Promise<void> {
   const e = getEntry(root);
   const prev = e.snapshot;
-  e.snapshot = snap;
+  const { stories, changed: deduped } = dedupeStoriesByShortId(snap.stories);
+  const next = deduped ? { ...snap, stories } : snap;
+  e.snapshot = next;
   e.hydrated = true;
-  await persist(root, snap);
+  await persist(root, next);
   notify(e);
-  refreshAllWorkProgress(snap);
+  refreshAllWorkProgress(next);
   void import("./worksChatAutoLink").then((m) =>
-    m.afterWorksSaved(root, prev, snap),
+    m.afterWorksSaved(root, prev, next),
   );
 }
 
@@ -276,11 +335,7 @@ export async function createWorkItem(
     (opts.featureSlug
       ? moduleByFeatureSlug(snap, opts.featureSlug)
       : undefined) ??
-    moduleByName(
-      snap,
-      opts.moduleName ?? (opts.origin === "hotfix" ? "Bug" : "Feature"),
-    ) ??
-    snap.modules[0];
+    (opts.moduleName ? moduleByName(snap, opts.moduleName) : undefined);
   const labelIds = (opts.labelNames ?? []).flatMap((name) => {
     const hit = snap.labels.find((l) => l.name === name);
     return hit ? [hit.id] : [];
@@ -296,7 +351,7 @@ export async function createWorkItem(
     id: newId(),
     shortId,
     filePath: workItemRelPath(shortId),
-    moduleId: mod?.id ?? parentStory?.moduleId ?? snap.modules[0]?.id ?? "",
+    moduleId: mod?.id ?? parentStory?.moduleId ?? "",
     parentId: opts.parentId,
     cycleId: opts.cycleId ?? parentStory?.cycleId,
     title: opts.title.trim() || "Untitled work",
@@ -427,10 +482,8 @@ export async function ensurePlanStory(
 ): Promise<WorkStory> {
   const e = getEntry(root);
   if (!e.hydrated) await hydrateWorks(root);
-  const linked = e.snapshot.stories.find(
-    (s) =>
-      s.status === "draft" &&
-      s.linkedChatIds.includes(chatId),
+  const linked = e.snapshot.stories.find((s) =>
+    s.linkedChatIds.includes(chatId),
   );
   if (linked) return linked;
   const cycle = activeCycle(e.snapshot);
@@ -563,13 +616,17 @@ export async function createStory(
   if (!e.hydrated) await hydrateWorks(root);
   let snap = e.snapshot;
   const now = Date.now();
-  const shortId = nextStoryShortId(snap);
+  let shortId = nextStoryShortId(snap);
+  while (findStoryByShortId(snap, shortId)) {
+    snap = bumpStorySeq(snap);
+    shortId = nextStoryShortId(snap);
+  }
   const title = opts.title.trim() || "Untitled story";
   const story: WorkStory = {
     id: newId(),
     shortId,
     filePath: storyRelPath(shortId),
-    moduleId: opts.moduleId ?? snap.modules.find((m) => m.featurePath)?.id ?? snap.modules[0]?.id ?? "",
+    moduleId: opts.moduleId ?? "",
     cycleId: opts.cycleId,
     title,
     status: opts.status ?? "draft",
@@ -751,4 +808,34 @@ export async function reloadWorkItem(
   e.snapshot = snap;
   notify(e);
   return findWork(snap, workId) ?? null;
+}
+
+function repointChatsFromMergedStories(
+  root: string,
+  loserToWinner: Map<string, string>,
+): void {
+  if (!loserToWinner.size) return;
+  const wsId = wsIdForRoot(root);
+  if (!wsId) return;
+  const store = useStore.getState();
+  const ws = store.loaded[wsId];
+  if (!ws) return;
+  for (const [chatId, chat] of Object.entries(ws.aiChats)) {
+    if (!chat.storyId) continue;
+    const keepId = loserToWinner.get(chat.storyId);
+    if (keepId) store.setAIChatStory(wsId, chatId, keepId);
+  }
+}
+
+/** User-triggered merge — collapses duplicate S-NNN rows and reparents work. */
+export async function mergeDuplicateStories(
+  root: string,
+): Promise<{ merged: number; reparented: number }> {
+  const e = getEntry(root);
+  if (!e.hydrated) await hydrateWorks(root);
+  const plan = mergeDuplicateStoriesInSnapshot(e.snapshot);
+  if (plan.mergedCount === 0) return { merged: 0, reparented: 0 };
+  await saveWorks(root, plan.snap);
+  repointChatsFromMergedStories(root, plan.loserToWinner);
+  return { merged: plan.mergedCount, reparented: plan.reparentedCount };
 }

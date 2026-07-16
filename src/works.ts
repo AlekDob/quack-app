@@ -257,6 +257,131 @@ export function findStoryByShortId(
   return snap.stories.find((s) => s.shortId.toUpperCase() === q);
 }
 
+/** Prefer the row agents linked, recently touched, or promoted to active. */
+function storyDedupeRank(s: WorkStory): number {
+  let score = s.updatedAt;
+  score += s.linkedChatIds.length * 1e12;
+  if (s.status === "active") score += 5e11;
+  if (s.status === "done") score += 1e11;
+  return score;
+}
+
+/** Collapse duplicate S-NNN rows (race: disk import + createStory). */
+export function dedupeStoriesByShortId(stories: WorkStory[]): {
+  stories: WorkStory[];
+  changed: boolean;
+} {
+  const kept = new Map<string, WorkStory>();
+  for (const s of stories) {
+    const key = s.shortId.toUpperCase();
+    const prev = kept.get(key);
+    if (!prev) {
+      kept.set(key, s);
+      continue;
+    }
+    const winner =
+      storyDedupeRank(s) >= storyDedupeRank(prev) ? s : prev;
+    kept.set(key, winner);
+  }
+  const next = [...kept.values()];
+  const changed =
+    next.length !== stories.length ||
+    next.some((s, i) => s.id !== stories[i]?.id);
+  return { stories: next, changed };
+}
+
+export function countDuplicateStories(stories: WorkStory[]): number {
+  const seen = new Set<string>();
+  let n = 0;
+  for (const s of stories) {
+    const key = s.shortId.toUpperCase();
+    if (seen.has(key)) n++;
+    else seen.add(key);
+  }
+  return n;
+}
+
+export type MergeDuplicateStoriesResult = {
+  snap: WorksSnapshot;
+  mergedCount: number;
+  reparentedCount: number;
+  loserToWinner: Map<string, string>;
+};
+
+function groupStoriesByShortId(
+  stories: WorkStory[],
+): Map<string, WorkStory[]> {
+  const groups = new Map<string, WorkStory[]>();
+  for (const s of stories) {
+    const key = s.shortId.toUpperCase();
+    const list = groups.get(key) ?? [];
+    list.push(s);
+    groups.set(key, list);
+  }
+  return groups;
+}
+
+function pickStoryMergePlan(groups: Map<string, WorkStory[]>): {
+  loserToWinner: Map<string, string>;
+  winnerPatches: Map<string, Partial<WorkStory>>;
+  mergedCount: number;
+} {
+  const loserToWinner = new Map<string, string>();
+  const winnerPatches = new Map<string, Partial<WorkStory>>();
+  let mergedCount = 0;
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    const ranked = [...group].sort(
+      (a, b) => storyDedupeRank(b) - storyDedupeRank(a),
+    );
+    const keep = ranked[0];
+    for (const drop of ranked.slice(1)) {
+      loserToWinner.set(drop.id, keep.id);
+      mergedCount++;
+      const prev = winnerPatches.get(keep.id);
+      const chats = new Set([
+        ...(prev?.linkedChatIds ?? keep.linkedChatIds),
+        ...drop.linkedChatIds,
+      ]);
+      winnerPatches.set(keep.id, { linkedChatIds: [...chats] });
+    }
+  }
+  return { loserToWinner, winnerPatches, mergedCount };
+}
+
+/** Merge duplicate S-NNN snapshot rows and repoint child work items. */
+export function mergeDuplicateStoriesInSnapshot(
+  snap: WorksSnapshot,
+): MergeDuplicateStoriesResult {
+  const { loserToWinner, winnerPatches, mergedCount } = pickStoryMergePlan(
+    groupStoriesByShortId(snap.stories),
+  );
+  if (mergedCount === 0) {
+    return { snap, mergedCount: 0, reparentedCount: 0, loserToWinner };
+  }
+  const now = Date.now();
+  const stories = snap.stories
+    .filter((s) => !loserToWinner.has(s.id))
+    .map((s) => {
+      const patch = winnerPatches.get(s.id);
+      return patch ? { ...s, ...patch, updatedAt: now } : s;
+    });
+  let reparentedCount = 0;
+  const items = snap.items.map((w) => {
+    if (!w.parentId) return w;
+    const nextParent = loserToWinner.get(w.parentId);
+    if (!nextParent) return w;
+    reparentedCount++;
+    return { ...w, parentId: nextParent, updatedAt: now };
+  });
+  return {
+    snap: { ...snap, stories, items },
+    mergedCount,
+    reparentedCount,
+    loserToWinner,
+  };
+}
+
 export function findWork(snap: WorksSnapshot, id: string): WorkItem | undefined {
   return snap.items.find((w) => w.id === id);
 }

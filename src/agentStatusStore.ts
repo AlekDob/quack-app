@@ -52,15 +52,27 @@ export function publishAgentStatus(
   chatId: string,
   rec: AgentLiveRecord | null,
 ): void {
+  // Dedupe: a no-op publish must NOT fan out. notify() re-renders every
+  // subscriber (WorkspaceShell + each mounted AIChatHost + the rail +
+  // AgentModeShell), so firing it when nothing meaningful changed is a
+  // multiplied waste. Compare the stable fields, not lastTransitionAt.
   if (rec) {
-    liveByChat.set(chatId, rec);
+    const prev = liveByChat.get(chatId);
+    const meaningfulChange =
+      !prev ||
+      prev.derived !== rec.derived ||
+      prev.needsInputKind !== rec.needsInputKind ||
+      prev.wsId !== rec.wsId;
+    if (meaningfulChange) liveByChat.set(chatId, rec);
+    let changed = meaningfulChange;
     if (rec.derived === "ready" || rec.derived === "needs-input") {
-      seen.delete(chatId);
+      // Fresh attention state re-surfaces the chat for the user.
+      changed = seen.delete(chatId) || changed;
     }
-  } else {
-    liveByChat.delete(chatId);
+    if (changed) notify();
+  } else if (liveByChat.delete(chatId)) {
+    notify();
   }
-  notify();
 }
 
 /** Drop a chat's live status entirely (e.g. chat closed). */
