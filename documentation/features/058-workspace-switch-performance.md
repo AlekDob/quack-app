@@ -59,10 +59,27 @@ across unwatch, so switching back paints decorations from cache instantly while 
 fresh `git status` runs in the background (was: watch dropped at refs 0 → flash
 empty until the subprocess resolved).
 
-**Still cold on switch-back (tradeoff, not fixed):** Monaco widget is recreated per
-visible pane (text models preserved → no re-tokenize), file tree re-lists via
-`list_dir`. A warm-LRU keeping the last-used project's editors mounted would make
-A↔B instant but raises the memory floor this doc lowered — deliberately left.
+### Monaco warm-LRU — instant switch-back (2026-07-16, opt-in)
+
+`workspaceWarmSet.ts` keeps the last **`WARM_LIMIT = 3`** projects (active + 2
+most-recent) *warm*: their heavy UI stays mounted while hidden (`display:none`),
+so switching back is instant — no Monaco recreation, no `list_dir`.
+`useWorkspaceHeavyMount(wsId, isActive)` gates `showHeavy`/`editorsReady` on
+`isActive || isWorkspaceWarm(wsId)`; a project evicted past the window tears down
+after the 300ms grace as before.
+
+Two correctness details:
+- **Relayout on re-show:** `FileTabHost` folds shell visibility into
+  `paneVisible` (`visible && shellVisible`), so a warm-hidden `EditorPane` fires
+  `ed.layout()` (EditorPane `[paneVisible]` effect) when the project is switched
+  back — otherwise Monaco can paint mis-sized after a window resize while warm.
+- **No memo regression:** the warm-set subscription only re-renders a shell when
+  *its own* warm status flips (ref-gated `forceTick`), so a switch doesn't
+  re-render every mounted shell (which would undo `memo(WorkspaceShell)`).
+
+**Tradeoff:** ~1–2 extra mounted Monaco instances (bounded by `WARM_LIMIT`) for
+instant switching between the projects you bounce between. Lower `WARM_LIMIT` in
+`workspaceWarmSet.ts` to trade snappiness back for memory.
 
 ### `WorkspaceShell` gates (`showHeavy` / `editorsReady`)
 | Surface | Gate | Intentionally NOT gated |

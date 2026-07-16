@@ -95,7 +95,7 @@ function ShellDropdown({ anchor, shells, onClose, onPick }: ShellDropdownProps) 
 // background side panels) — O(#projects). With memo only the two shells whose
 // `isActive` actually flipped re-render.
 function WorkspaceShellInner({ wsId, isActive }: Props) {
-  const { showHeavy, editorsReady } = useWorkspaceHeavyMount(isActive);
+  const { showHeavy, editorsReady } = useWorkspaceHeavyMount(wsId, isActive);
   const ws = useStore((s) => s.loaded[wsId]);
   const setTermH = useStore((s) => s.setTermH);
   const setBottomVisible = useStore((s) => s.setBottomVisible);
@@ -424,6 +424,7 @@ function WorkspaceShellInner({ wsId, isActive }: Props) {
                   media={media}
                   container={container}
                   visible={visible}
+                  shellVisible={isActive}
                 />,
               );
             }
@@ -1037,6 +1038,10 @@ interface FileTabHostProps {
   media: ReturnType<typeof mediaKindOf>;
   container: HTMLElement;
   visible: boolean;
+  /** Owning shell is the foreground project. Warm (background) shells keep
+   *  editors mounted but hidden — paneVisible must fold this in so Monaco
+   *  relayouts when the project is switched back into view. */
+  shellVisible: boolean;
 }
 
 function FileTabHost({
@@ -1045,9 +1050,11 @@ function FileTabHost({
   media,
   container,
   visible,
+  shellVisible,
 }: FileTabHostProps) {
   const switching = useChatSwitching();
-  const showSurface = visible && !switching;
+  const paneVisible = visible && shellVisible;
+  const showSurface = paneVisible && !switching;
   const [mounted, setMounted] = useState(visible);
   useEffect(() => {
     if (visible) setMounted(true);
@@ -1058,7 +1065,7 @@ function FileTabHost({
       {media ? (
         <MediaPreviewPane wsId={wsId} path={path} kind={media} />
       ) : (
-        <EditorPane wsId={wsId} path={path} paneVisible={visible} />
+        <EditorPane wsId={wsId} path={path} paneVisible={paneVisible} />
       )}
     </div>,
     container,
