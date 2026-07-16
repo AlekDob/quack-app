@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-11
-last_verified: 2026-07-11
+last_verified: 2026-07-16
 tags: [workspace, switch, performance, monaco, tabs, multitask, mount-asymmetry]
 ---
 
@@ -56,12 +56,17 @@ Constants: `UNMOUNT_DELAY_MS = 300`.
 | `ComposeReviewPane` | `showHeavy && visible` | was mounting all open `crev:` keys |
 | `PaneNode` / tab bar | always | user sees tab strip on switch-in |
 
-### `AIChatPanel` foreground gates (`wsActive`)
+### `AIChatPanel` foreground gates (`wsActive` **+ `chatVisible`**)
+The three CC disk/usage/auth polls now also gate on `chatVisible`, so only the
+**foreground visible** chat polls — hidden multitask tabs in the active
+workspace stay mounted (fast switch) but go quiet (was: every mounted CC panel
+in the active workspace ran its own trio).
+
 | Effect | Interval / trigger | Gated? |
 |---|---|---|
-| Disk JSONL hydrate (`guessClaudeSessionId`, `drawerStats`) | 12 s + on activate | yes — catch-up on switch-back |
-| Plan limits (`claude_usage_limits`) | 30 s | yes |
-| Claude auth probe | 60 s | yes |
+| Disk JSONL hydrate (`guessClaudeSessionId`, `drawerStats`) | 12 s + on activate | yes — `wsActive && chatVisible`, catch-up on switch-back |
+| Plan limits (`claude_usage_limits`) | 30 s | yes — `wsActive && chatVisible` |
+| Claude auth probe | 60 s | yes — `wsActive && chatVisible` |
 | Ollama auto-retry loop | 4 s → 30 s backoff | yes |
 | Model discovery `refresh({ force: false })` | on `wsActive` | yes; global `subscribeModelDiscovery` stays |
 | Rules file probe | on `root` change | yes |

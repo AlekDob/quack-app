@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-12
-last_verified: 2026-07-12
+last_verified: 2026-07-16
 status: active
 related: [063-surface-view-prefs.md, 065-works-drawer-ux.md, 066-works-cycles-stories.md, 068-quack-plan-harness.md]
 tags: [works, plan-mode, tickets, kanban, timeline, modules, plane, drawer, brain, markdown]
@@ -299,6 +299,7 @@ Mirror copies in `documentation/skills/`. Upgrades via `quack-bundled-version`.
 | Brain ref UI | `worksBrainRefUi.ts` |
 | Hub badge | `WorkHubBadge.tsx` |
 | Plan bridge | `ClaudePermissionOverlay.tsx` (`onPlanApproved`) |
+| Disk sync engine | `078-works-disk-sync.md` — persist/hydrate/refresh, echo guard, changed-only writes, debounce |
 | Surface mode | `surfaceViewPrefs.ts` — drawer default; see `063-surface-view-prefs.md` |
 | Drawer UX | `065-works-drawer-ux.md` — list catalog, draft create, nested stack, inline markdown, module picker |
 | Doc open | `070-workspace-doc-open.md` — friendly path resolution from refs and chat links |

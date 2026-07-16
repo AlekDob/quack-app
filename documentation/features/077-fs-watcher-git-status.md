@@ -97,4 +97,5 @@ Idle repos with `files.length === 0` skip numstat entirely.
 | Composer Changes pill | `053-composer-git-actions.md` |
 | Agent commit dock | `051-agent-commit-dock.md` |
 | Explorer git decorations | `034-explorer-tree.md` |
+| Works disk sync (same `dir` events, self-write echo guard) | `078-works-disk-sync.md` |
 | Diary (CPU storm) | `documentation/diary/2026-07-16.md` |
