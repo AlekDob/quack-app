@@ -24,6 +24,13 @@ pub struct FsEvent {
 /// Path segments that flood fseventsd + git refresh when watched recursively.
 /// Matching any component drops the event (agent builds, deps, git objects).
 fn ignored_segment(name: &str) -> bool {
+    // Prefix/suffix build-output patterns: exact-match missed real-world dirs
+    // like `build-mac` / `build-e2e` (Xcode) and `*.noindex` compile caches,
+    // so a 7k-file build tree kept emitting events → git/tree/works refresh
+    // storm on switch-in. Keep these conservative to avoid hiding source dirs.
+    if name.starts_with("build-") || name.ends_with(".noindex") {
+        return true;
+    }
     matches!(
         name,
         ".git"
@@ -31,6 +38,8 @@ fn ignored_segment(name: &str) -> bool {
             | "target"
             | "dist"
             | "build"
+            | "DerivedData"
+            | ".build"
             | ".next"
             | ".nuxt"
             | ".turbo"

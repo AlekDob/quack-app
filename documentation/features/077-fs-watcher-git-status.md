@@ -52,9 +52,21 @@ disk write
 Any path whose components include one of these is **not** emitted (stops
 `fseventsd` + git refresh storms during builds, installs, and git object writes):
 
-`.git`, `node_modules`, `target`, `dist`, `build`, `.next`, `.nuxt`, `.turbo`,
-`.cache`, `coverage`, `graphify-out`, `__pycache__`, `.venv`, `venv`,
-`.pnpm-store`, `Pods`, `.parcel-cache`, `.svelte-kit`
+`.git`, `node_modules`, `target`, `dist`, `build`, `DerivedData`, `.build`,
+`.next`, `.nuxt`, `.turbo`, `.cache`, `coverage`, `graphify-out`, `__pycache__`,
+`.venv`, `venv`, `.pnpm-store`, `Pods`, `.parcel-cache`, `.svelte-kit`
+
+**Prefix/suffix patterns** (exact-match was too narrow): a segment is also
+ignored when it `starts_with("build-")` (real Xcode outputs `build-mac`,
+`build-e2e`) or `ends_with(".noindex")` (Xcode compile caches). A single iOS
+project's `ios/build-mac` + `ios/build-e2e` held ~7k files that kept emitting
+events → git/tree/works refresh storm that made switching INTO that project
+crawl. Kept conservative so real source dirs aren't hidden from live updates.
+
+> **Scope caveat:** the OS watch is still `RecursiveMode::Recursive` on the
+> root, so these dirs are *watched* but their events are *dropped at emit*.
+> On macOS FSEvents this is cheap; the win is stopping the downstream `fsBus`
+> → git/tree/works cascade, not the kernel watch itself.
 
 Branch/index updates that only touch `.git/**` no longer auto-refresh status;
 saves, composer commit/push (`forceGitStatusRefresh`), and the Agent Commit
