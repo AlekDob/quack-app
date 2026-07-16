@@ -19,9 +19,30 @@ export function publishChatDiff(
   chatId: string,
   summary: SessionDiffSummary | null,
 ): void {
+  // Dedupe: AIChatPanel republishes on every `messages` change, but notify()
+  // re-renders the whole Agent Hub rail (every row + WorkHubBadge). Skip the
+  // fan-out when the summary is unchanged. Summary is small ({added,removed,
+  // files}), so a serialized compare is cheap and stable.
+  const had = hydrated.has(chatId);
+  const prev = diffByChat.get(chatId);
   diffByChat.set(chatId, summary);
   hydrated.add(chatId);
+  if (had && sameDiff(prev ?? null, summary)) return;
   notify();
+}
+
+function sameDiff(
+  a: SessionDiffSummary | null,
+  b: SessionDiffSummary | null,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.added === b.added &&
+    a.removed === b.removed &&
+    a.files.length === b.files.length &&
+    a.files.every((f, i) => f === b.files[i])
+  );
 }
 
 export function getChatDiff(
