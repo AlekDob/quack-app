@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-05
-last_verified: 2026-07-05
+last_verified: 2026-07-16
 tags: [chat, composer, context, workspace, editor, ux]
 ---
 
@@ -64,7 +64,11 @@ and context at a glance without scrolling.
   - `No files in context` when the editor file exists in the workspace but
     attach is OFF and no `@` files are queued.
 - Hidden entirely when there is nothing workspace-local to show (no in-root
-  editor file and no in-root attached files).
+  editor file and no in-root attached files). **Implementation note:** the
+  `return null` guard must run **after** all React hooks (`useLayoutEffect`,
+  `useEffect`, etc.) — opening/closing editor tabs toggles `showDock`, and an
+  early return before hooks causes `Rendered fewer hooks than expected` and a
+  black screen until reload.
 
 ## Hover popover
 

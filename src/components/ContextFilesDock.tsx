@@ -69,9 +69,6 @@ export function ContextFilesDock({ wsId, root }: Props) {
     [root, editorState.filePath, ctx.attachContext, ctx.attachedFiles],
   );
 
-  const showDock = editorInWs !== null || ctx.attachedFiles.some((f) => isUnderRoot(f, root));
-  if (!showDock) return null;
-
   const scheduleClose = () => {
     leaveTimer.current = setTimeout(() => setOpen(false), 120);
   };
@@ -88,6 +85,11 @@ export function ContextFilesDock({ wsId, root }: Props) {
   }, [open, active.length, ctx.attachContext]);
 
   useEffect(() => () => cancelClose(), []);
+
+  const showDock =
+    editorInWs !== null ||
+    ctx.attachedFiles.some((f) => isUnderRoot(f, root));
+  if (!showDock) return null;
 
   const openFile = (path: string) => {
     void useStore.getState().openFile(wsId, path);
