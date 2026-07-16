@@ -406,7 +406,7 @@ function MainApp() {
       void openDock().then(() => refreshNativeMenuBinding());
     }
     const offs: Array<() => void> = [];
-    void listen(DOCK_REQUEST_EVENT, () => emitDockSummary()).then((u) =>
+    void listen(DOCK_REQUEST_EVENT, () => emitDockSummary(true)).then((u) =>
       offs.push(u),
     );
     void listen<string>(DOCK_FOCUS_EVENT, async (e) => {

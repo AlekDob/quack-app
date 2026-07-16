@@ -27,7 +27,10 @@ const pendingWrites = new Set<string>();
 
 export function markWorkWrite(absPath: string): void {
   pendingWrites.add(absPath.toLowerCase());
-  window.setTimeout(() => pendingWrites.delete(absPath.toLowerCase()), 600);
+  // 2s window: persist() rewrites ALL story+item files in bulk, and the FS
+  // watcher debounces 200ms — a 600ms TTL let early marks expire before their
+  // echoed events arrived, reopening the write-storm loop.
+  window.setTimeout(() => pendingWrites.delete(absPath.toLowerCase()), 2000);
 }
 
 export function isPendingWorkWrite(absPath: string): boolean {
@@ -214,8 +217,7 @@ export async function importOrphanMdFiles(
     const parsed = parseWorkItemMd(src, snap);
     if (!parsed) continue;
     const now = Date.now();
-    const moduleId =
-      moduleIdFromSlug(snap, parsed.moduleSlug) ?? snap.modules[0]?.id ?? "";
+    const moduleId = moduleIdFromSlug(snap, parsed.moduleSlug) ?? "";
     const item: WorkItem = {
       id: parsed.id ?? newId(),
       shortId: parsed.shortId ?? shortId,

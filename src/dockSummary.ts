@@ -69,9 +69,15 @@ export function computeDockProjects(): DockProject[] {
   return out;
 }
 
+// Last broadcast, serialized — the AgentHubWatcher poll (every 1.5s) calls
+// emitDockSummary regardless of change; skipping identical summaries stops
+// ~40 no-op IPC badge writes + event emits per minute.
+let lastSummaryJson = "";
+
 /** Broadcast the current summary to the Dock window and update the native
- *  Dock-icon badge. Fire-and-forget; safe when no Dock window exists. */
-export function emitDockSummary(): void {
+ *  Dock-icon badge. Fire-and-forget; safe when no Dock window exists.
+ *  No-ops when the summary is unchanged since the last call. */
+export function emitDockSummary(force = false): void {
   let projects: DockProject[] = [];
   try {
     projects = computeDockProjects();
@@ -79,6 +85,11 @@ export function emitDockSummary(): void {
     // Never let a status-compute error kill the watcher's poll loop.
     console.error("[dock] computeDockProjects failed", e);
   }
+  const json = JSON.stringify(projects);
+  // force: a freshly opened Dock window requests the summary — it must get
+  // one even when unchanged since the last broadcast.
+  if (!force && json === lastSummaryJson) return;
+  lastSummaryJson = json;
   void emit(DOCK_SUMMARY_EVENT, projects);
   const total = projects.reduce((n, p) => n + p.ready + p.needsInput, 0);
   void invoke("set_dock_badge", { count: total }).catch(() => {});

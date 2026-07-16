@@ -16,7 +16,7 @@ import {
   type WorkStory,
   type WorksSnapshot,
 } from "./works";
-import { markWorkWrite } from "./worksItemFiles";
+import { isPendingWorkWrite, markWorkWrite } from "./worksItemFiles";
 
 export async function ensureStoriesDir(root: string): Promise<void> {
   await fs.createDir(joinPath(root, WORKS_STORIES_DIR));
@@ -108,8 +108,7 @@ export async function importOrphanStoryFiles(
     const parsed = parseStoryMd(src);
     if (!parsed) continue;
     const now = Date.now();
-    const moduleId =
-      moduleIdFromSlug(snap, parsed.moduleSlug) ?? snap.modules[0]?.id ?? "";
+    const moduleId = moduleIdFromSlug(snap, parsed.moduleSlug) ?? "";
     const story: WorkStory = {
       id: parsed.id ?? newId(),
       shortId: parsed.shortId ?? shortId,
@@ -138,6 +137,10 @@ export async function reloadStoryFromPath(
   snap: WorksSnapshot,
   absPath: string,
 ): Promise<WorksSnapshot | null> {
+  // Echo suppression: ignore the FS event our own writeStoryFile() just fired.
+  // Without this, a single story edit -> saveWorks -> persist (rewrites ALL
+  // stories) -> N watcher events -> N saveWorks -> N^2 write storm (CPU pegged).
+  if (isPendingWorkWrite(absPath)) return null;
   const shortId = basename(absPath).replace(/\.md$/i, "");
   const hit = snap.stories.find(
     (s) =>
