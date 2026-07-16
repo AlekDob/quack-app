@@ -4,7 +4,7 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-11
 last_verified: 2026-07-16
-tags: [workspace, switch, performance, monaco, tabs, multitask, mount-asymmetry]
+tags: [workspace, switch, performance, monaco, tabs, multitask, mount-asymmetry, react-memo, warm-lru, git-status]
 ---
 
 ## Workspace Switch Performance

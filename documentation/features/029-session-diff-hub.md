@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-03
-last_verified: 2026-07-03
-tags: [agent-hub, session-diff, edit-stats, chatDiffStore, hub-subtitle]
+last_verified: 2026-07-16
+tags: [agent-hub, session-diff, edit-stats, chatDiffStore, hub-subtitle, performance]
 ---
 
 ## Session diff subtitles (Agent Hub)
@@ -38,7 +38,7 @@ Two scopes:
 
 | Role | File |
 |---|---|
-| Live publish (mounted chat) | `AIChatPanel` → `publishChatDiff(aiChatId, summarizeLastTurn(messages))` on every `messages` change |
+| Live publish (mounted chat) | `AIChatPanel` → `publishChatDiff(aiChatId, summarizeLastTurn(messages))` on every `messages` change — **deduped**: `notify()` fires only when `{added,removed,files}` actually changed, so a no-op republish doesn't re-render the whole rail (`029` subtitle + every row + `WorkHubBadge`) |
 | Hydrate (background chats) | `AIChatsRail` → `hydrateChatDiff(chatId, wsId, sessionId)` reads `loadSessions` once per chat |
 | Store (pub/sub) | `chatDiffStore.ts` — `getChatDiff`, `subscribeChatDiff`, `clearChatDiff` |
 | Hub UI | `AIChatsRail` → `HubDiffLine` + `DiffCounts` when `expanded` |
