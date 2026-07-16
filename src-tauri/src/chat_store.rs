@@ -170,21 +170,26 @@ fn remove_provider_links_for_session(session: &serde_json::Value) {
 
 #[tauri::command]
 pub fn chat_store_load_workspace(ws_id: String) -> Result<ChatWorkspaceSnapshot, String> {
+    // Index only — session bodies load on demand via chat_store_load.
     let index = read_index(&ws_id)?;
-    let mut sessions = Vec::new();
-    for id in &index.ids {
-        let path = session_path(&ws_id, id)?;
-        if !path.exists() {
-            continue;
-        }
-        let s = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        let v: serde_json::Value = serde_json::from_str(&s).map_err(|e| e.to_string())?;
-        sessions.push(v);
-    }
     Ok(ChatWorkspaceSnapshot {
         ids: index.ids,
-        sessions,
+        sessions: Vec::new(),
     })
+}
+
+#[tauri::command]
+pub fn chat_store_load(
+    ws_id: String,
+    session_id: String,
+) -> Result<Option<serde_json::Value>, String> {
+    let path = session_path(&ws_id, &session_id)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    let s = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let v: serde_json::Value = serde_json::from_str(&s).map_err(|e| e.to_string())?;
+    Ok(Some(v))
 }
 
 #[tauri::command]

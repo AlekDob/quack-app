@@ -35,6 +35,8 @@ import { Icon } from "./Icon";
 import { useZenMode } from "../zenMode";
 import { useChatSwitching } from "../useChatSwitching";
 import { endChatSwitch } from "../chatSwitch";
+import { shouldKeepChatHostMounted } from "../chatHostMount";
+import { dropCachedSessionBody } from "../chatStoreCache";
 import { useWorkspaceHeavyMount } from "../useWorkspaceHeavyMount";
 import { EditorTabDrawer } from "./EditorTabDrawer";
 import { EditorDrawerDropHint } from "./EditorDrawerDropHint";
@@ -470,6 +472,8 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
             chatId={chat.id}
             container={container}
             visible={visible}
+            doneAt={chat.doneAt}
+            archivedAt={chat.archivedAt}
           />
         );
       })}
@@ -1042,6 +1046,8 @@ interface AIChatHostProps {
   chatId: string;
   container: HTMLElement | null;
   visible: boolean;
+  doneAt?: number;
+  archivedAt?: number;
 }
 
 function AIChatHost({
@@ -1050,13 +1056,24 @@ function AIChatHost({
   chatId,
   container,
   visible,
+  doneAt,
+  archivedAt,
 }: AIChatHostProps) {
   const switching = useChatSwitching();
+  const keepWarm = shouldKeepChatHostMounted({ visible, doneAt, archivedAt });
   const [mounted, setMounted] = useState(visible);
   const onHydrated = useCallback(() => endChatSwitch(), []);
   useEffect(() => {
-    if (visible) setMounted(true);
-  }, [visible]);
+    if (visible) {
+      setMounted(true);
+      return;
+    }
+    if (!keepWarm) setMounted(false);
+  }, [visible, keepWarm]);
+  useEffect(() => {
+    if (mounted || keepWarm) return;
+    dropCachedSessionBody(wsId, chatId);
+  }, [mounted, keepWarm, wsId, chatId]);
   if (!container || !mounted) return null;
   const showVeil = switching && visible;
   return createPortal(

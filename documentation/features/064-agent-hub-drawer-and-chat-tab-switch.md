@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-12
-last_verified: 2026-07-12
+last_verified: 2026-07-16
 tags: [agent-hub, chat-switch, performance, pane-tabs, drawer, overlay, monaco]
 ---
 
@@ -96,9 +96,11 @@ pane relayout felt like a resize.
 | File / media tab | `.file-tab-host` | same |
 | Agent mode chat | `.agent-chat-host` | same (removed opacity fade transition) |
 
-Active tab adds `.is-visible` (or `data-visible` in agent mode). All visited hosts
-stay **mounted** in `.pane-content` (`position:relative`); hosts are
-`position:absolute; inset:0` stacked.
+Active tab adds `.is-visible` (or `data-visible` in agent mode). **Live** visited
+hosts stay **mounted** in `.pane-content` (`position:relative`); hosts are
+`position:absolute; inset:0` stacked. **DONE/archived** hosts unload when hidden
+(`chatHostMount.shouldKeepChatHostMounted`) and drop the transcript body from
+the warm cache — reopen remounts and `ensureSessionLoaded` pulls from disk.
 
 **File tabs:** `FileTabHost` in `WorkspaceShell.tsx` lazy-mounts on first visit,
 portals **every** `file:` tab in the pane (not only the active one). `EditorPane`
@@ -114,6 +116,7 @@ avoid animated scroll jank.
 | `src/components/WorkspaceShell.tsx` | `AIChatHost`, `FileTabHost` |
 | `src/components/TabContentHost.tsx` | `DrawerAIChatHost` |
 | `src/components/AgentModeShell.tsx` | `AgentChatHost` |
+| `src/chatHostMount.ts` | Live sticky vs DONE unload policy |
 | `src/components/EditorPane.tsx` | `paneVisible` → Monaco `layout()` |
 | `src/App.css` | `.ai-tab-host`, `.file-tab-host`, `.agent-chat-host` |
 
@@ -125,8 +128,10 @@ avoid animated scroll jank.
   toggles persistent 240px width.
 - **Cold first open:** First visit to a chat tab still mounts `AIChatPanel` and
   hydrates the full transcript (no message virtualization yet) — separate from
-  tab visibility fix.
-- **Cross-project switch:** Still shows veil until hydrate or 280ms cap; workspace
+  tab visibility fix. DONE reopen uses lazy `ensureSessionLoaded` (`076`).
+- **DONE unload:** Leaving a DONE/archived chat unmounts the host and drops the
+  warm body — live chats stay sticky (`076-chat-lazy-hydrate-done-unload.md`).
+- **Cross-project switch:** Still shows veil until hydrate or cap; workspace
   `useWorkspaceHeavyMount` ramp-up unchanged (`058`).
 - **Legacy `.ai-chats-rail` CSS** in `App.css` is dead (hub renamed to
   `.agent-hub`); safe to delete in a cleanup pass.

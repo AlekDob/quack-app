@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-03
-last_verified: 2026-07-11
+last_verified: 2026-07-16
 tags: [startup, splash, hydrate, workspace, performance, parallel-load]
 ---
 
@@ -16,15 +16,15 @@ tags: [startup, splash, hydrate, workspace, performance, parallel-load]
 |------|------|-----------------|
 | Component | `src/App.tsx` | Splash min 700 ms + `hydrated` gate; `prefetchModelDiscovery()` ∥ `hydrate()` |
 | Component | `src/components/Splash.tsx` | Brand splash while booting |
-| Store | `src/store.ts` | `hydrate()`, `loadWorkspaceFromDisk()`, `hydrateProgress` |
+| Store | `src/store.ts` | `hydrate()`, `loadWorkspaceFromDisk()`, `hydrateProgress`; passes live chat warm ids into chat hydrate |
 | Service (Rust) | `src-tauri/src/workspace.rs` | `workspaces.json` index + per-workspace `state.json` |
-| Store | `src/chatStoreCache.ts` | `hydrateChatStore(wsId)` — disk chat transcripts + legacy migrate (`043`) |
+| Store | `src/chatStoreCache.ts` | `hydrateChatStore(wsId, warmIds?)` — session **index** + warm live bodies (`076`, `043`) |
 | Store | `src/modelDiscoveryStore.ts` | `prefetchModelDiscovery()` — see `031-model-discovery-cache.md` |
 
 ### Data Flow
 **Boot:** `MainApp` mount → `bootstrapTheme` + `startFsBusOnce` + `installNativeMenu` → `prefetchModelDiscovery()` ∥ `hydrate()` → splash until `hydrated && splashMinElapsed(700ms)` → render shell
 
-**Hydrate:** `wsApi.load()` index → `ptyApi.listSessions()` live PTYs → `Promise.all(requestedOpen.map(loadWorkspaceFromDisk))` → `Promise.all(survivingIds.map(hydrateChatStore))` (chat transcripts from disk + legacy migrate) → merge `loaded` + `openIds` + `activeId` → `hydrated: true`
+**Hydrate:** `wsApi.load()` index → `ptyApi.listSessions()` live PTYs → `Promise.all(requestedOpen.map(loadWorkspaceFromDisk))` → `Promise.all(survivingIds.map(id => hydrateChatStore(id, warmLiveIds)))` — chat **index** from disk + warm-load live (non-DONE) session bodies; DONE stay cold until open (`076`) → merge `loaded` + `openIds` + `activeId` → `hydrated: true`
 
 **Per workspace disk load:** `loadState` → normalize layout + aiChats + terminals → parallel `readFile` for open editor tabs → prune dead tabs → return `WorkspaceData`
 
@@ -33,6 +33,7 @@ tags: [startup, splash, hydrate, workspace, performance, parallel-load]
 ### Key Functions
 - `hydrate() → Promise<void>` — full boot restore; parallel workspace opens
 - `loadWorkspaceFromDisk(meta, liveSessionIds) → WorkspaceData` — layout + files + terminal filter
+- `warmChatIdsFromWs(ws)` — live descriptor `sessionId`s for chat warm-load (`076`)
 - `prefetchModelDiscovery() → void` — overlap provider probe with hydration (031)
 - `splashMinElapsed` — 700 ms latch independent of hydration speed
 
@@ -45,4 +46,10 @@ tags: [startup, splash, hydrate, workspace, performance, parallel-load]
 - **Parallel workspace open:** multiple projects restore concurrently; progress text may jump (last-finishing workspace wins the bar).
 - **Splash minimum:** fast SSD + one workspace still waits ~700 ms for brand display — intentional; prefetch uses that window.
 - **Inactive workspace weight:** shell DOM + tab bar stay mounted for Monaco stability and terminal containers; sidebar/Monaco/tab portals **unmount** when backgrounded (`058-workspace-switch-performance.md`). Chat side panel stays for multitask; usage polls gated to `activeId`.
+- **Chat transcripts are not all loaded at boot** — only the index + live bodies (`076`). Opening a DONE chat hits disk once via `ensureSessionLoaded`.
 - **Corrupt index:** unreadable `workspaces.json` resets to empty index with toast — app no longer stuck on splash forever.
+
+### Related
+- Chat lazy hydrate + DONE unload: `076-chat-lazy-hydrate-done-unload.md`
+- Transcript persistence: `043-chat-transcript-persistence.md`
+- Workspace switch: `058-workspace-switch-performance.md`

@@ -122,8 +122,9 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `004-subagent-mentions.md` — `@`-mention subagents + click a Task chip to open its read-only transcript (tab or drawer; `TranscriptTurnRows` shares main-chat markup).
   - `005-jack-duck-identity.md` — the assistant IS Jack (duck PM): persona, `AIIcon` duck mark, chat header.
   - `009-agent-hub.md` — the cross-project status hub (right rail): groups, `AgentHubWatcher`, notifications, lifecycle.
-  - `064-agent-hub-drawer-and-chat-tab-switch.md` — collapsed hover drawer, chat switch perf, pane tab visibility stacking.
+  - `064-agent-hub-drawer-and-chat-tab-switch.md` — collapsed hover drawer, chat switch perf, pane tab visibility stacking; DONE hosts unload when hidden (`076`).
   - `075-chat-switch-loader.md` — gradual translucent veil on chat/session switch (fade + min-floor + cap in `chatSwitch.ts`, `ChatSwitchVeil`); perceived-performance polish. Pairs with the `044` freeze fix.
+  - `076-chat-lazy-hydrate-done-unload.md` — session index + on-demand bodies; DONE/archived chat hosts unmount when hidden; live stay sticky for multitask.
   - `006-chat-tool-render.md` — chat tool-call rendering (pills, result drawer, diff modal).
   - `007-native-macos-menu.md` — macOS uses the native system menu bar (built from the command registry); the in-window `TopBar` menus are hidden there, kept on Win/Linux.
   - `008-skill-slash-menu.md` — Claude Code skills in the `/` menu (lightning icon + orange, name only), loaded from `.claude/skills/`, dispatched like CC commands.
@@ -185,7 +186,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `037-project-context-dock.md` — per-workspace "N files in context" pill in the composer status row (right); hover popover lists active editor attach + `@`-queued files; `workspaceChatContext.ts` + `isUnderRoot` guards prevent cross-project bleed from the global editor singleton.
   - `039-composer-queue.md` — Cursor-style follow-up queue inside the composer pill: visible preview, `Send follow-up` placeholder, Start Multitasking (new chat parallel send / send now), auto-drain on turn end; `ComposerQueue.tsx`, optional `chatId` on `aiBus`.
   - `040-per-session-composer-state.md` — per-session composer draft (input, queue, images, attach toggles), CC knobs (effort/mode/thinking), model restore; `composerDraft.ts` (`mergeComposerDraft`, `mergeSessionKnobs`), fields on `ChatSession`; legacy knob fallback + debounce-unmount flush gotchas.
-  - `043-chat-transcript-persistence.md` — disk-backed per-session transcripts (`chat_store.rs`), legacy localStorage migrate, `provider-links.json` reverse index, flush on switch + streaming checkpoint, save-failure toast.
+  - `043-chat-transcript-persistence.md` — disk-backed per-session transcripts (`chat_store.rs`), legacy localStorage migrate, `provider-links.json` reverse index, flush on switch + streaming checkpoint, save-failure toast. Lazy body load: see `076`.
   - `044-provider-session-bridge.md` — unified CLI session bridge (CC/CU/OC): chip, multi-provider ⟲ Sessions picker, `provider_sessions.rs`, thin-row recovery via `chatProviderRecovery.ts`; **platform pin** locks model picker per chat (`057`).
   - `057-platform-pin.md` — agentic chats pin to starting CLI; model picker hard-filter + **New chat** to switch platform; `pinnedProviderId` on `ChatSession`.
   - `059-claude-code-model-catalog.md` — live CC model names (Sonnet 5, Opus 4.8…) via fast `/model` probe + background label cache; instant picker fallbacks.

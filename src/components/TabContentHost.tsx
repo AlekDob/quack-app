@@ -19,6 +19,8 @@ import { parseKey, type WorkspaceData } from "../store";
 import { useChatSwitching } from "../useChatSwitching";
 import { useCallback, useEffect, useState } from "react";
 import { endChatSwitch } from "../chatSwitch";
+import { shouldKeepChatHostMounted } from "../chatHostMount";
+import { dropCachedSessionBody } from "../chatStoreCache";
 
 interface Props {
   wsId: string;
@@ -73,6 +75,7 @@ export function TabContentHost({
   }
 
   if (parsed.kind === "ai") {
+    const chat = ws.aiChats[parsed.id];
     return (
       <DrawerAIChatHost
         wsId={wsId}
@@ -80,6 +83,8 @@ export function TabContentHost({
         chatId={parsed.id}
         container={container}
         visible={visible}
+        doneAt={chat?.doneAt}
+        archivedAt={chat?.archivedAt}
       />
     );
   }
@@ -171,19 +176,32 @@ function DrawerAIChatHost({
   chatId,
   container,
   visible,
+  doneAt,
+  archivedAt,
 }: {
   wsId: string;
   root: string;
   chatId: string;
   container: HTMLElement;
   visible: boolean;
+  doneAt?: number;
+  archivedAt?: number;
 }) {
   const switching = useChatSwitching();
+  const keepWarm = shouldKeepChatHostMounted({ visible, doneAt, archivedAt });
   const [mounted, setMounted] = useState(visible);
   const onHydrated = useCallback(() => endChatSwitch(), []);
   useEffect(() => {
-    if (visible) setMounted(true);
-  }, [visible]);
+    if (visible) {
+      setMounted(true);
+      return;
+    }
+    if (!keepWarm) setMounted(false);
+  }, [visible, keepWarm]);
+  useEffect(() => {
+    if (mounted || keepWarm) return;
+    dropCachedSessionBody(wsId, chatId);
+  }, [mounted, keepWarm, wsId, chatId]);
   if (!mounted) return null;
   const showVeil = switching && visible;
   return createPortal(

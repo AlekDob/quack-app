@@ -1076,6 +1076,14 @@ function makeAIChatId(): string {
   return "a_" + Math.random().toString(36).slice(2, 10);
 }
 
+/** Live (non-DONE) chat ids to warm-load at workspace hydrate. */
+function warmChatIdsFromWs(ws: WorkspaceData | undefined): string[] {
+  if (!ws) return [];
+  return Object.values(ws.aiChats)
+    .filter((c) => !c.doneAt && !c.archivedAt)
+    .map((c) => c.sessionId);
+}
+
 function parseAIChatsRaw(raw: unknown): Record<string, AIChatDescriptor> {
   const out: Record<string, AIChatDescriptor> = {};
   if (!raw || typeof raw !== "object") return out;
@@ -1649,7 +1657,11 @@ export const useStore = create<AppState>((set, get) => {
       }
 
       setProg("Loading chat history…", 92, 100);
-      await Promise.all(survivingIds.map((id) => hydrateChatStore(id)));
+      await Promise.all(
+        survivingIds.map((id) =>
+          hydrateChatStore(id, warmChatIdsFromWs(loaded[id])),
+        ),
+      );
 
       setProg("Reattaching terminals…", 95, 100);
       set({
@@ -1713,13 +1725,11 @@ export const useStore = create<AppState>((set, get) => {
         };
       }
       // Chat transcripts live in a per-workspace in-memory cache hydrated
-      // from disk. hydrate() only warms the workspaces open at boot, so a
-      // project opened later (picker / activity bar / command palette /
-      // agent mode) would mount its chats against a COLD cache — showing
-      // empty transcripts and, on the next save, overwriting the real
-      // on-disk history. Hydrate before the panels mount. Idempotent.
+      // from disk (index first; live session bodies warm-loaded). hydrate()
+      // only warms workspaces open at boot, so a project opened later
+      // must hydrate before panels mount. Idempotent.
       await Promise.all([
-        hydrateChatStore(meta.id),
+        hydrateChatStore(meta.id, warmChatIdsFromWs(loaded[meta.id])),
         ensureAppBundledSkills(root),
       ]);
       set({ recent, openIds, activeId: meta.id, loaded });

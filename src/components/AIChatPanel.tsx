@@ -227,6 +227,9 @@ import {
 import { confirm as dialogConfirm } from "../dialog";
 import {
   loadSessions,
+  listSessionIds,
+  ensureSessionLoaded,
+  hydrateChatStore,
   saveSession,
   deleteSession,
   patchSession,
@@ -1914,9 +1917,10 @@ export function AIChatPanel({
   //   that would make every newly-opened tab show the same chat.
   // - Without `aiChatId` (singleton sidebar mode): keep the legacy
   //   behavior of restoring the most-recently-saved session.
+  // Transcript bodies may be cold (lazy hydrate) — ensureSessionLoaded
+  // pulls from disk before applyLoadedMessages.
   useEffect(() => {
-    const list = loadSessions(wsId);
-    setSessions(list);
+    let cancelled = false;
     // Per-switch resets shared by every branch below. Previous code had
     // the lastUsage + todos clears only in the empty-list else branch,
     // so switching workspaces while either was populated left the
@@ -1929,80 +1933,90 @@ export function AIChatPanel({
     setCumulativeTurns(0);
     setDiskSessionDurationMs(0);
 
-    if (aiChatId) {
-      const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
-      const targetSid = desc?.sessionId ?? newSessionId();
-      const found = list.find((s) => s.id === targetSid);
-      setSessionId(targetSid);
-      // Restore the Claude Code session id alongside the conversation
-      // so the next turn resumes server-side context. If the chat is
-      // empty / non-CC, this stays undefined.
-      setProviderSessionIds(readProviderSessionIds(found ?? {}));
-      setChatTotalCost(found?.totalCostUsd ?? 0);
+    const finishHydrated = () => {
+      if (cancelled || !onHydrated) return;
+      requestAnimationFrame(() => requestAnimationFrame(onHydrated));
+    };
+
+    const applyFound = (found: ChatSession, sid: string) => {
+      setSessionId(sid);
+      setProviderSessionIds(readProviderSessionIds(found));
+      setChatTotalCost(found.totalCostUsd ?? 0);
       const knobs = sessionKnobsFrom(found);
       setCcEffort(knobs.effort);
       setCcThinking(knobs.thinking);
       setCcPermMode(knobs.permMode);
-      setPresetId(found?.presetId ?? null);
+      setPresetId(found.presetId ?? null);
       applyComposerDraft(draftFromSession(found));
-      if (found) {
-        void applyLoadedMessages(found.messages).then((msgs) => {
-          void hydrateAgentCommitFromMessages(wsId, targetSid, root, msgs);
-        });
-        if (found.model) {
-          const q = parseQualifiedModel(found.model)
-            ? found.model
-            : makeQualifiedModel("ollama", found.model);
-          setSelected(q);
-        }
-        const gen = ++ccHydrateGenRef.current;
-        void tryProviderRecover(found, gen);
-      } else {
-        setMessages([]);
-        // Brand-new tab: no saved session yet — same Jack/preset model
-        // bootstrap as /new or the empty-workspace path below.
-        applyJackDefaultsIfConfigured();
-      }
-      if (onHydrated) {
-        requestAnimationFrame(() => requestAnimationFrame(onHydrated));
-      }
-      return;
-    }
-
-    if (list.length > 0) {
-      setSessionId(list[0].id);
-      setProviderSessionIds(readProviderSessionIds(list[0]));
-      setChatTotalCost(list[0].totalCostUsd ?? 0);
-      const knobs = sessionKnobsFrom(list[0]);
-      setCcEffort(knobs.effort);
-      setCcThinking(knobs.thinking);
-      setCcPermMode(knobs.permMode);
-      setPresetId(list[0].presetId ?? null);
-      applyComposerDraft(draftFromSession(list[0]));
-      // Filter out stale "Unknown tool: X" result messages from older
-      // sessions where we incorrectly tried to execute the agentic
-      // provider's tool calls on our side. They're meaningless garbage.
-      void applyLoadedMessages(list[0].messages).then((msgs) => {
-        void hydrateAgentCommitFromMessages(wsId, list[0].id, root, msgs);
+      void applyLoadedMessages(found.messages).then((msgs) => {
+        if (cancelled) return;
+        void hydrateAgentCommitFromMessages(wsId, sid, root, msgs);
       });
-      if (list[0].model) {
-        const q = parseQualifiedModel(list[0].model)
-          ? list[0].model
-          : makeQualifiedModel("ollama", list[0].model);
+      if (found.model) {
+        const q = parseQualifiedModel(found.model)
+          ? found.model
+          : makeQualifiedModel("ollama", found.model);
         setSelected(q);
       }
-    } else {
-      setSessionId(newSessionId());
-      setProviderSessionIds({});
-      setChatTotalCost(0);
-      setMessages([]);
-      const knobs = defaultSessionKnobs();
-      setCcEffort(knobs.effort);
-      setCcThinking(knobs.thinking);
-      setCcPermMode(knobs.permMode);
-      applyJackDefaultsIfConfigured();
-      applyComposerDraft({});
-    }
+      const gen = ++ccHydrateGenRef.current;
+      void tryProviderRecover(found, gen);
+    };
+
+    void (async () => {
+      await hydrateChatStore(wsId);
+      if (cancelled) return;
+
+      if (aiChatId) {
+        const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
+        const targetSid = desc?.sessionId ?? newSessionId();
+        const found = await ensureSessionLoaded(wsId, targetSid);
+        if (cancelled) return;
+        setSessions(loadSessions(wsId));
+        if (found) {
+          applyFound(found, targetSid);
+        } else {
+          setSessionId(targetSid);
+          setProviderSessionIds({});
+          setChatTotalCost(0);
+          setMessages([]);
+          const knobs = defaultSessionKnobs();
+          setCcEffort(knobs.effort);
+          setCcThinking(knobs.thinking);
+          setCcPermMode(knobs.permMode);
+          applyJackDefaultsIfConfigured();
+          applyComposerDraft({});
+        }
+        finishHydrated();
+        return;
+      }
+
+      const ids = listSessionIds(wsId);
+      const firstId = ids[0];
+      const found = firstId
+        ? await ensureSessionLoaded(wsId, firstId)
+        : undefined;
+      if (cancelled) return;
+      setSessions(loadSessions(wsId));
+      if (found && firstId) {
+        applyFound(found, firstId);
+      } else {
+        setSessionId(newSessionId());
+        setProviderSessionIds({});
+        setChatTotalCost(0);
+        setMessages([]);
+        const knobs = defaultSessionKnobs();
+        setCcEffort(knobs.effort);
+        setCcThinking(knobs.thinking);
+        setCcPermMode(knobs.permMode);
+        applyJackDefaultsIfConfigured();
+        applyComposerDraft({});
+      }
+      finishHydrated();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [wsId, aiChatId, onHydrated, applyComposerDraft, tryProviderRecover, applyLoadedMessages]);
 
   // When sessionId changes inside a tabbed panel (e.g. via /new or the

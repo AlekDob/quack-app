@@ -17,6 +17,7 @@ interface WsCache {
 }
 
 const caches = new Map<string, WsCache>();
+const bodyLoads = new Map<string, Promise<ChatSession | undefined>>();
 let onSaveFailed: (() => void) | null = null;
 
 export function registerChatSaveFailed(cb: () => void): void {
@@ -30,6 +31,10 @@ function getCache(wsId: string): WsCache {
     caches.set(wsId, c);
   }
   return c;
+}
+
+function bodyKey(wsId: string, sessionId: string): string {
+  return `${wsId}:${sessionId}`;
 }
 
 function isValidSession(s: unknown): s is ChatSession {
@@ -99,40 +104,106 @@ async function migrateFromLocalStorage(wsId: string, cache: WsCache): Promise<vo
   clearLegacyStorage(wsId);
 }
 
-/** Hydrate in-memory cache from disk (call once per workspace at boot). */
-export async function hydrateChatStore(wsId: string): Promise<void> {
-  const cache = getCache(wsId);
-  if (cache.hydrated) return;
-  if (cache.hydrating) return cache.hydrating;
-  cache.hydrating = (async () => {
+function rememberSession(cache: WsCache, session: ChatSession): void {
+  cache.sessions.set(session.id, session);
+  if (!cache.index.includes(session.id)) {
+    cache.index = [session.id, ...cache.index].slice(0, MAX_SESSIONS);
+  }
+}
+
+async function loadSessionBody(
+  wsId: string,
+  sessionId: string,
+): Promise<ChatSession | undefined> {
+  const hit = getCachedSession(wsId, sessionId);
+  if (hit) return hit;
+  const key = bodyKey(wsId, sessionId);
+  const inflight = bodyLoads.get(key);
+  if (inflight) return inflight;
+  const p = (async () => {
     try {
-      const snap = await invoke<{
-        ids: string[];
-        sessions: ChatSession[];
-      }>("chat_store_load_workspace", { wsId });
-      if (snap.sessions.length > 0) {
-        for (const s of snap.sessions) {
-          if (isValidSession(s)) cache.sessions.set(s.id, s);
-        }
-        cache.index = snap.ids;
-      } else {
-        await migrateFromLocalStorage(wsId, cache);
-      }
-      cache.hydrated = true;
+      const raw = await invoke<unknown | null>("chat_store_load", {
+        wsId,
+        sessionId,
+      });
+      if (!isValidSession(raw)) return undefined;
+      rememberSession(getCache(wsId), raw);
+      return raw;
     } catch (e) {
-      console.warn("[chatStore] disk hydrate failed, falling back to localStorage", e);
-      const legacy = loadLegacySessions(wsId);
-      for (const s of legacy) cache.sessions.set(s.id, s);
-      cache.index = [...legacy]
-        .sort((a, b) => b.updatedAt - a.updatedAt)
-        .map((s) => s.id)
-        .slice(0, MAX_SESSIONS);
-      cache.hydrated = true;
+      console.warn("[chatStore] session load failed", sessionId, e);
+      return undefined;
     } finally {
-      cache.hydrating = null;
+      bodyLoads.delete(key);
     }
   })();
-  return cache.hydrating;
+  bodyLoads.set(key, p);
+  return p;
+}
+
+/**
+ * Hydrate session index from disk (bodies stay cold). Optionally warm-load
+ * live chat ids so open panels have transcripts without waiting.
+ */
+export async function hydrateChatStore(
+  wsId: string,
+  warmIds?: string[],
+): Promise<void> {
+  const cache = getCache(wsId);
+  if (!cache.hydrated) {
+    if (cache.hydrating) {
+      await cache.hydrating;
+    } else {
+      cache.hydrating = (async () => {
+        try {
+          const snap = await invoke<{
+            ids: string[];
+            sessions: ChatSession[];
+          }>("chat_store_load_workspace", { wsId });
+          cache.index = snap.ids;
+          // Compat: older backends may still return full bodies.
+          for (const s of snap.sessions ?? []) {
+            if (isValidSession(s)) cache.sessions.set(s.id, s);
+          }
+          if (snap.ids.length === 0) {
+            await migrateFromLocalStorage(wsId, cache);
+          }
+          cache.hydrated = true;
+        } catch (e) {
+          console.warn(
+            "[chatStore] disk hydrate failed, falling back to localStorage",
+            e,
+          );
+          const legacy = loadLegacySessions(wsId);
+          for (const s of legacy) cache.sessions.set(s.id, s);
+          cache.index = [...legacy]
+            .sort((a, b) => b.updatedAt - a.updatedAt)
+            .map((s) => s.id)
+            .slice(0, MAX_SESSIONS);
+          cache.hydrated = true;
+        } finally {
+          cache.hydrating = null;
+        }
+      })();
+      await cache.hydrating;
+    }
+  }
+  if (warmIds && warmIds.length > 0) {
+    await Promise.all(warmIds.map((id) => loadSessionBody(wsId, id)));
+  }
+}
+
+/** Load one transcript into the cache (no-op if already warm). */
+export async function ensureSessionLoaded(
+  wsId: string,
+  sessionId: string,
+): Promise<ChatSession | undefined> {
+  if (!getCache(wsId).hydrated) await hydrateChatStore(wsId);
+  return loadSessionBody(wsId, sessionId);
+}
+
+/** Drop transcript body from RAM; keep id in the index for reopen. */
+export function dropCachedSessionBody(wsId: string, sessionId: string): void {
+  getCache(wsId).sessions.delete(sessionId);
 }
 
 export function isChatStoreHydrated(wsId: string): boolean {
@@ -151,6 +222,11 @@ export function getCachedSessions(wsId: string): ChatSession[] {
   return cache.index
     .map((id) => cache.sessions.get(id))
     .filter((s): s is ChatSession => !!s);
+}
+
+/** Session ids known on disk (index), including cold bodies. */
+export function getCachedSessionIds(wsId: string): string[] {
+  return [...getCache(wsId).index];
 }
 
 export function putCachedSession(wsId: string, session: ChatSession): void {

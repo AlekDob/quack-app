@@ -6,6 +6,7 @@ import {
   flushSessionToDisk,
   getCachedSession,
   getCachedSessions,
+  getCachedSessionIds,
   legacySaveToLocalStorage,
   putCachedSession,
   removeCachedSession,
@@ -35,7 +36,7 @@ export interface ChatSession {
 const LEGACY_SESSION_KEY = (wsId: string, sessionId: string) =>
   `lcp.ollama.history.${wsId}.s.${sessionId}`;
 
-export { hydrateChatStore } from "./chatStoreCache";
+export { hydrateChatStore, ensureSessionLoaded } from "./chatStoreCache";
 
 export function loadSession(
   wsId: string,
@@ -46,6 +47,10 @@ export function loadSession(
 
 export function loadSessions(wsId: string): ChatSession[] {
   return getCachedSessions(wsId);
+}
+
+export function listSessionIds(wsId: string): string[] {
+  return getCachedSessionIds(wsId);
 }
 
 /** Atomic per-session write — disk-backed, no localStorage quota. */

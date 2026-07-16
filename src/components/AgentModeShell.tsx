@@ -28,6 +28,8 @@ import { AIChatsRail } from "./AIChatsRail";
 import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { endChatSwitch, pulseChatSwitch } from "../chatSwitch";
 import { useChatSwitching } from "../useChatSwitching";
+import { shouldKeepChatHostMounted } from "../chatHostMount";
+import { dropCachedSessionBody } from "../chatStoreCache";
 
 interface Props {
   // Always the active workspace id. The shell is NOT remounted on
@@ -150,19 +152,32 @@ function AgentChatHost({
   root,
   chatId,
   visible,
+  doneAt,
+  archivedAt,
   onOpenFile,
 }: {
   wsId: string;
   root: string;
   chatId: string;
   visible: boolean;
+  doneAt?: number;
+  archivedAt?: number;
   onOpenFile: (path: string | null) => void;
 }) {
+  const keepWarm = shouldKeepChatHostMounted({ visible, doneAt, archivedAt });
   const [mounted, setMounted] = useState(visible);
   const onHydrated = useCallback(() => endChatSwitch(), []);
   useEffect(() => {
-    if (visible) setMounted(true);
-  }, [visible]);
+    if (visible) {
+      setMounted(true);
+      return;
+    }
+    if (!keepWarm) setMounted(false);
+  }, [visible, keepWarm]);
+  useEffect(() => {
+    if (mounted || keepWarm) return;
+    dropCachedSessionBody(wsId, chatId);
+  }, [mounted, keepWarm, wsId, chatId]);
   if (!mounted) return null;
   return (
     <div
@@ -452,6 +467,8 @@ export function AgentModeShell({ wsId }: Props) {
                     root={ws.meta.root}
                     chatId={chat.id}
                     visible={!switching && chat.id === activeChatId}
+                    doneAt={chat.doneAt}
+                    archivedAt={chat.archivedAt}
                     onOpenFile={setOpenFilePath}
                   />
                 ))}

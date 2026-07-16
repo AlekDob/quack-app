@@ -128,6 +128,7 @@ pub fn run() {
             workspace::workspace_state_load,
             workspace::workspace_state_save,
             chat_store::chat_store_load_workspace,
+            chat_store::chat_store_load,
             chat_store::chat_store_save,
             chat_store::chat_store_delete,
             chat_store::chat_store_lookup_link,

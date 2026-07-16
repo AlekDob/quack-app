@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-06
-last_verified: 2026-07-12
+last_verified: 2026-07-16
 tags: [chat, persistence, disk, rust, transcript, multitasking, reliability, provider-links, audit]
 ---
 
@@ -54,20 +54,26 @@ session via `chat_store_save`, then `remove` legacy keys.
 
 ### In-memory cache (frontend)
 
-`chatStoreCache.ts` holds a per-workspace `Map<sessionId, ChatSession>` hydrated
-from disk at boot. `chatHistory.ts` APIs remain **sync** against this cache;
-disk writes are async fire-and-forget with failure toast via `registerChatSaveFailed`.
+`chatStoreCache.ts` holds a per-workspace session **index** plus a
+`Map<sessionId, ChatSession>` of **warm** bodies. Boot `hydrateChatStore(wsId,
+warmIds?)` loads the index only (no bulk body read), then warm-loads live chat
+ids (`!doneAt && !archivedAt`). DONE/cold transcripts load on demand via
+`ensureSessionLoaded`. Sync `loadSession` / `loadSessions` see only warm rows;
+panel open awaits `ensureSessionLoaded` before `applyLoadedMessages`. Leaving a
+DONE host drops the body from RAM (`dropCachedSessionBody`) while keeping the
+id in the index.
 
 ## Files
 
 | File | Role |
 |---|---|
-| `src-tauri/src/chat_store.rs` | `chat_store_load_workspace`, `chat_store_save`, `chat_store_delete`, `chat_store_lookup_link`, `chat_store_all_links` |
+| `src-tauri/src/chat_store.rs` | `chat_store_load_workspace` (ids only), `chat_store_load` (one body), `chat_store_save`, `chat_store_delete`, `chat_store_lookup_link`, `chat_store_all_links` |
 | `src-tauri/src/provider_sessions.rs` | Unified CLI list/load — see `044-provider-session-bridge.md` |
 | `src-tauri/src/session_jsonl.rs` | Shared JSONL parser (CC + Cursor agent-transcripts) |
 | `src-tauri/src/provider_path.rs` | `encode_project_path` — same slug as CC/Cursor on-disk dirs |
-| `src/chatStoreCache.ts` | Hydrate, migrate, in-memory cache, async disk flush |
-| `src/chatHistory.ts` | Public API: `loadSession`, `saveSession`, `patchSession`, `deleteSession` |
+| `src/chatStoreCache.ts` | Index hydrate, `ensureSessionLoaded`, warm ids, body drop, async disk flush |
+| `src/chatHistory.ts` | Public API: `loadSession`, `ensureSessionLoaded`, `saveSession`, `patchSession`, `deleteSession` |
+| `src/chatHostMount.ts` | DONE hosts unload when hidden; live stay sticky (multitask) |
 | `src/chatProviderRecovery.ts` | Hydrate thin Quack rows from CLI on-disk transcripts (all agentic providers) |
 | `src/chatCcRecovery.ts` | Thin wrapper → `chatProviderRecovery` (CC-only compat) |
 | `src/chatPersistFlush.ts` | `flushAllChatPersist()` / `flushWorkspaceChatPersist(wsId)` before chat switch |
@@ -82,18 +88,22 @@ disk writes are async fire-and-forget with failure toast via `registerChatSaveFa
 ### TypeScript (sync, cache-backed)
 
 ```ts
-hydrateChatStore(wsId) → Promise<void>   // boot; migrates legacy localStorage once
-loadSession(wsId, sessionId) → ChatSession | undefined
-loadSessions(wsId) → ChatSession[]
+hydrateChatStore(wsId, warmIds?) → Promise<void>  // index + optional warm bodies
+ensureSessionLoaded(wsId, sessionId) → Promise<ChatSession | undefined>
+loadSession(wsId, sessionId) → ChatSession | undefined  // warm cache only
+loadSessions(wsId) → ChatSession[]                     // warm cache only
+listSessionIds(wsId) → string[]                        // full index
 saveSession(wsId, session) → boolean      // cache always ok; disk fail → toast
 patchSession(wsId, sessionId, partial) → boolean
 deleteSession(wsId, id) → void
+dropCachedSessionBody(wsId, sessionId) → void  // free RAM; keep index
 ```
 
 ### Rust (Tauri invoke)
 
 ```ts
-chat_store_load_workspace(wsId) → { ids, sessions }
+chat_store_load_workspace(wsId) → { ids, sessions: [] }  // index only
+chat_store_load(wsId, sessionId) → ChatSession | null
 chat_store_save(wsId, session) → void
 chat_store_delete(wsId, sessionId) → void
 chat_store_lookup_link(provider, cliSessionId) → ProviderLink | null
@@ -141,18 +151,20 @@ Files: `src/chatProviderRecovery.ts`, `src-tauri/src/provider_sessions.rs`.
 `store.hydrate()` after workspace disk load, for the workspaces open at boot:
 
 ```
-Promise.all(survivingIds.map(hydrateChatStore))
+Promise.all(survivingIds.map((id) => hydrateChatStore(id, warmLiveIds)))
 ```
 
-Splash phase: **"Loading chat history…"** (~92% progress).
+Splash phase: **"Loading chat history…"** (~92% progress). Index-only load +
+warm live bodies — see `076-chat-lazy-hydrate-done-unload.md`.
 
 **On-demand:** a project opened *after* boot (picker / activity bar / command
 palette / Agent Mode / `actions.ts`) goes through `store.openWorkspace`, which
-`await hydrateChatStore(meta.id)` **before** the `set(...)` that mounts its
-`AIChatHost` panels. Without this the panels mount against a cold cache →
-`loadSessions` returns `[]` → empty transcripts, and the next `saveSession`
-overwrites the real on-disk row. Idempotent (`hydrated` guard) → no cost when
-the workspace was already warmed at boot.
+`await hydrateChatStore(meta.id, warmLiveIds)` **before** the `set(...)` that
+mounts its `AIChatHost` panels. Without this the panels mount against a cold
+cache → `loadSessions` returns `[]` → empty transcripts, and the next
+`saveSession` overwrites the real on-disk row. Idempotent (`hydrated` guard) →
+no cost when the workspace was already warmed at boot. Opening a cold (DONE)
+chat still needs `ensureSessionLoaded` in `AIChatPanel` (`076`).
 
 ## Gotchas
 
@@ -161,15 +173,17 @@ the workspace was already warmed at boot.
 - **`saveSession` return value** — always `true` for cache; disk failures surface via toast callback.
 - **MAX_SESSIONS (30)** — evicts oldest transcript files + provider-link cleanup for evicted rows.
 - **Do not** use monolithic array writes — always per-session files.
-- **Agent Mode** mounts one `AIChatPanel` per open chat; parallel saves are safe (separate files).
+- **Agent Mode** mounts one `AIChatPanel` per **live** (or currently visible DONE)
+  chat; DONE hosts unload when hidden (`076`). Parallel saves are safe (separate files).
 - **Vite-only dev** (`npm run dev` without Tauri) — `hydrateChatStore` falls back to legacy `localStorage` read.
 - **Audit script** — `audit-chat-persistence.mjs` predates v3; inspect `~/Library/Application Support/codetta/chats/` for ground truth.
 
 ## Related
 
+- Lazy hydrate + DONE unload: `076-chat-lazy-hydrate-done-unload.md`
 - Session library model: `001-ai-session-library.md`
 - Provider session bridge: `044-provider-session-bridge.md`
 - Composer / knobs on same row: `040-per-session-composer-state.md`
 - Startup hydrate: `032-startup-hydration.md`
-- Chat switch veil: `chatSwitch.ts`, `ChatSwitchVeil.tsx`, `useChatSwitching.ts`
-- Diary: `documentation/diary/2026-07-06.md` (v2), `2026-07-08.md` (v3 disk)
+- Chat switch veil: `075-chat-switch-loader.md`
+- Diary: `documentation/diary/2026-07-06.md` (v2), `2026-07-08.md` (v3 disk), `2026-07-16.md` (lazy hydrate)
