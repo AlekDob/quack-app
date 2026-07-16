@@ -44,6 +44,26 @@ tags: [workspace, switch, performance, monaco, tabs, multitask, mount-asymmetry]
 
 Constants: `UNMOUNT_DELAY_MS = 300`.
 
+### Render fanout — `WorkspaceShell` is `React.memo` (2026-07-16)
+
+`MainApp` subscribes to `activeId` **and** the whole `loaded` map (`App.tsx`), and
+shells are all mounted (stacked, `display`-toggled). `WorkspaceShell` is wrapped in
+`memo` (props `{wsId, isActive}` only) so a switch re-renders **only the two shells
+whose `isActive` flipped** — not every open project's shell body (PaneNode trees,
+terminals, background side-panel `AIChatPanel`s). Without it, switch cost scaled
+with **# open projects**. The shell reads all other state via its own `useStore`
+selectors, so memo doesn't stale it.
+
+Git status: `gitStatusStore` keeps the **last snapshot per ws** (`lastSnapshotByWs`)
+across unwatch, so switching back paints decorations from cache instantly while a
+fresh `git status` runs in the background (was: watch dropped at refs 0 → flash
+empty until the subprocess resolved).
+
+**Still cold on switch-back (tradeoff, not fixed):** Monaco widget is recreated per
+visible pane (text models preserved → no re-tokenize), file tree re-lists via
+`list_dir`. A warm-LRU keeping the last-used project's editors mounted would make
+A↔B instant but raises the memory floor this doc lowered — deliberately left.
+
 ### `WorkspaceShell` gates (`showHeavy` / `editorsReady`)
 | Surface | Gate | Intentionally NOT gated |
 |---|---|---|

@@ -71,6 +71,9 @@ interface WatchEntry {
 }
 
 const watches = new Map<string, WatchEntry>();
+// Last snapshot per ws, kept across unwatch so a switch-back paints git
+// decorations immediately (the live WatchEntry is dropped at refs 0).
+const lastSnapshotByWs = new Map<string, GitStatusSnapshot>();
 type Listener = (wsId: string) => void;
 const listeners = new Set<Listener>();
 
@@ -197,7 +200,10 @@ export function startGitStatusWatch(wsId: string, root: string): () => void {
       timer: null,
       fetching: false,
       queued: false,
-      snapshot: EMPTY,
+      // Seed from the last snapshot for this ws so switching back renders
+      // decorations instantly instead of flashing empty until the fresh
+      // subprocess resolves. Still fetchNow to catch changes made away.
+      snapshot: lastSnapshotByWs.get(wsId) ?? EMPTY,
     };
     watches.set(wsId, entry);
     void fetchNow(wsId);
@@ -212,6 +218,8 @@ export function startGitStatusWatch(wsId: string, root: string): () => void {
     e.refs--;
     if (e.refs <= 0) {
       if (e.timer) window.clearTimeout(e.timer);
+      // Preserve the snapshot for an instant switch-back; drop the live watch.
+      lastSnapshotByWs.set(wsId, e.snapshot);
       watches.delete(wsId);
     }
   };

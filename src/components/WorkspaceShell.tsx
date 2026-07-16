@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { EditorPane } from "./EditorPane";
 import { MediaPreviewPane } from "./MediaPreviewPane";
@@ -35,7 +35,8 @@ import { Icon } from "./Icon";
 import { useZenMode } from "../zenMode";
 import { useChatSwitching } from "../useChatSwitching";
 import { endChatSwitch } from "../chatSwitch";
-import { shouldKeepChatHostMounted } from "../chatHostMount";
+import { shouldKeepChatHostMounted, useChatHostLiveStatus } from "../chatHostMount";
+import { getAgentStatus, subscribeAgentStatus } from "../agentStatusStore";
 import { dropCachedSessionBody } from "../chatStoreCache";
 import { useWorkspaceHeavyMount } from "../useWorkspaceHeavyMount";
 import { EditorTabDrawer } from "./EditorTabDrawer";
@@ -88,7 +89,12 @@ function ShellDropdown({ anchor, shells, onClose, onPick }: ShellDropdownProps) 
   );
 }
 
-export function WorkspaceShell({ wsId, isActive }: Props) {
+// Memoized: MainApp re-renders on every activeId change (and on any `loaded`
+// mutation), but props here are just {wsId, isActive}. Without memo, a switch
+// re-executes EVERY open workspace's shell body (PaneNode trees, terminals,
+// background side panels) — O(#projects). With memo only the two shells whose
+// `isActive` actually flipped re-render.
+function WorkspaceShellInner({ wsId, isActive }: Props) {
   const { showHeavy, editorsReady } = useWorkspaceHeavyMount(isActive);
   const ws = useStore((s) => s.loaded[wsId]);
   const setTermH = useStore((s) => s.setTermH);
@@ -99,6 +105,9 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
   const dockEditorDrawer = useStore((s) => s.dockEditorDrawer);
   const setEditorDrawerW = useStore((s) => s.setEditorDrawerW);
   const zen = useZenMode();
+
+  const [, setAgentStatusTick] = useState(0);
+  useEffect(() => subscribeAgentStatus(() => setAgentStatusTick((t) => t + 1)), []);
 
   const [paneContainers, setPaneContainers] = useState<
     Record<PaneId, HTMLElement>
@@ -464,6 +473,18 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
           !!pane &&
           pane.active === tabKeyStr &&
           (inBottom ? layout.bottomVisible : true);
+        const live = getAgentStatus(chat.id)?.derived ?? null;
+        if (
+          !shouldKeepChatHostMounted({
+            visible,
+            doneAt: chat.doneAt,
+            archivedAt: chat.archivedAt,
+            liveStatus: live,
+            tabOpen: !!pane,
+          })
+        ) {
+          return null;
+        }
         return (
           <AIChatHost
             key={chat.id}
@@ -472,6 +493,7 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
             chatId={chat.id}
             container={container}
             visible={visible}
+            tabOpen={!!pane}
             doneAt={chat.doneAt}
             archivedAt={chat.archivedAt}
           />
@@ -1007,6 +1029,8 @@ export function WorkspaceShell({ wsId, isActive }: Props) {
   );
 }
 
+export const WorkspaceShell = memo(WorkspaceShellInner);
+
 interface FileTabHostProps {
   wsId: string;
   path: string;
@@ -1022,13 +1046,15 @@ function FileTabHost({
   container,
   visible,
 }: FileTabHostProps) {
+  const switching = useChatSwitching();
+  const showSurface = visible && !switching;
   const [mounted, setMounted] = useState(visible);
   useEffect(() => {
     if (visible) setMounted(true);
   }, [visible]);
   if (!mounted) return null;
   return createPortal(
-    <div className={`file-tab-host${visible ? " is-visible" : ""}`}>
+    <div className={`file-tab-host${showSurface ? " is-visible" : ""}`}>
       {media ? (
         <MediaPreviewPane wsId={wsId} path={path} kind={media} />
       ) : (
@@ -1046,6 +1072,7 @@ interface AIChatHostProps {
   chatId: string;
   container: HTMLElement | null;
   visible: boolean;
+  tabOpen: boolean;
   doneAt?: number;
   archivedAt?: number;
 }
@@ -1056,29 +1083,41 @@ function AIChatHost({
   chatId,
   container,
   visible,
+  tabOpen,
   doneAt,
   archivedAt,
 }: AIChatHostProps) {
   const switching = useChatSwitching();
-  const keepWarm = shouldKeepChatHostMounted({ visible, doneAt, archivedAt });
-  const [mounted, setMounted] = useState(visible);
-  const onHydrated = useCallback(() => endChatSwitch(), []);
+  const liveStatus = useChatHostLiveStatus(chatId);
+  const keepWarm = shouldKeepChatHostMounted({
+    visible,
+    doneAt,
+    archivedAt,
+    liveStatus,
+    tabOpen,
+  });
+  const [mounted, setMounted] = useState(visible || keepWarm);
+  const onHydrated = useCallback(
+    () => endChatSwitch(`AIChatHost:${chatId}`, chatId),
+    [chatId],
+  );
   useEffect(() => {
-    if (visible) {
+    if (visible || keepWarm) {
       setMounted(true);
       return;
     }
-    if (!keepWarm) setMounted(false);
+    setMounted(false);
   }, [visible, keepWarm]);
   useEffect(() => {
     if (mounted || keepWarm) return;
     dropCachedSessionBody(wsId, chatId);
   }, [mounted, keepWarm, wsId, chatId]);
   if (!container || !mounted) return null;
+  const showSurface = visible && !switching;
   const showVeil = switching && visible;
   return createPortal(
     <div
-      className={`ai-tab-host${visible ? " is-visible" : ""}${showVeil ? " is-switching" : ""}`}
+      className={`ai-tab-host${showSurface ? " is-visible" : ""}${showVeil ? " is-switching" : ""}`}
     >
       <AIChatPanel
         wsId={wsId}
