@@ -22,10 +22,9 @@ UI labels are English (app language). Dot colors are vivid + glowing — the dot
 | Needs input | `needs-input` | `claude:permission-request` (permission or AskUserQuestion) | `#a855f7` purple + glow, pulsing |
 | Working | `working` | sessionId present in `claude_code_active_sessions` | `#eab308` yellow + glow, pulsing |
 | Ready | `ready` | resting state — anything not running/blocked/done | `#22c55e` green + glow |
-| Done | `done` | manual (right-click **Mark done**) | neutral dim |
-| Archived | `archived` | legacy (`archivedAt` on descriptor) | neutral dim (muted title) |
+| Done | `done` | manual **Mark done** + legacy `archivedAt` chats | neutral dim |
 
-`archived` chats are **hidden from the live status groups** (Error → Done) but surfaced in a separate **Archived** section when the hub is expanded — see below. **"Ready" is the resting baseline** — there is no separate "idle" group; a chat that isn't actively running, blocked, or marked done is Ready (waiting for the user). Priority on collision: archived → error → needs-input → working → done → ready (`resolveDisplayStatus`).
+`archivedAt` chats are **folded into the Done pile** in the hub UI (one searchable section). The `archived` display status and **Archived** section header are gone — legacy archives show under **Done** with the same search/preview UX the old Archived block had. **"Ready" is the resting baseline** — there is no separate "idle" group; a chat that isn't actively running, blocked, or in the done pile is Ready (waiting for the user). Priority on collision: error → needs-input → working → done (manual pile only) → ready (`resolveDisplayStatus`; `archived` lifecycle remains in the store for old data but the hub maps `archivedAt` → Done).
 
 ### Architecture — single producer, no panel coupling
 
@@ -61,15 +60,16 @@ Context menu on a row (`ContextMenu`, shared viewport-clamped component):
 | Item | When | Effect |
 |---|---|---|
 | **Rename** | always | Inline input; sets `titleLocked` so `AIChatPanel` auto-title stops overwriting |
-| **Mark done** / **Reopen** | not archived | Toggles `doneAt` — finished but still in hub |
-| **Unarchive** | `archivedAt` set (legacy) | `setAIChatLifecycle(…, "active")` |
+| **Mark done** / **Reopen** | live groups vs done pile | Mark done parks a chat; **Reopen** clears `doneAt` / legacy `archivedAt` |
 | **Delete** | always (separator above) | Confirm dialog → `deleteSession` (disk transcript) + `closeAIChat` (tab + descriptor) |
 
-**Archive removed from the menu (2026-07-16):** Done + Archive overlapped ("finished" vs "hide"). New workflow: **Mark done** to park a session, **Delete** to remove it permanently. The **Archived** section and `archivedAt` field remain for chats archived before this change; no new archives are created from the hub UI.
+**Archive removed from the menu (2026-07-16):** Done + Archive overlapped ("finished" vs "hide"). New workflow: **Mark done** to park a session, **Delete** to remove it permanently. Legacy `archivedAt` data is shown in the **Done** section (searchable); no separate Archived header.
 
-**Done section bulk menu:** **Reopen all** only — **Archive all** removed with the menu simplification.
+**Done section bulk menu:** **Reopen all** only.
 
-**Archived row click (2026-07-16):** clicking an archived row now **focuses** the chat (`focusChat`) without auto-unarchiving. Sending a message unarchives (`AIChatPanel.sendUserText` → `setAIChatLifecycle(…, "active")` when `desc.archivedAt` is set). Use **Unarchive** in the context menu to restore explicitly.
+**Done pile search (2026-07-16):** expanded hub shows an inline search under **Done** (replaces the old Archived block). Default preview **10** chats; search returns up to **30** title/workspace matches. Hint: *Latest 10 of N — search for more*. Collapsed 44px rail shows at most **10** done dots (same cap).
+
+**Archived row click:** clicking a done-pile row **focuses** without auto-reopen. Sending a message unarchives/reopens (`AIChatPanel.sendUserText` when `desc.archivedAt`). Use **Reopen** in the context menu to restore explicitly.
 
 Persisted lifecycle fields on `AIChatDescriptor` in per-workspace `state.json`: `doneAt`, `archivedAt` (legacy), `titleLocked`.
 
@@ -77,25 +77,29 @@ Persisted lifecycle fields on `AIChatDescriptor` in per-workspace `state.json`: 
 
 **Delete vs close tab:** the row **×** / `closeAIChat` closes the editor tab but keeps the descriptor + transcript on disk (chat can reappear if reopened from history). **Delete** is destructive — removes `ChatSession` from disk (`chatHistory.deleteSession` → `chat_store.rs`) and drops the tab descriptor.
 
-### Archived section (expanded hub, 2026-07-13)
+### Done pile (expanded hub, 2026-07-16)
 
-When the hub is **expanded** and at least one chat has `archivedAt`, a sixth collapsible group **Archived** appears below Done. Speed-first: archived rows skip live status polling and session-diff hydration.
+When the hub is **expanded** and at least one chat has `doneAt` or legacy `archivedAt`, a collapsible **Done** section appears below the live groups. Speed-first: done-pile rows skip live status polling and session-diff hydration.
 
 | Concern | Behavior |
 |---|---|
-| Default visibility | Latest **10** chats by `createdAt` desc |
+| Default visibility | Latest **10** chats by `createdAt` desc (done + legacy archived) |
 | Search | Inline filter on chat title + workspace name; max **30** matches |
 | Hint | *Latest 10 of N — search for more* when `N > 10` and search empty |
-| Open row | `focusChat` — focuses without unarchive; **Unarchive** in menu or send a message to restore |
-| Collapsed by default | `hubPrefs` first-run default includes `"archived"` (with `"done"`) |
-| Collapsed rail | Section hidden when hub is not expanded (44px chip mode) |
+| Open row | `focusChat` — focuses without reopen; **Reopen** in menu or send a message to restore |
+| Collapsed by default | `hubPrefs` first-run default includes `"done"` only |
+| Collapsed rail | At most **10** done dots (no search) |
 
 | Constant | Value | File |
 |---|---|---|
-| `ARCHIVED_PREVIEW` | 10 | `AIChatsRail.tsx` |
-| `ARCHIVED_SEARCH_CAP` | 30 | `AIChatsRail.tsx` |
+| `DONE_PREVIEW` | 10 | `AIChatsRail.tsx` |
+| `DONE_SEARCH_CAP` | 30 | `AIChatsRail.tsx` |
 
-CSS: `.agent-hub-section.status-archived`, `.agent-hub-archived-search`, `.agent-hub-archived-hint`, `.agent-hub-dot.archived`.
+CSS: `.agent-hub-section.status-done`, `.agent-hub-done-search`, `.agent-hub-done-hint`, `.agent-hub-dot.done`.
+
+### Archived section (removed from UI, 2026-07-16)
+
+The separate **Archived** header/search block is gone. `archivedAt` on disk is unchanged; those chats render in **Done** above. `setAIChatLifecycle(…, "archived")` still exists in `store.ts` for API compat but is no longer exposed in the hub menu.
 
 ### Session diff subtitles (expanded hub)
 

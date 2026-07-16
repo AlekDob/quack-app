@@ -56,23 +56,20 @@ interface HubEntry {
   color: WorkspaceColor | null;
 }
 
-// Status groups, in attention order (top = most urgent). Archived chats
-// live in a separate lazy section (preview + search) below Done.
-const ARCHIVED_PREVIEW = 10;
-const ARCHIVED_SEARCH_CAP = 30;
+// Status groups, in attention order (top = most urgent). Finished chats
+// (done + legacy archived) live in a separate searchable Done section.
+const DONE_PREVIEW = 10;
+const DONE_SEARCH_CAP = 30;
 
 const GROUPS: Array<{ status: DisplayStatus; label: string }> = [
   { status: "error", label: "Error" },
   { status: "needs-input", label: "Needs input" },
   { status: "working", label: "Working" },
   { status: "ready", label: "Ready" },
-  { status: "done", label: "Done" },
 ];
 
-function lifecycleOf(chat: AIChatDescriptor): "active" | "done" | "archived" {
-  if (chat.archivedAt) return "archived";
-  if (chat.doneAt) return "done";
-  return "active";
+function isDonePile(chat: AIChatDescriptor): boolean {
+  return !!(chat.doneAt || chat.archivedAt);
 }
 
 // Two-letter project initials for the color badge (clones AgentModeShell).
@@ -169,7 +166,7 @@ export function AIChatsRail({
   );
   const [renaming, setRenaming] = useState<string | null>(null);
   const [custTab, setCustTab] = useState<CustomizationTab | null>(null);
-  const [archivedSearch, setArchivedSearch] = useState("");
+  const [doneSearch, setDoneSearch] = useState("");
 
   // The chat the user is currently looking at (for highlight).
   const activeChatId =
@@ -179,26 +176,26 @@ export function AIChatsRail({
         ? activeAiChatId(loaded[activeId])
         : null;
 
-  // Flatten every open workspace's chats; archived memoized (no live status).
-  const archivedSorted = useMemo(() => {
-    const archived: HubEntry[] = [];
+  // Finished pile: manual done + legacy archived (one searchable section).
+  const doneSorted = useMemo(() => {
+    const pile: HubEntry[] = [];
     for (const [wsId, ws] of Object.entries(loaded)) {
       const color = getWorkspaceColor(wsId);
       for (const chat of Object.values(ws.aiChats)) {
-        if (!chat.archivedAt) continue;
-        archived.push({ wsId, ws, chat, status: "archived", color });
+        if (!isDonePile(chat)) continue;
+        pile.push({ wsId, ws, chat, status: "done", color });
       }
     }
-    return archived.sort((a, b) => b.chat.createdAt - a.chat.createdAt);
+    return pile.sort((a, b) => b.chat.createdAt - a.chat.createdAt);
   }, [loaded]);
 
   const entries: HubEntry[] = [];
   for (const [wsId, ws] of Object.entries(loaded)) {
     const color = getWorkspaceColor(wsId);
     for (const chat of Object.values(ws.aiChats)) {
-      if (chat.archivedAt) continue;
+      if (isDonePile(chat)) continue;
       const status = resolveDisplayStatus({
-        lifecycle: lifecycleOf(chat),
+        lifecycle: "active",
         live: getAgentStatus(chat.id),
         seen: isSeen(chat.id),
       });
@@ -206,19 +203,24 @@ export function AIChatsRail({
     }
   }
 
-  const archivedVisible = useMemo(() => {
-    const q = archivedSearch.trim().toLowerCase();
+  const doneVisible = useMemo(() => {
+    const q = doneSearch.trim().toLowerCase();
     if (q) {
-      return archivedSorted
+      return doneSorted
         .filter(
           (e) =>
             e.chat.title.toLowerCase().includes(q) ||
             e.ws.meta.name.toLowerCase().includes(q),
         )
-        .slice(0, ARCHIVED_SEARCH_CAP);
+        .slice(0, DONE_SEARCH_CAP);
     }
-    return archivedSorted.slice(0, ARCHIVED_PREVIEW);
-  }, [archivedSorted, archivedSearch]);
+    return doneSorted.slice(0, DONE_PREVIEW);
+  }, [doneSorted, doneSearch]);
+
+  const doneRailItems = useMemo(() => {
+    if (showExpanded) return doneVisible;
+    return doneSorted.slice(0, DONE_PREVIEW);
+  }, [showExpanded, doneVisible, doneSorted]);
 
   const focusChat = async (wsId: string, chatId: string) => {
     markSeen(chatId);
@@ -351,17 +353,6 @@ export function AIChatsRail({
                 label={label}
                 count={items.length}
                 expanded={showExpanded}
-                bulkActions={
-                  status === "done"
-                    ? {
-                        onReopenAll: () => {
-                          for (const e of items) {
-                            setAIChatLifecycle(e.wsId, e.chat.id, "active");
-                          }
-                        },
-                      }
-                    : undefined
-                }
               >
                 {items.map((entry) => (
                   <HubRow
@@ -389,57 +380,62 @@ export function AIChatsRail({
               </HubSection>
             );
           })}
-          {showExpanded && archivedSorted.length > 0 && (
+          {doneSorted.length > 0 && (
             <HubSection
-              status="archived"
-              label="Archived"
-              count={archivedSorted.length}
+              status="done"
+              label="Done"
+              count={doneSorted.length}
               expanded={showExpanded}
+              bulkActions={{
+                onReopenAll: () => {
+                  for (const e of doneSorted) {
+                    setAIChatLifecycle(e.wsId, e.chat.id, "active");
+                  }
+                },
+              }}
             >
-              {!isSectionCollapsed("archived") && (
+              {showExpanded && !isSectionCollapsed("done") && (
                 <>
-                  <div className="agent-hub-archived-search">
+                  <div className="agent-hub-done-search">
                     <Icon name="search" size={12} aria-hidden="true" />
                     <input
-                      className="agent-hub-archived-search-input"
-                      value={archivedSearch}
-                      onChange={(e) => setArchivedSearch(e.target.value)}
-                      placeholder="Search archived…"
-                      aria-label="Search archived chats"
+                      className="agent-hub-done-search-input"
+                      value={doneSearch}
+                      onChange={(e) => setDoneSearch(e.target.value)}
+                      placeholder="Search done…"
+                      aria-label="Search done chats"
                       onClick={(e) => e.stopPropagation()}
                     />
-                    {archivedSearch && (
+                    {doneSearch && (
                       <button
                         type="button"
-                        className="agent-hub-archived-search-clear"
+                        className="agent-hub-done-search-clear"
                         title="Clear search"
                         aria-label="Clear search"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setArchivedSearch("");
+                          setDoneSearch("");
                         }}
                       >
                         <Icon name="x" size={10} />
                       </button>
                     )}
                   </div>
-                  {archivedSorted.length > ARCHIVED_PREVIEW &&
-                    !archivedSearch.trim() && (
-                      <div className="agent-hub-archived-hint">
-                        Latest {ARCHIVED_PREVIEW} of {archivedSorted.length} —
-                        search for more
-                      </div>
-                    )}
-                  {archivedSearch.trim() &&
-                    archivedVisible.length === 0 && (
-                      <div className="agent-hub-archived-hint">
-                        No archived chats match
-                      </div>
-                    )}
+                  {doneSorted.length > DONE_PREVIEW && !doneSearch.trim() && (
+                    <div className="agent-hub-done-hint">
+                      Latest {DONE_PREVIEW} of {doneSorted.length} — search for
+                      more
+                    </div>
+                  )}
+                  {doneSearch.trim() && doneVisible.length === 0 && (
+                    <div className="agent-hub-done-hint">
+                      No done chats match
+                    </div>
+                  )}
                 </>
               )}
-              {!isSectionCollapsed("archived") &&
-                archivedVisible.map((entry) => (
+              {(showExpanded ? !isSectionCollapsed("done") : true) &&
+                doneRailItems.map((entry) => (
                   <HubRow
                     key={entry.chat.id}
                     entry={entry}
@@ -488,10 +484,10 @@ export function AIChatsRail({
               label: "Rename",
               onClick: () => setRenaming(menu.entry.chat.id),
             },
-            ...(menu.entry.chat.archivedAt
+            ...(isDonePile(menu.entry.chat)
               ? [
                   {
-                    label: "Unarchive",
+                    label: "Reopen",
                     onClick: () =>
                       setAIChatLifecycle(
                         menu.entry.wsId,
@@ -502,12 +498,12 @@ export function AIChatsRail({
                 ]
               : [
                   {
-                    label: menu.entry.chat.doneAt ? "Reopen" : "Mark done",
+                    label: "Mark done",
                     onClick: () =>
                       setAIChatLifecycle(
                         menu.entry.wsId,
                         menu.entry.chat.id,
-                        menu.entry.chat.doneAt ? "active" : "done",
+                        "done",
                       ),
                   },
                 ]),
