@@ -233,7 +233,8 @@ export function AIChatsRail({
       activeId && loaded[activeId] ? activeAiChatId(loaded[activeId]) : null;
     const crossWs = wsId !== activeId;
     if (chatId !== current || crossWs) {
-      pulseChatSwitch({ veil: crossWs, flushWsId: activeId ?? undefined });
+      // Veil on every switch (not just cross-workspace) — see AgentModeShell.
+      pulseChatSwitch({ veil: true, flushWsId: activeId ?? undefined });
     }
     if (crossWs) await setActiveWorkspace(wsId);
     focusAIChat(wsId, chatId);

@@ -198,7 +198,8 @@ function DrawerAIChatHost({
         chatVisible={visible}
         onHydrated={onHydrated}
       />
-      {showVeil && <ChatSwitchVeil />}
+      {/* Always mounted — the veil fades itself out on `active` false. */}
+      <ChatSwitchVeil active={showVeil} />
     </div>,
     container,
   );

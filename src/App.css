@@ -18226,7 +18226,54 @@ button.composer-mention-chip-label:hover {
   align-items: center;
   justify-content: center;
   gap: 14px;
-  background: var(--bg);
+  /* Translucent glass wash instead of a solid blank: the switch reads as a
+     gradual transition, not a hard cut. Fades via opacity (ChatSwitchVeil
+     toggles .is-shown). */
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  backdrop-filter: blur(10px) saturate(120%);
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+.chat-switch-veil.is-shown {
+  opacity: 1;
+}
+/* Slim indeterminate progress sweep at the top edge — the "loading" motion. */
+.chat-switch-veil-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+}
+.chat-switch-veil-bar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 38%;
+  border-radius: 999px;
+  background: var(--fg);
+  opacity: 0.5;
+  animation: chatSwitchBar 1s ease-in-out infinite;
+}
+@keyframes chatSwitchBar {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-switch-veil {
+    transition: none;
+  }
+  .chat-switch-veil-bar::before {
+    animation: none;
+  }
 }
 .chat-switch-veil-spinner {
   width: 28px;

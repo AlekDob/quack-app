@@ -123,6 +123,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `005-jack-duck-identity.md` — the assistant IS Jack (duck PM): persona, `AIIcon` duck mark, chat header.
   - `009-agent-hub.md` — the cross-project status hub (right rail): groups, `AgentHubWatcher`, notifications, lifecycle.
   - `064-agent-hub-drawer-and-chat-tab-switch.md` — collapsed hover drawer, chat switch perf, pane tab visibility stacking.
+  - `075-chat-switch-loader.md` — gradual translucent veil on chat/session switch (fade + min-floor + cap in `chatSwitch.ts`, `ChatSwitchVeil`); perceived-performance polish. Pairs with the `044` freeze fix.
   - `006-chat-tool-render.md` — chat tool-call rendering (pills, result drawer, diff modal).
   - `007-native-macos-menu.md` — macOS uses the native system menu bar (built from the command registry); the in-window `TopBar` menus are hidden there, kept on Win/Linux.
   - `008-skill-slash-menu.md` — Claude Code skills in the `/` menu (lightning icon + orange, name only), loaded from `.claude/skills/`, dispatched like CC commands.

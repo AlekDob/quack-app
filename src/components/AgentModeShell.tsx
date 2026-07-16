@@ -277,7 +277,9 @@ export function AgentModeShell({ wsId }: Props) {
   const selectSession = (id: string, chatId: string) => {
     const crossWs = id !== wsId;
     if (chatId !== activeChatId || crossWs) {
-      pulseChatSwitch({ veil: crossWs, flushWsId: wsId });
+      // Veil on every switch (not just cross-workspace) — the gradual loader
+      // smooths the perceived jank of swapping the whole chat panel.
+      pulseChatSwitch({ veil: true, flushWsId: wsId });
     }
     if (crossWs) void setActiveWorkspace(id);
     setSelectedByWs((m) => ({ ...m, [id]: chatId }));
