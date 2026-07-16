@@ -3,10 +3,42 @@
 
 use crate::provider_path::encode_project_path;
 use crate::session_jsonl::{extract_user_text, parse_session_jsonl, trim_oneline, LoadedMessage};
+use std::collections::HashMap;
 use std::fs;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
+
+// Per-file summary cache. Summarizing a session means parsing the WHOLE
+// JSONL line-by-line (turn_count, first/last user text, cost) — and a single
+// heavy Claude Code project dir can hold hundreds of MB across sessions
+// (98 MB single files observed). Re-parsing all of it on every
+// provider_list_sessions call froze the UI. Cache each file's summary keyed
+// by (mtime, size): an unchanged file is parsed once, ever. Only the session
+// currently being written keeps re-parsing (its sig changes), which is one
+// small file, not the whole history. Pattern mirrors the usage-monitor fix
+// (feature 019: mtime gate + cache-on-success).
+type CacheEntry = (u64, u64, CliSessionSummary); // (mtime_ms, size_bytes, summary)
+fn summary_cache() -> &'static Mutex<HashMap<PathBuf, CacheEntry>> {
+    static CACHE: OnceLock<Mutex<HashMap<PathBuf, CacheEntry>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn file_sig(path: &Path) -> (u64, u64) {
+    match fs::metadata(path) {
+        Ok(m) => {
+            let mtime = m
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(SystemTime::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            (mtime, m.len())
+        }
+        Err(_) => (0, 0),
+    }
+}
 
 #[derive(serde::Serialize, Clone)]
 pub struct CliSessionSummary {
@@ -19,33 +51,40 @@ pub struct CliSessionSummary {
     pub last_turn_at_ms: u64,
 }
 
+// Both commands parse potentially huge JSONL from disk. They MUST run off the
+// Tauri main thread (spawn_blocking) — a synchronous parse of a multi-hundred-MB
+// project dir on the main thread blocks the webview IPC pump and freezes the UI.
 #[tauri::command]
-pub fn provider_list_sessions(
+pub async fn provider_list_sessions(
     provider: String,
     cwd: String,
 ) -> Result<Vec<CliSessionSummary>, String> {
-    match provider.as_str() {
+    tauri::async_runtime::spawn_blocking(move || match provider.as_str() {
         "claude-code" => list_claude_sessions(&cwd),
         "cursor-cli" => list_cursor_sessions(&cwd),
         "opencode-cli" => list_opencode_sessions(&cwd),
         other => Err(format!("unknown provider: {}", other)),
-    }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn provider_load_session(
+pub async fn provider_load_session(
     provider: String,
     cwd: String,
     session_id: String,
 ) -> Result<Vec<LoadedMessage>, String> {
-    match provider.as_str() {
+    tauri::async_runtime::spawn_blocking(move || match provider.as_str() {
         "claude-code" => load_claude_session(&cwd, &session_id),
         "cursor-cli" => load_cursor_session(&cwd, &session_id),
         "opencode-cli" => Err(
             "OpenCode transcript load not yet supported — resume via chat works".into(),
         ),
         other => Err(format!("unknown provider: {}", other)),
-    }
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 fn home() -> Result<PathBuf, String> {
@@ -62,6 +101,15 @@ fn mtime_ms(path: &Path) -> u64 {
 }
 
 fn summarize_jsonl(path: &Path, provider: &str, id: String) -> Option<CliSessionSummary> {
+    // Cache gate: skip the full parse if the file is unchanged since last time.
+    let (mtime, size) = file_sig(path);
+    if let Ok(cache) = summary_cache().lock() {
+        if let Some((cm, cs, summary)) = cache.get(path) {
+            if *cm == mtime && *cs == size {
+                return Some(summary.clone());
+            }
+        }
+    }
     let file = fs::File::open(path).ok()?;
     let reader = std::io::BufReader::new(file);
     let mut first_user: Option<String> = None;
@@ -103,7 +151,7 @@ fn summarize_jsonl(path: &Path, provider: &str, id: String) -> Option<CliSession
     }
     let title = trim_oneline(first_user.as_deref().unwrap_or("Untitled"), 80);
     let preview = trim_oneline(last_user.as_deref().unwrap_or(&title), 140);
-    Some(CliSessionSummary {
+    let summary = CliSessionSummary {
         provider: provider.to_string(),
         id,
         title,
@@ -111,7 +159,11 @@ fn summarize_jsonl(path: &Path, provider: &str, id: String) -> Option<CliSession
         cost_usd,
         turn_count,
         last_turn_at_ms: mtime_ms(path),
-    })
+    };
+    if let Ok(mut cache) = summary_cache().lock() {
+        cache.insert(path.to_path_buf(), (mtime, size, summary.clone()));
+    }
+    Some(summary)
 }
 
 fn list_claude_sessions(cwd: &str) -> Result<Vec<CliSessionSummary>, String> {

@@ -1,9 +1,12 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { useTypewriterReveal } from "../useTypewriterReveal";
 import { formatStreamInline } from "../streamInlineFormat";
 
-/** Live assistant tail — smooth char reveal + light inline markdown + caret. */
-export function StreamingPlainText({
+/** Live assistant tail — smooth char reveal + light inline markdown + caret.
+ *  Memoized so parent re-renders (composer keystrokes, usage strip ticks)
+ *  do NOT re-run the typewriter hook or formatStreamInline when the text
+ *  prop is unchanged. */
+export const StreamingPlainText = memo(function StreamingPlainText({
   text,
   showCaret = true,
   active = true,
@@ -27,4 +30,4 @@ export function StreamingPlainText({
       </span>
     </div>
   );
-}
+});

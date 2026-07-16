@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-07
-last_verified: 2026-07-11
-tags: [sessions, claude-code, cursor-cli, opencode-cli, resume, terminal, provider-session, bridge, disk, quack-v1]
+last_verified: 2026-07-16
+tags: [sessions, claude-code, cursor-cli, opencode-cli, resume, terminal, provider-session, bridge, disk, quack-v1, performance]
 ---
 
 ## Provider session bridge (Quack ↔ CLI session ids)
@@ -68,7 +68,8 @@ Lookup: `chat_store_lookup_link(provider, cliSessionId)`.
 | Legacy CC-only picker | `chatPanelChrome.tsx` → `ClaudeSessionsButton` (kept, unused in header) |
 | Wiring | `src/components/AIChatPanel.tsx` |
 | Id read/write | `src/providerSession.ts` |
-| Unified list/load (Rust) | `src-tauri/src/provider_sessions.rs` → `provider_list_sessions`, `provider_load_session` |
+| Unified list/load (Rust) | `src-tauri/src/provider_sessions.rs` → `provider_list_sessions`, `provider_load_session` (both **async + `spawn_blocking`**, per-file summary cache) |
+| Disk-hydrate poll + session-id guess | `src/components/AIChatPanel.tsx` (diskHydrate effect), `src/sessionDiskHydrate.ts` → `guessClaudeSessionId` |
 | JSONL parser (shared) | `src-tauri/src/session_jsonl.rs` |
 | CC list/load (legacy invoke) | `claude_code_list_sessions`, `claude_code_load_session` — still available |
 | Thin-row recovery | `src/chatProviderRecovery.ts` |
@@ -141,12 +142,31 @@ Confirming a switch updates `pinnedProviderId` to the new platform.
 ### Tauri commands
 
 ```ts
-provider_list_sessions(provider, cwd) → CliSessionSummary[]
-provider_load_session(provider, cwd, sessionId) → LoadedMessage[]
+provider_list_sessions(provider, cwd) → CliSessionSummary[]   // async, spawn_blocking
+provider_load_session(provider, cwd, sessionId) → LoadedMessage[]  // async, spawn_blocking
 // provider: "claude-code" | "cursor-cli" | "opencode-cli"
 ```
 
 `CliSessionSummary` adds a `provider` field vs legacy `ClaudeSession`.
+
+### Performance — the JSONL-parse freeze fix (2026-07-16)
+
+`provider_list_sessions` summarizes a provider's session dir by **parsing every
+JSONL line-by-line** (`summarize_jsonl`: turn_count, first/last user text, cost).
+A heavy Claude Code project holds hundreds of MB (single files ~100 MB seen;
+`~/.claude/projects` was 1.1 GB / 1298 files). Three problems caused a **100% CPU
+main-thread freeze on launch and on chat switch**:
+
+| Problem | Fix |
+|---|---|
+| Command ran **synchronously on the Tauri main thread** → blocked the webview IPC pump → JS timers drifted ~1 s, UI froze | `provider_list_sessions` + `provider_load_session` → `async` + `tauri::async_runtime::spawn_blocking` |
+| Re-parsed the **whole dir on every call** | Per-file summary cache in `summarize_jsonl`, gated on **(mtime, size)** — inactive JSONL parsed once ever; only the live session re-parses (one small file) |
+| Frontend `guessClaudeSessionId` (in the 12 s disk-hydrate poll) re-ran the full parse **every tick** when a chat had no saved `claudeSessionId` | `guessAttemptRef` in `AIChatPanel` — the guess runs once per distinct assistant-turn count, not every poll |
+
+**Diagnosis note:** on macOS the Tauri webview is a **separate process**
+(`com.apple.WebKit.WebContent`). When the Rust `Quack` process itself pegs a core,
+the culprit is backend / IPC, not React — a JS render/effect probe correctly shows
+nothing. `sample <pid>` on the Rust process is the fastest locator.
 
 ### Related features
 
@@ -167,6 +187,8 @@ provider_load_session(provider, cwd, sessionId) → LoadedMessage[]
 - **Duplicate CLI id across Quack tabs** — linked-title badges surface it; last writer wins on next send.
 - **Platform pin** — switching CLI mid-chat starts a fresh server-side session; use "Change platform…" only when you mean it.
 - **Flattened first-turn prompt on recovery** — the CLI stores the whole `[System]…[User]…` first-turn `-p` packet as its first user message; recovery would render it as a giant `[System]…` user bubble. `stripCliFlattenScaffold` (`chatTextUtils.ts`, called from `cleanStaleToolMessages`) unwraps it to the real user text on load, healing old + new sessions.
+- **Never call `provider_list_sessions` synchronously per-render/per-poll** — it parses potentially hundreds of MB of JSONL. It is `spawn_blocking` + cached now, but a caller that fires it on a tight loop still spins disk I/O. Attempt session-id guesses once per turn-count (see the freeze-fix table), and prefer a saved `providerSessionIds[provider]` over guessing.
+- **watcher.rs recursive, no ignore list** (separate, tracked follow-up) — `fs_watch_start` watches each root `RecursiveMode::Recursive` with no `target/`/`node_modules/`/`.git` exclusion, so build/dev-server churn floods `fs:event` → per-workspace `git status` + tree rescans. Not part of this fix.
 
 ### Future
 

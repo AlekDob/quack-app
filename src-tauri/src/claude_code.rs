@@ -397,12 +397,25 @@ fn ensure_pretooluse_hook(workspace: &str, endpoint: &str) -> Result<(), String>
     let arr = pretooluse.as_array_mut().unwrap();
 
     // Dedupe: drop any prior Codetta-managed entry, then push fresh.
+    // Matches on the `_codetta` marker OR on the `/permission?token=`
+    // command fingerprint, so pre-marker legacy entries (written by
+    // older Codetta builds, before the marker existed) also get
+    // cleaned up instead of accumulating forever alongside the fresh
+    // one — a real bug: a stale legacy hook defaulted to `ask` on a
+    // missing `CODETTA_PERM_HOOK` env, which outranks the fresh hook's
+    // `allow` default and forces a prompt on every tool call
+    // regardless of the UI's permission mode (including Bypass).
     arr.retain(|entry| {
         let inner = entry.get("hooks").and_then(|h| h.as_array());
         let is_ours = inner
             .map(|hs| {
-                hs.iter()
-                    .any(|h| h.get("_codetta").and_then(|v| v.as_bool()).unwrap_or(false))
+                hs.iter().any(|h| {
+                    h.get("_codetta").and_then(|v| v.as_bool()).unwrap_or(false)
+                        || h.get("command")
+                            .and_then(|c| c.as_str())
+                            .map(|c| c.contains("/permission?token="))
+                            .unwrap_or(false)
+                })
             })
             .unwrap_or(false);
         !is_ours

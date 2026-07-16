@@ -3500,6 +3500,11 @@ export function AIChatPanel({
         // ids we've already handled this round and skip repeats.
         const seenToolCallIds = new Set<string>();
         const paintStreamUi = createStreamPainter(() => {
+          // Painted once per frame (createStreamPainter coalesces via rAF).
+          // These are the primary streamed content — keep them as urgent
+          // updates. Wrapping them in startTransition starves the stream:
+          // each frame's low-priority render gets aborted by the next
+          // frame's, so React rarely commits and the tail visibly stalls.
           setStreaming(acc);
           if (blocksThisRound.length > 0) {
             setStreamingBlocks([...blocksThisRound]);
@@ -4406,6 +4411,11 @@ export function AIChatPanel({
 
   // Hydrate drawer + ring from CC JSONL when stream usage is absent.
   const diskHydrateGenRef = useRef(0);
+  // Remember the last (root, turnCount) we ran guessClaudeSessionId for.
+  // That guess parses the whole ~/.claude project dir; the 12s poll used to
+  // re-run it every tick whenever the sid stayed unresolved, re-parsing
+  // hundreds of MB on a loop. Attempt it once per distinct turn count only.
+  const guessAttemptRef = useRef("");
   const assistantTurnCount = messages.filter((m) => m.role === "assistant").length;
 
   useEffect(() => {
@@ -4421,7 +4431,9 @@ export function AIChatPanel({
     const poll = async () => {
       if (cancelled || gen !== diskHydrateGenRef.current) return;
       let sid = claudeSessionId;
-      if (!sid && assistantTurnCount > 0) {
+      const guessKey = `${root}:${assistantTurnCount}`;
+      if (!sid && assistantTurnCount > 0 && guessAttemptRef.current !== guessKey) {
+        guessAttemptRef.current = guessKey;
         sid = await guessClaudeSessionId(root, assistantTurnCount);
         if (sid && !cancelled && gen === diskHydrateGenRef.current) {
           setProviderSessionIds((prev) =>
@@ -5221,6 +5233,43 @@ export function AIChatPanel({
     streamingToolResults,
   ]);
 
+  // Tool-result and user-turn lookups derived from committed messages
+  // only — NOT from `display` (which changes every frame during
+  // streaming). Memoizing on `messages` keeps these Maps stable across
+  // streaming re-renders so the renderAt loop doesn't rebuild them
+  // 60 times per second. Streaming tool results are merged in too
+  // (they change infrequently — only when a tool result arrives, not
+  // on every text delta).
+  const toolResultsById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const msg of messages) {
+      if (msg.role === "tool" && msg.tool_call_id) {
+        m.set(msg.tool_call_id, msg.content);
+      }
+      if (msg.role === "assistant" && msg.tool_results) {
+        for (const tr of msg.tool_results) {
+          if (tr.tool_use_id) m.set(tr.tool_use_id, tr.content);
+        }
+      }
+    }
+    for (const tr of streamingToolResults) {
+      if (tr.tool_use_id) m.set(tr.tool_use_id, tr.content);
+    }
+    return m;
+  }, [messages, streamingToolResults]);
+
+  const userTurnByIdx = useMemo(() => {
+    const m = new Map<number, number>();
+    let turn = 0;
+    let di = 0;
+    for (const msg of messages) {
+      if (msg.role === "system") continue;
+      if (msg.role === "user") m.set(di, ++turn);
+      di++;
+    }
+    return m;
+  }, [messages]);
+
   // No early-return for "checking" — render the normal panel and let
   // model discovery populate the dropdown when it finishes. The previous
   // "Checking for Ollama…" splash was misleading for users who don't
@@ -5438,9 +5487,12 @@ export function AIChatPanel({
       : null
     : (path: string) => void openWorkspaceDocPath(wsId, root, path);
 
-  const openChatFile = (path: string) => {
-    void openWorkspaceDocPath(wsId, root, path);
-  };
+  const openChatFile = useCallback(
+    (path: string) => {
+      void openWorkspaceDocPath(wsId, root, path);
+    },
+    [wsId, root],
+  );
 
   // Format a resetsAt ISO timestamp into a human-friendly countdown
   // (e.g. "2h 14m", "35m", "4d"). Used by SessionUsageCircle.
@@ -5635,35 +5687,10 @@ export function AIChatPanel({
           </>
         )}
         {(() => {
-          // Build a lookup of tool results by call id so each tool_call
-          // row can render its result inline (Claude-Code-style). Two
-          // sources to merge:
-          //   1. Standalone `tool` role messages (Ollama / OpenAI flow,
-          //      where Codetta itself runs the tool and posts the result
-          //      back as the next message).
-          //   2. The `tool_results` array on assistant messages (Claude
-          //      Code flow, where the agent ran the tool internally and
-          //      we received its result via the same stream).
-          const toolResultsById = new Map<string, string>();
-          for (const msg of display) {
-            if (msg.role === "tool" && msg.tool_call_id) {
-              toolResultsById.set(msg.tool_call_id, msg.content);
-            }
-            if (msg.role === "assistant" && msg.tool_results) {
-              for (const tr of msg.tool_results) {
-                if (tr.tool_use_id) {
-                  toolResultsById.set(tr.tool_use_id, tr.content);
-                }
-              }
-            }
-          }
-          const userTurnByIdx = new Map<number, number>();
-          let userTurn = 0;
-          for (let j = 0; j < display.length; j++) {
-            if (display[j].role === "user") {
-              userTurnByIdx.set(j, ++userTurn);
-            }
-          }
+          // toolResultsById and userTurnByIdx are now memoized on
+          // `messages` (see component body) — not rebuilt every frame
+          // during streaming. The streaming message's tool results
+          // (streamingToolResults) are merged in below only when needed.
           const renderAt = (i: number) => {
           const m = display[i];
           const isAssistant = m.role === "assistant";

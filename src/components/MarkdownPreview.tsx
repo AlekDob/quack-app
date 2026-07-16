@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { renderMarkdown } from "../markdown";
 import { enrichMarkdownWithFileLinks } from "../chatFileLinks";
 import { onMdPreviewScroll, setEditorGoto } from "../editorState";
@@ -16,7 +16,11 @@ interface Props {
   onFileOpen?: (path: string) => void;
 }
 
-export function MarkdownPreview({
+/** Memoized so parent re-renders during streaming don't re-run
+ *  renderMarkdown on committed (unchanged) messages. The `content`
+ *  prop is a string (value-compared by React.memo) and `onFileOpen`
+ *  is stabilized with useCallback in the parent. */
+export const MarkdownPreview = memo(function MarkdownPreview({
   content,
   interactive = false,
   onFileOpen,
@@ -123,4 +127,4 @@ export function MarkdownPreview({
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
-}
+});
