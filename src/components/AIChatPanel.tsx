@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  startTransition,
 } from "react";
 import { flushSync } from "react-dom";
 import { Icon } from "./Icon";
@@ -26,6 +27,7 @@ import { ComposerContextBar } from "./ComposerContextBar";
 import { ComposerGitActions } from "./ComposerGitActions";
 import { ComposerWorkBar } from "./ComposerWorkBar";
 import { StoryPlanDrawer } from "./StoryPlanDrawer";
+import { ChatEmptyState } from "./ChatEmptyState";
 import { AgentCommitDock } from "./AgentCommitDock";
 import {
   hydrateAgentCommitFromMessages,
@@ -52,7 +54,7 @@ import {
   type ProviderModel,
 } from "../providers";
 import { openSettings } from "../settingsBus";
-import { useStore, parseKey, findPaneById } from "../store";
+import { useStore, parseKey, findPaneById, activeAiChatId } from "../store";
 import { addNewAIChat, defaultNewChatAnchor } from "../addNewAIChat";
 import { useEditorState, getActiveEditor } from "../editorState";
 import { setWorkspaceRoot } from "../wsRoot";
@@ -91,6 +93,7 @@ import {
   ToolCallRow,
   toolDetailFor,
   isAskUserQuestionTool,
+  hasParsedAskQuestions,
   mergeAskQuestionArgs,
 } from "./chatToolRender";
 import { ComposeCard } from "./composeCard";
@@ -172,6 +175,8 @@ import {
   parseWorksDirectives,
   applyWorksDirectives,
   formatOpenItemsIndex,
+  parseWorksNewStoryBlock,
+  stripWorksDirectiveBlocks,
 } from "../worksAgentDirectives";
 import {
   getWorksSnapshot,
@@ -186,6 +191,7 @@ import { recordBrainUsage } from "../brainUsageStore";
 import { BrainTurnChip } from "./BrainTurnChip";
 import { ReasoningTurnChip } from "./ReasoningTurnChip";
 import { BrainSaveChip } from "./BrainSaveChip";
+import { WorksStoryChip } from "./WorksStoryChip";
 import { SkillProposalChip } from "./SkillProposalChip";
 import {
   parseBrainSaveProposal,
@@ -238,6 +244,8 @@ import {
   type ChatSession,
 } from "../chatHistory";
 import { registerChatPersist } from "../chatPersistFlush";
+import { logChatSwitch } from "../chatSwitchDebug";
+import { isChatSwitching } from "../chatSwitch";
 import {
   recoverSessionFromAnyProvider,
   persistRecoveredSession,
@@ -439,9 +447,9 @@ interface Props {
    * stored sessionId on mount, and write back any sessionId / title
    * changes so they survive pane drags + reloads.
    *
-   * When omitted, the panel runs in legacy "right-side singleton" mode:
-   * it auto-restores the most-recent saved session on workspace switch,
-   * just like before.
+   * When omitted, the panel runs in legacy "right-side singleton" mode
+   * (kept for old `aiPanelVisible` layouts). New entry points use
+   * `ensureFocusedAIChat` / tabbed `aiChatId` instead — see feature 001.
    */
   aiChatId?: string;
   /** False when this tab's host is hidden (background multitask). Gates Esc so
@@ -612,6 +620,9 @@ export function AIChatPanel({
   // collapse to an icon row, tighter spacing). Default false → the docked
   // chat is unchanged.
   const compact = useContext(CompactChat);
+  const chatVisibleRef = useRef(chatVisible);
+  chatVisibleRef.current = chatVisible;
+  const hydratedKeyRef = useRef("");
   // Parent-provided file opener (agent-mode popup); forwarded in compact mode
   // so the docked-chat opener below doesn't clobber it. See fileOpenHandler.
   const parentFileOpen = useContext(AgentFileOpen);
@@ -803,6 +814,7 @@ export function AIChatPanel({
   const lastWorksChatRef = useRef<string | null>(null);
   useEffect(() => {
     if (!aiChatId || !root || !getWorkInjectEnabled(wsId)) return;
+    if (streaming !== null || runningTools) return;
     const lastAsst = [...messages]
       .reverse()
       .find((m) => m.role === "assistant" && !!m.content);
@@ -819,7 +831,13 @@ export function AIChatPanel({
     if (!text || text === lastWorksTextRef.current) return;
     lastWorksTextRef.current = text;
     if (!hasWorksDirectives(text)) return;
-    void applyWorksDirectives(wsId, aiChatId, root, parseWorksDirectives(text))
+    void applyWorksDirectives(
+      wsId,
+      aiChatId,
+      root,
+      parseWorksDirectives(text),
+      { linkedStoryId: storyId },
+    )
       .then((actions) => {
         for (const a of actions) {
           const verb =
@@ -834,7 +852,7 @@ export function AIChatPanel({
       .catch(() => {
         /* Works optional — never block the chat */
       });
-  }, [messages, aiChatId, root, wsId]);
+  }, [messages, aiChatId, root, wsId, storyId, streaming, runningTools]);
 
   // Rebuild the sticky checklist from saved history. The checklist is
   // normally driven by LIVE tool_call events, so a reload or chat
@@ -920,8 +938,15 @@ export function AIChatPanel({
   const applyLoadedMessages = useCallback(async (raw: ChatMessage[]) => {
     const cleaned = cleanStaleToolMessages(raw);
     const hydrated = await rehydrateMessageImages(cleaned);
-    setMessages(hydrated);
-    rebuildChecklist(hydrated);
+    const applyT0 = performance.now();
+    startTransition(() => {
+      setMessages(hydrated);
+      rebuildChecklist(hydrated);
+      logChatSwitch("messages applied", {
+        count: hydrated.length,
+        elapsedMs: Math.round(performance.now() - applyT0),
+      });
+    });
     return hydrated;
   }, []);
   const tryProviderRecover = useCallback(
@@ -1918,9 +1943,16 @@ export function AIChatPanel({
   // - Without `aiChatId` (singleton sidebar mode): keep the legacy
   //   behavior of restoring the most-recently-saved session.
   // Transcript bodies may be cold (lazy hydrate) — ensureSessionLoaded
-  // pulls from disk before applyLoadedMessages.
+  // pulls from disk before paint. Skips hidden warm hosts and already-loaded tabs.
   useEffect(() => {
+    const boundKey = `${wsId}:${aiChatId ?? ""}`;
+    if (hydratedKeyRef.current === boundKey) {
+      if (isChatSwitching() && onHydrated) onHydrated();
+      return;
+    }
     let cancelled = false;
+    const hydrateT0 = performance.now();
+    logChatSwitch("hydrate start", { wsId, aiChatId: aiChatId ?? null });
     // Per-switch resets shared by every branch below. Previous code had
     // the lastUsage + todos clears only in the empty-list else branch,
     // so switching workspaces while either was populated left the
@@ -1935,29 +1967,59 @@ export function AIChatPanel({
 
     const finishHydrated = () => {
       if (cancelled || !onHydrated) return;
-      requestAnimationFrame(() => requestAnimationFrame(onHydrated));
+      hydratedKeyRef.current = boundKey;
+      logChatSwitch("hydrate done", {
+        wsId,
+        aiChatId: aiChatId ?? null,
+        elapsedMs: Math.round(performance.now() - hydrateT0),
+      });
+      onHydrated();
     };
 
-    const applyFound = (found: ChatSession, sid: string) => {
-      setSessionId(sid);
-      setProviderSessionIds(readProviderSessionIds(found));
-      setChatTotalCost(found.totalCostUsd ?? 0);
-      const knobs = sessionKnobsFrom(found);
-      setCcEffort(knobs.effort);
-      setCcThinking(knobs.thinking);
-      setCcPermMode(knobs.permMode);
-      setPresetId(found.presetId ?? null);
-      applyComposerDraft(draftFromSession(found));
-      void applyLoadedMessages(found.messages).then((msgs) => {
-        if (cancelled) return;
-        void hydrateAgentCommitFromMessages(wsId, sid, root, msgs);
+    const paintSession = (
+      found: ChatSession | undefined,
+      sid: string,
+      msgs: ChatMessage[],
+    ) => {
+      startTransition(() => {
+        setSessions(loadSessions(wsId));
+        if (found) {
+          setSessionId(sid);
+          setProviderSessionIds(readProviderSessionIds(found));
+          setChatTotalCost(found.totalCostUsd ?? 0);
+          const knobs = sessionKnobsFrom(found);
+          setCcEffort(knobs.effort);
+          setCcThinking(knobs.thinking);
+          setCcPermMode(knobs.permMode);
+          setPresetId(found.presetId ?? null);
+          applyComposerDraft(draftFromSession(found));
+          setMessages(msgs);
+          rebuildChecklist(msgs);
+          if (found.model) {
+            const q = parseQualifiedModel(found.model)
+              ? found.model
+              : makeQualifiedModel("ollama", found.model);
+            setSelected(q);
+          }
+          logChatSwitch("messages applied", {
+            count: msgs.length,
+            aiChatId: aiChatId ?? null,
+          });
+          return;
+        }
+        setSessionId(sid);
+        setProviderSessionIds({});
+        setChatTotalCost(0);
+        setMessages([]);
+        const knobs = defaultSessionKnobs();
+        setCcEffort(knobs.effort);
+        setCcThinking(knobs.thinking);
+        setCcPermMode(knobs.permMode);
+        applyJackDefaultsIfConfigured();
+        applyComposerDraft({});
       });
-      if (found.model) {
-        const q = parseQualifiedModel(found.model)
-          ? found.model
-          : makeQualifiedModel("ollama", found.model);
-        setSelected(q);
-      }
+      if (!found) return;
+      void hydrateAgentCommitFromMessages(wsId, sid, root, msgs);
       const gen = ++ccHydrateGenRef.current;
       void tryProviderRecover(found, gen);
     };
@@ -1971,22 +2033,19 @@ export function AIChatPanel({
         const targetSid = desc?.sessionId ?? newSessionId();
         const found = await ensureSessionLoaded(wsId, targetSid);
         if (cancelled) return;
-        setSessions(loadSessions(wsId));
-        if (found) {
-          applyFound(found, targetSid);
-        } else {
-          setSessionId(targetSid);
-          setProviderSessionIds({});
-          setChatTotalCost(0);
-          setMessages([]);
-          const knobs = defaultSessionKnobs();
-          setCcEffort(knobs.effort);
-          setCcThinking(knobs.thinking);
-          setCcPermMode(knobs.permMode);
-          applyJackDefaultsIfConfigured();
-          applyComposerDraft({});
-        }
+        const msgs = found
+          ? await rehydrateMessageImages(
+              cleanStaleToolMessages(found.messages),
+            )
+          : [];
+        logChatSwitch("session loaded", {
+          aiChatId,
+          targetSid,
+          msgCount: msgs.length,
+          loadMs: Math.round(performance.now() - hydrateT0),
+        });
         finishHydrated();
+        paintSession(found, targetSid, msgs);
         return;
       }
 
@@ -1996,28 +2055,25 @@ export function AIChatPanel({
         ? await ensureSessionLoaded(wsId, firstId)
         : undefined;
       if (cancelled) return;
-      setSessions(loadSessions(wsId));
-      if (found && firstId) {
-        applyFound(found, firstId);
-      } else {
-        setSessionId(newSessionId());
-        setProviderSessionIds({});
-        setChatTotalCost(0);
-        setMessages([]);
-        const knobs = defaultSessionKnobs();
-        setCcEffort(knobs.effort);
-        setCcThinking(knobs.thinking);
-        setCcPermMode(knobs.permMode);
-        applyJackDefaultsIfConfigured();
-        applyComposerDraft({});
-      }
+      const msgs = found
+        ? await rehydrateMessageImages(cleanStaleToolMessages(found.messages))
+        : [];
       finishHydrated();
+      paintSession(found, firstId ?? newSessionId(), msgs);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [wsId, aiChatId, onHydrated, applyComposerDraft, tryProviderRecover, applyLoadedMessages]);
+  }, [wsId, aiChatId, chatVisible, onHydrated, applyComposerDraft, tryProviderRecover]);
+
+  // Warm tab re-show (file → chat): no ws/chat change, just signal veil end.
+  useEffect(() => {
+    if (!chatVisible || !onHydrated || !isChatSwitching()) return;
+    const boundKey = `${wsId}:${aiChatId ?? ""}`;
+    if (hydratedKeyRef.current !== boundKey) return;
+    onHydrated();
+  }, [chatVisible, wsId, aiChatId, onHydrated]);
 
   // When sessionId changes inside a tabbed panel (e.g. via /new or the
   // history dropdown), persist it back to the descriptor so a reload
@@ -2693,6 +2749,7 @@ export function AIChatPanel({
   // Keyed by call id so dismissing one question doesn't suppress the
   // next one Claude asks.
   const [dismissedAskId, setDismissedAskId] = useState<string | null>(null);
+  const [askFreeform, setAskFreeform] = useState(false);
   const [askInputRev, setAskInputRev] = useState(0);
   useEffect(() => subscribeAskInput(() => setAskInputRev((n) => n + 1)), []);
   const pendingAskCall = useMemo(() => {
@@ -2713,11 +2770,16 @@ export function AIChatPanel({
       pendingAskCall.function.arguments,
       getAskInput(claudeSessionId),
     );
+    if (!hasParsedAskQuestions(merged)) return null;
     return {
       ...pendingAskCall,
       function: { ...pendingAskCall.function, arguments: merged },
     };
   }, [pendingAskCall, claudeSessionId, askInputRev]);
+  const askQuestionMode = !!dockedAskCall && !askFreeform;
+  useEffect(() => {
+    setAskFreeform(false);
+  }, [dockedAskCall?.id]);
 
   // @-mention candidates: subagents first (short, high-signal list),
   // then workspace files. Agents only appear with Claude Code (the
@@ -2910,7 +2972,20 @@ export function AIChatPanel({
   useEffect(() => {
     return onAIPromptRequest(async (req) => {
       if (req.wsId !== wsId) return;
-      if (req.chatId && req.chatId !== aiChatId) return;
+      // Scoped: only the named tab handles it (hub / multitask / Ask AI).
+      if (req.chatId) {
+        if (req.chatId !== aiChatId) return;
+      } else if (aiChatId) {
+        // Unscoped: only the focused tabbed chat — sticky background hosts
+        // must not all ingest the same prompt.
+        const ws = useStore.getState().loaded[wsId];
+        const active = ws ? activeAiChatId(ws) : null;
+        if (active && active !== aiChatId) return;
+      } else {
+        // Legacy singleton: ignore when any tabbed chat exists.
+        const ws = useStore.getState().loaded[wsId];
+        if (ws && Object.keys(ws.aiChats).length > 0) return;
+      }
       const imgs = req.images?.length
         ? await queueImagesAsAttachments({ text: req.text, images: req.images })
         : [];
@@ -5676,63 +5751,11 @@ export function AIChatPanel({
       )}
       <div className="ai-messages" ref={scrollRef}>
         {display.length === 0 && (
-          <>
-            <div className="ai-welcome">
-              <div className="ai-welcome-title">What's on your mind?</div>
-              <div className="ai-welcome-sub">
-                Ask anything about the active file — its contents are sent
-                as context. Or pick a starter:
-              </div>
-            </div>
-            <div className="ai-quick-prompts">
-              {[
-                {
-                  label: "Explain this code",
-                  desc: "Walk through what it does",
-                  prompt: "Explain what this file does, in simple terms.",
-                },
-                {
-                  label: "Find bugs",
-                  desc: "Spot logic errors and edge cases",
-                  prompt:
-                    "Are there bugs or logic errors in this file? Be specific.",
-                },
-                {
-                  label: "Suggest refactor",
-                  desc: "Improve readability or correctness",
-                  prompt:
-                    "Suggest a refactor that would improve readability or correctness. Show the proposed change.",
-                },
-                {
-                  label: "Write tests",
-                  desc: "Generate unit tests",
-                  prompt:
-                    "Suggest unit tests for the functions in this file.",
-                },
-                {
-                  label: "Add types",
-                  desc: "Improve type annotations",
-                  prompt:
-                    "Suggest type annotations or improvements to existing types.",
-                },
-                {
-                  label: "Summarize",
-                  desc: "Key responsibilities in 3–5 bullets",
-                  prompt:
-                    "Summarize the key responsibilities of this file in 3-5 bullets.",
-                },
-              ].map((q) => (
-                <button
-                  key={q.label}
-                  className="ai-quick-card"
-                  onClick={() => setInput(q.prompt)}
-                >
-                  <span className="ai-quick-card-title">{q.label}</span>
-                  <span className="ai-quick-card-desc">{q.desc}</span>
-                </button>
-              ))}
-            </div>
-          </>
+          <ChatEmptyState
+            wsId={wsId}
+            chatId={aiChatId}
+            onPickStarter={setInput}
+          />
         )}
         {(() => {
           // toolResultsById and userTurnByIdx are now memoized on
@@ -5744,11 +5767,15 @@ export function AIChatPanel({
           const isAssistant = m.role === "assistant";
           const isStreamingThis = isAssistant && i === display.length - 1 && streaming !== null;
           const bodyForRender = isAssistant
-            ? stripBrainSaveBlocks(m.content)
+            ? stripWorksDirectiveBlocks(stripBrainSaveBlocks(m.content))
             : m.content;
           const brainProposal =
             isAssistant && !isStreamingThis
               ? (m.brain_save ?? parseBrainSaveProposal(m.content))
+              : null;
+          const worksNewStory =
+            isAssistant && !isStreamingThis
+              ? parseWorksNewStoryBlock(m.content)
               : null;
           const blocks = isAssistant ? extractCodeBlocks(bodyForRender) : [];
           const insertText = blocks.length > 0 ? blocks.join("\n\n") : bodyForRender;
@@ -5979,6 +6006,15 @@ export function AIChatPanel({
                   m.content
                 )}
               </div>
+              {worksNewStory && aiChatId && (
+                <WorksStoryChip
+                  wsId={wsId}
+                  chatId={aiChatId}
+                  root={root}
+                  fields={worksNewStory}
+                  chatStoryId={storyId}
+                />
+              )}
               {pinkyBrainExt &&
                 brainProposal &&
                 brainProposal.status !== "dismissed" && (
@@ -6459,24 +6495,6 @@ export function AIChatPanel({
             </div>
           );
         })()}
-      {/* Docked question card: when Claude's turn ended on an
-          AskUserQuestion, the interactive radio/checkbox card sits
-          right above the composer where the user is already looking —
-          not floating over the conversation. */}
-      {dockedAskCall && (
-        <div className="ai-ask-dock">
-          <AskQuestionCard
-            key={dockedAskCall.id ?? "ask"}
-            call={dockedAskCall}
-            onAnswer={answerQuestion}
-            onOther={() => inputRef.current?.focus()}
-            onDismiss={() => {
-              if (claudeSessionId) clearAskInput(claudeSessionId);
-              setDismissedAskId(dockedAskCall.id ?? "ask");
-            }}
-          />
-        </div>
-      )}
       {/* Plan chip above the composer (astronave-style): collapsed by default,
           expands upward on click. In compact (agent) mode the checklist lives
           in the sidebar Tasks section, so we skip the duplicate here. */}
@@ -6490,7 +6508,7 @@ export function AIChatPanel({
         claudeAuth &&
         claudeAuth.status !== "signed_in" && <ClaudeLoginBanner />}
       {/* Live turn status + per-project context files — docked above composer. */}
-      {showComposerDock && (
+      {showComposerDock && !askQuestionMode && (
         <div className="ai-status-dock" aria-live="polite">
           <div className="ai-status-dock-row">
             <div className="ai-inline-status">
@@ -6514,15 +6532,37 @@ export function AIChatPanel({
       {/* Cursor-style composer: one pill. CSS `order` puts the textarea
           row on top and the controls (model/effort/thinking) below;
           permission/queue cards float to the top when present. */}
-      {sessionId ? (
+      {sessionId && !askQuestionMode ? (
         <AgentCommitDock wsId={wsId} sessionId={sessionId} root={root} />
       ) : null}
       <SkillProposalChip enabled={skillTrainerExt} foreground={wsActive && chatVisible} />
       <div
-        className={`ai-composer-shell${dictating ? " dictating" : ""}${fileDropHover ? " file-drop-over" : ""}`}
+        className={`ai-composer-shell${dockedAskCall ? " has-ask" : ""}${
+          askFreeform ? " ask-freeform" : ""
+        }${dictating ? " dictating" : ""}${fileDropHover ? " file-drop-over" : ""}`}
         ref={composerShellRef}
         {...{ [COMPOSER_FILE_DROP_ATTR]: "" }}
       >
+      {dockedAskCall && (
+        <AskQuestionCard
+          key={dockedAskCall.id ?? "ask"}
+          call={dockedAskCall}
+          onAnswer={answerQuestion}
+          otherActive={askFreeform}
+          composerHidden={!askFreeform}
+          onOther={() => {
+            setAskFreeform(true);
+            requestAnimationFrame(() => inputRef.current?.focus());
+          }}
+          onDismiss={() => {
+            if (claudeSessionId) clearAskInput(claudeSessionId);
+            setAskFreeform(false);
+            setDismissedAskId(dockedAskCall.id ?? "ask");
+          }}
+        />
+      )}
+      {(!dockedAskCall || askFreeform) && (
+      <>
       <ComposerContextBar wsId={wsId} root={root} />
       <ComposerGitActions
         wsId={wsId}
@@ -7163,6 +7203,8 @@ export function AIChatPanel({
           }}
         />
       </div>
+      </>
+      )}
       </div>
       {aggregatedPullProgress && (
         <div className="ai-status-strip">

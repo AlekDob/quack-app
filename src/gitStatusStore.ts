@@ -6,9 +6,18 @@
 // (startGitStatusWatch) and ONE fetch per debounce window feeds all
 // subscribers. Module cache + subscribe + notify, same shape as
 // bookmarks.ts.
+//
+// Also owns `git diff HEAD --numstat` (composer Changes +N −M). That
+// used to run once per mounted AIChatPanel on every status notify —
+// sticky multitask hosts × huge dirty trees pegged WebKit + Quack.
 
 import { fsBus } from "./fsBus";
-import { git as gitApi, type GitFile, type GitStatus } from "./ipc";
+import {
+  git as gitApi,
+  type GitDiffStat,
+  type GitFile,
+  type GitStatus,
+} from "./ipc";
 import { joinPath } from "./pathUtils";
 
 /** Same normalization as fsBus's pathsEqual: forward slashes, no
@@ -19,9 +28,17 @@ export function normalizeGitPath(p: string): string {
   return p.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
 }
 
+const EMPTY_DIFF: GitDiffStat = {
+  insertions: 0,
+  deletions: 0,
+  files: [],
+};
+
 export interface GitStatusSnapshot {
   /** Last full status, null until the first fetch resolves. */
   status: GitStatus | null;
+  /** Shared `git diff HEAD --numstat` — composer Changes pill. */
+  diffStat: GitDiffStat | null;
   /** normalized absolute path → its status entry. */
   byPath: Map<string, GitFile>;
   /** Normalized absolute paths of every ancestor dir (up to and
@@ -34,6 +51,7 @@ export interface GitStatusSnapshot {
 
 const EMPTY: GitStatusSnapshot = {
   status: null,
+  diffStat: null,
   byPath: new Map(),
   changedDirs: new Set(),
   error: null,
@@ -72,7 +90,11 @@ export function getGitStatus(wsId: string): GitStatusSnapshot {
   return watches.get(wsId)?.snapshot ?? EMPTY;
 }
 
-function buildSnapshot(root: string, status: GitStatus): GitStatusSnapshot {
+function buildSnapshot(
+  root: string,
+  status: GitStatus,
+  diffStat: GitDiffStat | null,
+): GitStatusSnapshot {
   const byPath = new Map<string, GitFile>();
   const changedDirs = new Set<string>();
   const rootNorm = normalizeGitPath(root);
@@ -92,7 +114,18 @@ function buildSnapshot(root: string, status: GitStatus): GitStatusSnapshot {
       if (dir === rootNorm) break;
     }
   }
-  return { status, byPath, changedDirs, error: null };
+  return { status, diffStat, byPath, changedDirs, error: null };
+}
+
+async function loadDiffStat(root: string, status: GitStatus): Promise<GitDiffStat | null> {
+  if (!status.is_repo) return EMPTY_DIFF;
+  // No dirty files → skip the heavy numstat (common idle case).
+  if (status.files.length === 0) return EMPTY_DIFF;
+  try {
+    return await gitApi.diffStat(root);
+  } catch {
+    return null;
+  }
 }
 
 async function fetchNow(wsId: string): Promise<void> {
@@ -105,10 +138,12 @@ async function fetchNow(wsId: string): Promise<void> {
   entry.fetching = true;
   try {
     const status = await gitApi.status(entry.root);
-    entry.snapshot = buildSnapshot(entry.root, status);
+    const diffStat = await loadDiffStat(entry.root, status);
+    entry.snapshot = buildSnapshot(entry.root, status, diffStat);
   } catch (e) {
     entry.snapshot = {
       status: null,
+      diffStat: null,
       byPath: new Map(),
       changedDirs: new Set(),
       error: e instanceof Error ? e.message : String(e),
@@ -131,8 +166,8 @@ export function forceGitStatusRefresh(wsId: string): Promise<void> {
 }
 
 // One global fsBus listener; per-workspace debounce timers live on the
-// watch entries. 250ms matches the cadence SourceControlPanel used —
-// long enough to coalesce a save burst, short enough to feel live.
+// watch entries. 400ms coalesces agent write bursts better than 250ms
+// without feeling laggy on a single save.
 let busStarted = false;
 function ensureBusListener() {
   if (busStarted) return;
@@ -145,7 +180,7 @@ function ensureBusListener() {
     entry.timer = window.setTimeout(() => {
       entry.timer = null;
       void fetchNow(detail.wsId);
-    }, 250);
+    }, 400);
   });
 }
 

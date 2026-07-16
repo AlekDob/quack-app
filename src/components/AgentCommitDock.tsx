@@ -63,9 +63,11 @@ export function AgentCommitDock({ wsId, sessionId, root }: Props) {
     markAgentCommitPushed(key);
   }, [commit, hasUpstream, ahead, key]);
 
+  // Rely on FS-driven gitStatusStore for ahead/behind — an 8s force
+  // refresh re-ran `git diff --numstat` for every sticky chat host.
   useEffect(() => {
     if (!commit || commit.pushed) return;
-    const id = window.setInterval(() => void forceGitStatusRefresh(wsId), 8000);
+    const id = window.setInterval(() => void forceGitStatusRefresh(wsId), 30000);
     return () => window.clearInterval(id);
   }, [commit, wsId]);
 

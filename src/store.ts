@@ -32,6 +32,10 @@ import type { ToolCall } from "./ai";
 import { clearChatDiff } from "./chatDiffStore";
 import { stopChatAgent } from "./stopChatAgent";
 import { hydrateChatStore } from "./chatHistory";
+import { hydratePresetOverrides } from "./presets";
+import { pulseChatSwitch } from "./chatSwitch";
+import { logChatSwitch } from "./chatSwitchDebug";
+import { getAgentStatus } from "./agentStatusStore";
 import { ensureAppBundledSkills } from "./bundledSkills/sync";
 import {
   error as toastError,
@@ -169,6 +173,8 @@ export interface AIChatDescriptor {
   /** True once the user renamed the chat by hand — stops the auto-title
    *  effect (derives a title from the first message) from clobbering it. */
   titleLocked?: boolean;
+  /** Fresh tab from New chat — show inline name prompt in the empty panel. */
+  namePending?: boolean;
   /** Active Works ticket linked to this chat (feature 054). */
   workItemId?: string;
   /** Story linked while planning or executing under a parent story. */
@@ -1015,6 +1021,8 @@ interface AppState {
   /** User-driven rename from the Agent Hub — locks the title against the
    *  auto-title effect. */
   renameAIChat(wsId: string, id: string, title: string): void;
+  /** Show or hide the inline name prompt on a fresh chat tab. */
+  setAIChatNamePending(wsId: string, id: string, pending: boolean): void;
   /** Manual lifecycle for the Agent Hub: "active" clears both timestamps,
    *  "done" sets doneAt, "archived" sets archivedAt + hides from the hub. */
   setAIChatLifecycle(
@@ -1076,12 +1084,19 @@ function makeAIChatId(): string {
   return "a_" + Math.random().toString(36).slice(2, 10);
 }
 
-/** Live (non-DONE) chat ids to warm-load at workspace hydrate. */
+/** Live bodies to warm at boot — focused tab + any hidden active run. */
 function warmChatIdsFromWs(ws: WorkspaceData | undefined): string[] {
   if (!ws) return [];
-  return Object.values(ws.aiChats)
-    .filter((c) => !c.doneAt && !c.archivedAt)
-    .map((c) => c.sessionId);
+  const active = activeAiChatId(ws);
+  const out: string[] = [];
+  for (const c of Object.values(ws.aiChats)) {
+    if (c.doneAt || c.archivedAt) continue;
+    const live = getAgentStatus(c.id)?.derived;
+    if (c.id === active || live === "working" || live === "needs-input") {
+      out.push(c.sessionId);
+    }
+  }
+  return out;
 }
 
 function parseAIChatsRaw(raw: unknown): Record<string, AIChatDescriptor> {
@@ -1108,6 +1123,7 @@ function parseAIChatsRaw(raw: unknown): Record<string, AIChatDescriptor> {
     const archivedAt =
       typeof v.archivedAt === "number" ? v.archivedAt : undefined;
     const titleLocked = v.titleLocked === true ? true : undefined;
+    const namePending = v.namePending === true ? true : undefined;
     const workItemId =
       typeof v.workItemId === "string" ? v.workItemId : undefined;
     const storyId = typeof v.storyId === "string" ? v.storyId : undefined;
@@ -1121,6 +1137,7 @@ function parseAIChatsRaw(raw: unknown): Record<string, AIChatDescriptor> {
       doneAt,
       archivedAt,
       titleLocked,
+      namePending,
       workItemId,
       storyId,
       planning,
@@ -1657,11 +1674,12 @@ export const useStore = create<AppState>((set, get) => {
       }
 
       setProg("Loading chat history…", 92, 100);
-      await Promise.all(
-        survivingIds.map((id) =>
+      await Promise.all([
+        ...survivingIds.map((id) =>
           hydrateChatStore(id, warmChatIdsFromWs(loaded[id])),
         ),
-      );
+        hydratePresetOverrides(),
+      ]);
 
       setProg("Reattaching terminals…", 95, 100);
       set({
@@ -1802,17 +1820,18 @@ export const useStore = create<AppState>((set, get) => {
 
     setActiveWorkspace: async (id) => {
       if (!get().loaded[id]) return;
-      // Reset the editor-state singleton so the AI panel doesn't carry
-      // the previous workspace's "active file" into the next chat turn
-      // (and so other consumers don't accidentally read or write across
-      // workspace boundaries). The new editor will repopulate it as
-      // soon as a tab is focused in the just-activated workspace.
       const prevId = get().activeId;
+      const t0 = performance.now();
+      logChatSwitch("workspace switch start", { from: prevId, to: id });
       if (prevId !== id) {
         clearEditorState();
       }
       set({ activeId: id });
       await persistIdx();
+      logChatSwitch("workspace switch done", {
+        to: id,
+        elapsedMs: Math.round(performance.now() - t0),
+      });
     },
 
     reorderWorkspaces: (fromIndex, toIndex) => {
@@ -2095,6 +2114,26 @@ export const useStore = create<AppState>((set, get) => {
     },
 
     setActiveTab: (wsId, paneId, key) => {
+      const ws = get().loaded[wsId];
+      if (ws) {
+        const pane =
+          findPaneById(ws.layout.editorRoot, paneId) ??
+          (ws.layout.bottomRoot
+            ? findPaneById(ws.layout.bottomRoot, paneId)
+            : null);
+        const prev = pane?.kind === "tabs" ? pane.active : null;
+        const touchesAi =
+          key.startsWith("ai:") ||
+          (typeof prev === "string" && prev.startsWith("ai:"));
+        if (touchesAi && prev !== key) {
+          logChatSwitch("tab click", { prev, key, wsId });
+          pulseChatSwitch({
+            veil: true,
+            source: "setActiveTab",
+            chatId: key.startsWith("ai:") ? key.slice(3) : undefined,
+          });
+        }
+      }
       updateWs(wsId, (w) => ({
         ...w,
         layout: {
@@ -3440,13 +3479,22 @@ export const useStore = create<AppState>((set, get) => {
       updateWs(wsId, (w) => {
         const desc = w.aiChats[id];
         if (!desc) return w;
+        const next = { ...desc, title, titleLocked: true };
+        delete next.namePending;
         return {
           ...w,
-          aiChats: {
-            ...w.aiChats,
-            [id]: { ...desc, title, titleLocked: true },
-          },
+          aiChats: { ...w.aiChats, [id]: next },
         };
+      }),
+
+    setAIChatNamePending: (wsId, id, pending) =>
+      updateWs(wsId, (w) => {
+        const desc = w.aiChats[id];
+        if (!desc) return w;
+        const next = { ...desc };
+        if (pending) next.namePending = true;
+        else delete next.namePending;
+        return { ...w, aiChats: { ...w.aiChats, [id]: next } };
       }),
 
     setAIChatLifecycle: (wsId, id, state) => {

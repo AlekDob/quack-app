@@ -16,6 +16,7 @@ import {
   flushAllChatPersist,
   flushWorkspaceChatPersist,
 } from "./chatPersistFlush";
+import { logChatSwitch } from "./chatSwitchDebug";
 
 // Graceful floor: keep the veil up at least this long so even an instant switch
 // clearly shows the loader (the user wants a minimum always visible). The freeze
@@ -27,12 +28,20 @@ const CAP_MS = 1000;
 export type ChatSwitchOpts = {
   /** Show the veil — the gradual loader. Only skip for empty/new chats. */
   veil?: boolean;
+  /** Sync-flush mounted panels before switch. Off for same-workspace tab hops. */
+  flush?: boolean;
   /** Flush mounted panels for one workspace (cheaper than all). */
   flushWsId?: string;
+  /** Caller label for console perf trace. */
+  source?: string;
+  /** Only this chat tab may call `endChatSwitch` for this pulse. */
+  chatId?: string;
 };
 
 let switching = false;
 let startedAt = 0;
+let lastSource = "";
+let targetChatId: string | null = null;
 let capTimer: ReturnType<typeof setTimeout> | null = null;
 let endTimer: ReturnType<typeof setTimeout> | null = null;
 const subs = new Set<() => void>();
@@ -48,11 +57,14 @@ function clearTimers() {
   endTimer = null;
 }
 
-function finish() {
+function finish(reason: string) {
   clearTimers();
   if (!switching) return;
+  const elapsedMs = Date.now() - startedAt;
   switching = false;
+  targetChatId = null;
   notify();
+  logChatSwitch("veil down", { reason, source: lastSource, elapsedMs });
 }
 
 export function isChatSwitching(): boolean {
@@ -60,25 +72,53 @@ export function isChatSwitching(): boolean {
 }
 
 /** Drop the veil once the target panel has hydrated — after the MIN floor. */
-export function endChatSwitch(): void {
+export function endChatSwitch(source = "unknown", chatId?: string): void {
   if (!switching) return;
-  const remain = Math.max(0, MIN_VISIBLE_MS - (Date.now() - startedAt));
+  if (targetChatId && chatId && chatId !== targetChatId) {
+    logChatSwitch("end ignored", { source, chatId, targetChatId });
+    return;
+  }
+  const elapsed = Date.now() - startedAt;
+  const remain = Math.max(0, MIN_VISIBLE_MS - elapsed);
+  logChatSwitch("end scheduled", {
+    source,
+    elapsedMs: elapsed,
+    remainMs: remain,
+    pulseSource: lastSource,
+  });
   if (endTimer) clearTimeout(endTimer);
-  endTimer = setTimeout(finish, remain);
+  endTimer = setTimeout(() => finish(`end:${source}`), remain);
 }
 
 export function pulseChatSwitch(opts: ChatSwitchOpts = {}): void {
-  const { veil = true, flushWsId } = opts;
-  if (flushWsId) flushWorkspaceChatPersist(flushWsId);
-  else flushAllChatPersist();
-  if (!veil) return;
+  const { veil = true, flush = false, flushWsId, source = "unknown", chatId } =
+    opts;
+  lastSource = source;
+  targetChatId = chatId ?? null;
+  logChatSwitch("pulse", {
+    source,
+    veil,
+    flush,
+    flushWsId: flushWsId ?? null,
+    chatId: targetChatId,
+  });
+  if (flush) {
+    if (flushWsId) flushWorkspaceChatPersist(flushWsId, source);
+    else flushAllChatPersist();
+  }
+  // New/empty chats skip the veil — but must still clear a prior pulse,
+  // otherwise sticky hosts stay `!is-visible` until CAP and look "missing".
+  if (!veil) {
+    if (switching) finish(`veil-skipped:${source}`);
+    return;
+  }
   clearTimers();
   startedAt = Date.now();
   if (!switching) {
     switching = true;
     notify();
   }
-  capTimer = setTimeout(finish, CAP_MS);
+  capTimer = setTimeout(() => finish("cap"), CAP_MS);
 }
 
 export function subscribeChatSwitch(fn: () => void): () => void {

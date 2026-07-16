@@ -4,7 +4,11 @@ import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 // Injected by vite from package.json — same hook the Splash uses.
 declare const __APP_VERSION__: string;
 import { findPaneById, parseKey, useStore } from "./store";
-import { addNewAIChat, defaultNewChatAnchor } from "./addNewAIChat";
+import {
+  addNewAIChat,
+  defaultNewChatAnchor,
+  ensureFocusedAIChat,
+} from "./addNewAIChat";
 import { openPalette } from "./paletteBus";
 import { openSettings } from "./settingsBus";
 import { openTaskManager } from "./taskManagerBus";
@@ -534,6 +538,48 @@ export const commands: CommandSpec[] = [
     },
   },
   {
+    id: "works.merge_duplicate_stories",
+    label: "Merge Duplicate Stories",
+    category: "Workspace",
+    hint: "Collapse duplicate S-NNN rows in Works and reparent child work",
+    run: async () => {
+      const wsId = s().activeId;
+      if (!wsId) {
+        toastError("Open a workspace first");
+        return;
+      }
+      const root = s().loaded[wsId]?.meta.root;
+      if (!root) return;
+      const { hydrateWorks, mergeDuplicateStories } = await import(
+        "./worksCache"
+      );
+      const { countDuplicateStories } = await import("./works");
+      const snap = await hydrateWorks(root);
+      const dupes = countDuplicateStories(snap.stories);
+      if (dupes === 0) {
+        toastInfo("No duplicate stories in this workspace");
+        return;
+      }
+      const ok = await dialogConfirm(
+        `Merge ${dupes} duplicate ${dupes === 1 ? "story" : "stories"}? Keeps the best-linked row per S-NNN and repoints child work items.`,
+        { title: "Merge duplicate stories", okLabel: "Merge" },
+      );
+      if (!ok) return;
+      try {
+        const { merged, reparented } = await mergeDuplicateStories(root);
+        const extra =
+          reparented > 0
+            ? ` · ${reparented} work item${reparented === 1 ? "" : "s"} reparented`
+            : "";
+        toastSuccess(
+          `Merged ${merged} duplicate ${merged === 1 ? "story" : "stories"}${extra}`,
+        );
+      } catch (e) {
+        toastError(`Couldn't merge stories: ${errMsg(e)}`);
+      }
+    },
+  },
+  {
     id: "edit.reopen_closed_tab",
     label: "Reopen Closed Tab",
     category: "Edit",
@@ -994,15 +1040,11 @@ export const commands: CommandSpec[] = [
       const ed = getActiveEditor();
       const lang = ed?.getModel()?.getLanguageId() || "";
       const text = `Review this entire file. Call out bugs, edge cases, naming issues, and architectural smells. Be specific — quote the lines you're commenting on.\n\n\`\`\`${lang} ${filename}\n${file.contents}\n\`\`\``;
-      // Mirror EditorPane's askAI.* pattern: make sure the chat panel
-      // is mounted before dispatching, otherwise the bus event lands
-      // before any subscriber and only the 1.5s replay buffer saves us.
-      const store = useStore.getState();
-      if (!store.loaded[wsId]?.layout?.aiPanelVisible) {
-        store.setAIPanelVisible(wsId, true);
-      }
+      // Tabbed hub session (not the legacy side panel) so the chat appears
+      // in the Agent Hub + as a real tab. chatId scopes the bus to one host.
+      const chatId = ensureFocusedAIChat(wsId);
       requestAnimationFrame(() => {
-        requestAIPrompt({ wsId, text, send: true });
+        requestAIPrompt({ wsId, chatId, text, send: true });
       });
     },
   },
@@ -1027,12 +1069,9 @@ export const commands: CommandSpec[] = [
       const ed = getActiveEditor();
       const lang = ed?.getModel()?.getLanguageId() || "";
       const text = `Give a concise summary of what this file does. Lead with the one-sentence purpose, then list the key exports / functions.\n\n\`\`\`${lang} ${filename}\n${file.contents}\n\`\`\``;
-      const store = useStore.getState();
-      if (!store.loaded[wsId]?.layout?.aiPanelVisible) {
-        store.setAIPanelVisible(wsId, true);
-      }
+      const chatId = ensureFocusedAIChat(wsId);
       requestAnimationFrame(() => {
-        requestAIPrompt({ wsId, text, send: true });
+        requestAIPrompt({ wsId, chatId, text, send: true });
       });
     },
   },
@@ -1115,7 +1154,8 @@ ${elided ? "(Diff truncated to ~60 KB — full diff is larger.)\n\n" : ""}Staged
 \`\`\`diff
 ${sample}
 \`\`\``;
-      requestAIPrompt({ wsId, text, send: true });
+      const chatId = ensureFocusedAIChat(wsId);
+      requestAIPrompt({ wsId, chatId, text, send: true });
     },
   },
   {
@@ -1210,7 +1250,8 @@ ${sample}
       if (!t) return;
       const wsId = s().activeId;
       if (!wsId) return;
-      requestAIPrompt({ wsId, text: t.prompt, send: false });
+      const chatId = ensureFocusedAIChat(wsId);
+      requestAIPrompt({ wsId, chatId, text: t.prompt, send: false });
     },
   },
   {

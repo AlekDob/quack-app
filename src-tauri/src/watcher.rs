@@ -21,6 +21,41 @@ pub struct FsEvent {
     pub dirs: Vec<String>,
 }
 
+/// Path segments that flood fseventsd + git refresh when watched recursively.
+/// Matching any component drops the event (agent builds, deps, git objects).
+fn ignored_segment(name: &str) -> bool {
+    matches!(
+        name,
+        ".git"
+            | "node_modules"
+            | "target"
+            | "dist"
+            | "build"
+            | ".next"
+            | ".nuxt"
+            | ".turbo"
+            | ".cache"
+            | "coverage"
+            | "graphify-out"
+            | "__pycache__"
+            | ".venv"
+            | "venv"
+            | ".pnpm-store"
+            | "Pods"
+            | ".parcel-cache"
+            | ".svelte-kit"
+    )
+}
+
+fn path_ignored(path: &Path) -> bool {
+    path.components().any(|c| {
+        c.as_os_str()
+            .to_str()
+            .map(ignored_segment)
+            .unwrap_or(false)
+    })
+}
+
 #[tauri::command]
 pub fn fs_watch_start(
     app: AppHandle,
@@ -45,12 +80,18 @@ pub fn fs_watch_start(
                 let mut dirs: HashSet<String> = HashSet::new();
                 for ev in events {
                     let path = ev.path;
+                    if path_ignored(&path) {
+                        continue;
+                    }
                     let target = if path.is_dir() {
                         Some(path.clone())
                     } else {
                         path.parent().map(|p| p.to_path_buf())
                     };
                     if let Some(t) = target {
+                        if path_ignored(&t) {
+                            continue;
+                        }
                         dirs.insert(t.to_string_lossy().into_owned());
                     }
                 }

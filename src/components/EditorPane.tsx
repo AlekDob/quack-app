@@ -31,6 +31,7 @@ import { EditorBreadcrumbs } from "./EditorBreadcrumbs";
 import { EditorTabToolbar } from "./EditorTabToolbar";
 import { DiffView } from "./DiffView";
 import { requestAIPrompt } from "../aiBus";
+import { ensureFocusedAIChat } from "../addNewAIChat";
 import { registerResumeComponent } from "../resumeDebug";
 import {
   loadViewState,
@@ -839,16 +840,11 @@ export function EditorPane({ wsId, path, paneVisible = true }: Props) {
                 const lang = model.getLanguageId() || "";
                 const filename = path.split(/[\\/]/).pop() || path;
                 const text = `${action.prompt}\n\n\`\`\`${lang} ${filename}\n${snippet}\n\`\`\``;
-                // Make sure the chat panel is mounted (it ignores bus
-                // events if hidden because it isn't listening). Toggle
-                // visibility then schedule the dispatch a frame later
-                // so the panel has a chance to subscribe.
-                const store = useStore.getState();
-                if (!store.loaded[wsId]?.layout?.aiPanelVisible) {
-                  store.setAIPanelVisible(wsId, true);
-                }
+                // Tabbed hub session — not the legacy side panel (orphans
+                // never show in the Agent Hub / tab bar).
+                const chatId = ensureFocusedAIChat(wsId);
                 requestAnimationFrame(() => {
-                  requestAIPrompt({ wsId, text, send: true });
+                  requestAIPrompt({ wsId, chatId, text, send: true });
                 });
               },
             }),

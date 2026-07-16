@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { basename } from "../pathUtils";
 import {
   runComposerGitAction,
   type ComposerGitAction,
 } from "../composerGitOps";
 import {
+  forceGitStatusRefresh,
   getGitStatus,
   startGitStatusWatch,
   subscribeGitStatus,
 } from "../gitStatusStore";
-import { git, type GitDiffStat, type GitFile, type GitStatus } from "../ipc";
+import { type GitDiffStat, type GitFile, type GitStatus } from "../ipc";
 import { openGitFileDiff } from "../gitFileDiff";
 import { ComposerCtxMenu } from "../composerCtxMenu";
 import { Icon } from "./Icon";
@@ -79,31 +80,20 @@ export function ComposerGitActions({
   const [busy, setBusy] = useState(false);
   const btnRef = useRef<HTMLButtonElement>(null);
 
-  const refreshDiff = useCallback(async () => {
-    try {
-      setDiff(await git.diffStat(root));
-    } catch {
-      setDiff(null);
-    }
-  }, [root]);
-
   useEffect(() => {
     const apply = () => {
       const snap = getGitStatus(wsId);
       setStatus(snap.status);
+      setDiff(snap.diffStat);
     };
     const stop = startGitStatusWatch(wsId, root);
-    const unsub = subscribeGitStatus(wsId, () => {
-      apply();
-      void refreshDiff();
-    });
+    const unsub = subscribeGitStatus(wsId, apply);
     apply();
-    void refreshDiff();
     return () => {
       unsub();
       stop();
     };
-  }, [wsId, root, refreshDiff]);
+  }, [wsId, root]);
 
   const fileRows = useMemo(
     () => (status ? buildFileRows(status, diff) : []),
@@ -126,7 +116,7 @@ export function ComposerGitActions({
         action,
         suggestedMessage: suggestedMessage?.trim() || undefined,
       });
-      await refreshDiff();
+      await forceGitStatusRefresh(wsId);
     } finally {
       setBusy(false);
     }

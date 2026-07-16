@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-10
-last_verified: 2026-07-10
+last_verified: 2026-07-16
 ---
 
 # 053 — Composer git actions (Cursor-style)
@@ -22,7 +22,7 @@ Parent composer doc: **`022-chat-composer.md`**.
 | `src/composerGitOps.ts` | Stage-all → commit prompt → push/publish orchestration |
 | `src-tauri/src/git.rs` | `git_diff_stat` — `git diff HEAD --numstat` aggregate + per-file |
 | `src/ipc.ts` | `GitDiffStat`, `git.diffStat`, `git.stage`, `git.commit` |
-| `src/gitStatusStore.ts` | Shared status watch (same cache as Source Control) |
+| `src/gitStatusStore.ts` | Shared status **and** `diffStat` (one numstat per refresh; not per chat host) |
 | `src/composerCtxMenu.tsx` | Portaled dropdown (escapes `.ai-panel overflow:hidden`) |
 | `src/components/AIChatPanel.tsx` | Mounts bar; passes composer `input` as suggested commit message |
 | `src/App.css` | `.ai-composer-git*` |
@@ -90,6 +90,7 @@ file list (no line counts until staged).
 | Composer shell | `022-chat-composer.md` |
 | Path + branch bar | `050-composer-context-bar.md` |
 | Agent commit indicator (above pill) | `051-agent-commit-dock.md` |
+| FS watcher + shared git status | `077-fs-watcher-git-status.md` |
 | Source Control panel | `SourceControlPanel.tsx` |
 
 ## Verify
@@ -99,6 +100,7 @@ file list (no line counts until staged).
 3. Chevron → **Create Branch & Commit** works; publish dialog on branch without upstream.
 4. Only unpushed commits (`ahead > 0`, clean tree) → bar shows **Push** only.
 5. Non-repo workspace → bar hidden.
+6. Several sticky AI chats + large dirty tree → only **one** `git diff --numstat` per refresh (shared store).
 
 ## Gotchas
 
@@ -106,3 +108,5 @@ file list (no line counts until staged).
 - Stage-all is intentional (Cursor parity); partial staging still lives in Source Control.
 - Menu must stay **portaled** via `ComposerCtxMenu` — do not inline absolute menus in the pill.
 - `git diff HEAD --numstat` ignores untracked line counts; rows show `new` until staged.
+- **Do not call `git.diffStat` from each chat host** — read `getGitStatus(wsId).diffStat` (`077`). N sticky hosts × numstat on a huge dirty tree pegs WebKit + Quack.
+- FS watcher must ignore `.git` / `node_modules` / `target` / build caches or every agent write retriggers status+numstat (`077`).

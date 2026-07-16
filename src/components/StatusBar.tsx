@@ -6,7 +6,12 @@ import { runCommand } from "../actions";
 import { useEditorSettings, zoomIn, zoomOut, zoomReset } from "../editorSettings";
 import { basename } from "../pathUtils";
 import { Icon, type IconName } from "./Icon";
-import { git as gitApi, type GitStatus } from "../ipc";
+import { type GitStatus } from "../ipc";
+import {
+  getGitStatus,
+  startGitStatusWatch,
+  subscribeGitStatus,
+} from "../gitStatusStore";
 import { openPalette } from "../paletteBus";
 import { invoke } from "@tauri-apps/api/core";
 import { openTaskManager } from "../taskManagerBus";
@@ -88,33 +93,24 @@ export function StatusBar({ onOpenPalette }: Props) {
     };
   }, []);
 
-  // Lightweight git status pulled every 15s — branch + ahead/behind +
-  // working-tree change count for the status-bar chip. The Source
-  // Control panel does its own richer fetch when open; this is the
-  // always-on glance.
+  // Branch chip from the shared gitStatusStore (same fetch as the tree /
+  // composer) — no separate 15s poll that raced FS-driven refreshes.
   const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
   const wsRoot = ws?.meta.root;
   useEffect(() => {
-    if (!wsRoot) {
+    if (!activeId || !wsRoot) {
       setGitStatus(null);
       return;
     }
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const s = await gitApi.status(wsRoot);
-        if (!cancelled) setGitStatus(s);
-      } catch {
-        if (!cancelled) setGitStatus(null);
-      }
-    };
-    void tick();
-    const id = window.setInterval(tick, 15000);
+    const apply = () => setGitStatus(getGitStatus(activeId).status);
+    const stop = startGitStatusWatch(activeId, wsRoot);
+    const unsub = subscribeGitStatus(activeId, apply);
+    apply();
     return () => {
-      cancelled = true;
-      window.clearInterval(id);
+      unsub();
+      stop();
     };
-  }, [wsRoot]);
+  }, [activeId, wsRoot]);
 
   const cycleTheme = () => setTheme(themeNext[theme]);
 

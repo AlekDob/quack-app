@@ -48,7 +48,6 @@ import { getRecentFiles } from "./recentFiles";
 import { useEditorState } from "./editorState";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Dialog } from "./components/Dialog";
-import { NewChatNamePopover } from "./components/NewChatNamePopover";
 import { SettingsModal } from "./components/SettingsModal";
 import { WelcomeModal } from "./components/WelcomeModal";
 import { TaskManagerModal } from "./components/TaskManagerModal";
@@ -836,7 +835,6 @@ function MainApp() {
       <StoryDrawer />
       <FeatureDocDrawer />
       <Dialog />
-      <NewChatNamePopover />
       <SettingsModal />
       <WelcomeModal />
       <TaskManagerModal />

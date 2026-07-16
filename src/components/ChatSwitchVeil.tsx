@@ -34,7 +34,9 @@ export function ChatSwitchVeil({
       return () => cancelAnimationFrame(r);
     }
     setShown(false);
-    const t = setTimeout(() => setMounted(false), FADE_MS);
+    const t = setTimeout(() => {
+      setMounted(false);
+    }, FADE_MS);
     return () => clearTimeout(t);
   }, [on]);
 

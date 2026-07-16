@@ -162,6 +162,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `050-composer-context-bar.md` — Cursor-style path + git branch inside the composer pill; portaled menus, project switch, shared `GitBranchPicker`.
   - `051-agent-commit-dock.md` — agent Bash `git commit` pill above the composer (hash, message, time, pushed/local); `agentCommitDetect.ts`, `agentCommitStore.ts`, `AgentCommitDock.tsx`.
   - `053-composer-git-actions.md` — Cursor-style changed-files + Commit & Push split control inside the composer pill; `git_diff_stat`, `ComposerGitActions.tsx`, `composerGitOps.ts`.
+  - `077-fs-watcher-git-status.md` — recursive FS watch with ignore filter + shared `gitStatusStore` (one status + one numstat); stops WebKit/git CPU storms on huge dirty trees.
   - `054-works-layer.md` — Plane-inspired Works: views sidebar, list/kanban/timeline (story groups in all three), Modules catalog; **`works/items/W-NNN.md`** + **`works/stories/S-NNN.md`** + slim `snapshot.json` (v3); **opens in side drawer by default** (`063`).
   - `067-agent-tasks-checklist.md` — Cursor-style collapsible task checklist (`AgentTasks` in `AgentModeShell.tsx`) below the sessions list, sourced from `aiTaskStore.ts` (TodoWrite/TaskCreate items published by `AIChatPanel.tsx`); collapsed by default, resets on `chatId` change.
   - `066-works-cycles-stories.md` — auto weekly **Cycles** (progress + burndown charts), Scrum **Stories** spawning backlog work items; storage at workspace `works/` (not `.quack/`).

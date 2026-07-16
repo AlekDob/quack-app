@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, startTransition } from "react";
 import { createPortal } from "react-dom";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
@@ -21,14 +21,19 @@ import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
 import { setAgentMode } from "../agentMode";
 import { getTasks, subscribeTasks, clearTasks } from "../aiTaskStore";
+import { getAgentStatus, subscribeAgentStatus } from "../agentStatusStore";
 import { FilePopupModal } from "./FilePopupModal";
 import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
 import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
 import { AIChatsRail } from "./AIChatsRail";
 import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { endChatSwitch, pulseChatSwitch } from "../chatSwitch";
+import { logChatSwitch } from "../chatSwitchDebug";
 import { useChatSwitching } from "../useChatSwitching";
-import { shouldKeepChatHostMounted } from "../chatHostMount";
+import {
+  shouldKeepChatHostMounted,
+  useChatHostLiveStatus,
+} from "../chatHostMount";
 import { dropCachedSessionBody } from "../chatStoreCache";
 
 interface Props {
@@ -164,9 +169,18 @@ function AgentChatHost({
   archivedAt?: number;
   onOpenFile: (path: string | null) => void;
 }) {
-  const keepWarm = shouldKeepChatHostMounted({ visible, doneAt, archivedAt });
+  const liveStatus = useChatHostLiveStatus(chatId);
+  const keepWarm = shouldKeepChatHostMounted({
+    visible,
+    doneAt,
+    archivedAt,
+    liveStatus,
+  });
   const [mounted, setMounted] = useState(visible);
-  const onHydrated = useCallback(() => endChatSwitch(), []);
+  const onHydrated = useCallback(
+    () => endChatSwitch("AgentChatHost", chatId),
+    [chatId],
+  );
   useEffect(() => {
     if (visible) {
       setMounted(true);
@@ -286,17 +300,38 @@ export function AgentModeShell({ wsId }: Props) {
 
   const switching = useChatSwitching();
 
+  const [, setAgentStatusTick] = useState(0);
+  useEffect(() => subscribeAgentStatus(() => setAgentStatusTick((t) => t + 1)), []);
+
+  const mountChats = activeChats.filter((chat) => {
+    const visible = !switching && chat.id === activeChatId;
+    const live = getAgentStatus(chat.id)?.derived ?? null;
+    return shouldKeepChatHostMounted({
+      visible,
+      doneAt: chat.doneAt,
+      archivedAt: chat.archivedAt,
+      liveStatus: live,
+    });
+  });
+
   const recentNotOpen = recent.filter((w) => !openIds.includes(w.id));
 
   const selectSession = (id: string, chatId: string) => {
     const crossWs = id !== wsId;
     if (chatId !== activeChatId || crossWs) {
-      // Veil on every switch (not just cross-workspace) — the gradual loader
-      // smooths the perceived jank of swapping the whole chat panel.
-      pulseChatSwitch({ veil: true, flushWsId: wsId });
+      logChatSwitch("agent select", { chatId, activeChatId, crossWs, wsId: id });
+      pulseChatSwitch({
+        veil: true,
+        flush: crossWs,
+        flushWsId: crossWs ? wsId : undefined,
+        source: "AgentModeShell.selectSession",
+        chatId,
+      });
     }
     if (crossWs) void setActiveWorkspace(id);
-    setSelectedByWs((m) => ({ ...m, [id]: chatId }));
+    startTransition(() => {
+      setSelectedByWs((m) => ({ ...m, [id]: chatId }));
+    });
   };
 
   const newSession = (
@@ -307,7 +342,6 @@ export function AgentModeShell({ wsId }: Props) {
     if (id !== wsId) void setActiveWorkspace(id);
     setSelectedByWs((m) => ({ ...m, [id]: chatId }));
   };
-
 
   return (
     <div className="agent-shell" data-ws-id={wsId}>
@@ -460,18 +494,21 @@ export function AgentModeShell({ wsId }: Props) {
               <div
                 className={`agent-main-chat-panels${switching ? " is-switching" : ""}`}
               >
-                {activeChats.map((chat) => (
+                {mountChats.map((chat) => {
+                  const hostVisible = !switching && chat.id === activeChatId;
+                  return (
                   <AgentChatHost
                     key={chat.id}
                     wsId={wsId}
                     root={ws.meta.root}
                     chatId={chat.id}
-                    visible={!switching && chat.id === activeChatId}
+                    visible={hostVisible}
                     doneAt={chat.doneAt}
                     archivedAt={chat.archivedAt}
                     onOpenFile={setOpenFilePath}
                   />
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="agent-main-empty">
