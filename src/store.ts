@@ -35,6 +35,9 @@ import { hydrateChatStore } from "./chatHistory";
 import { hydratePresetOverrides } from "./presets";
 import { pulseChatSwitch } from "./chatSwitch";
 import { logChatSwitch } from "./chatSwitchDebug";
+import { markSwitchStart } from "./switchPerf";
+import { isWorkspaceWarm } from "./workspaceWarmSet";
+import { beginWorkspaceLoad } from "./workspaceSwitchLoader";
 import { getAgentStatus } from "./agentStatusStore";
 import { ensureAppBundledSkills } from "./bundledSkills/sync";
 import {
@@ -1822,6 +1825,13 @@ export const useStore = create<AppState>((set, get) => {
       if (!get().loaded[id]) return;
       const prevId = get().activeId;
       const t0 = performance.now();
+      markSwitchStart(id);
+      // Cold switch (target not warm) → mask the mount lag with the branded
+      // full-screen wash. Warm projects switch instantly, so no loader. Skip
+      // the initial activation (prevId null) — the splash owns first paint.
+      if (prevId && prevId !== id && !isWorkspaceWarm(id)) {
+        beginWorkspaceLoad(id);
+      }
       logChatSwitch("workspace switch start", { from: prevId, to: id });
       if (prevId !== id) {
         clearEditorState();

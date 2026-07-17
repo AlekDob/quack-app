@@ -130,7 +130,18 @@ in the active workspace ran its own trio).
 - **300 ms unmount delay** — brief overlap if user rapid-fires project icons; incoming shell paints first by design.
 - **Monaco DOM order** — `App.tsx` `shellOrder` append-only; never reorder shells on drag-reorder (`012-workspace-reorder.md`).
 
+### Switch-perf instrumentation (dev)
+
+`switchPerf.ts` — dev-only `[switch-perf]` console timing. `markSwitchStart(wsId)`
+in `setActiveWorkspace` stamps the switch; `logSwitchPhase(phase, wsId, extra)`
+logs each heavy phase with `sinceSwitchMs` (the `[chat-switch]` logs only measure
+`setActiveWorkspace`, which is fast). Wired at: FileTree root `list_dir`
+(`filetree root loaded` + `listDirMs`/`entries`) and editors mount
+(`editors ready`). Gated to the workspace being switched INTO. Use it to catch
+which phase an intermittent slow switch actually costs.
+
 ### Related
+- Cold-switch loader (perceived polish): `079-cold-project-switch-loader.md`
 - Startup + inactive shell note (updated): `032-startup-hydration.md`
 - Session usage polls + JSONL hydrate: `023-session-usage-panel.md`
 - Workspace icon reorder (stable shell mount): `012-workspace-reorder.md`

@@ -35,6 +35,7 @@ import { getAgentStatus, markSeen } from "./agentStatusStore";
 import { CommandPalette } from "./components/CommandPalette";
 import { DragGhost } from "./components/DragGhost";
 import { ChatSwitchVeil } from "./components/ChatSwitchVeil";
+import { WorkspaceSwitchVeil } from "./components/WorkspaceSwitchVeil";
 import { StatusBar } from "./components/StatusBar";
 import { Toasts } from "./components/Toast";
 import { DiffModal } from "./components/DiffModal";
@@ -827,6 +828,9 @@ function MainApp() {
       {/* One global switch loader — shows on EVERY chat/session switch,
           including cross-project (per-host veils miss that case). */}
       <ChatSwitchVeil global />
+      {/* Branded full-screen wash for COLD project switches (warm ones stay
+          instant). Masks the Monaco/tree cold-mount lag in the project color. */}
+      <WorkspaceSwitchVeil />
       <Toasts />
       <AgentHubWatcher />
       <DiffModal />

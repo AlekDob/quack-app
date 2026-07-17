@@ -9,6 +9,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { fs, type DirEntry } from "../ipc";
+import { logSwitchPhase } from "../switchPerf";
 import { fsBus, pathsEqual } from "../fsBus";
 import { findTabsPaneByTab, useStore } from "../store";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
@@ -452,10 +453,17 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
   }, [wsId]);
 
   const refresh = useCallback(() => {
+    const t0 = performance.now();
     fs.listDir(root)
-      .then((e) => setEntries(e))
+      .then((e) => {
+        logSwitchPhase("filetree root loaded", wsId, {
+          entries: e.length,
+          listDirMs: Math.round(performance.now() - t0),
+        });
+        setEntries(e);
+      })
       .catch(() => setEntries([]));
-  }, [root]);
+  }, [root, wsId]);
 
   useEffect(() => {
     refresh();

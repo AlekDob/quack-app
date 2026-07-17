@@ -34,6 +34,8 @@ import { redockTerminal } from "../terminalPopout";
 import { Icon } from "./Icon";
 import { useZenMode } from "../zenMode";
 import { useChatSwitching } from "../useChatSwitching";
+import { logSwitchPhase } from "../switchPerf";
+import { endWorkspaceLoad } from "../workspaceSwitchLoader";
 import { endChatSwitch } from "../chatSwitch";
 import { shouldKeepChatHostMounted, useChatHostLiveStatus } from "../chatHostMount";
 import { getAgentStatus, subscribeAgentStatus } from "../agentStatusStore";
@@ -96,6 +98,15 @@ function ShellDropdown({ anchor, shells, onClose, onPick }: ShellDropdownProps) 
 // `isActive` actually flipped re-render.
 function WorkspaceShellInner({ wsId, isActive }: Props) {
   const { showHeavy, editorsReady } = useWorkspaceHeavyMount(wsId, isActive);
+  // Switch-perf: time from switch start to editors mounting for the incoming
+  // project (the perceived lag the [chat-switch] logs don't capture). Also the
+  // signal to fade the cold-switch loader — the heavy mount is done.
+  useEffect(() => {
+    if (isActive && editorsReady) {
+      logSwitchPhase("editors ready", wsId);
+      endWorkspaceLoad(wsId);
+    }
+  }, [isActive, editorsReady, wsId]);
   const ws = useStore((s) => s.loaded[wsId]);
   const setTermH = useStore((s) => s.setTermH);
   const setBottomVisible = useStore((s) => s.setBottomVisible);

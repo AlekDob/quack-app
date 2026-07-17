@@ -993,6 +993,63 @@ body.ws-dragging * {
 .ws-color-swatch.active {
   border-color: var(--fg);
 }
+/* Custom color swatch: rainbow ring signals "pick your own"; a transparent
+   native color input fills it so a click opens the OS picker. */
+.ws-color-custom {
+  position: relative;
+  overflow: hidden;
+  /* Smooth full-spectrum hue wheel + a soft center highlight so it reads as a
+     glossy color picker rather than a segmented pie. Explicit stops every
+     15deg (not 2-stop `in hsl` interpolation — unreliable across webviews)
+     so plain RGB interpolation between adjacent stops stays visually
+     indistinguishable from following the true hue circle. */
+  background:
+    radial-gradient(
+      circle at 50% 38%,
+      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0) 60%
+    ),
+    conic-gradient(
+      from 0deg,
+      hsl(0deg 85% 60%),
+      hsl(15deg 85% 60%),
+      hsl(30deg 85% 60%),
+      hsl(45deg 85% 60%),
+      hsl(60deg 85% 60%),
+      hsl(75deg 85% 60%),
+      hsl(90deg 85% 60%),
+      hsl(105deg 85% 60%),
+      hsl(120deg 85% 60%),
+      hsl(135deg 85% 60%),
+      hsl(150deg 85% 60%),
+      hsl(165deg 85% 60%),
+      hsl(180deg 85% 60%),
+      hsl(195deg 85% 60%),
+      hsl(210deg 85% 60%),
+      hsl(225deg 85% 60%),
+      hsl(240deg 85% 60%),
+      hsl(255deg 85% 60%),
+      hsl(270deg 85% 60%),
+      hsl(285deg 85% 60%),
+      hsl(300deg 85% 60%),
+      hsl(315deg 85% 60%),
+      hsl(330deg 85% 60%),
+      hsl(345deg 85% 60%),
+      hsl(360deg 85% 60%)
+    );
+}
+.ws-color-custom-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  opacity: 0;
+  cursor: pointer;
+}
 .ws-color-clear {
   font-size: 12px;
   padding: 6px;
@@ -1007,71 +1064,6 @@ body.ws-dragging * {
   background: var(--bg-hi);
 }
 
-/* New chat session name popover — anchored near the New chat control */
-.new-chat-name-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 200;
-}
-.new-chat-name-popover {
-  position: fixed;
-  z-index: 210;
-  width: 280px;
-  padding: 14px;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.new-chat-name-title {
-  font-size: var(--fs-base);
-  font-weight: var(--fw-semibold);
-  color: var(--fg);
-}
-.new-chat-name-hint {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--fg-dim);
-  line-height: var(--lh-tight);
-}
-.new-chat-name-input {
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--fg);
-  font-size: var(--fs-base);
-  font-family: var(--font-ui);
-}
-.new-chat-name-input:focus {
-  outline: none;
-  border-color: var(--border-strong);
-}
-.new-chat-name-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.new-chat-name-actions button {
-  font-size: var(--fs-sm);
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg-hover);
-  color: var(--fg);
-  cursor: pointer;
-}
-.new-chat-name-actions button.primary {
-  background: var(--primary-bg);
-  color: var(--primary-fg);
-  border-color: transparent;
-}
-.new-chat-name-actions button.primary:hover {
-  opacity: 0.92;
-}
 .ws-icon-text {
   font-family: var(--font);
 }
@@ -1540,24 +1532,28 @@ body.ab-dragging * {
   line-height: 15px;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 40%, transparent);
 }
-.topbar-brand-sep {
-  flex-shrink: 0;
-  font-weight: 500;
-  font-size: 12px;
-  color: var(--fg-muted);
-  letter-spacing: 0;
-}
+/* Nome progetto come chip/tag: sfondo = colore del progetto, testo bianco.
+   Senza colore assegnato ripiega su un chip neutro leggibile. */
 .topbar-brand-project {
+  flex-shrink: 1;
+  min-width: 0;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 12px;
+  letter-spacing: -0.1px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--bg-hi);
   color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--border);
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .topbar-brand-project.has-color {
-  color: var(--ws-color);
+  background: var(--ws-color);
+  color: #fff;
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--ws-color) 45%, transparent);
 }
 .topbar-menus {
   display: flex;
@@ -3392,8 +3388,8 @@ body.ab-dragging * {
   min-width: 0;
 }
 /* Wrapper around an AIChatPanel that's been portaled into a pane tab.
-   Stacked absolute hosts — visibility toggle avoids display:none reflow
-   and Monaco/chat resize jank when switching tabs. */
+   Stacked absolute hosts — opacity crossfade avoids a hard visibility pop
+   when swapping file ↔ chat tabs (pairs with the global switch veil). */
 .ai-tab-host {
   position: absolute;
   inset: 0;
@@ -3402,16 +3398,24 @@ body.ab-dragging * {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  opacity: 0;
   visibility: hidden;
   pointer-events: none;
   z-index: 0;
+  transition:
+    opacity 160ms ease,
+    visibility 0ms linear 160ms;
 }
 .ai-tab-host.is-visible {
+  opacity: 1;
   visibility: visible;
   pointer-events: auto;
   z-index: 1;
+  transition:
+    opacity 160ms ease,
+    visibility 0ms;
 }
-/* File / media editors in pane tabs — same stacking model as AI hosts. */
+/* File / media editors in pane tabs — same stacking + fade model. */
 .file-tab-host {
   position: absolute;
   inset: 0;
@@ -3420,28 +3424,34 @@ body.ab-dragging * {
   min-height: 0;
   min-width: 0;
   overflow: hidden;
+  opacity: 0;
   visibility: hidden;
   pointer-events: none;
   z-index: 0;
+  transition:
+    opacity 160ms ease,
+    visibility 0ms linear 160ms;
 }
 .file-tab-host.is-visible {
+  opacity: 1;
   visibility: visible;
   pointer-events: auto;
   z-index: 1;
+  transition:
+    opacity 160ms ease,
+    visibility 0ms;
 }
-.ai-tab-host.is-switching > .ai-panel {
-  visibility: hidden;
+.ai-tab-host.is-switching > .ai-panel,
+.ai-tab-host.is-switching > .ai-chat-with-story {
+  opacity: 0;
   pointer-events: none;
 }
-.ai-tab-host > .ai-panel {
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-}
+.ai-tab-host > .ai-panel,
 .ai-tab-host > .ai-chat-with-story {
   flex: 1;
   min-height: 0;
   min-width: 0;
+  transition: opacity 160ms ease;
 }
 .vsplit {
   width: 4px;
@@ -8771,6 +8781,19 @@ button.composer-mention-chip-label:hover {
 .ai-ask-dock .ai-ask-card {
   margin: 0;
 }
+/* Ask card merged into the composer shell — one bordered surface. */
+.ai-composer-shell.has-ask .ai-ask-card {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  margin: 0;
+  padding: 10px 12px 8px;
+}
+.ai-composer-shell.has-ask.ask-freeform .ai-ask-card {
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
 /* Grouped runs of the same read-ish tool ("Read × 8"): one bordered
    card, slim rows inside. */
 /* Action strip — compact-chat activity chips (reads / searches / runs) */
@@ -9983,71 +10006,109 @@ button.composer-mention-chip-label:hover {
   text-align: center;
   padding: 16px 0;
 }
-.ai-welcome {
-  padding: 24px 16px 8px;
+/* Empty chat — Cursor-style hero (name + starters) */
+.ai-messages:has(> .ai-empty-hero) {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  justify-content: center;
+}
+.ai-empty-hero {
+  width: min(100%, 440px);
+  margin: 0 auto;
+  padding: 32px 20px 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   text-align: center;
 }
-.ai-welcome-title {
+.ai-empty-hero-mark {
+  opacity: 0.88;
+  margin-bottom: 2px;
+}
+.ai-empty-hero-title {
+  margin: 0;
   font-size: 15px;
   font-weight: 600;
-  background: linear-gradient(90deg, var(--accent), #9aa0ad);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  letter-spacing: -0.01em;
+  color: var(--fg);
 }
-.ai-welcome-sub {
-  font-size: 11.5px;
+.ai-empty-hero-name {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 0 4px;
+}
+.ai-empty-hero-name-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 4px 7px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--fg);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-family: inherit;
+  text-align: center;
+}
+.ai-empty-hero-name-input::placeholder {
   color: var(--fg-muted);
-  line-height: 1.5;
-  max-width: 360px;
-  margin: 0 auto;
 }
-.ai-quick-prompts {
+.ai-empty-hero-name-input:focus {
+  outline: none;
+  border-bottom-color: var(--fg-muted);
+}
+.ai-empty-hero-lead {
+  margin: 0 0 8px;
+  max-width: 360px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--fg-muted);
+}
+.ai-empty-starters {
+  width: 100%;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
-  padding: 4px 4px 12px;
 }
-.ai-quick-card {
+.ai-empty-starter {
   display: flex;
   flex-direction: column;
-  gap: 2px;
   align-items: flex-start;
-  text-align: left;
-  padding: 8px 10px;
-  background: var(--bg-alt);
+  gap: 2px;
+  padding: 9px 11px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  cursor: pointer;
-  font-family: inherit;
+  border-radius: var(--radius-md);
+  background: transparent;
   color: var(--fg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
   transition:
-    border-color 0.15s,
-    transform 0.05s,
-    background 0.15s,
-    box-shadow 0.15s;
+    background 0.12s ease,
+    border-color 0.12s ease;
 }
-.ai-quick-card:hover {
-  border-color: var(--accent);
-  background: var(--bg-elev);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+.ai-empty-starter:hover {
+  background: var(--bg-hi);
+  border-color: color-mix(in srgb, var(--fg) 14%, var(--border));
 }
-.ai-quick-card:active {
+.ai-empty-starter:active {
   transform: translateY(1px);
 }
-.ai-quick-card-title {
+.ai-empty-starter-label {
   font-size: 12px;
   font-weight: 500;
   color: var(--fg);
 }
-.ai-quick-card-desc {
+.ai-empty-starter-desc {
   font-size: 10.5px;
-  color: var(--fg-muted);
   line-height: 1.35;
+  color: var(--fg-muted);
 }
 .ai-msg {
   display: flex;
@@ -15014,23 +15075,30 @@ button.composer-mention-chip-label:hover {
   color: var(--fg-dim);
   white-space: nowrap;
   user-select: none;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
 .tab:hover {
   background: var(--bg-hi);
   color: var(--fg);
 }
 .tab.active {
-  /* Active = raised neutral surface + hairline trace (brand: no accent underline) */
-  background: var(--bg);
+  /* Active = quiet lift — same language as editor-tab-seg, no accent traces */
+  background: var(--bg-hi);
   color: var(--fg);
-  box-shadow: var(--shadow-sm), inset 0 0 0 1px var(--border);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 .tab.pinned {
   background: transparent;
 }
 .tab.pinned .tab-name {
   color: var(--fg-dim);
+}
+.tab.pinned.active {
+  background: var(--bg-hi);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.tab.pinned.active .tab-name {
+  color: var(--fg);
 }
 .tab-icon {
   font-size: 11px;
@@ -15162,21 +15230,39 @@ button.composer-mention-chip-label:hover {
   color: var(--fg);
   opacity: 1 !important;
 }
+/* Terminal panel header actions (+ Term, hide panel). Cursor-style chips:
+   a thin border + faint surface so they read as real buttons instead of
+   ghost text, staying discoverable while remaining elegant/monochrome. */
 .tab-add {
-  background: transparent;
-  border: none;
+  background: var(--bg-hi);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  color: var(--fg-muted);
+  color: var(--fg-dim);
   font-size: 11px;
-  padding: 5px 8px;
+  padding: 5px 9px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    border-color 120ms ease,
+    transform 120ms ease,
+    box-shadow 120ms ease;
 }
 .tab-add:hover {
-  background: var(--bg-hi);
+  background: var(--bg-hover);
+  border-color: var(--fg-muted);
   color: var(--fg);
+  /* Micro-lift Cursor-style: sale di 1px con un'ombra tenue */
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.tab-add:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 .tab-add-ai {
   color: var(--accent);
@@ -15620,8 +15706,7 @@ button.composer-mention-chip-label:hover {
   background: var(--bg-alt);
   z-index: 2;
 }
-.story-drawer-shell.is-peeking:not(.is-pinned),
-.story-drawer-shell.is-pinned {
+.story-drawer-shell.is-open {
   z-index: 50;
 }
 .story-drawer-strip {
@@ -18285,6 +18370,12 @@ button.composer-mention-chip-label:hover {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .ai-tab-host,
+  .file-tab-host,
+  .ai-tab-host > .ai-panel,
+  .ai-tab-host > .ai-chat-with-story {
+    transition: none;
+  }
   .chat-switch-veil {
     transition: none;
   }
@@ -18301,6 +18392,93 @@ button.composer-mention-chip-label:hover {
   font-size: var(--fs-base);
   font-weight: var(--fw-medium);
   color: var(--fg);
+}
+
+/* ── Cold project-switch loader ─────────────────────────────────────────
+   Full-window branded wash while a cold project mounts (Monaco + tree). Base
+   is the theme bg so it MASKS the incoming content; a soft gradient in the
+   project's own color (--ws-load-color) makes the wait read as an intentional
+   transition. Warm switches never mount this. Fades via opacity. */
+.ws-switch-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      120% 130% at 50% 38%,
+      color-mix(in srgb, var(--ws-load-color, var(--accent)) 26%, transparent),
+      transparent 68%
+    ),
+    var(--bg);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+.ws-switch-veil.is-shown {
+  opacity: 1;
+}
+.ws-switch-veil-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  transform: translateY(6px) scale(0.98);
+  opacity: 0;
+  transition:
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 320ms ease;
+}
+.ws-switch-veil.is-shown .ws-switch-veil-inner {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+.ws-switch-veil-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-lg, 14px);
+  font-size: 26px;
+  font-weight: var(--fw-semibold, 600);
+  letter-spacing: 0.5px;
+  color: color-mix(in srgb, var(--ws-load-color, var(--fg)) 92%, var(--fg));
+  background: color-mix(in srgb, var(--ws-load-color, var(--fg)) 18%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--ws-load-color, var(--fg)) 40%, transparent);
+  box-shadow: 0 8px 40px
+    color-mix(in srgb, var(--ws-load-color, var(--fg)) 28%, transparent);
+  animation: wsSwitchPulse 1.4s ease-in-out infinite;
+}
+.ws-switch-veil-name {
+  font-size: var(--fs-base, 14px);
+  font-weight: var(--fw-medium, 500);
+  color: color-mix(in srgb, var(--fg) 72%, transparent);
+}
+@keyframes wsSwitchPulse {
+  0%,
+  100% {
+    box-shadow: 0 8px 40px
+      color-mix(in srgb, var(--ws-load-color, var(--fg)) 22%, transparent);
+  }
+  50% {
+    box-shadow: 0 10px 56px
+      color-mix(in srgb, var(--ws-load-color, var(--fg)) 44%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-switch-veil,
+  .ws-switch-veil-inner {
+    transition: none;
+  }
+  .ws-switch-veil-badge {
+    animation: none;
+  }
 }
 .agent-chat-host {
   position: absolute;
@@ -22831,6 +23009,92 @@ button.composer-mention-chip-label:hover {
   }
 }
 
+/* Works new-story card — opens StoryPlanDrawer on the chat column */
+.works-story-chip {
+  margin: 4px 12px 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  animation: brain-turn-in 0.34s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.works-story-chip-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.works-story-chip-icon {
+  flex-shrink: 0;
+  color: var(--fg-muted);
+  opacity: 0.9;
+}
+
+.works-story-chip-label {
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.works-story-chip-meta {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--fg-dim);
+}
+
+.works-story-chip-body {
+  margin: 4px 0 0;
+  padding: 0 0 0 9px;
+  border-left: 1px solid var(--border);
+}
+
+.works-story-chip-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.works-story-chip-preview {
+  margin: 2px 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--fg-dim);
+  font-family: var(--font-mono);
+}
+
+.works-story-chip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 6px 0 0 9px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--fg);
+  background: var(--bg-hi);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.works-story-chip-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--fg) 6%, var(--bg-hi));
+}
+
+.works-story-chip-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .works-story-chip {
+    animation: none !important;
+  }
+}
+
 /* ── Quack Store (store:<wsId> editor tab) ── */
 .store-panel {
   flex: 1;
@@ -24954,6 +25218,16 @@ button.composer-mention-chip-label:hover {
 .works-plane-btn:hover {
   background: var(--bg-hi);
   color: var(--fg);
+}
+
+.works-merge-dupes-btn {
+  color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 35%, var(--border));
+}
+
+.works-merge-dupes-btn:hover {
+  color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 12%, var(--bg-hi));
 }
 
 .works-plane-panel {
