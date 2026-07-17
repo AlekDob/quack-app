@@ -85,6 +85,8 @@ Warm ids come from workspace descriptors: `sessionId` of chats with neither
 | Component | `src/components/AgentModeShell.tsx` | `AgentChatHost` unload policy |
 | Component | `src/components/WorkspaceShell.tsx` | `AIChatHost` unload policy + `memo` (no N-wide re-render on chat add) |
 | Dev perf | `src/switchPerf.ts` | `markNewChat` / `logNewChatPhase` (`[new-chat-perf]`) |
+| Transcript window | `src/chatScroll.ts` | `windowChatTurns(turns, limit, expanded)` — tail-only render for long chats |
+| Test | `src/chatScroll.test.ts` | vitest regression for grouping + windowing (`npm test`) |
 | Component | `src/components/TabContentHost.tsx` | `DrawerAIChatHost` unload policy |
 | Component | `src/components/AIChatPanel.tsx` | Awaits `ensureSessionLoaded` before messages |
 | Rust | `src-tauri/src/chat_store.rs` | `chat_store_load_workspace` (ids only), `chat_store_load` (one body) |
@@ -116,8 +118,16 @@ chat_store_load(wsId, sessionId) → ChatSession | null
   unmount still flushes via `registerChatPersist` cleanup first.
 - **Live sticky still wins.** Marking done mid-stream while another chat is
   focused: host unloads once hidden; do not unmount a **visible** DONE chat.
-- **Message virtualization** (windowed `turns.map`) is **not** this feature —
-  still the main cost for a single monster open transcript. Follow-up.
+- **Message virtualization** — DONE (2026-07-17): `turns.map` is windowed via
+  `windowChatTurns(allTurns, TURN_WINDOW=40, showAllTurns)` (`chatScroll.ts`). A
+  long chat renders only its last 40 turns until the user clicks
+  **"Show N earlier messages"** (`.ai-show-earlier`); `showAllTurns` resets per
+  `aiChatId` so switching into a huge transcript starts windowed (fast paint,
+  no more stall). Windowed turns keep ABSOLUTE `display` indices so scrub /
+  `data-anchor` / `display[i]` lookups stay correct. Newest turns (streaming +
+  pinned user turn) are always in the window. Nav rail (`021`) shows ticks for
+  visible turns only until expanded. Regression: `src/chatScroll.test.ts`
+  (vitest, `npm test`).
 
 ### Related
 

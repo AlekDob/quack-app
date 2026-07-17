@@ -335,6 +335,7 @@ import {
   isNearBottom,
   pinUserTurnToTop,
   scrollToBottom,
+  windowChatTurns,
 } from "../chatScroll";
 import {
   ensureCloudCatalog,
@@ -464,6 +465,10 @@ interface Props {
 // disabled (no warning ever fires). Read on every turn so changes
 // from Settings take effect immediately.
 const BUDGET_KEY = "lcp.claudeCode.budgetUsd";
+// Transcript windowing: render only the last N turns of a long chat so a switch
+// doesn't paint hundreds of turns and stall. "Show earlier" reveals the rest.
+// The newest turns (streaming + pinned user turn) are always in the window.
+const TURN_WINDOW = 40;
 // Last-used Claude Code permission mode, persisted so "Auto" sticks across
 // restarts. Empty / missing = Ask (null). See permModeStore for how the mode
 // reaches the permission overlay.
@@ -684,6 +689,11 @@ export function AIChatPanel({
   const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([]);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Transcript windowing (see TURN_WINDOW): a long chat renders only its tail
+  // until the user asks for earlier turns. Reset per chat so switching into a
+  // huge transcript starts windowed (fast paint), not fully expanded.
+  const [showAllTurns, setShowAllTurns] = useState(false);
+  useEffect(() => setShowAllTurns(false), [aiChatId]);
   const [streaming, setStreaming] = useState<string | null>(null);
   // Live chronological block log for the in-progress assistant bubble.
   // Mirrors `blocksThisRound` inside sendUserText so the streaming
@@ -6164,8 +6174,24 @@ export function AIChatPanel({
             </div>
           );
           };
-          const turns = groupChatTurns(display);
-          return turns.map((turn) => (
+          const allTurns = groupChatTurns(display);
+          const { turns, hiddenCount } = windowChatTurns(
+            allTurns,
+            TURN_WINDOW,
+            showAllTurns,
+          );
+          return (
+            <>
+              {hiddenCount > 0 && (
+                <button
+                  className="ai-show-earlier"
+                  onClick={() => setShowAllTurns(true)}
+                >
+                  Show {hiddenCount} earlier{" "}
+                  {hiddenCount === 1 ? "message" : "messages"}
+                </button>
+              )}
+              {turns.map((turn) => (
             <div
               key={turn.userIdx ?? `lead-${turn.followIdxs[0] ?? 0}`}
               className="ai-turn"
@@ -6201,7 +6227,9 @@ export function AIChatPanel({
               })()}
               {turn.followIdxs.map((i) => renderAt(i))}
             </div>
-          ));
+              ))}
+            </>
+          );
         })()}
         {pendingPermission && (
           <PermissionCard

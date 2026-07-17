@@ -993,50 +993,15 @@ body.ws-dragging * {
 .ws-color-swatch.active {
   border-color: var(--fg);
 }
-/* Custom color swatch: rainbow ring signals "pick your own"; a transparent
-   native color input fills it so a click opens the OS picker. */
+/* Custom color swatch: soft two-tone gradient signals "pick your own"; a
+   transparent native color input fills it so a click opens the OS picker.
+   Deliberately NOT a conic/hue-wheel gradient — those need many stops or
+   modern interpolation keywords to look smooth and render inconsistently
+   across webviews. A plain 2-stop linear gradient can't show seams. */
 .ws-color-custom {
   position: relative;
   overflow: hidden;
-  /* Smooth full-spectrum hue wheel + a soft center highlight so it reads as a
-     glossy color picker rather than a segmented pie. Explicit stops every
-     15deg (not 2-stop `in hsl` interpolation — unreliable across webviews)
-     so plain RGB interpolation between adjacent stops stays visually
-     indistinguishable from following the true hue circle. */
-  background:
-    radial-gradient(
-      circle at 50% 38%,
-      rgba(255, 255, 255, 0.55),
-      rgba(255, 255, 255, 0) 60%
-    ),
-    conic-gradient(
-      from 0deg,
-      hsl(0deg 85% 60%),
-      hsl(15deg 85% 60%),
-      hsl(30deg 85% 60%),
-      hsl(45deg 85% 60%),
-      hsl(60deg 85% 60%),
-      hsl(75deg 85% 60%),
-      hsl(90deg 85% 60%),
-      hsl(105deg 85% 60%),
-      hsl(120deg 85% 60%),
-      hsl(135deg 85% 60%),
-      hsl(150deg 85% 60%),
-      hsl(165deg 85% 60%),
-      hsl(180deg 85% 60%),
-      hsl(195deg 85% 60%),
-      hsl(210deg 85% 60%),
-      hsl(225deg 85% 60%),
-      hsl(240deg 85% 60%),
-      hsl(255deg 85% 60%),
-      hsl(270deg 85% 60%),
-      hsl(285deg 85% 60%),
-      hsl(300deg 85% 60%),
-      hsl(315deg 85% 60%),
-      hsl(330deg 85% 60%),
-      hsl(345deg 85% 60%),
-      hsl(360deg 85% 60%)
-    );
+  background: linear-gradient(135deg, #f472b6, #818cf8);
 }
 .ws-color-custom-input {
   position: absolute;
@@ -10026,6 +9991,15 @@ button.composer-mention-chip-label:hover {
   opacity: 0.88;
   margin-bottom: 2px;
 }
+/* Active-agent avatar in the empty-state hero — mirrors the composer pill so
+   the face matches whoever the next turn is addressed to (preset/subagent). */
+.ai-empty-hero-mark-img {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  display: block;
+}
 .ai-empty-hero-title {
   margin: 0;
   font-size: 15px;
@@ -10464,6 +10438,28 @@ button.composer-mention-chip-label:hover {
 .ai-msg:hover .ai-msg-actions,
 .ai-msg-actions:focus-within {
   opacity: 1;
+}
+/* "Show N earlier messages" — head of a windowed long transcript. Centered
+   pill; clicking expands to the full history (transcript windowing). */
+.ai-show-earlier {
+  display: block;
+  margin: 8px auto 14px;
+  padding: 5px 14px;
+  font-size: 12px;
+  line-height: 1;
+  background: var(--bg-hi);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border-color 0.12s;
+}
+.ai-show-earlier:hover {
+  color: var(--fg);
+  border-color: var(--border-hi, var(--border));
 }
 .ai-msg-action {
   display: inline-flex;
