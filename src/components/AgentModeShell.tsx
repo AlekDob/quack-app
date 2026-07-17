@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, startTransition } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
@@ -27,7 +27,7 @@ import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
 import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
 import { AIChatsRail } from "./AIChatsRail";
 import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
-import { endChatSwitch, pulseChatSwitch } from "../chatSwitch";
+import { endChatSwitch, getChatSwitchTarget, pulseChatSwitch } from "../chatSwitch";
 import { logChatSwitch } from "../chatSwitchDebug";
 import { useChatSwitching } from "../useChatSwitching";
 import {
@@ -304,10 +304,16 @@ export function AgentModeShell({ wsId }: Props) {
   useEffect(() => subscribeAgentStatus(() => setAgentStatusTick((t) => t + 1)), []);
 
   const mountChats = activeChats.filter((chat) => {
-    const visible = !switching && chat.id === activeChatId;
+    // Keep the active (or pulse-target) host mounted DURING the veil so
+    // hydrate runs under the loader — not after CAP when switching flips
+    // false. Surface visibility is gated separately via hostVisible.
+    const switchTarget = getChatSwitchTarget();
+    const keepSurface =
+      chat.id === activeChatId ||
+      (switching && switchTarget !== null && chat.id === switchTarget);
     const live = getAgentStatus(chat.id)?.derived ?? null;
     return shouldKeepChatHostMounted({
-      visible,
+      visible: keepSurface,
       doneAt: chat.doneAt,
       archivedAt: chat.archivedAt,
       liveStatus: live,
@@ -329,9 +335,9 @@ export function AgentModeShell({ wsId }: Props) {
       });
     }
     if (crossWs) void setActiveWorkspace(id);
-    startTransition(() => {
-      setSelectedByWs((m) => ({ ...m, [id]: chatId }));
-    });
+    // Sync select so mountChats includes the target in the same tick as the
+    // pulse (startTransition delayed hydrate until after the veil CAP).
+    setSelectedByWs((m) => ({ ...m, [id]: chatId }));
   };
 
   const newSession = (
@@ -495,7 +501,16 @@ export function AgentModeShell({ wsId }: Props) {
                 className={`agent-main-chat-panels${switching ? " is-switching" : ""}`}
               >
                 {mountChats.map((chat) => {
-                  const hostVisible = !switching && chat.id === activeChatId;
+                  // Mount/hydrate while switching; only hide the surface
+                  // (parent `.is-switching` + aria) so cold load isn't deferred
+                  // until after the 1s CAP.
+                  const isActive = chat.id === activeChatId;
+                  const switchTarget = getChatSwitchTarget();
+                  const isPulseTarget =
+                    switching &&
+                    switchTarget !== null &&
+                    chat.id === switchTarget;
+                  const hostVisible = isActive || isPulseTarget;
                   return (
                   <AgentChatHost
                     key={chat.id}

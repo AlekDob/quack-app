@@ -82,14 +82,42 @@ function clearLegacyStorage(wsId: string): void {
   remove(LEGACY_KEY(wsId));
 }
 
+/** Coalesce parallel flushes per session — streaming + composer used to fire
+ *  overlapping `chat_store_save` invokes; a fixed `.codetta-tmp` then raced. */
+const pendingDisk = new Map<string, ChatSession>();
+const flushingDisk = new Set<string>();
+
+function diskKey(wsId: string, sessionId: string): string {
+  return `${wsId}\0${sessionId}`;
+}
+
 async function persistSession(wsId: string, session: ChatSession): Promise<boolean> {
-  try {
-    await invoke("chat_store_save", { wsId, session });
+  // `npm run dev` (Vite-only) has no Rust backend — keep the in-memory cache
+  // and skip disk. Don't toast "Chat not saved" in that mode.
+  if (typeof window !== "undefined" && !("__TAURI_INTERNALS__" in window)) {
     return true;
-  } catch {
-    onSaveFailed?.();
-    return false;
   }
+  const key = diskKey(wsId, session.id);
+  pendingDisk.set(key, session);
+  if (flushingDisk.has(key)) return true;
+  flushingDisk.add(key);
+  let ok = true;
+  try {
+    while (pendingDisk.has(key)) {
+      const next = pendingDisk.get(key)!;
+      pendingDisk.delete(key);
+      try {
+        await invoke("chat_store_save", { wsId, session: next });
+      } catch (e) {
+        ok = false;
+        console.error("[chatStore] chat_store_save failed", wsId, next.id, e);
+        onSaveFailed?.();
+      }
+    }
+  } finally {
+    flushingDisk.delete(key);
+  }
+  return ok;
 }
 
 async function migrateFromLocalStorage(wsId: string, cache: WsCache): Promise<void> {

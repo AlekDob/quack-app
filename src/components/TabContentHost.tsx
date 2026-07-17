@@ -19,7 +19,10 @@ import { parseKey, type WorkspaceData } from "../store";
 import { useChatSwitching } from "../useChatSwitching";
 import { useCallback, useEffect, useState } from "react";
 import { endChatSwitch } from "../chatSwitch";
-import { shouldKeepChatHostMounted } from "../chatHostMount";
+import {
+  shouldKeepChatHostMounted,
+  useChatHostLiveStatus,
+} from "../chatHostMount";
 import { dropCachedSessionBody } from "../chatStoreCache";
 
 interface Props {
@@ -188,25 +191,36 @@ function DrawerAIChatHost({
   archivedAt?: number;
 }) {
   const switching = useChatSwitching();
-  const keepWarm = shouldKeepChatHostMounted({ visible, doneAt, archivedAt });
-  const [mounted, setMounted] = useState(visible);
-  const onHydrated = useCallback(() => endChatSwitch(), []);
+  const liveStatus = useChatHostLiveStatus(chatId);
+  const keepWarm = shouldKeepChatHostMounted({
+    visible,
+    doneAt,
+    archivedAt,
+    liveStatus,
+    tabOpen: true,
+  });
+  const [mounted, setMounted] = useState(visible || keepWarm);
+  const onHydrated = useCallback(
+    () => endChatSwitch(`DrawerAIChatHost:${chatId}`, chatId),
+    [chatId],
+  );
   useEffect(() => {
-    if (visible) {
+    if (visible || keepWarm) {
       setMounted(true);
       return;
     }
-    if (!keepWarm) setMounted(false);
+    setMounted(false);
   }, [visible, keepWarm]);
   useEffect(() => {
     if (mounted || keepWarm) return;
     dropCachedSessionBody(wsId, chatId);
   }, [mounted, keepWarm, wsId, chatId]);
   if (!mounted) return null;
+  const showSurface = visible && !switching;
   const showVeil = switching && visible;
   return createPortal(
     <div
-      className={`ai-tab-host${visible ? " is-visible" : ""}${showVeil ? " is-switching" : ""}`}
+      className={`ai-tab-host${showSurface ? " is-visible" : ""}${showVeil ? " is-switching" : ""}`}
     >
       <AIChatPanel
         wsId={wsId}

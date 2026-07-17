@@ -7,6 +7,7 @@ import {
   subscribeWorks,
   updateWorkItem,
 } from "../../worksCache";
+import { startWorksWatchOnce } from "../../worksWatch";
 import { useWorkItemContextMenu } from "./useWorkItemContextMenu";
 import { useStoryContextMenu } from "./useStoryContextMenu";
 import {
@@ -44,6 +45,7 @@ import { WorksItemsList } from "./WorksItemsList";
 import { WorksFeaturesCatalog } from "./WorksFeaturesCatalog";
 import { WorksCyclesPanel } from "./WorksCyclesPanel";
 import { WorksStoriesList } from "./WorksStoriesList";
+import { WorksMergeDupesButton } from "./WorksMergeDupesButton";
 import { getWorkspaceColor } from "../../workspaceColors";
 
 type Props = {
@@ -83,6 +85,7 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
 
   useEffect(() => {
     if (!visible) return;
+    startWorksWatchOnce();
     void reload();
     return subscribeWorks(root, setSnap);
   }, [root, visible, reload]);
@@ -287,6 +290,7 @@ export function WorksPane({ wsId, root, container, visible }: Props) {
               </>
             )}
             <WorksPlanePanel wsId={wsId} root={root} snap={snap} />
+            <WorksMergeDupesButton root={root} snap={snap} />
             {isStoriesView && (
               <button type="button" className="works-new-btn" onClick={onNewStory}>
                 <Icon name="plus" size={12} /> Add story

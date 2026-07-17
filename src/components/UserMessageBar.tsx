@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Icon } from "./Icon";
 import { MarkdownPreview } from "./MarkdownPreview";
 import { useUserBarSticky } from "../hooks/useUserBarSticky";
@@ -172,7 +173,7 @@ function UserMessageBarInner({
 }
 
 /** Sentinel + sticky wrapper + bar — one turn's user prompt. */
-export function UserTurnBar({
+export const UserTurnBar = memo(function UserTurnBar({
   zIndex,
   anchorIdx,
   dimmed,
@@ -201,7 +202,7 @@ export function UserTurnBar({
       </div>
     </>
   );
-}
+});
 
 export function UserMessageBar(props: BarProps) {
   const sticky = useUserBarSticky(props.content);

@@ -18,6 +18,7 @@ import {
   subscribeWorks,
   updateWorkItem,
 } from "../../worksCache";
+import { startWorksWatchOnce } from "../../worksWatch";
 import {
   findWork,
   type WorkBlock,
@@ -108,18 +109,14 @@ export function WorkItemDrawer() {
     }
     let alive = true;
     blocksDirty.current = false;
+    startWorksWatchOnce();
     void hydrateWorks(req.root).then((next) => {
       if (!alive) return;
       setSnap(next);
       if (isWorkDrawerCreate(req)) {
         seedCreateDraft(req);
         const draft = req.draft;
-        const fallback =
-          draft?.moduleId ??
-          next.modules.find((m) => m.featurePath)?.id ??
-          next.modules[0]?.id ??
-          "";
-        setModuleId(fallback);
+        setModuleId(draft?.moduleId ?? "");
       } else {
         const w = findWork(next, req.workId);
         if (w) {

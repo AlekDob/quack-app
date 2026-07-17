@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-12
-last_verified: 2026-07-16
+last_verified: 2026-07-17
 status: active
 related: [063-surface-view-prefs.md, 065-works-drawer-ux.md, 066-works-cycles-stories.md, 068-quack-plan-harness.md]
 tags: [works, plan-mode, tickets, kanban, timeline, modules, plane, drawer, brain, markdown]
@@ -10,7 +10,7 @@ tags: [works, plan-mode, tickets, kanban, timeline, modules, plane, drawer, brai
 
 # 054 — Works layer (Plane-inspired tickets)
 
-**Purpose:** Native project-management tickets per workspace — Plane-style **views** sidebar, list/kanban/timeline, **Modules** feature catalog (Brain UI), app-level work + feature drawers, composer quick actions, Plan mode → Work ticket, cross-session context inject, optional Plane sync.
+**Purpose:** Native project-management tickets per workspace — Plane-style **views** sidebar, list/kanban/timeline, **Modules** feature catalog (Brain UI), app-level work + feature drawers, optional Plane sync. Chat composer Work chrome retired 2026-07-17 (see `068`); inject defaults off.
 
 ## Storage (hybrid — v3 markdown)
 
@@ -158,14 +158,14 @@ Bus: `featureDocDrawer.ts`.
 
 | Piece | Role |
 |---|---|
-| `ComposerWorkBar` | Intent menu (Plan a feature / Hotfix / Blank task); segmented cluster `S › W` \| docs \| acceptance |
+| `ComposerWorkBar` | **Removed 2026-07-17** — was intent menu / `S › W` cluster; use Works board + drawers |
 | `ComposerDocsChip` | Hover popover for linked Brain refs (Feature / Story / Related / Added); file icons + paths |
 
 See **`068-quack-plan-harness.md`** for Quack Plan flow + **StoryPlanDrawer** (hover soffietto on chat column).
 
 ### Composer ↔ disk auto-link (`worksChatAutoLink.ts`)
 
-When agents create Works files on disk, Quack keeps the composer **Work chip** in sync (`saveWorks` + `refreshWorksFromDisk` → `afterWorksSaved`).
+When agents create Works files on disk, the Works board refreshes while open (`refreshWorksFromDisk`). Chat auto-link (`afterWorksSaved`) was removed 2026-07-17.
 
 | Artifact | Auto-link to focused / `working` chat? |
 |---|---|
@@ -294,7 +294,7 @@ Mirror copies in `documentation/skills/`. Upgrades via `quack-bundled-version`.
 | Story menus | `useStoryContextMenu.tsx`, `worksStoryRowStyle.ts` |
 | Drawers | `WorkItemDrawer.tsx`, `FeatureDocDrawer.tsx`, `editorDrawerStack.ts` |
 | Kanban / timeline | `WorksKanbanView.tsx`, `WorksTimelineView.tsx`, `TimelineBar.tsx` |
-| Composer | `ComposerWorkBar.tsx`, `ComposerDocsChip.tsx`, `ComposerWorkLinkPanel.tsx`, `ComposerWorkQuickActions.tsx` |
+| Composer | Chat Work cluster **removed** 2026-07-17 (`068`) |
 | Doc open | `workspaceDocOpen.ts` — see `070-workspace-doc-open.md` |
 | Brain ref UI | `worksBrainRefUi.ts` |
 | Hub badge | `WorkHubBadge.tsx` |

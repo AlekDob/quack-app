@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-06
-last_verified: 2026-07-16
+last_verified: 2026-07-17
 tags: [chat, persistence, disk, rust, transcript, multitasking, reliability, provider-links, audit]
 ---
 
@@ -38,8 +38,10 @@ Auto-migrate from legacy `localStorage` on first boot hydrate per workspace.
 | `~/Library/Application Support/codetta/chats/{wsId}/{sessionId}.json` | Full `ChatSession` row (messages, knobs, composer, `providerSessionIds`, `pinnedProviderId`, …) |
 | `~/Library/Application Support/codetta/chats/provider-links.json` | Reverse index: `"provider:cliSessionId"` → `{ ws_id, quack_session_id, title }` |
 
-Each `chat_store_save` writes **one** session file atomically (`atomic::write`)
-+ updates the small index + upserts provider link rows.
+Each `chat_store_save` writes **one** session file atomically (`atomic::write`
+with a **unique** sibling tmp) + updates the small index + upserts provider
+link rows. Load/save run on `spawn_blocking` (async Tauri commands) so large
+JSON does not stall the main async runtime.
 
 ### Legacy (v1/v2 — auto-migrated)
 
@@ -67,11 +69,12 @@ id in the index.
 
 | File | Role |
 |---|---|
-| `src-tauri/src/chat_store.rs` | `chat_store_load_workspace` (ids only), `chat_store_load` (one body), `chat_store_save`, `chat_store_delete`, `chat_store_lookup_link`, `chat_store_all_links` |
+| `src-tauri/src/chat_store.rs` | `chat_store_load_workspace` (ids only), async `chat_store_load` / `chat_store_save` (`spawn_blocking` + `SAVE_LOCK`), delete/lookup/links |
+| `src-tauri/src/atomic.rs` | Unique `.codetta-tmp.{nanos}.{seq}` sibling + rename; concurrent-write unit test |
 | `src-tauri/src/provider_sessions.rs` | Unified CLI list/load — see `044-provider-session-bridge.md` |
 | `src-tauri/src/session_jsonl.rs` | Shared JSONL parser (CC + Cursor agent-transcripts) |
 | `src-tauri/src/provider_path.rs` | `encode_project_path` — same slug as CC/Cursor on-disk dirs |
-| `src/chatStoreCache.ts` | Index hydrate, `ensureSessionLoaded`, warm ids, body drop, async disk flush |
+| `src/chatStoreCache.ts` | Index hydrate, `ensureSessionLoaded`, warm ids, body drop, **coalesced** `persistSession` (latest wins while in-flight) |
 | `src/chatHistory.ts` | Public API: `loadSession`, `ensureSessionLoaded`, `saveSession`, `patchSession`, `deleteSession` |
 | `src/chatHostMount.ts` | DONE hosts unload when hidden; live stay sticky (multitask) |
 | `src/chatProviderRecovery.ts` | Hydrate thin Quack rows from CLI on-disk transcripts (all agentic providers) |
@@ -136,13 +139,24 @@ A tab can exist without a transcript row; Quack shows an empty pane.
 
 ## Recovery from CLI on-disk transcripts
 
-When a `ChatSession` has a provider id but **fewer assistant messages than user
-messages** (incomplete Quack row), `AIChatPanel` auto-calls
-`recoverSessionFromAnyProvider` on mount / history open:
+`AIChatPanel` auto-calls `recoverSessionFromAnyProvider` on mount when
+`needsProviderHydration` is true:
+
+| Probe | Condition |
+|---|---|
+| Classic thin row | `users > 0 && assistants < users` |
+| Short snapshot | `1…16` Quack messages **and** a linked CLI id (`SHORT_SNAPSHOT_PROBE`) |
+
+Then:
 
 1. For each linked agentic provider (`claude-code`, `cursor-cli`; OpenCode TBD)
 2. `provider_load_session(cwd, provider, cliId)` reads CLI JSONL / transcript
-3. If loaded count > saved count → replace messages, `saveSession`, toast
+3. If loaded count > Quack count → replace messages, persist, toast
+   `Restored N messages from {provider} session`
+
+Recover no-ops when the CLI transcript is not richer. Close-tab orphans still
+on disk can be re-linked via **⟲ Sessions** (`044`) — `closeAIChat` drops the
+hub descriptor but **does not** delete the transcript file.
 
 Files: `src/chatProviderRecovery.ts`, `src-tauri/src/provider_sessions.rs`.
 
@@ -173,9 +187,13 @@ chat still needs `ensureSessionLoaded` in `AIChatPanel` (`076`).
 - **`saveSession` return value** — always `true` for cache; disk failures surface via toast callback.
 - **MAX_SESSIONS (30)** — evicts oldest transcript files + provider-link cleanup for evicted rows.
 - **Do not** use monolithic array writes — always per-session files.
+- **Concurrent saves** — streaming checkpoints + composer `patchSession` fire overlapping
+  `chat_store_save`. Fixed `.codetta-tmp` sibling caused ENOENT on the second rename
+  ("Chat not saved" toast) and truncated rows. Fix: unique tmp tags in `atomic.rs`,
+  `SAVE_LOCK` in `chat_store_save`, frontend coalesce in `persistSession`.
 - **Agent Mode** mounts one `AIChatPanel` per **live** (or currently visible DONE)
-  chat; DONE hosts unload when hidden (`076`). Parallel saves are safe (separate files).
-- **Vite-only dev** (`npm run dev` without Tauri) — `hydrateChatStore` falls back to legacy `localStorage` read.
+  chat; DONE hosts unload when hidden (`076`).
+- **Vite-only dev** (`npm run dev` without Tauri) — `hydrateChatStore` falls back to legacy `localStorage` read; disk save is a no-op (no false toast).
 - **Audit script** — `audit-chat-persistence.mjs` predates v3; inspect `~/Library/Application Support/codetta/chats/` for ground truth.
 
 ## Related

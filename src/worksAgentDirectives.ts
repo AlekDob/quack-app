@@ -15,6 +15,7 @@ import {
 } from "./worksCache";
 import { linkStoryToChat, linkWorkToChat } from "./quackPlanHarness";
 import { findStory, type WorkStory, type WorksSnapshot } from "./works";
+import { moduleIdFromSlug } from "./storyMd";
 
 export interface AppliedWorksAction {
   kind: "linked" | "created-story" | "created-work" | "updated";
@@ -22,9 +23,17 @@ export interface AppliedWorksAction {
   title: string;
 }
 
-interface Fields {
-  [key: string]: string;
+export interface WorksNewStoryFields {
+  title?: string;
+  scope?: string;
+  entry?: string;
+  decisions?: string;
+  acceptance?: string;
+  notes?: string;
+  [key: string]: string | undefined;
 }
+
+type Fields = WorksNewStoryFields;
 
 const ID_RE = /^\[Works link\]\s+([SW]-\d+)/gim;
 const NEW_STORY_RE = /\[Works new-story\]([\s\S]*?)\[\/Works new-story\]/gi;
@@ -87,6 +96,48 @@ export function parseWorksDirectives(text: string): ParsedDirectives {
   return { links, newStories, newWorks, updates };
 }
 
+/** Strip agent Works directives from rendered assistant prose. */
+export function stripWorksDirectiveBlocks(content: string): string {
+  return content
+    .replace(/\[Works new-story\][\s\S]*?\[\/Works new-story\]/gi, "")
+    .replace(/\[Works new-work\][\s\S]*?\[\/Works new-work\]/gi, "")
+    .replace(/\[Works update\]\s+[SW]-\d+[\s\S]*?\[\/Works update\]/gi, "")
+    .replace(/^\[Works link\]\s+[SW]-\d+\s*$/gim, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** Parse the first `[Works new-story]` block in an assistant message. */
+export function parseWorksNewStoryBlock(
+  content: string,
+): WorksNewStoryFields | null {
+  const m = /\[Works new-story\]([\s\S]*?)\[\/Works new-story\]/i.exec(
+    content,
+  );
+  if (!m) return null;
+  const f = parseFields(m[1]);
+  return f.title ? f : null;
+}
+
+/** Resolve a story created from a new-story directive (title match, newest wins). */
+export function findStoryByTitle(
+  snap: WorksSnapshot,
+  title: string,
+): WorkStory | undefined {
+  const hits = snap.stories.filter((s) => s.title === title);
+  if (hits.length === 0) return undefined;
+  return hits.sort((a, b) => b.createdAt - a.createdAt)[0];
+}
+
+function moduleIdFromDirective(
+  snap: WorksSnapshot,
+  raw?: string,
+): string | undefined {
+  const t = raw?.trim();
+  if (!t) return undefined;
+  return moduleIdFromSlug(snap, t) ?? snap.modules.find((m) => m.id === t)?.id;
+}
+
 export function hasWorksDirectives(text: string): boolean {
   return (
     /\[Works link\]/i.test(text) ||
@@ -113,6 +164,7 @@ export async function applyWorksDirectives(
   chatId: string,
   root: string,
   d: ParsedDirectives,
+  opts?: { linkedStoryId?: string | null },
 ): Promise<AppliedWorksAction[]> {
   const done: AppliedWorksAction[] = [];
   const snap = getWorksSnapshot(root) ?? (await hydrateWorks(root));
@@ -125,12 +177,29 @@ export async function applyWorksDirectives(
     done.push({ kind: "linked", shortId, title: hit.title });
   }
 
+  const linkedStory = opts?.linkedStoryId
+    ? findStory(snap, opts.linkedStoryId)
+    : undefined;
+
   for (const f of d.newStories) {
     if (!f.title) continue;
+    if (linkedStory) {
+      const patch = buildStoryPatch(linkedStory, f);
+      if (f.title.trim()) patch.title = f.title.trim();
+      if (Object.keys(patch).length === 0) continue;
+      await updateStory(root, linkedStory.id, patch);
+      done.push({
+        kind: "updated",
+        shortId: linkedStory.shortId,
+        title: patch.title ?? linkedStory.title,
+      });
+      continue;
+    }
     const story = await createStory(root, {
       title: f.title,
       status: "active",
       bodyMd: buildEfficiencyBody(f),
+      moduleId: moduleIdFromDirective(snap, f.module),
     });
     await linkStoryToChat(wsId, chatId, root, story.id);
     done.push({ kind: "created-story", shortId: story.shortId, title: story.title });
@@ -151,8 +220,11 @@ async function applyNewWorks(
   if (newWorks.length === 0) return;
   const snap = getWorksSnapshot(root) ?? (await hydrateWorks(root));
   for (const f of newWorks) {
-    const parent = f.story
-      ? snap.stories.find((s) => s.shortId.toUpperCase() === f.story.toUpperCase())
+    const parentShort = f.story?.trim();
+    const parent = parentShort
+      ? snap.stories.find(
+          (s) => s.shortId.toUpperCase() === parentShort.toUpperCase(),
+        )
       : undefined;
     if (!f.title || !parent) continue; // new work needs a parent story
     const w = await createWorkFromStory(root, parent.id, {

@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-14
-tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command, plan-mode, exit-plan-mode, build-handoff, ask-user-question]
+last_verified: 2026-07-17
+tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command, plan-mode, exit-plan-mode, build-handoff, ask-user-question, tool-search]
 ---
 
 ## Claude Code Permission Mode (Ask / Plan / Auto-edit / Auto / Agent)
@@ -31,7 +31,7 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 | UI label | Stored value | Effect |
 |---|---|---|
 | Ask (default) | `null` | card on every gated tool; the safe default a fresh install gets |
-| Plan | `plan` | plan only, no edits; **read-only hook tools** (`Read`/`Grep`/`Glob`/`NotebookRead`) + **explore reads** (`ToolSearch`/`WebSearch`/`WebFetch`) + **read-only Bash** + **Task/subagent delegation** (`Task`/`Agent`/`TaskCreate`/`TaskUpdate`/`TaskList`/`TodoWrite`) + **subagent sidechains** (`parent_tool_use_id`) auto; writing Bash + file edits still card; `ExitPlanMode` always cards |
+| Plan | `plan` | plan only, no edits; **explore bypass by default** — read-only hook tools + explore reads + Task/subagent + **non-mutating Bash** (incl. `find -exec`, pipes, env assigns) auto-allow; writing Bash + file edits still card; `ExitPlanMode` always cards |
 | Auto-edit | `acceptEdits` | auto-allow file-edit tools (`Edit`/`MultiEdit`/`Write`/`NotebookEdit`); Bash & rest still card |
 | Auto | `auto` | auto-allow everything (Bash included); privacy gate + AskUserQuestion redirect still apply |
 | Agent | `bypassPermissions` | overlay allows EVERY tool, **before** the privacy gate too → no cards, no guard. Hook stays on (see gotcha). UI was **Bypass** until 2026-07-13. |
@@ -66,7 +66,7 @@ Cursor-style **semantic tint + icon** on the active mode pill; dropdown rows sho
 | `PLAN_READ_TOOLS` | `ToolSearch`, `WebSearch`, `WebFetch` | Plan only, inside `planModeAutoAllow` |
 | `PLAN_EXPLORE_TOOLS` | `Task`, `Agent`, `TaskCreate`, `TaskUpdate`, `TaskList`, `TodoWrite` | Plan only — Jack delegates without cards |
 | Sidechain | any tool when `parent_tool_use_id` present | Plan only — subagent inner steps; still blocks `WRITE_TOOLS`, non-read-only `Bash`, `ExitPlanMode` |
-| `isReadOnlyBash` | head ∈ `READ_ONLY_BASH` or `git` + `GIT_RO_SUBCMDS` subcommand | Plan only; `;` / `&&` chains allowed when **every** segment is read-only |
+| `isReadOnlyBash` / `isPlanExploreBash` | non-mutating Bash (pipes, env assigns, `find -exec`, `2>/dev/null`; block `rm`/`git commit`/stdout redirects/`exec`/`eval` as command heads) | Plan only — explore bypass by default (no "Allow exploration" click needed) |
 | `planSessionExplore` | in-memory flag per chat turn | User clicked **Allow exploration** — broad auto-allow except writes + `ExitPlanMode` |
 
 Hook payload shape (relevant fields):
@@ -100,7 +100,7 @@ Hook payload shape (relevant fields):
 - **Plan-mode explore auto-allow (2026-07-13):** `PLAN_EXPLORE_TOOLS` lets Jack delegate via Task/subagent and maintain TodoWrite checklists without permission cards, while **file edits, writing Bash, and `ExitPlanMode` still card**. Rationale: Plan mode exploration with subagents was unusable (dozens of cards); Jack must still call `ExitPlanMode` before the user can Build. `AskUserQuestion` is **not** in the set — user answers stay interactive.
 - **Plan-mode subagent follow-up (2026-07-14):** `PLAN_READ_TOOLS` (`ToolSearch`/`WebSearch`/`WebFetch`) + `NotebookRead` in the read-only hook set. Subagent sidechains auto-allow when the hook payload carries `parent_tool_use_id` (forwarded in `claude_perm.rs`). Read-only Bash allows safe `;`/`&&` chains (`sleep 1; echo done`, `cd ../sibling && grep …`) and adds `sleep`/`find`/`test`. **`ownerPermMode`** prop from `AIChatPanel` — `panelPermMode()` prefers composer Plan over `permModeStore` lookups that miss when subagent `cwd` diverges. **"Allow exploration"** (Plan only) sets `planSessionExploreRef` — stops carding without flipping the composer to Auto; `ExitPlanMode` + file writes still gate.
 - **Plan mode ignores saved always-allow rules:** otherwise a persisted "always allow Edit on .ts" would slip an edit past plan mode (the hook's `allow` overrides the CLI's plan block). In plan mode only read-only + explore allows fire; everything else cards.
-- **Plan-mode read-only Bash:** `READ_ONLY_BASH` lists provably-read commands (`ls cat head tail … sleep find test`); `git` is gated on `GIT_RO_SUBCMDS`. Pipes/redirects/subshells still reject. `;` / `&&` chains auto-allow when **every** segment is read-only (so `sleep 1; echo done` passes but `git status; rm` does not).
+- **Plan-mode explore Bash gotcha (`find -exec`, 2026-07-16):** `\bexec\b` in the dangerous-Bash regex matched `find … -exec`, so Plan still carded common explore commands (exactly the "don't annoy me in Plan" complaint). Fix: `exec`/`eval` are only refused as **command heads**; `;`/`&` split ignores escaped `\;` (find terminator). Plan remains explore-bypass by default — only file writes + `ExitPlanMode` card.
 - **`NEVER_BLANKET_ALLOW` (`Bash`, `ExitPlanMode`):** even if the user clicks a bare-name "always allow", these are refused a blanket rule — `Bash` because one name would allow arbitrary commands, `ExitPlanMode` because it's a per-plan approval that blanket-allowing would defeat.
 - **`/mode off` resets to Ask (`null`)**, not to a permissive default — the safe direction.
 - Mode is normalized: `default` is stored as `null` (Ask) so "no mode set" and "explicitly Ask" are the same state.
@@ -122,3 +122,5 @@ Hook payload shape (relevant fields):
   - Title copy: "Plan ready — build with Milo or keep discussing with Jack".
   - See [068-quack-plan-harness.md](068-quack-plan-harness.md) for story/work side effects.
 - **AskUserQuestion deny-redirect (073):** first gate always denies with a reason telling the model Quack is showing clickable options — never allow headless under `-p`. `publishAskInput` caches full `tool_input` for the dock. Subagent sidechain calls are denied the same way but **do not** mount `.ai-ask-dock` (parent stream filter) — orchestrator must re-ask. See [073-ask-user-question-dock.md](073-ask-user-question-dock.md), [004-subagent-mentions.md](004-subagent-mentions.md).
+- **MCP tools in the PreToolUse matcher (2026-07-17):** `PERMISSION_GATED_TOOLS` includes `mcp__.+` so `mcp__<server>__<tool>` calls hit the Quack card. Without this, CC under `-p` + Ask falls through to the native permission prompt (no TTY) and returns *"Claude requested permissions… but you haven't granted it yet"* with **no Allow button**. Same rationale as gating `WebFetch`/`WebSearch`. Overlay shows `pinky → brain_search`-style labels; Always / This session persist per full tool name. Hook fail-open timer is **50s** (matches `DECISION_TIMEOUT`) — the old 3s timer auto-allowed before the user could click.
+- **Eager tools for Plan/Ask docks (2026-07-16):** Quack sets `ENABLE_TOOL_SEARCH=false` on every CC spawn (`apply_clean_env`). Without it, CC defers `AskUserQuestion` + `ExitPlanMode` behind ToolSearch and `select:ExitPlanMode` often fails upstream — Jack pastes plans as prose and neither dock appears. Requires a **new** CC turn (env is per-process); resume alone is not enough if the old process is still alive.

@@ -71,6 +71,11 @@ export function isChatSwitching(): boolean {
   return switching;
 }
 
+/** Pulse target chat — Agent Mode keeps this host mounted during the veil. */
+export function getChatSwitchTarget(): string | null {
+  return targetChatId;
+}
+
 /** Drop the veil once the target panel has hydrated — after the MIN floor. */
 export function endChatSwitch(source = "unknown", chatId?: string): void {
   if (!switching) return;

@@ -146,9 +146,14 @@ const GIT_RO_SUBCMDS = new Set([
   "describe",
 ]);
 
-/** Mutating / risky Bash — never auto-allow, even in Plan explore. */
+/** Mutating / risky Bash — never auto-allow, even in Plan explore.
+ *  `exec`/`eval` are checked as command heads below — `\bexec\b` would
+ *  false-positive on `find … -exec` (common Plan explore pattern). */
 const PLAN_DANGEROUS_BASH_RE =
-  /\b(rm|rmdir|mv|cp|chmod|chown|mkdir|touch|truncate|tee|sudo|kill|pkill|eval|exec)\b|\bsed\s+-i\b|\b(npm|pnpm|yarn)\s+(install|add|remove|publish)\b|\bpip\s+install\b|\bgit\s+(add|commit|push|merge|checkout|reset|revert|stash|clean)\b/;
+  /\b(rm|rmdir|mv|cp|chmod|chown|mkdir|touch|truncate|tee|sudo|kill|pkill)\b|\bsed\s+-i\b|\b(npm|pnpm|yarn)\s+(install|add|remove|publish)\b|\bpip\s+install\b|\bgit\s+(add|commit|push|merge|checkout|reset|revert|stash|clean)\b/;
+
+/** Shell builtins that rewrite the process — only when they are the command. */
+const PLAN_DANGEROUS_HEADS = new Set(["eval", "exec"]);
 
 function stripStderrRedirects(part: string): string {
   return part.replace(/\s*2>\s*(&\d+|\/dev\/null|\S+)/g, "");
@@ -183,6 +188,7 @@ function isPlanExploreBashPart(part: string): boolean {
   if (PLAN_DANGEROUS_BASH_RE.test(p)) return false;
   const head = bashHead(p);
   if (!head) return true;
+  if (PLAN_DANGEROUS_HEADS.has(head)) return false;
   if (head === "git") return GIT_RO_SUBCMDS.has(p.split(/\s+/)[1] ?? "");
   return true;
 }
@@ -197,12 +203,16 @@ function planExploreChain(seg: string): boolean {
   return chains.length > 0 && chains.every(planExplorePipe);
 }
 
-/** Plan-mode explore Bash — pipes, env assigns, stderr redirect; block writes. */
+/** Plan-mode explore Bash — pipes, env assigns, stderr redirect; block writes.
+ *  Split on `;`/`&` only when not escaped (`find … -exec … \;`). */
 function isPlanExploreBash(input: Record<string, unknown>): boolean {
   const cmd = typeof input.command === "string" ? input.command : "";
   if (!cmd.trim()) return false;
   const flat = cmd.replace(/\n+/g, ";").trim();
-  const segments = flat.split(/[;&]+/).map((s) => s.trim()).filter(Boolean);
+  const segments = flat
+    .split(/(?<!\\)[;&]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
   return segments.length > 0 && segments.every(planExploreChain);
 }
 
@@ -484,7 +494,7 @@ export function ClaudePermissionOverlay({
           requestId: req.request_id,
           decision: "deny",
           reason:
-            "The editor is showing your question to the user as clickable option buttons right now. Do NOT repeat the question or options in text. Briefly say you're waiting for their selection, then END YOUR TURN; their next message will contain the answer.",
+            "Quack is rendering your AskUserQuestion options as clickable buttons above the composer. Do NOT repeat the question or paste option lists in prose — the user cannot answer that way. Say one short line that you're waiting for their pick, then END YOUR TURN.",
         }).catch((err) => console.warn("ask-redirect failed", err));
         return;
       }
@@ -889,10 +899,17 @@ export function ClaudePermissionOverlay({
   );
 }
 
+/** `mcp__pinky__brain_search` → `pinky → brain_search` for card titles. */
+function mcpToolLabel(tool: string): string | null {
+  const m = /^mcp__([^_]+)__(.+)$/.exec(tool);
+  return m ? `${m[1]} → ${m[2]}` : null;
+}
+
 function PermissionCardBody({ req }: { req: PermissionRequest }) {
   const { tool_name: tool, tool_input: input, cwd } = req;
   const wsName = cwd ? cwd.replace(/[\\/]+$/, "").split(/[\\/]/).pop() : null;
   const isPlan = tool === "ExitPlanMode";
+  const mcpLabel = mcpToolLabel(tool);
 
   return (
     <>
@@ -905,7 +922,7 @@ function PermissionCardBody({ req }: { req: PermissionRequest }) {
             <>Plan ready — build with Milo or keep discussing with Jack</>
           ) : (
             <>
-              Claude Code wants to use <code>{tool}</code>
+              Claude Code wants to use <code>{mcpLabel ?? tool}</code>
             </>
           )}
         </span>
@@ -1009,6 +1026,18 @@ function PermissionInputRenderer({
       </div>
     ) : (
       <div className="cc-perm-hint">(No plan text provided.)</div>
+    );
+  }
+  if (tool.startsWith("mcp__")) {
+    return (
+      <>
+        <pre className="cc-perm-content">{JSON.stringify(input, null, 2)}</pre>
+        <div className="cc-perm-hint">
+          MCP tool — Allow once for this call, or Always / This session so
+          Claude Code can use it under headless <code>-p</code> without a TTY
+          prompt.
+        </div>
+      </>
     );
   }
   return (

@@ -3,17 +3,21 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-13
-last_verified: 2026-07-14
-tags: [ai-chat, streaming, ux, claude-code, markdown, raf, typewriter, cursor-style, performance]
+last_verified: 2026-07-17
+tags: [ai-chat, streaming, ux, claude-code, markdown, raf, cursor-style, performance]
 ---
 
-## Smooth assistant streaming (char reveal + rAF paint)
+## Smooth assistant streaming (rAF paint)
 
-**Purpose:** Make in-flight assistant prose feel like steady typing instead of
-jerky blocks — especially with Claude Code bursts. Two layers: rAF-coalesced React
-updates + **char-by-char reveal** capped at 2 glyphs/frame. Live tail gets
-**light inline markdown** (closed bold / italic / code only); full block markdown
-on turn commit.
+**Purpose:** Make in-flight assistant prose feel steady instead of jerky blocks —
+especially with Claude Code bursts. **rAF-coalesced React updates** paint at most
+once per frame. Live tail gets **light inline markdown** (closed bold / italic /
+code only); full block markdown on turn commit.
+
+> **2026-07-17:** Char-by-char typewriter (`useTypewriterReveal`) was removed from
+> `StreamingPlainText`. It stacked a second rAF/`setState` loop on top of the
+> stream painter and made agent runs feel heavy. Stream smoothness is the painter
+> alone; caret still pulses on the live tail.
 
 **Problem (before):** Every `content_block_delta` called `setStreaming` +
 `setStreamingBlocks`, which re-ran `renderMarkdown()` on the **entire** growing
@@ -25,13 +29,12 @@ jumps, worse when tool calls split the turn into multiple text blocks.
 | Type | Path | Role |
 |------|------|------|
 | Utility | `src/streamPaint.ts` | `createStreamPainter` — coalesce UI commits to one per animation frame |
-| Utility | `src/typewriterReveal.ts` | `charsToReveal` — time-based budget, max 2 chars/frame |
-| Hook | `src/useTypewriterReveal.ts` | rAF reveal loop (~54 chars/s, gentle catch-up) |
 | Utility | `src/streamInlineFormat.ts` | `formatStreamInline` — closed `**`/`*`/`` ` `` only (no blocks) |
-| Component | `src/components/StreamingPlainText.tsx` | Char reveal + light inline MD + thin pulsing caret |
+| Component | `src/components/StreamingPlainText.tsx` | Live tail + light inline MD + thin pulsing caret |
 | Panel | `src/components/AIChatPanel.tsx` | Live loop + attach-replay use rAF painter; legacy bubble path uses plain tail |
 | Render | `src/components/chatToolRender.tsx` | `CompactBlocks` — stable text blocks → markdown; live tail → stream inline |
 | Styles | `src/App.css` | `.ai-stream-plain`, `.ai-stream-plain-md`, `.ai-stream-caret` |
+| (retired) | `src/useTypewriterReveal.ts`, `src/typewriterReveal.ts` | Kept on disk unused — char reveal removed for perf |
 
 ### Data flow
 

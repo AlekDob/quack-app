@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-13
+last_verified: 2026-07-17
 tags: [ai-chat, tool-calls, chatToolRender, cursor-style, conductor-style, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap, html-preview, ask-user-question]
 ---
 
@@ -27,7 +27,7 @@ Both docked chat and Agent Mode use the **same** chronology renderer:
 |---|---|---|
 | `InterleavedBlocks` | Always delegates to `CompactBlocks` | prose interleaved with tool runs |
 | `CompactBlocks` | Walks `blocks[]`, flushes tool runs | prose interleaved with tool runs |
-| `StreamingPlainText` | Last text block while `streaming` | char-by-char reveal + inline caret — `069-smooth-streaming.md` |
+| `StreamingPlainText` | Last text block while `streaming` | live tail + inline caret — `069-smooth-streaming.md` (typewriter removed 2026-07-17) |
 | `ThinkingBlock` | `splitThinking` on text blocks | `ReasoningTurnChip` (056) — Cursor-style collapsed reasoning |
 | `InlineActionRow` | One row per consecutive tool run (≥2 tools) | Conductor-style grouped chips |
 

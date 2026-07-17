@@ -128,7 +128,7 @@ export function AgentCreateDrawer({ open, root, editing, onClose, onCreated }: P
         // Built-ins have no backing file — persist as an override layer on
         // top of the shipped definition (effectivePresetDefinition merges
         // it back in everywhere the preset is displayed/resolved).
-        const ok = setPresetOverrides(editing.id, {
+        const ok = await setPresetOverrides(editing.id, {
           label: input.label,
           role: input.role,
           description: input.description,
@@ -140,7 +140,7 @@ export function AgentCreateDrawer({ open, root, editing, onClose, onCreated }: P
           instructions: input.instructions,
         });
         if (!ok) {
-          toastError("Couldn't save agent settings — storage may be full or disabled.");
+          toastError("Couldn't save agent settings — try freeing browser storage or restart Quack.");
           return;
         }
         toastSuccess(`Updated ${label.trim()}`);
@@ -157,9 +157,9 @@ export function AgentCreateDrawer({ open, root, editing, onClose, onCreated }: P
     }
   };
 
-  const resetToDefault = () => {
+  const resetToDefault = async () => {
     if (!editing || editing.source !== "builtin") return;
-    clearPresetOverrides(editing.id);
+    await clearPresetOverrides(editing.id);
     toastSuccess(`${editing.label} reset to defaults`);
     onCreated();
     onClose();
@@ -325,7 +325,7 @@ export function AgentCreateDrawer({ open, root, editing, onClose, onCreated }: P
           {editing?.source === "builtin" && (
             <button
               className="cust-btn agent-drawer-reset"
-              onClick={resetToDefault}
+              onClick={() => void resetToDefault()}
               disabled={saving}
               title="Clear overrides and go back to the shipped defaults"
             >

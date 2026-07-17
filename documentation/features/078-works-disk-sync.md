@@ -15,6 +15,10 @@ directions — Quack edits → disk, and external/agent edits → Quack — with
 write-storms, echo loops, or O(N) I/O per change. This is the persistence layer
 under the Works UI (`054`); analogous to `043` for chat transcripts.
 
+> **2026-07-17:** `startWorksWatchOnce()` is **not** called at app boot. It runs
+> when the Works pane becomes visible or a Work/Story drawer opens — chat and
+> editor paths no longer pay for `works/` `dir` refresh fanout.
+
 **Stack:** module-level per-root cache (not Zustand), Tauri `works_*` IPC for the
 slim JSON, `fs.readFile`/`writeFile` for the `.md` bodies, `fsBus` `dir` events
 from the recursive watcher (`077`).

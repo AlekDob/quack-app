@@ -341,7 +341,7 @@ always per-session.
 
 | Hot path | Rule |
 |---|---|
-| **Works catalog** | `ComposerWorkBar` owns `subscribeWorks` — isolated to the work-chip subtree. `AIChatPanel` must **not** mirror that subscription; `@` mention uses lazy `mentionWorksSnap` only while `mentionState` is open (`getWorksSnapshot` + hydrate on first `@`). |
+| **Works catalog** | **Retired from composer (2026-07-17).** `@` mention still uses lazy `mentionWorksSnap` only while `mentionState` is open. Works board hydrates on pane open (`078`). See `068`. |
 | **Work link menu** | `ComposerWorkLinkPanel` mounts only when the Work chip menu is open (`ComposerCtxMenu` returns `null` when closed). |
 | **Menu row icons** | `Icon` SVGs are `display: block`. All `.ai-composer-ctx-menu .menu-item-label` rows use `inline-flex` + `gap: 6px` so `+ New work item` stays on one line (`ComposerWorkQuickActions`). |
 | **Streaming + typing** | Typewriter RAF parks when caught up (`069`); nav rail must not observe `characterData` (`021`). |

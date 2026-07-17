@@ -25,7 +25,7 @@ export const PERM_MODE_OPTIONS: PermModeOption[] = [
   {
     v: "plan",
     label: "Plan",
-    desc: "Plan only — no edits",
+    desc: "Explore freely — no permission cards; edits still blocked",
     icon: "file-text",
     tone: "plan",
   },

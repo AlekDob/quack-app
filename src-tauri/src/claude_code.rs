@@ -112,6 +112,11 @@ pub fn claude_code_check() -> Result<String, String> {
 /// way to grant access, and (b) hitting external URLs is a meaningful
 /// trust decision the user should make once and for all via the
 /// "Always allow" button.
+/// MCP tools (`mcp__<server>__<tool>`) are gated for the same headless
+/// reason: under `claude -p` the CLI's native permission prompt has no
+/// TTY, so ungated MCP calls die with "haven't granted it yet" and no
+/// Quack Allow card. Matching `mcp__.+` routes them through the overlay
+/// (Always allow / This session work per tool name).
 /// Read/Grep/Glob are in the matcher ONLY so the frontend's privacy
 /// gate can see model-initiated reads (the exclusion list is useless
 /// if Claude can `Read .env` without the hook firing). The overlay
@@ -122,7 +127,7 @@ pub fn claude_code_check() -> Result<String, String> {
 /// fail opaquely. The overlay denies it with a reason telling the
 /// model Quack is showing clickable options above the composer.
 const PERMISSION_GATED_TOOLS: &str =
-    "Bash|Edit|MultiEdit|Write|NotebookEdit|WebFetch|WebSearch|Read|Grep|Glob|AskUserQuestion|ExitPlanMode";
+    "Bash|Edit|MultiEdit|Write|NotebookEdit|WebFetch|WebSearch|Read|Grep|Glob|AskUserQuestion|ExitPlanMode|mcp__.+";
 
 /// Cached resolution of the working `claude` executable name. On
 /// Windows, npm-installed Claude Code is `claude.cmd`, which
@@ -464,13 +469,12 @@ fn ensure_pretooluse_hook(workspace: &str, endpoint: &str) -> Result<(), String>
 /// on every gated tool and ignored Claude's own permission-mode and
 /// `permissions.allow` rules — unusable in terminal and Claude Desktop.
 ///
-/// Why a 3-second timeout:
-/// Codetta's server's own DECISION_TIMEOUT is 50s. If Codetta IS
-/// running, the user has up to that long to click. But if Codetta
-/// ISN'T running, ECONNREFUSED fires almost instantly via `r.on('error',...)`.
-/// The 3s timeout is purely a belt-and-suspenders for the very rare
-/// case where the connection *opens* but the server hangs without
-/// responding — fail open and let the agent proceed.
+/// Why the hook's fail-open timer is 50s (same as `DECISION_TIMEOUT`):
+/// while Quack holds the HTTP response open waiting for Allow/Deny, the
+/// hook sees an unanswered request. A short timer (old 3s) auto-allowed
+/// before the user could click, so Ask cards were ghosts. 50s matches
+/// the server ceiling; CC's hook budget is ~60s. ECONNREFUSED (Quack
+/// not running) still fails open almost instantly via `r.on('error')`.
 ///
 /// Note: `path` MUST be `pathname + search` because our endpoint URL
 /// includes a `?token=<secret>` query string that the server uses to
@@ -484,7 +488,7 @@ fn build_hook_command(endpoint: &str) -> String {
     // used e.g. to redirect AskUserQuestion ("ask in plain text") so
     // the agent recovers instead of treating it as a hard failure.
     let js = format!(
-        r#"const http=require('http');let b='';process.stdin.on('data',c=>b+=c).on('end',()=>{{let done=false;function out(d,reason){{if(done)return;done=true;const o={{hookEventName:'PreToolUse',permissionDecision:d}};if(reason)o.permissionDecisionReason=reason;process.stdout.write(JSON.stringify({{hookSpecificOutput:o}}));process.exit(0)}}if(!process.env.CODETTA_PERM_HOOK){{out('allow');return}}const t=setTimeout(()=>out('allow'),3000);try{{const u=new URL('{endpoint}');const r=http.request({{hostname:u.hostname,port:u.port,path:u.pathname+u.search,method:'POST',headers:{{'content-length':Buffer.byteLength(b)}}}},res=>{{let d='';res.on('data',c=>d+=c);res.on('end',()=>{{clearTimeout(t);const s=String(d).trim();if(s[0]==='2'){{const i=s.indexOf(':');out('deny',i>0?s.slice(i+1):undefined)}}else{{out('allow')}}}})}});r.on('error',()=>{{clearTimeout(t);out('allow')}});r.write(b);r.end()}}catch(_){{clearTimeout(t);out('allow')}}}});"#,
+        r#"const http=require('http');let b='';process.stdin.on('data',c=>b+=c).on('end',()=>{{let done=false;function out(d,reason){{if(done)return;done=true;const o={{hookEventName:'PreToolUse',permissionDecision:d}};if(reason)o.permissionDecisionReason=reason;process.stdout.write(JSON.stringify({{hookSpecificOutput:o}}));process.exit(0)}}if(!process.env.CODETTA_PERM_HOOK){{out('allow');return}}const t=setTimeout(()=>out('allow'),50000);try{{const u=new URL('{endpoint}');const r=http.request({{hostname:u.hostname,port:u.port,path:u.pathname+u.search,method:'POST',headers:{{'content-length':Buffer.byteLength(b)}}}},res=>{{let d='';res.on('data',c=>d+=c);res.on('end',()=>{{clearTimeout(t);const s=String(d).trim();if(s[0]==='2'){{const i=s.indexOf(':');out('deny',i>0?s.slice(i+1):undefined)}}else{{out('allow')}}}})}});r.on('error',()=>{{clearTimeout(t);out('allow')}});r.write(b);r.end()}}catch(_){{clearTimeout(t);out('allow')}}}});"#,
         endpoint = endpoint
     );
     format!("node -e \"{}\"", js.replace('"', "\\\""))
@@ -520,6 +524,13 @@ fn apply_clean_env(cmd: &mut Command) {
     // is a no-op (`allow`) and Claude's own permission UX applies instead
     // of hijacking into Codetta's UI. See build_hook_command.
     cmd.env("CODETTA_PERM_HOOK", "1");
+    // Eager-load tool schemas. CC ≥2.1.72 defers AskUserQuestion +
+    // ExitPlanMode behind ToolSearch; select:ExitPlanMode often returns
+    // "No matching deferred tools" (CC #45294 / #49843), so Jack falls
+    // back to plain-text plans and Quack never shows the Build / ask
+    // docks. false = schemas in context every turn (slightly more
+    // tokens; required for Quack's plan + question UX).
+    cmd.env("ENABLE_TOOL_SEARCH", "false");
 }
 
 fn shell_quote(s: &str) -> String {

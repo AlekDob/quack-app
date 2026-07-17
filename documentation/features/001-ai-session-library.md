@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-16
+last_verified: 2026-07-17
 tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, workspace, zustand, persistence]
 ---
 
@@ -72,6 +72,11 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 
 ### Gotcha — legacy singleton AI panel
 `WorkspaceShell` can still mount `AIChatPanel` **without** `aiChatId` when `layout.aiPanelVisible` (old right dock). That panel has **no** hub row / tab and used to receive every unscoped `requestAIPrompt`. Entry points must use `ensureFocusedAIChat` / `addNewAIChat` (which also force `aiPanelVisible` off). Do not reintroduce Ask AI → `setAIPanelVisible(true)`.
+
+### Gotcha — close tab vs Delete
+`closeAIChat` drops the hub descriptor + tab but **keeps** the transcript file
+on disk (orphan until ⟲ Sessions re-link). **Delete** removes disk + descriptor.
+See `009`, `043`, `044`.
 
 ### Gotcha — new chat + switch veil
 `addNewAIChat` pulses `veil: false`. That path must **clear** an in-flight switch pulse (`finish`), otherwise hosts stay `!is-visible` until CAP and the new tab looks missing. See `075-chat-switch-loader.md`.

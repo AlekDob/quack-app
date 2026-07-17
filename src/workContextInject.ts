@@ -11,7 +11,7 @@ const injectKey = (wsId: string) => `lcp.works.inject.${wsId}`;
 export function getWorkInjectEnabled(wsId: string): boolean {
   return getJson<boolean>(
     injectKey(wsId),
-    true,
+    false,
     (v): v is boolean => typeof v === "boolean",
   );
 }

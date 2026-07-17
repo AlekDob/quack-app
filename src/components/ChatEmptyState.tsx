@@ -40,10 +40,13 @@ type Props = {
   wsId: string;
   chatId?: string;
   onPickStarter: (prompt: string) => void;
+  /** Active agent avatar (preset or @-mentioned subagent). null = Jack, who
+   *  renders as the built-in duck mark so the hero matches the composer pill. */
+  avatarUrl?: string | null;
 };
 
 /** Cursor-style empty chat — always-editable session label + starter grid. */
-export function ChatEmptyState({ wsId, chatId, onPickStarter }: Props) {
+export function ChatEmptyState({ wsId, chatId, onPickStarter, avatarUrl }: Props) {
   const chatTitle = useStore((s) =>
     chatId ? (s.loaded[wsId]?.aiChats[chatId]?.title ?? "") : "",
   );
@@ -81,7 +84,11 @@ export function ChatEmptyState({ wsId, chatId, onPickStarter }: Props) {
   return (
     <div className="ai-empty-hero">
       <div className="ai-empty-hero-mark" aria-hidden="true">
-        <AIIcon size={28} />
+        {avatarUrl ? (
+          <img className="ai-empty-hero-mark-img" src={avatarUrl} alt="" />
+        ) : (
+          <AIIcon size={48} />
+        )}
       </div>
       {chatId ? (
         <div className="ai-empty-hero-name">

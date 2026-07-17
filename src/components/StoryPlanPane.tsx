@@ -3,13 +3,14 @@ import { parseStoryPlanKey } from "../storyPlanTab";
 import { findStory } from "../works";
 import { hydrateWorks, subscribeWorks } from "../worksCache";
 import { useStore } from "../store";
+import { openStoryDrawer } from "../storyDrawer";
 import { Icon } from "./Icon";
 import { MarkdownPreview } from "./MarkdownPreview";
 
 interface Props {
   tabKey: string;
   visible?: boolean;
-  /** Inside StoryPlanDrawer — hide duplicate header. */
+  /** Legacy embedded mode (no header). */
   embedded?: boolean;
 }
 
@@ -65,13 +66,13 @@ export function StoryPlanPane({ tabKey, visible = true, embedded = false }: Prop
   );
 }
 
-import { pinStoryPlanDrawer } from "../storyPlanDrawerStore";
-
+/** Open the Works story drawer (chat StoryPlanDrawer retired). */
 export function openStoryPlanTab(
   wsId: string,
-  chatId: string | undefined,
-  _storyId: string,
+  _chatId: string | undefined,
+  storyId: string,
 ): void {
-  if (!chatId) return;
-  pinStoryPlanDrawer(wsId, chatId);
+  const root = useStore.getState().loaded[wsId]?.meta.root;
+  if (!root) return;
+  openStoryDrawer({ wsId, root, storyId });
 }

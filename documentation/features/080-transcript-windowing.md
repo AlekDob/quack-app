@@ -51,6 +51,7 @@ display (messages)
 
 ### Gotchas
 
+- **Tool-dense turns:** windowing is by **turns**, not tools. A 20-turn chat with hundreds of `tool_calls` still painted every row. Legacy (no-blocks) lists now cap at `TOOL_ROW_CAP=12` with “Show N more tools” (`AIChatPanel`).
 - **Nav rail (`021`)** builds ticks from rendered `data-anchor` turns, so while
   windowed it shows ticks for **visible turns only**; clicking "Show earlier"
   reveals the rest and their ticks. Jump-to-turn targets a hidden turn only

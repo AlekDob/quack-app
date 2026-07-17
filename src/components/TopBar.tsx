@@ -410,22 +410,17 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
           </span>
         )}
         {activeWsName && (
-          <>
-            <span className="topbar-brand-sep" aria-hidden="true">
-              --&gt;
-            </span>
-            <span
-              className={`topbar-brand-project ${wsColor ? "has-color" : ""}`}
-              style={
-                wsColor
-                  ? ({ "--ws-color": wsColor.hex } as React.CSSProperties)
-                  : undefined
-              }
-              title={activeWsName}
-            >
-              {activeWsName}
-            </span>
-          </>
+          <span
+            className={`topbar-brand-project ${wsColor ? "has-color" : ""}`}
+            style={
+              wsColor
+                ? ({ "--ws-color": wsColor.hex } as React.CSSProperties)
+                : undefined
+            }
+            title={activeWsName}
+          >
+            {activeWsName}
+          </span>
         )}
       </div>
 

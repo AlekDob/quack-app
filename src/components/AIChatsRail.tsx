@@ -34,6 +34,7 @@ import {
 import { fileBase } from "../sessionDiffStats";
 import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { pulseChatSwitch } from "../chatSwitch";
+import { logChatSwitch } from "../chatSwitchDebug";
 import { deleteSession } from "../chatHistory";
 import { confirm as dialogConfirm } from "../dialog";
 import { AgentCustomizations } from "./AgentCustomizations";
@@ -149,7 +150,7 @@ export function AIChatsRail({
   const railSide = inSidebar ? "left" : sidebarSide === "left" ? "right" : "left";
 
   // Re-render on status / color / section changes (module-level stores).
-  const [, setTick] = useState(0);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     const force = () => setTick((t) => t + 1);
     const offs = [
@@ -189,19 +190,25 @@ export function AIChatsRail({
     return pile.sort((a, b) => b.chat.createdAt - a.chat.createdAt);
   }, [loaded]);
 
-  const entries: HubEntry[] = [];
-  for (const [wsId, ws] of Object.entries(loaded)) {
-    const color = getWorkspaceColor(wsId);
-    for (const chat of Object.values(ws.aiChats)) {
-      if (isDonePile(chat)) continue;
-      const status = resolveDisplayStatus({
-        lifecycle: "active",
-        live: getAgentStatus(chat.id),
-        seen: isSeen(chat.id),
-      });
-      entries.push({ wsId, ws, chat, status, color });
+  // `tick` MUST be a dep — status lives in agentStatusStore, not `loaded`.
+  // Without it, Working/Ready stayed frozen until a chat switch mutated the store.
+  const entries = useMemo(() => {
+    const out: HubEntry[] = [];
+    for (const [wsId, ws] of Object.entries(loaded)) {
+      const color = getWorkspaceColor(wsId);
+      for (const chat of Object.values(ws.aiChats)) {
+        if (isDonePile(chat)) continue;
+        const status = resolveDisplayStatus({
+          lifecycle: "active",
+          live: getAgentStatus(chat.id),
+          seen: isSeen(chat.id),
+        });
+        out.push({ wsId, ws, chat, status, color });
+      }
     }
-  }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tick = status/seen/diff/color
+  }, [loaded, tick]);
 
   const doneVisible = useMemo(() => {
     const q = doneSearch.trim().toLowerCase();
@@ -232,8 +239,14 @@ export function AIChatsRail({
       activeId && loaded[activeId] ? activeAiChatId(loaded[activeId]) : null;
     const crossWs = wsId !== activeId;
     if (chatId !== current || crossWs) {
-      // Veil on every switch (not just cross-workspace) — see AgentModeShell.
-      pulseChatSwitch({ veil: true, flushWsId: activeId ?? undefined });
+      logChatSwitch("rail focus", { chatId, current, crossWs, wsId });
+      pulseChatSwitch({
+        veil: true,
+        flush: crossWs,
+        flushWsId: crossWs ? (activeId ?? undefined) : undefined,
+        source: "AIChatsRail.focusChat",
+        chatId,
+      });
     }
     if (crossWs) await setActiveWorkspace(wsId);
     focusAIChat(wsId, chatId);
@@ -267,12 +280,16 @@ export function AIChatsRail({
 
   const totalChats = entries.length;
   const activeRoot = activeId ? loaded[activeId]?.meta.root ?? "" : "";
+  const entryKeys = useMemo(
+    () => entries.map((e) => `${e.wsId}:${e.chat.id}`).join("\0"),
+    [entries],
+  );
 
   useEffect(() => {
     for (const e of entries) {
       hydrateChatDiff(e.chat.id, e.wsId, e.chat.sessionId);
     }
-  }, [totalChats, activeId, loaded]);
+  }, [entryKeys, entries]);
 
   const hubBody = (
     <div
@@ -718,7 +735,6 @@ function HubRow({
         ))}
       {expanded && (
         <WorkHubBadge
-          root={ws.meta.root}
           workItemId={chat.workItemId}
           storyId={chat.storyId}
           planning={chat.planning}

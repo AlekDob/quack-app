@@ -5,6 +5,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
+
+/// Serialize index + session writes — parallel `spawn_blocking` saves used to
+/// race on `__idx__.json` / `provider-links.json` and on a shared `.codetta-tmp`.
+static SAVE_LOCK: Mutex<()> = Mutex::new(());
 
 const MAX_SESSIONS: usize = 30;
 
@@ -179,59 +184,70 @@ pub fn chat_store_load_workspace(ws_id: String) -> Result<ChatWorkspaceSnapshot,
 }
 
 #[tauri::command]
-pub fn chat_store_load(
+pub async fn chat_store_load(
     ws_id: String,
     session_id: String,
 ) -> Result<Option<serde_json::Value>, String> {
-    let path = session_path(&ws_id, &session_id)?;
-    if !path.exists() {
-        return Ok(None);
-    }
-    let s = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    let v: serde_json::Value = serde_json::from_str(&s).map_err(|e| e.to_string())?;
-    Ok(Some(v))
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = session_path(&ws_id, &session_id)?;
+        if !path.exists() {
+            return Ok(None);
+        }
+        let s = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let v: serde_json::Value = serde_json::from_str(&s).map_err(|e| e.to_string())?;
+        Ok(Some(v))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn chat_store_save(ws_id: String, session: serde_json::Value) -> Result<(), String> {
-    let session_id = session
-        .get("id")
-        .and_then(|x| x.as_str())
-        .ok_or_else(|| "session.id required".to_string())?
-        .to_string();
-    let path = session_path(&ws_id, &session_id)?;
-    let s = serde_json::to_string(&session).map_err(|e| e.to_string())?;
-    crate::atomic::write(&path, s.as_bytes()).map_err(|e| e.to_string())?;
+pub async fn chat_store_save(ws_id: String, session: serde_json::Value) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let _guard = SAVE_LOCK
+            .lock()
+            .map_err(|e| format!("chat_store lock poisoned: {e}"))?;
+        let session_id = session
+            .get("id")
+            .and_then(|x| x.as_str())
+            .ok_or_else(|| "session.id required".to_string())?
+            .to_string();
+        let path = session_path(&ws_id, &session_id)?;
+        let s = serde_json::to_string(&session).map_err(|e| e.to_string())?;
+        crate::atomic::write(&path, s.as_bytes()).map_err(|e| e.to_string())?;
 
-    let prev = read_index(&ws_id)?;
-    let ids: Vec<String> = std::iter::once(session_id.clone())
-        .chain(
-            prev.ids
-                .iter()
-                .filter(|id| **id != session_id)
-                .cloned(),
-        )
-        .take(MAX_SESSIONS)
-        .collect();
-    let evicted: Vec<String> = prev
-        .ids
-        .into_iter()
-        .filter(|id| !ids.contains(&id))
-        .collect();
-    for id in evicted {
-        let p = session_path(&ws_id, &id)?;
-        if p.exists() {
-            if let Ok(s) = fs::read_to_string(&p) {
-                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&s) {
-                    remove_provider_links_for_session(&v);
+        let prev = read_index(&ws_id)?;
+        let ids: Vec<String> = std::iter::once(session_id.clone())
+            .chain(
+                prev.ids
+                    .iter()
+                    .filter(|id| **id != session_id)
+                    .cloned(),
+            )
+            .take(MAX_SESSIONS)
+            .collect();
+        let evicted: Vec<String> = prev
+            .ids
+            .into_iter()
+            .filter(|id| !ids.contains(&id))
+            .collect();
+        for id in evicted {
+            let p = session_path(&ws_id, &id)?;
+            if p.exists() {
+                if let Ok(raw) = fs::read_to_string(&p) {
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+                        remove_provider_links_for_session(&v);
+                    }
                 }
+                let _ = fs::remove_file(p);
             }
-            let _ = fs::remove_file(p);
         }
-    }
-    write_index(&ws_id, &SessionIndex { ids })?;
-    upsert_provider_links(&ws_id, &session);
-    Ok(())
+        write_index(&ws_id, &SessionIndex { ids })?;
+        upsert_provider_links(&ws_id, &session);
+        Ok(())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

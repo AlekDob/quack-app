@@ -90,6 +90,7 @@ Set on every `claude_code_chat` spawn (in addition to `NO_COLOR`, `CI`, `CODETTA
 |---|---|---|
 | `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS` | `0` | Uncapped wait for background subagents in `-p` (see 048) |
 | `CLAUDE_CODE_RESUME_INTERRUPTED_TURN` | `1` | Auto-continue if prior headless run ended mid-turn |
+| `ENABLE_TOOL_SEARCH` | `false` | Eager-load deferred tools (`AskUserQuestion`, `ExitPlanMode`) — ToolSearch often misses them (073 / 015) |
 
 ### Auth status + guided sign-in
 

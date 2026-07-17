@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-16
+last_verified: 2026-07-17
 tags: [agent-hub, agent-status, sessions, notifications, cross-project, workspace-colors, watcher, mount-asymmetry, collapsed-rail, hover-drawer, archived, delete, lifecycle]
 ---
 
@@ -75,7 +75,12 @@ Persisted lifecycle fields on `AIChatDescriptor` in per-workspace `state.json`: 
 
 **Process cleanup:** Mark done, unarchive, delete, and close chat tab all call `stopChatAgent` where a live agent subprocess exists — kills the chat's CLI subprocess (`claude_code_kill_session` / `cursor_code_kill_session`) and aborts HTTP streams via `aiStopBus`. **Does not kill workspace PTY terminals** (e.g. a dev server in Terminal 1). See `046-process-cleanup.md`.
 
-**Delete vs close tab:** the row **×** / `closeAIChat` closes the editor tab but keeps the descriptor + transcript on disk (chat can reappear if reopened from history). **Delete** is destructive — removes `ChatSession` from disk (`chatHistory.deleteSession` → `chat_store.rs`) and drops the tab descriptor.
+**Delete vs close tab:** the row **×** / `closeAIChat` removes the tab **and**
+the hub descriptor (`aiChats[id]`), stops the agent, and keeps the transcript
+file on disk (`chats/{wsId}/{sessionId}.json`). It does **not** appear in the
+hub until reopened. Re-link via **New chat → ⟲ Sessions** (`044`) or a future
+orphan picker. **Delete** is destructive — `deleteSession` removes the disk
+row + descriptor. `Ctrl+Shift+T` only reopens **file** tabs, not AI chats.
 
 ### Done pile (expanded hub, 2026-07-16)
 
@@ -147,6 +152,10 @@ layout reflow. **Chevron** pins the hub at 240px in-flow. Implementation:
 
 ### Gotchas
 
+- **Hub `entries` must depend on status `tick`** — `subscribeAgentStatus` bumps a
+  local `tick`; `useMemo(..., [loaded, tick])`. Without `tick`, Working/Ready
+  stayed frozen until a store mutation (e.g. chat switch). Focused chat publishes
+  `ready` (not clear-to-null) in `AgentHubWatcher`.
 - **Backend stream key = chat-tab `sessionId`** (= `AIChatDescriptor.sessionId`), NOT the Claude session UUID. `claude_code_active_sessions` returns these, matched directly against descriptors. The permission event's `session_id` IS the Claude UUID — resolved to a chat via `loadSessions(wsId).claudeSessionId` (+ cwd→workspace fallback) in the watcher's `resolveChat`.
 - **Editor mode mounts all open workspaces' shells** (hidden via `display:none`), so their panels stream in the background; Agent Mode mounts only the active session. The watcher is mount-independent either way — it reads the backend, not the panels.
 - **`aiRailExpanded` (per-workspace) + `reorderAIChat` are now dead** — the hub is global (`hubPrefs`) and grouped by status (drag-reorder dropped in v1). Left in the store, harmless.

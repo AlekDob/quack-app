@@ -1,11 +1,9 @@
 import { memo, useMemo } from "react";
-import { useTypewriterReveal } from "../useTypewriterReveal";
 import { formatStreamInline } from "../streamInlineFormat";
 
-/** Live assistant tail — smooth char reveal + light inline markdown + caret.
- *  Memoized so parent re-renders (composer keystrokes, usage strip ticks)
- *  do NOT re-run the typewriter hook or formatStreamInline when the text
- *  prop is unchanged. */
+/** Live assistant tail — stream painter already coalesces to ~1 paint/frame.
+ *  Char-by-char typewriter was dropped: it added a second rAF/setState storm
+ *  on top of streaming and made the UI feel heavy during agent runs. */
 export const StreamingPlainText = memo(function StreamingPlainText({
   text,
   showCaret = true,
@@ -15,8 +13,7 @@ export const StreamingPlainText = memo(function StreamingPlainText({
   showCaret?: boolean;
   active?: boolean;
 }) {
-  const visible = useTypewriterReveal(text, active);
-  const html = useMemo(() => formatStreamInline(visible), [visible]);
+  const html = useMemo(() => formatStreamInline(text), [text]);
   return (
     <div className="ai-stream-plain">
       <span className="ai-stream-plain-text">

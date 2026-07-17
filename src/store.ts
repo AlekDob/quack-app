@@ -19,7 +19,7 @@ import {
 } from "./htmlPreview";
 import { planKey, parsePlanKey, stashPlan } from "./plan";
 import { parseStoryPlanKey } from "./storyPlanTab";
-import { pinStoryPlanDrawer } from "./storyPlanDrawerStore";
+import { openStoryDrawer } from "./storyDrawer";
 import {
   clampEditorDrawerW,
   defaultEditorDrawerW,
@@ -3481,8 +3481,10 @@ export const useStore = create<AppState>((set, get) => {
         return { ...w, aiChats: { ...w.aiChats, [id]: next } };
       }),
 
-    openStoryPlan: (wsId, chatId, _storyId) => {
-      if (chatId) pinStoryPlanDrawer(wsId, chatId);
+    openStoryPlan: (wsId, _chatId, storyId) => {
+      const root = get().loaded[wsId]?.meta.root;
+      if (!root) return;
+      openStoryDrawer({ wsId, root, storyId });
     },
 
     renameAIChat: (wsId, id, title) =>

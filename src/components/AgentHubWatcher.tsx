@@ -146,23 +146,24 @@ export function AgentHubWatcher() {
         return;
       }
       if (prev?.derived === "working") {
-        if (focusedChatId === chat.id) {
-          publishAgentStatus(chat.id, null); // you're watching — no fanfare
-          return;
-        }
+        // Always publish ready (including the focused chat). Clearing to
+        // null made the hub depend on a separate recompute path and felt
+        // like status only updated after switching away.
         publishAgentStatus(chat.id, {
           chatId: chat.id,
           wsId: meta.id,
           derived: "ready",
           lastTransitionAt: now,
         });
-        void notifyAgentEvent({
-          chatId: chat.id,
-          kind: "ready",
-          wsName: meta.name,
-          chatTitle: chat.title,
-          isFocusedHere: false,
-        });
+        if (focusedChatId !== chat.id) {
+          void notifyAgentEvent({
+            chatId: chat.id,
+            kind: "ready",
+            wsName: meta.name,
+            chatTitle: chat.title,
+            isFocusedHere: false,
+          });
+        }
       }
     };
 

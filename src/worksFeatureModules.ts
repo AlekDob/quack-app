@@ -48,14 +48,12 @@ function repairItemModules(
   modules: WorkModule[],
 ): { items: WorksSnapshot["items"]; changed: boolean } {
   const valid = new Set(modules.map((m) => m.id));
-  const fallback = modules[0];
-  if (!fallback) return { items: snap.items, changed: false };
   let changed = false;
   const items = snap.items.map((w) => {
     if (!w.moduleId) return w;
     if (valid.has(w.moduleId)) return w;
     changed = true;
-    return { ...w, moduleId: fallback.id };
+    return { ...w, moduleId: "" };
   });
   return { items, changed };
 }

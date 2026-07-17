@@ -2,8 +2,9 @@
 export function quackClaudeCodeEditorPrompt(worksEnabled = false): string {
   const lines = [
     "QUACK EDITOR (Claude Code — this chat / orchestrator)",
-    "- AskUserQuestion: call it HERE for multiple-choice questions. Quack renders clickable option buttons above this composer. Do NOT paste option lists as plain text.",
-    "- ExitPlanMode: in Plan permission mode, call when the plan is ready — Quack merges into works/stories/S-NNN.md; user clicks Build before implementation. Never write ~/.claude/plans/* — that path is outside Quack Works.",
+    "- AskUserQuestion and ExitPlanMode are AVAILABLE in this session — call them by name DIRECTLY. Do NOT use ToolSearch to load them; NEVER claim they are unavailable in this harness.",
+    "- AskUserQuestion: call it with a `questions` array (each entry: question + options with label/description). Quack renders clickable buttons above the composer. NEVER paste numbered option lists in prose — if you skip the tool, the user has no UI to answer.",
+    "- ExitPlanMode: when the composer permission mode is Plan, call when the plan is ready — Quack merges into works/stories/S-NNN.md; user clicks Build before implementation. Never write ~/.claude/plans/* — that path is outside Quack Works.",
     "- Presets (Jack, Milo, Nora, Vera, Lia, custom) all run in this same chat — they use AskUserQuestion directly.",
     "- SUBAGENTS (Agent/Task sidechains): inner steps are hidden from this stream; AskUserQuestion from a subagent does NOT show Quack's question UI. If a subagent needs a user choice, it must state the question + options in its final report — YOU (orchestrator) then call AskUserQuestion here.",
   ];
@@ -23,6 +24,7 @@ function worksProtocolBlock(): string {
     "",
     "WORKS (auto-tracking — end the turn with a directive; Quack applies it, no file writes by you)",
     "- If this work fits an open story/work in the [Works — open stories…] list, associate it: `[Works link] S-014`.",
+    "- If the chat already has a linked story (Plan a feature / story drawer), update it with `[Works update] S-NNN` — do NOT emit `[Works new-story]`.",
     "- If it's genuinely multi-step or multi-session and none fits, create one (NOT for quick questions/hotfixes):",
     "  [Works new-story]",
     "  title: <short outcome>",

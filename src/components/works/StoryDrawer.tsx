@@ -19,6 +19,7 @@ import {
   subscribeWorks,
   updateStory,
 } from "../../worksCache";
+import { startWorksWatchOnce } from "../../worksWatch";
 import {
   findStory,
   storyLabel,
@@ -88,17 +89,13 @@ export function StoryDrawer() {
     }
     let alive = true;
     blocksDirty.current = false;
+    startWorksWatchOnce();
     void hydrateWorks(req.root).then((next) => {
       if (!alive) return;
       setSnap(next);
       if (isStoryDrawerCreate(req)) {
         seedCreate(req);
-        const fallback =
-          req.draft?.moduleId ??
-          next.modules.find((m) => m.featurePath)?.id ??
-          next.modules[0]?.id ??
-          "";
-        setModuleId(fallback);
+        setModuleId(req.draft?.moduleId ?? "");
         setCycleId(req.draft?.cycleId ?? next.cycles.find((c) => c.status === "active")?.id ?? "");
       } else {
         const s = findStory(next, req.storyId);
@@ -278,6 +275,7 @@ export function StoryDrawer() {
               <WorkModulePicker
                 modules={modules}
                 value={moduleId}
+                allowClear
                 onChange={(next) => {
                   setModuleId(next);
                   if (!isCreate && story) void onUpdate({ moduleId: next });

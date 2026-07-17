@@ -10,6 +10,7 @@
 
 import {
   createContext,
+  memo,
   useContext,
   useEffect,
   useState,
@@ -1251,33 +1252,59 @@ function optionFromRaw(o: unknown): { label: string; description?: string } | nu
   return { label, description };
 }
 
+function parseOneQuestion(raw: unknown): AskQuestionSpec | null {
+  if (!raw || typeof raw !== "object") return null;
+  const q = raw as Record<string, unknown>;
+  const question =
+    (typeof q.question === "string" && q.question) ||
+    (typeof q.text === "string" && q.text) ||
+    (typeof q.title === "string" && q.title) ||
+    (typeof q.prompt === "string" && q.prompt) ||
+    "";
+  if (!question || !Array.isArray(q.options)) return null;
+  const options = q.options
+    .map(optionFromRaw)
+    .filter((o): o is { label: string; description?: string } => !!o);
+  if (options.length === 0) return null;
+  return {
+    question,
+    header: typeof q.header === "string" ? q.header : undefined,
+    multiSelect: q.multiSelect === true,
+    options,
+  };
+}
+
+function questionsArrayFromRoot(root: Record<string, unknown>): unknown[] | null {
+  let raw = root.questions;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw) as unknown;
+    } catch {
+      return null;
+    }
+  }
+  return Array.isArray(raw) ? raw : null;
+}
+
 /** Defensive parse of AskUserQuestion's tool input. */
 export function parseAskQuestions(args: Record<string, unknown>): AskQuestionSpec[] {
   const root = coerceToolArgs(args);
-  if (!Array.isArray(root.questions)) return [];
-  const out: AskQuestionSpec[] = [];
-  for (const raw of root.questions) {
-    if (!raw || typeof raw !== "object") continue;
-    const q = raw as Record<string, unknown>;
-    const question =
-      (typeof q.question === "string" && q.question) ||
-      (typeof q.text === "string" && q.text) ||
-      (typeof q.title === "string" && q.title) ||
-      (typeof q.prompt === "string" && q.prompt) ||
-      "";
-    if (!question || !Array.isArray(q.options)) continue;
-    const options = q.options
-      .map(optionFromRaw)
-      .filter((o): o is { label: string; description?: string } => !!o);
-    if (options.length === 0) continue;
-    out.push({
-      question,
-      header: typeof q.header === "string" ? q.header : undefined,
-      multiSelect: q.multiSelect === true,
-      options,
-    });
+  const listed = questionsArrayFromRoot(root);
+  if (listed) {
+    const out: AskQuestionSpec[] = [];
+    for (const raw of listed) {
+      const parsed = parseOneQuestion(raw);
+      if (parsed) out.push(parsed);
+    }
+    if (out.length > 0) return out;
   }
-  return out;
+  const single = parseOneQuestion(root);
+  return single ? [single] : [];
+}
+
+/** True when the dock can render clickable options (not a text-only stub). */
+export function hasParsedAskQuestions(args: unknown): boolean {
+  return parseAskQuestions(coerceToolArgs(args)).length > 0;
 }
 
 /** Prefer parsed call args; fall back to the hook snapshot when empty. */
@@ -1305,14 +1332,19 @@ export function AskQuestionCard({
   onAnswer,
   onOther,
   onDismiss,
+  otherActive = false,
+  composerHidden = false,
 }: {
   call: ToolCall;
   onAnswer?: (text: string) => void;
-  /** "Other…" picked — host should focus the chat input so the user
-   *  types a free-form answer instead. */
+  /** "Other…" picked — host reveals the composer for a free-form answer. */
   onOther?: () => void;
   /** ✕ / Esc — hide the card and let the user just keep chatting. */
   onDismiss?: () => void;
+  /** Host set when the user chose Other… (highlights that row). */
+  otherActive?: boolean;
+  /** Composer is hidden until Other… — tune footer copy. */
+  composerHidden?: boolean;
 }) {
   const questions = parseAskQuestions(coerceToolArgs(call.function.arguments));
   const [picked, setPicked] = useState<Map<number, Set<string>>>(new Map());
@@ -1341,55 +1373,10 @@ export function AskQuestionCard({
     return () => window.removeEventListener("keydown", onKey);
   }, [onDismiss, interactive]);
 
-  if (questions.length === 0) {
-    const raw = coerceToolArgs(call.function.arguments);
-    const fallback =
-      (typeof raw.question === "string" && raw.question) ||
-      (typeof raw.prompt === "string" && raw.prompt) ||
-      "";
-    return (
-      <div className="ai-ask-card ai-ask-card-fallback">
-        <div className="ai-ask-head">
-          <span className="ai-ask-head-label">Question</span>
-          {onDismiss && interactive && (
-            <button
-              type="button"
-              className="ai-ask-close"
-              onClick={onDismiss}
-              title="Dismiss (Esc)"
-              aria-label="Dismiss question card"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-        {fallback ? (
-          <div className="ai-ask-qtext">{fallback}</div>
-        ) : (
-          <div className="ai-ask-qtext ai-ask-qtext-muted">
-            Waiting for options…
-          </div>
-        )}
-        <div className="ai-ask-foot">
-          {interactive && onOther && (
-            <button
-              type="button"
-              className="ai-ask-reply-btn"
-              onClick={onOther}
-            >
-              Reply in message box
-            </button>
-          )}
-          {interactive && (
-            <span className="ai-ask-hint">
-              Type your answer below to continue.
-              {onDismiss ? " Esc to dismiss." : ""}
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }
+  // No parseable options → render nothing. A "Reply in message box" stub
+  // duplicated the composer and confused users when the model also pasted
+  // the question as plain text.
+  if (questions.length === 0) return null;
 
   const answered = (i: number) => (picked.get(i)?.size ?? 0) > 0;
   const allAnswered = questions.every((_, i) => answered(i));
@@ -1533,9 +1520,11 @@ export function AskQuestionCard({
           {interactive && onOther && (
             <button
               type="button"
-              className="ai-ask-option ai-ask-option-other"
+              className={`ai-ask-option ai-ask-option-other${
+                otherActive ? " picked" : ""
+              }`}
               onClick={onOther}
-              title="Answer in your own words in the message box"
+              title="Answer in your own words"
             >
               <span
                 className={`ai-ask-ind ${
@@ -1579,7 +1568,9 @@ export function AskQuestionCard({
         )}
         {interactive && (
           <span className="ai-ask-hint">
-            …or just reply in the message box below.
+            {composerHidden
+              ? "Choose Other… to type a custom answer."
+              : "…or type your answer in the message box below."}
             {onDismiss ? " Esc to dismiss." : ""}
           </span>
         )}
@@ -1589,7 +1580,7 @@ export function AskQuestionCard({
   );
 }
 
-export function ToolCallRow({
+export const ToolCallRow = memo(function ToolCallRow({
   call,
   result,
   standalone = false,
@@ -1771,7 +1762,7 @@ export function ToolCallRow({
       />
     </div>
   );
-}
+});
 
 interface EditDiffCardProps {
   call: ToolCall;

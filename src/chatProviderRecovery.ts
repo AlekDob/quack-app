@@ -7,7 +7,13 @@ import { providerSessions } from "./ipc";
 
 const AGENTIC: ProviderId[] = ["claude-code", "cursor-cli", "opencode-cli"];
 
-/** True when Quack saved user turns but lost assistant rows. */
+/** Max Quack messages before we skip a "maybe truncated" CLI probe.
+ *  Short rows often mean vite-only / mid-run save lost the tail while the
+ *  Claude Code JSONL kept growing — assistants>=users still, so the old
+ *  thin-row check never fired (seen: 5 Quack msgs vs 100+ CLI). */
+const SHORT_SNAPSHOT_PROBE = 16;
+
+/** True when Quack's row may be thinner than the linked CLI transcript. */
 export function needsProviderHydration(
   session: ChatSession,
   provider: ProviderId,
@@ -18,7 +24,14 @@ export function needsProviderHydration(
   const users = session.messages.filter((m) => m.role === "user").length;
   const assistants = session.messages.filter((m) => m.role === "assistant")
     .length;
-  return users > 0 && assistants < users;
+  // Classic thin row: user turns without matching assistants.
+  if (users > 0 && assistants < users) return true;
+  // Truncated snapshot with a linked CLI id — probe; recover no-ops if
+  // the CLI transcript isn't actually richer.
+  if (session.messages.length > 0 && session.messages.length <= SHORT_SNAPSHOT_PROBE) {
+    return true;
+  }
+  return false;
 }
 
 function toChatMessages(

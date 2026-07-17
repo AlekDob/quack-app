@@ -1,5 +1,5 @@
 import type { ChatSession } from "./chatHistory";
-import { patchSession } from "./chatHistory";
+import { loadSession, patchSession } from "./chatHistory";
 import type { QueuedComposerMessage } from "./composerQueue";
 
 import type { AttachedBrainHit } from "./brainMention";
@@ -40,7 +40,19 @@ export function mergeComposerDraft(
   draft: ChatComposerDraft,
 ): boolean {
   const composer = isEmptyDraft(draft) ? undefined : draft;
+  const existing = loadSession(wsId, sessionId);
+  if (draftEqual(existing?.composer, composer)) return true;
   return patchSession(wsId, sessionId, { composer });
+}
+
+function draftEqual(
+  a: ChatComposerDraft | undefined,
+  b: ChatComposerDraft | undefined,
+): boolean {
+  if (a === b) return true;
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /** Persist Claude Code knobs (+ active preset) without touching messages / composer. */

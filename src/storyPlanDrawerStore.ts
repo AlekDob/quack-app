@@ -1,4 +1,4 @@
-// Per-chat pin state for the story plan hover drawer (not persisted).
+// Per-chat open/pin state for the story plan drawer (not persisted).
 
 const pinnedByKey = new Map<string, boolean>();
 const listeners = new Set<() => void>();

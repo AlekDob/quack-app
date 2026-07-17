@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import {
   WORKSPACE_COLORS,
   getWorkspaceColor,
+  isHexColor,
   setWorkspaceColor,
 } from "../workspaceColors";
 import { AIIcon } from "./AIIcon";
@@ -51,6 +52,9 @@ export function WorkspaceColorPopover({
     e.stopPropagation();
   };
 
+  // A stored value that isn't a preset id is a raw hex from the custom picker.
+  const customActive = !!currentId && isHexColor(currentId);
+
   return createPortal(
     <>
       <div className="ws-color-overlay" onClick={onClose} />
@@ -83,6 +87,23 @@ export function WorkspaceColorPopover({
               onClick={() => pick(c.id)}
             />
           ))}
+          {/* Custom color — native picker. Rainbow ring when unset, the picked
+              hex once chosen. The hidden input fills the swatch so a click
+              opens the OS color picker directly. */}
+          <label
+            className={`ws-color-swatch ws-color-custom ${customActive ? "active" : ""}`}
+            style={customActive ? { background: currentId! } : undefined}
+            title="Custom color"
+            aria-label="Custom color"
+            onPointerDown={stopBubble}
+          >
+            <input
+              type="color"
+              className="ws-color-custom-input"
+              value={customActive ? currentId! : "#8b5cf6"}
+              onChange={(e) => pick(e.target.value)}
+            />
+          </label>
         </div>
         <button
           type="button"

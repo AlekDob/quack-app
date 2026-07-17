@@ -70,7 +70,11 @@ export function PresetNode({
         const { setFrontmatterScalar } = await import("../frontmatter");
         await setFrontmatterScalar(preset.path, "avatar", avatar);
       } else {
-        setPresetOverrides(preset.id, { avatar });
+        const ok = await setPresetOverrides(preset.id, { avatar });
+        if (!ok) {
+          toastError("Couldn't save avatar — try restarting Quack.");
+          return;
+        }
       }
       toastSuccess(`Updated ${preset.label}'s avatar`);
       onMutated();

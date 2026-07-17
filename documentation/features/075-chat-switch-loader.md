@@ -62,6 +62,7 @@ EVERY switch.
 
 ### Design notes / gotchas
 
+- **Agent Mode mount during veil** — do not gate `shouldKeepChatHostMounted` on `!switching`. The pulse target / active chat must stay mounted so hydrate runs under the loader; otherwise work starts after `CAP_MS` (1s) and the user sees multi-second stalls. Surface hide stays on `.is-switching`.
 - **Global overlay, self-fading** — mounted once at the app root as `<ChatSwitchVeil global />`; the component keeps itself mounted through the fade-OUT (`FADE_MS`) so there's no instant pop-out. Driven by the global `useChatSwitching()`. (An `active` prop still exists for scoping to a container, but the shipped design is the single global veil — a per-host veil missed cross-project switches.)
 - **Min floor lives in `chatSwitch.ts`, not the component** — `endChatSwitch` defers the end to `max(0, MIN_VISIBLE_MS - elapsed)`. Without it, the now-fast hydration would drop the veil in <100ms → a flash.
 - **`.is-switching` (raw `switching`) hides stale chat content** during the switch (`visibility: hidden`) so the old transcript isn't seen under the blur; it clears at `finish()` while the veil is still fading out → content reveals smoothly under the fading veil.

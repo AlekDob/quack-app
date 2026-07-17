@@ -9,6 +9,7 @@
 // when a color changes, without threading state through the store.
 
 import { getJson, setJson } from "./localStore";
+import { notify as toast } from "./notify";
 import { normalizeWorkspaceRoot } from "./pathUtils";
 import { useStore } from "./store";
 
@@ -83,11 +84,20 @@ function resolveColorId(map: Record<string, string>, wsId: string): string | und
   return map[key] ?? map[wsId];
 }
 
-/** Resolve a workspace's color object, or null if none / unknown id. */
+/** True for a `#rrggbb` (or `#rgb`) hex — how custom colors are stored. */
+export function isHexColor(v: string): boolean {
+  return /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v);
+}
+
+/** Resolve a workspace's color object, or null if none / unknown id.
+ *  The stored value is either a preset id ("blue") or a raw custom hex
+ *  ("#7c3aed") picked via the color picker — both map to a WorkspaceColor. */
 export function getWorkspaceColor(wsId: string): WorkspaceColor | null {
   const id = resolveColorId(readMap(), wsId);
   if (!id) return null;
-  return WORKSPACE_COLORS.find((c) => c.id === id) ?? null;
+  const preset = WORKSPACE_COLORS.find((c) => c.id === id);
+  if (preset) return preset;
+  return isHexColor(id) ? { id, label: "Custom", hex: id } : null;
 }
 
 /** Set (colorId) or clear (null) a workspace's color, then notify. */
@@ -97,7 +107,12 @@ export function setWorkspaceColor(wsId: string, colorId: string | null): void {
   if (colorId) map[key] = colorId;
   else delete map[key];
   if (key !== wsId) delete map[wsId];
-  setJson(KEY, map);
+  // setJson swallows quota/disabled-storage errors and returns false. Colors
+  // silently not persisting (esp. in a long-lived prod install where
+  // localStorage fills up) reads as a broken feature — surface it instead.
+  if (!setJson(KEY, map)) {
+    toast("Couldn't save the workspace color — local storage may be full.", "error");
+  }
   notify();
 }
 

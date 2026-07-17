@@ -113,8 +113,10 @@ User clicks ⟲ Sessions row
   → setProviderSessionId + provider_load_session → setMessages
   → next turn passes resumeSessionId to provider chat()
 
-Mount with thin Quack row (users > assistants)
+Mount with thin / short Quack row
   → recoverSessionFromAnyProvider → first richer CLI transcript wins
+  → thin = assistants < users OR ≤16 Quack messages with a linked CLI id
+    (covers vite-only / restart truncations where assistants ≥ users)
 ```
 
 ### Platform pin (one CLI per chat)

@@ -25,8 +25,6 @@ import { TurnStreamStatus } from "./TurnStreamStatus";
 import { ContextFilesDock } from "./ContextFilesDock";
 import { ComposerContextBar } from "./ComposerContextBar";
 import { ComposerGitActions } from "./ComposerGitActions";
-import { ComposerWorkBar } from "./ComposerWorkBar";
-import { StoryPlanDrawer } from "./StoryPlanDrawer";
 import { ChatEmptyState } from "./ChatEmptyState";
 import { AgentCommitDock } from "./AgentCommitDock";
 import {
@@ -171,9 +169,6 @@ import {
   manifestDocPaths,
 } from "../workContextInject";
 import {
-  hasWorksDirectives,
-  parseWorksDirectives,
-  applyWorksDirectives,
   formatOpenItemsIndex,
   parseWorksNewStoryBlock,
   stripWorksDirectiveBlocks,
@@ -469,6 +464,9 @@ const BUDGET_KEY = "lcp.claudeCode.budgetUsd";
 // doesn't paint hundreds of turns and stall. "Show earlier" reveals the rest.
 // The newest turns (streaming + pinned user turn) are always in the window.
 const TURN_WINDOW = 40;
+/** Cap tool chips on legacy (no-blocks) rows — tool-dense turns can have 100+
+ *  ToolCallRows inside the turn window and stall chat switch for seconds. */
+const TOOL_ROW_CAP = 12;
 // Last-used Claude Code permission mode, persisted so "Auto" sticks across
 // restarts. Empty / missing = Ask (null). See permModeStore for how the mode
 // reaches the permission overlay.
@@ -603,9 +601,6 @@ export function AIChatPanel({
   // Background panels stay mounted (multitask + mount-asymmetry) but
   // catch up with one poll when the user switches back.
   const wsActive = useStore((s) => s.activeId === wsId);
-  const workItemId = useStore((s) =>
-    aiChatId ? s.loaded[wsId]?.aiChats[aiChatId]?.workItemId : undefined,
-  );
   const storyId = useStore((s) =>
     aiChatId ? s.loaded[wsId]?.aiChats[aiChatId]?.storyId : undefined,
   );
@@ -825,54 +820,8 @@ export function AIChatPanel({
     );
   }, [messages, aiChatId]);
 
-  // Works auto-tracking: after a completed assistant turn, apply any Works
-  // directives the agent emitted (link/create/update) so the user files nothing
-  // by hand. Deduped on the message content; every action is surfaced as a
-  // toast and shows up on the Works board (the persistent overview). See
-  // feature docs / decisions/004.
-  const lastWorksTextRef = useRef<string>("");
-  const lastWorksChatRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!aiChatId || !root || !getWorkInjectEnabled(wsId)) return;
-    if (streaming !== null || runningTools) return;
-    const lastAsst = [...messages]
-      .reverse()
-      .find((m) => m.role === "assistant" && !!m.content);
-    const text = lastAsst?.content ?? "";
-    // Chat switch / first mount: adopt the current tail as the baseline and
-    // never re-apply directives already present in loaded history (that would
-    // duplicate stories on reload). Only genuinely new text from a live turn
-    // triggers an apply.
-    if (lastWorksChatRef.current !== aiChatId) {
-      lastWorksChatRef.current = aiChatId;
-      lastWorksTextRef.current = text;
-      return;
-    }
-    if (!text || text === lastWorksTextRef.current) return;
-    lastWorksTextRef.current = text;
-    if (!hasWorksDirectives(text)) return;
-    void applyWorksDirectives(
-      wsId,
-      aiChatId,
-      root,
-      parseWorksDirectives(text),
-      { linkedStoryId: storyId },
-    )
-      .then((actions) => {
-        for (const a of actions) {
-          const verb =
-            a.kind === "linked"
-              ? "Linked to"
-              : a.kind === "updated"
-                ? "Updated"
-                : "Created";
-          toastInfo(`Works: ${verb} ${a.shortId} — ${a.title}`);
-        }
-      })
-      .catch(() => {
-        /* Works optional — never block the chat */
-      });
-  }, [messages, aiChatId, root, wsId, storyId, streaming, runningTools]);
+  // Works auto-apply on turn end retired (perf) — Phase 1 strip. Directives
+  // may still render as WorksStoryChip; Apply is user-driven. See 054/068.
 
   // Rebuild the sticky checklist from saved history. The checklist is
   // normally driven by LIVE tool_call events, so a reload or chat
@@ -1168,13 +1117,17 @@ export function AIChatPanel({
       }),
     [],
   );
-  const presetChoices: PresetDefinition[] = [
-    ...PRESET_ORDER.map((id) => effectivePresetDefinition(BUILTIN_PRESETS[id])),
-    ...customPresets,
-  ];
-  void presetOverridesTick; // read only to trigger the recompute above
-  // Resolves a message's snapshotted agentId (or the live active preset,
-  // for the in-progress streaming bubble) to its display name/avatar/role.
+  const presetChoices: PresetDefinition[] = useMemo(
+    () => [
+      ...PRESET_ORDER.map((id) =>
+        effectivePresetDefinition(BUILTIN_PRESETS[id]),
+      ),
+      ...customPresets,
+    ],
+    // presetOverridesTick forces recompute when Team drawer edits builtins
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [customPresets, presetOverridesTick],
+  );
   const msgIdentityFor = useCallback(
     (agentId: string | null | undefined) => {
       const def =
@@ -1330,8 +1283,7 @@ export function AIChatPanel({
       })
       .catch(() => {});
   }, [pinkyBrainExt, root, brainRecentHits.length]);
-  // Works catalog for @-mention only — avoid panel-wide re-renders on every
-  // works/ disk write (ComposerWorkBar keeps its own subscription).
+  // Works catalog for @-mention only — hydrate while the mention menu is open.
   const [mentionWorksSnap, setMentionWorksSnap] =
     useState<WorksSnapshot | null>(null);
   useEffect(() => {
@@ -1372,10 +1324,14 @@ export function AIChatPanel({
   // mid-stream and they need a one-click way back to the live tail.
   const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const [expandedMsgIdx, setExpandedMsgIdx] = useState<Set<number>>(new Set());
+  const [expandedToolsMsgIdx, setExpandedToolsMsgIdx] = useState<Set<number>>(
+    new Set(),
+  );
 
   // Reset expanded state when the conversation switches (new chat / restore).
   useEffect(() => {
     setExpandedMsgIdx(new Set());
+    setExpandedToolsMsgIdx(new Set());
   }, [sessionId]);
 
   // Probe for a workspace rules file on mount + on workspace change so
@@ -2076,8 +2032,12 @@ export function AIChatPanel({
           msgCount: msgs.length,
           loadMs: Math.round(performance.now() - hydrateT0),
         });
-        finishHydrated();
         paintSession(found, targetSid, msgs);
+        // End veil after first paint — ending before setMessages left users
+        // staring at a stuck UI for seconds on tool-dense transcripts.
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => finishHydrated()),
+        );
         return;
       }
 
@@ -2090,8 +2050,10 @@ export function AIChatPanel({
       const msgs = found
         ? await rehydrateMessageImages(cleanStaleToolMessages(found.messages))
         : [];
-      finishHydrated();
       paintSession(found, firstId ?? newSessionId(), msgs);
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => finishHydrated()),
+      );
     })();
 
     return () => {
@@ -2246,8 +2208,10 @@ export function AIChatPanel({
     presetId,
   ]);
 
-  // Empty chats still need their knobs persisted — the messages effect
-  // above bails when messages.length === 0.
+  // Empty chats still need knobs persisted — the messages effect above
+  // bails when messages.length === 0. Composer draft (input/queue/…) is
+  // handled by the debounced flush below — do NOT list input here or
+  // every keystroke rewrites the full session JSON to disk.
   useEffect(() => {
     if (!sessionId || messages.length > 0) return;
     const existing = loadSessions(wsId).find((s) => s.id === sessionId);
@@ -2259,7 +2223,6 @@ export function AIChatPanel({
       ccEffort,
       ccThinking,
       ccPermMode,
-      composer: draftFromComposerSnap(composerPersistRef.current),
       pinnedProviderId,
       presetId: presetId ?? undefined,
     });
@@ -2274,13 +2237,6 @@ export function AIChatPanel({
     ccPermMode,
     pinnedProviderId,
     presetId,
-    input,
-    queuedMessages,
-    attachTree,
-    attachTerminal,
-    attachedAgents,
-    attachedBrainHits,
-    attachedImages,
   ]);
 
   useLayoutEffect(() => {
@@ -2309,13 +2265,14 @@ export function AIChatPanel({
     prevSessionIdRef.current = sessionId;
   }, [sessionId, flushSessionState]);
 
+  // Debounced draft/knob persist. Cleanup must ONLY clearTimeout —
+  // flushing here on every dep change (each keystroke) serialized the
+  // full session to disk and pegged CPU/RAM. Unmount + session switch
+  // flush via prevSessionIdRef + the layout cleanup below.
   useEffect(() => {
     if (!sessionId) return;
     const t = window.setTimeout(() => flushSessionState(sessionId), 400);
-    return () => {
-      window.clearTimeout(t);
-      flushSessionState(sessionId);
-    };
+    return () => window.clearTimeout(t);
   }, [
     sessionId,
     flushSessionState,
@@ -5732,9 +5689,6 @@ export function AIChatPanel({
     <ChatFileOpen.Provider value={openChatFile}>
     <AgentFileOpen.Provider value={fileOpenHandler}>
     <div
-      className={`ai-chat-with-story${storyId ? " has-story-drawer" : ""}`}
-    >
-    <div
       className={`ai-panel${
         (mentionState && mentionMatches.length > 0) ||
         (brainMentionState && brainMentionMatches.length > 0)
@@ -5944,15 +5898,32 @@ export function AIChatPanel({
                     ? otherCalls
                     : m.tool_calls;
                 if (rows.length === 0) return null;
+                const toolsExpanded = expandedToolsMsgIdx.has(i);
+                const shown =
+                  toolsExpanded || rows.length <= TOOL_ROW_CAP
+                    ? rows
+                    : rows.slice(0, TOOL_ROW_CAP);
+                const hiddenTools = rows.length - shown.length;
                 return (
                   <div className="ai-tcalls">
-                    {rows.map((c, j) => (
+                    {shown.map((c, j) => (
                       <ToolCallRow
                         key={c.id ?? j}
                         call={c}
                         result={c.id ? toolResultsById.get(c.id) : undefined}
                       />
                     ))}
+                    {hiddenTools > 0 ? (
+                      <button
+                        type="button"
+                        className="ai-show-more"
+                        onClick={() =>
+                          setExpandedToolsMsgIdx((s) => new Set(s).add(i))
+                        }
+                      >
+                        Show {hiddenTools} more tools
+                      </button>
+                    ) : null}
                   </div>
                 );
               })()}
@@ -6678,21 +6649,6 @@ export function AIChatPanel({
           activePresetId={presetId}
           onSelectPreset={applyPreset}
         />
-        {aiChatId ? (
-          <ComposerWorkBar
-            wsId={wsId}
-            root={root}
-            chatId={aiChatId}
-            workItemId={workItemId}
-            storyId={storyId}
-            planning={planning}
-            onPickJack={() => applyPreset(null, { silent: true })}
-            onSetPlanMode={
-              selectedIsCC ? () => setCcPermMode("plan") : undefined
-            }
-            onHandoffToBuilder={handoffToMiloBuilder}
-          />
-        ) : null}
         <div className="ai-composer-spacer" />
         {renderModelChip()}
         {parseQualifiedModel(selected)?.providerId === "claude-code" && (
@@ -7417,36 +7373,6 @@ export function AIChatPanel({
         hasKey={modelHasKey}
         onConfigureProviders={() => openSettings("ai-providers")}
       />
-    </div>
-    {aiChatId && storyId ? (
-      <StoryPlanDrawer
-        wsId={wsId}
-        chatId={aiChatId}
-        root={root}
-        storyId={storyId}
-        planning={planning}
-        onBuild={
-          planning
-            ? () => {
-                void (async () => {
-                  try {
-                    await handoffStoryToBuilder(
-                      wsId,
-                      aiChatId,
-                      root,
-                      storyId,
-                    );
-                    handoffToMiloBuilder();
-                  } catch (e) {
-                    console.warn("story drawer build failed", e);
-                    toastError("Couldn't hand off to Milo");
-                  }
-                })();
-              }
-            : undefined
-        }
-      />
-    ) : null}
     </div>
     </AgentFileOpen.Provider>
     </ChatFileOpen.Provider>

@@ -3,9 +3,9 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-13
-last_verified: 2026-07-14
+last_verified: 2026-07-16
 related: [015-claude-permission-mode.md, 004-subagent-mentions.md, 022-chat-composer.md, 068-quack-plan-harness.md, 039-composer-queue.md]
-tags: [claude-code, ask-user-question, composer-dock, interactive, cursor-style, permission-hook, askQuestionStore, system-prompt, orchestrator, subagent]
+tags: [claude-code, ask-user-question, composer-dock, interactive, cursor-style, permission-hook, askQuestionStore, system-prompt, orchestrator, subagent, tool-search]
 ---
 
 ## AskUserQuestion Dock (interactive question card)
@@ -117,7 +117,7 @@ via `parseAskQuestions`.
 | Multi-question tabs | Underline tabs; auto-advance after radio pick |
 | **Other…** | Focus composer — free-form reply |
 | **Esc** / ✕ | `onDismiss` — hide card; user can still type below |
-| Parse failure | Fallback card: "Reply in message box" (no infinite spinner) |
+| Parse failure | Dock hidden — user answers in composer; transcript keeps compact "Question" row |
 | Sent | `.ai-ask-card-sent` — dimmed, "Answer sent." |
 
 Answers format (user message text):
@@ -133,6 +133,8 @@ Multi-question: one line per question, newline-separated.
 | Surface | Render |
 |---|---|
 | `.ai-ask-dock` (above composer) | Full interactive `AskQuestionCard` while pending |
+| `.ai-composer-shell.has-ask` | Question card **replaces** composer body; one bordered pill |
+| Other… | Reveals composer (`ask-freeform`) for a custom typed answer |
 | `ToolCallRow` in stream | Compact one-liner: `Question` + summary (no duplicate option list) |
 | `CompactBlocks` / action strip | **Skipped** — same as `TodoWrite` / task tools |
 
@@ -158,10 +160,19 @@ Multi-question: one line per question, newline-separated.
 ### Gotchas
 
 - **Stuck spinner (fixed 2026-07-13):** parsing only stream args → empty `questions[]`
-  → old placeholder showed perpetual `Question ⟳`. Fix: hook cache + lenient parse +
-  fallback "Reply in message box".
+  → old placeholder showed perpetual `Question ⟳`. Fix: hook cache + lenient parse.
+- **Useless fallback dock (fixed 2026-07-16):** when parse still failed, a "Reply in
+  message box" card duplicated the composer while models pasted options in prose.
+  Fix: hide `.ai-ask-dock` unless `hasParsedAskQuestions`; lenient parse also accepts
+  root-level single question + JSON-string `questions`.
 - **Plain-text fallback (fixed 2026-07-14):** models said tools "unavailable in this harness"
   and pasted options in prose. Fix: `quackClaudeCodeEditorPrompt()` + delegation inject.
+- **Deferred ToolSearch miss (fixed 2026-07-16):** CC ≥2.1.72 defers `AskUserQuestion` /
+  `ExitPlanMode` behind `ToolSearch`. `select:ExitPlanMode` often returns "No matching
+  deferred tools" (upstream #45294 / #49843) → Jack pastes the plan as markdown and never
+  hits Quack's ask dock / Build card. Fix: Quack spawn sets `ENABLE_TOOL_SEARCH=false` in
+  `apply_clean_env` (`claude_code.rs`) so both schemas load eagerly; prompt also forbids
+  ToolSearch for these two tools.
 - **Dismiss is per call id:** `dismissedAskId` — dismissing Q1 does not block Q2.
 - **Hook deny is required:** allowing `AskUserQuestion` headless fails opaquely under `-p`.
   Deny reason tells the model Quack is showing clickable options (not "ask in plain text").
