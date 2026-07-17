@@ -1095,7 +1095,13 @@ interface AIChatHostProps {
   archivedAt?: number;
 }
 
-function AIChatHost({
+// Memoized: adding/removing a chat changes `loaded` → WorkspaceShell
+// re-renders and re-creates every host element. Without memo each mounted host
+// re-renders its full AIChatPanel (7382 lines), so creating a chat cost
+// O(#mounted panels) — the intermittent "new chat is slow" (worse the more
+// chats you have open). Props are primitives + stable refs (container/root),
+// so memo lets only the new host + the one losing focus re-render.
+const AIChatHost = memo(function AIChatHost({
   wsId,
   root,
   chatId,
@@ -1147,7 +1153,7 @@ function AIChatHost({
     </div>,
     container,
   );
-}
+});
 
 interface PoppedPlaceholderProps {
   container: HTMLElement | null;

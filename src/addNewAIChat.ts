@@ -1,5 +1,6 @@
 import { pulseChatSwitch } from "./chatSwitch";
 import { setHubExpanded } from "./hubPrefs";
+import { markNewChat } from "./switchPerf";
 import { activeAiChatId, useStore, type TerminalLocation } from "./store";
 
 export function anchorFromElement(
@@ -36,6 +37,7 @@ export function addNewAIChat(
   setHubExpanded(true);
   pulseChatSwitch({ veil: false, source: "addNewAIChat" });
   const chatId = useStore.getState().addAIChat(wsId, location);
+  markNewChat(chatId); // dev: time the fresh-panel mount cascade
   useStore.getState().focusAIChat(wsId, chatId);
   useStore.getState().setAIChatNamePending(wsId, chatId, true);
   return chatId;

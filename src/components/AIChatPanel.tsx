@@ -119,6 +119,7 @@ import {
   subscribeAskInput,
 } from "../askQuestionStore";
 import { publishChatDiff } from "../chatDiffStore";
+import { logNewChatPhase } from "../switchPerf";
 import { summarizeLastTurn, summarizeEdits } from "../sessionDiffStats";
 import { loadWorkspaceRules } from "../workspaceRules";
 import {
@@ -621,6 +622,16 @@ export function AIChatPanel({
   const compact = useContext(CompactChat);
   const chatVisibleRef = useRef(chatVisible);
   chatVisibleRef.current = chatVisible;
+  // Dev: time the fresh-panel mount for a just-created chat (see switchPerf).
+  useEffect(() => {
+    if (!aiChatId) return;
+    logNewChatPhase(aiChatId, "panel mounted");
+    const r = requestAnimationFrame(() =>
+      logNewChatPhase(aiChatId, "panel painted"),
+    );
+    return () => cancelAnimationFrame(r);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const hydratedKeyRef = useRef("");
   // Parent-provided file opener (agent-mode popup); forwarded in compact mode
   // so the docked-chat opener below doesn't clobber it. See fileOpenHandler.
@@ -1067,7 +1078,12 @@ export function AIChatPanel({
   // Active preset for this session — shapes instructions/model/effort but
   // is NOT a subagent (no isolated context). Built-in OR custom, so the id
   // is a plain string, not the narrower PresetId literal union.
-  const [presetId, setPresetId] = useState<string | null>(null);
+  // Seeds to the default agent (Milo) so a brand-new chat's composer pill
+  // shows Milo from the first frame. paintSession's async applyDefaultPreset
+  // runs inside startTransition (deferred) — relying on it alone left the
+  // initial render on Jack (presetId === null). A restored session overwrites
+  // this immediately via paintSession's found-branch (found.presetId ?? null).
+  const [presetId, setPresetId] = useState<string | null>(DEFAULT_PRESET_ID);
   // id === null means "Jack" — he's not in presetChoices (that list is only
   // the PRESETS group), but he's configurable the exact same way (see
   // getJackDefinition): no backing file, edits persist as an override layer.

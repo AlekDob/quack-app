@@ -25,3 +25,31 @@ export function logSwitchPhase(
   const sinceSwitchMs = Math.round(performance.now() - switchStartAt);
   console.log(`[switch-perf] ${phase}`, { wsId, sinceSwitchMs, ...extra });
 }
+
+// ── New-chat timing ────────────────────────────────────────────────────
+// Creating a chat is intermittently slow — the cost is the fresh AIChatPanel
+// mount + render cascade, which the switch logs above don't cover. Filter the
+// console by `[new-chat-perf]`.
+let newChatId = "";
+let newChatAt = 0;
+
+export function markNewChat(chatId: string): void {
+  if (!import.meta.env.DEV) return;
+  newChatId = chatId;
+  newChatAt = performance.now();
+}
+
+/** Log a phase of the just-created chat's first mount, timed from creation.
+ *  Gated to that chat so only its own panel logs. */
+export function logNewChatPhase(
+  chatId: string,
+  phase: string,
+  extra?: Record<string, unknown>,
+): void {
+  if (!import.meta.env.DEV || chatId !== newChatId || !newChatAt) return;
+  console.log(`[new-chat-perf] ${phase}`, {
+    chatId,
+    sinceMs: Math.round(performance.now() - newChatAt),
+    ...extra,
+  });
+}
