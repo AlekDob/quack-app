@@ -957,6 +957,17 @@ export function AIChatPanel({
         elapsedMs: Math.round(performance.now() - applyT0),
       });
     });
+    // Time from apply to two frames later (post commit + paint) — for a large
+    // transcript this captures the unwindowed render/layout cost that makes a
+    // chat switch "incagliare". Correlate `count` with `elapsedMs`.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        logChatSwitch("transcript painted", {
+          count: hydrated.length,
+          elapsedMs: Math.round(performance.now() - applyT0),
+        }),
+      ),
+    );
     return hydrated;
   }, []);
   const tryProviderRecover = useCallback(
@@ -5784,6 +5795,13 @@ export function AIChatPanel({
             wsId={wsId}
             chatId={aiChatId}
             onPickStarter={setInput}
+            avatarUrl={
+              (presetId
+                ? resolveActivePresetDef(presetId, customPresets)?.avatar
+                : undefined) ??
+              activeAgent?.avatar ??
+              null
+            }
           />
         )}
         {(() => {
