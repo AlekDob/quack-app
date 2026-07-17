@@ -3,6 +3,7 @@ import type { ToolCall } from "../ai";
 import {
   batchDiffTotals,
   batchSummaryLabel,
+  batchRenderCost,
   detailToolLabel,
   readLineRange,
   type BatchItem,
@@ -35,26 +36,37 @@ describe("batchSummaryLabel", () => {
     );
   });
 
-  it("includes commands and edits", () => {
+  it("puts Edited first with lowercase explored (Cursor order)", () => {
+    const items = [
+      item("Edit", { file_path: "a.ts", old_string: "a", new_string: "ab" }, "1"),
+      item("Edit", { file_path: "b.ts", old_string: "x", new_string: "xy" }, "2"),
+      item("Read", { file_path: "c.ts" }, "3"),
+    ];
+    expect(batchSummaryLabel(items, { live: false })).toBe(
+      "Edited 2 files, explored 1 file",
+    );
+  });
+
+  it("single-file edit uses basename", () => {
+    const items = [
+      item(
+        "Edit",
+        { file_path: "src/formatWorkedDuration.ts", old_string: "a", new_string: "ab" },
+        "1",
+      ),
+    ];
+    expect(batchSummaryLabel(items, { live: false })).toBe(
+      "Edited formatWorkedDuration.ts",
+    );
+  });
+
+  it("includes commands with edits", () => {
     const items = [
       item("Bash", { command: "ls" }, "1"),
       item("Edit", { file_path: "a.ts", old_string: "a", new_string: "ab" }, "2"),
     ];
-    expect(batchSummaryLabel(items, { live: true })).toBe(
-      "Running 1 command, Editing 1 file",
-    );
-    expect(batchSummaryLabel(items, { live: false })).toContain("Ran ls");
-    expect(batchSummaryLabel(items, { live: false })).toContain("Edited 1 file");
-  });
-
-  it("hides edits when hideEdits", () => {
-    const items = [
-      item("Read", { file_path: "a.ts" }, "1"),
-      item("Edit", { file_path: "a.ts", old_string: "a", new_string: "b" }, "2"),
-    ];
-    expect(batchSummaryLabel(items, { live: false, hideEdits: true })).toBe(
-      "Explored 1 file",
-    );
+    expect(batchSummaryLabel(items, { live: true })).toContain("Editing");
+    expect(batchSummaryLabel(items, { live: true })).toContain("Running 1 command");
   });
 });
 
@@ -99,5 +111,93 @@ describe("batchDiffTotals", () => {
     const t = batchDiffTotals(items);
     expect(t).not.toBeNull();
     expect(t!.added).toBeGreaterThan(0);
+  });
+});
+
+describe("batchRenderCost (collapsed loads less text)", () => {
+  function bigExploreBatch(n: number): BatchItem[] {
+    const out: BatchItem[] = [];
+    for (let i = 0; i < n; i++) {
+      if (i % 3 === 0) {
+        out.push(
+          item(
+            "Grep",
+            {
+              pattern: `very-long-pattern-with-lots-of-chars-${i}-`.repeat(4),
+              path: `src/deep/nested/path/module-${i}/index.ts`,
+            },
+            `g${i}`,
+          ),
+        );
+      } else {
+        out.push(
+          item(
+            "Read",
+            {
+              file_path: `documentation/features/${String(i).padStart(3, "0")}-long-feature-name.md`,
+              offset: 1,
+              limit: 80,
+            },
+            `r${i}`,
+          ),
+        );
+      }
+    }
+    return out;
+  }
+
+  function editHeavyBatch(n: number): BatchItem[] {
+    const body = "x".repeat(400);
+    return Array.from({ length: n }, (_, i) =>
+      item(
+        "Edit",
+        {
+          file_path: `src/components/File${i}.tsx`,
+          old_string: body,
+          new_string: `${body}\n${body}`,
+        },
+        `e${i}`,
+      ),
+    );
+  }
+
+  it("collapsed explore batch is one short line vs N detail lines", () => {
+    const items = bigExploreBatch(24);
+    const collapsed = batchRenderCost(items, "collapsed");
+    const expanded = batchRenderCost(items, "expanded");
+    expect(collapsed.lines).toBe(1);
+    expect(expanded.lines).toBeGreaterThan(20);
+    // Default paint mounts far less text than expanding every Grep/Read.
+    expect(collapsed.chars).toBeLessThan(expanded.chars / 5);
+    expect(collapsed.chars).toBeLessThan(80);
+  });
+
+  it("collapsed edit batch avoids mounting diff bodies until expand", () => {
+    const items = editHeavyBatch(8);
+    const collapsed = batchRenderCost(items, "collapsed");
+    const expanded = batchRenderCost(items, "expanded");
+    expect(collapsed.lines).toBe(1);
+    expect(collapsed.chars).toBeLessThan(60);
+    // Expanded pays for old+new bodies — orders of magnitude more.
+    expect(expanded.chars).toBeGreaterThan(collapsed.chars * 50);
+  });
+
+  it("solo tool stays one line (no group overhead)", () => {
+    const items = [
+      item(
+        "Edit",
+        {
+          file_path: "openapi.yaml",
+          old_string: "a".repeat(200),
+          new_string: "b".repeat(200),
+        },
+        "1",
+      ),
+    ];
+    const collapsed = batchRenderCost(items, "collapsed");
+    const expanded = batchRenderCost(items, "expanded");
+    expect(collapsed.lines).toBe(1);
+    expect(expanded.lines).toBe(1);
+    expect(collapsed.chars).toBe(expanded.chars);
   });
 });

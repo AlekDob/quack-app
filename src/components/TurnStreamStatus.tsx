@@ -22,6 +22,8 @@ type Props = {
   warmingUp: boolean;
   lastStreamEventAt: number | null;
   onStop: () => void;
+  /** Extended-thinking keepalives in flight — hide “Planning…”. */
+  thinkingLive?: boolean;
 };
 
 function StaleSuffix({
@@ -66,12 +68,14 @@ export function TurnStreamStatus({
   warmingUp,
   lastStreamEventAt,
   onStop,
+  thinkingLive = false,
 }: Props) {
   const planning =
     streaming !== null &&
     streaming.trim().length === 0 &&
     streamingBlocks.length === 0 &&
-    !runningTools;
+    !runningTools &&
+    !thinkingLive;
 
   const generating =
     streaming !== null &&

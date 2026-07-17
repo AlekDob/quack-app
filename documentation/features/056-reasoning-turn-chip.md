@@ -4,44 +4,58 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-11
 last_verified: 2026-07-17
-tags: [chat, reasoning, thinking, cursor-cli, claude-code, ui, brain-turn-chip]
+tags: [chat, reasoning, thinking, cursor-cli, claude-code, ui, brain-turn-chip, thought-for]
 ---
 
 ## Reasoning turn chip (Cursor-style)
 
-**Purpose:** Show extended-thinking / chain-of-thought from agentic providers (Claude Code, Cursor CLI Composer, etc.) as a **quiet, collapsible recap** — same visual language as `BrainTurnChip` (054), not the old grey `<details>` blocks with emoji.
+**Purpose:** Show extended-thinking / chain-of-thought from agentic providers
+as a quiet, collapsible recap — same shell as `BrainTurnChip` (054). Live
+label **Thinking**; done label **Thought for Xs** when a client clock is
+available.
 
-**Scope:** Display + client thinking clock. Thinking text still arrives wrapped in `<think>…</think>` inside stream content; `splitThinking()` extracts it before markdown render. `ChatMessage.thinkingMs` is measured in `AIChatPanel` (open tag → close tag).
+**Stream placement:** inline via `CompactBlocks` → `ThinkingBlock`. Turn wall
+time is separate — **Worked for** on `TurnWorkedHeader` (082).
 
 ### Files
-| Type | Path | Role |
-|------|------|------|
-| Component | `src/components/ReasoningTurnChip.tsx` | Collapsed header; live/done labels |
-| Inline render | `src/components/chatToolRender.tsx` | `ThinkingBlock` → `ReasoningTurnChip`; dedupe in `CompactBlocks` |
-| Fallback | `src/components/AIChatPanel.tsx` | Outer chip when message has thinking but **no** `blocks[]` log |
-| Extract | `src/chatTextUtils.ts` | `splitThinking()` — strips tags, dedupes fragments |
-| Duration | `src/formatWorkedDuration.ts` | `4s` / `1m 42s` formatter |
-| Styles | `src/App.css` | `.reasoning-turn-chip*` (mirrors `.brain-turn-chip`) |
+
+| Path | Role |
+|---|---|
+| `src/components/ReasoningTurnChip.tsx` | Header + expand body; live/done labels |
+| `src/components/chatToolRender.tsx` | `ThinkingBlock`; dedupe in `CompactBlocks` |
+| `src/components/AIChatPanel.tsx` | Outer chip when no `blocks[]`; `thinkingMs` / `thinkingLive` |
+| `src/chatTextUtils.ts` | `splitThinking()` |
+| `src/formatWorkedDuration.ts` | Shared `4s` / `1m 42s` formatter |
+| `src/ai.ts` | Optional `ChatMessage.thinkingMs` |
+| `src/App.css` | `.reasoning-turn-chip*` |
 
 ### Data flow
-1. Provider emits thinking (Claude `stream_event` / Cursor `type:"thinking"` → wrapped as `<think>` in `cliStreamJson.ts` / `cursorStreamJson.ts`).
-2. Stream loop appends text to `blocks[]` and `message.content`; client clock starts on first think open, stops on close.
-3. `CompactBlocks` walks blocks → `splitThinking(b.text)` → one `ReasoningTurnChip` per unique thinking fragment (inline with prose/tools). Live when streaming + incomplete/open think on the last text block.
-4. If no `blocks` (legacy sessions), `AIChatPanel` renders a single outer `ReasoningTurnChip` from `splitThinking(m.content)`.
+
+1. Provider emits thinking (Claude / Cursor → wrapped `<think>` in stream JSON parsers).
+2. **Claude Code** also emits empty `content` keepalives on `thinking_delta` —
+   `AIChatPanel` starts `thinkingStartedAt` + `thinkingLive` on those (not only
+   on the closed flush).
+3. Flush closes the clock → `thinkingMs` on the assistant message (span ≥ ~400ms).
+4. `CompactBlocks` → one `ReasoningTurnChip` per unique thinking fragment.
+5. Legacy (no `blocks[]`): outer chip from `splitThinking(m.content)`.
 
 ### UI contract
-| State | What the user sees |
-|---|---|
-| Live (streaming) | `Thinking` (+ optional shimmer) + chevron |
-| Done + `thinkingMs` | `Thought for 4s` + chevron; expand body |
-| Legacy (no duration) | `Reasoning · N words · first line preview…` + chevron |
-| Expanded | Italic pre-wrap body, max-height 240px scroll, left hairline |
 
-No emoji in chrome (brand rule). Icon: `Icon` `cloud` at 11px.
+| State | Label |
+|---|---|
+| Live (`streaming` / `thinkingLive`, maybe empty body) | `Thinking` + shimmer; no chevron until text exists |
+| Done + `thinkingMs` | `Thought for 4s`; expand body |
+| Legacy (no duration) | `Reasoning · N words · preview…` |
+| Expanded | Italic pre-wrap, max-height 240px |
+
+Icon: `cloud` at 11px. No emoji.
 
 ### Gotchas
-- **Double reasoning (fixed):** when `blocks.length > 0`, **do not** also render the outer panel — `InterleavedBlocks` already inlined thinking. Old gate was `!(compact && blocks)` which duplicated in the main editor chat.
-- **Duplicate text:** Cursor may emit two thinking cycles with identical copy; `seenThinking` Set in `CompactBlocks` + dedupe in `splitThinking()` suppress repeats.
-- **`splitThinking` tags:** supports `` pairs; closing tag must be exact (partial `think>` match was a historical bug).
-- **Pair with Brain:** `BrainTurnChip` = pre-turn inject recap; `ReasoningTurnChip` = model scratch work during the assistant turn. Different data, same shell pattern.
-- **Worked for** is separate (`TurnWorkedHeader` + `durationMs` on the message) — wall time for the whole turn, not thinking-only.
+
+- **Double reasoning:** when `blocks.length > 0`, do not also render the outer
+  chip — `InterleavedBlocks` already inlined thinking.
+- **Duplicate text:** `seenThinking` + `splitThinking` dedupe.
+- **`splitThinking` tags:** open/close must be exact.
+- **Pair with Brain:** BrainTurnChip = pre-turn inject; this chip = model
+  scratch during the turn.
+- **Worked for** (082) = whole-turn wall time, not thinking-only.

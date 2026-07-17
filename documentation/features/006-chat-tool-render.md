@@ -9,53 +9,37 @@ tags: [ai-chat, tool-calls, chatToolRender, cursor-style, compact-summary, drawe
 
 ## Chat Tool-Call Rendering
 
-**Purpose:** Render an assistant turn's tool calls (Read / Bash / Edit / Grep /
-Task / …) in the chat stream as **Cursor-compact** one-line summaries inline
-with prose — live present tense (`Exploring…`) flips to past (`Explored…`) when
-the batch settles. Read/bash/search detail opens in a right-side **drawer**;
-file edits recap in **ComposeCard** + **ComposeReviewPane** (feature 038).
-Finished turns show **Worked for Xm Ys** (`TurnWorkedHeader`). Pure presentational
-React + CSS; Quack tool icons + `--tool-*` tones preserved.
+**Purpose:** Presentational layer for assistant tool calls in chat — drawers,
+ComposeCard, AskUserQuestion rows, icon tones — plus the chronology walker that
+feeds **Cursor-compact** stream summaries.
 
-**Files:** `src/components/chatToolRender.tsx`, `src/components/chatActionSummary.tsx`,
-`src/components/TurnWorkedHeader.tsx`, `src/formatWorkedDuration.ts`,
-`src/components/ToolResultDrawer.tsx`, `src/toolDrawer.ts`, `src/htmlPreview.ts`,
-`src/components/HtmlPreviewFrame.tsx`, `src/components/composeCard.tsx`,
-`src/composeReview.ts`, `src/components/ComposeReviewPane.tsx`, styles in `src/App.css`.
+**Stream chrome (summaries, Worked for / Thought for, solo vs group, perf):**
+see **`082-cursor-compact-action-stream.md`** — primary UX contract.
 
-### Unified inline layout (editor + agent)
+**Stack:** React 19 + CSS variables. Quack icons + `--tool-*` tones.
 
-Both docked chat and Agent Mode use the **same** chronology renderer:
+### Files
 
-| Entry | Implementation | Look |
-|---|---|---|
-| `InterleavedBlocks` | Always delegates to `CompactBlocks` | prose interleaved with tool runs |
-| `CompactBlocks` | Walks `blocks[]`, flushes tool runs | prose interleaved with tool runs |
-| `StreamingPlainText` | Last text block while `streaming` | live tail + inline caret — `069-smooth-streaming.md` |
-| `ThinkingBlock` | `splitThinking` on text blocks | `ReasoningTurnChip` (056) — Thinking / Thought for |
-| `ActionBatchSummary` | One line per consecutive tool run (any length) | Cursor-compact live/past summary |
-
-### Action batch summary (`.ai-batch-summary`)
-
-Consecutive non-task tool calls collapse into **one muted text line**:
-
-| State | Example |
+| Path | Role |
 |---|---|
-| Live (streaming, results pending) | `Exploring 9 files, 4 searches` / `Running 2 commands` |
-| Done | `Explored 14 files, 7 searches, Ran 2 commands` + optional `+N −M` |
-| Expand | Detail rows: `Grepped …`, `Read foo.ts L1-80`, `Ran ls` → drawer / file |
+| `src/components/chatToolRender.tsx` | `InterleavedBlocks` / `CompactBlocks`, `ToolCallRow`, AskQuestion, tones |
+| `src/components/chatActionSummary.tsx` | Compact batch UI (082) |
+| `src/components/ToolResultDrawer.tsx` + `src/toolDrawer.ts` | Read/bash/search slide-over |
+| `src/htmlPreview.ts` + `HtmlPreviewFrame.tsx` | HTML preview drawer / tabs (045) |
+| `src/components/composeCard.tsx` + `composeReview.ts` | Turn-end Files recap (038) |
+| `src/App.css` | Tool / compose / batch / ask styles |
 
-**Explore set:** `Read`, `NotebookRead`, `Grep`, `Glob`, `ToolSearch`, `WebSearch`, `WebFetch`.
+### Chronology walker
 
-**Solo tools:** same `ActionBatchSummary` chrome (no bordered `.ai-tcall-standalone`).
+| Entry | Behaviour |
+|---|---|
+| `InterleavedBlocks` | Always → `CompactBlocks` |
+| `CompactBlocks` | Walks `blocks[]`; flushes consecutive tools into `ActionBatchSummary` (082); thinking → `ReasoningTurnChip` (056) |
+| `StreamingPlainText` | Live prose tail (069) |
 
-**Skipped in stream:** `TaskCreate`/`Update`/`List`, `TodoWrite`, `AskUserQuestion` (sidebar / ask-dock — **`073`**).
-
-**Worked for:** `ChatMessage.durationMs` (provider usage or client clock) → `TurnWorkedHeader` above the body when the turn is finished.
-
-**Status dock:** when tool calls already appear in `streamingBlocks`, `TurnStreamStatus` hides the generic “Running tools…” / “Generating…” copy so the transcript owns the live narrative (stale/idle + planning kept).
-
-Edits in the summary are hidden when `hideEdits` (ComposeCard owns the recap).
+**Skipped in stream:** Task*/TodoWrite/AskUserQuestion (sidebar / ask-dock —
+067 / 073). Edits **remain** in the compact summary; ComposeCard still recaps
+at turn end.
 
 ### AskUserQuestion (transcript row only)
 
@@ -67,111 +51,65 @@ are not duplicated in the scrollable transcript.
 |---|---|
 | `AskQuestionCard` | Docked interactive card (options, Other…, Esc dismiss) |
 | `parseAskQuestions` / `coerceToolArgs` / `mergeAskQuestionArgs` | Defensive parse + hook-args merge |
-| `isAskUserQuestionTool` | Name matcher (`AskUserQuestion`, `askUserQuestion`, …) |
+| `isAskUserQuestionTool` | Name matcher |
 
-See **`073-ask-user-question-dock.md`** for data flow, hook cache, and gotchas.
+See **`073-ask-user-question-dock.md`**.
 
 ### Shared row head: `ToolRowHead`
 
-Used by generic `ToolCallRow` and `EditDiffCard` when opened from detail:
+Used by generic `ToolCallRow` and `EditDiffCard`:
 
-| Part | Element | Behaviour |
-|---|---|---|
-| Primary | `<button class="ai-tcall-open">` icon · name · detail | one click → `onPrimary` |
-| Trail | `.ai-tcall-trail` — spinner / check / `±n` stats | status only |
-
-Batch expand uses Cursor-phrased detail lines; click opens drawer / file.
+| Part | Behaviour |
+|---|---|
+| Primary | icon · name · detail → drawer / DiffModal / file |
+| Trail | spinner / check / `±n` |
 
 ### Click targets
-| Row | `onPrimary` |
+
+| Row | Action |
 |---|---|
-| Generic with output | `requestToolDrawer(...)` — right slide-over |
-| Generic, no output but file-ref | `openFile(wsId, path)` — new editor tab |
-| Edit / Write / MultiEdit (pill) | `requestDiff(...)` — centered DiffModal |
-| **HTML preview tool** (`ShowHtmlPreview`, `*html_preview*`) | `requestHtmlPreviewDrawer(...)` — browser drawer; optional **Open in tab** |
-| **Write/Edit `.html`** (EditDiffCard) | Globe button in trail → browser drawer with modified HTML |
-| ComposeCard file row | `openComposeReviewTab(...)` — `crev:` diff tab (038) |
+| Generic with output | `requestToolDrawer(...)` |
+| File-ref, no output | `openFile` / agent popup |
+| Edit / Write / MultiEdit | DiffModal or compose-review (038) |
+| HTML preview tool | `requestHtmlPreviewDrawer` (045) |
+| ComposeCard file row | `openComposeReviewTab` (038) |
+| Compact solo edit / batch expand | DiffModal or inline preview (082) |
 
-`fileRefOf(call)` — openable path for `Read`/`Edit`/`Write`/`Notebook*` (not Grep/Glob patterns).
+### Result drawer
 
-`AgentFileOpen` context: docked → `openFile`; agent mode → file popup (non-edit reads).
-
-`HtmlPreviewOpen` context (`AIChatPanel`): `(previewId, html, title) → openHtmlPreviewTab`
-— drawer **Open in tab** and agent HTML tools. See `045-html-preview.md`.
-
-### Result drawer (`ToolResultDrawer` + `toolDrawer.ts`)
-
-App-level right slide-over (`App.tsx`).
-
-| Body mode | When |
-|---|---|
-| `HtmlPreviewFrame` | `variant: "browser"` + `html` set (agent HTML preview) |
-| `MarkdownPreview` | `.md` file reads (`isMarkdownRead` + `stripReadGutter`) — fenced blocks use copyable pill UI (`049`) |
-| `MarkdownPreview` | **WebFetch** / `web_fetch` results (`isMarkdownDrawer`) |
-| `<pre>` | Bash, Grep, code reads, other plain text |
-| Image | Read of an image path (`imagePath` → data URL) |
-| Terminal chrome | Bash variant (`TerminalResultView`) |
-
-### Edits → DiffModal vs Compose Review
-
-| Path | Trigger | UI |
-|---|---|---|
-| Stream `EditDiffCard` pill | Click inline edit chip (when not `hideEdits`) | Centered `DiffModal` |
-| **ComposeCard** | ≥1 edit in turn; click file / Review | **`crev:` tab** — see `038-compose-review.md` |
-
-When ComposeCard is shown, `hideEdits={true}` — no duplicate edit pills in stream.
+App-level right slide-over (`App.tsx`): markdown reads, WebFetch, bash terminal
+chrome, images — see prior modes; unchanged.
 
 ### ComposeCard (live recap)
 
-Cursor-style bar: `N Files` (+ `· editing…` while streaming), **total diff pill**
-(`+80 −35` in `.ai-compose-bar-recap`, live during stream), expandable per-file list.
+Turn-end / mid-stream Files bar: `N Files`, total `+/-`, Undo All / Keep /
+Review. Visible as soon as the first edit completes. Does **not** remove edit
+lines from the compact stream (082).
 
-| Action | When |
-|---|---|
-| **Undo All** | Turn finished; restores pre-turn snapshot |
-| **Keep All** | Collapses recap |
-| **Review** | Opens compose-review tab per file |
-| File row click | Opens compose-review for that file |
+### Live turn status
 
-**Prominence:** entrance slide-up + border attention pulse when the turn finishes;
-bar uses `--bg-hi`, `--shadow-sm`, taller min-height. Recap pill animates in separately.
-
-Visible **as soon as the first edit completes** (`showComposeCard && isAssistant`, including mid-stream).
-
-### Live turn status (`StatusPill`)
-
-Docked above composer in `.ai-status-dock` (022). Inverted monochrome pill; optional
-`RunningToolList` when tools aren't yet in `streamingBlocks`.
-
-Active labels inside `.ai-status-pill-main` use **`.ai-live-shimmer`** (gradient text
-sweep on `--primary-fg`) while the turn is in flight. Finished tool headers drop the
-shimmer class. Planning-without-pill (`Planning next moves…`) uses the same class on
-`.ai-turn-hint` with a neutral `--fg` peak — see 022 § Live label shimmer.
+`.ai-status-dock` + `TurnStreamStatus` (022). Soft-reduced when tools already
+appear in `streamingBlocks` (082). Shimmer labels while in flight.
 
 ### Per-tool icon tints
 
-`toolToneOf` / `.ai-tool-tone-*` on icon glyphs — see table in prior revision; unchanged.
+`toolToneOf` / `.ai-tool-tone-*` on glyphs — used by compact summaries and
+`ToolCallRow`.
 
-### Key CSS (`src/App.css`)
+### Key CSS
 
 | Class | Role |
 |---|---|
-| `.ai-iarow` / `.ai-iarow-chips` | Conductor-style grouped tool row (≥2 tools) |
-| `.ai-tcall-standalone` | Solo tool row between prose blocks — extra vertical margin |
-| `.ai-ichip` / `.ai-chip` | Compact category / action chips |
-| `.ai-compose-cursor` / `.is-streaming` | Live changed-files recap + entrance/attention animations |
-| `.ai-compose-bar-recap` | Total `+/-` pill in compose bar |
-| `.ai-tcall-status` | Live turn dock pill shell (inverted monochrome) |
-| `.ai-live-shimmer` | Animated gradient label on active turn status text |
-| `.ai-spinner-live` | Slightly larger spinner beside shimmer labels |
-| `.reasoning-turn-chip*` | Collapsed reasoning recap (056; mirrors brain-turn-chip) |
-| `.compose-review-*` | Diff review tab (038) |
-| `.tool-drawer` | Read/bash result slide-over |
-| `.ai-ask-card` / `.ai-ask-dock` | AskUserQuestion dock (073) |
+| `.ai-batch-summary*` | Compact stream (082) |
+| `.ai-worked-header` | Turn duration (082) |
+| `.ai-compose-cursor` / `.ai-compose-bar-recap` | Files recap |
+| `.ai-live-shimmer` | Live status / Thinking |
+| `.reasoning-turn-chip*` | 056 |
+| `.tool-drawer` / `.ai-ask-card` | Drawer / ask dock |
 
 ### Gotchas
 
-- Drawer/DiffModal are global — compact/subagent views share them.
-- Edit diff in DiffModal uses tool fragments, not full file; compose review uses snapshot vs disk.
-- During streaming with edits: stream shows ComposeCard live + explore/bash chips; edit pills hidden.
-- **Reasoning:** inline via `ReasoningTurnChip` inside `CompactBlocks`; do not duplicate outer `<details>` when `blocks[]` exists — see `056-reasoning-turn-chip.md`.
+- Drawer/DiffModal are global — all chat surfaces share them.
+- Edit DiffModal uses tool fragments, not full file; compose review uses snapshot vs disk.
+- **Reasoning:** inline via `CompactBlocks`; never duplicate outer chip when `blocks[]` exists — 056.
+- Legacy `.ai-iarow` / `.ai-ichip` CSS may remain; live path is `.ai-batch-summary`.

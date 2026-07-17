@@ -715,6 +715,8 @@ export function AIChatPanel({
   const [streamingBlocks, setStreamingBlocks] = useState<
     NonNullable<ChatMessage["blocks"]>
   >([]);
+  /** True while Claude Code emits thinking keepalives (before flush). */
+  const [thinkingLive, setThinkingLive] = useState(false);
   // Per-model pull progress so multiple installs can run in parallel.
   // Map(modelName → "human-readable progress line"). Empty = nothing pulling.
   const [pullProgressMap, setPullProgressMap] = useState<
@@ -1661,6 +1663,7 @@ export function AIChatPanel({
         setStreamingBlocks([]);
         setStreamingToolCalls([]);
         setStreamingToolResults([]);
+        setThinkingLive(false);
         setRunningTools(false);
         setActiveToolLabels([]);
         return;
@@ -3787,10 +3790,15 @@ export function AIChatPanel({
             // Empty content events are keep-alive pings (e.g. extended-
             // thinking deltas in the Claude Code provider). They keep
             // the staleness watchdog at the top of the loop fed but
-            // don't represent visible tokens — skip the rest of the
-            // accounting so they don't anchor firstTokenAt to the
-            // wrong moment and tank the t/s display.
-            if (ev.text.length === 0) continue;
+            // don't represent visible tokens — still start the thinking
+            // clock + live “Thinking” chip so CC extended think shows.
+            if (ev.text.length === 0) {
+              if (!thinkingStartedAt) {
+                thinkingStartedAt = performance.now();
+              }
+              setThinkingLive(true);
+              continue;
+            }
             if (firstTokenAt === null) {
               firstTokenAt = performance.now();
             }
@@ -3808,6 +3816,7 @@ export function AIChatPanel({
               acc.includes(thinkCloseTag)
             ) {
               thinkingClosedAt = performance.now();
+              setThinkingLive(false);
             }
             appendTextBlock(ev.text);
             // Approximate tokens/sec: ~4 chars per token on average.
@@ -3821,6 +3830,10 @@ export function AIChatPanel({
             if (ev.call.id && seenToolCallIds.has(ev.call.id)) {
               continue;
             }
+            if (thinkingStartedAt && !thinkingClosedAt) {
+              thinkingClosedAt = performance.now();
+            }
+            setThinkingLive(false);
             if (ev.call.id) seenToolCallIds.add(ev.call.id);
             toolCallsThisRound.push(ev.call);
             setStreamingToolCalls([...toolCallsThisRound]);
@@ -4031,11 +4044,14 @@ export function AIChatPanel({
           agentId: presetId,
           durationMs:
             turnDurationMs ?? Math.round(performance.now() - startedAt),
-          thinkingMs: thinkingStartedAt
-            ? Math.round(
-                (thinkingClosedAt ?? performance.now()) - thinkingStartedAt,
-              )
-            : undefined,
+          thinkingMs: (() => {
+            if (!thinkingStartedAt) return undefined;
+            const end = thinkingClosedAt ?? performance.now();
+            const span = Math.round(end - thinkingStartedAt);
+            // Ignore sub-second noise when think flushed in one chunk
+            // with no keepalive deltas (no real wall span to report).
+            return span >= 400 ? span : undefined;
+          })(),
         };
         conversation.push(assistantMsg);
         setMessages((m) => [...m, assistantMsg]);
@@ -4045,6 +4061,7 @@ export function AIChatPanel({
         setStreamingBlocks([]);
         setStreamingToolCalls([]);
         setStreamingToolResults([]);
+        setThinkingLive(false);
         setRunningTools(false);
         setActiveToolLabels([]);
 
@@ -4165,6 +4182,7 @@ export function AIChatPanel({
       setStreamingBlocks([]);
       setStreamingToolCalls([]);
       setStreamingToolResults([]);
+      setThinkingLive(false);
       setRunningTools(false);
       setActiveToolLabels([]);
       setTokensPerSec(null);
@@ -4233,6 +4251,7 @@ export function AIChatPanel({
     setStreamingBlocks([]);
     setStreamingToolCalls([]);
     setStreamingToolResults([]);
+    setThinkingLive(false);
     setRunningTools(false);
     setActiveToolLabels([]);
     setTokensPerSec(null);
@@ -5387,7 +5406,10 @@ export function AIChatPanel({
     const hasStreamingText =
       streaming !== null && streaming.trim().length > 0;
     const hasStreamingBlocks = streamingBlocks.length > 0;
-    if (streaming !== null && (hasStreamingText || hasStreamingBlocks)) {
+    if (
+      streaming !== null &&
+      (hasStreamingText || hasStreamingBlocks || thinkingLive)
+    ) {
       arr.push({
         role: "assistant",
         content: streaming ?? "",
@@ -5407,6 +5429,7 @@ export function AIChatPanel({
     streamingBlocks,
     streamingToolCalls,
     streamingToolResults,
+    thinkingLive,
   ]);
 
   // Tool-result and user-turn lookups derived from committed messages
@@ -5981,13 +6004,26 @@ export function AIChatPanel({
                 m.durationMs > 0 && (
                   <TurnWorkedHeader durationMs={m.durationMs} />
                 )}
+              {isStreamingThis &&
+                thinkingLive &&
+                !(
+                  m.blocks &&
+                  m.blocks.some(
+                    (b) =>
+                      b.kind === "text" &&
+                      splitThinking(b.text).thinking.trim().length > 0,
+                  )
+                ) &&
+                !(split.thinking.length > 0) && (
+                  <ReasoningTurnChip text="" streaming />
+                )}
               {!(m.blocks && m.blocks.length > 0) &&
                 isAssistant &&
                 split.thinking.length > 0 && (
                   <ReasoningTurnChip
                     text={split.thinking}
                     durationMs={m.thinkingMs}
-                    streaming={isStreamingThis}
+                    streaming={isStreamingThis && thinkingLive}
                   />
                 )}
               <div className="ai-msg-body">
@@ -6624,6 +6660,7 @@ export function AIChatPanel({
                   tokensPerSec={tokensPerSec}
                   warmingUp={warmingUp}
                   lastStreamEventAt={lastStreamEventAt}
+                  thinkingLive={thinkingLive}
                   onStop={() => stop()}
                 />
               )}

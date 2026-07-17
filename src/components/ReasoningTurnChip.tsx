@@ -23,7 +23,9 @@ function previewLine(text: string): string {
 export function ReasoningTurnChip({ text, durationMs, streaming }: Props) {
   const [open, setOpen] = useState(false);
   const trimmed = text.trim();
-  if (!trimmed) return null;
+  // Live “Thinking” can appear before any think text has flushed (CC
+  // keepalives). Allow an empty body in that case only.
+  if (!trimmed && !streaming) return null;
 
   const words = trimmed.split(/\s+/).filter(Boolean).length;
   const label = streaming
@@ -32,7 +34,9 @@ export function ReasoningTurnChip({ text, durationMs, streaming }: Props) {
       ? `Thought for ${formatWorkedDuration(durationMs)}`
       : "Reasoning";
   const meta =
-    !streaming && !(typeof durationMs === "number" && durationMs > 0)
+    !streaming &&
+    !(typeof durationMs === "number" && durationMs > 0) &&
+    words > 0
       ? `${words} word${words === 1 ? "" : "s"}`
       : null;
 
@@ -41,8 +45,9 @@ export function ReasoningTurnChip({ text, durationMs, streaming }: Props) {
       <button
         type="button"
         className="reasoning-turn-chip-head"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => trimmed && setOpen((v) => !v)}
         aria-expanded={open}
+        disabled={!trimmed}
       >
         <Icon name="cloud" size={11} className="reasoning-turn-chip-icon" />
         <span
@@ -53,18 +58,22 @@ export function ReasoningTurnChip({ text, durationMs, streaming }: Props) {
         {meta && (
           <span className="reasoning-turn-chip-meta">{meta}</span>
         )}
-        {!open && !streaming && (
+        {!open && !streaming && trimmed && (
           <span className="reasoning-turn-chip-preview">
             {previewLine(trimmed)}
           </span>
         )}
-        <Icon
-          name="chevron-down"
-          size={10}
-          className={`reasoning-turn-chip-caret${open ? " is-open" : ""}`}
-        />
+        {trimmed && (
+          <Icon
+            name="chevron-down"
+            size={10}
+            className={`reasoning-turn-chip-caret${open ? " is-open" : ""}`}
+          />
+        )}
       </button>
-      {open && <div className="reasoning-turn-chip-body">{trimmed}</div>}
+      {open && trimmed && (
+        <div className="reasoning-turn-chip-body">{trimmed}</div>
+      )}
     </div>
   );
 }

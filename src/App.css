@@ -8842,8 +8842,8 @@ button.composer-mention-chip-label:hover {
 
 /* Cursor-compact batch summary — one muted line, live→past tense. */
 .ai-batch-summary {
-  margin: 4px 0 6px;
-  padding: 0;
+  margin: 6px 0;
+  padding: 4px 0;
 }
 .ai-batch-summary-head {
   display: flex;
@@ -8921,6 +8921,78 @@ button.composer-mention-chip-label:hover {
   min-width: 0;
 }
 
+/* Per-file edit row inside an expanded batch ("Edited foo.ts +9"). */
+.ai-batch-edit-file {
+  margin: 1px 0;
+}
+.ai-batch-edit-file-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 1px 0;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ai-batch-edit-file-head:hover {
+  color: var(--fg-dim);
+}
+.ai-batch-edit-file-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ai-batch-edit-diff {
+  display: block;
+  width: 100%;
+  margin: 4px 0 6px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 5px);
+  background: var(--bg-alt);
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+.ai-batch-edit-diff:hover {
+  border-color: var(--fg-muted);
+}
+.ai-batch-edit-diff-pre {
+  margin: 0;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--fg-dim);
+  max-height: 220px;
+  overflow: auto;
+}
+.ai-batch-diff-add {
+  display: block;
+  color: var(--ok);
+  background: color-mix(in srgb, var(--ok) 10%, transparent);
+}
+.ai-batch-diff-del {
+  display: block;
+  color: var(--err, var(--danger, #e5484d));
+  background: color-mix(in srgb, var(--err, var(--danger, #e5484d)) 10%, transparent);
+}
+.ai-batch-diff-more {
+  display: block;
+  margin-top: 4px;
+  color: var(--fg-muted);
+  font-family: inherit;
+  font-size: 11px;
+}
+
 /* Quiet “Worked for 1m 42s” at the top of a finished assistant turn. */
 .ai-worked-header {
   display: flex;
@@ -8932,6 +9004,10 @@ button.composer-mention-chip-label:hover {
 }
 .ai-worked-header-label {
   font-variant-numeric: tabular-nums;
+}
+.ai-batch-summary.is-error .ai-batch-summary-label,
+.ai-batch-detail-line.is-error {
+  color: var(--err, var(--danger, #e5484d));
 }
 .ai-worked-header-caret {
   opacity: 0.55;

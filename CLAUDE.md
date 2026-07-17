@@ -125,8 +125,9 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `064-agent-hub-drawer-and-chat-tab-switch.md` — collapsed hover drawer, chat switch perf, pane tab visibility stacking; DONE hosts unload when hidden (`076`).
   - `075-chat-switch-loader.md` — gradual translucent veil on chat/session switch (fade + min-floor + cap in `chatSwitch.ts`, `ChatSwitchVeil`); perceived-performance polish. Pairs with the `044` freeze fix.
   - `081-chat-switch-chrome-freeze.md` — during the `075` veil, freeze sidebar/agent-context paint + skip Monaco `layout()` + defer FileTree `listDir` (`deferDuringChatSwitch.ts`) so transcript paint wins; same feel as Agent Mode / collapsed explorer without a permanent layout change.
+  - `082-cursor-compact-action-stream.md` — Cursor-compact stream: live/past tool summaries (solo flat vs group expand), Worked for / Thinking→Thought for, status-dock soft-reduce, `batchRenderCost` vitest (collapsed ≪ expanded text).
   - `076-chat-lazy-hydrate-done-unload.md` — session index + on-demand bodies; DONE/archived chat hosts unmount when hidden; live stay sticky for multitask; `memo(AIChatHost)` so creating a chat doesn't re-render all mounted panels (`[new-chat-perf]` dev timing).
-  - `006-chat-tool-render.md` — chat tool-call rendering (pills, result drawer, diff modal).
+  - `006-chat-tool-render.md` — drawers, ComposeCard, AskQuestion, icon tones; chronology walker feeds 082 summaries.
   - `007-native-macos-menu.md` — macOS uses the native system menu bar (built from the command registry); the in-window `TopBar` menus are hidden there, kept on Win/Linux.
   - `008-skill-slash-menu.md` — Claude Code skills in the `/` menu (lightning icon + orange, name only), loaded from `.claude/skills/`, dispatched like CC commands.
   - `010-project-dock.md` — floating always-on-top Dock window (per-project circles + counters) + native macOS Dock-icon badge.
@@ -151,7 +152,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `024-resume-white-screen-recovery.md` — detect resume from macOS standby (`resumeDebug.ts`), heal the blank webview (Monaco `layout()` / xterm `fit()` + synthetic resize), log every event to console **and** a durable `localStorage` ring (`__resumeLog()`). Gotcha: a Vite compile error also blanks the page but never fires `[resume]` — check the red overlay first.
   - `025-model-selector.md` — composer chip popover (favorites + groups), full ModelBrowser catalog, ManageModelsModal visibility toggles; prefs in `lcp.modelFavorites` / `lcp.modelDisabled`; **platform pin** for agentic CLIs (`057`); instant hydrate + CC dynamic names (`059`).
   - `026-cursor-cli-bridge.md` — `cursor-agent` spawn/stream/kill; dual parsers (Composer-native + Claude-shaped); images via path-in-prompt.
-  - `056-reasoning-turn-chip.md` — Cursor-style collapsed reasoning recap (mirrors BrainTurnChip); dedupes double panels.
+  - `056-reasoning-turn-chip.md` — Thinking / Thought for chip (client clock + CC keepalives); pairs with Worked for in 082.
   - `027-editor-tab-toolbar.md` — editor tab row under breadcrumb: markdown + mermaid Edit/Split/Preview, git Changes (HEAD vs buffer), Inline/Split diff layout, Save; shared with `FileEditorPane` modals.
   - `042-mermaid-preview.md` — `.mmd` tabs: lazy `mermaid` SVG render, default Preview mode, syntax errors inline; `MermaidPreview`, `editorMermaidView.ts`.
   - `045-html-preview.md` — HTML browser preview: agent drawer + `prev:` virtual tabs + `.html` Edit/Split/Preview; sandboxed iframe (`HtmlPreviewFrame`, `htmlPreview.ts`).

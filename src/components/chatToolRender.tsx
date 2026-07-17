@@ -669,6 +669,7 @@ export function InterleavedBlocks({
   blocks,
   callsById,
   resultsById,
+  erroredIds,
   streaming = false,
   hideEdits = false,
   onFileOpen,
@@ -677,7 +678,7 @@ export function InterleavedBlocks({
   blocks: NonNullable<ChatMessage["blocks"]>;
   callsById: Map<string, ToolCall>;
   resultsById: Map<string, string>;
-  /** @deprecated Kept for call-site compat; batch summary uses results only. */
+  /** Tool ids whose result was an error. */
   erroredIds?: Set<string>;
   /** True while this message is the in-flight turn (drives live labels). */
   streaming?: boolean;
@@ -695,6 +696,7 @@ export function InterleavedBlocks({
       blocks={blocks}
       callsById={callsById}
       resultsById={resultsById}
+      erroredIds={erroredIds}
       streaming={streaming}
       hideEdits={hideEdits}
       onFileOpen={onFileOpen}
@@ -724,6 +726,7 @@ function CompactBlocks({
   blocks,
   callsById,
   resultsById,
+  erroredIds,
   streaming,
   hideEdits = false,
   onFileOpen,
@@ -732,6 +735,7 @@ function CompactBlocks({
   blocks: NonNullable<ChatMessage["blocks"]>;
   callsById: Map<string, ToolCall>;
   resultsById: Map<string, string>;
+  erroredIds?: Set<string>;
   streaming: boolean;
   hideEdits?: boolean;
   onFileOpen?: (path: string) => void;
@@ -755,6 +759,7 @@ function CompactBlocks({
         resultsById={resultsById}
         streaming={streaming}
         hideEdits={hideEdits}
+        erroredIds={erroredIds}
       />,
     );
     run = [];
@@ -805,7 +810,9 @@ function CompactBlocks({
     const call = callsById.get(b.callId);
     if (!call) return;
     if (TASK_NAMES.has(call.function.name)) return;
-    if (hideEdits && extractEditDiffs(call)) {
+    // Always keep edits in the stream summary ("Edited N files +X").
+    // AutoOpenHtmlEdit still fires for .html (renders null).
+    if (extractEditDiffs(call)) {
       out.push(
         <AutoOpenHtmlEdit
           key={`ao${b.callId}`}
@@ -813,7 +820,6 @@ function CompactBlocks({
           result={b.callId ? resultsById.get(b.callId) : undefined}
         />,
       );
-      return;
     }
     run.push({ id: b.callId, call });
   });
