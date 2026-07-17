@@ -2224,6 +2224,13 @@ body.ab-dragging * {
   min-width: 160px;
   overflow: hidden;
 }
+/* Skip explorer/SC paint while chat-switch veil is up (keeps box size). */
+.sidebar.is-chat-switch-frozen .sidebar-section-body,
+.agent-context.is-chat-switch-frozen .agent-context-body {
+  content-visibility: hidden;
+  contain-intrinsic-size: auto 480px;
+  pointer-events: none;
+}
 .sidebar-header {
   padding: 8px 10px;
   font-size: 11px;
@@ -14907,6 +14914,7 @@ button.composer-mention-chip-label:hover {
   flex: 1;
   padding: 4px 0;
   user-select: none;
+  contain: content;
 }
 .tree-row {
   position: relative;
@@ -14919,6 +14927,9 @@ button.composer-mention-chip-label:hover {
   font-size: 13px;
   outline: none;
   min-width: 0;
+  /* Browser-native off-screen skip — light virtualization without a flat list. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 22px;
 }
 .tree-row::before {
   content: "";

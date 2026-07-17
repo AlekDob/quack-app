@@ -1,10 +1,12 @@
 import {
   createContext,
+  memo,
   useCallback,
   useContext,
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -48,6 +50,7 @@ import {
   subscribeGitStatus,
   treeBadge,
 } from "../gitStatusStore";
+import { runOrDeferDuringChatSwitch } from "../deferDuringChatSwitch";
 import { FileHistoryModal } from "./FileHistoryModal";
 import { Icon } from "./Icon";
 import { fileIconName, fileIconTint } from "../fileIcons";
@@ -90,7 +93,25 @@ interface NodeProps {
   onContext: (target: MenuTarget) => void;
 }
 
-function Node({ wsId, entry, depth, onContext }: NodeProps) {
+/** Stable key for this row's git chrome — only dirty rows re-render on status. */
+function gitRowKey(wsId: string, path: string, isDir: boolean): string {
+  const snap = getGitStatus(wsId);
+  const norm = normalizeGitPath(path);
+  if (isDir) return snap.changedDirs.has(norm) ? "d" : "";
+  const f = snap.byPath.get(norm);
+  if (!f) return "";
+  return `${f.index_status}${f.worktree_status}`;
+}
+
+function useGitRowKey(wsId: string, path: string, isDir: boolean): string {
+  return useSyncExternalStore(
+    (onStoreChange) => subscribeGitStatus(wsId, onStoreChange),
+    () => gitRowKey(wsId, path, isDir),
+    () => "",
+  );
+}
+
+const Node = memo(function Node({ wsId, entry, depth, onContext }: NodeProps) {
   const filterCtx = useContext(TreeFilterContext);
   const filterActive = filterCtx !== null;
   // Normalize-aware match: reveal-in-tree stores forward-slash paths
@@ -127,11 +148,13 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
 
   const refresh = useCallback(() => {
     if (!entry.is_dir) return;
-    setLoading(true);
-    fs.listDir(entry.path)
-      .then((c) => setChildren(c))
-      .catch(() => setChildren([]))
-      .finally(() => setLoading(false));
+    runOrDeferDuringChatSwitch(`ft:${entry.path}`, () => {
+      setLoading(true);
+      fs.listDir(entry.path)
+        .then((c) => setChildren(c))
+        .catch(() => setChildren([]))
+        .finally(() => setLoading(false));
+    });
   }, [entry]);
 
   useEffect(() => {
@@ -285,15 +308,14 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
 
   // Git decoration: files get a colored status letter on the right
   // edge; folders get a muted dot when anything under them changed.
-  // Read on-demand from the shared cache — the parent FileTree
-  // re-renders the whole tree on every published status, so Node
-  // doesn't need its own subscription.
-  const gitSnap = getGitStatus(wsId);
-  const gitFile = entry.is_dir
-    ? undefined
-    : gitSnap.byPath.get(normalizeGitPath(entry.path));
-  const gitDirDot =
-    entry.is_dir && gitSnap.changedDirs.has(normalizeGitPath(entry.path));
+  // Per-row subscription — only rows whose key changed re-render (was:
+  // parent FileTree setGitTick → every Node).
+  const gitKey = useGitRowKey(wsId, entry.path, entry.is_dir);
+  const gitFile =
+    !entry.is_dir && gitKey
+      ? getGitStatus(wsId).byPath.get(normalizeGitPath(entry.path))
+      : undefined;
+  const gitDirDot = entry.is_dir && gitKey === "d";
 
   if (filterActive && !filterCtx.visiblePaths.has(entry.path)) {
     return null;
@@ -379,7 +401,7 @@ function Node({ wsId, entry, depth, onContext }: NodeProps) {
       )}
     </>
   );
-}
+});
 
 interface Props {
   wsId: string;
@@ -397,17 +419,11 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
   const [filterBusy, setFilterBusy] = useState(false);
   const treeRef = useRef<HTMLDivElement | null>(null);
   const setExpandedDirs = useStore((s) => s.setExpandedDirs);
+  const onContext = useCallback((t: MenuTarget) => setMenu(t), []);
 
-  // Shared git status: one watcher feeds every Node's badge. The tick
-  // only forces a re-render — Nodes read the cache directly.
-  const [, setGitTick] = useState(0);
+  // Shared git status watch — Nodes subscribe per-row; no tree-wide tick.
   useEffect(() => {
-    const stop = startGitStatusWatch(wsId, root);
-    const unsub = subscribeGitStatus(wsId, () => setGitTick((n) => n + 1));
-    return () => {
-      unsub();
-      stop();
-    };
+    return startGitStatusWatch(wsId, root);
   }, [wsId, root]);
 
   // Scroll-into-view half of reveal-in-tree. Lazily-loaded levels need
@@ -453,16 +469,18 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
   }, [wsId]);
 
   const refresh = useCallback(() => {
-    const t0 = performance.now();
-    fs.listDir(root)
-      .then((e) => {
-        logSwitchPhase("filetree root loaded", wsId, {
-          entries: e.length,
-          listDirMs: Math.round(performance.now() - t0),
-        });
-        setEntries(e);
-      })
-      .catch(() => setEntries([]));
+    runOrDeferDuringChatSwitch(`ft-root:${root}`, () => {
+      const t0 = performance.now();
+      fs.listDir(root)
+        .then((e) => {
+          logSwitchPhase("filetree root loaded", wsId, {
+            entries: e.length,
+            listDirMs: Math.round(performance.now() - t0),
+          });
+          setEntries(e);
+        })
+        .catch(() => setEntries([]));
+    });
   }, [root, wsId]);
 
   useEffect(() => {
@@ -917,7 +935,7 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
             wsId={wsId}
             entry={e}
             depth={0}
-            onContext={(t) => setMenu(t)}
+            onContext={onContext}
           />
         ))
       )}

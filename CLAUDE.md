@@ -124,6 +124,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `009-agent-hub.md` — the cross-project status hub (right rail): groups, `AgentHubWatcher`, notifications, lifecycle.
   - `064-agent-hub-drawer-and-chat-tab-switch.md` — collapsed hover drawer, chat switch perf, pane tab visibility stacking; DONE hosts unload when hidden (`076`).
   - `075-chat-switch-loader.md` — gradual translucent veil on chat/session switch (fade + min-floor + cap in `chatSwitch.ts`, `ChatSwitchVeil`); perceived-performance polish. Pairs with the `044` freeze fix.
+  - `081-chat-switch-chrome-freeze.md` — during the `075` veil, freeze sidebar/agent-context paint + skip Monaco `layout()` + defer FileTree `listDir` (`deferDuringChatSwitch.ts`) so transcript paint wins; same feel as Agent Mode / collapsed explorer without a permanent layout change.
   - `076-chat-lazy-hydrate-done-unload.md` — session index + on-demand bodies; DONE/archived chat hosts unmount when hidden; live stay sticky for multitask; `memo(AIChatHost)` so creating a chat doesn't re-render all mounted panels (`[new-chat-perf]` dev timing).
   - `006-chat-tool-render.md` — chat tool-call rendering (pills, result drawer, diff modal).
   - `007-native-macos-menu.md` — macOS uses the native system menu bar (built from the command registry); the in-window `TopBar` menus are hidden there, kept on Win/Linux.
@@ -184,7 +185,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `032-startup-hydration.md` — splash gate, parallel workspace restore, overlap with model prefetch.
   - `058-workspace-switch-performance.md` — foreground-only Monaco/sidebar/tab portals (`useWorkspaceHeavyMount`) + `AIChatPanel` usage-poll gates (visible-only); `memo(WorkspaceShell)` kills O(#projects) render fanout; **Monaco warm-LRU** (`workspaceWarmSet`, last 3 projects) for instant switch-back; git snapshot kept warm across switch; multitask + terminals preserved.
   - `033-editor-color-themes.md` — VS Code bundled Monaco syntax themes; Monaco-compatible token rules (`monacoThemeRules.ts`), live `setTheme`, JetBrains Mono `fontFamily`; per-mode picker + separate light/dark persistence.
-  - `034-explorer-tree.md` — file tree layout (indent guides, overflow/ellipsis), theme-aware git decorations (`--git-*`), auto-reveal on tab switch; pairs with `013-file-type-icons.md` tints.
+  - `034-explorer-tree.md` — file tree layout (indent guides, overflow/ellipsis), theme-aware git decorations (`--git-*`), auto-reveal on tab switch; **row `content-visibility` + per-row git subscribe** (no tree-wide tick); pairs with `013` tints and chat-switch freeze `081`.
   - `035-macos-release-notarization.md` — local signed/notarized `.dmg` pipeline (`sign-and-notarize.sh`, `.env`, Entitlements); CI macOS still unsigned.
   - `036-agent-customizations.md` — Agent Customizations footer (hub + agent mode) + tabbed modal (instructions, skills, MCP, providers, privacy).
   - `037-project-context-dock.md` — per-workspace "N files in context" pill in the composer status row (right); hover popover lists active editor attach + `@`-queued files; `workspaceChatContext.ts` + `isUnderRoot` guards prevent cross-project bleed from the global editor singleton.

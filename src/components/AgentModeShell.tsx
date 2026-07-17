@@ -601,7 +601,9 @@ export function AgentModeShell({ wsId }: Props) {
       </main>
 
       {/* ── Context column (Changes / Files) ──────────────────── */}
-      <aside className="agent-context">
+      <aside
+        className={`agent-context${switching ? " is-chat-switch-frozen" : ""}`}
+      >
         <div className="agent-context-tabs" role="tablist" aria-label="Workspace context">
           <button
             className={`agent-context-tab ${contextTab === "changes" ? "active" : ""}`}
@@ -663,6 +665,7 @@ export function AgentModeShell({ wsId }: Props) {
       {colorMenu && (
         <WorkspaceColorPopover
           wsId={colorMenu.wsId}
+          root={loaded[colorMenu.wsId]?.meta.root ?? ""}
           x={colorMenu.x}
           y={colorMenu.y}
           nameAnchor={colorMenu.nameAnchor}

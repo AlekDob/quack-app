@@ -1065,6 +1065,8 @@ function FileTabHost({
 }: FileTabHostProps) {
   const switching = useChatSwitching();
   const paneVisible = visible && shellVisible;
+  // Hide + skip Monaco layout() while the chat-switch veil is up —
+  // editor reflows competed with transcript paint.
   const showSurface = paneVisible && !switching;
   const [mounted, setMounted] = useState(visible);
   useEffect(() => {
@@ -1076,7 +1078,7 @@ function FileTabHost({
       {media ? (
         <MediaPreviewPane wsId={wsId} path={path} kind={media} />
       ) : (
-        <EditorPane wsId={wsId} path={path} paneVisible={paneVisible} />
+        <EditorPane wsId={wsId} path={path} paneVisible={showSurface} />
       )}
     </div>,
     container,

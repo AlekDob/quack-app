@@ -4,6 +4,7 @@ import {
   type SidebarView,
   type WorkspaceData,
 } from "../store";
+import { useChatSwitching } from "../useChatSwitching";
 import { FileTree } from "./FileTree";
 import { SearchPanel } from "./SearchPanel";
 import { SourceControlPanel } from "./SourceControlPanel";
@@ -40,6 +41,10 @@ export function SidebarStack({ wsId, ws }: Props) {
   const setSidebarW = useStore((s) => s.setSidebarW);
   const setSidebarSectionSize = useStore((s) => s.setSidebarSectionSize);
   const reorderSidebarSection = useStore((s) => s.reorderSidebarSection);
+  // Freeze explorer/SC paint while the chat-switch veil is up so the
+  // transcript host gets the main thread (same feel as collapsing the
+  // sidebar, without changing the layout).
+  const chatSwitching = useChatSwitching();
   const layout = ws.layout;
   const sections = layout.sidebarSections;
 
@@ -175,7 +180,7 @@ export function SidebarStack({ wsId, ws }: Props) {
   return (
     <>
       <div
-        className="sidebar"
+        className={`sidebar${chatSwitching ? " is-chat-switch-frozen" : ""}`}
         style={{ width: layout.sidebarW, display: "flex" }}
       >
         {sections.map((sec, i) => (

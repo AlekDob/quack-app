@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-16
-last_verified: 2026-07-16
-tags: [chat-switch, loader, veil, transition, ux, perceived-performance, quack-v1]
+last_verified: 2026-07-17
+tags: [chat-switch, loader, veil, transition, ux, perceived-performance, quack-v1, chrome-freeze]
 ---
 
 ## Chat / session switch loader (gradual veil)
@@ -13,6 +13,17 @@ tags: [chat-switch, loader, veil, transition, ux, perceived-performance, quack-v
 so swapping the whole chat panel reads as a smooth transition instead of a hard
 content pop. Perceived-performance polish (inspired by spaceship-ai's entry
 transition); the actual switch is already fast after the freeze fix (`044`).
+
+### Chrome freeze (2026-07-17)
+
+While `isChatSwitching()` is true, editor chrome yields the main thread to the
+transcript host. **Full contract:** `081-chat-switch-chrome-freeze.md`.
+
+| Surface | Behavior |
+|---|---|
+| Sidebar / agent context | `.is-chat-switch-frozen` → `content-visibility: hidden` on section bodies |
+| Monaco file tabs | `FileTabHost` passes `paneVisible={false}` → skips `ed.layout()` |
+| FileTree `listDir` | Deferred via `runOrDeferDuringChatSwitch` until veil drops |
 
 ### Behaviour
 
@@ -71,10 +82,13 @@ EVERY switch.
 
 ### Related features
 
+- **Chrome freeze (sidebar / Monaco / deferred listDir):** `081-chat-switch-chrome-freeze.md`
 - Provider session bridge + freeze fix: `044-provider-session-bridge.md`
 - Chat tab switch / drawer: `064-agent-hub-drawer-and-chat-tab-switch.md`
 - Workspace switch performance: `058-workspace-switch-performance.md`
 - Session library / new chat: `001-ai-session-library.md`
+- Explorer tree (row virtualization + git fan-out): `034-explorer-tree.md`
+- Transcript windowing: `080-transcript-windowing.md`
 
 ### Future
 
