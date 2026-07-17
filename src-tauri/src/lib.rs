@@ -5,7 +5,6 @@ mod chat_store;
 mod claude_code;
 mod claude_models;
 mod cursor_code;
-mod opencode_sidecar;
 mod provider_path;
 mod provider_sessions;
 mod session_jsonl;
@@ -29,8 +28,7 @@ mod preset_overrides;
 
 use claude_code::ClaudeCodeState;
 use cursor_code::CursorCodeState;
-use opencode_sidecar::OpencodeSidecarState;
-use tauri::{Manager, RunEvent};
+use tauri::RunEvent;
 use claude_perm::PermState;
 use pty::PtyState;
 use watcher::WatcherState;
@@ -69,7 +67,6 @@ pub fn run() {
         .manage(WatcherState::default())
         .manage(ClaudeCodeState::default())
         .manage(CursorCodeState::default())
-        .manage(OpencodeSidecarState::default())
         .manage(PermState::default())
         .manage(sftp::SftpPoolState::default())
         .manage(sysmon::SysMonState::default())
@@ -98,11 +95,6 @@ pub fn run() {
                 }
             }
             Ok(())
-        })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::Destroyed = event {
-                window.state::<OpencodeSidecarState>().shutdown();
-            }
         })
         .invoke_handler(tauri::generate_handler![
             fs_ops::list_dir,
@@ -197,10 +189,6 @@ pub fn run() {
             cursor_code::cursor_code_chat,
             cursor_code::cursor_code_kill,
             cursor_code::cursor_code_kill_session,
-            opencode_sidecar::opencode_server_check,
-            opencode_sidecar::opencode_server_status,
-            opencode_sidecar::opencode_server_start,
-            opencode_sidecar::opencode_server_restart,
             claude_perm::claude_perm_decide,
             claude_perm::claude_perm_endpoint,
             claude_usage::claude_auth_status,

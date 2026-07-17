@@ -4,7 +4,6 @@ import { openaiProvider } from "./openai";
 import { anthropicProvider } from "./anthropic";
 import { claudeCodeProvider } from "./claudeCode";
 import { cursorCliProvider } from "./cursorCode";
-import { openCodeProvider } from "./openCode";
 
 export { hasApiKey, getApiKey, setApiKey } from "./keys";
 export type { ProviderId, ProviderModel } from "./types";
@@ -12,7 +11,6 @@ export { parseQualifiedModel, makeQualifiedModel, isAgenticProviderId } from "./
 export { warmupOllamaModel } from "./ollama";
 export { invalidateClaudeCodeCache, refreshClaudeCodeModelsLive, claudeCodePickerModels } from "./claudeCode";
 export { invalidateCursorCliCache, refreshCursorModelsLive } from "./cursorCode";
-export { invalidateOpenCodeCache, refreshOpenCodeModelsLive } from "./openCode";
 
 const REGISTRY: Record<ProviderId, ChatProvider> = {
   ollama: ollamaProvider,
@@ -20,14 +18,12 @@ const REGISTRY: Record<ProviderId, ChatProvider> = {
   anthropic: anthropicProvider,
   "claude-code": claudeCodeProvider,
   "cursor-cli": cursorCliProvider,
-  "opencode-cli": openCodeProvider,
 };
 
 export const PROVIDERS: ChatProvider[] = [
   ollamaProvider,
   claudeCodeProvider,
   cursorCliProvider,
-  openCodeProvider,
   openaiProvider,
   anthropicProvider,
 ];
@@ -39,11 +35,11 @@ export function getProvider(id: ProviderId): ChatProvider {
 export { REGISTRY as _registry };
 
 /**
- * Fast picker probe — skips slow CLI spawns (`cursor-agent`, OpenCode sidecar,
+ * Fast picker probe — skips slow CLI spawns (`cursor-agent`,
  * Claude `/model` label probes). CLI catalogs load lazily via warmPickerCatalogs().
  */
 export async function listFastModels(): Promise<ProviderModel[]> {
-  const skip = new Set<ProviderId>(["cursor-cli", "opencode-cli", "claude-code"]);
+  const skip = new Set<ProviderId>(["cursor-cli", "claude-code"]);
   const chunks = await Promise.all(
     PROVIDERS.filter((p) => !skip.has(p.id)).map(async (p) => {
       try {

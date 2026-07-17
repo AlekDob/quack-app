@@ -8,7 +8,7 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 ---
 
 ## Model Selector (composer chip + catalog + visibility)
-**Purpose:** Let the user pick an AI model from the composer chip (quick popover), browse the full catalog in a modal, and toggle which models appear in the quick picker — with favorites, free-model badges, and per-provider grouping across Ollama, Claude Code, Cursor CLI, OpenCode, OpenAI, and Anthropic.
+**Purpose:** Let the user pick an AI model from the composer chip (quick popover), browse the full catalog in a modal, and toggle which models appear in the quick picker — with favorites, free-model badges, and per-provider grouping across Ollama, Claude Code, Cursor CLI, OpenAI, and Anthropic.
 **Stack:** React 19 + Zustand (`AIChatPanel`), localStorage prefs, shared CSS shell (`model-browser`).
 
 ### Files

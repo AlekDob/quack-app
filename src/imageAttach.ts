@@ -27,7 +27,6 @@ export const MAX_ATTACHED_IMAGES = 10;
 export const IMAGE_ATTACH_PROVIDER_IDS = [
   "claude-code",
   "cursor-cli",
-  "opencode-cli",
 ] as const;
 
 export type ImageAttachProviderId = (typeof IMAGE_ATTACH_PROVIDER_IDS)[number];
@@ -49,11 +48,6 @@ const MIME_BY_EXT: Record<string, string> = {
 export function mimeForImagePath(path: string): string {
   const ext = path.split(".").pop()?.toLowerCase() ?? "";
   return MIME_BY_EXT[ext] ?? "image/png";
-}
-
-/** file:// URL for OpenCode FilePartInput. */
-export function fileUrlForImagePath(path: string): string {
-  return path.startsWith("file://") ? path : `file://${path}`;
 }
 
 // Anthropic vision sweet-spot: beyond ~1568px the long edge adds tokens

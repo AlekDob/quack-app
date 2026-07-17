@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-12
-last_verified: 2026-07-13
+last_verified: 2026-07-17
 status: active
 tags: [works, drawer, modules, notion-editor, create-flow, nested-stack, markdown, module-picker]
 ---
@@ -138,6 +138,18 @@ Works in the side drawer still uses **portaled** global overlays for right-click
 | Confirm / prompt | `.dialog-backdrop` | 1500 | Delete work item, rename prompt, etc. |
 
 Symptoms before fix: right-click “does nothing”; delete confirm appears but content bleeds through / sits under drawer.
+
+## Feature doc drawer (2026-07-17)
+
+`FeatureDocDrawer` preview/edit for `documentation/features/*.md`:
+
+| Mode | Body |
+|---|---|
+| Preview | Tasks checklist, `MarkdownPreview`, comment composer |
+| Edit | Full-height `SimpleMonacoEditor` (`work-feature-body--editing`) |
+| Meta | Status + start/end dates always editable; native `type="date"` picker; patches draft while Monaco is open |
+
+See `054-works-layer.md` for frontmatter fields and `083` for composer link.
 
 ## Related
 

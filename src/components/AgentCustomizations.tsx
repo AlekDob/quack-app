@@ -1,13 +1,38 @@
+import { openAgentSurface } from "../agentSurfaceNav";
 import { Icon } from "./Icon";
 import type { CustomizationTab } from "./CustomizationsModal";
+
+type SurfaceItem = {
+  surface: "team" | "works";
+  label: string;
+  icon: Parameters<typeof Icon>[0]["name"];
+  hint: string;
+};
 
 // Codetta's equivalents of VS Code's Agents/Skills/Instructions/Hooks/MCP
 // group — each row opens the one Agent Customizations modal at its tab.
 export function AgentCustomizations({
+  wsId,
   onOpen,
 }: {
+  wsId?: string | null;
   onOpen: (tab: CustomizationTab) => void;
 }) {
+  const surfaces: SurfaceItem[] = [
+    {
+      surface: "team",
+      label: "Team",
+      icon: "users",
+      hint: "Agents, presets, and skills runbook",
+    },
+    {
+      surface: "works",
+      label: "Features",
+      icon: "check-square",
+      hint: "Product feature docs — documentation/features/",
+    },
+  ];
+
   const items: {
     tab: CustomizationTab;
     label: string;
@@ -60,6 +85,19 @@ export function AgentCustomizations({
 
   return (
     <div className="agent-custom">
+      {wsId &&
+        surfaces.map((it) => (
+          <button
+            key={it.surface}
+            type="button"
+            className="agent-custom-item"
+            onClick={() => openAgentSurface(wsId, it.surface)}
+            title={it.hint}
+          >
+            <Icon name={it.icon} size={13} />
+            <span className="agent-custom-label">{it.label}</span>
+          </button>
+        ))}
       <div className="agent-custom-title">Customizations</div>
       {items.map((it) => (
         <button

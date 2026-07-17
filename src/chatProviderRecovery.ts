@@ -5,7 +5,7 @@ import type { ProviderId } from "./providers/types";
 import { readProviderSessionIds } from "./providerSession";
 import { PROVIDER_LOAD_MESSAGE_CAP, providerSessions } from "./ipc";
 
-const AGENTIC: ProviderId[] = ["claude-code", "cursor-cli", "opencode-cli"];
+const AGENTIC: ProviderId[] = ["claude-code", "cursor-cli"];
 
 /** Max Quack messages before we skip a "maybe truncated" CLI probe.
  *  Short rows often mean vite-only / mid-run save lost the tail while the
@@ -55,7 +55,6 @@ export async function recoverSessionFromProvider(
   if (!needsProviderHydration(session, provider)) return null;
   const cliId = readProviderSessionIds(session)[provider];
   if (!cliId) return null;
-  if (provider === "opencode-cli") return null;
   try {
     // Cap the pull — multi-10MB JSONL must not land fully in the webview.
     const loaded = await providerSessions.loadSession(

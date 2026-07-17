@@ -28,7 +28,8 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | Component | `src/components/AIChatPanel.tsx` | The chat panel itself; owns runtime state (streaming, tools, todos) per session |
 | Component | `src/components/ChatEmptyState.tsx` | Empty tab hero — inline session name + starter grid |
 | Component | `src/components/PaneNode.tsx` | Empty pane **New AI chat** → `addNewAIChat` |
-| Store/State | `src/store.ts` | `AIChatDescriptor`, `aiChats`, `addAIChat`, `closeAIChat`, `setAIChatNamePending` |
+| Store/State | `src/store.ts` | `AIChatDescriptor`, `aiChats`, `addAIChat`, `closeAIChat`, `dismissAIChatTab`, `setAIChatNamePending` |
+| Helper | `src/ideAiTabSlot.ts` | Single AI tab slot per pane (`placeAiKeyInTabsPane`, `pruneAiTabsInPane`) |
 | Store/State | `src/aiTaskStore.ts` | Module-level task store keyed by chatId |
 | Service | `src/addNewAIChat.ts` | `addNewAIChat`, `ensureFocusedAIChat` — tabbed hub sessions only |
 | Service | `src/aiBus.ts` | `requestAIPrompt` (`chatId` scopes to one host) |
@@ -47,8 +48,9 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | Service | `src/ipc.ts` | Workspace / chat IPC bridge |
 
 ### Data Flow
-- **Open a session:** `addNewAIChat(wsId)` → dismisses legacy `aiPanelVisible` → expands Agent Hub → `addAIChat` descriptor + layout tab → `focusAIChat` → `namePending` for inline naming. Persisted in `state.json` → appears in hub + Agent Mode lists.
+- **Open a session:** `addNewAIChat(wsId)` → dismisses legacy `aiPanelVisible` → expands Agent Hub → `addAIChat` descriptor + **single AI tab slot** in the active pane → `focusAIChat` → `namePending` for inline naming. Persisted in `state.json` → appears in hub + Agent Mode lists.
 - **Ask AI / editor actions:** `ensureFocusedAIChat(wsId)` focuses the active `ai:` tab or creates one, then `requestAIPrompt({ chatId, … })`. Never open the legacy right-side singleton panel.
+- **IDE tab model:** at most **one `ai:` tab per tabs pane** (`ideAiTabSlot.ts`). Hub is the session list; New chat / hub switch **swaps** the slot instead of stacking peer AI tabs next to files. Splits may still hold one AI each for multitask.
 - **Prompt bus:** `AIChatPanel` ignores events for other `chatId`s; unscoped events only hit the focused tabbed chat (sticky multitask hosts must not all ingest the same prompt).
 - **Render the lists:** `Object.values(ws.aiChats).sort(by createdAt)` → `AIChatsRail` / `AgentModeShell`
 - **Transcript load/save:** lazy hydrate — see `043` + `076`. Composer via `patchSession` (`040`)
@@ -78,10 +80,12 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 Transcript durability on that path is owned by `043` (flush-before-flip +
 never-shrink). Do not reintroduce `patchSession` empty-row invent.
 
-### Gotcha — close tab vs Delete
-`closeAIChat` drops the hub descriptor + tab but **keeps** the transcript file
+### Gotcha — close tab vs Delete vs dismiss
+Editor tab **×** calls `dismissAIChatTab` — removes the `ai:` tab only; the
+hub row stays (Agent Mode parity: list is source of truth). Hub row **×** /
+`closeAIChat` drops the descriptor + tab but **keeps** the transcript file
 on disk (orphan until ⟲ Sessions re-link). **Delete** removes disk + descriptor.
-See `009`, `043`, `044`.
+See `009`, `043`, `044`. **Mark done** also dismisses the editor tab.
 
 ### Gotcha — new chat + switch veil
 `addNewAIChat` pulses `veil: false`. That path must **clear** an in-flight switch pulse (`finish`), otherwise hosts stay `!is-visible` until CAP and the new tab looks missing. See `075-chat-switch-loader.md`.

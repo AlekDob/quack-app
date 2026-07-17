@@ -479,7 +479,10 @@ export function AIChatsRail({
           )}
         </div>
         {showExpanded && (
-          <AgentCustomizations onOpen={(t) => setCustTab(t)} />
+          <AgentCustomizations
+            wsId={activeId}
+            onOpen={(t) => setCustTab(t)}
+          />
         )}
         {footer}
       </div>
@@ -682,7 +685,7 @@ function HubRow({
   const collapsedTip = `${chat.title} · ${ws.meta.name}`;
   return (
     <div
-      className={`agent-hub-row ${active ? "active" : ""}${diff ? " has-diff" : ""}${chat.workItemId ? " has-work" : ""}`}
+      className={`agent-hub-row ${active ? "active" : ""}${diff ? " has-diff" : ""}${chat.workItemId || chat.featureId ? " has-work" : ""}`}
       data-status={status}
       role="tab"
       tabIndex={0}
@@ -738,6 +741,8 @@ function HubRow({
           workItemId={chat.workItemId}
           storyId={chat.storyId}
           planning={chat.planning}
+          featureId={chat.featureId}
+          featureLabel={chat.featureLabel}
         />
       )}
       {expanded && !renaming && (

@@ -1,4 +1,4 @@
-//! Unified on-disk session discovery for agent CLIs (Claude Code, Cursor, OpenCode).
+//! Unified on-disk session discovery for agent CLIs (Claude Code, Cursor).
 //! Quack links these ids to ChatSession rows via `providerSessionIds`.
 
 use crate::provider_path::encode_project_path;
@@ -74,7 +74,6 @@ pub async fn provider_list_sessions(
     tauri::async_runtime::spawn_blocking(move || match provider.as_str() {
         "claude-code" => list_claude_sessions(&cwd),
         "cursor-cli" => list_cursor_sessions(&cwd),
-        "opencode-cli" => list_opencode_sessions(&cwd),
         other => Err(format!("unknown provider: {}", other)),
     })
     .await
@@ -98,9 +97,6 @@ pub async fn provider_load_session(
     tauri::async_runtime::spawn_blocking(move || match provider.as_str() {
         "claude-code" => load_claude_session(&cwd, &session_id, cap),
         "cursor-cli" => load_cursor_session(&cwd, &session_id, cap),
-        "opencode-cli" => Err(
-            "OpenCode transcript load not yet supported — resume via chat works".into(),
-        ),
         other => Err(format!("unknown provider: {}", other)),
     })
     .await
@@ -309,98 +305,4 @@ fn load_cursor_session(
         return Err(format!("session {} not found at {:?}", session_id, path));
     }
     parse_session_jsonl_capped(&path, max_messages)
-}
-
-fn list_opencode_sessions(cwd: &str) -> Result<Vec<CliSessionSummary>, String> {
-    let storage = home()?
-        .join(".local")
-        .join("share")
-        .join("opencode")
-        .join("storage")
-        .join("session");
-    if !storage.exists() {
-        return Ok(Vec::new());
-    }
-    let mut sessions = Vec::new();
-    let cwd_norm = normalize_cwd(cwd);
-    for hash_entry in fs::read_dir(&storage).map_err(|e| e.to_string())? {
-        let hash_dir = match hash_entry {
-            Ok(e) => e.path(),
-            Err(_) => continue,
-        };
-        if !hash_dir.is_dir() {
-            continue;
-        }
-        let entries = match fs::read_dir(&hash_dir) {
-            Ok(e) => e,
-            Err(_) => continue,
-        };
-        for entry in entries {
-            let entry = match entry {
-                Ok(e) => e,
-                Err(_) => continue,
-            };
-            if let Some(s) = parse_opencode_session_file(&entry.path(), &cwd_norm) {
-                sessions.push(s);
-            }
-        }
-    }
-    sessions.sort_by(|a, b| b.last_turn_at_ms.cmp(&a.last_turn_at_ms));
-    Ok(sessions)
-}
-
-fn parse_opencode_session_file(path: &Path, cwd_norm: &str) -> Option<CliSessionSummary> {
-    if path.extension().and_then(|x| x.to_str()) != Some("json") {
-        return None;
-    }
-    let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-    if !name.starts_with("ses_") {
-        return None;
-    }
-    let raw = fs::read_to_string(path).ok()?;
-    let v: serde_json::Value = serde_json::from_str(&raw).ok()?;
-    let dir_field = v
-        .get("directory")
-        .or_else(|| v.get("cwd"))
-        .and_then(|x| x.as_str())
-        .unwrap_or("");
-    if !dir_field.is_empty() && normalize_cwd(dir_field) != cwd_norm {
-        return None;
-    }
-    let id = v
-        .get("id")
-        .and_then(|x| x.as_str())
-        .unwrap_or(name)
-        .to_string();
-    let title = v
-        .get("title")
-        .and_then(|x| x.as_str())
-        .map(|s| trim_oneline(s, 80))
-        .unwrap_or_else(|| "OpenCode session".to_string());
-    let updated = v
-        .get("time")
-        .and_then(|t| t.get("updated"))
-        .and_then(|x| x.as_u64())
-        .or_else(|| v.get("updated_at").and_then(|x| x.as_u64()))
-        .unwrap_or_else(|| mtime_ms(path));
-    let turn_count = v
-        .get("message_count")
-        .and_then(|x| x.as_u64())
-        .unwrap_or(0) as usize;
-    Some(CliSessionSummary {
-        provider: "opencode-cli".into(),
-        id,
-        title,
-        preview: String::new(),
-        cost_usd: v.get("cost").and_then(|x| x.as_f64()).unwrap_or(0.0),
-        turn_count,
-        last_turn_at_ms: updated,
-    })
-}
-
-fn normalize_cwd(cwd: &str) -> String {
-    let p = Path::new(cwd);
-    fs::canonicalize(p)
-        .map(|x| x.to_string_lossy().to_string())
-        .unwrap_or_else(|_| cwd.to_string())
 }

@@ -153,9 +153,8 @@ import { useBrainMentionSearch } from "../useBrainMentionSearch";
 import { BrainMentionSuggestions } from "./BrainMentionSuggestions";
 import {
   ComposerMentionChips,
-  parseLeadingSkill,
-  stripLeadingSkill,
 } from "./ComposerMentionChips";
+import { ComposerInputHighlight } from "./ComposerInputHighlight";
 import {
   handoffStoryToBuilder,
   onNativePlanReady,
@@ -169,6 +168,17 @@ import {
   getWorksInjectDepth,
   manifestDocPaths,
 } from "../workContextInject";
+import {
+  buildFeatureTurnContext,
+  getFeatureInjectEnabled,
+} from "../featureTurnContext";
+import {
+  featureLabelFromSlug,
+  listFeatures,
+  type FeatureEntry,
+} from "../featureCatalog";
+import { fuzzyMatch } from "../fuzzyMatch";
+import { ComposerFeaturePill } from "./ComposerFeaturePill";
 import {
   formatOpenItemsIndex,
   parseWorksNewStoryBlock,
@@ -333,8 +343,12 @@ import {
   isNearBottom,
   pinUserTurnToTop,
   scrollToBottom,
+  TOOL_ROW_CAP,
+  TURN_WINDOW,
   windowChatTurns,
+  windowToolRows,
 } from "../chatScroll";
+import { agenticProviderForPresetApply } from "../aiChatPresetApply";
 import {
   ensureCloudCatalog,
   ensureModelDiscovery,
@@ -462,13 +476,6 @@ interface Props {
 // disabled (no warning ever fires). Read on every turn so changes
 // from Settings take effect immediately.
 const BUDGET_KEY = "lcp.claudeCode.budgetUsd";
-// Transcript windowing: render only the last N turns of a long chat so a switch
-// doesn't paint hundreds of turns and stall. "Show earlier" reveals the rest.
-// The newest turns (streaming + pinned user turn) are always in the window.
-const TURN_WINDOW = 40;
-/** Cap tool chips on legacy (no-blocks) rows — tool-dense turns can have 100+
- *  ToolCallRows inside the turn window and stall chat switch for seconds. */
-const TOOL_ROW_CAP = 12;
 // Last-used Claude Code permission mode, persisted so "Auto" sticks across
 // restarts. Empty / missing = Ask (null). See permModeStore for how the mode
 // reaches the permission overlay.
@@ -536,29 +543,6 @@ function resolveActivePresetDef(
   return customPresets.find((p) => p.id === id);
 }
 
-type AgenticProviderId = "claude-code" | "cursor-cli" | "opencode-cli";
-
-// Fresh chats mount with `selected === ""` until model discovery hydrates.
-// Preset model/effort still need a backend — prefer the current picker
-// provider, else the first available agentic CLI (CC first).
-function agenticProviderForPresetApply(
-  selected: string,
-  availability: {
-    claudeCode: boolean;
-    cursorCli: boolean;
-    openCode: boolean;
-  },
-): AgenticProviderId | null {
-  const fromSelected = parseQualifiedModel(selected)?.providerId;
-  if (fromSelected && isAgenticProviderId(fromSelected)) {
-    return fromSelected as AgenticProviderId;
-  }
-  if (availability.claudeCode) return "claude-code";
-  if (availability.cursorCli) return "cursor-cli";
-  if (availability.openCode) return "opencode-cli";
-  return null;
-}
-
 // Flywheel scope: union of files already edited across a work/story's linked
 // sessions (read-only, from the in-memory cache). Surfaced in the manifest so
 // the agent Reads these first instead of re-exploring. See decisions/004.
@@ -608,6 +592,9 @@ export function AIChatPanel({
   );
   const planning = useStore((s) =>
     aiChatId ? !!s.loaded[wsId]?.aiChats[aiChatId]?.planning : false,
+  );
+  const featureId = useStore((s) =>
+    aiChatId ? s.loaded[wsId]?.aiChats[aiChatId]?.featureId : undefined,
   );
   const [pinkyBrainExt, setPinkyBrainExt] = useState(false);
   const [skillTrainerExt, setSkillTrainerExt] = useState(false);
@@ -665,9 +652,6 @@ export function AIChatPanel({
   const [cursorCliAvailable, setCursorCliAvailable] = useState(
     () => bootDiscovery?.cursorCliAvailable ?? false,
   );
-  const [openCodeAvailable, setOpenCodeAvailable] = useState(
-    () => bootDiscovery?.openCodeAvailable ?? false,
-  );
   // Rules-file hint shown in the header. Loaded once per workspace
   // mount + refreshed whenever fs events suggest the file may have
   // changed. Null when no rules file exists.
@@ -679,6 +663,7 @@ export function AIChatPanel({
   // Input lives in ComposerShell so keystrokes don't re-render the transcript.
   const composerRef = useRef<ComposerShellHandle>(null);
   const inputSnapRef = useRef("");
+  const prevComposerInputRef = useRef("");
   const [draftEpoch, setDraftEpoch] = useState(0);
   const setInput = useCallback((v: SetStateAction<string>) => {
     composerRef.current?.setInput(v);
@@ -687,10 +672,24 @@ export function AIChatPanel({
     () => composerRef.current?.getInput() ?? inputSnapRef.current,
     [],
   );
-  const onComposerInputChange = useCallback((next: string) => {
-    inputSnapRef.current = next;
-    setDraftEpoch((n) => n + 1);
-  }, []);
+  const onComposerInputChange = useCallback(
+    (next: string) => {
+      const prev = prevComposerInputRef.current;
+      prevComposerInputRef.current = next;
+      inputSnapRef.current = next;
+      setDraftEpoch((n) => n + 1);
+      if (!aiChatId) return;
+      const fid =
+        useStore.getState().loaded[wsId]?.aiChats[aiChatId]?.featureId;
+      if (!fid) return;
+      const token = `@${fid}`;
+      // Unlink only when the user deletes the inline @slug (not on session wipe).
+      if (prev.includes(token) && !next.includes(token)) {
+        useStore.getState().setAIChatFeature(wsId, aiChatId, null);
+      }
+    },
+    [wsId, aiChatId],
+  );
   const [dictating, setDictating] = useState(false);
   const [fileDropHover, setFileDropHover] = useState(false);
   const dictationCaptureRef = useRef<Promise<DictationCapture> | null>(null);
@@ -1084,7 +1083,6 @@ export function AIChatPanel({
     const provider = agenticProviderForPresetApply(selected, {
       claudeCode: claudeCodeAvailable,
       cursorCli: cursorCliAvailable,
-      openCode: openCodeAvailable,
     });
     // Effort/thinking/model/mode only apply to agentic CLIs — non-agentic
     // providers (ollama/openai/anthropic) still get the instructions text.
@@ -1304,14 +1302,19 @@ export function AIChatPanel({
   // Works catalog for @-mention only — hydrate while the mention menu is open.
   const [mentionWorksSnap, setMentionWorksSnap] =
     useState<WorksSnapshot | null>(null);
+  const [mentionFeatures, setMentionFeatures] = useState<FeatureEntry[] | null>(
+    null,
+  );
   useEffect(() => {
     if (!mentionState) {
       setMentionWorksSnap(null);
+      setMentionFeatures(null);
       return;
     }
     const cached = getWorksSnapshot(root);
     if (cached) setMentionWorksSnap(cached);
     void hydrateWorks(root).then(setMentionWorksSnap);
+    void listFeatures(root).then(setMentionFeatures);
     return subscribeWorks(root, setMentionWorksSnap);
   }, [mentionState, root]);
   // Shell-style prompt history. historyIdx counts backwards through
@@ -1392,7 +1395,6 @@ export function AIChatPanel({
     setAllCloudCatalog(snap.cloudCatalog);
     setClaudeCodeAvailable(snap.claudeCodeAvailable);
     setCursorCliAvailable(snap.cursorCliAvailable);
-    setOpenCodeAvailable(snap.openCodeAvailable);
     const aggregate = snap.allModels;
     if (aggregate.length > 0) {
       setStatus("ready");
@@ -1441,7 +1443,6 @@ export function AIChatPanel({
     if (!snap) return;
     const wantCc = snap.claudeCodeAvailable;
     const wantCursor = snap.cursorCliAvailable;
-    const wantOc = snap.openCodeAvailable;
     if (wantCc) {
       void import("../providers/claudeCode")
         .then(({ refreshClaudeCodeModelsLive }) =>
@@ -1449,34 +1450,23 @@ export function AIChatPanel({
         )
         .then((ccModels) => {
           if (ccModels.length > 0) {
-            mergeLiveCliModelsIntoDiscovery([], [], ccModels);
+            mergeLiveCliModelsIntoDiscovery([], ccModels);
             const next = getModelDiscovery();
             if (next) applyDiscoverySnapshot(next);
           }
         })
         .catch(() => {});
     }
-    if (!wantCursor && !wantOc) return;
+    if (!wantCursor) return;
     try {
-      const [{ refreshOpenCodeModelsLive }, { refreshCursorModelsLive }] =
-        await Promise.all([
-          import("../providers/openCode"),
-          import("../providers/cursorCode"),
-        ]);
-      const [ocModels, cursorModels] = await Promise.all([
-        wantOc
-          ? refreshOpenCodeModelsLive(force).catch(
-              () => [] as ProviderModel[],
-            )
-          : Promise.resolve([] as ProviderModel[]),
-        wantCursor
-          ? refreshCursorModelsLive(force).catch(
-              () => [] as ProviderModel[],
-            )
-          : Promise.resolve([] as ProviderModel[]),
-      ]);
-      if (ocModels.length === 0 && cursorModels.length === 0) return;
-      mergeLiveCliModelsIntoDiscovery(ocModels, cursorModels);
+      const { refreshCursorModelsLive } = await import(
+        "../providers/cursorCode"
+      );
+      const cursorModels = await refreshCursorModelsLive(force).catch(
+        () => [] as ProviderModel[],
+      );
+      if (cursorModels.length === 0) return;
+      mergeLiveCliModelsIntoDiscovery(cursorModels);
       const next = getModelDiscovery();
       if (next) applyDiscoverySnapshot(next);
     } catch {
@@ -2364,7 +2354,7 @@ export function AIChatPanel({
 
   // Stage image attachments from a Cmd+V paste or a Finder drop. Compresses
   // each (client-side) and persists it to disk; caps at MAX_ATTACHED_IMAGES.
-  // Agentic providers (Claude Code, Cursor CLI, OpenCode) consume paths or
+  // Agentic providers (Claude Code, Cursor CLI) consume paths or
   // file parts — other providers no-op with a hint.
   const appendImages = useCallback(
     async (
@@ -2375,7 +2365,7 @@ export function AIChatPanel({
     ) => {
       const providerId = parseQualifiedModel(selected)?.providerId ?? "ollama";
       if (!providerAcceptsImages(providerId)) {
-        toastInfo("Images attach only with Claude Code, Cursor CLI, or OpenCode");
+        toastInfo("Images attach only with Claude Code or Cursor CLI");
         return;
       }
       const room = MAX_ATTACHED_IMAGES - attachedImages.length;
@@ -2798,6 +2788,19 @@ export function AIChatPanel({
         if (out.length >= 4) break;
       }
     }
+    if (mentionFeatures) {
+      for (const f of mentionFeatures) {
+        if (
+          q === "" ||
+          fuzzyMatch(q, f.slug) ||
+          fuzzyMatch(q, f.title) ||
+          fuzzyMatch(q, f.path)
+        ) {
+          out.push({ type: "feature", feature: f });
+          if (out.length >= 8) break;
+        }
+      }
+    }
     if (mentionWorksSnap) {
       for (const s of mentionWorksSnap.stories) {
         if (
@@ -2830,7 +2833,14 @@ export function AIChatPanel({
       }
     }
     return out;
-  }, [mentionState, mentionFiles, root, agents, mentionWorksSnap]);
+  }, [
+    mentionState,
+    mentionFiles,
+    root,
+    agents,
+    mentionWorksSnap,
+    mentionFeatures,
+  ]);
 
   const acceptMention = (pick: MentionItem) => {
     if (!mentionState) return;
@@ -2840,6 +2850,18 @@ export function AIChatPanel({
       setAttachedAgents((prev) =>
         prev.includes(pick.agent.name) ? prev : [...prev, pick.agent.name],
       );
+    } else if (pick.type === "feature" && aiChatId) {
+      const token = pick.feature.slug;
+      const cur = readInput();
+      const before = cur.slice(0, mentionState.start);
+      const after = cur.slice(mentionState.end);
+      setInput(
+        `${before}@${token}${after.startsWith(" ") ? "" : " "}${after}`,
+      );
+      useStore.getState().setAIChatFeature(wsId, aiChatId, {
+        id: pick.feature.slug,
+        label: featureLabelFromSlug(pick.feature.slug),
+      });
     } else if (pick.type === "work" && aiChatId) {
       const token = pick.work.shortId;
       const cur = readInput();
@@ -3099,30 +3121,6 @@ export function AIChatPanel({
     ) {
       setPinnedProviderId(selectedProvider);
     }
-    if (
-      images.length > 0 &&
-      selectedProvider === "opencode-cli" &&
-      selectedParsed
-    ) {
-      const meta =
-        allModels.find(
-          (m) =>
-            m.providerId === "opencode-cli" &&
-            m.modelId === selectedParsed.modelId,
-        ) ??
-        allCloudCatalog.find(
-          (m) =>
-            m.providerId === "opencode-cli" &&
-            m.modelId === selectedParsed.modelId,
-        );
-      if (meta?.supportsVision === false) {
-        toastError(
-          "This OpenCode model does not support image input. Pick a vision-capable model or remove the attachments.",
-        );
-        liveTurnRef.current = false;
-        return;
-      }
-    }
     const providerRunsOwnTools = isAgenticProviderId(selectedProvider);
     const providerCanReadItself =
       providerRunsOwnTools ||
@@ -3174,7 +3172,7 @@ export function AIChatPanel({
     // can fetch any file in the workspace far more efficiently than
     // shoving file contents through the prompt.
     // Claude Code natively loads CLAUDE.md + reads files via its own tools.
-    // OpenCode/Cursor also run their own tool loop but still need rules inlined.
+    // Cursor also runs its own tool loop but still needs rules inlined.
     const skipAllInlining = selectedProvider === "claude-code";
 
     // Workspace AI rules. Claude Code natively loads CLAUDE.md so we
@@ -3222,9 +3220,7 @@ export function AIChatPanel({
           `The user wants you to look at: ${wsAttached.join(", ")}. Use your Read tool on these.`,
         );
       }
-      // Image attachments — provider-specific delivery:
-      // CC/Cursor: paths in turn context (Read / file tools).
-      // OpenCode: FilePart via HTTP API (see openCodeProvider.chat).
+      // Image attachments — CC/Cursor: paths in turn context (Read / file tools).
       if (images.length > 0) {
         const paths = images.map((i) => i.path).join(", ");
         if (selectedProvider === "claude-code") {
@@ -3236,10 +3232,6 @@ export function AIChatPanel({
           ccTurnContext.push(
             `The user attached ${images.length} image${images.length === 1 ? "" : "s"}. ` +
               `Analyze ${images.length === 1 ? "it" : "them"} using your tools: ${paths}.`,
-          );
-        } else if (selectedProvider === "opencode-cli") {
-          ccTurnContext.push(
-            `The user attached ${images.length} image${images.length === 1 ? "" : "s"} to this message.`,
           );
         }
       }
@@ -3413,10 +3405,35 @@ export function AIChatPanel({
     }
     let linkedWorkId: string | undefined;
     let linkedStoryId: string | undefined;
+    const chatDescForInject = aiChatId
+      ? useStore.getState().loaded[wsId]?.aiChats[aiChatId]
+      : undefined;
+    const linkedFeatureId = chatDescForInject?.featureId;
+    if (
+      linkedFeatureId &&
+      aiChatId &&
+      getFeatureInjectEnabled(wsId)
+    ) {
+      try {
+        const scopeFiles = collectStoryScopeFiles(wsId, [aiChatId]);
+        const featCtx = await buildFeatureTurnContext(
+          root,
+          linkedFeatureId,
+          wsId,
+          scopeFiles,
+        );
+        if (featCtx) {
+          ccTurnContext.push(
+            manifestForTurn(aiChatId, featCtx.block, featCtx.pointer),
+          );
+        }
+      } catch {
+        /* Feature inject optional */
+      }
+    }
     if (aiChatId && getWorkInjectEnabled(wsId)) {
-      const chatDesc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
-      linkedWorkId = chatDesc?.workItemId;
-      linkedStoryId = chatDesc?.storyId;
+      linkedWorkId = chatDescForInject?.workItemId;
+      linkedStoryId = chatDescForInject?.storyId;
     }
     if (linkedWorkId || linkedStoryId) {
       try {
@@ -3706,9 +3723,6 @@ export function AIChatPanel({
             : undefined,
           selectedProvider === "claude-code"
             ? (ccThinking ?? undefined)
-            : undefined,
-          selectedProvider === "opencode-cli" && images.length > 0
-            ? images.map((i) => ({ path: i.path, name: i.name }))
             : undefined,
         )) {
           // Any event from the provider is a sign of life — reset the
@@ -4245,7 +4259,7 @@ export function AIChatPanel({
     abortRef.current?.abort();
     liveTurnRef.current = false;
     // Immediate UI reset — don't wait for the tool-execution loop or
-    // provider generator to unwind (OpenCode could sit in runningTools).
+    // provider generator to unwind (agentic CLIs could sit in runningTools).
     setStreaming(null);
     setStreamingBlocks([]);
     setStreamingToolCalls([]);
@@ -4290,15 +4304,11 @@ export function AIChatPanel({
     () => attachedFiles.filter((f) => isUnderRoot(f, root)),
     [attachedFiles, root],
   );
-  const leadingSkill = useMemo(
-    () => parseLeadingSkill(inputSnapRef.current, skills),
-    [draftEpoch, skills],
-  );
   const hasComposerMentions =
     attachedBrainHits.length > 0 ||
     wsAttachedFiles.length > 0 ||
-    attachedAgents.length > 0 ||
-    leadingSkill !== null;
+    attachedAgents.length > 0;
+  const skillNames = useMemo(() => skills.map((s) => s.name), [skills]);
   const showComposerDock = turnActive || editorInWorkspace || hasWsAttached;
   useEffect(() => {
     if (!turnActive || !chatVisible) return;
@@ -5146,7 +5156,6 @@ export function AIChatPanel({
     ollama: { label: "ollama", color: "#4ade80" },
     "claude-code": { label: "claude code", color: "#b18cf0" },
     "cursor-cli": { label: "cursor cli", color: "#6b9bd1" },
-    "opencode-cli": { label: "opencode", color: "#8b7fd4" },
     openai: { label: "openai", color: "#10a37f" },
     anthropic: { label: "anthropic", color: "#d97757" },
   };
@@ -5216,13 +5225,6 @@ export function AIChatPanel({
                 setProviderSessionId(prev, provider, id),
               );
               resetTurnTransients();
-              if (provider === "opencode-cli") {
-                setMessages([]);
-                toastInfo(
-                  "Resumed OpenCode session — your next message continues the ses_* thread",
-                );
-                return;
-              }
               try {
                 const loaded = await providerSessions.loadSession(
                   root,
@@ -5304,11 +5306,10 @@ export function AIChatPanel({
       ollama: true,
       "claude-code": claudeCodeAvailable,
       "cursor-cli": cursorCliAvailable,
-      "opencode-cli": openCodeAvailable,
       openai: hasApiKey("openai"),
       anthropic: hasApiKey("anthropic"),
     }),
-    [claudeCodeAvailable, cursorCliAvailable, openCodeAvailable],
+    [claudeCodeAvailable, cursorCliAvailable],
   );
 
   const handlePickerOpen = useCallback(() => {
@@ -5623,6 +5624,16 @@ export function AIChatPanel({
     const desc = aiChatId
       ? useStore.getState().loaded[wsId]?.aiChats[aiChatId]
       : undefined;
+    if (desc?.featureId && aiChatId) {
+      void onNativePlanReady(
+        wsId,
+        aiChatId,
+        root,
+        desc.storyId ?? "",
+        plan,
+      );
+      return;
+    }
     if (desc?.storyId && aiChatId) {
       void onNativePlanReady(wsId, aiChatId, root, desc.storyId, plan);
       return;
@@ -5967,11 +5978,11 @@ export function AIChatPanel({
                     : m.tool_calls;
                 if (rows.length === 0) return null;
                 const toolsExpanded = expandedToolsMsgIdx.has(i);
-                const shown =
-                  toolsExpanded || rows.length <= TOOL_ROW_CAP
-                    ? rows
-                    : rows.slice(0, TOOL_ROW_CAP);
-                const hiddenTools = rows.length - shown.length;
+                const { rows: shown, hiddenCount: hiddenTools } = windowToolRows(
+                  rows,
+                  TOOL_ROW_CAP,
+                  toolsExpanded,
+                );
                 return (
                   <div className="ai-tcalls">
                     {shown.map((c, j) => (
@@ -6748,6 +6759,21 @@ export function AIChatPanel({
           activePresetId={presetId}
           onSelectPreset={applyPreset}
         />
+        {aiChatId && !featureId && (
+          <ComposerFeaturePill
+            wsId={wsId}
+            root={root}
+            chatId={aiChatId}
+            onLinked={(slug) => {
+              const token = `@${slug}`;
+              setInput((v) => {
+                if (v.includes(token)) return v;
+                const pad = v && !/\s$/.test(v) ? " " : "";
+                return `${v}${pad}${token} `;
+              });
+            }}
+          />
+        )}
         <div className="ai-composer-spacer" />
         {renderModelChip()}
         {parseQualifiedModel(selected)?.providerId === "claude-code" && (
@@ -6876,7 +6902,6 @@ export function AIChatPanel({
             files={wsAttachedFiles}
             agents={agents}
             attachedAgentNames={attachedAgents}
-            skill={leadingSkill}
             onRemoveBrain={removeAttachedBrainHit}
             onRemoveFile={(abs) =>
               setAttachedFiles((prev) => prev.filter((p) => p !== abs))
@@ -6884,15 +6909,17 @@ export function AIChatPanel({
             onRemoveAgent={(name) =>
               setAttachedAgents((prev) => prev.filter((n) => n !== name))
             }
-            onRemoveSkill={() => {
-              if (!leadingSkill) return;
-              setInput((v) => stripLeadingSkill(v, leadingSkill.name));
-            }}
           />
         )}
+        <ComposerInputHighlight
+          text={input}
+          skillNames={skillNames}
+          featureSlug={featureId ?? null}
+          textareaRef={inputRef}
+        >
         <textarea
           ref={inputRef}
-          className="ai-input"
+          className="ai-input ai-input--ghost"
           rows={2}
           placeholder={
             streaming !== null || runningTools
@@ -7299,12 +7326,13 @@ export function AIChatPanel({
             }
           }}
         />
+        </ComposerInputHighlight>
         {input.trim().length === 0 &&
           !hasComposerMentions &&
           streaming === null &&
           !runningTools && (
             <div className="ai-composer-hint" aria-hidden="true">
-              <span>@ files</span>
+              <span>@ files · features</span>
               <span># brain</span>
               <span>/ commands</span>
               {selectedIsCC && <span>Ctrl+1–5 effort</span>}

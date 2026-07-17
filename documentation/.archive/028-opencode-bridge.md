@@ -1,4 +1,10 @@
 ---
+status: archived
+archived: 2026-07-17
+reason: Dropped OpenCode sidecar bridge to reduce agentic-provider complexity (roadmap lighten Quack).
+---
+
+---
 type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)

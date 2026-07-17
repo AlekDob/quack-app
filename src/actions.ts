@@ -524,10 +524,10 @@ export const commands: CommandSpec[] = [
   },
   {
     id: "view.open_works",
-    label: "Open Works",
+    label: "Open Features",
     category: "View",
     accel: "Ctrl+Alt+T",
-    hint: "Project work items — modules, kanban, tickets",
+    hint: "Product feature docs — documentation/features/",
     run: () => {
       const wsId = s().activeId;
       if (!wsId) {

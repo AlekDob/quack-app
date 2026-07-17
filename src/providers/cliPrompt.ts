@@ -18,7 +18,7 @@ export function flattenMessages(messages: ChatMessage[]): string {
 
 /**
  * Split system instructions from the conversational turn(s).
- * OpenCode's HTTP API accepts `system` separately — inlining it as
+ * Some CLIs accept `system` separately — inlining it as
  * `[System]` text makes some models echo the whole block back.
  */
 export function splitCliPrompt(messages: ChatMessage[]): {

@@ -23,10 +23,10 @@ follow-up.
 
 | Type | Path | Role |
 |---|---|---|
-| Helper | `src/chatScroll.ts` | `windowChatTurns(turns, limit, expanded)` → `{ turns, hiddenCount }` |
-| Render | `src/components/AIChatPanel.tsx` | `TURN_WINDOW=40`, `showAllTurns` state (reset per `aiChatId`), `.ai-show-earlier` pill |
+| Helper | `src/chatScroll.ts` | `windowChatTurns`, `windowToolRows`, `TURN_WINDOW`, `TOOL_ROW_CAP` |
+| Render | `src/components/AIChatPanel.tsx` | uses shared constants; `.ai-show-earlier` pill; tool "Show N more" via `windowToolRows` |
 | Style | `src/App.css` | `.ai-show-earlier` centered pill |
-| Test | `src/chatScroll.test.ts` | vitest — grouping + windowing (`npm test`) |
+| Test | `src/chatScroll.test.ts` | vitest — grouping + turn/tool windowing (`npm test`) |
 
 ### How it works
 

@@ -18,7 +18,6 @@ export interface ModelDiscoverySnapshot {
   cloudCatalog: ProviderModel[];
   claudeCodeAvailable: boolean;
   cursorCliAvailable: boolean;
-  openCodeAvailable: boolean;
   ollamaUp: boolean;
   fetchedAt: number;
 }
@@ -58,7 +57,19 @@ function isDiskSnap(v: unknown): v is ModelDiscoverySnapshot {
 }
 
 function hydrateDisk(): ModelDiscoverySnapshot | null {
-  return getJson<ModelDiscoverySnapshot | null>(DISK_KEY, null, isDiskSnap);
+  const raw = getJson<ModelDiscoverySnapshot | null>(DISK_KEY, null, isDiskSnap);
+  if (!raw) return null;
+  // Drop retired OpenCode entries from older caches.
+  const allModels = raw.allModels.filter(
+    (m) => (m.providerId as string) !== "opencode-cli",
+  );
+  const cloudCatalog = raw.cloudCatalog.filter(
+    (m) => (m.providerId as string) !== "opencode-cli",
+  );
+  const { openCodeAvailable: _drop, ...rest } = raw as ModelDiscoverySnapshot & {
+    openCodeAvailable?: boolean;
+  };
+  return { ...rest, allModels, cloudCatalog };
 }
 
 function persistDisk(snap: ModelDiscoverySnapshot): void {
@@ -81,7 +92,7 @@ function mergeWithHints(
   for (const m of fastModels) byKey.set(modelKey(m), m);
   if (hints) {
     for (const m of hints.allModels) {
-      if (m.providerId === "cursor-cli" || m.providerId === "opencode-cli" || m.providerId === "claude-code") {
+      if (m.providerId === "cursor-cli" || m.providerId === "claude-code") {
         byKey.set(modelKey(m), m);
       }
     }
@@ -98,7 +109,6 @@ function mergeWithHints(
     cloudCatalog: cloudCatalogComplete && hints ? hints.cloudCatalog : [],
     claudeCodeAvailable,
     cursorCliAvailable: hints?.cursorCliAvailable ?? false,
-    openCodeAvailable: hints?.openCodeAvailable ?? false,
     ollamaUp,
     fetchedAt: Date.now(),
   };
@@ -116,26 +126,16 @@ async function probeCliAvailability(
   snap: ModelDiscoverySnapshot,
 ): Promise<ModelDiscoverySnapshot> {
   const providersMod = await import("./providers");
-  const [cursorAvail, ocAvail] = await Promise.all([
-    providersMod
-      .getProvider("cursor-cli")
-      .isAvailable()
-      .catch(() => false),
-    providersMod
-      .getProvider("opencode-cli")
-      .isAvailable()
-      .catch(() => false),
-  ]);
-  if (
-    cursorAvail === snap.cursorCliAvailable &&
-    ocAvail === snap.openCodeAvailable
-  ) {
+  const cursorAvail = await providersMod
+    .getProvider("cursor-cli")
+    .isAvailable()
+    .catch(() => false);
+  if (cursorAvail === snap.cursorCliAvailable) {
     return snap;
   }
   return {
     ...snap,
     cursorCliAvailable: cursorAvail,
-    openCodeAvailable: ocAvail,
     fetchedAt: Date.now(),
   };
 }
@@ -151,10 +151,7 @@ async function fetchSnapshot(
   ]);
   let snap = mergeWithHints(fastModels, hints, ollamaUp);
   void probeCliAvailability(snap).then((probed) => {
-    if (
-      probed.cursorCliAvailable === snap.cursorCliAvailable &&
-      probed.openCodeAvailable === snap.openCodeAvailable
-    ) {
+    if (probed.cursorCliAvailable === snap.cursorCliAvailable) {
       return;
     }
     if (cache) {
@@ -246,27 +243,10 @@ function mergeProviderModels(
 
 /** Merge lazy CLI catalogs (picker/browser open) into the shared cache. */
 export function mergeLiveCliModelsIntoDiscovery(
-  ocModels: ProviderModel[],
   cursorModels: ProviderModel[],
   ccModels: ProviderModel[] = [],
 ): void {
   if (!cache) return;
-  if (ocModels.length > 0) {
-    cache = {
-      ...cache,
-      allModels: mergeProviderModels(cache.allModels, ocModels, "opencode-cli"),
-    };
-    if (cloudCatalogComplete) {
-      cache = {
-        ...cache,
-        cloudCatalog: mergeProviderModels(
-          cache.cloudCatalog,
-          ocModels,
-          "opencode-cli",
-        ),
-      };
-    }
-  }
   if (cursorModels.length > 0) {
     cache = {
       ...cache,
@@ -342,7 +322,7 @@ export async function ensureCloudCatalog(): Promise<ProviderModel[]> {
     .then((catalog) => {
       if (cache) {
         let merged = catalog;
-        for (const pid of ["opencode-cli", "cursor-cli", "claude-code"] as const) {
+        for (const pid of ["cursor-cli", "claude-code"] as const) {
           const live = cache!.allModels.filter((m) => m.providerId === pid);
           if (live.length > 0) merged = mergeProviderModels(merged, live, pid);
         }
@@ -366,38 +346,24 @@ async function warmLiveCliCatalogs(force = false): Promise<void> {
   if (!snap) {
     // First run (no disk snapshot yet): wait for the base discovery fetch
     // so we know which CLIs are available, instead of silently skipping
-    // the CC/Cursor/OpenCode warm-up (which used to leave the picker
-    // loader stuck off on the very first open).
+    // the CC/Cursor warm-up (which used to leave the picker loader stuck
+    // off on the very first open).
     snap = await ensureModelDiscovery({ force: false });
   }
   const wantCc = snap.claudeCodeAvailable;
   const wantCursor = snap.cursorCliAvailable;
-  const wantOc = snap.openCodeAvailable;
   if (wantCc) void warmCcCatalog(force);
-  if (!wantCursor && !wantOc) return;
+  if (!wantCursor) return;
   if (!force && liveCliInflight) return liveCliInflight;
 
   liveCliInflight = (async () => {
     try {
-      const [{ refreshOpenCodeModelsLive }, { refreshCursorModelsLive }] =
-        await Promise.all([
-          import("./providers/openCode"),
-          import("./providers/cursorCode"),
-        ]);
-      const [ocModels, cursorModels] = await Promise.all([
-        wantOc
-          ? refreshOpenCodeModelsLive(force).catch(
-              () => [] as ProviderModel[],
-            )
-          : Promise.resolve([] as ProviderModel[]),
-        wantCursor
-          ? refreshCursorModelsLive(force).catch(
-              () => [] as ProviderModel[],
-            )
-          : Promise.resolve([] as ProviderModel[]),
-      ]);
-      if (ocModels.length > 0 || cursorModels.length > 0) {
-        mergeLiveCliModelsIntoDiscovery(ocModels, cursorModels);
+      const { refreshCursorModelsLive } = await import("./providers/cursorCode");
+      const cursorModels = await refreshCursorModelsLive(force).catch(
+        () => [] as ProviderModel[],
+      );
+      if (cursorModels.length > 0) {
+        mergeLiveCliModelsIntoDiscovery(cursorModels);
       }
     } finally {
       liveCliInflight = null;
@@ -420,7 +386,7 @@ function warmCcCatalog(force: boolean): void {
         () => [] as ProviderModel[],
       );
       if (ccModels.length > 0) {
-        mergeLiveCliModelsIntoDiscovery([], [], ccModels);
+        mergeLiveCliModelsIntoDiscovery([], ccModels);
       }
     } catch {
       /* keep fallback catalog */
@@ -435,7 +401,6 @@ function warmCcCatalog(force: boolean): void {
 /** Hover / picker open — never blocks UI; uses disk + in-memory cache first. */
 export function warmPickerCatalogs(): void {
   void import("./providers/claudeCode");
-  void import("./providers/openCode");
   void import("./providers/cursorCode");
   void ensureModelDiscovery({ force: false });
   void warmLiveCliCatalogs(false);

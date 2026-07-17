@@ -32,7 +32,7 @@ function drawerTabLabel(ws: WorkspaceData, key: string): string {
   if (parsed.kind === "ai") return ws.aiChats[parsed.id]?.title ?? "AI Chat";
   if (parsed.kind === "terminal") return ws.terminals[parsed.id]?.title ?? "Terminal";
   if (parsed.kind === "whiteboard") return "Team";
-  if (parsed.kind === "works") return "Works";
+  if (parsed.kind === "works") return "Features";
   if (parsed.kind === "usage") return "Usage";
   if (parsed.kind === "brain") return "Quack Brain";
   if (parsed.kind === "store") return "Quack Store";

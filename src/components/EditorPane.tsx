@@ -1,5 +1,5 @@
 import Editor, { type Monaco } from "@monaco-editor/react";
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { editor } from "monaco-editor";
 import { useStore } from "../store";
 import {
@@ -9,7 +9,6 @@ import {
 import { readEditorMonoFont } from "../editorMonoFont";
 import { useResolvedEditorColorTheme } from "../useResolvedEditorColorTheme";
 import { MarkdownPreview } from "./MarkdownPreview";
-import { MermaidPreview } from "./MermaidPreview";
 import { HtmlPreviewFrame } from "./HtmlPreviewFrame";
 import {
   setEditorState,
@@ -70,6 +69,12 @@ import {
   writeDiffSideBySide,
 } from "../editorDiffPrefs";
 import { useGitDiffPair } from "../hooks/useGitDiffPair";
+
+/** Mermaid stays out of the editor critical path — load only for .mmd tabs. */
+const MermaidPreview = lazy(async () => {
+  const m = await import("./MermaidPreview");
+  return { default: m.MermaidPreview };
+});
 
 // Right-click "Ask AI to …" actions registered with Monaco. Each one
 // grabs the current selection (or the whole file when nothing is
@@ -1063,7 +1068,9 @@ export function EditorPane({ wsId, path, paneVisible = true }: Props) {
             )}
             {showMermaidPreview && (
               <div className="preview-half">
-                <MermaidPreview content={file.contents} />
+                <Suspense fallback={null}>
+                  <MermaidPreview content={file.contents} />
+                </Suspense>
               </div>
             )}
             {showHtmlPreview && (

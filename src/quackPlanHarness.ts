@@ -16,6 +16,10 @@ import {
 import type { WorkItem } from "./works";
 import { openStoryPlanTab } from "./components/StoryPlanPane";
 import type { WorkStory } from "./works";
+import { openFeatureDocDrawer } from "./featureDocDrawer";
+import { mergePlanIntoFeature } from "./planFeatureMerge";
+import { FEATURE_DIR } from "./worksFeatureModules";
+import { featureLabelFromSlug } from "./featureCatalog";
 
 export async function enterPlanning(
   wsId: string,
@@ -38,6 +42,19 @@ export async function onNativePlanReady(
   storyId: string,
   planText: string,
 ): Promise<void> {
+  const featureId = useStore.getState().loaded[wsId]?.aiChats[chatId]?.featureId;
+  if (featureId) {
+    await mergePlanIntoFeature(root, featureId, planText);
+    openFeatureDocDrawer({
+      wsId,
+      root,
+      featurePath: featureId.includes("/")
+        ? featureId
+        : `${FEATURE_DIR}/${featureId}.md`,
+      title: featureLabelFromSlug(featureId),
+    });
+    return;
+  }
   await mergePlanIntoStory(root, storyId, planText);
   openStoryPlanTab(wsId, chatId, storyId);
 }

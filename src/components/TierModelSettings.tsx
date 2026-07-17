@@ -1,10 +1,10 @@
 // Settings → Providers section: lets the user map each abstract preset
 // tier (reasoning/balanced/fast) to a concrete model for backends whose
-// catalog is DISCOVERED LIVE (cursor-cli, opencode-cli) rather than
-// shipped as a fixed list — capabilities.ts can only offer a "default"
-// sentinel for those, which is why switching preset never changed the
-// model on them. Persists to lcp.tierModelMap.v1 via presets/tierModelOverrides;
-// resolvePresetConfigFor prefers this override over the static default.
+// catalog is DISCOVERED LIVE (cursor-cli) rather than shipped as a fixed
+// list — capabilities.ts can only offer a "default" sentinel for those,
+// which is why switching preset never changed the model on them. Persists
+// to lcp.tierModelMap.v1 via presets/tierModelOverrides; resolvePresetConfigFor
+// prefers this override over the static default.
 import { useEffect, useState } from "react";
 import {
   getProvider,
@@ -18,12 +18,11 @@ import {
   type ModelTier,
 } from "../presets";
 
-type DynamicBackendId = "claude-code" | "cursor-cli" | "opencode-cli";
+type DynamicBackendId = "claude-code" | "cursor-cli";
 
 const DYNAMIC_BACKENDS: { id: DynamicBackendId; label: string }[] = [
   { id: "claude-code", label: "Claude Code" },
   { id: "cursor-cli", label: "Cursor CLI" },
-  { id: "opencode-cli", label: "OpenCode" },
 ];
 
 const TIERS: { id: ModelTier; label: string; hint: string }[] = [
@@ -39,9 +38,9 @@ export function TierModelSettings() {
         Map each tier to a real model per backend so switching agents
         (Milo/Nora/Vera) actually changes the model. Claude Code already
         ships sensible defaults (Opus/Sonnet/Haiku) — override only if you
-        want something else. Cursor CLI and OpenCode discover their model
-        list live, so Quack can't ship fixed names for them and defaults to
-        "Use &lt;backend&gt; default" until you map one here.
+        want something else. Cursor CLI discovers its model list live, so
+        Quack can&apos;t ship fixed names for it and defaults to
+        &quot;Use &lt;backend&gt; default&quot; until you map one here.
       </div>
       {DYNAMIC_BACKENDS.map((b) => (
         <BackendTierRow key={b.id} backendId={b.id} label={b.label} />

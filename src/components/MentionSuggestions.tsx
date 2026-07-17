@@ -2,6 +2,7 @@ import { basename, dirname } from "../pathUtils";
 import { fileIconName } from "../fileIcons";
 import type { SubagentDef } from "../subagents";
 import type { WorkItem, WorkStory } from "../works";
+import { featureLabelFromSlug, type FeatureEntry } from "../featureCatalog";
 import { Icon } from "./Icon";
 import { MentionPathPreview } from "./MentionPathPreview";
 
@@ -9,7 +10,8 @@ export type MentionItem =
   | { type: "agent"; agent: SubagentDef }
   | { type: "file"; abs: string; rel: string }
   | { type: "work"; work: WorkItem }
-  | { type: "story"; story: WorkStory };
+  | { type: "story"; story: WorkStory }
+  | { type: "feature"; feature: FeatureEntry };
 
 type Props = {
   matches: MentionItem[];
@@ -17,6 +19,21 @@ type Props = {
   onPick: (item: MentionItem) => void;
   onHover: (index: number) => void;
 };
+
+function mentionKey(m: MentionItem): string {
+  switch (m.type) {
+    case "agent":
+      return `agent:${m.agent.name}`;
+    case "work":
+      return `work:${m.work.id}`;
+    case "story":
+      return `story:${m.story.id}`;
+    case "feature":
+      return `feature:${m.feature.slug}`;
+    case "file":
+      return m.abs;
+  }
+}
 
 export function MentionSuggestions({
   matches,
@@ -32,15 +49,7 @@ export function MentionSuggestions({
       <div className="ai-mention-list ai-slash-suggestions">
         {matches.map((m, i) => (
           <button
-            key={
-              m.type === "agent"
-                ? `agent:${m.agent.name}`
-                : m.type === "work"
-                  ? `work:${m.work.id}`
-                  : m.type === "story"
-                    ? `story:${m.story.id}`
-                    : m.abs
-            }
+            key={mentionKey(m)}
             type="button"
             className={`ai-slash-item ai-mention-item ${i === activeIndex ? "active" : ""}`}
             onMouseEnter={() => onHover(i)}
@@ -59,6 +68,21 @@ export function MentionSuggestions({
                   {m.agent.description
                     ? m.agent.description.slice(0, 60)
                     : `subagent · ${m.agent.source}`}
+                </span>
+              </>
+            ) : m.type === "feature" ? (
+              <>
+                <span
+                  className="ai-mention-file-icon ai-mention-file-icon--feature"
+                  aria-hidden
+                >
+                  <Icon name="file-text" size={14} />
+                </span>
+                <span className="ai-mention-file-label">
+                  <span className="ai-mention-file-name">
+                    {featureLabelFromSlug(m.feature.slug)}
+                  </span>
+                  <span className="ai-mention-file-dir">{m.feature.slug}</span>
                 </span>
               </>
             ) : m.type === "work" ? (

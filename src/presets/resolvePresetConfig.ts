@@ -63,7 +63,7 @@ function resolveModel(
   }
   // Precedence: explicit per-preset model pin > user's global tier->model
   // mapping (Settings → Providers, for dynamic-catalog backends like
-  // cursor-cli/opencode-cli) > the shipped static default for this tier.
+  // cursor-cli) > the shipped static default for this tier.
   return (
     ov.model ??
     getTierModelOverride(caps.backendId, def.defaults.modelTier) ??

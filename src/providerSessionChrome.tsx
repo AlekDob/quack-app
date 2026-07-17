@@ -5,7 +5,7 @@ import type { ProviderId } from "./providers/types";
 import { info as toastInfo } from "./notify";
 import { resumeProviderInTerminal } from "./providerSessionTerminal";
 
-const AGENTIC: ProviderId[] = ["claude-code", "cursor-cli", "opencode-cli"];
+const AGENTIC: ProviderId[] = ["claude-code", "cursor-cli"];
 
 /** CLI session id → Quack chat title for one provider. */
 export function providerLinkedChatTitles(
@@ -41,7 +41,6 @@ export function allProviderLinkedTitles(
 const PROVIDER_CHIP: Partial<Record<ProviderId, string>> = {
   "claude-code": "CC",
   "cursor-cli": "CU",
-  "opencode-cli": "OC",
 };
 
 export function providerChipLabel(provider: ProviderId): string {

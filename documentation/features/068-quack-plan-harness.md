@@ -11,6 +11,8 @@ tags: [works, plan, story, jack, composer, claude-code, drawer, click-open]
 
 **Purpose:** Product-owned planning where the **user story (`S-NNN`) on disk** is the durable plan artifact — not ephemeral Claude Code plan RAM, not agent TodoWrite checklists. Jack PM is the default planner; any agent can execute linked work (`W-NNN`). CC `permMode: plan` + `ExitPlanMode` are optional adapters that merge into the story.
 
+> **2026-07-17 — Features pivot:** Preferred durable plan target is the linked **feature** `.md` (`featureId` on chat). `onNativePlanReady` merges into the feature via `planFeatureMerge` when linked; otherwise falls back to story `S-NNN`. Composer Work cluster remains retired; use `ComposerFeaturePill` instead.
+
 > **2026-07-17 — chat chrome retired (perf):** Composer Work cluster (`ComposerWorkBar` / docs / acceptance chips) and chat-column `StoryPlanDrawer` were removed. Planning without a linked `storyId` uses the CC `plan:` tab (`061`). Opening a story goes to the Works **story drawer**. Works inject defaults **off**; no post-turn auto-apply of Works directives; no `afterWorksSaved` chat auto-link. FS watch for `works/` starts when the Works pane or a Works drawer opens (`078`), not at app boot.
 
 ## Mental model

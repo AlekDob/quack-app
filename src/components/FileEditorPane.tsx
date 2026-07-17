@@ -1,7 +1,7 @@
 // Inline file editor for modals (instructions, skills, agent file popup).
 // Monaco + the shared editor tab toolbar (markdown views, git diff, save).
 
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { fs } from "../ipc";
 import { dirname } from "../pathUtils";
 import { confirm as dialogConfirm } from "../dialog";
@@ -13,7 +13,6 @@ import {
 import { Icon } from "./Icon";
 import { SimpleMonacoEditor } from "./SimpleMonacoEditor";
 import { MarkdownPreview } from "./MarkdownPreview";
-import { MermaidPreview } from "./MermaidPreview";
 import { HtmlPreviewFrame } from "./HtmlPreviewFrame";
 import { EditorTabToolbar } from "./EditorTabToolbar";
 import { DiffView } from "./DiffView";
@@ -39,6 +38,11 @@ import {
   writeDiffSideBySide,
 } from "../editorDiffPrefs";
 import { useGitDiffPair } from "../hooks/useGitDiffPair";
+
+const MermaidPreview = lazy(async () => {
+  const m = await import("./MermaidPreview");
+  return { default: m.MermaidPreview };
+});
 
 interface Props {
   path: string | null;
@@ -251,7 +255,9 @@ export function FileEditorPane({
             )}
             {showMermaidPreview && (
               <div className="cust-editor-preview">
-                <MermaidPreview content={content} />
+                <Suspense fallback={null}>
+                  <MermaidPreview content={content} />
+                </Suspense>
               </div>
             )}
             {showHtmlPreview && (

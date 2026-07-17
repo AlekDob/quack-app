@@ -1,4 +1,5 @@
 // Cursor-style inline mention chips inside the composer input row.
+// Skills + features stay as colored text in the textarea (see ComposerInputHighlight).
 
 import { fileIconName } from "../fileIcons";
 import { openBrainDoc } from "../brainInject";
@@ -11,8 +12,7 @@ import { Icon } from "./Icon";
 export type ComposerMentionChip =
   | { kind: "brain"; hit: AttachedBrainHit }
   | { kind: "file"; abs: string; rel: string }
-  | { kind: "agent"; agent: SubagentDef }
-  | { kind: "skill"; skill: SkillDef };
+  | { kind: "agent"; agent: SubagentDef };
 
 type Props = {
   wsId: string;
@@ -21,11 +21,9 @@ type Props = {
   files: string[];
   agents: SubagentDef[];
   attachedAgentNames: string[];
-  skill: SkillDef | null;
   onRemoveBrain: (path: string) => void;
   onRemoveFile: (abs: string) => void;
   onRemoveAgent: (name: string) => void;
-  onRemoveSkill: () => void;
 };
 
 export function ComposerMentionChips({
@@ -35,11 +33,9 @@ export function ComposerMentionChips({
   files,
   agents,
   attachedAgentNames,
-  skill,
   onRemoveBrain,
   onRemoveFile,
   onRemoveAgent,
-  onRemoveSkill,
 }: Props) {
   const chips: ComposerMentionChip[] = [];
   for (const hit of brainHits) chips.push({ kind: "brain", hit });
@@ -50,7 +46,6 @@ export function ComposerMentionChips({
     const agent = agents.find((a) => a.name === name);
     if (agent) chips.push({ kind: "agent", agent });
   }
-  if (skill) chips.push({ kind: "skill", skill });
 
   if (chips.length === 0) return null;
 
@@ -62,12 +57,13 @@ export function ComposerMentionChips({
           chip={chip}
           wsId={wsId}
           root={root}
-          onRemove={() => removeChip(chip, {
-            onRemoveBrain,
-            onRemoveFile,
-            onRemoveAgent,
-            onRemoveSkill,
-          })}
+          onRemove={() =>
+            removeChip(chip, {
+              onRemoveBrain,
+              onRemoveFile,
+              onRemoveAgent,
+            })
+          }
         />
       ))}
     </div>
@@ -82,8 +78,6 @@ function chipKey(chip: ComposerMentionChip): string {
       return `file:${chip.abs}`;
     case "agent":
       return `agent:${chip.agent.name}`;
-    case "skill":
-      return `skill:${chip.skill.name}`;
   }
 }
 
@@ -93,7 +87,6 @@ function removeChip(
     onRemoveBrain: (path: string) => void;
     onRemoveFile: (abs: string) => void;
     onRemoveAgent: (name: string) => void;
-    onRemoveSkill: () => void;
   },
 ): void {
   switch (chip.kind) {
@@ -105,9 +98,6 @@ function removeChip(
       break;
     case "agent":
       handlers.onRemoveAgent(chip.agent.name);
-      break;
-    case "skill":
-      handlers.onRemoveSkill();
       break;
   }
 }
@@ -129,9 +119,7 @@ function MentionChip({
       ? chip.hit.title
       : chip.kind === "file"
         ? basename(chip.abs)
-        : chip.kind === "agent"
-          ? chip.agent.name
-          : chip.skill.name;
+        : chip.agent.name;
 
   const onOpen =
     chip.kind === "brain"
@@ -150,13 +138,7 @@ function MentionChip({
       ) : (
         <span className="composer-mention-chip-icon" aria-hidden>
           <Icon
-            name={
-              chip.kind === "brain"
-                ? "brain"
-                : chip.kind === "skill"
-                  ? "zap"
-                  : fileIconName(basename(chip.abs))
-            }
+            name={chip.kind === "brain" ? "brain" : fileIconName(basename(chip.abs))}
             size={12}
           />
         </span>

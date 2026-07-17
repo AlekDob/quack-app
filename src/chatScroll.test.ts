@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   groupChatTurns,
   windowChatTurns,
+  windowToolRows,
   type ChatTurnGroup,
 } from "./chatScroll";
 
@@ -69,5 +70,21 @@ describe("windowChatTurns", () => {
   it("treats a non-positive limit as unbounded (no windowing)", () => {
     const turns = makeTurns(100);
     expect(windowChatTurns(turns, 0, false).hiddenCount).toBe(0);
+  });
+});
+
+describe("windowToolRows", () => {
+  it("keeps the first `limit` rows when over it", () => {
+    const rows = Array.from({ length: 30 }, (_, i) => i);
+    const out = windowToolRows(rows, 12, false);
+    expect(out.rows).toEqual(rows.slice(0, 12));
+    expect(out.hiddenCount).toBe(18);
+  });
+
+  it("returns everything when expanded", () => {
+    const rows = Array.from({ length: 30 }, (_, i) => i);
+    const out = windowToolRows(rows, 12, true);
+    expect(out.rows).toBe(rows);
+    expect(out.hiddenCount).toBe(0);
   });
 });

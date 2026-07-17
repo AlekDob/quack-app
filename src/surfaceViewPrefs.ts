@@ -18,7 +18,7 @@ const DEFAULTS: Record<SurfaceViewId, SurfaceMode> = {
 };
 
 const LABELS: Record<SurfaceViewId, string> = {
-  works: "Works",
+  works: "Features",
   brain: "Quack Brain",
   whiteboard: "Team",
   subagent: "Subagent transcripts",

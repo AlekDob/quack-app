@@ -43,7 +43,6 @@ const PROVIDER_TABS: { id: ProviderFilter; label: string }[] = [
   { id: "ollama", label: "Ollama (local)" },
   { id: "claude-code", label: "Claude Code (CLI)" },
   { id: "cursor-cli", label: "Cursor CLI" },
-  { id: "opencode-cli", label: "OpenCode (local)" },
   { id: "openai", label: "OpenAI" },
   { id: "anthropic", label: "Anthropic" },
 ];
@@ -126,8 +125,6 @@ export function ModelBrowser({
     providerFilter === "all" || providerFilter === "claude-code";
   const showCursorCli =
     providerFilter === "all" || providerFilter === "cursor-cli";
-  const showOpenCode =
-    providerFilter === "all" || providerFilter === "opencode-cli";
   const showOpenai =
     providerFilter === "all" || providerFilter === "openai";
   const showAnthropic =
@@ -374,53 +371,6 @@ export function ModelBrowser({
             </Section>
           )}
 
-          {showOpenCode && (
-            <Section
-              title="OpenCode (local)"
-              subtitle={
-                hasKey["opencode-cli"]
-                  ? "OpenCode detected ✓ — sidecar starts automatically when you chat."
-                  : "Install OpenCode and run `opencode auth login`. Then refresh."
-              }
-              right={
-                !hasKey["opencode-cli"] && (
-                  <button
-                    className="model-browser-configure"
-                    onClick={() => void openUrl("https://opencode.ai/install")}
-                    title="Open OpenCode install guide"
-                  >
-                    Install
-                  </button>
-                )
-              }
-            >
-              {!hasKey["opencode-cli"] ? (
-                <div className="model-browser-empty">
-                  Install OpenCode, authenticate with{" "}
-                  <code>opencode auth login</code>, then refresh this panel.
-                </div>
-              ) : filteredCloud.filter((m) => m.providerId === "opencode-cli")
-                  .length === 0 ? (
-                <div className="model-browser-empty">No models match.</div>
-              ) : (
-                filteredCloud
-                  .filter((m) => m.providerId === "opencode-cli")
-                  .map((m) => (
-                    <CloudCard
-                      key={m.modelId}
-                      model={m}
-                      selected={
-                        selectedQualified === `opencode-cli:${m.modelId}`
-                      }
-                      onUse={() => {
-                        onSelect(`opencode-cli:${m.modelId}`);
-                        onClose();
-                      }}
-                    />
-                  ))
-              )}
-            </Section>
-          )}
 
           {showOpenai && (
             <Section
@@ -630,9 +580,7 @@ function CloudCard({
       ? "uses your `claude /login` session (Max / Pro / API key / Bedrock / Vertex)"
       : model.providerId === "cursor-cli"
         ? "uses your Cursor subscription (`cursor-agent login`)"
-        : model.providerId === "opencode-cli"
-          ? "uses your OpenCode login (`opencode auth login`)"
-          : "billed via your API key";
+        : "billed via your API key";
   return (
     <div className={`model-card ${selected ? "selected" : ""}`}>
       <div className="model-card-left">

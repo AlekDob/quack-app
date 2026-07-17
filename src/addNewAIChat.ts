@@ -26,7 +26,8 @@ function dismissLegacyAiPanel(wsId: string): void {
   useStore.getState().setAIPanelVisible(wsId, false);
 }
 
-/** Create a chat tab, focus it, and flag inline naming in the empty panel. */
+/** Create a hub session, show it in the single IDE AI tab slot, and flag
+ *  inline naming in the empty panel. */
 export function addNewAIChat(
   wsId: string,
   location: TerminalLocation = "editor",

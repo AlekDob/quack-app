@@ -35,7 +35,7 @@ jumps, worse when tool calls split the turn into multiple text blocks.
 | Panel | `src/components/AIChatPanel.tsx` | Live loop + attach-replay use rAF painter; legacy bubble path uses plain tail |
 | Render | `src/components/chatToolRender.tsx` | `CompactBlocks` — stable text blocks → markdown; live tail → stream inline |
 | Styles | `src/App.css` | `.ai-stream-plain`, `.ai-stream-plain-md` |
-| (retired) | `src/useTypewriterReveal.ts`, `src/typewriterReveal.ts` | Kept on disk unused — char reveal removed for perf |
+| (retired) | `src/useTypewriterReveal.ts`, `src/typewriterReveal.ts` | **Deleted 2026-07-17** — char reveal removed for perf |
 
 ### Data flow
 

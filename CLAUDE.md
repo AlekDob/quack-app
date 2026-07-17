@@ -76,16 +76,14 @@ Frontend `src/` (React 19 + TypeScript + Zustand, Monaco, xterm — **no Tailwin
 | Whiteboard tab — organigramma + DnD + .md export | `src/components/WhiteboardPane.tsx`, `src/components/WhiteboardOrganigramma.tsx`, `src/whiteboardMd.ts`, `src/frontmatter.ts` |
 
 Backend `src-tauri/src/`: `lib.rs` (command registration), `claude_code.rs` (CC bridge),
-`cursor_code.rs` (Cursor CLI bridge), `opencode_sidecar.rs` (OpenCode HTTP sidecar),
+`cursor_code.rs` (Cursor CLI bridge),
 `workspace.rs` (persistent workspace state → `workspaces.json` + per-ws `state.json`),
 `pty.rs`, `git.rs`, `fs_ops.rs`, `search.rs`, `watcher.rs`.
 
 ## Agent-state model (the focus area)
 
-Today the per-tool status exists inside the chat (`AIChatPanel` → `activeToolLabels` with
-`status: "running" | "done" | "error"`; live todos in `AgentModeShell.AgentTasks`). What's
-**missing** is a per-**session** status surfaced in the agent lists (Agent Mode sessions +
-`AIChatsRail`). Target states, mapped to brand semantics:
+Per-session status is surfaced in Agent Mode sessions + `AIChatsRail` via
+`agentStatusStore` + `AgentHubWatcher` (feature `009`, decision `001`). States:
 
 | State | Meaning | Visual hint |
 |---|---|---|
@@ -95,8 +93,7 @@ Today the per-tool status exists inside the chat (`AIChatPanel` → `activeToolL
 | `error` | run failed | `--err` |
 
 Derive these from existing chat/streaming state — don't invent a parallel source of truth.
-Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). Design:
-`decisions/001-agent-status-indicators.md`. Still TODO (the headline feature).
+Pattern: `src/aiTaskStore.ts` / `src/agentStatusStore.ts` (module-level pub/sub keyed by chatId).
 
 ## Conventions (The 4 Laws)
 
@@ -137,13 +134,14 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `013-file-type-icons.md` — per-type icons in the file tree (`fileIconName` map); monochrome shapes only, no Seti-style color (brand rule).
   - `014-claude-code-bridge.md` — CC CLI bridge: spawn/stream/attach + Stop. **Stop kills the whole process group** (no orphaned tool children pinning the CPU); `children` map holds pids, not lockable `Child`s; dynamic model catalog (`059`).
   - `015-claude-permission-mode.md` — per-chat permission mode (Ask/Plan/Auto-edit/Auto/Bypass); `permModeStore` bridges the composer mode to `ClaudePermissionOverlay`, the single auto-allow authority.
-  - `016-image-attachments.md` — paste/drag up to 10 images into agentic chats (Claude Code, Cursor CLI, OpenCode); temp disk storage + provider-specific delivery.
+  - `016-image-attachments.md` — paste/drag up to 10 images into agentic chats (Claude Code, Cursor CLI); temp disk storage + provider-specific delivery.
   - `017-media-preview.md` — open images + PDFs as a read-only preview tab from the file tree (replaces the "File appears to be binary" toast); `mediaKindOf` classifier, `MediaPreviewPane`, empty-sentinel buffer.
   - `018-whiteboard-organigramma.md` — Whiteboard editor tab (Jack → agents → skills tree), HTML5 DnD that writes `skills:` into the agent's `.md` frontmatter in place, operational `.md` export (`renderWhiteboardMd`, save to `.codetta/whiteboard.md`).
   - `019-usage-monitor.md` — Usage tab (live Claude Code cost/session monitor + chunked transcript viewer); opens as a tab like the whiteboard; the freeze fix (mtime gate + cache-on-success + `spawn_blocking`).
   - `020-context-optimizer.md` — Usage tab "Context" view: measures per-skill/subagent system-prompt weight (~char/4) + real invocation count (from transcripts), ranks heavy-but-unused skills, per-skill visibility toggle writing `skillOverrides` in `~/.claude/settings.json` (`name-only`/`user-invocable-only`); click a row → open its `.md` + reveal in tree via shared `openFileAndReveal`.
   - `054-pinky-brain-integration.md` — Pinky Brain: hybrid search, opt-in inject gates, `#` composer cites, MCP setup, `~/.quack/brain` → `~/.pinky/brain` migration.
-  - `072-composer-mention-chips.md` — Cursor-style in-composer chips for `#` brain, `@` files/agents, `/` skills.
+  - `072-composer-mention-chips.md` — Cursor-style in-composer chips for `#` brain, `@` files/agents; features/skills inline in textarea (`083`).
+  - `083-composer-feature-link.md` — composer feature pill (fuzzy + infinite scroll), inline `@slug` highlight, drawer Monaco edit; hub **Feature** badge.
   - `059-quack-brain-store.md` — Quack Store editor tab (`store:<wsId>`), optional extension detect + hybrid install (pipx/cargo), Quack Brain hub segments, SkillOpt-Sleep bridge, gated chat chips.
   - `060-activity-bar-overflow.md` — dynamic view-icons: height-driven visible count, `…` overflow + always-on customize grip, two-zone drag reorder, sidebar vs tab visual split; `lcp.activityBar.*` prefs.
   - `061-plan-mode-tab.md` — Claude Code `ExitPlanMode` plan (inline markdown, never a file) opens as a `plan:` virtual tab forced into a split next to the chat (Cursor-style), as soon as it lands, independent of approve/deny.
@@ -169,7 +167,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `078-works-disk-sync.md` — Works persistence + FS-watch engine (`worksCache`/`worksWatch`/`works*Files`): changed-only writes, self-write echo guard (kills the `dir`→persist→`dir` loop), debounced refresh, memoized dir-ensure; bodies stay in RAM for progress/context.
   - `079-cold-project-switch-loader.md` — full-window branded wash (project-color gradient + badge) masking the cold-mount lag on switch into a non-warm project; `workspaceSwitchLoader` (grace/min-floor/cap) + `WorkspaceSwitchVeil`; warm projects stay instant. Sibling of `075`.
   - `080-transcript-windowing.md` — long chats render only the last `TURN_WINDOW=40` turns (`windowChatTurns` in `chatScroll.ts`) + "Show earlier" pill; fixes the main-thread stall when switching into a huge transcript; vitest regression (`npm test`, first test infra).
-  - `054-works-layer.md` — Plane-inspired Works: views sidebar, list/kanban/timeline (story groups in all three), Modules catalog; **`works/items/W-NNN.md`** + **`works/stories/S-NNN.md`** + slim `snapshot.json` (v3); **opens in side drawer by default** (`063`).
+  - `054-works-layer.md` — **Features layer** (md-first): catalog of `documentation/features/*.md`, FeatureDocDrawer (Monaco edit), timeline, composer link (`083`); Plane board soft-sunset. Tab key `works:{wsId}`.
   - `067-agent-tasks-checklist.md` — Cursor-style collapsible task checklist (`AgentTasks` in `AgentModeShell.tsx`) below the sessions list, sourced from `aiTaskStore.ts` (TodoWrite/TaskCreate items published by `AIChatPanel.tsx`); collapsed by default, resets on `chatId` change.
   - `066-works-cycles-stories.md` — auto weekly **Cycles** (progress + burndown charts), Scrum **Stories** spawning backlog work items; storage at workspace `works/` (not `.quack/`).
   - `068-quack-plan-harness.md` — product-owned plan on stories (`S-NNN`): Jack PM; chat Work chrome / `StoryPlanDrawer` retired (2026-07-17) → Works story drawer + `WorksStoryChip`; `plan:` tab (`061`) fallback without `storyId`.
@@ -180,7 +178,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `063-surface-view-prefs.md` — per-surface tab vs drawer default (Works / Brain / Team / **subagent transcripts**); Settings → Views; nested child-drawer stack.
   - `065-works-drawer-ux.md` — catalog list, draft create, Notion editor in drawer, module picker, nested drawer stack, overlay z-index (ctx menu + confirm).
   - `052-composer-voice-dictation.md` — Cursor-style composer mic: waveform row, native macOS `SFSpeechRecognizer` + Web Speech on Windows; `dictation.ts`, `dictation.rs`, `ComposerMic.tsx`.
-  - `028-opencode-bridge.md` — `opencode serve` sidecar (port 17346), SSE `/global/event`, `providerSessionIds`, lazy startup catalog.
+  - `028-opencode-bridge.md` — **archived 2026-07-17** (OpenCode sidecar dropped; see `documentation/.archive/028-opencode-bridge.md`).
   - `029-session-diff-hub.md` — Agent Hub expanded-row edit subtitles (`Edited foo.ts −N +M`); `chatDiffStore` pub/sub + `summarizeLastTurn` (deduped publish — no redundant rail re-renders).
   - `030-user-message-bar.md` — user turns as inset cards; sticky pin + Cursor-style 3-line clamp / click-to-expand (`UserTurnBar`, `useUserBarSticky.ts`).
   - `031-model-discovery-cache.md` — shared provider/model probe cache (`modelDiscoveryStore`); prefetch at splash; lazy cloud + CLI catalogs; invalidation on API-key edit / force refresh.

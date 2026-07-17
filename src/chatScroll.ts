@@ -34,6 +34,12 @@ export interface WindowedTurns {
   hiddenCount: number;
 }
 
+/** Default tail size for long transcripts (see feature 080). */
+export const TURN_WINDOW = 40;
+
+/** Cap tool chips on a single legacy (no-blocks) message row. */
+export const TOOL_ROW_CAP = 12;
+
 /** Render only the last `limit` turns of a long transcript (unless `expanded`),
  *  so switching into a huge chat doesn't paint hundreds of turns at once and
  *  stall. The newest turns — where streaming and the pinned user turn live —
@@ -48,6 +54,28 @@ export function windowChatTurns(
   }
   const start = turns.length - limit;
   return { turns: turns.slice(start), hiddenCount: start };
+}
+
+export interface WindowedRows<T> {
+  rows: T[];
+  hiddenCount: number;
+}
+
+/** Cap a chronological tool-row list to the first `limit` items (legacy
+ *  ToolCallRow lists grow top→bottom; early tools stay visible, rest behind
+ *  "Show N more"). Same expand semantics as turn windowing. */
+export function windowToolRows<T>(
+  rows: T[],
+  limit: number,
+  expanded: boolean,
+): WindowedRows<T> {
+  if (expanded || limit <= 0 || rows.length <= limit) {
+    return { rows, hiddenCount: 0 };
+  }
+  return {
+    rows: rows.slice(0, limit),
+    hiddenCount: rows.length - limit,
+  };
 }
 
 const NEAR_BOTTOM_PX = 60;

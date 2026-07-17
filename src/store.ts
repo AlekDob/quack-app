@@ -37,6 +37,7 @@ import {
   awaitChatDiskFlushes,
   dropAllCachedBodies,
 } from "./chatStoreCache";
+import { placeAiKeyInTabsPane, pruneAiTabsInPane } from "./ideAiTabSlot";
 import { hydratePresetOverrides } from "./presets";
 import { pulseChatSwitch } from "./chatSwitch";
 import { logChatSwitch } from "./chatSwitchDebug";
@@ -183,12 +184,16 @@ export interface AIChatDescriptor {
   titleLocked?: boolean;
   /** Fresh tab from New chat — show inline name prompt in the empty panel. */
   namePending?: boolean;
-  /** Active Works ticket linked to this chat (feature 054). */
+  /** Active Works ticket linked to this chat (feature 054, soft-sunset). */
   workItemId?: string;
   /** Story linked while planning or executing under a parent story. */
   storyId?: string;
   /** Quack Plan harness — Jack PM planning session. */
   planning?: boolean;
+  /** Linked feature slug (e.g. 054-works-layer) — Features layer. */
+  featureId?: string;
+  /** Display label cached at link time (pill reads this — zero hydrate). */
+  featureLabel?: string;
 }
 
 export type SidebarView =
@@ -664,6 +669,10 @@ function closeAiTabInLayout(
   return { ...layout, editorRoot, bottomRoot, activePaneId };
 }
 
+function pruneAiTabsInTree(root: Pane): Pane {
+  return mapTree(root, (t) => pruneAiTabsInPane(t));
+}
+
 function dockTabToPane(root: Pane, paneId: PaneId, key: string): Pane {
   return mapTree(root, (t) =>
     t.id === paneId
@@ -1012,6 +1021,8 @@ interface AppState {
   sessionOpen(wsId: string, project: string, sessionId: string): void;
   sessionClose(wsId: string, project: string, sessionId: string): void;
   closeAIChat(wsId: string, id: string): void;
+  /** Hide the chat's editor tab; keep the hub descriptor (Agent Mode style). */
+  dismissAIChatTab(wsId: string, id: string): void;
   /** Focus an existing chat's tab (reopening it in the active editor pane
    *  if its tab was closed). Used by the Agent Hub to jump to a chat. */
   focusAIChat(wsId: string, id: string): void;
@@ -1020,6 +1031,12 @@ interface AppState {
   setAIChatWorkItem(wsId: string, chatId: string, workItemId: string | null): void;
   setAIChatStory(wsId: string, chatId: string, storyId: string | null): void;
   setAIChatPlanning(wsId: string, chatId: string, planning: boolean): void;
+  /** Link or unlink a Features doc on a chat (slug + cached label). */
+  setAIChatFeature(
+    wsId: string,
+    chatId: string,
+    feature: { id: string; label: string } | null,
+  ): void;
   /** Open (or focus) a story plan tab, side-by-side with the chat. */
   openStoryPlan(
     wsId: string,
@@ -1136,6 +1153,10 @@ function parseAIChatsRaw(raw: unknown): Record<string, AIChatDescriptor> {
       typeof v.workItemId === "string" ? v.workItemId : undefined;
     const storyId = typeof v.storyId === "string" ? v.storyId : undefined;
     const planning = v.planning === true ? true : undefined;
+    const featureId =
+      typeof v.featureId === "string" ? v.featureId : undefined;
+    const featureLabel =
+      typeof v.featureLabel === "string" ? v.featureLabel : undefined;
     out[id] = {
       id: v.id,
       title: v.title,
@@ -1149,6 +1170,8 @@ function parseAIChatsRaw(raw: unknown): Record<string, AIChatDescriptor> {
       workItemId,
       storyId,
       planning,
+      featureId,
+      featureLabel,
     };
   }
   return out;
@@ -2045,7 +2068,10 @@ export const useStore = create<AppState>((set, get) => {
         return;
       }
       if (parsed?.kind === "ai") {
-        get().closeAIChat(wsId, parsed.id);
+        // Tab × dismisses the surface only — hub keeps the session (list
+        // is source of truth, same as Agent Mode). Hub × / Delete still
+        // call closeAIChat.
+        get().dismissAIChatTab(wsId, parsed.id);
         return;
       }
       if (parsed?.kind === "file") {
@@ -2212,7 +2238,7 @@ export const useStore = create<AppState>((set, get) => {
         }
         if (parsed.kind === "subagent") return parsed.agentType || key;
         if (parsed.kind === "whiteboard") return "Team";
-        if (parsed.kind === "works") return "Works";
+        if (parsed.kind === "works") return "Features";
         if (parsed.kind === "usage") return "Usage";
         if (parsed.kind === "session") {
           return `Session ${parsed.sessionId.slice(0, 8)}`;
@@ -2944,8 +2970,10 @@ export const useStore = create<AppState>((set, get) => {
       };
       updateWs(wsId, (w) => {
         const aiChats = { ...w.aiChats, [id]: desc };
-        let editorRoot = w.layout.editorRoot;
-        let bottomRoot = w.layout.bottomRoot;
+        let editorRoot = pruneAiTabsInTree(w.layout.editorRoot);
+        let bottomRoot = w.layout.bottomRoot
+          ? pruneAiTabsInTree(w.layout.bottomRoot)
+          : w.layout.bottomRoot;
         let activePaneId = w.layout.activePaneId;
         if (location === "bottom") {
           if (!bottomRoot) {
@@ -2958,9 +2986,7 @@ export const useStore = create<AppState>((set, get) => {
           } else {
             const leafId = firstLeaf(bottomRoot).id;
             bottomRoot = mapTree(bottomRoot, (t) =>
-              t.id === leafId
-                ? { ...t, tabs: [...t.tabs, k], active: k }
-                : t,
+              t.id === leafId ? placeAiKeyInTabsPane(t, k) : t,
             );
           }
         } else {
@@ -2968,9 +2994,7 @@ export const useStore = create<AppState>((set, get) => {
             (activePaneId && isInTree(editorRoot, activePaneId) && activePaneId) ||
             firstLeaf(editorRoot).id;
           editorRoot = mapTree(editorRoot, (t) =>
-            t.id === targetPaneId
-              ? { ...t, tabs: [...t.tabs, k], active: k }
-              : t,
+            t.id === targetPaneId ? placeAiKeyInTabsPane(t, k) : t,
           );
           activePaneId = targetPaneId;
         }
@@ -2995,51 +3019,52 @@ export const useStore = create<AppState>((set, get) => {
       if (!ws || !ws.aiChats[id]) return;
       const k = aiKey(id);
       updateWs(wsId, (w) => {
-        const inEditor = findTabsPaneByTab(w.layout.editorRoot, k);
+        const editorRoot0 = pruneAiTabsInTree(w.layout.editorRoot);
+        const bottomRoot0 = w.layout.bottomRoot
+          ? pruneAiTabsInTree(w.layout.bottomRoot)
+          : null;
+        const inEditor = findTabsPaneByTab(editorRoot0, k);
         if (inEditor) {
           return {
             ...w,
             layout: {
               ...w.layout,
-              editorRoot: setActiveInPane(w.layout.editorRoot, inEditor.id, k),
+              editorRoot: setActiveInPane(editorRoot0, inEditor.id, k),
+              bottomRoot: bottomRoot0,
               activePaneId: inEditor.id,
             },
           };
         }
-        const inBottom = w.layout.bottomRoot
-          ? findTabsPaneByTab(w.layout.bottomRoot, k)
+        const inBottom = bottomRoot0
+          ? findTabsPaneByTab(bottomRoot0, k)
           : null;
-        if (inBottom && w.layout.bottomRoot) {
+        if (inBottom && bottomRoot0) {
           return {
             ...w,
             layout: {
               ...w.layout,
-              bottomRoot: setActiveInPane(w.layout.bottomRoot, inBottom.id, k),
+              editorRoot: editorRoot0,
+              bottomRoot: setActiveInPane(bottomRoot0, inBottom.id, k),
               activePaneId: inBottom.id,
               bottomVisible: true,
             },
           };
         }
-        // Tab was closed but the descriptor survives — reopen it in the
-        // active editor pane.
+        // Tab was closed but the descriptor survives — reopen in the
+        // active pane, swapping any other AI slot (single-slot).
         const targetPaneId =
           (w.layout.activePaneId &&
-            isInTree(w.layout.editorRoot, w.layout.activePaneId) &&
+            isInTree(editorRoot0, w.layout.activePaneId) &&
             w.layout.activePaneId) ||
-          firstLeaf(w.layout.editorRoot).id;
+          firstLeaf(editorRoot0).id;
         return {
           ...w,
           layout: {
             ...w.layout,
-            editorRoot: mapTree(w.layout.editorRoot, (t) =>
-              t.id === targetPaneId
-                ? {
-                    ...t,
-                    tabs: t.tabs.includes(k) ? t.tabs : [...t.tabs, k],
-                    active: k,
-                  }
-                : t,
+            editorRoot: mapTree(editorRoot0, (t) =>
+              t.id === targetPaneId ? placeAiKeyInTabsPane(t, k) : t,
             ),
+            bottomRoot: bottomRoot0,
             activePaneId: targetPaneId,
           },
         };
@@ -3451,6 +3476,15 @@ export const useStore = create<AppState>((set, get) => {
       clearChatDiff(id);
     },
 
+    dismissAIChatTab: (wsId, id) => {
+      const ws = get().loaded[wsId];
+      if (!ws?.aiChats[id]) return;
+      updateWs(wsId, (w) => ({
+        ...w,
+        layout: closeAiTabInLayout(w.layout, id),
+      }));
+    },
+
     setAIChatTitle: (wsId, id, title) =>
       updateWs(wsId, (w) => {
         const desc = w.aiChats[id];
@@ -3488,6 +3522,21 @@ export const useStore = create<AppState>((set, get) => {
         const next = { ...desc };
         if (planning) next.planning = true;
         else delete next.planning;
+        return { ...w, aiChats: { ...w.aiChats, [id]: next } };
+      }),
+
+    setAIChatFeature: (wsId, id, feature) =>
+      updateWs(wsId, (w) => {
+        const desc = w.aiChats[id];
+        if (!desc) return w;
+        const next = { ...desc };
+        if (feature) {
+          next.featureId = feature.id;
+          next.featureLabel = feature.label;
+        } else {
+          delete next.featureId;
+          delete next.featureLabel;
+        }
         return { ...w, aiChats: { ...w.aiChats, [id]: next } };
       }),
 
@@ -3537,8 +3586,9 @@ export const useStore = create<AppState>((set, get) => {
         return {
           ...w,
           aiChats: { ...w.aiChats, [id]: next },
+          // Park in Done: leave the file-centric editor (hub keeps the row).
           layout:
-            state === "archived"
+            state === "done" || state === "archived"
               ? closeAiTabInLayout(w.layout, id)
               : w.layout,
         };

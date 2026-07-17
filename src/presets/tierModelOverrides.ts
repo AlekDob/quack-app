@@ -1,9 +1,9 @@
 // User-configurable tier -> concrete model mapping, per backend. Exists
-// because backends like cursor-cli/opencode-cli have a DYNAMIC model
+// because backends like cursor-cli have a DYNAMIC model
 // catalog (discovered live from the CLI, not a fixed list Quack ships
 // with) — capabilities.ts can only offer a "default" sentinel for them,
 // which is why switching preset never changed the model on those backends.
-// This store lets the user say "on opencode-cli, reasoning = <model X>"
+// This store lets the user say "on cursor-cli, reasoning = <model X>"
 // from Settings; resolvePresetConfigFor prefers it over the static
 // capabilities.ts default. Same map/pub-sub pattern as settings.ts.
 import { getJson, setJson } from "../localStore";

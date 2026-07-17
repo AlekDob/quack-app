@@ -161,7 +161,7 @@ Product-owned plan mode — **story is the artifact**, not ephemeral CC plan tex
 | Approve | `approvePlanStory` → status `active` |
 | Implement | `createWorkFromStory` → link `W-NNN`, composer shows `S › W` |
 
-Other providers (Cursor CLI, OpenCode, API): same story panel; Jack updates `works/stories/S-NNN.md` via Write — no `ExitPlanMode` or `AskUserQuestion`.
+Other providers (Cursor CLI, API): same story panel; Jack updates `works/stories/S-NNN.md` via Write — no `ExitPlanMode` or `AskUserQuestion`.
 
 Files: `quackPlanHarness.ts`, `planStoryMerge.ts`, `StoryPlanPane.tsx`, `storyPlanTab.ts`.
 

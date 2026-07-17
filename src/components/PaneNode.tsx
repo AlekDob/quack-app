@@ -94,7 +94,7 @@ function tabLabel(
   }
   if (parsed?.kind === "works") {
     return {
-      label: "Works",
+      label: "Features",
       dirty: false,
       isTerminal: false,
       isAI: false,
@@ -461,6 +461,11 @@ function TabsPaneView(
           if (!next || !next.trim()) return;
           useStore.getState().setAIChatTitle(wsId, parsed.id, next.trim());
         },
+      });
+      out.push({
+        label: "Close session",
+        disabled: !chat,
+        onClick: () => useStore.getState().closeAIChat(wsId, parsed.id),
       });
     }
     if (parsed?.kind === "terminal") {

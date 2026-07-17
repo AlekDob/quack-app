@@ -2,102 +2,89 @@
 type: feature
 project: quack-desktop
 created: 2026-07-13
-last_verified: 2026-07-13
-tags: [composer, mention, chips, brain, files, skills, agents, cursor-style, ai-chat]
-related: [054-pinky-brain-integration.md, 041-mention-file-preview.md, 004-subagent-mentions.md, 008-skill-slash-menu.md, 022-chat-composer.md]
+last_verified: 2026-07-17
+tags: [composer, mention, chips, brain, files, skills, agents, features, cursor-style, ai-chat, inline-highlight]
+related: [054-pinky-brain-integration.md, 054-works-layer.md, 083-composer-feature-link.md, 041-mention-file-preview.md, 004-subagent-mentions.md, 008-skill-slash-menu.md, 022-chat-composer.md]
 ---
 
 # 072 — Composer mention chips (Cursor-style)
 
-**Purpose:** When the user cites brain docs (`#`), files (`@`), subagents (`@`),
-or a leading skill (`/skill-name`), show **colored inline chips inside the
-composer input row** — not a separate strip above the pill. Each kind gets its
-own icon and background tint (Cursor-style atomic mentions).
+**Purpose:** When the user cites brain docs (`#`), files (`@`), or subagents (`@`), show **colored inline chips** inside the composer input row. **Features** and **skills** are **not** chips — they render as colored inline text in the textarea (see `083` + `ComposerInputHighlight`).
 
-Chips are the **source of truth** for what gets injected on send; the textarea
-holds only free-form prose (no `#Title` or `@path` tokens for brain/file/agent).
+Chips are the source of truth for brain/file/agent on send; the textarea holds free-form prose (no `#Title` or `@path` tokens for those kinds).
 
-## Chip kinds
+## Chip kinds (chip row only)
 
 | Kind | Trigger | Icon | Background | Queue / state |
 |---|---|---|---|---|
 | **brain** | `#` popover pick | `brain` | `--info-bg` | `attachedBrainHits[]` on `ChatComposerDraft` |
 | **file** | `@` file pick or tree drag | per-type `fileIconName` | `--bg-hi` | `workspaceChatContext` `attachedFiles` |
 | **agent** | `@` subagent pick | duck avatar | `--bg-hi` | `attachedAgents[]` on session draft |
-| **skill** | leading `/skill-name` in input | `zap` (orange) | `--skill-bg` | parsed from `input` (ephemeral until send) |
 
-Work/story mentions (`@W-001`, `@S-001`) still insert a text token — no chip
-(link + composer text for Plane refs; see `054-works-layer.md`).
+## Inline (not chips)
+
+| Kind | Trigger | Render | State |
+|---|---|---|---|
+| **feature** | `@` feature pick or Feature pill | `@slug` green underline (`--feature`) | `featureId` on chat; see `083` |
+| **skill** | `/skill-name` in input | `/name` orange (`--skill`) | lives in `input` text |
+
+Legacy work/story mentions (`@W-001`, `@S-001`) may still insert a text token when a Works snapshot is present.
 
 ## Layout
 
 ```
 .ai-composer-shell
-  ComposerContextBar / git / …
-  .ai-input-row                    ← flex-wrap
-    .composer-mention-chips        ← full-width row when any chip present
-      .composer-mention-chip--*
-    textarea.ai-input
-    .ai-composer-hint              ← hidden when chips OR text present
+  .ai-input-row
+    .composer-mention-chips     ← brain | file | agent only
+    .ai-input-highlight-wrap
+      .ai-input-highlight-backdrop   ← colored mirror
+      textarea.ai-input--ghost
+    .ai-composer-hint
   .ai-composer-meta
+    ComposerFeaturePill (icon, when unlinked)
 ```
 
-Popover menus (`#`, `@`, `/`) stay **above** `.ai-composer-shell` (unchanged
-from 041 / 054). Only the **committed** picks render as chips inside the pill.
+Popover menus (`#`, `@`, `/`) stay **above** `.ai-composer-shell`.
 
-## `#` brain flow (feature 054)
+## `#` brain flow
 
-1. User types `#` at start-of-string or after whitespace → `parseBrainMention`.
-2. `BrainMentionSuggestions` — debounced `pinky.search`; empty query shows
-   telemetry `most_used`. Rows use **brain icon** (not generic file).
-3. Pick → `hitToAttached` → chip in row; **no** `#title` inserted in textarea.
-4. On send → `fetchBrainContextForPaths` injects cited docs (bypasses auto-inject
-   gates). Chips cleared; `brain_usage` → `BrainTurnChip` on user turn.
+1. `#` at start-of-string or after whitespace → `parseBrainMention`.
+2. `BrainMentionSuggestions` — debounced `pinky.search`.
+3. Pick → chip; **no** `#title` in textarea.
+4. On send → `fetchBrainContextForPaths`. Detail: `054-pinky-brain-integration.md`.
 
-Full gate / auto-inject detail: **`054-pinky-brain-integration.md`**.
+## `@` file / agent / feature
 
-## `@` file / agent flow
+| Pick | Textarea | Chip / link |
+|---|---|---|
+| file | unchanged | file chip |
+| agent | unchanged | agent chip |
+| feature | inserts `@slug` | `featureId` (no chip) |
 
-- **File:** `acceptMention(file)` → `addAttachedFile` only (no `@rel` in text).
-  Drag-from-tree (055) same outcome.
-- **Agent:** `acceptMention(agent)` → `attachedAgents` only (no `@name` in text).
-  Delegation line still injected on send from `attachedAgents` (004).
+## `/` skill
 
-## `/` skill chip
-
-`parseLeadingSkill(input, skills)` — when input starts with `/name` matching a
-loaded skill, render an orange skill chip. Remove (`×`) strips the prefix via
-`stripLeadingSkill`. Skill still dispatches as normal slash text on Enter.
-
-## Persistence
-
-| Field | Where |
-|---|---|
-| `attachedBrainHits` | `ChatComposerDraft` (`composerDraft.ts`) |
-| `attachedAgents` | `ChatComposerDraft` |
-| `attachedFiles` | per-workspace `workspaceChatContext` cache |
-| skill chip | derived from live `input` — not persisted separately |
+Rendered orange via highlight mirror; dispatches as normal slash text on Enter. `parseLeadingSkill` / `stripLeadingSkill` remain in `ComposerMentionChips.tsx` for helpers; no skill chip row.
 
 ## Files
 
 | File | Role |
 |---|---|
-| `src/components/ComposerMentionChips.tsx` | Chip row + `parseLeadingSkill` / `stripLeadingSkill` |
-| `src/components/BrainMentionSuggestions.tsx` | `#` search popover (above shell) |
-| `src/brainMention.ts` | `parseBrainMention`, `AttachedBrainHit`, accept helpers |
-| `src/useBrainMentionSearch.ts` | Debounced Pinky search for `#` menu |
-| `src/components/AIChatPanel.tsx` | Wires chips, popovers, send assembly |
-| `src/composerDraft.ts` | `attachedBrainHits` on draft |
-| `src/App.css` | `.composer-mention-chips`, `.composer-mention-chip--*` |
+| `src/components/ComposerMentionChips.tsx` | Chip row (brain/file/agent) + skill parse helpers |
+| `src/composerInputHighlight.ts` | Token spans + backdrop HTML |
+| `src/components/ComposerInputHighlight.tsx` | Mirror behind textarea |
+| `src/components/BrainMentionSuggestions.tsx` | `#` popover |
+| `src/components/MentionSuggestions.tsx` | `@` popover rows |
+| `src/components/AIChatPanel.tsx` | Wire-up |
+| `src/App.css` | `.composer-mention-chip--*`, `.ai-input-highlight-*`, `--feature` |
 
 ## Composer hint
 
-When idle, empty input, no chips: `@ files · # brain · / commands · …`
+Idle, empty input, no chips: `@ files · features · # brain · / commands · …`
 
 ## Related
 
-- Brain gates + explicit inject: `054-pinky-brain-integration.md`
-- `@` autocomplete + path preview: `041-mention-file-preview.md`
-- Subagent delegation: `004-subagent-mentions.md`
-- Slash / skills menu: `008-skill-slash-menu.md`
-- Composer shell: `022-chat-composer.md`
+- `083-composer-feature-link.md` — pill, fuzzy popover, infinite scroll, hub badge
+- `041-mention-file-preview.md` — `@` file autocomplete + path preview
+- `004-subagent-mentions.md` — agent delegation
+- `008-skill-slash-menu.md` — `/` skills menu
+- `022-chat-composer.md` — composer shell

@@ -54,7 +54,7 @@ export interface ChatMessage {
   >;
   /**
    * Image attachments on a user message (agentic providers). Paths are read
-   * via provider tools (CC/Cursor) or FilePart (OpenCode). Additive +
+   * via provider tools (CC/Cursor). Additive +
    * providers that only consume `content` are unaffected and old saved
    * sessions render fine. We persist only the lightweight `path`/`name`
    * plus a tiny `thumb` data: URL for the inline preview — full-quality

@@ -16,6 +16,32 @@ export default defineConfig(async () => ({
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
 
+  build: {
+    // Keep Monaco + Mermaid out of the main entry chunk so first paint /
+    // splash stays lighter. Mermaid is already dynamic-imported; this
+    // makes the split explicit and stable across builds.
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (
+            id.includes("node_modules/monaco-editor") ||
+            id.includes("node_modules/@monaco-editor")
+          ) {
+            return "monaco";
+          }
+          if (
+            id.includes("node_modules/mermaid") ||
+            id.includes("node_modules/cytoscape") ||
+            id.includes("node_modules/katex")
+          ) {
+            return "mermaid";
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1200,
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

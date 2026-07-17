@@ -1,6 +1,6 @@
 // Pub/sub for "stop this chat's in-flight turn" without prop drilling.
 // CLI providers (Claude Code, Cursor) are killed on the Rust side by
-// session id; HTTP providers (Anthropic, OpenAI, OpenCode, Ollama) need
+// session id; HTTP providers (Anthropic, OpenAI, Ollama) need
 // the mounted AIChatPanel to abort its AbortController — this bus covers
 // that second path. Also fired on archive / done / close so panels that
 // are still mounted get a clean UI reset.

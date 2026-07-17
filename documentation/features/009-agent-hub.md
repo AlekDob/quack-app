@@ -75,12 +75,14 @@ Persisted lifecycle fields on `AIChatDescriptor` in per-workspace `state.json`: 
 
 **Process cleanup:** Mark done, unarchive, delete, and close chat tab all call `stopChatAgent` where a live agent subprocess exists — kills the chat's CLI subprocess (`claude_code_kill_session` / `cursor_code_kill_session`) and aborts HTTP streams via `aiStopBus`. **Does not kill workspace PTY terminals** (e.g. a dev server in Terminal 1). See `046-process-cleanup.md`.
 
-**Delete vs close tab:** the row **×** / `closeAIChat` removes the tab **and**
+**Delete vs dismiss vs close:** editor tab **×** → `dismissAIChatTab` (hide
+surface, hub row stays). Hub row **×** / `closeAIChat` removes the tab **and**
 the hub descriptor (`aiChats[id]`), stops the agent, and keeps the transcript
 file on disk (`chats/{wsId}/{sessionId}.json`). It does **not** appear in the
 hub until reopened. Re-link via **New chat → ⟲ Sessions** (`044`) or a future
 orphan picker. **Delete** is destructive — `deleteSession` removes the disk
 row + descriptor. `Ctrl+Shift+T` only reopens **file** tabs, not AI chats.
+**IDE single-slot:** at most one `ai:` tab per pane — see `001` / `ideAiTabSlot.ts`.
 
 ### Done pile (expanded hub, 2026-07-16)
 
@@ -122,6 +124,17 @@ second line (feature **029**):
 - CSS: `.agent-hub-row-body`, `.agent-hub-row-diff`, `.agent-hub-diff-add` /
   `.agent-hub-diff-del` (semantic green/red).
 - Row class `.has-diff` when a summary exists.
+
+### Work / feature badge (row subtitle)
+
+Linked chats show a compact pill via `WorkHubBadge` (metadata only — no hydrate):
+
+| Link | Badge label | Tooltip |
+|---|---|---|
+| `featureId` | **Feature** | `featureLabel` or slug |
+| `workItemId` / `storyId` | **Work** / **Plan** | short id |
+
+Long feature titles are **not** inlined in the badge — keeps the chat title readable (2026-07-17).
 
 ### Customizations footer (expanded hub)
 

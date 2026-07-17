@@ -62,3 +62,20 @@ export function itemRange(w: {
   const end = dayStart(parseDay(w.targetDate) ?? w.updatedAt);
   return { start, end: Math.max(end, start) };
 }
+
+/** Feature timeline range from frontmatter dates (created → startDate → endDate). */
+export function featureRange(f: {
+  startDate?: string;
+  endDate?: string;
+  created?: string;
+  status?: string;
+}): { start: number; end: number } {
+  const created = parseDay(f.created) ?? Date.now();
+  const start = dayStart(parseDay(f.startDate) ?? created);
+  const endRaw =
+    parseDay(f.endDate) ??
+    (f.status === "done" || f.status === "archived" ? start : Date.now());
+  const end = dayStart(endRaw);
+  return { start, end: Math.max(end, start) };
+}
+

@@ -143,8 +143,8 @@ export const ACTIVITY_BAR_VIEWS: Record<ActivityBarIconId, ActivityBarViewDef> =
   },
   works: {
     id: "works",
-    label: "Works",
-    title: "Works — project tickets, kanban & timeline (Ctrl+Alt+T)",
+    label: "Features",
+    title: "Features — product component docs (Ctrl+Alt+T)",
     icon: "check-square",
     kind: "tab",
     tabPrefix: "works:",

@@ -5,7 +5,7 @@ import type { CcEffort } from "../components/EffortPopover";
 export type PresetId = "builder" | "debugger" | "reviewer" | "companion";
 
 // Backend che i preset conoscono. `codex` è noto ma non ancora wired (vedi capabilities).
-export type BackendId = "claude-code" | "cursor-cli" | "opencode-cli" | "codex";
+export type BackendId = "claude-code" | "cursor-cli" | "codex";
 
 // Modello concreto qualificato "<providerId>:<modelId>" (riusa parseQualifiedModel).
 export type ModelId = string;

@@ -1,21 +1,27 @@
 ---
 name: quack-works
-description: Quack PM + Works — document product components (documentation/features/NNN-slug.md), sync Works modules, user stories S-NNN, tickets W-NNN, cycles, kanban. Use whenever the user mentions tickets, work items, stories, sprints, cycles, feature docs, feature-doc, modules, plan approval, W-NNN, S-NNN, or project task tracking in Quack — even if they don't say "Works".
-quack-bundled-version: 11
+description: Quack Features — document product components as documentation/features/NNN-slug.md (feature-creator), link chats via featureId, Tasks/Plan in the .md. Legacy W-NNN/S-NNN Works board is soft-sunset. Use for feature docs, feature-doc, modules, Tasks checklists, plan merge into features.
+quack-bundled-version: 12
 ---
 
-# Quack Works
+# Quack Features (was Works)
 
-One skill for **feature mapping** + **ticket management** in Quack desktop. Every feature doc is a Works module; stories and work items hang off that module.
+**Primary unit:** `documentation/features/NNN-slug.md` — map of the product for agents and humans. Tickets/stories/cycles are legacy; prefer Tasks + Plan sections in the feature doc.
 
-Pair with `/quack-brain` only for search/save after implementation (Pinky, diary, gotchas).
+Pair with `/quack-brain` for search/save after implementation.
 
 ## When to use
 
-- Document or update a product component → feature doc + module
-- Create/update stories, tickets, cycles, session links
-- Kanban, backlog, plan mode, Plane sync
-- User says feature-doc, ticket, story, sprint, module, W-001, S-003
+- Document or update a product component → feature doc (feature-creator numbering)
+- Link a chat to a feature (composer Feature pill)
+- Update Tasks / Plan in the feature `.md` (Edit tool)
+- User says feature-doc, feature, module, documentation/features
+
+## Do not
+
+- Create new W-NNN / S-NNN from the UI (Features pane is catalog-only)
+- Dump full feature bodies into every turn — inject is opt-in outline/pointer only
+- Put Comments into inject context
 
 ## PM loop
 
@@ -161,7 +167,7 @@ Product-owned plan mode — **story is the artifact**, not ephemeral CC plan tex
 | Approve | `approvePlanStory` → status `active` |
 | Implement | `createWorkFromStory` → link `W-NNN`, composer shows `S › W` |
 
-Other providers (Cursor CLI, OpenCode, API): same story panel; Jack updates `works/stories/S-NNN.md` via Write — no `ExitPlanMode` or `AskUserQuestion`.
+Other providers (Cursor CLI, API): same story panel; Jack updates `works/stories/S-NNN.md` via Write — no `ExitPlanMode` or `AskUserQuestion`.
 
 Files: `quackPlanHarness.ts`, `planStoryMerge.ts`, `StoryPlanPane.tsx`, `storyPlanTab.ts`.
 
