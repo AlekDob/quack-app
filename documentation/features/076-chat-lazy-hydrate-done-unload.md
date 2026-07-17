@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-16
-last_verified: 2026-07-16
-tags: [chat, performance, hydrate, lazy-load, done, mount, ram, multitask, quack-v1]
+last_verified: 2026-07-17
+tags: [chat, performance, hydrate, lazy-load, done, mount, ram, multitask, quack-v1, react-memo]
 ---
 
 ## Chat lazy hydrate + DONE host unload
@@ -31,12 +31,27 @@ memory. Boot paid disk+parse for transcripts the user never reopened.
 
 | Kind | Hidden host | Transcript in RAM |
 |---|---|---|
-| **Live** (`!doneAt && !archivedAt`) | Stay mounted (multitask / streams) | Warm at boot + stay warm while mounted |
+| **Live** (`!doneAt && !archivedAt`) | Unmount when hidden **unless** `working` / `needs-input` **or tab still open in layout** (`tabOpen`) | Warm at boot for focused tab + active runs only |
 | **DONE / archived** | Unmount when `!visible` | Cold until open; dropped on unload |
 | **Visible** (any) | Mounted | Loaded via `ensureSessionLoaded` |
 
-Helper: `shouldKeepChatHostMounted({ visible, doneAt, archivedAt })` in
-`src/chatHostMount.ts`.
+Helper: `shouldKeepChatHostMounted({ visible, doneAt, archivedAt, tabOpen })` in
+`src/chatHostMount.ts`. `tabOpen` keeps idle live hosts warm while their `ai:`
+tab remains in the pane tree — fast file↔chat tab switches without re-mount.
+
+### `AIChatHost` is `React.memo` (new-chat perf, 2026-07-17)
+
+Creating/removing a chat mutates `loaded` → `WorkspaceShell` re-renders and
+re-creates **every** mounted host element. Unmemoized, each re-rendered its full
+7382-line `AIChatPanel`, so **new-chat cost scaled O(#mounted panels)** — the
+intermittent "new chat is slow" (worse the more chats you have open). `AIChatHost`
+is wrapped in `memo`; its props are primitives + stable `container`/`root` refs,
+so only the new host and the one losing focus (`visible` flip) re-render. Same
+fix family as `memo(WorkspaceShell)` (`058`).
+
+Dev timing: `switchPerf.markNewChat(chatId)` in `addNewAIChat` + `logNewChatPhase`
+in the `AIChatPanel` mount effect log `[new-chat-perf] panel mounted|painted`
+with `sinceMs` — confirms the click→mount cost.
 
 ### Data flow
 
@@ -68,7 +83,8 @@ Warm ids come from workspace descriptors: `sessionId` of chats with neither
 | Service | `src/chatHistory.ts` | Re-exports + `listSessionIds` |
 | Store | `src/store.ts` | Passes warm ids into `hydrateChatStore` on boot / open |
 | Component | `src/components/AgentModeShell.tsx` | `AgentChatHost` unload policy |
-| Component | `src/components/WorkspaceShell.tsx` | `AIChatHost` unload policy |
+| Component | `src/components/WorkspaceShell.tsx` | `AIChatHost` unload policy + `memo` (no N-wide re-render on chat add) |
+| Dev perf | `src/switchPerf.ts` | `markNewChat` / `logNewChatPhase` (`[new-chat-perf]`) |
 | Component | `src/components/TabContentHost.tsx` | `DrawerAIChatHost` unload policy |
 | Component | `src/components/AIChatPanel.tsx` | Awaits `ensureSessionLoaded` before messages |
 | Rust | `src-tauri/src/chat_store.rs` | `chat_store_load_workspace` (ids only), `chat_store_load` (one body) |
