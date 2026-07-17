@@ -4,7 +4,7 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-17
 last_verified: 2026-07-17
-tags: [ai-chat, cursor-compact, action-summary, worked-for, thought-for, streaming, perf, vitest]
+tags: [ai-chat, cursor-compact, action-summary, worked-for, thought-for, streaming, perf, vitest, isFlatBatch]
 ---
 
 ## Cursor-compact chat action stream
@@ -19,14 +19,14 @@ variables; Quack tool icons + `--tool-*` tones + semantic `+/-`.
 
 Pairs with **`006-chat-tool-render`** (drawer / ComposeCard / AskQuestion) and
 **`056-reasoning-turn-chip`** (thinking body). This doc is the stream chrome
-contract.
+contract. Turn-end Files recap + review surface: **`038-compose-review`**.
 
 ### Files
 
 | Path | Role |
 |---|---|
-| `src/components/chatActionSummary.tsx` | `ActionBatchSummary`, solo line, labels, `batchRenderCost` |
-| `src/components/chatActionSummary.test.ts` | Label + perf regression (`collapsed ≪ expanded`) |
+| `src/components/chatActionSummary.tsx` | `ActionBatchSummary`, `isFlatBatch`, solo/group, labels, `batchRenderCost` |
+| `src/components/chatActionSummary.test.ts` | Labels, `isFlatBatch`, perf (`collapsed ≪ expanded`) |
 | `src/components/chatToolRender.tsx` | `CompactBlocks` / `InterleavedBlocks` flush into summaries |
 | `src/components/TurnWorkedHeader.tsx` | `Worked for 1m 42s` on finished turns |
 | `src/formatWorkedDuration.ts` | `4s` / `1m 42s` formatter (+ unit test) |
@@ -34,7 +34,7 @@ contract.
 | `src/components/TurnStreamStatus.tsx` | Soft-reduce dock when tools already inline |
 | `src/components/AIChatPanel.tsx` | `durationMs` / `thinkingMs` / `thinkingLive` wiring |
 | `src/ai.ts` | Optional `ChatMessage.durationMs`, `thinkingMs` |
-| `src/App.css` | `.ai-batch-summary*`, `.ai-worked-header`, edit-diff preview |
+| `src/App.css` | `.ai-batch-summary*`, live shimmer/icon pulse, `.ai-worked-header` |
 
 ### Stream chronology
 
@@ -50,9 +50,9 @@ CC keepalives → thinkingLive → in-stream Thinking chip
 
 | Case | UI |
 |---|---|
-| **1 tool** | Flat solo line — no chevron, no nested duplicate. Edit: `Edited foo.ts +35 −6` → click opens DiffModal. Explore/bash: detail label → drawer. |
-| **2+ tools** | One muted summary (`Explored 2 files, 1 search` / `Edited 4 files, explored 1 file +417`) + chevron. Expand → Grepped/Read rows and/or per-file `Edited name +N` with inline diff snippet. |
-| **Live** | Present continuous: `Exploring…` / `Editing…` / `Running…` / `Thinking` (shimmer). Counts update as tools land. |
+| **≤1 expand leaf** | Flat solo line — no chevron, no nested duplicate. Covers **1 tool** and **N Edit calls on the same file** (one path). Edit: `Edited foo.ts +35 −6` → click opens DiffModal. Explore/bash: detail label → drawer. |
+| **2+ expand leaves** | One muted summary (`Explored 2 files, 1 search` / `Edited 4 files, explored 1 file +417`) + chevron. Expand → Grepped/Read rows and/or per-file `Edited name +N` with inline diff snippet. |
+| **Live** | Present continuous + **`.ai-live-shimmer`** on the label (and icon pulse). `live = streaming && !allDone`; `allDone` requires every tool **id and** result. |
 | **Done** | Past tense + optional `+/-` (git colors via `.ai-compose-add` / `.ai-compose-rem`). |
 
 **Label order (Cursor):** Edited first, then lowercase `explored…` / `N searches`, then Ran…
@@ -62,6 +62,20 @@ CC keepalives → thinkingLive → in-stream Thinking chip
 **Edits stay in the stream** (not stripped when ComposeCard is present). ComposeCard (006 / 038) remains the turn-end Files recap + Undo/Review.
 
 **Skipped:** Task*/TodoWrite/AskUserQuestion (sidebar / ask-dock — 067 / 073).
+
+### `isFlatBatch` (solo vs group)
+
+Expand tree leaves = **unique edit paths** + **each non-edit tool**.
+
+| Input | Flat? | Why |
+|---|---|---|
+| 1 tool | yes | Single leaf |
+| 2+ `Edit` on `ConversationDrawer.tsx` | yes | One path → one leaf (was the nested-duplicate bug) |
+| `Edit` a.ts + `Edit` b.ts | no | Two edit leaves |
+| `Edit` + `Read` | no | Edit leaf + explore leaf |
+
+`ActionBatchSummary` → `SoloActionLine` when flat (merges same-file edit diffs
+into one `+/-` line); else `BatchGroupSummary`.
 
 ### Timing
 
@@ -84,16 +98,18 @@ Default paint is **collapsed**: one summary line per batch.
 | Helper | Asserts |
 |---|---|
 | `batchRenderCost(items, "collapsed" \| "expanded")` | Collapsed = 1 short line; expanded includes detail labels + edit bodies |
+| `isFlatBatch` | Same-file multi-edit costs one line in both modes |
 
-Vitest (`npm test -- chatActionSummary.test.ts`): explore×24 and edit×8 batches
-prove `collapsed.chars ≪ expanded.chars`; solo stays one line either mode.
+Vitest (`npm test -- chatActionSummary.test.ts`): explore×24, edit×8,
+same-file multi-edit, and label tense / Cursor order.
 
 ### CSS
 
 | Class | Role |
 |---|---|
 | `.ai-batch-summary` | Container — vertical padding (`padding: 4px 0`) |
-| `.ai-batch-summary.is-solo` | Single-tool flat line |
+| `.ai-batch-summary.is-solo` | Flat leaf line (no caret) |
+| `.ai-batch-summary.is-live` | Shimmer label + icon pulse; label `overflow: visible` (WebKit) |
 | `.ai-batch-summary-head` / `-label` / `-diff` / `-caret` | Summary row |
 | `.ai-batch-summary-detail` | Expanded list |
 | `.ai-batch-edit-file*` / `.ai-batch-edit-diff*` | Per-file edit + inline preview |
@@ -101,8 +117,14 @@ prove `collapsed.chars ≪ expanded.chars`; solo stays one line either mode.
 
 ### Gotchas
 
+- **Solo ≠ `items.length === 1`.** Counting tool calls nested same-file edits
+  under a group whose only child duplicated the head. Use `isFlatBatch`.
 - **Hooks:** solo vs group are separate components (`SoloActionLine` /
   `BatchGroupSummary`) so hook count stays stable.
+- **Live shimmer / WebKit:** `overflow: hidden` + `background-clip: text`
+  clips the shimmer — live labels use `overflow: visible`.
+- **`allDone`:** requires `id` **and** result. Treating missing id as done
+  dropped shimmer mid-stream.
 - **CC thinking:** keepalives are empty `content` events — must start
   `thinkingStartedAt` / `thinkingLive` there, not only on the closed
   `<think>` flush (or `Thought for` stays ~0).
@@ -110,3 +132,5 @@ prove `collapsed.chars ≪ expanded.chars`; solo stays one line either mode.
   `pathOf` / `extractEditDiffs`). Safe at render time; prefer extracting
   meta helpers if it grows.
 - **Do not** also render outer Reasoning when `blocks[]` exists (056).
+- **Diff click:** stream solo/expand edits → DiffModal (`requestDiff`).
+  ComposeCard review in Agent Mode also → DiffModal (038); IDE → `crev:` tab.

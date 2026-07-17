@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-05
-last_verified: 2026-07-05
+last_verified: 2026-07-17
 tags: [ai-chat, compose-card, diff, agent-mode, conductor-style, monaco, undo-keep, compose-recap]
 ---
 
@@ -11,20 +11,21 @@ tags: [ai-chat, compose-card, diff, agent-mode, conductor-style, monaco, undo-ke
 
 **Purpose:** When Jack edits files, the user reviews changes in an **inline diff tab**
 (before → after, red/green Monaco hunks) with **Undo / Keep** and hunk navigation —
-not only in a centered modal. Works in **editor layout** (editor pane tab) and
-**Agent Mode** (50/50 split beside the chat).
+not only in a centered modal. Works in **editor layout** (editor pane tab). In
+**Agent Mode**, ComposeCard opens the centered **DiffModal** instead of the 50/50
+side split (chat stays full-width; same overlay as stream batch-summary edits).
 
 ### Files
 
 | Type | Path | Role |
 |---|---|---|
-| Tab pane | `src/components/ComposeReviewPane.tsx` | Inline diff + dock (nav, Undo, Keep, Esc-close) |
-| Keys + before-content | `src/composeReview.ts` | `crev:` tab keys, snapshot/tool-call "before" text |
-| Recap card | `src/components/composeCard.tsx` | Live recap; file click → `openComposeReviewTab` |
+| Tab pane | `src/components/ComposeReviewPane.tsx` | Inline diff + dock (nav, Undo, Keep, Esc-close); `openComposeReviewTab` |
+| Keys + before-content | `src/composeReview.ts` | `crev:` tab keys, snapshot/tool-call "before" text, `openComposeDiffModal` |
+| Recap card | `src/components/composeCard.tsx` | Live recap; file click → review (modal in Agent Mode) |
 | Diff widget | `src/components/DiffView.tsx` | Optional `onDiffMount` for hunk navigation |
 | Store | `src/store.ts` | `openComposeReview`, `collectComposeReviewTabs`, `focusedComposeReviewKey`, `collectSubagentTabs`, `focusedSubagentKey`, `focusedAgentSidePanelKey` |
 | Editor shell | `src/components/WorkspaceShell.tsx` | Portals `ComposeReviewPane` into pane containers |
-| Agent shell | `src/components/AgentModeShell.tsx` | Reads `crev:` / `sub:` tabs via `focusedAgentSidePanelKey`; splits chat \| review or subagent transcript |
+| Agent shell | `src/components/AgentModeShell.tsx` | Still hosts `crev:` / `sub:` if tabs exist; new ComposeCard clicks skip creating them |
 | Tab chrome | `src/components/PaneNode.tsx` | `git-compare` icon + basename label |
 | Snapshots | `src/composeSnapshots.ts` | Pre-turn buffer for **Undo** (unchanged contract) |
 | Styles | `src/App.css` | `.compose-review-*`, `.agent-main.has-review` |
@@ -34,16 +35,15 @@ not only in a centered modal. Works in **editor layout** (editor pane tab) and
 1. Turn includes ≥1 `Write` / `Edit` / `MultiEdit` → **ComposeCard** appears
    (**live during stream**: `N Files · editing…`, per-file list grows, **total `+/-` recap**
    in `.ai-compose-bar-recap`; Undo/Keep only after turn ends).
-2. User clicks a file row (or **Review** for all) → `openComposeReview(wsId, chatId, msgIndex, path, calls)`.
-3. A **`crev:`** tab opens:
-   - **Editor layout:** in the active/sibling editor pane (avoids opening on top of an `ai:` tab when possible).
-   - **Agent Mode:** right half of `.agent-main` (chat stays left); mini-tab strip when multiple files.
-4. **ComposeReviewPane** loads:
+2. User clicks a file row (or **Review**):
+   - **Agent Mode:** `openComposeDiffModal` → global **DiffModal** (snapshot/disk before→after). **Review** expands the list and opens the first file.
+   - **Editor layout:** `openComposeReview` → **`crev:`** tab in the editor pane with Undo/Keep dock.
+3. **ComposeReviewPane** (IDE only) loads:
    - **Original:** pre-turn snapshot (`composeSnapshots`) or first edit `old_string` / empty for new files.
    - **Modified:** fresh `fs.readFile` (disk truth).
-5. Dock: `^ n of m v` (Monaco `goToDiff`), **Undo `⌘N`** (restore snapshot + close tab), **Keep `⌘Y`** (close tab), **✕** (close).
+4. Dock (IDE): `^ n of m v` (Monaco `goToDiff`), **Undo `⌘N`**, **Keep `⌘Y`**, **✕**.
 
-Inline edit pills stay hidden while ComposeCard is shown (`hideEdits={showComposeCard}`) — the recap + review tab are canonical.
+Stream edit summaries (082) also use DiffModal; ComposeCard remains the turn-end Files recap + Undo All / Keep All.
 
 ### Tab key format
 
@@ -59,24 +59,19 @@ crev:{wsId}|{chatId}|{msgIndex}|{encodeURIComponent(path)}
 ```
 ComposeCard click
   → openComposeReviewTab(...)
-  → store.openComposeReview
-  → layout.editorRoot gains/focuses crev: tab
-  → WorkspaceShell (editor) OR AgentModeShell (agent) mounts ComposeReviewPane
-  → DiffView inline (sideBySide=false)
+  → Agent Mode? openComposeDiffModal → DiffModal
+  → else store.openComposeReview → crev: tab → ComposeReviewPane
 ```
 
-Agent Mode does **not** mount `WorkspaceShell`; it watches the same layout keys via
-`collectComposeReviewTabs` / `focusedComposeReviewKey`.
+Agent Mode does **not** create `crev:` tabs from ComposeCard anymore. Legacy `crev:` tabs (if any) can still render in `AgentModeShell`.
 
 ### Relation to other surfaces
 
 | Surface | When used |
 |---|---|
-| **ComposeReviewPane** (`crev:` tab) | ComposeCard file click, Review all |
-| **DiffModal** (`requestDiff`) | `EditDiffCard` pill click in stream (legacy one-off) |
+| **DiffModal** (`requestDiff` / `openComposeDiffModal`) | Agent Mode ComposeCard; stream batch-summary edits (082); legacy EditDiffCard |
+| **ComposeReviewPane** (`crev:` tab) | ComposeCard in **editor/IDE** layout |
 | **EditorPane git diff** | User toggles Changes on an open file tab (HEAD vs buffer) |
-
-Future: route stream edit chips to compose review when turn context is available.
 
 ### CSS
 
@@ -96,3 +91,10 @@ Future: route stream edit chips to compose review when turn context is available
 - Snapshot only covers files **open in the workspace buffer** at turn start; new files undo to empty string.
 - **`crev:` tabs** live in `layout.editorRoot` even in Agent Mode — the shell renders them, not the hidden editor chrome.
 - Re-clicking the same file focuses the existing tab (no duplicate).
+- **Agent Mode prefers DiffModal.** Side split stole chat width; ComposeCard now
+  calls `openComposeDiffModal` (snapshot + `fs.readFile`) via `getAgentMode()`.
+  Undo All / Keep All stay on the card; per-file Undo/Keep dock is IDE-only.
+- **Review in Agent Mode** opens the **first** file in the modal and expands the
+  list (one DiffModal at a time). IDE **Review** still opens every `crev:` tab.
+- DiffModal has no Undo/Keep dock — accept/revert for Agent Mode is ComposeCard
+  **Undo All** / **Keep All**, or edit the file in IDE later.

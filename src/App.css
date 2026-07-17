@@ -8871,6 +8871,24 @@ button.composer-mention-chip-label:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* Live ops: shimmer needs visible overflow (WebKit clips background-clip
+   text when overflow:hidden). Prefer full live label over ellipsis. */
+.ai-batch-summary.is-live .ai-batch-summary-label {
+  overflow: visible;
+  text-overflow: clip;
+}
+.ai-batch-summary.is-live .ai-batch-summary-head > svg {
+  animation: ai-batch-live-icon 1.1s ease-in-out infinite;
+}
+@keyframes ai-batch-live-icon {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
 .ai-batch-summary-diff {
   display: inline-flex;
   gap: 4px;
@@ -10329,6 +10347,29 @@ button.composer-mention-chip-label:hover {
   background: transparent;
   /* transform on .ai-msg breaks position:sticky */
   animation: none;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+/* User prompts: uniform small type — pasted markdown must not scale up */
+.ai-msg-user .md-preview {
+  font-size: inherit;
+  line-height: inherit;
+}
+.ai-msg-user .md-preview h1,
+.ai-msg-user .md-preview h2,
+.ai-msg-user .md-preview h3,
+.ai-msg-user .md-preview h4,
+.ai-msg-user .md-preview h5,
+.ai-msg-user .md-preview h6 {
+  font-size: inherit;
+  font-weight: 600;
+  line-height: inherit;
+  margin: 4px 0 2px;
+  border: none;
+  padding: 0;
+}
+.ai-msg-user .md-preview > :first-child {
+  margin-top: 0;
 }
 .ai-user-msg-images {
   position: absolute;
@@ -10534,10 +10575,6 @@ button.composer-mention-chip-label:hover {
   font-size: 13.5px;
   line-height: 1.55;
 }
-.ai-user-bar-main .md-preview h1 { font-size: 17px; }
-.ai-user-bar-main .md-preview h2 { font-size: 15px; }
-.ai-user-bar-main .md-preview h3 { font-size: 14px; }
-.ai-user-bar-main .md-preview h4 { font-size: 13px; }
 .ai-user-bar-main .md-preview > :first-child {
   margin-top: 0;
 }
@@ -12880,23 +12917,6 @@ button.composer-mention-chip-label:hover {
 }
 .ai-stream-plain-md em {
   font-style: italic;
-}
-/* Inline caret — thin pulse, not a blocky step-blink bar. */
-.ai-stream-caret {
-  display: inline-block;
-  width: 1.5px;
-  height: 0.92em;
-  margin-left: 1px;
-  vertical-align: -0.06em;
-  background: currentColor;
-  border-radius: 1px;
-  opacity: 0.5;
-  pointer-events: none;
-  animation: ai-stream-caret-pulse 1.2s ease-in-out infinite;
-}
-@keyframes ai-stream-caret-pulse {
-  0%, 42% { opacity: 0.38; }
-  58%, 100% { opacity: 0.88; }
 }
 .ai-msg-body .md-preview {
   padding: 0;

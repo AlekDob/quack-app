@@ -9,8 +9,10 @@ import { useStore } from "../store";
 import {
   composeOriginalContent,
   composeReviewCalls,
+  openComposeDiffModal,
   parseComposeReviewKey,
 } from "../composeReview";
+import { getAgentMode } from "../agentMode";
 import { dropSnapshot, lookupSnapshot } from "../composeSnapshots";
 import { DiffView } from "./DiffView";
 import { Icon } from "./Icon";
@@ -217,6 +219,7 @@ export function ComposeReviewPane({ wsId, tabKey, visible }: Props) {
   );
 }
 
+/** ComposeCard entry — Agent Mode uses DiffModal; IDE uses `crev:` tabs. */
 export function openComposeReviewTab(
   wsId: string,
   chatId: string | undefined,
@@ -224,5 +227,9 @@ export function openComposeReviewTab(
   path: string,
   calls: ToolCall[],
 ): void {
+  if (getAgentMode()) {
+    void openComposeDiffModal(wsId, chatId, msgIndex, path, calls);
+    return;
+  }
   useStore.getState().openComposeReview(wsId, chatId, msgIndex, path, calls);
 }

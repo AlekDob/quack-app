@@ -125,7 +125,8 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `064-agent-hub-drawer-and-chat-tab-switch.md` — collapsed hover drawer, chat switch perf, pane tab visibility stacking; DONE hosts unload when hidden (`076`).
   - `075-chat-switch-loader.md` — gradual translucent veil on chat/session switch (fade + min-floor + cap in `chatSwitch.ts`, `ChatSwitchVeil`); perceived-performance polish. Pairs with the `044` freeze fix.
   - `081-chat-switch-chrome-freeze.md` — during the `075` veil, freeze sidebar/agent-context paint + skip Monaco `layout()` + defer FileTree `listDir` (`deferDuringChatSwitch.ts`) so transcript paint wins; same feel as Agent Mode / collapsed explorer without a permanent layout change.
-  - `082-cursor-compact-action-stream.md` — Cursor-compact stream: live/past tool summaries (solo flat vs group expand), Worked for / Thinking→Thought for, status-dock soft-reduce, `batchRenderCost` vitest (collapsed ≪ expanded text).
+  - `082-cursor-compact-action-stream.md` — Cursor-compact stream: live/past tool summaries (`isFlatBatch` solo vs group), Worked for / Thinking→Thought for, live shimmer, status-dock soft-reduce, `batchRenderCost` vitest.
+  - `038-compose-review.md` — ComposeCard Files recap; IDE `crev:` diff tabs (Undo/Keep); **Agent Mode → DiffModal** (`openComposeDiffModal`); `composeReview.ts`, `ComposeReviewPane.tsx`.
   - `076-chat-lazy-hydrate-done-unload.md` — session index + on-demand bodies; DONE/archived chat hosts unmount when hidden; live stay sticky for multitask; `memo(AIChatHost)` so creating a chat doesn't re-render all mounted panels (`[new-chat-perf]` dev timing).
   - `006-chat-tool-render.md` — drawers, ComposeCard, AskQuestion, icon tones; chronology walker feeds 082 summaries.
   - `007-native-macos-menu.md` — macOS uses the native system menu bar (built from the command registry); the in-window `TopBar` menus are hidden there, kept on Win/Linux.
@@ -172,7 +173,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `067-agent-tasks-checklist.md` — Cursor-style collapsible task checklist (`AgentTasks` in `AgentModeShell.tsx`) below the sessions list, sourced from `aiTaskStore.ts` (TodoWrite/TaskCreate items published by `AIChatPanel.tsx`); collapsed by default, resets on `chatId` change.
   - `066-works-cycles-stories.md` — auto weekly **Cycles** (progress + burndown charts), Scrum **Stories** spawning backlog work items; storage at workspace `works/` (not `.quack/`).
   - `068-quack-plan-harness.md` — product-owned plan on stories (`S-NNN`): Jack PM; chat Work chrome / `StoryPlanDrawer` retired (2026-07-17) → Works story drawer + `WorksStoryChip`; `plan:` tab (`061`) fallback without `storyId`.
-  - `069-smooth-streaming.md` — smooth assistant stream: rAF paint + char-by-char `useTypewriterReveal` (max 2 chars/frame); inline pulsing caret; full `MarkdownPreview` on turn commit.
+  - `069-smooth-streaming.md` — smooth assistant stream: rAF-coalesced paint + light inline MD on the live tail (no typewriter / no caret); full `MarkdownPreview` on turn commit.
   - `073-ask-user-question-dock.md` — Claude Code `AskUserQuestion`: Cursor-style interactive card above composer; hook `tool_input` cache + lenient parse; deny-redirect flow (015); `quackClaudeCodeEditorPrompt()` tells all CC agents to call the tool; subagents hand off to orchestrator (004).
   - `070-workspace-doc-open.md` — resolve doc paths from chat links and Context docs; route story → drawer, features → preview drawer, Agent Mode → tab drawer (`workspaceDocOpen.ts`).
   - `071-honest-model-labels.md` — composer chip shows CC alias (`sonnet`); post-turn usage strip shows resolved billed model (`Sonnet 5`); `modelDisplay.ts`.
@@ -198,7 +199,7 @@ Pattern to clone: `src/aiTaskStore.ts` (module-level pub/sub keyed by chatId). D
   - `059-claude-code-model-catalog.md` — live CC model names (Sonnet 5, Opus 4.8…) via fast `/model` probe + background label cache; instant picker fallbacks.
   - `041-mention-file-preview.md` — Cursor-style `@` file autocomplete: basename + parent dir rows, side path tree preview, inline popover above composer, `.ai-mention-open` overflow escape (no portal).
   - `055-file-composer-drag.md` — pointer drag a file from the explorer onto the composer to cite it (`@relPath` + context queue); no HTML5 DnD (Tauri 2).
-  - `038-compose-review.md` — Conductor-style agent edit review: live ComposeCard recap, `crev:` diff tabs (inline Monaco + Undo/Keep), editor pane + Agent Mode 50/50 split; `composeReview.ts`, `ComposeReviewPane.tsx`.
+  - `038-compose-review.md` — ComposeCard Files recap; IDE `crev:` diff tabs (Undo/Keep); **Agent Mode → DiffModal** (`openComposeDiffModal`); `composeReview.ts`, `ComposeReviewPane.tsx`.
 - `documentation/design/` — UI style contracts beyond tokens.
   - `directives.md` — hard rules (no emoji, tokens-only, neutral chrome).
   - `model-modal-pattern.md` — shared shell for Choose a model + Manage models (liquid glass, pill controls, light/dark surfaces).

@@ -17,7 +17,8 @@ code only); full block markdown on turn commit.
 > **2026-07-17:** Char-by-char typewriter (`useTypewriterReveal`) was removed from
 > `StreamingPlainText`. It stacked a second rAF/`setState` loop on top of the
 > stream painter and made agent runs feel heavy. Stream smoothness is the painter
-> alone; caret still pulses on the live tail.
+> alone. The pulsing live-tail caret was removed the same day (animation cost,
+> typewriter look we do not want).
 
 **Problem (before):** Every `content_block_delta` called `setStreaming` +
 `setStreamingBlocks`, which re-ran `renderMarkdown()` on the **entire** growing
@@ -30,10 +31,10 @@ jumps, worse when tool calls split the turn into multiple text blocks.
 |------|------|------|
 | Utility | `src/streamPaint.ts` | `createStreamPainter` — coalesce UI commits to one per animation frame |
 | Utility | `src/streamInlineFormat.ts` | `formatStreamInline` — closed `**`/`*`/`` ` `` only (no blocks) |
-| Component | `src/components/StreamingPlainText.tsx` | Live tail + light inline MD + thin pulsing caret |
+| Component | `src/components/StreamingPlainText.tsx` | Live tail + light inline MD (no caret) |
 | Panel | `src/components/AIChatPanel.tsx` | Live loop + attach-replay use rAF painter; legacy bubble path uses plain tail |
 | Render | `src/components/chatToolRender.tsx` | `CompactBlocks` — stable text blocks → markdown; live tail → stream inline |
-| Styles | `src/App.css` | `.ai-stream-plain`, `.ai-stream-plain-md`, `.ai-stream-caret` |
+| Styles | `src/App.css` | `.ai-stream-plain`, `.ai-stream-plain-md` |
 | (retired) | `src/useTypewriterReveal.ts`, `src/typewriterReveal.ts` | Kept on disk unused — char reveal removed for perf |
 
 ### Data flow
@@ -70,7 +71,7 @@ CLI burst (50–200 chars) → streamPaint → setStreaming(target grows)
                               ↓
               visible = target.slice(0, pos)   // max +2 chars/frame
                               ↓
-              StreamingPlainText → formatStreamInline(visible) + caret
+              StreamingPlainText → formatStreamInline(visible)
 ```
 
 | Constant | Default | Role |
@@ -105,9 +106,8 @@ unchanged slice.
 | Token / class | Value |
 |---------------|-------|
 | `.ai-stream-plain` | 13.5px / 1.55 lh — matches `.ai-msg-body .md-preview` |
-| `.ai-stream-plain-text` | `pre-wrap` + **inline** caret after last glyph |
+| `.ai-stream-plain-text` | `pre-wrap` live tail (no caret) |
 | `.ai-stream-plain-md` | Light inline MD on revealed text (`code` / `strong` / `em`) |
-| `.ai-stream-caret` | 1.5px `currentColor`, soft opacity pulse (not step-blink) |
 
 **During live tail:** closed inline code + bold + italic only (cheap regex on the
 revealed slice). No headings, lists, fences, links, or tables — those stay for
@@ -131,7 +131,7 @@ an aborted turn cannot paint stale text after `setStreaming(null)`.
 | Block | `streaming` | Renderer |
 |-------|-------------|----------|
 | Text block before last | any | `MarkdownPreview` |
-| Last text block | `true` | `StreamingPlainText` (light inline MD) + caret |
+| Last text block | `true` | `StreamingPlainText` (light inline MD) |
 | Any text block | `false` (committed) | `MarkdownPreview` |
 
 Legacy path (assistant message **without** `blocks[]`, e.g. Ollama): `AIChatPanel`

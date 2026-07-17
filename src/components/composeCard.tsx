@@ -3,6 +3,7 @@
 
 import { useMemo, useState } from "react";
 import type { ToolCall } from "../ai";
+import { useAgentMode } from "../agentMode";
 import { fileIconName } from "../fileIcons";
 import {
   diffStats,
@@ -153,6 +154,7 @@ export function ComposeCard({
   /** True while the turn is still in flight — list grows live. */
   streaming?: boolean;
 }) {
+  const agentMode = useAgentMode();
   const [collapsed, setCollapsed] = useState(true);
   const { byPath, totals } = useMemo(() => {
     const m = new Map<string, ToolCall[]>();
@@ -190,6 +192,13 @@ export function ComposeCard({
   };
 
   const openAll = () => {
+    if (byPath.length === 0) return;
+    // Agent Mode: one DiffModal — expand list + open first file.
+    if (agentMode) {
+      if (byPath.length > 1) setCollapsed(false);
+      openReview(byPath[0].path);
+      return;
+    }
     for (const { path } of byPath) openReview(path);
   };
 
@@ -259,7 +268,11 @@ export function ComposeCard({
             type="button"
             className="ai-compose-review"
             onClick={() => void openAll()}
-            title="Open every modified file in diff review tabs"
+            title={
+              agentMode
+                ? "Open the first file in a diff modal"
+                : "Open every modified file in diff review tabs"
+            }
           >
             Review
           </button>

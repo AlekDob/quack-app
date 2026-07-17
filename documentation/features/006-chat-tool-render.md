@@ -72,7 +72,7 @@ Used by generic `ToolCallRow` and `EditDiffCard`:
 | File-ref, no output | `openFile` / agent popup |
 | Edit / Write / MultiEdit | DiffModal or compose-review (038) |
 | HTML preview tool | `requestHtmlPreviewDrawer` (045) |
-| ComposeCard file row | `openComposeReviewTab` (038) |
+| ComposeCard file row | Agent Mode → DiffModal; IDE → `openComposeReviewTab` (038) |
 | Compact solo edit / batch expand | DiffModal or inline preview (082) |
 
 ### Result drawer
@@ -85,6 +85,9 @@ chrome, images — see prior modes; unchanged.
 Turn-end / mid-stream Files bar: `N Files`, total `+/-`, Undo All / Keep /
 Review. Visible as soon as the first edit completes. Does **not** remove edit
 lines from the compact stream (082).
+
+**Open review:** Agent Mode → centered DiffModal (`openComposeDiffModal`);
+IDE layout → `crev:` ComposeReviewPane tabs. See **038**.
 
 ### Live turn status
 

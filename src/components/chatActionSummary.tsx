@@ -89,6 +89,20 @@ function uniqueEditPaths(edits: BatchItem[]): string[] {
   return out;
 }
 
+/**
+ * True when expand would show ≤1 leaf (identical to the head).
+ * N Edit calls on the same file → one leaf → flat line, no group chrome.
+ */
+export function isFlatBatch(items: BatchItem[]): boolean {
+  if (items.length <= 1) return true;
+  const edits = items.filter((it) => EDIT_NAMES.has(it.call.function.name));
+  const nonEdits = items.filter(
+    (it) => !EDIT_NAMES.has(it.call.function.name),
+  );
+  // Leaves in the expand tree: unique edit paths + each non-edit tool.
+  return uniqueEditPaths(edits).length + nonEdits.length <= 1;
+}
+
 /** One muted sentence — Cursor order: Edited…, explored…, searches, Ran… */
 export function batchSummaryLabel(
   items: BatchItem[],
@@ -234,9 +248,8 @@ export function batchRenderCost(
 ): { chars: number; lines: number } {
   if (items.length === 0) return { chars: 0, lines: 0 };
 
-  // Solo: always one line (no group chrome) — same cost either mode
-  // for the head; expanded still adds nothing until user opens a drawer.
-  if (items.length === 1) {
+  // Flat batch (1 tool, or N edits on one file): one line either mode.
+  if (isFlatBatch(items)) {
     const label =
       batchSummaryLabel(items, { live: false }) ||
       detailToolLabel(items[0].call);
@@ -420,24 +433,34 @@ function groupEditsByFile(items: BatchItem[]): FileEditGroup[] {
   });
 }
 
-/** One line when a batch has a single tool — no expand/group chrome. */
+/** One line when a batch has a single leaf — no expand/group chrome. */
 function SoloActionLine({
-  item,
+  items,
   resultsById,
   streaming,
   errored,
 }: {
-  item: BatchItem;
+  items: BatchItem[];
   resultsById: Map<string, string>;
   streaming: boolean;
   errored?: boolean;
 }) {
   const openFile = useContext(AgentFileOpen);
-  const call = item.call;
+  const primary = items[0];
+  const call = primary.call;
   const name = call.function.name;
-  const live = streaming && !(item.id && resultsById.has(item.id));
-  const editDiffs = extractEditDiffs(call);
-  const path = pathOf(call);
+  const live =
+    streaming && !items.every((it) => !!it.id && resultsById.has(it.id));
+
+  // Merge edit fragments across multiple Edit calls on the same file.
+  const editDiffs: EditDiff[] = [];
+  for (const it of items) {
+    const d = extractEditDiffs(it.call);
+    if (d) editDiffs.push(...d);
+  }
+  const path =
+    uniqueEditPaths(items.filter((it) => EDIT_NAMES.has(it.call.function.name)))[0] ||
+    pathOf(call);
   const base = basename(path);
   const tone = toolToneOf(name);
   const ico = detailIcon(name);
@@ -445,7 +468,7 @@ function SoloActionLine({
   let label: string;
   let added = 0;
   let removed = 0;
-  if (editDiffs && editDiffs.length > 0) {
+  if (editDiffs.length > 0) {
     const stats = diffStats(editDiffs);
     added = stats.added;
     removed = stats.removed;
@@ -458,17 +481,19 @@ function SoloActionLine({
         : "Edited 1 file";
   } else {
     label = live
-      ? batchSummaryLabel([item], { live: true })
-      : detailToolLabel(call) || batchSummaryLabel([item], { live: false });
+      ? batchSummaryLabel(items, { live: true })
+      : detailToolLabel(call) || batchSummaryLabel(items, { live: false });
   }
 
-  const result = item.id ? resultsById.get(item.id) : undefined;
-  const hasResult = typeof result === "string" && result.length > 0;
+  const result = primary.id ? resultsById.get(primary.id) : undefined;
+  const hasResult =
+    items.some((it) => it.id && resultsById.has(it.id)) ||
+    (typeof result === "string" && result.length > 0);
   const canOpenFile =
     !!openFile && !!path && path !== "(unknown)" && EDIT_NAMES.has(name);
 
   const onClick = () => {
-    if (editDiffs && editDiffs.length > 0) {
+    if (editDiffs.length > 0) {
       const original = editDiffs
         .map((d) => d.oldText)
         .filter(Boolean)
@@ -490,7 +515,7 @@ function SoloActionLine({
       openFile!(path);
       return;
     }
-    if (hasResult) {
+    if (typeof result === "string" && result.length > 0) {
       requestToolDrawer({
         title: friendlyToolName(name),
         subtitle:
@@ -503,14 +528,19 @@ function SoloActionLine({
   return (
     <div
       className={`ai-batch-summary is-solo${live ? " is-live" : ""}${errored ? " is-error" : ""}`}
+      aria-busy={live || undefined}
     >
       <button
         type="button"
         className="ai-batch-summary-head"
         onClick={onClick}
-        disabled={!editDiffs && !canOpenFile && !hasResult && !live}
+        disabled={!editDiffs.length && !canOpenFile && !hasResult && !live}
       >
-        <Icon name={ico} size={12} className={tone ? `ai-tool-tone-${tone}` : undefined} />
+        <Icon
+          name={ico}
+          size={12}
+          className={tone ? `ai-tool-tone-${tone}` : undefined}
+        />
         <span
           className={`ai-batch-summary-label${live ? " ai-live-shimmer" : ""}`}
         >
@@ -534,15 +564,14 @@ export function ActionBatchSummary({
   streaming,
   erroredIds,
 }: Props) {
-  // One tool → flat line (no group / no nested duplicate).
-  if (items.length === 1) {
-    const it = items[0];
+  // One leaf (1 tool, or N edits on the same file) → flat line, no nest.
+  if (isFlatBatch(items)) {
     return (
       <SoloActionLine
-        item={it}
+        items={items}
         resultsById={resultsById}
         streaming={streaming}
-        errored={!!(it.id && erroredIds?.has(it.id))}
+        errored={items.some((it) => !!(it.id && erroredIds?.has(it.id)))}
       />
     );
   }
@@ -563,7 +592,9 @@ function BatchGroupSummary({
   erroredIds,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const allDone = items.every((it) => !it.id || resultsById.has(it.id));
+  // Only "done" when every tool has an id AND a result — missing ids
+  // while streaming must stay live (shimmer + Exploring…).
+  const allDone = items.every((it) => !!it.id && resultsById.has(it.id));
   const live = streaming && !allDone;
   const hasError =
     !!erroredIds && items.some((it) => it.id && erroredIds.has(it.id));
@@ -581,6 +612,7 @@ function BatchGroupSummary({
   return (
     <div
       className={`ai-batch-summary${live ? " is-live" : ""}${hasError ? " is-error" : ""}`}
+      aria-busy={live || undefined}
     >
       <button
         type="button"

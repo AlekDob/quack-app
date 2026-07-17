@@ -5,6 +5,7 @@ import {
   batchSummaryLabel,
   batchRenderCost,
   detailToolLabel,
+  isFlatBatch,
   readLineRange,
   type BatchItem,
 } from "./chatActionSummary";
@@ -114,6 +115,51 @@ describe("batchDiffTotals", () => {
   });
 });
 
+describe("isFlatBatch", () => {
+  it("is flat for a single tool", () => {
+    expect(isFlatBatch([item("Read", { file_path: "a.ts" }, "1")])).toBe(true);
+  });
+
+  it("is flat for multiple edits on the same file (one expand leaf)", () => {
+    const items = [
+      item(
+        "Edit",
+        { file_path: "ConversationDrawer.tsx", old_string: "a", new_string: "ab" },
+        "1",
+      ),
+      item(
+        "Edit",
+        {
+          file_path: "ConversationDrawer.tsx",
+          old_string: "x",
+          new_string: "xy",
+        },
+        "2",
+      ),
+    ];
+    expect(isFlatBatch(items)).toBe(true);
+    expect(batchSummaryLabel(items, { live: false })).toBe(
+      "Edited ConversationDrawer.tsx",
+    );
+  });
+
+  it("is not flat for edits on two different files", () => {
+    const items = [
+      item("Edit", { file_path: "a.ts", old_string: "a", new_string: "ab" }, "1"),
+      item("Edit", { file_path: "b.ts", old_string: "x", new_string: "xy" }, "2"),
+    ];
+    expect(isFlatBatch(items)).toBe(false);
+  });
+
+  it("is not flat for edit + explore", () => {
+    const items = [
+      item("Edit", { file_path: "a.ts", old_string: "a", new_string: "ab" }, "1"),
+      item("Read", { file_path: "b.ts" }, "2"),
+    ];
+    expect(isFlatBatch(items)).toBe(false);
+  });
+});
+
 describe("batchRenderCost (collapsed loads less text)", () => {
   function bigExploreBatch(n: number): BatchItem[] {
     const out: BatchItem[] = [];
@@ -199,5 +245,26 @@ describe("batchRenderCost (collapsed loads less text)", () => {
     expect(collapsed.lines).toBe(1);
     expect(expanded.lines).toBe(1);
     expect(collapsed.chars).toBe(expanded.chars);
+  });
+
+  it("same-file multi-edit stays one line (no nested duplicate)", () => {
+    const body = "x".repeat(100);
+    const items = [
+      item(
+        "Edit",
+        { file_path: "ConversationDrawer.tsx", old_string: body, new_string: `${body}\ny` },
+        "1",
+      ),
+      item(
+        "Edit",
+        { file_path: "ConversationDrawer.tsx", old_string: "a", new_string: "ab" },
+        "2",
+      ),
+    ];
+    expect(isFlatBatch(items)).toBe(true);
+    const collapsed = batchRenderCost(items, "collapsed");
+    const expanded = batchRenderCost(items, "expanded");
+    expect(collapsed.lines).toBe(1);
+    expect(expanded.lines).toBe(1);
   });
 });

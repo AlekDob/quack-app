@@ -3,6 +3,10 @@
 import type { ToolCall } from "./ai";
 import { extractEditDiffs, pathOf } from "./components/chatToolRender";
 import { lookupSnapshot } from "./composeSnapshots";
+import { requestDiff } from "./editorState";
+import { fs } from "./ipc";
+import { langOf } from "./langDetect";
+import { basename } from "./pathUtils";
 
 const metaByKey = new Map<string, ToolCall[]>();
 
@@ -71,4 +75,38 @@ export function composeOriginalContent(
     return diffs.map((d) => d.oldText).join("\n\n");
   }
   return "";
+}
+
+function toolModifiedFallback(path: string, calls: ToolCall[]): string {
+  for (const c of calls) {
+    if (pathOf(c) !== path) continue;
+    const diffs = extractEditDiffs(c);
+    if (!diffs?.length) continue;
+    return diffs.map((d) => d.newText).join("\n\n");
+  }
+  return "";
+}
+
+/** Agent Mode: centered DiffModal (chat stays full-width). */
+export async function openComposeDiffModal(
+  wsId: string,
+  chatId: string | undefined,
+  msgIndex: number,
+  path: string,
+  calls: ToolCall[],
+): Promise<void> {
+  const original = composeOriginalContent(wsId, chatId, msgIndex, path, calls);
+  let modified = "";
+  try {
+    modified = await fs.readFile(path);
+  } catch {
+    modified = toolModifiedFallback(path, calls);
+  }
+  requestDiff({
+    path: basename(path),
+    refspec: "before → after",
+    originalContent: original,
+    modifiedContent: modified,
+    language: langOf(path),
+  });
 }
