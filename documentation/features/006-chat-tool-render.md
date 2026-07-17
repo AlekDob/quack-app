@@ -4,20 +4,24 @@ project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
 last_verified: 2026-07-17
-tags: [ai-chat, tool-calls, chatToolRender, cursor-style, conductor-style, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap, html-preview, ask-user-question]
+tags: [ai-chat, tool-calls, chatToolRender, cursor-style, compact-summary, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap, html-preview, ask-user-question]
 ---
 
 ## Chat Tool-Call Rendering
 
 **Purpose:** Render an assistant turn's tool calls (Read / Bash / Edit / Grep /
-Task / …) in the chat stream — **Conductor-style** grouped chips inline with prose.
-Read/bash/search detail opens in a right-side **drawer**; file edits recap in
-**ComposeCard** + **ComposeReviewPane** (feature 038). Pure presentational React + CSS.
+Task / …) in the chat stream as **Cursor-compact** one-line summaries inline
+with prose — live present tense (`Exploring…`) flips to past (`Explored…`) when
+the batch settles. Read/bash/search detail opens in a right-side **drawer**;
+file edits recap in **ComposeCard** + **ComposeReviewPane** (feature 038).
+Finished turns show **Worked for Xm Ys** (`TurnWorkedHeader`). Pure presentational
+React + CSS; Quack tool icons + `--tool-*` tones preserved.
 
-**Files:** `src/components/chatToolRender.tsx`, `src/components/ToolResultDrawer.tsx`,
-`src/toolDrawer.ts`, `src/htmlPreview.ts`, `src/components/HtmlPreviewFrame.tsx`,
-`src/components/composeCard.tsx`, `src/composeReview.ts`,
-`src/components/ComposeReviewPane.tsx`, styles in `src/App.css`.
+**Files:** `src/components/chatToolRender.tsx`, `src/components/chatActionSummary.tsx`,
+`src/components/TurnWorkedHeader.tsx`, `src/formatWorkedDuration.ts`,
+`src/components/ToolResultDrawer.tsx`, `src/toolDrawer.ts`, `src/htmlPreview.ts`,
+`src/components/HtmlPreviewFrame.tsx`, `src/components/composeCard.tsx`,
+`src/composeReview.ts`, `src/components/ComposeReviewPane.tsx`, styles in `src/App.css`.
 
 ### Unified inline layout (editor + agent)
 
@@ -27,30 +31,31 @@ Both docked chat and Agent Mode use the **same** chronology renderer:
 |---|---|---|
 | `InterleavedBlocks` | Always delegates to `CompactBlocks` | prose interleaved with tool runs |
 | `CompactBlocks` | Walks `blocks[]`, flushes tool runs | prose interleaved with tool runs |
-| `StreamingPlainText` | Last text block while `streaming` | live tail + inline caret — `069-smooth-streaming.md` (typewriter removed 2026-07-17) |
-| `ThinkingBlock` | `splitThinking` on text blocks | `ReasoningTurnChip` (056) — Cursor-style collapsed reasoning |
-| `InlineActionRow` | One row per consecutive tool run (≥2 tools) | Conductor-style grouped chips |
+| `StreamingPlainText` | Last text block while `streaming` | live tail + inline caret — `069-smooth-streaming.md` |
+| `ThinkingBlock` | `splitThinking` on text blocks | `ReasoningTurnChip` (056) — Thinking / Thought for |
+| `ActionBatchSummary` | One line per consecutive tool run (any length) | Cursor-compact live/past summary |
 
-The old non-compact **pill cloud** (`.ai-tcall-wrap` per Read/Grep) was removed —
-editor and agent surfaces now match.
+### Action batch summary (`.ai-batch-summary`)
 
-### Inline action chips (`.ai-iarow`)
+Consecutive non-task tool calls collapse into **one muted text line**:
 
-Consecutive non-task tool calls collapse into one row:
-
-| Chip | Contents |
+| State | Example |
 |---|---|
-| Explore (muted) | Reads + searches → `Explored 3 files, 4 searches` or `read N files` |
-| Action (prominent) | Bash → `4 ran`; edits → `edited foo.ts`; multi-target → count prefix |
-| Expand on click | Reveals underlying `ToolCallRow` list in `.ai-iaction-detail` |
+| Live (streaming, results pending) | `Exploring 9 files, 4 searches` / `Running 2 commands` |
+| Done | `Explored 14 files, 7 searches, Ran 2 commands` + optional `+N −M` |
+| Expand | Detail rows: `Grepped …`, `Read foo.ts L1-80`, `Ran ls` → drawer / file |
 
 **Explore set:** `Read`, `NotebookRead`, `Grep`, `Glob`, `ToolSearch`, `WebSearch`, `WebFetch`.
 
-**Single-tool runs:** when a flush has exactly **one** tool, `CompactBlocks` renders a
-standalone `ToolCallRow` directly (no `.ai-iarow` wrapper). The row gets
-`.ai-tcall-standalone` (`margin: 10px 0`) so it keeps the same vertical rhythm as grouped rows.
+**Solo tools:** same `ActionBatchSummary` chrome (no bordered `.ai-tcall-standalone`).
 
-**Skipped in stream:** `TaskCreate`/`Update`/`List`, `TodoWrite`, `AskUserQuestion` (sidebar / ask-dock — full UX in **`073-ask-user-question-dock.md`**).
+**Skipped in stream:** `TaskCreate`/`Update`/`List`, `TodoWrite`, `AskUserQuestion` (sidebar / ask-dock — **`073`**).
+
+**Worked for:** `ChatMessage.durationMs` (provider usage or client clock) → `TurnWorkedHeader` above the body when the turn is finished.
+
+**Status dock:** when tool calls already appear in `streamingBlocks`, `TurnStreamStatus` hides the generic “Running tools…” / “Generating…” copy so the transcript owns the live narrative (stale/idle + planning kept).
+
+Edits in the summary are hidden when `hideEdits` (ComposeCard owns the recap).
 
 ### AskUserQuestion (transcript row only)
 
@@ -66,18 +71,16 @@ are not duplicated in the scrollable transcript.
 
 See **`073-ask-user-question-dock.md`** for data flow, hook cache, and gotchas.
 
-Edits in the chip row are hidden when `hideEdits` (ComposeCard owns the recap).
-
 ### Shared row head: `ToolRowHead`
 
-Used by generic `ToolCallRow` and `EditDiffCard` when expanded from a chip:
+Used by generic `ToolCallRow` and `EditDiffCard` when opened from detail:
 
 | Part | Element | Behaviour |
 |---|---|---|
 | Primary | `<button class="ai-tcall-open">` icon · name · detail | one click → `onPrimary` |
 | Trail | `.ai-tcall-trail` — spinner / check / `±n` stats | status only |
 
-There is **no inline expansion** in the transcript — clicking opens an overlay/drawer.
+Batch expand uses Cursor-phrased detail lines; click opens drawer / file.
 
 ### Click targets
 | Row | `onPrimary` |

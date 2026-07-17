@@ -144,17 +144,39 @@ function UserMessageBarInner({
     imageCount > 0 ? "has-images" : "",
     isCompact ? "is-compact" : "",
     expanded ? "is-expanded" : "",
-    canToggle ? "is-stuck" : "",
+    canToggle ? "is-expandable" : "",
   ]
     .filter(Boolean)
     .join(" ");
 
+  // Cursor-style: whole card toggles when the prompt overflows 3 lines.
+  // Short prompts keep the compact class (no-op clamp) but are not clickable.
   return (
-    <div className={barClass}>
+    <div
+      className={barClass}
+      role={canToggle ? "button" : undefined}
+      tabIndex={canToggle ? 0 : undefined}
+      aria-expanded={canToggle ? expanded : undefined}
+      title={canToggle ? (expanded ? "Collapse" : "Expand") : undefined}
+      onClick={() => {
+        if (canToggle) toggleExpanded();
+      }}
+      onKeyDown={(e) => {
+        if (!canToggle) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggleExpanded();
+        }
+      }}
+    >
       <div ref={mainRef} className="ai-user-bar-main">
         {displayText ? <MarkdownPreview content={displayText} /> : null}
       </div>
-      <div className="ai-user-bar-aside">
+      <div
+        className="ai-user-bar-aside"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
         {imageCount > 0 && images && (
           <UserMessageImageDeck
             images={images}
@@ -172,7 +194,7 @@ function UserMessageBarInner({
   );
 }
 
-/** Sentinel + sticky wrapper + bar — one turn's user prompt. */
+/** Sticky wrapper + bar — one turn's user prompt. */
 export const UserTurnBar = memo(function UserTurnBar({
   zIndex,
   anchorIdx,
@@ -184,23 +206,20 @@ export const UserTurnBar = memo(function UserTurnBar({
   const sticky = useUserBarSticky(content);
 
   return (
-    <>
-      <div ref={sticky.sentinelRef} className="ai-user-bar-sentinel" aria-hidden />
-      <div
-        className={`ai-msg ai-msg-user${dimmed ? " ai-msg-scrubbed-past" : ""}`}
-        style={{ zIndex }}
-        data-anchor-idx={anchorIdx}
-        data-anchor-role="user"
-        data-anchor-preview={content.slice(0, 120)}
-      >
-        <UserMessageBarInner
-          content={content}
-          images={images}
-          sticky={sticky}
-          {...barProps}
-        />
-      </div>
-    </>
+    <div
+      className={`ai-msg ai-msg-user${dimmed ? " ai-msg-scrubbed-past" : ""}`}
+      style={{ zIndex }}
+      data-anchor-idx={anchorIdx}
+      data-anchor-role="user"
+      data-anchor-preview={content.slice(0, 120)}
+    >
+      <UserMessageBarInner
+        content={content}
+        images={images}
+        sticky={sticky}
+        {...barProps}
+      />
+    </div>
   );
 });
 

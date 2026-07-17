@@ -1,90 +1,61 @@
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
-/** Natural height above which we collapse while the bar is stuck. */
-const TALL_THRESHOLD_PX = 160;
-/** Pixels sentinel must clear the scroll top before we unstick (anti-flicker). */
-const UNSTICK_GAP_PX = 10;
+/** Cursor-style: clamp tall user prompts to this many lines when collapsed. */
+export const USER_BAR_COMPACT_LINES = 3;
 
-function estimateTall(content: string): boolean {
-  if (content.length > 500) return true;
-  return (content.match(/\n/g)?.length ?? 0) >= 7;
+/** Seed overflow before layout — long paste / multi-line prompts. */
+export function estimateUserBarOverflow(content: string): boolean {
+  if (content.length > 180) return true;
+  return (content.match(/\n/g)?.length ?? 0) >= USER_BAR_COMPACT_LINES;
 }
 
+/**
+ * Cursor-style user-bar collapse: clamp to ~3 lines by default, click to
+ * expand. Decoupled from sticky scroll (pin stays CSS-only on `.ai-msg-user`)
+ * so height changes never fight IntersectionObserver — that was the flicker.
+ */
 export function useUserBarSticky(content: string) {
-  const sentinelRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
-  const tallCacheRef = useRef(estimateTall(content));
-  const [isStuck, setIsStuck] = useState(false);
-  const [isTall, setIsTall] = useState(() => estimateTall(content));
   const [expanded, setExpanded] = useState(false);
+  const [canExpand, setCanExpand] = useState(() =>
+    estimateUserBarOverflow(content),
+  );
 
-  const isCompact = isStuck && isTall && !expanded;
-  const canToggle = isStuck && isTall;
+  useLayoutEffect(() => {
+    setExpanded(false);
+    setCanExpand(estimateUserBarOverflow(content));
+  }, [content]);
 
-  const measureNatural = (main: HTMLElement): boolean => {
-    const tall =
-      main.scrollHeight > TALL_THRESHOLD_PX || estimateTall(content);
-    tallCacheRef.current = tall;
-    return tall;
-  };
+  useLayoutEffect(() => {
+    const main = mainRef.current;
+    if (!main || expanded) return;
 
-  useEffect(() => {
-    const sentinel = sentinelRef.current;
-    if (!sentinel) return;
-    const root = sentinel.closest(".ai-messages");
-    if (!(root instanceof HTMLElement)) return;
-
-    const syncStuck = () => {
-      const rootTop = root.getBoundingClientRect().top;
-      const sentBottom = sentinel.getBoundingClientRect().bottom;
-      setIsStuck((prev) => {
-        if (sentBottom <= rootTop + 2) return true;
-        if (sentBottom > rootTop + UNSTICK_GAP_PX) return false;
+    const check = () => {
+      const styles = getComputedStyle(main);
+      const fontSize = parseFloat(styles.fontSize) || 13.5;
+      const lhParsed = parseFloat(styles.lineHeight);
+      const lineHeight = Number.isFinite(lhParsed) ? lhParsed : fontSize * 1.55;
+      const limit = lineHeight * USER_BAR_COMPACT_LINES;
+      // scrollHeight is full content even under overflow:hidden.
+      const overflows = main.scrollHeight > limit + 1;
+      setCanExpand((prev) => {
+        if (overflows) return true;
+        if (main.scrollHeight <= limit) return false;
         return prev;
       });
     };
 
-    syncStuck();
-    const obs = new IntersectionObserver(syncStuck, { root, threshold: 0 });
-    obs.observe(sentinel);
-    root.addEventListener("scroll", syncStuck, { passive: true });
-    return () => {
-      obs.disconnect();
-      root.removeEventListener("scroll", syncStuck);
-    };
-  }, []);
-
-  useEffect(() => {
-    tallCacheRef.current = estimateTall(content);
-    const main = mainRef.current;
-    if (!main) {
-      setIsTall(tallCacheRef.current);
-      return;
-    }
-
-    const applyMeasure = () => {
-      if (main.closest(".ai-user-bar.is-compact")) {
-        setIsTall(tallCacheRef.current);
-        return;
-      }
-      setIsTall(measureNatural(main));
-    };
-
-    applyMeasure();
-    const ro = new ResizeObserver(applyMeasure);
+    check();
+    const ro = new ResizeObserver(check);
     ro.observe(main);
     return () => ro.disconnect();
-  }, [content]);
-
-  useEffect(() => {
-    if (!isStuck) setExpanded(false);
-  }, [isStuck]);
+  }, [content, expanded]);
 
   return {
-    sentinelRef,
     mainRef,
-    isCompact,
-    canToggle,
+    /** Clamp only when the prompt overflows — short cards keep natural layout. */
+    isCompact: !expanded && canExpand,
+    canToggle: canExpand,
     expanded,
     toggleExpanded: () => setExpanded((v) => !v),
   };

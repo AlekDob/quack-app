@@ -2,13 +2,25 @@
 //! Quack links these ids to ChatSession rows via `providerSessionIds`.
 
 use crate::provider_path::encode_project_path;
-use crate::session_jsonl::{extract_user_text, parse_session_jsonl, trim_oneline, LoadedMessage};
+use crate::session_jsonl::{
+    extract_user_text, parse_session_jsonl_capped, trim_oneline, LoadedMessage,
+};
 use std::collections::HashMap;
 use std::fs;
 use std::io::BufRead;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
+
+/// Skip full line-by-line summarize for cold list when a JSONL is this large.
+/// Full parse happens on open/resume (capped). Prevents listing a 757 MB
+/// project dir from pegging disk + CPU on every first open.
+const GIANT_JSONL_BYTES: u64 = 8 * 1024 * 1024;
+
+/// Default tail when loading a CLI transcript into the webview. Huge JSONL
+/// (10–90 MB) must not land fully in JS heap — windowing already shows the
+/// recent turns.
+const DEFAULT_LOAD_CAP: usize = 120;
 
 // Per-file summary cache. Summarizing a session means parsing the WHOLE
 // JSONL line-by-line (turn_count, first/last user text, cost) — and a single
@@ -69,15 +81,23 @@ pub async fn provider_list_sessions(
     .map_err(|e| e.to_string())?
 }
 
+/// Load a CLI transcript. `max_messages`: None → last DEFAULT_LOAD_CAP;
+/// Some(0) → uncapped; Some(n) → last n messages.
 #[tauri::command]
 pub async fn provider_load_session(
     provider: String,
     cwd: String,
     session_id: String,
+    max_messages: Option<usize>,
 ) -> Result<Vec<LoadedMessage>, String> {
+    let cap = match max_messages {
+        None => Some(DEFAULT_LOAD_CAP),
+        Some(0) => None,
+        Some(n) => Some(n),
+    };
     tauri::async_runtime::spawn_blocking(move || match provider.as_str() {
-        "claude-code" => load_claude_session(&cwd, &session_id),
-        "cursor-cli" => load_cursor_session(&cwd, &session_id),
+        "claude-code" => load_claude_session(&cwd, &session_id, cap),
+        "cursor-cli" => load_cursor_session(&cwd, &session_id, cap),
         "opencode-cli" => Err(
             "OpenCode transcript load not yet supported — resume via chat works".into(),
         ),
@@ -100,6 +120,19 @@ fn mtime_ms(path: &Path) -> u64 {
         .unwrap_or(0)
 }
 
+fn light_summary(path: &Path, provider: &str, id: String, size: u64) -> CliSessionSummary {
+    let mb = size as f64 / (1024.0 * 1024.0);
+    CliSessionSummary {
+        provider: provider.to_string(),
+        id,
+        title: format!("Large session ({:.0} MB)", mb),
+        preview: "Open to load recent turns".into(),
+        cost_usd: 0.0,
+        turn_count: 0,
+        last_turn_at_ms: mtime_ms(path),
+    }
+}
+
 fn summarize_jsonl(path: &Path, provider: &str, id: String) -> Option<CliSessionSummary> {
     // Cache gate: skip the full parse if the file is unchanged since last time.
     let (mtime, size) = file_sig(path);
@@ -109,6 +142,14 @@ fn summarize_jsonl(path: &Path, provider: &str, id: String) -> Option<CliSession
                 return Some(summary.clone());
             }
         }
+    }
+    // Giants: metadata-only stub on cold list — full parse only on load.
+    if size >= GIANT_JSONL_BYTES {
+        let summary = light_summary(path, provider, id, size);
+        if let Ok(mut cache) = summary_cache().lock() {
+            cache.insert(path.to_path_buf(), (mtime, size, summary.clone()));
+        }
+        return Some(summary);
     }
     let file = fs::File::open(path).ok()?;
     let reader = std::io::BufReader::new(file);
@@ -236,7 +277,11 @@ fn list_jsonl_dir(
     Ok(sessions)
 }
 
-fn load_claude_session(cwd: &str, session_id: &str) -> Result<Vec<LoadedMessage>, String> {
+fn load_claude_session(
+    cwd: &str,
+    session_id: &str,
+    max_messages: Option<usize>,
+) -> Result<Vec<LoadedMessage>, String> {
     let path = home()?
         .join(".claude")
         .join("projects")
@@ -245,10 +290,14 @@ fn load_claude_session(cwd: &str, session_id: &str) -> Result<Vec<LoadedMessage>
     if !path.exists() {
         return Err(format!("session {} not found at {:?}", session_id, path));
     }
-    parse_session_jsonl(&path)
+    parse_session_jsonl_capped(&path, max_messages)
 }
 
-fn load_cursor_session(cwd: &str, session_id: &str) -> Result<Vec<LoadedMessage>, String> {
+fn load_cursor_session(
+    cwd: &str,
+    session_id: &str,
+    max_messages: Option<usize>,
+) -> Result<Vec<LoadedMessage>, String> {
     let path = home()?
         .join(".cursor")
         .join("projects")
@@ -259,7 +308,7 @@ fn load_cursor_session(cwd: &str, session_id: &str) -> Result<Vec<LoadedMessage>
     if !path.exists() {
         return Err(format!("session {} not found at {:?}", session_id, path));
     }
-    parse_session_jsonl(&path)
+    parse_session_jsonl_capped(&path, max_messages)
 }
 
 fn list_opencode_sessions(cwd: &str) -> Result<Vec<CliSessionSummary>, String> {

@@ -125,6 +125,8 @@ Two merge helpers in `composerDraft.ts` — both call `patchSession` so
 |---|---|
 | Keystroke / toggle / queue / knob change | Debounced 400ms `flushSessionState`; cleanup **only** `clearTimeout` (flushing on cleanup re-ran a full `chat_store_save` on every keystroke — CPU/RAM spike) |
 | `sessionId` changes (`/new`, history) | `prevSessionIdRef` effect → `flushSessionState(previous)` |
+
+**ComposerShell (2026-07-17):** `input` state lives in [`ComposerShell.tsx`](../../src/components/ComposerShell.tsx) so keystrokes do **not** re-render `AIChatPanel`’s transcript. Parent reads/writes via imperative handle (`getInput` / `setInput`); draft debounce watches `draftEpoch` from `onInputChange`.
 | Panel unmount / chat switch | `useLayoutEffect` cleanup + `registerChatPersist` / `pulseChatSwitch` → `flushAllChatPersist` |
 | Messages saved / `beforeunload` / streaming (5s) | Full `saveSession`; toast if `false` |
 
@@ -170,5 +172,7 @@ Editor mode (`WorkspaceShell` `AIChatHost`) uses the same mount-once pattern.
 - Do **not** restore model with `setSelected((cur) => cur || q)`.
 - Do **not** use `readEffort()` / `readDefaultPermMode()` when a `ChatSession` row exists but lacks knob fields — use `CC_EFFORT_DEFAULT` + Ask.
 - Debounce cleanup must **only** `clearTimeout`. Flush on unmount / `sessionId` change via dedicated effects — never flush inside the debounce cleanup (that wrote the full session JSON on every keystroke).
+- **Do not** invent a transcript via `patchSession` when the cache body is missing — return `false` unless `patch.messages` is non-empty (`043` project-switch shrink).
+- Unmount composer flush is safe only because `preferRicherSession` + `setActiveWorkspace` flush-before-flip (`043`, `058`).
 - Image thumbs are **not** stored in localStorage — only paths; missing files on disk are dropped on rehydrate.
 - First time a legacy chat gets a custom effort, the value is written to its row — until then it shows **medium**, not whatever another chat last set globally.

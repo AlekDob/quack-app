@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   startTransition,
+  type SetStateAction,
 } from "react";
 import { flushSync } from "react-dom";
 import { Icon } from "./Icon";
@@ -185,6 +186,7 @@ import { pinky, type PinkySearchHit } from "../pinky";
 import { recordBrainUsage } from "../brainUsageStore";
 import { BrainTurnChip } from "./BrainTurnChip";
 import { ReasoningTurnChip } from "./ReasoningTurnChip";
+import { TurnWorkedHeader } from "./TurnWorkedHeader";
 import { BrainSaveChip } from "./BrainSaveChip";
 import { WorksStoryChip } from "./WorksStoryChip";
 import { SkillProposalChip } from "./SkillProposalChip";
@@ -313,6 +315,7 @@ import { permissionFor } from "../toolPermissions";
 import { onAIPromptRequest, requestAIPrompt } from "../aiBus";
 import { onChatStopRequest } from "../aiStopBus";
 import { ComposerQueue } from "./ComposerQueue";
+import { ComposerShell, type ComposerShellHandle } from "./ComposerShell";
 import { ClaudeLoginBanner } from "./ClaudeLoginBanner";
 import {
   probeClaudeAuth,
@@ -674,7 +677,21 @@ export function AIChatPanel({
   // Full char count of the rules file — drives the colored token-weight dot.
   const [rulesBytes, setRulesBytes] = useState<number>(0);
   const [selected, setSelected] = useState<string>("");
-  const [input, setInput] = useState("");
+  // Input lives in ComposerShell so keystrokes don't re-render the transcript.
+  const composerRef = useRef<ComposerShellHandle>(null);
+  const inputSnapRef = useRef("");
+  const [draftEpoch, setDraftEpoch] = useState(0);
+  const setInput = useCallback((v: SetStateAction<string>) => {
+    composerRef.current?.setInput(v);
+  }, []);
+  const readInput = useCallback(
+    () => composerRef.current?.getInput() ?? inputSnapRef.current,
+    [],
+  );
+  const onComposerInputChange = useCallback((next: string) => {
+    inputSnapRef.current = next;
+    setDraftEpoch((n) => n + 1);
+  }, []);
   const [dictating, setDictating] = useState(false);
   const [fileDropHover, setFileDropHover] = useState(false);
   const dictationCaptureRef = useRef<Promise<DictationCapture> | null>(null);
@@ -1366,16 +1383,8 @@ export function AIChatPanel({
     };
   }, [root, wsActive]);
 
-  // Auto-grow the prompt textarea up to ~8 lines so multi-paragraph
-  // questions don't get cropped behind a tiny scrollbar. Falls back to
-  // the rows={2} baseline when empty.
-  useEffect(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    const max = 8 * 18 + 16; // ~8 rows of line-height 18px + padding
-    el.style.height = Math.min(el.scrollHeight, max) + "px";
-  }, [input]);
+  // Auto-grow lives inside ComposerShell's textarea onChange/effect via
+  // the children that still call the same resize logic on input.
 
   const applyDiscoverySnapshot = useCallback((snap: ModelDiscoverySnapshot) => {
     setAllModels(snap.allModels);
@@ -2019,7 +2028,9 @@ export function AIChatPanel({
       if (aiChatId) {
         const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
         const targetSid = desc?.sessionId ?? newSessionId();
-        const found = await ensureSessionLoaded(wsId, targetSid);
+        const found = await ensureSessionLoaded(wsId, targetSid, {
+          force: true,
+        });
         if (cancelled) return;
         const msgs = found
           ? await rehydrateMessageImages(
@@ -2242,7 +2253,7 @@ export function AIChatPanel({
   useLayoutEffect(() => {
     composerPersistRef.current = {
       sessionId,
-      input,
+      input: inputSnapRef.current,
       queue: queueRef.current,
       attachTree,
       attachTerminal,
@@ -2276,7 +2287,7 @@ export function AIChatPanel({
   }, [
     sessionId,
     flushSessionState,
-    input,
+    draftEpoch,
     queuedMessages,
     attachTree,
     attachTerminal,
@@ -2429,7 +2440,7 @@ export function AIChatPanel({
   }, [zoomImage]);
 
   const send = async () => {
-    const text = input.trim();
+    const text = readInput().trim();
     const imgs = attachedImages;
     if (!text && imgs.length === 0) return;
     if (streaming !== null || runningTools) {
@@ -2507,7 +2518,7 @@ export function AIChatPanel({
     | Array<{ name: string; hint: string; run: () => void }>
     | null => {
     if (!slashState) return null;
-    const tail = input.slice(slashState.start);
+    const tail = readInput().slice(slashState.start);
     if (!tail.includes(" ")) return null;
     const parts = tail.split(/\s+/);
     const fw = parts[0].toLowerCase();
@@ -2719,9 +2730,10 @@ export function AIChatPanel({
   // Send a Claude Code slash command through as the prompt — the CLI
   // expands it. Keeps any arguments the user typed after the name.
   const sendCcCommand = (name: string) => {
+    const cur = readInput();
     const segment = slashState
-      ? input.slice(slashState.start).trim()
-      : input.trim();
+      ? cur.slice(slashState.start).trim()
+      : cur.trim();
     const text = segment.toLowerCase().startsWith(name.toLowerCase())
       ? segment
       : name;
@@ -2828,15 +2840,17 @@ export function AIChatPanel({
       );
     } else if (pick.type === "work" && aiChatId) {
       const token = pick.work.shortId;
-      const before = input.slice(0, mentionState.start);
-      const after = input.slice(mentionState.end);
+      const cur = readInput();
+      const before = cur.slice(0, mentionState.start);
+      const after = cur.slice(mentionState.end);
       setInput(`${before}@${token}${after.startsWith(" ") ? "" : " "}${after}`);
       void linkChatToWork(root, pick.work.id, aiChatId);
       useStore.getState().setAIChatWorkItem(wsId, aiChatId, pick.work.id);
     } else if (pick.type === "story" && aiChatId) {
       const token = pick.story.shortId;
-      const before = input.slice(0, mentionState.start);
-      const after = input.slice(mentionState.end);
+      const cur = readInput();
+      const before = cur.slice(0, mentionState.start);
+      const after = cur.slice(mentionState.end);
       setInput(`${before}@${token}${after.startsWith(" ") ? "" : " "}${after}`);
       void linkChatToStory(root, pick.story.id, aiChatId).then(() => {
         useStore.getState().setAIChatStory(wsId, aiChatId, pick.story.id);
@@ -2867,12 +2881,13 @@ export function AIChatPanel({
       setSlashState(null);
       return;
     }
-    const next = `${input.slice(0, slashState.start)}${input.slice(slashState.end)}`
+    const cur = readInput();
+    const next = `${cur.slice(0, slashState.start)}${cur.slice(slashState.end)}`
       .replace(/\s{2,}/g, " ")
       .trim();
     setInput(next);
     setSlashState(null);
-  }, [input, slashState]);
+  }, [readInput, setInput, slashState]);
 
   const replaceSlashSegment = useCallback(
     (replacement: string) => {
@@ -2881,8 +2896,9 @@ export function AIChatPanel({
         setSlashState(parseSlash(replacement, replacement.length));
         return;
       }
-      const before = input.slice(0, slashState.start);
-      const after = input.slice(slashState.end);
+      const cur = readInput();
+      const before = cur.slice(0, slashState.start);
+      const after = cur.slice(slashState.end);
       const glueBefore = before.length > 0 && !before.endsWith(" ") ? " " : "";
       const glueAfter = after.length > 0 && !after.startsWith(" ") ? " " : "";
       const next = `${before}${glueBefore}${replacement}${glueAfter}${after}`.trim();
@@ -2890,7 +2906,7 @@ export function AIChatPanel({
       setInput(next);
       setSlashState(parseSlash(next, cursor));
     },
-    [input, slashState],
+    [readInput, setInput, slashState],
   );
 
   const citeFileFromDrop = useCallback(
@@ -3658,6 +3674,11 @@ export function AIChatPanel({
         }> = [];
         let firstTokenAt: number | null = null;
         const startedAt = performance.now();
+        let turnDurationMs: number | undefined;
+        let thinkingStartedAt: number | null = null;
+        let thinkingClosedAt: number | null = null;
+        const thinkOpenTag = "<" + "think>";
+        const thinkCloseTag = "</" + "think>";
         // Reset on each new round so the "still working" timer doesn't
         // anchor to a previous turn.
         setLastStreamEventAt(Date.now());
@@ -3708,6 +3729,9 @@ export function AIChatPanel({
               tokens: ev.tokens,
               contextTokens: ev.contextTokens,
             });
+            if (typeof ev.durationMs === "number" && ev.durationMs > 0) {
+              turnDurationMs = ev.durationMs;
+            }
             if (ev.contextTokens) setLiveContextTokens(ev.contextTokens);
             // Append to the cross-chat usage log so the dashboard +
             // monthly hard cap have data to work with. Skipped if
@@ -3771,6 +3795,20 @@ export function AIChatPanel({
               firstTokenAt = performance.now();
             }
             acc += ev.text;
+            if (
+              !thinkingStartedAt &&
+              (acc.includes(thinkOpenTag) ||
+                splitThinking(acc).thinking.length > 0)
+            ) {
+              thinkingStartedAt = performance.now();
+            }
+            if (
+              thinkingStartedAt &&
+              !thinkingClosedAt &&
+              acc.includes(thinkCloseTag)
+            ) {
+              thinkingClosedAt = performance.now();
+            }
             appendTextBlock(ev.text);
             // Approximate tokens/sec: ~4 chars per token on average.
             const elapsedSec = (performance.now() - firstTokenAt) / 1000;
@@ -3965,7 +4003,6 @@ export function AIChatPanel({
             );
           }
         }
-        void startedAt;
         // Fallback: some models emit tool calls as JSON inside the content
         // stream instead of using Ollama's native tool_calls field. Detect
         // and lift them out before showing the message to the user.
@@ -3992,6 +4029,13 @@ export function AIChatPanel({
           // blocks fall back to the legacy combined render.
           blocks: blocksThisRound.length > 0 ? blocksThisRound : undefined,
           agentId: presetId,
+          durationMs:
+            turnDurationMs ?? Math.round(performance.now() - startedAt),
+          thinkingMs: thinkingStartedAt
+            ? Math.round(
+                (thinkingClosedAt ?? performance.now()) - thinkingStartedAt,
+              )
+            : undefined,
         };
         conversation.push(assistantMsg);
         setMessages((m) => [...m, assistantMsg]);
@@ -4229,8 +4273,8 @@ export function AIChatPanel({
     [attachedFiles, root],
   );
   const leadingSkill = useMemo(
-    () => parseLeadingSkill(input, skills),
-    [input, skills],
+    () => parseLeadingSkill(inputSnapRef.current, skills),
+    [draftEpoch, skills],
   );
   const hasComposerMentions =
     attachedBrainHits.length > 0 ||
@@ -4872,9 +4916,10 @@ export function AIChatPanel({
   }, [usageReport]);
 
   const runSlashCommand = (cmd: SlashCommand) => {
+    const cur = readInput();
     const slashArg = (slashState
-      ? slashSegmentTail(input, slashState.start, slashState.firstWord)
-      : input.split(/\s+/).slice(1).join(" ")
+      ? slashSegmentTail(cur, slashState.start, slashState.firstWord)
+      : cur.split(/\s+/).slice(1).join(" ")
     )
       .split(/\s+/)[0]
       ?.toLowerCase() ?? "";
@@ -4994,9 +5039,10 @@ export function AIChatPanel({
       return;
     }
     if (cmd.action === "file") {
+      const cur = readInput();
       const rest = slashState
-        ? slashSegmentTail(input, slashState.start, slashState.firstWord)
-        : input.replace(/^\/file\s*/i, "").trim();
+        ? slashSegmentTail(cur, slashState.start, slashState.firstWord)
+        : cur.replace(/^\/file\s*/i, "").trim();
       if (!rest) {
         replaceSlashSegment("/file ");
         return;
@@ -5929,10 +5975,20 @@ export function AIChatPanel({
               })()}
               {/* InterleavedBlocks renders reasoning inline — skip the outer
                   duplicate when a blocks log exists (was only gated on compact). */}
+              {isAssistant &&
+                !isStreamingThis &&
+                typeof m.durationMs === "number" &&
+                m.durationMs > 0 && (
+                  <TurnWorkedHeader durationMs={m.durationMs} />
+                )}
               {!(m.blocks && m.blocks.length > 0) &&
                 isAssistant &&
                 split.thinking.length > 0 && (
-                  <ReasoningTurnChip text={split.thinking} />
+                  <ReasoningTurnChip
+                    text={split.thinking}
+                    durationMs={m.thinkingMs}
+                    streaming={isStreamingThis}
+                  />
                 )}
               <div className="ai-msg-body">
                 {m.images && m.images.length > 0 && (
@@ -5965,6 +6021,7 @@ export function AIChatPanel({
                     blocks={m.blocks}
                     hideEdits={showComposeCard}
                     onFileOpen={openChatFile}
+                    thinkingMs={m.thinkingMs}
                     callsById={
                       new Map(
                         (m.tool_calls ?? [])
@@ -6582,6 +6639,12 @@ export function AIChatPanel({
         <AgentCommitDock wsId={wsId} sessionId={sessionId} root={root} />
       ) : null}
       <SkillProposalChip enabled={skillTrainerExt} foreground={wsActive && chatVisible} />
+      <ComposerShell
+        ref={composerRef}
+        sessionKey={aiChatId}
+        onInputChange={onComposerInputChange}
+      >
+        {({ input, setInput }) => (
       <div
         className={`ai-composer-shell${dockedAskCall ? " has-ask" : ""}${
           askFreeform ? " ask-freeform" : ""
@@ -6877,6 +6940,11 @@ export function AIChatPanel({
               bumpEffortPulse();
             }
             setInput(v);
+            // Auto-grow up to ~8 lines.
+            const el = e.target;
+            el.style.height = "auto";
+            const max = 8 * 18 + 16;
+            el.style.height = Math.min(el.scrollHeight, max) + "px";
             setSlashIndex(0);
             // Any user-driven change (typing, paste) takes us out of
             // history mode so the next ArrowUp starts a fresh walk
@@ -7237,6 +7305,8 @@ export function AIChatPanel({
       </>
       )}
       </div>
+        )}
+      </ComposerShell>
       {aggregatedPullProgress && (
         <div className="ai-status-strip">
           <span className="ai-status-item ai-status-pull">

@@ -60,23 +60,33 @@ export function saveSession(wsId: string, session: ChatSession): boolean {
   return true;
 }
 
-/** Merge fields without clobbering messages when absent from the patch. */
+/** Merge fields without clobbering messages when absent from the patch.
+ *  Never invents a new empty transcript row (composer unmount used to). */
 export function patchSession(
   wsId: string,
   sessionId: string,
   patch: Partial<Omit<ChatSession, "id">>,
 ): boolean {
   const existing = loadSession(wsId, sessionId);
-  const base: ChatSession = existing ?? {
-    id: sessionId,
-    title: "Untitled",
-    messages: [],
-    updatedAt: Date.now(),
-  };
+  if (!existing) {
+    if (!patch.messages || patch.messages.length === 0) return false;
+    return saveSession(wsId, {
+      id: sessionId,
+      title: patch.title ?? "Untitled",
+      messages: patch.messages,
+      updatedAt: Date.now(),
+      ...patch,
+    });
+  }
+  const messages = patch.messages ?? existing.messages;
   return saveSession(wsId, {
-    ...base,
+    ...existing,
     ...patch,
     id: sessionId,
+    messages:
+      messages.length >= existing.messages.length
+        ? messages
+        : existing.messages,
     updatedAt: Date.now(),
   });
 }

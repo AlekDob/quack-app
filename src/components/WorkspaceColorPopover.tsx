@@ -1,15 +1,20 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import {
   WORKSPACE_COLORS,
   getWorkspaceColor,
   isHexColor,
   setWorkspaceColor,
 } from "../workspaceColors";
+import { success as toastSuccess } from "../notify";
+import { IS_MACOS } from "../theme";
 import { AIIcon } from "./AIIcon";
 
 interface Props {
   wsId: string;
+  /** Absolute project root — for Reveal / Copy path. */
+  root: string;
   /** Screen coords to anchor the popover near (usually the icon's edge). */
   x: number;
   y: number;
@@ -19,9 +24,14 @@ interface Props {
   onNewChat: (wsId: string, anchor: { x: number; y: number }) => void;
 }
 
-// Right-click popover on a project icon — new chat + color picker.
+const REVEAL_LABEL = IS_MACOS
+  ? "Reveal in Finder"
+  : "Reveal in File Explorer";
+
+// Right-click popover on a project icon — new chat, path actions, color picker.
 export function WorkspaceColorPopover({
   wsId,
+  root,
   x,
   y,
   nameAnchor,
@@ -47,6 +57,27 @@ export function WorkspaceColorPopover({
     onClose();
   };
 
+  const revealRoot = async () => {
+    if (!root) return;
+    try {
+      await revealItemInDir(root);
+    } catch (e) {
+      console.error(e);
+    }
+    onClose();
+  };
+
+  const copyPath = async () => {
+    if (!root) return;
+    try {
+      await navigator.clipboard.writeText(root);
+      toastSuccess(`Copied: ${root}`);
+    } catch {
+      /* ignore */
+    }
+    onClose();
+  };
+
   const stopBubble = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -65,14 +96,32 @@ export function WorkspaceColorPopover({
         aria-label="Workspace actions"
         onPointerDown={stopBubble}
       >
-        <button
-          type="button"
-          className="ws-color-new-chat"
-          onClick={startChat}
-        >
-          <AIIcon size={14} />
-          <span>New chat here</span>
-        </button>
+        <div className="ws-color-actions">
+          <button
+            type="button"
+            className="ws-color-action"
+            onClick={startChat}
+          >
+            <AIIcon size={14} />
+            <span>New chat here</span>
+          </button>
+          <button
+            type="button"
+            className="ws-color-action"
+            disabled={!root}
+            onClick={() => void revealRoot()}
+          >
+            <span>{REVEAL_LABEL}</span>
+          </button>
+          <button
+            type="button"
+            className="ws-color-action"
+            disabled={!root}
+            onClick={() => void copyPath()}
+          >
+            <span>Copy path</span>
+          </button>
+        </div>
         <div className="ws-color-divider" role="separator" />
         <div className="ws-color-grid">
           {WORKSPACE_COLORS.map((c) => (

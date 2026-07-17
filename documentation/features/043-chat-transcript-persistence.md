@@ -74,7 +74,7 @@ id in the index.
 | `src-tauri/src/provider_sessions.rs` | Unified CLI list/load — see `044-provider-session-bridge.md` |
 | `src-tauri/src/session_jsonl.rs` | Shared JSONL parser (CC + Cursor agent-transcripts) |
 | `src-tauri/src/provider_path.rs` | `encode_project_path` — same slug as CC/Cursor on-disk dirs |
-| `src/chatStoreCache.ts` | Index hydrate, `ensureSessionLoaded`, warm ids, body drop, **coalesced** `persistSession` (latest wins while in-flight) |
+| `src/chatStoreCache.ts` | Index hydrate, `ensureSessionLoaded({ force })`, warm ids, body drop, **coalesced** `persistSession`, `preferRicherSession`, `awaitChatDiskFlushes` |
 | `src/chatHistory.ts` | Public API: `loadSession`, `ensureSessionLoaded`, `saveSession`, `patchSession`, `deleteSession` |
 | `src/chatHostMount.ts` | DONE hosts unload when hidden; live stay sticky (multitask) |
 | `src/chatProviderRecovery.ts` | Hydrate thin Quack rows from CLI on-disk transcripts (all agentic providers) |
@@ -180,6 +180,41 @@ cache → `loadSessions` returns `[]` → empty transcripts, and the next
 no cost when the workspace was already warmed at boot. Opening a cold (DONE)
 chat still needs `ensureSessionLoaded` in `AIChatPanel` (`076`).
 
+## Project switch ↔ transcript durability (2026-07-17)
+
+Leaving a project **unmounts every** `AIChatHost` (`WorkspaceShell`:
+`{isActive && Object.values(ws.aiChats).map(...)}`). That teardown used to
+shrink or wipe on-disk transcripts.
+
+| Step | What runs | Failure mode (before) | Fix |
+|---|---|---|---|
+| 1. Leave project | `setActiveWorkspace` | No flush before `isActive` flip | `flushWorkspaceChatPersist` + `awaitChatDiskFlushes(prevId)` **before** `set({ activeId })` |
+| 2. Host unmount | `useLayoutEffect` → `mergeComposerDraft` / knobs | `patchSession` invented `{ messages: [] }` when RAM body missing | `patchSession` refuses empty invent; never shrinks `messages` |
+| 3. Persist | `putCachedSession` / `chat_store_save` | Thin overwrite of rich row | `preferRicherSession` in cache + disk queue |
+| 4. After flip | — | Remount reused thin RAM cache | `dropAllCachedBodies(prevId)` after switch |
+| 5. Remount hydrate | `ensureSessionLoaded` | Cache hit skipped disk | `ensureSessionLoaded(wsId, sid, { force: true })` |
+
+```
+ActivityBar / hub → setActiveWorkspace(next)
+  → flushWorkspaceChatPersist(prev) → awaitChatDiskFlushes(prev)
+  → set activeId=next → dropAllCachedBodies(prev)
+  → (prev hosts unmount; next hosts mount)
+  → ensureSessionLoaded(..., { force: true }) → chat_store_load
+  → needsProviderHydration? recoverSessionFromAnyProvider (044)
+```
+
+| API | Role |
+|---|---|
+| `preferRicherSession(prev, next)` | Keep longer `messages`; allow other field updates |
+| `awaitChatDiskFlushes(wsId?)` | Spin until coalesce queue idle for ws |
+| `dropAllCachedBodies(wsId)` | Clear warm bodies; keep `__idx__` ids |
+| `ensureSessionLoaded(wsId, id, { force })` | Drop body then reload from disk |
+
+Tests: `src/chatStoreCache.test.ts` (`npm test`).
+
+Cross-refs: warm Monaco LRU still in `058` (editors); chat hosts stay
+`isActive`-gated (not warm) — that asymmetry is why this flush path exists.
+
 ## Gotchas
 
 - **Disk is source of truth** — `localStorage` is legacy only; do not add new chat keys there.
@@ -191,6 +226,7 @@ chat still needs `ensureSessionLoaded` in `AIChatPanel` (`076`).
   `chat_store_save`. Fixed `.codetta-tmp` sibling caused ENOENT on the second rename
   ("Chat not saved" toast) and truncated rows. Fix: unique tmp tags in `atomic.rs`,
   `SAVE_LOCK` in `chat_store_save`, frontend coalesce in `persistSession`.
+- **Project switch shrink** — see section above; never reintroduce empty `patchSession` invent.
 - **Agent Mode** mounts one `AIChatPanel` per **live** (or currently visible DONE)
   chat; DONE hosts unload when hidden (`076`).
 - **Vite-only dev** (`npm run dev` without Tauri) — `hydrateChatStore` falls back to legacy `localStorage` read; disk save is a no-op (no false toast).

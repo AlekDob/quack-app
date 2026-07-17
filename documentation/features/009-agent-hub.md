@@ -92,7 +92,8 @@ When the hub is **expanded** and at least one chat has `doneAt` or legacy `archi
 | Search | Inline filter on chat title + workspace name; max **30** matches |
 | Hint | *Latest 10 of N — search for more* when `N > 10` and search empty |
 | Open row | `focusChat` — focuses without reopen; **Reopen** in menu or send a message to restore |
-| Collapsed by default | `hubPrefs` first-run default includes `"done"` only |
+| Collapsed by default | Once per browser session (`sessionStorage` boot flag); expand mid-session persists |
+| Visual separation | Expanded hub: top hairline + extra margin above Done (archive vs live) |
 | Collapsed rail | At most **10** done dots (no search) |
 
 | Constant | Value | File |

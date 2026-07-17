@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-10
+last_verified: 2026-07-17
 tags: [workspace, colors, palette, popover, activity-bar, agent-rail, topbar, theming, localStorage]
 ---
 
@@ -15,7 +15,7 @@ tags: [workspace, colors, palette, popover, activity-bar, agent-rail, topbar, th
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Service | `src/workspaceColors.ts` | `WORKSPACE_COLORS`, `get/setWorkspaceColor`, `subscribeWorkspaceColors`, `hexRgbChannels`; localStorage map + pub/sub |
-| Component | `src/components/WorkspaceColorPopover.tsx` | Right-click popover: swatch grid + "No color"; portals to body |
+| Component | `src/components/WorkspaceColorPopover.tsx` | Right-click popover: New chat / Reveal in Finder|Explorer / Copy path + swatch grid + "No color"; portals to body |
 | Component | `src/components/ActivityBar.tsx` | Editor-mode workspace icons: context menu → popover, applies `--ws-color` |
 | Component | `src/components/AgentModeShell.tsx` | Agent-mode workspace rail: same context menu + color application |
 | Component | `src/components/TopBar.tsx` | Active workspace: `--ws-color` + `--ws-color-rgb` on `.topbar.has-ws-color` |
@@ -77,7 +77,9 @@ tags: [workspace, colors, palette, popover, activity-bar, agent-rail, topbar, th
 
 ### Notes / gotchas
 - Persistence is **frontend localStorage**, not Rust `workspace.json` — survives reloads; not synced across machines
-- Right-click workspace **icon** → colors; right-click activity-bar **background** → flip sidebar side (unchanged)
+- Right-click workspace **icon** → actions (New chat / Reveal in Finder|File Explorer / Copy path) + colors; right-click activity-bar **background** → flip sidebar side (unchanged)
+- Reveal uses `@tauri-apps/plugin-opener` `revealItemInDir(root)` (same as file-tree); label is macOS-aware via `IS_MACOS`
+- Copy path writes the absolute `meta.root` to the clipboard
 - `color-mix()` + `rgba(var(--ws-color-rgb))` need a modern engine — fine on Tauri's WebKit
 - macOS: native menu bar hides in-window brand/menus; title-bar wash still spans the drag region + Agents toggle
 - No wash when color is cleared ("No color" in popover) — by design

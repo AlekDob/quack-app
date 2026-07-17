@@ -192,14 +192,24 @@ export interface CliSessionSummary {
   last_turn_at_ms: number;
 }
 
+/** Default tail when hydrating a CLI transcript into the webview. */
+export const PROVIDER_LOAD_MESSAGE_CAP = 120;
+
 export const providerSessions = {
   listSessions: (cwd: string, provider: string) =>
     invoke<CliSessionSummary[]>("provider_list_sessions", { provider, cwd }),
-  loadSession: (cwd: string, provider: string, sessionId: string) =>
+  /** `maxMessages` defaults to PROVIDER_LOAD_MESSAGE_CAP; pass 0 to uncap. */
+  loadSession: (
+    cwd: string,
+    provider: string,
+    sessionId: string,
+    maxMessages: number = PROVIDER_LOAD_MESSAGE_CAP,
+  ) =>
     invoke<LoadedMessage[]>("provider_load_session", {
       provider,
       cwd,
       sessionId,
+      maxMessages,
     }),
 };
 

@@ -3,7 +3,7 @@ import type { ChatSession } from "./chatHistory";
 import { saveSession } from "./chatHistory";
 import type { ProviderId } from "./providers/types";
 import { readProviderSessionIds } from "./providerSession";
-import { providerSessions } from "./ipc";
+import { PROVIDER_LOAD_MESSAGE_CAP, providerSessions } from "./ipc";
 
 const AGENTIC: ProviderId[] = ["claude-code", "cursor-cli", "opencode-cli"];
 
@@ -57,7 +57,13 @@ export async function recoverSessionFromProvider(
   if (!cliId) return null;
   if (provider === "opencode-cli") return null;
   try {
-    const loaded = await providerSessions.loadSession(root, provider, cliId);
+    // Cap the pull — multi-10MB JSONL must not land fully in the webview.
+    const loaded = await providerSessions.loadSession(
+      root,
+      provider,
+      cliId,
+      PROVIDER_LOAD_MESSAGE_CAP,
+    );
     if (loaded.length <= session.messages.length) return null;
     return {
       ...session,

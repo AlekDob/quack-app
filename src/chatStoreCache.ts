@@ -98,7 +98,9 @@ async function persistSession(wsId: string, session: ChatSession): Promise<boole
     return true;
   }
   const key = diskKey(wsId, session.id);
-  pendingDisk.set(key, session);
+  const prev = getCachedSession(wsId, session.id);
+  const safe = preferRicherSession(prev, session);
+  pendingDisk.set(key, safe);
   if (flushingDisk.has(key)) return true;
   flushingDisk.add(key);
   let ok = true;
@@ -118,6 +120,30 @@ async function persistSession(wsId: string, session: ChatSession): Promise<boole
     flushingDisk.delete(key);
   }
   return ok;
+}
+
+/** Wait for in-flight disk writes (optionally one workspace). */
+export async function awaitChatDiskFlushes(wsId?: string): Promise<void> {
+  const prefix = wsId ? `${wsId}\0` : null;
+  for (let i = 0; i < 100; i++) {
+    let busy = false;
+    for (const key of flushingDisk) {
+      if (!prefix || key.startsWith(prefix)) {
+        busy = true;
+        break;
+      }
+    }
+    if (!busy) {
+      for (const key of pendingDisk.keys()) {
+        if (!prefix || key.startsWith(prefix)) {
+          busy = true;
+          break;
+        }
+      }
+    }
+    if (!busy) return;
+    await new Promise((r) => setTimeout(r, 16));
+  }
 }
 
 async function migrateFromLocalStorage(wsId: string, cache: WsCache): Promise<void> {
@@ -155,8 +181,10 @@ async function loadSessionBody(
         sessionId,
       });
       if (!isValidSession(raw)) return undefined;
-      rememberSession(getCache(wsId), raw);
-      return raw;
+      const cache = getCache(wsId);
+      const merged = preferRicherSession(cache.sessions.get(sessionId), raw);
+      rememberSession(cache, merged);
+      return merged;
     } catch (e) {
       console.warn("[chatStore] session load failed", sessionId, e);
       return undefined;
@@ -220,12 +248,15 @@ export async function hydrateChatStore(
   }
 }
 
-/** Load one transcript into the cache (no-op if already warm). */
+/** Load one transcript into the cache.
+ *  `force: true` drops the RAM body first so project remount re-reads disk. */
 export async function ensureSessionLoaded(
   wsId: string,
   sessionId: string,
+  opts?: { force?: boolean },
 ): Promise<ChatSession | undefined> {
   if (!getCache(wsId).hydrated) await hydrateChatStore(wsId);
+  if (opts?.force) dropCachedSessionBody(wsId, sessionId);
   return loadSessionBody(wsId, sessionId);
 }
 
@@ -259,7 +290,9 @@ export function getCachedSessionIds(wsId: string): string[] {
 
 export function putCachedSession(wsId: string, session: ChatSession): void {
   const cache = getCache(wsId);
-  cache.sessions.set(session.id, session);
+  const prev = cache.sessions.get(session.id);
+  const next = preferRicherSession(prev, session);
+  cache.sessions.set(session.id, next);
   cache.index = [
     session.id,
     ...cache.index.filter((id) => id !== session.id),
@@ -268,6 +301,26 @@ export function putCachedSession(wsId: string, session: ChatSession): void {
     (id) => !cache.index.includes(id),
   );
   for (const id of evicted) cache.sessions.delete(id);
+}
+
+/** Keep richer message lists — composer unmount patches must not wipe transcripts. */
+export function preferRicherSession(
+  prev: ChatSession | undefined,
+  next: ChatSession,
+): ChatSession {
+  if (!prev) return next;
+  if (next.messages.length >= prev.messages.length) return next;
+  console.warn(
+    "[chatStore] refuse shrink",
+    next.id,
+    `${prev.messages.length}→${next.messages.length}`,
+  );
+  return { ...next, messages: prev.messages };
+}
+
+/** Drop all warm bodies for a workspace (keep index) — remount reloads disk. */
+export function dropAllCachedBodies(wsId: string): void {
+  getCache(wsId).sessions.clear();
 }
 
 export function removeCachedSession(wsId: string, sessionId: string): void {

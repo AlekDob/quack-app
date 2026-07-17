@@ -300,6 +300,7 @@ export function ActivityBar() {
       {colorMenu && (
         <WorkspaceColorPopover
           wsId={colorMenu.wsId}
+          root={loaded[colorMenu.wsId]?.meta.root ?? ""}
           x={colorMenu.x}
           y={colorMenu.y}
           nameAnchor={colorMenu.nameAnchor}

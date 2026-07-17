@@ -20,6 +20,7 @@ import type { ChatMessage, ToolCall } from "../ai";
 import { balanceFences, splitThinking } from "../chatTextUtils";
 import { ReasoningTurnChip } from "./ReasoningTurnChip";
 import { MarkdownPreview } from "./MarkdownPreview";
+import { ActionBatchSummary } from "./chatActionSummary";
 import { StreamingPlainText } from "./StreamingPlainText";
 import { Icon, type IconName } from "./Icon";
 import { duckAvatarFor } from "../subagents";
@@ -101,34 +102,6 @@ function toolVerb(name: string): string {
       return "fetched";
     default:
       return friendlyToolName(name).toLowerCase();
-  }
-}
-
-// Small glyph per tool, for the Replit-style icon row on collapsed groups.
-function toolIconName(name: string): IconName {
-  switch (name) {
-    case "Read":
-      return "file-text";
-    case "Edit":
-    case "MultiEdit":
-      return "edit";
-    case "Write":
-    case "create_file":
-      return "file";
-    case "Grep":
-    case "Glob":
-    case "ToolSearch":
-      return "search";
-    case "Bash":
-      return "terminal";
-    case "WebSearch":
-    case "WebFetch":
-      return "globe";
-    case "TaskCreate":
-    case "TaskUpdate":
-      return "check-square";
-    default:
-      return "code";
   }
 }
 
@@ -696,234 +669,73 @@ export function InterleavedBlocks({
   blocks,
   callsById,
   resultsById,
-  erroredIds,
   streaming = false,
   hideEdits = false,
   onFileOpen,
+  thinkingMs,
 }: {
   blocks: NonNullable<ChatMessage["blocks"]>;
   callsById: Map<string, ToolCall>;
   resultsById: Map<string, string>;
-  /** Tool ids whose result was an error (for outcome-aware chips). */
+  /** @deprecated Kept for call-site compat; batch summary uses results only. */
   erroredIds?: Set<string>;
-  /** True while this message is the in-flight turn (drives the live
-   *  "working now" pulse on the last unfinished chip). */
+  /** True while this message is the in-flight turn (drives live labels). */
   streaming?: boolean;
   /** When true, file edits are summarized in ComposeCard at turn end. */
   hideEdits?: boolean;
   /** Clickable `foo.html` / `bar.md` paths inside prose blocks. */
   onFileOpen?: (path: string) => void;
+  /** Client-measured thinking span for “Thought for…”. */
+  thinkingMs?: number;
 }) {
-  // Conductor-style inline grouping (`.ai-iarow`) in every chat surface —
-  // docked editor and agent mode share the same chronology + chip runs.
+  // Cursor-compact one-line batch summaries in every chat surface —
+  // docked editor and agent mode share the same chronology.
   return (
     <CompactBlocks
       blocks={blocks}
       callsById={callsById}
       resultsById={resultsById}
-      erroredIds={erroredIds ?? EMPTY_ID_SET}
       streaming={streaming}
       hideEdits={hideEdits}
       onFileOpen={onFileOpen}
+      thinkingMs={thinkingMs}
     />
   );
 }
-
-const EMPTY_ID_SET: Set<string> = new Set();
-
-/** Last path segment of an editing tool's target, or its primary detail
- *  (search query, bash command) for non-file tools. */
-function shortTarget(call: ToolCall): string {
-  const path = pathOf(call);
-  if (path && path !== "(unknown)")
-    return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
-  return primaryToolDetail(call.function.arguments);
-}
-
-/** Full file path of an editing tool, or "" if it isn't file-targeted. */
-function fullPathOf(call: ToolCall): string {
-  if (!EDIT_NAMES.has(call.function.name)) return "";
-  const p = pathOf(call);
-  return p && p !== "(unknown)" ? p : "";
-}
-
-// Read-only "looking around" tools. They get collapsed into ONE muted
-// summary chip so they don't compete with the actions that actually
-// changed something.
-const EXPLORE_NAMES = new Set([
-  "Read",
-  "NotebookRead",
-  "Grep",
-  "Glob",
-  "ToolSearch",
-  "WebSearch",
-  "WebFetch",
-]);
-
-function exploreSummaryLabel(
-  reads: number,
-  searches: number,
-  total: number,
-): string {
-  if (reads > 0 && searches > 0) {
-    return `Explored ${reads} file${reads === 1 ? "" : "s"}, ${searches} search${searches === 1 ? "" : "es"}`;
-  }
-  if (reads > 0) return `read ${reads} file${reads === 1 ? "" : "s"}`;
-  if (searches > 0) return `${searches} search${searches === 1 ? "" : "es"}`;
-  return `explored ${total}`;
-}
-
-// A run of consecutive tool calls, rendered with hierarchy:
-// read/search "exploration" collapses into one quiet chip ("read 16
-// files"), while changes (edits/writes) and commands stand out as their
-// own prominent chips. Clicking an edit chip opens that file; any chip
-// expands its full detail inline.
-function InlineActionRow({
-  items,
-  resultsById,
-  erroredIds,
-  streaming,
-}: {
-  items: { id: string; call: ToolCall }[];
-  resultsById: Map<string, string>;
-  erroredIds: Set<string>;
-  streaming: boolean;
-}) {
-  const onOpenFile = useContext(AgentFileOpen);
-  const [open, setOpen] = useState<string | null>(null);
-
-  const explore = items.filter((it) =>
-    EXPLORE_NAMES.has(it.call.function.name),
-  );
-  const actionItems = items.filter(
-    (it) => !EXPLORE_NAMES.has(it.call.function.name),
-  );
-  // Merge consecutive same-tool action calls into one chip.
-  const groups: { name: string; calls: { id: string; call: ToolCall }[] }[] = [];
-  for (const it of actionItems) {
-    const last = groups[groups.length - 1];
-    if (last && last.name === it.call.function.name) last.calls.push(it);
-    else groups.push({ name: it.call.function.name, calls: [it] });
-  }
-
-  const statusOf = (calls: { id: string; call: ToolCall }[]) => {
-    if (calls.some((c) => erroredIds.has(c.id))) return "error";
-    if (streaming && !calls.every((c) => resultsById.has(c.id)))
-      return "pending";
-    return "ok";
-  };
-
-  // Quiet exploration summary chip.
-  const reads = explore.filter((it) =>
-    /Read/.test(it.call.function.name),
-  ).length;
-  const searches = explore.length - reads;
-  const exLabel = exploreSummaryLabel(reads, searches, explore.length);
-
-  return (
-    <div className="ai-iarow">
-      <div className="ai-iarow-chips">
-        {explore.length > 0 && (
-          <button
-            className={`ai-ichip tone-muted status-${statusOf(explore)} ${open === "explore" ? "active" : ""}`}
-            title={`${reads} read · ${searches} search`}
-            aria-expanded={open === "explore"}
-            onClick={() => setOpen(open === "explore" ? null : "explore")}
-          >
-            <span className="ai-ichip-dot" aria-hidden="true" />
-            <Icon name="search" size={12} className="ai-tool-tone-search" />
-            <span className="ai-ichip-label">{exLabel}</span>
-          </button>
-        )}
-        {groups.map((g, gi) => {
-          const n = g.calls.length;
-          const verb = toolVerb(g.name);
-          const targets = [
-            ...new Set(g.calls.map((c) => shortTarget(c.call)).filter(Boolean)),
-          ];
-          const label =
-            n > 1 && targets.length !== 1
-              ? `${n} ${verb}`
-              : targets.length === 1
-                ? `${verb} ${targets[0]}${n > 1 ? ` ×${n}` : ""}`
-                : verb;
-          const key = `a${gi}`;
-          const tone = EDIT_NAMES.has(g.name) ? "tone-edit" : "tone-action";
-          const file = targets.length === 1 ? fullPathOf(g.calls[0].call) : "";
-          const canOpen = !!onOpenFile && !!file;
-          return (
-            <button
-              key={key}
-              className={`ai-ichip ${tone} status-${statusOf(g.calls)} ${open === key ? "active" : ""}`}
-              title={`${verb} ${targets.join(", ")}`}
-              aria-expanded={open === key}
-              onClick={() => {
-                if (canOpen) onOpenFile!(file);
-                else setOpen(open === key ? null : key);
-              }}
-            >
-              <span className="ai-ichip-dot" aria-hidden="true" />
-              <Icon
-                name={toolIconName(g.name)}
-                size={13}
-                className={toolToneClass(g.name) || undefined}
-              />
-              {targets.length > 1 && n > 1 && (
-                <span className="ai-ichip-count">{n}</span>
-              )}
-              <span className="ai-ichip-label">{label}</span>
-            </button>
-          );
-        })}
-      </div>
-      {open !== null &&
-        (() => {
-          const calls =
-            open === "explore"
-              ? explore
-              : (groups[parseInt(open.slice(1), 10)]?.calls ?? []);
-          if (calls.length === 0) return null;
-          return (
-            <div className="ai-iaction-detail">
-              {calls.map((it, idx) => (
-                <ToolCallRow
-                  key={it.id ?? idx}
-                  call={it.call}
-                  result={it.id ? resultsById.get(it.id) : undefined}
-                />
-              ))}
-            </div>
-          );
-        })()}
-    </div>
-  );
-}
-
 // Foldable extended-thinking — Cursor-style chip (see BrainTurnChip).
-function ThinkingBlock({ text }: { text: string }) {
-  return <ReasoningTurnChip text={text} />;
+function ThinkingBlock({
+  text,
+  durationMs,
+  live,
+}: {
+  text: string;
+  durationMs?: number;
+  live?: boolean;
+}) {
+  return (
+    <ReasoningTurnChip text={text} durationMs={durationMs} streaming={live} />
+  );
 }
 
 // Compact-mode walk of an assistant turn's blocks: prose between runs of
-// icon chips, in chronological order, so narration stays attached to the
-// actions it introduces. Skips task tools + AskUserQuestion (surfaced in
-// the sidebar / question dock) and de-duplicates re-emitted tool ids.
+// one-line action summaries, in chronological order. Skips task tools +
+// AskUserQuestion (sidebar / question dock) and de-duplicates re-emitted ids.
 function CompactBlocks({
   blocks,
   callsById,
   resultsById,
-  erroredIds,
   streaming,
   hideEdits = false,
   onFileOpen,
+  thinkingMs,
 }: {
   blocks: NonNullable<ChatMessage["blocks"]>;
   callsById: Map<string, ToolCall>;
   resultsById: Map<string, string>;
-  erroredIds: Set<string>;
   streaming: boolean;
   hideEdits?: boolean;
   onFileOpen?: (path: string) => void;
+  thinkingMs?: number;
 }) {
   const seen = new Set<string>();
   const seenThinking = new Set<string>();
@@ -935,43 +747,41 @@ function CompactBlocks({
   let run: { id: string; call: ToolCall }[] = [];
   let runKey = 0;
   const flush = () => {
-    if (run.length === 1) {
-      const it = run[0];
-      out.push(
-        <ToolCallRow
-          key={`s${runKey++}`}
-          call={it.call}
-          result={it.id ? resultsById.get(it.id) : undefined}
-          standalone
-        />,
-      );
-      run = [];
-      return;
-    }
-    if (run.length) {
-      out.push(
-        <InlineActionRow
-          key={`r${runKey++}`}
-          items={run}
-          resultsById={resultsById}
-          erroredIds={erroredIds}
-          streaming={streaming}
-        />,
-      );
-      run = [];
-    }
+    if (run.length === 0) return;
+    out.push(
+      <ActionBatchSummary
+        key={`r${runKey++}`}
+        items={run}
+        resultsById={resultsById}
+        streaming={streaming}
+        hideEdits={hideEdits}
+      />,
+    );
+    run = [];
   };
   blocks.forEach((b, i) => {
     if (b.kind === "text") {
       flush();
       if (b.text) {
-        // Pull extended-thinking (<think>…</think>) out of the text and
-        // render it as a foldable Reasoning block in place — otherwise it
-        // either leaks as raw tags or gets dropped in the compact layout.
         const { thinking, visible } = splitThinking(b.text);
         if (thinking.trim() && !seenThinking.has(thinking.trim())) {
           seenThinking.add(thinking.trim());
-          out.push(<ThinkingBlock key={`tk${i}`} text={thinking} />);
+          const thinkOpen = "<" + "think>";
+          const thinkClose = "</" + "think>";
+          const incomplete =
+            b.text.includes(thinkOpen) && !b.text.includes(thinkClose);
+          const liveThinking =
+            streaming &&
+            i === lastTextIdx &&
+            (incomplete || (!visible.trim() && !!thinking.trim()));
+          out.push(
+            <ThinkingBlock
+              key={`tk${i}`}
+              text={thinking}
+              durationMs={thinkingMs}
+              live={liveThinking}
+            />,
+          );
         }
         if (visible.trim()) {
           const isLiveTail = streaming && i === lastTextIdx;
@@ -994,7 +804,7 @@ function CompactBlocks({
     seen.add(b.callId);
     const call = callsById.get(b.callId);
     if (!call) return;
-    if (TASK_NAMES.has(call.function.name)) return; // tasks live in the sidebar
+    if (TASK_NAMES.has(call.function.name)) return;
     if (hideEdits && extractEditDiffs(call)) {
       out.push(
         <AutoOpenHtmlEdit

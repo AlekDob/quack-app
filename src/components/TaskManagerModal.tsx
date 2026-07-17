@@ -1,8 +1,9 @@
 // Task Manager — live view of Quack's own process tree (the app,
 // PTY shells, Claude Code subprocesses, hook helpers, anything they
 // spawned) with CPU / RAM per process and a kill button for runaway
-// descendants. Scoped to OUR tree on the Rust side; this is "what is
-// my editor running", not a system task manager.
+// descendants. Also lists related macOS WebKit UI helpers (WKWebView
+// XPC) that are not tree descendants but often the real CPU/RAM hog.
+// Scoped on the Rust side — not a system task manager.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -18,6 +19,8 @@ interface ProcStat {
   cpu: number;
   mem: number;
   depth: number;
+  killable: boolean;
+  related: boolean;
 }
 
 const POLL_MS = 2000;
@@ -31,6 +34,7 @@ function fmtMem(bytes: number): string {
 
 /** Friendly role guess from image name + command line. */
 function roleOf(p: ProcStat): string {
+  if (p.related) return "Quack UI (WebKit)";
   const n = p.name.toLowerCase();
   const cmd = p.cmd.toLowerCase();
   if (p.depth === 0) return "Quack";
@@ -162,7 +166,7 @@ export function TaskManagerModal() {
                   <td className="num">{p.cpu.toFixed(1)}%</td>
                   <td className="num">{fmtMem(p.mem)}</td>
                   <td className="taskman-actions">
-                    {p.depth > 0 && (
+                    {p.killable && (
                       <button
                         className="taskman-kill"
                         onClick={() => void kill(p)}
@@ -185,9 +189,9 @@ export function TaskManagerModal() {
           </table>
         </div>
         <div className="taskman-foot">
-          CPU is per-core percent since the previous 2s sample. Only
-          Quack's own process tree is shown; Kill only works on
-          descendants.
+          CPU is per-core percent since the previous 2s sample. Shows
+          Quack&apos;s process tree plus related WebKit UI helpers
+          (WKWebView). Kill only works on tree descendants — not WebKit.
         </div>
       </div>
     </div>

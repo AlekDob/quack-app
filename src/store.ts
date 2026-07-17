@@ -32,6 +32,11 @@ import type { ToolCall } from "./ai";
 import { clearChatDiff } from "./chatDiffStore";
 import { stopChatAgent } from "./stopChatAgent";
 import { hydrateChatStore } from "./chatHistory";
+import { flushWorkspaceChatPersist } from "./chatPersistFlush";
+import {
+  awaitChatDiskFlushes,
+  dropAllCachedBodies,
+} from "./chatStoreCache";
 import { hydratePresetOverrides } from "./presets";
 import { pulseChatSwitch } from "./chatSwitch";
 import { logChatSwitch } from "./chatSwitchDebug";
@@ -1833,10 +1838,15 @@ export const useStore = create<AppState>((set, get) => {
         beginWorkspaceLoad(id);
       }
       logChatSwitch("workspace switch start", { from: prevId, to: id });
-      if (prevId !== id) {
+      // Flush leaving project BEFORE isActive unmounts its AIChatHosts —
+      // otherwise layout composer patches can race and shrink disk rows.
+      if (prevId && prevId !== id) {
+        flushWorkspaceChatPersist(prevId, "setActiveWorkspace");
+        await awaitChatDiskFlushes(prevId);
         clearEditorState();
       }
       set({ activeId: id });
+      if (prevId && prevId !== id) dropAllCachedBodies(prevId);
       await persistIdx();
       logChatSwitch("workspace switch done", {
         to: id,

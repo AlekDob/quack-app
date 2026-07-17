@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-11
-last_verified: 2026-07-16
+last_verified: 2026-07-17
 tags: [workspace, switch, performance, monaco, tabs, multitask, mount-asymmetry, react-memo, warm-lru, git-status]
 ---
 
@@ -24,11 +24,12 @@ tags: [workspace, switch, performance, monaco, tabs, multitask, mount-asymmetry,
 | Hook | `src/useWorkspaceHeavyMount.ts` | `useWorkspaceHeavyMount(isActive) → { showHeavy, editorsReady }` |
 | Component | `src/components/WorkspaceShell.tsx` | Stacked shell; gates sidebar, editors, tab portals on `showHeavy` / `editorsReady` |
 | Component | `src/components/AIChatPanel.tsx` | `wsActive = activeId === wsId`; gates usage/discovery polls |
-| Store | `src/store.ts` | `setActiveWorkspace(id)` — `clearEditorState()` + `persistIdx` (200 ms debounce) |
+| Store | `src/store.ts` | `setActiveWorkspace` — flush+await chat disk for leaving ws, `dropAllCachedBodies`, then `clearEditorState` + `persistIdx` |
+| Cache | `src/chatStoreCache.ts` | `preferRicherSession`, `awaitChatDiskFlushes`, `dropAllCachedBodies` — see `043` |
 | Component | `src/App.tsx` | `shellOrder` stable DOM order; `isActive={id === activeId}` per shell |
 
 ### Data Flow
-**Project switch (ActivityBar / hub / palette):** click → `setActiveWorkspace(wsId)` → `activeId` update → previously active shell `isActive: false`, incoming `isActive: true` → `useWorkspaceHeavyMount` on each shell
+**Project switch (ActivityBar / hub / palette):** click → `setActiveWorkspace(wsId)` → **flush leaving workspace chats to disk** → `activeId` update → `dropAllCachedBodies(prev)` → previously active shell `isActive: false` (AI hosts unmount), incoming `isActive: true` → `useWorkspaceHeavyMount` on each shell
 
 **Foreground shell (`isActive: true`):** `showHeavy: true` immediately → tab bar + `PaneNode` paint → 2× `requestAnimationFrame` → `editorsReady: true` → `EditorPane` / media portals mount → catch-up usage polls in `AIChatPanel`
 
@@ -113,7 +114,7 @@ in the active workspace ran its own trio).
 
 ### Key Functions
 - `useWorkspaceHeavyMount(isActive: boolean) → WorkspaceHeavyMount` — heavy UI lifecycle
-- `setActiveWorkspace(id) → Promise<void>` — focus switch + `clearEditorState()`
+- `setActiveWorkspace(id) → Promise<void>` — flush leaving chats → flip `activeId` → drop prev bodies → `clearEditorState`
 - `wsActive` in `AIChatPanel` — `useStore(s => s.activeId === wsId)`
 
 ### State
@@ -123,8 +124,9 @@ in the active workspace ran its own trio).
 - Monaco text models: global per path — survive editor unmount via `keepCurrentModel` (`editorState.ts`)
 
 ### Gotchas
+- **AI chat hosts are `isActive`-gated (not warm-LRU)** — leaving a project unmounts every `AIChatHost`. Must flush+await disk before flip or composer unmount patches can shrink transcripts (`043` project-switch section).
 - **Do not unmount `PaneNode` / bottom panel** on blur — `TerminalCore` portals need stable `pane-content` refs; see comment in `WorkspaceShell.tsx` (same class of bug as xterm re-open).
-- **Do not gate side `AIChatPanel`** on `showHeavy` — user can multitask agents across projects; only polls are gated.
+- **Do not gate side `AIChatPanel`** on `showHeavy` — user can multitask agents across projects; only polls are gated. (Tabbed hosts still unmount when `!isActive`.)
 - **Pinky Brain is unrelated** to switch slowness — `pinky.search` runs pre-turn on send; `BrainPanel` only when `brain:` tab active + `showHeavy && visible`.
 - **Many tabs still cost tab-bar DOM** — one `EditorPane` per pane (active file only); further win = tab-bar virtualization (not done).
 - **300 ms unmount delay** — brief overlap if user rapid-fires project icons; incoming shell paints first by design.
@@ -141,10 +143,11 @@ logs each heavy phase with `sinceSwitchMs` (the `[chat-switch]` logs only measur
 which phase an intermittent slow switch actually costs.
 
 ### Related
+- Chat transcript durability on project leave: `043-chat-transcript-persistence.md`
 - Cold-switch loader (perceived polish): `079-cold-project-switch-loader.md`
 - Startup + inactive shell note (updated): `032-startup-hydration.md`
 - Session usage polls + JSONL hydrate: `023-session-usage-panel.md`
 - Workspace icon reorder (stable shell mount): `012-workspace-reorder.md`
 - Chat panel mount asymmetry: `001-ai-session-library.md`
 - Process cleanup (PTY survives tab unmount): `046-process-cleanup.md`
-- Diary: `documentation/diary/2026-07-11.md`
+- Diary: `documentation/diary/2026-07-11.md`, `2026-07-17.md`

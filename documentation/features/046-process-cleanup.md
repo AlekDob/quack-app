@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-08
-last_verified: 2026-07-10
+last_verified: 2026-07-17
 tags: [task-manager, process-tree, pty, terminal, agent-lifecycle, claude-code, cursor-cli, cleanup, sysmon, footprint]
 ---
 
@@ -35,11 +35,17 @@ PTY terminals and CLI chat agents are **independent trees**. Killing `claude` do
 | Rust backend | `src-tauri/src/sysmon.rs` | `process_stats`, `process_kill` |
 | Mount | `src/App.tsx` | `<TaskManagerModal/>` |
 
-**Scope:** `process_stats` walks **strict descendants** of the Quack app pid — not a system-wide Activity Monitor. `process_kill` refuses anything outside that tree (including Quack itself).
+**Scope:** `process_stats` walks **strict descendants** of the Quack app pid, plus
+**related macOS WebKit UI helpers** (`WebKit.WebContent` / Networking / GPU) that
+host the WKWebView — those run as XPC under `launchd`, not as Quack children, so a
+tree-only view hid the real CPU/RAM hog. Related rows are labeled
+`Quack UI (WebKit)`, are **not killable**, and are capped to the heaviest few
+started at/after Quack. `process_kill` still refuses anything outside the strict
+tree (including Quack itself and WebKit).
 
-**CPU semantics:** per-core percent since the previous 2s sample (can exceed 100% on multi-threaded processes). Status bar shows the **sum** across the tree.
+**CPU semantics:** per-core percent since the previous 2s sample (can exceed 100% on multi-threaded processes). Status bar shows the **sum** across the tree (+ related WebKit when present).
 
-**Role column heuristics** (`TaskManagerModal.roleOf`): Quack root → `claude` → Claude Code; `node` → Vite / permission hook / generic Node; `zsh`/`bash` → Terminal shell.
+**Role column heuristics** (`TaskManagerModal.roleOf`): Quack root → related WebKit → `claude` → Claude Code; `node` → Vite / permission hook / generic Node; `zsh`/`bash` → Terminal shell. ProcStat fields: `killable`, `related`.
 
 ### Agent stop on chat lifecycle
 

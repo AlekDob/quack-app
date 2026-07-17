@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-07
-last_verified: 2026-07-16
+last_verified: 2026-07-17
 tags: [sessions, claude-code, cursor-cli, opencode-cli, resume, terminal, provider-session, bridge, disk, quack-v1, performance]
 ---
 
@@ -145,8 +145,9 @@ Confirming a switch updates `pinnedProviderId` to the new platform.
 
 ```ts
 provider_list_sessions(provider, cwd) → CliSessionSummary[]   // async, spawn_blocking
-provider_load_session(provider, cwd, sessionId) → LoadedMessage[]  // async, spawn_blocking
+provider_load_session(provider, cwd, sessionId, maxMessages?) → LoadedMessage[]  // async, spawn_blocking; default cap 120
 // provider: "claude-code" | "cursor-cli" | "opencode-cli"
+// maxMessages: omit/undefined → 120; 0 → uncapped
 ```
 
 `CliSessionSummary` adds a `provider` field vs legacy `ClaudeSession`.
@@ -164,6 +165,14 @@ main-thread freeze on launch and on chat switch**:
 | Command ran **synchronously on the Tauri main thread** → blocked the webview IPC pump → JS timers drifted ~1 s, UI froze | `provider_list_sessions` + `provider_load_session` → `async` + `tauri::async_runtime::spawn_blocking` |
 | Re-parsed the **whole dir on every call** | Per-file summary cache in `summarize_jsonl`, gated on **(mtime, size)** — inactive JSONL parsed once ever; only the live session re-parses (one small file) |
 | Frontend `guessClaudeSessionId` (in the 12 s disk-hydrate poll) re-ran the full parse **every tick** when a chat had no saved `claudeSessionId` | `guessAttemptRef` in `AIChatPanel` — the guess runs once per distinct assistant-turn count, not every poll |
+
+### Performance — giant JSONL / WebKit RAM (2026-07-17)
+
+| Problem | Fix |
+|---|---|
+| Cold list still line-parsed every file, including 10–90 MB JSONL | Files **≥ 8 MB** get a **light summary** (mtime/size stub title) on list; full parse only on load |
+| Recovery / resume pulled entire multi-10MB transcripts into JS | `provider_load_session` defaults to **last 120 messages** (`PROVIDER_LOAD_MESSAGE_CAP`); pass `0` to uncap |
+| Task Manager hid the real hog (`com.apple.WebKit.WebContent`) | Related WebKit rows in `process_stats` (see `046`) |
 
 **Diagnosis note:** on macOS the Tauri webview is a **separate process**
 (`com.apple.WebKit.WebContent`). When the Rust `Quack` process itself pegs a core,

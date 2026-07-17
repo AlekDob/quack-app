@@ -13,20 +13,37 @@ import {
 
 const KEY_EXPANDED = "lcp.hub.expanded";
 const KEY_COLLAPSED = "lcp.hub.collapsedSections";
+// sessionStorage — survives HMR, clears on full app quit/new tab.
+const KEY_DONE_BOOTED = "lcp.hub.doneBooted";
 
 // Default expanded: the hub's whole point is reading status at a glance,
 // which needs titles + group headers visible.
 let _expanded = lsGetString(KEY_EXPANDED) !== "0";
 const isStringArray = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((x) => typeof x === "string");
-// First run (no stored pref): the "done" group starts collapsed — it's the
-// archive-ish pile, not what you scan for. Once the user toggles anything
-// their explicit choice is persisted and wins.
-let _collapsed = new Set(
-  lsGetString(KEY_COLLAPSED) === null
-    ? ["done"]
-    : lsGetJson<string[]>(KEY_COLLAPSED, [], isStringArray),
-);
+
+function readCollapsed(): Set<string> {
+  if (lsGetString(KEY_COLLAPSED) === null) return new Set(["done"]);
+  return new Set(lsGetJson<string[]>(KEY_COLLAPSED, [], isStringArray));
+}
+
+let _collapsed = readCollapsed();
+
+// Once per browser session: start Done collapsed (archive pile). Expanding
+// mid-session still works and persists; we must NOT re-seed on Vite HMR or
+// the toggle appears broken (stale subscribe + forced re-collapse).
+try {
+  if (sessionStorage.getItem(KEY_DONE_BOOTED) !== "1") {
+    sessionStorage.setItem(KEY_DONE_BOOTED, "1");
+    if (!_collapsed.has("done")) {
+      _collapsed = new Set(_collapsed);
+      _collapsed.add("done");
+      lsSetJson(KEY_COLLAPSED, [..._collapsed]);
+    }
+  }
+} catch {
+  /* private mode — first-run default above is enough */
+}
 const expandedListeners = new Set<(v: boolean) => void>();
 const collapsedListeners = new Set<() => void>();
 

@@ -65,6 +65,16 @@ export interface ChatMessage {
   brain_usage?: BrainUsageMeta;
   /** Display-only: Jack proposal to persist hard-won knowledge. */
   brain_save?: BrainSaveProposal;
+  /**
+   * Display-only: wall time for this assistant turn (provider usage
+   * `duration_ms`, or client clock fallback). Powers “Worked for…”.
+   */
+  durationMs?: number;
+  /**
+   * Display-only: client-measured extended-thinking span for this
+   * turn. Powers “Thought for…” on ReasoningTurnChip.
+   */
+  thinkingMs?: number;
 }
 
 export type BrainSaveStatus = "pending" | "saved" | "dismissed";

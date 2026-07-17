@@ -73,6 +73,11 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 ### Gotcha — legacy singleton AI panel
 `WorkspaceShell` can still mount `AIChatPanel` **without** `aiChatId` when `layout.aiPanelVisible` (old right dock). That panel has **no** hub row / tab and used to receive every unscoped `requestAIPrompt`. Entry points must use `ensureFocusedAIChat` / `addNewAIChat` (which also force `aiPanelVisible` off). Do not reintroduce Ask AI → `setAIPanelVisible(true)`.
 
+### Gotcha — project switch unmounts chat hosts
+`AIChatHost` mounts only when `isActive`. Leaving a project tears them down.
+Transcript durability on that path is owned by `043` (flush-before-flip +
+never-shrink). Do not reintroduce `patchSession` empty-row invent.
+
 ### Gotcha — close tab vs Delete
 `closeAIChat` drops the hub descriptor + tab but **keeps** the transcript file
 on disk (orphan until ⟲ Sessions re-link). **Delete** removes disk + descriptor.

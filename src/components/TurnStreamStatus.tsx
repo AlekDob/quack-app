@@ -86,7 +86,21 @@ export function TurnStreamStatus({
       : 0;
   const stale = streaming !== null && lastStreamEventAt !== null && idleSec >= 10;
 
-  if (!runningTools && !planning && !generating && !stale) return null;
+  // In-stream ActionBatchSummary / Thinking already narrate the turn —
+  // don't double up with dock "Running tools…" / "Generating…".
+  const toolsRenderedInline = streamingBlocks.some(
+    (b) => b.kind === "tool_call",
+  );
+  const hasInlineProse = streamingBlocks.some(
+    (b) => b.kind === "text" && b.text.trim().length > 0,
+  );
+  const showToolDock = runningTools && !toolsRenderedInline;
+  const showGeneratingDock =
+    generating && !toolsRenderedInline && !hasInlineProse;
+
+  if (!planning && !stale && !showToolDock && !showGeneratingDock) {
+    return null;
+  }
 
   const staleSuffix = stale ? (
     <StaleSuffix idleSec={idleSec} onStop={onStop} />
@@ -109,7 +123,7 @@ export function TurnStreamStatus({
           {staleSuffix}
         </div>
       )}
-      {runningTools &&
+      {showToolDock &&
         (activeToolLabels.length === 0 ? (
           <StatusPill trail={tpsTrail} suffix={staleSuffix}>
             <span className="ai-spinner ai-spinner-live" />
@@ -122,9 +136,6 @@ export function TurnStreamStatus({
             const total = activeToolLabels.length;
             const allDone = done === total;
             const streamStillActive = streaming !== null;
-            const toolsRenderedInline = streamingBlocks.some(
-              (b) => b.kind === "tool_call",
-            );
             const header =
               allDone && streamStillActive
                 ? `Got ${total} tool result${total === 1 ? "" : "s"} — generating response…`
@@ -135,11 +146,7 @@ export function TurnStreamStatus({
               <StatusPill
                 trail={tpsTrail}
                 suffix={staleSuffix}
-                list={
-                  !toolsRenderedInline ? (
-                    <RunningToolList entries={activeToolLabels} />
-                  ) : undefined
-                }
+                list={<RunningToolList entries={activeToolLabels} />}
               >
                 {allDone && !streamStillActive ? (
                   <span className="ai-running-check">
@@ -158,7 +165,7 @@ export function TurnStreamStatus({
               </StatusPill>
             );
           })())}
-      {generating && (
+      {showGeneratingDock && (
         <StatusPill
           trail={
             <span className="ai-inline-tps">{tokensPerSec!.toFixed(1)} t/s</span>
@@ -169,7 +176,9 @@ export function TurnStreamStatus({
           <span className="ai-live-shimmer">Generating…</span>
         </StatusPill>
       )}
-      {stale && !planning && !runningTools && !generating && staleSuffix}
+      {stale && !planning && !showToolDock && !showGeneratingDock && (
+        <div className="ai-inline-status-row">{staleSuffix}</div>
+      )}
     </>
   );
 }

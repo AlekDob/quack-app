@@ -943,7 +943,7 @@ body.ws-dragging * {
 .ws-color-popover {
   position: fixed;
   z-index: 1200;
-  width: 156px;
+  width: 188px;
   padding: 10px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
@@ -951,7 +951,12 @@ body.ws-dragging * {
   flex-direction: column;
   gap: 10px;
 }
-.ws-color-new-chat {
+.ws-color-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ws-color-action {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -965,8 +970,12 @@ body.ws-dragging * {
   cursor: pointer;
   text-align: left;
 }
-.ws-color-new-chat:hover {
+.ws-color-action:hover:not(:disabled) {
   background: var(--bg-hi);
+}
+.ws-color-action:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .ws-color-divider {
   height: 1px;
@@ -3269,6 +3278,12 @@ body.ab-dragging * {
 .agent-hub-row-close:hover {
   background: var(--danger, #c44);
   color: #fff;
+}
+/* Done is archive-ish: pull it away from live groups with a hairline. */
+.agent-hub.expanded .agent-hub-section.status-done {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 /* Collapsed-group (done) keeps a dimmer row presence. */
 .agent-hub-section.status-done .agent-hub-row-title {
@@ -8825,8 +8840,105 @@ button.composer-mention-chip-label:hover {
   gap: 1px;
 }
 
-/* Inline action chips — a run of tool calls rendered as Conductor-style
-   grouped chips (`.ai-iarow`). Used in docked editor and agent mode. */
+/* Cursor-compact batch summary — one muted line, live→past tense. */
+.ai-batch-summary {
+  margin: 4px 0 6px;
+  padding: 0;
+}
+.ai-batch-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  min-height: 0;
+}
+.ai-batch-summary-head:hover {
+  color: var(--fg-dim);
+}
+.ai-batch-summary-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-batch-summary-diff {
+  display: inline-flex;
+  gap: 4px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+.ai-batch-summary-caret {
+  flex-shrink: 0;
+  opacity: 0.55;
+  transition: transform 0.14s ease;
+  margin-left: auto;
+}
+.ai-batch-summary-caret.is-open {
+  transform: rotate(180deg);
+}
+.ai-batch-summary-detail {
+  margin: 2px 0 4px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.ai-batch-detail-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 1px 0;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ai-batch-detail-line:hover:not(:disabled) {
+  color: var(--fg-dim);
+}
+.ai-batch-detail-line:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+.ai-batch-detail-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Quiet “Worked for 1m 42s” at the top of a finished assistant turn. */
+.ai-worked-header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 2px 12px 6px;
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+.ai-worked-header-label {
+  font-variant-numeric: tabular-nums;
+}
+.ai-worked-header-caret {
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+
+/* Inline action chips — legacy Conductor-style (kept for unused paths). */
 .ai-iarow {
   margin: 12px 0;
 }
@@ -10134,10 +10246,10 @@ button.composer-mention-chip-label:hover {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
+  gap: 4px;
   width: 100%;
   flex-shrink: 0;
-  padding-bottom: 6px;
+  padding-bottom: 2px;
   background: transparent;
   /* transform on .ai-msg breaks position:sticky */
   animation: none;
@@ -10196,21 +10308,14 @@ button.composer-mention-chip-label:hover {
   color: var(--fg-dim);
   cursor: default;
 }
-/* Sentinel sits before the sticky wrapper — scroll past it ⇒ sticky is active. */
-.ai-user-bar-sentinel {
-  height: 0;
-  width: 100%;
-  pointer-events: none;
-  flex-shrink: 0;
-}
 .ai-user-bar {
   position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
-  min-height: 42px;
-  padding: 11px 12px 11px 14px;
+  min-height: 36px;
+  padding: 8px 12px 8px 14px;
   background: linear-gradient(
     135deg,
     var(--user-bar-glass-from) 0%,
@@ -10265,9 +10370,8 @@ button.composer-mention-chip-label:hover {
 .ai-user-bar.is-expanded {
   align-items: flex-start;
 }
-.ai-user-bar.is-compact {
-  padding: 8px 10px 8px 12px;
-  min-height: 36px;
+.ai-user-bar.is-expandable {
+  cursor: pointer;
 }
 .ai-user-bar-main {
   flex: 1;
@@ -10276,13 +10380,13 @@ button.composer-mention-chip-label:hover {
   line-height: 1.55;
   color: var(--fg);
 }
-/* Tall prompts collapse while stuck so the response stays readable. */
+/* Cursor-style: always clamp to 3 lines until the user expands. */
 .ai-user-bar.is-compact .ai-user-bar-main {
   position: relative;
-  max-height: 92px;
+  max-height: calc(1.55em * 3);
   overflow: hidden;
 }
-.ai-user-bar.is-compact .ai-user-bar-main::after {
+.ai-user-bar.is-compact.is-expandable .ai-user-bar-main::after {
   content: "";
   position: absolute;
   left: 0;
@@ -10299,16 +10403,16 @@ button.composer-mention-chip-label:hover {
 .ai-user-bar.is-compact .md-preview {
   flex: 1;
   min-width: 0;
-  max-height: 4.2em;
-  overflow: hidden;
-  font-size: 13px;
-  line-height: 1.5;
+  padding: 0;
+  max-width: none;
+  font-size: 13.5px;
+  line-height: 1.55;
 }
 .ai-user-bar.is-expanded .ai-user-bar-main {
   max-height: min(60vh, 420px);
   overflow-y: auto;
 }
-.ai-user-bar.is-stuck .ai-user-bar-expand {
+.ai-user-bar.is-expandable .ai-user-bar-expand {
   opacity: 0.65;
 }
 .ai-user-bar-actions {

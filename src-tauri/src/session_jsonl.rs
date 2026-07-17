@@ -35,7 +35,13 @@ pub struct LoadedToolResult {
     pub is_error: Option<bool>,
 }
 
-pub fn parse_session_jsonl(path: &Path) -> Result<Vec<LoadedMessage>, String> {
+/// Parse a session JSONL, optionally keeping only the last `max_messages`
+/// messages (anti-bomb for multi-10MB Claude Code transcripts).
+/// `None` = uncapped.
+pub fn parse_session_jsonl_capped(
+    path: &Path,
+    max_messages: Option<usize>,
+) -> Result<Vec<LoadedMessage>, String> {
     use std::fs;
     let file = fs::File::open(path).map_err(|e| e.to_string())?;
     let mut reader = BufReader::new(file);
@@ -93,6 +99,11 @@ pub fn parse_session_jsonl(path: &Path) -> Result<Vec<LoadedMessage>, String> {
                 }
             }
             Err(_) => break,
+        }
+    }
+    if let Some(max) = max_messages {
+        if max > 0 && messages.len() > max {
+            messages = messages.split_off(messages.len() - max);
         }
     }
     Ok(messages)
@@ -297,4 +308,38 @@ pub fn last_context_snap(path: &Path) -> Option<SessionContextSnap> {
         }
     }
     result_snap
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn load_cap_keeps_tail_only() {
+        let path = std::env::temp_dir().join(format!(
+            "quack-cap-test-{}.jsonl",
+            std::process::id()
+        ));
+        let mut f = std::fs::File::create(&path).unwrap();
+        for i in 0..10 {
+            writeln!(
+                f,
+                r#"{{"type":"user","message":{{"content":"u{i}"}}}}"#
+            )
+            .unwrap();
+            writeln!(
+                f,
+                r#"{{"type":"assistant","message":{{"content":[{{"type":"text","text":"a{i}"}}]}}}}"#
+            )
+            .unwrap();
+        }
+        let all = parse_session_jsonl_capped(&path, None).unwrap();
+        assert_eq!(all.len(), 20);
+        let capped = parse_session_jsonl_capped(&path, Some(6)).unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(capped.len(), 6);
+        assert_eq!(capped[0].content, "u7");
+        assert_eq!(capped[5].content, "a9");
+    }
 }
