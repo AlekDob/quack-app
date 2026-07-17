@@ -3,58 +3,107 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-13
-last_verified: 2026-07-13
-tags: [model-selector, claude-code, composer, usage, anthropic, cursor-style]
+last_verified: 2026-07-17
+tags: [model-selector, claude-code, composer, usage, display-names]
 ---
 
-## Honest model labels (alias vs resolved)
-**Purpose:** Split model naming into two honest layers — composer shows the **alias you picked** (`sonnet`); post-turn feedback shows the **concrete model the API billed** (`Sonnet 5`). Eliminates Sonnet ↔ Sonnet 5 flip in the chip when CC label probes refresh.
-**Stack:** `src/modelDisplay.ts` + composer picker + usage strip.
+## Claude Code model display labels (Codetta-style)
+
+**Purpose:** Show stable, human model names in the composer and catalog —
+Title Case **aliases** (`Sonnet`, `Opus`, `Haiku`, `Fable`) — without a static
+version map (`Sonnet 5` / `Opus 4.8`) and without flipping the chip when Rust
+CLI probes refresh.
+
+**Stack:** `claudeCode.ts` (`ccStableDisplayName` + `FALLBACK_MODELS`) +
+`modelLabel` in `modelSelectorUtils.ts` + picker/usage surfaces.
 
 ### Files
+
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Service | `src/modelDisplay.ts` | `composerChipLabel`, `pickerRowLabel`, `formatResolvedModel` |
-| Service | `src/modelSelectorUtils.ts` | `modelLabel()` → delegates to `composerChipLabel` |
-| Component | `src/components/ModelPickerPopover.tsx` | Chip via `modelLabel` |
-| Component | `src/components/ModelPickerRow.tsx` | Picker rows via `pickerRowLabel` |
-| Component | `src/components/chatPanelChrome.tsx` | `UsageChip` appends resolved model |
-| Component | `src/components/AIChatPanel.tsx` | `.ai-usage-strip` tooltip uses `formatResolvedModel` |
-| Component | `src/components/UsagePanel.tsx` | Session list model column |
-| Provider | `src/providers/claudeCode.ts` | `FALLBACK_MODELS` `displayName` = alias (`sonnet`) |
+| Provider | `src/providers/claudeCode.ts` | `FALLBACK_MODELS` Title Case; `ccStableDisplayName`; maps live CLI rows |
+| Service | `src/modelSelectorUtils.ts` | `modelLabel(models, qualified)` → `displayName \|\| modelId` |
+| Component | `src/components/ModelPickerPopover.tsx` | Chip text via `modelLabel` |
+| Component | `src/components/ModelPickerRow.tsx` | Row name = `displayName \|\| modelId` |
+| Component | `src/components/ModelBrowser.tsx` | Cards use catalog `displayName` (same stable titles for CC) |
+| Component | `src/components/chatPanelChrome.tsx` | `UsageChip` — cost / tokens / cache / duration **only** |
+| Component | `src/components/UsagePanel.tsx` | Session row: `shortModelFamily` (family only) |
+| Component | `src/components/AIChatPanel.tsx` | Usage-strip tooltip = raw `lastUsage.model` when present |
+| Rust | `src-tauri/src/claude_models.rs` | Still probes version labels for CLI catalog — **not** used as UI `displayName` |
 
 ### Display rules
-| Surface | Claude Code | Other providers |
-|---|---|---|
-| Composer chip | `modelId` alias (`sonnet`, `opus`, `default`) | Catalog `displayName` or `modelId` |
-| Picker row | Same alias | `displayName` |
-| Usage strip / `UsageChip` | `formatResolvedModel(usage.model)` from stream `result` / `usage` event | Same |
-| Usage tab session row | `formatResolvedModel(primary_model)` | Same |
-| Model browser cards | Unchanged — still `displayName` for full catalog browse | — |
+
+| Surface | What the user sees |
+|---|---|
+| Composer chip | Catalog `displayName` — e.g. `Sonnet`, `Default · …` |
+| Picker row / Model Browser (CC) | Same stable Title Case alias |
+| Usage strip (`UsageChip`) | `$cost · tokens · cache% · duration` — **no** model name |
+| Usage strip tooltip | Raw API / transcript id when known (`claude-sonnet-…`) |
+| Usage tab session row | Family only: `sonnet` / `opus` / `haiku` / … (`shortModelFamily`) |
+
+Other providers (Anthropic BYOK, Cursor CLI, Ollama): unchanged — chip/picker
+still use each row’s catalog `displayName`.
 
 ### Data flow
-**Selection:** `onSelect(claude-code:sonnet)` → chip `sonnet` → `--model sonnet` to CLI
 
-**Post-turn:** `ChatStreamEvent kind:usage` with `model: "claude-sonnet-4-…"` → `setLastUsage` → `UsageChip` → `$0.02 · 1.2k in / 567 out · 3.1s · Sonnet 5`
+```
+FALLBACK_MODELS (instant)
+  displayName: "Sonnet" | "Opus" | …
 
-**CC catalog probe (`059`):** Rust still probes `Sonnet 5` into `display_name` on `ProviderModel` — **not** shown in chip/picker; kept for browser search + internal catalog only
+claude_code_list_models (Rust)
+  id + probed display_name ("Sonnet 5", …)
+       │
+       ▼
+ccStableDisplayName(id, fromCli, isDefault)
+  default row → keep CLI "Default · …"
+  else        → Title Case alias (ignore probe version)
+       │
+       ▼
+ProviderModel.displayName → modelLabel / picker / browser
+```
+
+Selection still sends the **alias id** to the CLI (`--model sonnet`), not the
+pretty label.
 
 ### Key functions
-- `composerChipLabel(qualified, models?) → string` — chip label
-- `pickerRowLabel(model) → string` — picker row primary label
-- `formatResolvedModel(raw) → string | null` — API / transcript id → human label
+
+- `ccStableDisplayName(id, fromCli, isDefault) → string` — UI label for CC rows
+- `CC_ALIAS_TITLE` — alias → Title Case map (`sonnet` → `Sonnet`, …); unknown
+  aliases title-case the id
+- `modelLabel(models, qualified) → string` — chip lookup by qualified key
+- `shortModelFamily(raw) → string` — Usage tab: first matching family substring,
+  else first two `-`-segments of the id
 
 ### State
-- None — pure formatters; `lastUsage.model` on `AIChatPanel` holds raw resolved id per turn
+
+- None for labels — pure formatters over catalog / usage payloads
+- Rust `LABEL_CACHE` (1h) still holds probed version names for the CLI list
+  command; TS discards them for `displayName` on non-default rows
 
 ### Gotchas
-- **Not a mapping table** — no alias→version map in TS; resolved name comes only from API `usage.model` at turn end
-- **Anthropic BYOK** — chip shows catalog name (`Claude Sonnet 4.6 (balanced)`); resolved feedback from `message_start` usage event
-- **Mismatch is OK** — chip `sonnet` + strip `Sonnet 5` is intentional (honest alias vs billed model)
-- **Browser unchanged** — `ModelBrowser` cards still use probed `displayName` for discovery
+
+- **Probes ≠ chip** — Rust may still resolve `Sonnet 5`; UI must not bind the
+  chip to `e.display_name` or the Sonnet ↔ Sonnet 5 flip returns
+- **No version regex table** — do not reintroduce `RESOLVED_LABELS` /
+  `formatResolvedModel` for Anthropic version strings; they rot every release
+- **Default row is special** — `is_default` keeps the CLI string
+  (`Default · Sonnet 5`) so the user still sees which model “default” is
+- **`[1m]` aliases** — `sonnet[1m]` → `Sonnet (1M context)` via recursive
+  `ccStableDisplayName`
+- **Deleted** — `src/modelDisplay.ts` (honest-labels dual layer, 2026-07-13 →
+  reverted 2026-07-17)
+
+### History
+
+| Date | Change |
+|---|---|
+| 2026-07-13 | `071` “honest labels”: chip = raw alias (`sonnet`); usage strip appended billed model via static `RESOLVED_LABELS` |
+| 2026-07-17 | Reverted to Codetta-style Title Case `displayName`; dropped `modelDisplay.ts` and version map |
 
 ### Related features
-- `025-model-selector.md` — picker UX, chip entry point
-- `059-claude-code-model-catalog.md` — CLI probe; labels internal to catalog now
-- `023-session-usage-panel.md` — `UsageChip` + usage strip
-- `022-chat-composer.md` — composer model chip
+
+- `025-model-selector.md` — picker / browser / favorites
+- `059-claude-code-model-catalog.md` — CLI `/model` probe + instant fallbacks
+- `023-session-usage-panel.md` — UsageChip + Usage tab
+- `022-chat-composer.md` — composer model chip chrome
+- `031-model-discovery-cache.md` — shared catalog hydrate

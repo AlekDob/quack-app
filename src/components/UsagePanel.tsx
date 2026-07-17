@@ -8,7 +8,6 @@
 // Brain: claude-usage-spike
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { formatResolvedModel } from "../modelDisplay";
 import { useStore } from "../store";
 import { ContextPanel } from "./ContextPanel";
 
@@ -392,7 +391,7 @@ function SessionRow(props: {
           </span>
         )}
         <span className="usage-row-model" title={s.primary_model}>
-          {formatResolvedModel(s.primary_model) ?? "—"}
+          {shortModelFamily(s.primary_model)}
         </span>
         <span className="usage-row-cost">{fmtCost(s.estimated_cost_usd)}</span>
       </div>
@@ -426,4 +425,14 @@ function SessionRow(props: {
       </div>
     </li>
   );
+}
+
+/** Family only (sonnet/opus/…) — no static version map. */
+function shortModelFamily(m: string): string {
+  if (!m) return "—";
+  const lower = m.toLowerCase();
+  for (const name of ["opus", "sonnet", "haiku", "fable", "mythos"]) {
+    if (lower.includes(name)) return name;
+  }
+  return m.split("-").slice(0, 2).join("-");
 }

@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-13
+last_verified: 2026-07-17
 tags: [session, usage, context, progress, claude-code, popover, monitor, quack-v1]
 ---
 
@@ -20,7 +20,7 @@ Claude Code only for the ring + live context data. Other providers: ring absent.
 |---|---|---|
 | `SessionUsageCircle` | Composer (`.ai-context-ring-dock`, above meta row) | Ring % — context when known, else plan 5hr % |
 | `SessionUsagePopover` | Popover above ring (click toggle) | Hero %, segmented bar, per-category token rows, **plan limit bars** |
-| `UsageChip` | `.ai-usage-strip` above composer (idle, post-turn) | Cost + in/out + cache % + duration + **resolved model** (`formatResolvedModel`) — `071-honest-model-labels.md` |
+| `UsageChip` | `.ai-usage-strip` above composer (idle, post-turn) | Cost + in/out + cache % + duration (no model label) |
 | Usage tab (`usage:<wsId>`) | Activity bar / Settings | Plan limits (5hr / 7day), This chat, Quack spend |
 
 Ring stays pinned between turns (`pinnedContextRef`) so it does not flash empty
@@ -210,6 +210,7 @@ swallows transient failures.
 | Breakdown segments are estimates, not CC `/context` | `gotcha/context-breakdown-estimates.md` |
 | No per-category 5hr breakdown from Anthropic API | `gotcha/anthropic-session-budget-breakdown.md` |
 | CC may warn before statusline hits 100% (output + compact buffer) | anthropics/claude-code#17959 |
+| UsageChip does **not** show model name; session list uses family-only `shortModelFamily` | `071-honest-model-labels.md` |
 
 ## Related
 
@@ -219,6 +220,7 @@ swallows transient failures.
 - Context optimizer (skills weight): `020-context-optimizer.md`
 - CC sign-in (usage poll needs OAuth): `052-claude-code-login-ux.md`
 - Workspace switch perf (poll + Monaco gates): `058-workspace-switch-performance.md`
+- CC model display labels: `071-honest-model-labels.md`
 
 ## Future
 

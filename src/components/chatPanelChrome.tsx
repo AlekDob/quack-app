@@ -260,12 +260,11 @@ export function ClaudeSessionsButton({
   );
 }
 
-// ---------- ProviderSessionsButton (CC + Cursor + OpenCode) ----------
+// ---------- ProviderSessionsButton (CC + Cursor) ----------
 
 const AGENTIC_PROVIDERS: ProviderId[] = [
   "claude-code",
   "cursor-cli",
-  "opencode-cli",
 ];
 
 interface ProviderSessionsButtonProps {
@@ -518,8 +517,6 @@ export function TodosCard({ items }: TodosCardProps) {
   );
 }
 
-import { formatResolvedModel } from "../modelDisplay";
-
 // ---------- UsageChip ----------
 
 interface UsageChipProps {
@@ -558,8 +555,6 @@ export function UsageChip({ usage }: UsageChipProps) {
   if (typeof usage.durationMs === "number") {
     parts.push(`${(usage.durationMs / 1000).toFixed(1)}s`);
   }
-  const resolved = formatResolvedModel(usage.model);
-  if (resolved) parts.push(resolved);
   if (parts.length === 0) return null;
   return <span className="ai-usage-text">{parts.join(" · ")}</span>;
 }

@@ -345,7 +345,6 @@ import {
   warmPickerCatalogs,
   type ModelDiscoverySnapshot,
 } from "../modelDiscoveryStore";
-import { formatResolvedModel } from "../modelDisplay";
 
 // @-mention parser: given the composer text and current cursor index,
 // return the active @-segment when the cursor sits in one. A segment
@@ -7358,7 +7357,7 @@ export function AIChatPanel({
             className="ai-usage-strip"
             title={
               lastUsage?.model
-                ? `Last turn — ${formatResolvedModel(lastUsage.model) ?? lastUsage.model}`
+                ? `Last turn — ${lastUsage.model}`
                 : "Chat usage"
             }
           >

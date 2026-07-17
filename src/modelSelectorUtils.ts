@@ -1,4 +1,3 @@
-import { composerChipLabel } from "./modelDisplay";
 import { makeQualifiedModel, type ProviderId, type ProviderModel } from "./providers/types";
 import { modelKey } from "./modelPrefs";
 
@@ -12,7 +11,6 @@ const PROVIDER_LABELS: Record<ProviderId, string> = {
   ollama: "Ollama (local)",
   "claude-code": "Claude Code (CLI)",
   "cursor-cli": "Cursor CLI",
-  "opencode-cli": "OpenCode (local)",
   openai: "OpenAI",
   anthropic: "Anthropic",
 };
@@ -21,7 +19,6 @@ const PROVIDER_ORDER: ProviderId[] = [
   "ollama",
   "claude-code",
   "cursor-cli",
-  "opencode-cli",
   "openai",
   "anthropic",
 ];
@@ -99,9 +96,16 @@ export function splitFavoriteModels(
   return { favorites: favList, groupsNoFav };
 }
 
+/** Composer chip — catalog displayName (Codetta-style; no alias/resolved split). */
 export function modelLabel(
   models: ProviderModel[],
   selectedQualified: string,
 ): string {
-  return composerChipLabel(selectedQualified, models);
+  const hit = models.find(
+    (m) => makeQualifiedModel(m.providerId, m.modelId) === selectedQualified,
+  );
+  if (hit) return hit.displayName || hit.modelId;
+  const colon = selectedQualified.indexOf(":");
+  if (colon > 0) return selectedQualified.slice(colon + 1);
+  return selectedQualified ? selectedQualified : "Pick a model…";
 }

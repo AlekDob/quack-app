@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-01
-last_verified: 2026-07-16
-tags: [model-selector, model-browser, model-picker, favorites, visibility, cursor-cli, opencode-cli, claude-code, composer, lazy-load, free-models, model-discovery-cache, platform-pin, instant-hydrate, honest-model-labels]
+last_verified: 2026-07-17
+tags: [model-selector, model-browser, model-picker, favorites, visibility, cursor-cli, opencode-cli, claude-code, composer, lazy-load, free-models, model-discovery-cache, platform-pin, instant-hydrate]
 ---
 
 ## Model Selector (composer chip + catalog + visibility)
@@ -22,8 +22,7 @@ tags: [model-selector, model-browser, model-picker, favorites, visibility, curso
 | Component | `src/components/ManageModelsModal.tsx` | Toggle model visibility in quick picker (reuses `model-browser` shell) |
 | Service | `src/modelPrefs.ts` | Favorites + disabled-model maps in localStorage |
 | Service | `src/modelSelectorUtils.ts` | `buildModelGroups`, `filterVisibleGroups`, `splitFavoriteModels`, `modelLabel`, `reorderGroupsFirst` |
-| Service | `src/modelDisplay.ts` | `composerChipLabel`, `pickerRowLabel`, `formatResolvedModel` — see `071-honest-model-labels.md` |
-| Service | `src/providers/claudeCode.ts` | `claudeCodePickerModels`, `refreshClaudeCodeModelsLive` — see `059-claude-code-model-catalog.md` |
+| Service | `src/providers/claudeCode.ts` | `claudeCodePickerModels`, `refreshClaudeCodeModelsLive`, `ccStableDisplayName` — see `059-claude-code-model-catalog.md` |
 | Service | `src/modelDiscoveryStore.ts` | Shared discovery cache — see `031-model-discovery-cache.md` |
 | Service | `src/providers/index.ts` | `listAllModels` / `listAllCloudModels` — underlying provider probes |
 | Component | `src/components/AIChatPanel.tsx` | Subscribes to discovery store; `refreshLiveCliModels`; lazy cloud catalog on browser/manage open |
@@ -62,7 +61,7 @@ cache), reopening or background refresh no longer blanks the list. `loadingProp`
 so the first live fetch doesn't pay dynamic-import latency. Foreground `AIChatPanel` also calls
 `warmPickerCatalogs()` on workspace activate alongside `ensureModelDiscovery`.
 
-**Honest labels (2026-07-13):** chip + picker rows show Claude Code **alias** (`sonnet`, `opus`); resolved version (`Sonnet 5`) only in post-turn usage strip — `071-honest-model-labels.md`.
+**CC labels (Codetta-style):** chip + picker use catalog `displayName` (Title Case alias: `Sonnet`) via `ccStableDisplayName` — ignores probed version names so the chip does not flip. Full contract: `071-honest-model-labels.md`.
 
 **Pick:** `pickerCloudModels` (from `allModels`, non-Ollama) → `buildModelGroups()` → **platform pin** hard filter OR `reorderGroupsFirst` for unpinned → popover filters disabled via `isModelEnabled` → `onSelect(qualified)` → chat provider routing
 
@@ -106,5 +105,5 @@ so the first live fetch doesn't pay dynamic-import latency. Foreground `AIChatPa
 - **Parallel refresh:** `refresh()` no longer serializes provider checks — startup latency fix post-OpenCode integration.
 - **Platform pin:** agentic chats show only the starting CLI; switch platform via **New chat** — `057-platform-pin.md`.
 - **Instant hydrate:** `.model-picker-pop.is-hydrating` — full skeleton + readonly search only when the catalog is **empty**; `.is-refreshing` keeps cached rows visible during background CLI refresh. Removed local `sessionLoad`/`opening` state + `flushSync` on chip click — open is synchronous, loading is `catalogWarming` from the panel.
-- **CC chip vs catalog:** chip/picker = alias (`sonnet`); probed `Sonnet 5` labels stay in catalog/browser only — `071-honest-model-labels.md`, probe mechanics `059-claude-code-model-catalog.md`.
+- **CC chip labels:** chip/picker use stable Title Case alias (`Sonnet`) via `ccStableDisplayName` — not probed `Sonnet 5` (avoids flip). See `071-honest-model-labels.md`, probe mechanics `059-claude-code-model-catalog.md`.
 - **Cursor effort tiers:** appear as separate model rows (`Opus 4.8 1M Extra High`); CC effort uses `EffortPopover` instead (`022`, `026`).

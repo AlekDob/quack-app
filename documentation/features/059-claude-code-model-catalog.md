@@ -3,12 +3,12 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-11
-last_verified: 2026-07-13
+last_verified: 2026-07-17
 tags: [claude-code, model-selector, model-catalog, composer, rust, performance, lazy-load]
 ---
 
 ## Claude Code dynamic model catalog
-**Purpose:** Probe live version names from the CLI (`Sonnet 5`, `Opus 4.8`, `Fable 5`) into the catalog while keeping the picker **instant** — one fast `/model` probe, version labels refreshed in background (1h cache). **UI chip/picker show alias only** (`sonnet`); probed names surface in post-turn usage feedback — `071-honest-model-labels.md`.
+**Purpose:** Probe live version names from the CLI (`Sonnet 5`, `Opus 4.8`, `Fable 5`) into the Rust catalog while keeping the picker **instant** — one fast `/model` probe, version labels refreshed in background (1h cache). **UI chip/picker use stable Title Case aliases** (`Sonnet`) via `ccStableDisplayName` — probed names are not shown in the composer (Codetta-style; see `071` revert).
 **Stack:** Rust `claude_models.rs` + `claude_print_text` helper; TS `claudeCode.ts` stale-while-revalidate; shared discovery store (`031`).
 
 ### Files
@@ -16,10 +16,9 @@ tags: [claude-code, model-selector, model-catalog, composer, rust, performance, 
 |------|------|-----------------|
 | Rust | `src-tauri/src/claude_models.rs` | `claude_code_list_models` — parse `/model`, probe labels, dedupe |
 | Rust | `src-tauri/src/claude_code.rs` | `claude_print_text(prompt)` — shared `-p` text helper for probes |
-| Provider | `src/providers/claudeCode.ts` | `claudeCodePickerModels()`, `refreshClaudeCodeModelsLive()`, `FALLBACK_MODELS` |
+| Provider | `src/providers/claudeCode.ts` | `claudeCodePickerModels()`, `refreshClaudeCodeModelsLive()`, `ccStableDisplayName`, `FALLBACK_MODELS` |
 | Store | `src/modelDiscoveryStore.ts` | `listFastModels` + merge CC live list (`ccCliInflight`) |
-| Picker | `src/components/ModelPickerPopover.tsx` | Chip shows alias via `composerChipLabel`; instant hydrate skeleton |
-| Service | `src/modelDisplay.ts` | Honest alias vs resolved labels — `071-honest-model-labels.md` |
+| Picker | `src/components/ModelPickerPopover.tsx` | Chip via `modelLabel` → `displayName`; instant hydrate skeleton |
 | Config | `src/App.css` | `.model-picker-pop.is-hydrating` |
 
 ### Tauri command
@@ -37,13 +36,14 @@ tags: [claude-code, model-selector, model-catalog, composer, rust, performance, 
 **Stale-while-revalidate:** if in-memory cache is warm but TTL expired, return cached rows immediately and refresh in background (`fetchAndCacheModels` fire-and-forget)
 
 ### Display rules
-| Rule | Why |
-|---|---|
-| `display_label()` prefers probed name when `is_sane_probe_label` | Rejects junk like "plan mode" from bad probes |
-| `[1m]` aliases append `(1M context)` when probe omits it | e.g. `Fable 5 (1M context)` not duplicate "Fable 5" rows |
-| `dedupe_display_names()` collapses same display name | `best` alias sometimes resolves to same label as `fable` |
-| `PICKER_ORDER` | default → sonnet → opus → haiku → fable → best → `[1m]` variants → opusplan |
-| Default row | `Default · {current short name}` when CLI reports current model |
+| Rule | Layer | Why |
+|---|---|---|
+| `display_label()` prefers probed name when `is_sane_probe_label` | Rust CLI list | Rejects junk like "plan mode" from bad probes |
+| `[1m]` aliases append `(1M context)` when probe omits it | Rust | e.g. `Fable 5 (1M context)` not duplicate "Fable 5" rows |
+| `dedupe_display_names()` collapses same display name | Rust | `best` alias sometimes resolves to same label as `fable` |
+| `PICKER_ORDER` | Rust | default → sonnet → opus → haiku → fable → best → `[1m]` variants → opusplan |
+| Default row | Rust → TS passthrough | `Default · {current short name}` when CLI reports current model |
+| **UI `displayName`** | TS `ccStableDisplayName` | Non-default rows → Title Case alias (`Sonnet`), **ignore** probed version — `071` |
 
 ### Key functions
 - `claude_print_text(prompt) → String` — `-p` stdout for `/model` and per-alias probes
@@ -51,6 +51,7 @@ tags: [claude-code, model-selector, model-catalog, composer, rust, performance, 
 - `probe_alias_labels(available) → HashMap` — parallel thread-per-alias background refresh
 - `claudeCodePickerModels() → ProviderModel[]` — zero-spawn instant slice for discovery
 - `refreshClaudeCodeModelsLive(force?) → ProviderModel[]` — full catalog + SWR
+- `ccStableDisplayName(id, fromCli, isDefault) → string` — UI label (see `071`)
 
 ### State
 - `LABEL_CACHE`: in-process 1h map alias → probed display name (Rust)
@@ -64,7 +65,7 @@ tags: [claude-code, model-selector, model-catalog, composer, rust, performance, 
 ### Gotchas
 - **Effort is separate** — CC effort uses `EffortPopover` + `--effort` (`022`); catalog rows are model aliases only.
 - **Not Cursor** — Cursor CLI lists effort/speed tiers as distinct models via `--list-models` (`026`); no Quack effort knob there.
-- **Chip label** — composer shows alias `modelId` (`opus`, `sonnet`), not probed `displayName` — `071-honest-model-labels.md`.
+- **Chip label** — composer shows stable Title Case alias (`Sonnet`), not probed `Sonnet 5` — `ccStableDisplayName` in `claudeCode.ts` (`071`).
 - **First open skeleton** — popover sets `sessionLoad` + `is-hydrating` until live CLI catalogs finish; no partial stale list + tail shimmer.
 - **Force refresh** — `invalidateClaudeCodeCache()` clears TS cache; Rust label cache survives until TTL (acceptable — aliases rarely change mid-hour).
 
@@ -72,3 +73,4 @@ tags: [claude-code, model-selector, model-catalog, composer, rust, performance, 
 - `014-claude-code-bridge.md` — spawn/stream; shares `claude_print_text`
 - `025-model-selector.md` — picker UX, platform pin filter
 - `031-model-discovery-cache.md` — disk hydrate + `listFastModels`
+- `071-honest-model-labels.md` — UI Title Case aliases via `ccStableDisplayName` (probes stay in Rust)

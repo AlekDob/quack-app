@@ -27,39 +27,64 @@ const FALLBACK_MODELS: ProviderModel[] = [
   {
     providerId: "claude-code",
     modelId: "default",
-    displayName: "default",
+    displayName: "Default",
     contextWindow: 200_000,
     supportsTools: true,
   },
   {
     providerId: "claude-code",
     modelId: "sonnet",
-    displayName: "sonnet",
+    displayName: "Sonnet",
     contextWindow: 1_000_000,
     supportsTools: true,
   },
   {
     providerId: "claude-code",
     modelId: "opus",
-    displayName: "opus",
+    displayName: "Opus",
     contextWindow: 1_000_000,
     supportsTools: true,
   },
   {
     providerId: "claude-code",
     modelId: "haiku",
-    displayName: "haiku",
+    displayName: "Haiku",
     contextWindow: 200_000,
     supportsTools: true,
   },
   {
     providerId: "claude-code",
     modelId: "fable",
-    displayName: "fable",
+    displayName: "Fable",
     contextWindow: 200_000,
     supportsTools: true,
   },
 ];
+
+/** Stable Codetta labels — alias title-case, not probed "Sonnet 5". */
+const CC_ALIAS_TITLE: Record<string, string> = {
+  default: "Default",
+  sonnet: "Sonnet",
+  opus: "Opus",
+  haiku: "Haiku",
+  fable: "Fable",
+  best: "Best",
+  opusplan: "Opus Plan",
+};
+
+function ccStableDisplayName(
+  id: string,
+  fromCli: string,
+  isDefault: boolean,
+): string {
+  if (isDefault) return fromCli;
+  if (id.endsWith("[1m]")) {
+    const base = id.slice(0, -4);
+    return `${ccStableDisplayName(base, fromCli, false)} (1M context)`;
+  }
+  if (CC_ALIAS_TITLE[id]) return CC_ALIAS_TITLE[id];
+  return id ? id[0]!.toUpperCase() + id.slice(1) : fromCli;
+}
 
 /** Instant picker slice — no CLI spawn. */
 export function claudeCodePickerModels(): ProviderModel[] {
@@ -81,7 +106,7 @@ async function fetchModels(): Promise<ProviderModel[]> {
   return entries.map((e) => ({
     providerId: "claude-code" as const,
     modelId: e.id,
-    displayName: e.display_name,
+    displayName: ccStableDisplayName(e.id, e.display_name, e.is_default),
     contextWindow: ccAliasContextWindow(e.id),
     supportsTools: true,
   }));
