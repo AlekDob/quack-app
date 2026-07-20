@@ -157,9 +157,14 @@ import {
 } from "./ComposerMentionChips";
 import { ComposerInputHighlight } from "./ComposerInputHighlight";
 import {
-  handoffStoryToBuilder,
   onNativePlanReady,
 } from "../quackPlanHarness";
+import { PlanBuyInCard } from "./PlanBuyInCard";
+import {
+  getPlanBuyIn,
+  resolvePlanBuyIn,
+  subscribePlanBuyIn,
+} from "../planBuyInStore";
 import {
   buildStoryTurnContext,
   buildSiblingSummaries,
@@ -253,7 +258,7 @@ import {
 } from "../chatHistory";
 import { registerChatPersist } from "../chatPersistFlush";
 import { logChatSwitch } from "../chatSwitchDebug";
-import { isChatSwitching } from "../chatSwitch";
+import { isChatSwitching, noteChatSwitchProgress } from "../chatSwitch";
 import {
   recoverSessionFromAnyProvider,
   persistRecoveredSession,
@@ -1958,6 +1963,7 @@ export function AIChatPanel({
     let cancelled = false;
     const hydrateT0 = performance.now();
     logChatSwitch("hydrate start", { wsId, aiChatId: aiChatId ?? null });
+    noteChatSwitchProgress();
     logAgentModePhase("chat hydrate start", {
       wsId,
       aiChatId: aiChatId ?? null,
@@ -2037,12 +2043,33 @@ export function AIChatPanel({
         applyDefaultPreset();
         applyComposerDraft({});
       };
-      // Empty / new chats: paint sync. startTransition deferred the empty
-      // UI for seconds behind mount-effect work (Perf Audit: session
-      // loaded 14ms → hydrate done 6.9s). Dense transcripts keep the
-      // transition so hydration doesn't block input.
-      if (msgs.length === 0) apply();
-      else startTransition(apply);
+      // Under the switch veil: apply with flushSync so the loader stays up
+      // through the real transcript commit. startTransition + opacity-0 fade-in
+      // left a blank stall (main thread busy, veil never painted; CAP often
+      // fired before hydrate done — Audit 086). Off-veil dense loads still
+      // defer via startTransition.
+      const underVeil = isChatSwitching();
+      const afterPaint = () => {
+        if (msgs.length === 0) {
+          finishHydrated();
+          return;
+        }
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => finishHydrated()),
+        );
+      };
+      if (msgs.length === 0) {
+        apply();
+        afterPaint();
+      } else if (underVeil) {
+        flushSync(apply);
+        afterPaint();
+      } else {
+        startTransition(() => {
+          apply();
+          afterPaint();
+        });
+      }
       if (!found) return;
       void hydrateAgentCommitFromMessages(wsId, sid, root, msgs);
       const gen = ++ccHydrateGenRef.current;
@@ -2077,15 +2104,6 @@ export function AIChatPanel({
           cacheHit: !!cached,
         });
         paintSession(found, targetSid, msgs);
-        // Empty chat: end hydrate now (sync paint above). Dense transcripts
-        // wait for a paint frame so the veil doesn't drop on a blank panel.
-        if (msgs.length === 0) {
-          finishHydrated();
-        } else {
-          requestAnimationFrame(() =>
-            requestAnimationFrame(() => finishHydrated()),
-          );
-        }
         return;
       }
 
@@ -2099,13 +2117,6 @@ export function AIChatPanel({
         ? await rehydrateMessageImages(cleanStaleToolMessages(found.messages))
         : [];
       paintSession(found, firstId ?? newSessionId(), msgs);
-      if (msgs.length === 0) {
-        finishHydrated();
-      } else {
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => finishHydrated()),
-        );
-      }
     })();
 
     return () => {
@@ -2801,6 +2812,20 @@ export function AIChatPanel({
   const [askFreeform, setAskFreeform] = useState(false);
   const [askInputRev, setAskInputRev] = useState(0);
   useEffect(() => subscribeAskInput(() => setAskInputRev((n) => n + 1)), []);
+  const [planBuyInRev, setPlanBuyInRev] = useState(0);
+  useEffect(
+    () => subscribePlanBuyIn(() => setPlanBuyInRev((n) => n + 1)),
+    [],
+  );
+  const planBuyIn = useMemo(() => {
+    void planBuyInRev;
+    return getPlanBuyIn({
+      sessionId: claudeSessionId,
+      cwd: root,
+    });
+  }, [planBuyInRev, claudeSessionId, root]);
+  const planBuyInRef = useRef(planBuyIn);
+  planBuyInRef.current = planBuyIn;
   const pendingAskCall = useMemo(() => {
     if (streaming !== null || runningTools) return null;
     const last = messages[messages.length - 1];
@@ -3084,6 +3109,11 @@ export function AIChatPanel({
     images: ImageAttachment[] = [],
   ) => {
     if ((!text && images.length === 0) || !selected) return;
+    // User wrote instead of clicking Pass the ball — keep discussing.
+    const pendingPlan = planBuyInRef.current;
+    if (pendingPlan) {
+      await resolvePlanBuyIn(pendingPlan.requestId, "deny");
+    }
     // Sending revives an archived chat; opening it from the hub does not.
     if (aiChatId) {
       const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
@@ -3406,13 +3436,18 @@ export function AIChatPanel({
       // Resumed CC turns send only the latest user message — sysParts vanish
       // after turn one. Orchestrator tool contract must ride in ccTurnContext.
       // Works protocol rides along only when Works tracking is on.
-      ccTurnContext.push(quackClaudeCodeEditorPrompt(getWorkInjectEnabled(wsId)));
-      if (planning) {
+      // ExitPlanMode only when composer is Plan — otherwise CC errors.
+      const inPlanMode = ccPermMode === "plan";
+      ccTurnContext.push(
+        quackClaudeCodeEditorPrompt(getWorkInjectEnabled(wsId), inPlanMode),
+      );
+      if (planning && inPlanMode) {
         ccTurnContext.push(
           [
             "[Quack Plan — active]",
             "Planning session: when the plan is ready call ExitPlanMode with the full markdown plan.",
-            "Do NOT write plans to ~/.claude/plans/ or paste a plan-only summary — ExitPlanMode merges into the linked works/stories/S-NNN.md and Quack shows Build for Milo handoff.",
+            "Do NOT write plans to ~/.claude/plans/ or paste a plan-only summary — ExitPlanMode merges into the linked feature `.md` (Composer Feature pill) or opens a plan preview; Quack shows Pass the ball to Milo.",
+            "Do NOT create stories (S-NNN) for the plan — Features are the durable plan target.",
             "Use AskUserQuestion for multiple-choice clarifications (not plain-text option lists).",
             "[/Quack Plan]",
           ].join("\n"),
@@ -5676,51 +5711,62 @@ export function AIChatPanel({
       );
       return;
     }
-    if (desc?.storyId && aiChatId) {
-      void onNativePlanReady(wsId, aiChatId, root, desc.storyId, plan);
-      return;
-    }
+    // Features-first: no story draft. Ephemeral plan: tab when unlinked.
     openPlanTab(wsId, aiChatId, requestId, plan);
-  };
-
-  const onPlanApproved = async (_requestId: string, plan: string) => {
-    if (!aiChatId) return;
-    try {
-      const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
-      if (desc?.storyId) {
-        await handoffStoryToBuilder(wsId, aiChatId, root, desc.storyId, plan);
-        return;
-      }
-      if (desc?.workItemId) {
-        const { approvePlanWork } = await import("../worksCache");
-        await approvePlanWork(root, desc.workItemId, plan);
-      }
-    } catch (e) {
-      console.warn("plan approve failed", e);
-    }
   };
 
   const handoffToMiloBuilder = () => {
     applyPreset("builder", { silent: true });
     setCcPermMode("bypassPermissions");
-    toastInfo("Handed off to Milo — build from your next message");
+  };
+
+  const implementPlanPrompt = (featId?: string | null) => {
+    if (featId) {
+      const label = featureLabelFromSlug(featId);
+      return `Implement the approved plan for @${featId}${
+        label && label !== featId ? ` (${label})` : ""
+      }. Start with the first step.`;
+    }
+    return "Implement the approved plan. Start with the first step.";
   };
 
   const onPlanBuild = async (_requestId: string, plan: string) => {
     if (!aiChatId) return;
     try {
       const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
-      if (desc?.storyId) {
-        await handoffStoryToBuilder(wsId, aiChatId, root, desc.storyId, plan);
+      // Features-first: plan already merged via onPlanReady when featureId set.
+      // Do not spawn S-NNN / W-NNN from legacy story handoff.
+      if (desc?.featureId) {
+        useStore.getState().setAIChatPlanning(wsId, aiChatId, false);
         handoffToMiloBuilder();
         return;
       }
-      await onPlanApproved(_requestId, plan);
+      if (desc?.workItemId) {
+        const { approvePlanWork } = await import("../worksCache");
+        await approvePlanWork(root, desc.workItemId, plan);
+      }
+      useStore.getState().setAIChatPlanning(wsId, aiChatId, false);
       handoffToMiloBuilder();
     } catch (e) {
       console.warn("plan build failed", e);
       toastError("Couldn't hand off to Milo");
     }
+  };
+
+  const passBallToMilo = async (requestId: string, plan: string) => {
+    const featId = featureId;
+    await onPlanBuild(requestId, plan);
+    await resolvePlanBuyIn(requestId, "allow");
+    planBuyInRef.current = null;
+    const prompt = implementPlanPrompt(featId);
+    // Allow ExitPlanMode to settle, then flush Milo knobs into the next turn.
+    queueMicrotask(() => {
+      void sendUserTextRef.current?.(prompt);
+    });
+  };
+
+  const keepDiscussingPlan = async (requestId: string) => {
+    await resolvePlanBuyIn(requestId, "deny");
   };
 
   // Clicking a file-targeted tool row opens that file in a new editor tab.
@@ -6875,6 +6921,16 @@ export function AIChatPanel({
           </button>
         )}
       </div>
+      {planBuyIn && (
+        <PlanBuyInCard
+          plan={planBuyIn.plan}
+          featureLabel={
+            featureId ? featureLabelFromSlug(featureId) : null
+          }
+          onBuild={() => passBallToMilo(planBuyIn.requestId, planBuyIn.plan)}
+          onKeepDiscussing={() => keepDiscussingPlan(planBuyIn.requestId)}
+        />
+      )}
       {/* Inline permission card — replaces the old full-window overlay.
           Renders nothing when there are no pending requests; otherwise
           shows the request just above the input where the user is

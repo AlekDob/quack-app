@@ -3,35 +3,35 @@ type: feature-doc
 project: quack-desktop
 stack: React 19, Zustand store (split-pane layout)
 created: 2026-07-12
-last_verified: 2026-07-14
-tags: [chat, plan-mode, claude-code, virtual-tab, split, permission-overlay, build-handoff]
+last_verified: 2026-07-20
+tags: [chat, plan-mode, claude-code, virtual-tab, split, permission-overlay, build-handoff, features]
 ---
 
 ## Claude Code plan mode — side-by-side plan tab
 
 **Purpose:** when Claude Code is in plan mode it calls `ExitPlanMode` with the
 proposed plan as inline markdown (`tool_input.plan`) — never a file on disk.
-Before this feature the plan text was only visible inside the small permission
-card (`ClaudePermissionOverlay`). This opens it as a real editor tab, forced
-into a split next to the chat (Cursor-style), the moment the plan lands —
-independent of approve/deny.
+Quack opens a preview the moment the plan lands, and shows an in-stream
+**Pass the ball to Milo** CTA (`PlanBuyInCard`) — independent of approve/deny.
 
-> **Since `068-quack-plan-harness`:** when the chat has `storyId` set, plan text
-> merges into `works/stories/S-NNN.md` and opens **`StoryPlanPane`** (`story:`)
-> instead. The ephemeral `plan:` tab below is the **fallback** for chats without a
-> linked story (legacy work-only plan drafts).
+> **Features-first (2026-07-17 / 2026-07-20):** when the chat has `featureId`
+> set, plan text merges into the feature `.md` via `planFeatureMerge` and opens
+> **FeatureDocDrawer**. Ephemeral `plan:` tab is the fallback when no feature
+> is linked. Story (`S-NNN`) merge is legacy — not the Build happy path.
 
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Service | `src/plan.ts` | `planKey`, `parsePlanKey`, in-memory stash (`stashPlan`/`planPayload`) |
 | Component | `src/components/PlanPane.tsx` | Body for `plan:` virtual tabs (`MarkdownPreview`); `openPlanTab()` helper |
-| Component | `src/components/ClaudePermissionOverlay.tsx` | `onPlanReady(requestId, plan)` — fires once per `ExitPlanMode` request as soon as `tool_input.plan` is non-empty; **`onPlanBuild`** on user Build — see [068-quack-plan-harness.md](068-quack-plan-harness.md) |
-| Component | `src/components/AIChatPanel.tsx` | Wires `onPlanReady` → `openPlanHandler`; `onPlanBuild` → `handoffStoryToBuilder` + Milo |
+| Store | `src/planBuyInStore.ts` | Pending ExitPlanMode → stream CTA |
+| Component | `src/components/PlanBuyInCard.tsx` | **Pass the ball to Milo** / Keep discussing |
+| Component | `src/components/ClaudePermissionOverlay.tsx` | `onPlanReady` + publish buy-in; ExitPlanMode card suppressed |
+| Component | `src/components/AIChatPanel.tsx` | Wires preview + Milo handoff + auto-send |
 | Component | `src/components/WorkspaceShell.tsx` | Portals `PlanPane` for open `plan:` keys |
 | Component | `src/components/PaneNode.tsx` | Tab label ("Plan") + `check-square` icon for `plan:` tabs |
 | Store | `src/store.ts` | `parseKey` → `plan`; `openPlan()` |
-| Config | `src/App.css` | `.plan-pane`, `.plan-pane-head`, `.plan-pane-body` |
+| Config | `src/App.css` | `.plan-pane`, `.ai-plan-buyin` |
 
 ### Virtual tab keys (`plan:`)
 Pattern mirrors `prev:` HTML preview tabs:
@@ -53,11 +53,10 @@ other pane is open yet.
 ### Data flow
 ```
 ExitPlanMode permission request arrives (tool_input.plan non-empty)
-  → ClaudePermissionOverlay useEffect (dedup by request_id)
-  → onPlanReady(requestId, plan)
-  → AIChatPanel.openPlanHandler → openPlanTab(wsId, chatId, requestId, plan)
-  → store.openPlan → stashPlan + dropTabAt(..., "right", plan:key)
-  → WorkspaceShell portal → PlanPane → MarkdownPreview
+  → ClaudePermissionOverlay publishes planBuyInStore + onPlanReady
+  → featureId? mergePlanIntoFeature + FeatureDocDrawer : openPlanTab
+  → PlanBuyInCard (Pass the ball to Milo / Keep discussing)
+  → Build: Milo + Agent + allow ExitPlanMode + auto-send implement prompt
 ```
 
 ### Gotchas
@@ -67,11 +66,15 @@ ExitPlanMode permission request arrives (tool_input.plan non-empty)
 - **Dedup key is `request_id`**, not plan content — a brand-new plan proposed
   later in the same turn gets its own tab; re-renders of the same request
   don't reopen/refocus the tab repeatedly.
-- **Approval (2026-07-13):** the `ExitPlanMode` card no longer offers "Approve & start" (Jack implementing). **Keep discussing** denies; **Build** approves + hands off to Milo via `onPlanBuild` then `claude_perm_decide: allow`. Plan text display (`onPlanReady`) is unchanged — merge into story/drawer still happens before the user decides.
+- **Approval (2026-07-20):** ExitPlanMode permission card replaced by in-stream
+  **Pass the ball to Milo** (`PlanBuyInCard`). Keep discussing / composer send
+  denies; Build allows + Milo + Agent + auto-send. Plan text display
+  (`onPlanReady`) unchanged — feature merge / `plan:` tab still before decide.
 - **Plan explore permissions (2026-07-14):** parallel `Task` subagents in Plan mode auto-allow via `parent_tool_use_id` sidechain routing + `PLAN_READ_TOOLS` — see [015-claude-permission-mode.md](015-claude-permission-mode.md). Generic permission cards in Plan show **Allow exploration** (stays Plan) instead of **Allow all** (would flip to Auto).
 
 ### Related docs
-- `068-quack-plan-harness.md` — story-owned plan (primary path when `storyId` set)
-- `045-html-preview.md` — `prev:` virtual tab pattern this clones
+- `088-plan-milo-handoff.md` — Pass the ball to Milo CTA (primary Build UX)
+- `068-quack-plan-harness.md` — Features-first plan (primary when `featureId` set)
+- `015-claude-permission-mode.md` — overlay + buy-in store + Plan isolation
+- `045-html-preview.md` — `prev:` virtual-tab pattern this clones
 - `038-compose-review.md` — original `crev:` virtual-tab registration pattern
-- `015-claude-permission-mode.md` — `ClaudePermissionOverlay` / permission flow

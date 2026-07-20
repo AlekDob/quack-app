@@ -1,13 +1,31 @@
-/** Claude Code in Quack — orchestrator chat (parent session) tool contract. */
-export function quackClaudeCodeEditorPrompt(worksEnabled = false): string {
+/** Claude Code in Quack — orchestrator chat (parent session) tool contract.
+ *  Pass `planMode` only when the composer permission chip is Plan — otherwise
+ *  ExitPlanMode is not enabled by the CLI and calling it errors. */
+export function quackClaudeCodeEditorPrompt(
+  worksEnabled = false,
+  planMode = false,
+): string {
   const lines = [
     "QUACK EDITOR (Claude Code — this chat / orchestrator)",
-    "- AskUserQuestion and ExitPlanMode are AVAILABLE in this session — call them by name DIRECTLY. Do NOT use ToolSearch to load them; NEVER claim they are unavailable in this harness.",
+    "- AskUserQuestion is AVAILABLE in this session — call it by name DIRECTLY. Do NOT use ToolSearch to load it; NEVER claim it is unavailable in this harness.",
     "- AskUserQuestion: call it with a `questions` array (each entry: question + options with label/description). Quack renders clickable buttons above the composer. NEVER paste numbered option lists in prose — if you skip the tool, the user has no UI to answer.",
-    "- ExitPlanMode: when the composer permission mode is Plan, call when the plan is ready — Quack merges into works/stories/S-NNN.md; user clicks Build before implementation. Never write ~/.claude/plans/* — that path is outside Quack Works.",
     "- Presets (Jack, Milo, Nora, Vera, Lia, custom) all run in this same chat — they use AskUserQuestion directly.",
     "- SUBAGENTS (Agent/Task sidechains): inner steps are hidden from this stream; AskUserQuestion from a subagent does NOT show Quack's question UI. If a subagent needs a user choice, it must state the question + options in its final report — YOU (orchestrator) then call AskUserQuestion here.",
   ];
+  if (planMode) {
+    lines.splice(
+      3,
+      0,
+      "- ExitPlanMode is AVAILABLE while composer mode is Plan — call it by name DIRECTLY when the plan is ready (full markdown in `plan`). Do NOT use ToolSearch. Quack merges into the linked feature `.md` (or opens a plan preview); the user clicks Pass the ball to Milo before implementation. Never write ~/.claude/plans/*.",
+      "- Do NOT start implementing after ExitPlanMode — wait for the user to hand off to Milo.",
+    );
+  } else {
+    lines.splice(
+      3,
+      0,
+      "- ExitPlanMode is NOT enabled in this session (composer is not Plan). Do NOT call it — you will get a tool error. Write plans as normal markdown if asked; never claim ExitPlanMode is available.",
+    );
+  }
   if (worksEnabled) lines.push(worksProtocolBlock());
   return lines.join("\n");
 }

@@ -16,7 +16,9 @@
 /** Last mode written per Claude Code session id. */
 const bySession = new Map<string, string>();
 /** Fallback keyed by workspace cwd, for requests whose session id we
- *  haven't recorded yet (first tool call of a fresh chat). */
+ *  haven't recorded yet (first tool call of a fresh chat).
+ *  Never stores `"plan"` — Plan is strictly per-session so one chat in
+ *  Plan cannot make siblings in the same cwd behave as Plan. */
 const byCwd = new Map<string, string>();
 
 /** Strip trailing slashes so a panel's `root` and the hook's `cwd` compare
@@ -34,7 +36,13 @@ export function setPermMode(
   const m = mode ?? "default";
   if (opts.sessionId) bySession.set(opts.sessionId, m);
   const c = normCwd(opts.cwd);
-  if (c) byCwd.set(c, m);
+  if (!c) return;
+  // Plan must not leak across chats that share a workspace cwd.
+  if (m === "plan") {
+    byCwd.delete(c);
+    return;
+  }
+  byCwd.set(c, m);
 }
 
 /** Resolve the mode for an incoming permission request. Falls back to
@@ -46,6 +54,9 @@ export function getPermModeFor(req: {
   if (req.session_id) {
     const m = bySession.get(req.session_id);
     if (m) return m;
+    // Session known but not yet recorded — do NOT fall through to byCwd
+    // (another chat in the same project may have written a different mode).
+    return "default";
   }
   const c = normCwd(req.cwd);
   if (c) {

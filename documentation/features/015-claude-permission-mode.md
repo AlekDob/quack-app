@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-17
+last_verified: 2026-07-20
 tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command, plan-mode, exit-plan-mode, build-handoff, ask-user-question, tool-search]
 ---
 
@@ -16,7 +16,7 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Bridge store | `src/permModeStore.ts` | `setPermMode(opts, mode)`, `getPermModeFor(req)` — mode keyed by CC session id (+ cwd fallback) |
+| Bridge store | `src/permModeStore.ts` | `setPermMode` / `getPermModeFor` — **bySession** authoritative; `byCwd` never holds `"plan"`; unknown session_id → Ask (no cwd leak) |
 | Ask cache | `src/askQuestionStore.ts` | `publishAskInput(sessionId, tool_input)` — full question payload before deny-redirect (073) |
 | Enforcer | `src/components/ClaudePermissionOverlay.tsx` | `isForThisPanel(req)` route guard; `panelPermMode` + `modeAutoAllow`; `PLAN_EXPLORE_TOOLS` / `PLAN_READ_TOOLS`; `planSessionExplore` flag; auto-allows after safety gates |
 | Producer | `src/components/AIChatPanel.tsx` | `ccPermMode` state, `/mode` handler; publishes via `setPermMode`; passes `ownerRoot` / `ownerSessionId` / `ownerStreaming` / **`ownerPermMode`** to overlay |
@@ -24,14 +24,15 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 | Composer chip | `src/components/ComposerPermMode.tsx` | Cursor-style tinted mode pill + portaled menu (`document.body`) |
 | Mode catalog | `src/presets/permModes.ts` | `PERM_MODE_OPTIONS` — label, desc, `icon`, `tone` per mode; `permModeOption()` |
 | Slash hint | `src/slashCommands.ts` | `/mode ask\|plan\|auto-edit\|auto\|agent` |
-| Plan tab trigger | `src/components/ClaudePermissionOverlay.tsx` | `onPlanReady(requestId, plan)` — fires once per `ExitPlanMode` request as soon as `tool_input.plan` lands; `onPlanBuild(requestId, plan)` — Build handoff (see below) |
+| Plan tab trigger | `src/components/ClaudePermissionOverlay.tsx` | `onPlanReady(requestId, plan)` — fires once per `ExitPlanMode` as soon as `tool_input.plan` lands; buy-in CTA via `planBuyInStore` + `PlanBuyInCard` |
+| Plan buy-in | `src/planBuyInStore.ts`, `src/components/PlanBuyInCard.tsx` | Cursor-style **Pass the ball to Milo** / Keep discussing; auto-send on build |
 | Hook gate (backend) | `src-tauri/src/claude_code.rs` | `apply_clean_env` sets `CODETTA_PERM_HOOK=1`; `build_hook_command` emits `permissionDecision:'allow'` when that env is absent (no-op for foreign sessions) |
 
 ### Modes
 | UI label | Stored value | Effect |
 |---|---|---|
 | Ask (default) | `null` | card on every gated tool; the safe default a fresh install gets |
-| Plan | `plan` | plan only, no edits; **explore bypass by default** — read-only hook tools + explore reads + Task/subagent + **non-mutating Bash** (incl. `find -exec`, pipes, env assigns) auto-allow; writing Bash + file edits still card; `ExitPlanMode` always cards |
+| Plan | `plan` | plan only, no edits; explore bypass (reads / Task / non-mutating Bash); writes card; `ExitPlanMode` held for [088](088-plan-milo-handoff.md) buy-in (not a generic card) |
 | Auto-edit | `acceptEdits` | auto-allow file-edit tools (`Edit`/`MultiEdit`/`Write`/`NotebookEdit`); Bash & rest still card |
 | Auto | `auto` | auto-allow everything (Bash included); privacy gate + AskUserQuestion redirect still apply |
 | Agent | `bypassPermissions` | overlay allows EVERY tool, **before** the privacy gate too → no cards, no guard. Hook stays on (see gotcha). UI was **Bypass** until 2026-07-13. |
@@ -115,12 +116,9 @@ Hook payload shape (relevant fields):
   **Queue purge:** a `useEffect` on `[ownerRoot, ownerSessionId, ownerStreaming]` filters the overlay queue through `isForThisPanel` so stale cards disappear when the user switches chat or the CC session id lands. Pattern mirrors `AgentHubWatcher.resolveChat`, which already preferred `claudeSessionId` over cwd for hub status — the overlay was the missing piece.
   **Decision order inside `isForThisPanel`:** (1) reject different `cwd`; (2) if `req.session_id` present → match `ownerSessionId`, or require `ownerStreaming` when the panel hasn't captured init yet; (3) cwd-only fallback when `session_id` absent (shouldn't happen); (4) default `false` — never accept orphan requests.
 - The overlay/cards themselves are documented alongside the bridge — see [014-claude-code-bridge.md](014-claude-code-bridge.md).
-- **Plan tab opens independently of the decision:** `onPlanReady` fires as soon as the plan text is non-empty, regardless of whether the user later Builds or "Keep discussing"s the card — reading the plan shouldn't require deciding first. This does not change `respond()`/`claude_perm_decide` at all. See [061-plan-mode-tab.md](061-plan-mode-tab.md).
-- **`ExitPlanMode` card — Cursor-style Build handoff (2026-07-13):** when `tool_name === "ExitPlanMode"`, the card is a plan-review variant (`.cc-perm-plan-card`), not a generic tool gate. Actions:
-  - **Keep discussing** (`deny`) — Jack stays in Plan mode; user can refine the plan in chat. `Esc` shortcut.
-  - **Build** (`allow` after handoff) — primary action (`Enter`). Calls `onPlanBuild(requestId, plan)` wired by `AIChatPanel` → `handoffStoryToBuilder` + `applyPreset("builder")` + `setCcPermMode("bypassPermissions")` (Milo · Agent). Then `claude_perm_decide: allow` so CC exits plan mode. **No "Allow all"** on this card — that shortcut would flip to Auto and let Jack implement without a formal handoff.
-  - Title copy: "Plan ready — build with Milo or keep discussing with Jack".
-  - See [068-quack-plan-harness.md](068-quack-plan-harness.md) for story/work side effects.
+- **`permModeStore` isolation (2026-07-20):** `"plan"` is **never** written to `byCwd`. Lookup with a known `session_id` that has no recorded mode returns Ask (`default`) — does **not** inherit another chat’s mode via cwd. Prevents “Plan chip / plan permissions” bleeding across sessions in the same project. Vitest: `permModeStore.test.ts`.
+- **Plan tab opens independently of the decision:** `onPlanReady` fires as soon as the plan text is non-empty, regardless of whether the user later Builds or "Keep discussing"s — reading the plan shouldn't require deciding first. See [061-plan-mode-tab.md](061-plan-mode-tab.md).
+- **`ExitPlanMode` → in-stream Pass the ball to Milo (2026-07-20):** full flow in [088-plan-milo-handoff.md](088-plan-milo-handoff.md). Overlay publishes `planBuyInStore`; `PlanBuyInCard` owns CTA; Features-first Build; ExitPlanMode prompts only when composer is Plan.
 - **AskUserQuestion deny-redirect (073):** first gate always denies with a reason telling the model Quack is showing clickable options — never allow headless under `-p`. `publishAskInput` caches full `tool_input` for the dock. Subagent sidechain calls are denied the same way but **do not** mount `.ai-ask-dock` (parent stream filter) — orchestrator must re-ask. See [073-ask-user-question-dock.md](073-ask-user-question-dock.md), [004-subagent-mentions.md](004-subagent-mentions.md).
 - **MCP tools in the PreToolUse matcher (2026-07-17):** `PERMISSION_GATED_TOOLS` includes `mcp__.+` so `mcp__<server>__<tool>` calls hit the Quack card. Without this, CC under `-p` + Ask falls through to the native permission prompt (no TTY) and returns *"Claude requested permissions… but you haven't granted it yet"* with **no Allow button**. Same rationale as gating `WebFetch`/`WebSearch`. Overlay shows `pinky → brain_search`-style labels; Always / This session persist per full tool name. Hook fail-open timer is **50s** (matches `DECISION_TIMEOUT`) — the old 3s timer auto-allowed before the user could click.
 - **Eager tools for Plan/Ask docks (2026-07-16):** Quack sets `ENABLE_TOOL_SEARCH=false` on every CC spawn (`apply_clean_env`). Without it, CC defers `AskUserQuestion` + `ExitPlanMode` behind ToolSearch and `select:ExitPlanMode` often fails upstream — Jack pastes plans as prose and neither dock appears. Requires a **new** CC turn (env is per-process); resume alone is not enough if the old process is still alive.

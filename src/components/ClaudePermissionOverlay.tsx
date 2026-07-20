@@ -8,6 +8,11 @@ import { error as toastError } from "../notify";
 import { getJson as lsGetJson, setJson as lsSetJson } from "../localStore";
 import { Icon } from "./Icon";
 import { MarkdownPreview } from "./MarkdownPreview";
+import {
+  clearPlanBuyIn,
+  publishPlanBuyIn,
+  setPlanBuyInDecide,
+} from "../planBuyInStore";
 
 /**
  * Per-user always-allow rules persisted in localStorage. Three kinds:
@@ -389,7 +394,7 @@ export function ClaudePermissionOverlay({
   ownerPermMode,
   onAllowAll,
   onPlanReady,
-  onPlanBuild,
+  onPlanBuild: _onPlanBuild,
 }: {
   /** Workspace cwd this overlay's panel drives — used to route cards. */
   ownerRoot: string;
@@ -407,8 +412,7 @@ export function ClaudePermissionOverlay({
    *  opens the plan in a side-by-side tab (Cursor-style) while the card
    *  is still pending approval. */
   onPlanReady?: (requestId: string, plan: string) => void;
-  /** Fired when the user clicks Build — hand off to Milo before allowing
-   *  ExitPlanMode so Jack exits plan mode without implementing himself. */
+  /** Kept for API compat — Build is handled by PlanBuyInCard in the stream. */
   onPlanBuild?: (requestId: string, plan: string) => void | Promise<void>;
 }) {
   const [queue, setQueue] = useState<PermissionRequest[]>([]);
@@ -463,6 +467,27 @@ export function ClaudePermissionOverlay({
   useEffect(() => {
     planSessionExploreRef.current = false;
   }, [ownerRoot, ownerSessionId]);
+
+  useEffect(() => {
+    const decide = async (
+      requestId: string,
+      decision: "allow" | "deny",
+    ) => {
+      try {
+        await invoke("claude_perm_decide", { requestId, decision });
+      } catch (e) {
+        console.warn("plan buy-in decide failed", e);
+      }
+      setQueue((q) => q.filter((r) => r.request_id !== requestId));
+      clearPlanBuyIn({ requestId });
+    };
+    setPlanBuyInDecide(
+      { sessionId: ownerSessionId, cwd: ownerRoot },
+      decide,
+    );
+    return () =>
+      setPlanBuyInDecide({ sessionId: ownerSessionId, cwd: ownerRoot }, null);
+  }, [ownerSessionId, ownerRoot]);
 
   useEffect(() => {
     let offReq: (() => void) | undefined;
@@ -584,6 +609,7 @@ export function ClaudePermissionOverlay({
     void listen<string>("claude:permission-cancelled", (e) => {
       const requestId = e.payload;
       setQueue((q) => q.filter((r) => r.request_id !== requestId));
+      clearPlanBuyIn({ requestId });
     }).then((u) => {
       offCancel = u;
     });
@@ -599,19 +625,30 @@ export function ClaudePermissionOverlay({
   // after that return crashes React ("rendered more hooks than during
   // the previous render") the instant the FIRST permission card
   // arrives.
-  const req: PermissionRequest | null = queue[0] ?? null;
+  // ExitPlanMode stays in the queue (hook pending) but is owned by the
+  // in-stream PlanBuyInCard — never block other cards behind it.
+  const planReq =
+    queue.find((r) => r.tool_name === "ExitPlanMode") ?? null;
+  const req: PermissionRequest | null =
+    queue.find((r) => r.tool_name !== "ExitPlanMode") ?? null;
 
-  // Open the plan tab as soon as it lands — don't wait for the user to
-  // approve/deny, since reading the plan is the whole point of the card.
+  // Open the plan preview + in-stream buy-in as soon as ExitPlanMode lands.
   const lastPlanRequestId = useRef<string | null>(null);
   useEffect(() => {
-    if (!req || req.tool_name !== "ExitPlanMode") return;
-    if (lastPlanRequestId.current === req.request_id) return;
-    const plan = typeof req.tool_input.plan === "string" ? req.tool_input.plan : "";
+    if (!planReq) return;
+    if (lastPlanRequestId.current === planReq.request_id) return;
+    const plan =
+      typeof planReq.tool_input.plan === "string" ? planReq.tool_input.plan : "";
     if (!plan) return;
-    lastPlanRequestId.current = req.request_id;
-    onPlanReady?.(req.request_id, plan);
-  }, [req, onPlanReady]);
+    lastPlanRequestId.current = planReq.request_id;
+    publishPlanBuyIn({
+      requestId: planReq.request_id,
+      plan,
+      sessionId: planReq.session_id ?? ownerSessionId ?? null,
+      cwd: planReq.cwd ?? ownerRoot,
+    });
+    onPlanReady?.(planReq.request_id, plan);
+  }, [planReq, onPlanReady, ownerSessionId, ownerRoot]);
 
   const respond = async (decision: "allow" | "deny") => {
     if (!req) return;
@@ -623,25 +660,10 @@ export function ClaudePermissionOverlay({
     } catch (e) {
       console.warn("claude_perm_decide failed", e);
     }
-    setQueue((q) => q.slice(1));
+    setQueue((q) => q.filter((r) => r.request_id !== req.request_id));
   };
 
-  const buildPlan = async () => {
-    if (!req || req.tool_name !== "ExitPlanMode") return;
-    const plan =
-      typeof req.tool_input.plan === "string" ? req.tool_input.plan : "";
-    try {
-      await onPlanBuild?.(req.request_id, plan);
-    } catch (e) {
-      console.warn("plan build handoff failed", e);
-    }
-    await respond("allow");
-  };
-
-  // Keyboard shortcuts on the active request: Esc denies, Enter allows
-  // once. Lets a user blast through a series of safe prompts without
-  // mousing to the button row each time. Skipped if the user is typing
-  // in an input (so Enter inside the chat input still sends a message).
+  // Keyboard shortcuts on the active (non-plan) request.
   useEffect(() => {
     if (!req) return;
     const onKey = (e: KeyboardEvent) => {
@@ -657,19 +679,18 @@ export function ClaudePermissionOverlay({
         void respond("deny");
       } else if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        if (req.tool_name === "ExitPlanMode") void buildPlan();
-        else void respond("allow");
+        void respond("allow");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // respond closes over req.request_id which changes between cards;
-    // re-binding per card is correct.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [req?.request_id]);
 
   if (!req) return null;
-  const isPlan = req.tool_name === "ExitPlanMode";
+  // ExitPlanMode UI moved to PlanBuyInCard — never render plan card here.
+  const isPlan = false;
+  const buildPlan = async () => {};
   const inPlanMode = panelPermMode(ownerPermMode, req) === "plan";
   const isBash = req.tool_name === "Bash";
   const bashCmd =

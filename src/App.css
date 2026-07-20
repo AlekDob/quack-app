@@ -8866,32 +8866,61 @@ button.composer-mention-chip-label:hover {
   font-weight: 700;
   line-height: 1;
 }
-/* Tab bar for multi-question cards: answer one, flow to the next.
-   Underline style, like the official Claude Code extension's card. */
+/* Multi-question stepper — segmented pills (same language as editor tabs). */
 .ai-ask-tabs {
-  display: flex;
-  gap: 14px;
+  display: inline-flex;
+  align-self: flex-start;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--border);
+  gap: 2px;
+  max-width: 100%;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg);
 }
 .ai-ask-tab {
-  padding: 3px 2px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--fg-muted);
   font-size: 11.5px;
+  font-weight: 500;
   font-family: inherit;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
-  margin-bottom: -1px;
+  transition: background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+.ai-ask-tab:hover {
+  color: var(--fg);
+  background: var(--bg-hi);
 }
 .ai-ask-tab.active {
   color: var(--fg);
-  border-bottom-color: var(--fg);
   font-weight: 600;
+  background: var(--bg-hi);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
-.ai-ask-tab.answered {
-  color: var(--ok, #2ecc71);
+.ai-ask-tab.answered:not(.active) {
+  color: var(--ok);
+}
+.ai-ask-tab-check {
+  display: inline-grid;
+  place-items: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+  color: var(--ok);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
 }
 .ai-ask-close {
   margin-left: auto;
@@ -8941,6 +8970,120 @@ button.composer-mention-chip-label:hover {
 .ai-ask-dock .ai-ask-card {
   margin: 0;
 }
+
+/* Cursor-style plan buy-in — Pass the ball to Milo (above composer). */
+.ai-plan-buyin {
+  flex-shrink: 0;
+  margin: 0 12px 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ai-plan-buyin-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--warn);
+}
+.ai-plan-buyin-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ai-plan-buyin-title {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--fg);
+}
+.ai-plan-buyin-feat {
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-plan-buyin-preview {
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: var(--fs-sm);
+}
+.ai-plan-buyin-preview .md-preview {
+  font-size: var(--fs-sm);
+}
+.ai-plan-buyin-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ai-plan-buyin-keep {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-muted);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.ai-plan-buyin-keep:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--fg);
+}
+.ai-plan-buyin-build {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+}
+.ai-plan-buyin-build:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.ai-plan-buyin-build:disabled,
+.ai-plan-buyin-keep:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.ai-plan-buyin-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.ai-plan-buyin-hint {
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+.ai-plan-buyin-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
 /* Ask card merged into the composer shell — one bordered surface. */
 .ai-composer-shell.has-ask .ai-ask-card {
   border: none;
