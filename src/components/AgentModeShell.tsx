@@ -15,8 +15,7 @@ import { ComposeReviewPane } from "./ComposeReviewPane";
 import { SubagentTranscriptView } from "./SubagentTranscriptView";
 import { EditorTabDrawer } from "./EditorTabDrawer";
 import { TabContentHost } from "./TabContentHost";
-import { SourceControlPanel } from "./SourceControlPanel";
-import { FileTree } from "./FileTree";
+import { AgentContextColumn } from "./AgentContextColumn";
 import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
 import { setAgentMode } from "../agentMode";
@@ -29,6 +28,7 @@ import { AIChatsRail } from "./AIChatsRail";
 import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { endChatSwitch, getChatSwitchTarget, pulseChatSwitch } from "../chatSwitch";
 import { logChatSwitch } from "../chatSwitchDebug";
+import { logAgentModePhase } from "../switchPerf";
 import { useChatSwitching } from "../useChatSwitching";
 import {
   shouldKeepChatHostMounted,
@@ -140,8 +140,6 @@ function AgentTasks({ chatId }: { chatId: string | null }) {
   );
 }
 
-type ContextTab = "changes" | "files";
-
 // 1–2 char workspace badge, same scheme the main app's ActivityBar uses
 // so the agent-mode rail reads as the same Codetta workspace switcher.
 function initials(name: string): string {
@@ -221,10 +219,13 @@ export function AgentModeShell({ wsId }: Props) {
   const setActiveWorkspace = useStore((s) => s.setActiveWorkspace);
   const openWorkspace = useStore((s) => s.openWorkspace);
 
+  useEffect(() => {
+    logAgentModePhase("agent-shell mounted", { wsId });
+  }, [wsId]);
+
   // Which session fills the center column, tracked PER workspace so
   // switching workspaces (and back) restores what you were looking at.
   const [selectedByWs, setSelectedByWs] = useState<Record<string, string>>({});
-  const [contextTab, setContextTab] = useState<ContextTab>("changes");
 
   // File opened from the Files tab (agent mode has no editor pane).
   const [openFilePath, setOpenFilePath] = useState<string | null>(null);
@@ -600,60 +601,15 @@ export function AgentModeShell({ wsId }: Props) {
         </div>
       </main>
 
-      {/* ── Context column (Changes / Files) ──────────────────── */}
-      <aside
-        className={`agent-context${switching ? " is-chat-switch-frozen" : ""}`}
-      >
-        <div className="agent-context-tabs" role="tablist" aria-label="Workspace context">
-          <button
-            className={`agent-context-tab ${contextTab === "changes" ? "active" : ""}`}
-            role="tab"
-            aria-selected={contextTab === "changes"}
-            onClick={() => setContextTab("changes")}
-          >
-            Changes
-          </button>
-          <button
-            className={`agent-context-tab ${contextTab === "files" ? "active" : ""}`}
-            role="tab"
-            aria-selected={contextTab === "files"}
-            onClick={() => setContextTab("files")}
-          >
-            Files
-          </button>
-        </div>
-        <div className="agent-context-body">
-          {/* Both panels stay mounted (just hidden) so toggling the tab
-              doesn't re-run their git/fs scans on every switch. Keyed by
-              wsId so they re-bind when the active workspace changes. */}
-          {ws && (
-            <>
-              <div
-                className="agent-context-pane"
-                style={{ display: contextTab === "changes" ? "flex" : "none" }}
-              >
-                <SourceControlPanel
-                  key={`sc:${wsId}`}
-                  wsId={wsId}
-                  root={ws.meta.root}
-                  compact
-                />
-              </div>
-              <div
-                className="agent-context-pane"
-                style={{ display: contextTab === "files" ? "flex" : "none" }}
-              >
-                <FileTree
-                  key={`ft:${wsId}`}
-                  wsId={wsId}
-                  root={ws.meta.root}
-                  onOpenFile={(_id, p) => setOpenFilePath(p)}
-                />
-              </div>
-            </>
-          )}
-        </div>
-      </aside>
+      {/* ── Context column (Changes / Files / Terminals) ─────── */}
+      {ws && (
+        <AgentContextColumn
+          wsId={wsId}
+          root={ws.meta.root}
+          frozen={switching}
+          onOpenFile={setOpenFilePath}
+        />
+      )}
 
       {/* ── File popup (Files tab → click) ────────────────────── */}
       <FilePopupModal

@@ -11,7 +11,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { fs, type DirEntry } from "../ipc";
-import { logSwitchPhase } from "../switchPerf";
+import { logAgentModePhase, logSwitchPhase } from "../switchPerf";
 import { fsBus, pathsEqual } from "../fsBus";
 import { findTabsPaneByTab, useStore } from "../store";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
@@ -473,9 +473,15 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
       const t0 = performance.now();
       fs.listDir(root)
         .then((e) => {
+          const listDirMs = Math.round(performance.now() - t0);
           logSwitchPhase("filetree root loaded", wsId, {
             entries: e.length,
-            listDirMs: Math.round(performance.now() - t0),
+            listDirMs,
+          });
+          logAgentModePhase("filetree root loaded", {
+            wsId,
+            entries: e.length,
+            listDirMs,
           });
           setEntries(e);
         })

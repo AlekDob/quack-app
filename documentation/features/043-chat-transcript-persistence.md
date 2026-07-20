@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-06
-last_verified: 2026-07-17
+last_verified: 2026-07-20
 tags: [chat, persistence, disk, rust, transcript, multitasking, reliability, provider-links, audit]
 ---
 
@@ -192,14 +192,14 @@ shrink or wipe on-disk transcripts.
 | 2. Host unmount | `useLayoutEffect` → `mergeComposerDraft` / knobs | `patchSession` invented `{ messages: [] }` when RAM body missing | `patchSession` refuses empty invent; never shrinks `messages` |
 | 3. Persist | `putCachedSession` / `chat_store_save` | Thin overwrite of rich row | `preferRicherSession` in cache + disk queue |
 | 4. After flip | — | Remount reused thin RAM cache | `dropAllCachedBodies(prevId)` after switch |
-| 5. Remount hydrate | `ensureSessionLoaded` | Cache hit skipped disk | `ensureSessionLoaded(wsId, sid, { force: true })` |
+| 5. Remount hydrate | `ensureSessionLoaded` | Cache hit skipped disk after thin RAM | Project leave: `dropAllCachedBodies(prev)` then load. Panel hydrate: **`force` only if cache empty/thin** (085) — keeps rich RAM across Agent↔IDE remount |
 
 ```
 ActivityBar / hub → setActiveWorkspace(next)
   → flushWorkspaceChatPersist(prev) → awaitChatDiskFlushes(prev)
   → set activeId=next → dropAllCachedBodies(prev)
   → (prev hosts unmount; next hosts mount)
-  → ensureSessionLoaded(..., { force: true }) → chat_store_load
+  → ensureSessionLoaded(..., { force: !richCache }) → disk only when cold
   → needsProviderHydration? recoverSessionFromAnyProvider (044)
 ```
 
@@ -208,12 +208,14 @@ ActivityBar / hub → setActiveWorkspace(next)
 | `preferRicherSession(prev, next)` | Keep longer `messages`; allow other field updates |
 | `awaitChatDiskFlushes(wsId?)` | Spin until coalesce queue idle for ws |
 | `dropAllCachedBodies(wsId)` | Clear warm bodies; keep `__idx__` ids |
-| `ensureSessionLoaded(wsId, id, { force })` | Drop body then reload from disk |
+| `ensureSessionLoaded(wsId, id, { force })` | Optional drop-then-disk; callers should force only when RAM body missing/empty |
 
 Tests: `src/chatStoreCache.test.ts` (`npm test`).
 
 Cross-refs: warm Monaco LRU still in `058` (editors); chat hosts stay
 `isActive`-gated (not warm) — that asymmetry is why this flush path exists.
+**Agent Mode ↔ IDE** remounts panels without `dropAllCachedBodies` — see `085`
+(skip `force` when a rich body is already in RAM).
 
 ## Gotchas
 

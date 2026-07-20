@@ -17,6 +17,7 @@
 
 import { useEffect, useState } from "react";
 import { getString as lsGetString, setString as lsSetString } from "./localStore";
+import { markAgentModeSwitch } from "./switchPerf";
 
 const KEY = "lcp.agentMode";
 
@@ -33,6 +34,7 @@ export function getAgentMode(): boolean {
 
 export function setAgentMode(v: boolean): void {
   if (_agent === v) return;
+  markAgentModeSwitch(v ? "agent" : "ide");
   _agent = v;
   if (v) lsSetString(KEY, "1");
   else lsSetString(KEY, "");

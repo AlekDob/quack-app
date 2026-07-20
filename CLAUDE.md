@@ -142,6 +142,9 @@ Pattern: `src/aiTaskStore.ts` / `src/agentStatusStore.ts` (module-level pub/sub 
   - `054-pinky-brain-integration.md` — Pinky Brain: hybrid search, opt-in inject gates, `#` composer cites, MCP setup, `~/.quack/brain` → `~/.pinky/brain` migration.
   - `072-composer-mention-chips.md` — Cursor-style in-composer chips for `#` brain, `@` files/agents; features/skills inline in textarea (`083`).
   - `083-composer-feature-link.md` — composer feature pill (fuzzy + infinite scroll), inline `@slug` highlight, drawer Monaco edit; hub **Feature** badge.
+  - `084-agent-context-panels.md` — Agent Mode right column: `+` add-view menu, Changes/Files + project Terminal top tabs (`AgentTerminalPanel` / `TerminalCore`); StatusBar panel/Ctrl+J/Ctrl+`/`New Terminal` via `agentContextNav`.
+  - `085-agent-ide-mode-toggle.md` — Agents ↔ IDE layout toggle (`lcp.agentMode`): full shell swap; cold cost = chat disk hydrate + terminal reattach; warm path keeps rich RAM transcript (`force` only when cache empty); `[agent-mode-switch]` timings.
+  - `086-perf-audit-window.md` — opt-in companion window: Quack/WebKit process CPU·RAM + switch/new-chat/resume timeline; StatusBar Audit chip / Settings Diagnostics / Ctrl+Alt+P; shared StatusBar `process_stats` (no second poll).
   - `059-quack-brain-store.md` — Quack Store editor tab (`store:<wsId>`), optional extension detect + hybrid install (pipx/cargo), Quack Brain hub segments, SkillOpt-Sleep bridge, gated chat chips.
   - `060-activity-bar-overflow.md` — dynamic view-icons: height-driven visible count, `…` overflow + always-on customize grip, two-zone drag reorder, sidebar vs tab visual split; `lcp.activityBar.*` prefs.
   - `061-plan-mode-tab.md` — Claude Code `ExitPlanMode` plan (inline markdown, never a file) opens as a `plan:` virtual tab forced into a split next to the chat (Cursor-style), as soon as it lands, independent of approve/deny.

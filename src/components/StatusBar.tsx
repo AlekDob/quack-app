@@ -15,6 +15,10 @@ import {
 import { openPalette } from "../paletteBus";
 import { invoke } from "@tauri-apps/api/core";
 import { openTaskManager } from "../taskManagerBus";
+import { toggleAudit } from "../auditWindow";
+import { publishProcessStats } from "../perfAuditBus";
+import { useAgentMode } from "../agentMode";
+import { termIdOfPanel, useAgentContextPanel } from "../agentContextNav";
 
 interface Props {
   onOpenPalette: () => void;
@@ -61,6 +65,12 @@ export function StatusBar({ onOpenPalette }: Props) {
   const sidebarVisible = ws?.layout.sidebarVisible ?? true;
   const bottomVisible = ws?.layout.bottomVisible ?? true;
   const sidebarView = ws?.layout.sidebarView ?? "files";
+  const agentMode = useAgentMode();
+  const agentPanel = useAgentContextPanel(activeId ?? "");
+  const agentTermOpen = agentMode && !!termIdOfPanel(agentPanel);
+  // In Agent Mode the bottom panel is gone — highlight when the right
+  // column is showing a project terminal instead.
+  const panelActive = agentMode ? agentTermOpen : bottomVisible;
 
   // Live resource glance for Quack's own process tree (app + PTY
   // shells + Claude Code subprocesses), polled every 5s. Clicking it
@@ -74,8 +84,21 @@ export function StatusBar({ onOpenPalette }: Props) {
     const tick = async () => {
       try {
         const stats =
-          await invoke<Array<{ cpu: number; mem: number }>>("process_stats");
+          await invoke<
+            Array<{
+              pid: number;
+              parent: number | null;
+              name: string;
+              cmd: string;
+              cpu: number;
+              mem: number;
+              depth: number;
+              killable: boolean;
+              related: boolean;
+            }>
+          >("process_stats");
         if (!cancelled) {
+          publishProcessStats(stats);
           setProcTotals({
             cpu: stats.reduce((a, p) => a + p.cpu, 0),
             mem: stats.reduce((a, p) => a + p.mem, 0),
@@ -131,6 +154,15 @@ export function StatusBar({ onOpenPalette }: Props) {
               : `${Math.round(procTotals.mem / (1024 * 1024))} MB`}
           </button>
         )}
+        <button
+          type="button"
+          className="sb-item sb-audit"
+          onClick={() => void toggleAudit()}
+          title="Perf Audit — processes + switch/hydrate timeline (Ctrl+Alt+P)"
+        >
+          <Icon name="chart-bar" size={11} />
+          Audit
+        </button>
         {ws && (
           <span className="sb-item sb-ws" title={ws.meta.root}>
             <span className="sb-icon">⌥</span>
@@ -308,10 +340,16 @@ export function StatusBar({ onOpenPalette }: Props) {
           <Icon name="git-branch" />
         </button>
         <button
-          className={`sb-btn ${bottomVisible ? "active" : ""}`}
-          title="Toggle Panel (Ctrl+J)"
-          aria-label="Toggle bottom panel"
-          aria-pressed={bottomVisible}
+          className={`sb-btn ${panelActive ? "active" : ""}`}
+          title={
+            agentMode
+              ? "Toggle Terminal (Ctrl+J)"
+              : "Toggle Panel (Ctrl+J)"
+          }
+          aria-label={
+            agentMode ? "Toggle Agent Mode terminal" : "Toggle bottom panel"
+          }
+          aria-pressed={panelActive}
           disabled={!activeId}
           onClick={() => runCommand("view.toggle_panel")}
         >

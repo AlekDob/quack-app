@@ -24,12 +24,19 @@ import { ActivityBar } from "./components/ActivityBar";
 import { AIChatsRail } from "./components/AIChatsRail";
 import { AgentHubWatcher } from "./components/AgentHubWatcher";
 import { DockWindow } from "./components/DockWindow";
+import { PerfAuditWindow } from "./components/PerfAuditWindow";
 import { openDock, isDockEnabled } from "./dock";
 import {
   emitDockSummary,
   DOCK_REQUEST_EVENT,
   DOCK_FOCUS_EVENT,
 } from "./dockSummary";
+import {
+  installAuditRequestListener,
+  setAuditContextProvider,
+} from "./perfAuditBus";
+import { isChatSwitching, getChatSwitchTarget } from "./chatSwitch";
+import { isWorkspaceWarm } from "./workspaceWarmSet";
 import { getAgentStatus, markSeen } from "./agentStatusStore";
 import { CommandPalette } from "./components/CommandPalette";
 import { DragGhost } from "./components/DragGhost";
@@ -65,6 +72,7 @@ import { installResumeDebug } from "./resumeDebug";
 import { prefetchModelDiscovery } from "./modelDiscoveryStore";
 import { teardownBeforeQuit, quitArmed } from "./appQuit";
 import { IS_DEV } from "./devMode";
+import { startAgentModeSimPoll } from "./agentModeSwitchSim";
 import "./App.css";
 
 // When this document was opened as a terminal pop-out window, render only
@@ -88,6 +96,14 @@ const IS_FILE = (() => {
 const IS_DOCK = (() => {
   try {
     return new URLSearchParams(window.location.search).get("dock") === "1";
+  } catch {
+    return false;
+  }
+})();
+
+const IS_AUDIT = (() => {
+  try {
+    return new URLSearchParams(window.location.search).get("audit") === "1";
   } catch {
     return false;
   }
@@ -227,6 +243,21 @@ function MainApp() {
   // about every Monaco/xterm instance worth healing. Idempotent — safe to
   // call again in StrictMode.
   useEffect(() => installResumeDebug(), []);
+
+  // Perf Audit (086): context provider + request listener for the companion
+  // window. No auto-open — opt-in from StatusBar / Settings / command.
+  useEffect(() => {
+    setAuditContextProvider(() => {
+      const activeWsId = useStore.getState().activeId;
+      return {
+        activeWsId,
+        activeWsWarm: activeWsId ? isWorkspaceWarm(activeWsId) : false,
+        chatSwitchTarget: getChatSwitchTarget(),
+        chatSwitching: isChatSwitching(),
+      };
+    });
+    return installAuditRequestListener();
+  }, []);
 
   // Files opened from Finder / Explorer or forwarded by a second instance.
   useEffect(() => {
@@ -429,6 +460,12 @@ function MainApp() {
     }).then((u) => offs.push(u));
     return () => offs.forEach((f) => f());
   }, [hydrated]);
+
+  // Feature 085: poll for one-shot Agent↔IDE sim trigger file (dev only).
+  useEffect(() => {
+    if (!IS_DEV || !hydrated || !splashMinElapsed) return;
+    startAgentModeSimPoll();
+  }, [hydrated, splashMinElapsed]);
 
   // After a Ctrl+R reload, popout windows from the previous session may
   // still be alive. Mark their terminals as popped so the main window
@@ -871,6 +908,7 @@ function MainApp() {
 
 export default function App() {
   if (IS_DOCK) return <DockWindow />;
+  if (IS_AUDIT) return <PerfAuditWindow />;
   if (IS_FILE) return <FilePopoutWindow />;
   return IS_POPOUT ? <TerminalPopoutWindow /> : <MainApp />;
 }

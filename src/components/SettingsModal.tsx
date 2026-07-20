@@ -17,6 +17,11 @@ import {
   setFootprintSettings,
   useFootprintSettings,
 } from "../footprintSettings";
+import {
+  closeAudit,
+  isAuditEnabled,
+  openAudit,
+} from "../auditWindow";
 import { useTheme, useResolvedTheme, type ThemeMode } from "../theme";
 import { onSettingsOpen } from "../settingsBus";
 import { useModalFocus } from "../useModalFocus";
@@ -390,6 +395,7 @@ export function SettingsModal() {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const settings = useEditorSettings();
   const footprint = useFootprintSettings();
+  const [auditOn, setAuditOn] = useState(() => isAuditEnabled());
   const [theme, setTheme] = useTheme();
   const resolvedTheme = useResolvedTheme();
   const activeId = useStore((s) => s.activeId);
@@ -412,6 +418,7 @@ export function SettingsModal() {
   useEffect(() => {
     return onSettingsOpen((section) => {
       pendingSlugRef.current = section ?? null;
+      setAuditOn(isAuditEnabled());
       setOpen(true);
       setView("form");
       setOpenNonce((n) => n + 1);
@@ -739,6 +746,25 @@ export function SettingsModal() {
               Trade-off: a tab pointing at a dropped buffer triggers a
               fresh disk read on click. Worth it for memory wins on
               long-running sessions.
+            </div>
+          </Section>
+
+          <Section title="Diagnostics" id="diagnostics">
+            <Toggle
+              label="Perf Audit window"
+              value={auditOn}
+              onChange={(v) => {
+                setAuditOn(v);
+                if (v) void openAudit();
+                else void closeAudit();
+              }}
+            />
+            <div className="settings-row settings-row-note">
+              Separate always-on-top window: Quack/WebKit process CPU·RAM
+              (shared StatusBar poll) plus a timeline of chat/project
+              switch, new chat, and wake-from-sleep timings. Also from the
+              StatusBar Audit chip or Ctrl+Alt+P. Kill processes via Task
+              Manager (Ctrl+Alt+U).
             </div>
           </Section>
 

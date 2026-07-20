@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-16
-last_verified: 2026-07-17
+last_verified: 2026-07-20
 tags: [chat, performance, hydrate, lazy-load, done, mount, ram, multitask, quack-v1, react-memo]
 ---
 
@@ -97,7 +97,8 @@ Warm ids come from workspace descriptors: `sessionId` of chats with neither
 ```ts
 // Frontend
 hydrateChatStore(wsId, warmIds?) → Promise<void>
-ensureSessionLoaded(wsId, sessionId) → Promise<ChatSession | undefined>
+ensureSessionLoaded(wsId, sessionId, { force? }) → Promise<ChatSession | undefined>
+// force: drop RAM then disk. AIChatPanel forces only when cache empty/thin (085).
 dropCachedSessionBody(wsId, sessionId) → void  // RAM only; disk + index stay
 loadSession / loadSessions  // sync, warm cache only
 listSessionIds(wsId) → string[]  // full disk index
@@ -133,6 +134,7 @@ chat_store_load(wsId, sessionId) → ChatSession | null
 | `009-agent-hub.md` | DONE preview 10 / search 30 (list stays metadata-only) |
 | `075-chat-switch-loader.md` | Veil covers cold `ensureSessionLoaded` latency |
 | `058-workspace-switch-performance.md` | Sibling: heavy UI unload for background workspaces |
+| `085-agent-ide-mode-toggle.md` | Agent↔IDE remount: keep rich RAM body (no blanket `force`) |
 
 ### Verify
 

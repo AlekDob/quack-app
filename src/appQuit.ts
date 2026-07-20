@@ -1,5 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { closeDock } from "./dock";
+import { closeAudit } from "./auditWindow";
 
 let armed = false;
 
@@ -21,11 +22,12 @@ async function closeAuxiliaryWindows(): Promise<void> {
   }
 }
 
-/** Close dock + popouts after the unsaved-changes guard passed. */
+/** Close dock + audit + popouts after the unsaved-changes guard passed. */
 export async function teardownBeforeQuit(): Promise<void> {
   if (armed) return;
   armed = true;
   await closeDock();
+  await closeAudit();
   await closeAuxiliaryWindows();
 }
 

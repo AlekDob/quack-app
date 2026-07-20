@@ -9,6 +9,13 @@ import {
   defaultNewChatAnchor,
   ensureFocusedAIChat,
 } from "./addNewAIChat";
+import { getAgentMode, toggleAgentMode } from "./agentMode";
+import {
+  newAgentTerminal,
+  setAgentContextPanel,
+  termPanelOf,
+  toggleAgentTerminal,
+} from "./agentContextNav";
 import { openPalette } from "./paletteBus";
 import { openSettings } from "./settingsBus";
 import { openTaskManager } from "./taskManagerBus";
@@ -48,8 +55,8 @@ import { joinPath } from "./pathUtils";
 import { QUACK_DISCORD, QUACK_HOME } from "./quackLinks";
 import { revealInTree } from "./revealInTree";
 import { toggleZenMode } from "./zenMode";
-import { toggleAgentMode } from "./agentMode";
 import { toggleDock } from "./dock";
+import { toggleAudit } from "./auditWindow";
 import {
   invalidateClaudeAuthCache,
   scheduleClaudeAuthRecheck,
@@ -364,6 +371,11 @@ export const commands: CommandSpec[] = [
     run: () => {
       const wsId = s().activeId;
       if (!wsId) return;
+      // Agent Mode has no bottom panel — toggle the right-column Terminal.
+      if (getAgentMode()) {
+        toggleAgentTerminal(wsId);
+        return;
+      }
       const ws = s().loaded[wsId];
       if (!ws) return;
       if (ws.layout.bottomVisible && ws.layout.bottomRoot) {
@@ -399,6 +411,16 @@ export const commands: CommandSpec[] = [
     accel: "Ctrl+Shift+D",
     run: () => {
       void toggleDock();
+    },
+  },
+  {
+    id: "view.toggle_audit",
+    label: "Toggle Perf Audit",
+    category: "View",
+    // Ctrl+Shift+A is Agent Mode; Ctrl+Alt+P = Perf.
+    accel: "Ctrl+Alt+P",
+    run: () => {
+      void toggleAudit();
     },
   },
   {
@@ -916,6 +938,10 @@ export const commands: CommandSpec[] = [
     run: () => {
       const wsId = s().activeId;
       if (!wsId) return;
+      if (getAgentMode()) {
+        toggleAgentTerminal(wsId);
+        return;
+      }
       const ws = s().loaded[wsId];
       if (!ws) return;
       if (ws.layout.bottomVisible && ws.layout.bottomRoot) {
@@ -932,7 +958,12 @@ export const commands: CommandSpec[] = [
     category: "Terminal",
     run: () => {
       const wsId = s().activeId;
-      if (wsId) s().addTerminal(wsId, "bottom");
+      if (!wsId) return;
+      if (getAgentMode()) {
+        newAgentTerminal(wsId);
+        return;
+      }
+      s().addTerminal(wsId, "bottom");
     },
   },
   {
@@ -989,12 +1020,17 @@ export const commands: CommandSpec[] = [
             args: ["-lc", 'claude; exec "${SHELL:-/bin/sh}"'],
             label: "Claude Code",
           };
-      // Taller bottom panel so the interactive /login menu is readable.
-      const LOGIN_TERM_H = 440;
-      s().setBottomVisible(wsId, true);
-      const curH = s().loaded[wsId]?.layout.termH ?? 240;
-      s().setTermH(wsId, Math.max(curH, LOGIN_TERM_H));
+      // IDE: taller bottom panel so the interactive /login menu is readable.
+      // Agent Mode: no bottom panel — select the new terminal in the right
+      // column instead so Sign in is interactive there.
+      if (!getAgentMode()) {
+        const LOGIN_TERM_H = 440;
+        s().setBottomVisible(wsId, true);
+        const curH = s().loaded[wsId]?.layout.termH ?? 240;
+        s().setTermH(wsId, Math.max(curH, LOGIN_TERM_H));
+      }
       const termId = s().addTerminal(wsId, "bottom", shell);
+      if (getAgentMode()) setAgentContextPanel(wsId, termPanelOf(termId));
       void beginClaudeLoginWatch(wsId, termId);
       toastInfo(
         "Follow the browser prompt in the terminal, then return here.",

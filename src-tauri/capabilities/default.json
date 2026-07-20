@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Capability for the main window, pop-out terminals, and file windows",
-  "windows": ["main", "popout-*", "file-*", "dock"],
+  "windows": ["main", "popout-*", "file-*", "dock", "audit"],
   "permissions": [
     "core:default",
     "opener:default",

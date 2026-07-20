@@ -53,3 +53,7 @@ Desktop.ini
 
 # Windows tooling shims
 *.lnk
+
+# Agent Mode ↔ IDE toggle sim artifacts (feature 085)
+documentation/.agent-mode-sim-trigger
+documentation/.agent-mode-sim-results.json

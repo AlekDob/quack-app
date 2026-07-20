@@ -23,6 +23,8 @@
 // coupling to module-scope singletons (Monaco has per-editor models,
 // xterm has per-Terminal instances).
 
+import { recordPerfEvent } from "./perfAuditBus";
+
 export type ResumeComponentKind = "monaco" | "xterm";
 
 export interface ResumeComponent {
@@ -165,6 +167,16 @@ function fireResumeOnce(reason: string): void {
       `healed=${entry.healed}`,
     entry,
   );
+
+  // Perf Audit timeline (feature 086) — wake-from-sleep is a common
+  // "suddenly slow then warms up" trigger.
+  recordPerfEvent("resume", reason, {
+    detail: {
+      components: entry.components,
+      healed: entry.healed,
+      heap: entry.heap,
+    },
+  });
 }
 
 /** Read the persisted resume log (oldest → newest). Never throws. */

@@ -17,6 +17,7 @@ import { getEditorSettings, useEditorSettings } from "../editorSettings";
 import { setEditorGoto } from "../editorState";
 import { ContextMenu } from "./ContextMenu";
 import { registerResumeComponent } from "../resumeDebug";
+import { logAgentModePhase } from "../switchPerf";
 
 /**
  * Match `path:line` and `path:line:col` patterns in terminal output so the
@@ -487,10 +488,15 @@ export function TerminalCore({
           id = ptyId;
           // Replay the rolling scrollback the backend kept for us so the
           // terminal looks like it never went away.
+          const replayT0 = performance.now();
+          let replayChars = 0;
           try {
             const buf = await pty.getBuffer(ptyId);
             if (cancelled) return;
-            if (buf) term.write(buf);
+            if (buf) {
+              replayChars = buf.length;
+              term.write(buf);
+            }
           } catch {
             /* ignore */
           }
@@ -504,6 +510,12 @@ export function TerminalCore({
           term.writeln(
             "\r\n\x1b[2m[reattached to running shell]\x1b[22m",
           );
+          logAgentModePhase("terminal attached", {
+            termId,
+            reattached: true,
+            replayMs: Math.round(performance.now() - replayT0),
+            replayChars,
+          });
         } else {
           id = await pty.spawn({
             cwd,
@@ -525,6 +537,10 @@ export function TerminalCore({
           }
           earlyOut.length = 0;
           if (earlyExit) term.writeln("\r\n[process exited]");
+          logAgentModePhase("terminal attached", {
+            termId,
+            reattached: false,
+          });
         }
 
         term.onData((data) => {

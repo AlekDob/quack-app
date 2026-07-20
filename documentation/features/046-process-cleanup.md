@@ -43,6 +43,10 @@ tree-only view hid the real CPU/RAM hog. Related rows are labeled
 started at/after Quack. `process_kill` still refuses anything outside the strict
 tree (including Quack itself and WebKit).
 
+**Companion:** Perf Audit window (`086`) reuses the StatusBar's 5s `process_stats`
+sample for a read-only process table + switch/hydrate timeline; it does not
+replace Task Manager (no kill).
+
 **CPU semantics:** per-core percent since the previous 2s sample (can exceed 100% on multi-threaded processes). Status bar shows the **sum** across the tree (+ related WebKit when present).
 
 **Role column heuristics** (`TaskManagerModal.roleOf`): Quack root → related WebKit → `claude` → Claude Code; `node` → Vite / permission hook / generic Node; `zsh`/`bash` → Terminal shell. ProcStat fields: `killable`, `related`.

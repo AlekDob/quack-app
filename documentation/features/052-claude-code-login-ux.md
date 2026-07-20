@@ -3,8 +3,9 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-10
-last_verified: 2026-07-10
-tags: [claude-code, auth, oauth, login, terminal, composer, onboarding]
+last_verified: 2026-07-20
+tags: [claude-code, auth, oauth, login, terminal, composer, onboarding, agent-mode]
+related: [014-claude-code-bridge.md, 023-session-usage-panel.md, 084-agent-context-panels.md]
 ---
 
 # 052 — Claude Code login UX
@@ -13,7 +14,7 @@ tags: [claude-code, auth, oauth, login, terminal, composer, onboarding]
 
 **Problem:** `claude_code_check` only probes `claude --version`. The CLI stderr `Not logged in · Please run /login` was shown raw in chat. New users had no in-app path to sign in.
 
-**Related:** spawn/stream bridge in [014-claude-code-bridge.md](014-claude-code-bridge.md); OAuth usage panel in [023-session-usage-panel.md](023-session-usage-panel.md).
+**Related:** spawn/stream bridge in [014-claude-code-bridge.md](014-claude-code-bridge.md); OAuth usage panel in [023-session-usage-panel.md](023-session-usage-panel.md); Agent Mode terminal host in [084-agent-context-panels.md](084-agent-context-panels.md).
 
 ## Files
 
@@ -86,12 +87,14 @@ flowchart LR
 
 | Step | Detail |
 |------|--------|
-| 1 | `setBottomVisible(true)` |
-| 2 | `setTermH(max(current, 440))` — taller panel for interactive login menu |
-| 3 | `addTerminal(bottom, claude shell)` |
+| 1 | IDE only: `setBottomVisible(true)` + `setTermH(max(current, 440))` |
+| 2 | `addTerminal(bottom, claude shell)` |
+| 3 | Agent Mode: `setAgentContextPanel(wsId, term:id)` so the right-column Terminal tab hosts the interactive `/login` |
 | 4 | `beginClaudeLoginWatch(wsId, termId)` |
 | 5 | After 1200ms PTY write `/login\r` |
 | 6 | `invalidateClaudeAuthCache` + `scheduleClaudeAuthRecheck` |
+
+**Agent Mode:** bottom panel is unmounted — without step 3, Sign in would spawn a PTY the user cannot see. Same project terminal descriptors; see [084-agent-context-panels.md](084-agent-context-panels.md).
 
 ## Login terminal watcher (`claudeLoginTerminal.ts`)
 
@@ -114,7 +117,7 @@ flowchart LR
 |-------|------|
 | CLI ≠ login | Binary on PATH does not imply OAuth; banner closes false-positive gap |
 | Not a Quack logout | `needs_login` usually means expired refresh or Keychain read failure — not app-initiated logout |
-| `/login` is interactive | Cannot run through `claude -p`; must use real terminal (by design) |
+| Gotcha | Agent Mode | Sign in must call `setAgentContextPanel` — bottom panel is not mounted |
 | macOS Keychain | Locked keychain can make probe and CLI disagree with iTerm until unlocked |
 | Hook noise | `node: command not found` on `~/.quack/hooks/` is separate PATH issue — not auth |
 

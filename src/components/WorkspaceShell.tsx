@@ -34,7 +34,7 @@ import { redockTerminal } from "../terminalPopout";
 import { Icon } from "./Icon";
 import { useZenMode } from "../zenMode";
 import { useChatSwitching } from "../useChatSwitching";
-import { logSwitchPhase } from "../switchPerf";
+import { logAgentModePhase, logSwitchPhase } from "../switchPerf";
 import { endWorkspaceLoad } from "../workspaceSwitchLoader";
 import { endChatSwitch } from "../chatSwitch";
 import { shouldKeepChatHostMounted, useChatHostLiveStatus } from "../chatHostMount";
@@ -102,8 +102,12 @@ function WorkspaceShellInner({ wsId, isActive }: Props) {
   // project (the perceived lag the [chat-switch] logs don't capture). Also the
   // signal to fade the cold-switch loader — the heavy mount is done.
   useEffect(() => {
+    logAgentModePhase("ide-shell mounted", { wsId, isActive });
+  }, [wsId, isActive]);
+  useEffect(() => {
     if (isActive && editorsReady) {
       logSwitchPhase("editors ready", wsId);
+      logAgentModePhase("editors ready", { wsId });
       endWorkspaceLoad(wsId);
     }
   }, [isActive, editorsReady, wsId]);

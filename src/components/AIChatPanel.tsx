@@ -118,7 +118,7 @@ import {
   subscribeAskInput,
 } from "../askQuestionStore";
 import { publishChatDiff } from "../chatDiffStore";
-import { logNewChatPhase } from "../switchPerf";
+import { logAgentModePhase, logNewChatPhase } from "../switchPerf";
 import { summarizeLastTurn, summarizeEdits } from "../sessionDiffStats";
 import { loadWorkspaceRules } from "../workspaceRules";
 import {
@@ -1942,6 +1942,10 @@ export function AIChatPanel({
     let cancelled = false;
     const hydrateT0 = performance.now();
     logChatSwitch("hydrate start", { wsId, aiChatId: aiChatId ?? null });
+    logAgentModePhase("chat hydrate start", {
+      wsId,
+      aiChatId: aiChatId ?? null,
+    });
     // Per-switch resets shared by every branch below. Previous code had
     // the lastUsage + todos clears only in the empty-list else branch,
     // so switching workspaces while either was populated left the
@@ -1955,13 +1959,23 @@ export function AIChatPanel({
     setDiskSessionDurationMs(0);
 
     const finishHydrated = () => {
-      if (cancelled || !onHydrated) return;
-      hydratedKeyRef.current = boundKey;
+      if (cancelled) return;
+      const elapsedMs = Math.round(performance.now() - hydrateT0);
       logChatSwitch("hydrate done", {
         wsId,
         aiChatId: aiChatId ?? null,
-        elapsedMs: Math.round(performance.now() - hydrateT0),
+        elapsedMs,
       });
+      logAgentModePhase("chat hydrate done", {
+        wsId,
+        aiChatId: aiChatId ?? null,
+        elapsedMs,
+      });
+      if (!onHydrated) {
+        hydratedKeyRef.current = boundKey;
+        return;
+      }
+      hydratedKeyRef.current = boundKey;
       onHydrated();
     };
 
@@ -2020,9 +2034,13 @@ export function AIChatPanel({
       if (aiChatId) {
         const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
         const targetSid = desc?.sessionId ?? newSessionId();
-        const found = await ensureSessionLoaded(wsId, targetSid, {
-          force: true,
-        });
+        // Mode toggle remounts AIChatPanel but Agent/IDE hosts often leave a
+        // rich body in RAM — force:true was wiping it and re-reading disk
+        // (~2–4s on long transcripts). Only force when the cache is empty
+        // (project-switch dropAllCachedBodies / DONE unload). See feature 085.
+        const cached = getCachedSession(wsId, targetSid);
+        const force = !cached || cached.messages.length === 0;
+        const found = await ensureSessionLoaded(wsId, targetSid, { force });
         if (cancelled) return;
         const msgs = found
           ? await rehydrateMessageImages(
@@ -2034,6 +2052,7 @@ export function AIChatPanel({
           targetSid,
           msgCount: msgs.length,
           loadMs: Math.round(performance.now() - hydrateT0),
+          cacheHit: !force,
         });
         paintSession(found, targetSid, msgs);
         // End veil after first paint — ending before setMessages left users
