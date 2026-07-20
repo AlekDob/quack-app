@@ -1,5 +1,4 @@
 import type { TurnTokens } from "./contextUsage";
-import { providerSessions } from "./ipc";
 
 /** Shape from `claude_session_drawer_stats` (CC JSONL on disk). */
 export interface SessionDrawerStats {
@@ -32,26 +31,6 @@ export function sessionDurationMs(stats: SessionDrawerStats): number {
     return stats.last_ts_ms - stats.first_ts_ms;
   }
   return 0;
-}
-
-/** Link a Quack chat row to a CC JSONL when the session id was never saved. */
-export async function guessClaudeSessionId(
-  root: string,
-  assistantTurns: number,
-): Promise<string | undefined> {
-  if (assistantTurns <= 0) return undefined;
-  try {
-    const list = await providerSessions.listSessions(root, "claude-code");
-    const exact = list.find((s) => s.turn_count === assistantTurns);
-    if (exact) return exact.id;
-    const close = list.filter(
-      (s) => Math.abs(s.turn_count - assistantTurns) <= 1,
-    );
-    if (close.length === 1) return close[0].id;
-    return undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 export interface DiskBillingPatch {

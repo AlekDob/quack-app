@@ -102,7 +102,7 @@ in the active workspace ran its own trio).
 
 | Effect | Interval / trigger | Gated? |
 |---|---|---|
-| Disk JSONL hydrate (`guessClaudeSessionId`, `drawerStats`) | 12 s + on activate | yes — `wsActive && chatVisible`, catch-up on switch-back |
+| Disk JSONL hydrate (`drawerStats` when `providerSessionIds` set) | 12 s + on activate | yes — `wsActive && chatVisible`, catch-up on switch-back; **no** turn-count sid guess |
 | Plan limits (`claude_usage_limits`) | 30 s | yes — `wsActive && chatVisible` |
 | Claude auth probe | 60 s | yes — `wsActive && chatVisible` |
 | Ollama auto-retry loop | 4 s → 30 s backoff | yes |

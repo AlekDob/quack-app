@@ -301,7 +301,6 @@ import {
 } from "../contextUsage";
 import {
   contextTokensFromDisk,
-  guessClaudeSessionId,
   mergeDiskBilling,
 } from "../sessionDiskHydrate";
 import { SessionUsageCircle } from "./SessionUsageCircle";
@@ -4665,13 +4664,10 @@ export function AIChatPanel({
   };
 
   // Hydrate drawer + ring from CC JSONL when stream usage is absent.
+  // Never invent a Claude Code session id from turn_count — that mixed
+  // Quack chats with the wrong JSONL. Sid comes only from stream-json
+  // or an explicit ⟲ Sessions pick (feature 044).
   const diskHydrateGenRef = useRef(0);
-  // Remember the last (root, turnCount) we ran guessClaudeSessionId for.
-  // That guess parses the whole ~/.claude project dir; the 12s poll used to
-  // re-run it every tick whenever the sid stayed unresolved, re-parsing
-  // hundreds of MB on a loop. Attempt it once per distinct turn count only.
-  const guessAttemptRef = useRef("");
-  const assistantTurnCount = messages.filter((m) => m.role === "assistant").length;
 
   useEffect(() => {
     if (!selectedIsCC) {
@@ -4687,17 +4683,7 @@ export function AIChatPanel({
 
     const poll = async () => {
       if (cancelled || gen !== diskHydrateGenRef.current) return;
-      let sid = claudeSessionId;
-      const guessKey = `${root}:${assistantTurnCount}`;
-      if (!sid && assistantTurnCount > 0 && guessAttemptRef.current !== guessKey) {
-        guessAttemptRef.current = guessKey;
-        sid = await guessClaudeSessionId(root, assistantTurnCount);
-        if (sid && !cancelled && gen === diskHydrateGenRef.current) {
-          setProviderSessionIds((prev) =>
-            setProviderSessionId(prev, "claude-code", sid!),
-          );
-        }
-      }
+      const sid = claudeSessionId;
       if (!sid) return;
       try {
         const stats = await claudeCode.drawerStats(root, sid);
@@ -4761,7 +4747,6 @@ export function AIChatPanel({
     claudeSessionId,
     root,
     liveContextTokens,
-    assistantTurnCount,
     streaming,
   ]);
 
@@ -5288,13 +5273,13 @@ export function AIChatPanel({
                   provider,
                   id,
                 );
-                const hydrated: ChatMessage[] = loaded.map((m) => ({
+                const raw: ChatMessage[] = loaded.map((m) => ({
                   role: m.role as ChatMessage["role"],
                   content: m.content,
                   tool_calls: m.tool_calls,
                   tool_results: m.tool_results,
                 }));
-                setMessages(hydrated);
+                const hydrated = await applyLoadedMessages(raw);
                 toastInfo(
                   `Resumed ${provider} session — ${hydrated.length} message${hydrated.length === 1 ? "" : "s"} restored`,
                 );

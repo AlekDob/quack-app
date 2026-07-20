@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-17
+last_verified: 2026-07-20
 tags: [session, usage, context, progress, claude-code, popover, monitor, quack-v1]
 ---
 
@@ -110,10 +110,12 @@ Subagent `result` events (`parent_tool_use_id`) are ignored for both metrics.
 | `fmtTokenCount(n)` | `1.2k` / `1.0M` labels |
 
 Fallback when no stream snapshot: `claude_session_drawer_stats` (context +
-billing + duration from JSONL) polls every 12s when `claudeSessionId` is known
-(or guessed by turn count). Legacy `claude_session_context_usage` kept for
-context-only reads. **Poll runs only when `wsActive` (`activeId === wsId`)** —
-immediate catch-up on project switch-back; see `058-workspace-switch-performance.md`.
+billing + duration from JSONL) polls every 12s **only when**
+`providerSessionIds["claude-code"]` is already known (stream-json or ⟲ Sessions).
+Do **not** invent a sid from turn count — that mixed Quack chats with the wrong
+JSONL (see `044`). Legacy `claude_session_context_usage` kept for context-only
+reads. **Poll runs only when `wsActive` (`activeId === wsId`)** — immediate
+catch-up on project switch-back; see `058-workspace-switch-performance.md`.
 
 ## Context breakdown (popover segments)
 
@@ -167,7 +169,7 @@ hardcoded hex).
 | `src-tauri/src/claude_sessions.rs` | `claude_session_drawer_stats` + usage rollup |
 | `src-tauri/src/session_jsonl.rs` | Shared `last_context_snap`, `claude_jsonl_path` |
 | `src-tauri/src/context_assets.rs` | Skills/agents scan (shared with Usage → Context view) |
-| `src/sessionDiskHydrate.ts` | JSONL merge helpers + session-id guess |
+| `src/sessionDiskHydrate.ts` | JSONL merge helpers (`contextTokensFromDisk`, `mergeDiskBilling`) — **no** session-id guess |
 | `src/providers/claudeCode.ts` | Stream snapshot + `context_snapshot` events |
 | `src/ai.ts` | `ChatStreamEvent` — `usage.contextTokens`, `context_snapshot` |
 | `src/components/SessionUsageCircle.tsx` | Ring button + popover host (toggle state) |

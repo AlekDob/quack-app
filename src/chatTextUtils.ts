@@ -127,6 +127,27 @@ export function stripCliFlattenScaffold(content: string): string {
 }
 
 /**
+ * Undo Quack's per-turn Claude Code prefix. Send path prepends
+ * `[Editor context]…[/Editor context]` (QUACK EDITOR, Agent identity,
+ * attachments, …) only on the wire; the Quack row keeps bare user text.
+ * CLI JSONL recovery / ⟲ Sessions re-import the prefixed form — strip it
+ * so history never shows the orchestrator prompt as a user bubble.
+ */
+export function stripEditorContextPrefix(content: string): string {
+  const open = "[Editor context]\n";
+  const close = "\n[/Editor context]";
+  if (!content.startsWith(open)) return content;
+  const end = content.indexOf(close, open.length);
+  if (end === -1) return content;
+  return content.slice(end + close.length).replace(/^\n+/, "");
+}
+
+/** Flatten scaffold first, then Editor context (nested or sequential). */
+export function sanitizeUserMessageContent(content: string): string {
+  return stripEditorContextPrefix(stripCliFlattenScaffold(content));
+}
+
+/**
  * Strip messages that should never be rendered or replayed from a
  * persisted chat session:
  *   - role:"system" rows (older versions stored the rebuilt system
@@ -153,11 +174,11 @@ export function cleanStaleToolMessages(messages: ChatMessage[]): ChatMessage[] {
       if (/^Unknown tool:/i.test(m.content)) return false;
       return true;
     })
-    // Heal recovered CLI transcripts whose first user turn still carries the
-    // flattened `[System]…[User]…` prompt (would render as a giant bubble).
+    // Heal recovered CLI transcripts: flatten scaffold + Editor context
+    // prefix (would otherwise render as giant user bubbles).
     .map((m) =>
       m.role === "user"
-        ? { ...m, content: stripCliFlattenScaffold(m.content) }
+        ? { ...m, content: sanitizeUserMessageContent(m.content) }
         : m,
     );
   const out: ChatMessage[] = [];

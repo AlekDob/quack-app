@@ -4,6 +4,7 @@ import { saveSession } from "./chatHistory";
 import type { ProviderId } from "./providers/types";
 import { readProviderSessionIds } from "./providerSession";
 import { PROVIDER_LOAD_MESSAGE_CAP, providerSessions } from "./ipc";
+import { cleanStaleToolMessages } from "./chatTextUtils";
 
 const AGENTIC: ProviderId[] = ["claude-code", "cursor-cli"];
 
@@ -37,12 +38,14 @@ export function needsProviderHydration(
 function toChatMessages(
   loaded: Awaited<ReturnType<typeof providerSessions.loadSession>>,
 ): ChatMessage[] {
-  return loaded.map((m) => ({
-    role: m.role as ChatMessage["role"],
-    content: m.content,
-    tool_calls: m.tool_calls,
-    tool_results: m.tool_results,
-  }));
+  return cleanStaleToolMessages(
+    loaded.map((m) => ({
+      role: m.role as ChatMessage["role"],
+      content: m.content,
+      tool_calls: m.tool_calls,
+      tool_results: m.tool_results,
+    })),
+  );
 }
 
 /** Pull on-disk CLI transcript when the Quack row is thinner. */

@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-07
-last_verified: 2026-07-17
+last_verified: 2026-07-20
 tags: [sessions, claude-code, cursor-cli, opencode-cli, resume, terminal, provider-session, bridge, disk, quack-v1, performance]
 ---
 
@@ -69,10 +69,12 @@ Lookup: `chat_store_lookup_link(provider, cliSessionId)`.
 | Wiring | `src/components/AIChatPanel.tsx` |
 | Id read/write | `src/providerSession.ts` |
 | Unified list/load (Rust) | `src-tauri/src/provider_sessions.rs` → `provider_list_sessions`, `provider_load_session` (both **async + `spawn_blocking`**, per-file summary cache) |
-| Disk-hydrate poll + session-id guess | `src/components/AIChatPanel.tsx` (diskHydrate effect), `src/sessionDiskHydrate.ts` → `guessClaudeSessionId` |
+| Disk-hydrate poll (usage / ring from JSONL) | `src/components/AIChatPanel.tsx` (diskHydrate effect), `src/sessionDiskHydrate.ts` (`drawerStats` helpers) — **no** turn-count session-id guess |
 | JSONL parser (shared) | `src-tauri/src/session_jsonl.rs` |
 | CC list/load (legacy invoke) | `claude_code_list_sessions`, `claude_code_load_session` — still available |
-| Thin-row recovery | `src/chatProviderRecovery.ts` |
+| Thin-row recovery | `src/chatProviderRecovery.ts` (+ `cleanStaleToolMessages` strip) |
+| User-message sanitization | `src/chatTextUtils.ts` → `stripEditorContextPrefix`, `stripCliFlattenScaffold`, `sanitizeUserMessageContent`, `cleanStaleToolMessages` |
+| Tests | `src/chatTextUtils.test.ts` |
 | Platform pin (model picker) | `src/chatPinnedProvider.ts`, `src/components/modelPickerPlatform.tsx` — see **`057-platform-pin.md`** |
 | Styles | `src/App.css` → `.ai-provider-session-*`, `.model-picker-platform-*`, session rows |
 
@@ -100,7 +102,9 @@ Shown when the active model is `claude-code`, `cursor-cli`, or `opencode-cli`.
 | **Terminal icon** | CC + Cursor only |
 
 `onResume(provider, id)`: sets `providerSessionIds`, hydrates from
-`provider_load_session` (CC + Cursor JSONL; OpenCode resume-only for now).
+`provider_load_session` (CC + Cursor JSONL; OpenCode resume-only for now),
+then runs `cleanStaleToolMessages` / `applyLoadedMessages` so wire prefixes
+never land in the visible transcript.
 
 ### Data flow
 
@@ -110,14 +114,26 @@ Agentic stream emits session_id
   → saveSession → chat_store_save + provider-links upsert
 
 User clicks ⟲ Sessions row
-  → setProviderSessionId + provider_load_session → setMessages
+  → setProviderSessionId + provider_load_session
+  → cleanStaleToolMessages / applyLoadedMessages → setMessages
   → next turn passes resumeSessionId to provider chat()
 
 Mount with thin / short Quack row
   → recoverSessionFromAnyProvider → first richer CLI transcript wins
+  → toChatMessages already runs cleanStaleToolMessages (wire prefixes stripped)
   → thin = assistants < users OR ≤16 Quack messages with a linked CLI id
     (covers vite-only / restart truncations where assistants ≥ users)
 ```
+
+### Session identity safety (2026-07-20)
+
+| Rule | Why |
+|---|---|
+| **Never invent** `providerSessionIds` from turn_count / list heuristics | Two CC JSONL files often share the same turn count → wrong `--resume` + recovery overwrites Quack history with another chat |
+| Sid sources | (1) stream-json `session_id` on first agentic turn, (2) explicit ⟲ Sessions pick |
+| Display vs wire | Send keeps `displayUserMsg` (bare text) in Quack state; `ccPrefix` (`[Editor context]…`) goes only to the CLI |
+| Re-import sanitization | `sanitizeUserMessageContent` = `stripCliFlattenScaffold` then `stripEditorContextPrefix` — used by `cleanStaleToolMessages` on load / recover / ⟲ resume |
+| Already-wrong links | Not auto-cleared; user re-links via ⟲ Sessions. Polluted bubbles heal on next open via strip |
 
 ### Platform pin (one CLI per chat)
 
@@ -164,7 +180,7 @@ main-thread freeze on launch and on chat switch**:
 |---|---|
 | Command ran **synchronously on the Tauri main thread** → blocked the webview IPC pump → JS timers drifted ~1 s, UI froze | `provider_list_sessions` + `provider_load_session` → `async` + `tauri::async_runtime::spawn_blocking` |
 | Re-parsed the **whole dir on every call** | Per-file summary cache in `summarize_jsonl`, gated on **(mtime, size)** — inactive JSONL parsed once ever; only the live session re-parses (one small file) |
-| Frontend `guessClaudeSessionId` (in the 12 s disk-hydrate poll) re-ran the full parse **every tick** when a chat had no saved `claudeSessionId` | `guessAttemptRef` in `AIChatPanel` — the guess runs once per distinct assistant-turn count, not every poll |
+| Frontend used to call `guessClaudeSessionId` from the 12 s disk-hydrate poll whenever a chat had no saved sid — re-parsed the project dir and could link the **wrong** CC JSONL by turn_count | **Removed** (2026-07-20). Sid comes only from stream-json `session_id` or an explicit ⟲ Sessions pick; poll skips JSONL stats when sid is absent |
 
 ### Performance — giant JSONL / WebKit RAM (2026-07-17)
 
@@ -197,8 +213,10 @@ nothing. `sample <pid>` on the Rust process is the fastest locator.
 - **Interactive CLI ≠ headless bridge** — only one should stream at a time.
 - **Duplicate CLI id across Quack tabs** — linked-title badges surface it; last writer wins on next send.
 - **Platform pin** — switching CLI mid-chat starts a fresh server-side session; use "Change platform…" only when you mean it.
-- **Flattened first-turn prompt on recovery** — the CLI stores the whole `[System]…[User]…` first-turn `-p` packet as its first user message; recovery would render it as a giant `[System]…` user bubble. `stripCliFlattenScaffold` (`chatTextUtils.ts`, called from `cleanStaleToolMessages`) unwraps it to the real user text on load, healing old + new sessions.
-- **Never call `provider_list_sessions` synchronously per-render/per-poll** — it parses potentially hundreds of MB of JSONL. It is `spawn_blocking` + cached now, but a caller that fires it on a tight loop still spins disk I/O. Attempt session-id guesses once per turn-count (see the freeze-fix table), and prefer a saved `providerSessionIds[provider]` over guessing.
+- **Flattened first-turn prompt on recovery** — the CLI stores the whole `[System]…[User]…` first-turn `-p` packet as its first user message; recovery would render it as a giant `[System]…` user bubble. `stripCliFlattenScaffold` (`chatTextUtils.ts`, via `sanitizeUserMessageContent` / `cleanStaleToolMessages`) unwraps it to the real user text on load, healing old + new sessions.
+- **Editor context prefix on recovery** — Quack sends `[Editor context]…[/Editor context]` (QUACK EDITOR, Agent identity, attachments) only on the CC wire; the Quack row stores bare user text. Re-importing CLI JSONL without stripping showed that block as a user bubble. `stripEditorContextPrefix` runs on every load/recover/⟲ resume.
+- **Never invent a CC session id from turn_count** — the old `guessClaudeSessionId` helper mixed Quack chats with unrelated JSONL when two sessions shared a turn count. Link only via stream-json or ⟲ Sessions.
+- **Never call `provider_list_sessions` synchronously per-render/per-poll** — it parses potentially hundreds of MB of JSONL. It is `spawn_blocking` + cached now, but a caller that fires it on a tight loop still spins disk I/O. Prefer a saved `providerSessionIds[provider]`; do not guess.
 - **watcher.rs recursive, no ignore list** (separate, tracked follow-up) — `fs_watch_start` watches each root `RecursiveMode::Recursive` with no `target/`/`node_modules/`/`.git` exclusion, so build/dev-server churn floods `fs:event` → per-workspace `git status` + tree rescans. Not part of this fix.
 
 ### Future

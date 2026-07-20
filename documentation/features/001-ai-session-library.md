@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-17
+last_verified: 2026-07-20
 tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, workspace, zustand, persistence]
 ---
 
@@ -35,7 +35,8 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | Service | `src/aiBus.ts` | `requestAIPrompt` (`chatId` scopes to one host) |
 | Service | `src/chatHistory.ts` | `ChatSession` + sync load/save API (cache-backed) |
 | Service | `src/chatStoreCache.ts` | Hydrate from disk, legacy localStorage migrate, async flush |
-| Service | `src/chatProviderRecovery.ts` | Thin-row recovery from CLI on-disk transcripts |
+| Service | `src/chatProviderRecovery.ts` | Thin-row recovery from CLI on-disk transcripts; sanitizes via `cleanStaleToolMessages` |
+| Service | `src/chatTextUtils.ts` | `stripEditorContextPrefix` / `stripCliFlattenScaffold` — hide CC wire prefixes on re-import |
 | Service | `src/chatPersistFlush.ts` | Flush registry — all mounted panels save before chat switch |
 | Service | `src/composerDraft.ts` | `mergeComposerDraft`, `mergeSessionKnobs` — via `patchSession` |
 | Service | `src/providerSession.ts` | `providerSessionIds` read/write; legacy `claudeSessionId` migration |
@@ -86,6 +87,11 @@ hub row stays (Agent Mode parity: list is source of truth). Hub row **×** /
 `closeAIChat` drops the descriptor + tab but **keeps** the transcript file
 on disk (orphan until ⟲ Sessions re-link). **Delete** removes disk + descriptor.
 See `009`, `043`, `044`. **Mark done** also dismisses the editor tab.
+
+### Gotcha — CLI recovery must not invent sid / leak wire prompts
+Never guess `providerSessionIds` from turn count (mixed chats). On CLI
+re-import, strip `[Editor context]` / flatten scaffolds via
+`cleanStaleToolMessages`. See `044` + `bugs/001-session-mix-editor-context-leak`.
 
 ### Gotcha — new chat + switch veil
 `addNewAIChat` pulses `veil: false`. That path must **clear** an in-flight switch pulse (`finish`), otherwise hosts stay `!is-visible` until CAP and the new tab looks missing. See `075-chat-switch-loader.md`.
