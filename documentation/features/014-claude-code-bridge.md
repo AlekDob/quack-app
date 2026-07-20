@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-13
+last_verified: 2026-07-20
 tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog, rust, performance]
 ---
 
@@ -38,7 +38,7 @@ tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog
 | `claude_code_load_session` | parse one JSONL into `LoadedMessage[]` for resume hydrate |
 
 Session id ↔ Quack chat UI (chip, terminal resume, picker badges): `044-provider-session-bridge.md`.
-
+First-turn prompt flatten / image path reinject: `src/providers/cliPrompt.ts` (shared with Cursor). Cross-project `--resume` fork: bug `004`.
 ### Per-run thread model (one spawn → 4 threads)
 | Thread | Job | Touches the `Child`? |
 |---|---|---|

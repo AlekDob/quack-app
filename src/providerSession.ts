@@ -33,3 +33,15 @@ export function setProviderSessionId(
   else delete next[provider];
   return next;
 }
+
+/** Next wins per provider when set; prev fills gaps (thin remount must not wipe). */
+export function mergeProviderSessionIds(
+  prev: Partial<Record<ProviderId, string>>,
+  next: Partial<Record<ProviderId, string>>,
+): Partial<Record<ProviderId, string>> {
+  const out: Partial<Record<ProviderId, string>> = { ...prev };
+  for (const [k, v] of Object.entries(next) as [ProviderId, string][]) {
+    if (v) out[k] = v;
+  }
+  return out;
+}

@@ -205,7 +205,7 @@ ActivityBar / hub → setActiveWorkspace(next)
 
 | API | Role |
 |---|---|
-| `preferRicherSession(prev, next)` | Keep longer `messages`; `preferSessionTitle` keeps real titles over `Untitled` |
+| `preferRicherSession(prev, next)` | Keep longer `messages`; `preferSessionTitle` keeps real titles over `Untitled`; merge `providerSessionIds` so thin remounts cannot wipe CLI `--resume` links (`044`) |
 | `preferSessionTitle(prev, next)` | Never let empty/`Untitled` wipe a good session title |
 | `awaitChatDiskFlushes(wsId?)` | Spin until coalesce queue idle for ws |
 | `dropAllCachedBodies(wsId)` | Clear warm bodies; keep `__idx__` ids |

@@ -47,6 +47,29 @@ describe("preferRicherSession", () => {
     expect(out.messages).toHaveLength(10);
     expect(out.title).toBe("Good name");
   });
+
+  it("keeps CLI session ids when a thin row omits them", () => {
+    const prev = row("a", 10, {
+      providerSessionIds: { "claude-code": "cc-old" },
+      claudeSessionId: "cc-old",
+    });
+    const next = row("a", 2, { providerSessionIds: {} });
+    const out = preferRicherSession(prev, next);
+    expect(out.providerSessionIds?.["claude-code"]).toBe("cc-old");
+    expect(out.claudeSessionId).toBe("cc-old");
+  });
+
+  it("lets next overwrite a provider id when set", () => {
+    const prev = row("a", 5, {
+      providerSessionIds: { "claude-code": "cc-old" },
+    });
+    const next = row("a", 5, {
+      providerSessionIds: { "claude-code": "cc-new" },
+    });
+    expect(preferRicherSession(prev, next).providerSessionIds?.["claude-code"]).toBe(
+      "cc-new",
+    );
+  });
 });
 
 describe("putCachedSession shrink guard", () => {

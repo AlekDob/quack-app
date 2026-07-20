@@ -67,14 +67,15 @@ Lookup: `chat_store_lookup_link(provider, cliSessionId)`.
 | ⟲ Sessions picker (multi-provider) | `src/components/chatPanelChrome.tsx` → `ProviderSessionsButton` |
 | Legacy CC-only picker | `chatPanelChrome.tsx` → `ClaudeSessionsButton` (kept, unused in header) |
 | Wiring | `src/components/AIChatPanel.tsx` |
-| Id read/write | `src/providerSession.ts` |
+| Id read/write | `src/providerSession.ts` (`mergeProviderSessionIds`, read/write) |
+| First-turn flatten + image wire hint | `src/providers/cliPrompt.ts` (`wireUserContent`, `flattenMessages`) |
 | Unified list/load (Rust) | `src-tauri/src/provider_sessions.rs` → `provider_list_sessions`, `provider_load_session` (both **async + `spawn_blocking`**, per-file summary cache) |
 | Disk-hydrate poll (usage / ring from JSONL) | `src/components/AIChatPanel.tsx` (diskHydrate effect), `src/sessionDiskHydrate.ts` (`drawerStats` helpers) — **no** turn-count session-id guess |
 | JSONL parser (shared) | `src-tauri/src/session_jsonl.rs` |
 | CC list/load (legacy invoke) | `claude_code_list_sessions`, `claude_code_load_session` — still available |
 | Thin-row recovery | `src/chatProviderRecovery.ts` (+ `cleanStaleToolMessages` strip) |
 | User-message sanitization | `src/chatTextUtils.ts` → `stripEditorContextPrefix`, `stripCliFlattenScaffold`, `sanitizeUserMessageContent`, `cleanStaleToolMessages` |
-| Tests | `src/chatTextUtils.test.ts` |
+| Tests | `src/chatTextUtils.test.ts`, `src/providers/cliPrompt.test.ts`, `src/chatStoreCache.test.ts` (link merge) |
 | Platform pin (model picker) | `src/chatPinnedProvider.ts`, `src/components/modelPickerPlatform.tsx` — see **`057-platform-pin.md`** |
 | Styles | `src/App.css` → `.ai-provider-session-*`, `.model-picker-platform-*`, session rows |
 
@@ -110,30 +111,45 @@ never land in the visible transcript.
 
 ```
 Agentic stream emits session_id
-  → AIChatPanel sets providerSessionIds[provider]
-  → saveSession → chat_store_save + provider-links upsert
+  → AIChatPanel: providerSessionIdsRef + setState
+  → patchSession IMMEDIATELY (id on disk before project-switch flush)
+  → later saveSession / messages effect also writes provider-links upsert
 
 User clicks ⟲ Sessions row
   → setProviderSessionId + provider_load_session
   → cleanStaleToolMessages / applyLoadedMessages → setMessages
-  → next turn passes resumeSessionId to provider chat()
+  → next turn passes resumeSessionId from providerSessionIdsRef
 
 Mount with thin / short Quack row
   → recoverSessionFromAnyProvider → first richer CLI transcript wins
   → toChatMessages already runs cleanStaleToolMessages (wire prefixes stripped)
   → thin = assistants < users OR ≤16 Quack messages with a linked CLI id
     (covers vite-only / restart truncations where assistants ≥ users)
+  → does NOT auto-pick orphan sibling JSONLs (see bug 004)
 ```
 
+### Gotchas (cross-project)
+
+| Symptom | Cause | Mitigation |
+|---|---|---|
+| New CC UUID after workspace switch | Resume id missing on send / wiped on disk merge | `providerSessionIdsRef` + immediate patch; `preferRicherSession` keeps links |
+| “No images” after follow-up | Lost-resume flatten dropped `message.images` | `wireUserContent` in `cliPrompt.ts` |
+| Two CLI links → one Quack chat | Fork already happened; upsert is additive | ⟲ Sessions re-link; no auto-merge |
+| Quack thin, CLI rich (same id) | Mid-run save / vite-only | `recoverSessionFromAnyProvider` on mount |
 ### Session identity safety (2026-07-20)
 
 | Rule | Why |
 |---|---|
 | **Never invent** `providerSessionIds` from turn_count / list heuristics | Two CC JSONL files often share the same turn count → wrong `--resume` + recovery overwrites Quack history with another chat |
 | Sid sources | (1) stream-json `session_id` on first agentic turn, (2) explicit ⟲ Sessions pick |
+| **Persist sid immediately** on `session` / CC init | Project switch mid-turn used to flush a row without the id → next follow-up spawn a **new** JSONL and overwrite the Quack link (seen: astronaut `1b9e6e56` then `f136f591` on the same chat) |
+| **`providerSessionIdsRef` on send** | `chatStream` resume id comes from the ref, not a stale React closure after remount |
+| **`preferRicherSession` keeps CLI links** | Thin remount/`{}` must not wipe `providerSessionIds`; next wins only when it sets a provider |
 | Display vs wire | Send keeps `displayUserMsg` (bare text) in Quack state; `ccPrefix` (`[Editor context]…`) goes only to the CLI |
+| **Flatten reinjects `message.images`** | Lost-resume first-turn flatten reads path metadata via `wireUserContent` in `cliPrompt.ts` so the CLI still gets Read hints |
+| Wire cadence | `ccWirePrompt.ts`: skip prefix for **any** CC slash (`/compact`, `/init`, `/review`, custom commands); reinject static QUACK EDITOR + Agent identity only on first CC wire / agent·Plan change / turn after slash; ephemeral hints (files, images, brain) still per-turn when present |
 | Re-import sanitization | `sanitizeUserMessageContent` = `stripCliFlattenScaffold` then `stripEditorContextPrefix` — used by `cleanStaleToolMessages` on load / recover / ⟲ resume |
-| Already-wrong links | Not auto-cleared; user re-links via ⟲ Sessions. Polluted bubbles heal on next open via strip |
+| Already-wrong / forked links | Not auto-merged; user re-links via ⟲ Sessions. Orphan richer JSONLs stay on disk. Polluted bubbles heal on next open via strip |
 
 ### Platform pin (one CLI per chat)
 

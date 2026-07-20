@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-13
+last_verified: 2026-07-20
 tags: [claude-code, cursor-cli, opencode-cli, chat, images, attachments, paste, drag-drop, compression, modal, vision]
 ---
 
@@ -17,8 +17,9 @@ tags: [claude-code, cursor-cli, opencode-cli, chat, images, attachments, paste, 
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Logic + bus | `src/imageAttach.ts` | `compressAndSave`, `attachFromBlob`, `rehydrateMessageImages`, `userMessageDisplayText`, `providerAcceptsImages` |
+| CLI wire flatten | `src/providers/cliPrompt.ts` | `wireUserContent`, `flattenMessages`, `lastUserMessage` — reinjects `message.images` paths when `--resume` is lost |
 | Queue | `src/composerQueue.ts` | `QueuedComposerMessage`, `queueItemFromSend`, `queueImagesAsAttachments`, persist strip |
-| Composer | `src/components/AIChatPanel.tsx` | `attachedImages`, `appendImages`, queue drain with images |
+| Composer | `src/components/AIChatPanel.tsx` | `attachedImages`, `appendImages`, queue drain with images; live turn uses `[Editor context]` paths |
 | User bubble | `src/components/UserMessageBar.tsx` | `UserMessageImageDeck` in bar aside (32px pile, fan on hover) |
 | Provider types | `src/providers/types.ts` | `supportsVision?` on `ProviderModel`; `imageAttachments?` on `chat()` |
 | Router | `src/ai.ts` | `chatStream(..., imageAttachments?)` passthrough |
@@ -29,6 +30,7 @@ tags: [claude-code, cursor-cli, opencode-cli, chat, images, attachments, paste, 
 | Backend | `src-tauri/src/fs_ops.rs` | temp dir `quack-attachments/` |
 | Type | `src/ai.ts` | `ChatMessage.images?: {path, name, thumb}[]` |
 | Tool chip | `src/components/chatToolRender.tsx` | Read of image path → teal pill + drawer preview |
+| Test | `src/providers/cliPrompt.test.ts` | Flatten / last-user reinject image paths |
 
 ### Provider delivery matrix
 | Provider | Mechanism | Vision requirement |
@@ -56,6 +58,7 @@ tags: [claude-code, cursor-cli, opencode-cli, chat, images, attachments, paste, 
 
 ### Notes / gotchas
 - **Why temp dir:** keeps repo clean; CC Ask mode may permission-prompt on out-of-workspace Read (015).
+- **Display vs wire:** Quack stores bare text + `images[]` metadata; live CC/Cursor turns put paths in `[Editor context]`. If `--resume` is lost and Quack flattens history, `wireUserContent` re-appends Read-tool paths from metadata (bug `004`, feature `044`) — without that, the model sees text-only history.
 - **Cursor ≠ native vision:** no `--image` CLI flag; path-in-prompt only.
 - **OpenCode custom models:** add `modalities.input: ["text","image"]` in `opencode.json` or images never reach the model.
 - **localStorage lean:** only path + thumb on `ChatMessage.images`; full bytes on disk.

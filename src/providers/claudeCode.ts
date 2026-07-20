@@ -1,8 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import type { ChatMessage, ChatStreamEvent, ToolCall } from "../ai";
+import type { ChatStreamEvent, ToolCall } from "../ai";
 import { ccAliasContextWindow, contextTokensFromApiUsage } from "../contextUsage";
 import type { ChatProvider, ProviderModel } from "./types";
+import { flattenMessages, lastUserMessage } from "./cliPrompt";
 import { getWorkspaceRoot } from "../wsRoot";
 import { getJson as lsGetJson } from "../localStore";
 
@@ -165,41 +166,6 @@ async function checkAvailability(): Promise<boolean> {
 export function invalidateClaudeCodeCache(): void {
   availabilityCache = null;
   modelsCache = null;
-}
-
-/**
- * On a resumed session Claude Code already has the prior history server-
- * side, so we only need to send the most recent user turn. Falls back
- * to the empty string if no user message exists (shouldn't happen).
- */
-function lastUserMessage(messages: ChatMessage[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role === "user") return m.content;
-  }
-  return "";
-}
-
-/**
- * Flatten our internal ChatMessage history into a single prompt string for
- * `claude -p`. Used only on the FIRST turn of a Claude Code conversation —
- * subsequent turns reuse the server-side session via --resume and send
- * just the latest user message.
- */
-function flattenMessages(messages: ChatMessage[]): string {
-  const parts: string[] = [];
-  for (const m of messages) {
-    if (m.role === "system") {
-      parts.push(`[System]\n${m.content}\n`);
-    } else if (m.role === "user") {
-      parts.push(`[User]\n${m.content}\n`);
-    } else if (m.role === "assistant") {
-      if (m.content) parts.push(`[Assistant]\n${m.content}\n`);
-    } else if (m.role === "tool") {
-      parts.push(`[Tool result]\n${m.content}\n`);
-    }
-  }
-  return parts.join("\n");
 }
 
 export const claudeCodeProvider: ChatProvider = {

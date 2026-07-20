@@ -213,6 +213,10 @@ import {
   stripBrainSaveBlocks,
 } from "../brainSave";
 import { quackAgentCorePrompt, quackClaudeCodeEditorPrompt } from "../brainPrompt";
+import {
+  isClaudeCodeBareSlash,
+  planCcWireRefresh,
+} from "../ccWirePrompt";
 import { installedIds, quackExtensions } from "../quackExtensions";
 import { isExtensionInstalled } from "../extensionGate";
 import {
@@ -273,12 +277,14 @@ import {
   type ChatComposerDraft,
 } from "../composerDraft";
 import {
+  hasQueueKnobs,
   normalizeQueuedDraft,
   queueImagesAsAttachments,
   queueItemFromSend,
   queuePromptText,
   rehydrateQueue,
   stripQueueForPersist,
+  type QueuedComposerKnobs,
   type QueuedComposerMessage,
 } from "../composerQueue";
 import {
@@ -1117,6 +1123,8 @@ export function AIChatPanel({
   const [providerSessionIds, setProviderSessionIds] = useState<
     Partial<Record<ProviderId, string>>
   >({});
+  const providerSessionIdsRef = useRef(providerSessionIds);
+  providerSessionIdsRef.current = providerSessionIds;
   const [pinnedProviderId, setPinnedProviderId] = useState<
     ProviderId | undefined
   >();
@@ -1149,6 +1157,10 @@ export function AIChatPanel({
   const ccEffortRef = useRef(ccEffort);
   const ccPermModeRef = useRef(ccPermMode);
   const ccThinkingRef = useRef(ccThinking);
+  // CC `[Editor context]` policy — see `ccWirePrompt.ts` (/compact bare + refresh).
+  const ccWireLastAgentRef = useRef<string | null | undefined>(undefined);
+  const ccWireLastPlanRef = useRef<boolean | undefined>(undefined);
+  const ccWireForceRefreshRef = useRef(false);
   presetIdRef.current = presetId;
   selectedRef.current = selected;
   ccEffortRef.current = ccEffort;
@@ -1799,9 +1811,16 @@ export function AIChatPanel({
           obj.subtype === "init" &&
           typeof obj.session_id === "string"
         ) {
-          setProviderSessionIds((prev) =>
-            setProviderSessionId(prev, "claude-code", obj.session_id as string),
+          const nextIds = setProviderSessionId(
+            providerSessionIdsRef.current,
+            "claude-code",
+            obj.session_id as string,
           );
+          providerSessionIdsRef.current = nextIds;
+          setProviderSessionIds(nextIds);
+          patchSession(wsId, sessionId, {
+            ...writeProviderSessionIds(nextIds),
+          });
         }
         // Token-level deltas via --include-partial-messages. Append
         // each text_delta straight to streaming. The wrapping
@@ -2500,10 +2519,43 @@ export function AIChatPanel({
     };
   }, [wsId]);
 
-  // drainQueue is a stable useCallback([]), so it MUST call the latest
+  const liveQueueKnobs = (): QueuedComposerKnobs => ({
+    presetId: presetIdRef.current,
+    model: selectedRef.current || "",
+    effort: ccEffortRef.current,
+    thinking: ccThinkingRef.current,
+    permMode: ccPermModeRef.current,
+  });
+  const applyQueueKnobs = (item: QueuedComposerMessage) => {
+    if (!hasQueueKnobs(item)) return;
+    // Stamp refs BEFORE setState — drain → send must see Nora/effort
+    // before React re-renders (same pattern as Pass-the-ball).
+    presetIdRef.current = item.presetId;
+    setPresetId(item.presetId);
+    if (item.model) {
+      selectedRef.current = item.model;
+      setSelected(item.model);
+    }
+    if (item.effort !== undefined) {
+      ccEffortRef.current = item.effort;
+      setCcEffort(item.effort);
+    }
+    if (item.thinking !== undefined) {
+      ccThinkingRef.current = item.thinking;
+      setCcThinking(item.thinking);
+    }
+    if (item.permMode !== undefined) {
+      ccPermModeRef.current = item.permMode;
+      setCcPermMode(item.permMode);
+    }
+  };
   const pushQueue = useCallback(
-    (text: string, images: ImageAttachment[] = []) => {
-      const item = queueItemFromSend(text, images);
+    (
+      text: string,
+      images: ImageAttachment[] = [],
+      knobs?: QueuedComposerKnobs,
+    ) => {
+      const item = queueItemFromSend(text, images, knobs ?? liveQueueKnobs());
       if (!item) return;
       queueRef.current.push(item);
       syncQueueUi();
@@ -2526,25 +2578,47 @@ export function AIChatPanel({
   // very first render's sendUserText, whose stale `messages`/`selected`
   // silently dropped queued follow-ups.
   const sendUserTextRef = useRef<
-    ((text: string, images?: ImageAttachment[]) => Promise<void>) | null
+    | ((
+        text: string,
+        images?: ImageAttachment[],
+        opts?: { onTurnStarted?: () => void },
+      ) => Promise<boolean>)
+    | null
   >(null);
+  const drainInFlightRef = useRef(false);
   const drainQueue = useCallback(async () => {
-    if (queueRef.current.length === 0) return;
-    const next = queueRef.current.shift();
-    syncQueueUi();
+    if (drainInFlightRef.current) return;
+    const next = queueRef.current[0];
     if (!next) return;
-    const imgs = await queueImagesAsAttachments(next);
-    const prompt = queuePromptText(next);
-    // One message per drain — the turn's `finally` re-schedules drain
-    // for the rest. A `while` here spun forever when sendUserText
-    // re-queued defensively (stale `streaming === ""` closure) and
-    // immediately returned, pegging WebKit at 100% CPU + GB of RAM.
-    await sendUserTextRef.current?.(prompt, imgs);
+    // Peek first — only consume after sendUserText past early exits.
+    // Shifting at turn-start (not after await) keeps the card from
+    // lingering mid-send and blocks a duplicate drain of the same item.
+    drainInFlightRef.current = true;
+    try {
+      applyQueueKnobs(next);
+      const imgs = await queueImagesAsAttachments(next);
+      const prompt = queuePromptText(next);
+      // One message per drain — the turn's `finally` re-schedules drain
+      // for the rest. A `while` here spun forever when sendUserText
+      // re-queued defensively (stale `streaming === ""` closure) and
+      // immediately returned, pegging WebKit at 100% CPU + GB of RAM.
+      await sendUserTextRef.current?.(prompt, imgs, {
+        onTurnStarted: () => {
+          if (queueRef.current[0] === next) {
+            queueRef.current.shift();
+            syncQueueUi();
+          }
+        },
+      });
+    } finally {
+      drainInFlightRef.current = false;
+    }
   }, [syncQueueUi]);
   // Keep the ref pointing at this render's sendUserText (defined
   // further down; the effect runs post-render so the binding exists).
   useEffect(() => {
-    sendUserTextRef.current = (t, imgs) => sendUserText(t, messages, imgs ?? []);
+    sendUserTextRef.current = (t, imgs, opts) =>
+      sendUserText(t, messages, imgs ?? [], opts);
   });
 
   // Stage image attachments from a Cmd+V paste or a Finder drop. Compresses
@@ -2676,6 +2750,19 @@ export function AIChatPanel({
         chatId: newChatId,
         text: queuePromptText(item),
         images: item.images?.map(({ id, path, name }) => ({ id, path, name })),
+        knobs: hasQueueKnobs(item)
+          ? {
+              presetId: item.presetId,
+              model: item.model,
+              ...(item.effort !== undefined ? { effort: item.effort } : {}),
+              ...(item.thinking !== undefined
+                ? { thinking: item.thinking }
+                : {}),
+              ...(item.permMode !== undefined
+                ? { permMode: item.permMode }
+                : {}),
+            }
+          : undefined,
         send: true,
       });
     });
@@ -3190,13 +3277,22 @@ export function AIChatPanel({
   // sees the latest sendUserText / queue state on every event without
   // having to re-subscribe each render.
   const handleExternalPromptRef = useRef<
-    (text: string, immediate: boolean, images?: ImageAttachment[]) => void
+    (
+      text: string,
+      immediate: boolean,
+      images?: ImageAttachment[],
+      knobs?: QueuedComposerKnobs,
+    ) => void
   >(() => {});
   handleExternalPromptRef.current = (
     text: string,
     immediate: boolean,
     images: ImageAttachment[] = [],
+    knobs?: QueuedComposerKnobs,
   ) => {
+    if (knobs && hasQueueKnobs({ text: "", ...knobs })) {
+      applyQueueKnobs({ text: "", ...knobs });
+    }
     if (!immediate) {
       setInput(text);
       if (images.length > 0) setAttachedImages(images);
@@ -3206,7 +3302,7 @@ export function AIChatPanel({
     setInput("");
     setAttachedImages([]);
     if (streaming !== null || runningTools) {
-      pushQueue(text, images);
+      pushQueue(text, images, knobs);
       return;
     }
     void sendUserText(
@@ -3234,9 +3330,14 @@ export function AIChatPanel({
         if (ws && Object.keys(ws.aiChats).length > 0) return;
       }
       const imgs = req.images?.length
-        ? await queueImagesAsAttachments({ text: req.text, images: req.images })
+        ? await queueImagesAsAttachments({
+            text: req.text,
+            images: req.images,
+            presetId: req.knobs?.presetId ?? null,
+            model: req.knobs?.model ?? "",
+          })
         : [];
-      handleExternalPromptRef.current(req.text, req.send, imgs);
+      handleExternalPromptRef.current(req.text, req.send, imgs, req.knobs);
     });
   }, [wsId, aiChatId]);
 
@@ -3244,9 +3345,10 @@ export function AIChatPanel({
     text: string,
     baseMessages: ChatMessage[] = messages,
     images: ImageAttachment[] = [],
-  ) => {
+    opts?: { onTurnStarted?: () => void },
+  ): Promise<boolean> => {
     if ((!text && images.length === 0) || !(selectedRef.current || selected))
-      return;
+      return false;
     // User wrote instead of clicking Pass the ball — keep discussing.
     const pendingPlan = planBuyInRef.current;
     if (pendingPlan) {
@@ -3265,7 +3367,7 @@ export function AIChatPanel({
     // closure and re-queue forever inside drainQueue's old `while`.
     if (liveTurnRef.current) {
       pushQueue(text, images);
-      return;
+      return false;
     }
     cancelBackgroundWake();
     // Mark the live loop as the stream's owner so the attach effect
@@ -3292,8 +3394,11 @@ export function AIChatPanel({
       );
       liveTurnRef.current = false;
       setTurnAgentId(undefined);
-      return;
+      return false;
     }
+
+    // Past early exits — consume the queue head (drain) / notify callers.
+    opts?.onTurnStarted?.();
 
     // Flip the turn-status dock on immediately, before the (potentially
     // slow, first-turn-only) system-prompt assembly below — workspace
@@ -3405,6 +3510,26 @@ export function AIChatPanel({
     // Claude Code natively loads CLAUDE.md + reads files via its own tools.
     // Cursor also runs its own tool loop but still needs rules inlined.
     const skipAllInlining = selectedProvider === "claude-code";
+    // Meta-/custom slash (`/compact`, `/init`, `/review`, …) must reach the
+    // CLI as bare text — wrapping them in `[Editor context]` breaks the
+    // command and wastes IN tokens. Static blocks (QUACK EDITOR + Agent
+    // identity) only reinject when the agent/plan changes, on first CC wire,
+    // or after a bare slash (`ccWirePrompt.ts`).
+    const bareCcSlash = skipAllInlining && isClaudeCodeBareSlash(text);
+    const inPlanMode = ccPermModeRef.current === "plan";
+    const ccWire = skipAllInlining
+      ? planCcWireRefresh({
+          bareSlash: bareCcSlash,
+          isFirstCcWire: !providerSessionIdsRef.current["claude-code"],
+          agentId: agentAtSend,
+          planMode: inPlanMode,
+          lastAgentId: ccWireLastAgentRef.current,
+          lastPlanMode: ccWireLastPlanRef.current,
+          forceRefresh: ccWireForceRefreshRef.current,
+        })
+      : null;
+    const allowCcEphemeral = !ccWire?.skipPrefix;
+    const allowCcStatic = !!ccWire?.injectStatic;
 
     // Workspace AI rules. Claude Code natively loads CLAUDE.md so we
     // skip the inline injection for that provider — duplicating the
@@ -3430,7 +3555,7 @@ export function AIChatPanel({
     // the active-file hint stopped working exactly when conversations
     // got going.
     const ccTurnContext: string[] = [];
-    if (skipAllInlining || providerRunsOwnTools) {
+    if ((skipAllInlining || providerRunsOwnTools) && allowCcEphemeral) {
       // Hint to the user's request which file they're focused on —
       // unless the active file is on the AI privacy exclusion list,
       // in which case we omit the hint entirely so the model never
@@ -3579,24 +3704,26 @@ export function AIChatPanel({
       // Core prompt already sets identity + tools + the EFFICIENCY rule; no
       // "be thorough" mandate here (that tripled per-turn cost — decisions/004).
       // Resumed CC turns send only the latest user message — sysParts vanish
-      // after turn one. Orchestrator tool contract must ride in ccTurnContext.
+      // after turn one. Orchestrator tool contract must ride in ccTurnContext
+      // when `allowCcStatic` (first wire / agent·plan change / post-/compact).
       // Works protocol rides along only when Works tracking is on.
       // ExitPlanMode only when composer is Plan — otherwise CC errors.
-      const inPlanMode = ccPermMode === "plan";
-      ccTurnContext.push(
-        quackClaudeCodeEditorPrompt(getWorkInjectEnabled(wsId), inPlanMode),
-      );
-      if (planning && inPlanMode) {
+      if (allowCcStatic) {
         ccTurnContext.push(
-          [
-            "[Quack Plan — active]",
-            "Planning session: when the plan is ready call ExitPlanMode with the full markdown plan.",
-            "Do NOT write plans to ~/.claude/plans/ or paste a plan-only summary — ExitPlanMode merges into the linked feature `.md` (Composer Feature pill) or opens a plan preview; Quack shows Pass the ball to Milo.",
-            "Do NOT create stories (S-NNN) for the plan — Features are the durable plan target.",
-            "Use AskUserQuestion for multiple-choice clarifications (not plain-text option lists).",
-            "[/Quack Plan]",
-          ].join("\n"),
+          quackClaudeCodeEditorPrompt(getWorkInjectEnabled(wsId), inPlanMode),
         );
+        if (planning && inPlanMode) {
+          ccTurnContext.push(
+            [
+              "[Quack Plan — active]",
+              "Planning session: when the plan is ready call ExitPlanMode with the full markdown plan.",
+              "Do NOT write plans to ~/.claude/plans/ or paste a plan-only summary — ExitPlanMode merges into the linked feature `.md` (Composer Feature pill) or opens a plan preview; Quack shows Pass the ball to Milo.",
+              "Do NOT create stories (S-NNN) for the plan — Features are the durable plan target.",
+              "Use AskUserQuestion for multiple-choice clarifications (not plain-text option lists).",
+              "[/Quack Plan]",
+            ].join("\n"),
+          );
+        }
       }
     } else {
       sysParts.push(
@@ -3622,7 +3749,7 @@ export function AIChatPanel({
     const pinkyInstalled = pinkyBrainExt && (await isExtensionInstalled(root, "pinky-brain"));
     const pinkyReady = pinkyInstalled && getBrainInjectEnabled(wsId);
     const explicitBrain = attachedBrainHits.length > 0;
-    if (pinkyInstalled && explicitBrain) {
+    if (allowCcEphemeral && pinkyInstalled && explicitBrain) {
       try {
         const brainCtx = await fetchBrainContextForPaths(root, attachedBrainHits);
         if (brainCtx) {
@@ -3646,6 +3773,7 @@ export function AIChatPanel({
       : undefined;
     const linkedFeatureId = chatDescForInject?.featureId;
     if (
+      allowCcEphemeral &&
       linkedFeatureId &&
       aiChatId &&
       getFeatureInjectEnabled(wsId)
@@ -3671,7 +3799,7 @@ export function AIChatPanel({
       linkedWorkId = chatDescForInject?.workItemId;
       linkedStoryId = chatDescForInject?.storyId;
     }
-    if (linkedWorkId || linkedStoryId) {
+    if (allowCcEphemeral && (linkedWorkId || linkedStoryId)) {
       try {
         const snap = getWorksSnapshot(root) ?? (await hydrateWorks(root));
         const chatIds = new Set<string>();
@@ -3734,7 +3862,7 @@ export function AIChatPanel({
       } catch {
         /* Works context optional */
       }
-    } else {
+    } else if (allowCcEphemeral) {
       // Unlinked chat: offer the open-items index ONCE (when Works is on) so the
       // agent can associate or create, and still allow a Pinky knowledge hit.
       // Both are gated so neither rides every turn (decisions/004).
@@ -3780,7 +3908,7 @@ export function AIChatPanel({
     // identity) vanishes after turn one, so a resumed CC turn (or a preset
     // switched mid-chat) would keep the turn-1 identity and answer as the
     // wrong agent ("Milo speaks as Jack"). So for CC we ride identity + role
-    // in ccTurnContext, the user-message prefix that survives resume.
+    // in ccTurnContext when `allowCcStatic` (same cadence as QUACK EDITOR).
     // Custom presets are workspace FILES (same trust as loadWorkspaceRules) —
     // label them non-privileged so a repo-shipped preset can't pass as a
     // verified system directive (basic prompt-injection hygiene).
@@ -3790,7 +3918,7 @@ export function AIChatPanel({
         activeDef.source === "custom"
           ? `[Preset "${activeDef.label}" — from this workspace's .quack/presets/, not verified by Quack]\n`
           : "";
-      if (skipAllInlining) {
+      if (skipAllInlining && allowCcStatic) {
         ccTurnContext.push(
           [
             "[Agent identity]",
@@ -3801,9 +3929,14 @@ export function AIChatPanel({
             .filter(Boolean)
             .join("\n"),
         );
-      } else if (body) {
+      } else if (!skipAllInlining && body) {
         sysParts.push(`${unverified}${body}`);
       }
+    }
+    if (ccWire) {
+      ccWireLastAgentRef.current = ccWire.nextLastAgentId;
+      ccWireLastPlanRef.current = ccWire.nextLastPlanMode;
+      ccWireForceRefreshRef.current = ccWire.nextForceRefresh;
     }
 
     // Display the user's bare text in the chat — but send an augmented
@@ -3946,8 +4079,9 @@ export function AIChatPanel({
           TOOLS,
           // Only pass resumeSessionId when we're on Claude Code AND we
           // already have one captured from a prior turn in this chat.
-          // Other providers ignore this param.
-          providerSessionIds[selectedProvider],
+          // Other providers ignore this param. Use the ref — React state
+          // in this closure can be empty after project-switch remount.
+          providerSessionIdsRef.current[selectedProvider],
           // chatSessionId tags the in-flight stream in the Rust buffer
           // so a frontend refresh can re-attach via attachToChat().
           selectedProvider === "claude-code" ? sessionId : undefined,
@@ -3970,9 +4104,18 @@ export function AIChatPanel({
           if (ev.kind === "session") {
             // Captured the Claude Code session id — store it so the next
             // turn passes --resume <id> and avoids re-flattening history.
-            setProviderSessionIds((prev) =>
-              setProviderSessionId(prev, selectedProvider, ev.id),
+            // Persist immediately: a project switch mid-turn must not lose
+            // the link before the messages effect flushes.
+            const nextIds = setProviderSessionId(
+              providerSessionIdsRef.current,
+              selectedProvider,
+              ev.id,
             );
+            providerSessionIdsRef.current = nextIds;
+            setProviderSessionIds(nextIds);
+            patchSession(wsId, sessionId, {
+              ...writeProviderSessionIds(nextIds),
+            });
             continue;
           }
           if (ev.kind === "usage") {
@@ -4557,6 +4700,7 @@ export function AIChatPanel({
         setTimeout(() => void drainQueue(), 0);
       }
     }
+    return true;
   };
 
   const stop = () => {
@@ -7156,6 +7300,12 @@ export function AIChatPanel({
       <ComposerQueue
         messages={queuedMessages}
         turnActive={turnActive}
+        resolveAvatar={(msg) => {
+          // Legacy items without a real snapshot fall back to the live
+          // session agent so the card still shows who will send.
+          const id = hasQueueKnobs(msg) ? msg.presetId : presetId;
+          return resolveActivePresetDef(id, customPresets)?.avatar ?? null;
+        }}
         onSendNow={sendQueuedNow}
         onMultitask={multitaskQueued}
         onRemove={removeQueueAt}

@@ -25,6 +25,16 @@ export interface AIPromptImageMeta {
   name: string;
 }
 
+/** Optional agent knobs carried with a multitask / external prompt
+ *  so the target chat sends as the queued agent, not its default pill. */
+export interface AIPromptKnobs {
+  presetId: string | null;
+  model: string;
+  effort?: string;
+  thinking?: boolean | null;
+  permMode?: string | null;
+}
+
 export interface AIPromptRequest {
   /** Workspace this request is targeting; chat panels in other
    *  workspaces ignore the event. */
@@ -37,6 +47,8 @@ export interface AIPromptRequest {
   text: string;
   /** Disk paths for queued image follow-ups (multitask / external send). */
   images?: AIPromptImageMeta[];
+  /** Snapshot from a queued follow-up (agent + effort + model). */
+  knobs?: AIPromptKnobs;
   /** When true, immediately dispatch the message after filling.
    *  When false, leave it in the composer so the user can edit
    *  before sending. */

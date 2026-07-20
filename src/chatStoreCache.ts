@@ -2,6 +2,11 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ChatSession } from "./chatHistory";
 import type { ProviderId } from "./providers/types";
 import { getJson, remove, getString, setJson } from "./localStore";
+import {
+  mergeProviderSessionIds,
+  readProviderSessionIds,
+  writeProviderSessionIds,
+} from "./providerSession";
 
 const MAX_SESSIONS = 30;
 const LEGACY_KEY = (wsId: string) => `lcp.ollama.history.${wsId}`;
@@ -312,6 +317,19 @@ export function preferSessionTitle(prev: string, next: string): string {
   return n;
 }
 
+/** Keep CLI links when a thin/partial row omits them (cross-project remount). */
+function preferProviderSessionFields(
+  prev: ChatSession,
+  next: ChatSession,
+): Pick<ChatSession, "providerSessionIds" | "claudeSessionId"> {
+  return writeProviderSessionIds(
+    mergeProviderSessionIds(
+      readProviderSessionIds(prev),
+      readProviderSessionIds(next),
+    ),
+  );
+}
+
 /** Keep richer message lists — composer unmount patches must not wipe transcripts. */
 export function preferRicherSession(
   prev: ChatSession | undefined,
@@ -319,15 +337,17 @@ export function preferRicherSession(
 ): ChatSession {
   if (!prev) return next;
   const title = preferSessionTitle(prev.title, next.title);
+  const links = preferProviderSessionFields(prev, next);
   if (next.messages.length >= prev.messages.length) {
-    return title === next.title ? next : { ...next, title };
+    const base = title === next.title ? next : { ...next, title };
+    return { ...base, ...links };
   }
   console.warn(
     "[chatStore] refuse shrink",
     next.id,
     `${prev.messages.length}→${next.messages.length}`,
   );
-  return { ...next, messages: prev.messages, title };
+  return { ...next, messages: prev.messages, title, ...links };
 }
 
 /** Drop all warm bodies for a workspace (keep index) — remount reloads disk. */

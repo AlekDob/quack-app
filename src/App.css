@@ -10363,7 +10363,15 @@ html.audit-root #root {
   flex: 1 1 auto;
   min-width: 8px;
 }
+.ai-queue-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
 .ai-queue-text {
+  flex: 1 1 auto;
+  min-width: 0;
   margin: 0;
   font-size: 12px;
   line-height: 1.4;
@@ -10371,6 +10379,12 @@ html.audit-root #root {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ai-queue-agent-avatar {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 .ai-queue-thumbs {
   display: flex;

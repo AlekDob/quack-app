@@ -2,8 +2,8 @@
 type: feature
 project: quack-desktop
 created: 2026-07-05
-last_verified: 2026-07-13
-tags: [chat, composer, queue, ux, multitasking, bugfix]
+last_verified: 2026-07-20
+tags: [chat, composer, queue, ux, multitasking, bugfix, presets]
 ---
 
 # 039 — Composer message queue (Cursor-style)
@@ -51,7 +51,7 @@ CSS flex `order` stack (see `003-design-system.md`):
 Each queued message renders as `.ai-queue-card`:
 
 - **Header** (first card only): `{N} Queued` · `↵ to Send` · **Start Multitasking ▾** · remove (×)
-- **Body:** truncated one-line preview of the message text; optional **image thumb row** (`.ai-queue-thumbs`, 36px) when the item has attachments
+- **Body:** truncated one-line preview + **assigned-agent avatar** (right); optional **image thumb row** (`.ai-queue-thumbs`, 36px) when the item has attachments
 - **Footer** (2+ cards): inline Remove on subsequent cards
 
 Styling uses design tokens only (`--bg-alt`, `--border`, `--fg-muted`) —
@@ -75,24 +75,28 @@ No toast on enqueue — the card is the feedback.
 ### Drain (automatic)
 
 When `sendUserText` finishes (`finally`), if `queueRef` is non-empty,
-`drainQueue()` shifts **one** `QueuedComposerMessage`, rehydrates image
-attachments from disk if needed, and awaits a single send; the next item
-drains when that follow-up turn's `finally` runs.
+`drainQueue()` **peeks** the head `QueuedComposerMessage`, applies its
+snapshotted agent knobs (preset / model / effort / thinking / permMode),
+rehydrates images, and awaits a single send. The head is **shifted only
+when the turn actually starts** (`onTurnStarted`, past no-model / hard-cap
+early exits) so a failed start no longer drops the item or stalls the rest.
+The next item drains when that follow-up turn's `finally` runs.
 
 ```
 turn ends (finally)
   liveTurnRef ← false          // synchronous, before drain
   if queueRef non-empty:
     setTimeout(drainQueue, 0)
-      shift one QueuedComposerMessage
-      queueImagesAsAttachments(next)   // rebuild thumbs from disk paths
-      sendUserTextRef(prompt, imgs)  // starts new turn OR re-queues
+      peek head QueuedComposerMessage
+      applyQueueKnobs(next)      // restore agent + effort + model
+      queueImagesAsAttachments(next)
+      sendUserTextRef(prompt, imgs, { onTurnStarted → shift })
       turn ends → finally → drain next item …
 ```
 
 Uses `sendUserTextRef` so the stable `useCallback([])` closure always
 calls the latest `sendUserText` (stale `messages`/`selected` bug fix
-predates this doc).
+predates this doc). `sendUserText` returns `boolean` (`false` on early exit).
 
 #### `liveTurnRef` vs React `streaming`
 
@@ -159,12 +163,25 @@ direction now", not "send my follow-ups after abort". Differs from Send now.
 |---|---|---|
 | `queueRef` (`QueuedComposerMessage[]`) | Per chat session | Source of truth for drain logic |
 | `queuedMessages` (`useState`) | Mirror of ref | Drives `ComposerQueue` render |
-| `QueuedComposerMessage` | `{ text, images? }` | `images` = disk `{ id, path, name, thumb? }`; thumbs stripped before persist |
+| `QueuedComposerMessage` | `{ text, images?, presetId, model, effort?, thinking?, permMode? }` | Agent knobs snapshotted at enqueue; thumbs stripped before persist |
 | `liveTurnRef` (`boolean`) | Per `AIChatPanel` mount | Sync turn-in-flight flag; `false` before drain |
 | `ChatSession.composer.queue` | Persisted | `QueuedComposerMessage[]`; legacy `string[]` normalized on load |
-| `pushQueue(text, images?)` | Helper | Builds item via `queueItemFromSend`; no-op if empty |
+| `pushQueue(text, images?, knobs?)` | Helper | Builds item via `queueItemFromSend` + live refs; no-op if empty |
 | `removeQueueAt` / `clearQueue` / `syncQueueUi` | Helpers | Keep ref + state in sync |
-| `drainQueue` / `sendUserTextRef` | Drain pipeline | One shift per call; ref → latest `sendUserText(text, msgs, imgs)` |
+| `drainQueue` / `sendUserTextRef` | Drain pipeline | Peek → apply knobs → send; shift on `onTurnStarted` |
+
+### Agent snapshot (2026-07-20)
+
+Each queued follow-up carries the **composer agent at enqueue time**
+(SubagentPill preset + live model / effort / thinking / permMode). Changing
+the pill after enqueue does **not** retarget items already in the queue.
+Drain restores those knobs onto refs before send (same ref-sync pattern as
+Pass-the-ball). Multitask **New chat** forwards `AIPromptRequest.knobs` so
+the parallel tab sends as the assigned agent. Queue cards show the agent
+avatar via `resolveAvatar` (legacy items without knobs fall back to the
+live session agent).
+
+Vitest: `src/composerQueue.test.ts`.
 
 ### Image queue (2026-07-13)
 
@@ -177,7 +194,7 @@ showed an Italian toast and dropped the send. Now images ride along:
 | Persist | `stripQueueForPersist` — only `{ id, path, name }` on `ChatSession.composer.queue` |
 | Restore | `normalizeQueuedDraft` accepts legacy `string[]`; `rehydrateQueue` rebuilds thumbs |
 | Drain | `queueImagesAsAttachments` → `sendUserText(prompt, messages, imgs)` |
-| Multitask | `AIPromptRequest.images` → target panel rehydrates and sends |
+| Multitask | `AIPromptRequest.images` + optional `knobs` → target panel applies agent then sends |
 
 Images-only follow-ups use prompt `"See the attached images."` (same as immediate send).
 
@@ -200,6 +217,11 @@ follow-ups would be lost on switch.
 - **Do not** drain the queue in a `while` loop — see **Production freeze** above.
 - **Do not** use React `streaming` / `runningTools` inside `sendUserText` to
   decide whether to re-queue when `drainQueue` calls in — use `liveTurnRef`.
+- **Do not** shift the queue head before `sendUserText` past early exits —
+  peek + `onTurnStarted` shift; otherwise no-model / hard-cap drops the item
+  and stalls remaining auto-drain.
+- **Do not** call `applyPreset()` alone on drain — that resets effort/model
+  to preset defaults and wipes user tweaks snapshotted on the item.
 - Multitask **New chat** only sends the **first** queued message; the rest
   stay on the busy panel and drain when that turn ends.
 - Queue + draft persist on `ChatSession.composer` — see `040-per-session-composer-state.md`.

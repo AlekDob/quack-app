@@ -174,9 +174,10 @@ Rather than hardcode guesses, the user maps tiers to real models themselves:
   - **Non-CC** (Ollama/OpenAI/Anthropic/Cursor/OpenCode resend the full system each turn) →
     appended to `sysParts`.
   - **Claude Code** (`skipAllInlining`) → an `[Agent identity]` block (identity line + role
-    instructions) is pushed into `ccTurnContext`, which is prepended to every user message
-    (`ccPrefix`) and therefore survives resume. This is what keeps a preset changed mid-chat — and
-    the agent's very identity — effective on turn 2+ (see "Default agent + identity survives resume").
+    instructions) rides in `ccTurnContext` / `ccPrefix` — but only when `planCcWireRefresh`
+    says to reinject (`src/ccWirePrompt.ts`): first CC wire, agent or Plan-mode change, or the
+    turn after a bare slash (`/compact`, `/init`, `/review`, custom…). Same-agent follow-ups skip the static block
+    (still in CLI history). All CC slashes send **bare** text so the CLI sees the command first.
   - When `def.source === "custom"` the block is wrapped with
     `[Preset "X" — from this workspace's .codetta/presets/, not verified by Quack]` — see Security
     note below.
@@ -378,8 +379,8 @@ load — old chats are not retroactively rewritten.
 after turn 1 the system message — identity included — vanished; a resumed CC turn (or a preset
 switched mid-chat) kept the turn-1 identity and answered as the wrong agent even though the
 message header showed the new one. Fix: for CC (`skipAllInlining`), push an `[Agent identity]`
-block into `ccTurnContext` (prepended to every user message via `ccPrefix`), the same channel
-already used for the orchestrator contract + Works protocol. Non-CC providers keep the plain
+block into `ccTurnContext` (via `ccPrefix`) on the cadence in `ccWirePrompt.ts` — first wire /
+agent·Plan change / post-`/compact` — not on every follow-up. Non-CC providers keep the plain
 `sysParts` append.
 
 | Concern | Where |
@@ -389,7 +390,7 @@ already used for the orchestrator contract + Works protocol. Non-CC providers ke
 | Empty-seed preset | `store.addAIChat` → `putCachedSession({ …, presetId: DEFAULT_PRESET_ID })` |
 | Provider race | `presetKnobsPendingRef` retries when CC/Cursor availability lands |
 | Milo shipped tier | `builtins.ts` `builder.defaults.modelTier: "reasoning"` (→ `claude-code:opus`) |
-| CC identity injection | `AIChatPanel.sendUserText` — `[Agent identity]` block in `ccTurnContext` when `skipAllInlining` |
+| CC identity injection | `AIChatPanel.sendUserText` + `ccWirePrompt.ts` — `[Agent identity]` when `injectStatic` |
 
 **Prior root cause still relevant** (`applyPreset` + empty picker): `applyPreset` reads the
 agentic backend from the composer's `selected` model; a brand-new tab mounts with `selected === ""`
@@ -410,9 +411,11 @@ Settings tier map (`lcp.tierModelMap.v1`) > `capabilities.modelForTier` (Milo/Ja
 - **CC resume drops `sysParts` — identity too.** Claude Code resumes send only the latest user
   message, so anything in the system message (`sysParts`) — including the `You are {label}`
   identity line — is gone from turn 2 on. Anything that must persist across a CC session
-  (identity, preset role-instructions, orchestrator contract, Works protocol) belongs in
-  `ccTurnContext` (the `ccPrefix` on every user message), **never** in a "first message only"
-  branch. This is the "Milo speaks as Jack" bug — see "Default agent + identity survives resume".
+  (identity, preset role-instructions, orchestrator contract) belongs in `ccTurnContext` /
+  `ccPrefix`, gated by `ccWirePrompt.ts` (reinject on first wire / agent·Plan change /
+  post-`/compact` — not every follow-up). Never put identity only in a "first message only"
+  `sysParts` branch. This is the "Milo speaks as Jack" bug — see "Default agent + identity
+  survives resume". Meta-slashes (`/compact`, …) must stay bare (no prefix).
 - **Built-ins have no `.path`.** `PresetDefinition.path` is `null`/absent for built-ins — the
   organigramma and any edit UI must gate on `preset.source === "custom"` before writing
   frontmatter.
