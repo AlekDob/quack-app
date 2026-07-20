@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-17
-last_verified: 2026-07-17
+last_verified: 2026-07-20
 tags: [ai-chat, cursor-compact, action-summary, worked-for, thought-for, streaming, perf, vitest, isFlatBatch]
 ---
 
@@ -27,7 +27,7 @@ contract. Turn-end Files recap + review surface: **`038-compose-review`**.
 |---|---|
 | `src/components/chatActionSummary.tsx` | `ActionBatchSummary`, `isFlatBatch`, solo/group, labels, `batchRenderCost` |
 | `src/components/chatActionSummary.test.ts` | Labels, `isFlatBatch`, perf (`collapsed ≪ expanded`) |
-| `src/components/chatToolRender.tsx` | `CompactBlocks` / `InterleavedBlocks` flush into summaries |
+| `src/components/chatToolRender.tsx` | `CompactBlocks` / `InterleavedBlocks` flush into summaries; `isSubagentDispatch` → duck chip (004) |
 | `src/components/TurnWorkedHeader.tsx` | `Worked for 1m 42s` on finished turns |
 | `src/formatWorkedDuration.ts` | `4s` / `1m 42s` formatter (+ unit test) |
 | `src/components/ReasoningTurnChip.tsx` | Live `Thinking` / done `Thought for…` (056) |
@@ -61,7 +61,13 @@ CC keepalives → thinkingLive → in-stream Thinking chip
 
 **Edits stay in the stream** (not stripped when ComposeCard is present). ComposeCard (006 / 038) remains the turn-end Files recap + Undo/Review.
 
-**Skipped:** Task*/TodoWrite/AskUserQuestion (sidebar / ask-dock — 067 / 073).
+**Skipped from batch:** TaskCreate/TaskUpdate/TaskList, TodoWrite, AskUserQuestion
+(sidebar / ask-dock — 067 / 073).
+
+**Subagent dispatch (`Task` / `Agent`):** not batched. `CompactBlocks` flushes the
+current summary and mounts a duck-avatar `ToolCallRow` (`isSubagentDispatch`) so
+click → transcript drawer still works (004). Two parallel explores → two chips,
+not `"Ran 2 actions"`.
 
 ### `isFlatBatch` (solo vs group)
 
@@ -85,11 +91,14 @@ into one `+/-` line); else `BatchGroupSummary`.
 | **Thinking** | CC empty content keepalives + open think | Live, before flush |
 | **Thought for Xs** | Client clock: keepalive/open → close tag / tool_call / turn end (`thinkingMs`, min ~400ms) | Done chip; legacy → `Reasoning · N words` |
 
-### Status dock soft-reduce
+### Status dock (composer live signal)
 
-When `streamingBlocks` already has `tool_call` (or inline prose), hide generic
-“Running tools…” / “Generating…” so the transcript owns the narrative. Keep
-Planning (until `thinkingLive`), stale/idle, and warming-up.
+The composer dock always keeps the inverted pill + spinner + `.ai-live-shimmer`
+while tools run or tokens generate — that is the at-a-glance “agent is working”
+signal above the textarea (feature 022). When `streamingBlocks` already has
+`tool_call`, only the dock’s `RunningToolList` is suppressed (transcript
+`ActionBatchSummary` owns the detail rows). Planning / stale / warming-up
+unchanged.
 
 ### Perf contract
 
@@ -132,5 +141,8 @@ same-file multi-edit, and label tense / Cursor order.
   `pathOf` / `extractEditDiffs`). Safe at render time; prefer extracting
   meta helpers if it grows.
 - **Do not** also render outer Reasoning when `blocks[]` exists (056).
+- **Subagent ≠ batch "other":** `Task`/`Agent` must leave the run via
+  `isSubagentDispatch` + `ToolCallRow`. Leaving them in the batch yields
+  `"Ran N actions"` / generic Subagent rows with no avatar or drawer (004).
 - **Diff click:** stream solo/expand edits → DiffModal (`requestDiff`).
   ComposeCard review in Agent Mode also → DiffModal (038); IDE → `crev:` tab.

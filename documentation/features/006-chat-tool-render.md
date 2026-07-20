@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-17
+last_verified: 2026-07-20
 tags: [ai-chat, tool-calls, chatToolRender, cursor-style, compact-summary, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap, html-preview, ask-user-question]
 ---
 
@@ -34,12 +34,13 @@ see **`082-cursor-compact-action-stream.md`** — primary UX contract.
 | Entry | Behaviour |
 |---|---|
 | `InterleavedBlocks` | Always → `CompactBlocks` |
-| `CompactBlocks` | Walks `blocks[]`; flushes consecutive tools into `ActionBatchSummary` (082); thinking → `ReasoningTurnChip` (056) |
+| `CompactBlocks` | Walks `blocks[]`; flushes consecutive tools into `ActionBatchSummary` (082); `Task`/`Agent` → duck-avatar `ToolCallRow` (004); thinking → `ReasoningTurnChip` (056) |
 | `StreamingPlainText` | Live prose tail (069) |
 
-**Skipped in stream:** Task*/TodoWrite/AskUserQuestion (sidebar / ask-dock —
-067 / 073). Edits **remain** in the compact summary; ComposeCard still recaps
-at turn end.
+**Skipped in stream:** TaskCreate/TaskUpdate/TaskList, TodoWrite, AskUserQuestion
+(sidebar / ask-dock — 067 / 073). **`Task`/`Agent` subagent dispatch** is not
+skipped — rendered as clickable duck chips (004). Edits **remain** in the
+compact summary; ComposeCard still recaps at turn end.
 
 ### AskUserQuestion (transcript row only)
 
@@ -91,8 +92,9 @@ IDE layout → `crev:` ComposeReviewPane tabs. See **038**.
 
 ### Live turn status
 
-`.ai-status-dock` + `TurnStreamStatus` (022). Soft-reduced when tools already
-appear in `streamingBlocks` (082). Shimmer labels while in flight.
+`.ai-status-dock` + `TurnStreamStatus` (022). Pill + spinner + shimmer stay
+visible while tools/tokens run; only the dock tool *list* soft-reduces when
+tools already appear in `streamingBlocks` (082).
 
 ### Per-tool icon tints
 

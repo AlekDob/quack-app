@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-14
+last_verified: 2026-07-20
 
 **Purpose:** Let the user delegate a chat turn to a Claude Code **subagent** by
 typing `@` in the composer — the same affordance that already attaches files.
@@ -42,7 +42,7 @@ dependency).
 | Component | `src/components/MentionSuggestions.tsx` | `@` popover UI (agent + file rows, path preview) — see **`041-mention-file-preview.md`** |
 | Component | `src/components/MentionPathPreview.tsx` | Side tree for highlighted file row (041) |
 | Component | `src/components/AIChatPanel.tsx` | `agents`/`attachedAgents` state, agent-load effect (CC-only), `@` match logic + `acceptMention`, delegation injection, reset, chips; `SubagentOpen.Provider` + `openSubagentTab`; `.ai-mention-open` overflow toggle |
-| Render | `src/components/chatToolRender.tsx` | `SubagentOpen` context, `subagentTypeOf()`, Task→duck-avatar chip (clickable) |
+| Render | `src/components/chatToolRender.tsx` | `SubagentOpen` context, `subagentTypeOf()`, `isSubagentDispatch()`, Task/Agent→duck-avatar chip (clickable); `CompactBlocks` mounts chip outside `ActionBatchSummary` |
 | Component | `src/components/SubagentTranscriptView.tsx` | read-only transcript viewer (portaled in editor/drawer, **inline** in agent mode when pref = tab), reuses `TranscriptTurnRows` + `ToolCallRow` |
 | Render | `src/components/TranscriptTurnRows.tsx` | shared read-only turn markup (`.ai-msg`, `.ai-tcalls`, `UserTurnBar` shell) |
 | Host | `src/components/WorkspaceShell.tsx` | walks panes for `sub:` keys, portals one viewer each |
@@ -79,6 +79,23 @@ dependency).
    `agent-<id>.meta.json` = `{agentType, description, toolUseId}`. The command finds the meta whose
    `toolUseId` matches the Task call id, then parses the sibling jsonl (reuses `parse_session_jsonl`).
 7. Rendered read-only: delegation prompt as a "user" bubble, subagent steps via `ToolCallRow`. **No composer.**
+
+### Compact stream contract (082 — restored 2026-07-20)
+
+All chat surfaces walk tools via `CompactBlocks` → `ActionBatchSummary`. Checklist
+tools (`TaskCreate` / `TodoWrite` / `AskUserQuestion`) stay **out of the stream**.
+**Subagent dispatch does not:**
+
+| Tool name | Stream UI |
+|---|---|
+| `Agent` / `Task` | Duck-avatar `ToolCallRow` (this feature) — click opens drawer/tab |
+| Read / Grep / Bash / Edit… | Cursor batch summary (`082`) |
+
+`isSubagentDispatch(name)` gates the branch. On match, `CompactBlocks` **flushes**
+the current batch then mounts the chip so two parallel Explores become two chips,
+never `"Ran 2 actions"` / generic `<> Subagent`.
+
+Vitest: `src/components/chatToolRender.test.ts`.
 
 ### Agent Mode gotcha (fixed)
 Previously `openSubagent` added a tab to `layout.editorRoot` but Agent Mode **does not mount**
@@ -139,6 +156,10 @@ Delegation inject in `AIChatPanel` and `quackClaudeCodeEditorPrompt()` encode th
   so they don't survive an app restart (by design — read-only viewers).
 - **Avatar consistency:** chip, tab icon, and view header all derive the duck from the SAME
   `subagent_type` string via `duckAvatarFor`, so they always match (and match the @-mention popover).
-- **Compact (agent) mode** renders Task/Agent chips in the stream (single-tool runs as
-  standalone `.ai-tcall-subagent`; multi-tool runs inside `.ai-iarow`). Click opens the side panel.
+- **Compact stream (082):** `CompactBlocks` must special-case `Task`/`Agent` via
+  `isSubagentDispatch` — flush the batch and render `ToolCallRow`. Otherwise they
+  fall into `other` → `"Ran N actions"` / generic `<> Subagent` with no avatar
+  and no drawer click (regression fixed 2026-07-20).
+- **Compact (agent) mode** renders Task/Agent chips in the stream (standalone
+  `.ai-tcall-subagent`). Click opens the side panel / drawer per prefs.
 - **View pref:** Settings → Views → **Subagent transcripts** (`lcp.surfaceView.subagent`). Default drawer; Editor tab restores pre-2026-07-14 inline split in Agent Mode. Manual override: drag any `sub:` tab to the drawer edge anytime (`063`).

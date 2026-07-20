@@ -76,6 +76,11 @@ export function subagentTypeOf(args: Record<string, unknown>): string {
   return typeof v === "string" ? v : "";
 }
 
+/** Claude Code subagent dispatch — current CLI uses `Agent`; older/`Task`. */
+export function isSubagentDispatch(name: string): boolean {
+  return name === "Task" || name === "Agent";
+}
+
 // Past-tense verb for a chip label — reads as "edited run.ts" / "ran tsc"
 // rather than the raw tool name.
 function toolVerb(name: string): string {
@@ -720,8 +725,9 @@ function ThinkingBlock({
 }
 
 // Compact-mode walk of an assistant turn's blocks: prose between runs of
-// one-line action summaries, in chronological order. Skips task tools +
-// AskUserQuestion (sidebar / question dock) and de-duplicates re-emitted ids.
+// one-line action summaries, in chronological order. Skips checklist /
+// AskUserQuestion tools (sidebar / question dock). Task/Agent dispatch
+// renders as duck-avatar chips (004), not ActionBatchSummary rows.
 function CompactBlocks({
   blocks,
   callsById,
@@ -810,6 +816,19 @@ function CompactBlocks({
     const call = callsById.get(b.callId);
     if (!call) return;
     if (TASK_NAMES.has(call.function.name)) return;
+    // Duck-avatar chip + drawer (004) — not a Cursor batch "Ran N actions".
+    if (isSubagentDispatch(call.function.name)) {
+      flush();
+      out.push(
+        <ToolCallRow
+          key={`sub${b.callId}`}
+          call={call}
+          result={resultsById.get(b.callId)}
+          standalone
+        />,
+      );
+      return;
+    }
     // Always keep edits in the stream summary ("Edited N files +X").
     // AutoOpenHtmlEdit still fires for .html (renders null).
     if (extractEditDiffs(call)) {
@@ -899,7 +918,7 @@ export function toolToneOf(name: string): ToolTone | null {
     return "web";
   }
   if (name === "TodoWrite") return "todo";
-  if (name === "Task" || name === "Agent" || TASK_NAMES.has(name)) return "task";
+  if (isSubagentDispatch(name) || TASK_NAMES.has(name)) return "task";
   return null;
 }
 
@@ -1283,8 +1302,12 @@ export function AskQuestionCard({
               }`}
               onClick={() => setActiveIdx(i)}
             >
-              {answered(i) && <span aria-hidden="true">✓ </span>}
-              {tq.header ?? `Q${i + 1}`}
+              {answered(i) && (
+                <span className="ai-ask-tab-check" aria-hidden="true">
+                  ✓
+                </span>
+              )}
+              <span>{tq.header ?? `Q${i + 1}`}</span>
             </button>
           ))}
         </div>
@@ -1415,7 +1438,7 @@ export const ToolCallRow = memo(function ToolCallRow({
   // versions / other providers use "Task". Render it as a duck-avatar chip
   // that opens the subagent's read-only transcript on click (the transcript
   // lands on disk once the run finishes, linked by this call's id).
-  if (call.function.name === "Task" || call.function.name === "Agent") {
+  if (isSubagentDispatch(call.function.name)) {
     const agentType = subagentTypeOf(call.function.arguments);
     const desc =
       typeof call.function.arguments.description === "string"
@@ -1472,6 +1495,30 @@ export const ToolCallRow = memo(function ToolCallRow({
           <span className="ai-tcall-name">Question</span>
           <span className="ai-tcall-detail" title={summary}>
             {summary}
+          </span>
+        </div>
+      </div>
+    );
+  }
+  // ExitPlanMode: buy-in lives in PlanBuyInCard above the composer. Even
+  // when the CLI rejects the tool ("not enabled"), we still got the plan
+  // text — don't paint a scary red error row in the transcript.
+  if (call.function.name === "ExitPlanMode") {
+    const plan =
+      typeof call.function.arguments.plan === "string"
+        ? call.function.arguments.plan.trim()
+        : "";
+    const preview = plan
+      ? plan.split("\n").find((l) => l.trim())?.slice(0, 80) ?? "Plan ready"
+      : "Plan ready";
+    return (
+      <div className={`ai-tcall${standalone ? " ai-tcall-standalone" : ""}`}>
+        <div className="ai-tcall-head">
+          <span className="ai-tcall-dot" />
+          <span className="ai-tcall-name">Plan ready</span>
+          <span className="ai-tcall-detail" title={preview}>
+            {preview}
+            {preview.length >= 80 ? "…" : ""}
           </span>
         </div>
       </div>

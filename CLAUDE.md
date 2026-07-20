@@ -116,17 +116,17 @@ Pattern: `src/aiTaskStore.ts` / `src/agentStatusStore.ts` (module-level pub/sub 
   - `001-ai-session-library.md` — sessions/agents lists, persistence, mount-asymmetry gotcha.
   - `002-workspace-colors.md` — per-project color (right-click popover + palette); title-bar ambient wash when active project has a color.
   - `003-design-system.md` — tokens, themes, neutral chrome, liquid glass, native window, composer, pill tabs.
-  - `004-subagent-mentions.md` — `@`-mention subagents + click a Task chip to open its read-only transcript (tab or drawer; `TranscriptTurnRows` shares main-chat markup).
+  - `004-subagent-mentions.md` — `@`-mention subagents + duck-avatar Task/Agent chip → read-only transcript (tab/drawer); `CompactBlocks` must use `isSubagentDispatch` so chips are not swallowed by 082 batch summaries.
   - `005-jack-duck-identity.md` — the assistant IS Jack (duck PM): persona, `AIIcon` duck mark, chat header.
   - `009-agent-hub.md` — the cross-project status hub (right rail): groups, `AgentHubWatcher`, notifications, lifecycle.
   - `064-agent-hub-drawer-and-chat-tab-switch.md` — collapsed hover drawer, chat switch perf, pane tab visibility stacking; DONE hosts unload when hidden (`076`).
   - `075-chat-switch-loader.md` — gradual translucent veil on chat/session switch (fade + min-floor + cap in `chatSwitch.ts`, `ChatSwitchVeil`); perceived-performance polish. Pairs with the `044` freeze fix.
   - `081-chat-switch-chrome-freeze.md` — during the `075` veil, freeze sidebar/agent-context paint + skip Monaco `layout()` + defer FileTree `listDir` (`deferDuringChatSwitch.ts`) so transcript paint wins; same feel as Agent Mode / collapsed explorer without a permanent layout change.
-  - `082-cursor-compact-action-stream.md` — Cursor-compact stream: live/past tool summaries (`isFlatBatch` solo vs group), Worked for / Thinking→Thought for, live shimmer, status-dock soft-reduce, `batchRenderCost` vitest.
+  - `082-cursor-compact-action-stream.md` — Cursor-compact stream: live/past tool summaries (`isFlatBatch` solo vs group), Worked for / Thinking→Thought for, live shimmer, status-dock soft-reduce; **Task/Agent stay outside batches** (004 chips); `batchRenderCost` vitest.
   - `038-compose-review.md` — ComposeCard Files recap; IDE `crev:` diff tabs (Undo/Keep); **Agent Mode → DiffModal** (`openComposeDiffModal`); `composeReview.ts`, `ComposeReviewPane.tsx`.
   - `076-chat-lazy-hydrate-done-unload.md` — session index + on-demand bodies; DONE/archived chat hosts unmount when hidden; live stay sticky for multitask; `memo(AIChatHost)` so creating a chat doesn't re-render all mounted panels (`[new-chat-perf]` dev timing).
   - `087-new-chat-perf.md` — New chat: seed empty RAM body (skip disk miss), sync empty paint + immediate `finishHydrated`, `afterFirstPaint` for extension/catalog/skills mounts; resume flicker gate pairs with `024`. Diagnose via Perf Audit Copy JSON (`086`).
-  - `006-chat-tool-render.md` — drawers, ComposeCard, AskQuestion, icon tones; chronology walker feeds 082 summaries.
+  - `006-chat-tool-render.md` — drawers, ComposeCard, AskQuestion, icon tones; chronology walker feeds 082 summaries; Task/Agent → duck chips (004).
   - `007-native-macos-menu.md` — macOS uses the native system menu bar (built from the command registry); the in-window `TopBar` menus are hidden there, kept on Win/Linux.
   - `008-skill-slash-menu.md` — Claude Code skills in the `/` menu (lightning icon + orange, name only), loaded from `.claude/skills/`, dispatched like CC commands.
   - `010-project-dock.md` — floating always-on-top Dock window (per-project circles + counters) + native macOS Dock-icon badge.
