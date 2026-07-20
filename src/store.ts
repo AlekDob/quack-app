@@ -39,7 +39,7 @@ import {
   putCachedSession,
 } from "./chatStoreCache";
 import { placeAiKeyInTabsPane, pruneAiTabsInPane } from "./ideAiTabSlot";
-import { hydratePresetOverrides } from "./presets";
+import { hydratePresetOverrides, DEFAULT_PRESET_ID } from "./presets";
 import { pulseChatSwitch } from "./chatSwitch";
 import { logChatSwitch } from "./chatSwitchDebug";
 import { markSwitchStart } from "./switchPerf";
@@ -195,6 +195,8 @@ export interface AIChatDescriptor {
   featureId?: string;
   /** Display label cached at link time (pill reads this — zero hydrate). */
   featureLabel?: string;
+  /** Icon/auto pin — shows chip next to composer icon; `@` cite stays unpinned. */
+  featurePinned?: boolean;
 }
 
 export type SidebarView =
@@ -1032,11 +1034,11 @@ interface AppState {
   setAIChatWorkItem(wsId: string, chatId: string, workItemId: string | null): void;
   setAIChatStory(wsId: string, chatId: string, storyId: string | null): void;
   setAIChatPlanning(wsId: string, chatId: string, planning: boolean): void;
-  /** Link or unlink a Features doc on a chat (slug + cached label). */
+  /** Link or unlink a Features doc on a chat (slug + cached label + optional pin). */
   setAIChatFeature(
     wsId: string,
     chatId: string,
-    feature: { id: string; label: string } | null,
+    feature: { id: string; label: string; pinned?: boolean } | null,
   ): void;
   /** Open (or focus) a story plan tab, side-by-side with the chat. */
   openStoryPlan(
@@ -1158,6 +1160,7 @@ function parseAIChatsRaw(raw: unknown): Record<string, AIChatDescriptor> {
       typeof v.featureId === "string" ? v.featureId : undefined;
     const featureLabel =
       typeof v.featureLabel === "string" ? v.featureLabel : undefined;
+    const featurePinned = v.featurePinned === true ? true : undefined;
     out[id] = {
       id: v.id,
       title: v.title,
@@ -1173,6 +1176,7 @@ function parseAIChatsRaw(raw: unknown): Record<string, AIChatDescriptor> {
       planning,
       featureId,
       featureLabel,
+      featurePinned,
     };
   }
   return out;
@@ -2971,11 +2975,13 @@ export const useStore = create<AppState>((set, get) => {
       };
       // Empty RAM body so AIChatPanel hydrate skips chat_store_load miss
       // (new chats have no file yet — force-on-empty paid multi-second IPC).
+      // Seed presetId so empty hydrate applies Team knobs (062), not last-used.
       putCachedSession(wsId, {
         id,
         title,
         messages: [],
         updatedAt: Date.now(),
+        presetId: DEFAULT_PRESET_ID,
       });
       updateWs(wsId, (w) => {
         const aiChats = { ...w.aiChats, [id]: desc };
@@ -3542,9 +3548,12 @@ export const useStore = create<AppState>((set, get) => {
         if (feature) {
           next.featureId = feature.id;
           next.featureLabel = feature.label;
+          if (feature.pinned) next.featurePinned = true;
+          else delete next.featurePinned;
         } else {
           delete next.featureId;
           delete next.featureLabel;
+          delete next.featurePinned;
         }
         return { ...w, aiChats: { ...w.aiChats, [id]: next } };
       }),

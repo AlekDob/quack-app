@@ -76,6 +76,8 @@ export async function resolvePlanBuyIn(
     }
   }
   try {
+    // Client-only buy-ins (ExitPlanMode failed / no hook) have no decide fn —
+    // handoff still proceeds; ignore missing decide.
     await findDecide(entry)?.(requestId, decision);
   } finally {
     clearPlanBuyIn({ requestId });

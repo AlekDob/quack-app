@@ -36,9 +36,12 @@ export function addNewAIChat(
   dismissLegacyAiPanel(wsId);
   // Surface the session in the Agent Hub (collapsed 44px rail is easy to miss).
   setHubExpanded(true);
-  pulseChatSwitch({ veil: false, source: "addNewAIChat" });
   const chatId = useStore.getState().addAIChat(wsId, location);
   markNewChat(chatId); // time the fresh-panel mount cascade
+  // Same ChatSwitchVeil as session switch (075): instant feedback while the
+  // empty panel mounts (~200ms paint). Pulse AFTER id exists so Agent Mode
+  // keeps the host mounted and endChatSwitch accepts this chat only.
+  pulseChatSwitch({ veil: true, source: "addNewAIChat", chatId });
   useStore.getState().focusAIChat(wsId, chatId);
   useStore.getState().setAIChatNamePending(wsId, chatId, true);
   return chatId;

@@ -6,9 +6,8 @@
  *
  * Timing:
  *  - on pulse → `switching = true` immediately (veil fades in),
- *  - `endChatSwitch()` (called when the target panel has hydrated) ends the
- *    pulse only after a MIN floor, so a sub-floor hydration still fades
- *    gently rather than flashing,
+ *  - `endChatSwitch()` ends after an adaptive floor (short when hydrate
+ *    was instant; no padding when hydrate already took ≥ floor),
  *  - a CAP timer ends it regardless, in case hydration never signals.
  */
 
@@ -18,15 +17,23 @@ import {
 } from "./chatPersistFlush";
 import { logChatSwitch } from "./chatSwitchDebug";
 
-// Graceful floor: keep the veil up at least this long so even an instant switch
-// clearly shows the loader (the user wants a minimum always visible). The freeze
-// is fixed, so this is pure perceived-smoothness polish.
-const MIN_VISIBLE_MS = 320;
+// Warm / empty / cache-hit: just long enough for the fade-in to register
+// (~FADE_MS 160). A fixed 320ms floor made 9ms switches feel slow (086).
+const MIN_VISIBLE_FAST_MS = 160;
+// Soft floor when hydrate took a little but still under this.
+const MIN_VISIBLE_MS = 220;
 // Hard fallback: drop the veil after this even if `endChatSwitch` never fires.
 const CAP_MS = 1000;
 
+/** How long the veil should stay up given hydrate elapsed so far. */
+export function veilFloorMs(elapsedMs: number): number {
+  if (elapsedMs <= 60) return MIN_VISIBLE_FAST_MS;
+  if (elapsedMs >= MIN_VISIBLE_MS) return elapsedMs;
+  return MIN_VISIBLE_MS;
+}
+
 export type ChatSwitchOpts = {
-  /** Show the veil — the gradual loader. Only skip for empty/new chats. */
+  /** Show the veil — the gradual loader. Default true (incl. new chat). */
   veil?: boolean;
   /** Sync-flush mounted panels before switch. Off for same-workspace tab hops. */
   flush?: boolean;
@@ -76,7 +83,16 @@ export function getChatSwitchTarget(): string | null {
   return targetChatId;
 }
 
-/** Drop the veil once the target panel has hydrated — after the MIN floor. */
+/** Refresh the CAP timer — call when hydrate actually starts so a dense
+ *  flushSync paint can exceed the original 1s window without the veil
+ *  disappearing mid-commit (Audit: hydrate done 1437ms after CAP at 1000). */
+export function noteChatSwitchProgress(): void {
+  if (!switching) return;
+  if (capTimer) clearTimeout(capTimer);
+  capTimer = setTimeout(() => finish("cap"), CAP_MS);
+}
+
+/** Drop the veil once the target panel has hydrated — after the adaptive floor. */
 export function endChatSwitch(source = "unknown", chatId?: string): void {
   if (!switching) return;
   if (targetChatId && chatId && chatId !== targetChatId) {
@@ -84,14 +100,23 @@ export function endChatSwitch(source = "unknown", chatId?: string): void {
     return;
   }
   const elapsed = Date.now() - startedAt;
-  const remain = Math.max(0, MIN_VISIBLE_MS - elapsed);
+  const floor = veilFloorMs(elapsed);
+  const remain = Math.max(0, floor - elapsed);
   logChatSwitch("end scheduled", {
     source,
     elapsedMs: elapsed,
     remainMs: remain,
+    floorMs: floor,
     pulseSource: lastSource,
   });
   if (endTimer) clearTimeout(endTimer);
+  // remain 0 must finish SYNCHRONOUSLY. setTimeout(0) sat behind multi-second
+  // main-thread work in production (Audit: end scheduled 249ms → veil down
+  // 4928ms) while the loader stayed up for nothing.
+  if (remain <= 0) {
+    finish(`end:${source}`);
+    return;
+  }
   endTimer = setTimeout(() => finish(`end:${source}`), remain);
 }
 
@@ -111,8 +136,8 @@ export function pulseChatSwitch(opts: ChatSwitchOpts = {}): void {
     if (flushWsId) flushWorkspaceChatPersist(flushWsId, source);
     else flushAllChatPersist();
   }
-  // New/empty chats skip the veil — but must still clear a prior pulse,
-  // otherwise sticky hosts stay `!is-visible` until CAP and look "missing".
+  // veil:false clears a prior pulse without starting a new one (rare; most
+  // callers want the loader). Sticky hosts otherwise stay `!is-visible` until CAP.
   if (!veil) {
     if (switching) finish(`veil-skipped:${source}`);
     return;

@@ -3433,9 +3433,10 @@ body.ab-dragging * {
     opacity 160ms ease,
     visibility 0ms;
 }
+/* During switch the global veil covers the UI — keep the panel opaque so the
+   incoming transcript can layout underneath (avoids a thaw storm on veil-down). */
 .ai-tab-host.is-switching > .ai-panel,
 .ai-tab-host.is-switching > .ai-chat-with-story {
-  opacity: 0;
   pointer-events: none;
 }
 .ai-tab-host > .ai-panel,
@@ -7888,14 +7889,22 @@ button.composer-mention-chip-label:hover {
   flex-shrink: 0;
   min-width: 0;
 }
+.ai-composer-feature-wrap {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 2px;
+  margin-left: 2px;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: min(220px, 40vw);
+}
 .ai-composer-feature-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  align-self: center;
   width: 26px;
   height: 26px;
-  margin-left: 2px;
   padding: 0;
   border: none;
   border-radius: var(--radius-sm);
@@ -7910,6 +7919,56 @@ button.composer-mention-chip-label:hover {
 }
 .ai-composer-feature-pill.is-linked {
   color: var(--feature);
+}
+.ai-composer-feature-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--feature) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--feature) 28%, transparent);
+  color: var(--feature);
+}
+.ai-composer-feature-chip-main {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  height: 100%;
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+}
+.ai-composer-feature-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ai-composer-feature-chip-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 100%;
+  padding: 0;
+  border: none;
+  border-left: 1px solid color-mix(in srgb, var(--feature) 22%, transparent);
+  background: transparent;
+  color: var(--feature-muted);
+  cursor: pointer;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.ai-composer-feature-chip-clear:hover {
+  color: var(--feature);
+  background: color-mix(in srgb, var(--feature) 14%, transparent);
 }
 .ai-mention-feature-icon {
   display: inline-flex;
@@ -8974,7 +9033,7 @@ button.composer-mention-chip-label:hover {
 /* Cursor-style plan buy-in — Pass the ball to Milo (above composer). */
 .ai-plan-buyin {
   flex-shrink: 0;
-  margin: 0 12px 8px;
+  margin: 0 12px 10px;
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -19042,7 +19101,10 @@ html.audit-root #root {
   min-height: 0;
 }
 .agent-main-chat-panels.is-switching {
-  visibility: hidden;
+  /* Do NOT visibility:hidden the whole column — that deferred layout of the
+     incoming transcript until veil-down and left setTimeout(0) starved
+     (multi-second loader after hydrate done). The global ChatSwitchVeil
+     already covers the UI; let the target host paint underneath. */
   pointer-events: none;
 }
 .chat-switch-veil {

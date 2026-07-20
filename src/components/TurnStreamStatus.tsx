@@ -90,21 +90,14 @@ export function TurnStreamStatus({
       : 0;
   const stale = streaming !== null && lastStreamEventAt !== null && idleSec >= 10;
 
-  // In-stream ActionBatchSummary / Thinking already narrate the turn —
-  // don't double up with dock "Running tools…" / "Generating…".
+  // Transcript ActionBatchSummary already lists tools — keep the dock pill
+  // (spinner + shimmer) so the composer always signals a live turn, but skip
+  // the duplicate RunningToolList when tools are painted inline.
   const toolsRenderedInline = streamingBlocks.some(
     (b) => b.kind === "tool_call",
   );
-  const hasInlineProse = streamingBlocks.some(
-    (b) => b.kind === "text" && b.text.trim().length > 0,
-  );
-  const showToolDock = runningTools && !toolsRenderedInline;
-  const showGeneratingDock =
-    generating && !toolsRenderedInline && !hasInlineProse;
 
-  if (!planning && !stale && !showToolDock && !showGeneratingDock) {
-    return null;
-  }
+  if (!runningTools && !planning && !generating && !stale) return null;
 
   const staleSuffix = stale ? (
     <StaleSuffix idleSec={idleSec} onStop={onStop} />
@@ -127,7 +120,7 @@ export function TurnStreamStatus({
           {staleSuffix}
         </div>
       )}
-      {showToolDock &&
+      {runningTools &&
         (activeToolLabels.length === 0 ? (
           <StatusPill trail={tpsTrail} suffix={staleSuffix}>
             <span className="ai-spinner ai-spinner-live" />
@@ -150,7 +143,11 @@ export function TurnStreamStatus({
               <StatusPill
                 trail={tpsTrail}
                 suffix={staleSuffix}
-                list={<RunningToolList entries={activeToolLabels} />}
+                list={
+                  toolsRenderedInline ? undefined : (
+                    <RunningToolList entries={activeToolLabels} />
+                  )
+                }
               >
                 {allDone && !streamStillActive ? (
                   <span className="ai-running-check">
@@ -169,7 +166,7 @@ export function TurnStreamStatus({
               </StatusPill>
             );
           })())}
-      {showGeneratingDock && (
+      {generating && (
         <StatusPill
           trail={
             <span className="ai-inline-tps">{tokensPerSec!.toFixed(1)} t/s</span>
@@ -180,7 +177,7 @@ export function TurnStreamStatus({
           <span className="ai-live-shimmer">Generating…</span>
         </StatusPill>
       )}
-      {stale && !planning && !showToolDock && !showGeneratingDock && (
+      {stale && !planning && !runningTools && !generating && (
         <div className="ai-inline-status-row">{staleSuffix}</div>
       )}
     </>

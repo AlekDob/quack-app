@@ -3,6 +3,8 @@ import {
   parseQualifiedModel,
   type ProviderId,
 } from "./providers/types";
+import type { ChatSession } from "./chatHistory";
+import { DEFAULT_PRESET_ID } from "./presets/builtins";
 
 export type AgenticProviderId = Extract<
   ProviderId,
@@ -28,4 +30,23 @@ export function agenticProviderForPresetApply(
   if (availability.claudeCode) return "claude-code";
   if (availability.cursorCli) return "cursor-cli";
   return null;
+}
+
+/**
+ * Empty RAM seeds from `addAIChat` (087) hit the hydrate `found` branch with
+ * no model/knobs — those must still take the Team default agent (Milo), not
+ * last-used Sonnet/Auto from localStorage.
+ */
+export function shouldApplyPresetOnEmptyHydrate(
+  found: ChatSession,
+  msgCount: number,
+): boolean {
+  if (msgCount > 0) return false;
+  if (found.model) return false;
+  return true;
+}
+
+/** Preset id to apply on a fresh empty hydrate (seeded or legacy blank). */
+export function presetIdForEmptyHydrate(found: ChatSession): string {
+  return found.presetId ?? DEFAULT_PRESET_ID;
 }

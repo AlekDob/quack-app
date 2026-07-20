@@ -11,6 +11,7 @@ related:
   - 062-presets.md
   - 083-composer-feature-link.md
   - 073-ask-user-question-dock.md
+  - documentation/bugs/003-agent-identity-mismatch.md
 tags:
   [
     plan-mode,
@@ -98,11 +99,17 @@ ExitPlanMode (plan non-empty)
 
 | Step | Effect |
 |---|---|
-| Preset | `applyPreset("builder", { silent: true })` → Milo |
-| Perm | `setCcPermMode("bypassPermissions")` → Agent |
+| Preset | `applyPreset("builder", { silent: true })` → Milo (+ sync `presetIdRef` / model / effort / thinking) |
+| Perm | `ccPermModeRef` + `setCcPermMode("bypassPermissions")` → Agent (forced even if Milo override differs) |
 | CLI | `claude_perm_decide: allow` on ExitPlanMode |
-| Auto-send | `Implement the approved plan…` (+ `@slug` if `featureId`) |
+| Auto-send | `sendUserText(Implement…)` **immediately** after handoff — reads refs, not stale React state |
 | Features | Clear `planning`; **no** `handoffStoryToBuilder` |
+
+**Gotcha (2026-07-20) — apply-then-send race:** `applyPreset` + immediate `sendUserText`
+must sync refs inside `applyPreset` **before** `setState`. A send before React re-renders
+used to stamp **Jack** on the bubble while `[Agent identity]` / the model already spoke as
+Milo ("Sono Milo…" under a Jack header). Fixed in `AIChatPanel` + `chatTurnAgent.ts`.
+Full write-up: `documentation/bugs/003-agent-identity-mismatch.md`. Related: `062`.
 
 ### Per-session Plan isolation
 
@@ -125,10 +132,11 @@ Avatar: Milo builtin `duck3` → `/images/ducks/duck3.jpeg`.
 
 ### Gotchas
 
-- ExitPlanMode must stay **pending** until user decides — CTA owns UI; overlay still holds the request in queue (filtered out of visible cards so it does not block Bash/Edit cards).
+- ExitPlanMode must stay **pending** until user decides when the permission hook fires — CTA owns UI; overlay still holds the request in queue (filtered out of visible cards so it does not block Bash/Edit cards).
+- **Upstream often rejects ExitPlanMode** ("exists but is not enabled") even with composer Plan — channels / resume / CC bugs. Quack still shows the CTA from the `tool_call` args (and end-of-turn fallback) so Pass the ball does not depend on the hook succeeding.
 - Auto-send after allow: clear `planBuyInRef` before `sendUserText` so the implement prompt is not treated as Keep discussing.
 - Multiple `AIChatHost` overlays: `setPlanBuyInDecide` keyed by session/cwd so the correct panel settles the hook.
-- CLI enables ExitPlanMode only with `--permission-mode plan` — prompt gate alone is not enough; composer must be Plan when Jack calls it.
+- CLI enables ExitPlanMode only with `--permission-mode plan` — prompt gate alone is not enough; composer must be Plan when Jack calls it. When the tool still fails, client buy-in path covers UX.
 
 ### Related
 

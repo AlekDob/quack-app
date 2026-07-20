@@ -1143,7 +1143,10 @@ const AIChatHost = memo(function AIChatHost({
     dropCachedSessionBody(wsId, chatId);
   }, [mounted, keepWarm, wsId, chatId]);
   if (!container || !mounted) return null;
-  const showSurface = visible && !switching;
+  // Keep the active host paintable under the global veil. Hiding via
+  // !switching deferred layout until veil-down (prod: 249ms hydrate →
+  // 5s blank loader). Outgoing hosts are already !visible.
+  const showSurface = visible;
   const showVeil = switching && visible;
   return createPortal(
     <div

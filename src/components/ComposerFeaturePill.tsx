@@ -1,6 +1,5 @@
-// Minimal composer feature pill — label from chat descriptor only (no hydrate).
-// Feature list + fuzzy search load only when the menu opens.
-// List uses page-size + scroll sentinel (infinite loading).
+// Composer feature control — icon opens fuzzy list; pinned link shows a chip.
+// Feature list loads only when the menu opens (infinite scroll, page size 24).
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
@@ -24,16 +23,17 @@ type Props = {
   wsId: string;
   root: string;
   chatId: string;
-  /** Insert `@slug` into the composer when a feature is linked. */
-  onLinked?: (slug: string) => void;
 };
 
-export function ComposerFeaturePill({ wsId, root, chatId, onLinked }: Props) {
+export function ComposerFeaturePill({ wsId, root, chatId }: Props) {
   const featureId = useStore(
     (s) => s.loaded[wsId]?.aiChats[chatId]?.featureId,
   );
   const featureLabel = useStore(
     (s) => s.loaded[wsId]?.aiChats[chatId]?.featureLabel,
+  );
+  const featurePinned = useStore(
+    (s) => !!s.loaded[wsId]?.aiChats[chatId]?.featurePinned,
   );
   const setFeature = useStore((s) => s.setAIChatFeature);
   const [open, setOpen] = useState(false);
@@ -78,6 +78,7 @@ export function ComposerFeaturePill({ wsId, root, chatId, onLinked }: Props) {
     featureLabel ||
     (featureId ? featureLabelFromSlug(featureId) : null) ||
     "Feature";
+  const showChip = !!(featureId && featurePinned);
 
   const filtered = useMemo(() => {
     const q = normalizeFilterQuery(query);
@@ -123,8 +124,13 @@ export function ComposerFeaturePill({ wsId, root, chatId, onLinked }: Props) {
     setFeature(wsId, chatId, {
       id: f.slug,
       label: featureLabelFromSlug(f.slug),
+      pinned: true,
     });
-    onLinked?.(f.slug);
+    setOpen(false);
+  };
+
+  const clear = () => {
+    setFeature(wsId, chatId, null);
     setOpen(false);
   };
 
@@ -187,7 +193,7 @@ export function ComposerFeaturePill({ wsId, root, chatId, onLinked }: Props) {
                   aria-label="Search features"
                 />
               </div>
-              {featureId && (
+              {featureId && featurePinned && (
                 <div className="ai-composer-feature-popover-actions">
                   <button
                     type="button"
@@ -211,10 +217,7 @@ export function ComposerFeaturePill({ wsId, root, chatId, onLinked }: Props) {
                   <button
                     type="button"
                     className="menu-item"
-                    onClick={() => {
-                      setFeature(wsId, chatId, null);
-                      setOpen(false);
-                    }}
+                    onClick={clear}
                   >
                     <span className="menu-item-label">Clear link</span>
                   </button>
@@ -228,7 +231,7 @@ export function ComposerFeaturePill({ wsId, root, chatId, onLinked }: Props) {
                     }}
                   >
                     <span className="menu-item-label">
-                      Inject: {injectOn ? "On" : "Off"}
+                      Inject on send: {injectOn ? "On" : "Off"}
                     </span>
                   </button>
                 </div>
@@ -240,7 +243,7 @@ export function ComposerFeaturePill({ wsId, root, chatId, onLinked }: Props) {
                 {loading && (
                   <div className="ai-composer-feature-empty">Loading…</div>
                 )}
-                {!loading && filtered.length === 0 && (
+                {!loading && shown.length === 0 && (
                   <div className="ai-composer-feature-empty">No matches</div>
                 )}
                 {!loading &&
@@ -256,12 +259,7 @@ export function ComposerFeaturePill({ wsId, root, chatId, onLinked }: Props) {
                       onMouseEnter={() => setActiveIndex(i)}
                       onClick={() => pick(f)}
                     >
-                      <span
-                        className="ai-mention-file-icon ai-mention-file-icon--feature"
-                        aria-hidden
-                      >
-                        <Icon name="file-text" size={14} />
-                      </span>
+                      <Icon name="file-text" size={13} />
                       <span className="ai-composer-feature-row-body">
                         <span className="ai-composer-feature-row-title">
                           {featureLabelFromSlug(f.slug)}
@@ -272,11 +270,10 @@ export function ComposerFeaturePill({ wsId, root, chatId, onLinked }: Props) {
                       </span>
                     </button>
                   ))}
-                {!loading && hasMore && (
+                {hasMore && (
                   <div
                     ref={sentinelRef}
                     className="ai-composer-feature-sentinel"
-                    aria-hidden
                   />
                 )}
               </div>
@@ -288,24 +285,49 @@ export function ComposerFeaturePill({ wsId, root, chatId, onLinked }: Props) {
 
   return (
     <>
-      <button
-        ref={btnRef}
-        type="button"
-        className={`ai-composer-feature-pill${featureId ? " is-linked" : ""}`}
-        onClick={() => setOpen((v) => !v)}
-        title={
-          featureId
-            ? `Feature: ${label}`
-            : "Link a feature doc to this chat"
-        }
-        aria-label={
-          featureId ? `Feature: ${label}` : "Link a feature doc to this chat"
-        }
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <Icon name="file-text" size={14} />
-      </button>
+      <div className={`ai-composer-feature-wrap${showChip ? " is-pinned" : ""}`}>
+        <button
+          ref={btnRef}
+          type="button"
+          className={`ai-composer-feature-pill${showChip ? " is-linked" : ""}`}
+          onClick={() => setOpen((v) => !v)}
+          title={
+            showChip
+              ? `Feature: ${label}`
+              : "Link a feature doc to this chat"
+          }
+          aria-label={
+            showChip
+              ? `Feature: ${label}`
+              : "Link a feature doc to this chat"
+          }
+          aria-haspopup="listbox"
+          aria-expanded={open}
+        >
+          <Icon name="file-text" size={14} />
+        </button>
+        {showChip && (
+          <div className="ai-composer-feature-chip" title={label}>
+            <button
+              type="button"
+              className="ai-composer-feature-chip-main"
+              onClick={() => setOpen((v) => !v)}
+              aria-label={`Pinned feature: ${label}`}
+            >
+              <span className="ai-composer-feature-chip-label">{label}</span>
+            </button>
+            <button
+              type="button"
+              className="ai-composer-feature-chip-clear"
+              title="Clear feature link"
+              aria-label="Clear feature link"
+              onClick={clear}
+            >
+              <Icon name="x" size={11} />
+            </button>
+          </div>
+        )}
+      </div>
       {menu}
     </>
   );

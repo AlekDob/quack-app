@@ -89,7 +89,7 @@ Keys used: `ft-root:{root}`, `ft:{dirPath}`. Avoids N per-Node
 
 - Chat hosts / transcript hydrate (must run under the veil — see `075` gotcha)
 - Agent Hub rail status (cheap)
-- `veil: false` paths (`addNewAIChat`) — no freeze window
+- New chat (`addNewAIChat`) now pulses `veil: true` (`075`/`087`) — freeze window applies for the adaptive veil floor (~160–220ms)
 
 ### Related always-on tree lightening (`034`)
 
@@ -109,7 +109,7 @@ Independent of the pulse — helps idle + switch:
    Agent Mode.
 2. Expand a folder mid-veil (if possible) — `listDir` runs after veil down.
 3. `npm test` → `deferDuringChatSwitch.test.ts` green.
-4. New chat (`veil: false`) — no freeze flash / no stuck sidebar.
+4. New chat — brief freeze under the adaptive veil floor (~160ms warm), then sidebar restores; empty composer visible after fade.
 
 ### Gotchas
 

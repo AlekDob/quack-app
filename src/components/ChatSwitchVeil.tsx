@@ -1,19 +1,18 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { useChatSwitching } from "../useChatSwitching";
 
-// Fade duration — must match the `.chat-switch-veil` opacity transition in CSS
-// so the node unmounts exactly when the fade-out ends (no flicker, no leftover).
+// Fade-OUT duration — must match the `.chat-switch-veil` opacity transition in CSS.
 const FADE_MS = 160;
 
 /** Gradual translucent loader shown while a chat / session switch hydrates.
- *  Fades IN on `active`, then lingers mounted through a fade-OUT so the
- *  transition reads smooth instead of a hard content pop.
  *
  *  Mounted ONCE at the app root with `global` (driven by the global switch
- *  pulse, `position: fixed` full-window): this way it shows on EVERY switch —
- *  including cross-project switches, where the old host unmounts and the new
- *  one isn't visible yet, so a per-host veil would leave a "stuck" gap.
- *  `active` can still be passed to scope it to a container. */
+ *  pulse, `position: fixed` full-window): shows on EVERY switch — including
+ *  cross-project, where the old host unmounts and the new one isn't visible.
+ *
+ *  Show is SYNCHRONOUS (no fade-in rAF). Fade-in used to leave opacity 0 while
+ *  the main thread was busy applying a dense transcript — user saw a blank
+ *  stall with no loader (Perf Audit 086). Fade-out still softens the reveal. */
 export function ChatSwitchVeil({
   active,
   global = false,
@@ -23,20 +22,19 @@ export function ChatSwitchVeil({
 }) {
   const auto = useChatSwitching();
   const on = active ?? auto;
+  // First paint while `on` must already be opaque — layout effect keeps it
+  // in sync when the pulse flips without unmounting the node.
   const [mounted, setMounted] = useState(on);
-  const [shown, setShown] = useState(false);
+  const [shown, setShown] = useState(on);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (on) {
       setMounted(true);
-      // Paint one frame at opacity 0 before flipping to 1 → the fade-in runs.
-      const r = requestAnimationFrame(() => setShown(true));
-      return () => cancelAnimationFrame(r);
+      setShown(true);
+      return;
     }
     setShown(false);
-    const t = setTimeout(() => {
-      setMounted(false);
-    }, FADE_MS);
+    const t = setTimeout(() => setMounted(false), FADE_MS);
     return () => clearTimeout(t);
   }, [on]);
 

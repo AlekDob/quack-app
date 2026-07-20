@@ -102,6 +102,10 @@ import {
   openWorkspaceDocPath,
   resolveWorkspaceDocPath,
 } from "../workspaceDocOpen";
+import {
+  featureSlugFromSuccessfulEdit,
+  pinFeatureOnChat,
+} from "../featureChatAutoLink";
 import { PermissionCard, PrivacyBanner } from "./aiInlineCards";
 import {
   ProviderSessionsButton,
@@ -162,6 +166,7 @@ import {
 import { PlanBuyInCard } from "./PlanBuyInCard";
 import {
   getPlanBuyIn,
+  publishPlanBuyIn,
   resolvePlanBuyIn,
   subscribePlanBuyIn,
 } from "../planBuyInStore";
@@ -353,7 +358,17 @@ import {
   windowChatTurns,
   windowToolRows,
 } from "../chatScroll";
-import { agenticProviderForPresetApply } from "../aiChatPresetApply";
+import {
+  agenticProviderForPresetApply,
+  presetIdForEmptyHydrate,
+  shouldApplyPresetOnEmptyHydrate,
+} from "../aiChatPresetApply";
+import {
+  backfillAssistantAgentIds,
+  displayAgentForAssistantRow,
+  sessionAgentFromStored,
+  streamingBubbleAgentId,
+} from "../chatTurnAgent";
 import {
   ensureCloudCatalog,
   ensureModelDiscovery,
@@ -548,6 +563,25 @@ function resolveActivePresetDef(
   return customPresets.find((p) => p.id === id);
 }
 
+/** Sync RAM seed so remounting a Jack chat after a Milo one doesn't flash
+ *  the default Milo pill/avatars for a frame before hydrate. */
+function cachedSessionSeed(
+  wsId: string,
+  aiChatId: string | undefined,
+): { presetId: string | null; messages: ChatMessage[] } | null {
+  if (!aiChatId) return null;
+  const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
+  const sid = desc?.sessionId;
+  if (!sid) return null;
+  const cached = getCachedSession(wsId, sid);
+  if (!cached) return null;
+  const presetId = sessionAgentFromStored(cached.presetId);
+  return {
+    presetId,
+    messages: backfillAssistantAgentIds(cached.messages, presetId),
+  };
+}
+
 // Flywheel scope: union of files already edited across a work/story's linked
 // sessions (read-only, from the in-memory cache). Surfaced in the manifest so
 // the agent Reads these first instead of re-exploring. See decisions/004.
@@ -692,11 +726,12 @@ export function AIChatPanel({
       inputSnapRef.current = next;
       setDraftEpoch((n) => n + 1);
       if (!aiChatId) return;
-      const fid =
-        useStore.getState().loaded[wsId]?.aiChats[aiChatId]?.featureId;
-      if (!fid) return;
+      const chat =
+        useStore.getState().loaded[wsId]?.aiChats[aiChatId];
+      const fid = chat?.featureId;
+      if (!fid || chat?.featurePinned) return;
       const token = `@${fid}`;
-      // Unlink only when the user deletes the inline @slug (not on session wipe).
+      // Unlink inline @ cite only — never clear an icon/auto pin.
       if (prev.includes(token) && !next.includes(token)) {
         useStore.getState().setAIChatFeature(wsId, aiChatId, null);
       }
@@ -711,13 +746,24 @@ export function AIChatPanel({
   // whichever thumbnail the user clicked (fetched from disk on demand).
   const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([]);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(
+    () => cachedSessionSeed(wsId, aiChatId)?.messages ?? [],
+  );
   // Transcript windowing (see TURN_WINDOW): a long chat renders only its tail
   // until the user asks for earlier turns. Reset per chat so switching into a
   // huge transcript starts windowed (fast paint), not fully expanded.
   const [showAllTurns, setShowAllTurns] = useState(false);
   useEffect(() => setShowAllTurns(false), [aiChatId]);
   const [streaming, setStreaming] = useState<string | null>(null);
+  // Agent that owns the in-flight turn (avatar + commit). Frozen at send
+  // so a mid-turn SubagentPill switch only shapes the NEXT message —
+  // the streaming bubble must not reattribute to the newly picked agent.
+  // `undefined` = no live turn; `null` = Jack; string = preset id.
+  const [turnAgentId, setTurnAgentId] = useState<string | null | undefined>(
+    undefined,
+  );
+  const turnAgentIdRef = useRef(turnAgentId);
+  turnAgentIdRef.current = turnAgentId;
   // Live chronological block log for the in-progress assistant bubble.
   // Mirrors `blocksThisRound` inside sendUserText so the streaming
   // bubble can render text → tool → text → tool in real time instead
@@ -934,37 +980,52 @@ export function AIChatPanel({
     }
     setTodos(list.length > 0 ? list : null);
   };
-  const applyLoadedMessages = useCallback(async (raw: ChatMessage[]) => {
-    const cleaned = cleanStaleToolMessages(raw);
-    const hydrated = await rehydrateMessageImages(cleaned);
-    const applyT0 = performance.now();
-    startTransition(() => {
-      setMessages(hydrated);
-      rebuildChecklist(hydrated);
-      logChatSwitch("messages applied", {
-        count: hydrated.length,
-        elapsedMs: Math.round(performance.now() - applyT0),
-      });
-    });
-    // Time from apply to two frames later (post commit + paint) — for a large
-    // transcript this captures the unwindowed render/layout cost that makes a
-    // chat switch "incagliare". Correlate `count` with `elapsedMs`.
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() =>
-        logChatSwitch("transcript painted", {
-          count: hydrated.length,
+  const applyLoadedMessages = useCallback(
+    async (
+      raw: ChatMessage[],
+      sessionPresetId: string | null = presetIdRef.current,
+    ) => {
+      const cleaned = cleanStaleToolMessages(raw);
+      const hydrated = await rehydrateMessageImages(cleaned);
+      const withAgents = backfillAssistantAgentIds(hydrated, sessionPresetId);
+      const applyT0 = performance.now();
+      startTransition(() => {
+        setMessages(withAgents);
+        rebuildChecklist(withAgents);
+        logChatSwitch("messages applied", {
+          count: withAgents.length,
           elapsedMs: Math.round(performance.now() - applyT0),
-        }),
-      ),
-    );
-    return hydrated;
-  }, []);
+        });
+      });
+      // Time from apply to two frames later (post commit + paint) — for a large
+      // transcript this captures the unwindowed render/layout cost that makes a
+      // chat switch "incagliare". Correlate `count` with `elapsedMs`.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() =>
+          logChatSwitch("transcript painted", {
+            count: withAgents.length,
+            elapsedMs: Math.round(performance.now() - applyT0),
+          }),
+        ),
+      );
+      return withAgents;
+    },
+    [],
+  );
   const tryProviderRecover = useCallback(
     async (row: ChatSession, gen: number) => {
       const recovered = await recoverSessionFromAnyProvider(root, row);
       if (!recovered || gen !== ccHydrateGenRef.current) return;
-      const msgs = await applyLoadedMessages(recovered.session.messages);
-      persistRecoveredSession(wsId, { ...recovered.session, messages: msgs });
+      const sessionAgent = sessionAgentFromStored(recovered.session.presetId);
+      const msgs = await applyLoadedMessages(
+        recovered.session.messages,
+        sessionAgent,
+      );
+      persistRecoveredSession(wsId, {
+        ...recovered.session,
+        messages: msgs,
+        presetId: recovered.session.presetId,
+      });
       setSessions(loadSessions(wsId));
       toastInfo(
         `Restored ${msgs.length} messages from ${recovered.provider} session`,
@@ -1078,22 +1139,40 @@ export function AIChatPanel({
   // Active preset for this session — shapes instructions/model/effort but
   // is NOT a subagent (no isolated context). Built-in OR custom, so the id
   // is a plain string, not the narrower PresetId literal union.
-  // Seeds to the default agent (Milo) so a brand-new chat's composer pill
-  // shows Milo from the first frame. paintSession's async applyDefaultPreset
-  // runs inside startTransition (deferred) — relying on it alone left the
-  // initial render on Jack (presetId === null). A restored session overwrites
-  // this immediately via paintSession's found-branch (found.presetId ?? null).
-  const [presetId, setPresetId] = useState<string | null>(DEFAULT_PRESET_ID);
+  // Seeds from the RAM session cache when remounting (DONE unload → switch
+  // back) so a Jack chat doesn't flash Milo's default pill for a frame.
+  // Fresh chats / cold cache still start on Milo (DEFAULT_PRESET_ID).
+  const [presetId, setPresetId] = useState<string | null>(
+    () => cachedSessionSeed(wsId, aiChatId)?.presetId ?? DEFAULT_PRESET_ID,
+  );
+  // Refs mirror composer knobs so applyPreset → immediate send (Pass the
+  // ball microtask) reads Milo/Agent/Opus before React re-renders.
+  const presetIdRef = useRef(presetId);
+  const selectedRef = useRef(selected);
+  const ccEffortRef = useRef(ccEffort);
+  const ccPermModeRef = useRef(ccPermMode);
+  const ccThinkingRef = useRef(ccThinking);
+  presetIdRef.current = presetId;
+  selectedRef.current = selected;
+  ccEffortRef.current = ccEffort;
+  ccPermModeRef.current = ccPermMode;
+  ccThinkingRef.current = ccThinking;
+  // applyPreset may run before discovery sets claudeCodeAvailable — retry
+  // once the agentic CLI is known so empty new chats get Opus/Agent.
+  const presetKnobsPendingRef = useRef(false);
   // id === null means "Jack" — he's not in presetChoices (that list is only
   // the PRESETS group), but he's configurable the exact same way (see
   // getJackDefinition): no backing file, edits persist as an override layer.
   // `silent` skips the toast — used to apply a configured Jack's mode/model
   // at new-chat time without narrating it every time a fresh tab opens.
   const applyPreset = (id: string | null, opts: { silent?: boolean } = {}) => {
-    setPresetId(id);
     const def = resolveActivePresetDef(id, customPresets);
     if (!def) return; // stale id (e.g. a deleted custom preset) — no-op
-    const provider = agenticProviderForPresetApply(selected, {
+    // Sync refs BEFORE setState — Pass-the-ball / immediate send runs before
+    // React re-renders, and must see Milo (not stale Jack).
+    presetIdRef.current = id;
+    setPresetId(id);
+    const provider = agenticProviderForPresetApply(selectedRef.current, {
       claudeCode: claudeCodeAvailable,
       cursorCli: cursorCliAvailable,
     });
@@ -1101,11 +1180,23 @@ export function AIChatPanel({
     // providers (ollama/openai/anthropic) still get the instructions text.
     if (provider) {
       const cfg = resolvePresetConfigFor(def, provider);
-      if (cfg.effort) setCcEffort(cfg.effort);
+      if (cfg.effort) {
+        ccEffortRef.current = cfg.effort;
+        setCcEffort(cfg.effort);
+      }
+      ccThinkingRef.current = cfg.thinking;
       setCcThinking(cfg.thinking);
+      selectedRef.current = cfg.model;
       setSelected(cfg.model);
       // Permission mode is a Claude Code-only concept (the overlay bridge).
-      if (provider === "claude-code") setCcPermMode(cfg.permMode);
+      if (provider === "claude-code") {
+        ccPermModeRef.current = cfg.permMode;
+        setCcPermMode(cfg.permMode);
+      }
+      presetKnobsPendingRef.current = false;
+    } else {
+      // Discovery hasn't reported an agentic CLI yet — retry when it does.
+      presetKnobsPendingRef.current = true;
     }
     if (!opts.silent) toastInfo(`Preset: ${def.label} (from your next message)`);
   };
@@ -1135,8 +1226,6 @@ export function AIChatPanel({
   const [presetOverridesTick, setPresetOverridesTick] = useState(0);
   const applyPresetRef = useRef(applyPreset);
   applyPresetRef.current = applyPreset;
-  const presetIdRef = useRef(presetId);
-  presetIdRef.current = presetId;
   useEffect(
     () =>
       subscribePresetSettings(() => {
@@ -1146,6 +1235,18 @@ export function AIChatPanel({
       }),
     [],
   );
+  // New-chat race: preset applied while discovery still reports no agentic
+  // CLI. Retry once availability lands (empty transcript only — don't
+  // clobber a user who already picked a model on a blank chat).
+  useEffect(() => {
+    if (!presetKnobsPendingRef.current) return;
+    if (!claudeCodeAvailable && !cursorCliAvailable) return;
+    if (messages.length > 0) {
+      presetKnobsPendingRef.current = false;
+      return;
+    }
+    applyPresetRef.current(presetIdRef.current, { silent: true });
+  }, [claudeCodeAvailable, cursorCliAvailable, messages.length]);
   const presetChoices: PresetDefinition[] = useMemo(
     () => [
       ...PRESET_ORDER.map((id) =>
@@ -1614,6 +1715,15 @@ export function AIChatPanel({
     // arrives so we don't double-render the same text.
     let replayMsgGotDeltas = false;
     let replayContextTokens: TurnTokens | null = null;
+    // Freeze identity for the replayed turn the same way live sends do —
+    // composer switches during reattach must not flip the bubble's face.
+    const replayAgentId = presetIdRef.current;
+    let replayIdentityPinned = false;
+    const pinReplayIdentity = () => {
+      if (replayIdentityPinned) return;
+      replayIdentityPinned = true;
+      setTurnAgentId(replayAgentId);
+    };
     // Replay bookkeeping mirrors the live loop: a chronological blocks
     // log + tool calls/results so the resumed bubble renders the SAME
     // interleaved text → tool → text flow as a never-refreshed turn.
@@ -1636,6 +1746,7 @@ export function AIChatPanel({
     });
     const appendReplayText = (t: string) => {
       if (!t) return;
+      pinReplayIdentity();
       const last = replayBlocks[replayBlocks.length - 1];
       if (last && last.kind === "text" && !breakNextText) {
         last.text += t;
@@ -1660,7 +1771,7 @@ export function AIChatPanel({
             tool_results:
               replayResults.length > 0 ? [...replayResults] : undefined,
             blocks: replayBlocks.length > 0 ? [...replayBlocks] : undefined,
-            agentId: presetId,
+            agentId: replayAgentId,
           };
           setMessages((m) => [...m, msg]);
         }
@@ -1676,6 +1787,7 @@ export function AIChatPanel({
         setThinkingLive(false);
         setRunningTools(false);
         setActiveToolLabels([]);
+        setTurnAgentId(undefined);
         return;
       }
       if (line.kind === "stderr" && line.line) {
@@ -1761,6 +1873,7 @@ export function AIChatPanel({
                 id,
                 function: { name, arguments: args },
               };
+              pinReplayIdentity();
               replayCalls.push(call);
               setStreamingToolCalls([...replayCalls]);
               if (id) {
@@ -2012,22 +2125,40 @@ export function AIChatPanel({
           setSessionId(sid);
           setProviderSessionIds(readProviderSessionIds(found));
           setChatTotalCost(found.totalCostUsd ?? 0);
-          const knobs = sessionKnobsFrom(found);
-          setCcEffort(knobs.effort);
-          setCcThinking(knobs.thinking);
-          setCcPermMode(knobs.permMode);
-          setPresetId(found.presetId ?? null);
           applyComposerDraft(draftFromSession(found));
-          setMessages(msgs);
-          rebuildChecklist(msgs);
-          if (found.model) {
-            const q = parseQualifiedModel(found.model)
-              ? found.model
-              : makeQualifiedModel("ollama", found.model);
-            setSelected(q);
+          // Session preset before message paint — missing agentId rows must
+          // resolve to THIS chat's agent when switching Jack↔Milo sessions.
+          const sessionAgent = sessionAgentFromStored(found.presetId);
+          const withAgents = backfillAssistantAgentIds(msgs, sessionAgent);
+          setMessages(withAgents);
+          rebuildChecklist(withAgents);
+          // 087 seeds an empty RAM body so hydrate always `found`s new chats.
+          // Without a persisted model, Team preset knobs must still apply —
+          // otherwise last-used Sonnet/Auto stick while the pill shows Milo.
+          if (shouldApplyPresetOnEmptyHydrate(found, withAgents.length)) {
+            applyPreset(presetIdForEmptyHydrate(found), { silent: true });
+          } else {
+            const knobs = sessionKnobsFrom(found);
+            // Keep send-path refs in lockstep with state — a fast send right
+            // after chat switch must not still see the previous chat's agent.
+            presetIdRef.current = sessionAgent;
+            ccEffortRef.current = knobs.effort;
+            ccThinkingRef.current = knobs.thinking;
+            ccPermModeRef.current = knobs.permMode;
+            setCcEffort(knobs.effort);
+            setCcThinking(knobs.thinking);
+            setCcPermMode(knobs.permMode);
+            setPresetId(sessionAgent);
+            if (found.model) {
+              const q = parseQualifiedModel(found.model)
+                ? found.model
+                : makeQualifiedModel("ollama", found.model);
+              selectedRef.current = q;
+              setSelected(q);
+            }
           }
           logChatSwitch("messages applied", {
-            count: msgs.length,
+            count: withAgents.length,
             aiChatId: aiChatId ?? null,
           });
           return;
@@ -2036,10 +2167,6 @@ export function AIChatPanel({
         setProviderSessionIds({});
         setChatTotalCost(0);
         setMessages([]);
-        const knobs = defaultSessionKnobs();
-        setCcEffort(knobs.effort);
-        setCcThinking(knobs.thinking);
-        setCcPermMode(knobs.permMode);
         applyDefaultPreset();
         applyComposerDraft({});
       };
@@ -2170,7 +2297,11 @@ export function AIChatPanel({
       if (partial !== null && partial.trim().length > 0) {
         finalMessages = [
           ...messages,
-          { role: "assistant" as const, content: partial },
+          {
+            role: "assistant" as const,
+            content: partial,
+            agentId: streamingBubbleAgentId(turnAgentId, presetId),
+          },
         ];
       }
       if (finalMessages.length === 0) return;
@@ -2236,7 +2367,11 @@ export function AIChatPanel({
         assistantSoFar !== null && assistantSoFar.trim().length > 0
           ? [
               ...messages,
-              { role: "assistant" as const, content: assistantSoFar },
+              {
+                role: "assistant" as const,
+                content: assistantSoFar,
+                agentId: streamingBubbleAgentId(turnAgentId, presetId),
+              },
             ]
           : messages;
       if (finalMessages.length === 0) return;
@@ -2942,9 +3077,11 @@ export function AIChatPanel({
       setInput(
         `${before}@${token}${after.startsWith(" ") ? "" : " "}${after}`,
       );
+      // Inline @ cite — unpinned (chip only from icon / auto-agent).
       useStore.getState().setAIChatFeature(wsId, aiChatId, {
         id: pick.feature.slug,
         label: featureLabelFromSlug(pick.feature.slug),
+        pinned: false,
       });
     } else if (pick.type === "work" && aiChatId) {
       const token = pick.work.shortId;
@@ -3111,7 +3248,8 @@ export function AIChatPanel({
     baseMessages: ChatMessage[] = messages,
     images: ImageAttachment[] = [],
   ) => {
-    if ((!text && images.length === 0) || !selected) return;
+    if ((!text && images.length === 0) || !(selectedRef.current || selected))
+      return;
     // User wrote instead of clicking Pass the ball — keep discussing.
     const pendingPlan = planBuyInRef.current;
     if (pendingPlan) {
@@ -3136,6 +3274,12 @@ export function AIChatPanel({
     // Mark the live loop as the stream's owner so the attach effect
     // can't subscribe a duplicate consumer (cleared in the finally).
     liveTurnRef.current = true;
+    // Read from refs — Pass-the-ball calls applyPreset then send in a
+    // microtask before React re-renders; closure `presetId` would still
+    // be Jack while the model must speak as Milo (and the bubble stamp too).
+    const agentAtSend = presetIdRef.current;
+    turnAgentIdRef.current = agentAtSend;
+    setTurnAgentId(agentAtSend);
 
     // Cross-chat hard-cap check. Per-workspace budget takes precedence
     // (if one is set on this workspace), then the global cap. The
@@ -3150,6 +3294,7 @@ export function AIChatPanel({
         `🛑 ${scope} reached: $${cap.current.toFixed(2)} / $${cap.cap.toFixed(2)}. Raise it in Settings → AI Usage Dashboard to send.`,
       );
       liveTurnRef.current = false;
+      setTurnAgentId(undefined);
       return;
     }
 
@@ -3172,11 +3317,9 @@ export function AIChatPanel({
     const parsed = activeKey ? parseKey(activeKey) : null;
     // Persona-aware core: the active preset (Jack when none) supplies the
     // identity, so switching agents in the composer actually changes who
-    // "speaks". Resolved once here and reused for the role-instructions
-    // append below. Role behavior lives in the preset block, not the core.
-    const activeDef = presetId
-      ? presetChoices.find((p) => p.id === presetId)
-      : effectivePresetDefinition(getJackDefinition());
+    // "speaks". Resolved once here from the same ref as agentAtSend so a
+    // Pass-the-ball handoff can't stamp Jack while prompting as Milo.
+    const activeDef = resolveActivePresetDef(agentAtSend, customPresets);
     const coreIdentity = activeDef
       ? { label: activeDef.label, role: activeDef.role }
       : { label: "Jack", role: "Project Manager · Planner" };
@@ -3200,7 +3343,9 @@ export function AIChatPanel({
     //   - openai/anthropic API: skip inlining the tree. Frontier models
     //     reliably call list_files when they need it. Saves tokens.
     //   - ollama: inline the tree (small models often won't tool-call).
-    const selectedParsed = parseQualifiedModel(selected);
+    const selectedParsed = parseQualifiedModel(
+      selectedRef.current || selected,
+    );
     const selectedProvider = selectedParsed?.providerId ?? "ollama";
     const isFirstUserTurn = !baseMessages.some((m) => m.role === "user");
     if (
@@ -3785,6 +3930,8 @@ export function AIChatPanel({
           content: string;
           is_error?: boolean;
         }> = [];
+        // Last successful feature-doc edit this turn → pin after stream if empty.
+        let lastAutoFeatureSlug: string | null = null;
         let firstTokenAt: number | null = null;
         const startedAt = performance.now();
         let turnDurationMs: number | undefined;
@@ -3796,7 +3943,7 @@ export function AIChatPanel({
         // anchor to a previous turn.
         setLastStreamEventAt(Date.now());
         for await (const ev of chatStream(
-          selected,
+          selectedRef.current || selected,
           conversation,
           abortRef.current.signal,
           TOOLS,
@@ -3811,12 +3958,12 @@ export function AIChatPanel({
           // active when the turn fires (multi-workspace isolation).
           root,
           // Per-chat /effort, /mode and /thinking knobs (Claude Code only).
-          selectedProvider === "claude-code" ? ccEffort : undefined,
+          selectedProvider === "claude-code" ? ccEffortRef.current : undefined,
           selectedProvider === "claude-code"
-            ? (ccPermMode ?? undefined)
+            ? (ccPermModeRef.current ?? undefined)
             : undefined,
           selectedProvider === "claude-code"
-            ? (ccThinking ?? undefined)
+            ? (ccThinkingRef.current ?? undefined)
             : undefined,
         )) {
           // Any event from the provider is a sign of life — reset the
@@ -3944,6 +4091,27 @@ export function AIChatPanel({
             if (ev.call.id) seenToolCallIds.add(ev.call.id);
             toolCallsThisRound.push(ev.call);
             setStreamingToolCalls([...toolCallsThisRound]);
+            // ExitPlanMode may fail upstream ("not enabled") — still offer
+            // Pass the ball to Milo from the tool args so UX doesn't depend
+            // on the CLI actually enabling the tool.
+            if (ev.call.function.name === "ExitPlanMode") {
+              const planArg = ev.call.function.arguments.plan;
+              const plan =
+                typeof planArg === "string" && planArg.trim()
+                  ? planArg
+                  : "";
+              if (plan) {
+                const reqId =
+                  ev.call.id ?? `client-plan-${Date.now().toString(36)}`;
+                publishPlanBuyIn({
+                  requestId: reqId,
+                  plan,
+                  sessionId: claudeSessionId ?? null,
+                  cwd: root,
+                });
+                openPlanHandler(reqId, plan);
+              }
+            }
             if (ev.call.id) {
               blocksThisRound.push({ kind: "tool_call", callId: ev.call.id });
               setStreamingBlocks([...blocksThisRound]);
@@ -4104,6 +4272,21 @@ export function AIChatPanel({
               }
               return next;
             });
+            // Track feature-doc edits; pin the last one after the turn.
+            if (aiChatId && ev.tool_use_id) {
+              const call = toolCallsThisRound.find(
+                (c) => c.id === ev.tool_use_id,
+              );
+              if (call) {
+                const slug = featureSlugFromSuccessfulEdit(
+                  call,
+                  root,
+                  ev.content,
+                  ev.is_error === true,
+                );
+                if (slug) lastAutoFeatureSlug = slug;
+              }
+            }
             // Stash for attachment to the assistant message at end of round.
             toolResultsThisRound.push({
               tool_use_id: ev.tool_use_id,
@@ -4112,6 +4295,10 @@ export function AIChatPanel({
             });
             setStreamingToolResults([...toolResultsThisRound]);
           }
+        }
+        // Pin last feature-doc edit this turn (only if chat still unlinked).
+        if (aiChatId && lastAutoFeatureSlug) {
+          pinFeatureOnChat(wsId, aiChatId, lastAutoFeatureSlug);
         }
         // Record final speed for the slow-model banner heuristic.
         if (firstTokenAt !== null) {
@@ -4148,7 +4335,7 @@ export function AIChatPanel({
           // present (for new messages); old saved sessions without
           // blocks fall back to the legacy combined render.
           blocks: blocksThisRound.length > 0 ? blocksThisRound : undefined,
-          agentId: presetId,
+          agentId: agentAtSend,
           durationMs:
             turnDurationMs ?? Math.round(performance.now() - startedAt),
           thinkingMs: (() => {
@@ -4160,6 +4347,49 @@ export function AIChatPanel({
             return span >= 400 ? span : undefined;
           })(),
         };
+        // End-of-turn safety net: ExitPlanMode often errors "not enabled"
+        // before the permission hook fires. Re-offer buy-in from args (or
+        // assistant markdown) so Pass the ball still appears.
+        {
+          const exitCall = [...toolCallsThisRound]
+            .reverse()
+            .find((c) => c.function.name === "ExitPlanMode");
+          if (exitCall && !getPlanBuyIn({ sessionId: claudeSessionId, cwd: root })) {
+            const fromArgs =
+              typeof exitCall.function.arguments.plan === "string"
+                ? exitCall.function.arguments.plan.trim()
+                : "";
+            const fromProse =
+              !fromArgs && visibleContent.trim().length > 80
+                ? visibleContent.trim()
+                : "";
+            const plan = fromArgs || fromProse;
+            if (plan) {
+              const reqId =
+                exitCall.id ?? `client-plan-${Date.now().toString(36)}`;
+              publishPlanBuyIn({
+                requestId: reqId,
+                plan,
+                sessionId: claudeSessionId ?? null,
+                cwd: root,
+              });
+              const desc = aiChatId
+                ? useStore.getState().loaded[wsId]?.aiChats[aiChatId]
+                : undefined;
+              if (desc?.featureId && aiChatId) {
+                void onNativePlanReady(
+                  wsId,
+                  aiChatId,
+                  root,
+                  desc.storyId ?? "",
+                  plan,
+                );
+              } else {
+                openPlanTab(wsId, aiChatId, reqId, plan);
+              }
+            }
+          }
+        }
         conversation.push(assistantMsg);
         setMessages((m) => [...m, assistantMsg]);
         paintStreamUi.flush();
@@ -4310,6 +4540,7 @@ export function AIChatPanel({
       });
       abortRef.current = null;
       liveTurnRef.current = false;
+      setTurnAgentId(undefined);
       // One-shot attach flags reset after the message goes out.
       setAttachTree(false);
       clearAttachedFiles();
@@ -4352,6 +4583,7 @@ export function AIChatPanel({
     cancelBackgroundWake();
     abortRef.current?.abort();
     liveTurnRef.current = false;
+    setTurnAgentId(undefined);
     // Immediate UI reset — don't wait for the tool-execution loop or
     // provider generator to unwind (agentic CLIs could sit in runningTools).
     setStreaming(null);
@@ -4532,10 +4764,6 @@ export function AIChatPanel({
     resetTurnTransients();
     setMessages([]);
     applyComposerDraft({});
-    const knobs = defaultSessionKnobs();
-    setCcEffort(knobs.effort);
-    setCcThinking(knobs.thinking);
-    setCcPermMode(knobs.permMode);
     applyDefaultPreset();
     setHistoryOpen(false);
   };
@@ -4569,17 +4797,25 @@ export function AIChatPanel({
     // index) clears via the shared transient-reset helper.
     setChatTotalCost(s.totalCostUsd ?? 0);
     const knobs = sessionKnobsFrom(s);
+    const sessionAgent = sessionAgentFromStored(s.presetId);
+    presetIdRef.current = sessionAgent;
+    ccEffortRef.current = knobs.effort;
+    ccThinkingRef.current = knobs.thinking;
+    ccPermModeRef.current = knobs.permMode;
     setCcEffort(knobs.effort);
     setCcThinking(knobs.thinking);
     setCcPermMode(knobs.permMode);
-    setPresetId(s.presetId ?? null);
+    setPresetId(sessionAgent);
     resetTurnTransients();
-    void applyLoadedMessages(s.messages).then((msgs) => {
+    void applyLoadedMessages(s.messages, sessionAgent).then((msgs) => {
       void hydrateAgentCommitFromMessages(wsId, s.id, root, msgs);
     });
     applyComposerDraft(draftFromSession(s));
     setHistoryOpen(false);
-    if (s.model) setSelected(s.model);
+    if (s.model) {
+      selectedRef.current = s.model;
+      setSelected(s.model);
+    }
     const gen = ++ccHydrateGenRef.current;
     void tryProviderRecover(s, gen);
   };
@@ -5188,10 +5424,6 @@ export function AIChatPanel({
       setMessages([]);
       setProviderSessionIds({});
       setChatTotalCost(0);
-      const knobs = defaultSessionKnobs();
-      setCcEffort(knobs.effort);
-      setCcThinking(knobs.thinking);
-      setCcPermMode(knobs.permMode);
       applyDefaultPreset();
       applyComposerDraft({});
       resetTurnTransients();
@@ -5317,7 +5549,9 @@ export function AIChatPanel({
                   tool_calls: m.tool_calls,
                   tool_results: m.tool_results,
                 }));
-                const hydrated = await applyLoadedMessages(raw);
+                // CLI re-import has no per-message agentId — stamp from
+                // the current session so Jack/Milo chats stay distinct.
+                const hydrated = await applyLoadedMessages(raw, presetId);
                 toastInfo(
                   `Resumed ${provider} session — ${hydrated.length} message${hydrated.length === 1 ? "" : "s"} restored`,
                 );
@@ -5498,13 +5732,14 @@ export function AIChatPanel({
         tool_results:
           streamingToolResults.length > 0 ? streamingToolResults : undefined,
         blocks: hasStreamingBlocks ? streamingBlocks : undefined,
-        agentId: presetId,
+        agentId: streamingBubbleAgentId(turnAgentId, presetId),
       });
     }
     return arr;
   }, [
     messages,
     presetId,
+    turnAgentId,
     streaming,
     streamingBlocks,
     streamingToolCalls,
@@ -5720,6 +5955,9 @@ export function AIChatPanel({
 
   const handoffToMiloBuilder = () => {
     applyPreset("builder", { silent: true });
+    // Force Agent mode even if Milo's saved override says otherwise —
+    // Pass the ball means implement, not stay in Plan.
+    ccPermModeRef.current = "bypassPermissions";
     setCcPermMode("bypassPermissions");
   };
 
@@ -5762,10 +6000,9 @@ export function AIChatPanel({
     await resolvePlanBuyIn(requestId, "allow");
     planBuyInRef.current = null;
     const prompt = implementPlanPrompt(featId);
-    // Allow ExitPlanMode to settle, then flush Milo knobs into the next turn.
-    queueMicrotask(() => {
-      void sendUserTextRef.current?.(prompt);
-    });
+    // Refs already hold Milo + Agent from handoffToMiloBuilder — send must
+    // not wait for a re-render (queueMicrotask alone used to stamp Jack).
+    void sendUserTextRef.current?.(prompt);
   };
 
   const keepDiscussingPlan = async (requestId: string) => {
@@ -6040,7 +6277,14 @@ export function AIChatPanel({
             >
               <span className="ai-msg-role">
                 {(() => {
-                  const identity = msgIdentityFor(m.agentId);
+                  const identity = msgIdentityFor(
+                    displayAgentForAssistantRow({
+                      messageAgentId: m.agentId,
+                      sessionPresetId: presetId,
+                      turnFrozenId: turnAgentId,
+                      isStreamingBubble: isStreamingThis,
+                    }),
+                  );
                   return (
                     <>
                       <img
@@ -6777,6 +7021,16 @@ export function AIChatPanel({
         <AgentCommitDock wsId={wsId} sessionId={sessionId} root={root} />
       ) : null}
       <SkillProposalChip enabled={skillTrainerExt} foreground={wsActive && chatVisible} />
+      {planBuyIn && (
+        <PlanBuyInCard
+          plan={planBuyIn.plan}
+          featureLabel={
+            featureId ? featureLabelFromSlug(featureId) : null
+          }
+          onBuild={() => passBallToMilo(planBuyIn.requestId, planBuyIn.plan)}
+          onKeepDiscussing={() => keepDiscussingPlan(planBuyIn.requestId)}
+        />
+      )}
       <ComposerShell
         ref={composerRef}
         sessionKey={aiChatId}
@@ -6850,19 +7104,11 @@ export function AIChatPanel({
           activePresetId={presetId}
           onSelectPreset={applyPreset}
         />
-        {aiChatId && !featureId && (
+        {aiChatId && (
           <ComposerFeaturePill
             wsId={wsId}
             root={root}
             chatId={aiChatId}
-            onLinked={(slug) => {
-              const token = `@${slug}`;
-              setInput((v) => {
-                if (v.includes(token)) return v;
-                const pad = v && !/\s$/.test(v) ? " " : "";
-                return `${v}${pad}${token} `;
-              });
-            }}
           />
         )}
         <div className="ai-composer-spacer" />
@@ -6924,16 +7170,6 @@ export function AIChatPanel({
           </button>
         )}
       </div>
-      {planBuyIn && (
-        <PlanBuyInCard
-          plan={planBuyIn.plan}
-          featureLabel={
-            featureId ? featureLabelFromSlug(featureId) : null
-          }
-          onBuild={() => passBallToMilo(planBuyIn.requestId, planBuyIn.plan)}
-          onKeepDiscussing={() => keepDiscussingPlan(planBuyIn.requestId)}
-        />
-      )}
       {/* Inline permission card — replaces the old full-window overlay.
           Renders nothing when there are no pending requests; otherwise
           shows the request just above the input where the user is

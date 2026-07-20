@@ -73,7 +73,7 @@ before changing the visible chat, but options reduce perceived latency:
 |---|---|---|
 | Hub click, **same project** | `false` | outgoing `activeId` |
 | Hub click, **cross project** | `true` | outgoing `activeId` |
-| `addNewAIChat` | `false` | target `wsId` |
+| `addNewAIChat` | `true` (+ `chatId`) | — (no flush) |
 | Agent mode `selectSession` | `false` if same ws | current `wsId` |
 
 **Veil timing:** max **280ms** (was 500ms). `endChatSwitch()` clears early when

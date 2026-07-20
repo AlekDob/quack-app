@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-12
-last_verified: 2026-07-16
+last_verified: 2026-07-20
 tags: [presets, agents, model-selection, effort, organigramma, avatar, backend-agnostic, prompt-injection, settings, chat-identity, companion, team-sync, user-instructions]
 ---
 
@@ -203,18 +203,43 @@ Every assistant message used to render a hardcoded `<img src="/jack.jpeg">` + "J
 switching to Milo/Nora/Vera — nothing snapshotted which agent was active when a message was
 sent, so the header never reflected preset switches mid-conversation.
 
-- `ChatMessage.agentId?: string | null` (`src/ai.ts`) — display-only field, the live `presetId`
-  at the moment an assistant message is committed (`null`/`undefined` = Jack). Set at every
+**Module:** `src/chatTurnAgent.ts` (+ `chatTurnAgent.test.ts`) — pure helpers shared by
+hydrate, render, and stream commit so Jack/Milo cannot diverge between stamp and prompt.
+
+| Helper | Role |
+|---|---|
+| `streamingBubbleAgentId(frozen, live)` | In-flight bubble keeps send-time agent |
+| `resolveMessageAgentId(msg, session)` | `null` = Jack; `undefined` = fall back to session |
+| `backfillAssistantAgentIds(msgs, session)` | Stamp missing ids on load |
+| `sessionAgentFromStored(presetId?)` | Disk omit → Jack (`null`) |
+| `displayAgentForAssistantRow(...)` | One path for streaming vs committed rows |
+
+- `ChatMessage.agentId?: string | null` (`src/ai.ts`) — display-only field, the preset id that
+  owned the turn when it **started** (`null` = Jack; omitted/`undefined` = legacy). Set at every
   commit site in `AIChatPanel.tsx`: the unified streaming-loop commit (works for every provider —
-  Ollama, Claude Code, Cursor CLI, OpenCode all funnel through the same `assistantMsg` push),
-  the process-replay finalize (reattaching to a running CC/Cursor/OpenCode subprocess after
-  reload), and the in-progress streaming bubble (so it's correct even before the turn commits).
+  Ollama, Claude Code, Cursor CLI all funnel through the same `assistantMsg` push), the
+  process-replay finalize (reattaching to a running CC/Cursor subprocess after reload), and the
+  in-progress streaming bubble / persist checkpoints.
+- **Mid-turn freeze:** `turnAgentId` is captured at send (and at replay pin). A SubagentPill
+  switch while tools/stream are still running updates the composer for the **next** message only
+  — it must not reattribute the in-flight bubble (toast already says "from your next message").
+- **Chat-session switch:** rows missing `agentId` fall back to **this session's** `presetId`
+  (not hardcoded Jack). Remount seeds preset + messages from the RAM chat cache
+  (`cachedSessionSeed`) so switching Jack↔Milo sessions doesn't flash the wrong face.
+  Hydrate / `openSession` / provider recover also sync send-path refs (`presetIdRef`, model,
+  effort, mode, thinking) so a fast send after switch cannot see the previous chat's agent.
+- **Pass-the-ball race:** `applyPreset` validates the definition, then writes `presetIdRef`
+  (+ model/effort/mode/thinking refs) **before** `setState`. `sendUserText` reads those refs for
+  `[Agent identity]`, message `agentId`, and `chatStream` knobs — so a send in the same turn as
+  handoff cannot stamp Jack while Milo speaks ("Sono Milo…" under a Jack header). See bug
+  `003-agent-identity-mismatch.md` and `088`.
 - `msgIdentityFor(agentId)` in `AIChatPanel.tsx` resolves an `agentId` to `{ name, role, avatar }`:
   `null`/`undefined` → `effectivePresetDefinition(getJackDefinition())`; otherwise looks it up in
   `presetChoices` (falls back to Jack if the preset was since deleted). Same resolution the
   composer picker already uses — one lookup, not a second copy.
-- Old saved sessions have no `agentId` on their messages — they render as Jack, which is
-  correct (presets didn't exist yet when those messages were sent).
+- Old saved sessions have no `agentId` on their messages — they render via the session preset
+  after backfill (Jack sessions stay Jack; Milo sessions show Milo). Rows already persisted with
+  a wrong stamp are not rewritten.
 
 ### Configurable + creatable agents (organigramma)
 
@@ -332,11 +357,20 @@ Two coupled fixes so new chats start **and stay** on the right agent.
 
 **1. Default agent = Milo (not Jack).** `DEFAULT_PRESET_ID = "builder"` (`builtins.ts`) is the
 baseline for every fresh chat. The old `applyJackDefaultsIfConfigured()` is replaced by
-`applyDefaultPreset()` (`AIChatPanel.tsx`) which silently `applyPreset("builder")` at the 3
-fresh-chat / reset sites (`/new`, new-tab mount `else` branch, delete-session reset). Milo's
-shipped `modelTier` was also bumped `balanced` → `reasoning`, so the default is **Opus**.
-Legacy sessions with no saved `presetId` still fall back to `null`/Jack on load (`?? null`) — old
-chats are not retroactively rewritten.
+`applyDefaultPreset()` / `applyPreset(...)` at fresh-chat sites. Milo's shipped `modelTier`
+was bumped `balanced` → `reasoning`, so the default is **Opus** + **Agent**
+(`bypassPermissions`).
+
+**087 regression (2026-07-20):** `addAIChat` seeds an empty RAM body so hydrate always takes
+the `found` branch. That path used to restore sparse knobs / `presetId ?? null` (Jack) and
+**skip** `applyDefaultPreset` — new Agent Mode sessions showed Milo's pill (initial state)
+with last-used Sonnet/Auto. Fix: empty hydrate without a persisted `model` calls
+`applyPreset(presetIdForEmptyHydrate(found))` (`aiChatPresetApply.ts`); seeds include
+`presetId: DEFAULT_PRESET_ID`; if discovery has not reported an agentic CLI yet,
+`presetKnobsPendingRef` retries once availability lands.
+
+Legacy sessions **with messages** and no saved `presetId` still fall back to `null`/Jack on
+load — old chats are not retroactively rewritten.
 
 **2. Identity survives CC resume ("Milo speaks as Jack" bug).** The active agent's identity
 (`quackAgentCorePrompt(coreIdentity)`) and preset role-instructions used to live only in
@@ -351,7 +385,9 @@ already used for the orchestrator contract + Works protocol. Non-CC providers ke
 | Concern | Where |
 |---|---|
 | Default preset id | `DEFAULT_PRESET_ID = "builder"` (`src/presets/builtins.ts`, exported via barrel) |
-| Fresh-chat apply | `applyDefaultPreset()` → 3 sites in `AIChatPanel.tsx` (`/new`, new-tab mount, delete-reset) |
+| Fresh-chat apply | Empty hydrate → `shouldApplyPresetOnEmptyHydrate` + `applyPreset` (`aiChatPresetApply.ts`); also `/new`, delete-reset |
+| Empty-seed preset | `store.addAIChat` → `putCachedSession({ …, presetId: DEFAULT_PRESET_ID })` |
+| Provider race | `presetKnobsPendingRef` retries when CC/Cursor availability lands |
 | Milo shipped tier | `builtins.ts` `builder.defaults.modelTier: "reasoning"` (→ `claude-code:opus`) |
 | CC identity injection | `AIChatPanel.sendUserText` — `[Agent identity]` block in `ccTurnContext` when `skipAllInlining` |
 
@@ -396,6 +432,13 @@ Settings tier map (`lcp.tierModelMap.v1`) > `capabilities.modelForTier` (Milo/Ja
 - **Empty picker on new tab.** If Jack's model still shows Sonnet after a new chat, confirm Jack
   was saved in Team (`lcp.presets.v1` key `jack` non-empty) and that Claude Code is available —
   `applyPreset` only sets model knobs for agentic CLIs.
+- **Apply-then-send must use refs.** Never read React `presetId` / `selected` / mode from the
+  render closure for a send that follows `applyPreset` in the same turn (Pass the ball, Tab
+  cycle + Enter). Sync refs inside `applyPreset` first — see bug `003` and
+  `chatTurnAgent.test.ts` ("pass-ball apply-then-send contract").
+- **Identity stamp vs prompt must share one id.** `agentAtSend = presetIdRef.current` drives
+  both `[Agent identity]` and `ChatMessage.agentId` — splitting them recreates "Sono Milo under
+  Jack".
 
 ### Related docs
 
@@ -406,5 +449,7 @@ Settings tier map (`lcp.tierModelMap.v1`) > `capabilities.modelForTier` (Milo/Ja
 - `016-image-attachments.md` — the compress/encode pipeline `avatarStore.ts` reuses.
 - `022-chat-composer.md` — composer row hosting the merged `SubagentPill`.
 - `005-jack-duck-identity.md` — Jack persona line vs per-user instruction overrides (Team).
+- `088-plan-milo-handoff.md` — Pass the ball must share the apply-then-send ref contract.
+- `documentation/bugs/003-agent-identity-mismatch.md` — Jack header / Milo voice write-up.
 - `031-model-discovery-cache.md` — the live model catalog `TierModelSettings` reads via
   `getProvider(id).listModels()` for Cursor CLI/OpenCode/Claude Code.

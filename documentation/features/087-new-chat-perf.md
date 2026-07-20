@@ -81,8 +81,15 @@ standby / long background, not alt-tab flickers.
 | Type | Path | Role |
 |---|---|---|
 | Util | `src/afterFirstPaint.ts` | Double-rAF defer helper |
-| Store | `src/store.ts` | `addAIChat` seeds empty `putCachedSession` |
-| Entry | `src/addNewAIChat.ts` | `markNewChat` + focus (no seed here — store owns it) |
+| Store | `src/store.ts` | `addAIChat` seeds empty `putCachedSession` (+ `presetId`) |
+| Entry | `src/addNewAIChat.ts` | `markNewChat` + **`pulseChatSwitch({ veil: true, chatId })`** + focus |
+
+### UX: immediate loader (075)
+
+New chat uses the same global `ChatSwitchVeil` as session switch — click → veil
+in, hydrate ends pulse after the adaptive floor (`veilFloorMs`, ~160ms when
+instant). Covers most of the ~200ms mount gap without inventing a second spinner.
+
 | Component | `src/components/AIChatPanel.tsx` | Warm hydrate, sync empty paint, deferred mounts |
 | Resume | `src/resumeDebug.ts` | `MIN_HIDDEN_MS` |
 | Audit | `src/components/PerfAuditWindow.tsx` | Copy JSON + prefer `detail.elapsedMs` |
@@ -105,6 +112,9 @@ cold-wake / other chrome still dominates — measure again when already warm.
 - **Do not** reintroduce `force` when `messages.length === 0` — that is the
   empty-file miss.
 - Seeding empty RAM is intentional; first real `saveSession` creates the file.
+  Seed includes `presetId: DEFAULT_PRESET_ID`. Empty hydrate **must** still call
+  `applyPreset` when there is no persisted `model` (`shouldApplyPresetOnEmptyHydrate`)
+  — otherwise Team knobs (Opus/Agent for Milo) lose to last-used Sonnet/Auto (`062`).
 - Defer only work that is OK a frame late (slash menus / chips). Hydrate and
   stream wiring stay eager.
 - `[new-chat-perf]` / Perf Audit ring (`086`) are the source of truth for

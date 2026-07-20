@@ -16,7 +16,7 @@ export function quackClaudeCodeEditorPrompt(
     lines.splice(
       3,
       0,
-      "- ExitPlanMode is AVAILABLE while composer mode is Plan — call it by name DIRECTLY when the plan is ready (full markdown in `plan`). Do NOT use ToolSearch. Quack merges into the linked feature `.md` (or opens a plan preview); the user clicks Pass the ball to Milo before implementation. Never write ~/.claude/plans/*.",
+      "- ExitPlanMode is AVAILABLE while composer mode is Plan — call it by name DIRECTLY when the plan is ready (full markdown in the `plan` parameter). Do NOT use ToolSearch. Always put the COMPLETE plan markdown in `plan` even if unsure the tool will succeed — Quack reads that field to show Pass the ball to Milo. Never write ~/.claude/plans/*.",
       "- Do NOT start implementing after ExitPlanMode — wait for the user to hand off to Milo.",
     );
   } else {

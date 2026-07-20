@@ -216,7 +216,7 @@ function DrawerAIChatHost({
     dropCachedSessionBody(wsId, chatId);
   }, [mounted, keepWarm, wsId, chatId]);
   if (!mounted) return null;
-  const showSurface = visible && !switching;
+  const showSurface = visible;
   const showVeil = switching && visible;
   return createPortal(
     <div
