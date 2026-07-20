@@ -90,6 +90,9 @@ See `009`, `043`, `044`. **Mark done** also dismisses the editor tab.
 ### Gotcha — new chat + switch veil
 `addNewAIChat` pulses `veil: false`. That path must **clear** an in-flight switch pulse (`finish`), otherwise hosts stay `!is-visible` until CAP and the new tab looks missing. See `075-chat-switch-loader.md`.
 
+### Gotcha — new chat hydrate / paint
+`addAIChat` seeds an empty RAM body; hydrate must not `force` on empty (disk miss). Empty UI paints sync; non-critical mounts use `afterFirstPaint`. See **`087-new-chat-perf.md`** + Perf Audit Copy JSON (`086`).
+
 ### AIChatDescriptor
 | Field | Type | Description |
 |-------|------|-------------|

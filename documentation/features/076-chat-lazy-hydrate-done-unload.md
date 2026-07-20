@@ -51,7 +51,9 @@ fix family as `memo(WorkspaceShell)` (`058`).
 
 Dev timing: `switchPerf.markNewChat(chatId)` in `addNewAIChat` + `logNewChatPhase`
 in the `AIChatPanel` mount effect log `[new-chat-perf] panel mounted|painted`
-with `sinceMs` — confirms the click→mount cost.
+with `sinceMs` — confirms the click→mount cost. Empty-session hydrate seed,
+sync empty paint, and `afterFirstPaint` mount deferrals live in
+**`087-new-chat-perf.md`** (Perf Audit Copy JSON is the regression harness).
 
 ### Data flow
 
@@ -98,7 +100,7 @@ Warm ids come from workspace descriptors: `sessionId` of chats with neither
 // Frontend
 hydrateChatStore(wsId, warmIds?) → Promise<void>
 ensureSessionLoaded(wsId, sessionId, { force? }) → Promise<ChatSession | undefined>
-// force: drop RAM then disk. AIChatPanel forces only when cache empty/thin (085).
+// force: drop RAM then disk. Prefer RAM; never force empty new chats (085/087).
 dropCachedSessionBody(wsId, sessionId) → void  // RAM only; disk + index stay
 loadSession / loadSessions  // sync, warm cache only
 listSessionIds(wsId) → string[]  // full disk index
@@ -135,6 +137,7 @@ chat_store_load(wsId, sessionId) → ChatSession | null
 | `075-chat-switch-loader.md` | Veil covers cold `ensureSessionLoaded` latency |
 | `058-workspace-switch-performance.md` | Sibling: heavy UI unload for background workspaces |
 | `085-agent-ide-mode-toggle.md` | Agent↔IDE remount: keep rich RAM body (no blanket `force`) |
+| `087-new-chat-perf.md` | Seed empty body + sync empty paint + deferred mount work |
 
 ### Verify
 

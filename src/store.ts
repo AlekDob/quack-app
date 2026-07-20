@@ -36,6 +36,7 @@ import { flushWorkspaceChatPersist } from "./chatPersistFlush";
 import {
   awaitChatDiskFlushes,
   dropAllCachedBodies,
+  putCachedSession,
 } from "./chatStoreCache";
 import { placeAiKeyInTabsPane, pruneAiTabsInPane } from "./ideAiTabSlot";
 import { hydratePresetOverrides } from "./presets";
@@ -2968,6 +2969,14 @@ export const useStore = create<AppState>((set, get) => {
         sessionId: id,
         createdAt: Math.max(Date.now(), maxCreated + 1),
       };
+      // Empty RAM body so AIChatPanel hydrate skips chat_store_load miss
+      // (new chats have no file yet — force-on-empty paid multi-second IPC).
+      putCachedSession(wsId, {
+        id,
+        title,
+        messages: [],
+        updatedAt: Date.now(),
+      });
       updateWs(wsId, (w) => {
         const aiChats = { ...w.aiChats, [id]: desc };
         let editorRoot = pruneAiTabsInTree(w.layout.editorRoot);

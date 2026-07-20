@@ -192,7 +192,7 @@ shrink or wipe on-disk transcripts.
 | 2. Host unmount | `useLayoutEffect` → `mergeComposerDraft` / knobs | `patchSession` invented `{ messages: [] }` when RAM body missing | `patchSession` refuses empty invent; never shrinks `messages` |
 | 3. Persist | `putCachedSession` / `chat_store_save` | Thin overwrite of rich row | `preferRicherSession` in cache + disk queue |
 | 4. After flip | — | Remount reused thin RAM cache | `dropAllCachedBodies(prevId)` after switch |
-| 5. Remount hydrate | `ensureSessionLoaded` | Cache hit skipped disk after thin RAM | Project leave: `dropAllCachedBodies(prev)` then load. Panel hydrate: **`force` only if cache empty/thin** (085) — keeps rich RAM across Agent↔IDE remount |
+| 5. Remount hydrate | `ensureSessionLoaded` | Cache hit skipped disk after thin RAM | Project leave: `dropAllCachedBodies(prev)` then load. Panel hydrate: **use RAM when present; never force-drop empty new chats** (`085`/`087`) — `addAIChat` seeds `messages: []` so empty sessions skip `chat_store_load` miss |
 
 ```
 ActivityBar / hub → setActiveWorkspace(next)
@@ -208,7 +208,7 @@ ActivityBar / hub → setActiveWorkspace(next)
 | `preferRicherSession(prev, next)` | Keep longer `messages`; allow other field updates |
 | `awaitChatDiskFlushes(wsId?)` | Spin until coalesce queue idle for ws |
 | `dropAllCachedBodies(wsId)` | Clear warm bodies; keep `__idx__` ids |
-| `ensureSessionLoaded(wsId, id, { force })` | Optional drop-then-disk; callers should force only when RAM body missing/empty |
+| `ensureSessionLoaded(wsId, id, { force })` | Optional drop-then-disk; prefer RAM hit. **Do not** force solely because `messages.length === 0` (new chat has no file yet — `087`) |
 
 Tests: `src/chatStoreCache.test.ts` (`npm test`).
 
@@ -237,6 +237,8 @@ Cross-refs: warm Monaco LRU still in `058` (editors); chat hosts stay
 ## Related
 
 - Lazy hydrate + DONE unload: `076-chat-lazy-hydrate-done-unload.md`
+- New chat seed + empty paint: `087-new-chat-perf.md`
+- Agent↔IDE warm remount: `085-agent-ide-mode-toggle.md`
 - Session library model: `001-ai-session-library.md`
 - Provider session bridge: `044-provider-session-bridge.md`
 - Composer / knobs on same row: `040-per-session-composer-state.md`

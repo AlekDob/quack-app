@@ -54,6 +54,15 @@ function kindLabel(kind: PerfEvent["kind"]): string {
   }
 }
 
+/** Prefer phase-local duration in `detail.elapsedMs` — agent-mode top-level
+ *  `elapsedMs` is "since mode toggle started" and misleads (e.g. 162s). */
+function displayElapsedMs(e: PerfEvent): number | undefined {
+  const d = e.detail?.elapsedMs;
+  if (typeof d === "number") return d;
+  if (typeof e.detail?.loadMs === "number") return e.detail.loadMs as number;
+  return e.elapsedMs;
+}
+
 function fmtTime(at: number): string {
   const d = new Date(at);
   return d.toLocaleTimeString(undefined, {
@@ -61,6 +70,73 @@ function fmtTime(at: number): string {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+/** Compact JSON for pasting into chat — trims long cmd lines, keeps timings. */
+function buildAuditExport(snap: AuditSnapshot): string {
+  const processes = snap.processes.map((p) => ({
+    role: roleOf(p),
+    pid: p.pid,
+    cpu: Math.round(p.cpu * 10) / 10,
+    memMb: Math.round(p.mem / (1024 * 1024)),
+    depth: p.depth,
+    related: p.related || undefined,
+    cmd: p.cmd.length > 120 ? `${p.cmd.slice(0, 117)}…` : p.cmd || undefined,
+  }));
+  const events = snap.events.map((e) => ({
+    kind: e.kind,
+    label: e.label,
+    elapsedMs: displayElapsedMs(e),
+    sinceModeMs:
+      e.kind === "agent-mode" &&
+      typeof e.elapsedMs === "number" &&
+      e.elapsedMs !== displayElapsedMs(e)
+        ? e.elapsedMs
+        : undefined,
+    at: new Date(e.at).toISOString(),
+    detail: e.detail,
+  }));
+  const cpuSum = snap.processes.reduce((a, p) => a + p.cpu, 0);
+  const memSum = snap.processes.reduce((a, p) => a + p.mem, 0);
+  return JSON.stringify(
+    {
+      type: "quack-perf-audit",
+      v: 1,
+      capturedAt: new Date(snap.at).toISOString(),
+      context: snap.context,
+      totals: {
+        cpuPct: Math.round(cpuSum * 10) / 10,
+        memMb: Math.round(memSum / (1024 * 1024)),
+        processCount: processes.length,
+        eventCount: events.length,
+      },
+      processes,
+      events,
+    },
+    null,
+    2,
+  );
+}
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
 }
 
 function useThemeSync() {
@@ -83,6 +159,7 @@ function useThemeSync() {
 export function PerfAuditWindow() {
   useThemeSync();
   const [snap, setSnap] = useState<AuditSnapshot | null>(null);
+  const [copyState, setCopyState] = useState<"idle" | "ok" | "err">("idle");
 
   useEffect(() => {
     const theme = new URLSearchParams(window.location.search).get("theme");
@@ -131,6 +208,14 @@ export function PerfAuditWindow() {
   const cpuSum = procs.reduce((a, p) => a + p.cpu, 0);
   const memSum = procs.reduce((a, p) => a + p.mem, 0);
 
+  const onCopy = () => {
+    if (!snap) return;
+    void copyText(buildAuditExport(snap)).then((ok) => {
+      setCopyState(ok ? "ok" : "err");
+      window.setTimeout(() => setCopyState("idle"), 1600);
+    });
+  };
+
   return (
     <div className="audit-win">
       <header className="audit-head">
@@ -138,15 +223,34 @@ export function PerfAuditWindow() {
           <Icon name="chart-bar" size={14} />
           <span>Perf Audit</span>
         </div>
-        <div className="audit-ctx" title="Workspace warm-LRU + chat-switch state">
-          <span className={ctx?.activeWsWarm ? "is-warm" : "is-cold"}>
-            {ctx?.activeWsWarm ? "Warm" : "Cold"}
-          </span>
-          {ctx?.chatSwitching && (
-            <span className="is-switch">
-              Switching{ctx.chatSwitchTarget ? ` → ${ctx.chatSwitchTarget.slice(0, 8)}` : ""}
+        <div className="audit-head-actions">
+          <div className="audit-ctx" title="Workspace warm-LRU + chat-switch state">
+            <span className={ctx?.activeWsWarm ? "is-warm" : "is-cold"}>
+              {ctx?.activeWsWarm ? "Warm" : "Cold"}
             </span>
-          )}
+            {ctx?.chatSwitching && (
+              <span className="is-switch">
+                Switching
+                {ctx.chatSwitchTarget
+                  ? ` → ${ctx.chatSwitchTarget.slice(0, 8)}`
+                  : ""}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="audit-copy-btn"
+            onClick={onCopy}
+            disabled={!snap}
+            title="Copy snapshot as JSON — paste into chat for diagnosis"
+          >
+            <Icon name="copy" size={12} />
+            {copyState === "ok"
+              ? "Copied"
+              : copyState === "err"
+                ? "Failed"
+                : "Copy JSON"}
+          </button>
         </div>
       </header>
 
@@ -202,22 +306,25 @@ export function PerfAuditWindow() {
           </p>
         ) : (
           <ul className="audit-events">
-            {events.map((e) => (
+            {events.map((e) => {
+              const ms = displayElapsedMs(e);
+              return (
               <li key={e.id} className={`audit-event kind-${e.kind}`}>
                 <span className="audit-event-kind">{kindLabel(e.kind)}</span>
                 <span className="audit-event-label">{e.label}</span>
-                {typeof e.elapsedMs === "number" && (
-                  <span className="audit-event-ms">{e.elapsedMs}ms</span>
+                {typeof ms === "number" && (
+                  <span className="audit-event-ms">{ms}ms</span>
                 )}
                 <span className="audit-event-time">{fmtTime(e.at)}</span>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </section>
 
       <footer className="audit-foot">
-        Read-only · Kill via Task Manager (Ctrl+Alt+U) · Shared process poll
+        Copy JSON → paste in chat · Kill via Task Manager (Ctrl+Alt+U)
       </footer>
     </div>
   );

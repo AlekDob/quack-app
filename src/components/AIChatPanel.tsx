@@ -119,6 +119,7 @@ import {
 } from "../askQuestionStore";
 import { publishChatDiff } from "../chatDiffStore";
 import { logAgentModePhase, logNewChatPhase } from "../switchPerf";
+import { afterFirstPaint } from "../afterFirstPaint";
 import { summarizeLastTurn, summarizeEdits } from "../sessionDiffStats";
 import { loadWorkspaceRules } from "../workspaceRules";
 import {
@@ -599,11 +600,19 @@ export function AIChatPanel({
   const [pinkyBrainExt, setPinkyBrainExt] = useState(false);
   const [skillTrainerExt, setSkillTrainerExt] = useState(false);
   useEffect(() => {
-    void quackExtensions.status(root).then((rows) => {
-      const ids = installedIds(rows);
-      setPinkyBrainExt(ids.has("pinky-brain"));
-      setSkillTrainerExt(ids.has("skill-trainer"));
+    let cancelled = false;
+    const stop = afterFirstPaint(() => {
+      void quackExtensions.status(root).then((rows) => {
+        if (cancelled) return;
+        const ids = installedIds(rows);
+        setPinkyBrainExt(ids.has("pinky-brain"));
+        setSkillTrainerExt(ids.has("skill-trainer"));
+      });
     });
+    return () => {
+      cancelled = true;
+      stop();
+    };
   }, [root]);
   // Agent mode supplies this via context to render denser (tool bursts
   // collapse to an icon row, tighter spacing). Default false → the docked
@@ -615,10 +624,10 @@ export function AIChatPanel({
   useEffect(() => {
     if (!aiChatId) return;
     logNewChatPhase(aiChatId, "panel mounted");
-    const r = requestAnimationFrame(() =>
+    const stop = afterFirstPaint(() =>
       logNewChatPhase(aiChatId, "panel painted"),
     );
-    return () => cancelAnimationFrame(r);
+    return stop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const hydratedKeyRef = useRef("");
@@ -1496,10 +1505,18 @@ export function AIChatPanel({
 
   useEffect(() => {
     if (!wsActive) return;
-    const warm = getModelDiscovery();
-    void refresh({ showChecking: !warm, force: false });
-    warmPickerCatalogs();
-    setCatalogWarming(isPickerCatalogLoading());
+    let cancelled = false;
+    const stop = afterFirstPaint(() => {
+      if (cancelled) return;
+      const warm = getModelDiscovery();
+      void refresh({ showChecking: !warm, force: false });
+      warmPickerCatalogs();
+      setCatalogWarming(isPickerCatalogLoading());
+    });
+    return () => {
+      cancelled = true;
+      stop();
+    };
   }, [wsActive, applyDiscoverySnapshot]);
 
   useEffect(() => {
@@ -1984,7 +2001,7 @@ export function AIChatPanel({
       sid: string,
       msgs: ChatMessage[],
     ) => {
-      startTransition(() => {
+      const apply = () => {
         setSessions(loadSessions(wsId));
         if (found) {
           setSessionId(sid);
@@ -2020,7 +2037,13 @@ export function AIChatPanel({
         setCcPermMode(knobs.permMode);
         applyDefaultPreset();
         applyComposerDraft({});
-      });
+      };
+      // Empty / new chats: paint sync. startTransition deferred the empty
+      // UI for seconds behind mount-effect work (Perf Audit: session
+      // loaded 14ms → hydrate done 6.9s). Dense transcripts keep the
+      // transition so hydration doesn't block input.
+      if (msgs.length === 0) apply();
+      else startTransition(apply);
       if (!found) return;
       void hydrateAgentCommitFromMessages(wsId, sid, root, msgs);
       const gen = ++ccHydrateGenRef.current;
@@ -2034,13 +2057,13 @@ export function AIChatPanel({
       if (aiChatId) {
         const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
         const targetSid = desc?.sessionId ?? newSessionId();
-        // Mode toggle remounts AIChatPanel but Agent/IDE hosts often leave a
-        // rich body in RAM — force:true was wiping it and re-reading disk
-        // (~2–4s on long transcripts). Only force when the cache is empty
-        // (project-switch dropAllCachedBodies / DONE unload). See feature 085.
+        // Never force-drop RAM — new chats are empty (no file yet) and the old
+        // `force when messages.length===0` paid ~3s on chat_store_load miss
+        // (Perf Audit 086). Rich bodies stay warm across Agent↔IDE (085);
+        // project switch still dropAllCachedBodies → cold disk load here.
         const cached = getCachedSession(wsId, targetSid);
-        const force = !cached || cached.messages.length === 0;
-        const found = await ensureSessionLoaded(wsId, targetSid, { force });
+        const found =
+          cached ?? (await ensureSessionLoaded(wsId, targetSid));
         if (cancelled) return;
         const msgs = found
           ? await rehydrateMessageImages(
@@ -2052,14 +2075,18 @@ export function AIChatPanel({
           targetSid,
           msgCount: msgs.length,
           loadMs: Math.round(performance.now() - hydrateT0),
-          cacheHit: !force,
+          cacheHit: !!cached,
         });
         paintSession(found, targetSid, msgs);
-        // End veil after first paint — ending before setMessages left users
-        // staring at a stuck UI for seconds on tool-dense transcripts.
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => finishHydrated()),
-        );
+        // Empty chat: end hydrate now (sync paint above). Dense transcripts
+        // wait for a paint frame so the veil doesn't drop on a blank panel.
+        if (msgs.length === 0) {
+          finishHydrated();
+        } else {
+          requestAnimationFrame(() =>
+            requestAnimationFrame(() => finishHydrated()),
+          );
+        }
         return;
       }
 
@@ -2073,9 +2100,13 @@ export function AIChatPanel({
         ? await rehydrateMessageImages(cleanStaleToolMessages(found.messages))
         : [];
       paintSession(found, firstId ?? newSessionId(), msgs);
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => finishHydrated()),
-      );
+      if (msgs.length === 0) {
+        finishHydrated();
+      } else {
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => finishHydrated()),
+        );
+      }
     })();
 
     return () => {
@@ -2646,9 +2677,12 @@ export function AIChatPanel({
       }
       if (!cancelled) setCcCommands([...custom, ...builtins]);
     };
-    void scan();
+    const stop = afterFirstPaint(() => {
+      if (!cancelled) void scan();
+    });
     return () => {
       cancelled = true;
+      stop();
     };
   }, [selectedIsCC, root]);
 
@@ -2664,26 +2698,30 @@ export function AIChatPanel({
       return;
     }
     let cancelled = false;
-    void (async () => {
-      let home: string | null = null;
-      try {
-        const { homeDir } = await import("@tauri-apps/api/path");
-        home = (await homeDir()).replace(/[\\/]+$/, "");
-      } catch {
-        /* home unavailable — project agents/skills still load */
-      }
-      const [agentList, skillList, customList] = await Promise.all([
-        selectedIsCC ? loadSubagents(root, home) : Promise.resolve([]),
-        selectedIsCC ? loadSkills(root, home) : Promise.resolve([]),
-        loadCustomPresets(root),
-      ]);
+    const stop = afterFirstPaint(() => {
       if (cancelled) return;
-      setAgents(agentList);
-      setSkills(skillList);
-      setCustomPresets(customList);
-    })();
+      void (async () => {
+        let home: string | null = null;
+        try {
+          const { homeDir } = await import("@tauri-apps/api/path");
+          home = (await homeDir()).replace(/[\\/]+$/, "");
+        } catch {
+          /* home unavailable — project agents/skills still load */
+        }
+        const [agentList, skillList, customList] = await Promise.all([
+          selectedIsCC ? loadSubagents(root, home) : Promise.resolve([]),
+          selectedIsCC ? loadSkills(root, home) : Promise.resolve([]),
+          loadCustomPresets(root),
+        ]);
+        if (cancelled) return;
+        setAgents(agentList);
+        setSkills(skillList);
+        setCustomPresets(customList);
+      })();
+    });
     return () => {
       cancelled = true;
+      stop();
     };
   }, [selectedIsCC, root]);
 

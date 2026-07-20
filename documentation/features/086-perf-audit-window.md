@@ -15,6 +15,7 @@ related:
   - 058-workspace-switch-performance.md
   - 075-chat-switch-loader.md
   - 085-agent-ide-mode-toggle.md
+  - 087-new-chat-perf.md
 ---
 
 ## Perf Audit Window
@@ -63,17 +64,35 @@ Audit window ──audit:request──► force snapshot
 | StatusBar | **Audit** chip → `toggleAudit()` |
 | Settings → Diagnostics | Toggle Perf Audit window |
 | Command palette / accel | `view.toggle_audit` — **Ctrl+Alt+P** |
+| Audit header | **Copy JSON** — clipboard snapshot (`type: "quack-perf-audit"`) for pasting into chat |
+
+### Copy JSON
+
+Exports a compact report (`type: "quack-perf-audit"`, `v: 1`): context (warm/cold),
+process totals + trimmed rows, timeline events with ISO `at` timestamps.
+
+| Field | Meaning |
+|---|---|
+| `elapsedMs` (export) | Prefers `detail.elapsedMs` / `detail.loadMs` over top-level — agent-mode top-level is “since mode toggle” and misleads (e.g. 162s) |
+| `sinceModeMs` | Present only when agent-mode wall clock differs from phase-local ms |
+| `processes[].cmd` | Truncated to 120 chars |
+
+Paste the JSON into an agent chat to diagnose intermittent lag. New-chat
+regressions: see **`087`** expected marks (`session loaded` / `hydrate done` /
+`panel painted`).
 
 ### Gotchas
 
-- Feature number **086** (085 is Agent↔IDE toggle).
+- Feature number **086** (085 is Agent↔IDE toggle; 087 is new-chat perf).
 - Ctrl+Shift+A is already Agent Mode — do not reuse for audit.
 - Closing via OS × calls `markAuditClosed()` so pref stays in sync.
 - Requires `tauri dev` restart for the new window capability label.
 - Measuring with a heavy subscriber during chat-switch freeze would bias results — timeline updates are throttled and the audit UI lives in a separate webview.
+- Resume flicker (hidden under 2s) is filtered out of heal + timeline so New chat after alt-tab isn’t buried under `visibility` spam (`024`).
 
 ### Related
 
 - Task Manager (`046`) — kill + modal process tree
 - Project Dock (`010`) — companion window pattern
 - Resume (`024`) — wake events appear as `resume` timeline rows
+- New chat hydrate/paint (`087`) — primary consumer of Copy JSON samples

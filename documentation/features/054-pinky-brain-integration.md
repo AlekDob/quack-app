@@ -211,10 +211,16 @@ Cumulative per workspace: `lcp.brain.cum.<wsId>`.
 - Pre-turn inject + MCP `brain_search` can overlap on CC turns — complementary
 - Pinky search paths are relative to `documentation/` — use `brainDocAbsPath()`
 - **Cross-workspace open (fixed):** `openBrainDoc` uses chat `wsId` root
+- **Project `.mcp.json` (2026-07-20):** Quack desktop does **not** ship a
+  committed Pinky MCP config. Brain → Setup / `pinky_setup` still writes
+  `pinky` → `pinky-mcp` locally — that process can cost ~1 GB+ under Claude
+  Code. Prefer `documentation/features/` + diary unless you explicitly want
+  Pinky MCP. Agent rule `.claude/rules/use-pinky-brain.md` was removed from
+  this repo; CLAUDE.md no longer `@`-includes it.
 
 ## Related
 
 - Composer mention chips: **`072-composer-mention-chips.md`**
-- Virgilio: `.claude/rules/use-pinky-brain.md`
 - Quack Store: `059-quack-brain-store.md`
 - Context optimizer: `020-context-optimizer.md`
+- Perf / process footprint: `086-perf-audit-window.md`, `046-process-cleanup.md`

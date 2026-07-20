@@ -64,6 +64,10 @@ let lastFireAt = 0;
 // single log line. 250 ms is small enough to feel immediate, large enough
 // to skip the noisy double-event pattern.
 const FIRE_MIN_GAP_MS = 250;
+// Ignore brief focus flickers (alt-tab, Spaces, click chrome). Healing
+// Monaco/xterm on every 11–80ms hide flooded Perf Audit and stole main-
+// thread time right before New chat (086). Real standby is multi-second+.
+const MIN_HIDDEN_MS = 2000;
 
 export function registerResumeComponent(c: ResumeComponent): () => void {
   components.set(c.id, c);
@@ -220,19 +224,23 @@ export function installResumeDebug(): () => void {
       lastHiddenAt = Date.now();
       return;
     }
+    const hiddenMs = lastHiddenAt ? Date.now() - lastHiddenAt : 0;
+    // Skip flicker; still heal after real standby / long background.
+    if (lastHiddenAt && hiddenMs < MIN_HIDDEN_MS) return;
     fireResumeOnce(
       lastHiddenAt
-        ? `visibility (was hidden ${Date.now() - lastHiddenAt}ms)`
+        ? `visibility (was hidden ${hiddenMs}ms)`
         : "visibility (initial)",
     );
   };
 
   const onFocus = () => {
-    // Only treat as "resume" if we were actually hidden; refocus from a
-    // different app window mid-session is not a blank-screen trigger.
-    if (lastHiddenAt && Date.now() - lastHiddenAt > 100) {
-      fireResumeOnce(`focus (was hidden ${Date.now() - lastHiddenAt}ms)`);
-    }
+    // Only treat as "resume" if we were actually hidden long enough;
+    // brief alt-tab / Spaces flickers are not blank-screen triggers.
+    if (!lastHiddenAt) return;
+    const hiddenMs = Date.now() - lastHiddenAt;
+    if (hiddenMs < MIN_HIDDEN_MS) return;
+    fireResumeOnce(`focus (was hidden ${hiddenMs}ms)`);
   };
 
   const onPageShow = (e: PageTransitionEvent) => {

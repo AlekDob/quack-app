@@ -9509,12 +9509,40 @@ html.audit-root #root {
   font-weight: 600;
   font-size: var(--fs-base, 14px);
 }
+.audit-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
 .audit-ctx {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 10.5px;
   color: var(--fg-muted);
+}
+.audit-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--bg-elev, var(--bg-hi));
+  color: var(--fg);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.audit-copy-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-strong, var(--border));
+}
+.audit-copy-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .audit-ctx .is-warm {
   color: var(--ok, #22c55e);

@@ -18,6 +18,7 @@ related:
   - 081-chat-switch-chrome-freeze.md
   - 084-agent-context-panels.md
   - 086-perf-audit-window.md
+  - 087-new-chat-perf.md
 ---
 
 ## Agent Mode ↔ IDE layout toggle
@@ -29,7 +30,7 @@ related:
 - [x] Dev instrumentation `[agent-mode-switch]` (`switchPerf.ts` + Perf Audit ring `086`)
 - [x] Trigger-file sim (`agentModeSwitchSim.ts`)
 - [x] Measure cold Agent→IDE (user console + automated sim)
-- [x] Warm hydrate: `force` only when RAM body empty/thin (`AIChatPanel`)
+- [x] Warm hydrate: use RAM when present; never force-drop empty new chats (`AIChatPanel` + `087`)
 - [ ] Keep shells mounted / lazy terminals / veil — deferred
 
 ### Files
@@ -65,11 +66,12 @@ Constraint: one `AIChatPanel` owner per chat (no double stream). Chat bodies can
 
 | Before | After |
 |---|---|
-| Every remount `ensureSessionLoaded({ force: true })` | `force` only if `!cached \|\| messages.length === 0` |
-| ~2.6s disk reload on 102-msg chat (OS page-cache cold after idle) | RAM hit → `cacheHit: true` in `[chat-switch] session loaded` |
-| “First slow, then fast, idle slow again” | Idle no longer forces a cold disk read when body still in RAM |
+| Every remount `ensureSessionLoaded({ force: true })` | Use RAM when present; disk only if cold |
+| Then: `force` if `!cached \|\| messages.length === 0` | **Removed empty-force** — empty new chats were paying `chat_store_load` miss (~3s) |
+| ~2.6s disk reload on 102-msg chat (OS page-cache cold after idle) | RAM hit → `cacheHit: true` |
+| New chat `msgCount: 0` still forced disk | `addAIChat` seeds empty body in RAM → instant hydrate (`087`) |
 
-Project switch still clears bodies via `dropAllCachedBodies` (`043`) before remount — cold load remains correct there.
+Project switch still clears bodies via `dropAllCachedBodies` (`043`) before remount — cold load remains correct there. Full new-chat paint path (sync empty apply + `afterFirstPaint`): **`087-new-chat-perf.md`**.
 
 ### Measurement
 
