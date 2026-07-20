@@ -303,19 +303,31 @@ export function putCachedSession(wsId: string, session: ChatSession): void {
   for (const id of evicted) cache.sessions.delete(id);
 }
 
+/** Prefer a real title over the empty/Untitled placeholder. */
+export function preferSessionTitle(prev: string, next: string): string {
+  const p = prev.trim();
+  const n = next.trim();
+  if (!n || n === "Untitled") return p || n || "Untitled";
+  if (!p || p === "Untitled") return n;
+  return n;
+}
+
 /** Keep richer message lists — composer unmount patches must not wipe transcripts. */
 export function preferRicherSession(
   prev: ChatSession | undefined,
   next: ChatSession,
 ): ChatSession {
   if (!prev) return next;
-  if (next.messages.length >= prev.messages.length) return next;
+  const title = preferSessionTitle(prev.title, next.title);
+  if (next.messages.length >= prev.messages.length) {
+    return title === next.title ? next : { ...next, title };
+  }
   console.warn(
     "[chatStore] refuse shrink",
     next.id,
     `${prev.messages.length}→${next.messages.length}`,
   );
-  return { ...next, messages: prev.messages };
+  return { ...next, messages: prev.messages, title };
 }
 
 /** Drop all warm bodies for a workspace (keep index) — remount reloads disk. */

@@ -2146,7 +2146,10 @@ export function AIChatPanel({
     if (!aiChatId) return;
     if (messages.length === 0) return;
     const title = deriveTitle(messages);
-    if (!title) return;
+    // Never clobber a real hub title with the empty placeholder — remount
+    // races (Agent↔IDE) can briefly derive "Untitled" from a thin/partial
+    // transcript and wipe a hand-set or previously good name.
+    if (!title || title === "Untitled") return;
     const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
     if (!desc || desc.title === title) return;
     // Respect a hand-set title from the Agent Hub rename — don't clobber it.

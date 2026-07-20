@@ -205,7 +205,8 @@ ActivityBar / hub → setActiveWorkspace(next)
 
 | API | Role |
 |---|---|
-| `preferRicherSession(prev, next)` | Keep longer `messages`; allow other field updates |
+| `preferRicherSession(prev, next)` | Keep longer `messages`; `preferSessionTitle` keeps real titles over `Untitled` |
+| `preferSessionTitle(prev, next)` | Never let empty/`Untitled` wipe a good session title |
 | `awaitChatDiskFlushes(wsId?)` | Spin until coalesce queue idle for ws |
 | `dropAllCachedBodies(wsId)` | Clear warm bodies; keep `__idx__` ids |
 | `ensureSessionLoaded(wsId, id, { force })` | Optional drop-then-disk; prefer RAM hit. **Do not** force solely because `messages.length === 0` (new chat has no file yet — `087`) |
@@ -215,7 +216,9 @@ Tests: `src/chatStoreCache.test.ts` (`npm test`).
 Cross-refs: warm Monaco LRU still in `058` (editors); chat hosts stay
 `isActive`-gated (not warm) — that asymmetry is why this flush path exists.
 **Agent Mode ↔ IDE** remounts panels without `dropAllCachedBodies` — see `085`
-(skip `force` when a rich body is already in RAM).
+(skip `force` when a rich body is already in RAM). **`setAgentMode` must
+flush+await** before the layout flip (same durability as project switch);
+selection survives remount via `agentModeSelection.ts`.
 
 ## Gotchas
 
@@ -229,6 +232,7 @@ Cross-refs: warm Monaco LRU still in `058` (editors); chat hosts stay
   ("Chat not saved" toast) and truncated rows. Fix: unique tmp tags in `atomic.rs`,
   `SAVE_LOCK` in `chat_store_save`, frontend coalesce in `persistSession`.
 - **Project switch shrink** — see section above; never reintroduce empty `patchSession` invent.
+- **Agent↔IDE without flush** — used to thin transcripts / wipe titles; fixed in `085` / bug `002`.
 - **Agent Mode** mounts one `AIChatPanel` per **live** (or currently visible DONE)
   chat; DONE hosts unload when hidden (`076`).
 - **Vite-only dev** (`npm run dev` without Tauri) — `hydrateChatStore` falls back to legacy `localStorage` read; disk save is a no-op (no false toast).

@@ -115,7 +115,7 @@ export function WelcomeModal() {
             className="welcome-btn"
             onClick={() => {
               close();
-              setAgentMode(true);
+              void setAgentMode(true);
             }}
             title="Agent Mode applies once you open a folder"
           >

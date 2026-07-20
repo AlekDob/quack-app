@@ -34,13 +34,18 @@ describe("preferRicherSession", () => {
     expect(out.composer?.input).toBe("x");
   });
 
-  it("accepts equal or longer", () => {
-    expect(preferRicherSession(row("a", 2), row("a", 2)).messages).toHaveLength(
-      2,
-    );
-    expect(preferRicherSession(row("a", 2), row("a", 5)).messages).toHaveLength(
-      5,
-    );
+  it("keeps a real title when next is Untitled", () => {
+    const prev = row("a", 10, { title: "Storico conversazioni" });
+    const next = row("a", 10, { title: "Untitled" });
+    expect(preferRicherSession(prev, next).title).toBe("Storico conversazioni");
+  });
+
+  it("keeps prev title when refusing a shrink to Untitled", () => {
+    const prev = row("a", 10, { title: "Good name" });
+    const next = row("a", 2, { title: "Untitled" });
+    const out = preferRicherSession(prev, next);
+    expect(out.messages).toHaveLength(10);
+    expect(out.title).toBe("Good name");
   });
 });
 

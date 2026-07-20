@@ -119,7 +119,7 @@ function dominantPhaseOf(
 
 async function runDirection(to: AgentModeTarget): Promise<AgentModeSimRun> {
   const startedAt = new Date().toISOString();
-  setAgentMode(to === "agent");
+  await setAgentMode(to === "agent");
   const settleName = to === "agent" ? "agent-shell mounted" : "editors ready";
   await waitForPhase(settleName, SETTLE_MS);
   await waitForPhase("chat hydrate done", SETTLE_MS);
@@ -164,7 +164,7 @@ export async function runAgentModeSwitchSim(
     await sleep(GAP_MS);
     runs.push(await runDirection("ide"));
   }
-  setAgentMode(wasAgent);
+  await setAgentMode(wasAgent);
   const report: AgentModeSimReport = {
     ranAt: new Date().toISOString(),
     ...buildContext(wsId, root),

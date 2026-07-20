@@ -7,6 +7,7 @@ import {
   focusedAgentSidePanelKey,
   findTabsPaneByTab,
   parseKey,
+  activeAiChatId,
   type EditorDrawerState,
 } from "../store";
 import { AIChatPanel } from "./AIChatPanel";
@@ -19,6 +20,11 @@ import { AgentContextColumn } from "./AgentContextColumn";
 import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
 import { setAgentMode } from "../agentMode";
+import {
+  getAgentSelectedChat,
+  setAgentSelectedChat,
+  clearAgentSelectedChat,
+} from "../agentModeSelection";
 import { getTasks, subscribeTasks, clearTasks } from "../aiTaskStore";
 import { getAgentStatus, subscribeAgentStatus } from "../agentStatusStore";
 import { FilePopupModal } from "./FilePopupModal";
@@ -38,8 +44,8 @@ import { dropCachedSessionBody } from "../chatStoreCache";
 
 interface Props {
   // Always the active workspace id. The shell is NOT remounted on
-  // workspace switch (no React key), so this prop simply updates and the
-  // component's per-workspace selection map survives the switch.
+  // workspace switch (no React key). Agent↔IDE *does* remount the shell —
+  // selected chat lives in `agentModeSelection.ts`, not component state.
   wsId: string;
 }
 
@@ -223,9 +229,10 @@ export function AgentModeShell({ wsId }: Props) {
     logAgentModePhase("agent-shell mounted", { wsId });
   }, [wsId]);
 
-  // Which session fills the center column, tracked PER workspace so
-  // switching workspaces (and back) restores what you were looking at.
-  const [selectedByWs, setSelectedByWs] = useState<Record<string, string>>({});
+  // Which session fills the center column — module-level so Agent↔IDE
+  // shell remount does not forget the pick (component state used to).
+  const [, setSelTick] = useState(0);
+  const bumpSel = () => setSelTick((n) => n + 1);
 
   // File opened from the Files tab (agent mode has no editor pane).
   const [openFilePath, setOpenFilePath] = useState<string | null>(null);
@@ -288,16 +295,23 @@ export function AgentModeShell({ wsId }: Props) {
     return Object.values(w.aiChats).sort((a, b) => a.createdAt - b.createdAt);
   };
 
-  // Resolve the center session for the active workspace: the explicit
-  // per-ws pick if it still exists, else the most recent session.
+  // Resolve the center session: remembered pick → IDE-focused AI tab →
+  // most recent. Seeding the module map keeps Agent↔IDE round-trips stable.
   const activeChats = chatsFor(wsId);
-  const pickedId = selectedByWs[wsId];
+  const remembered = getAgentSelectedChat(wsId);
+  const ideFocused = ws ? activeAiChatId(ws) : null;
   const activeChatId =
-    pickedId && ws?.aiChats[pickedId]
-      ? pickedId
-      : activeChats.length
-        ? activeChats[activeChats.length - 1].id
-        : null;
+    remembered && ws?.aiChats[remembered]
+      ? remembered
+      : ideFocused && ws?.aiChats[ideFocused]
+        ? ideFocused
+        : activeChats.length
+          ? activeChats[activeChats.length - 1].id
+          : null;
+
+  useEffect(() => {
+    if (activeChatId) setAgentSelectedChat(wsId, activeChatId);
+  }, [wsId, activeChatId]);
 
   const switching = useChatSwitching();
 
@@ -336,9 +350,10 @@ export function AgentModeShell({ wsId }: Props) {
       });
     }
     if (crossWs) void setActiveWorkspace(id);
-    // Sync select so mountChats includes the target in the same tick as the
-    // pulse (startTransition delayed hydrate until after the veil CAP).
-    setSelectedByWs((m) => ({ ...m, [id]: chatId }));
+    setAgentSelectedChat(id, chatId);
+    bumpSel();
+    // Keep IDE tab focus in sync so Agent→IDE lands on the same chat.
+    useStore.getState().focusAIChat(id, chatId);
   };
 
   const newSession = (
@@ -347,7 +362,8 @@ export function AgentModeShell({ wsId }: Props) {
   ) => {
     const chatId = addNewAIChat(id, "editor", anchor);
     if (id !== wsId) void setActiveWorkspace(id);
-    setSelectedByWs((m) => ({ ...m, [id]: chatId }));
+    setAgentSelectedChat(id, chatId);
+    bumpSel();
   };
 
   return (
@@ -418,19 +434,17 @@ export function AgentModeShell({ wsId }: Props) {
           onNewChat={newSession}
           onCloseChat={(id, chatId) => {
             clearTasks(chatId);
-            setSelectedByWs((m) => {
-              if (m[id] !== chatId) return m;
-              const rest = { ...m };
-              delete rest[id];
-              return rest;
-            });
+            if (getAgentSelectedChat(id) === chatId) {
+              clearAgentSelectedChat(id);
+              bumpSel();
+            }
           }}
           footer={
             <>
               <AgentTasks chatId={activeChatId} />
               <button
                 className="agent-exit"
-                onClick={() => setAgentMode(false)}
+                onClick={() => void setAgentMode(false)}
                 title="Back to editor layout"
               >
                 <Icon name="chevron-left" size={12} />

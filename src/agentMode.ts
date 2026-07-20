@@ -14,10 +14,16 @@
 //
 // Persistence: localStorage so the choice survives reloads. Like Zen we
 // don't toast on toggle — the layout swap IS the feedback.
+//
+// Before flipping the layout we flush + await chat disk writes — same
+// durability path as project switch (`043`). Otherwise remounted panels
+// can hydrate a stale/thin disk row and clobber the rich RAM transcript.
 
 import { useEffect, useState } from "react";
 import { getString as lsGetString, setString as lsSetString } from "./localStore";
 import { markAgentModeSwitch } from "./switchPerf";
+import { flushAllChatPersist } from "./chatPersistFlush";
+import { awaitChatDiskFlushes } from "./chatStoreCache";
 
 const KEY = "lcp.agentMode";
 
@@ -32,8 +38,11 @@ export function getAgentMode(): boolean {
   return _agent;
 }
 
-export function setAgentMode(v: boolean): void {
+/** Flip layout after transcripts are durable on disk. */
+export async function setAgentMode(v: boolean): Promise<void> {
   if (_agent === v) return;
+  flushAllChatPersist();
+  await awaitChatDiskFlushes();
   markAgentModeSwitch(v ? "agent" : "ide");
   _agent = v;
   if (v) lsSetString(KEY, "1");
@@ -42,7 +51,7 @@ export function setAgentMode(v: boolean): void {
 }
 
 export function toggleAgentMode(): void {
-  setAgentMode(!_agent);
+  void setAgentMode(!_agent);
 }
 
 export function useAgentMode(): boolean {

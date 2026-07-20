@@ -36,9 +36,10 @@ related:
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Store/State | `src/agentMode.ts` | `get/set/toggle/useAgentMode`; marks switch start |
+| Store/State | `src/agentMode.ts` | `get/set/toggle/useAgentMode`; **flush+await disk before flip** |
+| Service | `src/agentModeSelection.ts` | Per-ws selected chat id — survives shell remount |
 | Component | `src/App.tsx` | `AgentModeShell` XOR `WorkspaceShell`s; DEV sim poll |
-| Component | `src/components/AgentModeShell.tsx` | Agent layout; `agent-shell mounted` |
+| Component | `src/components/AgentModeShell.tsx` | Agent layout; selection via module map + IDE `activeAiChatId` fallback |
 | Component | `src/components/WorkspaceShell.tsx` | IDE shell; `ide-shell mounted` / `editors ready` |
 | Component | `src/components/AIChatPanel.tsx` | Conditional `force` hydrate + phase logs |
 | Component | `src/components/FileTree.tsx` | `filetree root loaded` phase |
@@ -48,10 +49,19 @@ related:
 | Util | `src/switchPerf.ts` | `markAgentModeSwitch` / `logAgentModePhase` |
 | Util | `src/agentModeSwitchSim.ts` | Trigger-file round-trip → JSON report |
 | Test | `src/switchPerf.test.ts` | Agent-mode mark/phase contract |
+| Test | `src/chatStoreCache.test.ts` | `preferSessionTitle` / refuse Untitled clobber |
+
+### Key Functions
+- `setAgentMode(v) → Promise<void>` — flush+await disk, then flip layout
+- `get/set/clearAgentSelectedChat(wsId, chatId?)` — selection across remount
+- `preferSessionTitle(prev, next) → string` — real title wins over Untitled
+- `activeAiChatId(ws) → string | null` — IDE focused `ai:` tab (seed for Agent)
 
 ### Data Flow
 ```
-toggleAgentMode → setAgentMode → markAgentModeSwitch
+toggleAgentMode → setAgentMode
+  → flushAllChatPersist + awaitChatDiskFlushes   // same durability as project switch (043)
+  → markAgentModeSwitch → notify
   → App re-render (full shell swap)
   → phases: ide-shell|agent-shell mounted → editors ready
   → chat hydrate (cacheHit? RAM : disk) → terminal attached…
@@ -59,8 +69,19 @@ toggleAgentMode → setAgentMode → markAgentModeSwitch
 
 - **IDE → Agent:** unmount all `WorkspaceShell` + ActivityBar + hub rail → `AgentModeShell`
 - **Agent → IDE:** unmount `AgentModeShell` → remount N `WorkspaceShell` + chrome
+- **Selected chat:** `agentModeSelection` map (not React state) + seed from IDE focused `ai:` tab; `selectSession` also `focusAIChat` so IDE lands on the same chat
 
 Constraint: one `AIChatPanel` owner per chat (no double stream). Chat bodies can stay in `chatStoreCache` across the swap; Monaco warm-LRU (`058`) does **not**.
+
+### Durability + title (2026-07-20 follow-up)
+
+| Bug | Fix |
+|---|---|
+| Agent↔IDE remount without flush → thin disk hydrate / truncated transcript | `setAgentMode` flushes + awaits disk before layout flip |
+| `selectedByWs` `useState` lost on shell remount → wrong/Untitled session | Module `agentModeSelection.ts` + IDE `activeAiChatId` fallback |
+| `deriveTitle` → `"Untitled"` overwrote hub title on thin remount | Skip auto-title when derived is empty/Untitled; `preferSessionTitle` in `preferRicherSession` |
+
+See `documentation/bugs/002-agent-ide-title-transcript-loss.md`.
 
 ### Warm hydrate (2026-07-20)
 
@@ -100,6 +121,9 @@ Project switch still clears bodies via `dropAllCachedBodies` (`043`) before remo
 - Multi-project remounts every shell in `shellOrder`.
 - Terminal remount still dominates with many PTYs (lazy attach deferred).
 - No veil on this path (`075`/`079` are chat/project only).
+- **Always flush+await before flip** — do not notify listeners until disk queue is idle (`043` parity).
+- **Do not store Agent selection in React state** on `AgentModeShell` — remount wipes it; use `agentModeSelection.ts`.
+- Auto-title must not write `"Untitled"` over a real hub title (`AIChatPanel` + `preferSessionTitle`).
 
 ### Fix candidates (remaining)
 1. Keep `WorkspaceShell` mounted in Agent Mode (`display:none`) + single chat owner.

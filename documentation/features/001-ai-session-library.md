@@ -93,6 +93,11 @@ Never guess `providerSessionIds` from turn count (mixed chats). On CLI
 re-import, strip `[Editor context]` / flatten scaffolds via
 `cleanStaleToolMessages`. See `044` + `bugs/001-session-mix-editor-context-leak`.
 
+### Gotcha — Agent↔IDE must keep selection + titles
+Agent Mode center pick lives in `agentModeSelection.ts` (not React state).
+`setAgentMode` flush+awaits disk before shell swap. Auto-title must not write
+`"Untitled"` over a real hub name. See `085` + `bugs/002-agent-ide-title-transcript-loss`.
+
 ### Gotcha — new chat + switch veil
 `addNewAIChat` pulses `veil: false`. That path must **clear** an in-flight switch pulse (`finish`), otherwise hosts stay `!is-visible` until CAP and the new tab looks missing. See `075-chat-switch-loader.md`.
 

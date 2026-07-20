@@ -1022,7 +1022,7 @@ function EmptyPane({ wsId }: { wsId: string }) {
           </button>
           <button
             className="pane-empty-agent"
-            onClick={() => setAgentMode(true)}
+            onClick={() => void setAgentMode(true)}
             title="Switch to Agent Mode (Ctrl+Shift+A)"
           >
             <Icon name="code" size={14} />
