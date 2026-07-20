@@ -97,7 +97,7 @@ import {
 } from "./chatToolRender";
 import { ComposeCard } from "./composeCard";
 import { openHtmlPreviewTab } from "./HtmlPreviewPane";
-import { openPlanTab } from "./PlanPane";
+import { presentPlanReady } from "./PlanPane";
 import {
   openWorkspaceDocPath,
   resolveWorkspaceDocPath,
@@ -160,9 +160,6 @@ import {
   ComposerMentionChips,
 } from "./ComposerMentionChips";
 import { ComposerInputHighlight } from "./ComposerInputHighlight";
-import {
-  onNativePlanReady,
-} from "../quackPlanHarness";
 import { PlanBuyInCard } from "./PlanBuyInCard";
 import {
   getPlanBuyIn,
@@ -4373,20 +4370,7 @@ export function AIChatPanel({
                 sessionId: claudeSessionId ?? null,
                 cwd: root,
               });
-              const desc = aiChatId
-                ? useStore.getState().loaded[wsId]?.aiChats[aiChatId]
-                : undefined;
-              if (desc?.featureId && aiChatId) {
-                void onNativePlanReady(
-                  wsId,
-                  aiChatId,
-                  root,
-                  desc.storyId ?? "",
-                  plan,
-                );
-              } else {
-                openPlanTab(wsId, aiChatId, reqId, plan);
-              }
+              presentPlanReady(wsId, aiChatId, root, reqId, plan);
             }
           }
         }
@@ -5936,21 +5920,7 @@ export function AIChatPanel({
   };
 
   const openPlanHandler = (requestId: string, plan: string) => {
-    const desc = aiChatId
-      ? useStore.getState().loaded[wsId]?.aiChats[aiChatId]
-      : undefined;
-    if (desc?.featureId && aiChatId) {
-      void onNativePlanReady(
-        wsId,
-        aiChatId,
-        root,
-        desc.storyId ?? "",
-        plan,
-      );
-      return;
-    }
-    // Features-first: no story draft. Ephemeral plan: tab when unlinked.
-    openPlanTab(wsId, aiChatId, requestId, plan);
+    presentPlanReady(wsId, aiChatId, root, requestId, plan);
   };
 
   const handoffToMiloBuilder = () => {

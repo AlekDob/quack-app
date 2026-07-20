@@ -620,6 +620,7 @@ export function AgentModeShell({ wsId }: Props) {
         <AgentContextColumn
           wsId={wsId}
           root={ws.meta.root}
+          activeChatId={activeChatId}
           frozen={switching}
           onOpenFile={setOpenFilePath}
         />

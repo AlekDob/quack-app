@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store";
 import {
   getAgentContextPanel,
@@ -8,23 +8,32 @@ import {
   termPanelOf,
   type AgentContextPanel,
 } from "../agentContextNav";
+import {
+  getPlanBuyIn,
+  subscribePlanBuyIn,
+} from "../planBuyInStore";
+import { getCachedSession } from "../chatStoreCache";
+import { readProviderSessionIds } from "../providerSession";
 import { SourceControlPanel } from "./SourceControlPanel";
 import { FileTree } from "./FileTree";
 import { AgentAddViewMenu } from "./AgentAddViewMenu";
 import { AgentTerminalPanel } from "./AgentTerminalPanel";
+import { AgentPlanPane } from "./PlanPane";
 import { Icon } from "./Icon";
 
 interface Props {
   wsId: string;
   root: string;
+  activeChatId: string | null;
   frozen?: boolean;
   onOpenFile: (path: string) => void;
 }
 
-/** Agent Mode right column: Changes / Files / project Terminals + add-view. */
+/** Agent Mode right column: Changes / Files / Plan / project Terminals. */
 export function AgentContextColumn({
   wsId,
   root,
+  activeChatId,
   frozen,
   onOpenFile,
 }: Props) {
@@ -50,6 +59,28 @@ export function AgentContextColumn({
   const [addViewOpen, setAddViewOpen] = useState(false);
   const addViewRef = useRef<HTMLButtonElement>(null);
   const activeTermId = termIdOfPanel(contextPanel);
+
+  const [planRev, setPlanRev] = useState(0);
+  useEffect(() => subscribePlanBuyIn(() => setPlanRev((n) => n + 1)), []);
+
+  const planBuyIn = useMemo(() => {
+    void planRev;
+    if (!activeChatId) return null;
+    const session = getCachedSession(wsId, activeChatId);
+    const sessionId = session
+      ? readProviderSessionIds(session)["claude-code"]
+      : undefined;
+    return getPlanBuyIn({ sessionId, cwd: root });
+  }, [planRev, activeChatId, wsId, root]);
+
+  const hasPlan = !!planBuyIn?.plan;
+
+  // Hide Plan tab when buy-in clears; fall back if it was selected.
+  useEffect(() => {
+    if (hasPlan) return;
+    if (getAgentContextPanel(wsId) !== "plan") return;
+    setContextPanel("changes");
+  }, [hasPlan, wsId, setContextPanel]);
 
   useEffect(() => {
     if (!activeTermId || !terminalsMap) return;
@@ -100,6 +131,18 @@ export function AgentContextColumn({
           >
             Files
           </button>
+          {hasPlan && (
+            <button
+              className={`agent-context-tab agent-context-tab--plan ${contextPanel === "plan" ? "active" : ""}`}
+              role="tab"
+              aria-selected={contextPanel === "plan"}
+              onClick={() => setContextPanel("plan")}
+              title="Plan"
+            >
+              <Icon name="check-square" size={12} />
+              <span className="agent-context-tab-label">Plan</span>
+            </button>
+          )}
           {terminals.map((t) => {
             const panel = termPanelOf(t.id);
             const active = contextPanel === panel;
@@ -177,6 +220,14 @@ export function AgentContextColumn({
             onOpenFile={(_id, p) => onOpenFile(p)}
           />
         </div>
+        {hasPlan && planBuyIn && (
+          <div
+            className="agent-context-pane"
+            style={{ display: contextPanel === "plan" ? "flex" : "none" }}
+          >
+            <AgentPlanPane plan={planBuyIn.plan} />
+          </div>
+        )}
         {(terminals.length > 0 || !!activeTermId) && (
           <div
             className="agent-context-pane agent-context-pane--terminal"

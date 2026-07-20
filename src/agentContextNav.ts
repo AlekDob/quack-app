@@ -1,12 +1,16 @@
 // Agent Mode right-column panel selection — module pub/sub so StatusBar
 // / commands can focus Terminal without prop-drilling through the shell.
 // Descriptors stay in WorkspaceData.terminals; this only tracks which
-// view is showing (Changes / Files / term:<id>).
+// view is showing (Changes / Files / Plan / term:<id>).
 
 import { useEffect, useState } from "react";
 import { useStore } from "./store";
 
-export type AgentContextPanel = "changes" | "files" | `term:${string}`;
+export type AgentContextPanel =
+  | "changes"
+  | "files"
+  | "plan"
+  | `term:${string}`;
 
 const panelByWs = new Map<string, AgentContextPanel>();
 const listeners = new Set<() => void>();
@@ -81,4 +85,9 @@ export function toggleAgentTerminal(wsId: string): void {
 export function newAgentTerminal(wsId: string): void {
   const id = useStore.getState().addTerminal(wsId, "bottom");
   setAgentContextPanel(wsId, termPanelOf(id));
+}
+
+/** Show the on-demand Plan tab (ExitPlanMode buy-in). */
+export function focusAgentPlan(wsId: string): void {
+  setAgentContextPanel(wsId, "plan");
 }

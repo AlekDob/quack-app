@@ -19450,6 +19450,11 @@ html.audit-root #root {
   max-width: 120px;
   padding-right: 4px;
 }
+.agent-context-tab--plan {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
 .agent-context-tab-label {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -20,6 +20,7 @@ import { openFeatureDocDrawer } from "./featureDocDrawer";
 import { mergePlanIntoFeature } from "./planFeatureMerge";
 import { FEATURE_DIR } from "./worksFeatureModules";
 import { featureLabelFromSlug } from "./featureCatalog";
+import { getAgentMode } from "./agentMode";
 
 export async function enterPlanning(
   wsId: string,
@@ -45,16 +46,20 @@ export async function onNativePlanReady(
   const featureId = useStore.getState().loaded[wsId]?.aiChats[chatId]?.featureId;
   if (featureId) {
     await mergePlanIntoFeature(root, featureId, planText);
-    openFeatureDocDrawer({
-      wsId,
-      root,
-      featurePath: featureId.includes("/")
-        ? featureId
-        : `${FEATURE_DIR}/${featureId}.md`,
-      title: featureLabelFromSlug(featureId),
-    });
+    // Agent Mode reads the plan in the right-column Plan tab — skip drawer.
+    if (!getAgentMode()) {
+      openFeatureDocDrawer({
+        wsId,
+        root,
+        featurePath: featureId.includes("/")
+          ? featureId
+          : `${FEATURE_DIR}/${featureId}.md`,
+        title: featureLabelFromSlug(featureId),
+      });
+    }
     return;
   }
+  if (getAgentMode()) return;
   await mergePlanIntoStory(root, storyId, planText);
   openStoryPlanTab(wsId, chatId, storyId);
 }

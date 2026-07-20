@@ -133,12 +133,12 @@ CC plan mode no longer auto-calls `enterPlanning` — story opens only via **Pla
 
 ## AIChatPanel wiring
 
-| Event | Story-linked chat | Legacy (work-only / no story) |
-|---|---|---|
-| `onPlanReady` | `onNativePlanReady` → merge + refresh drawer | `openPlanTab` (`061`) |
-| `onPlanBuild` | `handoffStoryToBuilder` + Milo preset + Agent mode | `approvePlanWork` + Milo handoff |
+| Event | Path |
+|---|---|
+| `onPlanReady` | `presentPlanReady` → Agent Plan tab / FeatureDocDrawer / `plan:` (`061` / `084`) |
+| `onPlanBuild` (Pass the ball) | Features-first: clear planning + Milo; legacy work-only may `approvePlanWork` (`088`) |
 
-`onPlanBuild` replaces the old `onPlanApproved` → `approvePlanning` only path on the `ExitPlanMode` card. Approving without building is no longer a first-class button — use **Keep discussing** to iterate with Jack, then **Build** when ready.
+`onPlanBuild` replaces the old `onPlanApproved` → `approvePlanning` only path on the `ExitPlanMode` card. Approving without building is no longer a first-class button — use **Keep discussing** to iterate with Jack, then **Pass the ball to Milo** when ready.
 
 ## Build handoff flow (Cursor-style, 2026-07-13)
 

@@ -10,6 +10,7 @@ related:
   - 068-quack-plan-harness.md
   - 062-presets.md
   - 083-composer-feature-link.md
+  - 084-agent-context-panels.md
   - 073-ask-user-question-dock.md
   - documentation/bugs/003-agent-identity-mismatch.md
 tags:
@@ -40,12 +41,12 @@ implementation. Keep discussing / typing in the composer → stay in Plan with J
 | Step | Who | What |
 |---|---|---|
 | 1 | Jack + composer **Plan** | Explores; when ready calls `ExitPlanMode` (`tool_input.plan`) |
-| 2 | Overlay | Publishes `planBuyInStore`; fires `onPlanReady` (feature drawer or `plan:` tab); **no** ExitPlanMode permission card |
-| 3 | User | Sees `PlanBuyInCard` above composer |
+| 2 | Overlay | Publishes `planBuyInStore`; fires `onPlanReady` → `presentPlanReady` (Agent Plan tab / feature drawer / `plan:`); **no** ExitPlanMode permission card |
+| 3 | User | Sees `PlanBuyInCard` above composer; in Agent Mode also the right-column **Plan** tab (full markdown) |
 | 4a | **Pass the ball to Milo** | `allow` ExitPlanMode → `applyPreset("builder")` → `bypassPermissions` → auto-send implement prompt |
 | 4b | Keep discussing / send message | `deny` ExitPlanMode → stay Plan + Jack |
 
-Features-first durable target: linked `featureId` → `mergePlanIntoFeature` + FeatureDocDrawer. No `S-NNN` spawn on Build.
+Features-first durable target: linked `featureId` → `mergePlanIntoFeature` (+ FeatureDocDrawer in IDE; Agent Mode uses the context Plan tab instead — see `061` / `084`). No `S-NNN` spawn on Build.
 
 ### Files
 
@@ -59,7 +60,7 @@ Features-first durable target: linked `featureId` → `mergePlanIntoFeature` + F
 | Isolation | `src/permModeStore.ts` | Plan never written to `byCwd`; session_id miss ≠ sibling cwd mode |
 | Test | `src/permModeStore.test.ts` | Cross-chat Plan isolation |
 | Styles | `src/App.css` | `.ai-plan-buyin*` |
-| Preview | `061` / `planFeatureMerge` / `openPlanTab` | Side preview on `onPlanReady` |
+| Preview | `061` / `084` / `presentPlanReady` | Side preview: Agent Plan tab, FeatureDocDrawer, or `plan:` |
 
 ### API (store)
 
@@ -78,9 +79,10 @@ Features-first durable target: linked `featureId` → `mergePlanIntoFeature` + F
 ```
 ExitPlanMode (plan non-empty)
   → overlay queues request (hook stays open)
-  → publishPlanBuyIn + onPlanReady
-       ├─ featureId → mergePlanIntoFeature + FeatureDocDrawer
-       └─ else → plan: virtual tab (061)
+  → publishPlanBuyIn + onPlanReady → presentPlanReady
+       ├─ Agent Mode → focusAgentPlan (084 Plan tab); merge feature if linked (no drawer)
+       ├─ IDE + featureId → mergePlanIntoFeature + FeatureDocDrawer
+       └─ IDE unlinked → plan: virtual tab (061)
   → PlanBuyInCard
        ├─ Pass → onPlanBuild (Milo + Agent) → resolve allow → sendUserText(implement…)
        └─ Keep / composer send → resolve deny

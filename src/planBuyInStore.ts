@@ -124,6 +124,13 @@ export function getPlanBuyIn(opts: {
       if (v.sessionId === opts.sessionId) return v;
     }
   }
+  // Session id may lag disk/RAM cache (Agent Mode Plan tab) — match cwd.
+  const cwd = normCwd(opts.cwd);
+  if (cwd) {
+    for (const v of byKey.values()) {
+      if (normCwd(v.cwd) === cwd) return v;
+    }
+  }
   return null;
 }
 
