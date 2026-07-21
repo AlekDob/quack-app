@@ -53,12 +53,20 @@ export function relPath(path: string, root: string): string {
   return p.startsWith(r) ? p.slice(r.length) : p;
 }
 
+/** Absolute POSIX or Windows path (after forward-slash normalize). */
+function isAbsolutePath(p: string): boolean {
+  return p.startsWith("/") || /^[A-Za-z]:\//.test(p);
+}
+
 /** True when `path` resolves under `root` (absolute or workspace-relative). */
 export function isUnderRoot(path: string, root: string): boolean {
   if (!path || !root) return false;
   const p = path.replace(/\\/g, "/");
   const r = root.replace(/\\/g, "/").replace(/\/+$/, "");
   if (p === r || p.startsWith(`${r}/`)) return true;
+  // Absolute paths outside `root` must not join — `joinPath(root, /other/file)`
+  // still starts with `root/` and falsely matches sibling workspaces (bug 006).
+  if (isAbsolutePath(p)) return false;
   const joined = joinPath(r, p);
   return joined === r || joined.startsWith(`${r}/`);
 }
@@ -69,6 +77,7 @@ export function resolveUnderRoot(path: string, root: string): string | null {
   const p = path.replace(/\\/g, "/");
   const r = root.replace(/\\/g, "/").replace(/\/+$/, "");
   if (p === r || p.startsWith(`${r}/`)) return p;
+  if (isAbsolutePath(p)) return null;
   const joined = joinPath(r, p);
   return joined === r || joined.startsWith(`${r}/`) ? joined : null;
 }

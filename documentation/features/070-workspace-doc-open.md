@@ -2,9 +2,9 @@
 type: feature
 project: quack-desktop
 created: 2026-07-13
-last_verified: 2026-07-14
+last_verified: 2026-07-21
 status: active
-related: [054-works-layer.md, 063-surface-view-prefs.md, 065-works-drawer-ux.md, 068-quack-plan-harness.md, 041-mention-file-preview.md]
+related: [054-works-layer.md, 063-surface-view-prefs.md, 065-works-drawer-ux.md, 068-quack-plan-harness.md, 041-mention-file-preview.md, 006-chat-file-link-wrong-workspace.md]
 tags: [works, brain, documentation, open-file, agent-mode, ux]
 ---
 
@@ -51,11 +51,21 @@ All composer / Works doc clicks funnel here. Resolution always prefers **disk tr
 1. Normalize via `chatFileLinks` (`normalizeFileLinkPath`, `resolveChatFilePath`)
 2. Bare filename or `documentation/…` → `normalizeBrainDocPath` → `documentation/features/{NNN}-slug.md` candidate
 3. **Engine layout extras** (spaceship-style repos): for `NNN-slug.md` also try `documentation/engine/features/` and `engine/documentation/features/`; diary dates also try `documentation/engine/diary/`
-4. Try candidates across **all open workspace roots** (chat may reference another project's docs)
+4. Try candidates across **all open workspace roots** (preferred chat root first; chat may reference another project's docs)
 5. Bare `.md` still missing → `search.listFiles` basename walk under `**/documentation/**` (cap **8k** files per root — avoids UI lockups on huge trees)
-6. Open in the workspace that owns the resolved absolute path; `activateWorkspace` when needed
+6. **Ownership:** map the resolved absolute path to an open workspace via `isUnderRoot`; **longest root wins** if nested; then `activateWorkspace` + open
 
 **Basename scoring** (when multiple hits): `features/` < `diary/` < other; shorter relative path wins within tier.
+
+### Ownership contract (`isUnderRoot`)
+
+| Input | Result |
+|---|---|
+| Absolute path already under `root` | `true` |
+| Absolute path in a **sibling** workspace | `false` (must not `joinPath`) |
+| Workspace-relative (`firma.html`, `src/a.ts`) | `true` after join under `root` |
+
+**Gotcha (bug `006`, fixed 2026-07-21):** Before the fix, `joinPath(root, absSibling)` still started with `root/`, so `workspaceForAbs` attributed files to whichever project came first in `openIds`. Agent Mode then called `setActiveWorkspace` on the wrong project when clicking a chat file link. Absolute paths outside `root` now short-circuit to false/null in `pathUtils`. Same longest-root pick in `smartFileOpen`.
 
 ## Surfaces opened
 
@@ -77,7 +87,11 @@ All composer / Works doc clicks funnel here. Resolution always prefers **disk tr
 
 | File | Role |
 |---|---|
-| `src/workspaceDocOpen.ts` | Resolution + open routing |
+| `src/workspaceDocOpen.ts` | Resolution + open routing; `workspaceForAbs` (longest root) |
+| `src/pathUtils.ts` | `isUnderRoot` / `resolveUnderRoot` ownership guards |
+| `src/pathUtils.test.ts` | Sibling-workspace false-positive regression |
+| `src/smartFileOpen.ts` | Palette / smart open — same longest-root ownership |
+| `src/chatFileLinks.ts` | Markdown linkify + `resolveChatFilePath` |
 | `src/components/ComposerDocsChip.tsx` | Hover popover; row click → `openBrainRef` |
 | `src/components/works/WorksDocRefsSection.tsx` | Works drawer doc list → `openBrainRef` |
 | `src/components/works/FeatureDocDrawer.tsx` | Feature preview + missing state |
@@ -90,6 +104,8 @@ All composer / Works doc clicks funnel here. Resolution always prefers **disk tr
 - Composer docs chip UX: `068-quack-plan-harness.md`, `054-works-layer.md`
 - Tab vs drawer prefs: `063-surface-view-prefs.md`
 - Brain ref model: `worksBrainRefs.ts`, `worksBrainRefUi.ts`
+- Context dock / send guards share `isUnderRoot`: `037-project-context-dock.md`
+- Incident: `documentation/bugs/006-chat-file-link-wrong-workspace.md`
 - Skill guidance (paths in `refs:`, not pasted bodies): `quack-works` skill
 
 ## Verify
@@ -97,4 +113,5 @@ All composer / Works doc clicks funnel here. Resolution always prefers **disk tr
 1. **Editor layout:** link story + feature + diary in Context docs → each opens correct surface.
 2. **Agent Mode:** same three clicks → story drawer, feature preview drawer, file in right tab drawer (no freeze).
 3. **Engine paths:** bare `040-foo.md` ref resolves to `documentation/engine/features/040-foo.md` when that file exists.
-4. **Cross-workspace:** doc in project B opens in B when clicked from project A chat (active workspace switches).
+4. **Cross-workspace (intentional):** doc that exists only in project B opens in B when clicked from project A chat (active workspace switches to B).
+5. **Sibling false-positive (bug `006`):** two projects open; click a file that exists only in the **current** chat's project → shell must **not** flip to the other project. `npm test -- src/pathUtils.test.ts`.

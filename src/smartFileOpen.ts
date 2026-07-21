@@ -76,10 +76,12 @@ export async function resolveExistingFilePath(
 }
 
 function findWorkspaceForPath(absPath: string): WsRoot | null {
+  let best: WsRoot | null = null;
   for (const entry of listWorkspaceRoots()) {
-    if (isUnderRoot(absPath, entry.root)) return entry;
+    if (!isUnderRoot(absPath, entry.root)) continue;
+    if (!best || entry.root.length > best.root.length) best = entry;
   }
-  return null;
+  return best;
 }
 
 /** Open a file in the active workspace tab or a standalone window. */

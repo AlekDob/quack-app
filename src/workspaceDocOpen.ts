@@ -158,10 +158,13 @@ export async function resolveWorkspaceDocPath(
 
 function workspaceForAbs(abs: string): WsRoot | null {
   const norm = abs.replace(/\\/g, "/");
+  let best: WsRoot | null = null;
   for (const entry of listOpenWorkspaceRoots("")) {
-    if (isUnderRoot(norm, entry.root)) return entry;
+    if (!isUnderRoot(norm, entry.root)) continue;
+    // Longest root wins (nested workspaces).
+    if (!best || entry.root.length > best.root.length) best = entry;
   }
-  return null;
+  return best;
 }
 
 interface DocOpenTarget {

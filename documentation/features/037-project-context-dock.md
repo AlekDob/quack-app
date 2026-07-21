@@ -2,8 +2,9 @@
 type: feature
 project: quack-desktop
 created: 2026-07-05
-last_verified: 2026-07-16
+last_verified: 2026-07-21
 tags: [chat, composer, context, workspace, editor, ux]
+related: [022-chat-composer.md, 006-chat-tool-render.md, 070-workspace-doc-open.md, 006-chat-file-link-wrong-workspace.md]
 ---
 
 # 037 — Per-project context dock
@@ -110,6 +111,11 @@ All context injection respects `isUnderRoot(path, root)`:
 - **API / Ollama** `sysParts` editor inline + `/file` attachments — same root
   filter; privacy exclusions unchanged.
 
+**`isUnderRoot` contract (bug `006`, 2026-07-21):** Absolute paths in a
+**sibling** workspace must return `false`. Do not `joinPath(root, absPath)` —
+the joined string still starts with `root/` and falsely matches. Relative
+paths still join under `root`. Shared with chat file-open ownership (`070`).
+
 After a message is sent, `clearAttachedFiles(wsId)` runs (`@` queue is
 one-shot). `attachContext` survives across turns.
 
@@ -119,3 +125,5 @@ one-shot). `attachContext` survives across turns.
 - Live turn `StatusPill` (left side of the same row): `006-chat-tool-render.md`
 - `@`-mention file attach: `004-subagent-mentions.md`
 - Editor state singleton: `src/editorState.ts` (dock filters by workspace root)
+- Chat / doc open ownership: `070-workspace-doc-open.md`
+- Incident: `documentation/bugs/006-chat-file-link-wrong-workspace.md`
