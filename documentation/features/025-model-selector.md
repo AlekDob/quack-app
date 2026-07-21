@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-01
-last_verified: 2026-07-17
+last_verified: 2026-07-21
 tags: [model-selector, model-browser, model-picker, favorites, visibility, cursor-cli, opencode-cli, claude-code, composer, lazy-load, free-models, model-discovery-cache, platform-pin, instant-hydrate]
 ---
 
@@ -107,3 +107,4 @@ so the first live fetch doesn't pay dynamic-import latency. Foreground `AIChatPa
 - **Instant hydrate:** `.model-picker-pop.is-hydrating` — full skeleton + readonly search only when the catalog is **empty**; `.is-refreshing` keeps cached rows visible during background CLI refresh. Removed local `sessionLoad`/`opening` state + `flushSync` on chip click — open is synchronous, loading is `catalogWarming` from the panel.
 - **CC chip labels:** chip/picker use stable Title Case alias (`Sonnet`) via `ccStableDisplayName` — not probed `Sonnet 5` (avoids flip). See `071-honest-model-labels.md`, probe mechanics `059-claude-code-model-catalog.md`.
 - **Cursor effort tiers:** appear as separate model rows (`Opus 4.8 1M Extra High`); CC effort uses `EffortPopover` instead (`022`, `026`).
+- **Per-session model (not global):** the chip's selection is stored on `ChatSession.model` and restored per chat. Discovery must not stamp `lcp.ollama.lastModel` onto a remounting panel before hydrate — see `040-per-session-composer-state.md` and bug `005`.

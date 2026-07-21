@@ -281,7 +281,9 @@ presets are fully editable** from the same drawer:
   `AIChatPanel`'s `presetChoices` and `WhiteboardPane`'s `data.presets` map built-ins through it.
   **Team → chat sync:** `subscribePresetSettings` in `AIChatPanel` bumps `presetOverridesTick`
   and silently re-runs `applyPreset` for the active `presetId` (including Jack when `null`) so
-  effort/mode/model knobs update immediately after Save in the organigramma drawer. `WhiteboardOrganigramma`
+  effort/mode/model knobs update immediately after Save in the organigramma drawer — **only when
+  `chatVisible`** (hidden warm hosts must not reset their per-session overrides; bug `005` /
+  feature `040`). `WhiteboardOrganigramma`
   also subscribes so Jack's root card and preset chips re-render without waiting for a disk refresh.
 - **Avatar** — defaults to the same deterministic duck pool subagents use (`duckAvatarFor`,
   `src/subagents.ts`, `DUCK_COUNT` exported for reuse); click any custom preset's avatar (or the
@@ -454,5 +456,7 @@ Settings tier map (`lcp.tierModelMap.v1`) > `capabilities.modelForTier` (Milo/Ja
 - `005-jack-duck-identity.md` — Jack persona line vs per-user instruction overrides (Team).
 - `088-plan-milo-handoff.md` — Pass the ball must share the apply-then-send ref contract.
 - `documentation/bugs/003-agent-identity-mismatch.md` — Jack header / Milo voice write-up.
+- `040-per-session-composer-state.md` — per-chat model/effort/mode; Team apply gated on visibility.
+- `documentation/bugs/005-session-knobs-bleed.md` — remount race that stamped knobs across chats.
 - `031-model-discovery-cache.md` — the live model catalog `TierModelSettings` reads via
   `getProvider(id).listModels()` for Cursor CLI/OpenCode/Claude Code.

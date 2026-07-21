@@ -103,7 +103,9 @@ import {
   resolveWorkspaceDocPath,
 } from "../workspaceDocOpen";
 import {
+  featureSlugFromDelegateResult,
   featureSlugFromSuccessfulEdit,
+  featureSlugFromToolCall,
   pinFeatureOnChat,
 } from "../featureChatAutoLink";
 import { PermissionCard, PrivacyBanner } from "./aiInlineCards";
@@ -276,6 +278,13 @@ import {
   mergeSessionKnobs,
   type ChatComposerDraft,
 } from "../composerDraft";
+import {
+  knobsFromSessionRow,
+  loadSessionComposerSeed,
+  nextSelectedAfterDiscovery,
+  qualifyStoredModel,
+  type SessionComposerSeed,
+} from "../sessionComposerSeed";
 import {
   hasQueueKnobs,
   normalizeQueuedDraft,
@@ -516,13 +525,7 @@ function sessionKnobsFrom(
   session: ChatSession | undefined,
 ): { effort: string; thinking: boolean | null; permMode: string | null } {
   if (!session) return defaultSessionKnobs();
-  return {
-    effort: session.ccEffort
-      ? normalizeCcEffort(session.ccEffort)
-      : CC_EFFORT_DEFAULT,
-    thinking: session.ccThinking ?? null,
-    permMode: session.ccPermMode !== undefined ? session.ccPermMode : null,
-  };
+  return knobsFromSessionRow(session);
 }
 function defaultSessionKnobs(): {
   effort: string;
@@ -566,23 +569,14 @@ function resolveActivePresetDef(
   return customPresets.find((p) => p.id === id);
 }
 
-/** Sync RAM seed so remounting a Jack chat after a Milo one doesn't flash
- *  the default Milo pill/avatars for a frame before hydrate. */
+/** Sync RAM seed so remounting doesn't flash another chat's agent / knobs. */
 function cachedSessionSeed(
   wsId: string,
   aiChatId: string | undefined,
-): { presetId: string | null; messages: ChatMessage[] } | null {
-  if (!aiChatId) return null;
-  const desc = useStore.getState().loaded[wsId]?.aiChats[aiChatId];
-  const sid = desc?.sessionId;
-  if (!sid) return null;
-  const cached = getCachedSession(wsId, sid);
-  if (!cached) return null;
-  const presetId = sessionAgentFromStored(cached.presetId);
-  return {
-    presetId,
-    messages: backfillAssistantAgentIds(cached.messages, presetId),
-  };
+): SessionComposerSeed | null {
+  return loadSessionComposerSeed(wsId, aiChatId, (chatId) => {
+    return useStore.getState().loaded[wsId]?.aiChats[chatId]?.sessionId;
+  });
 }
 
 // Flywheel scope: union of files already edited across a work/story's linked
@@ -672,6 +666,12 @@ export function AIChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const hydratedKeyRef = useRef("");
+  // Blocks model/knob persistence + global last-used writes until this
+  // panel has painted its bound session — prevents remount races from
+  // stamping another chat's Opus/Auto onto every idle host (040).
+  const [sessionReady, setSessionReady] = useState(false);
+  const sessionReadyRef = useRef(false);
+  sessionReadyRef.current = sessionReady;
   // Parent-provided file opener (agent-mode popup); forwarded in compact mode
   // so the docked-chat opener below doesn't clobber it. See fileOpenHandler.
   const parentFileOpen = useContext(AgentFileOpen);
@@ -709,7 +709,9 @@ export function AIChatPanel({
   const [rulesPath, setRulesPath] = useState<string | null>(null);
   // Full char count of the rules file — drives the colored token-weight dot.
   const [rulesBytes, setRulesBytes] = useState<number>(0);
-  const [selected, setSelected] = useState<string>("");
+  const [selected, setSelected] = useState<string>(
+    () => cachedSessionSeed(wsId, aiChatId)?.model ?? "",
+  );
   // Input lives in ComposerShell so keystrokes don't re-render the transcript.
   const composerRef = useRef<ComposerShellHandle>(null);
   const inputSnapRef = useRef("");
@@ -1129,18 +1131,27 @@ export function AIChatPanel({
     ProviderId | undefined
   >();
   const claudeSessionId = providerSessionIds["claude-code"];
-  // Per-chat Claude Code session knobs — restored from ChatSession on switch.
-  const [ccEffort, setCcEffort] = useState<string>(() => readEffort());
+  // Per-chat Claude Code session knobs — seeded from the warm session
+  // cache when present so remounts don't flash / persist another chat's
+  // global last-used effort/mode (feature 040 isolation).
+  const [ccEffort, setCcEffort] = useState<string>(() => {
+    const seed = cachedSessionSeed(wsId, aiChatId);
+    return seed ? seed.effort : readEffort();
+  });
   const [effortPulseToken, setEffortPulseToken] = useState(0);
   const bumpEffortPulse = () => setEffortPulseToken((n) => n + 1);
   const applyCcEffort = (v: CcEffort, toast = true) => {
     setCcEffort(v);
     if (toast) toastInfo(`Effort: ${v} (from your next message)`);
   };
-  const [ccPermMode, setCcPermMode] = useState<string | null>(
-    () => readDefaultPermMode(),
-  );
-  const [ccThinking, setCcThinking] = useState<boolean | null>(null);
+  const [ccPermMode, setCcPermMode] = useState<string | null>(() => {
+    const seed = cachedSessionSeed(wsId, aiChatId);
+    return seed ? seed.permMode : readDefaultPermMode();
+  });
+  const [ccThinking, setCcThinking] = useState<boolean | null>(() => {
+    const seed = cachedSessionSeed(wsId, aiChatId);
+    return seed ? seed.thinking : null;
+  });
   // Active preset for this session — shapes instructions/model/effort but
   // is NOT a subagent (no isolated context). Built-in OR custom, so the id
   // is a plain string, not the narrower PresetId literal union.
@@ -1239,7 +1250,9 @@ export function AIChatPanel({
     () =>
       subscribePresetSettings(() => {
         setPresetOverridesTick((n) => n + 1);
-        // Team-tab edits should immediately shape the active session knobs.
+        // Team-tab edits shape the visible session only — applying to every
+        // mounted host would reset sibling chats' model/effort/mode.
+        if (!chatVisibleRef.current) return;
         applyPresetRef.current(presetIdRef.current, { silent: true });
       }),
     [],
@@ -1305,6 +1318,7 @@ export function AIChatPanel({
     ccThinking,
     ccPermMode,
     presetId: presetId ?? undefined,
+    model: selected || undefined,
   });
   const lastSaveWarnAt = useRef(0);
   const ccHydrateGenRef = useRef(0);
@@ -1539,21 +1553,20 @@ export function AIChatPanel({
         return q;
       };
       setSelected((cur) => {
-        const migrated = cur ? migrateClaudeCode(cur) : cur;
-        if (migrated && isPresent(migrated)) return migrated;
-        let preferred: string | null = null;
-        if (stored) {
-          const qualified = parseQualifiedModel(stored)
-            ? stored
-            : makeQualifiedModel("ollama", stored);
-          const migratedStored = migrateClaudeCode(qualified);
-          if (isPresent(migratedStored)) preferred = migratedStored;
-        }
-        if (!preferred) {
-          const first = aggregate[0];
-          preferred = makeQualifiedModel(first.providerId, first.modelId);
-        }
-        return preferred;
+        const first = aggregate[0];
+        const firstQ = first
+          ? makeQualifiedModel(first.providerId, first.modelId)
+          : null;
+        return nextSelectedAfterDiscovery({
+          current: cur,
+          sessionReady: sessionReadyRef.current,
+          isPresent,
+          migrate: migrateClaudeCode,
+          globalStored: stored || null,
+          qualifyStored: (raw) =>
+            parseQualifiedModel(raw) ? raw : makeQualifiedModel("ollama", raw),
+          firstAggregate: firstQ,
+        });
       });
       return;
     }
@@ -1616,6 +1629,14 @@ export function AIChatPanel({
     setCatalogWarming(isPickerCatalogLoading());
     return unsub;
   }, [applyDiscoverySnapshot]);
+
+  // After hydrate, fill an empty picker from global last-used / catalog —
+  // never do this before sessionReady (that stamped siblings' models).
+  useEffect(() => {
+    if (!sessionReady || selected) return;
+    const snap = getModelDiscovery();
+    if (snap) applyDiscoverySnapshot(snap);
+  }, [sessionReady, selected, applyDiscoverySnapshot]);
 
   useEffect(() => {
     if (!wsActive) return;
@@ -2032,6 +2053,9 @@ export function AIChatPanel({
   }, [sessionId]);
 
   useEffect(() => {
+    // Don't stamp global last-used / rail badge until this chat's own
+    // model is restored — otherwise every remount rewrites siblings.
+    if (!sessionReady) return;
     if (selected) lsSetString(STORAGE_KEY, selected);
     // Mirror the selected model onto the chat descriptor so the AI
     // chats rail can render a per-chat provider badge without each rail
@@ -2048,7 +2072,7 @@ export function AIChatPanel({
     void warmupOllamaModel(parsed.modelId).finally(() => {
       setWarmingUp(false);
     });
-  }, [selected, aiChatId, wsId]);
+  }, [selected, aiChatId, wsId, sessionReady]);
 
   // Track whether the user is parked at the bottom (for tail-follow + jump chip).
   useEffect(() => {
@@ -2086,11 +2110,17 @@ export function AIChatPanel({
   useEffect(() => {
     const boundKey = `${wsId}:${aiChatId ?? ""}`;
     if (hydratedKeyRef.current === boundKey) {
+      if (!sessionReadyRef.current) {
+        sessionReadyRef.current = true;
+        setSessionReady(true);
+      }
       if (isChatSwitching() && onHydrated) onHydrated();
       return;
     }
     let cancelled = false;
     const hydrateT0 = performance.now();
+    sessionReadyRef.current = false;
+    setSessionReady(false);
     logChatSwitch("hydrate start", { wsId, aiChatId: aiChatId ?? null });
     noteChatSwitchProgress();
     logAgentModePhase("chat hydrate start", {
@@ -2166,9 +2196,7 @@ export function AIChatPanel({
             setCcPermMode(knobs.permMode);
             setPresetId(sessionAgent);
             if (found.model) {
-              const q = parseQualifiedModel(found.model)
-                ? found.model
-                : makeQualifiedModel("ollama", found.model);
+              const q = qualifyStoredModel(found.model);
               selectedRef.current = q;
               setSelected(q);
             }
@@ -2177,14 +2205,16 @@ export function AIChatPanel({
             count: withAgents.length,
             aiChatId: aiChatId ?? null,
           });
-          return;
+        } else {
+          setSessionId(sid);
+          setProviderSessionIds({});
+          setChatTotalCost(0);
+          setMessages([]);
+          applyDefaultPreset();
+          applyComposerDraft({});
         }
-        setSessionId(sid);
-        setProviderSessionIds({});
-        setChatTotalCost(0);
-        setMessages([]);
-        applyDefaultPreset();
-        applyComposerDraft({});
+        sessionReadyRef.current = true;
+        setSessionReady(true);
       };
       // Under the switch veil: apply with flushSync so the loader stays up
       // through the real transcript commit. startTransition + opacity-0 fade-in
@@ -2341,10 +2371,11 @@ export function AIChatPanel({
   });
 
   useEffect(() => {
-    if (messages.length === 0) return;
+    if (!sessionReady || messages.length === 0) return;
     persistTranscriptRef.current();
     setSessions(loadSessions(wsId));
   }, [
+    sessionReady,
     messages,
     sessionId,
     wsId,
@@ -2430,7 +2461,7 @@ export function AIChatPanel({
   // handled by the debounced flush below — do NOT list input here or
   // every keystroke rewrites the full session JSON to disk.
   useEffect(() => {
-    if (!sessionId || messages.length > 0) return;
+    if (!sessionReady || !sessionId || messages.length > 0) return;
     const existing = loadSessions(wsId).find((s) => s.id === sessionId);
     patchSession(wsId, sessionId, {
       title: existing?.title ?? "Untitled",
@@ -2444,6 +2475,7 @@ export function AIChatPanel({
       presetId: presetId ?? undefined,
     });
   }, [
+    sessionReady,
     sessionId,
     wsId,
     messages.length,
@@ -2472,6 +2504,7 @@ export function AIChatPanel({
       ccThinking,
       ccPermMode,
       presetId: presetId ?? undefined,
+      model: selected || undefined,
     };
   });
 
@@ -2487,10 +2520,11 @@ export function AIChatPanel({
   // full session to disk and pegged CPU/RAM. Unmount + session switch
   // flush via prevSessionIdRef + the layout cleanup below.
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionReady || !sessionId) return;
     const t = window.setTimeout(() => flushSessionState(sessionId), 400);
     return () => window.clearTimeout(t);
   }, [
+    sessionReady,
     sessionId,
     flushSessionState,
     draftEpoch,
@@ -2504,10 +2538,12 @@ export function AIChatPanel({
     ccThinking,
     ccPermMode,
     presetId,
+    selected,
   ]);
 
   useLayoutEffect(() => {
     return () => {
+      if (!sessionReadyRef.current) return;
       const snap = composerPersistRef.current;
       if (!snap.sessionId) return;
       mergeComposerDraft(
@@ -2778,12 +2814,14 @@ export function AIChatPanel({
   >([]);
   // Persist defaults for brand-new chats + publish mode to the overlay bridge.
   useEffect(() => {
+    if (!sessionReady) return;
     lsSetString(PERM_MODE_KEY, ccPermMode ?? "");
     setPermMode({ sessionId: claudeSessionId, cwd: root }, ccPermMode);
-  }, [ccPermMode, claudeSessionId, root]);
+  }, [sessionReady, ccPermMode, claudeSessionId, root]);
   useEffect(() => {
+    if (!sessionReady) return;
     lsSetString(EFFORT_KEY, ccEffort);
-  }, [ccEffort]);
+  }, [sessionReady, ccEffort]);
 
   // Argument submenu for /effort, /mode and /thinking: once the command
   // name is complete ("/effort "), the slash window switches to the
@@ -4231,6 +4269,12 @@ export function AIChatPanel({
             if (ev.call.id) seenToolCallIds.add(ev.call.id);
             toolCallsThisRound.push(ev.call);
             setStreamingToolCalls([...toolCallsThisRound]);
+            // Subagent Write may stream as tool_call without a parent
+            // tool_result (Skill/Task fork). Candidate pin; cleared on error.
+            {
+              const fromCall = featureSlugFromToolCall(ev.call, root);
+              if (fromCall) lastAutoFeatureSlug = fromCall;
+            }
             // ExitPlanMode may fail upstream ("not enabled") — still offer
             // Pass the ball to Milo from the tool args so UX doesn't depend
             // on the CLI actually enabling the tool.
@@ -4412,19 +4456,34 @@ export function AIChatPanel({
               }
               return next;
             });
-            // Track feature-doc edits; pin the last one after the turn.
+            // Track feature-doc edits + Skill/Task fork results; pin after turn.
             if (aiChatId && ev.tool_use_id) {
               const call = toolCallsThisRound.find(
                 (c) => c.id === ev.tool_use_id,
               );
               if (call) {
-                const slug = featureSlugFromSuccessfulEdit(
+                const err = ev.is_error === true;
+                const fromEdit = featureSlugFromSuccessfulEdit(
                   call,
                   root,
                   ev.content,
-                  ev.is_error === true,
+                  err,
                 );
-                if (slug) lastAutoFeatureSlug = slug;
+                if (fromEdit) {
+                  lastAutoFeatureSlug = fromEdit;
+                } else if (err) {
+                  const failed = featureSlugFromToolCall(call, root);
+                  if (failed && lastAutoFeatureSlug === failed) {
+                    lastAutoFeatureSlug = null;
+                  }
+                } else {
+                  const fromSkill = featureSlugFromDelegateResult(
+                    call,
+                    ev.content,
+                    err,
+                  );
+                  if (fromSkill) lastAutoFeatureSlug = fromSkill;
+                }
               }
             }
             // Stash for attachment to the assistant message at end of round.

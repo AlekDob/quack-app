@@ -138,6 +138,7 @@ chat_store_load(wsId, sessionId) → ChatSession | null
 | `058-workspace-switch-performance.md` | Sibling: heavy UI unload for background workspaces |
 | `085-agent-ide-mode-toggle.md` | Agent↔IDE remount: keep rich RAM body (no blanket `force`) |
 | `087-new-chat-perf.md` | Seed empty body + sync empty paint + deferred mount work |
+| `040-per-session-composer-state.md` | Remount must seed knobs from session + `sessionReady` gate (bug `005`) |
 
 ### Verify
 

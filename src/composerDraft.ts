@@ -55,7 +55,7 @@ function draftEqual(
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-/** Persist Claude Code knobs (+ active preset) without touching messages / composer. */
+/** Persist Claude Code knobs (+ model / active preset) without touching messages / composer. */
 export function mergeSessionKnobs(
   wsId: string,
   sessionId: string,
@@ -64,6 +64,7 @@ export function mergeSessionKnobs(
     ccThinking?: boolean | null;
     ccPermMode?: string | null;
     presetId?: string;
+    model?: string;
   },
 ): boolean {
   return patchSession(wsId, sessionId, knobs);
