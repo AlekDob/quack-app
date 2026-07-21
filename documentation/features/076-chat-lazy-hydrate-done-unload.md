@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-16
-last_verified: 2026-07-20
+last_verified: 2026-07-21
 tags: [chat, performance, hydrate, lazy-load, done, mount, ram, multitask, quack-v1, react-memo]
 ---
 
