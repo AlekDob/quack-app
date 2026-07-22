@@ -838,7 +838,11 @@ export function AIChatPanel({
   } | null>(null);
   // Live tokens-per-second during streaming, and a sticky "warming up"
   // marker for the cold-start window before the first token arrives.
-  const [tokensPerSec, setTokensPerSec] = useState<number | null>(null);
+  // Ref, not state: updated on every content delta but only READ once per
+  // second by the TurnStreamStatus badge (via the 1-Hz nowTick below). Using
+  // state here fired a full AIChatPanel render per token, defeating the 069
+  // rAF painter. See lastStreamEventAtRef.
+  const tokensPerSecRef = useRef<number | null>(null);
   // Most-recent end-of-turn usage report from the agentic provider
   // (Claude Code emits this in its `result` event). Pinned in the
   // status strip so the user sees what the last turn cost in dollars +
@@ -1096,9 +1100,11 @@ export function AIChatPanel({
   // for a noticeable while. User reported waiting "so long for messages
   // to come back" with the indicator hidden — this gives them visible
   // proof that the app hasn't lost track.
-  const [lastStreamEventAt, setLastStreamEventAt] = useState<number | null>(
-    null,
-  );
+  // Ref, not state: reset on every provider event (sign-of-life for the
+  // "still working" badge), but the badge only reads it on the 1-Hz nowTick.
+  // As state this fired one render per event/token — the painter (069) is
+  // supposed to be the only per-frame writer.
+  const lastStreamEventAtRef = useRef<number | null>(null);
   // Keying the 1-Hz tick interval by `streaming === null ? 'idle' : 'live'`
   // so we set it up exactly once per turn (start) and tear it down once
   // (end), instead of churning the interval on every incoming event when
@@ -4162,7 +4168,7 @@ export function AIChatPanel({
         const thinkCloseTag = "</" + "think>";
         // Reset on each new round so the "still working" timer doesn't
         // anchor to a previous turn.
-        setLastStreamEventAt(Date.now());
+        lastStreamEventAtRef.current = Date.now();
         for await (const ev of chatStream(
           selectedRef.current || selected,
           conversation,
@@ -4191,7 +4197,7 @@ export function AIChatPanel({
           // Any event from the provider is a sign of life — reset the
           // staleness timer so the "still working" badge only fires
           // when the stream really has gone quiet for a while.
-          setLastStreamEventAt(Date.now());
+          lastStreamEventAtRef.current = Date.now();
           if (ev.kind === "session") {
             // Captured the Claude Code session id — store it so the next
             // turn passes --resume <id> and avoids re-flattening history.
@@ -4307,7 +4313,7 @@ export function AIChatPanel({
             // Approximate tokens/sec: ~4 chars per token on average.
             const elapsedSec = (performance.now() - firstTokenAt) / 1000;
             if (elapsedSec > 0.5) {
-              setTokensPerSec(acc.length / 4 / elapsedSec);
+              tokensPerSecRef.current = acc.length / 4 / elapsedSec;
             }
           } else if (ev.kind === "tool_call") {
             // Skip a re-emitted tool_use: same id already handled this
@@ -4761,8 +4767,8 @@ export function AIChatPanel({
       setThinkingLive(false);
       setRunningTools(false);
       setActiveToolLabels([]);
-      setTokensPerSec(null);
-      setLastStreamEventAt(null);
+      tokensPerSecRef.current = null;
+      lastStreamEventAtRef.current = null;
       // If a permission card was awaiting a decision when the turn
       // aborted, resolve it as deny so the parent promise unblocks
       // and clear the card so the user doesn't see a stale prompt
@@ -4833,8 +4839,8 @@ export function AIChatPanel({
     setThinkingLive(false);
     setRunningTools(false);
     setActiveToolLabels([]);
-    setTokensPerSec(null);
-    setLastStreamEventAt(null);
+    tokensPerSecRef.current = null;
+    lastStreamEventAtRef.current = null;
   };
 
   // Archive / done / close tab kills CLI subprocesses on the Rust side and
@@ -7228,9 +7234,9 @@ export function AIChatPanel({
                   streaming={streaming}
                   streamingBlocks={streamingBlocks}
                   activeToolLabels={activeToolLabels}
-                  tokensPerSec={tokensPerSec}
+                  tokensPerSec={tokensPerSecRef.current}
                   warmingUp={warmingUp}
-                  lastStreamEventAt={lastStreamEventAt}
+                  lastStreamEventAt={lastStreamEventAtRef.current}
                   thinkingLive={thinkingLive}
                   onStop={() => stop()}
                 />

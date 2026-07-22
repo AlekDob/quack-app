@@ -4,6 +4,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
@@ -519,13 +520,19 @@ export function FileTree({ wsId, root, onOpenFile }: Props) {
     setFilterQuery("");
   };
 
-  const filterCtx =
-    filter && normalizeFilterQuery(filterQuery)
-      ? {
-          visiblePaths: filter.visiblePaths,
-          matchPaths: filter.matchPaths,
-        }
-      : null;
+  // Memoize the context value: `filter` is state (stable ref between renders),
+  // so an unrelated FileTree re-render no longer mints a fresh object that
+  // would re-render every tree row via useContext(TreeFilterContext).
+  const filterCtx = useMemo(
+    () =>
+      filter && normalizeFilterQuery(filterQuery)
+        ? {
+            visiblePaths: filter.visiblePaths,
+            matchPaths: filter.matchPaths,
+          }
+        : null,
+    [filter, filterQuery],
+  );
 
   const visibleEntries =
     filterCtx === null

@@ -475,13 +475,23 @@ pub fn pty_spawn(
         };
 
         loop {
-            let elapsed = last_flush.elapsed();
-            let timeout = if elapsed >= flush_interval {
-                Duration::from_millis(1)
+            // When nothing is buffered, block until the next chunk arrives.
+            // Previously an idle terminal collapsed the timeout to 1ms and
+            // woke this thread ~1000x/sec doing nothing (x every open
+            // terminal). A short timeout is only needed to flush data we are
+            // already holding within flush_interval.
+            let recv = if residual.is_empty() {
+                rx.recv().map_err(|_| mpsc::RecvTimeoutError::Disconnected)
             } else {
-                flush_interval - elapsed
+                let elapsed = last_flush.elapsed();
+                let timeout = if elapsed >= flush_interval {
+                    Duration::from_millis(1)
+                } else {
+                    flush_interval - elapsed
+                };
+                rx.recv_timeout(timeout)
             };
-            match rx.recv_timeout(timeout) {
+            match recv {
                 Ok(chunk) => {
                     residual.extend_from_slice(&chunk);
                     if residual.len() >= flush_threshold

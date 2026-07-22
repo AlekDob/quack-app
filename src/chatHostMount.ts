@@ -8,7 +8,7 @@
  * sticky only) — see bug `007` / feature `043`.
  */
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import {
   getAgentStatus,
   subscribeAgentStatus,
@@ -31,9 +31,19 @@ export function shouldKeepChatHostMounted(opts: {
   return false;
 }
 
-/** Re-render hosts when a background chat starts or stops a run. */
+/**
+ * Re-render a host when ITS OWN background chat starts or stops a run.
+ *
+ * `agentStatusStore.notify()` is unkeyed — it wakes every subscriber on any
+ * chat's transition. Every mounted AIChatHost calls this hook, so with many
+ * live chats (Agent Mode keeps them all mounted) a plain tick re-rendered
+ * ALL hosts on ANY status change. useSyncExternalStore compares the snapshot
+ * (this chat's derived status) and bails out when it is unchanged, so a host
+ * re-renders only when its own chat transitions — the store stays untouched.
+ */
 export function useChatHostLiveStatus(chatId: string): LiveStatus | null {
-  const [, tick] = useState(0);
-  useEffect(() => subscribeAgentStatus(() => tick((t) => t + 1)), []);
-  return getAgentStatus(chatId)?.derived ?? null;
+  return useSyncExternalStore(
+    subscribeAgentStatus,
+    () => getAgentStatus(chatId)?.derived ?? null,
+  );
 }

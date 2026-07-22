@@ -235,8 +235,20 @@ export function AgentHubWatcher() {
       emitDockSummary();
     };
 
-    const interval = window.setInterval(() => void recompute(), POLL_MS);
+    // Pause the steady-state poll (an IPC activeSessions() call + a full
+    // per-workspace x per-chat reconcile) while the window is backgrounded.
+    // The permission/question listeners below still drive the interactive
+    // path when hidden; we just stop the 1.5s CPU/IPC churn. Catch up
+    // immediately on return so status is fresh when the user looks again.
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      void recompute();
+    }, POLL_MS);
     void recompute();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") void recompute();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     const offReq = listen<PermissionRequest>("claude:permission-request", (e) =>
       onRequest(e.payload),
     );
@@ -250,6 +262,7 @@ export function AgentHubWatcher() {
     return () => {
       stopped = true;
       window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibility);
       for (const e of pending.values())
         if (e.timer) window.clearTimeout(e.timer);
       void offReq.then((f) => f());
