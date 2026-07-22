@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-20
+last_verified: 2026-07-22
 tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, workspace, zustand, persistence]
 ---
 
@@ -25,6 +25,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | Component | `src/components/AgentModeShell.tsx` | Agent-mode layout: workspace rail + sessions list + live Tasks + Customizations |
 | Component | `src/components/AgentCustomizations.tsx` | Shared Customizations footer menu → `CustomizationsModal` (feature 036) |
 | Component | `src/components/WorkspacePicker.tsx` | Library entry / recent-workspaces picker on first run |
+| Component | `src/components/WorkspacePathPicker.tsx` | Composer project chip — Recents + new chat in target ws (`050`) |
 | Component | `src/components/AIChatPanel.tsx` | The chat panel itself; owns runtime state (streaming, tools, todos) per session |
 | Component | `src/components/ChatEmptyState.tsx` | Empty tab hero — inline session name + starter grid |
 | Component | `src/components/PaneNode.tsx` | Empty pane **New AI chat** → `addNewAIChat` |
@@ -76,10 +77,12 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 ### Gotcha — legacy singleton AI panel
 `WorkspaceShell` can still mount `AIChatPanel` **without** `aiChatId` when `layout.aiPanelVisible` (old right dock). That panel has **no** hub row / tab and used to receive every unscoped `requestAIPrompt`. Entry points must use `ensureFocusedAIChat` / `addNewAIChat` (which also force `aiPanelVisible` off). Do not reintroduce Ask AI → `setAIPanelVisible(true)`.
 
-### Gotcha — project switch unmounts chat hosts
-`AIChatHost` mounts only when `isActive`. Leaving a project tears them down.
-Transcript durability on that path is owned by `043` (flush-before-flip +
-never-shrink). Do not reintroduce `patchSession` empty-row invent.
+### Gotcha — project switch keeps sticky chat hosts
+`working` / `needs-input` hosts stay mounted across project switch (IDE:
+`WorkspaceShell` without `isActive` gate for sticky; Agent Mode: sticky
+hosts from all `openIds`). Idle hosts still unload. Flush-before-flip +
+never-shrink (`043`) remain the durability backstop. Do not reintroduce
+`patchSession` empty-row invent. See bug `007`.
 
 ### Gotcha — close tab vs Delete vs dismiss
 Editor tab **×** calls `dismissAIChatTab` — removes the `ai:` tab only; the

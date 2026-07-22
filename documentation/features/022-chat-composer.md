@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-14
+last_verified: 2026-07-22
 tags: [composer, stop, multitask, esc, turn-status]
 ---
 
@@ -33,7 +33,7 @@ mode/mic/send on the right.
 | `src/components/AgentCommitDock.tsx` | Agent `git commit` pill above the composer (hash, message, time, push state) — feature 051 |
 | `src/components/ComposerGitActions.tsx` | Changed-files list + Commit & Push split control inside the pill — feature 053 |
 | `src/composerGitOps.ts` | Stage / commit / branch / push orchestration for composer git menu |
-| `src/components/WorkspacePathPicker.tsx` | Workspace path segment — switch open projects or open a folder |
+| `src/components/WorkspacePathPicker.tsx` | Project-name chip + Recents MRU menu — switch/open project + **new chat** (050) |
 | `src/components/GitBranchPicker.tsx` | Shared git branch dropdown (composer + Source Control panel) |
 | `src/components/EffortPopover.tsx` | Effort + thinking popover (portaled) |
 | `src/components/ComposerPermMode.tsx` | CC permission-mode pill + portaled menu (015) |
@@ -46,7 +46,7 @@ Full detail: **`050-composer-context-bar.md`**.
 
 Cursor-style selectors at the **top inside** `.ai-composer-shell` (above queue/textarea/meta):
 
-- **Path** — `~/…` label; menu lists open workspaces + **Open folder…**; switching project or opening a folder starts a **new chat** (`addNewAIChat`).
+- **Project** — chip shows workspace **name** (path in tooltip); menu = **Recents** MRU (cap 10, open or closed) + **Open folder…**; picking another project switches/opens it and starts a **new chat** (`addNewAIChat`). Default = current workspace on every new chat.
 - **Branch** — checkout/create/delete via shared `GitBranchPicker`. Hidden when not a git repo.
 
 Menus are **portaled** (`ComposerCtxMenu`, fixed coords) so `.ai-panel { overflow: hidden }` does not clip them. Always visible — not gated by `showComposerDock`. No **Run on** target in v1.

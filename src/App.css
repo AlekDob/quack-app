@@ -7372,8 +7372,8 @@ body.ab-dragging * {
 .ai-composer-ctx-menu {
   z-index: 95;
   min-width: 220px;
-  max-width: min(360px, 90vw);
-  max-height: 280px;
+  max-width: min(420px, 90vw);
+  max-height: 320px;
   overflow-y: auto;
   background: var(--bg-elev);
   border: 1px solid var(--border);
@@ -7395,9 +7395,16 @@ body.ab-dragging * {
   align-items: center;
   gap: 6px;
   min-width: 0;
+  flex: 1;
 }
 .ai-composer-ctx-menu .menu-item-label svg {
   flex-shrink: 0;
+}
+.ai-composer-ctx-menu .ai-composer-ctx-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .ai-composer-ctx-menu .menu-item-accel {
   font-size: 10px;
@@ -7406,6 +7413,13 @@ body.ab-dragging * {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 55%;
+}
+.ai-composer-ctx-menu .menu-item-accel.ai-composer-ctx-check {
+  max-width: none;
+  flex-shrink: 0;
+  color: var(--fg);
+  display: inline-flex;
+  overflow: visible;
 }
 .ai-composer-ctx-menu .menu-item.ai-composer-ctx-open {
   justify-content: flex-start;
