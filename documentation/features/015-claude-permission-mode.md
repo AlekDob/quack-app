@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-20
-tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command, plan-mode, exit-plan-mode, build-handoff, ask-user-question, tool-search]
+last_verified: 2026-07-22
+tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command, plan-mode, exit-plan-mode, build-handoff, ask-user-question, tool-search, plan-file-write]
 ---
 
 ## Claude Code Permission Mode (Ask / Plan / Auto-edit / Auto / Agent)
@@ -69,6 +69,7 @@ Cursor-style **semantic tint + icon** on the active mode pill; dropdown rows sho
 | Sidechain | any tool when `parent_tool_use_id` present | Plan only — subagent inner steps; still blocks `WRITE_TOOLS`, non-read-only `Bash`, `ExitPlanMode` |
 | `isReadOnlyBash` / `isPlanExploreBash` | non-mutating Bash (pipes, env assigns, `find -exec`, `2>/dev/null`; block `rm`/`git commit`/stdout redirects/`exec`/`eval` as command heads) | Plan only — explore bypass by default (no "Allow exploration" click needed) |
 | `planSessionExplore` | in-memory flag per chat turn | User clicked **Allow exploration** — broad auto-allow except writes + `ExitPlanMode` |
+| `isPlanFileWrite` | `WRITE_TOOLS` targeting a path under `.claude/plans/` | Plan only — CC's internal plan scratch file; auto-allow so Plan mode is prompt-free. Every other write still cards |
 
 Hook payload shape (relevant fields):
 
@@ -101,6 +102,7 @@ Hook payload shape (relevant fields):
 - **Plan-mode explore auto-allow (2026-07-13):** `PLAN_EXPLORE_TOOLS` lets Jack delegate via Task/subagent and maintain TodoWrite checklists without permission cards, while **file edits, writing Bash, and `ExitPlanMode` still card**. Rationale: Plan mode exploration with subagents was unusable (dozens of cards); Jack must still call `ExitPlanMode` before the user can Build. `AskUserQuestion` is **not** in the set — user answers stay interactive.
 - **Plan-mode subagent follow-up (2026-07-14):** `PLAN_READ_TOOLS` (`ToolSearch`/`WebSearch`/`WebFetch`) + `NotebookRead` in the read-only hook set. Subagent sidechains auto-allow when the hook payload carries `parent_tool_use_id` (forwarded in `claude_perm.rs`). Read-only Bash allows safe `;`/`&&` chains (`sleep 1; echo done`, `cd ../sibling && grep …`) and adds `sleep`/`find`/`test`. **`ownerPermMode`** prop from `AIChatPanel` — `panelPermMode()` prefers composer Plan over `permModeStore` lookups that miss when subagent `cwd` diverges. **"Allow exploration"** (Plan only) sets `planSessionExploreRef` — stops carding without flipping the composer to Auto; `ExitPlanMode` + file writes still gate.
 - **Plan mode ignores saved always-allow rules:** otherwise a persisted "always allow Edit on .ts" would slip an edit past plan mode (the hook's `allow` overrides the CLI's plan block). In plan mode only read-only + explore allows fire; everything else cards.
+- **Plan-file write auto-allow (`isPlanFileWrite`, 2026-07-22):** Claude Code sometimes writes its own plan scratch file at `~/.claude/plans/*.md` during Plan mode. That is not a project edit, but `planModeAutoAllow` blocked ALL `WRITE_TOOLS`, so it carded an "Edit" prompt every time. `isPlanFileWrite(req)` now auto-allows `Edit`/`Write`/`MultiEdit`/`NotebookEdit` **only** when the target path is under `.claude/plans/` (guarded in both `planModeAutoAllow` and `isPlanSidechainExplore`); every other write in Plan mode still cards exactly as before. Complements the prompt gate that tells Jack to prefer `ExitPlanMode` over writing scratch files — native CC still writes them sometimes.
 - **Plan-mode explore Bash gotcha (`find -exec`, 2026-07-16):** `\bexec\b` in the dangerous-Bash regex matched `find … -exec`, so Plan still carded common explore commands (exactly the "don't annoy me in Plan" complaint). Fix: `exec`/`eval` are only refused as **command heads**; `;`/`&` split ignores escaped `\;` (find terminator). Plan remains explore-bypass by default — only file writes + `ExitPlanMode` card.
 - **`NEVER_BLANKET_ALLOW` (`Bash`, `ExitPlanMode`):** even if the user clicks a bare-name "always allow", these are refused a blanket rule — `Bash` because one name would allow arbitrary commands, `ExitPlanMode` because it's a per-plan approval that blanket-allowing would defeat.
 - **`/mode off` resets to Ask (`null`)**, not to a permissive default — the safe direction.

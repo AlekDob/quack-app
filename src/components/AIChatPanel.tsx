@@ -1168,6 +1168,11 @@ export function AIChatPanel({
   const selectedRef = useRef(selected);
   const ccEffortRef = useRef(ccEffort);
   const ccPermModeRef = useRef(ccPermMode);
+  // Set when a mode change should apply only to THIS chat (e.g. the
+  // Milo handoff forcing Agent) — skips writing the new-chat global default
+  // so future new chats don't inherit a one-off Agent switch and silently
+  // lose Plan mode (ExitPlanMode would then look "unavailable" to Jack).
+  const skipPermModeDefaultRef = useRef(false);
   const ccThinkingRef = useRef(ccThinking);
   // CC `[Editor context]` policy — see `ccWirePrompt.ts` (/compact bare + refresh).
   const ccWireLastAgentRef = useRef<string | null | undefined>(undefined);
@@ -2815,7 +2820,9 @@ export function AIChatPanel({
       pushQueue(text);
       return;
     }
-    void sendUserText(text);
+    // Preserve any pending Pass-the-ball-to-Milo CTA — answering a question
+    // continues the plan discussion, it doesn't decline the handoff.
+    void sendUserText(text, messages, [], { keepPlanBuyIn: true });
   };
 
   const sendQueuedNow = () => {
@@ -2863,7 +2870,11 @@ export function AIChatPanel({
   // Persist defaults for brand-new chats + publish mode to the overlay bridge.
   useEffect(() => {
     if (!sessionReady) return;
-    lsSetString(PERM_MODE_KEY, ccPermMode ?? "");
+    if (skipPermModeDefaultRef.current) {
+      skipPermModeDefaultRef.current = false;
+    } else {
+      lsSetString(PERM_MODE_KEY, ccPermMode ?? "");
+    }
     setPermMode({ sessionId: claudeSessionId, cwd: root }, ccPermMode);
   }, [sessionReady, ccPermMode, claudeSessionId, root]);
   useEffect(() => {
@@ -3431,13 +3442,15 @@ export function AIChatPanel({
     text: string,
     baseMessages: ChatMessage[] = messages,
     images: ImageAttachment[] = [],
-    opts?: { onTurnStarted?: () => void },
+    opts?: { onTurnStarted?: () => void; keepPlanBuyIn?: boolean },
   ): Promise<boolean> => {
     if ((!text && images.length === 0) || !(selectedRef.current || selected))
       return false;
     // User wrote instead of clicking Pass the ball — keep discussing.
+    // Skip for AskUserQuestion answers: answering a docked question is not a
+    // deliberate "keep discussing" action, so it must not dismiss the Milo CTA.
     const pendingPlan = planBuyInRef.current;
-    if (pendingPlan) {
+    if (pendingPlan && !opts?.keepPlanBuyIn) {
       await resolvePlanBuyIn(pendingPlan.requestId, "deny");
     }
     // Sending revives an archived chat; opening it from the hub does not.
@@ -6182,7 +6195,9 @@ export function AIChatPanel({
   const handoffToMiloBuilder = () => {
     applyPreset("builder", { silent: true });
     // Force Agent mode even if Milo's saved override says otherwise —
-    // Pass the ball means implement, not stay in Plan.
+    // Pass the ball means implement, not stay in Plan. This chat only:
+    // don't let it become the global default for brand-new chats.
+    skipPermModeDefaultRef.current = true;
     ccPermModeRef.current = "bypassPermissions";
     setCcPermMode("bypassPermissions");
   };

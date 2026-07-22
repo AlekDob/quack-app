@@ -221,9 +221,20 @@ function isPlanExploreBash(input: Record<string, unknown>): boolean {
   return segments.length > 0 && segments.every(planExploreChain);
 }
 
+/** CC's own scratch plan file (~/.claude/plans/*.md) is not a project edit —
+ *  it's the CLI's internal plan-mode bookkeeping, so writes to it auto-allow
+ *  even though WRITE_TOOLS otherwise card in Plan mode. */
+function isPlanFileWrite(req: PermissionRequest): boolean {
+  if (!WRITE_TOOLS.has(req.tool_name)) return false;
+  const p = pathFromInput(req.tool_input);
+  if (!p) return false;
+  return /(^|[\\/])\.claude[\\/]plans[\\/]/.test(p.replace(/\\/g, "/"));
+}
+
 /** Sidechain (Task subagent) explore — auto in Plan unless it's a write. */
 function isPlanSidechainExplore(req: PermissionRequest): boolean {
   if (!req.parent_tool_use_id) return false;
+  if (isPlanFileWrite(req)) return true;
   if (WRITE_TOOLS.has(req.tool_name) || req.tool_name === "ExitPlanMode") {
     return false;
   }
@@ -235,6 +246,7 @@ function planModeAutoAllow(
   req: PermissionRequest,
   sessionExplore: boolean,
 ): boolean {
+  if (isPlanFileWrite(req)) return true;
   if (sessionExplore) {
     if (req.tool_name === "ExitPlanMode") return false;
     if (WRITE_TOOLS.has(req.tool_name)) return false;

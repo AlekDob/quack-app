@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-20
-last_verified: 2026-07-20
+last_verified: 2026-07-22
 related:
   - 015-claude-permission-mode.md
   - 061-plan-mode-tab.md
@@ -102,7 +102,7 @@ ExitPlanMode (plan non-empty)
 | Step | Effect |
 |---|---|
 | Preset | `applyPreset("builder", { silent: true })` → Milo (+ sync `presetIdRef` / model / effort / thinking) |
-| Perm | `ccPermModeRef` + `setCcPermMode("bypassPermissions")` → Agent (forced even if Milo override differs) |
+| Perm | `ccPermModeRef` + `setCcPermMode("bypassPermissions")` → Agent (forced even if Milo override differs); sets `skipPermModeDefaultRef` so this one-off Agent switch does **not** become the new-chat global default (see gotcha) |
 | CLI | `claude_perm_decide: allow` on ExitPlanMode |
 | Auto-send | `sendUserText(Implement…)` **immediately** after handoff — reads refs, not stale React state |
 | Features | Clear `planning`; **no** `handoffStoryToBuilder` |
@@ -139,6 +139,8 @@ Avatar: Milo builtin `duck3` → `/images/ducks/duck3.jpeg`.
 - Auto-send after allow: clear `planBuyInRef` before `sendUserText` so the implement prompt is not treated as Keep discussing.
 - Multiple `AIChatHost` overlays: `setPlanBuyInDecide` keyed by session/cwd so the correct panel settles the hook.
 - CLI enables ExitPlanMode only with `--permission-mode plan` — prompt gate alone is not enough; composer must be Plan when Jack calls it. When the tool still fails, client buy-in path covers UX.
+- **Handoff must not poison the new-chat default (bug fix 2026-07-22):** `handoffToMiloBuilder` force-sets Agent (`bypassPermissions`) for the current chat, but the mode-persistence effect (`AIChatPanel.tsx`) writes `ccPermMode` into the global `PERM_MODE_KEY` default that seeds **new** chats. Without a guard, one "Pass the ball" flipped every future new chat to Agent → they never started in Plan, so Jack saw a non-plan session and (correctly, per the prompt gate) said "ExitPlanMode is not active" and fell back to `~/.claude/plans/*` scratch files. Fix: `skipPermModeDefaultRef` set by `handoffToMiloBuilder` makes the effect skip the global-default write for that one transition; the per-session `setPermMode` bridge still updates.
+- **Answering AskUserQuestion must not dismiss the CTA (bug fix 2026-07-22):** `sendUserText` opens with a "user typed instead of clicking Pass the ball → resolve deny" guard that clears `planBuyIn`. `answerQuestion` (073) routes selections through the same `sendUserText`, so answering a docked question while the Milo CTA was up silently declined the handoff and the CTA vanished. Fix: `sendUserText` takes `opts.keepPlanBuyIn`; `answerQuestion` passes it — answering continues the plan discussion, the CTA survives. Only free-form composer sends still deny.
 
 ### Related
 

@@ -11,6 +11,7 @@ export function quackClaudeCodeEditorPrompt(
     "- AskUserQuestion: call it with a `questions` array (each entry: question + options with label/description). Quack renders clickable buttons above the composer. NEVER paste numbered option lists in prose — if you skip the tool, the user has no UI to answer.",
     "- Presets (Jack, Milo, Nora, Vera, Lia, custom) all run in this same chat — they use AskUserQuestion directly.",
     "- SUBAGENTS (Agent/Task sidechains): inner steps are hidden from this stream; AskUserQuestion from a subagent does NOT show Quack's question UI. If a subagent needs a user choice, it must state the question + options in its final report — YOU (orchestrator) then call AskUserQuestion here.",
+    "- COST DISCIPLINE — do NOT fan out parallel Task/Explore subagents for routine exploration; each one is a full extra context that burns tokens. Investigate directly with Read/Grep/Glob for normal questions and edits. Spawn a subagent (and at most ONE at a time unless the user asked for breadth) ONLY when the task genuinely needs isolated or parallel research across large, independent areas.",
   ];
   if (planMode) {
     lines.splice(
