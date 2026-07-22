@@ -677,6 +677,7 @@ function InterleavedBlocksInner({
   streaming = false,
   hideEdits = false,
   onFileOpen,
+  onFileReveal,
   thinkingMs,
 }: {
   blocks: NonNullable<ChatMessage["blocks"]>;
@@ -690,6 +691,8 @@ function InterleavedBlocksInner({
   hideEdits?: boolean;
   /** Clickable `foo.html` / `bar.md` paths inside prose blocks. */
   onFileOpen?: (path: string) => void;
+  /** Right-click → Reveal in Finder / File Explorer. */
+  onFileReveal?: (path: string) => void;
   /** Client-measured thinking span for “Thought for…”. */
   thinkingMs?: number;
 }) {
@@ -704,6 +707,7 @@ function InterleavedBlocksInner({
       streaming={streaming}
       hideEdits={hideEdits}
       onFileOpen={onFileOpen}
+      onFileReveal={onFileReveal}
       thinkingMs={thinkingMs}
     />
   );
@@ -742,6 +746,7 @@ function CompactBlocks({
   streaming,
   hideEdits = false,
   onFileOpen,
+  onFileReveal,
   thinkingMs,
 }: {
   blocks: NonNullable<ChatMessage["blocks"]>;
@@ -751,6 +756,7 @@ function CompactBlocks({
   streaming: boolean;
   hideEdits?: boolean;
   onFileOpen?: (path: string) => void;
+  onFileReveal?: (path: string) => void;
   thinkingMs?: number;
 }) {
   const seen = new Set<string>();
@@ -808,6 +814,7 @@ function CompactBlocks({
               text={visible}
               streaming={isLiveTail}
               onFileOpen={onFileOpen}
+              onFileReveal={onFileReveal}
             />,
           );
         }

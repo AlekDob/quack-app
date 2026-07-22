@@ -2,9 +2,9 @@
 type: feature
 project: quack-desktop
 created: 2026-07-13
-last_verified: 2026-07-21
+last_verified: 2026-07-22
 status: active
-related: [054-works-layer.md, 063-surface-view-prefs.md, 065-works-drawer-ux.md, 068-quack-plan-harness.md, 041-mention-file-preview.md, 006-chat-file-link-wrong-workspace.md]
+related: [054-works-layer.md, 063-surface-view-prefs.md, 065-works-drawer-ux.md, 068-quack-plan-harness.md, 041-mention-file-preview.md, 006-chat-file-link-wrong-workspace.md, 049-markdown-renderer.md]
 tags: [works, brain, documentation, open-file, agent-mode, ux]
 ---
 
@@ -17,9 +17,10 @@ tags: [works, brain, documentation, open-file, agent-mode, ux]
 | Surface | Handler |
 |---|---|
 | Chat file link click (`AIChatPanel`) | `openWorkspaceDocPath` |
+| Chat file link right-click → Reveal | `resolveWorkspaceDocPath` + `revealItemInDir` |
 | `ComposerDocsChip` ref row | `openBrainRef` |
 | `WorksDocRefsSection` ref row | `openBrainRef` |
-| `FeatureDocDrawer` → link in preview | `openWorkspaceDocPath` |
+| `FeatureDocDrawer` → link in preview | `openWorkspaceDocPath` (+ Reveal via same resolve) |
 | Missing feature file in drawer | Inline empty state (no toast + close) |
 
 ## `openBrainRef` dispatch (by `BrainRef.role` + path)

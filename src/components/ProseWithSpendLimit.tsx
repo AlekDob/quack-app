@@ -10,19 +10,25 @@ interface ProseWithSpendLimitProps {
   text: string;
   streaming?: boolean;
   onFileOpen?: (path: string) => void;
+  onFileReveal?: (path: string) => void;
 }
 
 export function ProseWithSpendLimit({
   text,
   streaming = false,
   onFileOpen,
+  onFileReveal,
 }: ProseWithSpendLimitProps) {
   const hit = !streaming ? splitSpendLimitText(text) : null;
   if (!hit) {
     return streaming ? (
       <StreamingPlainText text={text} />
     ) : (
-      <MarkdownPreview content={balanceFences(text)} onFileOpen={onFileOpen} />
+      <MarkdownPreview
+        content={balanceFences(text)}
+        onFileOpen={onFileOpen}
+        onFileReveal={onFileReveal}
+      />
     );
   }
   return (
@@ -31,6 +37,7 @@ export function ProseWithSpendLimit({
         <MarkdownPreview
           content={balanceFences(hit.remainder)}
           onFileOpen={onFileOpen}
+          onFileReveal={onFileReveal}
         />
       ) : null}
       <SpendLimitCard raw={hit.limit} />

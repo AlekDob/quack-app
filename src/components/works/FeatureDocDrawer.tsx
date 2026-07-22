@@ -1,3 +1,4 @@
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useModalFocus } from "../../useModalFocus";
@@ -347,6 +348,19 @@ export function FeatureDocDrawer() {
                   onFileOpen={(path) => {
                     if (!req) return;
                     void openWorkspaceDocPath(req.wsId, req.root, path);
+                  }}
+                  onFileReveal={(path) => {
+                    if (!req) return;
+                    void resolveWorkspaceDocPath(req.root, path).then(
+                      async (abs) => {
+                        if (!abs) return;
+                        try {
+                          await revealItemInDir(abs);
+                        } catch {
+                          /* ignore */
+                        }
+                      },
+                    );
                   }}
                 />
               )}

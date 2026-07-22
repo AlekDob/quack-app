@@ -8,6 +8,11 @@ const OPENABLE_EXT =
 const BARE_FILE_RE =
   /(?:[\w.-]+\/)*[\w.-]+\.(?:html?|mdx?|mmd|tsx?|jsx?|css|json|rs|py|toml|ya?ml|svg|txt|pdf|vue|svelte|excalidraw)\b/gi;
 
+/** Absolute Unix paths (`/Users/…/foo.pdf`) — BARE_FILE_RE skips these
+ *  because a leading `/` looks like a mid-path segment boundary. */
+const ABS_UNIX_FILE_RE =
+  /\/(?:[\w.-]+\/)+[\w.-]+\.(?:html?|mdx?|mmd|tsx?|jsx?|css|json|rs|py|toml|ya?ml|svg|txt|pdf|vue|svelte|excalidraw)\b/gi;
+
 const autoOpened = new Set<string>();
 
 /** Strip `:42` / `:42:10` line refs agents append to paths. */
@@ -58,6 +63,27 @@ function wrapFileLink(path: string, innerHtml: string): string {
   return `<a class="md-file-link" href="#" data-file-link="${escapeAttr(path)}">${innerHtml}</a>`;
 }
 
+function linkifyAbsUnixPaths(text: string): string {
+  return text.replace(ABS_UNIX_FILE_RE, (match, offset, whole) => {
+    const before = whole[offset - 1] ?? "";
+    // Avoid gluing onto a preceding path/URL segment (`x/Users/…`).
+    if (before && /[\w.-]/.test(before)) return match;
+    if (!looksLikeOpenableFilePath(match)) return match;
+    return wrapFileLink(normalizeFileLinkPath(match), match);
+  });
+}
+
+function linkifyRelFilePaths(text: string): string {
+  return text.replace(BARE_FILE_RE, (match, offset, whole) => {
+    const before = whole[offset - 1] ?? "";
+    const after = whole[offset + match.length] ?? "";
+    if (before === "/" || before === ".") return match;
+    if (after === "/") return match;
+    if (!looksLikeOpenableFilePath(match)) return match;
+    return wrapFileLink(normalizeFileLinkPath(match), match);
+  });
+}
+
 function linkifyBareFilePaths(html: string): string {
   const parts = html.split(/(<[^>]+>)/g);
   let inAnchor = 0;
@@ -72,14 +98,8 @@ function linkifyBareFilePaths(html: string): string {
         return part;
       }
       if (inAnchor > 0 || inCode > 0) return part;
-      return part.replace(BARE_FILE_RE, (match, offset, whole) => {
-        const before = whole[offset - 1] ?? "";
-        const after = whole[offset + match.length] ?? "";
-        if (before === "/" || before === ".") return match;
-        if (after === "/") return match;
-        if (!looksLikeOpenableFilePath(match)) return match;
-        return wrapFileLink(normalizeFileLinkPath(match), match);
-      });
+      // Abs first so `/Users/…/a.pdf` isn't truncated to a relative tail.
+      return linkifyRelFilePaths(linkifyAbsUnixPaths(part));
     })
     .join("");
 }

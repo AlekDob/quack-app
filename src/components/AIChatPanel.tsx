@@ -35,7 +35,7 @@ import {
 import { clearAgentCommit, commitKey } from "../agentCommitStore";
 import { useWorkspaceChatContext } from "../workspaceChatContext";
 import { isUnderRoot } from "../pathUtils";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -6257,6 +6257,20 @@ export function AIChatPanel({
     [wsId, root],
   );
 
+  const revealChatFile = useCallback(
+    (path: string) => {
+      void resolveWorkspaceDocPath(root, path).then(async (abs) => {
+        if (!abs) return;
+        try {
+          await revealItemInDir(abs);
+        } catch {
+          /* ignore — missing file / opener denied */
+        }
+      });
+    },
+    [root],
+  );
+
   // Format a resetsAt ISO timestamp into a human-friendly countdown
   // (e.g. "2h 14m", "35m", "4d"). Used by SessionUsageCircle.
   const fmtResetsIn = (resetsAt: string | null): string => {
@@ -6624,6 +6638,7 @@ export function AIChatPanel({
                     blocks={m.blocks}
                     hideEdits={showComposeCard}
                     onFileOpen={openChatFile}
+                    onFileReveal={revealChatFile}
                     thinkingMs={m.thinkingMs}
                     // Memoized, stable-ref lookup maps (chatRowDerive) so
                     // memo(InterleavedBlocks) can bail out for committed rows
@@ -6639,6 +6654,7 @@ export function AIChatPanel({
                       text={visibleContent}
                       streaming={isStreamingThis}
                       onFileOpen={openChatFile}
+                      onFileReveal={revealChatFile}
                     />
                     {shouldCollapse && (
                       <button

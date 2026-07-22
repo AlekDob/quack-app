@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-10
-last_verified: 2026-07-21
+last_verified: 2026-07-22
 tags: [markdown, md-preview, copy, code-block, chat, shell, syntax, cursor-style]
 ---
 
@@ -15,8 +15,8 @@ tags: [markdown, md-preview, copy, code-block, chat, shell, syntax, cursor-style
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Service | `src/markdown.ts` | `renderMarkdown(md) → HTML`, `tokenize`, `Block` type; fenced blocks via `renderCodeBlock` |
-| Component | `src/components/MarkdownPreview.tsx` | Renders HTML; copy + file-link clicks; optional editor scroll-sync (`interactive`) |
-| Service | `src/chatFileLinks.ts` | `enrichMarkdownWithFileLinks` — workspace paths → clickable pills when `onFileOpen` set |
+| Component | `src/components/MarkdownPreview.tsx` | Renders HTML; copy + file-link clicks; right-click Open / Reveal in Finder / Copy Path; optional editor scroll-sync (`interactive`) |
+| Service | `src/chatFileLinks.ts` | `enrichMarkdownWithFileLinks` — workspace + absolute Unix paths → clickable pills when `onFileOpen` set |
 | Config | `src/App.css` | `.md-preview`, `.md-code-block*`, `.md-tok-cmd` / `.md-tok-arg`; chat overrides under `.ai-msg-body .md-preview` |
 
 ### Surfaces (who mounts `MarkdownPreview`)
@@ -39,8 +39,11 @@ Markdown string
   → MarkdownPreview dangerouslySetInnerHTML
   → delegated click:
        [data-md-copy]  → clipboard.writeText(code.textContent)
-       [data-file-link] → onFileOpen(path)
+       [data-file-link] / file-like href → onFileOpen(path)
        [data-source-line] → setEditorGoto (interactive only)
+  → delegated contextmenu (when onFileOpen / onFileReveal):
+       Open · Reveal in Finder/Explorer · Copy Path
+       (replaces native WKWebView link menu)
 ```
 
 ### Markdown subset supported
