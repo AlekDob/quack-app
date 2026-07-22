@@ -1116,8 +1116,18 @@ pub struct ClaudeSession {
 /// List all Claude Code sessions persisted on disk for the given
 /// workspace cwd. Reads `~/.claude/projects/<encoded-cwd>/*.jsonl`
 /// and extracts a summary of each. Sorted newest-first.
+///
+/// Async wrapper: parsing every `.jsonl` in the project dir (can be hundreds
+/// of files, tens of MB) on the main thread stalled the sessions picker.
+/// Runs off-thread — same pattern as `git.rs::off_thread` / feature 019.
 #[tauri::command]
-pub fn claude_code_list_sessions(cwd: String) -> Result<Vec<ClaudeSession>, String> {
+pub async fn claude_code_list_sessions(cwd: String) -> Result<Vec<ClaudeSession>, String> {
+    tauri::async_runtime::spawn_blocking(move || claude_code_list_sessions_blocking(cwd))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn claude_code_list_sessions_blocking(cwd: String) -> Result<Vec<ClaudeSession>, String> {
     use std::fs;
     use std::time::SystemTime;
 
@@ -1275,20 +1285,25 @@ pub struct SessionContextUsage {
 }
 
 /// Read the latest context-window fill for a Claude Code session from disk.
+/// Off-thread: full-file parse must not run on the main thread (resume/hydrate).
 #[tauri::command]
-pub fn claude_session_context_usage(
+pub async fn claude_session_context_usage(
     cwd: String,
     session_id: String,
 ) -> Result<Option<SessionContextUsage>, String> {
-    let path = crate::session_jsonl::claude_jsonl_path(&cwd, &session_id);
-    if !path.exists() {
-        return Ok(None);
-    }
-    Ok(crate::session_jsonl::last_context_snap(&path).map(|s| SessionContextUsage {
-        input_tokens: s.input_tokens,
-        cache_read_tokens: s.cache_read_tokens,
-        cache_creation_tokens: s.cache_creation_tokens,
-    }))
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = crate::session_jsonl::claude_jsonl_path(&cwd, &session_id);
+        if !path.exists() {
+            return Ok(None);
+        }
+        Ok(crate::session_jsonl::last_context_snap(&path).map(|s| SessionContextUsage {
+            input_tokens: s.input_tokens,
+            cache_read_tokens: s.cache_read_tokens,
+            cache_creation_tokens: s.cache_creation_tokens,
+        }))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Reconstruct the full message history of a saved Claude Code
@@ -1296,22 +1311,28 @@ pub fn claude_session_context_usage(
 /// assistant message they belong to, and matches tool_result blocks
 /// to that same assistant message via tool_use_id (so the chat UI
 /// can render results inline beneath their calls).
+/// Off-thread: reconstructing a full history parses the whole JSONL — a big
+/// session used to stall the UI on resume/hydrate.
 #[tauri::command]
-pub fn claude_code_load_session(
+pub async fn claude_code_load_session(
     cwd: String,
     session_id: String,
 ) -> Result<Vec<LoadedMessage>, String> {
-    let home = dirs::home_dir().ok_or_else(|| "no home dir".to_string())?;
-    let encoded = encode_project_path(&cwd);
-    let path = home
-        .join(".claude")
-        .join("projects")
-        .join(&encoded)
-        .join(format!("{}.jsonl", session_id));
-    if !path.exists() {
-        return Err(format!("session {} not found at {:?}", session_id, path));
-    }
-    parse_session_jsonl(&path)
+    tauri::async_runtime::spawn_blocking(move || {
+        let home = dirs::home_dir().ok_or_else(|| "no home dir".to_string())?;
+        let encoded = encode_project_path(&cwd);
+        let path = home
+            .join(".claude")
+            .join("projects")
+            .join(&encoded)
+            .join(format!("{}.jsonl", session_id));
+        if !path.exists() {
+            return Err(format!("session {} not found at {:?}", session_id, path));
+        }
+        parse_session_jsonl(&path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Result of loading one subagent's full transcript from disk. `agent_type`
@@ -1329,8 +1350,22 @@ pub struct LoadedSubagent {
 /// toolUseId}`. We locate the meta whose `toolUseId` matches the parent
 /// Task tool-call, then parse its jsonl with the same reader as the main
 /// session.
+/// Off-thread: parses the subagent JSONL (full transcript) — kept off the
+/// main thread like its sibling loaders.
 #[tauri::command]
-pub fn claude_code_load_subagent(
+pub async fn claude_code_load_subagent(
+    cwd: String,
+    session_id: String,
+    tool_use_id: String,
+) -> Result<LoadedSubagent, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        claude_code_load_subagent_blocking(cwd, session_id, tool_use_id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn claude_code_load_subagent_blocking(
     cwd: String,
     session_id: String,
     tool_use_id: String,

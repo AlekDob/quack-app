@@ -17,9 +17,19 @@ pub struct DirEntry {
 const MAX_READ_BYTES: u64 = 8 * 1024 * 1024; // 8 MiB
 const BINARY_PROBE_BYTES: usize = 8 * 1024;
 
+// list_dir does a read_dir + a metadata() stat syscall PER entry + a sort.
+// On the main thread (Tauri dispatches non-async commands there) a directory
+// with thousands of children stalls the UI — and this is the hot file-tree
+// call (expand, auto-reveal). Run it off-thread. Same pattern as git.rs.
 #[tauri::command]
-pub fn list_dir(path: String) -> Result<Vec<DirEntry>, String> {
-    let p = Path::new(&path);
+pub async fn list_dir(path: String) -> Result<Vec<DirEntry>, String> {
+    tauri::async_runtime::spawn_blocking(move || list_dir_blocking(&path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn list_dir_blocking(path: &str) -> Result<Vec<DirEntry>, String> {
+    let p = Path::new(path);
     let mut out = Vec::new();
     let read = std::fs::read_dir(p).map_err(|e| e.to_string())?;
     for entry in read.flatten() {
@@ -222,9 +232,17 @@ pub fn save_persistent_image(
 /// the chat zoom modal AND by the in-tab media preview (MediaPreviewPane).
 /// Keeps base64 OUT of localStorage — callers ask for full quality on
 /// demand. Mime is derived from the extension (good enough for previews).
+// Reads the whole binary + base64-encodes it — a large PDF/image visibly
+// froze the window on the main thread. Off-thread via spawn_blocking.
 #[tauri::command]
-pub fn read_image_data_url(path: String) -> Result<String, String> {
-    let p = Path::new(&path);
+pub async fn read_image_data_url(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || read_image_data_url_blocking(&path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn read_image_data_url_blocking(path: &str) -> Result<String, String> {
+    let p = Path::new(path);
     let bytes = std::fs::read(p).map_err(|e| e.to_string())?;
     let mime = match p
         .extension()

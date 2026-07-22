@@ -167,6 +167,18 @@ pub fn summarise_jsonl(path: &Path) -> Option<UsageSession> {
         .unwrap_or(0);
 
     let content = fs::read_to_string(path).ok()?;
+    summarise_jsonl_str(&content, modified_ms, path)
+}
+
+/// Same as `summarise_jsonl` but over already-read content — lets the drawer
+/// stats command read the (possibly large) JSONL ONCE and derive both the
+/// summary and the last-context snapshot from a single read. `path` is still
+/// needed to derive the project label + session id (from the file location).
+pub fn summarise_jsonl_str(
+    content: &str,
+    modified_ms: u64,
+    path: &Path,
+) -> Option<UsageSession> {
     if content.is_empty() {
         return None;
     }
@@ -869,8 +881,25 @@ pub struct TurnChunk {
 /// Walk the session JSONL and return turns[offset .. offset+limit].
 /// `limit=0` returns only the metadata (counts) — used by the pane to
 /// show the header before any scroll happens.
+///
+/// Off-thread: this reads + parses the WHOLE JSONL per page fetch. On the
+/// main thread the transcript viewer got slower the deeper you scrolled.
+/// Same pattern as `git.rs::off_thread`.
 #[tauri::command]
-pub fn claude_session_load_turns(
+pub async fn claude_session_load_turns(
+    project: String,
+    session_id: String,
+    offset: usize,
+    limit: usize,
+) -> Result<TurnChunk, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        claude_session_load_turns_blocking(project, session_id, offset, limit)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn claude_session_load_turns_blocking(
     project: String,
     session_id: String,
     offset: usize,
@@ -1161,17 +1190,42 @@ pub struct SessionDrawerStats {
     pub last_ts_ms: u64,
 }
 
+/// Off-thread + single read: this is polled every 12s per visible CC chat.
+/// It used to run on the main thread AND read the whole file twice
+/// (summarise forward + context snap reverse). Now one `spawn_blocking`, one
+/// `read_to_string`, both passes over the same content.
 #[tauri::command]
-pub fn claude_session_drawer_stats(
+pub async fn claude_session_drawer_stats(
     cwd: String,
     session_id: String,
 ) -> Result<Option<SessionDrawerStats>, String> {
-    let path = crate::session_jsonl::claude_jsonl_path(&cwd, &session_id);
-    if !path.exists() {
+    tauri::async_runtime::spawn_blocking(move || {
+        claude_session_drawer_stats_blocking(&cwd, &session_id)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+fn claude_session_drawer_stats_blocking(
+    cwd: &str,
+    session_id: &str,
+) -> Result<Option<SessionDrawerStats>, String> {
+    let path = crate::session_jsonl::claude_jsonl_path(cwd, session_id);
+    let Ok(meta) = std::fs::metadata(&path) else {
         return Ok(None);
-    }
-    let summary = summarise_jsonl(&path);
-    let context = crate::session_jsonl::last_context_snap(&path);
+    };
+    let modified_ms = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0);
+    let Ok(content) = std::fs::read_to_string(&path) else {
+        return Ok(None);
+    };
+    // One read → both derivations (forward summary + reverse context snap).
+    let summary = summarise_jsonl_str(&content, modified_ms, &path);
+    let context = crate::session_jsonl::last_context_snap_str(&content);
     let Some(s) = summary else {
         return Ok(None);
     };

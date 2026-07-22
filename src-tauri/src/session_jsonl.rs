@@ -286,6 +286,12 @@ fn usage_snap_from_value(u: &serde_json::Value) -> SessionContextSnap {
 /// Walk JSONL backwards — prefer latest non-subagent `assistant` usage.
 pub fn last_context_snap(path: &Path) -> Option<SessionContextSnap> {
     let content = std::fs::read_to_string(path).ok()?;
+    last_context_snap_str(&content)
+}
+
+/// Same as `last_context_snap` but over already-read content — lets callers
+/// that also need `summarise_jsonl` read the (possibly large) file ONCE.
+pub fn last_context_snap_str(content: &str) -> Option<SessionContextSnap> {
     let mut result_snap: Option<SessionContextSnap> = None;
     for line in content.lines().rev() {
         let v: serde_json::Value = match serde_json::from_str(line) {

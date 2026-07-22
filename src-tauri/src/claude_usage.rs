@@ -228,8 +228,19 @@ fn has_non_oauth_cli_auth(cred: &Value) -> bool {
 /// Lightweight auth probe — reads local credentials only (no usage API).
 /// Returns `{ status, reason?, subscriptionType? }` where status is one of
 /// `signed_in`, `signed_out`, or `needs_login`.
+///
+/// Async wrapper: the body spawns the `security` keychain subprocess and may
+/// refresh the OAuth token over HTTP (blocking `ureq`). Tauri runs non-async
+/// commands on the MAIN thread, so this used to freeze the whole window on a
+/// slow/offline network. Same pattern as `git.rs::off_thread`.
 #[tauri::command]
-pub fn claude_auth_status() -> Result<Value, String> {
+pub async fn claude_auth_status() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(claude_auth_status_blocking)
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn claude_auth_status_blocking() -> Result<Value, String> {
     let home = user_home()?;
     let (mut cred, store) = match load_credentials(&home) {
         Ok(pair) => pair,
@@ -290,8 +301,19 @@ pub fn claude_auth_status() -> Result<Value, String> {
 }
 
 /// Returns `{ usage, profile, subscriptionType, rateLimitTier }`.
+///
+/// Async wrapper: the body makes sequential blocking HTTP calls (usage +
+/// profile, plus a possible token refresh — each with a 10s timeout). On the
+/// main thread that froze the UI for up to ~30s per poll when offline. Runs
+/// off-thread via `spawn_blocking` (ureq stays sync).
 #[tauri::command]
-pub fn claude_usage_limits() -> Result<Value, String> {
+pub async fn claude_usage_limits() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(claude_usage_limits_blocking)
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn claude_usage_limits_blocking() -> Result<Value, String> {
     let home = user_home()?;
     let (token, oauth) = resolve_access_token(&home)?;
     let usage = oauth_get(USAGE_URL, &token)?;
