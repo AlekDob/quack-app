@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-05
-last_verified: 2026-07-20
+last_verified: 2026-07-22
 tags: [chat, composer, queue, ux, multitasking, bugfix, presets]
 ---
 
@@ -209,6 +209,37 @@ follow-ups would be lost on switch.
 - Permission cards stack above queue in the same order slot: `015-claude-permission-mode.md`
 - New chat tab creation: `store.addAIChat` / `001-ai-session-library.md`
 - Per-session persistence: `040-per-session-composer-state.md`
+
+### Stale-snapshot overwrite on rapid drain (2026-07-22)
+
+**Trigger:** queue 2+ follow-ups back-to-back (e.g. "considera che uso ai
+coding" then "bruttolan lo fanno loro direttamente manualmente" while a turn
+is running). Some drained messages never appear in the rendered transcript,
+even though the agent's reply clearly reflects their content.
+
+**Root cause:** `sendUserText` (`AIChatPanel.tsx`) takes `baseMessages` as a
+plain snapshot parameter (default `= messages`), then `await`s several async
+steps (Brain lookup, workspace-rules load, system-prompt assembly) before
+committing:
+
+```ts
+setMessages([...baseMessages, displayUserMsg]);   // was a plain replace
+```
+
+Because `baseMessages` is captured **before** those awaits, any state commit
+that lands in that window — typically another drained queue item finishing
+first — gets silently clobbered by this later, stale `[...baseMessages, ...]`
+replace. The model still sees the correct `conversation` array (built fresh
+from `baseMessages + sentUserMsg` independently of React state), so the
+agent's reply is correct even though a message vanished from the UI.
+
+**Fix:** commit with a functional updater instead of spreading the stale
+snapshot — `setMessages((prev) => [...prev, displayUserMsg])` — so every
+commit is additive onto whatever is currently in state, not a replace of an
+outdated snapshot.
+
+**Do not** revert this to `setMessages([...baseMessages, displayUserMsg])`;
+that reintroduces the drop under rapid-fire queue drains.
 
 ## Gotchas
 

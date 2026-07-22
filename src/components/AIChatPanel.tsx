@@ -4062,7 +4062,12 @@ export function AIChatPanel({
     pinActiveRef.current = true;
     stickyBottomRef.current = false;
     flushSync(() => {
-      setMessages([...baseMessages, displayUserMsg]);
+      // Functional update: `baseMessages` is a snapshot captured before the
+      // awaits above (Brain lookup, system-prompt assembly). If another
+      // drained queue item committed its own message in that window, a
+      // plain `[...baseMessages, displayUserMsg]` would silently overwrite
+      // it. Appending to `prev` instead keeps every commit additive.
+      setMessages((prev) => [...prev, displayUserMsg]);
       setStreaming("");
     });
     const scroller = scrollRef.current;
