@@ -670,7 +670,7 @@ export function RunningToolRow({
  * messages with no recorded blocks log (older sessions, non-agentic
  * providers) — the parent picks the legacy renderer in that case.
  */
-export function InterleavedBlocks({
+function InterleavedBlocksInner({
   blocks,
   callsById,
   resultsById,
@@ -709,6 +709,13 @@ export function InterleavedBlocks({
     />
   );
 }
+
+// Memoized: the row derivation (chatRowDerive) now passes stable-ref lookup
+// maps + booleans, so a committed assistant row's InterleavedBlocks bails out
+// instead of re-walking its blocks on every streaming frame. The streaming
+// row (streaming=true, growing blocks) still re-renders as before.
+export const InterleavedBlocks = memo(InterleavedBlocksInner);
+
 // Foldable extended-thinking — Cursor-style chip (see BrainTurnChip).
 function ThinkingBlock({
   text,

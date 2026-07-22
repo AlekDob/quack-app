@@ -75,13 +75,11 @@ import { setPermMode } from "../permModeStore";
 import {
   balanceFences,
   cleanStaleToolMessages,
-  extractCodeBlocks,
-  extractTaggedCodeBlocks,
-  isShellLang,
   parseInlineToolCalls,
   pickPriorityFiles,
   splitThinking,
 } from "../chatTextUtils";
+import { deriveRow, deriveToolMaps } from "../chatRowDerive";
 import { executeTool, TOOLS } from "../aiTools";
 import { SLASH_COMMANDS, type SlashCommand } from "../slashCommands";
 import {
@@ -193,11 +191,7 @@ import {
 } from "../featureCatalog";
 import { fuzzyMatch } from "../fuzzyMatch";
 import { ComposerFeaturePill } from "./ComposerFeaturePill";
-import {
-  formatOpenItemsIndex,
-  parseWorksNewStoryBlock,
-  stripWorksDirectiveBlocks,
-} from "../worksAgentDirectives";
+import { formatOpenItemsIndex } from "../worksAgentDirectives";
 import {
   getWorksSnapshot,
   hydrateWorks,
@@ -214,10 +208,6 @@ import { TurnWorkedHeader } from "./TurnWorkedHeader";
 import { BrainSaveChip } from "./BrainSaveChip";
 import { WorksStoryChip } from "./WorksStoryChip";
 import { SkillProposalChip } from "./SkillProposalChip";
-import {
-  parseBrainSaveProposal,
-  stripBrainSaveBlocks,
-} from "../brainSave";
 import { quackAgentCorePrompt, quackClaudeCodeEditorPrompt } from "../brainPrompt";
 import {
   isClaudeCodeBareSlash,
@@ -6416,27 +6406,23 @@ export function AIChatPanel({
           const m = display[i];
           const isAssistant = m.role === "assistant";
           const isStreamingThis = isAssistant && i === display.length - 1 && streaming !== null;
-          const bodyForRender = isAssistant
-            ? stripWorksDirectiveBlocks(stripBrainSaveBlocks(m.content))
-            : m.content;
+          // Heavy text derivation (regex/parse) is memoized per message
+          // (chatRowDerive) so it does not re-run for every committed row on
+          // each streaming frame. Same values as before — just cached.
+          const d = isAssistant ? deriveRow(m) : null;
+          const toolMaps = deriveToolMaps(m);
+          const bodyForRender = d ? d.bodyForRender : m.content;
           const brainProposal =
             isAssistant && !isStreamingThis
-              ? (m.brain_save ?? parseBrainSaveProposal(m.content))
+              ? (m.brain_save ?? d!.brainProposalParsed)
               : null;
           const worksNewStory =
-            isAssistant && !isStreamingThis
-              ? parseWorksNewStoryBlock(m.content)
-              : null;
-          const blocks = isAssistant ? extractCodeBlocks(bodyForRender) : [];
-          const insertText = blocks.length > 0 ? blocks.join("\n\n") : bodyForRender;
-          const taggedBlocks = isAssistant
-            ? extractTaggedCodeBlocks(bodyForRender)
-            : [];
-          const shellBlocks = taggedBlocks.filter((b) => isShellLang(b.lang));
-          const shellText = shellBlocks.map((b) => b.code).join("\n");
-          const split = isAssistant
-            ? splitThinking(bodyForRender)
-            : { thinking: "", visible: m.content };
+            isAssistant && !isStreamingThis ? d!.worksNewStoryParsed : null;
+          const blocks = d ? d.blocks : [];
+          const insertText = d ? d.insertText : bodyForRender;
+          const shellBlocks = d ? d.shellBlocks : [];
+          const shellText = d ? d.shellText : "";
+          const split = d ? d.split : { thinking: "", visible: m.content };
           const showThinking =
             isStreamingThis && m.content.length === 0 && !m.tool_calls;
           // Collapse long, older assistant messages by default. Keep the most
@@ -6635,30 +6621,12 @@ export function AIChatPanel({
                     hideEdits={showComposeCard}
                     onFileOpen={openChatFile}
                     thinkingMs={m.thinkingMs}
-                    callsById={
-                      new Map(
-                        (m.tool_calls ?? [])
-                          .filter((c): c is ToolCall & { id: string } =>
-                            typeof c.id === "string",
-                          )
-                          .map((c) => [c.id, c]),
-                      )
-                    }
-                    resultsById={(() => {
-                      const out = new Map<string, string>();
-                      for (const tr of m.tool_results ?? []) {
-                        if (tr.tool_use_id) out.set(tr.tool_use_id, tr.content);
-                      }
-                      return out;
-                    })()}
-                    erroredIds={(() => {
-                      const out = new Set<string>();
-                      for (const tr of m.tool_results ?? []) {
-                        if (tr.tool_use_id && tr.is_error)
-                          out.add(tr.tool_use_id);
-                      }
-                      return out;
-                    })()}
+                    // Memoized, stable-ref lookup maps (chatRowDerive) so
+                    // memo(InterleavedBlocks) can bail out for committed rows
+                    // instead of rebuilding these three every frame.
+                    callsById={toolMaps.callsById}
+                    resultsById={toolMaps.resultsById}
+                    erroredIds={toolMaps.erroredIds}
                     streaming={isStreamingThis}
                   />
                 ) : isAssistant ? (

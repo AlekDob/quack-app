@@ -63,9 +63,22 @@ orthogonal to the Monaco DOM-move gotcha (012): it does not move DOM nodes.
 | Change | File |
 |---|---|
 | `tokensPerSec` / `lastStreamEventAt`: state → **ref** | `AIChatPanel.tsx` |
+| Per-message memoized row derivation | new `chatRowDerive.ts` |
+| `memo(InterleavedBlocks)` | `chatToolRender.tsx` |
 
-As state they fired a full render PER content delta, defeating the 069 rAF
-painter. `TurnStreamStatus` reads them on the existing 1-Hz `nowTick`.
+- **Refs:** as state they fired a full render PER content delta, defeating the
+  069 rAF painter. `TurnStreamStatus` reads them on the existing 1-Hz `nowTick`.
+- **`deriveRow(m)` / `deriveToolMaps(m)`** (`chatRowDerive.ts`): the row renderer
+  ran a batch of regex/parse passes (strip brain-save + works blocks, extract
+  code + tagged blocks, split `<think>`, parse proposals) AND rebuilt three
+  lookup Maps for EVERY windowed message on every streaming frame. Both are now
+  memoized by message-object identity + content (WeakMap) → O(1) per frame (only
+  the still-growing streaming message recomputes); committed rows hit the cache.
+  Pure memo layer — same values, cached, so behavior is unchanged.
+- **`memo(InterleavedBlocks)`**: with the stable-ref maps above, a committed
+  assistant row's block subtree bails out instead of re-walking its blocks each
+  frame. The streaming row (`streaming=true`, growing blocks) still re-renders.
+- Vitest: `chatRowDerive.test.ts` (7 cases — cache identity + map building).
 
 ### Phase 4 — Fan-out re-renders + idle drains
 
@@ -84,9 +97,14 @@ gives the bail-out without a store-signature change (safer vs concurrent WIP).
 
 | Item | Why deferred |
 |---|---|
-| Extract `renderAt` → `memo(ChatRow)` + memoized lookup maps + `memo(InterleavedBlocks)` | Biggest streaming win, but a delicate refactor of the 8k-line hot file (`AIChatPanel.tsx`); needs React Profiler in the running app. All of items 1/2/4/5 of the streaming analysis hinge on this one extraction. |
 | Cap `StreamBuffer.lines` (ring/byte budget or drop-on-attach) | Feeds live re-attach replay (`claude_code.rs`); a naive cap risks a gap in a long single turn after refresh — needs attach-flow study. |
 | Keyed `agentStatusStore.notify(chatId)` + scope WorkspaceShell/AgentModeShell ticks | Marginal after the `useSyncExternalStore` fix; touches files under active WIP. |
+
+> **Done since first draft:** the per-frame regex/map cost (originally deferred as
+> "extract `renderAt` → memo") was instead solved with a WeakMap memo layer
+> (`chatRowDerive`) + `memo(InterleavedBlocks)` — same win, far less risk than
+> threading ~20 props out of the 8k-line closure. Confirm the render-count drop
+> with the React Profiler / Perf Audit in the running app.
 
 ### Verification
 
