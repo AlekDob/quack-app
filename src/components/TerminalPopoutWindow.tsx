@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { emit } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { TerminalCore } from "./TerminalCore";
+import { TerminalCore } from "./lazyHeavy";
 import { bootstrapTheme } from "../theme";
 import { setEditorSettings } from "../editorSettings";
 import { pty } from "../ipc";

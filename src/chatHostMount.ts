@@ -2,6 +2,10 @@
  * Chat host mount policy: only the visible chat + hidden runs that are
  * actually streaming / waiting on input stay mounted. Idle live tabs and
  * DONE/archived unload to keep New chat and switches fast.
+ *
+ * Sticky live hosts also survive **cross-project** switch (Agent Mode mounts
+ * working chats from every open workspace; IDE drops the `isActive` gate for
+ * sticky only) — see bug `007` / feature `043`.
  */
 
 import { useEffect, useState } from "react";

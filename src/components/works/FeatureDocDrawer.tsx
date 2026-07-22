@@ -16,7 +16,7 @@ import {
 } from "../../featureDocDrawer";
 import { Icon } from "../Icon";
 import { MarkdownPreview } from "../MarkdownPreview";
-import { SimpleMonacoEditor } from "../SimpleMonacoEditor";
+import { SimpleMonacoEditor } from "../lazyHeavy";
 import { useResizableWorkDrawerWidth } from "../../useResizableWorkDrawerWidth";
 import {
   featureDocPreviewBody,

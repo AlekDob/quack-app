@@ -91,3 +91,19 @@ export function newAgentTerminal(wsId: string): void {
 export function focusAgentPlan(wsId: string): void {
   setAgentContextPanel(wsId, "plan");
 }
+
+/** Show Files in the Agent Mode context column (Explorer substitute). */
+export function focusAgentFiles(wsId: string): void {
+  setAgentContextPanel(wsId, "files");
+}
+
+/** Show Changes in the Agent Mode context column (Source Control substitute). */
+export function focusAgentChanges(wsId: string): void {
+  setAgentContextPanel(wsId, "changes");
+}
+
+/** Toggle Files ↔ Changes — Agent Mode stand-in for Toggle Sidebar. */
+export function toggleAgentFiles(wsId: string): void {
+  const panel = getAgentContextPanel(wsId);
+  setAgentContextPanel(wsId, panel === "files" ? "changes" : "files");
+}

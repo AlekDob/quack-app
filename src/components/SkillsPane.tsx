@@ -9,7 +9,7 @@ import { prompt as dialogPrompt } from "../dialog";
 import { error as toastError, errMsg } from "../notify";
 import { fuzzyMatch, normalizeFilterQuery } from "../fuzzyMatch";
 import { Icon } from "./Icon";
-import { FileEditorPane } from "./FileEditorPane";
+import { FileEditorPane } from "./lazyHeavy";
 
 interface Props {
   root: string;

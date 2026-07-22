@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { EditorPane } from "./EditorPane";
+import { EditorPane } from "./lazyHeavy";
 import { MediaPreviewPane } from "./MediaPreviewPane";
 import { SessionTranscriptPane } from "./SessionTranscriptPane";
 import { SubagentTranscriptView } from "./SubagentTranscriptView";

@@ -180,42 +180,45 @@ cache → `loadSessions` returns `[]` → empty transcripts, and the next
 no cost when the workspace was already warmed at boot. Opening a cold (DONE)
 chat still needs `ensureSessionLoaded` in `AIChatPanel` (`076`).
 
-## Project switch ↔ transcript durability (2026-07-17)
+## Project switch ↔ transcript durability (2026-07-17, sticky hosts 2026-07-21)
 
-Leaving a project **unmounts every** `AIChatHost` (`WorkspaceShell`:
-`{isActive && Object.values(ws.aiChats).map(...)}`). That teardown used to
-shrink or wipe on-disk transcripts.
+Leaving a project used to **unmount every** `AIChatHost`. Idle hosts still
+unload; **`working` / `needs-input` stay sticky** across the switch (IDE
+`WorkspaceShell` + Agent Mode cross-`openIds` mounts) so the stream consumer
+is not orphaned. Flush + never-shrink remain the disk backstop; attach replay
+upgrades thin checkpoints (`chatAttachReplay.ts`, bug `007`).
 
 | Step | What runs | Failure mode (before) | Fix |
 |---|---|---|---|
 | 1. Leave project | `setActiveWorkspace` | No flush before `isActive` flip | `flushWorkspaceChatPersist` + `awaitChatDiskFlushes(prevId)` **before** `set({ activeId })` |
-| 2. Host unmount | `useLayoutEffect` → `mergeComposerDraft` / knobs | `patchSession` invented `{ messages: [] }` when RAM body missing | `patchSession` refuses empty invent; never shrinks `messages` |
-| 3. Persist | `putCachedSession` / `chat_store_save` | Thin overwrite of rich row | `preferRicherSession` in cache + disk queue |
-| 4. After flip | — | Remount reused thin RAM cache | `dropAllCachedBodies(prevId)` after switch |
-| 5. Remount hydrate | `ensureSessionLoaded` | Cache hit skipped disk after thin RAM | Project leave: `dropAllCachedBodies(prev)` then load. Panel hydrate: **use RAM when present; never force-drop empty new chats** (`085`/`087`) — `addAIChat` seeds `messages: []` so empty sessions skip `chat_store_load` miss |
+| 2. Host unmount | Idle hosts only; sticky live stay | `patchSession` invented `{ messages: [] }` when RAM body missing | Sticky mount + `patchSession` refuses empty invent; never shrinks `messages` |
+| 3. Persist | `putCachedSession` / `chat_store_save` | Thin overwrite of rich row | `preferRicherSession` (count + last-assistant length) in cache + disk queue |
+| 4. After flip | — | Remount reused thin RAM cache | `dropAllCachedBodies(prevId)` after switch (sticky hosts keep their own RAM) |
+| 5. Remount hydrate | `ensureSessionLoaded` / attach | Cache hit skipped disk; attach skipped when last=assistant | Disk load when cold; attach compares buffer vs checkpoint (`shouldSkipEndedAttachReplay`) |
 
 ```
 ActivityBar / hub → setActiveWorkspace(next)
   → flushWorkspaceChatPersist(prev) → awaitChatDiskFlushes(prev)
   → set activeId=next → dropAllCachedBodies(prev)
-  → (prev hosts unmount; next hosts mount)
+  → sticky working hosts stay mounted (hidden); idle hosts unmount
   → ensureSessionLoaded(..., { force: !richCache }) → disk only when cold
   → needsProviderHydration? recoverSessionFromAnyProvider (044)
 ```
 
 | API | Role |
 |---|---|
-| `preferRicherSession(prev, next)` | Keep longer `messages`; `preferSessionTitle` keeps real titles over `Untitled`; merge `providerSessionIds` so thin remounts cannot wipe CLI `--resume` links (`044`) |
+| `preferRicherSession(prev, next)` | Keep longer `messages`; at equal count keep longer last-assistant `content`; `preferSessionTitle` keeps real titles over `Untitled`; merge `providerSessionIds` so thin remounts cannot wipe CLI `--resume` links (`044`) |
 | `preferSessionTitle(prev, next)` | Never let empty/`Untitled` wipe a good session title |
+| `shouldSkipEndedAttachReplay` / `attachBufferAssistantChars` | Attach skips only when Quack assistant ≥ buffer text; else strip thin checkpoint and replay |
 | `awaitChatDiskFlushes(wsId?)` | Spin until coalesce queue idle for ws |
 | `dropAllCachedBodies(wsId)` | Clear warm bodies; keep `__idx__` ids |
 | `ensureSessionLoaded(wsId, id, { force })` | Optional drop-then-disk; prefer RAM hit. **Do not** force solely because `messages.length === 0` (new chat has no file yet — `087`) |
 
-Tests: `src/chatStoreCache.test.ts` (`npm test`).
+Tests: `src/chatStoreCache.test.ts`, `src/chatAttachReplay.test.ts` (`npm test`).
 
-Cross-refs: warm Monaco LRU still in `058` (editors); chat hosts stay
-`isActive`-gated (not warm) — that asymmetry is why this flush path exists.
-**Agent Mode ↔ IDE** remounts panels without `dropAllCachedBodies` — see `085`
+Cross-refs: warm Monaco LRU still in `058` (editors); sticky live chat hosts
+cross-project (not a full warm-LRU of idle chats). **Agent Mode ↔ IDE**
+remounts panels without `dropAllCachedBodies` — see `085`
 (skip `force` when a rich body is already in RAM). **`setAgentMode` must
 flush+await** before the layout flip (same durability as project switch);
 selection survives remount via `agentModeSelection.ts`.
@@ -231,10 +234,9 @@ selection survives remount via `agentModeSelection.ts`.
   `chat_store_save`. Fixed `.codetta-tmp` sibling caused ENOENT on the second rename
   ("Chat not saved" toast) and truncated rows. Fix: unique tmp tags in `atomic.rs`,
   `SAVE_LOCK` in `chat_store_save`, frontend coalesce in `persistSession`.
-- **Project switch shrink** — see section above; never reintroduce empty `patchSession` invent.
+- **Project switch shrink / stream orphan** — see section above + bug `007`; sticky live hosts; never reintroduce empty `patchSession` invent or blind attach skip.
 - **Agent↔IDE without flush** — used to thin transcripts / wipe titles; fixed in `085` / bug `002`.
-- **Agent Mode** mounts one `AIChatPanel` per **live** (or currently visible DONE)
-  chat; DONE hosts unload when hidden (`076`).
+- **Agent Mode** mounts sticky `working`/`needs-input` hosts from **all open workspaces**; DONE hosts unload when hidden (`076`).
 - **Vite-only dev** (`npm run dev` without Tauri) — `hydrateChatStore` falls back to legacy `localStorage` read; disk save is a no-op (no false toast).
 - **Audit script** — `audit-chat-persistence.mjs` predates v3; inspect `~/Library/Application Support/codetta/chats/` for ground truth.
 

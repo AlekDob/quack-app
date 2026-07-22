@@ -11,9 +11,12 @@ import {
 } from "./addNewAIChat";
 import { getAgentMode, toggleAgentMode } from "./agentMode";
 import {
+  focusAgentChanges,
+  focusAgentFiles,
   newAgentTerminal,
   setAgentContextPanel,
   termPanelOf,
+  toggleAgentFiles,
   toggleAgentTerminal,
 } from "./agentContextNav";
 import { openPalette } from "./paletteBus";
@@ -359,8 +362,14 @@ export const commands: CommandSpec[] = [
     accel: "Ctrl+B",
     run: () => {
       const wsId = s().activeId;
-      const ws = wsId ? s().loaded[wsId] : null;
-      if (ws && wsId) s().setSidebarVisible(wsId, !ws.layout.sidebarVisible);
+      if (!wsId) return;
+      // Agent Mode has no left sidebar — toggle Files ↔ Changes instead.
+      if (getAgentMode()) {
+        toggleAgentFiles(wsId);
+        return;
+      }
+      const ws = s().loaded[wsId];
+      if (ws) s().setSidebarVisible(wsId, !ws.layout.sidebarVisible);
     },
   },
   {
@@ -431,6 +440,10 @@ export const commands: CommandSpec[] = [
     run: () => {
       const wsId = s().activeId;
       if (!wsId) return;
+      if (getAgentMode()) {
+        focusAgentFiles(wsId);
+        return;
+      }
       s().setSidebarVisible(wsId, true);
       s().setSidebarView(wsId, "files");
     },
@@ -443,6 +456,10 @@ export const commands: CommandSpec[] = [
     run: () => {
       const wsId = s().activeId;
       if (!wsId) return;
+      if (getAgentMode()) {
+        focusAgentChanges(wsId);
+        return;
+      }
       s().setSidebarVisible(wsId, true);
       s().setSidebarView(wsId, "git");
     },

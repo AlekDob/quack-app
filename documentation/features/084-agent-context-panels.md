@@ -5,7 +5,7 @@ stack: Tauri + React
 created: 2026-07-20
 startDate: 2026-07-20
 endDate:
-last_verified: 2026-07-20
+last_verified: 2026-07-22
 status: active
 tags: [agent-mode, terminal, context-panel, cursor-style, status-bar, plan-mode]
 related: [001-ai-session-library.md, 038-compose-review.md, 052-claude-code-login-ux.md, 061-plan-mode-tab.md, 081-chat-switch-chrome-freeze.md, 088-plan-milo-handoff.md]
@@ -59,6 +59,7 @@ ExitPlanMode buy-in → `presentPlanReady` → `focusAgentPlan(wsId)` → on-dem
 - `newAgentTerminal(wsId) → void` — `addTerminal` + select new tab
 - `focusAgentTerminal(wsId) → void` — select last (or create) project terminal
 - `focusAgentPlan(wsId) → void` — select the Plan context tab
+- `focusAgentFiles(wsId) / focusAgentChanges(wsId) / toggleAgentFiles(wsId)` — StatusBar Explorer / Git / Ctrl+B stand-ins
 - `presentPlanReady(...)` — Agent Mode → Plan tab; IDE → FeatureDocDrawer / `plan:` split
 - `AgentAddViewMenu({ open, anchor, onClose, onAddTerminal }) → JSX` — add-view menu
 - `AgentTerminalPanel({ wsId, root, activeTermId, onCreate }) → JSX` — xterm host only
@@ -75,6 +76,7 @@ ExitPlanMode buy-in → `presentPlanReady` → `focusAgentPlan(wsId)` → on-dem
 - Agent Mode mounts `TerminalCore` (IDE `WorkspaceShell` unmounted); all terms stay mounted, `visible` toggled.
 - Leaving Agent Mode remounts IDE bottom terminals; re-attach via `ptyId` + scrollback replay.
 - StatusBar panel icon highlights when Agent terminal tab is active; title becomes “Toggle Terminal”.
+- StatusBar **Explorer / Source Control** map to Files / Changes tabs (`focusAgentFiles` / `focusAgentChanges`); Ctrl+B toggles Files ↔ Changes. **Save / Auto-save / zoom** hide in Agent Mode (no IDE editor surface).
 - Claude **Sign in** banner (`terminal.claude_login`) in Agent Mode selects the new Claude Code terminal tab so `/login` is interactive in the right column (IDE still uses the taller bottom panel).
 - Browser row in `+` menu is disabled until a later feature.
 

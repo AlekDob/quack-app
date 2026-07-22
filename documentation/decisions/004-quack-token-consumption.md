@@ -2,7 +2,7 @@
 type: decision
 project: codetta
 created: 2026-07-15
-last_verified: 2026-07-15
+last_verified: 2026-07-20
 tags: [claude-code, harness, tokens, cost, performance, system-prompt]
 ---
 
@@ -73,15 +73,17 @@ negligible; the damage is the extra tool loops it induces.
 
 ## Mechanism (verified in code)
 
-Injected on every Claude Code turn from `src/components/AIChatPanel.tsx`
-(`sendUserText`) + `src/brainPrompt.ts`:
+Injected on Claude Code turns from `src/components/AIChatPanel.tsx`
+(`sendUserText`) + `src/brainPrompt.ts` + `src/ccWirePrompt.ts`:
 
-- `jackSystemPrompt` (`brainPrompt.ts:21`): *"read 5+ relevant files before responding"*
-- inside-Quack block (`AIChatPanel.tsx:3153`): *"Be thorough and substantive."*
-- turn-1 packaging: `flattenMessages` (`providers/claudeCode.ts:164`) folds the
-  whole system block into the first user prompt; resumed turns send only the
-  latest user message + the `[Editor context]` prefix.
-- spawn flags: `--effort <medium>` + `--permission-mode` (`src-tauri/src/claude_code.rs:276`).
+- `jackSystemPrompt` / `quackAgentCorePrompt` (`brainPrompt.ts`): identity + EFFICIENCY
+  (the old "read 5+ / be thorough" mandates were removed — see Fix below).
+- turn-1 packaging: `flattenMessages` folds the system block into the first user prompt;
+  resumed turns send only the latest user message + optional `[Editor context]` prefix.
+- **Static wire block cadence (2026-07-20):** QUACK EDITOR + `[Agent identity]` reinject only
+  when `planCcWireRefresh` says so (first wire / agent·Plan change / after `/compact`).
+  Meta-slashes (`/compact`, `/clear`, …) send **bare** text — prefix broke those commands.
+- spawn flags: `--effort` + `--permission-mode` (`src-tauri/src/claude_code.rs`).
 
 The bare desktop app sends just what the user typed; its own system prompt does
 not carry these "read many files / be thorough" directives, so it stops sooner.

@@ -64,6 +64,10 @@ import {
   type BackgroundWakeHandle,
 } from "../backgroundWake";
 import {
+  attachBufferAssistantChars,
+  shouldSkipEndedAttachReplay,
+} from "../chatAttachReplay";
+import {
   getString as lsGetString,
   setString as lsSetString,
 } from "../localStore";
@@ -262,8 +266,10 @@ import {
   patchSession,
   newSessionId,
   deriveTitle,
+  preferredTitle,
   type ChatSession,
 } from "../chatHistory";
+import { maybeAutoTitle } from "../chatAutoTitle";
 import { registerChatPersist } from "../chatPersistFlush";
 import { logChatSwitch } from "../chatSwitchDebug";
 import { isChatSwitching, noteChatSwitchProgress } from "../chatSwitch";
@@ -1323,6 +1329,8 @@ export function AIChatPanel({
   const lastSaveWarnAt = useRef(0);
   const ccHydrateGenRef = useRef(0);
   const persistTranscriptRef = useRef<() => void>(() => {});
+  // Guards the cheap LLM auto-title to one call per chat (keyed wsId:chatId).
+  const autoTitledChatRef = useRef<string | null>(null);
   const warnSaveFailed = useCallback(() => {
     if (Date.now() - lastSaveWarnAt.current < 30_000) return;
     lastSaveWarnAt.current = Date.now();
@@ -2008,13 +2016,23 @@ export function AIChatPanel({
         // end of this chat's history must NOT replay: the Rust buffer
         // survives until the next turn, so every page refresh was
         // re-committing (and persisting) another copy of the same
-        // assistant message. Replay exists for the one real recovery
-        // case — a refresh while the turn was mid-flight, where the
-        // history still ends with the user's message.
-        if (att.ended != null) {
-          const cur = messagesRef.current;
-          const last = cur[cur.length - 1];
-          if (last && last.role === "assistant") return;
+        // assistant message. Replay exists for the real recovery
+        // cases — refresh mid-flight, or a thin streaming checkpoint
+        // that is shorter than the buffer (project-switch orphan).
+        const cur = messagesRef.current;
+        const last = cur[cur.length - 1];
+        const bufChars = attachBufferAssistantChars(att.lines);
+        if (att.ended != null && last?.role === "assistant") {
+          if (shouldSkipEndedAttachReplay(last.content.length, bufChars)) {
+            return;
+          }
+        }
+        // Drop a thin assistant checkpoint so the end-handler append
+        // (or live resume) does not leave a duplicate truncated bubble.
+        if (last?.role === "assistant") {
+          const trimmed = cur.slice(0, -1);
+          messagesRef.current = trimmed;
+          setMessages(trimmed);
         }
         // Replay everything we missed.
         for (const ln of att.lines) replayLine(ln);
@@ -2330,6 +2348,31 @@ export function AIChatPanel({
     useStore.getState().setAIChatTitle(wsId, aiChatId, title);
   }, [wsId, aiChatId, messages]);
 
+  // Cheap LLM auto-title (like Claude Code / Cursor): once the first turn
+  // finishes (streaming idle, one assistant reply), ask a fast model for a
+  // short name. Runs once per chat; maybeAutoTitle re-checks the guards
+  // (locked / already auto-titled / disabled) and falls back silently to the
+  // heuristic title above on any failure.
+  useEffect(() => {
+    if (!aiChatId || streaming !== null) return;
+    const key = `${wsId}:${aiChatId}`;
+    if (autoTitledChatRef.current === key) return;
+    const hasAsst = messages.some(
+      (m) => m.role === "assistant" && m.content.trim().length > 0,
+    );
+    if (!hasAsst) return;
+    autoTitledChatRef.current = key;
+    const providerId =
+      pinnedProviderId ?? parseQualifiedModel(selected ?? "")?.providerId ?? null;
+    void maybeAutoTitle({
+      wsId,
+      chatId: aiChatId,
+      providerId,
+      messages,
+      fallbackModelId: parseQualifiedModel(selected ?? "")?.modelId,
+    });
+  }, [wsId, aiChatId, streaming, messages, pinnedProviderId, selected]);
+
   // Persist session whenever messages change. Used to be debounced
   // 400ms but a refresh during that window orphaned the chat — the
   // descriptor still pointed to a sessionId whose saved row had only
@@ -2351,9 +2394,14 @@ export function AIChatPanel({
         ];
       }
       if (finalMessages.length === 0) return;
+      // Keep a hand-set (titleLocked) or LLM (autoTitled) title — only the
+      // fallback heuristic recomputes from messages on each flush.
+      const desc = aiChatId
+        ? useStore.getState().loaded[wsId]?.aiChats[aiChatId]
+        : undefined;
       const session: ChatSession = {
         id: sessionId,
-        title: deriveTitle(finalMessages),
+        title: preferredTitle(desc, finalMessages),
         messages: finalMessages,
         model: selected,
         updatedAt: Date.now(),
@@ -2365,6 +2413,7 @@ export function AIChatPanel({
         composer: draftFromComposerSnap(composerPersistRef.current),
         pinnedProviderId,
         presetId: presetId ?? undefined,
+        autoTitled: desc?.autoTitled,
       };
       if (!saveSession(wsId, session)) warnSaveFailed();
     };
@@ -2422,9 +2471,12 @@ export function AIChatPanel({
             ]
           : messages;
       if (finalMessages.length === 0) return;
+      const desc = aiChatId
+        ? useStore.getState().loaded[wsId]?.aiChats[aiChatId]
+        : undefined;
       const session: ChatSession = {
         id: sessionId,
-        title: deriveTitle(finalMessages),
+        title: preferredTitle(desc, finalMessages),
         messages: finalMessages,
         model: selected,
         updatedAt: Date.now(),
@@ -2436,6 +2488,7 @@ export function AIChatPanel({
         composer: draftFromComposerSnap(composerPersistRef.current),
         pinnedProviderId,
         presetId: presetId ?? undefined,
+        autoTitled: desc?.autoTitled,
       };
       if (!saveSession(wsId, session)) warnSaveFailed();
     };

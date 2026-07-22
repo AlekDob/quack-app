@@ -124,9 +124,9 @@ in the active workspace ran its own trio).
 - Monaco text models: global per path — survive editor unmount via `keepCurrentModel` (`editorState.ts`)
 
 ### Gotchas
-- **AI chat hosts are `isActive`-gated (not warm-LRU)** — leaving a project unmounts every `AIChatHost`. Must flush+await disk before flip or composer unmount patches can shrink transcripts (`043` project-switch section).
+- **AI chat hosts: sticky live across projects** — `working` / `needs-input` stay mounted when leaving a project (IDE + Agent Mode). Idle / DONE still unload. Flush+await disk before flip remains required so composer unmount patches cannot shrink transcripts (`043`, bug `007`).
 - **Do not unmount `PaneNode` / bottom panel** on blur — `TerminalCore` portals need stable `pane-content` refs; see comment in `WorkspaceShell.tsx` (same class of bug as xterm re-open).
-- **Do not gate side `AIChatPanel`** on `showHeavy` — user can multitask agents across projects; only polls are gated. (Tabbed hosts still unmount when `!isActive`.)
+- **Do not gate side `AIChatPanel`** on `showHeavy` — user can multitask agents across projects; only polls are gated.
 - **Pinky Brain is unrelated** to switch slowness — `pinky.search` runs pre-turn on send; `BrainPanel` only when `brain:` tab active + `showHeavy && visible`.
 - **Many tabs still cost tab-bar DOM** — one `EditorPane` per pane (active file only); further win = tab-bar virtualization (not done).
 - **300 ms unmount delay** — brief overlap if user rapid-fires project icons; incoming shell paints first by design.
@@ -144,7 +144,7 @@ which phase an intermittent slow switch actually costs.
 
 ### Related
 - Chat transcript durability on project leave: `043-chat-transcript-persistence.md`
-- Cold-switch loader (perceived polish): `079-cold-project-switch-loader.md`
+- Cold-switch loader: **removed** 2026-07-21 — see `079-cold-project-switch-loader.md`
 - Startup + inactive shell note (updated): `032-startup-hydration.md`
 - Session usage polls + JSONL hydrate: `023-session-usage-panel.md`
 - Workspace icon reorder (stable shell mount): `012-workspace-reorder.md`

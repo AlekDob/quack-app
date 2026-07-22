@@ -43,8 +43,6 @@ import { hydratePresetOverrides, DEFAULT_PRESET_ID } from "./presets";
 import { pulseChatSwitch } from "./chatSwitch";
 import { logChatSwitch } from "./chatSwitchDebug";
 import { markSwitchStart } from "./switchPerf";
-import { isWorkspaceWarm } from "./workspaceWarmSet";
-import { beginWorkspaceLoad } from "./workspaceSwitchLoader";
 import { getAgentStatus } from "./agentStatusStore";
 import { ensureAppBundledSkills } from "./bundledSkills/sync";
 import {
@@ -183,6 +181,10 @@ export interface AIChatDescriptor {
   /** True once the user renamed the chat by hand — stops the auto-title
    *  effect (derives a title from the first message) from clobbering it. */
   titleLocked?: boolean;
+  /** True once the cheap LLM auto-title (chatAutoTitle.ts) named this chat.
+   *  Stops the first-line heuristic from overwriting it; a hand rename
+   *  (titleLocked) still wins over both. */
+  autoTitled?: boolean;
   /** Fresh tab from New chat — show inline name prompt in the empty panel. */
   namePending?: boolean;
   /** Active Works ticket linked to this chat (feature 054, soft-sunset). */
@@ -1029,7 +1031,15 @@ interface AppState {
   /** Focus an existing chat's tab (reopening it in the active editor pane
    *  if its tab was closed). Used by the Agent Hub to jump to a chat. */
   focusAIChat(wsId: string, id: string): void;
-  setAIChatTitle(wsId: string, id: string, title: string): void;
+  /** Set the tab/rail title. `opts.auto` marks it as LLM-generated
+   *  (chatAutoTitle.ts) so the persist path won't clobber it with the
+   *  first-line heuristic — but a hand rename (renameAIChat) still wins. */
+  setAIChatTitle(
+    wsId: string,
+    id: string,
+    title: string,
+    opts?: { auto?: boolean },
+  ): void;
   /** Link or unlink a Works ticket on a chat tab. */
   setAIChatWorkItem(wsId: string, chatId: string, workItemId: string | null): void;
   setAIChatStory(wsId: string, chatId: string, storyId: string | null): void;
@@ -1681,52 +1691,75 @@ export const useStore = create<AppState>((set, get) => {
         /* ignore */
       }
 
-      const total = Math.max(1, requestedOpen.length);
+      // ACTIVE-FIRST hydration: read only the active workspace's files (+ its
+      // chat history) before releasing the splash, then load the remaining
+      // projects in the background. Previously the splash waited on file reads
+      // for EVERY open project x every open tab, yet only the active shell's
+      // buffers paint immediately — inactive shells are heavy-mount-gated
+      // (feature 058/076) and Agent Mode (default) only mounts the active one.
       const loaded: Record<string, WorkspaceData> = {};
-      const survivingIds: string[] = [];
-
-      const opened = await Promise.all(
-        requestedOpen.map(async (id, i) => {
-          const meta = recent.find((w) => w.id === id);
-          if (!meta) return null;
-          const pct = 20 + Math.round(((i + 1) / total) * 70);
-          setProg(`Opening ${meta.name}…`, pct, 100);
-          try {
-            const data = await loadWorkspaceFromDisk(meta, liveSessions);
-            return { id, data };
-          } catch {
-            return null;
-          }
-        }),
+      const openable = requestedOpen.filter((id) =>
+        recent.some((w) => w.id === id),
       );
-      for (const row of opened) {
-        if (!row) continue;
-        loaded[row.id] = row.data;
-        survivingIds.push(row.id);
+      if (activeId && !openable.includes(activeId)) {
+        activeId = openable[0] ?? null;
       }
 
-      if (activeId && !loaded[activeId]) {
-        activeId = survivingIds[0] ?? null;
-      }
+      const loadOne = async (id: string): Promise<boolean> => {
+        const meta = recent.find((w) => w.id === id);
+        if (!meta) return false;
+        try {
+          loaded[id] = await loadWorkspaceFromDisk(meta, liveSessions);
+          return true;
+        } catch {
+          return false;
+        }
+      };
 
-      setProg("Loading chat history…", 92, 100);
+      setProg("Opening workspace…", 60, 100);
+      const activeOk = activeId ? await loadOne(activeId) : false;
+      // Presets are a small global read but the active chat needs them to
+      // render correctly, so gate the splash on them too.
       await Promise.all([
-        ...survivingIds.map((id) =>
-          hydrateChatStore(id, warmChatIdsFromWs(loaded[id])),
-        ),
         hydratePresetOverrides(),
+        activeOk && activeId
+          ? hydrateChatStore(activeId, warmChatIdsFromWs(loaded[activeId]))
+          : Promise.resolve(),
       ]);
 
-      setProg("Reattaching terminals…", 95, 100);
+      // Optimistically show every openable project icon; a failed load is
+      // pruned when the background pass reconciles openIds below. WorkspaceShell
+      // renders null until its data arrives, so an unloaded id is harmless.
       set({
         recent,
-        openIds: survivingIds,
-        activeId,
-        loaded,
+        openIds: openable,
+        activeId: activeOk ? activeId : null,
+        loaded: { ...loaded },
         hydrated: true,
         hydrateProgress: { phase: "Ready", current: 100, total: 100 },
       });
       void persistIdx();
+
+      const rest = openable.filter((id) => id !== (activeOk ? activeId : null));
+      if (rest.length) {
+        void (async () => {
+          await Promise.all(rest.map(loadOne));
+          const surviving = openable.filter((id) => loaded[id]);
+          await Promise.all(
+            surviving
+              .filter((id) => !(activeOk && id === activeId))
+              .map((id) => hydrateChatStore(id, warmChatIdsFromWs(loaded[id]))),
+          );
+          set((s) => ({
+            loaded: { ...s.loaded, ...loaded },
+            openIds: surviving,
+            activeId:
+              s.activeId && surviving.includes(s.activeId)
+                ? s.activeId
+                : (surviving[0] ?? null),
+          }));
+        })();
+      }
     },
 
     openWorkspace: async (root) => {
@@ -1859,12 +1892,6 @@ export const useStore = create<AppState>((set, get) => {
       const prevId = get().activeId;
       const t0 = performance.now();
       markSwitchStart(id);
-      // Cold switch (target not warm) → mask the mount lag with the branded
-      // full-screen wash. Warm projects switch instantly, so no loader. Skip
-      // the initial activation (prevId null) — the splash owns first paint.
-      if (prevId && prevId !== id && !isWorkspaceWarm(id)) {
-        beginWorkspaceLoad(id);
-      }
       logChatSwitch("workspace switch start", { from: prevId, to: id });
       // Flush leaving project BEFORE isActive unmounts its AIChatHosts —
       // otherwise layout composer patches can race and shrink disk rows.
@@ -3500,14 +3527,15 @@ export const useStore = create<AppState>((set, get) => {
       }));
     },
 
-    setAIChatTitle: (wsId, id, title) =>
+    setAIChatTitle: (wsId, id, title, opts) =>
       updateWs(wsId, (w) => {
         const desc = w.aiChats[id];
         if (!desc) return w;
-        return {
-          ...w,
-          aiChats: { ...w.aiChats, [id]: { ...desc, title } },
-        };
+        // A hand rename locks the title — never let an auto-title overwrite it.
+        if (opts?.auto && desc.titleLocked) return w;
+        const next = { ...desc, title };
+        if (opts?.auto) next.autoTitled = true;
+        return { ...w, aiChats: { ...w.aiChats, [id]: next } };
       }),
 
     setAIChatWorkItem: (wsId, id, workItemId) =>

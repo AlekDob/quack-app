@@ -70,6 +70,55 @@ describe("preferRicherSession", () => {
       "cc-new",
     );
   });
+
+  it("at equal count keeps the longer last-assistant content", () => {
+    const prev: ChatSession = {
+      id: "a",
+      title: "t",
+      messages: [
+        { role: "user", content: "q" },
+        { role: "assistant", content: "long answer from flush" },
+      ],
+      updatedAt: 1,
+    };
+    const next: ChatSession = {
+      id: "a",
+      title: "t",
+      messages: [
+        { role: "user", content: "q" },
+        { role: "assistant", content: "thin" },
+      ],
+      updatedAt: 2,
+      composer: { input: "draft" },
+    };
+    const out = preferRicherSession(prev, next);
+    expect(out.messages[1].content).toBe("long answer from flush");
+    expect(out.composer?.input).toBe("draft");
+  });
+
+  it("at equal count accepts a richer next assistant", () => {
+    const prev: ChatSession = {
+      id: "a",
+      title: "t",
+      messages: [
+        { role: "user", content: "q" },
+        { role: "assistant", content: "short" },
+      ],
+      updatedAt: 1,
+    };
+    const next: ChatSession = {
+      id: "a",
+      title: "t",
+      messages: [
+        { role: "user", content: "q" },
+        { role: "assistant", content: "much longer completed answer" },
+      ],
+      updatedAt: 2,
+    };
+    expect(preferRicherSession(prev, next).messages[1].content).toBe(
+      "much longer completed answer",
+    );
+  });
 });
 
 describe("putCachedSession shrink guard", () => {

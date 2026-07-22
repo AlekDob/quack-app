@@ -8,7 +8,7 @@ import { useModalFocus } from "../useModalFocus";
 import { confirm as dialogConfirm } from "../dialog";
 import { basename, relPath } from "../pathUtils";
 import { Icon } from "./Icon";
-import { FileEditorPane } from "./FileEditorPane";
+import { FileEditorPane } from "./lazyHeavy";
 
 interface Props {
   /** Absolute path of the file to view, or null when closed. */

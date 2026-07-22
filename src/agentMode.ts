@@ -14,6 +14,8 @@
 //
 // Persistence: localStorage so the choice survives reloads. Like Zen we
 // don't toast on toggle — the layout swap IS the feedback.
+// Default ON when the key is unset — Agent Mode is the primary surface;
+// explicit IDE choice still persists as "" (see setAgentMode).
 //
 // Before flipping the layout we flush + await chat disk writes — same
 // durability path as project switch (`043`). Otherwise remounted panels
@@ -27,7 +29,14 @@ import { awaitChatDiskFlushes } from "./chatStoreCache";
 
 const KEY = "lcp.agentMode";
 
-let _agent = lsGetString(KEY) === "1";
+/** Unset → Agent Mode; `"1"` → on; `""` (or other) → IDE. */
+function readStoredAgentMode(): boolean {
+  const raw = lsGetString(KEY);
+  if (raw === null) return true;
+  return raw === "1";
+}
+
+let _agent = readStoredAgentMode();
 const listeners = new Set<(v: boolean) => void>();
 
 function notify() {

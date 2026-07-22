@@ -305,6 +305,18 @@ export interface Block {
   line?: number;
 }
 
+/** Lang from fence info: `ts`, `c++`, or Cursor `12:15:path/file.ts`. */
+function fenceInfoLang(info: string): string {
+  const trimmed = info.trim();
+  if (!trimmed) return "";
+  const cite = trimmed.match(/^\d+:\d+:(.+)$/);
+  if (cite) {
+    const ext = cite[1].match(/\.([a-zA-Z0-9]+)$/);
+    return (ext?.[1] ?? "").toLowerCase();
+  }
+  return trimmed.split(/\s+/)[0] ?? "";
+}
+
 function tokenize(md: string): Block[] {
   const lines = md.replace(/\r\n?/g, "\n").split("\n");
   const blocks: Block[] = [];
@@ -312,10 +324,13 @@ function tokenize(md: string): Block[] {
   while (i < lines.length) {
     const line = lines[i];
     const blockLine = i + 1;
-    // Fenced code block
-    const fence = line.match(/^```(\w*)\s*$/);
+    // Fenced code block. Info string is anything after ``` (lang, or a
+    // Cursor citation `12:15:path/file.ts`). Restricting to `\w*` used
+    // to reject citations — the body then leaked into blockquotes when
+    // it contained `>` lines (chat Findings rendering bug).
+    const fence = line.match(/^```([^\n`]*)\s*$/);
     if (fence) {
-      const lang = fence[1] ?? "";
+      const lang = fenceInfoLang(fence[1] ?? "");
       i++;
       const start = i;
       while (i < lines.length && !lines[i].match(/^```\s*$/)) i++;

@@ -11,7 +11,7 @@ import { loadWorkspaceRules } from "../workspaceRules";
 import { joinPath, relPath } from "../pathUtils";
 import { PROVIDERS } from "../providers";
 import { Icon, type IconName } from "./Icon";
-import { FileEditorPane } from "./FileEditorPane";
+import { FileEditorPane } from "./lazyHeavy";
 import { SkillsPane } from "./SkillsPane";
 import { PluginsPane } from "./PluginsPane";
 import { McpServerBrowser } from "./McpServerBrowser";

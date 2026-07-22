@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { ChatMessage } from "./ai";
 import type { ChatSession } from "./chatHistory";
 import type { ProviderId } from "./providers/types";
 import { getJson, remove, getString, setJson } from "./localStore";
@@ -338,16 +339,40 @@ export function preferRicherSession(
   if (!prev) return next;
   const title = preferSessionTitle(prev.title, next.title);
   const links = preferProviderSessionFields(prev, next);
-  if (next.messages.length >= prev.messages.length) {
+  if (next.messages.length > prev.messages.length) {
     const base = title === next.title ? next : { ...next, title };
     return { ...base, ...links };
   }
-  console.warn(
-    "[chatStore] refuse shrink",
-    next.id,
-    `${prev.messages.length}→${next.messages.length}`,
-  );
-  return { ...next, messages: prev.messages, title, ...links };
+  if (next.messages.length < prev.messages.length) {
+    console.warn(
+      "[chatStore] refuse shrink",
+      next.id,
+      `${prev.messages.length}→${next.messages.length}`,
+    );
+    return { ...next, messages: prev.messages, title, ...links };
+  }
+  // Same count: keep the longer last-assistant body so a thin streaming
+  // checkpoint cannot overwrite a richer flush from another host.
+  const messages = preferRicherSameLengthMessages(prev.messages, next.messages);
+  const base = title === next.title ? next : { ...next, title };
+  return { ...base, messages, ...links };
+}
+
+function lastAssistantContentLen(messages: ChatMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "assistant") return messages[i].content.length;
+  }
+  return 0;
+}
+
+function preferRicherSameLengthMessages(
+  prev: ChatMessage[],
+  next: ChatMessage[],
+): ChatMessage[] {
+  if (lastAssistantContentLen(next) >= lastAssistantContentLen(prev)) {
+    return next;
+  }
+  return prev;
 }
 
 /** Drop all warm bodies for a workspace (keep index) — remount reloads disk. */

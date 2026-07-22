@@ -1,6 +1,8 @@
-// Spawn or reuse a bottom PTY and inject a provider resume command.
+// Spawn a fresh bottom PTY and inject a provider resume command.
 // Bridges Quack chat sessions ↔ interactive CLI in the terminal pane.
 
+import { getAgentMode } from "./agentMode";
+import { setAgentContextPanel, termPanelOf } from "./agentContextNav";
 import { pty } from "./ipc";
 import { useStore } from "./store";
 import type { ProviderId } from "./providers/types";
@@ -43,7 +45,7 @@ async function waitForPtyId(
   return null;
 }
 
-/** Open bottom terminal and run `claude --resume` (or cursor equivalent). */
+/** Always open a new terminal and run `claude --resume` (or cursor equivalent). */
 export async function resumeProviderInTerminal(
   wsId: string,
   cwd: string,
@@ -55,11 +57,8 @@ export async function resumeProviderInTerminal(
     toastError("This provider cannot be resumed in a terminal yet");
     return;
   }
-  const { addTerminal } = useStore.getState();
-  const ws = useStore.getState().loaded[wsId];
-  const terms = ws ? Object.values(ws.terminals) : [];
-  let termId = terms[terms.length - 1]?.id;
-  if (!termId) termId = addTerminal(wsId, "bottom");
+  const termId = useStore.getState().addTerminal(wsId, "bottom");
+  if (getAgentMode()) setAgentContextPanel(wsId, termPanelOf(termId));
   const ptyId = await waitForPtyId(wsId, termId);
   if (!ptyId) {
     toastError("Terminal not ready — try again in a moment");

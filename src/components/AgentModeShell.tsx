@@ -318,22 +318,36 @@ export function AgentModeShell({ wsId }: Props) {
   const [, setAgentStatusTick] = useState(0);
   useEffect(() => subscribeAgentStatus(() => setAgentStatusTick((t) => t + 1)), []);
 
-  const mountChats = activeChats.filter((chat) => {
-    // Keep the active (or pulse-target) host mounted DURING the veil so
-    // hydrate runs under the loader — not after CAP when switching flips
-    // false. Surface visibility is gated separately via hostVisible.
-    const switchTarget = getChatSwitchTarget();
-    const keepSurface =
-      chat.id === activeChatId ||
-      (switching && switchTarget !== null && chat.id === switchTarget);
-    const live = getAgentStatus(chat.id)?.derived ?? null;
-    return shouldKeepChatHostMounted({
-      visible: keepSurface,
-      doneAt: chat.doneAt,
-      archivedAt: chat.archivedAt,
-      liveStatus: live,
-    });
-  });
+  // Mount sticky (working / needs-input) hosts from EVERY open workspace so a
+  // project switch does not tear down an in-flight stream. Surface visibility
+  // stays gated to the active workspace selection (hostVisible below).
+  const switchTarget = getChatSwitchTarget();
+  const mountChats: Array<{
+    chatWsId: string;
+    root: string;
+    chat: (typeof activeChats)[number];
+  }> = [];
+  for (const id of openIds) {
+    const w = loaded[id];
+    if (!w) continue;
+    for (const chat of chatsFor(id)) {
+      const keepSurface =
+        (id === wsId && chat.id === activeChatId) ||
+        (switching && switchTarget !== null && chat.id === switchTarget);
+      const live = getAgentStatus(chat.id)?.derived ?? null;
+      if (
+        !shouldKeepChatHostMounted({
+          visible: keepSurface,
+          doneAt: chat.doneAt,
+          archivedAt: chat.archivedAt,
+          liveStatus: live,
+        })
+      ) {
+        continue;
+      }
+      mountChats.push({ chatWsId: id, root: w.meta.root, chat });
+    }
+  }
 
   const recentNotOpen = recent.filter((w) => !openIds.includes(w.id));
 
@@ -511,36 +525,38 @@ export function AgentModeShell({ wsId }: Props) {
       <main className={`agent-main${sidePanelKey ? " has-review" : ""}`}>
         <div className="agent-main-inner">
           <div className="agent-main-chat">
-            {ws && activeChats.length > 0 ? (
+            {mountChats.length > 0 && (
               <div
                 className={`agent-main-chat-panels${switching ? " is-switching" : ""}`}
               >
-                {mountChats.map((chat) => {
+                {mountChats.map(({ chatWsId, root, chat }) => {
                   // Mount/hydrate while switching; only hide the surface
                   // (parent `.is-switching` + aria) so cold load isn't deferred
-                  // until after the 1s CAP.
-                  const isActive = chat.id === activeChatId;
-                  const switchTarget = getChatSwitchTarget();
+                  // until after the 1s CAP. Cross-ws sticky hosts stay
+                  // invisible until their project is active again.
+                  const isActive =
+                    chatWsId === wsId && chat.id === activeChatId;
                   const isPulseTarget =
                     switching &&
                     switchTarget !== null &&
                     chat.id === switchTarget;
                   const hostVisible = isActive || isPulseTarget;
                   return (
-                  <AgentChatHost
-                    key={chat.id}
-                    wsId={wsId}
-                    root={ws.meta.root}
-                    chatId={chat.id}
-                    visible={hostVisible}
-                    doneAt={chat.doneAt}
-                    archivedAt={chat.archivedAt}
-                    onOpenFile={setOpenFilePath}
-                  />
+                    <AgentChatHost
+                      key={chat.id}
+                      wsId={chatWsId}
+                      root={root}
+                      chatId={chat.id}
+                      visible={hostVisible}
+                      doneAt={chat.doneAt}
+                      archivedAt={chat.archivedAt}
+                      onOpenFile={setOpenFilePath}
+                    />
                   );
                 })}
               </div>
-            ) : (
+            )}
+            {ws && activeChats.length === 0 && (
               <div className="agent-main-empty">
                 <div className="agent-main-empty-card">
                   <AIIcon size={28} />

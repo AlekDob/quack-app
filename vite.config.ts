@@ -17,12 +17,35 @@ export default defineConfig(async () => ({
   },
 
   build: {
-    // Keep Monaco + Mermaid out of the main entry chunk so first paint /
-    // splash stays lighter. Mermaid is already dynamic-imported; this
-    // makes the split explicit and stable across builds.
+    // Group the heavy deps into their own chunks. NOTE: manualChunks only
+    // splits WHERE code lands — it does NOT defer loading. What actually
+    // keeps Monaco/xterm off the boot path (and drops their modulepreload)
+    // is that every consumer imports them via React.lazy (`lazyHeavy.tsx`),
+    // so no static import chain from the entry reaches them. Mermaid is
+    // lazy the same way. This block just makes those async chunks explicit
+    // and stable across builds.
     rollupOptions: {
       output: {
         manualChunks(id) {
+          // React MUST get its own chunk BEFORE monaco/mermaid. Otherwise
+          // Rollup co-locates the shared React runtime inside the big monaco
+          // chunk, and since the entry needs React it ends up statically
+          // importing (and modulepreloading) monaco — defeating the lazy
+          // split. With React isolated, the entry depends on `react` (needed
+          // at boot anyway) and monaco stays purely dynamic.
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/react/jsx-runtime") ||
+            id.includes("node_modules/scheduler/") ||
+            // Vite's dynamic-import preload helper. If left unassigned Rollup
+            // hoists it into the biggest importer (monaco), and since the
+            // entry uses it for its OWN dynamic imports the entry then
+            // statically imports monaco. Pin it next to react (always loaded).
+            id.includes("vite/preload-helper")
+          ) {
+            return "react";
+          }
           if (
             id.includes("node_modules/monaco-editor") ||
             id.includes("node_modules/@monaco-editor")

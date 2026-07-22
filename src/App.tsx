@@ -41,7 +41,6 @@ import { getAgentStatus, markSeen } from "./agentStatusStore";
 import { CommandPalette } from "./components/CommandPalette";
 import { DragGhost } from "./components/DragGhost";
 import { ChatSwitchVeil } from "./components/ChatSwitchVeil";
-import { WorkspaceSwitchVeil } from "./components/WorkspaceSwitchVeil";
 import { StatusBar } from "./components/StatusBar";
 import { Toasts } from "./components/Toast";
 import { DiffModal } from "./components/DiffModal";
@@ -218,11 +217,15 @@ function MainApp() {
   const [recentList, setRecentList] = useState<string[]>([]);
   // Min-display latch for the splash. Without this, fast hydrations
   // (warm OS cache, no workspaces to restore) flash the brand for a
-  // few frames or skip it entirely. We hold the splash visible until
-  // 700 ms after first paint regardless of hydration state.
+  // few frames or skip it entirely. The splash gate is `hydrated &&
+  // splashMinElapsed`, so it is already adaptive upward — a slow hydrate
+  // holds it as long as needed. The floor just prevents a sub-perceptible
+  // flash; 350 ms is enough for that. On a warm SSD (hydrate ~100-150 ms
+  // now that we only read the active workspace first) this reclaims ~350 ms
+  // of pure perceived latency vs the old 700 ms floor.
   const [splashMinElapsed, setSplashMinElapsed] = useState(false);
   useEffect(() => {
-    const t = window.setTimeout(() => setSplashMinElapsed(true), 700);
+    const t = window.setTimeout(() => setSplashMinElapsed(true), 350);
     return () => window.clearTimeout(t);
   }, []);
 
@@ -864,9 +867,6 @@ function MainApp() {
       {/* One global switch loader — shows on EVERY chat/session switch,
           including cross-project (per-host veils miss that case). */}
       <ChatSwitchVeil global />
-      {/* Branded full-screen wash for COLD project switches (warm ones stay
-          instant). Masks the Monaco/tree cold-mount lag in the project color. */}
-      <WorkspaceSwitchVeil />
       <Toasts />
       <AgentHubWatcher />
       <DiffModal />

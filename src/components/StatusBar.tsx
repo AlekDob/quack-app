@@ -57,10 +57,9 @@ export function StatusBar({ onOpenPalette }: Props) {
   // Editor zoom chip: percent of the hardcoded default font size (13).
   // Hidden at 100% on an empty workspace — only shows when the user has
   // actually zoomed, or when there's a focused file so they can adjust
-  // mid-edit.
+  // mid-edit. Agent Mode has no IDE editor surface — hide entirely.
   const DEFAULT_FONT_SIZE = 13;
   const zoomPct = Math.round((settings.fontSize / DEFAULT_FONT_SIZE) * 100);
-  const showZoom = zoomPct !== 100 || !!editorState.filePath;
 
   const sidebarVisible = ws?.layout.sidebarVisible ?? true;
   const bottomVisible = ws?.layout.bottomVisible ?? true;
@@ -71,6 +70,13 @@ export function StatusBar({ onOpenPalette }: Props) {
   // In Agent Mode the bottom panel is gone — highlight when the right
   // column is showing a project terminal instead.
   const panelActive = agentMode ? agentTermOpen : bottomVisible;
+  const explorerActive = agentMode
+    ? agentPanel === "files"
+    : sidebarVisible && sidebarView === "files";
+  const gitActive = agentMode
+    ? agentPanel === "changes"
+    : sidebarVisible && sidebarView === "git";
+  const showZoom = !agentMode && (zoomPct !== 100 || !!editorState.filePath);
 
   // Live resource glance for Quack's own process tree (app + PTY
   // shells + Claude Code subprocesses), polled every 5s. Clicking it
@@ -320,20 +326,28 @@ export function StatusBar({ onOpenPalette }: Props) {
         )}
 
         <button
-          className={`sb-btn ${sidebarVisible && sidebarView === "files" ? "active" : ""}`}
-          title="Toggle Explorer (Ctrl+B)"
-          aria-label="Toggle Explorer"
-          aria-pressed={sidebarVisible && sidebarView === "files"}
+          className={`sb-btn ${explorerActive ? "active" : ""}`}
+          title={
+            agentMode
+              ? "Toggle Files (Ctrl+B)"
+              : "Toggle Explorer (Ctrl+B)"
+          }
+          aria-label={agentMode ? "Toggle Files" : "Toggle Explorer"}
+          aria-pressed={explorerActive}
           disabled={!activeId}
           onClick={() => runCommand("view.toggle_sidebar")}
         >
           <Icon name="folder" />
         </button>
         <button
-          className={`sb-btn ${sidebarVisible && sidebarView === "git" ? "active" : ""}`}
-          title="Source Control (Ctrl+Shift+G)"
-          aria-label="Source Control"
-          aria-pressed={sidebarVisible && sidebarView === "git"}
+          className={`sb-btn ${gitActive ? "active" : ""}`}
+          title={
+            agentMode
+              ? "Changes (Ctrl+Shift+G)"
+              : "Source Control (Ctrl+Shift+G)"
+          }
+          aria-label={agentMode ? "Show Changes" : "Source Control"}
+          aria-pressed={gitActive}
           disabled={!activeId}
           onClick={() => runCommand("view.source_control")}
         >
@@ -364,28 +378,34 @@ export function StatusBar({ onOpenPalette }: Props) {
         >
           <Icon name="terminal" />
         </button>
-        <button
-          className={`sb-btn ${settings.autoSave ? "active" : ""}`}
-          title={
-            settings.autoSave
-              ? "Auto-save ON (click to disable)"
-              : "Auto-save OFF (click to enable)"
-          }
-          aria-label={settings.autoSave ? "Disable auto-save" : "Enable auto-save"}
-          aria-pressed={settings.autoSave}
-          onClick={() => runCommand("edit.toggle_auto_save")}
-        >
-          <Icon name={settings.autoSave ? "save-auto" : "save"} />
-        </button>
-        <button
-          className="sb-btn"
-          title="Save (Ctrl+S)"
-          aria-label="Save current file"
-          disabled={!editorState.filePath}
-          onClick={() => runCommand("file.save")}
-        >
-          <Icon name="save" />
-        </button>
+        {!agentMode && (
+          <button
+            className={`sb-btn ${settings.autoSave ? "active" : ""}`}
+            title={
+              settings.autoSave
+                ? "Auto-save ON (click to disable)"
+                : "Auto-save OFF (click to enable)"
+            }
+            aria-label={
+              settings.autoSave ? "Disable auto-save" : "Enable auto-save"
+            }
+            aria-pressed={settings.autoSave}
+            onClick={() => runCommand("edit.toggle_auto_save")}
+          >
+            <Icon name={settings.autoSave ? "save-auto" : "save"} />
+          </button>
+        )}
+        {!agentMode && (
+          <button
+            className="sb-btn"
+            title="Save (Ctrl+S)"
+            aria-label="Save current file"
+            disabled={!editorState.filePath}
+            onClick={() => runCommand("file.save")}
+          >
+            <Icon name="save" />
+          </button>
+        )}
         <button
           className="sb-btn"
           title="Open Folder (Ctrl+O)"

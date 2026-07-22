@@ -1,10 +1,10 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { EditorPane } from "./EditorPane";
+import { EditorPane } from "./lazyHeavy";
 import { MediaPreviewPane } from "./MediaPreviewPane";
 import { SessionTranscriptPane } from "./SessionTranscriptPane";
 import { mediaKindOf } from "../mediaPreview";
-import { TerminalCore } from "./TerminalCore";
+import { TerminalCore } from "./lazyHeavy";
 import { PaneNode } from "./PaneNode";
 import { SidebarStack } from "./SidebarStack";
 import { AIChatPanel } from "./AIChatPanel";
@@ -35,7 +35,6 @@ import { Icon } from "./Icon";
 import { useZenMode } from "../zenMode";
 import { useChatSwitching } from "../useChatSwitching";
 import { logAgentModePhase, logSwitchPhase } from "../switchPerf";
-import { endWorkspaceLoad } from "../workspaceSwitchLoader";
 import { endChatSwitch } from "../chatSwitch";
 import { shouldKeepChatHostMounted, useChatHostLiveStatus } from "../chatHostMount";
 import { getAgentStatus, subscribeAgentStatus } from "../agentStatusStore";
@@ -99,8 +98,7 @@ function ShellDropdown({ anchor, shells, onClose, onPick }: ShellDropdownProps) 
 function WorkspaceShellInner({ wsId, isActive }: Props) {
   const { showHeavy, editorsReady } = useWorkspaceHeavyMount(wsId, isActive);
   // Switch-perf: time from switch start to editors mounting for the incoming
-  // project (the perceived lag the [chat-switch] logs don't capture). Also the
-  // signal to fade the cold-switch loader — the heavy mount is done.
+  // project (the perceived lag the [chat-switch] logs don't capture).
   useEffect(() => {
     logAgentModePhase("ide-shell mounted", { wsId, isActive });
   }, [wsId, isActive]);
@@ -108,7 +106,6 @@ function WorkspaceShellInner({ wsId, isActive }: Props) {
     if (isActive && editorsReady) {
       logSwitchPhase("editors ready", wsId);
       logAgentModePhase("editors ready", { wsId });
-      endWorkspaceLoad(wsId);
     }
   }, [isActive, editorsReady, wsId]);
   const ws = useStore((s) => s.loaded[wsId]);
@@ -128,6 +125,12 @@ function WorkspaceShellInner({ wsId, isActive }: Props) {
     Record<PaneId, HTMLElement>
   >({});
   const [drawerContainer, setDrawerContainer] = useState<HTMLElement | null>(
+    null,
+  );
+  // Offscreen portal target for sticky (working) hosts while this workspace
+  // is backgrounded — keeps AIChatPanel mounted without remounting when the
+  // pane container disappears / reappears on project switch.
+  const [stickyHostRoot, setStickyHostRoot] = useState<HTMLElement | null>(
     null,
   );
   const [drawerLinger, setDrawerLinger] = useState<EditorDrawerState | null>(
@@ -211,6 +214,15 @@ function WorkspaceShellInner({ wsId, isActive }: Props) {
 
   if (!ws) return null;
   const layout = ws.layout;
+  // Keep pane portals mounted while any chat is mid-run so AIChatHost does
+  // not lose its container (and remount) when this workspace is backgrounded
+  // or falls out of the Monaco warm LRU.
+  const hasLiveSticky = Object.values(ws.aiChats).some((c) => {
+    if (c.doneAt || c.archivedAt) return false;
+    const live = getAgentStatus(c.id)?.derived;
+    return live === "working" || live === "needs-input";
+  });
+  const mountHeavy = showHeavy || hasLiveSticky;
 
   return (
     <div
@@ -219,7 +231,13 @@ function WorkspaceShellInner({ wsId, isActive }: Props) {
       data-ws-id={wsId}
       data-sidebar-side={layout.sidebarSide}
     >
-      {showHeavy && layout.sidebarVisible && !zen && (
+      <div
+        ref={setStickyHostRoot}
+        className="ai-sticky-host-root"
+        hidden
+        aria-hidden
+      />
+      {mountHeavy && layout.sidebarVisible && !zen && (
         <SidebarStack wsId={wsId} ws={ws} />
       )}
       {/* The cross-project Agent Hub (was the per-workspace AI rail) now
@@ -471,11 +489,11 @@ function WorkspaceShellInner({ wsId, isActive }: Props) {
           AIChatPanel into the pane container that currently owns the
           tab. Because the React component itself stays mounted across
           container changes, in-flight streams + chat state survive a
-          tab being dragged from one pane to another. Only mount hosts
-          for the active workspace — background projects hydrate from
-          the store without paying per-chat panel cost. */}
-      {isActive &&
-        Object.values(ws.aiChats).map((chat) => {
+          tab being dragged from one pane to another.
+          Sticky (working / needs-input) hosts stay mounted even when
+          this workspace is backgrounded — otherwise project switch
+          orphans the stream consumer and truncates the transcript. */}
+      {Object.values(ws.aiChats).map((chat) => {
         const tabKeyStr = aiKey(chat.id);
         const editorPane = findTabsPaneByTab(layout.editorRoot, tabKeyStr);
         const bottomPane = layout.bottomRoot
@@ -496,7 +514,9 @@ function WorkspaceShellInner({ wsId, isActive }: Props) {
             doneAt: chat.doneAt,
             archivedAt: chat.archivedAt,
             liveStatus: live,
-            tabOpen: !!pane,
+            // Only treat tabs as "open" while this workspace is foreground —
+            // otherwise every open tab across projects would stay mounted.
+            tabOpen: isActive && !!pane,
           })
         ) {
           return null;
@@ -507,9 +527,9 @@ function WorkspaceShellInner({ wsId, isActive }: Props) {
             wsId={wsId}
             root={ws.meta.root}
             chatId={chat.id}
-            container={container}
+            container={container ?? stickyHostRoot}
             visible={visible}
-            tabOpen={!!pane}
+            tabOpen={isActive && !!pane}
             doneAt={chat.doneAt}
             archivedAt={chat.archivedAt}
           />

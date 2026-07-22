@@ -134,6 +134,19 @@ pub fn cursor_code_list_models() -> Result<Vec<CursorModelEntry>, String> {
     Ok(parse_list_models(&text))
 }
 
+/// One-shot headless print for the cheap auto-title call. Mirrors
+/// `claude_print_title` on the Cursor side. `default`/empty model = CLI default.
+#[tauri::command]
+pub fn cursor_print_text(prompt: String, model: Option<String>) -> Result<String, String> {
+    let use_model = matches!(model.as_deref(), Some(m) if m != "default" && !m.is_empty());
+    let mut args: Vec<&str> = vec!["-p", &prompt, "--output-format", "text"];
+    if use_model {
+        args.push("--model");
+        args.push(model.as_deref().unwrap());
+    }
+    run_cursor_output(&args)
+}
+
 fn run_cursor_output(args: &[&str]) -> Result<String, String> {
     let bin = resolve_cursor_bin().ok_or_else(|| "Cursor CLI not found".to_string())?;
     match bin {

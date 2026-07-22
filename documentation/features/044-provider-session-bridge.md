@@ -88,7 +88,7 @@ Shown after the first streamed turn assigns a provider session id (agentic provi
 - **Label:** `CC` / `CU` / `OC`
 - **Truncated id:** first 8 chars + `…`
 - **Click chip:** copy full id
-- **Terminal icon** (CC + Cursor): `claude --resume` / `cursor-agent --resume` in bottom PTY
+- **Terminal icon** (CC + Cursor): always spawns a **new** PTY, then runs `claude --resume` / `cursor-agent --resume`. IDE → bottom tab; Agent Mode → selects the new `term:<id>` tab in the right column (`setAgentContextPanel`)
 
 #### ⟲ Sessions picker (all agentic providers)
 
@@ -166,6 +166,8 @@ but each CLI owns a separate server-side session — tool context does not trans
 Confirming a switch updates `pinnedProviderId` to the new platform.
 
 ### Terminal resume commands
+
+`resumeProviderInTerminal` always calls `addTerminal` (never reuses an existing tab).
 
 | Provider | Command written to PTY |
 |---|---|

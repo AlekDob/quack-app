@@ -14,7 +14,7 @@ import {
 } from "../composeReview";
 import { getAgentMode } from "../agentMode";
 import { dropSnapshot, lookupSnapshot } from "../composeSnapshots";
-import { DiffView } from "./DiffView";
+import { DiffView } from "./lazyHeavy";
 import { Icon } from "./Icon";
 import { error as toastError, errMsg, success as toastSuccess } from "../notify";
 

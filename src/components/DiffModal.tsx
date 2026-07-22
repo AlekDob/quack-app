@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { onDiffRequest, type DiffRequest } from "../editorState";
 import { useModalFocus } from "../useModalFocus";
-import { DiffView } from "./DiffView";
+import { DiffView } from "./lazyHeavy";
 import { Icon } from "./Icon";
 
 export function DiffModal() {

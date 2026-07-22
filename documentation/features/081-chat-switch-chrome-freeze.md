@@ -130,4 +130,4 @@ Independent of the pulse — helps idle + switch:
 | Transcript windowing | `080-transcript-windowing.md` |
 | Explorer tree | `034-explorer-tree.md` |
 | Workspace heavy-mount | `058-workspace-switch-performance.md` |
-| Cold project-switch loader | `079-cold-project-switch-loader.md` |
+| Cold project-switch loader | `079` — **removed** 2026-07-21 |

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { useStore } from "../store";
-import { TerminalCore } from "./TerminalCore";
+import { TerminalCore } from "./lazyHeavy";
 
 interface Props {
   wsId: string;

@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-10
-last_verified: 2026-07-13
+last_verified: 2026-07-21
 tags: [markdown, md-preview, copy, code-block, chat, shell, syntax, cursor-style]
 ---
 
@@ -48,7 +48,7 @@ Markdown string
 |-----------|-------|
 | Headings `#`–`######` | `md-anchor` class on headings for interactive jump |
 | Paragraphs | Soft-wrap; consecutive non-block lines merge |
-| Fenced code ` ```lang ` | Copyable pill UI — see below |
+| Fenced code ` ```lang ` | Copyable pill UI — see below. Info string may be a **Cursor citation** ` ```12:15:path/file.ts ` (lang derived from extension); rejecting those used to leak `>` body lines into callouts |
 | Inline code `` ` `` | Escaped; not copy-pill (plain `<code>` chip) |
 | Bold / italic | `**` / `*` / `__` / `_` |
 | Links / images | URL scheme allowlist (`https`, `mailto`, `file`, …) |
@@ -129,6 +129,7 @@ Chat scope (`.ai-msg-body .md-preview`) uses tighter padding on pills — see `0
 | `045-html-preview.md` | Raw agent HTML never routed through this renderer |
 
 ### Gotchas
+- Fence info used to be `\w*` only — Cursor ` ```12:15:path ` openers were not fences; `>` body lines became `.md-callout` (fixed 2026-07-21; `fenceInfoLang`)
 - `data-source-line` on `.md-code-block` wrapper (not `<pre>`) — interactive click-to-jump uses `closest("[data-source-line]")`
 - Copy extracts `code.textContent` — shell highlight spans are stripped automatically
 - `MarkdownPreview` inline `<style>` for copy was removed (2026-07-10); all rules live in `App.css`

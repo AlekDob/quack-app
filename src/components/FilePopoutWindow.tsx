@@ -3,7 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { bootstrapTheme } from "../theme";
 import { basename } from "../pathUtils";
 import { Icon } from "./Icon";
-import { FileEditorPane } from "./FileEditorPane";
+import { FileEditorPane } from "./lazyHeavy";
 
 (function applyInitialFilePopoutTheme() {
   try {

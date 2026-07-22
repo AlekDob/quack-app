@@ -567,21 +567,31 @@ fn try_run_claude(args: &[&str], explicit_path: Option<&str>) -> Result<String, 
 
 /// Headless `claude -p` for short catalog probes (model picker).
 pub(crate) fn claude_print_text(prompt: &str) -> Result<String, String> {
-    run_claude_print(prompt)
+    run_claude_print(prompt, None)
 }
 
-fn run_claude_print(prompt: &str) -> Result<String, String> {
+/// Headless one-shot print with an optional model override. Used for the
+/// cheap auto-title call (feature: pass a fast alias like "haiku").
+#[tauri::command]
+pub fn claude_print_title(prompt: String, model: Option<String>) -> Result<String, String> {
+    run_claude_print(&prompt, model.as_deref())
+}
+
+fn run_claude_print(prompt: &str, model: Option<&str>) -> Result<String, String> {
     if let Some(exe) = resolve_claude_executable() {
-        if let Ok(text) = claude_print_with_exe(&exe, prompt) {
+        if let Ok(text) = claude_print_with_exe(&exe, prompt, model) {
             return Ok(text);
         }
     }
-    claude_print_via_shell(prompt)
+    claude_print_via_shell(prompt, model)
 }
 
-fn claude_print_with_exe(exe: &str, prompt: &str) -> Result<String, String> {
+fn claude_print_with_exe(exe: &str, prompt: &str, model: Option<&str>) -> Result<String, String> {
     let mut cmd = Command::new(exe);
     cmd.args(["-p", prompt, "--output-format", "text"]);
+    if let Some(m) = model {
+        cmd.args(["--model", m]);
+    }
     cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::null());
@@ -600,14 +610,19 @@ fn claude_print_with_exe(exe: &str, prompt: &str) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-fn claude_print_via_shell(prompt: &str) -> Result<String, String> {
+fn claude_print_via_shell(prompt: &str, model: Option<&str>) -> Result<String, String> {
     let quoted = shell_quote(prompt);
+    // Model flag is optional — append only when a fast alias is requested.
+    let model_flag = match model {
+        Some(m) => format!(" --model {}", shell_quote(m)),
+        None => String::new(),
+    };
     #[cfg(windows)]
     {
         let mut cmd = Command::new("cmd");
         cmd.args([
             "/c",
-            &format!("claude -p {quoted} --output-format text <nul"),
+            &format!("claude -p {quoted} --output-format text{model_flag} <nul"),
         ]);
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000);
@@ -622,7 +637,7 @@ fn claude_print_via_shell(prompt: &str) -> Result<String, String> {
         let mut cmd = Command::new("sh");
         cmd.args([
             "-lc",
-            &format!("claude -p {quoted} --output-format text </dev/null"),
+            &format!("claude -p {quoted} --output-format text{model_flag} </dev/null"),
         ]);
         let out = cmd.output().map_err(|e| e.to_string())?;
         if !out.status.success() {

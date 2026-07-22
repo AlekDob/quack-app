@@ -5,7 +5,7 @@ stack: Tauri + React
 created: 2026-07-20
 startDate: 2026-07-20
 endDate:
-last_verified: 2026-07-20
+last_verified: 2026-07-22
 status: active
 tags: [agent-mode, ide-mode, layout-toggle, performance, remount, chat-hydrate]
 related:
@@ -22,7 +22,7 @@ related:
 ---
 
 ## Agent Mode ↔ IDE layout toggle
-**Purpose:** Global Agents ↔ IDE layout preference (`lcp.agentMode`): Agent Mode replaces the editor-centric shell with a sessions + chat + context column; leaving remounts every `WorkspaceShell`. Instrument, measure, and keep chat hydrate warm across the swap.
+**Purpose:** Global Agents ↔ IDE layout preference (`lcp.agentMode`): Agent Mode replaces the editor-centric shell with a sessions + chat + context column; leaving remounts every `WorkspaceShell`. **Default is Agent Mode** when the key is unset; explicit IDE persists as `""`. Instrument, measure, and keep chat hydrate warm across the swap.
 **Stack:** Tauri 2 + React 19 / TypeScript, plain CSS tokens
 
 ### Tasks

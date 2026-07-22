@@ -4,7 +4,7 @@ project: quack-desktop
 created: 2026-07-17
 last_verified: 2026-07-20
 status: active
-related: [054-works-layer.md, 072-composer-mention-chips.md, 022-chat-composer.md, 041-mention-file-preview.md, 009-agent-hub.md]
+related: [054-works-layer.md, 072-composer-mention-chips.md, 022-chat-composer.md, 041-mention-file-preview.md, 009-agent-hub.md, 004-subagent-mentions.md]
 tags: [features, composer, mention, inline-highlight, fuzzy-search, monaco, drawer, cursor-style, pin, auto-link]
 ---
 
@@ -21,6 +21,7 @@ tags: [features, composer, mention, inline-highlight, fuzzy-search, monaco, draw
 | `@` mention in input | Green `@slug` underline in textarea | Draft token; `featureId` **unpinned** (no chip) |
 | Icon fuzzy pick | Mint **chip** next to icon (`104 · …`); no `@` insert | `featureId` + `featurePinned` on chat |
 | Agent Write/Edit feature `.md` | Same pin chip as icon | Auto when `featureId` empty (`featureChatAutoLink`) |
+| Skill/Task fork (`feature-creator`) | Same pin chip | Parent result text / leaked Write tool_call |
 
 ## Surfaces
 
@@ -46,7 +47,15 @@ Inject: `getFeatureInjectEnabled` (default **off**) → `buildFeatureTurnContext
 
 ## Auto-pin
 
-During a turn, successful Write/Edit/MultiEdit of `documentation/features/NNN-*.md` are tracked; after the stream, the **last** such slug is pinned if the chat still has no `featureId`. See `featureChatAutoLink.ts` (`featureSlugFromSuccessfulEdit` + `pinFeatureOnChat`).
+During a turn, feature slugs are collected and the **last** one is pinned after the stream if the chat still has no `featureId`:
+
+| Signal | When |
+|---|---|
+| Write/Edit/MultiEdit tool_call | Path under `documentation/features/NNN-*.md` (covers sidechain Writes that stream without a parent tool_result) |
+| Write/Edit/MultiEdit tool_result | Confirms success; clears the candidate on error |
+| Skill / Task / Agent tool_result | Parses `documentation/features/NNN-*.md` from result text (e.g. feature-creator “Feature doc created at …”) |
+
+See `featureChatAutoLink.ts` (`featureSlugFromToolCall`, `featureSlugFromDelegateResult`, `pinFeatureOnChat`).
 
 ## Popover actions (when pinned)
 
@@ -70,7 +79,7 @@ Open linked drawer · Clear link · Inject on/off (`setFeatureInjectEnabled`).
 | File | Covers |
 |---|---|
 | `src/composerInputHighlight.test.ts` | Token spans + HTML for skill/feature |
-| `src/featureChatAutoLink.test.ts` | Path → slug gates for feature docs |
+| `src/featureChatAutoLink.test.ts` | Path → slug; Skill/Task result text; tool_call Write |
 
 ## Related
 
