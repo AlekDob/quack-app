@@ -126,7 +126,7 @@ Pattern: `src/aiTaskStore.ts` / `src/agentStatusStore.ts` (module-level pub/sub 
   - `038-compose-review.md` — ComposeCard Files recap; IDE `crev:` diff tabs (Undo/Keep); **Agent Mode → DiffModal** (`openComposeDiffModal`); `composeReview.ts`, `ComposeReviewPane.tsx`.
   - `076-chat-lazy-hydrate-done-unload.md` — session index + on-demand bodies; DONE/archived chat hosts unmount when hidden; live stay sticky for multitask; `memo(AIChatHost)` so creating a chat doesn't re-render all mounted panels (`[new-chat-perf]` dev timing).
   - `087-new-chat-perf.md` — New chat: seed empty RAM body (skip disk miss), sync empty paint + immediate `finishHydrated`, `afterFirstPaint` for extension/catalog/skills mounts; resume flicker gate pairs with `024`. Diagnose via Perf Audit Copy JSON (`086`).
-  - `006-chat-tool-render.md` — drawers, ComposeCard, AskQuestion, icon tones; chronology walker feeds 082 summaries; Task/Agent → duck chips (004).
+  - `006-chat-tool-render.md` — drawers, ComposeCard, AskQuestion, icon tones; chronology walker feeds 082 summaries; Task/Agent → duck chips (004); spend-limit prose → 091.
   - `007-native-macos-menu.md` — macOS uses the native system menu bar (built from the command registry); the in-window `TopBar` menus are hidden there, kept on Win/Linux.
   - `008-skill-slash-menu.md` — Claude Code skills in the `/` menu (lightning icon + orange, name only), loaded from `.claude/skills/`, dispatched like CC commands.
   - `010-project-dock.md` — floating always-on-top Dock window (per-project circles + counters) + native macOS Dock-icon badge.
@@ -167,6 +167,7 @@ Pattern: `src/aiTaskStore.ts` / `src/agentStatusStore.ts` (module-level pub/sub 
   - `048-background-task-wake.md` — Claude Code `-p` background Bash/subagent wake: spawn env (`PRINT_BG_WAIT_CEILING_MS`, `RESUME_INTERRUPTED_TURN`) + `backgroundWake.ts` auto `--resume` nudge when headless turn ends idle.
   - `049-markdown-renderer.md` — dependency-free Markdown → HTML for chat, editor preview, tool drawers; fenced code blocks as copyable pills (icon row underneath) + single-line shell token coloring.
   - `023-session-usage-panel.md` — composer context ring + Context Usage popover (CC): last-API `contextTokens` snapshot, Cursor-style segmented breakdown, Usage tab for plan limits + billing; `contextUsage.ts`, `contextBreakdown.ts`, `SessionUsageCircle`, `SessionUsagePopover`.
+  - `091-spend-limit-card.md` — org/API monthly spend-limit assistant copy → warn card with live extra/plan bars + View usage (`spendLimitMessage.ts`, `SpendLimitCard`, `ProseWithSpendLimit`); pairs with 023 meters + 006 chronology.
   - `050-composer-context-bar.md` — Cursor-style **project name** + git branch inside the composer pill; Recents MRU menu + Open folder… → new chat in target project; portaled menus, shared `GitBranchPicker`.
   - `051-agent-commit-dock.md` — agent Bash `git commit` pill above the composer (hash, message, time, pushed/local); `agentCommitDetect.ts`, `agentCommitStore.ts`, `AgentCommitDock.tsx`.
   - `053-composer-git-actions.md` — Cursor-style changed-files + Commit & Push split control inside the composer pill; `git_diff_stat`, `ComposerGitActions.tsx`, `composerGitOps.ts`.

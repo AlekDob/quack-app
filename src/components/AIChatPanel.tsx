@@ -73,13 +73,13 @@ import {
 } from "../localStore";
 import { setPermMode } from "../permModeStore";
 import {
-  balanceFences,
   cleanStaleToolMessages,
   parseInlineToolCalls,
   pickPriorityFiles,
   splitThinking,
 } from "../chatTextUtils";
 import { deriveRow, deriveToolMaps } from "../chatRowDerive";
+import { isSpendLimitText } from "../spendLimitMessage";
 import { executeTool, TOOLS } from "../aiTools";
 import { SLASH_COMMANDS, type SlashCommand } from "../slashCommands";
 import {
@@ -329,8 +329,7 @@ import {
   pty,
   fs,
 } from "../ipc";
-import { MarkdownPreview } from "./MarkdownPreview";
-import { StreamingPlainText } from "./StreamingPlainText";
+import { ProseWithSpendLimit } from "./ProseWithSpendLimit";
 import { createStreamPainter } from "../streamPaint";
 import { UserTurnBar } from "./UserMessageBar";
 import { ModelPickerPopover } from "./ModelPickerPopover";
@@ -6636,14 +6635,11 @@ export function AIChatPanel({
                   />
                 ) : isAssistant ? (
                   <>
-                    {isStreamingThis ? (
-                      <StreamingPlainText text={visibleContent} />
-                    ) : (
-                      <MarkdownPreview
-                        content={balanceFences(visibleContent)}
-                        onFileOpen={openChatFile}
-                      />
-                    )}
+                    <ProseWithSpendLimit
+                      text={visibleContent}
+                      streaming={isStreamingThis}
+                      onFileOpen={openChatFile}
+                    />
                     {shouldCollapse && (
                       <button
                         className="ai-show-more"
@@ -6772,7 +6768,7 @@ export function AIChatPanel({
                       <span>Run</span>
                     </button>
                   )}
-                  {isLatest && (
+                  {isLatest && !isSpendLimitText(m.content) && (
                     <button
                       className="ai-msg-action"
                       onClick={() => void goDeeper()}

@@ -3,8 +3,9 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-20
-tags: [ai-chat, tool-calls, chatToolRender, cursor-style, compact-summary, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap, html-preview, ask-user-question]
+last_verified: 2026-07-22
+tags: [ai-chat, tool-calls, chatToolRender, cursor-style, compact-summary, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap, html-preview, ask-user-question, spend-limit]
+related: [082-cursor-compact-action-stream.md, 091-spend-limit-card.md]
 ---
 
 ## Chat Tool-Call Rendering
@@ -16,6 +17,8 @@ feeds **Cursor-compact** stream summaries.
 **Stream chrome (summaries, Worked for / Thought for, solo vs group, perf):**
 see **`082-cursor-compact-action-stream.md`** — primary UX contract.
 
+**Spend-limit prose → warn card:** see **`091-spend-limit-card.md`**.
+
 **Stack:** React 19 + CSS variables. Quack icons + `--tool-*` tones.
 
 ### Files
@@ -23,6 +26,7 @@ see **`082-cursor-compact-action-stream.md`** — primary UX contract.
 | Path | Role |
 |---|---|
 | `src/components/chatToolRender.tsx` | `InterleavedBlocks` / `CompactBlocks`, `ToolCallRow`, AskQuestion, tones |
+| `src/components/ProseWithSpendLimit.tsx` | Compact/legacy prose bridge → MD or spend-limit card (091) |
 | `src/components/chatActionSummary.tsx` | Compact batch UI (082) |
 | `src/components/ToolResultDrawer.tsx` + `src/toolDrawer.ts` | Read/bash/search slide-over |
 | `src/htmlPreview.ts` + `HtmlPreviewFrame.tsx` | HTML preview drawer / tabs (045) |
@@ -34,7 +38,8 @@ see **`082-cursor-compact-action-stream.md`** — primary UX contract.
 | Entry | Behaviour |
 |---|---|
 | `InterleavedBlocks` | Always → `CompactBlocks` |
-| `CompactBlocks` | Walks `blocks[]`; flushes consecutive tools into `ActionBatchSummary` (082); `Task`/`Agent` → duck-avatar `ToolCallRow` (004); thinking → `ReasoningTurnChip` (056) |
+| `CompactBlocks` | Walks `blocks[]`; flushes consecutive tools into `ActionBatchSummary` (082); `Task`/`Agent` → duck-avatar `ToolCallRow` (004); thinking → `ReasoningTurnChip` (056); text → `ProseWithSpendLimit` (091) |
+| `ProseWithSpendLimit` | Committed prose: spend-limit lines → `SpendLimitCard`; else MD. Streaming → plain tail (069) |
 | `StreamingPlainText` | Live prose tail (069) |
 
 **Skipped in stream:** TaskCreate/TaskUpdate/TaskList, TodoWrite, AskUserQuestion
@@ -111,6 +116,7 @@ tools already appear in `streamingBlocks` (082).
 | `.ai-live-shimmer` | Live status / Thinking |
 | `.reasoning-turn-chip*` | 056 |
 | `.tool-drawer` / `.ai-ask-card` | Drawer / ask dock |
+| `.ai-spend-limit-*` | Org spend-limit card (091) |
 
 ### Gotchas
 

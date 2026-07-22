@@ -2,8 +2,9 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-20
-tags: [session, usage, context, progress, claude-code, popover, monitor, quack-v1]
+last_verified: 2026-07-22
+tags: [session, usage, context, progress, claude-code, popover, monitor, quack-v1, spend-limit]
+related: [091-spend-limit-card.md]
 ---
 
 # 023 — Session Usage Panel
@@ -14,6 +15,10 @@ the Usage tab for plan limits + billing.
 
 Claude Code only for the ring + live context data. Other providers: ring absent.
 
+**In-transcript spend-limit card** (org monthly cap copy → warn + meters): see
+**`091-spend-limit-card.md`**. Reuses `parseUsageLimits` / `parseUsageExtra` /
+`claude_usage_limits` from this feature.
+
 ## UI surfaces
 
 | Surface | Location | Shows |
@@ -22,6 +27,7 @@ Claude Code only for the ring + live context data. Other providers: ring absent.
 | `SessionUsagePopover` | Popover above ring (click toggle) | Hero %, segmented bar, per-category token rows, **plan limit bars** |
 | `UsageChip` | `.ai-usage-strip` above composer (idle, post-turn) | Cost + in/out + cache % + duration (no model label) |
 | Usage tab (`usage:<wsId>`) | Activity bar / Settings | Plan limits (5hr / 7day), This chat, Quack spend |
+| `SpendLimitCard` (091) | Transcript when Claude returns org spend-limit copy | Warn card + live extra/plan bars + View usage |
 
 Ring stays pinned between turns (`pinnedContextRef`) so it does not flash empty
 while a new turn streams.

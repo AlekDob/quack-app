@@ -13502,6 +13502,113 @@ html.audit-root #root {
 .ai-cc-login-banner-btn:hover {
   background: var(--bg-hi);
 }
+/* Org / API monthly spend limit — replaces raw Claude limit prose. */
+.ai-spend-limit-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0 4px;
+  padding: 12px 14px;
+  background: var(--warn-bg);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  border-radius: var(--radius-lg);
+  font-size: 12px;
+  color: var(--fg);
+  overflow: hidden;
+}
+.ai-spend-limit-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.ai-spend-limit-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--warn);
+}
+.ai-spend-limit-copy {
+  flex: 1;
+  min-width: 0;
+}
+.ai-spend-limit-title {
+  font-weight: 600;
+  line-height: 1.35;
+}
+.ai-spend-limit-text {
+  font-size: 11px;
+  color: var(--fg-muted);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+.ai-spend-limit-btn {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--primary-bg);
+  color: var(--primary-fg);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.ai-spend-limit-btn:hover {
+  background: var(--bg-hi);
+}
+.ai-spend-limit-meters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 2px;
+}
+.ai-spend-limit-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ai-spend-limit-bar-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.ai-spend-limit-bar-pct {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 11px;
+  color: var(--fg-muted);
+  flex-shrink: 0;
+}
+.ai-spend-limit-bar-pct.hot {
+  color: var(--err);
+}
+.ai-spend-limit-bar-track {
+  height: 5px;
+  border-radius: var(--radius-full);
+  background: var(--border);
+  overflow: hidden;
+}
+.ai-spend-limit-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  background: var(--fg);
+  transition: width 0.3s ease;
+}
+.ai-spend-limit-bar-fill.hot {
+  background: var(--err);
+}
+.ai-spend-limit-bar-reset {
+  font-size: 10.5px;
+  color: var(--fg-muted);
+}
+.ai-spend-limit-raw {
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  line-height: 1.4;
+  opacity: 0.85;
+}
 /* Markdown rendering inside AI chat messages — tighter than the doc preview. */
 .ai-stream-plain {
   font-size: 13.5px;

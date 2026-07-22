@@ -17,12 +17,11 @@ import {
   type ReactNode,
 } from "react";
 import type { ChatMessage, ToolCall } from "../ai";
-import { balanceFences, splitThinking } from "../chatTextUtils";
+import { splitThinking } from "../chatTextUtils";
 import { ReasoningTurnChip } from "./ReasoningTurnChip";
-import { MarkdownPreview } from "./MarkdownPreview";
 import { ActionBatchSummary } from "./chatActionSummary";
-import { StreamingPlainText } from "./StreamingPlainText";
 import { Icon, type IconName } from "./Icon";
+import { ProseWithSpendLimit } from "./ProseWithSpendLimit";
 import { duckAvatarFor } from "../subagents";
 import { requestToolDrawer } from "../toolDrawer";
 import { requestDiff } from "../editorState";
@@ -804,15 +803,12 @@ function CompactBlocks({
         if (visible.trim()) {
           const isLiveTail = streaming && i === lastTextIdx;
           out.push(
-            isLiveTail ? (
-              <StreamingPlainText key={`t${i}`} text={visible} />
-            ) : (
-              <MarkdownPreview
-                key={`t${i}`}
-                content={balanceFences(visible)}
-                onFileOpen={onFileOpen}
-              />
-            ),
+            <ProseWithSpendLimit
+              key={`t${i}`}
+              text={visible}
+              streaming={isLiveTail}
+              onFileOpen={onFileOpen}
+            />,
           );
         }
       }
