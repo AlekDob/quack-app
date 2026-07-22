@@ -1716,8 +1716,16 @@ export const useStore = create<AppState>((set, get) => {
         }
       };
 
-      setProg("Opening workspace…", 60, 100);
+      // Intermediate progress steps so the bar keeps climbing instead of
+      // freezing at one value during the two awaits below (files, then chat
+      // history) — the old per-workspace loop gave this granularity for free.
+      const activeName =
+        recent.find((w) => w.id === activeId)?.name ?? "workspace";
+      setProg(`Opening ${activeName}…`, 45, 100);
+      const tOpen = performance.now();
       const activeOk = activeId ? await loadOne(activeId) : false;
+      setProg("Loading chat history…", 80, 100);
+      const tFiles = performance.now();
       // Presets are a small global read but the active chat needs them to
       // render correctly, so gate the splash on them too.
       await Promise.all([
@@ -1726,6 +1734,11 @@ export const useStore = create<AppState>((set, get) => {
           ? hydrateChatStore(activeId, warmChatIdsFromWs(loaded[activeId]))
           : Promise.resolve(),
       ]);
+      // One-line boot breakdown — read it in the console if startup feels slow.
+      console.info(
+        `[startup] active hydrate: files ${Math.round(tFiles - tOpen)}ms, ` +
+          `chat+presets ${Math.round(performance.now() - tFiles)}ms`,
+      );
 
       // Optimistically show every openable project icon; a failed load is
       // pruned when the background pass reconciles openIds below. WorkspaceShell
