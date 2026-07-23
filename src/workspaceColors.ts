@@ -8,8 +8,8 @@
 // (same shape as aiTaskStore) lets the activity bar + agent rail re-render
 // when a color changes, without threading state through the store.
 
-import { getJson, setJson } from "./localStore";
-import { notify as toast } from "./notify";
+import { getJson, remove as removeLocal } from "./localStore";
+import { workspaces } from "./ipc";
 import { normalizeWorkspaceRoot } from "./pathUtils";
 import { useStore } from "./store";
 
@@ -50,19 +50,54 @@ export const WORKSPACE_COLORS: WorkspaceColor[] = [
   { id: "slate", label: "Slate", hex: "#64748b" },
 ];
 
-const KEY = "lcp.ws.colors";
+const KEY = "lcp.ws.colors"; // legacy localStorage key — read once for migration
 const listeners = new Set<() => void>();
+
+// Colors now live on disk (colors.json via Tauri) to dodge the localStorage
+// quota that was silently breaking persistence in long-lived installs. The
+// public API stays SYNCHRONOUS — render paths (activity bar, rail) read
+// `getWorkspaceColor` inline — so we keep an in-RAM cache: hydrated once at
+// boot, mutated on set, and written to disk async (fire-and-forget).
+let cache: Record<string, string> = {};
+let hydrated = false;
 
 function isMap(v: unknown): v is Record<string, string> {
   return !!v && typeof v === "object" && !Array.isArray(v);
 }
 
 function readMap(): Record<string, string> {
-  return getJson<Record<string, string>>(KEY, {}, isMap);
+  return cache;
 }
 
 function notify() {
   for (const l of listeners) l();
+}
+
+/** Load colors from disk into the RAM cache, migrating any legacy
+ *  localStorage map on first run. Call once at boot before first paint. */
+export async function hydrateWorkspaceColors(): Promise<void> {
+  if (hydrated) return;
+  hydrated = true;
+  try {
+    const onDisk = await workspaces.loadColors();
+    if (isMap(onDisk)) cache = onDisk;
+  } catch {
+    cache = {};
+  }
+  // One-time migration: fold the old localStorage map into disk, then drop it.
+  const legacy = getJson<Record<string, string>>(KEY, {}, isMap);
+  if (Object.keys(legacy).length) {
+    let changed = false;
+    for (const [k, v] of Object.entries(legacy)) {
+      if (!(k in cache)) {
+        cache[k] = v;
+        changed = true;
+      }
+    }
+    if (changed) void workspaces.saveColors(cache).catch(() => {});
+    removeLocal(KEY);
+  }
+  notify();
 }
 
 function workspaceRoot(wsId: string): string | null {
@@ -100,20 +135,20 @@ export function getWorkspaceColor(wsId: string): WorkspaceColor | null {
   return isHexColor(id) ? { id, label: "Custom", hex: id } : null;
 }
 
-/** Set (colorId) or clear (null) a workspace's color, then notify. */
+/** Set (colorId) or clear (null) a workspace's color, then notify.
+ *  Cache mutation is synchronous so the UI reflects the change instantly;
+ *  the disk write is fire-and-forget (colors.json has no practical quota). */
 export function setWorkspaceColor(wsId: string, colorId: string | null): void {
-  const map = readMap();
   const key = colorStorageKey(wsId);
-  if (colorId) map[key] = colorId;
-  else delete map[key];
-  if (key !== wsId) delete map[wsId];
-  // setJson swallows quota/disabled-storage errors and returns false. Colors
-  // silently not persisting (esp. in a long-lived prod install where
-  // localStorage fills up) reads as a broken feature — surface it instead.
-  if (!setJson(KEY, map)) {
-    toast("Couldn't save the workspace color — local storage may be full.", "error");
-  }
+  if (colorId) cache[key] = colorId;
+  else delete cache[key];
+  if (key !== wsId) delete cache[wsId];
   notify();
+  void workspaces.saveColors(cache).catch(() => {
+    // Disk write failing is rare (permissions / disk full) — unlike the old
+    // localStorage quota it is not an expected steady-state; log, don't toast.
+    console.warn("[ws-colors] failed to persist colors to disk");
+  });
 }
 
 export function subscribeWorkspaceColors(cb: () => void): () => void {

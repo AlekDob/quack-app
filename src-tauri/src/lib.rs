@@ -120,6 +120,8 @@ pub fn run() {
             workspace::workspaces_save,
             workspace::workspace_state_load,
             workspace::workspace_state_save,
+            workspace::workspace_colors_load,
+            workspace::workspace_colors_save,
             preset_overrides::preset_overrides_load,
             preset_overrides::preset_overrides_save,
             chat_store::chat_store_load_workspace,

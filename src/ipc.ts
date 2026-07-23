@@ -476,4 +476,10 @@ export const workspaces = {
     invoke<unknown>("workspace_state_load", { id }),
   saveState: (id: string, state: unknown) =>
     invoke<void>("workspace_state_save", { id, state }),
+  // Per-project colors: one global map (root → colorId) persisted on disk,
+  // immune to localStorage quota. See workspaceColors.ts.
+  loadColors: () =>
+    invoke<Record<string, string>>("workspace_colors_load"),
+  saveColors: (map: Record<string, string>) =>
+    invoke<void>("workspace_colors_save", { map }),
 };

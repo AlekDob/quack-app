@@ -40,6 +40,7 @@ import {
 } from "./chatStoreCache";
 import { placeAiKeyInTabsPane, pruneAiTabsInPane } from "./ideAiTabSlot";
 import { hydratePresetOverrides, DEFAULT_PRESET_ID } from "./presets";
+import { hydrateWorkspaceColors } from "./workspaceColors";
 import { pulseChatSwitch } from "./chatSwitch";
 import { logChatSwitch } from "./chatSwitchDebug";
 import { markSwitchStart } from "./switchPerf";
@@ -1752,6 +1753,10 @@ export const useStore = create<AppState>((set, get) => {
         hydrateProgress: { phase: "Ready", current: 100, total: 100 },
       });
       void persistIdx();
+      // Load per-project colors from disk (+ migrate legacy localStorage).
+      // recent/loaded are set above so root-keyed migration resolves; the
+      // color API is sync-over-RAM-cache and re-notifies once disk arrives.
+      void hydrateWorkspaceColors();
 
       const rest = openable.filter((id) => id !== (activeOk ? activeId : null));
       if (rest.length) {
