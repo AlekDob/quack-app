@@ -179,6 +179,8 @@ export interface LoadedMessage {
 export interface LoadedSubagent {
   agent_type: string;
   description: string;
+  /** Sidechain billed model id when known (e.g. claude-haiku-4-5-…). */
+  model?: string | null;
   messages: LoadedMessage[];
 }
 

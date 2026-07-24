@@ -15474,6 +15474,14 @@ html.audit-root #root {
   object-fit: cover;
   flex-shrink: 0;
 }
+/* Cursor-style model label next to subagent type (Haiku 4.5). */
+.ai-tcall-subagent .ai-tcall-model {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
 /* Read-only subagent transcript tab body */
 .subagent-view {
   flex: 1;
@@ -15522,6 +15530,11 @@ html.audit-root #root {
   font-size: 14px;
   font-weight: 600;
   color: var(--fg);
+}
+.subagent-view-model {
+  font-weight: 400;
+  color: var(--fg-muted);
+  font-size: 12px;
 }
 .subagent-view-sub {
   font-size: 11px;

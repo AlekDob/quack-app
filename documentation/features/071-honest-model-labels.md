@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-13
-last_verified: 2026-07-17
+last_verified: 2026-07-24
 tags: [model-selector, claude-code, composer, usage, display-names]
 ---
 
@@ -40,9 +40,15 @@ CLI probes refresh.
 | Usage strip (`UsageChip`) | `$cost · tokens · cache% · duration` — **no** model name |
 | Usage strip tooltip | Raw API / transcript id when known (`claude-sonnet-…`) |
 | Usage tab session row | Family only: `sonnet` / `opus` / `haiku` / … (`shortModelFamily`) |
+| **Subagent chip / transcript header** | **Out of scope here** — Cursor-style versioned labels (`Haiku 4.5`) via `streamModelLabel` in [`004-subagent-mentions.md`](004-subagent-mentions.md) |
 
 Other providers (Anthropic BYOK, Cursor CLI, Ollama): unchanged — chip/picker
 still use each row’s catalog `displayName`.
+
+> **Split (2026-07-24):** picker/composer stay on stable aliases so the chip does
+> not flip when CLI probes refresh. Stream subagent chips intentionally show
+> family + short version so you can see which model a delegated Explore/Plan
+> actually billed — different product surface, different formatter.
 
 ### Data flow
 

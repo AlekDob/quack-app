@@ -116,7 +116,7 @@ Pattern: `src/aiTaskStore.ts` / `src/agentStatusStore.ts` (module-level pub/sub 
   - `001-ai-session-library.md` — sessions/agents lists, persistence, mount-asymmetry gotcha.
   - `002-workspace-colors.md` — per-project color (right-click popover + palette); title-bar ambient wash when active project has a color.
   - `003-design-system.md` — tokens, themes, neutral chrome, liquid glass, native window, composer, pill tabs.
-  - `004-subagent-mentions.md` — `@`-mention subagents + duck-avatar Task/Agent chip → read-only transcript (tab/drawer); `CompactBlocks` must use `isSubagentDispatch` so chips are not swallowed by 082 batch summaries.
+  - `004-subagent-mentions.md` — `@`-mention subagents + duck-avatar Task/Agent chip → read-only transcript (tab/drawer); Cursor-style **model label** on chip + header (`streamModelLabel`, sidechain peek); `CompactBlocks` must use `isSubagentDispatch` so chips are not swallowed by 082 batch summaries.
   - `005-jack-duck-identity.md` — the assistant IS Jack (duck PM): persona, `AIIcon` duck mark, chat header.
   - `009-agent-hub.md` — the cross-project status hub (right rail): groups, `AgentHubWatcher`, notifications, lifecycle.
   - `064-agent-hub-drawer-and-chat-tab-switch.md` — collapsed hover drawer, chat switch perf, pane tab visibility stacking; DONE hosts unload when hidden (`076`).
@@ -182,7 +182,7 @@ Pattern: `src/aiTaskStore.ts` / `src/agentStatusStore.ts` (module-level pub/sub 
   - `069-smooth-streaming.md` — smooth assistant stream: rAF-coalesced paint + light inline MD on the live tail (no typewriter / no caret); full `MarkdownPreview` on turn commit.
   - `073-ask-user-question-dock.md` — Claude Code `AskUserQuestion`: Cursor-style interactive card above composer; hook `tool_input` cache + lenient parse; deny-redirect flow (015); `quackClaudeCodeEditorPrompt()` tells all CC agents to call the tool; subagents hand off to orchestrator (004).
   - `070-workspace-doc-open.md` — resolve doc/file paths from chat links + Context docs; ownership via `isUnderRoot` (no sibling false-positive — bug `006`); story → drawer, features → preview, Agent Mode → tab drawer (`workspaceDocOpen.ts`, `pathUtils.ts`).
-  - `071-honest-model-labels.md` — CC display labels: Codetta-style Title Case alias (`Sonnet`); stable via `ccStableDisplayName` (no static version map / dual alias-vs-resolved layer).
+  - `071-honest-model-labels.md` — CC display labels: Codetta-style Title Case alias (`Sonnet`); stable via `ccStableDisplayName` (no static version map / dual alias-vs-resolved layer). Subagent stream chips use versioned labels in `004`, not this alias set.
   - `063-surface-view-prefs.md` — per-surface tab vs drawer default (Works / Brain / Team / **subagent transcripts**); Settings → Views; nested child-drawer stack.
   - `065-works-drawer-ux.md` — catalog list, draft create, Notion editor in drawer, module picker, nested drawer stack, overlay z-index (ctx menu + confirm).
   - `052-composer-voice-dictation.md` — Cursor-style composer mic: waveform row, native macOS `SFSpeechRecognizer` + Web Speech on Windows; `dictation.ts`, `dictation.rs`, `ComposerMic.tsx`.

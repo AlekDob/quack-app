@@ -23,6 +23,7 @@ import { ActionBatchSummary } from "./chatActionSummary";
 import { Icon, type IconName } from "./Icon";
 import { ProseWithSpendLimit } from "./ProseWithSpendLimit";
 import { duckAvatarFor } from "../subagents";
+import { streamModelLabel } from "../streamModelLabel";
 import { requestToolDrawer } from "../toolDrawer";
 import { requestDiff } from "../editorState";
 import { langOf } from "../langDetect";
@@ -1454,6 +1455,10 @@ export const ToolCallRow = memo(function ToolCallRow({
       typeof call.function.arguments.description === "string"
         ? call.function.arguments.description
         : "";
+    const argModel = call.function.arguments.model;
+    const modelLabel = streamModelLabel(
+      call.model ?? (typeof argModel === "string" ? argModel : undefined),
+    );
     const canOpen = !!openSubagent && !!call.id;
     return (
       <div className={`ai-tcall ai-tcall-subagent${standalone ? " ai-tcall-standalone" : ""}`}>
@@ -1479,6 +1484,9 @@ export const ToolCallRow = memo(function ToolCallRow({
             aria-hidden="true"
           />
           <span className="ai-tcall-name">{agentType || "Subagent"}</span>
+          {modelLabel && (
+            <span className="ai-tcall-model">{modelLabel}</span>
+          )}
           {desc && <span className="ai-tcall-detail">{desc}</span>}
           {typeof result !== "string" && (
             <span className="ai-tcall-pending">

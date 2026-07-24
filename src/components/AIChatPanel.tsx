@@ -4284,6 +4284,17 @@ export function AIChatPanel({
             setLiveContextTokens(ev.tokens);
             continue;
           }
+          if (ev.kind === "subagent_model") {
+            // Sidechain billed model → stamp on the parent Agent/Task chip.
+            const call = toolCallsThisRound.find(
+              (c) => c.id === ev.toolUseId,
+            );
+            if (call && call.model !== ev.model) {
+              call.model = ev.model;
+              setStreamingToolCalls([...toolCallsThisRound]);
+            }
+            continue;
+          }
           if (ev.kind === "content") {
             // Empty content events are keep-alive pings (e.g. extended-
             // thinking deltas in the Claude Code provider). They keep

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { claudeCode, type LoadedMessage } from "../ipc";
 import { duckAvatarFor } from "../subagents";
+import { streamModelLabel } from "../streamModelLabel";
 import type { ToolCall } from "../ai";
 import { TranscriptTurnRows, type TranscriptTurn } from "./TranscriptTurnRows";
 
@@ -21,7 +22,12 @@ interface Props {
 type LoadState =
   | { phase: "loading" }
   | { phase: "error"; message: string }
-  | { phase: "ready"; description: string; messages: LoadedMessage[] };
+  | {
+      phase: "ready";
+      description: string;
+      model?: string | null;
+      messages: LoadedMessage[];
+    };
 
 function toTranscriptTurns(messages: LoadedMessage[]): TranscriptTurn[] {
   return messages.flatMap((m) => {
@@ -64,6 +70,7 @@ export function SubagentTranscriptView({
           setState({
             phase: "ready",
             description: r.description,
+            model: r.model,
             messages: r.messages,
           });
       })
@@ -77,6 +84,8 @@ export function SubagentTranscriptView({
 
   if (!inline && !container) return null;
   const desc = state.phase === "ready" ? state.description : "";
+  const modelLabel =
+    state.phase === "ready" ? streamModelLabel(state.model) : null;
   const name = agentType || "Subagent";
   const body = (
     <div
@@ -91,7 +100,12 @@ export function SubagentTranscriptView({
           aria-hidden="true"
         />
         <div className="subagent-view-id">
-          <div className="subagent-view-name">{name}</div>
+          <div className="subagent-view-name">
+            {name}
+            {modelLabel && (
+              <span className="subagent-view-model"> {modelLabel}</span>
+            )}
+          </div>
           <div className="subagent-view-sub">
             Subagent · read-only{desc ? ` · ${desc}` : ""}
           </div>

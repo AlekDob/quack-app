@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-20
+last_verified: 2026-07-24
 
 **Purpose:** Let the user delegate a chat turn to a Claude Code **subagent** by
 typing `@` in the composer — the same affordance that already attaches files.
@@ -42,8 +42,9 @@ dependency).
 | Component | `src/components/MentionSuggestions.tsx` | `@` popover UI (agent + file rows, path preview) — see **`041-mention-file-preview.md`** |
 | Component | `src/components/MentionPathPreview.tsx` | Side tree for highlighted file row (041) |
 | Component | `src/components/AIChatPanel.tsx` | `agents`/`attachedAgents` state, agent-load effect (CC-only), `@` match logic + `acceptMention`, delegation injection, reset, chips; `SubagentOpen.Provider` + `openSubagentTab`; `.ai-mention-open` overflow toggle |
-| Render | `src/components/chatToolRender.tsx` | `SubagentOpen` context, `subagentTypeOf()`, `isSubagentDispatch()`, Task/Agent→duck-avatar chip (clickable); `CompactBlocks` mounts chip outside `ActionBatchSummary` |
-| Component | `src/components/SubagentTranscriptView.tsx` | read-only transcript viewer (portaled in editor/drawer, **inline** in agent mode when pref = tab), reuses `TranscriptTurnRows` + `ToolCallRow` |
+| Render | `src/components/chatToolRender.tsx` | `SubagentOpen` context, `subagentTypeOf()`, `isSubagentDispatch()`, Task/Agent→duck-avatar chip (clickable + model label); `CompactBlocks` mounts chip outside `ActionBatchSummary` |
+| Util | `src/streamModelLabel.ts` | Cursor-style short labels (`Haiku 4.5`) for chip + header |
+| Component | `src/components/SubagentTranscriptView.tsx` | read-only transcript viewer (portaled in editor/drawer, **inline** in agent mode when pref = tab), reuses `TranscriptTurnRows` + `ToolCallRow`; header shows model |
 | Render | `src/components/TranscriptTurnRows.tsx` | shared read-only turn markup (`.ai-msg`, `.ai-tcalls`, `UserTurnBar` shell) |
 | Host | `src/components/WorkspaceShell.tsx` | walks panes for `sub:` keys, portals one viewer each |
 | Agent host | `src/components/AgentModeShell.tsx` | Tab pref: inline `SubagentTranscriptView` in `.agent-main-review`. Drawer pref: `EditorTabDrawer` + `TabContentHost` overlay |
@@ -67,18 +68,84 @@ dependency).
 1. The subagent tool-call renders as a **duck-avatar chip** (`chatToolRender` ToolCallRow special-case),
    avatar from `duckAvatarFor(subagent_type)`. **The tool is named `Agent` in current Claude Code**
    (older versions / other providers use `Task`) — the chip matches BOTH names.
+   **Model label (Cursor-style):** muted text next to the type (`Haiku 4.5`) via
+   `streamModelLabel` — sourced from live sidechain peek (`subagent_model` stream event) or
+   rare `arguments.model`, persisted on `ToolCall.model`.
 2. Click → `SubagentOpen` context → `openSubagentTab(call.id, agentType)` → `store.openSubagent`,
    which opens a self-contained `sub:<ccSessionId>|<toolUseId>|<agentType>` tab or drawer per Settings → Views → **Subagent transcripts**.
 3. **Editor layout:** `WorkspaceShell` portals `SubagentTranscriptView` into the editor pane container or `EditorTabDrawer`.
 4. **Agent Mode:** when pref = tab, `AgentModeShell` reads the focused `sub:` key via `focusedAgentSidePanelKey`
    and renders `SubagentTranscriptView` **inline** in `.agent-main-review` (50/50 beside chat). When pref = drawer,
    `AgentModeShell` mounts the same overlay drawer host as `WorkspaceShell`.
-5. `SubagentTranscriptView` calls `claude_code_load_subagent(cwd, ccSessionId, toolUseId)`.
+5. `SubagentTranscriptView` calls `claude_code_load_subagent(cwd, ccSessionId, toolUseId)` — returns
+   `model` (first non-synthetic `message.model` on the sidechain jsonl) and shows it in the header.
 6. **On-disk linkage:** Claude Code writes each subagent to
    `~/.claude/projects/<enc-cwd>/<session>/subagents/agent-<id>.jsonl` with a sibling
    `agent-<id>.meta.json` = `{agentType, description, toolUseId}`. The command finds the meta whose
    `toolUseId` matches the Task call id, then parses the sibling jsonl (reuses `parse_session_jsonl`).
 7. Rendered read-only: delegation prompt as a "user" bubble, subagent steps via `ToolCallRow`. **No composer.**
+
+### Model on chip + header (2026-07-24)
+
+Cursor-style billed-model label next to the subagent type — **not** the stable
+picker aliases of [`071-honest-model-labels.md`](071-honest-model-labels.md).
+
+**Why peek:** Agent/Task `tool_input` almost never includes `model` (0 hits in
+local transcripts). Ground truth is sidechain `assistant.message.model`.
+
+#### Data flow
+
+```
+CC sidechain NDJSON (parent_tool_use_id set)
+  → claudeCode.ts peek once per parent id
+  → ChatStreamEvent { kind: "subagent_model"; toolUseId; model }
+  → AIChatPanel stamps ToolCall.model
+  → ToolCallRow → streamModelLabel → .ai-tcall-model
+
+Disk: agent-*.jsonl
+  → peek_jsonl_model (first non-<synthetic> message.model)
+  → LoadedSubagent.model
+  → SubagentTranscriptView → .subagent-view-model
+```
+
+#### Surfaces
+
+| Surface | CSS / markup | Label source |
+|---|---|---|
+| Main stream chip | `.ai-tcall-model` after `.ai-tcall-name` | `call.model` \|\| `arguments.model` |
+| Transcript header | `.subagent-view-model` next to agent type | `LoadedSubagent.model` |
+
+#### Key functions / types
+
+| Symbol | Where | Role |
+|---|---|---|
+| `streamModelLabel(raw) → string \| null` | `src/streamModelLabel.ts` | `claude-haiku-4-5-…` → `Haiku 4.5`; bare `haiku` → `Haiku`; skips `<synthetic>` |
+| `ToolCall.model?` | `src/ai.ts` | Persisted on the parent Agent/Task call |
+| `ChatStreamEvent.subagent_model` | `src/ai.ts` | Live one-shot enrichment |
+| `peek_jsonl_model(path) → Option<String>` | `src-tauri/src/claude_code.rs` | Disk scan for transcript header |
+| `LoadedSubagent.model` | Rust + `src/ipc.ts` | Optional billed id on load |
+
+#### Files (model-label slice)
+
+| Type | Path | Purpose |
+|---|---|---|
+| Util | `src/streamModelLabel.ts` | Cursor-style short labels |
+| Test | `src/streamModelLabel.test.ts` | Vitest for dated ids / aliases / synthetic |
+| Type | `src/ai.ts` | `ToolCall.model`, `subagent_model` event |
+| Provider | `src/providers/claudeCode.ts` | Sidechain peek + rare `arguments.model` stamp |
+| Component | `src/components/AIChatPanel.tsx` | Handles `subagent_model` → mutates live `ToolCall` |
+| Render | `src/components/chatToolRender.tsx` | Chip `.ai-tcall-model` |
+| Component | `src/components/SubagentTranscriptView.tsx` | Header model |
+| Backend | `src-tauri/src/claude_code.rs` | `LoadedSubagent.model`, `peek_jsonl_model` |
+| IPC | `src/ipc.ts` | TS `LoadedSubagent.model` |
+| Style | `src/App.css` | `.ai-tcall-model`, `.subagent-view-model` |
+
+#### Gotchas
+
+- Do **not** infer model from `subagent_type` (Explore is often Haiku, sometimes Opus/Sonnet).
+- Nested sidechain content stays filtered; only `message.model` is peeked once.
+- Old chats without `ToolCall.model` show no chip label until a new run (header still works via disk).
+- Picker / composer keep `071` aliases (`Haiku`, not `Haiku 4.5`).
 
 ### Compact stream contract (082 — restored 2026-07-20)
 
@@ -123,6 +190,8 @@ with `parent_tool_use_id` (and aren't persisted to the main session jsonl — th
 file). `providers/claudeCode.ts` skips emitting any `assistant`/`user` record where
 `parent_tool_use_id` (or `parentToolUseID`) is set, so the main transcript shows **only** the
 Agent chip + its final report. The full inner work lives in the read-only transcript tab.
+**Exception:** the first sidechain `assistant.message.model` is peeked once as `subagent_model`
+so the chip can show which model the run is using.
 
 ### Plan mode — sidechain permission auto-allow (2026-07-14)
 When Jack is in CC **Plan** mode and delegates via `Task`/`Agent`, the subagent's inner tool calls

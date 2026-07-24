@@ -271,6 +271,8 @@ export const claudeCodeProvider: ChatProvider = {
     // Set of tool_use ids we've already emitted via stream_event so
     // the wrapping `assistant` event handler can skip duplicates.
     const emittedToolUseIds = new Set<string>();
+    // Parent Agent/Task ids we've already surfaced a sidechain model for.
+    const emittedSubagentModels = new Set<string>();
     // Buffer extended-thinking content per content-block index. The model
     // can spend many seconds (sometimes minutes) in extended thinking
     // before emitting its first text token; without surfacing those
@@ -486,6 +488,10 @@ export const claudeCodeProvider: ChatProvider = {
                 id: buf.id,
                 function: { name: buf.name ?? "tool", arguments: args },
               };
+              const argModel = args.model;
+              if (typeof argModel === "string" && argModel) {
+                call.model = argModel;
+              }
               if (buf.id) emittedToolUseIds.add(buf.id);
               queue.push({ kind: "tool_call", call });
               wake();
@@ -515,6 +521,35 @@ export const claudeCodeProvider: ChatProvider = {
         // id of the parent Agent/Task call. We hide these inner steps from
         // the main transcript: the duck-avatar chip shows the run, and the
         // full subagent transcript lives in its own read-only tab.
+        // Peek message.model once so the chip can show Cursor-style labels.
+        if (
+          isSubagentRecord &&
+          obj.type === "assistant" &&
+          obj.message &&
+          typeof obj.message === "object"
+        ) {
+          const parentId =
+            (typeof obj.parent_tool_use_id === "string" &&
+              obj.parent_tool_use_id) ||
+            (typeof obj.parentToolUseID === "string" && obj.parentToolUseID) ||
+            "";
+          const model =
+            typeof obj.message.model === "string" ? obj.message.model : "";
+          if (
+            parentId &&
+            model &&
+            model !== "<synthetic>" &&
+            !emittedSubagentModels.has(parentId)
+          ) {
+            emittedSubagentModels.add(parentId);
+            queue.push({
+              kind: "subagent_model",
+              toolUseId: parentId,
+              model,
+            });
+            wake();
+          }
+        }
         if (obj.type === "assistant" && obj.message?.content && !isSubagentRecord) {
           // If we've already streamed this message's text via
           // content_block_delta events, suppress the duplicate text
@@ -553,6 +588,10 @@ export const claudeCodeProvider: ChatProvider = {
                       : {},
                 },
               };
+              const argModel = call.function.arguments.model;
+              if (typeof argModel === "string" && argModel) {
+                call.model = argModel;
+              }
               queue.push({ kind: "tool_call", call });
             }
           }

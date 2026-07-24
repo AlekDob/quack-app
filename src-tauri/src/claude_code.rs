@@ -1351,11 +1351,13 @@ pub async fn claude_code_load_session(
 }
 
 /// Result of loading one subagent's full transcript from disk. `agent_type`
-/// and `description` come from the sibling `*.meta.json`.
+/// and `description` come from the sibling `*.meta.json`. `model` is the
+/// first non-synthetic `message.model` stamped on the sidechain jsonl.
 #[derive(serde::Serialize)]
 pub struct LoadedSubagent {
     pub agent_type: String,
     pub description: String,
+    pub model: Option<String>,
     pub messages: Vec<LoadedMessage>,
 }
 
@@ -1415,6 +1417,7 @@ fn claude_code_load_subagent_blocking(
         }
         let base = name.trim_end_matches(".meta.json");
         let jsonl = sub_dir.join(format!("{}.jsonl", base));
+        let model = peek_jsonl_model(&jsonl);
         return Ok(LoadedSubagent {
             agent_type: meta
                 .get("agentType")
@@ -1426,10 +1429,41 @@ fn claude_code_load_subagent_blocking(
                 .and_then(|x| x.as_str())
                 .unwrap_or("")
                 .to_string(),
+            model,
             messages: parse_session_jsonl(&jsonl)?,
         });
     }
     Err(format!("no subagent transcript for tool_use {}", tool_use_id))
+}
+
+/// First billed model on a sidechain jsonl (skip empty / `<synthetic>`).
+fn peek_jsonl_model(path: &std::path::Path) -> Option<String> {
+    use std::fs;
+    let file = fs::File::open(path).ok()?;
+    let mut reader = BufReader::new(file);
+    let mut buf = String::with_capacity(4 * 1024);
+    loop {
+        buf.clear();
+        if std::io::BufRead::read_line(&mut reader, &mut buf).ok()? == 0 {
+            return None;
+        }
+        let line = buf.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let v: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let model = v
+            .get("message")
+            .and_then(|m| m.get("model"))
+            .and_then(|x| x.as_str())
+            .unwrap_or("");
+        if !model.is_empty() && model != "<synthetic>" {
+            return Some(model.to_string());
+        }
+    }
 }
 
 /// Parse a Claude Code JSONL transcript (main session OR subagent) into our

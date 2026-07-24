@@ -11,6 +11,11 @@ export interface OllamaModel {
 export interface ToolCall {
   id?: string;
   function: { name: string; arguments: Record<string, unknown> };
+  /**
+   * Subagent (Agent/Task) billed model from sidechain `message.model`
+   * (or rare tool_input.model). Display via `streamModelLabel`.
+   */
+  model?: string;
 }
 
 export interface ChatMessage {
@@ -178,7 +183,12 @@ export type ChatStreamEvent =
         cacheRead: number;
         cacheCreate: number;
       };
-    };
+    }
+  /**
+   * Subagent sidechain billed model, peeked once per parent Agent/Task
+   * tool_use id (nested content stays hidden — chip-only UX).
+   */
+  | { kind: "subagent_model"; toolUseId: string; model: string };
 
 import { getProvider, parseQualifiedModel } from "./providers";
 import type { ProviderId } from "./providers";
