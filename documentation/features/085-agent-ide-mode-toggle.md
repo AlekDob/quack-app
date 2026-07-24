@@ -5,13 +5,14 @@ stack: Tauri + React
 created: 2026-07-20
 startDate: 2026-07-20
 endDate:
-last_verified: 2026-07-22
+last_verified: 2026-07-24
 status: active
 tags: [agent-mode, ide-mode, layout-toggle, performance, remount, chat-hydrate]
 related:
   - 001-ai-session-library.md
   - 043-chat-transcript-persistence.md
   - 058-workspace-switch-performance.md
+  - 067-agent-tasks-checklist.md
   - 075-chat-switch-loader.md
   - 076-chat-lazy-hydrate-done-unload.md
   - 079-cold-project-switch-loader.md
@@ -44,7 +45,7 @@ related:
 | Component | `src/components/AIChatPanel.tsx` | Conditional `force` hydrate + phase logs |
 | Component | `src/components/FileTree.tsx` | `filetree root loaded` phase |
 | Component | `src/components/TerminalCore.tsx` | `terminal attached` + `replayMs` |
-| Component | `src/components/TopBar.tsx` | Agents / IDE toggle |
+| Component | `src/components/TopBar.tsx` | Agents / IDE toggle (sole chrome exit; no sidebar “Editor layout” button) |
 | Service | `src/actions.ts` | `view.toggle_agent_mode` |
 | Util | `src/switchPerf.ts` | `markAgentModeSwitch` / `logAgentModePhase` |
 | Util | `src/agentModeSwitchSim.ts` | Trigger-file round-trip → JSON report |
@@ -71,7 +72,7 @@ toggleAgentMode → setAgentMode
 - **Agent → IDE:** unmount `AgentModeShell` → remount N `WorkspaceShell` + chrome
 - **Selected chat:** `agentModeSelection` map (not React state) + seed from IDE focused `ai:` tab; `selectSession` also `focusAIChat` so IDE lands on the same chat
 
-Constraint: one `AIChatPanel` owner per chat (no double stream). Chat bodies can stay in `chatStoreCache` across the swap; Monaco warm-LRU (`058`) does **not**.
+Constraint: one `AIChatPanel` owner per chat (no double stream). Chat bodies can stay in `chatStoreCache` across the swap; Monaco warm-LRU (`058`) does **not**. Agent Mode sidebar does **not** offer an “Editor layout” exit — only TopBar / command `view.toggle_agent_mode` (`085` chrome; removed 2026-07-24). Todo checklist lives on the composer chip (`067`), not the rail.
 
 ### Durability + title (2026-07-20 follow-up)
 

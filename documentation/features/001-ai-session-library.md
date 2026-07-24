@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-22
+last_verified: 2026-07-24
 tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, workspace, zustand, persistence]
 ---
 
@@ -56,7 +56,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 - **Prompt bus:** `AIChatPanel` ignores events for other `chatId`s; unscoped events only hit the focused tabbed chat (sticky multitask hosts must not all ingest the same prompt).
 - **Render the lists:** `Object.values(ws.aiChats).sort(by createdAt)` → `AIChatsRail` / `AgentModeShell`
 - **Transcript load/save:** lazy hydrate — see `043` + `076`. Composer via `patchSession` (`040`)
-- **Live tasks:** `publishTasks(chatId, todos)` → `aiTaskStore` → `AgentTasks`
+- **Live tasks:** `publishTasks(chatId, todos)` → `aiTaskStore` + composer `TodosCard` (`067`)
 
 ### Key Functions
 - `addNewAIChat(wsId, location?)` — create tab + hub row + inline name flag

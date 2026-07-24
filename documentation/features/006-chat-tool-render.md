@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-22
+last_verified: 2026-07-24
 tags: [ai-chat, tool-calls, chatToolRender, cursor-style, compact-summary, drawer, diff-modal, css, presentational, tool-icon-tints, webfetch-markdown, compose-recap, html-preview, ask-user-question, spend-limit]
 related: [082-cursor-compact-action-stream.md, 091-spend-limit-card.md]
 ---
@@ -43,7 +43,7 @@ see **`082-cursor-compact-action-stream.md`** — primary UX contract.
 | `StreamingPlainText` | Live prose tail (069) |
 
 **Skipped in stream:** TaskCreate/TaskUpdate/TaskList, TodoWrite, AskUserQuestion
-(sidebar / ask-dock — 067 / 073). **`Task`/`Agent` subagent dispatch** is not
+(composer chip / ask-dock — 067 / 073). **`Task`/`Agent` subagent dispatch** is not
 skipped — rendered as clickable duck chips (004). Edits **remain** in the
 compact summary; ComposeCard still recaps at turn end.
 

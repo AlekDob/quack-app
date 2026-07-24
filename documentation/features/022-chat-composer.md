@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-22
+last_verified: 2026-07-24
 tags: [composer, stop, multitask, esc, turn-status]
 ---
 
@@ -169,12 +169,12 @@ Claude Code only. Full behaviour table: **`015-claude-permission-mode.md`**.
 
 ## Plan chip (todos)
 
-- `TodosCard` (`chatPanelChrome.tsx`) moved from a top sticky card to an
-  astronave-style **chip above the composer** (`.ai-todos-bar` / `.ai-todos-wrap`).
-- Collapsed by default: shows `Plan · {done}/{total}` (or the in-progress item).
-  Click expands **upward** into a popover (`.ai-todos-pop`) with the full list
-  (reuses `.ai-todos-list` / `.ai-todo-*`). Backdrop closes it. Skipped in
-  compact/agent mode (the checklist lives in the sidebar there).
+- `TodosCard` (`chatPanelChrome.tsx`) — astronave / Cursor-style **chip above the
+  composer** (`.ai-todos-bar` / `.ai-todos-wrap`). Same in IDE and Agent Mode.
+- Collapsed by default: `Plan · {done}/{total}` or in-progress summary. Click
+  expands **upward** (`.ai-todos-pop`); backdrop closes. Full checklist detail:
+  **`067-agent-tasks-checklist.md`**.
+- Not rendered in the left Agent Mode sidebar (removed 2026-07-24).
 
 ## Ask question dock (feature 073)
 

@@ -3,44 +3,58 @@ type: feature-doc
 project: codetta
 stack: Tauri (Rust + React/TypeScript)
 created: 2026-07-12
-last_verified: 2026-07-12
-tags: [agent-mode, tasks, todo, sidebar, checklist]
+last_verified: 2026-07-24
+tags: [agent-mode, tasks, todo, composer, checklist]
+related:
+  - 001-ai-session-library.md
+  - 022-chat-composer.md
+  - 085-agent-ide-mode-toggle.md
+  - 006-chat-tool-render.md
+  - 082-cursor-compact-action-stream.md
 ---
 
 ## Agent Tasks Checklist
-**Purpose:** Cursor-style collapsible checklist of the active agent's live TodoWrite/TaskCreate items, shown below the sessions list in the Agent Mode sidebar.
+**Purpose:** Cursor-style expandable chip of the active agent's live TodoWrite/TaskCreate items, docked **above the composer** in both IDE and Agent Mode. Collapsed by default; expands upward into the full checklist.
 **Stack:** React 19 + TypeScript
 
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Store/State | src/aiTaskStore.ts | Module-level pub/sub map (`tasksByChat`, keyed by chatId), not Zustand — transient per-session UI state |
-| Component | src/components/AgentModeShell.tsx | `AgentTasks({ chatId })` — collapsed/expanded checklist, rendered under the sessions rail |
-| Component | src/components/AIChatPanel.tsx | Publishes the live checklist via `publishTasks(aiChatId, todos)` as TodoWrite/TaskCreate stream events arrive |
-| Component | src/components/Icon.tsx | Icon glyphs used: `check-circle`, `arrow-down-circle`, `circle`, `chevron-up`, `chevron-down` |
-| Config | src/App.css | `.agent-tasks*` rules (`.agent-tasks-head` clickable button w/ hover `bg-hi`, `.agent-tasks-current`, `.agent-tasks-head-trail`, `.agent-tasks-list`, `.agent-task`) |
+| Store/State | `src/aiTaskStore.ts` | Module-level pub/sub (`tasksByChat` by chatId) — transient; feeds `workProgressStore` |
+| Component | `src/components/chatPanelChrome.tsx` | `TodosCard` — chip + upward popover |
+| Component | `src/components/AIChatPanel.tsx` | Owns `todos` state; `publishTasks`; mounts chip in `.ai-todos-bar` |
+| Component | `src/components/AgentModeShell.tsx` | `clearTasks` on session close only (no sidebar Tasks UI) |
+| Config | `src/App.css` | `.ai-todos-bar`, `.ai-todos-wrap`, `.ai-todos-chip`, `.ai-todos-pop`, `.ai-todo*` |
 
 ### Data Flow
-Claude Code CLI stream (TodoWrite/TaskCreate/TaskUpdate tool events) → `AIChatPanel` accumulates todos → `publishTasks(chatId, items)` → `aiTaskStore` module map + listener notify → `AgentModeShell.AgentTasks` (`subscribeTasks` + `getTasks(chatId)`) → collapsed/expanded checklist UI
+Claude Code stream (`TodoWrite` / `TaskCreate` / `TaskUpdate`) → `AIChatPanel` `todos` state → `publishTasks(chatId, items)` → `aiTaskStore` (+ `workProgressStore`) **and** local `todos` → `TodosCard` above composer
 
 ### Key Functions
-- `publishTasks(chatId: string, items: AiTaskItem[] | null) → void` — AIChatPanel writes the current checklist; empty/null clears the entry
-- `clearTasks(chatId: string) → void` — drops a chat's tasks entirely (e.g. session closed)
-- `getTasks(chatId: string | null | undefined) → AiTaskItem[]` — read-only snapshot for a chat
-- `subscribeTasks(cb: () => void) → () => void` — register a re-render listener, returns unsubscribe
-- `AgentTasks({ chatId: string | null }) → JSX.Element | null` — renders nothing when the dedup'd task list is empty
+- `publishTasks(chatId, items | null) → void` — write/clear mirror; identical lists are no-ops
+- `clearTasks(chatId) → void` — drop on Agent Mode session close
+- `getTasks(chatId?) → AiTaskItem[]` — read snapshot (progress)
+- `subscribeTasks(cb) → unsubscribe` — re-render listeners
+- `TodosCard({ items }) → JSX` — chip (`N/M · current` or `Plan · N/M`) + expand-up list
 
 ### State
-- `expanded`: boolean — collapsed/expanded toggle, resets to `false` on `chatId` change (component)
-- `tasksByChat`: Map<string, AiTaskItem[]> — live checklist per chat id (global, module-level in `aiTaskStore.ts`)
+| State | Where | Notes |
+|---|---|---|
+| `todos` | `AIChatPanel` | Authoritative UI list for the chip |
+| `open` | `TodosCard` | Popover toggle (local) |
+| `tasksByChat` | `aiTaskStore` | Mirror for progress / other subscribers |
 
 ### Behavior Notes
-- Collapsed by default; auto-collapses again whenever `chatId` changes (`useEffect(() => setExpanded(false), [chatId])`) so a new chat never inherits the previous one's expanded state.
-- Duplicate tasks (same `content` emitted by both TaskCreate and TodoWrite) are collapsed client-side, keeping the furthest-along status (`pending` < `in_progress` < `completed`).
-- Collapsed head shows: current task (`in_progress` first, else next `pending`, else last item) with `activeForm` text if present, a `done/total` count pill, and a chevron.
-- Expanded view lists every task: `completed` → strikethrough + green check-circle; `in_progress` → bold + accent arrow-down-circle; `pending` → hollow circle.
-- Entire head row (`.agent-tasks-head`) is a `<button>` toggling `expanded`; whole component returns `null` when there are no tasks for the chat.
+- Same chip in Agent Mode (`compact`) and IDE — no `!compact` skip.
+- Hidden when `todos.length === 0`.
+- TodoWrite / TaskCreate / TaskUpdate / TaskList stay **out of** the compact action stream (006 / 082); the chip is the surface.
+- Agent Mode left rail has **no** Tasks section and **no** “Editor layout” exit — Agents ↔ IDE is TopBar / `085`.
+
+### Gotchas
+- Do not resurrect a second checklist under the sessions rail — one surface only (composer chip).
+- `aiTaskStore` is not the chip’s render path; the chip reads `AIChatPanel` `todos`. The store still matters for `workProgressStore` and `clearTasks`.
+- Removed CSS: `.agent-tasks*`, `.agent-exit` (do not reintroduce without updating this doc).
 
 ### Related
-- Not to be confused with `009-agent-hub.md` (`AIChatsRail` cross-project sessions hub) — that's the adjacent sessions list this checklist sits below, not the same concept.
-- Rendered inside `AgentModeShell` at the sessions rail (`<AgentTasks chatId={activeChatId} />`).
+- Composer dock family: `022-chat-composer.md` (Plan chip section)
+- Layout toggle: `085-agent-ide-mode-toggle.md`
+- Not the sessions hub: `009-agent-hub.md` / `001-ai-session-library.md`

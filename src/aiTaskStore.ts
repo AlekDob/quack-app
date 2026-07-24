@@ -1,7 +1,7 @@
 // Tiny shared store for the agent's task checklist (TodoWrite /
 // TaskCreate / TaskUpdate), keyed by AI chat id. AIChatPanel owns the
-// authoritative state and publishes here; other surfaces (the agent-mode
-// sidebar's Tasks section) subscribe read-only. Module-level, not Zustand
+// authoritative state and publishes here; other surfaces (e.g.
+// workProgressStore) subscribe read-only. Module-level, not Zustand
 // — it's transient per-session UI state, not persisted workspace state.
 
 export interface AiTaskItem {
@@ -36,7 +36,7 @@ function sameTasks(a: AiTaskItem[] | undefined, b: AiTaskItem[] | null): boolean
 /** AIChatPanel calls this whenever its checklist changes. Empty/null
  *  clears the entry. AIChatPanel republishes on every TodoWrite AND on
  *  stream ticks, so dedupe identical lists — an unchanged publish must not
- *  fan out to AgentTasks + workProgressStore (mirrors chatDiffStore.sameDiff). */
+ *  fan out to workProgressStore (mirrors chatDiffStore.sameDiff). */
 export function publishTasks(chatId: string, items: AiTaskItem[] | null): void {
   if (sameTasks(tasksByChat.get(chatId), items)) return;
   if (items && items.length > 0) tasksByChat.set(chatId, items);

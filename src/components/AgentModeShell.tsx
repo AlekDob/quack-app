@@ -26,13 +26,12 @@ import {
 } from "../agentContextWidth";
 import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
-import { setAgentMode } from "../agentMode";
 import {
   getAgentSelectedChat,
   setAgentSelectedChat,
   clearAgentSelectedChat,
 } from "../agentModeSelection";
-import { getTasks, subscribeTasks, clearTasks } from "../aiTaskStore";
+import { clearTasks } from "../aiTaskStore";
 import { getAgentStatus, subscribeAgentStatus } from "../agentStatusStore";
 import { FilePopupModal } from "./FilePopupModal";
 import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
@@ -55,103 +54,6 @@ interface Props {
   // workspace switch (no React key). Agent↔IDE *does* remount the shell —
   // selected chat lives in `agentModeSelection.ts`, not component state.
   wsId: string;
-}
-
-// Live view of the active session's agent checklist (TodoWrite /
-// TaskCreate), published by AIChatPanel into the shared task store. Sits
-// below the sessions list so "what the agent is doing" is always visible
-// without scrolling the chat. Hidden when the session has no tasks.
-function AgentTasks({ chatId }: { chatId: string | null }) {
-  const [, setTick] = useState(0);
-  useEffect(() => subscribeTasks(() => setTick((t) => t + 1)), []);
-  // Cursor-style: collapsed by default, showing only the current task +
-  // progress; the user expands to see the full checklist. Re-collapses
-  // whenever the session changes so a new chat doesn't inherit the
-  // previous one's expanded state.
-  const [expanded, setExpanded] = useState(false);
-  useEffect(() => setExpanded(false), [chatId]);
-  const raw = getTasks(chatId);
-  // The checklist builder can emit the same task twice (TaskCreate +
-  // TodoWrite both feeding one list). Collapse by content, keeping the
-  // furthest-along status, so the count and rows read correctly.
-  const rank = { pending: 0, in_progress: 1, completed: 2 } as const;
-  const byContent = new Map<string, (typeof raw)[number]>();
-  for (const t of raw) {
-    const ex = byContent.get(t.content);
-    if (!ex || rank[t.status] > rank[ex.status]) byContent.set(t.content, t);
-  }
-  const tasks = [...byContent.values()];
-  if (tasks.length === 0) return null;
-  const done = tasks.filter((t) => t.status === "completed").length;
-  const current =
-    tasks.find((t) => t.status === "in_progress") ??
-    tasks.find((t) => t.status === "pending") ??
-    tasks[tasks.length - 1];
-  return (
-    <div className="agent-tasks">
-      <button
-        type="button"
-        className="agent-tasks-head"
-        onClick={() => setExpanded((e) => !e)}
-        aria-expanded={expanded}
-      >
-        {expanded ? (
-          <span className="agent-tasks-title">Tasks</span>
-        ) : (
-          <span className={`agent-tasks-current status-${current.status}`}>
-            <span className="agent-task-icon" aria-hidden="true">
-              <Icon
-                name={
-                  current.status === "completed"
-                    ? "check-circle"
-                    : current.status === "in_progress"
-                      ? "arrow-down-circle"
-                      : "circle"
-                }
-                size={12}
-              />
-            </span>
-            <span className="agent-task-text">
-              {current.status === "in_progress" && current.activeForm
-                ? current.activeForm
-                : current.content}
-            </span>
-          </span>
-        )}
-        <span className="agent-tasks-head-trail">
-          <span className="agent-tasks-count">
-            {done}/{tasks.length}
-          </span>
-          <Icon name={expanded ? "chevron-up" : "chevron-down"} size={12} />
-        </span>
-      </button>
-      {expanded && (
-        <div className="agent-tasks-list">
-          {tasks.map((t, i) => (
-            <div key={i} className={`agent-task status-${t.status}`}>
-              <span className="agent-task-icon" aria-hidden="true">
-                <Icon
-                  name={
-                    t.status === "completed"
-                      ? "check-circle"
-                      : t.status === "in_progress"
-                        ? "arrow-down-circle"
-                        : "circle"
-                  }
-                  size={12}
-                />
-              </span>
-              <span className="agent-task-text">
-                {t.status === "in_progress" && t.activeForm
-                  ? t.activeForm
-                  : t.content}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 // 1–2 char workspace badge, same scheme the main app's ActivityBar uses
@@ -498,19 +400,6 @@ export function AgentModeShell({ wsId }: Props) {
               bumpSel();
             }
           }}
-          footer={
-            <>
-              <AgentTasks chatId={activeChatId} />
-              <button
-                className="agent-exit"
-                onClick={() => void setAgentMode(false)}
-                title="Back to editor layout"
-              >
-                <Icon name="chevron-left" size={12} />
-                <span>Editor layout</span>
-              </button>
-            </>
-          }
         />
       </aside>
 

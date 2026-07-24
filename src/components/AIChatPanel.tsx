@@ -7224,10 +7224,9 @@ export function AIChatPanel({
             </div>
           );
         })()}
-      {/* Plan chip above the composer (astronave-style): collapsed by default,
-          expands upward on click. In compact (agent) mode the checklist lives
-          in the sidebar Tasks section, so we skip the duplicate here. */}
-      {!compact && todos && todos.length > 0 && (
+      {/* Plan chip above the composer (Cursor / astronave): collapsed by
+          default, expands upward on click. Same dock in IDE + Agent Mode. */}
+      {todos && todos.length > 0 && (
         <div className="ai-todos-bar">
           <TodosCard items={todos} />
         </div>

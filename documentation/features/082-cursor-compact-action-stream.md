@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-17
-last_verified: 2026-07-20
+last_verified: 2026-07-24
 tags: [ai-chat, cursor-compact, action-summary, worked-for, thought-for, streaming, perf, vitest, isFlatBatch]
 ---
 
@@ -62,7 +62,7 @@ CC keepalives → thinkingLive → in-stream Thinking chip
 **Edits stay in the stream** (not stripped when ComposeCard is present). ComposeCard (006 / 038) remains the turn-end Files recap + Undo/Review.
 
 **Skipped from batch:** TaskCreate/TaskUpdate/TaskList, TodoWrite, AskUserQuestion
-(sidebar / ask-dock — 067 / 073).
+(composer chip / ask-dock — 067 / 073).
 
 **Subagent dispatch (`Task` / `Agent`):** not batched. `CompactBlocks` flushes the
 current summary and mounts a duck-avatar `ToolCallRow` (`isSubagentDispatch`) so

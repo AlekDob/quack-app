@@ -178,7 +178,7 @@ Pattern: `src/aiTaskStore.ts` / `src/agentStatusStore.ts` (module-level pub/sub 
   - `079-cold-project-switch-loader.md` — **removed** 2026-07-21 (min-floor veil felt slower than bare cold mount); warm-LRU in `058` remains. Sibling of `075` (chat veil still live).
   - `080-transcript-windowing.md` — long chats render only the last `TURN_WINDOW=40` turns (`windowChatTurns` in `chatScroll.ts`) + "Show earlier" pill; fixes the main-thread stall when switching into a huge transcript; vitest regression (`npm test`, first test infra).
   - `054-works-layer.md` — **Features layer** (md-first): catalog of `documentation/features/*.md`, FeatureDocDrawer (Monaco edit), timeline, composer link (`083`); Plane board soft-sunset. Tab key `works:{wsId}`.
-  - `067-agent-tasks-checklist.md` — Cursor-style collapsible task checklist (`AgentTasks` in `AgentModeShell.tsx`) below the sessions list, sourced from `aiTaskStore.ts` (TodoWrite/TaskCreate items published by `AIChatPanel.tsx`); collapsed by default, resets on `chatId` change.
+  - `067-agent-tasks-checklist.md` — Cursor-style task chip above the composer (`TodosCard` in `chatPanelChrome.tsx` / `AIChatPanel.tsx`); `aiTaskStore.ts` mirror for progress; Agent Mode + IDE.
   - `066-works-cycles-stories.md` — auto weekly **Cycles** (progress + burndown charts), Scrum **Stories** spawning backlog work items; storage at workspace `works/` (not `.quack/`).
   - `068-quack-plan-harness.md` — Features-first plan (`featureId` + `planFeatureMerge`); story `S-NNN` legacy; buy-in Build via `088`; `plan:` tab (`061`) fallback without feature.
   - `069-smooth-streaming.md` — smooth assistant stream: rAF-coalesced paint + light inline MD on the live tail (no typewriter / no caret); full `MarkdownPreview` on turn commit.
