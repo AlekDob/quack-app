@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-16
-last_verified: 2026-07-21
-tags: [chat, performance, hydrate, lazy-load, done, mount, ram, multitask, quack-v1, react-memo]
+last_verified: 2026-07-24
+tags: [chat, performance, hydrate, lazy-load, done, mount, ram, multitask, quack-v1, react-memo, warm-lru]
 ---
 
 ## Chat lazy hydrate + DONE host unload
@@ -31,13 +31,16 @@ memory. Boot paid disk+parse for transcripts the user never reopened.
 
 | Kind | Hidden host | Transcript in RAM |
 |---|---|---|
-| **Live** (`!doneAt && !archivedAt`) | Unmount when hidden **unless** `working` / `needs-input` **or tab still open in layout** (`tabOpen`) | Warm at boot for focused tab + active runs only |
+| **Live** (`!doneAt && !archivedAt`) | Unmount when hidden **unless** `working` / `needs-input` **or tab still open in layout** (`tabOpen`) **or warm LRU / per-ws last pick** (`092`) | Warm at boot for focused tab + active runs only |
 | **DONE / archived** | Unmount when `!visible` | Cold until open; dropped on unload |
 | **Visible** (any) | Mounted | Loaded via `ensureSessionLoaded` |
 
 Helper: `shouldKeepChatHostMounted({ visible, doneAt, archivedAt, tabOpen })` in
 `src/chatHostMount.ts`. `tabOpen` keeps idle live hosts warm while their `ai:`
 tab remains in the pane tree — fast file↔chat tab switches without re-mount.
+**Agent Mode + IDE hub** have no durable multi-AI tab strip (Agent has a list;
+IDE single-slots via `pruneAiTabsInTree`) — they pass `tabOpen` from
+**`092-agent-chat-warm-lru.md`** (MRU of 5 + per-ws `getAgentSelectedChat`).
 
 ### `AIChatHost` is `React.memo` (new-chat perf, 2026-07-17)
 
@@ -81,10 +84,11 @@ Warm ids come from workspace descriptors: `sessionId` of chats with neither
 | Type | Path | Role |
 |---|---|---|
 | Util | `src/chatHostMount.ts` | `shouldKeepChatHostMounted` |
+| Service | `src/agentChatWarm.ts` | Warm LRU (`tabOpen` for Agent Mode + IDE hub) — see `092` |
 | Store | `src/chatStoreCache.ts` | Index hydrate, `ensureSessionLoaded`, `dropCachedSessionBody`, warm ids |
 | Service | `src/chatHistory.ts` | Re-exports + `listSessionIds` |
 | Store | `src/store.ts` | Passes warm ids into `hydrateChatStore` on boot / open |
-| Component | `src/components/AgentModeShell.tsx` | `AgentChatHost` unload policy |
+| Component | `src/components/AgentModeShell.tsx` | `AgentChatHost` unload policy + `memo` + warm `tabOpen` |
 | Component | `src/components/WorkspaceShell.tsx` | `AIChatHost` unload policy + `memo` (no N-wide re-render on chat add) |
 | Dev perf | `src/switchPerf.ts` | `markNewChat` / `logNewChatPhase` (`[new-chat-perf]`) |
 | Transcript window | `src/chatScroll.ts` | `windowChatTurns(turns, limit, expanded)` — tail-only render for long chats |
@@ -135,6 +139,7 @@ chat_store_load(wsId, sessionId) → ChatSession | null
 | `032-startup-hydration.md` | Boot calls warm hydrate |
 | `009-agent-hub.md` | DONE preview 10 / search 30 (list stays metadata-only) |
 | `075-chat-switch-loader.md` | Veil covers cold `ensureSessionLoaded` latency |
+| `092-agent-chat-warm-lru.md` | Agent Mode + IDE hub warm set (`tabOpen` without a tab strip) |
 | `058-workspace-switch-performance.md` | Sibling: heavy UI unload for background workspaces |
 | `085-agent-ide-mode-toggle.md` | Agent↔IDE remount: keep rich RAM body (no blanket `force`) |
 | `087-new-chat-perf.md` | Seed empty body + sync empty paint + deferred mount work |

@@ -35,6 +35,7 @@ import { fileBase } from "../sessionDiffStats";
 import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { pulseChatSwitch } from "../chatSwitch";
 import { logChatSwitch } from "../chatSwitchDebug";
+import { isAgentChatWarm, touchAgentChatWarm } from "../agentChatWarm";
 import { deleteSession } from "../chatHistory";
 import { confirm as dialogConfirm } from "../dialog";
 import { AgentCustomizations } from "./AgentCustomizations";
@@ -238,10 +239,20 @@ export function AIChatsRail({
     const current =
       activeId && loaded[activeId] ? activeAiChatId(loaded[activeId]) : null;
     const crossWs = wsId !== activeId;
+    // Same warm LRU as Agent Mode — IDE single-slot prune would otherwise
+    // remount AIChatPanel on every hub hop.
+    const alreadyWarm = isAgentChatWarm(chatId);
+    touchAgentChatWarm(chatId);
     if (chatId !== current || crossWs) {
-      logChatSwitch("rail focus", { chatId, current, crossWs, wsId });
+      logChatSwitch("rail focus", {
+        chatId,
+        current,
+        crossWs,
+        wsId,
+        alreadyWarm,
+      });
       pulseChatSwitch({
-        veil: true,
+        veil: !alreadyWarm,
         flush: crossWs,
         flushWsId: crossWs ? (activeId ?? undefined) : undefined,
         source: "AIChatsRail.focusChat",

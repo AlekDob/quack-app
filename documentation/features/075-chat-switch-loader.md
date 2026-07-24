@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-16
-last_verified: 2026-07-20
-tags: [chat-switch, loader, veil, transition, ux, perceived-performance, quack-v1, chrome-freeze, new-chat]
+last_verified: 2026-07-24
+tags: [chat-switch, loader, veil, transition, ux, perceived-performance, quack-v1, chrome-freeze, new-chat, warm-lru]
 ---
 
 ## Chat / session switch loader (gradual veil)
@@ -52,7 +52,7 @@ EVERY switch.
 | Veil component (fade in/out, `global` variant) | `src/components/ChatSwitchVeil.tsx` |
 | Global mount point | `src/App.tsx` → `<ChatSwitchVeil global />` (one instance, app root) |
 | Styles | `src/App.css` → `.chat-switch-veil`, `.chat-switch-veil--global`, `.chat-switch-veil-bar`, `@keyframes chatSwitchBar` |
-| Triggers | `AgentModeShell.selectSession`, `AIChatsRail.focusChat`, **`addNewAIChat`** (`veil: true` + `chatId`) |
+| Triggers | `AgentModeShell.selectSession`, `AIChatsRail.focusChat` (**`veil: false` when already warm** — see `092`), **`addNewAIChat`** (`veil: true` + `chatId`) |
 | End signal | `AIChatPanel.tsx` `onHydrated` → host `endChatSwitch()` (empty new chats finish hydrate sync — adaptive floor still applies) |
 | Console trace | `src/chatSwitchDebug.ts` → `[chat-switch]` |
 | Test | `src/chatSwitch.test.ts` — `veilFloorMs` |
@@ -83,11 +83,13 @@ EVERY switch.
 - **`.is-switching` no longer blanks the incoming transcript** — global veil covers; target host stays visible/paintable underneath so reveal is cheap.
 - **New chat uses the same veil (2026-07-20)** — `addNewAIChat` pulses `veil: true` + `chatId`. Instant hydrate → ~160ms floor (covers most of ~200ms paint). Pulse **after** `chatId` exists so Agent Mode keeps the host mounted.
 - **`veil: false` still clears a prior pulse** — if something skips the loader while `switching === true`, hosts stay `!is-visible` until CAP. Prefer `veil: true` + correct `chatId`.
-- **Veil ≠ freeze fix** — this is cosmetic. The switch was made actually fast by the provider-session JSONL-parse fix in `044`. New-chat speed is `087`.
+- **Veil ≠ freeze fix** — this is cosmetic. The switch was made actually fast by the provider-session JSONL-parse fix in `044`. New-chat speed is `087`. **Warm revisit speed is `092`** (`veil: false` when the host is already mounted).
+- **`veil: false` on warm hops (2026-07-24)** — Agent Mode / IDE hub used to pulse the loader on every select; adaptive floor still cost ≥160ms even when hydrate was a no-op. Skip the veil when `alreadyMounted` / `alreadyWarm` (`092-agent-chat-warm-lru.md`).
 
 ### Related features
 
 - **Chrome freeze (sidebar / Monaco / deferred listDir):** `081-chat-switch-chrome-freeze.md`
+- **Warm host LRU (skip veil on revisit):** `092-agent-chat-warm-lru.md`
 - Provider session bridge + freeze fix: `044-provider-session-bridge.md`
 - Chat tab switch / drawer: `064-agent-hub-drawer-and-chat-tab-switch.md`
 - Workspace switch performance: `058-workspace-switch-performance.md`

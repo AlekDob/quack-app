@@ -39,6 +39,7 @@ import { endChatSwitch } from "../chatSwitch";
 import { shouldKeepChatHostMounted, useChatHostLiveStatus } from "../chatHostMount";
 import { getAgentStatus, subscribeAgentStatus } from "../agentStatusStore";
 import { dropCachedSessionBody } from "../chatStoreCache";
+import { isAgentChatWarm } from "../agentChatWarm";
 import { useWorkspaceHeavyMount } from "../useWorkspaceHeavyMount";
 import { EditorTabDrawer } from "./EditorTabDrawer";
 import { EditorDrawerDropHint } from "./EditorDrawerDropHint";
@@ -508,15 +509,19 @@ function WorkspaceShellInner({ wsId, isActive }: Props) {
           pane.active === tabKeyStr &&
           (inBottom ? layout.bottomVisible : true);
         const live = getAgentStatus(chat.id)?.derived ?? null;
+        // IDE single-slot prune removes the previous `ai:` tab on hub focus
+        // (`focusAIChat`). Without the warm LRU those hosts unmounted every
+        // hop — same cold remount Agent Mode had. Keep recent chats mounted
+        // via stickyHostRoot even when their tab is not in the pane tree.
+        const tabOpen =
+          isAgentChatWarm(chat.id) || (isActive && !!pane);
         if (
           !shouldKeepChatHostMounted({
             visible,
             doneAt: chat.doneAt,
             archivedAt: chat.archivedAt,
             liveStatus: live,
-            // Only treat tabs as "open" while this workspace is foreground —
-            // otherwise every open tab across projects would stay mounted.
-            tabOpen: isActive && !!pane,
+            tabOpen,
           })
         ) {
           return null;
@@ -529,7 +534,7 @@ function WorkspaceShellInner({ wsId, isActive }: Props) {
             chatId={chat.id}
             container={container ?? stickyHostRoot}
             visible={visible}
-            tabOpen={isActive && !!pane}
+            tabOpen={tabOpen}
             doneAt={chat.doneAt}
             archivedAt={chat.archivedAt}
           />

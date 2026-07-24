@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import {
@@ -47,6 +47,7 @@ import {
   shouldKeepChatHostMounted,
   useChatHostLiveStatus,
 } from "../chatHostMount";
+import { isAgentChatWarm, touchAgentChatWarm } from "../agentChatWarm";
 import { dropCachedSessionBody } from "../chatStoreCache";
 
 interface Props {
@@ -163,11 +164,14 @@ function initials(name: string): string {
 
 // One panel per chat, toggled with CSS — mirrors WorkspaceShell's
 // AIChatHost so switching doesn't remount and replay hydration.
-function AgentChatHost({
+// memo: AgentModeShell re-renders on every select + agent-status tick;
+// without memo every warm host re-painted its full AIChatPanel.
+const AgentChatHost = memo(function AgentChatHost({
   wsId,
   root,
   chatId,
   visible,
+  tabOpen,
   doneAt,
   archivedAt,
   onOpenFile,
@@ -176,6 +180,7 @@ function AgentChatHost({
   root: string;
   chatId: string;
   visible: boolean;
+  tabOpen: boolean;
   doneAt?: number;
   archivedAt?: number;
   onOpenFile: (path: string | null) => void;
@@ -186,18 +191,19 @@ function AgentChatHost({
     doneAt,
     archivedAt,
     liveStatus,
+    tabOpen,
   });
-  const [mounted, setMounted] = useState(visible);
+  const [mounted, setMounted] = useState(visible || keepWarm);
   const onHydrated = useCallback(
     () => endChatSwitch("AgentChatHost", chatId),
     [chatId],
   );
   useEffect(() => {
-    if (visible) {
+    if (visible || keepWarm) {
       setMounted(true);
       return;
     }
-    if (!keepWarm) setMounted(false);
+    setMounted(false);
   }, [visible, keepWarm]);
   useEffect(() => {
     if (mounted || keepWarm) return;
@@ -223,7 +229,7 @@ function AgentChatHost({
       </CompactChat.Provider>
     </div>
   );
-}
+});
 
 export function AgentModeShell({ wsId }: Props) {
   const openIds = useStore((s) => s.openIds);
@@ -331,34 +337,47 @@ export function AgentModeShell({ wsId }: Props) {
   const [, setAgentStatusTick] = useState(0);
   useEffect(() => subscribeAgentStatus(() => setAgentStatusTick((t) => t + 1)), []);
 
-  // Mount sticky (working / needs-input) hosts from EVERY open workspace so a
-  // project switch does not tear down an in-flight stream. Surface visibility
-  // stays gated to the active workspace selection (hostVisible below).
+  // Mount sticky (working / needs-input) + warm LRU + per-ws last selection
+  // from EVERY open workspace. Without the warm set, every Agent Mode hop
+  // remounted AIChatPanel (Audit: 0/15 alreadyMounted, hydrate 70–380ms).
+  // Surface visibility stays gated to the active workspace selection below.
   const switchTarget = getChatSwitchTarget();
   const mountChats: Array<{
     chatWsId: string;
     root: string;
     chat: (typeof activeChats)[number];
+    tabOpen: boolean;
   }> = [];
   for (const id of openIds) {
     const w = loaded[id];
     if (!w) continue;
+    const wsSelected = getAgentSelectedChat(id);
     for (const chat of chatsFor(id)) {
       const keepSurface =
         (id === wsId && chat.id === activeChatId) ||
         (switching && switchTarget !== null && chat.id === switchTarget);
       const live = getAgentStatus(chat.id)?.derived ?? null;
+      // Per-ws last pick stays mounted across cross-ws flips (veil can end
+      // before setActiveWorkspace resolves — was a second cold remount).
+      const tabOpen =
+        chat.id === wsSelected || isAgentChatWarm(chat.id);
       if (
         !shouldKeepChatHostMounted({
           visible: keepSurface,
           doneAt: chat.doneAt,
           archivedAt: chat.archivedAt,
           liveStatus: live,
+          tabOpen,
         })
       ) {
         continue;
       }
-      mountChats.push({ chatWsId: id, root: w.meta.root, chat });
+      mountChats.push({
+        chatWsId: id,
+        root: w.meta.root,
+        chat,
+        tabOpen,
+      });
     }
   }
 
@@ -366,10 +385,22 @@ export function AgentModeShell({ wsId }: Props) {
 
   const selectSession = (id: string, chatId: string) => {
     const crossWs = id !== wsId;
+    // Touch BEFORE mount pass so the target enters the warm set this frame
+    // (and survives veil-down before a cross-ws setActiveWorkspace resolves).
+    touchAgentChatWarm(chatId);
     if (chatId !== activeChatId || crossWs) {
-      logChatSwitch("agent select", { chatId, activeChatId, crossWs, wsId: id });
+      const alreadyMounted = mountChats.some((m) => m.chat.id === chatId);
+      logChatSwitch("agent select", {
+        chatId,
+        activeChatId,
+        crossWs,
+        wsId: id,
+        alreadyMounted,
+      });
+      // Warm hop: CSS toggle only — veil made 160–220ms floors feel heavy
+      // even when hydrate was already done (Cursor has no loader on revisit).
       pulseChatSwitch({
-        veil: true,
+        veil: !alreadyMounted,
         flush: crossWs,
         flushWsId: crossWs ? wsId : undefined,
         source: "AgentModeShell.selectSession",
@@ -388,6 +419,7 @@ export function AgentModeShell({ wsId }: Props) {
     anchor: { x: number; y: number },
   ) => {
     const chatId = addNewAIChat(id, "editor", anchor);
+    touchAgentChatWarm(chatId);
     if (id !== wsId) void setActiveWorkspace(id);
     setAgentSelectedChat(id, chatId);
     bumpSel();
@@ -542,7 +574,7 @@ export function AgentModeShell({ wsId }: Props) {
               <div
                 className={`agent-main-chat-panels${switching ? " is-switching" : ""}`}
               >
-                {mountChats.map(({ chatWsId, root, chat }) => {
+                {mountChats.map(({ chatWsId, root, chat, tabOpen }) => {
                   // Mount/hydrate while switching; only hide the surface
                   // (parent `.is-switching` + aria) so cold load isn't deferred
                   // until after the 1s CAP. Cross-ws sticky hosts stay
@@ -561,6 +593,7 @@ export function AgentModeShell({ wsId }: Props) {
                       root={root}
                       chatId={chat.id}
                       visible={hostVisible}
+                      tabOpen={tabOpen}
                       doneAt={chat.doneAt}
                       archivedAt={chat.archivedAt}
                       onOpenFile={setOpenFilePath}
