@@ -18,6 +18,10 @@ CI (`.github/workflows/release.yml`) still builds **unsigned** macOS artifacts.
 Local release builds with `.env` are the path to Gatekeeper-clean DMGs until CI
 secrets are fixed.
 
+**Version bumps / tags:** dual-track SemVer (`develop` RC vs `production` stable)
+lives in [`093-app-versioning.md`](093-app-versioning.md) — `npm run release:rc` /
+`release:prod`, then optional local notarized DMG from this doc.
+
 ## Architecture
 
 ```
@@ -100,3 +104,4 @@ spctl -a -vvv -t install path/to/Quack.dmg
 
 - `quack-app/documentation/patterns/macos-release-signing-notarization.md` — original pattern
 - `documentation/decisions/003-git-remote-quack-1.0.md` — push signed builds from local `main`
+- [`093-app-versioning.md`](093-app-versioning.md) — SemVer bump, tags, CI draft releases

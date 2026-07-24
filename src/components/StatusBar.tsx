@@ -20,6 +20,10 @@ import { publishProcessStats } from "../perfAuditBus";
 import { useAgentMode } from "../agentMode";
 import { termIdOfPanel, useAgentContextPanel } from "../agentContextNav";
 
+// Injected by vite from package.json — see vite.config.ts `define`.
+declare const __APP_VERSION__: string;
+const APP_VERSION = `v${__APP_VERSION__}`;
+
 interface Props {
   onOpenPalette: () => void;
 }
@@ -146,6 +150,15 @@ export function StatusBar({ onOpenPalette }: Props) {
   return (
     <div className="statusbar" role="status">
       <div className="sb-section sb-left">
+        <button
+          type="button"
+          className="sb-item sb-version"
+          onClick={() => runCommand("help.about")}
+          title={`Quack ${APP_VERSION} — About`}
+          aria-label={`Quack ${APP_VERSION}`}
+        >
+          {APP_VERSION}
+        </button>
         {procTotals && (
           <button
             type="button"

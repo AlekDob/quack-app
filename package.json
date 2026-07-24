@@ -43,7 +43,10 @@
     "build:mac": "source ./scripts/load-signing-env.sh && npm run build && cargo tauri build",
     "build:mac:universal": "source ./scripts/load-signing-env.sh && npm run build && cargo tauri build --target universal-apple-darwin",
     "build:mac:release": "source ./scripts/load-signing-env.sh && npm run build && cargo tauri build --bundles app && ./scripts/sign-and-notarize.sh",
-    "build:mac:release:universal": "source ./scripts/load-signing-env.sh && npm run build && cargo tauri build --target universal-apple-darwin --bundles app && ./scripts/sign-and-notarize.sh"
+    "build:mac:release:universal": "source ./scripts/load-signing-env.sh && npm run build && cargo tauri build --target universal-apple-darwin --bundles app && ./scripts/sign-and-notarize.sh",
+    "release:rc": "node scripts/bump-version.mjs --channel rc",
+    "release:prod": "node scripts/bump-version.mjs --channel prod",
+    "release:dry": "node scripts/bump-version.mjs --dry-run"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

@@ -17394,6 +17394,27 @@ html.audit-root #root {
   align-items: center;
   gap: 4px;
 }
+/* App SemVer from package.json (__APP_VERSION__). Muted chip; click → About. */
+.sb-version {
+  background: transparent;
+  border: 0;
+  color: var(--fg-dim);
+  padding: 0 8px;
+  margin: 0;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  flex-shrink: 0;
+  max-width: none;
+  opacity: 0.85;
+}
+.sb-version:hover {
+  background: var(--bg-hover);
+  color: var(--fg);
+  opacity: 1;
+}
 .sb-icon {
   opacity: 0.85;
 }

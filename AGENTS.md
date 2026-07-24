@@ -24,6 +24,16 @@ Prereqs: Node 18+, Rust 1.77+ stable, Tauri OS prerequisites.
 | `npm test` | Unit tests (vitest, `*.test.ts`) — pure helpers / regression |
 | `npm run tauri build` | Production installers → `src-tauri/target/release/bundle/` |
 | `npm run build:mac:release:universal` | Signed + notarized universal `.dmg` (local; needs `.env`) |
+| `npm run release:rc` | On **`develop`**: bump `X.Y.Z-rc.N`, sync version sources, commit + tag `v…` |
+| `npm run release:prod -- patch\|minor\|major\|X.Y.Z` | On **`production`**: stable SemVer bump + tag |
+| `npm run release:dry -- rc\|prod …` | Dry-run the bump (no file writes / commit / tag) |
+
+**Versioning (dual-track):** RC tags from `develop` (`v1.0.0-rc.1`); stable tags from
+`production` (`v1.0.0`). Script: `scripts/bump-version.mjs` — syncs `package.json`,
+`package-lock.json`, `tauri.conf.json`, `Cargo.toml`, `Cargo.lock`. Default is no
+push; add `--push` to push branch + tag (fires `.github/workflows/release.yml`).
+RC tags create a **prerelease** draft; stable tags a normal draft. Signed macOS
+builds stay local (`build:mac:release:universal`).
 
 macOS signing/notarization: see **[README-MAC.md](README-MAC.md)** and
 `documentation/features/035-macos-release-notarization.md`.
@@ -41,12 +51,28 @@ Remote: `https://github.com/AlekDob/quack-app.git`
 |---|---|
 | **Local `main`** | Desktop integration branch (merge topic work here) |
 | **`origin/quack-1.0`** | **Push target** for desktop — tracks local `main` |
+| **`develop`** | RC release line — `npm run release:rc` → `vX.Y.Z-rc.N` |
+| **`production`** | Stable release line — `npm run release:prod` → `vX.Y.Z` |
 | **`origin/main`** | Other product line — **do not push desktop here** |
 
 ```bash
 git checkout main && git merge feat/my-topic
 git push origin main:quack-1.0   # or `git push` if upstream is quack-1.0
 ```
+
+Release cut (after promoting work onto the release branch):
+
+```bash
+# RC (must be on develop)
+npm run release:rc -- --push                 # auto 1.0.0-rc.1, or next .N
+npm run release:rc -- 1.1.0-rc.1 --push      # explicit RC
+
+# Stable (must be on production; merge/promote from develop first)
+npm run release:prod -- 1.0.0 --push         # or patch|minor|major
+```
+
+Omit `--push` to commit + tag locally first; push the tag when ready (CI
+draft release starts on `v*` tag push).
 
 Full rationale: `documentation/decisions/003-git-remote-quack-1.0.md`.
 

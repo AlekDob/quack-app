@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-08
-last_verified: 2026-07-17
-tags: [task-manager, process-tree, pty, terminal, agent-lifecycle, claude-code, cursor-cli, cleanup, sysmon, footprint]
+last_verified: 2026-07-24
+tags: [task-manager, process-tree, pty, terminal, agent-lifecycle, claude-code, cursor-cli, cleanup, sysmon, footprint, status-bar]
 ---
 
 ## Process cleanup & Task Manager
@@ -30,6 +30,7 @@ PTY terminals and CLI chat agents are **independent trees**. Killing `claude` do
 |---|---|---|
 | Modal UI | `src/components/TaskManagerModal.tsx` | Table: process name, role guess, PID, CPU %, RAM; Kill button for descendants |
 | Status bar chip | `src/components/StatusBar.tsx` | `NN% · X MB` every 5s; click → Task Manager |
+| Version chip | `src/components/StatusBar.tsx` | `v${__APP_VERSION__}` (left); click → About — see `093` |
 | Open bus | `src/taskManagerBus.ts` | `openTaskManager()` / `onTaskManagerOpen` |
 | Command | `src/actions.ts` → `view.task_manager` | **Ctrl+Alt+U** |
 | Rust backend | `src-tauri/src/sysmon.rs` | `process_stats`, `process_kill` |
@@ -117,3 +118,4 @@ PaneNode tab ✕
 - `026-cursor-cli-bridge.md` — `cursor_code_kill`, `cursor_code_kill_session`
 - `009-agent-hub.md` — Mark done / Archive lifecycle (now stops agent subprocess)
 - `032-startup-hydration.md` — PTY re-attach after reload (`pty.listSessions`)
+- `093-app-versioning.md` — StatusBar SemVer chip + release dual-track

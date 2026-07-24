@@ -1,9 +1,9 @@
 name: Release
 
-# Triggered when you push a tag like v0.1.0, v0.2.0, etc.
-# Builds Codetta for Windows, macOS, and Linux in parallel and creates a
-# draft GitHub Release with all installers attached. You review, edit
-# release notes, then click Publish.
+# Triggered when you push a tag like v1.0.0 or v1.0.0-rc.1.
+# Dual-track: stable tags (vX.Y.Z) → draft release; RC tags (vX.Y.Z-rc.N)
+# → draft prerelease. Builds Quack for Windows, macOS, and Linux in parallel.
+# Review artifacts / notes, then Publish.
 on:
   push:
     tags:
@@ -36,6 +36,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Verify tag matches package / Tauri version
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./package.json').version")
+          TAURI=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "tag=$TAG package.json=$PKG tauri.conf.json=$TAURI"
+          if [[ "$TAG" != "$PKG" || "$TAG" != "$TAURI" ]]; then
+            echo "::error::Tag v$TAG does not match package.json ($PKG) / tauri.conf.json ($TAURI). Run npm run release:rc or release:prod before tagging."
+            exit 1
+          fi
 
       - name: Set up Node
         uses: actions/setup-node@v5
@@ -103,9 +115,9 @@ jobs:
           # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: "Codetta ${{ github.ref_name }}"
+          releaseName: ${{ contains(github.ref_name, '-rc.') && format('Quack {0} (RC)', github.ref_name) || format('Quack {0}', github.ref_name) }}
           releaseBody: |
-            ### Codetta ${{ github.ref_name }}
+            ### Quack ${{ github.ref_name }}
 
             Download the installer for your OS below.
 
@@ -117,8 +129,11 @@ jobs:
             | **Linux** | `codetta_<ver>_amd64.AppImage` | Portable, single file |
             | **Linux** | `codetta_<ver>_amd64.deb` | Debian / Ubuntu |
 
-            See the [README](https://github.com/getcodetta/codetta#install-end-users)
+            RC tags (`v*-rc.*`) are prerelease builds from `develop`.
+            Stable tags (`vX.Y.Z`) ship from `production`.
+
+            See the [README](https://github.com/AlekDob/quack-app#install-end-users)
             for first-run setup and AI provider configuration.
           releaseDraft: true
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-rc.') }}
           args: ${{ matrix.args }}
