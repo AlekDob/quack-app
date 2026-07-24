@@ -9100,6 +9100,7 @@ button.composer-mention-chip-label:hover {
   gap: 8px;
   flex-wrap: wrap;
 }
+.ai-plan-buyin-open,
 .ai-plan-buyin-keep {
   display: inline-flex;
   align-items: center;
@@ -9112,6 +9113,7 @@ button.composer-mention-chip-label:hover {
   font-size: var(--fs-sm);
   cursor: pointer;
 }
+.ai-plan-buyin-open:hover:not(:disabled),
 .ai-plan-buyin-keep:hover:not(:disabled) {
   background: var(--bg-hover);
   color: var(--fg);
@@ -9133,6 +9135,7 @@ button.composer-mention-chip-label:hover {
   filter: brightness(1.06);
 }
 .ai-plan-buyin-build:disabled,
+.ai-plan-buyin-open:disabled,
 .ai-plan-buyin-keep:disabled {
   opacity: 0.55;
   cursor: default;
@@ -19446,20 +19449,20 @@ html.audit-root #root {
   border-color: var(--accent-hover);
 }
 
-/* Context column (Changes / Files / Terminals) */
+/* Context column (Changes / Files / Plan / Terminals) — width via inline
+   style from AgentModeShell + agentContextWidth (default 480, drag-resize). */
 .agent-context {
-  flex: 0 0 320px;
-  width: 320px;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
   background: var(--bg-alt);
   border-left: 1px solid var(--border);
-  transition: flex-basis 0.15s ease, width 0.15s ease;
 }
-.agent-context.agent-context--terminal {
-  flex: 0 0 420px;
-  width: 420px;
+.agent-context-vsplit {
+  /* Sit on the border so the resize hit target is obvious on hover. */
+  margin-right: -1px;
 }
 .agent-context-tabs {
   display: flex;

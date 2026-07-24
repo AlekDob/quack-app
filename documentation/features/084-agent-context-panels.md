@@ -5,14 +5,28 @@ stack: Tauri + React
 created: 2026-07-20
 startDate: 2026-07-20
 endDate:
-last_verified: 2026-07-22
+last_verified: 2026-07-24
 status: active
-tags: [agent-mode, terminal, context-panel, cursor-style, status-bar, plan-mode]
-related: [001-ai-session-library.md, 038-compose-review.md, 052-claude-code-login-ux.md, 061-plan-mode-tab.md, 081-chat-switch-chrome-freeze.md, 088-plan-milo-handoff.md]
+tags: [agent-mode, terminal, context-panel, cursor-style, status-bar, plan-mode, resize]
+related:
+  [
+    001-ai-session-library.md,
+    038-compose-review.md,
+    052-claude-code-login-ux.md,
+    061-plan-mode-tab.md,
+    081-chat-switch-chrome-freeze.md,
+    088-plan-milo-handoff.md,
+    documentation/bugs/008-plan-buyin-cross-session.md,
+  ]
 ---
 
 ## Agent Context Panels
-**Purpose:** Cursor-style pluggable right column in Agent Mode — Changes / Files / on-demand Plan plus project-scoped Terminal tabs via a `+` add-view menu; StatusBar panel/terminal commands target this column when Agent Mode is on.
+
+**Purpose:** Cursor-style pluggable right column in Agent Mode — Changes / Files /
+on-demand Plan plus project-scoped Terminal tabs via a `+` add-view menu; StatusBar
+panel/terminal commands target this column when Agent Mode is on. Column width is
+user-resizable and persisted.
+
 **Stack:** Tauri 2 + React 19 / TypeScript
 
 ### Tasks
@@ -21,18 +35,20 @@ related: [001-ai-session-library.md, 038-compose-review.md, 052-claude-code-logi
 - [x] Tab strip: Changes | Files | per-terminal tabs + close
 - [x] `AgentTerminalPanel`: `TerminalCore` host only (no nested list rail)
 - [x] Wire `addTerminal` / `closeTerminal` / active selection (project scope)
-- [x] CSS (strip overflow, terminal widen, menu) — tokens only
+- [x] CSS (strip overflow, menu) — tokens only
 - [x] Drop nested “N Terminals” rail — top tabs + `+` only
 - [x] StatusBar panel / Ctrl+J / Ctrl+` / New Terminal → `agentContextNav` in Agent Mode
 - [x] Claude Sign in banner → open Agent Mode terminal tab (`terminal.claude_login`)
 - [x] On-demand Plan tab when ExitPlanMode buy-in is pending (`061` / `088`)
+- [x] Drag-resize column width (default 480, persist `lcp.agent.contextWidth`) — 2026-07-24
+- [x] Plan tab / buy-in scoped to active Quack `chatId` (bug `008`) — 2026-07-24
 - [ ] Browser panel (deferred)
 
 ### Files
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
-| Component | `src/components/AgentModeShell.tsx` | Hosts `AgentContextColumn` in the right column |
-| Component | `src/components/AgentContextColumn.tsx` | Tab strip + Changes/Files/Plan/Terminal; `+` menu; close terminals |
+| Component | `src/components/AgentModeShell.tsx` | Hosts `.vsplit` + `AgentContextColumn`; owns width state |
+| Component | `src/components/AgentContextColumn.tsx` | Tab strip + Changes/Files/Plan/Terminal; `+` menu; close terminals; `width` prop |
 | Component | `src/components/AgentAddViewMenu.tsx` | `+` popover: Terminal / Browser (disabled + “Soon”) |
 | Component | `src/components/AgentTerminalPanel.tsx` | Mounts all project `TerminalCore`s; toggles `visible` |
 | Component | `src/components/PlanPane.tsx` | `AgentPlanPane` + `presentPlanReady` (Agent vs IDE routing) |
@@ -40,16 +56,28 @@ related: [001-ai-session-library.md, 038-compose-review.md, 052-claude-code-logi
 | Component | `src/components/StatusBar.tsx` | Panel icon active when Agent terminal view open |
 | Service | `src/actions.ts` | `view.toggle_panel` / `terminal.toggle` / `terminal.new_bottom` Agent Mode branch |
 | Store/State | `src/agentContextNav.ts` | Active panel per ws + focus/toggle/new helpers (`focusAgentPlan`) |
-| Store/State | `src/planBuyInStore.ts` | Pending ExitPlanMode → Plan tab visibility |
+| Store/State | `src/agentContextWidth.ts` | `get/set/clampAgentContextWidth` — `lcp.agent.contextWidth` |
+| Test | `src/agentContextWidth.test.ts` | Clamp bounds |
+| Store/State | `src/planBuyInStore.ts` | Pending ExitPlanMode → Plan tab visibility (**per `chatId`**) |
 | Store/State | `src/store.ts` | `terminals`, `addTerminal`, `closeTerminal`, `termKey` |
-| Config | `src/App.css` | `.agent-context-*`, `.agent-term-*`, `.agent-add-view-menu` |
+| Config | `src/App.css` | `.agent-context`, `.agent-context-vsplit`, `.agent-context-*`, `.agent-term-*` |
 
 ### Data Flow
 `+` / StatusBar New Terminal → `addTerminal(wsId)` → `WorkspaceData.terminals` → tab `term:id` → `AgentTerminalPanel` → `TerminalCore` → `ipc.pty` / `pty.rs`
 
 StatusBar panel / Ctrl+J / Ctrl+` → `toggleAgentTerminal(wsId)` → `agentContextNav` panel flip (term ↔ Changes)
 
-ExitPlanMode buy-in → `presentPlanReady` → `focusAgentPlan(wsId)` → on-demand **Plan** tab (`AgentPlanPane` full markdown). Composer `PlanBuyInCard` unchanged.
+ExitPlanMode buy-in → `presentPlanReady` → `focusAgentPlan(wsId)` → on-demand **Plan** tab (`AgentPlanPane` full markdown) **only while `getPlanBuyIn({ chatId: activeChatId })` hits**. Composer `PlanBuyInCard` includes **Open Plan** to re-focus the tab after switching away (Changes/Files/Terminal).
+
+### Width
+| Constant | Value |
+|---|---|
+| Default | 480px (`AGENT_CONTEXT_DEFAULT_W`) |
+| Min / Max | 280 / 720 |
+| Storage | `lcp.agent.contextWidth` via `localStore` |
+| Handle | Left-edge `.vsplit.agent-context-vsplit` (mousedown + ArrowLeft/Right; Shift = 60px step) |
+
+Inline `style={{ width, flexBasis }}` on `.agent-context` — no fixed CSS 320/420; Terminal no longer auto-widens separately.
 
 ### Key Functions
 - `addTerminal(wsId, location?, shell?) → string` — create project terminal descriptor + IDE bottom layout tab
@@ -60,6 +88,7 @@ ExitPlanMode buy-in → `presentPlanReady` → `focusAgentPlan(wsId)` → on-dem
 - `focusAgentTerminal(wsId) → void` — select last (or create) project terminal
 - `focusAgentPlan(wsId) → void` — select the Plan context tab
 - `focusAgentFiles(wsId) / focusAgentChanges(wsId) / toggleAgentFiles(wsId)` — StatusBar Explorer / Git / Ctrl+B stand-ins
+- `getAgentContextWidth() / setAgentContextWidth(w) / clampAgentContextWidth(w)` — persisted column width
 - `presentPlanReady(...)` — Agent Mode → Plan tab; IDE → FeatureDocDrawer / `plan:` split
 - `AgentAddViewMenu({ open, anchor, onClose, onAddTerminal }) → JSX` — add-view menu
 - `AgentTerminalPanel({ wsId, root, activeTermId, onCreate }) → JSX` — xterm host only
@@ -67,11 +96,12 @@ ExitPlanMode buy-in → `presentPlanReady` → `focusAgentPlan(wsId)` → on-dem
 ### State
 - `panelByWs`: `Map<wsId, AgentContextPanel>` — selected right-column view (`agentContextNav`, session memory)
 - `ws.terminals`: `Record<string, TerminalDescriptor>` — project-scoped PTYs (workspace `state.json`)
-- `planBuyInStore` — drives Plan tab show/hide for the active chat
+- `planBuyInStore` — drives Plan tab show/hide for the **active** chat only (`chatId`)
+- `lcp.agent.contextWidth` — column width across Agent Mode sessions
 
 ### Behavior Notes
-- Top strip: always Changes + Files; **Plan** appears only while ExitPlanMode buy-in is pending; one closable tab per open project terminal; `+` adds views.
-- Plan tab clears (and falls back to Changes) when Pass / Keep discussing settles buy-in.
+- Top strip: always Changes + Files; **Plan** appears only while ExitPlanMode buy-in is pending **for the active chat**; one closable tab per open project terminal; `+` adds views.
+- Plan tab clears (and falls back to Changes) when Pass / Keep discussing settles buy-in, or when switching to a chat without a pending buy-in.
 - No nested “N Terminals” rail — switch/close only via top tabs (simpler / one source of UI).
 - Agent Mode mounts `TerminalCore` (IDE `WorkspaceShell` unmounted); all terms stay mounted, `visible` toggled.
 - Leaving Agent Mode remounts IDE bottom terminals; re-attach via `ptyId` + scrollback replay.
@@ -82,6 +112,6 @@ ExitPlanMode buy-in → `presentPlanReady` → `focusAgentPlan(wsId)` → on-dem
 
 ### Gotchas (Plan tab)
 - Plan tab visibility is **buy-in-driven**, not layout-persisted — reload while a plan is pending loses the tab (same RAM lifetime as `planBuyInStore`).
-- Lookup uses active chat’s Claude session id, then **cwd fallback** if the sid is not yet in `chatStoreCache` (common mid-first-turn).
+- Lookup is **per Quack chat id** (`planBuyInStore`); session id is a secondary key only. **No cwd fallback** — that leaked Plan ready across Agent Mode sessions (bug `008`).
 - Selecting Plan while buy-in clears auto-falls back to Changes (no orphaned empty Plan selection).
-- Pass / Keep stay on the composer card — the Plan tab is read-only markdown (no duplicate CTAs).
+- Pass / Keep / **Open Plan** stay on the composer card — the Plan tab is read-only markdown (no duplicate CTAs). Open Plan only re-selects the tab / IDE surface.

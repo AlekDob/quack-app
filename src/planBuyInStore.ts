@@ -1,13 +1,19 @@
 // Pending ExitPlanMode buy-in — Cursor-style "Pass the ball to Milo" CTA.
 // The permission overlay holds the CC decision; this store drives the
 // in-stream card so the user never sees the generic tool-permission UI.
+//
+// Ownership is keyed by Quack chatId (never cwd). A cwd fallback once made
+// every Agent Mode session in the same project show another chat's Plan
+// ready card — see documentation/bugs/008-plan-buyin-cross-session.md.
 
 export type PlanBuyIn = {
   requestId: string;
   plan: string;
-  /** Claude Code session id (route to the owning chat panel). */
+  /** Quack AI chat id — primary ownership key. */
+  chatId: string | null;
+  /** Claude Code session id (decide / overlay routing). */
   sessionId: string | null;
-  /** Workspace cwd for panel matching when session id is missing. */
+  /** Workspace cwd (diagnostics only — not used for display lookup). */
   cwd: string | null;
 };
 
@@ -19,29 +25,33 @@ type DecideFn = (
   decision: "allow" | "deny",
 ) => Promise<void>;
 
-/** Per-panel decide handlers — keyed like buy-in entries (s: / c:). */
+/** Per-panel decide handlers — keyed by chat: / s:. */
 const decides = new Map<string, DecideFn>();
 
 function notify() {
   for (const l of listeners) l();
 }
 
-function keyOf(opts: {
-  sessionId?: string | null;
-  cwd?: string | null;
-}): string | null {
-  if (opts.sessionId) return `s:${opts.sessionId}`;
-  if (opts.cwd) return `c:${opts.cwd.replace(/[\\/]+$/, "")}`;
-  return null;
+function chatKey(chatId: string): string {
+  return `chat:${chatId}`;
 }
 
-function normCwd(p: string | null | undefined): string | null {
-  return p ? p.replace(/[\\/]+$/, "") : null;
+function sessionKey(sessionId: string): string {
+  return `s:${sessionId}`;
+}
+
+function keyOf(opts: {
+  chatId?: string | null;
+  sessionId?: string | null;
+}): string | null {
+  if (opts.chatId) return chatKey(opts.chatId);
+  if (opts.sessionId) return sessionKey(opts.sessionId);
+  return null;
 }
 
 /** Overlay registers how to settle ExitPlanMode for this panel. */
 export function setPlanBuyInDecide(
-  opts: { sessionId?: string | null; cwd?: string | null },
+  opts: { chatId?: string | null; sessionId?: string | null },
   fn: DecideFn | null,
 ): void {
   const k = keyOf(opts);
@@ -53,14 +63,12 @@ export function setPlanBuyInDecide(
 function findDecide(entry: PlanBuyIn | null): DecideFn | null {
   if (!entry) return null;
   const keys = [
-    entry.sessionId ? `s:${entry.sessionId}` : null,
-    entry.cwd ? `c:${normCwd(entry.cwd)}` : null,
+    entry.chatId ? chatKey(entry.chatId) : null,
+    entry.sessionId ? sessionKey(entry.sessionId) : null,
   ];
   for (const k of keys) {
     if (k && decides.has(k)) return decides.get(k)!;
   }
-  // Last resort: any registered decide (single-panel common case).
-  for (const fn of decides.values()) return fn;
   return null;
 }
 
@@ -84,16 +92,21 @@ export async function resolvePlanBuyIn(
   }
 }
 
-/** Overlay publishes when ExitPlanMode lands with a non-empty plan. */
+/** Overlay / stream publishes when ExitPlanMode lands with a non-empty plan. */
 export function publishPlanBuyIn(entry: PlanBuyIn): void {
   const k = keyOf(entry) ?? `r:${entry.requestId}`;
   byKey.set(k, entry);
+  // Dual-index by session when both ids exist so overlay decide + mid-turn
+  // sid hydrate can find the same entry without a cwd scan.
+  if (entry.chatId && entry.sessionId) {
+    byKey.set(sessionKey(entry.sessionId), entry);
+  }
   notify();
 }
 
 export function clearPlanBuyIn(opts: {
+  chatId?: string | null;
   sessionId?: string | null;
-  cwd?: string | null;
   requestId?: string;
 }): void {
   let changed = false;
@@ -107,28 +120,32 @@ export function clearPlanBuyIn(opts: {
   }
   const k = keyOf(opts);
   if (k && byKey.delete(k)) changed = true;
+  if (opts.sessionId) {
+    if (byKey.delete(sessionKey(opts.sessionId))) changed = true;
+  }
   if (changed) notify();
 }
 
+/**
+ * Lookup for the Plan ready card / Plan tab. Strict: chatId first, then
+ * sessionId. Never matches by cwd — that leaked across Agent Mode sessions.
+ */
 export function getPlanBuyIn(opts: {
+  chatId?: string | null;
   sessionId?: string | null;
-  cwd?: string | null;
 }): PlanBuyIn | null {
-  const k = keyOf(opts);
-  if (k) {
-    const hit = byKey.get(k);
+  if (opts.chatId) {
+    const hit = byKey.get(chatKey(opts.chatId));
     if (hit) return hit;
-  }
-  if (opts.sessionId) {
     for (const v of byKey.values()) {
-      if (v.sessionId === opts.sessionId) return v;
+      if (v.chatId === opts.chatId) return v;
     }
   }
-  // Session id may lag disk/RAM cache (Agent Mode Plan tab) — match cwd.
-  const cwd = normCwd(opts.cwd);
-  if (cwd) {
+  if (opts.sessionId) {
+    const hit = byKey.get(sessionKey(opts.sessionId));
+    if (hit) return hit;
     for (const v of byKey.values()) {
-      if (normCwd(v.cwd) === cwd) return v;
+      if (v.sessionId === opts.sessionId) return v;
     }
   }
   return null;
@@ -139,4 +156,11 @@ export function subscribePlanBuyIn(cb: () => void): () => void {
   return () => {
     listeners.delete(cb);
   };
+}
+
+/** Test-only — wipe RAM store between cases. */
+export function _resetPlanBuyInStoreForTests(): void {
+  byKey.clear();
+  decides.clear();
+  notify();
 }

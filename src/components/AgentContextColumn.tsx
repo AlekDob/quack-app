@@ -26,6 +26,8 @@ interface Props {
   root: string;
   activeChatId: string | null;
   frozen?: boolean;
+  /** Pixel width owned by AgentModeShell resize (persisted). */
+  width: number;
   onOpenFile: (path: string) => void;
 }
 
@@ -35,6 +37,7 @@ export function AgentContextColumn({
   root,
   activeChatId,
   frozen,
+  width,
   onOpenFile,
 }: Props) {
   const terminalsMap = useStore((s) => s.loaded[wsId]?.terminals);
@@ -70,8 +73,8 @@ export function AgentContextColumn({
     const sessionId = session
       ? readProviderSessionIds(session)["claude-code"]
       : undefined;
-    return getPlanBuyIn({ sessionId, cwd: root });
-  }, [planRev, activeChatId, wsId, root]);
+    return getPlanBuyIn({ chatId: activeChatId, sessionId });
+  }, [planRev, activeChatId, wsId]);
 
   const hasPlan = !!planBuyIn?.plan;
 
@@ -111,7 +114,8 @@ export function AgentContextColumn({
 
   return (
     <aside
-      className={`agent-context${activeTermId ? " agent-context--terminal" : ""}${frozen ? " is-chat-switch-frozen" : ""}`}
+      className={`agent-context${frozen ? " is-chat-switch-frozen" : ""}`}
+      style={{ width, flexBasis: width }}
     >
       <div className="agent-context-tabs" role="tablist" aria-label="Workspace context">
         <div className="agent-context-tabs-scroll">

@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-20
-last_verified: 2026-07-22
+last_verified: 2026-07-24
 related:
   - 015-claude-permission-mode.md
   - 061-plan-mode-tab.md
@@ -13,6 +13,7 @@ related:
   - 084-agent-context-panels.md
   - 073-ask-user-question-dock.md
   - documentation/bugs/003-agent-identity-mismatch.md
+  - documentation/bugs/008-plan-buyin-cross-session.md
 tags:
   [
     plan-mode,
@@ -31,8 +32,9 @@ tags:
 
 **Purpose:** When Claude Code calls `ExitPlanMode` with a ready plan, Quack shows a
 **Cursor-style** in-stream CTA (not the generic permission card): preview +
-**Pass the ball to Milo**. Click → Milo (Builder) + Agent permissions + auto-start
-implementation. Keep discussing / typing in the composer → stay in Plan with Jack.
+**Open Plan** + **Pass the ball to Milo**. Click Pass → Milo (Builder) + Agent
+permissions + auto-start implementation. Keep discussing / typing in the composer
+→ stay in Plan with Jack. Open Plan re-focuses the side preview without deciding.
 
 **Stack:** React 19 + TS strict; module pub/sub store (same pattern as `askQuestionStore`).
 
@@ -41,8 +43,9 @@ implementation. Keep discussing / typing in the composer → stay in Plan with J
 | Step | Who | What |
 |---|---|---|
 | 1 | Jack + composer **Plan** | Explores; when ready calls `ExitPlanMode` (`tool_input.plan`) |
-| 2 | Overlay | Publishes `planBuyInStore`; fires `onPlanReady` → `presentPlanReady` (Agent Plan tab / feature drawer / `plan:`); **no** ExitPlanMode permission card |
-| 3 | User | Sees `PlanBuyInCard` above composer; in Agent Mode also the right-column **Plan** tab (full markdown) |
+| 2 | Overlay / stream | Publishes `planBuyInStore` **keyed by Quack `chatId`**; fires `onPlanReady` → `presentPlanReady` (Agent Plan tab / feature drawer / `plan:`); **no** ExitPlanMode permission card |
+| 3 | User | Sees `PlanBuyInCard` above composer (only on the **owning** chat); in Agent Mode also the right-column **Plan** tab (full markdown) |
+| 3b | **Open Plan** | Re-calls `presentPlanReady` — focus Plan tab / drawer / `plan:` (no allow/deny) |
 | 4a | **Pass the ball to Milo** | `allow` ExitPlanMode → `applyPreset("builder")` → `bypassPermissions` → auto-send implement prompt |
 | 4b | Keep discussing / send message | `deny` ExitPlanMode → stay Plan + Jack |
 
@@ -52,38 +55,41 @@ Features-first durable target: linked `featureId` → `mergePlanIntoFeature` (+ 
 
 | Type | Path | Role |
 |---|---|---|
-| Store | `src/planBuyInStore.ts` | `publishPlanBuyIn`, `getPlanBuyIn`, `resolvePlanBuyIn`, `setPlanBuyInDecide`, `subscribePlanBuyIn` |
-| Component | `src/components/PlanBuyInCard.tsx` | CTA UI — preview, Milo avatar, Pass / Keep discussing |
-| Host | `src/components/AIChatPanel.tsx` | Subscribe buy-in; `passBallToMilo` / `keepDiscussingPlan`; deny on composer send; Features-first `onPlanBuild` |
-| Overlay | `src/components/ClaudePermissionOverlay.tsx` | ExitPlanMode → publish + `onPlanReady`; keep hook pending; skip card UI |
+| Store | `src/planBuyInStore.ts` | `publishPlanBuyIn`, `getPlanBuyIn`, `resolvePlanBuyIn`, `setPlanBuyInDecide`, `subscribePlanBuyIn` — ownership by `chatId` |
+| Test | `src/planBuyInStore.test.ts` | Cross-session isolation (no cwd leak — bug `008`) |
+| Component | `src/components/PlanBuyInCard.tsx` | CTA UI — preview, **Open Plan**, Milo avatar, Pass / Keep discussing |
+| Host | `src/components/AIChatPanel.tsx` | Subscribe by `aiChatId`; `passBallToMilo` / `keepDiscussingPlan` / `onOpenPlan`; deny on composer send; Features-first `onPlanBuild` |
+| Overlay | `src/components/ClaudePermissionOverlay.tsx` | `ownerChatId` + ExitPlanMode → publish + `onPlanReady`; keep hook pending; skip card UI |
 | Prompt | `src/brainPrompt.ts` | `quackClaudeCodeEditorPrompt(works, planMode)` — ExitPlanMode only if Plan |
 | Isolation | `src/permModeStore.ts` | Plan never written to `byCwd`; session_id miss ≠ sibling cwd mode |
-| Test | `src/permModeStore.test.ts` | Cross-chat Plan isolation |
-| Styles | `src/App.css` | `.ai-plan-buyin*` |
+| Test | `src/permModeStore.test.ts` | Cross-chat Plan **mode** isolation |
+| Styles | `src/App.css` | `.ai-plan-buyin*` (incl. `.ai-plan-buyin-open`) |
 | Preview | `061` / `084` / `presentPlanReady` | Side preview: Agent Plan tab, FeatureDocDrawer, or `plan:` |
 
 ### API (store)
 
 | Function | Signature |
 |---|---|
-| `publishPlanBuyIn` | `(entry: PlanBuyIn) → void` |
-| `getPlanBuyIn` | `({ sessionId?, cwd? }) → PlanBuyIn \| null` |
+| `publishPlanBuyIn` | `(entry: PlanBuyIn) → void` — keys `chat:{chatId}` (+ dual `s:{sessionId}` when both set) |
+| `getPlanBuyIn` | `({ chatId?, sessionId? }) → PlanBuyIn \| null` — **never cwd** (bug `008`) |
 | `resolvePlanBuyIn` | `(requestId, "allow" \| "deny") → Promise<void>` |
-| `setPlanBuyInDecide` | `({ sessionId?, cwd? }, fn \| null) → void` — per-panel hook settle |
+| `setPlanBuyInDecide` | `({ chatId?, sessionId? }, fn \| null) → void` — per-panel hook settle |
 | `subscribePlanBuyIn` | `(cb) → unsubscribe` |
+| `clearPlanBuyIn` | `({ chatId?, sessionId?, requestId? }) → void` |
 
-`PlanBuyIn`: `{ requestId, plan, sessionId, cwd }`
+`PlanBuyIn`: `{ requestId, plan, chatId, sessionId, cwd }` — **display ownership is `chatId`**. `cwd` is diagnostics only.
 
 ### Data flow
 
 ```
 ExitPlanMode (plan non-empty)
-  → overlay queues request (hook stays open)
-  → publishPlanBuyIn + onPlanReady → presentPlanReady
+  → overlay / tool_call / end-of-turn fallback
+  → publishPlanBuyIn({ chatId, sessionId, … }) + onPlanReady → presentPlanReady
        ├─ Agent Mode → focusAgentPlan (084 Plan tab); merge feature if linked (no drawer)
        ├─ IDE + featureId → mergePlanIntoFeature + FeatureDocDrawer
        └─ IDE unlinked → plan: virtual tab (061)
-  → PlanBuyInCard
+  → PlanBuyInCard (only if getPlanBuyIn({ chatId: thisChat }) hits)
+       ├─ Open Plan → presentPlanReady (re-focus; no decide)
        ├─ Pass → onPlanBuild (Milo + Agent) → resolve allow → sendUserText(implement…)
        └─ Keep / composer send → resolve deny
 ```
@@ -117,7 +123,8 @@ Full write-up: `documentation/bugs/003-agent-identity-mismatch.md`. Related: `06
 
 | Rule | Why |
 |---|---|
-| `bySession` is authoritative | Each CC session has its own mode |
+| Buy-in keyed by Quack `chatId` | Sibling Agent Mode chats share one cwd — cwd lookup leaked Plan ready (bug `008`) |
+| `bySession` is authoritative for **perm mode** | Each CC session has its own mode (`015`) |
 | Never store `"plan"` in `byCwd` | Shared workspace cwd must not make sibling chats Plan |
 | If `session_id` present but unknown | Return Ask (`default`), do **not** fall through to `byCwd` |
 | Composer chip | Restored from `ChatSession.ccPermMode` on switch (`040`) |
@@ -126,18 +133,19 @@ Full write-up: `documentation/bugs/003-agent-identity-mismatch.md`. Related: `06
 
 | Control | Label |
 |---|---|
-| Primary | Pass the ball to Milo |
+| Tertiary | Open Plan |
 | Secondary | Keep discussing |
+| Primary | Pass the ball to Milo |
 | Hint | Enter build · Esc keep discussing · or type below to refine |
 
-Avatar: Milo builtin `duck3` → `/images/ducks/duck3.jpeg`.
+Avatar: Milo builtin `duck3` → `/images/ducks/duck3.jpeg`. Open Plan icon: `columns-2`.
 
 ### Gotchas
 
 - ExitPlanMode must stay **pending** until user decides when the permission hook fires — CTA owns UI; overlay still holds the request in queue (filtered out of visible cards so it does not block Bash/Edit cards).
 - **Upstream often rejects ExitPlanMode** ("exists but is not enabled") even with composer Plan — channels / resume / CC bugs. Quack still shows the CTA from the `tool_call` args (and end-of-turn fallback) so Pass the ball does not depend on the hook succeeding.
 - Auto-send after allow: clear `planBuyInRef` before `sendUserText` so the implement prompt is not treated as Keep discussing.
-- Multiple `AIChatHost` overlays: `setPlanBuyInDecide` keyed by session/cwd so the correct panel settles the hook.
+- Multiple `AIChatHost` overlays: `setPlanBuyInDecide` keyed by chatId/session so the correct panel settles the hook. **Never match buy-in by cwd** — that showed Plan ready on sibling Agent Mode sessions (bug `008`).
 - CLI enables ExitPlanMode only with `--permission-mode plan` — prompt gate alone is not enough; composer must be Plan when Jack calls it. When the tool still fails, client buy-in path covers UX.
 - **Handoff must not poison the new-chat default (bug fix 2026-07-22):** `handoffToMiloBuilder` force-sets Agent (`bypassPermissions`) for the current chat, but the mode-persistence effect (`AIChatPanel.tsx`) writes `ccPermMode` into the global `PERM_MODE_KEY` default that seeds **new** chats. Without a guard, one "Pass the ball" flipped every future new chat to Agent → they never started in Plan, so Jack saw a non-plan session and (correctly, per the prompt gate) said "ExitPlanMode is not active" and fell back to `~/.claude/plans/*` scratch files. Fix: `skipPermModeDefaultRef` set by `handoffToMiloBuilder` makes the effect skip the global-default write for that one transition; the per-session `setPermMode` bridge still updates.
 - **Answering AskUserQuestion must not dismiss the CTA (bug fix 2026-07-22):** `sendUserText` opens with a "user typed instead of clicking Pass the ball → resolve deny" guard that clears `planBuyIn`. `answerQuestion` (073) routes selections through the same `sendUserText`, so answering a docked question while the Milo CTA was up silently declined the handoff and the CTA vanished. Fix: `sendUserText` takes `opts.keepPlanBuyIn`; `answerQuestion` passes it — answering continues the plan discussion, the CTA survives. Only free-form composer sends still deny.
@@ -150,3 +158,5 @@ Avatar: Milo builtin `duck3` → `/images/ducks/duck3.jpeg`.
 - [073](073-ask-user-question-dock.md) — sibling Cursor-style dock pattern
 - [062](062-presets.md) — Milo defaults (`bypassPermissions`)
 - [083](083-composer-feature-link.md) — `featureId` on chat
+- [084](084-agent-context-panels.md) — Agent Mode Plan tab + resizable column
+- [008](../bugs/008-plan-buyin-cross-session.md) — cwd leak fix

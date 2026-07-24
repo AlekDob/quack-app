@@ -3139,10 +3139,10 @@ export function AIChatPanel({
   const planBuyIn = useMemo(() => {
     void planBuyInRev;
     return getPlanBuyIn({
+      chatId: aiChatId,
       sessionId: claudeSessionId,
-      cwd: root,
     });
-  }, [planBuyInRev, claudeSessionId, root]);
+  }, [planBuyInRev, aiChatId, claudeSessionId]);
   const planBuyInRef = useRef(planBuyIn);
   planBuyInRef.current = planBuyIn;
   const pendingAskCall = useMemo(() => {
@@ -4367,6 +4367,7 @@ export function AIChatPanel({
                 publishPlanBuyIn({
                   requestId: reqId,
                   plan,
+                  chatId: aiChatId ?? null,
                   sessionId: claudeSessionId ?? null,
                   cwd: root,
                 });
@@ -4630,7 +4631,7 @@ export function AIChatPanel({
           const exitCall = [...toolCallsThisRound]
             .reverse()
             .find((c) => c.function.name === "ExitPlanMode");
-          if (exitCall && !getPlanBuyIn({ sessionId: claudeSessionId, cwd: root })) {
+          if (exitCall && !getPlanBuyIn({ chatId: aiChatId, sessionId: claudeSessionId })) {
             const fromArgs =
               typeof exitCall.function.arguments.plan === "string"
                 ? exitCall.function.arguments.plan.trim()
@@ -4646,6 +4647,7 @@ export function AIChatPanel({
               publishPlanBuyIn({
                 requestId: reqId,
                 plan,
+                chatId: aiChatId ?? null,
                 sessionId: claudeSessionId ?? null,
                 cwd: root,
               });
@@ -7272,6 +7274,15 @@ export function AIChatPanel({
           }
           onBuild={() => passBallToMilo(planBuyIn.requestId, planBuyIn.plan)}
           onKeepDiscussing={() => keepDiscussingPlan(planBuyIn.requestId)}
+          onOpenPlan={() =>
+            presentPlanReady(
+              wsId,
+              aiChatId,
+              root,
+              planBuyIn.requestId,
+              planBuyIn.plan,
+            )
+          }
         />
       )}
       <ComposerShell
@@ -7419,6 +7430,7 @@ export function AIChatPanel({
           already focused, instead of dimming the whole window. */}
       <ClaudePermissionOverlay
         ownerRoot={root}
+        ownerChatId={aiChatId}
         ownerSessionId={claudeSessionId}
         ownerStreaming={streaming !== null || runningTools}
         ownerPermMode={ccPermMode}

@@ -17,6 +17,13 @@ import { SubagentTranscriptView } from "./SubagentTranscriptView";
 import { EditorTabDrawer } from "./EditorTabDrawer";
 import { TabContentHost } from "./TabContentHost";
 import { AgentContextColumn } from "./AgentContextColumn";
+import {
+  AGENT_CONTEXT_MAX_W,
+  AGENT_CONTEXT_MIN_W,
+  clampAgentContextWidth,
+  getAgentContextWidth,
+  setAgentContextWidth,
+} from "../agentContextWidth";
 import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
 import { setAgentMode } from "../agentMode";
@@ -236,6 +243,12 @@ export function AgentModeShell({ wsId }: Props) {
 
   // File opened from the Files tab (agent mode has no editor pane).
   const [openFilePath, setOpenFilePath] = useState<string | null>(null);
+  const [contextW, setContextW] = useState(getAgentContextWidth);
+  const setContextWidth = useCallback((w: number) => {
+    const next = clampAgentContextWidth(w);
+    setContextW(next);
+    setAgentContextWidth(next);
+  }, []);
 
   // "+" workspace menu on the rail (open folder / recent).
   const [railMenu, setRailMenu] = useState(false);
@@ -633,13 +646,48 @@ export function AgentModeShell({ wsId }: Props) {
 
       {/* ── Context column (Changes / Files / Terminals) ─────── */}
       {ws && (
-        <AgentContextColumn
-          wsId={wsId}
-          root={ws.meta.root}
-          activeChatId={activeChatId}
-          frozen={switching}
-          onOpenFile={setOpenFilePath}
-        />
+        <>
+          <div
+            className="vsplit agent-context-vsplit"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize context panel"
+            aria-valuenow={contextW}
+            aria-valuemin={AGENT_CONTEXT_MIN_W}
+            aria-valuemax={AGENT_CONTEXT_MAX_W}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+              e.preventDefault();
+              const dir = e.key === "ArrowRight" ? 1 : -1;
+              const step = e.shiftKey ? 60 : 20;
+              setContextWidth(contextW + dir * step);
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              const startX = e.clientX;
+              const startW = contextW;
+              const onMove = (ev: MouseEvent) => {
+                // Dragging the left edge: move left → wider panel.
+                setContextWidth(startW - (ev.clientX - startX));
+              };
+              const onUp = () => {
+                window.removeEventListener("mousemove", onMove);
+                window.removeEventListener("mouseup", onUp);
+              };
+              window.addEventListener("mousemove", onMove);
+              window.addEventListener("mouseup", onUp);
+            }}
+          />
+          <AgentContextColumn
+            wsId={wsId}
+            root={ws.meta.root}
+            activeChatId={activeChatId}
+            frozen={switching}
+            width={contextW}
+            onOpenFile={setOpenFilePath}
+          />
+        </>
       )}
 
       {/* ── File popup (Files tab → click) ────────────────────── */}

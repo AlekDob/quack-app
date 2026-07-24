@@ -401,6 +401,7 @@ function shouldAutoAllow(req: PermissionRequest, rules: AllowRules): boolean {
  */
 export function ClaudePermissionOverlay({
   ownerRoot,
+  ownerChatId,
   ownerSessionId,
   ownerStreaming,
   ownerPermMode,
@@ -410,6 +411,8 @@ export function ClaudePermissionOverlay({
 }: {
   /** Workspace cwd this overlay's panel drives — used to route cards. */
   ownerRoot: string;
+  /** Quack chat id — Plan buy-in ownership (never share across sessions). */
+  ownerChatId?: string;
   /** CC session id of this panel, once it has streamed back (tiebreaker). */
   ownerSessionId?: string;
   /** True while this panel has an in-flight turn (pre-init session routing). */
@@ -494,12 +497,15 @@ export function ClaudePermissionOverlay({
       clearPlanBuyIn({ requestId });
     };
     setPlanBuyInDecide(
-      { sessionId: ownerSessionId, cwd: ownerRoot },
+      { chatId: ownerChatId, sessionId: ownerSessionId },
       decide,
     );
     return () =>
-      setPlanBuyInDecide({ sessionId: ownerSessionId, cwd: ownerRoot }, null);
-  }, [ownerSessionId, ownerRoot]);
+      setPlanBuyInDecide(
+        { chatId: ownerChatId, sessionId: ownerSessionId },
+        null,
+      );
+  }, [ownerChatId, ownerSessionId]);
 
   useEffect(() => {
     let offReq: (() => void) | undefined;
@@ -656,11 +662,12 @@ export function ClaudePermissionOverlay({
     publishPlanBuyIn({
       requestId: planReq.request_id,
       plan,
+      chatId: ownerChatId ?? null,
       sessionId: planReq.session_id ?? ownerSessionId ?? null,
       cwd: planReq.cwd ?? ownerRoot,
     });
     onPlanReady?.(planReq.request_id, plan);
-  }, [planReq, onPlanReady, ownerSessionId, ownerRoot]);
+  }, [planReq, onPlanReady, ownerChatId, ownerSessionId, ownerRoot]);
 
   const respond = async (decision: "allow" | "deny") => {
     if (!req) return;

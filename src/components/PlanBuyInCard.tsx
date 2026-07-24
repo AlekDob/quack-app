@@ -11,11 +11,14 @@ export function PlanBuyInCard({
   featureLabel,
   onBuild,
   onKeepDiscussing,
+  onOpenPlan,
 }: {
   plan: string;
   featureLabel?: string | null;
   onBuild: () => void | Promise<void>;
   onKeepDiscussing: () => void | Promise<void>;
+  /** Focus the full Plan preview (Agent Mode tab / IDE drawer or plan: tab). */
+  onOpenPlan?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const preview = planPreview(plan);
@@ -70,6 +73,18 @@ export function PlanBuyInCard({
         </div>
       ) : null}
       <div className="ai-plan-buyin-actions">
+        {onOpenPlan ? (
+          <button
+            type="button"
+            className="ai-plan-buyin-open"
+            disabled={busy}
+            onClick={onOpenPlan}
+            title="Open the full plan in the side panel"
+          >
+            <Icon name="columns-2" size={14} />
+            <span>Open Plan</span>
+          </button>
+        ) : null}
         <button
           type="button"
           className="ai-plan-buyin-keep"
