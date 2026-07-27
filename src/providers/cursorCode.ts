@@ -109,15 +109,11 @@ export const cursorCliProvider: ChatProvider = {
     return await checkAvailability();
   },
 
+  // The picker calls this directly when the Cursor tab opens, so it must return
+  // the real catalog — not just the sentinel. refreshCursorModelsLive owns the
+  // TTL cache + availability gate and falls back to DEFAULT_MODEL on failure.
   async listModels(): Promise<ProviderModel[]> {
-    if (
-      modelsCache &&
-      Date.now() - modelsCache.checkedAt < MODELS_TTL_MS
-    ) {
-      return modelsCache.models;
-    }
-    if (!(await checkAvailability())) return [DEFAULT_MODEL];
-    return [DEFAULT_MODEL];
+    return await refreshCursorModelsLive().catch(() => [DEFAULT_MODEL]);
   },
 
   async *chat({

@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-01
-last_verified: 2026-07-11
+last_verified: 2026-07-27
 tags: [cursor-cli, bridge, subprocess, streaming, stream-json, rust, cursor-agent, lazy-load, composer, tool-call, images]
 ---
 
@@ -51,7 +51,7 @@ User message → `cursorCliProvider.chat()` → `cursor_code_chat` (stdin prompt
 1. `parseCursorStreamJsonObject` — if it returns events, use those.
 2. Else `parseCliStreamJsonObject` — Claude-compatible `stream_event` / `assistant` lines.
 
-**Models (lazy):** mount → `listModels()` returns `[DEFAULT_MODEL]` if cache cold → picker/browser open → `refreshCursorModelsLive()` → `cursor_code_list_models` → cache 60s
+**Models (lazy):** mount → `listModels()` delegates to `refreshCursorModelsLive()` (cache cold → `[DEFAULT_MODEL]` until `cursor_code_list_models` resolves) → picker/browser open re-triggers the same call → cache 60s
 
 ### Cursor-native stream-json (Composer 2.5+)
 | `type` | `subtype` | Mapped to |
@@ -97,6 +97,7 @@ Quack flow (016):
 - **Two stream formats:** Composer uses native `tool_call`/`thinking`, not Claude `stream_event`. Extend **`cursorStreamJson.ts`**, not only `cliStreamJson.ts`.
 - **Doubled reply (`--stream-partial-output`):** Cursor emits each token as its own `assistant` message, then a FINAL `assistant` message repeating the whole text. The Claude-shaped anti-dup guard (`currentMsgGotDeltas`) never fires here (no `stream_event`/`text_delta`), so the reply rendered twice. Fix: `cliStreamJson.ts` accumulates streamed assistant text in `partialAssistantBuf` and drops the trailing full-text snapshot (reset on `message_start`/`result`).
 - **Lazy model list:** defer `--list-models` to picker/browser (025).
+- **`listModels()` returning only the default row (fixed 2026-07-27):** `cursorCliProvider.listModels()` used to return `[DEFAULT_MODEL]` on every branch, never calling `refreshCursorModelsLive()` — the picker's Cursor tab showed "Install cursor-agent" even when the CLI was installed and logged in. Fixed by delegating directly to `refreshCursorModelsLive().catch(() => [DEFAULT_MODEL])`. Rust side (`resolve_cursor_bin`, `parse_list_models`) was correct throughout. Second half of the fix in `031-model-discovery-cache.md`.
 - **Effort tiers in catalog:** Cursor exposes Low/Medium/High/xHigh/Max/Fast as **separate model ids** in `--list-models` (e.g. `Opus 4.8 1M Extra High`). Quack has **no** `EffortPopover` for Cursor — pick the tier as the model. Claude Code uses a separate effort knob + `--effort` (`022`, `059`).
 - **Lifecycle kill:** `cursor_code_kill_session` — see `046-process-cleanup.md`.
 - **Images ≠ multimodal:** path-in-prompt only; model must invoke read/view tools itself.

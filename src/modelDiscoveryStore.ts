@@ -351,9 +351,13 @@ async function warmLiveCliCatalogs(force = false): Promise<void> {
     snap = await ensureModelDiscovery({ force: false });
   }
   const wantCc = snap.claudeCodeAvailable;
-  const wantCursor = snap.cursorCliAvailable;
   if (wantCc) void warmCcCatalog(force);
-  if (!wantCursor) return;
+  // cursorCliAvailable starts false and is only corrected by a fire-and-forget
+  // probe, so trusting the snapshot here skipped the warm-up whenever the picker
+  // opened before that probe landed — the Cursor tab then rendered "install the
+  // CLI" on a machine where it was installed. Await the probe instead.
+  const probed = await probeCliAvailability(snap);
+  if (!probed.cursorCliAvailable) return;
   if (!force && liveCliInflight) return liveCliInflight;
 
   liveCliInflight = (async () => {

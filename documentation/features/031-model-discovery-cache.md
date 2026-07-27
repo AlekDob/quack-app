@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS
 created: 2026-07-03
-last_verified: 2026-07-11
+last_verified: 2026-07-27
 tags: [model-discovery, startup, cache, providers, ollama, claude-code, cursor-cli, opencode-cli, performance, lazy-mount, disk-persist, stale-while-revalidate]
 ---
 
@@ -72,3 +72,4 @@ tags: [model-discovery, startup, cache, providers, ollama, claude-code, cursor-c
 - **Background workspace chats:** `AIChatHost` renders only when `isActive` workspace; switching project mounts hosts on first visit (cache usually warm).
 - **Hidden chat tabs:** `AIChatHost` sets `mounted` on first `visible` — background tabs in the active workspace do not mount until selected (streams in hidden tabs won't run until shown — editor mode tradeoff).
 - **Splash overlap:** 700 ms min splash (`App.tsx`) still gates UI; prefetch runs during that window so model probe overlaps hydration rather than blocking first paint after splash.
+- **Stale `cursorCliAvailable` skipped the CLI warm-up (fixed 2026-07-27):** `warmLiveCliCatalogs` gated on `snap.cursorCliAvailable`, which starts `false` and is only corrected by a fire-and-forget `probeCliAvailability` call — opening the picker before that probe landed skipped the Cursor warm-up entirely, so the tab kept showing "install cursor-agent" on a machine where it was installed. Fixed by `await`ing `probeCliAvailability(snap)` before the gate instead of trusting the snapshot flag. Paired with the `listModels()` fix in `026-cursor-cli-bridge.md`.
