@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19), plain CSS (no Tailwind)
 created: 2026-06-28
-last_verified: 2026-07-13
+last_verified: 2026-07-27
 tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monochrome, macos, window, composer, cursor-style, tool-icon-tints]
 ---
 
@@ -23,7 +23,7 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 ### Token groups (`App.css` `:root`)
 | Group | Tokens |
 |-------|--------|
-| Surfaces | `--bg`, `--bg-alt`, `--bg-elev`, `--bg-hi`, `--bg-hover`, `--chat-stream-bg`, `--user-bar-glass-from/to`, `--user-bar-border`, `--user-bar-shadow`, `--user-bar-bg`, `--glass-bg` |
+| Surfaces | `--bg`, `--bg-alt`, `--bg-elev`, `--bg-hi`, `--bg-hover`, `--chat-stream-bg`, `--chat-stream-max` (760px Cursor-style measure), `--user-bar-glass-from/to`, `--user-bar-border`, `--user-bar-shadow`, `--user-bar-bg`, `--glass-bg` |
 | Text | `--fg`, `--fg-dim`, `--fg-muted` |
 | Borders | `--border`, `--border-strong` |
 | Accent (NEUTRAL) | `--accent` (#9aa0ad dark / #6b7280 light), `--accent-rgb`, `--accent-hover`, `--accent-soft`, `--accent-fg` |
@@ -74,7 +74,7 @@ tags: [design-system, theming, tokens, dark, light, liquid-glass, accent, monoch
 - Message body `.ai-msg-body .md-preview` is **13.5px** / line-height **1.6**; headings h1–h4 17/15/14/13; fenced code blocks 13px inside copyable pills (`.md-code-block`); fallback `.ai-msg` 14px. Copy UI: `features/049-markdown-renderer.md`.
 - **Document preview** (`.md-preview` without chat scope — editor split/preview, Customizations Instructions, whiteboard): body **14px**; headings h1–h6 **20/17/15/14/13/12** (2026-07-04 tightening). Full table in `features/027-editor-tab-toolbar.md`.
 - **Vertical rhythm** (was cramped): messages `gap: 14px`; paragraphs `margin-bottom: 10px`; tool groups `.ai-tcalls` gap 7 / margin 8 (inline 10); `.ai-tcall-wrap` gap 7 / margin 8.
-- **Gutters:** panel `.ai-panel` `padding: 0 5px`; stream `.ai-messages` asymmetric `8px 28px 8px 8px` (tight left, wide right so text + tool rows clear the nav rail). Assistant body `.ai-msg-assistant .ai-msg-body` = `padding: 0 8px`, **no left rail** (removed the hairline rule).
+- **Gutters + measure:** panel `.ai-panel` `padding: 0 5px`; stream `.ai-messages` + composer/docks share `--chat-stream-max` (760px), centered — Cursor-style readable column on wide panes, full-width when the pane is narrower. Stream padding `8px 22px 8px 12px` (right clears the nav rail on narrow panes). Assistant body `.ai-msg-assistant .ai-msg-body` = `padding: 0 8px`, **no left rail**.
 - Assistant identity header = **Jack** (duck avatar 32px + name 14px + "Project Manager" 10px) — full feature in `features/005-jack-duck-identity.md`.
 - Composer controls (subagent pill, mic, effort popover, uniform toolbar): full detail in `features/022-chat-composer.md`. Navigation rail: `features/021-chat-nav-rail.md`.
 

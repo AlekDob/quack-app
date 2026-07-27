@@ -14,6 +14,9 @@
   /* Chat stream column — slightly lifted from chrome so the center reads
      as the primary surface between side rails/panels. */
   --chat-stream-bg: #181818;
+  /* Cursor-style readable measure for the stream + composer column.
+     Wide panes center under this cap; narrow panes stay full-width. */
+  --chat-stream-max: 760px;
   /* User prompt card — liquid glass over the stream (translucent + blur). */
   --user-bar-glass-from: color-mix(in srgb, var(--fg) 10%, transparent);
   --user-bar-glass-to: color-mix(in srgb, var(--fg) 3%, transparent);
@@ -7016,7 +7019,11 @@ body.ab-dragging * {
   display: flex;
   flex-direction: column;
   position: relative;
-  margin: 8px 10px;
+  /* Same measure as the stream column (see --chat-stream-max). */
+  box-sizing: border-box;
+  width: calc(100% - 24px);
+  max-width: var(--chat-stream-max);
+  margin: 8px auto;
   background: var(--bg-elev);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -7434,7 +7441,7 @@ body.ab-dragging * {
 /* Agent commit indicator — Cursor-style pill above the composer. */
 .ai-commit-dock {
   flex-shrink: 0;
-  padding: 4px 10px 2px;
+  padding: 4px 0 2px;
 }
 .ai-commit-dock-pill {
   display: flex;
@@ -9047,7 +9054,8 @@ button.composer-mention-chip-label:hover {
 /* Cursor-style plan buy-in — Pass the ball to Milo (above composer). */
 .ai-plan-buyin {
   flex-shrink: 0;
-  margin: 0 12px 10px;
+  margin-top: 0;
+  margin-bottom: 10px;
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -10715,13 +10723,39 @@ html.audit-root #root {
   overflow-y: auto;
   overflow-x: hidden;
   overflow-anchor: none;
-  /* Asymmetric gutters: tight left (nothing lives there), wide right so text
-     AND tool rows clear the nav rail + its hover preview. One place controls
-     both — everything in the stream shifts together. */
-  padding: 8px 28px 8px 8px;
+  /* Side gutters: enough right clearance for the nav rail when the pane is
+     narrow (children go full-width). Wide panes center under --chat-stream-max
+     and the rail sits in the empty margin — Cursor-style measure. */
+  padding: 8px 22px 8px 12px;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 14px;
+}
+/* Stream rows share one readable column with the composer. */
+.ai-messages > * {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--chat-stream-max);
+}
+.ai-messages > .ai-show-earlier {
+  width: auto;
+}
+/* Composer docks / menus — same column as .ai-messages / .ai-composer-shell. */
+.ai-panel > .ai-status-dock,
+.ai-panel > .ai-commit-dock,
+.ai-panel > .ai-todos-bar,
+.ai-panel > .ai-plan-buyin,
+.ai-panel > .ai-cc-login-banner,
+.ai-panel > .ai-context-indicator,
+.ai-panel > .ai-slash-suggestions,
+.ai-panel > .ai-mention-popover,
+.ai-panel > .brain-save-chip {
+  box-sizing: border-box;
+  width: calc(100% - 24px);
+  max-width: var(--chat-stream-max);
+  margin-left: auto;
+  margin-right: auto;
 }
 /* Inline turn status — in the message stream under the pinned user turn. */
 .ai-turn-status {
@@ -13012,7 +13046,7 @@ html.audit-root #root {
 /* Plan chip — sits above the composer, expands upward on click (astronave). */
 .ai-todos-bar {
   flex-shrink: 0;
-  padding: 0 12px 2px;
+  padding: 0 0 2px;
 }
 .ai-todos-wrap {
   position: relative;
@@ -13434,7 +13468,8 @@ html.audit-root #root {
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
-  margin: 6px 8px 0;
+  margin-top: 6px;
+  margin-bottom: 0;
   background: var(--warn-bg);
   border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
   border-radius: var(--radius-lg);
@@ -13844,7 +13879,7 @@ html.audit-root #root {
    Cursor-style pills; live tool rows stack below as the same pill family. */
 .ai-status-dock {
   flex-shrink: 0;
-  padding: 6px 10px 2px;
+  padding: 6px 0 2px;
   max-height: 40%;
   overflow-y: auto;
   border-top: 1px solid var(--border);
@@ -15300,7 +15335,8 @@ html.audit-root #root {
   flex-shrink: 0;
   max-height: 220px;
   overflow: hidden;
-  margin: 0 10px;
+  margin-top: 0;
+  margin-bottom: 0;
   border: 1px solid var(--border);
   border-bottom: none;
   border-radius: var(--radius-md) var(--radius-md) 0 0;
@@ -23793,7 +23829,8 @@ html.audit-root #root {
 
 /* Brain save proposal — amber semantic, same minimal shell as turn chip */
 .brain-save-chip {
-  margin: 4px 12px 8px;
+  margin-top: 4px;
+  margin-bottom: 8px;
   padding: 0;
   border: none;
   background: transparent;
