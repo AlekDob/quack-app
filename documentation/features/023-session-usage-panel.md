@@ -2,9 +2,9 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-22
-tags: [session, usage, context, progress, claude-code, popover, monitor, quack-v1, spend-limit]
-related: [091-spend-limit-card.md]
+last_verified: 2026-07-27
+tags: [session, usage, context, progress, claude-code, popover, monitor, quack-v1, spend-limit, compact]
+related: [091-spend-limit-card.md, 014-claude-code-bridge.md]
 ---
 
 # 023 — Session Usage Panel
@@ -95,10 +95,15 @@ pct  = round(used / context_window × 100)
 ```
 stream_event.message_start  → fresh latestContextTokens + context_snapshot event
 stream_event.message_delta  → merge + context_snapshot event
+system.compact_boundary     → postTokens → context_snapshot (ring refresh after /compact)
 result (non-subagent)       → usage.tokens (billing) + contextTokens (ring)
 ```
 
 `context_snapshot` events update the ring **mid-turn** (before `result`).
+`compact_boundary` (manual `/compact` or auto) carries `compactMetadata.postTokens`
+— without handling it the ring stayed on the pre-compact snap until the next
+API call (and JSONL often has a trailing all-zero "No response requested."
+assistant that masked the boundary for disk hydrate).
 Attach/replay (`claude_code_attach`) parses the same stream_event usage fields.
 
 `--include-partial-messages` required so `stream_event` lines arrive.
@@ -110,6 +115,7 @@ Subagent `result` events (`parent_tool_use_id`) are ignored for both metrics.
 | Function | Role |
 |---|---|
 | `contextTokensFromApiUsage(usage, prev?)` | Parse one API usage object; merge deltas |
+| `contextTokensFromCompactMeta(meta)` | Map `compact_boundary.postTokens` → ring snap |
 | `estimateContextUsed(context, fallbackIn)` | Ring/popover `used` + `estimate` flag |
 | `resolveContextWindow(model, catalog)` | Denominator for % |
 | `contextFillPct(used, window)` | Clamped 0–100 |
@@ -122,6 +128,9 @@ Do **not** invent a sid from turn count — that mixed Quack chats with the wron
 JSONL (see `044`). Legacy `claude_session_context_usage` kept for context-only
 reads. **Poll runs only when `wsActive` (`activeId === wsId`)** — immediate
 catch-up on project switch-back; see `058-workspace-switch-performance.md`.
+JSONL `last_context_snap` prefers `compact_boundary.postTokens` over older
+assistant usage (skips all-zero placeholders). Idle disk poll steals into live
+when disk used drops by ≥50% (missed stream compact).
 
 ## Context breakdown (popover segments)
 
@@ -158,29 +167,62 @@ hardcoded hex).
 | Concern | Source | Rate |
 |---|---|---|
 | Context snapshot | `stream_event` via `claudeCode.ts` | Per API call in turn |
-| Context ring / popover hero | `lastUsage.contextTokens` | End of each turn |
-| Breakdown segments | `contextBreakdown.ts` on popover open | On demand |
+| Post-`/compact` snap | `system.compact_boundary` → `postTokens` | Once per compaction |
+| Context ring / popover hero | `liveContextTokens` → `lastUsage.contextTokens` → disk | Live + end of turn |
+| Breakdown segments | `contextBreakdown.ts` on popover open | On demand (re-runs when `context.used` changes) |
 | Plan limits (5hr, 7day, extra) | `claude_usage_limits` | 30s poll (foreground workspace only) |
 | Cumulative billing | `AIChatPanel` per-turn counters | Per `usage` event |
 | Cost / turns / cache-read totals | `aiUsageLog` + Usage tab | Per turn |
 | Monthly spend | `aiUsageLog` aggregates | Usage tab open |
 
+## `/compact` → ring refresh
+
+Compaction does **not** emit a fresh Anthropic `message_start` for the
+post-compact window. Claude Code instead appends:
+
+```json
+{"type":"system","subtype":"compact_boundary","compactMetadata":{
+  "trigger":"manual","preTokens":523087,"postTokens":20808,"durationMs":208616
+}}
+```
+
+| Layer | Behaviour |
+|---|---|
+| Stream (`claudeCode.ts`) | On `compact_boundary`, map `postTokens` → `context_snapshot`; also set `latestContextTokens` so a later `result` does not resurrect the pre-compact snap |
+| Zero-usage guard | Skip `message_start` / `message_delta` snaps whose used-total is 0 (post-compact `"No response requested."` placeholder) |
+| Panel (`AIChatPanel`) | `context_snapshot` updates `liveContextTokens` **and** `lastUsage.contextTokens` |
+| JSONL (`session_jsonl::last_context_snap_str`) | Reverse walk: prefer `compact_boundary.postTokens`; skip assistant usage with used-total 0; newer non-zero assistant still wins after the next real turn |
+| Disk poll (12s, idle) | Always refresh `diskContextTokens`; if disk used &lt; 50% of live, steal into live (missed stream event / remount) |
+
+**Caveat:** `postTokens` is a single used-total (stored on `input`). It can
+undercount vs CC `/context` (static system/tools/memory). The next API call
+corrects the ring. See `gotcha/cc-compact-context-ring.md`.
+
+### Tests
+
+| Test | Asserts |
+|---|---|
+| `src/contextUsage.test.ts` | `contextTokensFromCompactMeta` (camel + snake `post_tokens`, ignores ≤0) |
+| `session_jsonl::tests::context_snap_prefers_compact_post_tokens` | Boundary beats older assistant + zero placeholder |
+| `session_jsonl::tests::context_snap_prefers_newer_assistant_over_compact` | Post-compact real assistant wins |
+
 ## Components
 
 | File | Role |
 |---|---|
-| `src/contextUsage.ts` | Context math + `contextTokensFromApiUsage` |
+| `src/contextUsage.ts` | Context math + `contextTokensFromApiUsage` + `contextTokensFromCompactMeta` |
+| `src/contextUsage.test.ts` | Compact-meta + estimate regression |
 | `src/sessionUsageLocal.ts` | `SessionUsageData` types, `buildSessionUsageLocal`, plan parsers |
 | `src/contextBreakdown.ts` | Segment builder (assets + rules + MCP scan) |
 | `src-tauri/src/claude_sessions.rs` | `claude_session_drawer_stats` + usage rollup |
-| `src-tauri/src/session_jsonl.rs` | Shared `last_context_snap`, `claude_jsonl_path` |
+| `src-tauri/src/session_jsonl.rs` | `last_context_snap` (compact_boundary + zero-skip), `claude_jsonl_path` |
 | `src-tauri/src/context_assets.rs` | Skills/agents scan (shared with Usage → Context view) |
 | `src/sessionDiskHydrate.ts` | JSONL merge helpers (`contextTokensFromDisk`, `mergeDiskBilling`) — **no** session-id guess |
-| `src/providers/claudeCode.ts` | Stream snapshot + `context_snapshot` events |
+| `src/providers/claudeCode.ts` | Stream snapshot + `compact_boundary` + `context_snapshot` events |
 | `src/ai.ts` | `ChatStreamEvent` — `usage.contextTokens`, `context_snapshot` |
 | `src/components/SessionUsageCircle.tsx` | Ring button + popover host (toggle state) |
 | `src/components/SessionUsagePopover.tsx` | Cursor-style breakdown UI |
-| `src/components/AIChatPanel.tsx` | Host, poll, cumulative state, `pinnedContextRef` |
+| `src/components/AIChatPanel.tsx` | Host, poll, cumulative state, `pinnedContextRef`, compact steal |
 | `src/App.css` | `.session-circle-btn`, `.session-usage-pop*`, `.ctx-seg-*` |
 
 **Removed (2026-07-12):** `SessionUsageDrawer.tsx` — slide-over replaced by
@@ -216,6 +258,7 @@ swallows transient failures.
 |---|---|
 | `result.usage` sums cache reads → inflated context % | `gotcha/cc-context-ring-result-usage.md` |
 | Breakdown segments are estimates, not CC `/context` | `gotcha/context-breakdown-estimates.md` |
+| Ring stale after `/compact` until next API call | `gotcha/cc-compact-context-ring.md` |
 | No per-category 5hr breakdown from Anthropic API | `gotcha/anthropic-session-budget-breakdown.md` |
 | CC may warn before statusline hits 100% (output + compact buffer) | anthropics/claude-code#17959 |
 | UsageChip does **not** show model name; session list uses family-only `shortModelFamily` | `071-honest-model-labels.md` |
@@ -235,5 +278,5 @@ swallows transient failures.
 - Parse Claude Code `/context` output (or an equivalent structured hook) for
   live per-category numbers matching CC's `analyzeContext` — replace static
   baselines for system/tools/MCP.
-- Optional compact "Summarized conversation" segment when compaction is detectable
-  from JSONL.
+- `postTokens` undercounts vs full `/context` (static overhead); next API
+  call corrects. Optional: add estimated static segments onto postTokens.

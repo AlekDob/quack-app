@@ -283,7 +283,24 @@ fn usage_snap_from_value(u: &serde_json::Value) -> SessionContextSnap {
     }
 }
 
+fn snap_used(s: &SessionContextSnap) -> u64 {
+    s.input_tokens + s.cache_read_tokens + s.cache_creation_tokens
+}
+
+/// `compactMetadata.postTokens` (camel or snake) from a compact_boundary row.
+fn compact_post_tokens(v: &serde_json::Value) -> Option<u64> {
+    let meta = v
+        .get("compactMetadata")
+        .or_else(|| v.get("compact_metadata"))?;
+    meta.get("postTokens")
+        .or_else(|| meta.get("post_tokens"))
+        .and_then(|x| x.as_u64())
+        .filter(|&n| n > 0)
+}
+
 /// Walk JSONL backwards — prefer latest non-subagent `assistant` usage.
+/// After `/compact`, prefer `compact_boundary.postTokens` over older
+/// assistant snaps (and skip all-zero assistant usage placeholders).
 pub fn last_context_snap(path: &Path) -> Option<SessionContextSnap> {
     let content = std::fs::read_to_string(path).ok()?;
     last_context_snap_str(&content)
@@ -301,15 +318,36 @@ pub fn last_context_snap_str(content: &str) -> Option<SessionContextSnap> {
         if is_sidechain_record(&v) {
             continue;
         }
-        let t = v.get("type").and_then(|x| x.as_str())?;
+        let Some(t) = v.get("type").and_then(|x| x.as_str()) else {
+            continue;
+        };
+        if t == "system"
+            && v.get("subtype").and_then(|x| x.as_str()) == Some("compact_boundary")
+        {
+            if let Some(post) = compact_post_tokens(&v) {
+                return Some(SessionContextSnap {
+                    input_tokens: post,
+                    cache_read_tokens: 0,
+                    cache_creation_tokens: 0,
+                });
+            }
+        }
         if t == "assistant" {
             if let Some(u) = v.get("message").and_then(|m| m.get("usage")) {
-                return Some(usage_snap_from_value(u));
+                let snap = usage_snap_from_value(u);
+                // Post-compact "No response requested." rows carry usage:0 —
+                // keep walking so we can hit compact_boundary / real snaps.
+                if snap_used(&snap) > 0 {
+                    return Some(snap);
+                }
             }
         }
         if t == "result" && result_snap.is_none() {
             if let Some(u) = v.get("usage") {
-                result_snap = Some(usage_snap_from_value(u));
+                let snap = usage_snap_from_value(u);
+                if snap_used(&snap) > 0 {
+                    result_snap = Some(snap);
+                }
             }
         }
     }
@@ -347,5 +385,29 @@ mod tests {
         assert_eq!(capped.len(), 6);
         assert_eq!(capped[0].content, "u7");
         assert_eq!(capped[5].content, "a9");
+    }
+
+    #[test]
+    fn context_snap_prefers_compact_post_tokens() {
+        let content = r#"
+{"type":"assistant","message":{"usage":{"input_tokens":100,"cache_read_input_tokens":400000,"cache_creation_input_tokens":0}}}
+{"type":"system","subtype":"compact_boundary","compactMetadata":{"trigger":"manual","preTokens":400100,"postTokens":20808}}
+{"type":"assistant","message":{"usage":{"input_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
+"#;
+        let snap = last_context_snap_str(content).unwrap();
+        assert_eq!(snap.input_tokens, 20808);
+        assert_eq!(snap.cache_read_tokens, 0);
+    }
+
+    #[test]
+    fn context_snap_prefers_newer_assistant_over_compact() {
+        let content = r#"
+{"type":"system","subtype":"compact_boundary","compactMetadata":{"postTokens":20808}}
+{"type":"assistant","message":{"usage":{"input_tokens":12000,"cache_read_input_tokens":80000,"cache_creation_input_tokens":1000}}}
+"#;
+        let snap = last_context_snap_str(content).unwrap();
+        assert_eq!(snap.input_tokens, 12000);
+        assert_eq!(snap.cache_read_tokens, 80000);
+        assert_eq!(snap.cache_creation_tokens, 1000);
     }
 }

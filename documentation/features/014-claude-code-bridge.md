@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-20
+last_verified: 2026-07-27
 tags: [claude-code, bridge, subprocess, streaming, stop, process-group, watchdog, rust, performance]
 ---
 
@@ -103,16 +103,20 @@ rewrite in `claudeCode.ts`.
 
 ### End-of-turn usage + context snapshot
 
-Full design: **[023-session-usage-panel.md](023-session-usage-panel.md)**. Gotcha:
-**[cc-context-ring-result-usage.md](../gotcha/cc-context-ring-result-usage.md)**.
+Full design: **[023-session-usage-panel.md](023-session-usage-panel.md)**. Gotchas:
+**[cc-context-ring-result-usage.md](../gotcha/cc-context-ring-result-usage.md)**,
+**[cc-compact-context-ring.md](../gotcha/cc-compact-context-ring.md)**.
 
-| `result` field | Use |
+| Source | Use |
 |---|---|
-| `usage` (turn total) | Cost chip, cumulative billing, cache-read ledger |
-| `contextTokens` (derived) | Context ring % — last API `message_start` / `message_delta` snapshot |
+| `result.usage` (turn total) | Cost chip, cumulative billing, cache-read ledger |
+| `stream_event` `message_start` / `message_delta` | Context ring % — live `context_snapshot` |
+| `system` `compact_boundary` (`postTokens`) | Ring refresh after `/compact` / auto-compact |
 
 `claudeCode.ts` parses `stream_event` with `--include-partial-messages`. Do
-**not** use summed `result.usage` cache fields for context window %.
+**not** use summed `result.usage` cache fields for context window %. After
+compaction, prefer `compactMetadata.postTokens` over the pre-compact snap
+(and skip all-zero assistant placeholders in JSONL).
 
 ### Frontend streaming UX
 

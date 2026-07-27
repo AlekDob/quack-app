@@ -37,6 +37,23 @@ export function contextTokensFromApiUsage(
   };
 }
 
+/**
+ * Post-`/compact` size from CC `compact_boundary` metadata.
+ * `postTokens` is a single used-total (not split across cache fields) —
+ * store it on `input` so `estimateContextUsed` matches the ring formula.
+ * May undercount vs CC `/context` (static overhead) until the next API call.
+ */
+export function contextTokensFromCompactMeta(
+  meta: Record<string, unknown> | undefined,
+): TurnTokens | undefined {
+  if (!meta) return undefined;
+  const post = meta.postTokens ?? meta.post_tokens;
+  if (typeof post !== "number" || !Number.isFinite(post) || post <= 0) {
+    return undefined;
+  }
+  return { input: post, output: 0, cacheRead: 0, cacheCreate: 0 };
+}
+
 /** Tokens occupying the context window on the last API call (or estimate). */
 export function estimateContextUsed(
   context: TurnTokens | undefined,

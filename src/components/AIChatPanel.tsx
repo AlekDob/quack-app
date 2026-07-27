@@ -4282,6 +4282,11 @@ export function AIChatPanel({
           }
           if (ev.kind === "context_snapshot") {
             setLiveContextTokens(ev.tokens);
+            // Keep lastUsage in sync so a later live clear doesn't
+            // resurrect a pre-/compact snap from the previous turn.
+            setLastUsage((prev) =>
+              prev ? { ...prev, contextTokens: ev.tokens } : prev,
+            );
             continue;
           }
           if (ev.kind === "subagent_model") {
@@ -5228,9 +5233,28 @@ export function AIChatPanel({
       try {
         const stats = await claudeCode.drawerStats(root, sid);
         if (!stats || cancelled || gen !== diskHydrateGenRef.current) return;
-        if (!liveContextTokens) {
-          const ctx = contextTokensFromDisk(stats);
-          if (ctx) setDiskContextTokens(ctx);
+        const ctx = contextTokensFromDisk(stats);
+        if (ctx) {
+          setDiskContextTokens(ctx);
+          // After /compact, JSONL may learn postTokens while live still
+          // holds the pre-compact snap (missed stream event / remount).
+          // Only steal when idle and disk dropped sharply — avoid brief
+          // JSONL lag regressing a fresh stream snap.
+          if (streaming === null) {
+            const live = usageMetricsRef.current.liveContextTokens;
+            if (live) {
+              const diskUsed =
+                ctx.input + ctx.cacheRead + ctx.cacheCreate;
+              const liveUsed =
+                live.input + live.cacheRead + live.cacheCreate;
+              if (diskUsed > 0 && diskUsed < liveUsed * 0.5) {
+                setLiveContextTokens(ctx);
+                setLastUsage((prev) =>
+                  prev ? { ...prev, contextTokens: ctx } : prev,
+                );
+              }
+            }
+          }
         }
         const m = usageMetricsRef.current;
         const merged = mergeDiskBilling(

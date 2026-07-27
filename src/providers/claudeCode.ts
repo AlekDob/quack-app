@@ -1,7 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { ChatStreamEvent, ToolCall } from "../ai";
-import { ccAliasContextWindow, contextTokensFromApiUsage } from "../contextUsage";
+import {
+  ccAliasContextWindow,
+  contextTokensFromApiUsage,
+  contextTokensFromCompactMeta,
+} from "../contextUsage";
 import type { ChatProvider, ProviderModel } from "./types";
 import { flattenMessages, lastUserMessage } from "./cliPrompt";
 import { getWorkspaceRoot } from "../wsRoot";
@@ -345,6 +349,19 @@ export const claudeCodeProvider: ChatProvider = {
           queue.push({ kind: "session", id: obj.session_id });
           wake();
         }
+        // /compact (manual or auto) — refresh the context ring from
+        // compactMetadata.postTokens. Without this the ring stays on the
+        // pre-compact message_start snap until the next real API turn.
+        if (obj.type === "system" && obj.subtype === "compact_boundary") {
+          const meta = (obj.compactMetadata ??
+            obj.compact_metadata) as Record<string, unknown> | undefined;
+          const snap = contextTokensFromCompactMeta(meta);
+          if (snap) {
+            latestContextTokens = snap;
+            queue.push({ kind: "context_snapshot", tokens: snap });
+            wake();
+          }
+        }
         // Token-level streaming via --include-partial-messages.
         // Each `stream_event` line wraps a raw Anthropic API
         // streaming event. We only need text deltas — tool_use
@@ -365,7 +382,12 @@ export const claudeCodeProvider: ChatProvider = {
               (ev as { message?: { usage?: Record<string, unknown> } })
                 .message?.usage,
             );
-            if (snap) {
+            // Skip all-zero snaps (e.g. post-/compact "No response
+            // requested.") so they don't wipe a real context fill.
+            if (
+              snap &&
+              snap.input + snap.cacheRead + snap.cacheCreate > 0
+            ) {
               latestContextTokens = snap;
               queue.push({ kind: "context_snapshot", tokens: snap });
               wake();
@@ -375,7 +397,10 @@ export const claudeCodeProvider: ChatProvider = {
               (ev as { usage?: Record<string, unknown> }).usage,
               latestContextTokens ?? undefined,
             );
-            if (snap) {
+            if (
+              snap &&
+              snap.input + snap.cacheRead + snap.cacheCreate > 0
+            ) {
               latestContextTokens = snap;
               queue.push({ kind: "context_snapshot", tokens: snap });
               wake();
