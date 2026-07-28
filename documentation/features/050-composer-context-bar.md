@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-10
-last_verified: 2026-07-22
+last_verified: 2026-07-27
 ---
 
 # 050 — Composer context bar (path + branch)
@@ -17,13 +17,12 @@ Parent composer doc: **`022-chat-composer.md`**. Session ownership: **`001-ai-se
 
 ## User story (2026-07-22)
 
-When Alek hits **New chat**, the composer already shows which project the session
-belongs to. Like Cursor:
+When Alek hits **New chat** (hub) or the composer project chip:
 
-1. Chip defaults to the **active project name** (not a long path).
-2. Click → **Recents** (MRU folders, open or closed) + **Open folder…**.
-3. Pick another project → Quack switches/opens that workspace and **creates a new chat there**
-   (name prompt anchored on the chip). The previous chat tab stays in its project.
+1. Popover lists **Recents** (MRU) — scrollable.
+2. **Open folder…** stays **fixed at the bottom** of the menu (does not scroll away).
+3. Pick a project → Quack switches/opens that workspace and **creates a new chat there**.
+4. Hub **New chat** always creates (including current project). Composer chip picking the *current* project is still a no-op (already in that session).
 
 Out of scope (keep light): Cloud / No Repo / environment “This Mac” / New Folder.
 
@@ -32,7 +31,9 @@ Out of scope (keep light): Cloud / No Repo / environment “This Mac” / New Fo
 | File | Role |
 |---|---|
 | `src/components/ComposerContextBar.tsx` | Wrapper row: path segment + branch segment |
-| `src/components/WorkspacePathPicker.tsx` | Project-name chip + Recents menu + Open folder… |
+| `src/components/WorkspacePathPicker.tsx` | Project-name chip + shared project menu |
+| `src/components/WorkspaceProjectMenu.tsx` | Shared Recents body + fixed Open folder…; `createChatInProject` |
+| `src/components/AIChatsRail.tsx` | Hub **New chat** opens the same project menu |
 | `src/components/GitBranchPicker.tsx` | Shared branch dropdown (`panel` \| `composer` variants) |
 | `src/composerCtxMenu.tsx` | Portaled fixed-position menu (escapes `.ai-panel overflow:hidden`) |
 | `src/components/AIChatPanel.tsx` | Mounts `<ComposerContextBar wsId root />` inside `.ai-composer-shell` |

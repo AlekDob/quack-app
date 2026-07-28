@@ -19,10 +19,9 @@ tags: [workspace, colors, palette, popover, activity-bar, agent-rail, topbar, th
 | IPC | `src/ipc.ts` | `workspaces.loadColors`/`workspaces.saveColors` |
 | Component | `src/components/WorkspaceColorPopover.tsx` | Right-click popover: New chat / Reveal in Finder|Explorer / Copy path + swatch grid + "No color"; portals to body |
 | Component | `src/components/ActivityBar.tsx` | Editor-mode workspace icons: context menu → popover, applies `--ws-color` |
-| Component | `src/components/AgentModeShell.tsx` | Agent-mode workspace rail: same context menu + color application |
 | Component | `src/components/TopBar.tsx` | Active workspace: `--ws-color` + `--ws-color-rgb` on `.topbar.has-ws-color` |
 | Component | `src/components/AIChatsRail.tsx` | Hub row badges: `--ws-color` on project initials |
-| Config | `src/App.css` | `.ws-icon.has-color`, `.agent-wsrail-icon.has-color`, `.topbar.has-ws-color::before`, `.topbar-brand-project.has-color`, `--topbar-ws-tint-*` |
+| Config | `src/App.css` | `.ws-icon.has-color`, `.topbar.has-ws-color::before`, `.topbar-brand-project.has-color`, `--topbar-ws-tint-*` |
 
 ### Data Flow
 - **Set color:** right-click icon → `setColorMenu({wsId,x,y})` → `WorkspaceColorPopover` → `setWorkspaceColor(wsId, colorId)` → mutates in-RAM `cache` synchronously + `notify()` (instant UI) → async fire-and-forget `workspaces.saveColors(cache)` writes `colors.json` on disk
@@ -35,7 +34,6 @@ tags: [workspace, colors, palette, popover, activity-bar, agent-rail, topbar, th
 | Surface | Mechanism | When |
 |---------|-----------|------|
 | Activity bar icon | `.ws-icon.has-color` + `color-mix` tint / active full fill | Per open workspace |
-| Agent Mode rail icon | `.agent-wsrail-icon.has-color` | Same |
 | Top bar project name | `.topbar-brand-project.has-color` → `color: var(--ws-color)` | Active workspace with color |
 | **Top bar background** | `.topbar.has-ws-color::before` radial gradients | Active workspace with color |
 | Agent Hub row badge | `.agent-hub-ws-badge.has-color` | Session's workspace |

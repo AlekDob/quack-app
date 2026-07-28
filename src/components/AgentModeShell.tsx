@@ -1,6 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { memo, useCallback, useEffect, useState } from "react";
 import {
   useStore,
   collectComposeReviewTabs,
@@ -34,8 +32,6 @@ import {
 import { clearTasks } from "../aiTaskStore";
 import { getAgentStatus, subscribeAgentStatus } from "../agentStatusStore";
 import { FilePopupModal } from "./FilePopupModal";
-import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
-import { getWorkspaceColor, subscribeWorkspaceColors } from "../workspaceColors";
 import { AIChatsRail } from "./AIChatsRail";
 import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { endChatSwitch, getChatSwitchTarget, pulseChatSwitch } from "../chatSwitch";
@@ -54,14 +50,6 @@ interface Props {
   // workspace switch (no React key). Agent↔IDE *does* remount the shell —
   // selected chat lives in `agentModeSelection.ts`, not component state.
   wsId: string;
-}
-
-// 1–2 char workspace badge, same scheme the main app's ActivityBar uses
-// so the agent-mode rail reads as the same Codetta workspace switcher.
-function initials(name: string): string {
-  const parts = name.split(/[\s\-_.]+/).filter(Boolean);
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
-  return name.slice(0, 2).toUpperCase();
 }
 
 // One panel per chat, toggled with CSS — mirrors WorkspaceShell's
@@ -136,9 +124,7 @@ const AgentChatHost = memo(function AgentChatHost({
 export function AgentModeShell({ wsId }: Props) {
   const openIds = useStore((s) => s.openIds);
   const loaded = useStore((s) => s.loaded);
-  const recent = useStore((s) => s.recent);
   const setActiveWorkspace = useStore((s) => s.setActiveWorkspace);
-  const openWorkspace = useStore((s) => s.openWorkspace);
 
   useEffect(() => {
     logAgentModePhase("agent-shell mounted", { wsId });
@@ -157,23 +143,6 @@ export function AgentModeShell({ wsId }: Props) {
     setContextW(next);
     setAgentContextWidth(next);
   }, []);
-
-  // "+" workspace menu on the rail (open folder / recent).
-  const [railMenu, setRailMenu] = useState(false);
-  const railAddRef = useRef<HTMLButtonElement>(null);
-
-  // Right-click color popover for a workspace icon (shared with ActivityBar).
-  const [colorMenu, setColorMenu] = useState<{
-    wsId: string;
-    x: number;
-    y: number;
-    nameAnchor: { x: number; y: number };
-  } | null>(null);
-  const [, setColorTick] = useState(0);
-  useEffect(
-    () => subscribeWorkspaceColors(() => setColorTick((n) => n + 1)),
-    [],
-  );
 
   const ws = loaded[wsId];
   const editorRoot = ws?.layout.editorRoot;
@@ -283,8 +252,6 @@ export function AgentModeShell({ wsId }: Props) {
     }
   }
 
-  const recentNotOpen = recent.filter((w) => !openIds.includes(w.id));
-
   const selectSession = (id: string, chatId: string) => {
     const crossWs = id !== wsId;
     // Touch BEFORE mount pass so the target enters the warm set this frame
@@ -329,65 +296,9 @@ export function AgentModeShell({ wsId }: Props) {
 
   return (
     <div className="agent-shell" data-ws-id={wsId}>
-      {/* ── Left: workspace rail + expanded Agent Hub ───────── */}
+      {/* Left: Agent Hub only (project rail removed — switch via hub badges
+          / composer project picker; Open Folder from IDE ActivityBar). */}
       <aside className="agent-sidebar">
-        <div className="agent-wsrail" role="tablist" aria-label="Workspaces">
-          {openIds.map((id) => {
-            const meta = loaded[id]?.meta;
-            if (!meta) return null;
-            const isActiveWs = id === wsId;
-            const count = chatsFor(id).length;
-            const color = getWorkspaceColor(id);
-            return (
-              <button
-                key={id}
-                className={`agent-wsrail-icon ${isActiveWs ? "active" : ""} ${color ? "has-color" : ""}`}
-                style={
-                  color
-                    ? ({ "--ws-color": color.hex } as React.CSSProperties)
-                    : undefined
-                }
-                role="tab"
-                aria-selected={isActiveWs}
-                title={`${meta.name}\n${meta.root}\nRight-click for actions`}
-                aria-label={`Workspace ${meta.name}`}
-                onClick={() => {
-                  if (!isActiveWs) void setActiveWorkspace(id);
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault();
-                  const el = e.currentTarget as HTMLElement;
-                  const r = el.getBoundingClientRect();
-                  setColorMenu({
-                    wsId: id,
-                    x: r.right + 6,
-                    y: r.top,
-                    nameAnchor: anchorFromElement(el),
-                  });
-                }}
-              >
-                <span className="agent-wsrail-text">{initials(meta.name)}</span>
-                {count > 0 && (
-                  <span className="agent-wsrail-count" aria-hidden="true">
-                    {count > 9 ? "9+" : count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-          <button
-            ref={railAddRef}
-            className="agent-wsrail-icon agent-wsrail-add"
-            title="Open workspace"
-            aria-label="Open workspace"
-            aria-haspopup="menu"
-            aria-expanded={railMenu}
-            onClick={() => setRailMenu((v) => !v)}
-          >
-            <Icon name="plus" size={16} />
-          </button>
-        </div>
-
         <AIChatsRail
           placement="agent-sidebar"
           activeChatId={activeChatId}
@@ -402,58 +313,6 @@ export function AgentModeShell({ wsId }: Props) {
           }}
         />
       </aside>
-
-      {railMenu &&
-        railAddRef.current &&
-        (() => {
-          const rect = railAddRef.current.getBoundingClientRect();
-          const style: React.CSSProperties = {
-            position: "fixed",
-            left: rect.right + 6,
-            top: Math.max(8, rect.top - 4),
-            minWidth: 300,
-          };
-          return createPortal(
-            <>
-              <div className="menu-overlay" onClick={() => setRailMenu(false)} />
-              <div className="menu-dropdown" style={style} role="menu">
-                <button
-                  className="menu-item"
-                  onClick={async () => {
-                    setRailMenu(false);
-                    const sel = await openDialog({
-                      directory: true,
-                      multiple: false,
-                    });
-                    if (typeof sel === "string") await openWorkspace(sel);
-                  }}
-                >
-                  <span className="menu-item-label">Open Folder…</span>
-                </button>
-                {recentNotOpen.length > 0 && (
-                  <>
-                    <div className="menu-separator" />
-                    <div className="menu-section-title">Recent</div>
-                    {recentNotOpen.slice(0, 8).map((w) => (
-                      <button
-                        key={w.id}
-                        className="menu-item"
-                        onClick={() => {
-                          setRailMenu(false);
-                          void openWorkspace(w.root);
-                        }}
-                        title={w.root}
-                      >
-                        <span className="menu-item-label">{w.name}</span>
-                      </button>
-                    ))}
-                  </>
-                )}
-              </div>
-            </>,
-            document.body,
-          );
-        })()}
 
       {/* ── Chat column (+ optional side panel: diff review / subagent) ─ */}
       <main className={`agent-main${sidePanelKey ? " has-review" : ""}`}>
@@ -618,18 +477,6 @@ export function AgentModeShell({ wsId }: Props) {
         root={ws?.meta.root ?? ""}
         onClose={() => setOpenFilePath(null)}
       />
-
-      {colorMenu && (
-        <WorkspaceColorPopover
-          wsId={colorMenu.wsId}
-          root={loaded[colorMenu.wsId]?.meta.root ?? ""}
-          x={colorMenu.x}
-          y={colorMenu.y}
-          nameAnchor={colorMenu.nameAnchor}
-          onClose={() => setColorMenu(null)}
-          onNewChat={newSession}
-        />
-      )}
 
       {drawerLinger?.tabKey && drawerContainer && ws && (
         <TabContentHost

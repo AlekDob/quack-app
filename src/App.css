@@ -5,33 +5,34 @@
    here, not the architecture. Light mode is a full sibling theme below. */
 :root,
 :root[data-theme="dark"] {
-  /* Neutral surface scale — near-black base, not #000. Steps stay tight so
-     elevated chips read as "almost white" grey on charcoal (Cursor-like). */
-  --bg: #0c0d10;
-  --bg-alt: #101114;
-  --bg-elev: #141519;
-  --bg-hi: #1a1b21;
-  /* Chat stream column — slightly lifted from chrome so the center reads
-     as the primary surface between side rails/panels. */
-  --chat-stream-bg: #181818;
+  /* Neutral surface scale — Cursor-tight: 3 steps + hover wash.
+     Fewer greys = calmer chrome (stream shares --bg, no lifted band). */
+  --bg: #141414;
+  --bg-alt: #1a1a1a;
+  --bg-elev: #1e1e1e;
+  --bg-hi: #262626;
+  /* Chat stream = same plane as chrome (no separate grey strip). */
+  --chat-stream-bg: var(--bg);
   /* Cursor-style readable measure for the stream + composer column.
      Wide panes center under this cap; narrow panes stay full-width. */
   --chat-stream-max: 760px;
+  /* Horizontal gutter around the conversation column (both sides). */
+  --chat-stream-pad-x: 40px;
   /* User prompt card — liquid glass over the stream (translucent + blur). */
-  --user-bar-glass-from: color-mix(in srgb, var(--fg) 10%, transparent);
+  --user-bar-glass-from: color-mix(in srgb, var(--fg) 8%, transparent);
   --user-bar-glass-to: color-mix(in srgb, var(--fg) 3%, transparent);
   --user-bar-bg: var(--user-bar-glass-from);
-  --user-bar-border: color-mix(in srgb, var(--fg) 20%, transparent);
+  --user-bar-border: color-mix(in srgb, var(--fg) 14%, transparent);
   --user-bar-shadow:
-    0 1px 0 color-mix(in srgb, var(--fg) 5%, transparent),
+    0 1px 0 color-mix(in srgb, var(--fg) 4%, transparent),
     0 4px 14px rgba(0, 0, 0, 0.22);
-  /* ComposeCard — lifted recap bar at end of agent turns. */
-  --compose-card-bg: color-mix(in srgb, var(--fg) 14%, var(--chat-stream-bg));
-  --compose-bar-bg: color-mix(in srgb, var(--fg) 10%, var(--chat-stream-bg));
-  --compose-card-border: color-mix(in srgb, var(--fg) 18%, transparent);
-  --fg: #f2f3f5;
-  --fg-dim: rgba(242, 243, 245, 0.58);
-  --fg-muted: rgba(242, 243, 245, 0.38);
+  /* ComposeCard — same elev plane as composer (no extra mixed grey). */
+  --compose-card-bg: var(--bg-elev);
+  --compose-bar-bg: var(--bg-alt);
+  --compose-card-border: var(--border);
+  --fg: #ededed;
+  --fg-dim: rgba(237, 237, 237, 0.58);
+  --fg-muted: rgba(237, 237, 237, 0.38);
   --border: rgba(255, 255, 255, 0.08);
   /* Accent is NEUTRAL (Cursor-style "zero orange" chrome). Real color lives
      only on per-project workspace badges (separate palette) and semantic
@@ -46,10 +47,10 @@
      trace (focus ring, side accent, status dot) — never a button fill. */
   --primary-bg: var(--fg);
   --primary-fg: var(--bg);
-  --primary-bg-hover: #fafafb;
+  --primary-bg-hover: #fafafa;
   --danger: #ef4444;
-  --term-bg: #0c0d10;
-  --term-fg: #f2f3f5;
+  --term-bg: var(--bg);
+  --term-fg: var(--fg);
   /* Mono: Quack uses JetBrains Mono; Cascadia kept as fallback so the
      editor/terminal stay consistent where JBM isn't installed. */
   --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
@@ -134,24 +135,24 @@
    neutrals invert to a clean premium off-white. Dark stays the default
    (brand is dark-first) — this applies only on [data-theme="light"]. */
 :root[data-theme="light"] {
-  /* Near-white base, near-black text — not pure #fff / #000. */
-  --bg: #f8f8f9;
-  --bg-alt: #f1f1f3;
-  --bg-elev: #fdfdfd;
-  --bg-hi: #e8e8eb;
+  /* Near-white base — 3-step scale (matches dark). Stream = --bg. */
+  --bg: #f7f7f7;
+  --bg-alt: #efefef;
+  --bg-elev: #ffffff;
+  --bg-hi: #e8e8e8;
   --chat-stream-bg: var(--bg);
-  --user-bar-glass-from: color-mix(in srgb, var(--bg-elev) 94%, transparent);
-  --user-bar-glass-to: color-mix(in srgb, var(--bg-elev) 76%, transparent);
+  --user-bar-glass-from: color-mix(in srgb, var(--bg-elev) 92%, transparent);
+  --user-bar-glass-to: color-mix(in srgb, var(--bg-elev) 78%, transparent);
   --user-bar-bg: var(--user-bar-glass-from);
-  --user-bar-border: color-mix(in srgb, var(--fg) 14%, transparent);
-  --user-bar-shadow: 0 1px 2px rgba(0, 0, 0, 0.07);
-  --compose-card-bg: color-mix(in srgb, var(--fg) 7%, var(--bg-alt));
-  --compose-bar-bg: color-mix(in srgb, var(--fg) 5%, var(--bg-hi));
-  --compose-card-border: color-mix(in srgb, var(--fg) 14%, transparent);
-  --fg: #14151a;
-  --fg-dim: rgba(20, 21, 26, 0.62);
-  --fg-muted: rgba(20, 21, 26, 0.42);
-  --border: rgba(0, 0, 0, 0.09);
+  --user-bar-border: color-mix(in srgb, var(--fg) 12%, transparent);
+  --user-bar-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --compose-card-bg: var(--bg-elev);
+  --compose-bar-bg: var(--bg-alt);
+  --compose-card-border: var(--border);
+  --fg: #1a1a1a;
+  --fg-dim: rgba(26, 26, 26, 0.62);
+  --fg-muted: rgba(26, 26, 26, 0.42);
+  --border: rgba(0, 0, 0, 0.08);
   /* Neutral accent in light theme too (zero orange chrome). */
   --accent: #6b7280;
   --accent-rgb: 107, 114, 128;
@@ -162,8 +163,8 @@
   --primary-fg: var(--bg);
   --primary-bg-hover: #0a0a0c;
   --danger: #dc2626;
-  --term-bg: #f8f8f9;
-  --term-fg: #14151a;
+  --term-bg: var(--bg);
+  --term-fg: var(--fg);
   --mono: "JetBrains Mono", "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
   --border-strong: rgba(0, 0, 0, 0.16);
   --bg-hover: rgba(0, 0, 0, 0.05);
@@ -7021,7 +7022,7 @@ body.ab-dragging * {
   position: relative;
   /* Same measure as the stream column (see --chat-stream-max). */
   box-sizing: border-box;
-  width: calc(100% - 24px);
+  width: calc(100% - (var(--chat-stream-pad-x) * 2));
   max-width: var(--chat-stream-max);
   margin: 8px auto;
   background: var(--bg-elev);
@@ -7387,6 +7388,30 @@ body.ab-dragging * {
   border-radius: var(--radius-md);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   padding: 4px 0;
+}
+/* Project picker: scroll Recents; Open folder… pinned at the bottom. */
+.ai-composer-ctx-menu--project {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+.ai-composer-ctx-menu-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.ai-composer-ctx-menu-foot {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 4px 0;
+  background: var(--bg-elev);
+}
+.ai-composer-ctx-menu-empty {
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--fg-muted);
 }
 .ai-composer-ctx-menu--portaled {
   position: fixed;
@@ -8305,8 +8330,12 @@ button.composer-mention-chip-label:hover {
   padding: 0 8px 0 6px;
 }
 .ai-composer-shell .ai-mode-btn[class*="ai-mode-tone--"] {
-  background: var(--mode-bg);
-  border-color: color-mix(in srgb, var(--mode-fg) 34%, var(--border));
+  /* Neutral pill — semantic color lives on the icon only (calmer chrome). */
+  background: var(--bg-alt);
+  border-color: var(--border);
+  color: var(--fg-dim);
+}
+.ai-composer-shell .ai-mode-btn[class*="ai-mode-tone--"] .ai-mode-btn-icon {
   color: var(--mode-fg);
 }
 .ai-composer-shell .ai-model-chip:hover,
@@ -8317,8 +8346,10 @@ button.composer-mention-chip-label:hover {
   border-color: var(--border-strong);
 }
 .ai-composer-shell .ai-mode-btn[class*="ai-mode-tone--"]:hover {
-  filter: brightness(1.06);
-  border-color: color-mix(in srgb, var(--mode-fg) 48%, var(--border-strong));
+  background: var(--bg-hi);
+  color: var(--fg);
+  border-color: var(--border-strong);
+  filter: none;
 }
 /* Upward popover (the composer sits at the bottom of the panel). */
 .ai-flag-menu-overlay {
@@ -8389,26 +8420,26 @@ button.composer-mention-chip-label:hover {
   align-self: stretch;
   display: flex;
 }
-/* CC permission mode — semantic tint per mode (Cursor-style chip + menu dots). */
+/* CC permission mode — semantic tint on the glyph only; pill stays neutral. */
 .ai-mode-tone--ask {
-  --mode-fg: var(--info);
-  --mode-bg: var(--info-bg);
+  --mode-fg: var(--fg-dim);
+  --mode-bg: var(--bg-alt);
 }
 .ai-mode-tone--plan {
   --mode-fg: var(--warn);
-  --mode-bg: var(--warn-bg);
+  --mode-bg: var(--bg-alt);
 }
 .ai-mode-tone--auto-edit {
   --mode-fg: var(--tool-edit);
-  --mode-bg: color-mix(in srgb, var(--tool-edit) 16%, var(--bg-alt));
+  --mode-bg: var(--bg-alt);
 }
 .ai-mode-tone--auto {
   --mode-fg: var(--ok);
-  --mode-bg: var(--ok-bg);
+  --mode-bg: var(--bg-alt);
 }
 .ai-mode-tone--agent {
   --mode-fg: var(--tool-task);
-  --mode-bg: color-mix(in srgb, var(--tool-task) 16%, var(--bg-alt));
+  --mode-bg: var(--bg-alt);
 }
 .ai-mode-btn {
   display: inline-flex;
@@ -8426,13 +8457,17 @@ button.composer-mention-chip-label:hover {
   white-space: nowrap;
 }
 .ai-mode-btn[class*="ai-mode-tone--"] {
-  background: var(--mode-bg);
-  border-color: color-mix(in srgb, var(--mode-fg) 34%, var(--border));
+  background: var(--bg-alt);
+  border-color: var(--border);
+  color: var(--fg-dim);
+}
+.ai-mode-btn[class*="ai-mode-tone--"] .ai-mode-btn-icon {
   color: var(--mode-fg);
 }
 .ai-mode-btn:hover {
-  border-color: color-mix(in srgb, var(--mode-fg, var(--fg)) 48%, var(--border-strong, var(--border)));
-  filter: brightness(1.06);
+  border-color: var(--border-strong, var(--border));
+  color: var(--fg);
+  background: var(--bg-hi);
 }
 .ai-mode-btn-icon {
   display: inline-flex;
@@ -8510,7 +8545,7 @@ button.composer-mention-chip-label:hover {
   min-width: 0;
 }
 .ai-mode-item.active .ai-mode-item-label {
-  color: var(--mode-fg, var(--fg));
+  color: var(--fg);
 }
 .ai-mode-item-label {
   font-size: 12px;
@@ -9588,7 +9623,16 @@ button.composer-mention-chip-label:hover {
   margin: 2px 0;
 }
 .ai-panel.compact .ai-msg-assistant .ai-msg-body {
-  padding-left: 10px;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+/* Agent Mode — roomier conversation gutters (Cursor-like). */
+.ai-panel.compact {
+  --chat-stream-pad-x: 56px;
+}
+.ai-panel.compact .ai-user-bar {
+  padding-left: 18px;
+  padding-right: 18px;
 }
 /* Task Manager modal — Codetta's own process tree with CPU/RAM. */
 .taskman-modal {
@@ -10723,10 +10767,9 @@ html.audit-root #root {
   overflow-y: auto;
   overflow-x: hidden;
   overflow-anchor: none;
-  /* Side gutters: enough right clearance for the nav rail when the pane is
-     narrow (children go full-width). Wide panes center under --chat-stream-max
-     and the rail sits in the empty margin — Cursor-style measure. */
-  padding: 8px 22px 8px 12px;
+  /* Side gutters via --chat-stream-pad-x (Cursor-style breathing room).
+     Right side keeps a bit extra so the nav rail clears when narrow. */
+  padding: 8px max(var(--chat-stream-pad-x), 28px) 8px var(--chat-stream-pad-x);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -10752,7 +10795,7 @@ html.audit-root #root {
 .ai-panel > .ai-mention-popover,
 .ai-panel > .brain-save-chip {
   box-sizing: border-box;
-  width: calc(100% - 24px);
+  width: calc(100% - (var(--chat-stream-pad-x) * 2));
   max-width: var(--chat-stream-max);
   margin-left: auto;
   margin-right: auto;
@@ -18721,92 +18764,11 @@ html.audit-root #root {
   background: var(--bg);
 }
 
-/* Left side = workspace-initials rail + agents panel. The rail mirrors
-   the main app's ActivityBar so agent mode reads as the same Codetta. */
+/* Left side = Agent Hub sessions list (project icon rail removed). */
 .agent-sidebar {
   flex: 0 0 auto;
   display: flex;
   min-height: 0;
-}
-.agent-wsrail {
-  flex: 0 0 52px;
-  width: 52px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 0;
-  background: var(--bg-alt);
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-}
-.agent-wsrail-icon {
-  position: relative;
-  width: 38px;
-  height: 38px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--bg-elev);
-  color: var(--fg-dim);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.agent-wsrail-icon:hover {
-  background: var(--bg-hi);
-  color: var(--fg);
-  border-color: var(--fg-muted);
-}
-.agent-wsrail-icon.active {
-  background: var(--bg-hi);
-  color: var(--fg);
-}
-/* Per-project color in the agent rail (mirrors .ws-icon.has-color) */
-.agent-wsrail-icon.has-color {
-  background: color-mix(in srgb, var(--ws-color) 20%, var(--bg-elev));
-  border-color: color-mix(in srgb, var(--ws-color) 38%, var(--border));
-}
-.agent-wsrail-icon.has-color .agent-wsrail-text {
-  color: var(--ws-color);
-}
-.agent-wsrail-icon.active.has-color {
-  background: var(--ws-color);
-  border-color: var(--ws-color);
-}
-.agent-wsrail-icon.active.has-color .agent-wsrail-text {
-  color: var(--ws-on-color);
-  font-weight: 800;
-}
-.agent-wsrail-text {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-}
-.agent-wsrail-count {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  min-width: 14px;
-  height: 14px;
-  padding: 0 3px;
-  border-radius: 7px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 14px;
-  text-align: center;
-  border: 1.5px solid var(--bg-alt);
-}
-.agent-wsrail-icon.active .agent-wsrail-count {
-  background: var(--bg-elev);
-  color: var(--fg);
-}
-.agent-wsrail-add {
-  border-style: dashed;
-  background: transparent;
 }
 
 .agent-agents {

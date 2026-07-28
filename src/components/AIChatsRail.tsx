@@ -32,12 +32,13 @@ import {
   type SessionDiffSummary,
 } from "../chatDiffStore";
 import { fileBase } from "../sessionDiffStats";
-import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
+import { anchorFromElement } from "../addNewAIChat";
 import { pulseChatSwitch } from "../chatSwitch";
 import { logChatSwitch } from "../chatSwitchDebug";
 import { isAgentChatWarm, touchAgentChatWarm } from "../agentChatWarm";
 import { deleteSession } from "../chatHistory";
 import { confirm as dialogConfirm } from "../dialog";
+import { ComposerCtxMenu } from "../composerCtxMenu";
 import { AgentCustomizations } from "./AgentCustomizations";
 import {
   CustomizationsModal,
@@ -47,6 +48,13 @@ import { AIIcon } from "./AIIcon";
 import { ContextMenu } from "./ContextMenu";
 import { Icon } from "./Icon";
 import { WorkHubBadge } from "./works/WorkHubBadge";
+import {
+  createChatFromFolderDialog,
+  createChatInProject,
+  useHomeDir,
+  useRecentWorkspaces,
+  WorkspaceProjectMenuBody,
+} from "./WorkspaceProjectMenu";
 
 // One flattened chat across all open workspaces, with its derived status
 // and project color — the unit the hub groups and renders.
@@ -169,6 +177,9 @@ export function AIChatsRail({
   const [renaming, setRenaming] = useState<string | null>(null);
   const [custTab, setCustTab] = useState<CustomizationTab | null>(null);
   const [doneSearch, setDoneSearch] = useState("");
+  const [projectMenuOpen, setProjectMenuOpen] = useState(false);
+  const home = useHomeDir();
+  const recents = useRecentWorkspaces();
 
   // The chat the user is currently looking at (for highlight).
   const activeChatId =
@@ -279,14 +290,21 @@ export function AIChatsRail({
     closeChat(entry.wsId, entry.chat.id);
   };
 
-  const newChat = (e?: React.MouseEvent<HTMLButtonElement>) => {
+  const newChat = () => {
     if (!activeId) return;
-    const anchor = anchorFromElement(e?.currentTarget ?? addBtnRef.current);
-    if (onNewChat) {
-      onNewChat(activeId, anchor);
-      return;
-    }
-    addNewAIChat(activeId, "editor", anchor);
+    setProjectMenuOpen(true);
+  };
+
+  const pickProjectForChat = async (id: string, folder: string) => {
+    setProjectMenuOpen(false);
+    const anchor = anchorFromElement(addBtnRef.current);
+    await createChatInProject(id, folder, anchor, onNewChat);
+  };
+
+  const pickFolderForChat = async () => {
+    setProjectMenuOpen(false);
+    const anchor = anchorFromElement(addBtnRef.current);
+    await createChatFromFolderDialog(anchor, onNewChat);
   };
 
   const totalChats = entries.length;
@@ -314,8 +332,10 @@ export function AIChatsRail({
           ref={addBtnRef}
           className="agent-hub-add"
           onClick={newChat}
-          title="New AI chat"
+          title="New AI chat — pick a project"
           aria-label="New AI chat"
+          aria-haspopup="menu"
+          aria-expanded={projectMenuOpen}
           disabled={!activeId}
         >
           <AIIcon size={showExpanded ? 14 : 20} />
@@ -331,6 +351,21 @@ export function AIChatsRail({
             </span>
           )}
         </button>
+        <ComposerCtxMenu
+          open={projectMenuOpen}
+          onClose={() => setProjectMenuOpen(false)}
+          anchorRef={addBtnRef}
+          estimateHeight={Math.min(320, recents.length * 36 + 72)}
+          className="ai-composer-ctx-menu--project"
+        >
+          <WorkspaceProjectMenuBody
+            currentWsId={activeId ?? ""}
+            home={home}
+            recents={recents}
+            onPick={(id, folder) => void pickProjectForChat(id, folder)}
+            onOpenFolder={() => void pickFolderForChat()}
+          />
+        </ComposerCtxMenu>
         {!inSidebar && (
           <button
             className="agent-hub-toggle"

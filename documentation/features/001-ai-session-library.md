@@ -22,7 +22,7 @@ tags: [sessions, ai-chat, library, agent-mode, sidebar-rail, chat-history, works
 | Type | Path | Exports/Purpose |
 |------|------|-----------------|
 | Component | `src/components/AIChatsRail.tsx` | Cross-project Agent Hub: status groups, Done pile, Customizations → `009-agent-hub.md` |
-| Component | `src/components/AgentModeShell.tsx` | Agent-mode layout: workspace rail + sessions list + live Tasks + Customizations |
+| Component | `src/components/AgentModeShell.tsx` | Agent-mode layout: sessions hub + chat + context column (no project icon rail) |
 | Component | `src/components/AgentCustomizations.tsx` | Shared Customizations footer menu → `CustomizationsModal` (feature 036) |
 | Component | `src/components/WorkspacePicker.tsx` | Library entry / recent-workspaces picker on first run |
 | Component | `src/components/WorkspacePathPicker.tsx` | Composer project chip — Recents + new chat in target ws (`050`) |
