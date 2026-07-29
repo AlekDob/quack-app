@@ -7289,23 +7289,13 @@ export function AIChatPanel({
         <AgentCommitDock wsId={wsId} sessionId={sessionId} root={root} />
       ) : null}
       <SkillProposalChip enabled={skillTrainerExt} foreground={wsActive && chatVisible} />
-      {planBuyIn && (
+      {/* Full plan lives in the right Plan tab — chat only shows the Milo
+          chip. Hide it while AskUserQuestion is docked so the questionnaire
+          owns the dock. */}
+      {planBuyIn && !dockedAskCall && (
         <PlanBuyInCard
-          plan={planBuyIn.plan}
-          featureLabel={
-            featureId ? featureLabelFromSlug(featureId) : null
-          }
           onBuild={() => passBallToMilo(planBuyIn.requestId, planBuyIn.plan)}
           onKeepDiscussing={() => keepDiscussingPlan(planBuyIn.requestId)}
-          onOpenPlan={() =>
-            presentPlanReady(
-              wsId,
-              aiChatId,
-              root,
-              planBuyIn.requestId,
-              planBuyIn.plan,
-            )
-          }
         />
       )}
       <ComposerShell

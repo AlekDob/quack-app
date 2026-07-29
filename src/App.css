@@ -9086,87 +9086,21 @@ button.composer-mention-chip-label:hover {
   margin: 0;
 }
 
-/* Cursor-style plan buy-in — Pass the ball to Milo (above composer). */
+/* Plan buy-in — Milo chip only (full plan is the right Plan tab). */
 .ai-plan-buyin {
   flex-shrink: 0;
   margin-top: 0;
   margin-bottom: 10px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-elevated);
-  box-shadow: var(--shadow-sm);
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.ai-plan-buyin-head {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  color: var(--warn);
-}
-.ai-plan-buyin-titles {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.ai-plan-buyin-title {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--fg);
-}
-.ai-plan-buyin-feat {
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ai-plan-buyin-preview {
-  max-height: 160px;
-  overflow: auto;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  font-size: var(--fs-sm);
-}
-.ai-plan-buyin-preview .md-preview {
-  font-size: var(--fs-sm);
-}
-.ai-plan-buyin-actions {
-  display: flex;
-  align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.ai-plan-buyin-open,
-.ai-plan-buyin-keep {
-  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--fg-muted);
-  font-size: var(--fs-sm);
-  cursor: pointer;
-}
-.ai-plan-buyin-open:hover:not(:disabled),
-.ai-plan-buyin-keep:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--fg);
 }
 .ai-plan-buyin-build {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   padding: 6px 14px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   border: none;
   background: var(--primary-bg);
   color: var(--primary-fg);
@@ -9177,30 +9111,16 @@ button.composer-mention-chip-label:hover {
 .ai-plan-buyin-build:hover:not(:disabled) {
   filter: brightness(1.06);
 }
-.ai-plan-buyin-build:disabled,
-.ai-plan-buyin-open:disabled,
-.ai-plan-buyin-keep:disabled {
+.ai-plan-buyin-build:disabled {
   opacity: 0.55;
   cursor: default;
 }
 .ai-plan-buyin-avatar {
   width: 18px;
   height: 18px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   object-fit: cover;
   flex-shrink: 0;
-}
-.ai-plan-buyin-hint {
-  font-size: var(--fs-xs);
-  color: var(--fg-muted);
-}
-.ai-plan-buyin-hint kbd {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  padding: 1px 4px;
-  border-radius: 3px;
-  border: 1px solid var(--border);
-  background: var(--bg);
 }
 
 /* Ask card merged into the composer shell — one bordered surface. */

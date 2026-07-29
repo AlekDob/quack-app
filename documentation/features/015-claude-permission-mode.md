@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-29
-last_verified: 2026-07-22
+last_verified: 2026-07-29
 tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, slash-command, plan-mode, exit-plan-mode, build-handoff, ask-user-question, tool-search, plan-file-write]
 ---
 
@@ -25,7 +25,7 @@ tags: [claude-code, permissions, permission-mode, overlay, auto-allow, store, sl
 | Mode catalog | `src/presets/permModes.ts` | `PERM_MODE_OPTIONS` — label, desc, `icon`, `tone` per mode; `permModeOption()` |
 | Slash hint | `src/slashCommands.ts` | `/mode ask\|plan\|auto-edit\|auto\|agent` |
 | Plan tab trigger | `src/components/ClaudePermissionOverlay.tsx` | `onPlanReady(requestId, plan)` — fires once per `ExitPlanMode` as soon as `tool_input.plan` lands; buy-in CTA via `planBuyInStore` + `PlanBuyInCard` |
-| Plan buy-in | `src/planBuyInStore.ts`, `src/components/PlanBuyInCard.tsx` | Cursor-style **Pass the ball to Milo** / Keep discussing; auto-send on build |
+| Plan buy-in | `src/planBuyInStore.ts`, `src/components/PlanBuyInCard.tsx` | Milo chip (**Pass the ball to Milo**); full plan on side surface (`061` / `084`); auto-send on build |
 | Hook gate (backend) | `src-tauri/src/claude_code.rs` | `apply_clean_env` sets `CODETTA_PERM_HOOK=1`; `build_hook_command` emits `permissionDecision:'allow'` when that env is absent (no-op for foreign sessions) |
 
 ### Modes
@@ -119,8 +119,8 @@ Hook payload shape (relevant fields):
   **Decision order inside `isForThisPanel`:** (1) reject different `cwd`; (2) if `req.session_id` present → match `ownerSessionId`, or require `ownerStreaming` when the panel hasn't captured init yet; (3) cwd-only fallback when `session_id` absent (shouldn't happen); (4) default `false` — never accept orphan requests.
 - The overlay/cards themselves are documented alongside the bridge — see [014-claude-code-bridge.md](014-claude-code-bridge.md).
 - **`permModeStore` isolation (2026-07-20):** `"plan"` is **never** written to `byCwd`. Lookup with a known `session_id` that has no recorded mode returns Ask (`default`) — does **not** inherit another chat’s mode via cwd. Prevents “Plan chip / plan permissions” bleeding across sessions in the same project. Vitest: `permModeStore.test.ts`.
-- **Plan tab opens independently of the decision:** `onPlanReady` fires as soon as the plan text is non-empty, regardless of whether the user later Builds or "Keep discussing"s — reading the plan shouldn't require deciding first. See [061-plan-mode-tab.md](061-plan-mode-tab.md).
-- **`ExitPlanMode` → in-stream Pass the ball to Milo (2026-07-20):** full flow in [088-plan-milo-handoff.md](088-plan-milo-handoff.md). Overlay publishes `planBuyInStore`; `PlanBuyInCard` owns CTA; Features-first Build; ExitPlanMode prompts only when composer is Plan.
+- **Plan tab opens independently of the decision:** `onPlanReady` fires as soon as the plan text is non-empty, regardless of whether the user later Builds or denies — reading the plan shouldn't require deciding first. See [061-plan-mode-tab.md](061-plan-mode-tab.md).
+- **`ExitPlanMode` → Pass the ball to Milo chip (2026-07-20 / 2026-07-29):** full flow in [088-plan-milo-handoff.md](088-plan-milo-handoff.md). Overlay publishes `planBuyInStore`; chat shows Milo chip only (no plan body); side Plan tab holds markdown; chip hidden while AskUserQuestion docked; Features-first Build; ExitPlanMode prompts only when composer is Plan.
 - **AskUserQuestion deny-redirect (073):** first gate always denies with a reason telling the model Quack is showing clickable options — never allow headless under `-p`. `publishAskInput` caches full `tool_input` for the dock. Subagent sidechain calls are denied the same way but **do not** mount `.ai-ask-dock` (parent stream filter) — orchestrator must re-ask. See [073-ask-user-question-dock.md](073-ask-user-question-dock.md), [004-subagent-mentions.md](004-subagent-mentions.md).
 - **MCP tools in the PreToolUse matcher (2026-07-17):** `PERMISSION_GATED_TOOLS` includes `mcp__.+` so `mcp__<server>__<tool>` calls hit the Quack card. Without this, CC under `-p` + Ask falls through to the native permission prompt (no TTY) and returns *"Claude requested permissions… but you haven't granted it yet"* with **no Allow button**. Same rationale as gating `WebFetch`/`WebSearch`. Overlay shows `pinky → brain_search`-style labels; Always / This session persist per full tool name. Hook fail-open timer is **50s** (matches `DECISION_TIMEOUT`) — the old 3s timer auto-allowed before the user could click.
 - **Eager tools for Plan/Ask docks (2026-07-16):** Quack sets `ENABLE_TOOL_SEARCH=false` on every CC spawn (`apply_clean_env`). Without it, CC defers `AskUserQuestion` + `ExitPlanMode` behind ToolSearch and `select:ExitPlanMode` often fails upstream — Jack pastes plans as prose and neither dock appears. Requires a **new** CC turn (env is per-process); resume alone is not enough if the old process is still alive.

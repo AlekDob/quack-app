@@ -5,7 +5,7 @@ stack: Tauri + React
 created: 2026-07-20
 startDate: 2026-07-20
 endDate:
-last_verified: 2026-07-24
+last_verified: 2026-07-29
 status: active
 tags: [agent-mode, terminal, context-panel, cursor-style, status-bar, plan-mode, resize]
 related:
@@ -67,7 +67,7 @@ user-resizable and persisted.
 
 StatusBar panel / Ctrl+J / Ctrl+` → `toggleAgentTerminal(wsId)` → `agentContextNav` panel flip (term ↔ Changes)
 
-ExitPlanMode buy-in → `presentPlanReady` → `focusAgentPlan(wsId)` → on-demand **Plan** tab (`AgentPlanPane` full markdown) **only while `getPlanBuyIn({ chatId: activeChatId })` hits**. Composer `PlanBuyInCard` includes **Open Plan** to re-focus the tab after switching away (Changes/Files/Terminal).
+ExitPlanMode buy-in → `presentPlanReady` → `focusAgentPlan(wsId)` → on-demand **Plan** tab (`AgentPlanPane` full markdown) **only while `getPlanBuyIn({ chatId: activeChatId })` hits**. The Plan tab is the **sole** full-read surface; chat shows only the Milo chip (`088`), not a plan preview. Re-select Plan via the context column tabs after switching to Changes/Files/Terminal.
 
 ### Width
 | Constant | Value |
@@ -114,4 +114,4 @@ Inline `style={{ width, flexBasis }}` on `.agent-context` — no fixed CSS 320/4
 - Plan tab visibility is **buy-in-driven**, not layout-persisted — reload while a plan is pending loses the tab (same RAM lifetime as `planBuyInStore`).
 - Lookup is **per Quack chat id** (`planBuyInStore`); session id is a secondary key only. **No cwd fallback** — that leaked Plan ready across Agent Mode sessions (bug `008`).
 - Selecting Plan while buy-in clears auto-falls back to Changes (no orphaned empty Plan selection).
-- Pass / Keep / **Open Plan** stay on the composer card — the Plan tab is read-only markdown (no duplicate CTAs). Open Plan only re-selects the tab / IDE surface.
+- Pass-the-ball lives as a composer **chip** only (`088`) — the Plan tab is read-only markdown (no duplicate CTAs). Re-select the Plan tab from the context column after switching away.

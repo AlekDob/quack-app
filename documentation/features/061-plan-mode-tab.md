@@ -3,13 +3,14 @@ type: feature-doc
 project: quack-desktop
 stack: React 19, Zustand store (split-pane layout)
 created: 2026-07-12
-last_verified: 2026-07-24
+last_verified: 2026-07-29
 tags: [chat, plan-mode, claude-code, virtual-tab, split, permission-overlay, build-handoff, features]
 related:
   - 088-plan-milo-handoff.md
   - 084-agent-context-panels.md
   - 068-quack-plan-harness.md
   - 015-claude-permission-mode.md
+  - 073-ask-user-question-dock.md
   - documentation/bugs/008-plan-buyin-cross-session.md
 ---
 
@@ -17,9 +18,9 @@ related:
 
 **Purpose:** when Claude Code is in plan mode it calls `ExitPlanMode` with the
 proposed plan as inline markdown (`tool_input.plan`) — never a file on disk.
-Quack opens a preview the moment the plan lands, and shows an in-stream
-**PlanBuyInCard** CTA (**Open Plan** / **Pass the ball to Milo** / Keep discussing)
-— independent of approve/deny.
+Quack opens a **side** preview the moment the plan lands. Chat does **not**
+duplicate the plan body — only a compact **Pass the ball to Milo** chip above
+the composer (`088`), hidden while AskUserQuestion is docked.
 
 > **Features-first (2026-07-17 / 2026-07-20):** when the chat has `featureId`
 > set, plan text merges into the feature `.md` via `planFeatureMerge` and opens
@@ -32,11 +33,11 @@ Quack opens a preview the moment the plan lands, and shows an in-stream
 |------|------|-----------------|
 | Service | `src/plan.ts` | `planKey`, `parsePlanKey`, in-memory stash (`stashPlan`/`planPayload`) |
 | Component | `src/components/PlanPane.tsx` | `PlanPane` / `AgentPlanPane`; `openPlanTab` / `presentPlanReady` |
-| Store | `src/planBuyInStore.ts` | Pending ExitPlanMode → stream CTA + Agent Plan tab (**per `chatId`**) |
+| Store | `src/planBuyInStore.ts` | Pending ExitPlanMode → Milo chip + Agent Plan tab (**per `chatId`**) |
 | Test | `src/planBuyInStore.test.ts` | No cross-session cwd leak (bug `008`) |
-| Component | `src/components/PlanBuyInCard.tsx` | **Open Plan** / **Pass the ball to Milo** / Keep discussing |
+| Component | `src/components/PlanBuyInCard.tsx` | Milo chip only (full plan is side surface) |
 | Component | `src/components/ClaudePermissionOverlay.tsx` | `ownerChatId` + `onPlanReady` + publish buy-in; ExitPlanMode card suppressed |
-| Component | `src/components/AIChatPanel.tsx` | Wires preview + Milo handoff + auto-send + Open Plan |
+| Component | `src/components/AIChatPanel.tsx` | Wires preview + Milo handoff + auto-send; hides chip when `dockedAskCall` |
 | Component | `src/components/AgentContextColumn.tsx` | On-demand Plan tab (Agent Mode); lookup by `activeChatId` |
 | Store | `src/agentContextNav.ts` | `focusAgentPlan` |
 | Component | `src/components/WorkspaceShell.tsx` | Portals `PlanPane` for open `plan:` keys |
@@ -48,12 +49,13 @@ Quack opens a preview the moment the plan lands, and shows an in-stream
 
 | Mode | Full-read surface | Durable merge | Buy-in CTA |
 |------|-------------------|---------------|------------|
-| **Agent Mode** | Right-column **Plan** tab (`AgentPlanPane`) | `mergePlanIntoFeature` if `featureId` | `PlanBuyInCard` (composer) |
+| **Agent Mode** | Right-column **Plan** tab (`AgentPlanPane`) | `mergePlanIntoFeature` if `featureId` | Milo chip above composer (`088`) |
 | **IDE** + `featureId` | `FeatureDocDrawer` | same | same |
 | **IDE** unlinked | Ephemeral `plan:` editor split | none (RAM stash) | same |
 
 `presentPlanReady(wsId, chatId, root, planId, plan)` is the single router — called from
-`AIChatPanel` (`onPlanReady` + end-of-turn ExitPlanMode fallback + **Open Plan**).
+`AIChatPanel` (`onPlanReady` + end-of-turn ExitPlanMode fallback). Re-focus the Plan
+tab via the context column tabs (no separate Open Plan button on the chip).
 
 ### Virtual tab keys (`plan:`)
 Pattern mirrors `prev:` HTML preview tabs:
@@ -79,8 +81,7 @@ ExitPlanMode permission request arrives (tool_input.plan non-empty)
   → presentPlanReady:
        Agent Mode → merge feature (if linked) + focusAgentPlan (context Plan tab)
        IDE → featureId? FeatureDocDrawer : openPlanTab
-  → PlanBuyInCard (Open Plan / Pass the ball to Milo / Keep discussing)
-       Open Plan → presentPlanReady again (re-focus only)
+  → PlanBuyInCard Milo chip (if no docked AskUserQuestion)
   → Build: Milo + Agent + allow ExitPlanMode + auto-send implement prompt
 ```
 
@@ -92,12 +93,13 @@ ExitPlanMode permission request arrives (tool_input.plan non-empty)
   later in the same turn gets its own tab; re-renders of the same request
   don't reopen/refocus the tab repeatedly.
 - **Approval (2026-07-20):** ExitPlanMode permission card replaced by in-stream
-  **Pass the ball to Milo** (`PlanBuyInCard`). Keep discussing / composer send
-  denies; Build allows + Milo + Agent + auto-send. Plan text display
-  (`onPlanReady`) unchanged — feature merge / `plan:` tab still before decide.
-- **Open Plan (2026-07-24):** tertiary CTA re-focuses the side preview after the
-  user switched to Changes/Files/Terminal (or IDE drawer closed). Does not
-  allow/deny ExitPlanMode.
+  **Pass the ball to Milo** (`PlanBuyInCard`). Esc / composer send denies;
+  Build allows + Milo + Agent + auto-send. Plan text display (`onPlanReady`)
+  unchanged — feature merge / Plan tab still before decide.
+- **Chip-only buy-in (2026-07-29):** full plan markdown is **only** on the side
+  surface (Agent Plan tab / drawer / `plan:`). Chat shows the Milo chip alone —
+  no preview, Open Plan, or Keep discussing button. Hidden while AskUserQuestion
+  is docked (`073` / `088`).
 - **Agent Mode Plan tab (2026-07-20):** right-column Plan tab is the full-read
   surface; FeatureDocDrawer / `plan:` editor split are skipped. Linked features
   still merge to disk. Tab hides when buy-in clears **or** active chat changes
@@ -108,9 +110,10 @@ ExitPlanMode permission request arrives (tool_input.plan non-empty)
 - **Plan explore permissions (2026-07-14):** parallel `Task` subagents in Plan mode auto-allow via `parent_tool_use_id` sidechain routing + `PLAN_READ_TOOLS` — see [015-claude-permission-mode.md](015-claude-permission-mode.md). Generic permission cards in Plan show **Allow exploration** (stays Plan) instead of **Allow all** (would flip to Auto).
 
 ### Related docs
-- `088-plan-milo-handoff.md` — Pass the ball to Milo CTA (primary Build UX)
+- `088-plan-milo-handoff.md` — Pass the ball to Milo chip (primary Build UX)
 - `068-quack-plan-harness.md` — Features-first plan (primary when `featureId` set)
 - `084-agent-context-panels.md` — Agent Mode right-column Plan tab + resize
+- `073-ask-user-question-dock.md` — questionnaire hides Milo chip while docked
 - `015-claude-permission-mode.md` — overlay + buy-in store + Plan isolation
 - `045-html-preview.md` — `prev:` virtual-tab pattern this clones
 - `038-compose-review.md` — original `crev:` virtual-tab registration pattern

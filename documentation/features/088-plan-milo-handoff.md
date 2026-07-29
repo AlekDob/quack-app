@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-20
-last_verified: 2026-07-24
+last_verified: 2026-07-29
 related:
   - 015-claude-permission-mode.md
   - 061-plan-mode-tab.md
@@ -31,10 +31,11 @@ tags:
 ## Plan buy-in — Pass the ball to Milo
 
 **Purpose:** When Claude Code calls `ExitPlanMode` with a ready plan, Quack shows a
-**Cursor-style** in-stream CTA (not the generic permission card): preview +
-**Open Plan** + **Pass the ball to Milo**. Click Pass → Milo (Builder) + Agent
-permissions + auto-start implementation. Keep discussing / typing in the composer
-→ stay in Plan with Jack. Open Plan re-focuses the side preview without deciding.
+compact in-stream **Pass the ball to Milo** chip (full plan markdown lives only in
+the right Plan tab / IDE preview — not in the chat card). Hidden while an
+`AskUserQuestion` questionnaire is docked. Click Pass → Milo (Builder) + Agent
+permissions + auto-start implementation. Esc / typing in the composer → stay in
+Plan with Jack (deny ExitPlanMode).
 
 **Stack:** React 19 + TS strict; module pub/sub store (same pattern as `askQuestionStore`).
 
@@ -44,10 +45,9 @@ permissions + auto-start implementation. Keep discussing / typing in the compose
 |---|---|---|
 | 1 | Jack + composer **Plan** | Explores; when ready calls `ExitPlanMode` (`tool_input.plan`) |
 | 2 | Overlay / stream | Publishes `planBuyInStore` **keyed by Quack `chatId`**; fires `onPlanReady` → `presentPlanReady` (Agent Plan tab / feature drawer / `plan:`); **no** ExitPlanMode permission card |
-| 3 | User | Sees `PlanBuyInCard` above composer (only on the **owning** chat); in Agent Mode also the right-column **Plan** tab (full markdown) |
-| 3b | **Open Plan** | Re-calls `presentPlanReady` — focus Plan tab / drawer / `plan:` (no allow/deny) |
+| 3 | User | Sees Milo chip above composer (owning chat only; **hidden if AskUserQuestion docked**); full markdown only in Agent **Plan** tab / IDE preview |
 | 4a | **Pass the ball to Milo** | `allow` ExitPlanMode → `applyPreset("builder")` → `bypassPermissions` → auto-send implement prompt |
-| 4b | Keep discussing / send message | `deny` ExitPlanMode → stay Plan + Jack |
+| 4b | Esc / send message | `deny` ExitPlanMode → stay Plan + Jack |
 
 Features-first durable target: linked `featureId` → `mergePlanIntoFeature` (+ FeatureDocDrawer in IDE; Agent Mode uses the context Plan tab instead — see `061` / `084`). No `S-NNN` spawn on Build.
 
@@ -57,14 +57,14 @@ Features-first durable target: linked `featureId` → `mergePlanIntoFeature` (+ 
 |---|---|---|
 | Store | `src/planBuyInStore.ts` | `publishPlanBuyIn`, `getPlanBuyIn`, `resolvePlanBuyIn`, `setPlanBuyInDecide`, `subscribePlanBuyIn` — ownership by `chatId` |
 | Test | `src/planBuyInStore.test.ts` | Cross-session isolation (no cwd leak — bug `008`) |
-| Component | `src/components/PlanBuyInCard.tsx` | CTA UI — preview, **Open Plan**, Milo avatar, Pass / Keep discussing |
-| Host | `src/components/AIChatPanel.tsx` | Subscribe by `aiChatId`; `passBallToMilo` / `keepDiscussingPlan` / `onOpenPlan`; deny on composer send; Features-first `onPlanBuild` |
+| Component | `src/components/PlanBuyInCard.tsx` | Milo chip only (Enter = build, Esc = keep discussing) |
+| Host | `src/components/AIChatPanel.tsx` | Subscribe by `aiChatId`; hide chip when `dockedAskCall`; `passBallToMilo` / `keepDiscussingPlan`; deny on composer send; Features-first `onPlanBuild` |
 | Overlay | `src/components/ClaudePermissionOverlay.tsx` | `ownerChatId` + ExitPlanMode → publish + `onPlanReady`; keep hook pending; skip card UI |
 | Prompt | `src/brainPrompt.ts` | `quackClaudeCodeEditorPrompt(works, planMode)` — ExitPlanMode only if Plan |
 | Isolation | `src/permModeStore.ts` | Plan never written to `byCwd`; session_id miss ≠ sibling cwd mode |
 | Test | `src/permModeStore.test.ts` | Cross-chat Plan **mode** isolation |
-| Styles | `src/App.css` | `.ai-plan-buyin*` (incl. `.ai-plan-buyin-open`) |
-| Preview | `061` / `084` / `presentPlanReady` | Side preview: Agent Plan tab, FeatureDocDrawer, or `plan:` |
+| Styles | `src/App.css` | `.ai-plan-buyin`, `.ai-plan-buyin-build`, `.ai-plan-buyin-avatar` |
+| Preview | `061` / `084` / `presentPlanReady` | **Sole** full-read surface: Agent Plan tab, FeatureDocDrawer, or `plan:` |
 
 ### API (store)
 
@@ -88,10 +88,9 @@ ExitPlanMode (plan non-empty)
        ├─ Agent Mode → focusAgentPlan (084 Plan tab); merge feature if linked (no drawer)
        ├─ IDE + featureId → mergePlanIntoFeature + FeatureDocDrawer
        └─ IDE unlinked → plan: virtual tab (061)
-  → PlanBuyInCard (only if getPlanBuyIn({ chatId: thisChat }) hits)
-       ├─ Open Plan → presentPlanReady (re-focus; no decide)
+  → PlanBuyInCard chip (if getPlanBuyIn hits AND no docked AskUserQuestion)
        ├─ Pass → onPlanBuild (Milo + Agent) → resolve allow → sendUserText(implement…)
-       └─ Keep / composer send → resolve deny
+       └─ Esc / composer send → resolve deny
 ```
 
 ### Prompt gate
@@ -131,14 +130,24 @@ Full write-up: `documentation/bugs/003-agent-identity-mismatch.md`. Related: `06
 
 ### UI copy (English)
 
-| Control | Label |
-|---|---|
-| Tertiary | Open Plan |
-| Secondary | Keep discussing |
-| Primary | Pass the ball to Milo |
-| Hint | Enter build · Esc keep discussing · or type below to refine |
+| Control | Label | Surface |
+|---|---|---|
+| Primary chip | Pass the ball to Milo | Above composer (hidden if AskUserQuestion docked) |
+| Keyboard | Enter = build · Esc = keep discussing (deny) | No on-chip hint row |
 
-Avatar: Milo builtin `duck3` → `/images/ducks/duck3.jpeg`. Open Plan icon: `columns-2`.
+Avatar: Milo builtin `duck3` → `/images/ducks/duck3.jpeg`.
+
+**Not in chat (2026-07-29):** plan markdown preview, feature label, **Open Plan**,
+**Keep discussing** button, and the hint row were removed from `PlanBuyInCard`.
+Full plan = right Plan tab / IDE only. Deny still via Esc or free-form composer send.
+
+### Layout split (chat vs side)
+
+| Surface | Shows |
+|---|---|
+| Right Plan tab / FeatureDocDrawer / `plan:` | Full plan markdown (`AgentPlanPane` / drawer / tab) |
+| Above composer | Milo chip only (`planBuyIn && !dockedAskCall`) |
+| Transcript `ExitPlanMode` row | Compact one-liner “Plan ready” + first-line preview (`chatToolRender`) — not the full plan |
 
 ### Gotchas
 
@@ -148,7 +157,8 @@ Avatar: Milo builtin `duck3` → `/images/ducks/duck3.jpeg`. Open Plan icon: `co
 - Multiple `AIChatHost` overlays: `setPlanBuyInDecide` keyed by chatId/session so the correct panel settles the hook. **Never match buy-in by cwd** — that showed Plan ready on sibling Agent Mode sessions (bug `008`).
 - CLI enables ExitPlanMode only with `--permission-mode plan` — prompt gate alone is not enough; composer must be Plan when Jack calls it. When the tool still fails, client buy-in path covers UX.
 - **Handoff must not poison the new-chat default (bug fix 2026-07-22):** `handoffToMiloBuilder` force-sets Agent (`bypassPermissions`) for the current chat, but the mode-persistence effect (`AIChatPanel.tsx`) writes `ccPermMode` into the global `PERM_MODE_KEY` default that seeds **new** chats. Without a guard, one "Pass the ball" flipped every future new chat to Agent → they never started in Plan, so Jack saw a non-plan session and (correctly, per the prompt gate) said "ExitPlanMode is not active" and fell back to `~/.claude/plans/*` scratch files. Fix: `skipPermModeDefaultRef` set by `handoffToMiloBuilder` makes the effect skip the global-default write for that one transition; the per-session `setPermMode` bridge still updates.
-- **Answering AskUserQuestion must not dismiss the CTA (bug fix 2026-07-22):** `sendUserText` opens with a "user typed instead of clicking Pass the ball → resolve deny" guard that clears `planBuyIn`. `answerQuestion` (073) routes selections through the same `sendUserText`, so answering a docked question while the Milo CTA was up silently declined the handoff and the CTA vanished. Fix: `sendUserText` takes `opts.keepPlanBuyIn`; `answerQuestion` passes it — answering continues the plan discussion, the CTA survives. Only free-form composer sends still deny.
+- **AskUserQuestion owns the dock (2026-07-29):** while `dockedAskCall` is set, the Milo chip is **not rendered** — questionnaire first. Buy-in stays in `planBuyInStore`; chip returns after answer/dismiss.
+- **Answering AskUserQuestion must not deny the buy-in (bug fix 2026-07-22):** `sendUserText` opens with a "user typed instead of clicking Pass the ball → resolve deny" guard. `answerQuestion` (073) passes `opts.keepPlanBuyIn` so answering does not clear `planBuyIn` — after the question docks away, the Milo chip can reappear. Only free-form composer sends still deny.
 
 ### Related
 

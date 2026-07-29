@@ -3,8 +3,8 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-13
-last_verified: 2026-07-16
-related: [015-claude-permission-mode.md, 004-subagent-mentions.md, 022-chat-composer.md, 068-quack-plan-harness.md, 039-composer-queue.md]
+last_verified: 2026-07-29
+related: [015-claude-permission-mode.md, 004-subagent-mentions.md, 022-chat-composer.md, 068-quack-plan-harness.md, 039-composer-queue.md, 088-plan-milo-handoff.md]
 tags: [claude-code, ask-user-question, composer-dock, interactive, cursor-style, permission-hook, askQuestionStore, system-prompt, orchestrator, subagent, tool-search]
 ---
 
@@ -182,3 +182,5 @@ Multi-question: one line per question, newline-separated.
   report → orchestrator calls `AskUserQuestion` in the parent chat.
 - **Agent mode:** redirect still runs; interactive card is the answer path regardless of `bypassPermissions`.
 - **Presets ≠ subagents:** Milo/Nora/Lia share the orchestrator chat — they call `AskUserQuestion` directly.
+- **Owns the dock vs Milo chip (2026-07-29):** while `dockedAskCall` is set, `AIChatPanel` hides the Pass-the-ball Milo chip (`088`) so the questionnaire is the only CTA above the composer. Buy-in stays in `planBuyInStore` and the chip returns after answer/dismiss.
+- **Answering must not deny plan buy-in (2026-07-22):** `answerQuestion` → `sendUserText(..., { keepPlanBuyIn: true })` so selecting an option does not resolve ExitPlanMode as deny. Free-form composer sends still deny pending buy-in.
