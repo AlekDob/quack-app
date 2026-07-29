@@ -55,7 +55,7 @@ export function WorkspacePathPicker({ wsId, root }: WorkspacePathPickerProps) {
         open={open}
         onClose={() => setOpen(false)}
         anchorRef={btnRef}
-        estimateHeight={Math.min(320, recents.length * 36 + 72)}
+        estimateHeight={Math.min(360, recents.length * 36 + 112)}
         className="ai-composer-ctx-menu--project"
       >
         <WorkspaceProjectMenuBody
@@ -64,6 +64,7 @@ export function WorkspacePathPicker({ wsId, root }: WorkspacePathPickerProps) {
           recents={recents}
           onPick={(id, folder) => void pickWorkspace(id, folder)}
           onOpenFolder={() => void pickFolder()}
+          onClose={() => setOpen(false)}
         />
       </ComposerCtxMenu>
     </div>

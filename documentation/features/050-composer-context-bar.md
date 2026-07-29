@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-10
-last_verified: 2026-07-27
+last_verified: 2026-07-29
 ---
 
 # 050 — Composer context bar (path + branch)
@@ -72,9 +72,10 @@ compact layout.
 
 | Section | Content |
 |---|---|
-| **Recents** | `useStore().recent.slice(0, 10)` — MRU from `workspaces.json`, **not** filtered to open-only |
-| Row | Folder icon + ellipsized `~/…` path; `title` = absolute `root` |
-| Active row | `.active` + check icon (current panel `wsId`) |
+| **Search** | Fuzzy filter (top, auto-focused) — matches name + `~/…` path via `fuzzyMatch` |
+| **Recents** | `useRecentWorkspaces()` — sorted by `last_opened` desc, cap 20; MRU bumps on `openWorkspace` **and** `setActiveWorkspace` |
+| Row | Folder icon tinted with `getWorkspaceColor` (neutral if unset) + ellipsized `~/…` path |
+| Active row | `.active` + check icon (current panel `wsId`); keyboard highlight via ↑/↓ + Enter |
 | separator | |
 | **Open folder…** | Tauri `open({ directory: true })` — Cursor “Use Existing…” equivalent |
 
@@ -117,6 +118,14 @@ target project.
 | Menu listed **open** workspaces only | **Recents** MRU (open + closed), cap 10 |
 | No section title | “Recents” section header |
 | Check via `.active` on row | Explicit check icon on current project |
+
+### Before → after (2026-07-29)
+
+| Before | After |
+|---|---|
+| Recents order only moved on `openWorkspace` | Also bumps on project switch (`setActiveWorkspace`) + sort by `last_opened` |
+| Neutral folder icon on every row | Folder stroke uses the project’s workspace color |
+| No filter | Fuzzy search field at top of the menu |
 
 ## Branch segment (`GitBranchPicker`)
 

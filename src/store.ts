@@ -1678,7 +1678,9 @@ export const useStore = create<AppState>((set, get) => {
         );
         idx = { recent: [], active_id: null, open_ids: [] };
       }
-      const recent = idx.recent ?? [];
+      const recent = [...(idx.recent ?? [])].sort(
+        (a, b) => b.last_opened - a.last_opened,
+      );
       const requestedOpen =
         idx.open_ids ?? (idx.active_id ? [idx.active_id] : []);
       let activeId = idx.active_id ?? requestedOpen[0] ?? null;
@@ -1918,7 +1920,21 @@ export const useStore = create<AppState>((set, get) => {
         await awaitChatDiskFlushes(prevId);
         clearEditorState();
       }
-      set({ activeId: id });
+      // Bump MRU so New-chat Recents tracks real usage, not only openWorkspace.
+      if (prevId !== id) {
+        const meta = get().recent.find((w) => w.id === id);
+        if (meta) {
+          const bumped = { ...meta, last_opened: Date.now() };
+          set({
+            activeId: id,
+            recent: [bumped, ...get().recent.filter((w) => w.id !== id)],
+          });
+        } else {
+          set({ activeId: id });
+        }
+      } else {
+        set({ activeId: id });
+      }
       if (prevId && prevId !== id) dropAllCachedBodies(prevId);
       await persistIdx();
       logChatSwitch("workspace switch done", {

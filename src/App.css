@@ -7389,12 +7389,33 @@ body.ab-dragging * {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   padding: 4px 0;
 }
-/* Project picker: scroll Recents; Open folder… pinned at the bottom. */
+/* Project picker: search + scroll Recents; Open folder… pinned at the bottom. */
 .ai-composer-ctx-menu--project {
   display: flex;
   flex-direction: column;
   overflow: hidden;
   padding: 0;
+}
+.ai-composer-ctx-menu-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-muted);
+}
+.ai-composer-ctx-menu-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--fg);
+  font-size: 12px;
+  outline: none;
+}
+.ai-composer-ctx-menu-search input::placeholder {
+  color: var(--fg-muted);
 }
 .ai-composer-ctx-menu-scroll {
   flex: 1 1 auto;
@@ -7412,6 +7433,17 @@ body.ab-dragging * {
   padding: 10px 12px;
   font-size: 11px;
   color: var(--fg-muted);
+}
+.ai-composer-ctx-folder {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--fg-muted);
+}
+.ai-composer-ctx-folder.has-color {
+  color: var(--ws-color);
+}
+.ai-composer-ctx-menu .menu-item.is-highlight {
+  background: var(--bg-hi);
 }
 .ai-composer-ctx-menu--portaled {
   position: fixed;

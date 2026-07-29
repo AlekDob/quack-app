@@ -355,7 +355,7 @@ export function AIChatsRail({
           open={projectMenuOpen}
           onClose={() => setProjectMenuOpen(false)}
           anchorRef={addBtnRef}
-          estimateHeight={Math.min(320, recents.length * 36 + 72)}
+          estimateHeight={Math.min(360, recents.length * 36 + 112)}
           className="ai-composer-ctx-menu--project"
         >
           <WorkspaceProjectMenuBody
@@ -364,6 +364,7 @@ export function AIChatsRail({
             recents={recents}
             onPick={(id, folder) => void pickProjectForChat(id, folder)}
             onOpenFolder={() => void pickFolderForChat()}
+            onClose={() => setProjectMenuOpen(false)}
           />
         </ComposerCtxMenu>
         {!inSidebar && (
