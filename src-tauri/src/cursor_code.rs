@@ -577,6 +577,19 @@ fn spawn_waiter(
     });
 }
 
+/// Chat-tab session ids whose cursor-agent subprocess is still alive.
+/// Same contract as `claude_code_active_sessions` — Agent Hub unions both.
+#[tauri::command]
+pub fn cursor_code_active_sessions(state: State<'_, CursorCodeState>) -> Vec<String> {
+    let children = state.children.lock();
+    let streams = state.session_streams.lock();
+    streams
+        .iter()
+        .filter(|(_, stream_id)| children.contains_key(*stream_id))
+        .map(|(chat_sid, _)| chat_sid.clone())
+        .collect()
+}
+
 #[cfg(unix)]
 fn kill_process_tree(pid: u32) {
     unsafe {

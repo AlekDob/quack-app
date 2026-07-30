@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-17
+last_verified: 2026-07-30
 tags: [agent-hub, agent-status, sessions, notifications, cross-project, workspace-colors, watcher, mount-asymmetry, collapsed-rail, hover-drawer, archived, delete, lifecycle]
 ---
 
@@ -14,23 +14,23 @@ tags: [agent-hub, agent-status, sessions, notifications, cross-project, workspac
 
 ### Status taxonomy (groups, attention order)
 
-UI labels are English (app language). Dot colors are vivid + glowing — the dot IS the meaning, so it carries real color in the otherwise-neutral chrome.
+UI labels are English (app language). Status chrome is **Cursor-minimal**:
 
-| Group | status | derived from | dot color |
+| Group | status | derived from | cue |
 |---|---|---|---|
-| Error | `error` | (reserved) live error record | `#ef4444` red + glow |
-| Needs input | `needs-input` | `claude:permission-request` (permission or AskUserQuestion) | `#a855f7` purple + glow, pulsing |
-| Working | `working` | sessionId present in `claude_code_active_sessions` | `#eab308` yellow + glow, pulsing |
-| Ready | `ready` | resting state — anything not running/blocked/done | `#22c55e` green + glow |
-| Done | `done` | manual **Mark done** + legacy `archivedAt` chats | neutral dim |
+| Error | `error` | (reserved) live error record | tiny `--err` corner pip |
+| Needs input | `needs-input` | `claude:permission-request` (permission or AskUserQuestion) | tiny `--warn` pip (soft breathe) |
+| Working | `working` | sessionId in `claude_code_active_sessions` **∪** `cursor_code_active_sessions` | 2×2 spark in project color (else muted) — no ring/glow |
+| Ready | `ready` | resting state — anything not running/blocked/done | **quiet** project badge only |
+| Done | `done` | manual **Mark done** + legacy `archivedAt` chats | quiet badge + title |
 
 `archivedAt` chats are **folded into the Done pile** in the hub UI (one searchable section). The `archived` display status and **Archived** section header are gone — legacy archives show under **Done** with the same search/preview UX the old Archived block had. **"Ready" is the resting baseline** — there is no separate "idle" group; a chat that isn't actively running, blocked, or in the done pile is Ready (waiting for the user). Priority on collision: error → needs-input → working → done (manual pile only) → ready (`resolveDisplayStatus`; `archived` lifecycle remains in the store for old data but the hub maps `archivedAt` → Done).
 
 ### Architecture — single producer, no panel coupling
 
 A single headless `AgentHubWatcher` (mounted once in `App.tsx`) derives status for EVERY open chat and is the only writer of `agentStatusStore`. **Why not let panels publish:** mount-asymmetry — not every chat's `AIChatPanel` is mounted (esp. Agent Mode). The watcher instead reads app-wide signals that don't need a mounted panel:
-- **working/ready**: polls `claude_code_active_sessions` (Rust) every 1.5s. Returns chat-tab `sessionId`s whose subprocess child is alive. working→(not active) edge = ready (+ notify if unfocused).
-- **needs-input**: listens to the GLOBAL `claude:permission-request` event (carries `cwd` + `session_id`). A 600ms grace timer means auto-allowed tools (Read, always-allow, AskUserQuestion redirect) never flash needs-input — only genuinely-waiting prompts do. Cleared on the new `claude:permission-resolved` / existing `claude:permission-cancelled` events (permission) or on focus (question).
+- **working/ready**: polls `agentActiveSessions()` every 1.5s — union of `claude_code_active_sessions` + `cursor_code_active_sessions`. Returns chat-tab `sessionId`s whose CLI subprocess child is alive. working→(not active) edge = ready (+ notify if unfocused).
+- **needs-input**: listens to the GLOBAL `claude:permission-request` event (carries `cwd` + `session_id`). A 600ms grace timer means auto-allowed tools (Read, always-allow, AskUserQuestion redirect) never flash needs-input — only genuinely-waiting prompts do. Cleared on the new `claude:permission-resolved` / existing `claude:permission-cancelled` events (permission) or on focus (question). *(Cursor CLI has no Quack permission overlay yet — needs-input is Claude Code only.)*
 - **seen**: the watcher auto-marks the focused chat seen each tick, clearing a needs-input(question) once you look (ready, being the resting state, just stays ready).
 
 ### Key files
@@ -39,13 +39,13 @@ A single headless `AgentHubWatcher` (mounted once in `App.tsx`) derives status f
 |---|---|
 | Status store (pub/sub, `resolveDisplayStatus`, seen) | `src/agentStatusStore.ts` |
 | Global watcher (poll + permission events + notifications) | `src/components/AgentHubWatcher.tsx` |
-| The hub UI (groups, rows, dots, badge, context menu, rename) | `src/components/AIChatsRail.tsx` |
+| The hub UI (groups, rows, status-on-badge, context menu, rename) | `src/components/AIChatsRail.tsx` |
 | Customizations footer + modal (expanded hub) | `src/components/AgentCustomizations.tsx`, `CustomizationsModal` → feature 036 |
 | Session diff subtitles (expanded rows) | `src/chatDiffStore.ts`, `src/sessionDiffStats.ts` → feature 029 |
 | OS notification + toast + quack sound (60s dedup, focus gate) | `src/notifications.ts` |
 | View prefs (expanded, collapsed sections) — global | `src/hubPrefs.ts` — first-run collapses `done` + `archived` |
 | Shared provider badge (DRY extract) | `src/modelBadge.ts` |
-| Backend: live-session list | `src-tauri/src/claude_code.rs` → `claude_code_active_sessions` |
+| Backend: live-session lists | `claude_code_active_sessions` + `cursor_code_active_sessions` → `agentActiveSessions()` |
 | Backend: permission-resolved event | `src-tauri/src/claude_perm.rs` → `claude_perm_decide` emits `claude:permission-resolved` |
 | Lifecycle + rename persistence | `src/store.ts` → `AIChatDescriptor.{doneAt,archivedAt,titleLocked}`, `renameAIChat`, `setAIChatLifecycle`, `focusAIChat`, `activeAiChatId` |
 | Agent stop on lifecycle | `src/stopChatAgent.ts`, `src/aiStopBus.ts` → `046-process-cleanup.md` |
@@ -65,9 +65,9 @@ Context menu on a row (`ContextMenu`, shared viewport-clamped component):
 
 **Archive removed from the menu (2026-07-16):** Done + Archive overlapped ("finished" vs "hide"). New workflow: **Mark done** to park a session, **Delete** to remove it permanently. Legacy `archivedAt` data is shown in the **Done** section (searchable); no separate Archived header.
 
-**Done section bulk menu:** **Reopen all** only.
+**Done section bulk menu:** **Reopen all** + **Delete all** (confirm; permanent).
 
-**Done pile search (2026-07-16):** expanded hub shows an inline search under **Done** (replaces the old Archived block). Default preview **10** chats; search returns up to **30** title/workspace matches. Hint: *Latest 10 of N — search for more*. Collapsed 44px rail shows at most **10** done dots (same cap).
+**Done pile search (2026-07-16 / 2026-07-29):** expanded hub shows an inline **fuzzy** search under **Done**. Default preview **10** chats (by `doneAt`/`archivedAt` desc); search returns up to **30** title/workspace matches. Hint: *Latest 10 of N — search for more*. Collapsed 44px rail shows at most **10** done chips (same cap). Done rows are **quiet**: project badge + title only (no status pip, no diff −/+, no Feature pill).
 
 **Archived row click:** clicking a done-pile row **focuses** without auto-reopen. Sending a message unarchives/reopens (`AIChatPanel.sendUserText` when `desc.archivedAt`). Use **Reopen** in the context menu to restore explicitly.
 
@@ -90,20 +90,23 @@ When the hub is **expanded** and at least one chat has `doneAt` or legacy `archi
 
 | Concern | Behavior |
 |---|---|
-| Default visibility | Latest **10** chats by `createdAt` desc (done + legacy archived) |
-| Search | Inline filter on chat title + workspace name; max **30** matches |
+| Default visibility | Latest **10** chats by `doneAt` / `archivedAt` / `createdAt` desc |
+| Search | Fuzzy filter on chat title + workspace name; max **30** matches |
 | Hint | *Latest 10 of N — search for more* when `N > 10` and search empty |
 | Open row | `focusChat` — focuses without reopen; **Reopen** in menu or send a message to restore |
+| Bulk menu | **Reopen all** · **Delete all** (confirm → `deleteSession` + `closeAIChat` each) |
+| Row chrome | Badge (project color) + title only — no pip / diff / Feature pill |
 | Collapsed by default | Once per browser session (`sessionStorage` boot flag); expand mid-session persists |
 | Visual separation | Expanded hub: top hairline + extra margin above Done (archive vs live) |
-| Collapsed rail | At most **10** done dots (no search) |
+| Collapsed rail | At most **10** done chips (no search) |
 
 | Constant | Value | File |
 |---|---|---|
 | `DONE_PREVIEW` | 10 | `AIChatsRail.tsx` |
 | `DONE_SEARCH_CAP` | 30 | `AIChatsRail.tsx` |
 
-CSS: `.agent-hub-section.status-done`, `.agent-hub-done-search`, `.agent-hub-done-hint`, `.agent-hub-dot.done`.
+CSS: `.agent-hub-section.status-done`, `.agent-hub-done-search`, `.agent-hub-done-hint`
+(done rows: project badge only — no `.agent-hub-status` pip).
 
 ### Archived section (removed from UI, 2026-07-16)
 
@@ -154,7 +157,7 @@ in `064-agent-hub-drawer-and-chat-tab-switch.md`.
 ### Collapsed rail + hover drawer (2026-07-12)
 
 When **not** pinned expanded (`hubPrefs`), the stack rail is a **44px** strip of
-status chips (chat-title initial on project-color square + corner status dot).
+status chips (chat-title initial on project-color square + live status pip/ring on the same badge).
 **Hover** opens a **240px overlay drawer** (`z-index:80`) over the editor — no
 layout reflow. **Chevron** pins the hub at 240px in-flow. Implementation:
 `AIChatsRail.tsx` (`useHubPeek`, `.agent-hub-shell`), `App.css`. Full detail:

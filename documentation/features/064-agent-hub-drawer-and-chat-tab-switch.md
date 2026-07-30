@@ -24,7 +24,7 @@ switches.
 
 | Mode | Layout | Behaviour |
 |---|---|---|
-| **Collapsed** (default pin off) | Shell stays **44px** in `.shell-stack` | Icon chip per chat: project-color square + first letter of **chat title** + status dot corner badge; work badge only when expanded |
+| **Collapsed** (default pin off) | Shell stays **44px** in `.shell-stack` | Icon chip per chat: project-color square + first letter of **chat title** + live status pip/ring on the same badge; work badge only when expanded |
 | **Hover peek** | Shell still 44px; panel is **overlay drawer** | `is-peeking` on `.agent-hub-shell` → `.agent-hub` is `position:absolute`, 240px wide, `z-index:80`, slides in (~180ms) **over** the editor — **zero layout shift** |
 | **Pinned expanded** (chevron) | Shell grows to **240px** in-flow | Persists via `hubPrefs` (`lcp.hub.expanded`); pushes editor like before |
 

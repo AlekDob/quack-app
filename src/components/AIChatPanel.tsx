@@ -790,7 +790,6 @@ export function AIChatPanel({
     attachContext,
     attachedFiles,
     addAttachedFile,
-    setAttachedFiles,
     clearAttachedFiles,
   } = useWorkspaceChatContext(wsId);
   const [runningTools, setRunningTools] = useState(false);
@@ -3282,6 +3281,13 @@ export function AIChatPanel({
         useStore.getState().setAIChatStory(wsId, aiChatId, pick.story.id);
       });
     } else if (pick.type === "file") {
+      const rel = relPath(pick.abs, root);
+      const cur = readInput();
+      const before = cur.slice(0, mentionState.start);
+      const after = cur.slice(mentionState.end);
+      setInput(
+        `${before}@${rel}${after.startsWith(" ") ? "" : " "}${after}`,
+      );
       addAttachedFile(pick.abs, root);
     }
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -3337,10 +3343,16 @@ export function AIChatPanel({
 
   const citeFileFromDrop = useCallback(
     (absPath: string) => {
+      const rel = relPath(absPath, root);
+      const cur = readInput();
+      const token = `@${rel}`;
+      setInput(
+        cur.trim() ? `${cur.replace(/\s+$/, "")} ${token} ` : `${token} `,
+      );
       addAttachedFile(absPath, root);
       requestAnimationFrame(() => inputRef.current?.focus());
     },
-    [root, addAttachedFile],
+    [root, addAttachedFile, readInput, setInput],
   );
 
   useEffect(() => registerComposerFileDrop({ onFile: citeFileFromDrop }), [
@@ -4902,10 +4914,12 @@ export function AIChatPanel({
     [attachedFiles, root],
   );
   const hasComposerMentions =
-    attachedBrainHits.length > 0 ||
-    wsAttachedFiles.length > 0 ||
-    attachedAgents.length > 0;
+    attachedBrainHits.length > 0 || attachedAgents.length > 0;
   const skillNames = useMemo(() => skills.map((s) => s.name), [skills]);
+  const fileCiteRels = useMemo(
+    () => wsAttachedFiles.map((f) => relPath(f, root)),
+    [wsAttachedFiles, root],
+  );
   const showComposerDock = turnActive || editorInWorkspace || hasWsAttached;
   useEffect(() => {
     if (!turnActive || !chatVisible) return;
@@ -5682,7 +5696,7 @@ export function AIChatPanel({
         return;
       }
       addAttachedFile(rest, root);
-      clearSlashSegment();
+      replaceSlashSegment(`@${relPath(rest, root)}`);
       toastInfo(`Attached ${rest} to next message`);
       return;
     }
@@ -7510,13 +7524,9 @@ export function AIChatPanel({
             wsId={wsId}
             root={root}
             brainHits={pinkyBrainExt ? attachedBrainHits : []}
-            files={wsAttachedFiles}
             agents={agents}
             attachedAgentNames={attachedAgents}
             onRemoveBrain={removeAttachedBrainHit}
-            onRemoveFile={(abs) =>
-              setAttachedFiles((prev) => prev.filter((p) => p !== abs))
-            }
             onRemoveAgent={(name) =>
               setAttachedAgents((prev) => prev.filter((n) => n !== name))
             }
@@ -7526,6 +7536,7 @@ export function AIChatPanel({
           text={input}
           skillNames={skillNames}
           featureSlug={featureId ?? null}
+          fileRels={fileCiteRels}
           textareaRef={inputRef}
         >
         <textarea

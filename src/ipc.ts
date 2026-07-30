@@ -265,10 +265,21 @@ export const claudeCode = {
       "claude_session_drawer_stats",
       { cwd, sessionId },
     ),
-  /** Chat-tab sessionIds whose subprocess is still running. Powers the
-   *  Agent Hub's cross-project "working" indicator without mounting panels. */
+  /** Chat-tab sessionIds whose Claude Code subprocess is still running. */
   activeSessions: () => invoke<string[]>("claude_code_active_sessions"),
 };
+
+/** Union of Claude Code + Cursor CLI live chat-tab session ids.
+ *  Powers Agent Hub "working" without mounting every chat panel. */
+export async function agentActiveSessions(): Promise<string[]> {
+  const [cc, cu] = await Promise.all([
+    claudeCode.activeSessions().catch(() => [] as string[]),
+    invoke<string[]>("cursor_code_active_sessions").catch(() => [] as string[]),
+  ]);
+  if (cu.length === 0) return cc;
+  if (cc.length === 0) return cu;
+  return [...new Set([...cc, ...cu])];
+}
 
 export interface McpServer {
   name: string;

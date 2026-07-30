@@ -193,6 +193,7 @@ pub fn run() {
             cursor_code::cursor_code_chat,
             cursor_code::cursor_code_kill,
             cursor_code::cursor_code_kill_session,
+            cursor_code::cursor_code_active_sessions,
             claude_perm::claude_perm_decide,
             claude_perm::claude_perm_endpoint,
             claude_usage::claude_auth_status,

@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-07-01
-last_verified: 2026-07-27
+last_verified: 2026-07-30
 tags: [cursor-cli, bridge, subprocess, streaming, stream-json, rust, cursor-agent, lazy-load, composer, tool-call, images]
 ---
 
@@ -33,6 +33,7 @@ tags: [cursor-cli, bridge, subprocess, streaming, stream-json, rust, cursor-agen
 | `cursor_code_chat` | Spawn run; emit `cursor-stream:<id>` `{kind: line\|stderr\|end}` |
 | `cursor_code_kill` | `kill_process_tree(pid)` for stream id |
 | `cursor_code_kill_session` | kill by chat-tab `sessionId` (archive / done / close tab) |
+| `cursor_code_active_sessions` | chat-tab `sessionId`s whose child is still in `children` (Agent Hub working) |
 
 ### Spawn flags
 | Flag | When | Why |

@@ -6,6 +6,7 @@ import {
   commandsForCategory,
   type CommandSpec,
 } from "../actions";
+import { addNewAIChat, anchorFromElement } from "../addNewAIChat";
 import { useTheme, type ThemeMode, IS_MACOS } from "../theme";
 import { getActiveEditor } from "../editorState";
 import { Icon } from "./Icon";
@@ -18,6 +19,7 @@ import {
   subscribeWorkspaceColors,
 } from "../workspaceColors";
 import { IS_DEV } from "../devMode";
+import { WorkspaceColorPopover } from "./WorkspaceColorPopover";
 
 // Edit-menu actions delegate to the active Monaco editor when one is
 // focused (its built-in commands handle the editor's undo stack +
@@ -224,6 +226,14 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
   const activeWsName = useStore((s) =>
     s.activeId ? s.loaded[s.activeId]?.meta.name ?? null : null,
   );
+  const activeRoot = useStore((s) =>
+    s.activeId ? (s.loaded[s.activeId]?.meta.root ?? "") : "",
+  );
+  const [projectMenu, setProjectMenu] = useState<{
+    x: number;
+    y: number;
+    nameAnchor: { x: number; y: number };
+  } | null>(null);
   const [, setColorTick] = useState(0);
   useEffect(
     () => subscribeWorkspaceColors(() => setColorTick((n) => n + 1)),
@@ -247,6 +257,17 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
   // the first one (that's still a click), matching native menubars.
   const hoverMenu = (k: string) =>
     setMenu((cur) => (cur !== null && cur !== k ? k : cur));
+
+  // Same workspace actions popover as ActivityBar right-click (IDE mode).
+  const openProjectMenu = (el: HTMLElement) => {
+    closeMenu();
+    const r = el.getBoundingClientRect();
+    setProjectMenu({
+      x: r.left,
+      y: r.bottom + 6,
+      nameAnchor: anchorFromElement(el),
+    });
+  };
 
   useEffect(() => {
     let unl: (() => void) | undefined;
@@ -409,18 +430,33 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
             DEV
           </span>
         )}
-        {activeWsName && (
-          <span
+        {activeWsName && activeId && (
+          <button
+            type="button"
             className={`topbar-brand-project ${wsColor ? "has-color" : ""}`}
             style={
               wsColor
                 ? ({ "--ws-color": wsColor.hex } as React.CSSProperties)
                 : undefined
             }
-            title={activeWsName}
+            title={`${activeWsName}\nClick for workspace actions`}
+            aria-label={`Workspace ${activeWsName} — actions`}
+            aria-haspopup="menu"
+            aria-expanded={!!projectMenu}
+            data-tauri-drag-region={false}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openProjectMenu(e.currentTarget);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              openProjectMenu(e.currentTarget);
+            }}
           >
             {activeWsName}
-          </span>
+          </button>
         )}
       </div>
 
@@ -769,6 +805,20 @@ export function TopBar({ onOpenPalette }: TopBarProps) {
           </svg>
         </button>
       </div>
+
+      {projectMenu && activeId && (
+        <WorkspaceColorPopover
+          wsId={activeId}
+          root={activeRoot}
+          x={projectMenu.x}
+          y={projectMenu.y}
+          nameAnchor={projectMenu.nameAnchor}
+          onClose={() => setProjectMenu(null)}
+          onNewChat={(wsId, anchor) => {
+            addNewAIChat(wsId, "editor", anchor);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -38,6 +38,7 @@ import { logChatSwitch } from "../chatSwitchDebug";
 import { isAgentChatWarm, touchAgentChatWarm } from "../agentChatWarm";
 import { deleteSession } from "../chatHistory";
 import { confirm as dialogConfirm } from "../dialog";
+import { fuzzyMatch, normalizeFilterQuery } from "../fuzzyMatch";
 import { ComposerCtxMenu } from "../composerCtxMenu";
 import { AgentCustomizations } from "./AgentCustomizations";
 import {
@@ -80,6 +81,11 @@ const GROUPS: Array<{ status: DisplayStatus; label: string }> = [
 
 function isDonePile(chat: AIChatDescriptor): boolean {
   return !!(chat.doneAt || chat.archivedAt);
+}
+
+/** Most-recently parked first (doneAt / archivedAt), else createdAt. */
+function doneRecency(chat: AIChatDescriptor): number {
+  return chat.doneAt ?? chat.archivedAt ?? chat.createdAt;
 }
 
 // Two-letter project initials for the color badge (clones AgentModeShell).
@@ -199,7 +205,7 @@ export function AIChatsRail({
         pile.push({ wsId, ws, chat, status: "done", color });
       }
     }
-    return pile.sort((a, b) => b.chat.createdAt - a.chat.createdAt);
+    return pile.sort((a, b) => doneRecency(b.chat) - doneRecency(a.chat));
   }, [loaded]);
 
   // `tick` MUST be a dep — status lives in agentStatusStore, not `loaded`.
@@ -223,13 +229,12 @@ export function AIChatsRail({
   }, [loaded, tick]);
 
   const doneVisible = useMemo(() => {
-    const q = doneSearch.trim().toLowerCase();
+    const q = normalizeFilterQuery(doneSearch);
     if (q) {
       return doneSorted
         .filter(
           (e) =>
-            e.chat.title.toLowerCase().includes(q) ||
-            e.ws.meta.name.toLowerCase().includes(q),
+            fuzzyMatch(q, e.chat.title) || fuzzyMatch(q, e.ws.meta.name),
         )
         .slice(0, DONE_SEARCH_CAP);
     }
@@ -288,6 +293,20 @@ export function AIChatsRail({
     if (!ok) return;
     deleteSession(entry.wsId, entry.chat.sessionId);
     closeChat(entry.wsId, entry.chat.id);
+  };
+
+  const deleteAllDone = async () => {
+    const n = doneSorted.length;
+    if (n === 0) return;
+    const ok = await dialogConfirm(
+      `Delete all ${n} done chat${n === 1 ? "" : "s"}? Transcripts will be removed permanently.`,
+      { title: "Delete all done", okLabel: "Delete all", danger: true },
+    );
+    if (!ok) return;
+    for (const e of doneSorted) {
+      deleteSession(e.wsId, e.chat.sessionId);
+      closeChat(e.wsId, e.chat.id);
+    }
   };
 
   const newChat = () => {
@@ -456,6 +475,7 @@ export function AIChatsRail({
                     setAIChatLifecycle(e.wsId, e.chat.id, "active");
                   }
                 },
+                onDeleteAll: () => void deleteAllDone(),
               }}
             >
               {showExpanded && !isSectionCollapsed("done") && (
@@ -604,6 +624,18 @@ function byRecency(a: HubEntry, b: HubEntry): number {
   return bt - at;
 }
 
+/** Cursor-style 2×2 working spark — color from `--ws-color` / `--warn`. */
+function HubWorkingSpark() {
+  return (
+    <span className="agent-hub-spark" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+      <i />
+    </span>
+  );
+}
+
 interface SectionProps {
   status: DisplayStatus;
   label: string;
@@ -611,6 +643,7 @@ interface SectionProps {
   expanded: boolean;
   bulkActions?: {
     onReopenAll: () => void;
+    onDeleteAll: () => void;
   };
   children: React.ReactNode;
 }
@@ -652,7 +685,7 @@ function HubSection({
 function HubSectionBulkMenu({
   actions,
 }: {
-  actions: { onReopenAll: () => void };
+  actions: { onReopenAll: () => void; onDeleteAll: () => void };
 }) {
   const [open, setOpen] = useState(false);
 
@@ -696,6 +729,17 @@ function HubSectionBulkMenu({
           >
             Reopen all
           </button>
+          <button
+            type="button"
+            className="agent-hub-section-menu-item is-danger"
+            role="menuitem"
+            onClick={() => {
+              actions.onDeleteAll();
+              setOpen(false);
+            }}
+          >
+            Delete all
+          </button>
         </div>
       )}
     </div>
@@ -728,16 +772,29 @@ function HubRow({
   const { chat, ws, color, status } = entry;
   const badge = initials(ws.meta.name);
   const chip = expanded ? badge : chipLetter(chat.title, ws.meta.name);
-  const diff = expanded ? getChatDiff(chat.id) : undefined;
+  const quiet = status === "done" || status === "archived";
+  // Done pile stays title-only — no diff / feature chrome (too noisy).
+  const diff = expanded && !quiet ? getChatDiff(chat.id) : undefined;
   const collapsedTip = `${chat.title} · ${ws.meta.name}`;
+  // Cursor-minimal: Ready = quiet badge. Working = spark. Attention = tiny pip.
+  const showPip = status === "needs-input" || status === "error";
+  const badgeMod =
+    status === "working"
+      ? " is-working"
+      : status === "needs-input"
+        ? " is-needs-input"
+        : status === "error"
+          ? " is-error"
+          : "";
+  const showWork = expanded && !quiet && !!(chat.workItemId || chat.featureId);
   return (
     <div
-      className={`agent-hub-row ${active ? "active" : ""}${diff ? " has-diff" : ""}${chat.workItemId || chat.featureId ? " has-work" : ""}`}
+      className={`agent-hub-row ${active ? "active" : ""}${diff ? " has-diff" : ""}${showWork ? " has-work" : ""}`}
       data-status={status}
       role="tab"
       tabIndex={0}
       aria-selected={active}
-      aria-label={`${chat.title} — ${ws.meta.name}`}
+      aria-label={`${chat.title} — ${ws.meta.name} — ${status}`}
       title={expanded ? undefined : collapsedTip}
       onClick={onClick}
       onContextMenu={onContextMenu}
@@ -755,9 +812,8 @@ function HubRow({
         }
       }}
     >
-      <span className={`agent-hub-dot ${status}`} aria-hidden="true" />
       <span
-        className={`agent-hub-badge ${color ? "has-color" : ""}`}
+        className={`agent-hub-badge ${color ? "has-color" : ""}${badgeMod}`}
         style={
           color
             ? ({ "--ws-color": color.hex } as React.CSSProperties)
@@ -766,7 +822,10 @@ function HubRow({
         title={ws.meta.name}
         aria-hidden={expanded ? true : undefined}
       >
-        {chip}
+        {status === "working" ? <HubWorkingSpark /> : chip}
+        {showPip && (
+          <span className={`agent-hub-status ${status}`} aria-hidden="true" />
+        )}
       </span>
       {expanded &&
         (renaming ? (
@@ -783,7 +842,7 @@ function HubRow({
         ) : (
           <span className="agent-hub-row-title">{chat.title}</span>
         ))}
-      {expanded && (
+      {showWork && (
         <WorkHubBadge
           workItemId={chat.workItemId}
           storyId={chat.storyId}

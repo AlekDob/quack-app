@@ -3,7 +3,7 @@ type: feature-doc
 project: quack-desktop
 stack: Tauri (Rust + React 19)
 created: 2026-06-28
-last_verified: 2026-07-23
+last_verified: 2026-07-30
 tags: [workspace, colors, palette, popover, activity-bar, agent-rail, topbar, theming, disk-persistence]
 ---
 
@@ -19,12 +19,12 @@ tags: [workspace, colors, palette, popover, activity-bar, agent-rail, topbar, th
 | IPC | `src/ipc.ts` | `workspaces.loadColors`/`workspaces.saveColors` |
 | Component | `src/components/WorkspaceColorPopover.tsx` | Right-click popover: New chat / Reveal in Finder|Explorer / Copy path + swatch grid + "No color"; portals to body |
 | Component | `src/components/ActivityBar.tsx` | Editor-mode workspace icons: context menu → popover, applies `--ws-color` |
-| Component | `src/components/TopBar.tsx` | Active workspace: `--ws-color` + `--ws-color-rgb` on `.topbar.has-ws-color` |
+| Component | `src/components/TopBar.tsx` | Active workspace chip: click / right-click → same `WorkspaceColorPopover` as ActivityBar; `--ws-color` wash on `.topbar.has-ws-color` |
 | Component | `src/components/AIChatsRail.tsx` | Hub row badges: `--ws-color` on project initials |
 | Config | `src/App.css` | `.ws-icon.has-color`, `.topbar.has-ws-color::before`, `.topbar-brand-project.has-color`, `--topbar-ws-tint-*` |
 
 ### Data Flow
-- **Set color:** right-click icon → `setColorMenu({wsId,x,y})` → `WorkspaceColorPopover` → `setWorkspaceColor(wsId, colorId)` → mutates in-RAM `cache` synchronously + `notify()` (instant UI) → async fire-and-forget `workspaces.saveColors(cache)` writes `colors.json` on disk
+- **Set color:** right-click activity-bar icon **or** click/right-click top-bar project chip → `WorkspaceColorPopover` → `setWorkspaceColor(wsId, colorId)` → mutates in-RAM `cache` synchronously + `notify()` (instant UI) → async fire-and-forget `workspaces.saveColors(cache)` writes `colors.json` on disk
 - **Boot hydrate:** `store.ts` `hydrate()` calls `hydrateWorkspaceColors()` once `recent`/`loaded` are populated (root resolution needs them) → loads `colors.json`, migrates any legacy `lcp.ws.colors` localStorage map into it (one-time, then removes the old key), `notify()`s so bars repaint if colors arrived after first paint
 - **Badge tint:** `getWorkspaceColor(wsId)` → inline `style={{ '--ws-color': hex }}` + `.has-color` → CSS `color-mix(in srgb, var(--ws-color) N%, surface)` for faint fill + side trace
 - **Title bar wash:** `TopBar` → `hexRgbChannels(hex)` → `--ws-color-rgb` on `.topbar` + class `has-ws-color` → `::before` dual radial-gradient (faint left bloom, stronger right bloom toward project name); same in dev and production
@@ -34,7 +34,7 @@ tags: [workspace, colors, palette, popover, activity-bar, agent-rail, topbar, th
 | Surface | Mechanism | When |
 |---------|-----------|------|
 | Activity bar icon | `.ws-icon.has-color` + `color-mix` tint / active full fill | Per open workspace |
-| Top bar project name | `.topbar-brand-project.has-color` → `color: var(--ws-color)` | Active workspace with color |
+| Top bar project name | `.topbar-brand-project.has-color` → fill + white label; **click opens actions popover** | Active workspace |
 | **Top bar background** | `.topbar.has-ws-color::before` radial gradients | Active workspace with color |
 | Agent Hub row badge | `.agent-hub-ws-badge.has-color` | Session's workspace |
 

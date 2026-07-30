@@ -1,28 +1,23 @@
-// Cursor-style inline mention chips inside the composer input row.
-// Skills + features stay as colored text in the textarea (see ComposerInputHighlight).
+// Cursor-style mention chips above the composer textarea.
+// Files, skills, and features render as colored inline text (ComposerInputHighlight).
 
-import { fileIconName } from "../fileIcons";
 import { openBrainDoc } from "../brainInject";
 import type { AttachedBrainHit } from "../brainMention";
-import type { SubagentDef } from "../subagents";
 import type { SkillDef } from "../skills";
-import { basename, relPath } from "../pathUtils";
+import type { SubagentDef } from "../subagents";
 import { Icon } from "./Icon";
 
 export type ComposerMentionChip =
   | { kind: "brain"; hit: AttachedBrainHit }
-  | { kind: "file"; abs: string; rel: string }
   | { kind: "agent"; agent: SubagentDef };
 
 type Props = {
   wsId: string;
   root: string;
   brainHits: AttachedBrainHit[];
-  files: string[];
   agents: SubagentDef[];
   attachedAgentNames: string[];
   onRemoveBrain: (path: string) => void;
-  onRemoveFile: (abs: string) => void;
   onRemoveAgent: (name: string) => void;
 };
 
@@ -30,18 +25,13 @@ export function ComposerMentionChips({
   wsId,
   root,
   brainHits,
-  files,
   agents,
   attachedAgentNames,
   onRemoveBrain,
-  onRemoveFile,
   onRemoveAgent,
 }: Props) {
   const chips: ComposerMentionChip[] = [];
   for (const hit of brainHits) chips.push({ kind: "brain", hit });
-  for (const abs of files) {
-    chips.push({ kind: "file", abs, rel: relPath(abs, root) });
-  }
   for (const name of attachedAgentNames) {
     const agent = agents.find((a) => a.name === name);
     if (agent) chips.push({ kind: "agent", agent });
@@ -58,11 +48,9 @@ export function ComposerMentionChips({
           wsId={wsId}
           root={root}
           onRemove={() =>
-            removeChip(chip, {
-              onRemoveBrain,
-              onRemoveFile,
-              onRemoveAgent,
-            })
+            chip.kind === "brain"
+              ? onRemoveBrain(chip.hit.path)
+              : onRemoveAgent(chip.agent.name)
           }
         />
       ))}
@@ -71,35 +59,9 @@ export function ComposerMentionChips({
 }
 
 function chipKey(chip: ComposerMentionChip): string {
-  switch (chip.kind) {
-    case "brain":
-      return `brain:${chip.hit.path}`;
-    case "file":
-      return `file:${chip.abs}`;
-    case "agent":
-      return `agent:${chip.agent.name}`;
-  }
-}
-
-function removeChip(
-  chip: ComposerMentionChip,
-  handlers: {
-    onRemoveBrain: (path: string) => void;
-    onRemoveFile: (abs: string) => void;
-    onRemoveAgent: (name: string) => void;
-  },
-): void {
-  switch (chip.kind) {
-    case "brain":
-      handlers.onRemoveBrain(chip.hit.path);
-      break;
-    case "file":
-      handlers.onRemoveFile(chip.abs);
-      break;
-    case "agent":
-      handlers.onRemoveAgent(chip.agent.name);
-      break;
-  }
+  return chip.kind === "brain"
+    ? `brain:${chip.hit.path}`
+    : `agent:${chip.agent.name}`;
 }
 
 function MentionChip({
@@ -113,21 +75,14 @@ function MentionChip({
   root: string;
   onRemove: () => void;
 }) {
-  const variant = chip.kind;
-  const label =
-    chip.kind === "brain"
-      ? chip.hit.title
-      : chip.kind === "file"
-        ? basename(chip.abs)
-        : chip.agent.name;
-
+  const label = chip.kind === "brain" ? chip.hit.title : chip.agent.name;
   const onOpen =
     chip.kind === "brain"
       ? () => void openBrainDoc(wsId, root, chip.hit.path)
       : undefined;
 
   return (
-    <span className={`composer-mention-chip composer-mention-chip--${variant}`}>
+    <span className={`composer-mention-chip composer-mention-chip--${chip.kind}`}>
       {chip.kind === "agent" ? (
         <img
           className="composer-mention-chip-avatar"
@@ -137,10 +92,7 @@ function MentionChip({
         />
       ) : (
         <span className="composer-mention-chip-icon" aria-hidden>
-          <Icon
-            name={chip.kind === "brain" ? "brain" : fileIconName(basename(chip.abs))}
-            size={12}
-          />
+          <Icon name="brain" size={12} />
         </span>
       )}
       {onOpen ? (

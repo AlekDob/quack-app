@@ -70,6 +70,9 @@
   --topbar-ws-tint-right: 0.16;
   --err: #ef4444;
   --err-bg: rgba(239, 68, 68, 0.12);
+  /* Agent hub — needs-input attention (permission / AskUserQuestion). */
+  --attention: #a855f7;
+  --attention-bg: rgba(168, 85, 247, 0.14);
   --info: #9aa0ad;
   --info-bg: rgba(255, 255, 255, 0.07);
   /* Skills — dedicated Quack orange so `/skill` rows + the Skill tool stand out. */
@@ -181,6 +184,8 @@
   --topbar-ws-tint-right: 0.11;
   --err: #dc2626;
   --err-bg: rgba(239, 68, 68, 0.1);
+  --attention: #7c3aed;
+  --attention-bg: rgba(124, 58, 237, 0.12);
   --info: #6b7280;
   --info-bg: rgba(0, 0, 0, 0.06);
   --skill: #d9722e;
@@ -374,9 +379,14 @@
     backdrop-filter: blur(var(--blur-medium));
     -webkit-backdrop-filter: blur(var(--blur-medium));
   }
-  /* Static "working" dot — keep the accent fill, drop the pulse. */
-  .agent-hub-dot.working {
+  /* Static live status — keep fills, drop motion. */
+  .agent-hub-status.needs-input {
     animation: none;
+  }
+  .agent-hub-spark i {
+    animation: none;
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -1515,15 +1525,16 @@ body.ab-dragging * {
   line-height: 15px;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn) 40%, transparent);
 }
-/* Nome progetto come chip/tag: sfondo = colore del progetto, testo bianco.
-   Senza colore assegnato ripiega su un chip neutro leggibile. */
+/* Project name chip: tinted when colored; click opens workspace actions. */
 .topbar-brand-project {
   flex-shrink: 1;
   min-width: 0;
+  font-family: inherit;
   font-weight: 600;
   font-size: 12px;
   letter-spacing: -0.1px;
   padding: 2px 9px;
+  border: none;
   border-radius: 999px;
   background: var(--bg-hi);
   color: var(--fg);
@@ -1532,11 +1543,18 @@ body.ab-dragging * {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  cursor: pointer;
+}
+.topbar-brand-project:hover {
+  filter: brightness(1.08);
 }
 .topbar-brand-project.has-color {
   background: var(--ws-color);
   color: #fff;
   box-shadow: 0 1px 4px color-mix(in srgb, var(--ws-color) 45%, transparent);
+}
+.topbar-brand-project.has-color:hover {
+  filter: brightness(1.1);
 }
 .topbar-menus {
   display: flex;
@@ -2998,6 +3016,12 @@ body.ab-dragging * {
 .agent-hub-section-menu-item:hover {
   background: var(--bg-hover);
 }
+.agent-hub-section-menu-item.is-danger {
+  color: var(--err);
+}
+.agent-hub-section-menu-item.is-danger:hover {
+  background: var(--err-bg);
+}
 /* --- Row --- */
 .agent-hub-row {
   position: relative;
@@ -3033,15 +3057,16 @@ body.ab-dragging * {
   border-color: transparent;
 }
 .agent-hub:not(.expanded) .agent-hub-row.active .agent-hub-badge {
-  box-shadow:
-    0 0 0 1px var(--accent),
-    inset 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+  box-shadow: 0 0 0 1px var(--border-strong);
 }
 .agent-hub:not(.expanded) .agent-hub-badge {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 11px;
   font-weight: 700;
-  line-height: 26px;
+  line-height: 1;
   letter-spacing: 0;
   min-width: 26px;
   width: 26px;
@@ -3052,26 +3077,20 @@ body.ab-dragging * {
 .agent-hub:not(.expanded) .agent-hub-row.has-work .agent-hub-badge::before {
   content: "";
   position: absolute;
-  top: -2px;
-  left: -2px;
-  width: 7px;
-  height: 7px;
+  top: -1px;
+  left: -1px;
+  width: 5px;
+  height: 5px;
   border-radius: var(--radius-full);
   background: var(--fg-muted);
-  box-shadow: 0 0 0 2px var(--bg-alt);
+  box-shadow: 0 0 0 1.5px var(--bg-alt);
 }
-.agent-hub:not(.expanded) .agent-hub-dot {
-  position: absolute;
-  bottom: 4px;
-  right: 9px;
-  width: 8px;
-  height: 8px;
-  box-shadow: 0 0 0 2px var(--bg-alt);
-  z-index: 1;
-}
-.agent-hub:not(.expanded) .agent-hub-row[data-status="working"] .agent-hub-badge,
-.agent-hub:not(.expanded) .agent-hub-row[data-status="needs-input"] .agent-hub-badge {
-  box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 20%, var(--border));
+.agent-hub:not(.expanded) .agent-hub-status {
+  bottom: -1px;
+  right: -1px;
+  width: 7px;
+  height: 7px;
+  box-shadow: 0 0 0 1.5px var(--bg-alt);
 }
 .agent-hub:not(.expanded) .agent-hub-section + .agent-hub-section {
   margin-top: 8px;
@@ -3097,7 +3116,7 @@ body.ab-dragging * {
 }
 .agent-hub-row.active {
   background: var(--bg-hi);
-  border-color: var(--accent);
+  border-color: var(--border-strong);
 }
 .agent-hub-row-title {
   flex: 1 1 auto;
@@ -3129,9 +3148,6 @@ body.ab-dragging * {
 .agent-hub-diff-del {
   color: var(--err);
 }
-.agent-hub.expanded .agent-hub-row.has-diff .agent-hub-dot {
-  margin-top: 3px;
-}
 .agent-hub.expanded .agent-hub-row.has-diff .agent-hub-badge {
   margin-top: 1px;
 }
@@ -3150,14 +3166,23 @@ body.ab-dragging * {
   padding: 1px 4px;
   outline: none;
 }
-/* Project-color badge — the one chromatic touch (mirrors .ws-icon). */
+/* Project-color badge — the ONE chromatic signal (mirrors .ws-icon).
+   Cursor-minimal status: Ready = quiet. Working = spark. Attention = tiny pip.
+   Fixed box so spark ↔ initials never changes row/badge height. */
 .agent-hub-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.4px;
-  padding: 2px 4px;
-  border-radius: 3px;
+  line-height: 1;
+  height: 18px;
   min-width: 22px;
+  padding: 0 4px;
+  border-radius: 3px;
   text-align: center;
   background: var(--bg-hi);
   color: var(--fg-dim);
@@ -3165,44 +3190,72 @@ body.ab-dragging * {
   flex: 0 0 auto;
 }
 .agent-hub-badge.has-color {
-  background: color-mix(in srgb, var(--ws-color) 16%, var(--bg-elev));
-  border-color: color-mix(in srgb, var(--ws-color) 35%, var(--border));
+  background: color-mix(in srgb, var(--ws-color) 14%, var(--bg-elev));
+  border-color: color-mix(in srgb, var(--ws-color) 28%, var(--border));
   color: var(--ws-color);
 }
-/* --- Status dot --- */
-/* Vivid semantic colors — the dot IS the meaning, so it gets real color
-   even in the otherwise-neutral chrome. A soft glow ring + bigger core make
-   it pop: yellow = working, purple = needs input, green = ready, red = error. */
-.agent-hub-dot {
+.agent-hub-badge.is-working {
+  --spark-color: color-mix(in srgb, var(--fg) 72%, var(--fg-muted));
+}
+.agent-hub-badge.has-color.is-working {
+  --spark-color: color-mix(in srgb, var(--ws-color) 55%, #fff);
+  background: color-mix(in srgb, var(--ws-color) 22%, var(--bg-elev));
+  border-color: color-mix(in srgb, var(--ws-color) 42%, var(--border));
+}
+/* Cursor-style working spark (2×2) — soft stagger; brighter than Ready initials. */
+.agent-hub-spark {
+  display: grid;
+  grid-template-columns: repeat(2, 2.5px);
+  grid-template-rows: repeat(2, 2.5px);
+  gap: 2px;
+  width: 7px;
+  height: 7px;
   flex: 0 0 auto;
-  width: 9px;
-  height: 9px;
+  place-content: center;
+}
+.agent-hub-spark i {
+  display: block;
+  width: 2.5px;
+  height: 2.5px;
   border-radius: var(--radius-full);
-  background: var(--fg-muted);
+  background: var(--spark-color, var(--fg-muted));
+  box-shadow: 0 0 3px 0.5px color-mix(in srgb, var(--spark-color) 55%, transparent);
+  animation: agent-hub-spark 1.1s var(--ease-default, ease-in-out) infinite;
+  transform-origin: center;
 }
-.agent-hub-dot.working {
-  background: #eab308;
-  box-shadow: 0 0 7px 1px rgba(234, 179, 8, 0.7);
-  animation: agent-hub-pulse 1.3s var(--ease-default, ease-in-out) infinite;
+.agent-hub-spark i:nth-child(1) { animation-delay: 0s; }
+.agent-hub-spark i:nth-child(2) { animation-delay: 0.14s; }
+.agent-hub-spark i:nth-child(3) { animation-delay: 0.28s; }
+.agent-hub-spark i:nth-child(4) { animation-delay: 0.42s; }
+.agent-hub:not(.expanded) .agent-hub-spark {
+  grid-template-columns: repeat(2, 3.5px);
+  grid-template-rows: repeat(2, 3.5px);
+  gap: 2.5px;
+  width: 9.5px;
+  height: 9.5px;
 }
-.agent-hub-dot.needs-input {
-  background: #a855f7;
-  box-shadow: 0 0 7px 1px rgba(168, 85, 247, 0.75);
-  animation: agent-hub-pulse 1.3s var(--ease-default, ease-in-out) infinite;
+.agent-hub:not(.expanded) .agent-hub-spark i {
+  width: 3.5px;
+  height: 3.5px;
 }
-.agent-hub-dot.ready {
-  background: #22c55e;
-  box-shadow: 0 0 6px 1px rgba(34, 197, 94, 0.6);
+/* Tiny attention pip — needs-input (amber, Cursor) / error. No ring, no glow. */
+.agent-hub-status {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 0 0 1.5px var(--bg-elev);
+  z-index: 1;
+  pointer-events: none;
 }
-.agent-hub-dot.error {
-  background: #ef4444;
-  box-shadow: 0 0 6px 1px rgba(239, 68, 68, 0.65);
+.agent-hub-status.needs-input {
+  background: var(--warn);
+  animation: agent-hub-pip-breathe 1.6s var(--ease-default, ease-in-out) infinite;
 }
-.agent-hub-dot.idle,
-.agent-hub-dot.done,
-.agent-hub-dot.archived {
-  background: var(--fg-muted);
-  opacity: 0.5;
+.agent-hub-status.error {
+  background: var(--err);
 }
 .agent-hub-section.status-archived .agent-hub-row-title {
   color: var(--fg-muted);
@@ -3256,15 +3309,30 @@ body.ab-dragging * {
   color: var(--fg-muted);
   line-height: 1.35;
 }
-@keyframes agent-hub-pulse {
+@keyframes agent-hub-spark {
   0%,
   100% {
-    transform: scale(1);
+    opacity: 0.55;
+    transform: scale(0.78);
+  }
+  45% {
     opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    opacity: 0.78;
+    transform: scale(0.9);
+  }
+}
+@keyframes agent-hub-pip-breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
   }
   50% {
-    transform: scale(1.35);
     opacity: 0.55;
+    transform: scale(0.92);
   }
 }
 .agent-hub-row-close {
@@ -3294,9 +3362,16 @@ body.ab-dragging * {
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
-/* Collapsed-group (done) keeps a dimmer row presence. */
+/* Collapsed-group (done) keeps a dimmer row presence — title + badge only. */
 .agent-hub-section.status-done .agent-hub-row-title {
   color: var(--fg-dim);
+}
+.agent-hub-section.status-done .agent-hub-row {
+  height: 30px;
+  min-height: 30px;
+  align-items: center;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 /* --- Context menu (right-click) --- */
 .agent-hub-menu {
@@ -7919,6 +7994,9 @@ button.composer-mention-chip-label:hover {
   color: var(--feature);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+.ai-input-highlight-backdrop .tok-file {
+  color: var(--file-link-fg);
 }
 .ai-composer-shell .ai-input.ai-input--ghost,
 .ai-composer-shell .ai-input.ai-input--ghost:focus {

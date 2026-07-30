@@ -5,14 +5,15 @@
 // aren't all mounted (mount-asymmetry gotcha), so a panel-based publisher
 // could never cover background chats. Instead this watches app-wide
 // signals that don't need a mounted panel:
-//   - the backend's active-session list (poll) → "working" / "ready"
+//   - the backend's active-session lists (Claude Code + Cursor CLI poll)
+//     → "working" / "ready"
 //   - the global claude:permission-request event → "needs-input"
 //
 // Notifications fire here too, on the working→ready and →needs-input edges.
 
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { claudeCode } from "../ipc";
+import { agentActiveSessions } from "../ipc";
 import { activeAiChatId, useStore, type AIChatDescriptor } from "../store";
 import type { WorkspaceMeta } from "../ipc";
 import { loadSessions } from "../chatHistory";
@@ -170,7 +171,7 @@ export function AgentHubWatcher() {
     const recompute = async () => {
       let active: Set<string>;
       try {
-        active = new Set(await claudeCode.activeSessions());
+        active = new Set(await agentActiveSessions());
       } catch {
         return; // backend not ready / non-Tauri — try again next tick
       }
