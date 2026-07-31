@@ -2,11 +2,27 @@
 type: decision
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-01
-tags: [git, branching, remote, quack-1.0, main, fork]
+last_verified: 2026-07-31
+tags: [git, branching, remote, quack-1.0, main, fork, superseded]
 ---
 
 # Git remote: push desktop work to `quack-1.0`, leave `main` alone
+
+> **SUPERSEDED 2026-07-31 — `main` is now the desktop integration branch.**
+> Alek's call: desktop work pushes to **`origin/main`**. Because the old
+> `origin/main` (embedded-cli line) shared **no common ancestor** with the
+> desktop history, aligning it required a force push:
+>
+> ```bash
+> git push --force-with-lease origin main:main
+> #  + 55f0e16f...4fa15fa5 main -> main (forced update)
+> ```
+>
+> That discarded `55f0e16f` (`chore: squash history into single clean snapshot`,
+> 2026-07-22) from the branch — no backup branch was kept, by explicit choice.
+> `origin/main` and `origin/quack-1.0` now both point at the desktop line and are
+> pushed together; `quack-1.0` stays as a mirror until we decide to retire it.
+> Everything below describes the **previous** layout and is kept for history.
 
 ## Context
 

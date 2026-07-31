@@ -214,7 +214,7 @@ Pattern: `src/aiTaskStore.ts` / `src/agentStatusStore.ts` (module-level pub/sub 
 - `documentation/decisions/` — architectural rationales.
   - `001-agent-status-indicators.md` — the per-session agent-status design (the focus feature).
   - `002-ui-styling-rebrand-not-rewrite.md` — why CSS-token rebrand, not Tailwind/shadcn.
-  - `003-git-remote-quack-1.0.md` — desktop pushes to `origin/quack-1.0`; leave GitHub `main` alone (unrelated embedded-cli history).
+  - `003-git-remote-quack-1.0.md` — **superseded 2026-07-31**: desktop now pushes to `origin/main` (force-aligned over the old embedded-cli history); `quack-1.0` kept as a mirror.
 - `documentation/diary/YYYY-MM-DD.md` — daily changelog. Append after non-trivial work.
 
 ## Working agreement
