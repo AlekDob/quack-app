@@ -2,7 +2,7 @@
 type: feature
 project: quack-desktop
 created: 2026-07-01
-last_verified: 2026-07-24
+last_verified: 2026-07-31
 tags: [composer, stop, multitask, esc, turn-status]
 ---
 
@@ -19,6 +19,9 @@ mode/mic/send on the right.
 | File | Role |
 |---|---|
 | `src/components/AIChatPanel.tsx` | Composer shell, textarea, hint row, toolbar layout, `renderModelChip`, wiring |
+| `src/components/ComposerInputHighlight.tsx` | Highlight mirror + `fitComposerInputHeight` on every `text` change |
+| `src/composerTextareaFit.ts` | Cap auto-grow (~8 lines); shrink after send/clear |
+| `src/composerTextareaFit.test.ts` | Cap + shrink regression |
 | `src/components/SubagentPill.tsx` | "Who the message goes to" pill + upward menu (Jack default / discovered subagents) |
 | `src/components/EffortPopover.tsx` | Single control for BOTH reasoning effort (slider) and extended thinking (segmented) |
 | `src/components/ComposerMic.tsx` | Mic button + Cursor-style `ComposerDictationBar` (feature 052) |
@@ -60,6 +63,7 @@ Menus are **portaled** (`ComposerCtxMenu`, fixed coords) so `.ai-panel { overflo
 - **Uniform pills** (`.ai-composer-shell` scope): model chip / effort / mode / context indicator all 28px height, `radius-full`, 11px, weight 500, shared hover. Send + stop are 28×28 icon buttons (send = `arrow-up` on monochrome `--primary-bg`, stop = `stop` on red).
 - **Hint row** (`.ai-composer-hint`): `@ files · # brain · / commands · Ctrl+1–5 effort` (Claude Code only) · `Shift+Enter for newline · ↑ to recall`, shown only when the input is empty, idle, and **no mention chips** are staged.
 - Placeholder is dynamic: `Message {activeAgent?.name ?? "Jack"}…` when idle; **`Send follow-up`** while a turn is in flight.
+- **Auto-grow:** textarea height fits content up to ~8 lines via `fitComposerInputHeight` in `ComposerInputHighlight` (`useLayoutEffect` on `text`). Must not live only in `onChange` — send/queue/history/session clear leave `style.height` stuck tall with an empty field.
 
 ## Mention chips inside composer (feature 072)
 

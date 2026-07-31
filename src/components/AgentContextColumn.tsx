@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "../store";
 import {
   getAgentContextPanel,
+  isAgentContextCollapsed,
+  setAgentContextCollapsed,
   setAgentContextPanel,
   subscribeAgentContextPanel,
   termIdOfPanel,
@@ -47,15 +49,21 @@ export function AgentContextColumn({
   const [contextPanel, setLocalPanel] = useState<AgentContextPanel>(() =>
     getAgentContextPanel(wsId),
   );
+  const [collapsed, setLocalCollapsed] = useState(isAgentContextCollapsed);
   useEffect(() => {
     setLocalPanel(getAgentContextPanel(wsId));
-    return subscribeAgentContextPanel(() =>
-      setLocalPanel(getAgentContextPanel(wsId)),
-    );
+    return subscribeAgentContextPanel(() => {
+      setLocalPanel(getAgentContextPanel(wsId));
+      setLocalCollapsed(isAgentContextCollapsed());
+    });
   }, [wsId]);
 
+  // Picking a view from the collapsed rail also expands the column.
   const setContextPanel = useCallback(
-    (panel: AgentContextPanel) => setAgentContextPanel(wsId, panel),
+    (panel: AgentContextPanel) => {
+      setAgentContextCollapsed(false);
+      setAgentContextPanel(wsId, panel);
+    },
     [wsId],
   );
 
@@ -111,6 +119,76 @@ export function AgentContextColumn({
     },
     [closeTerminalStore, wsId, setContextPanel],
   );
+
+  // Collapsed default (Cursor-style): thin icon rail, panes stay mounted below.
+  if (collapsed) {
+    return (
+      <aside className="agent-context agent-context--rail">
+        <div className="agent-context-rail" aria-label="Workspace context">
+          <button
+            ref={addViewRef}
+            type="button"
+            className="agent-context-rail-btn"
+            title="Add view"
+            aria-label="Add view"
+            aria-haspopup="menu"
+            aria-expanded={addViewOpen}
+            onClick={() => setAddViewOpen((v) => !v)}
+          >
+            <Icon name="plus" size={15} />
+          </button>
+          <button
+            type="button"
+            className="agent-context-rail-btn"
+            title="Changes"
+            aria-label="Changes"
+            onClick={() => setContextPanel("changes")}
+          >
+            <Icon name="git-branch" size={15} />
+          </button>
+          <button
+            type="button"
+            className="agent-context-rail-btn"
+            title="Files"
+            aria-label="Files"
+            onClick={() => setContextPanel("files")}
+          >
+            <Icon name="folder" size={15} />
+          </button>
+          {hasPlan && (
+            <button
+              type="button"
+              className="agent-context-rail-btn"
+              title="Plan"
+              aria-label="Plan"
+              onClick={() => setContextPanel("plan")}
+            >
+              <Icon name="check-square" size={15} />
+            </button>
+          )}
+          <button
+            type="button"
+            className="agent-context-rail-btn"
+            title="Terminal"
+            aria-label="Terminal"
+            onClick={() =>
+              terminals.length > 0
+                ? setContextPanel(termPanelOf(terminals[terminals.length - 1].id))
+                : createTerminal()
+            }
+          >
+            <Icon name="terminal" size={15} />
+          </button>
+        </div>
+        <AgentAddViewMenu
+          open={addViewOpen}
+          anchor={addViewRef.current}
+          onClose={() => setAddViewOpen(false)}
+          onAddTerminal={createTerminal}
+        />
+      </aside>
+    );
+  }
 
   return (
     <aside
@@ -193,6 +271,15 @@ export function AgentContextColumn({
           onClick={() => setAddViewOpen((v) => !v)}
         >
           <Icon name="plus" size={14} />
+        </button>
+        <button
+          type="button"
+          className="agent-context-add"
+          title="Collapse panel"
+          aria-label="Collapse panel"
+          onClick={() => setAgentContextCollapsed(true)}
+        >
+          <Icon name="chevron-right" size={14} />
         </button>
       </div>
       <AgentAddViewMenu

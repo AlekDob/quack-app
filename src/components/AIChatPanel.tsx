@@ -378,10 +378,10 @@ import {
 } from "../chatTurnAgent";
 import {
   ensureCloudCatalog,
+  ensureLiveCliCatalogs,
   ensureModelDiscovery,
   getModelDiscovery,
   isPickerCatalogLoading,
-  mergeLiveCliModelsIntoDiscovery,
   subscribeModelDiscovery,
   warmPickerCatalogs,
   type ModelDiscoverySnapshot,
@@ -1531,9 +1531,6 @@ export function AIChatPanel({
     };
   }, [root, wsActive]);
 
-  // Auto-grow lives inside ComposerShell's textarea onChange/effect via
-  // the children that still call the same resize logic on input.
-
   const applyDiscoverySnapshot = useCallback((snap: ModelDiscoverySnapshot) => {
     setAllModels(snap.allModels);
     setAllCloudCatalog(snap.cloudCatalog);
@@ -1582,39 +1579,11 @@ export function AIChatPanel({
   }, []);
 
   const refreshLiveCliModels = useCallback(async (force = false) => {
-    const snap = getModelDiscovery();
-    if (!snap) return;
-    const wantCc = snap.claudeCodeAvailable;
-    const wantCursor = snap.cursorCliAvailable;
-    if (wantCc) {
-      void import("../providers/claudeCode")
-        .then(({ refreshClaudeCodeModelsLive }) =>
-          refreshClaudeCodeModelsLive(force),
-        )
-        .then((ccModels) => {
-          if (ccModels.length > 0) {
-            mergeLiveCliModelsIntoDiscovery([], ccModels);
-            const next = getModelDiscovery();
-            if (next) applyDiscoverySnapshot(next);
-          }
-        })
-        .catch(() => {});
-    }
-    if (!wantCursor) return;
-    try {
-      const { refreshCursorModelsLive } = await import(
-        "../providers/cursorCode"
-      );
-      const cursorModels = await refreshCursorModelsLive(force).catch(
-        () => [] as ProviderModel[],
-      );
-      if (cursorModels.length === 0) return;
-      mergeLiveCliModelsIntoDiscovery(cursorModels);
-      const next = getModelDiscovery();
-      if (next) applyDiscoverySnapshot(next);
-    } catch {
-      /* keep lightweight startup catalog */
-    }
+    // Shared warm path awaits the Cursor probe so a stale disk snapshot
+    // with cursorCliAvailable:false cannot skip the catalog.
+    await ensureLiveCliCatalogs(force);
+    const next = getModelDiscovery();
+    if (next) applyDiscoverySnapshot(next);
   }, [applyDiscoverySnapshot]);
 
   const refresh = async (options?: { showChecking?: boolean; force?: boolean }) => {
@@ -7625,11 +7594,8 @@ export function AIChatPanel({
               bumpEffortPulse();
             }
             setInput(v);
-            // Auto-grow up to ~8 lines.
-            const el = e.target;
-            el.style.height = "auto";
-            const max = 8 * 18 + 16;
-            el.style.height = Math.min(el.scrollHeight, max) + "px";
+            // Height sync: ComposerInputHighlight fits on `input` change
+            // (covers send/clear too — onChange-only left height stuck tall).
             setSlashIndex(0);
             // Any user-driven change (typing, paste) takes us out of
             // history mode so the next ArrowUp starts a fresh walk

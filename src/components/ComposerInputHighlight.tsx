@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 import { buildComposerHighlightHtml } from "../composerInputHighlight";
+import { fitComposerInputHeight } from "../composerTextareaFit";
 
 type Props = {
   text: string;
@@ -27,6 +28,13 @@ export function ComposerInputHighlight({
     featureSlug,
     fileRels,
   );
+
+  // Fit on every value change — including programmatic clears (send, queue,
+  // history recall, session switch). onChange-only resize left height stuck.
+  useLayoutEffect(() => {
+    const ta = textareaRef.current;
+    if (ta) fitComposerInputHeight(ta);
+  }, [textareaRef, text]);
 
   useLayoutEffect(() => {
     const ta = textareaRef.current;

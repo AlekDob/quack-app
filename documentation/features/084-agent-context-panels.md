@@ -5,9 +5,9 @@ stack: Tauri + React
 created: 2026-07-20
 startDate: 2026-07-20
 endDate:
-last_verified: 2026-07-29
+last_verified: 2026-07-31
 status: active
-tags: [agent-mode, terminal, context-panel, cursor-style, status-bar, plan-mode, resize]
+tags: [agent-mode, terminal, context-panel, cursor-style, status-bar, plan-mode, resize, collapsed]
 related:
   [
     001-ai-session-library.md,
@@ -25,7 +25,7 @@ related:
 **Purpose:** Cursor-style pluggable right column in Agent Mode — Changes / Files /
 on-demand Plan plus project-scoped Terminal tabs via a `+` add-view menu; StatusBar
 panel/terminal commands target this column when Agent Mode is on. Column width is
-user-resizable and persisted.
+user-resizable and persisted. **Default: collapsed to an icon rail** (expand on demand).
 
 **Stack:** Tauri 2 + React 19 / TypeScript
 
@@ -55,7 +55,8 @@ user-resizable and persisted.
 | Component | `src/components/TerminalCore.tsx` | Existing xterm + PTY (reused) |
 | Component | `src/components/StatusBar.tsx` | Panel icon active when Agent terminal view open |
 | Service | `src/actions.ts` | `view.toggle_panel` / `terminal.toggle` / `terminal.new_bottom` Agent Mode branch |
-| Store/State | `src/agentContextNav.ts` | Active panel per ws + focus/toggle/new helpers (`focusAgentPlan`) |
+| Store/State | `src/agentContextNav.ts` | Active panel per ws + collapsed rail + focus/toggle/new helpers |
+| Test | `src/agentContextCollapse.test.ts` | Default collapsed + expand/toggle |
 | Store/State | `src/agentContextWidth.ts` | `get/set/clampAgentContextWidth` — `lcp.agent.contextWidth` |
 | Test | `src/agentContextWidth.test.ts` | Clamp bounds |
 | Store/State | `src/planBuyInStore.ts` | Pending ExitPlanMode → Plan tab visibility (**per `chatId`**) |
@@ -65,16 +66,17 @@ user-resizable and persisted.
 ### Data Flow
 `+` / StatusBar New Terminal → `addTerminal(wsId)` → `WorkspaceData.terminals` → tab `term:id` → `AgentTerminalPanel` → `TerminalCore` → `ipc.pty` / `pty.rs`
 
-StatusBar panel / Ctrl+J / Ctrl+` → `toggleAgentTerminal(wsId)` → `agentContextNav` panel flip (term ↔ Changes)
+StatusBar panel / Ctrl+J / Ctrl+` → `toggleAgentTerminal(wsId)` → expand + focus terminal, or collapse rail if already on a terminal tab
 
-ExitPlanMode buy-in → `presentPlanReady` → `focusAgentPlan(wsId)` → on-demand **Plan** tab (`AgentPlanPane` full markdown) **only while `getPlanBuyIn({ chatId: activeChatId })` hits**. The Plan tab is the **sole** full-read surface; chat shows only the Milo chip (`088`), not a plan preview. Re-select Plan via the context column tabs after switching to Changes/Files/Terminal.
+ExitPlanMode buy-in → `presentPlanReady` → `focusAgentPlan(wsId)` (also **expands** the column) → on-demand **Plan** tab (`AgentPlanPane` full markdown) **only while `getPlanBuyIn({ chatId: activeChatId })` hits**. The Plan tab is the **sole** full-read surface; chat shows only the Milo chip (`088`), not a plan preview. Re-select Plan via the context column tabs after switching to Changes/Files/Terminal.
 
-### Width
+### Width / collapse
 | Constant | Value |
 |---|---|
-| Default | 480px (`AGENT_CONTEXT_DEFAULT_W`) |
+| Default width | 480px (`AGENT_CONTEXT_DEFAULT_W`) |
 | Min / Max | 280 / 720 |
-| Storage | `lcp.agent.contextWidth` via `localStore` |
+| Width storage | `lcp.agent.contextWidth` via `localStore` |
+| Collapsed default | `true` — icon rail until expanded (`lcp.agent.contextCollapsed`) |
 | Handle | Left-edge `.vsplit.agent-context-vsplit` (mousedown + ArrowLeft/Right; Shift = 60px step) |
 
 Inline `style={{ width, flexBasis }}` on `.agent-context` — no fixed CSS 320/420; Terminal no longer auto-widens separately.
@@ -83,11 +85,12 @@ Inline `style={{ width, flexBasis }}` on `.agent-context` — no fixed CSS 320/4
 - `addTerminal(wsId, location?, shell?) → string` — create project terminal descriptor + IDE bottom layout tab
 - `closeTerminal(wsId, id) → void` — kill PTY + drop descriptor
 - `setAgentContextPanel(wsId, panel) → void` — select Changes / Files / Plan / `term:id`
-- `toggleAgentTerminal(wsId) → void` — if on terminal → Changes; else focus/create terminal
-- `newAgentTerminal(wsId) → void` — `addTerminal` + select new tab
-- `focusAgentTerminal(wsId) → void` — select last (or create) project terminal
-- `focusAgentPlan(wsId) → void` — select the Plan context tab
-- `focusAgentFiles(wsId) / focusAgentChanges(wsId) / toggleAgentFiles(wsId)` — StatusBar Explorer / Git / Ctrl+B stand-ins
+- `isAgentContextCollapsed() / setAgentContextCollapsed(bool) / toggleAgentContextCollapsed()` — global rail collapse
+- `toggleAgentTerminal(wsId) → void` — if expanded on terminal → collapse; else expand + focus/create terminal
+- `newAgentTerminal(wsId) → void` — `addTerminal` + expand + select new tab
+- `focusAgentTerminal(wsId) → void` — expand + select last (or create) project terminal
+- `focusAgentPlan(wsId) → void` — expand + select the Plan context tab
+- `focusAgentFiles(wsId) / focusAgentChanges(wsId) / toggleAgentFiles(wsId)` — StatusBar Explorer / Git / Ctrl+B stand-ins (expand; Files toggle collapses when already on Files)
 - `getAgentContextWidth() / setAgentContextWidth(w) / clampAgentContextWidth(w)` — persisted column width
 - `presentPlanReady(...)` — Agent Mode → Plan tab; IDE → FeatureDocDrawer / `plan:` split
 - `AgentAddViewMenu({ open, anchor, onClose, onAddTerminal }) → JSX` — add-view menu
@@ -95,18 +98,20 @@ Inline `style={{ width, flexBasis }}` on `.agent-context` — no fixed CSS 320/4
 
 ### State
 - `panelByWs`: `Map<wsId, AgentContextPanel>` — selected right-column view (`agentContextNav`, session memory)
+- `collapsed`: global boolean — icon rail vs full column (`lcp.agent.contextCollapsed`, default `true`)
 - `ws.terminals`: `Record<string, TerminalDescriptor>` — project-scoped PTYs (workspace `state.json`)
 - `planBuyInStore` — drives Plan tab show/hide for the **active** chat only (`chatId`)
 - `lcp.agent.contextWidth` — column width across Agent Mode sessions
 
 ### Behavior Notes
 - Top strip: always Changes + Files; **Plan** appears only while ExitPlanMode buy-in is pending **for the active chat**; one closable tab per open project terminal; `+` adds views.
+- Column starts **collapsed** (Cursor-style minimal right rail); any `focus*` / Plan buy-in expands it.
 - Plan tab clears (and falls back to Changes) when Pass / Keep discussing settles buy-in, or when switching to a chat without a pending buy-in.
 - No nested “N Terminals” rail — switch/close only via top tabs (simpler / one source of UI).
 - Agent Mode mounts `TerminalCore` (IDE `WorkspaceShell` unmounted); all terms stay mounted, `visible` toggled.
 - Leaving Agent Mode remounts IDE bottom terminals; re-attach via `ptyId` + scrollback replay.
 - StatusBar panel icon highlights when Agent terminal tab is active; title becomes “Toggle Terminal”.
-- StatusBar **Explorer / Source Control** map to Files / Changes tabs (`focusAgentFiles` / `focusAgentChanges`); Ctrl+B toggles Files ↔ Changes. **Save / Auto-save / zoom** hide in Agent Mode (no IDE editor surface).
+- StatusBar **Explorer / Source Control** map to Files / Changes tabs (`focusAgentFiles` / `focusAgentChanges`); Ctrl+B toggles Files ↔ collapsed rail. **Save / Auto-save / zoom** hide in Agent Mode (no IDE editor surface).
 - Claude **Sign in** banner (`terminal.claude_login`) in Agent Mode selects the new Claude Code terminal tab so `/login` is interactive in the right column (IDE still uses the taller bottom panel).
 - Browser row in `+` menu is disabled until a later feature.
 

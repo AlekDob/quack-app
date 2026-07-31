@@ -7,6 +7,7 @@ import { getJson, setJson } from "./localStore";
 import { ping } from "./ai";
 import {
   invalidateClaudeCodeCache,
+  invalidateCursorCliCache,
   listAllCloudModels,
   listFastModels,
   claudeCodePickerModels,
@@ -69,7 +70,7 @@ function hydrateDisk(): ModelDiscoverySnapshot | null {
   const { openCodeAvailable: _drop, ...rest } = raw as ModelDiscoverySnapshot & {
     openCodeAvailable?: boolean;
   };
-  return { ...rest, allModels, cloudCatalog };
+  return { ...rest, allModels, cloudCatalog, cursorCliAvailable: rest.cursorCliAvailable ?? false };
 }
 
 function persistDisk(snap: ModelDiscoverySnapshot): void {
@@ -144,20 +145,29 @@ async function fetchSnapshot(
   force: boolean,
   hints: ModelDiscoverySnapshot | null,
 ): Promise<ModelDiscoverySnapshot> {
-  if (force) invalidateClaudeCodeCache();
+  if (force) {
+    invalidateClaudeCodeCache();
+    invalidateCursorCliCache();
+  }
   const [fastModels, ollamaUp] = await Promise.all([
     listFastModels().catch(() => [] as ProviderModel[]),
     ping().catch(() => false),
   ]);
   let snap = mergeWithHints(fastModels, hints, ollamaUp);
-  void probeCliAvailability(snap).then((probed) => {
-    if (probed.cursorCliAvailable === snap.cursorCliAvailable) {
-      return;
-    }
-    if (cache) {
-      applyCache({ ...cache, ...probed, fetchedAt: Date.now() });
-    }
-  });
+  // Await Cursor probe so Refresh / force rediscovery don't return a stale
+  // "CLI missing" snapshot while the fire-and-forget path is still in flight.
+  if (force) {
+    snap = await probeCliAvailability(snap);
+  } else {
+    void probeCliAvailability(snap).then((probed) => {
+      if (probed.cursorCliAvailable === snap.cursorCliAvailable) {
+        return;
+      }
+      if (cache) {
+        applyCache({ ...cache, ...probed, fetchedAt: Date.now() });
+      }
+    });
+  }
   void probeClaudeAvailability().then((claudeAvail) => {
     if (!cache) return;
     const models = claudeAvail
@@ -402,12 +412,17 @@ function warmCcCatalog(force: boolean): void {
   notify();
 }
 
-/** Hover / picker open — never blocks UI; uses disk + in-memory cache first. */
+/** Hover / picker / model-browser open — never blocks UI; disk + RAM first. */
 export function warmPickerCatalogs(): void {
   void import("./providers/claudeCode");
   void import("./providers/cursorCode");
   void ensureModelDiscovery({ force: false });
   void warmLiveCliCatalogs(false);
+}
+
+/** Awaitable CLI catalog warm (Model Browser Refresh / open). */
+export async function ensureLiveCliCatalogs(force = false): Promise<void> {
+  return warmLiveCliCatalogs(force);
 }
 
 /** Warm discovery during splash — overlaps with workspace hydration. */

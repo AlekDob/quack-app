@@ -22,6 +22,10 @@ import {
   getAgentContextWidth,
   setAgentContextWidth,
 } from "../agentContextWidth";
+import {
+  isAgentContextCollapsed,
+  subscribeAgentContextPanel,
+} from "../agentContextNav";
 import { AIIcon } from "./AIIcon";
 import { Icon } from "./Icon";
 import {
@@ -143,6 +147,17 @@ export function AgentModeShell({ wsId }: Props) {
     setContextW(next);
     setAgentContextWidth(next);
   }, []);
+  // No drag handle while the context column is a collapsed icon rail.
+  const [contextCollapsed, setContextCollapsed] = useState(
+    isAgentContextCollapsed,
+  );
+  useEffect(
+    () =>
+      subscribeAgentContextPanel(() =>
+        setContextCollapsed(isAgentContextCollapsed()),
+      ),
+    [],
+  );
 
   const ws = loaded[wsId];
   const editorRoot = ws?.layout.editorRoot;
@@ -428,6 +443,7 @@ export function AgentModeShell({ wsId }: Props) {
       {/* ── Context column (Changes / Files / Terminals) ─────── */}
       {ws && (
         <>
+          {!contextCollapsed && (
           <div
             className="vsplit agent-context-vsplit"
             role="separator"
@@ -460,6 +476,7 @@ export function AgentModeShell({ wsId }: Props) {
               window.addEventListener("mouseup", onUp);
             }}
           />
+          )}
           <AgentContextColumn
             wsId={wsId}
             root={ws.meta.root}

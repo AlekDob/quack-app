@@ -67,6 +67,47 @@ fn probe_shell(cmd: &str) -> bool {
     }
 }
 
+/// Absolute path from a login shell (`command -v`). GUI apps often lack
+/// `~/.local/bin` on process PATH; never cache a bare name from a shell hit —
+/// `Command::new("cursor-agent")` would then fail at check/spawn time.
+fn shell_which(name: &str) -> Option<String> {
+    #[cfg(windows)]
+    {
+        let mut c = Command::new("cmd");
+        c.args(["/c", &format!("where {name}")]);
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(0x08000000);
+        let out = c.output().ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        let line = String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .next()?
+            .trim()
+            .to_string();
+        if line.is_empty() {
+            return None;
+        }
+        return Some(line);
+    }
+    #[cfg(not(windows))]
+    {
+        let out = Command::new("sh")
+            .args(["-lc", &format!("command -v {name}")])
+            .output()
+            .ok()?;
+        if !out.status.success() {
+            return None;
+        }
+        let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if path.is_empty() || path.contains('\n') {
+            return None;
+        }
+        Some(path)
+    }
+}
+
 fn resolve_cursor_bin() -> Option<&'static CursorBin> {
     if let Some(cached) = CURSOR_BIN.get() {
         return Some(cached);
@@ -81,13 +122,14 @@ fn resolve_cursor_bin() -> Option<&'static CursorBin> {
             return CURSOR_BIN.get();
         }
     }
-    if probe_shell("cursor-agent --version") {
-        let _ = CURSOR_BIN.set(CursorBin::Standalone("cursor-agent".to_string()));
-        return CURSOR_BIN.get();
-    }
+    // Prefer well-known install paths before login-shell lookup — macOS GUI
+    // launches (Dock / IDE Run) often omit ~/.local/bin from PATH.
     if let Some(home) = dirs::home_dir() {
         #[cfg(windows)]
-        let rels: &[&str] = &[".local/bin/cursor-agent.exe", "AppData/Local/cursor-agent/cursor-agent.exe"];
+        let rels: &[&str] = &[
+            ".local/bin/cursor-agent.exe",
+            "AppData/Local/cursor-agent/cursor-agent.exe",
+        ];
         #[cfg(not(windows))]
         let rels: &[&str] = &[".local/bin/cursor-agent"];
         for rel in rels {
@@ -99,6 +141,12 @@ fn resolve_cursor_bin() -> Option<&'static CursorBin> {
                     return CURSOR_BIN.get();
                 }
             }
+        }
+    }
+    if let Some(abs) = shell_which("cursor-agent") {
+        if probe_bin(&abs) {
+            let _ = CURSOR_BIN.set(CursorBin::Standalone(abs));
+            return CURSOR_BIN.get();
         }
     }
     if probe_shell("cursor agent --version") {

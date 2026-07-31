@@ -3057,7 +3057,7 @@ body.ab-dragging * {
   border-color: transparent;
 }
 .agent-hub:not(.expanded) .agent-hub-row.active .agent-hub-badge {
-  box-shadow: 0 0 0 1px var(--border-strong);
+  box-shadow: none;
 }
 .agent-hub:not(.expanded) .agent-hub-badge {
   position: relative;
@@ -3116,7 +3116,7 @@ body.ab-dragging * {
 }
 .agent-hub-row.active {
   background: var(--bg-hi);
-  border-color: var(--border-strong);
+  border-color: transparent;
 }
 .agent-hub-row-title {
   flex: 1 1 auto;
@@ -3166,8 +3166,8 @@ body.ab-dragging * {
   padding: 1px 4px;
   outline: none;
 }
-/* Project-color badge — the ONE chromatic signal (mirrors .ws-icon).
-   Cursor-minimal status: Ready = quiet. Working = spark. Attention = tiny pip.
+/* Project-color badge — color via fill + glyph only (no loud colored outline).
+   Cursor-minimal: Ready = quiet. Working = spark. Attention = tiny pip.
    Fixed box so spark ↔ initials never changes row/badge height. */
 .agent-hub-badge {
   position: relative;
@@ -3186,12 +3186,12 @@ body.ab-dragging * {
   text-align: center;
   background: var(--bg-hi);
   color: var(--fg-dim);
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   flex: 0 0 auto;
 }
 .agent-hub-badge.has-color {
-  background: color-mix(in srgb, var(--ws-color) 14%, var(--bg-elev));
-  border-color: color-mix(in srgb, var(--ws-color) 28%, var(--border));
+  background: color-mix(in srgb, var(--ws-color) 16%, var(--bg-elev));
+  border-color: transparent;
   color: var(--ws-color);
 }
 .agent-hub-badge.is-working {
@@ -3199,8 +3199,8 @@ body.ab-dragging * {
 }
 .agent-hub-badge.has-color.is-working {
   --spark-color: color-mix(in srgb, var(--ws-color) 55%, #fff);
-  background: color-mix(in srgb, var(--ws-color) 22%, var(--bg-elev));
-  border-color: color-mix(in srgb, var(--ws-color) 42%, var(--border));
+  background: color-mix(in srgb, var(--ws-color) 24%, var(--bg-elev));
+  border-color: transparent;
 }
 /* Cursor-style working spark (2×2) — soft stagger; brighter than Ready initials. */
 .agent-hub-spark {
@@ -19381,6 +19381,37 @@ html.audit-root #root {
 .agent-context-vsplit {
   /* Sit on the border so the resize hit target is obvious on hover. */
   margin-right: -1px;
+}
+/* Collapsed default: icon-only rail, no resize handle (Cursor-style). */
+.agent-context--rail {
+  width: 40px;
+  flex-basis: 40px;
+}
+.agent-context-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 0;
+}
+.agent-context-rail-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.agent-context-rail-btn:hover,
+.agent-context-rail-btn[aria-expanded="true"] {
+  color: var(--fg);
+  background: var(--bg-hi);
 }
 .agent-context-tabs {
   display: flex;
