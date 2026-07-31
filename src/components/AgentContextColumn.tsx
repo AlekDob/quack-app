@@ -14,6 +14,8 @@ import {
   getPlanBuyIn,
   subscribePlanBuyIn,
 } from "../planBuyInStore";
+import { getChatDocs, subscribeChatDocs } from "../chatDocsStore";
+import { AgentDocsPanel } from "./AgentDocsPanel";
 import { getCachedSession } from "../chatStoreCache";
 import { readProviderSessionIds } from "../providerSession";
 import { SourceControlPanel } from "./SourceControlPanel";
@@ -86,19 +88,39 @@ export function AgentContextColumn({
 
   const hasPlan = !!planBuyIn?.plan;
 
+  // Docs (.md/.mmd) seen in this chat's stream — tab appears only when non-empty.
+  const [docs, setDocs] = useState(() => getChatDocs(activeChatId));
+  useEffect(() => {
+    setDocs(getChatDocs(activeChatId));
+    return subscribeChatDocs(() => setDocs(getChatDocs(activeChatId)));
+  }, [activeChatId]);
+  const hasDocs = docs.length > 0;
+
+  // Fall back when the Docs tab disappears (chat switch to one without docs).
+  // Selection only — must NOT expand a collapsed rail.
+  useEffect(() => {
+    if (hasDocs) return;
+    if (getAgentContextPanel(wsId) !== "docs") return;
+    setAgentContextPanel(wsId, "changes");
+  }, [hasDocs, wsId]);
+
   // Hide Plan tab when buy-in clears; fall back if it was selected.
   useEffect(() => {
     if (hasPlan) return;
     if (getAgentContextPanel(wsId) !== "plan") return;
-    setContextPanel("changes");
-  }, [hasPlan, wsId, setContextPanel]);
+    setAgentContextPanel(wsId, "changes");
+  }, [hasPlan, wsId]);
 
+  // Terminal closed elsewhere → reselect without expanding a collapsed rail.
   useEffect(() => {
     if (!activeTermId || !terminalsMap) return;
     if (terminalsMap[activeTermId]) return;
     const ids = Object.keys(terminalsMap);
-    setContextPanel(ids.length ? termPanelOf(ids[ids.length - 1]) : "changes");
-  }, [activeTermId, terminalsMap, setContextPanel]);
+    setAgentContextPanel(
+      wsId,
+      ids.length ? termPanelOf(ids[ids.length - 1]) : "changes",
+    );
+  }, [activeTermId, terminalsMap, wsId]);
 
   const createTerminal = useCallback(() => {
     const id = useStore.getState().addTerminal(wsId, "bottom");
@@ -155,6 +177,17 @@ export function AgentContextColumn({
           >
             <Icon name="folder" size={15} />
           </button>
+          {hasDocs && (
+            <button
+              type="button"
+              className="agent-context-rail-btn"
+              title={`Docs (${docs.length})`}
+              aria-label="Docs"
+              onClick={() => setContextPanel("docs")}
+            >
+              <Icon name="file-text" size={15} />
+            </button>
+          )}
           {hasPlan && (
             <button
               type="button"
@@ -213,6 +246,18 @@ export function AgentContextColumn({
           >
             Files
           </button>
+          {hasDocs && (
+            <button
+              className={`agent-context-tab agent-context-tab--plan ${contextPanel === "docs" ? "active" : ""}`}
+              role="tab"
+              aria-selected={contextPanel === "docs"}
+              onClick={() => setContextPanel("docs")}
+              title="Documentation touched in this chat"
+            >
+              <Icon name="file-text" size={12} />
+              <span className="agent-context-tab-label">Docs</span>
+            </button>
+          )}
           {hasPlan && (
             <button
               className={`agent-context-tab agent-context-tab--plan ${contextPanel === "plan" ? "active" : ""}`}
@@ -311,6 +356,14 @@ export function AgentContextColumn({
             onOpenFile={(_id, p) => onOpenFile(p)}
           />
         </div>
+        {hasDocs && (
+          <div
+            className="agent-context-pane"
+            style={{ display: contextPanel === "docs" ? "flex" : "none" }}
+          >
+            <AgentDocsPanel wsId={wsId} root={root} docs={docs} />
+          </div>
+        )}
         {hasPlan && planBuyIn && (
           <div
             className="agent-context-pane"

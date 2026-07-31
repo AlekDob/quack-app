@@ -126,6 +126,7 @@ import {
   subscribeAskInput,
 } from "../askQuestionStore";
 import { publishChatDiff } from "../chatDiffStore";
+import { collectChatDocs, publishChatDocs } from "../chatDocsStore";
 import { logAgentModePhase, logNewChatPhase } from "../switchPerf";
 import { afterFirstPaint } from "../afterFirstPaint";
 import { summarizeLastTurn, summarizeEdits } from "../sessionDiffStats";
@@ -897,6 +898,8 @@ export function AIChatPanel({
       aiChatId,
       messages.length > 0 ? summarizeLastTurn(messages) : null,
     );
+    // Docs (.md/.mmd) touched anywhere in the chat → Agent Mode "Docs" tab.
+    publishChatDocs(aiChatId, collectChatDocs(messages));
   }, [messages, aiChatId]);
 
   // Works auto-apply on turn end retired (perf) — Phase 1 strip. Directives

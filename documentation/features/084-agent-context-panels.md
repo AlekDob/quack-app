@@ -42,6 +42,8 @@ user-resizable and persisted. **Default: collapsed to an icon rail** (expand on 
 - [x] On-demand Plan tab when ExitPlanMode buy-in is pending (`061` / `088`)
 - [x] Drag-resize column width (default 480, persist `lcp.agent.contextWidth`) — 2026-07-24
 - [x] Plan tab / buy-in scoped to active Quack `chatId` (bug `008`) — 2026-07-24
+- [x] Collapsed-by-default icon rail (`lcp.agent.contextCollapsed`) — 2026-07-31
+- [x] **Docs tab**: `.md`/`.mmd` touched in the chat stream → row click opens the md drawer — 2026-07-31
 - [ ] Browser panel (deferred)
 
 ### Files
@@ -49,6 +51,10 @@ user-resizable and persisted. **Default: collapsed to an icon rail** (expand on 
 |------|------|-----------------|
 | Component | `src/components/AgentModeShell.tsx` | Hosts `.vsplit` + `AgentContextColumn`; owns width state |
 | Component | `src/components/AgentContextColumn.tsx` | Tab strip + Changes/Files/Plan/Terminal; `+` menu; close terminals; `width` prop |
+| Component | `src/components/AgentDocsPanel.tsx` | Docs list rows → `openWorkspaceDocPath` (md/feature drawer) |
+| Store/State | `src/chatDocsStore.ts` | `collectChatDocs` / `publishChatDocs` / `getChatDocs` / `subscribeChatDocs` |
+| Test | `src/chatDocsStore.test.ts` | Extension filter, read-vs-write dedupe, notify dedupe |
+| Component | `src/components/AIChatPanel.tsx` | Publishes docs on every `messages` change (same effect as `publishChatDiff`) |
 | Component | `src/components/AgentAddViewMenu.tsx` | `+` popover: Terminal / Browser (disabled + “Soon”) |
 | Component | `src/components/AgentTerminalPanel.tsx` | Mounts all project `TerminalCore`s; toggles `visible` |
 | Component | `src/components/PlanPane.tsx` | `AgentPlanPane` + `presentPlanReady` (Agent vs IDE routing) |
@@ -62,6 +68,16 @@ user-resizable and persisted. **Default: collapsed to an icon rail** (expand on 
 | Store/State | `src/planBuyInStore.ts` | Pending ExitPlanMode → Plan tab visibility (**per `chatId`**) |
 | Store/State | `src/store.ts` | `terminals`, `addTerminal`, `closeTerminal`, `termKey` |
 | Config | `src/App.css` | `.agent-context`, `.agent-context-vsplit`, `.agent-context-*`, `.agent-term-*` |
+
+### Docs tab (`.md` / `.mmd` in stream)
+| Aspect | Behavior |
+|---|---|
+| Source | Every assistant `tool_call` path (`pathOf`) ending in `.md`/`.mmd` — reads **and** writes |
+| Visibility | Tab + rail icon appear only while the active chat has ≥1 doc; falls back to Changes otherwise |
+| Live | `AIChatPanel` publishes on each `messages` change → appears mid-stream |
+| Row click | `openWorkspaceDocPath(wsId, root, path)` — feature docs → FeatureDocDrawer, others → `openFileInDrawer` (Agent Mode) |
+| `edited` badge | A write tool (`Edit`/`Write`/`MultiEdit`/…) anywhere in the chat wins over a read-only mention |
+| Lifetime | RAM per `chatId` (like `planBuyInStore`) — reload clears the list |
 
 ### Data Flow
 `+` / StatusBar New Terminal → `addTerminal(wsId)` → `WorkspaceData.terminals` → tab `term:id` → `AgentTerminalPanel` → `TerminalCore` → `ipc.pty` / `pty.rs`
@@ -84,7 +100,8 @@ Inline `style={{ width, flexBasis }}` on `.agent-context` — no fixed CSS 320/4
 ### Key Functions
 - `addTerminal(wsId, location?, shell?) → string` — create project terminal descriptor + IDE bottom layout tab
 - `closeTerminal(wsId, id) → void` — kill PTY + drop descriptor
-- `setAgentContextPanel(wsId, panel) → void` — select Changes / Files / Plan / `term:id`
+- `setAgentContextPanel(wsId, panel) → void` — select Changes / Files / Docs / Plan / `term:id` (selection only — does **not** expand the rail; fallback effects use this directly)
+- `collectChatDocs(messages) → ChatDoc[]` — `.md`/`.mmd` paths from tool calls, deduped, write-wins
 - `isAgentContextCollapsed() / setAgentContextCollapsed(bool) / toggleAgentContextCollapsed()` — global rail collapse
 - `toggleAgentTerminal(wsId) → void` — if expanded on terminal → collapse; else expand + focus/create terminal
 - `newAgentTerminal(wsId) → void` — `addTerminal` + expand + select new tab
@@ -104,7 +121,7 @@ Inline `style={{ width, flexBasis }}` on `.agent-context` — no fixed CSS 320/4
 - `lcp.agent.contextWidth` — column width across Agent Mode sessions
 
 ### Behavior Notes
-- Top strip: always Changes + Files; **Plan** appears only while ExitPlanMode buy-in is pending **for the active chat**; one closable tab per open project terminal; `+` adds views.
+- Top strip: always Changes + Files; **Docs** appears only while the active chat touched a `.md`/`.mmd`; **Plan** appears only while ExitPlanMode buy-in is pending **for the active chat**; one closable tab per open project terminal; `+` adds views.
 - Column starts **collapsed** (Cursor-style minimal right rail); any `focus*` / Plan buy-in expands it.
 - Plan tab clears (and falls back to Changes) when Pass / Keep discussing settles buy-in, or when switching to a chat without a pending buy-in.
 - No nested “N Terminals” rail — switch/close only via top tabs (simpler / one source of UI).

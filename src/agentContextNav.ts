@@ -10,6 +10,7 @@ import { getJson, setJson } from "./localStore";
 export type AgentContextPanel =
   | "changes"
   | "files"
+  | "docs"
   | "plan"
   | `term:${string}`;
 
