@@ -248,6 +248,7 @@ import {
   derivePendingUserInputProgress,
   hasCompletePendingUserInputAnswers,
   omitNullPendingUserInputAnswers,
+  selectPendingUserInputOtherAnswer,
   setPendingUserInputCustomAnswer,
   togglePendingUserInputOptionSelection,
   type PendingUserInputDraftAnswer,
@@ -355,7 +356,10 @@ import {
   useEffectiveComposerModelState,
 } from "../composerDraftStore";
 import { useTemporaryThreadStore } from "../temporaryThreadStore";
-import { useComposerFocusRequestStore } from "../composerFocusRequestStore";
+import {
+  requestComposerFocus,
+  useComposerFocusRequestStore,
+} from "../composerFocusRequestStore";
 import { useWorkflowRunUiStore, useWorkflowRunUiThreadState } from "../workflowRunUiStore";
 import { appendComposerPromptText } from "../lib/chatReferences";
 import {
@@ -8269,6 +8273,38 @@ export default function ChatView({
     [activePendingUserInput, activePendingUserInputKey],
   );
 
+  const onSelectActivePendingUserInputOther = useCallback(
+    (questionId: string) => {
+      if (!activePendingUserInput || !activePendingUserInputKey) {
+        return;
+      }
+      const question = activePendingUserInput.questions.find((entry) => entry.id === questionId);
+      if (!question) {
+        return;
+      }
+      const nextDraftAnswer = selectPendingUserInputOtherAnswer(
+        pendingUserInputAnswersByRequestIdRef.current[activePendingUserInputKey]?.[questionId],
+      );
+      const nextRequestAnswers = {
+        ...pendingUserInputAnswersByRequestIdRef.current[activePendingUserInputKey],
+        [questionId]: nextDraftAnswer,
+      };
+      pendingUserInputAnswersByRequestIdRef.current = {
+        ...pendingUserInputAnswersByRequestIdRef.current,
+        [activePendingUserInputKey]: nextRequestAnswers,
+      };
+      setPendingUserInputAnswersByRequestId((existing) => ({
+        ...existing,
+        [activePendingUserInputKey]: nextRequestAnswers,
+      }));
+      promptRef.current = nextDraftAnswer.customAnswer ?? "";
+      setComposerCursor(promptRef.current.length);
+      setComposerTrigger(null);
+      requestComposerFocus(threadId);
+    },
+    [activePendingUserInput, activePendingUserInputKey, threadId],
+  );
+
   const onChangeActivePendingUserInputCustomAnswer = useCallback(
     (
       questionId: string,
@@ -10779,6 +10815,7 @@ export default function ChatView({
                     answers={activePendingDraftAnswers}
                     questionIndex={activePendingQuestionIndex}
                     onToggleOption={onToggleActivePendingUserInputOption}
+                    onSelectOther={onSelectActivePendingUserInputOther}
                     onAdvance={onAdvanceActivePendingUserInput}
                     onPrevious={onPreviousActivePendingUserInputQuestion}
                     onCancel={onCancelActivePendingUserInput}
@@ -10922,7 +10959,8 @@ export default function ChatView({
                       isComposerApprovalState
                         ? "Resolve this approval request to continue"
                         : activePendingProgress
-                          ? activePendingProgress.activeQuestion?.options.length === 0
+                          ? activePendingProgress.activeQuestion?.options.length === 0 ||
+                            activePendingProgress.usingCustomAnswer
                             ? "Type your answer to continue"
                             : "Type your own answer, or leave this blank to use the selected option"
                           : showPlanFollowUpPrompt && activeProposedPlan

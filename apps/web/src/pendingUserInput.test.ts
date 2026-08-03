@@ -6,7 +6,9 @@ import {
   derivePendingUserInputProgress,
   findFirstUnansweredPendingUserInputQuestionIndex,
   hasCompletePendingUserInputAnswers,
+  questionProvidesOtherOption,
   resolvePendingUserInputAnswer,
+  selectPendingUserInputOtherAnswer,
   setPendingUserInputCustomAnswer,
   togglePendingUserInputOptionSelection,
 } from "./pendingUserInput";
@@ -45,6 +47,22 @@ describe("resolvePendingUserInputAnswer", () => {
     ).toBe("Scaffold only");
   });
 
+  it("treats Other with an empty custom answer as unanswered", () => {
+    expect(
+      resolvePendingUserInputAnswer(
+        {
+          id: "scope",
+          header: "Scope",
+          question: "What should the plan target first?",
+          options: [],
+        },
+        selectPendingUserInputOtherAnswer({
+          selectedOptionLabels: ["Scaffold only"],
+        }),
+      ),
+    ).toBeNull();
+  });
+
   it("clears the preset selection when a custom answer is entered", () => {
     expect(
       setPendingUserInputCustomAnswer(
@@ -54,7 +72,17 @@ describe("resolvePendingUserInputAnswer", () => {
         "doesn't matter",
       ),
     ).toEqual({
+      preferCustomAnswer: true,
       customAnswer: "doesn't matter",
+    });
+  });
+
+  it("keeps Other selected while the custom answer is still empty", () => {
+    expect(
+      setPendingUserInputCustomAnswer(selectPendingUserInputOtherAnswer(undefined), ""),
+    ).toEqual({
+      preferCustomAnswer: true,
+      customAnswer: "",
     });
   });
 
@@ -73,6 +101,35 @@ describe("resolvePendingUserInputAnswer", () => {
         },
       ),
     ).toEqual(["CLI", "Desktop"]);
+  });
+});
+
+describe("questionProvidesOtherOption", () => {
+  it("detects existing Other-like options case-insensitively", () => {
+    expect(
+      questionProvidesOtherOption({
+        options: [{ label: "Altro", description: "Scrivi tu" }],
+      }),
+    ).toBe(true);
+    expect(
+      questionProvidesOtherOption({
+        options: [{ label: "Keep going", description: "Continue" }],
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("selectPendingUserInputOtherAnswer", () => {
+  it("marks Other without submitting a preset label", () => {
+    expect(
+      selectPendingUserInputOtherAnswer({
+        selectedOptionLabels: ["Scaffold only"],
+        customAnswer: "partial",
+      }),
+    ).toEqual({
+      preferCustomAnswer: true,
+      customAnswer: "partial",
+    });
   });
 });
 
@@ -102,6 +159,26 @@ describe("togglePendingUserInputOptionSelection", () => {
     ).toEqual({
       customAnswer: "",
       selectedOptionLabels: ["Desktop"],
+    });
+  });
+
+  it("clears Other when a preset option is chosen", () => {
+    const question = {
+      id: "scope",
+      header: "Scope",
+      question: "What should the plan target first?",
+      options: [],
+    } as const;
+
+    expect(
+      togglePendingUserInputOptionSelection(
+        question,
+        selectPendingUserInputOtherAnswer(undefined),
+        "Scaffold only",
+      ),
+    ).toEqual({
+      customAnswer: "",
+      selectedOptionLabels: ["Scaffold only"],
     });
   });
 });
@@ -166,6 +243,29 @@ describe("buildPendingUserInputAnswers", () => {
           },
         ],
         {},
+      ),
+    ).toBeNull();
+  });
+
+  it("returns null while Other is selected without a typed answer", () => {
+    expect(
+      buildPendingUserInputAnswers(
+        [
+          {
+            id: "scope",
+            header: "Scope",
+            question: "What should the plan target first?",
+            options: [
+              {
+                label: "Orchestration-first",
+                description: "Focus on orchestration first",
+              },
+            ],
+          },
+        ],
+        {
+          scope: selectPendingUserInputOtherAnswer(undefined),
+        },
       ),
     ).toBeNull();
   });
@@ -271,6 +371,24 @@ describe("pending user input question progress", () => {
       isLastQuestion: false,
       isComplete: false,
       canAdvance: true,
+    });
+  });
+
+  it("marks Other as a custom-answer path before text is typed", () => {
+    expect(
+      derivePendingUserInputProgress(
+        questions,
+        {
+          scope: selectPendingUserInputOtherAnswer(undefined),
+        },
+        0,
+      ),
+    ).toMatchObject({
+      usingCustomAnswer: true,
+      selectedOptionLabels: [],
+      customAnswer: "",
+      resolvedAnswer: null,
+      canAdvance: false,
     });
   });
 });

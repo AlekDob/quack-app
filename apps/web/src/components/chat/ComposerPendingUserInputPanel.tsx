@@ -7,6 +7,9 @@ import { useEffect, useEffectEvent, useRef } from "react";
 import { type PendingUserInput } from "../../session-logic";
 import {
   derivePendingUserInputProgress,
+  PENDING_USER_INPUT_OTHER_OPTION_DESCRIPTION,
+  PENDING_USER_INPUT_OTHER_OPTION_LABEL,
+  questionProvidesOtherOption,
   type PendingUserInputDraftAnswer,
 } from "../../pendingUserInput";
 import { CheckIcon, ChevronLeftIcon, ChevronRightIcon } from "~/lib/icons";
@@ -20,6 +23,7 @@ interface PendingUserInputPanelProps {
   answers: Record<string, PendingUserInputDraftAnswer>;
   questionIndex: number;
   onToggleOption: (questionId: string, optionLabel: string) => PendingUserInputDraftAnswer | null;
+  onSelectOther: (questionId: string) => void;
   onAdvance: (answerOverrides?: Record<string, PendingUserInputDraftAnswer>) => void;
   onPrevious: () => void;
   onCancel: () => void;
@@ -35,6 +39,7 @@ export function ComposerPendingUserInputPanel({
   answers,
   questionIndex,
   onToggleOption,
+  onSelectOther,
   onAdvance,
   onPrevious,
   onCancel,
@@ -51,6 +56,7 @@ export function ComposerPendingUserInputPanel({
       answers={answers}
       questionIndex={questionIndex}
       onToggleOption={onToggleOption}
+      onSelectOther={onSelectOther}
       onAdvance={onAdvance}
       onPrevious={onPrevious}
       onCancel={onCancel}
@@ -64,6 +70,7 @@ function ComposerPendingUserInputCard({
   answers,
   questionIndex,
   onToggleOption,
+  onSelectOther,
   onAdvance,
   onPrevious,
   onCancel,
@@ -73,6 +80,7 @@ function ComposerPendingUserInputCard({
   answers: Record<string, PendingUserInputDraftAnswer>;
   questionIndex: number;
   onToggleOption: (questionId: string, optionLabel: string) => PendingUserInputDraftAnswer | null;
+  onSelectOther: (questionId: string) => void;
   onAdvance: (answerOverrides?: Record<string, PendingUserInputDraftAnswer>) => void;
   onPrevious: () => void;
   onCancel: () => void;
@@ -80,6 +88,11 @@ function ComposerPendingUserInputCard({
   const progress = derivePendingUserInputProgress(prompt.questions, answers, questionIndex);
   const activeQuestion = progress.activeQuestion;
   const selectedOptionLabelSet = new Set(progress.selectedOptionLabels);
+  const showOtherOption =
+    activeQuestion !== null &&
+    activeQuestion.options.length > 0 &&
+    !questionProvidesOtherOption(activeQuestion);
+  const isOtherSelected = progress.usingCustomAnswer && progress.selectedOptionLabels.length === 0;
   const autoAdvanceTimerRef = useRef<number | null>(null);
   const onAdvanceRef = useRef(onAdvance);
   useEffect(() => {
@@ -113,8 +126,18 @@ function ComposerPendingUserInputCard({
   };
   const handleEffectOptionSelection = useEffectEvent(handleOptionSelection);
 
+  const handleOtherSelection = (questionId: string) => {
+    if (autoAdvanceTimerRef.current !== null) {
+      window.clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+    onSelectOther(questionId);
+  };
+  const handleEffectOtherSelection = useEffectEvent(handleOtherSelection);
+
   // Keyboard shortcut: digits toggle options for multi-select prompts and preserve
-  // the current auto-advance behavior for single-select questions.
+  // the current auto-advance behavior for single-select questions. The synthetic
+  // Other row takes the next digit after the last provider option.
   useEffect(() => {
     if (!activeQuestion || isResponding) return;
     const handler = (event: globalThis.KeyboardEvent) => {
@@ -134,6 +157,11 @@ function ComposerPendingUserInputCard({
       const digit = Number.parseInt(event.key, 10);
       if (Number.isNaN(digit) || digit < 1 || digit > 9) return;
       const optionIndex = digit - 1;
+      if (showOtherOption && optionIndex === activeQuestion.options.length) {
+        event.preventDefault();
+        handleEffectOtherSelection(activeQuestion.id);
+        return;
+      }
       if (optionIndex >= activeQuestion.options.length) return;
       const option = activeQuestion.options[optionIndex];
       if (!option) return;
@@ -142,7 +170,7 @@ function ComposerPendingUserInputCard({
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [activeQuestion, isResponding]);
+  }, [activeQuestion, isResponding, showOtherOption]);
 
   if (!activeQuestion) {
     return null;
@@ -210,6 +238,24 @@ function ComposerPendingUserInputCard({
               />
             );
           })}
+          {showOtherOption ? (
+            <ComposerChoiceRow
+              key={`${activeQuestion.id}:__other__`}
+              shortcut={
+                activeQuestion.options.length < 9 ? activeQuestion.options.length + 1 : null
+              }
+              label={PENDING_USER_INPUT_OTHER_OPTION_LABEL}
+              description={PENDING_USER_INPUT_OTHER_OPTION_DESCRIPTION}
+              selected={isOtherSelected}
+              disabled={isResponding}
+              onSelect={() => handleOtherSelection(activeQuestion.id)}
+              trailing={
+                isOtherSelected ? (
+                  <CheckIcon className="mt-0.5 size-3.5 shrink-0 text-[var(--color-text-foreground)]" />
+                ) : null
+              }
+            />
+          ) : null}
         </div>
       ) : (
         <div className="mt-2.5 flex justify-end">

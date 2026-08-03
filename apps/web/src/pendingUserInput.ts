@@ -5,9 +5,16 @@
 
 import type { ProviderUserInputAnswers, UserInputQuestion } from "@synara/contracts";
 
+export const PENDING_USER_INPUT_OTHER_OPTION_LABEL = "Other";
+export const PENDING_USER_INPUT_OTHER_OPTION_DESCRIPTION = "Type your own answer";
+
+const OTHER_OPTION_LABEL_PATTERN = /^(other|altro|something else)$/i;
+
 export interface PendingUserInputDraftAnswer {
   selectedOptionLabels?: string[];
   customAnswer?: string;
+  /** True when the user chose the synthetic Other option (may still be empty). */
+  preferCustomAnswer?: boolean;
 }
 
 export interface PendingUserInputProgress {
@@ -22,6 +29,10 @@ export interface PendingUserInputProgress {
   isLastQuestion: boolean;
   isComplete: boolean;
   canAdvance: boolean;
+}
+
+export function questionProvidesOtherOption(question: Pick<UserInputQuestion, "options">): boolean {
+  return question.options.some((option) => OTHER_OPTION_LABEL_PATTERN.test(option.label.trim()));
 }
 
 function normalizeDraftAnswer(value: string | undefined): string | null {
@@ -56,6 +67,11 @@ export function resolvePendingUserInputAnswer(
     return customAnswer;
   }
 
+  // Other selected with an empty composer is intentionally unanswered.
+  if (draft?.preferCustomAnswer) {
+    return null;
+  }
+
   const selectedOptionLabels = normalizeSelectedOptionLabels(draft?.selectedOptionLabels);
   if (question.multiSelect) {
     return selectedOptionLabels.length > 0 ? selectedOptionLabels : null;
@@ -68,14 +84,24 @@ export function setPendingUserInputCustomAnswer(
   draft: PendingUserInputDraftAnswer | undefined,
   customAnswer: string,
 ): PendingUserInputDraftAnswer {
-  const selectedOptionLabels =
-    customAnswer.trim().length > 0
-      ? undefined
-      : normalizeSelectedOptionLabels(draft?.selectedOptionLabels);
+  const prefersCustom = customAnswer.trim().length > 0 || Boolean(draft?.preferCustomAnswer);
+  const selectedOptionLabels = prefersCustom
+    ? undefined
+    : normalizeSelectedOptionLabels(draft?.selectedOptionLabels);
 
   return {
     customAnswer,
+    ...(prefersCustom ? { preferCustomAnswer: true } : {}),
     ...(selectedOptionLabels && selectedOptionLabels.length > 0 ? { selectedOptionLabels } : {}),
+  };
+}
+
+export function selectPendingUserInputOtherAnswer(
+  draft: PendingUserInputDraftAnswer | undefined,
+): PendingUserInputDraftAnswer {
+  return {
+    preferCustomAnswer: true,
+    customAnswer: draft?.customAnswer ?? "",
   };
 }
 
@@ -193,7 +219,7 @@ export function derivePendingUserInputProgress(
     selectedOptionLabels: normalizeSelectedOptionLabels(activeDraft?.selectedOptionLabels),
     customAnswer,
     resolvedAnswer,
-    usingCustomAnswer: customAnswer.trim().length > 0,
+    usingCustomAnswer: Boolean(activeDraft?.preferCustomAnswer) || customAnswer.trim().length > 0,
     answeredQuestionCount,
     isLastQuestion,
     isComplete: buildPendingUserInputAnswers(questions, draftAnswers) !== null,

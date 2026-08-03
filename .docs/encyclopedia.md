@@ -8,6 +8,7 @@ This is a living glossary for Synara. It explains what common terms mean in this
 - [Thread timeline](#thread-timeline)
 - [Orchestration](#orchestration)
 - [Provider runtime](#provider-runtime)
+- [Composer pending user input](#composer-pending-user-input)
 - [Checkpointing](#checkpointing)
 
 ## Concepts
@@ -115,6 +116,18 @@ Controls how assistant text reaches the thread timeline. In [the contracts][1], 
 
 A point-in-time view of state. The word is used in multiple layers, including orchestration, provider, and checkpointing. See [ProjectionSnapshotQuery.ts][10], [ProviderAdapter.ts][15], and [CheckpointStore.ts][19].
 
+### Composer pending user input
+
+Provider-driven clarifying questions shown above the composer while a turn waits for answers. Living feature map: [001-pending-user-input.md][25].
+
+#### Pending user input
+
+A `user-input.requested` prompt with one or more questions, each with optional preset options and optional free text. Draft/progress helpers live in [pendingUserInput.ts][26]; the card is [ComposerPendingUserInputPanel.tsx][27].
+
+#### Other option
+
+Synthetic last choice on questions that already have presets. Selecting it focuses the composer and requires a typed custom answer; the submitted value is that text, never the label `"Other"`. See [pendingUserInput.ts][26] and the [Other option recap][28].
+
 ### Checkpointing
 
 Checkpointing captures workspace state over time so the app can diff turns and restore earlier points. The main pieces are [CheckpointStore.ts][19], [CheckpointDiffQuery.ts][20], and [CheckpointReactor.ts][6].
@@ -178,3 +191,7 @@ The file patch and changed-file summary for one turn. It is usually computed in 
 [22]: ../apps/server/src/checkpointing/Utils.ts
 [23]: ../apps/server/src/checkpointing/Diffs.ts
 [24]: ./architecture.md
+[25]: ../documentation/features/001-pending-user-input.md
+[26]: ../apps/web/src/pendingUserInput.ts
+[27]: ../apps/web/src/components/chat/ComposerPendingUserInputPanel.tsx
+[28]: ../documentation/recaps/pending-user-input-other-option.md
