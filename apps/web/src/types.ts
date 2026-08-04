@@ -111,6 +111,8 @@ export interface ChatMessage {
   mentions?: ProviderMentionReference[];
   dispatchMode?: TurnDispatchMode;
   dispatchOrigin?: MessageDispatchOrigin;
+  /** Papero identity active when this message was sent — fixed at creation, never retargeted. */
+  paperoId?: string;
   turnId?: TurnId | null;
   createdAt: string;
   completedAt?: string | undefined;

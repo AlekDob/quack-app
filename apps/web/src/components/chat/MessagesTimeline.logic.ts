@@ -240,6 +240,10 @@ export type MessagesTimelineRow =
       // pre-empt the composer's live changes strip mid-turn.
       assistantTurnInProgress?: boolean | undefined;
       revertTurnCount?: number | undefined;
+      // True on the first assistant row after a user message — the papero avatar
+      // renders once per turn, at the top of the response block, not per message.
+      showPaperoAvatar?: boolean | undefined;
+      avatarPaperoId?: string | undefined;
     }
   | {
       kind: "proposed-plan";
@@ -496,6 +500,10 @@ export function deriveMessagesTimelineRows(input: {
   const durationStartByMessageId = computeMessageDurationStart(timelineMessages);
   const terminalAssistantMessageIds = deriveTerminalAssistantMessageIds(timelineMessages);
   let pendingWorkGroup: Extract<MessagesTimelineRow, { kind: "work" }> | null = null;
+  // Tracks which papero opened the current turn and whether its avatar has
+  // already been rendered — reset at each user message (a new turn boundary).
+  let currentTurnPaperoId: string | undefined;
+  let paperoAvatarShownForTurn = false;
 
   const groupedEntriesEqual = (
     left: ReadonlyArray<WorkLogEntry>,
@@ -589,6 +597,15 @@ export function deriveMessagesTimelineRows(input: {
       flushPendingWorkGroup();
     }
 
+    if (message.role === "user") {
+      currentTurnPaperoId = message.paperoId;
+      paperoAvatarShownForTurn = false;
+    }
+    const showPaperoAvatar = message.role === "assistant" && !paperoAvatarShownForTurn;
+    if (showPaperoAvatar) {
+      paperoAvatarShownForTurn = true;
+    }
+
     const assistantTurnStillInProgress =
       message.role === "assistant" &&
       input.activeTurnInProgress === true &&
@@ -613,6 +630,8 @@ export function deriveMessagesTimelineRows(input: {
           : undefined,
       revertTurnCount:
         message.role === "user" ? input.revertTurnCountByUserMessageId.get(message.id) : undefined,
+      showPaperoAvatar,
+      avatarPaperoId: message.role === "assistant" ? currentTurnPaperoId : undefined,
     });
   }
 
@@ -794,6 +813,13 @@ function collapseSettledTurns(
         if (folded.collapsedTurnItems) collapsedItems.push(...folded.collapsedTurnItems);
         collapsedItems.push({ kind: "narration", id: folded.message.id, message: folded.message });
         if (folded.inlineWorkEntries) collectWorkItems(folded.inlineWorkEntries, collapsedItems);
+        // The row carrying the avatar can be folded away as non-terminal
+        // narration — hoist its flag onto the surviving terminal row so the
+        // block still shows one avatar at the top.
+        if (folded.showPaperoAvatar) {
+          row.showPaperoAvatar = true;
+          row.avatarPaperoId = folded.avatarPaperoId;
+        }
       }
     }
     // The terminal's own work rows are details around the final answer; fold
@@ -1101,7 +1127,9 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
         a.assistantCopyStreaming === bm.assistantCopyStreaming &&
         a.assistantTurnInProgress === bm.assistantTurnInProgress &&
         a.assistantTurnDiffSummary === bm.assistantTurnDiffSummary &&
-        a.revertTurnCount === bm.revertTurnCount
+        a.revertTurnCount === bm.revertTurnCount &&
+        a.showPaperoAvatar === bm.showPaperoAvatar &&
+        a.avatarPaperoId === bm.avatarPaperoId
       );
     }
   }

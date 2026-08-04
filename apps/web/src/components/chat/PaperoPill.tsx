@@ -18,20 +18,13 @@ import { paperoSlotProviders, usePaperoStore } from "~/paperi";
 import { Button } from "../ui/button";
 import { DisclosureChevron } from "../ui/DisclosureChevron";
 import { DisclosureRegion } from "../ui/DisclosureRegion";
-import {
-  Menu,
-  MenuItem,
-  MenuSeparator,
-  MenuSub,
-  MenuSubTrigger,
-  MenuTrigger,
-} from "../ui/menu";
+import { Menu, MenuItem, MenuSeparator, MenuSub, MenuSubTrigger, MenuTrigger } from "../ui/menu";
 import { Textarea } from "../ui/textarea";
 import { ComposerPickerMenuPopup, ComposerPickerMenuSubPopup } from "./ComposerPickerMenuPopup";
 import { PickerTriggerButton } from "./PickerTriggerButton";
 import { COMPOSER_PICKER_TRIGGER_TEXT_CLASS_NAME } from "./composerPickerStyles";
 
-function PaperoAvatar({
+export function PaperoAvatar({
   definition,
   className,
 }: {
@@ -73,11 +66,7 @@ function PaperoInstructionsPanel(props: {
       onPointerDown={(event) => event.stopPropagation()}
     >
       <div className="flex items-center gap-1.5">
-        <FileIcon
-          className="size-3.5 shrink-0 opacity-70"
-          strokeWidth={1.75}
-          aria-hidden="true"
-        />
+        <FileIcon className="size-3.5 shrink-0 opacity-70" strokeWidth={1.75} aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate text-[length:var(--app-font-size-ui-sm,11px)] font-medium">
           Instructions · {definition.label}
           {hasCustom ? (

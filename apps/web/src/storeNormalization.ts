@@ -489,6 +489,7 @@ export function normalizeChatMessage(
     previous.text === incoming.text &&
     previous.dispatchMode === incoming.dispatchMode &&
     previous.dispatchOrigin === incoming.dispatchOrigin &&
+    previous.paperoId === incoming.paperoId &&
     previous.turnId === incoming.turnId &&
     previous.createdAt === incoming.createdAt &&
     previous.streaming === incoming.streaming &&
@@ -507,6 +508,7 @@ export function normalizeChatMessage(
     text: incoming.text,
     ...(incoming.dispatchMode ? { dispatchMode: incoming.dispatchMode } : {}),
     ...(incoming.dispatchOrigin ? { dispatchOrigin: incoming.dispatchOrigin } : {}),
+    ...(incoming.paperoId ? { paperoId: incoming.paperoId } : {}),
     turnId: incoming.turnId,
     createdAt: incoming.createdAt,
     streaming: incoming.streaming,
@@ -568,6 +570,7 @@ function readModelMessageFromChatMessage(
     text: message.text,
     ...(message.dispatchMode ? { dispatchMode: message.dispatchMode } : {}),
     ...(message.dispatchOrigin ? { dispatchOrigin: message.dispatchOrigin } : {}),
+    ...(message.paperoId ? { paperoId: message.paperoId } : {}),
     turnId: message.turnId ?? null,
     streaming: message.streaming,
     source: message.source ?? "native",

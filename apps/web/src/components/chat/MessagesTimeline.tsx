@@ -58,8 +58,10 @@ import {
   WorktreeIcon,
 } from "~/lib/icons";
 import { pinActionLabel } from "~/lib/pin";
+import { DEFAULT_PAPERO_ID, isPaperoId, usePaperoStore } from "~/paperi";
 import { Button } from "../ui/button";
 import { CrossTaskOriginLabel, type CrossTaskOrigin } from "./CrossTaskOriginLabel";
+import { PaperoAvatar } from "./PaperoPill";
 import { SynaraThreadCreationCard } from "./SynaraThreadCreationCard";
 import { buildExpandedImagePreview, ExpandedImagePreview } from "./ExpandedImagePreview";
 import { ProposedPlanCard } from "./ProposedPlanCard";
@@ -391,7 +393,7 @@ interface MessagesTimelineProps {
    * the anchored slide settles; ChatView's auto-follow re-snaps pause while set.
    */
   tailAnchorScrollInFlightRef?: RefObject<boolean> | undefined;
-  /** Provenance for a conversation created from another Synara task. */
+  /** Provenance for a conversation created from another Quack task. */
   crossTaskOrigin?: CrossTaskOrigin | null;
   timelineEntries: ReturnType<typeof deriveTimelineEntries>;
   turnDiffSummaryByAssistantMessageId: Map<MessageId, TurnDiffSummary>;
@@ -617,6 +619,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       />
     ),
     [],
+  );
+  const resolveEffectivePaperoDefinition = usePaperoStore(
+    (store) => store.resolveEffectiveDefinition,
   );
   useTailAnchorScroll({
     listRef: resolvedListRef,
@@ -1071,7 +1076,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         (() => {
           const groupId = row.id;
           // Creation milestones are reserved for the end-of-turn recap card.
-          // The provider's actual Synara MCP tool rows remain visible here.
+          // The provider's actual Quack MCP tool rows remain visible here.
           const groupedEntries = row.groupedEntries.filter(
             (workEntry) => !workEntry.synaraThreadCreation,
           );
@@ -1258,7 +1263,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                   )}
                 >
                   {/* Keep user-message chrome outside the bubble so the message reads as one simple block. */}
-                  {/* The cross-task origin label already attributes this turn to another Synara thread,
+                  {/* The cross-task origin label already attributes this turn to another Quack thread,
                       so suppress the dispatch chip here to avoid a duplicate "Sent by …" marker. */}
                   {showCrossTaskOrigin ? null : (
                     <UserDispatchModeChip
@@ -1746,8 +1751,18 @@ export const MessagesTimeline = memo(function MessagesTimeline({
               />
             );
           };
+          const paperoDefinition = row.showPaperoAvatar
+            ? resolveEffectivePaperoDefinition(
+                row.avatarPaperoId && isPaperoId(row.avatarPaperoId)
+                  ? row.avatarPaperoId
+                  : DEFAULT_PAPERO_ID,
+              )
+            : null;
           return (
             <>
+              {paperoDefinition && (
+                <PaperoAvatar definition={paperoDefinition} className="mb-1.5 size-5" />
+              )}
               {settledCollapseTransition && (
                 <div
                   aria-hidden="true"
