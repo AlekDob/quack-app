@@ -1,26 +1,36 @@
 // FILE: SynaraLogo.tsx
-// Purpose: Render the Synara mark as an inline SVG that follows theme foreground color.
+// Purpose: Render the Quack mark PNG, swapping light/dark assets with the theme.
 // Layer: Shared app branding primitive
 
-import type { SVGProps } from "react";
-import { SYNARA_LOGO_PATHS } from "~/assets/synaraLogoPath";
+import type { HTMLAttributes } from "react";
 import { cn } from "~/lib/utils";
 
-export function SynaraLogo({ className, ...props }: SVGProps<SVGSVGElement>) {
+const QUACK_LOGO_DARK_SRC = "/synara.png";
+const QUACK_LOGO_LIGHT_SRC = "/synara-light.png";
+
+type SynaraLogoProps = HTMLAttributes<HTMLSpanElement> & {
+  "aria-label"?: string;
+};
+
+export function SynaraLogo({ className, ...props }: SynaraLogoProps) {
   const ariaLabel = props["aria-label"];
+  const showLabel = Boolean(ariaLabel);
 
   return (
-    <svg
-      viewBox="0 0 470 504"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden={ariaLabel ? undefined : true}
+    <span
       {...props}
-      className={cn("shrink-0 text-foreground", className)}
+      className={cn(
+        "relative inline-grid shrink-0 [&>img]:col-start-1 [&>img]:row-start-1 [&>img]:h-full [&>img]:w-full [&>img]:object-contain",
+        className,
+      )}
+      role={showLabel ? "img" : undefined}
+      aria-label={showLabel ? ariaLabel : undefined}
+      aria-hidden={showLabel ? undefined : true}
     >
-      {SYNARA_LOGO_PATHS.map((path) => (
-        <path key={path} d={path} fill="currentColor" />
-      ))}
-    </svg>
+      {/* Light UI: black mark, transparent background */}
+      <img src={QUACK_LOGO_LIGHT_SRC} alt="" draggable={false} className="dark:hidden" />
+      {/* Dark UI: white mark, transparent background */}
+      <img src={QUACK_LOGO_DARK_SRC} alt="" draggable={false} className="hidden dark:block" />
+    </span>
   );
 }

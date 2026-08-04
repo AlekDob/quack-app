@@ -92,8 +92,8 @@ type TimelineWorkEntry = WorkLogEntry;
 
 const AgentTaskIcon: LucideIcon = (props) => <BotIcon {...props} />;
 
-const SynaraToolIcon: LucideIcon = ({ className, ...props }) => (
-  <SynaraLogo {...props} className={cn("text-current", className)} />
+const SynaraToolIcon: LucideIcon = ({ className }) => (
+  <SynaraLogo className={cn("text-current", className)} />
 );
 
 function workToneIcon(tone: TimelineWorkEntry["tone"]): {
@@ -284,11 +284,11 @@ function isGitHubMcpToolCall(workEntry: TimelineWorkEntry): boolean {
   return Boolean(toolName?.startsWith("mcp__codex_apps__github"));
 }
 
-// Synara's own agent-gateway tools (synara_list_threads, synara_create_thread,
-// ...) get the Synara mark instead of the generic MCP glyph. Providers report
+// Quack's own agent-gateway tools (synara_list_threads, synara_create_thread,
+// ...) get the Quack mark instead of the generic MCP glyph. Providers report
 // the call differently: Claude prefixes the MCP server (mcp__synara__*), ACP
 // agents surface the bare tool name (synara_*), and Codex reports server/tool
-// pairs that the label humanizer renders as "Synara: ...".
+// pairs that the label humanizer renders as "Quack: ...".
 function toolWorkEntryStatus(workEntry: TimelineWorkEntry): SynaraMcpToolStatus {
   if (workEntry.toolStatus) return workEntry.toolStatus;
   return workEntry.activityKind !== undefined && workEntry.activityKind !== "tool.completed"

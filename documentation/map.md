@@ -2,7 +2,7 @@
 type: map
 project: synara
 created: 2026-08-03
-last_verified: 2026-08-03
+last_verified: 2026-08-04
 tags: [map, navigation]
 ---
 
@@ -17,11 +17,13 @@ tags: [map, navigation]
 | Doc | Component |
 |-----|-----------|
 | `documentation/features/001-pending-user-input.md` | Pending user input / AskUserQuestion composer card |
+| `documentation/features/002-brand-mark.md` | Quack brand mark / app icons / `SynaraLogo` |
 
 ## Recent recaps
 | Doc | Topic |
 |-----|-------|
 | `documentation/recaps/pending-user-input-other-option.md` | Synthetic Other option on pending questions |
+| `documentation/recaps/quack-brand-mark-duck-assets.md` | Duck mark raster assets + theme swap |
 
 ## Historical (do not use as live source)
 - `docs/RECAP-*.md` — older ad-hoc recaps; prefer `documentation/recaps/` going forward

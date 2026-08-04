@@ -11,7 +11,7 @@
       href="https://fonts.googleapis.com/css2?family=Cal+Sans&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&family=Inter:opsz,wght@14..32,100..900&display=swap"
       rel="stylesheet"
     />
-    <title>Synara</title>
+    <title>Quack</title>
     <style>
       /* Boot splash — shown while the JS bundle is parsing and React mounts.
          React's createRoot(...).render(...) wipes #root's children, so no teardown needed. */
@@ -40,9 +40,21 @@
         height: 112px;
         opacity: 0;
         transform: scale(0.96);
+        object-fit: contain;
         animation:
           app-boot-splash-in 420ms ease-out forwards,
           app-boot-splash-pulse 2.4s ease-in-out 420ms infinite;
+      }
+      .app-boot-splash__icon--dark {
+        display: none;
+      }
+      @media (prefers-color-scheme: dark) {
+        .app-boot-splash__icon--light {
+          display: none;
+        }
+        .app-boot-splash__icon--dark {
+          display: block;
+        }
       }
       @keyframes app-boot-splash-in {
         to {
@@ -71,7 +83,8 @@
   <body>
     <div id="root">
       <div class="app-boot-splash" aria-hidden="true">
-        <img class="app-boot-splash__icon" src="/synara-logo.svg" alt="" draggable="false" />
+        <img class="app-boot-splash__icon app-boot-splash__icon--light" src="/synara-light.png" alt="" draggable="false" />
+        <img class="app-boot-splash__icon app-boot-splash__icon--dark" src="/synara.png" alt="" draggable="false" />
       </div>
     </div>
     <script type="module" src="/src/bootstrap.ts"></script>
