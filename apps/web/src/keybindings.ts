@@ -167,6 +167,13 @@ export const DEFAULT_SHORTCUT_FALLBACKS: ResolvedKeybindingsConfig = [
     shortcut: commandShortcut("[", { altKey: true, modKey: false }),
     whenAst: whenNotTerminalFocus,
   },
+  // Cycle Jack / Milo / Nora / Vera / Lia. Bare Tab only — Shift+Tab stays the
+  // composer plan-mode toggle.
+  {
+    command: "papero.next",
+    shortcut: commandShortcut("tab", { modKey: false }),
+    whenAst: whenNotTerminalFocus,
+  },
   {
     command: "traitsPicker.toggle",
     shortcut: commandShortcut("e", { shiftKey: true }),

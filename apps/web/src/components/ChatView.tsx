@@ -329,6 +329,10 @@ import { newCommandId, newMessageId, newProjectId, newThreadId } from "~/lib/uti
 import { readNativeApi } from "~/nativeApi";
 import { promoteThreadCreate } from "~/lib/threadCreatePromotion";
 import { readFavoriteModelSlugs } from "~/lib/modelFavorites";
+import { usePaperoStore } from "~/paperi";
+import { DEFAULT_PAPERO_ID, resolveCycledPaperoId, type PaperoId } from "@synara/shared/paperi";
+
+const EMPTY_PAPERO_MODEL_MAP: Partial<Record<ProviderKind, ModelSelection>> = Object.freeze({});
 import {
   getCustomBinaryPathForProvider,
   getProviderStartOptions,
@@ -356,10 +360,7 @@ import {
   useEffectiveComposerModelState,
 } from "../composerDraftStore";
 import { useTemporaryThreadStore } from "../temporaryThreadStore";
-import {
-  requestComposerFocus,
-  useComposerFocusRequestStore,
-} from "../composerFocusRequestStore";
+import { requestComposerFocus, useComposerFocusRequestStore } from "../composerFocusRequestStore";
 import { useWorkflowRunUiStore, useWorkflowRunUiThreadState } from "../workflowRunUiStore";
 import { appendComposerPromptText } from "../lib/chatReferences";
 import {
@@ -469,6 +470,7 @@ import {
   resolveProviderModelLabel,
 } from "./chat/ProviderModelPicker";
 import { ComposerModelEffortPicker } from "./chat/ComposerModelEffortPicker";
+import { PaperoPill } from "./chat/PaperoPill";
 import { resolveTraitsTriggerSummary, TraitsPicker } from "./chat/TraitsPicker";
 import { ComposerCommandItem, ComposerCommandMenu } from "./chat/ComposerCommandMenu";
 import {
@@ -1126,7 +1128,7 @@ function composerPromptStillMatchesRestoredQueuedDraft(
 
 // Builds an ephemeral transcript bubble for the conversational automation-setup
 // exchange. These never reach a provider and are not persisted; they render the
-// back-and-forth (user request, Synara's clarifying questions) inline like Codex.
+// back-and-forth (user request, Quack's clarifying questions) inline like Codex.
 function makeAutomationSetupBubble(role: "user" | "assistant", text: string): ChatMessage {
   return {
     id: newMessageId(),
@@ -1177,6 +1179,36 @@ export default function ChatView({
   const setComposerDraftModelSelectionAndSticky = useComposerDraftStore(
     (store) => store.setModelSelectionAndSticky,
   );
+  const activePaperoId = usePaperoStore(
+    (store) => store.activePaperoIdByThreadId[threadId] ?? DEFAULT_PAPERO_ID,
+  );
+  const setActivePaperoId = usePaperoStore((store) => store.setActivePaperoId);
+  const resolvePaperoModelForProvider = usePaperoStore(
+    (store) => store.resolveModelForCurrentProvider,
+  );
+  const resolveEffectivePaperoDefinition = usePaperoStore(
+    (store) => store.resolveEffectiveDefinition,
+  );
+  const setPaperoModelSelectionForProvider = usePaperoStore(
+    (store) => store.setModelSelectionForProvider,
+  );
+  const clearPaperoModelSelectionForProvider = usePaperoStore(
+    (store) => store.clearModelSelectionForProvider,
+  );
+  const setPaperoInstructions = usePaperoStore((store) => store.setInstructions);
+  const activePaperoModelMap = usePaperoStore(
+    (store) => store.modelSelectionByProviderByPaperoId[activePaperoId] ?? EMPTY_PAPERO_MODEL_MAP,
+  );
+  const activePaperoOverrides = usePaperoStore(
+    (store) => store.overridesByPaperoId[activePaperoId],
+  );
+  const activePaperoDefinition = useMemo(
+    () => resolveEffectivePaperoDefinition(activePaperoId),
+    [activePaperoId, activePaperoOverrides, resolveEffectivePaperoDefinition],
+  );
+  // Freeze papero at send so flipping the pill mid-stream does not relabel the in-flight turn.
+  const paperoIdForSendRef = useRef<PaperoId>(activePaperoId);
+  paperoIdForSendRef.current = activePaperoId;
   const timestampFormat = settings.timestampFormat;
   const navigate = useNavigate();
   const { handleNewThread } = useHandleNewThread();
@@ -4697,7 +4729,7 @@ export default function ChatView({
             toastManager.add({
               type: "error",
               title: "Could not update access mode",
-              description: "Synara is not connected to the server.",
+              description: "Quack is not connected to the server.",
             });
             return false;
           }
@@ -5117,7 +5149,7 @@ export default function ChatView({
         toastManager.add({
           type: "warning",
           title: "Select a unique phrase to mark it.",
-          description: "Try including a few more words so Synara can find the exact place.",
+          description: "Try including a few more words so Quack can find the exact place.",
         });
         return;
       }
@@ -5945,12 +5977,23 @@ export default function ChatView({
         undefined,
         provider === "claudeAgent" ? runtimeModel?.supportsAutoMode : undefined,
       );
+      // Fallback B: on provider switch only, prefer the active papero's saved slot
+      // for that provider. Same-provider model picks stay under user control.
+      const paperoSlot =
+        provider !== selectedProvider
+          ? resolvePaperoModelForProvider(activePaperoId, provider)
+          : null;
+      const selectionToApply = paperoSlot ?? nextModelSelection;
       const providerStatus = findProviderStatus(providerStatuses, provider);
       const nextRuntimeMode =
         runtimeMode === "auto" &&
-        !providerModelSupportsAutoRuntimeMode(provider, runtimeModel, providerStatus)
+        !providerModelSupportsAutoRuntimeMode(
+          selectionToApply.provider,
+          selectionToApply.provider === provider ? runtimeModel : undefined,
+          providerStatus,
+        )
           ? "approval-required"
-          : normalizeRuntimeModeForProvider(runtimeMode, provider);
+          : normalizeRuntimeModeForProvider(runtimeMode, selectionToApply.provider);
       // Commit the canonical downgrade before storing an incompatible model.
       // On failure the Auto draft remains visible so compatibility checks can retry.
       const didCommitSelection = await commitAfterRuntimeModePersistence({
@@ -5958,12 +6001,17 @@ export default function ChatView({
         nextRuntimeMode,
         persistRuntimeMode: persistRuntimeModeChange,
         commit: () => {
-          setComposerDraftModelSelectionAndSticky(activeThread.id, nextModelSelection);
-          if (provider === "cursor") {
-            setComposerDraftProviderModelOptions(activeThread.id, provider, undefined, {
-              persistSticky: true,
-              model: resolvedModel,
-            });
+          setComposerDraftModelSelectionAndSticky(activeThread.id, selectionToApply);
+          if (selectionToApply.provider === "cursor") {
+            setComposerDraftProviderModelOptions(
+              activeThread.id,
+              selectionToApply.provider,
+              selectionToApply.options,
+              {
+                persistSticky: true,
+                model: selectionToApply.model,
+              },
+            );
           }
         },
       });
@@ -5974,18 +6022,97 @@ export default function ChatView({
       scheduleComposerFocus();
     },
     [
+      activePaperoId,
       activeThread,
       customModelsByProvider,
       lockedProvider,
       modelOptionsByProvider,
       persistRuntimeModeChange,
       providerStatuses,
+      resolvePaperoModelForProvider,
       runtimeMode,
       runtimeModelsByProvider,
       scheduleComposerFocus,
+      selectedProvider,
       setComposerDraftModelSelectionAndSticky,
       setComposerDraftProviderModelOptions,
     ],
+  );
+
+  const onSelectPapero = useCallback(
+    (paperoId: PaperoId) => {
+      if (!activeThread) return;
+      setActivePaperoId(activeThread.id, paperoId);
+      paperoIdForSendRef.current = paperoId;
+      const slot = resolvePaperoModelForProvider(paperoId, selectedProvider);
+      if (slot) {
+        setComposerDraftModelSelectionAndSticky(activeThread.id, slot);
+        if (slot.provider === "cursor") {
+          setComposerDraftProviderModelOptions(activeThread.id, slot.provider, slot.options, {
+            persistSticky: true,
+            model: slot.model,
+          });
+        }
+      }
+      const definition = resolveEffectivePaperoDefinition(paperoId);
+      toastManager.add({
+        type: "success",
+        title: `${definition.label}`,
+        description: `Active from your next message · ${definition.role}`,
+      });
+      scheduleComposerFocus();
+    },
+    [
+      activeThread,
+      resolveEffectivePaperoDefinition,
+      resolvePaperoModelForProvider,
+      scheduleComposerFocus,
+      selectedProvider,
+      setActivePaperoId,
+      setComposerDraftModelSelectionAndSticky,
+      setComposerDraftProviderModelOptions,
+    ],
+  );
+
+  const onSavePaperoCurrentModelSlot = useCallback(() => {
+    setPaperoModelSelectionForProvider(activePaperoId, selectedModelSelection);
+    toastManager.add({
+      type: "success",
+      title: "Model saved",
+      description: `Saved ${selectedModelSelection.provider} slot for ${activePaperoDefinition.label}`,
+    });
+  }, [
+    activePaperoDefinition.label,
+    activePaperoId,
+    selectedModelSelection,
+    setPaperoModelSelectionForProvider,
+  ]);
+
+  const onClearPaperoModelSlot = useCallback(
+    (provider: ProviderKind) => {
+      clearPaperoModelSelectionForProvider(activePaperoId, provider);
+    },
+    [activePaperoId, clearPaperoModelSelectionForProvider],
+  );
+
+  const onSavePaperoInstructions = useCallback(
+    (paperoId: PaperoId, instructions: string) => {
+      setPaperoInstructions(paperoId, instructions);
+      const definition = resolveEffectivePaperoDefinition(paperoId);
+      toastManager.add({
+        type: "success",
+        title: "Instructions saved",
+        description: `${definition.label} will use these from the next message`,
+      });
+    },
+    [resolveEffectivePaperoDefinition, setPaperoInstructions],
+  );
+
+  const onResetPaperoInstructions = useCallback(
+    (paperoId: PaperoId) => {
+      setPaperoInstructions(paperoId, null);
+    },
+    [setPaperoInstructions],
   );
 
   useEffect(() => {
@@ -6083,6 +6210,20 @@ export default function ChatView({
         });
         if (!nextSlug) return;
         onProviderModelSelect(selectedProvider, nextSlug as ModelSlug);
+        return;
+      }
+
+      if (command === "papero.next") {
+        // Yield to slash/mention/folder menus so Tab still completes items there.
+        if (!composerPickerShortcutActive || composerMenuOpenRef.current) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onSelectPapero(
+          resolveCycledPaperoId({
+            currentId: activePaperoId,
+            direction: "next",
+          }),
+        );
         return;
       }
 
@@ -6288,6 +6429,8 @@ export default function ChatView({
     selectedModel,
     modelOptionsByProvider,
     onProviderModelSelect,
+    activePaperoId,
+    onSelectPapero,
   ]);
 
   // Preserve the original "single mic button" contract:
@@ -6599,7 +6742,7 @@ export default function ChatView({
                 type: "warning",
                 title: "Thread note not added",
                 description:
-                  "The automation was created, but Synara could not add the activity note.",
+                  "The automation was created, but Quack could not add the activity note.",
               });
             }
           })();
@@ -6619,7 +6762,7 @@ export default function ChatView({
             type: "error",
             title: "Could not create automation",
             description:
-              error instanceof Error ? error.message : "Synara could not save the automation.",
+              error instanceof Error ? error.message : "Quack could not save the automation.",
           });
           return false;
         })
@@ -6693,7 +6836,7 @@ export default function ChatView({
           toastManager.add({
             type: "error",
             title: "Could not create chat",
-            description: "Synara could not promote this draft before saving the automation.",
+            description: "Quack could not promote this draft before saving the automation.",
           });
           return null;
         }
@@ -6720,7 +6863,7 @@ export default function ChatView({
           description:
             error instanceof Error
               ? error.message
-              : "Synara could not promote this draft before saving the automation.",
+              : "Quack could not promote this draft before saving the automation.",
         });
         return null;
       }
@@ -7972,6 +8115,13 @@ export default function ChatView({
             ...(mentionedPluginMentionsForSend.length > 0
               ? { mentions: mentionedPluginMentionsForSend }
               : {}),
+            paperoId: paperoIdForSendRef.current,
+            ...(() => {
+              const override = usePaperoStore.getState().overridesByPaperoId[
+                paperoIdForSendRef.current
+              ]?.instructions?.trim();
+              return override ? { paperoInstructions: override } : {};
+            })(),
           },
           modelSelection: selectedModelSelectionForSend,
           ...(providerOptionsForDispatchForSend
@@ -10049,6 +10199,28 @@ export default function ChatView({
 
     const { snapshot, trigger } = resolveActiveComposerTrigger();
     const menuIsActive = composerMenuOpenRef.current || trigger !== null;
+
+    // Bare Tab cycles agents when no slash/mention menu is open. Lexical owns Tab
+    // inside the composer — returning false here falls through to focus traversal
+    // ("classic Tab"), which is why the global keybinding alone is not enough.
+    if (
+      key === "Tab" &&
+      !event.shiftKey &&
+      !event.metaKey &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !menuIsActive &&
+      !isComposerApprovalState
+    ) {
+      onSelectPapero(
+        resolveCycledPaperoId({
+          currentId: activePaperoId,
+          direction: "next",
+        }),
+      );
+      return true;
+    }
+
     if (
       key === "Enter" &&
       !event.shiftKey &&
@@ -10470,6 +10642,24 @@ export default function ChatView({
   const relocateComposerLeadingControls = composerFooterControlsPlan.relocateLeadingControls;
   const renderComposerLeadingControls = (options: { iconOnly: boolean }) => (
     <>
+      <PaperoPill
+        activePaperoId={activePaperoId}
+        activeDefinition={activePaperoDefinition}
+        currentProvider={selectedProvider}
+        modelSelectionByProvider={activePaperoModelMap}
+        compact={isComposerFooterCompact}
+        hideRole={
+          isComposerFooterCompact ||
+          options.iconOnly ||
+          !composerFooterControlsPlan.showModelLabel
+        }
+        disabled={isComposerApprovalState || isConnecting || isSendBusy}
+        onSelectPapero={onSelectPapero}
+        onSaveCurrentModelSlot={onSavePaperoCurrentModelSlot}
+        onClearModelSlot={onClearPaperoModelSlot}
+        onSaveInstructions={onSavePaperoInstructions}
+        onResetInstructions={onResetPaperoInstructions}
+      />
       <ComposerExtrasMenu
         interactionMode={interactionMode}
         supportsFastMode={composerTraitSelection.caps.supportsFastMode}

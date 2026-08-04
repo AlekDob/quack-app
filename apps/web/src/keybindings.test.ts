@@ -294,6 +294,11 @@ const DEFAULT_BINDINGS = compile([
     whenAst: whenNot(whenIdentifier("terminalFocus")),
   },
   {
+    shortcut: modShortcut("tab", { modKey: false }),
+    command: "papero.next",
+    whenAst: whenNot(whenIdentifier("terminalFocus")),
+  },
+  {
     shortcut: modShortcut("e", { shiftKey: true }),
     command: "traitsPicker.toggle",
     whenAst: whenNot(whenIdentifier("terminalFocus")),
@@ -1009,6 +1014,7 @@ describe("shortcutLabelForCommand", () => {
       shortcutLabelForCommand(DEFAULT_BINDINGS, "model.previous", "MacIntel"),
       "⌥[",
     );
+    assert.strictEqual(shortcutLabelForCommand(DEFAULT_BINDINGS, "papero.next", "MacIntel"), "Tab");
     assert.strictEqual(
       shortcutLabelForCommand(DEFAULT_BINDINGS, "traitsPicker.toggle", "MacIntel"),
       "⇧⌘E",
@@ -1506,6 +1512,38 @@ describe("resolveShortcutCommand", () => {
     );
   });
 
+  it("resolves papero cycle on bare Tab outside terminal focus", () => {
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "Tab" }), DEFAULT_BINDINGS, {
+        platform: "MacIntel",
+        context: { terminalFocus: false },
+      }),
+      "papero.next",
+    );
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "Tab", shiftKey: true }), DEFAULT_BINDINGS, {
+        platform: "MacIntel",
+        context: { terminalFocus: false },
+      }),
+      null,
+    );
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "Tab" }), DEFAULT_BINDINGS, {
+        platform: "MacIntel",
+        context: { terminalFocus: true },
+      }),
+      null,
+    );
+    // Ctrl+Tab remains the recent-view switcher.
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "Tab", ctrlKey: true }), DEFAULT_BINDINGS, {
+        platform: "MacIntel",
+        context: { terminalFocus: false },
+      }),
+      "view.recent.next",
+    );
+  });
+
   it("returns dynamic script commands", () => {
     const keybindings = compile([{ shortcut: modShortcut("r"), command: "script.setup.run" }]);
 
@@ -1560,6 +1598,7 @@ describe("resolveShortcutCommand", () => {
         binding.command !== "modelPicker.toggle" &&
         binding.command !== "model.next" &&
         binding.command !== "model.previous" &&
+        binding.command !== "papero.next" &&
         binding.command !== "traitsPicker.toggle",
     );
 
@@ -1590,6 +1629,13 @@ describe("resolveShortcutCommand", () => {
         context: { terminalFocus: false },
       }),
       "model.previous",
+    );
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "Tab" }), legacyBindings, {
+        platform: "MacIntel",
+        context: { terminalFocus: false },
+      }),
+      "papero.next",
     );
   });
 

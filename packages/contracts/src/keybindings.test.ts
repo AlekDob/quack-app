@@ -113,6 +113,12 @@ it.effect("parses keybinding rules", () =>
     });
     assert.strictEqual(parsedPreviousModel.command, "model.previous");
 
+    const parsedNextPapero = yield* decode(KeybindingRule, {
+      key: "tab",
+      command: "papero.next",
+    });
+    assert.strictEqual(parsedNextPapero.command, "papero.next");
+
     const parsedTraitsPickerToggle = yield* decode(KeybindingRule, {
       key: "mod+shift+e",
       command: "traitsPicker.toggle",

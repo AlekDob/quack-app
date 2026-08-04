@@ -148,6 +148,10 @@
       "types": "./src/subagents.ts",
       "import": "./src/subagents.ts"
     },
+    "./paperi": {
+      "types": "./src/paperi.ts",
+      "import": "./src/paperi.ts"
+    },
     "./agentMentions": {
       "types": "./src/agentMentions.ts",
       "import": "./src/agentMentions.ts"

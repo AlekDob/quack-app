@@ -157,6 +157,12 @@ const AVAILABLE_NOW_DEFINITIONS: readonly ShortcutDefinition[] = [
       "Cycle to the previous model for the active provider (favorites first, then remaining models).",
   },
   {
+    command: "papero.next",
+    label: "Next agent",
+    description:
+      "Cycle the composer agent (Jack, Milo, Nora, Vera, Lia). Does not run while a slash or mention menu is open.",
+  },
+  {
     command: "traitsPicker.toggle",
     label: "Reasoning picker",
     description: "Open the composer reasoning and trait controls.",

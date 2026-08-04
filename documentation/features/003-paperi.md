@@ -1,0 +1,80 @@
+---
+type: feature-doc
+project: synara
+stack: React / Vite / TypeScript / Node
+created: 2026-08-04
+startDate: 2026-08-04
+endDate:
+last_verified: 2026-08-04
+status: active
+tags: [paperi, composer, agents, jack, milo, instructions, keybindings]
+---
+
+## Paperi (Composer Agents)
+**Purpose:** Built-in composer agents (Jack / Milo / Nora / Vera / Lia) with per-provider model slots, editable instructions, and server-side identity injection that never appears in the user bubble.
+**Stack:** React / TypeScript (apps/web) + Node orchestration (apps/server) + shared domain (`packages/shared`)
+
+### Files
+| Type | Path | Exports/Purpose |
+|------|------|-----------------|
+| Model/Type | `packages/shared/src/paperi.ts` | Ids, builtins, house style, identity block, `resolveCycledPaperoId` |
+| Model/Type | `packages/contracts/src/orchestration.ts` | Optional `paperoId` / `paperoInstructions` on turn message payloads |
+| Model/Type | `packages/contracts/src/keybindings.ts` | `papero.next` command |
+| Store/State | `apps/web/src/paperi/store.ts` | `synara:paperi:v1` — active agent, overrides, model slots |
+| Util | `apps/web/src/paperi/resolve.ts` | Fallback B: slot for current provider only (never switches provider) |
+| Util | `apps/web/src/paperi/index.ts` | Web barrel |
+| Util | `apps/web/src/lib/duckAvatars.ts` | Codetta duck avatar URLs |
+| Component | `apps/web/src/components/chat/PaperoPill.tsx` | Agent picker + discreet chevron → instructions submenu |
+| Component | `apps/web/src/components/ChatView.tsx` | Pill wiring, select/save/reset, Tab cycle, send freeze |
+| Config | `apps/web/src/keybindings.ts` | Client fallback: bare `Tab` → `papero.next` |
+| Config | `apps/server/src/keybindings.ts` | Default: `tab` → `papero.next` when `!terminalFocus` |
+| Util | `apps/web/src/shortcutsSheet.ts` | Settings / Mod+/ sheet entry “Next agent” |
+| Service | `apps/server/src/provider/paperoPromptInjection.ts` | `buildInlinePaperoInstructions` for provider input |
+| Service | `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` | Prepends identity to turn/steer input |
+| Service | `apps/server/src/orchestration/decider.ts` | Persists `paperoId` / `paperoInstructions` on message events |
+| Service | `apps/server/src/orchestration/projector.ts` | In-memory message projection of papero fields |
+| Test | `apps/web/src/paperi/store.test.ts` | Store defaults / instructions overrides |
+| Test | `apps/web/src/paperi/resolve.test.ts` | Fallback B + cycle order |
+| Test | `apps/server/src/provider/paperoPromptInjection.test.ts` | Injection bounds / override |
+| Test | `apps/web/src/keybindings.test.ts` | Tab → `papero.next` (+ Ctrl+Tab still recent-view) |
+| Test | `packages/contracts/src/keybindings.test.ts` | Schema accepts `papero.next` |
+
+### Assets
+| Path | Role |
+|------|------|
+| `apps/web/public/images/ducks/duck1–35.jpeg` | Builtin agent avatars |
+| `apps/web/public/images/ducks/jack.jpeg` | Jack avatar |
+
+### Data Flow
+`PaperoPill` / `Tab` → `onSelectPapero` → `usePaperoStore` (per-thread active id + optional model slot) → `thread.turn.start` (`paperoId`, optional `paperoInstructions`) → decider/projector → `ProviderCommandReactor` → `buildInlinePaperoInstructions` prepended to provider input (not bubble text)
+
+### Key Functions
+- `listComposerPaperi() → PaperoDefinition[]` — Jack then Milo/Nora/Vera/Lia
+- `resolveCycledPaperoId({ currentId, direction }) → PaperoId` — wrap-around cycle
+- `resolvePaperoModelSelection({ map, currentProvider }) → ModelSelection \| null` — Fallback B
+- `buildPaperoIdentityBlock({ definition, overrides }) → string` — `[Agent identity]…[/Agent identity]`
+- `buildInlinePaperoInstructions({ paperoId, paperoInstructions?, maxChars }) → string` — server inject text
+- `onSelectPapero(paperoId) → void` — activate; apply slot if present; toast
+- `onComposerCommandKey("Tab") → true` — Lexical path cycles when no slash/mention menu
+
+### State
+- `activePaperoIdByThreadId`: `Record<threadId, PaperoId>` — per-thread active agent (localStorage `synara:paperi:v1`)
+- `modelSelectionByProviderByPaperoId`: `Partial<Record<PaperoId, Partial<Record<ProviderKind, ModelSelection>>>>` — explicit saved slots
+- `overridesByPaperoId`: `Partial<Record<PaperoId, overrides>>` — custom instructions / label / avatar
+- `paperoIdForSendRef`: `PaperoId` — frozen at send so mid-stream pill flips do not relabel the turn
+- Default active: `builder` (Milo)
+
+### Behavior
+- Builtins only (v1): `jack` · `builder`(Milo) · `debugger`(Nora) · `reviewer`(Vera) · `companion`(Lia)
+- Picking an agent never switches provider; missing slot keeps current composer model/effort
+- Model slots saved only via “Save current model for \<provider\>”
+- Instructions: row click selects; small chevron opens right submenu (edit / Reset / Save)
+- Narrow composer pill: avatar + name only (`hideRole`)
+- **Tab** cycles agents in the Lexical composer (not when slash/mention/folder menu open)
+- **Shift+Tab** remains plan-mode toggle; **Ctrl+Tab** remains recent-view switcher
+- Identity injection is server-side only — user bubble stays clean
+
+### Config
+- `papero.next`: bare `Tab`, `when: !terminalFocus` (server default + client fallback)
+- Storage key: `synara:paperi:v1`
+- Shared export: `@synara/shared/paperi`

@@ -72,6 +72,7 @@ import {
   ProviderServiceError,
 } from "../../provider/Errors.ts";
 import { buildInlineSkillInstructions } from "../../provider/skillPromptInjection.ts";
+import { buildInlinePaperoInstructions } from "../../provider/paperoPromptInjection.ts";
 import {
   appendThreadMentionContextBlocks,
   resolveThreadMentionPromptProjection,
@@ -1278,6 +1279,8 @@ const make = Effect.gen(function* () {
     readonly attachments?: ReadonlyArray<ChatAttachment>;
     readonly skills?: ReadonlyArray<ProviderSkillReference>;
     readonly mentions?: ReadonlyArray<ProviderMentionReference>;
+    readonly paperoId?: string;
+    readonly paperoInstructions?: string;
     readonly reviewTarget?: ProviderReviewTarget;
     readonly modelSelection?: ModelSelection;
     readonly providerOptions?: ProviderStartOptions;
@@ -1317,6 +1320,19 @@ const make = Effect.gen(function* () {
       // text-only subagent steering channel.
       const steerProvider = (providerThread.session?.providerName ??
         providerThread.modelSelection.provider) as ProviderKind;
+      const steerPaperoInlineText = buildInlinePaperoInstructions({
+        paperoId: input.paperoId,
+        paperoInstructions: input.paperoInstructions,
+        maxChars: Math.max(
+          0,
+          PROVIDER_SEND_TURN_MAX_INPUT_CHARS -
+            messageText.length -
+            PROVIDER_INPUT_SAFETY_MARGIN_CHARS,
+        ),
+      });
+      const steerMessageWithPapero = steerPaperoInlineText
+        ? `${steerPaperoInlineText}\n\n${messageText}`
+        : messageText;
       const steerSkillInlineText =
         input.skills !== undefined && input.skills.length > 0
           ? yield* Effect.tryPromise(() =>
@@ -1326,7 +1342,7 @@ const make = Effect.gen(function* () {
                 maxChars: Math.max(
                   0,
                   PROVIDER_SEND_TURN_MAX_INPUT_CHARS -
-                    messageText.length -
+                    steerMessageWithPapero.length -
                     PROVIDER_INPUT_SAFETY_MARGIN_CHARS,
                 ),
               }),
@@ -1340,8 +1356,8 @@ const make = Effect.gen(function* () {
             )
           : "";
       const steerMessageWithSkills = steerSkillInlineText
-        ? `${messageText}\n\n${steerSkillInlineText}`
-        : messageText;
+        ? `${steerMessageWithPapero}\n\n${steerSkillInlineText}`
+        : steerMessageWithPapero;
       const normalizedSteerInput = toNonEmptyProviderInput(
         normalizeSkillMentionTextForProvider({
           provider: steerProvider,
@@ -1502,6 +1518,19 @@ const make = Effect.gen(function* () {
             })
           : boundaryMessageText;
     const providerInputWithMentionContext = `${providerInput}${mentionContextSuffix}`;
+    const paperoInlineText = buildInlinePaperoInstructions({
+      paperoId: input.paperoId,
+      paperoInstructions: input.paperoInstructions,
+      maxChars: Math.max(
+        0,
+        PROVIDER_SEND_TURN_MAX_INPUT_CHARS -
+          providerInputWithMentionContext.length -
+          PROVIDER_INPUT_SAFETY_MARGIN_CHARS,
+      ),
+    });
+    const providerInputWithPapero = paperoInlineText
+      ? `${paperoInlineText}\n\n${providerInputWithMentionContext}`
+      : providerInputWithMentionContext;
     // Portable skills fallback: providers that cannot load the referenced skill
     // file natively get the skill instructions inlined into the prompt.
     const skillInlineText =
@@ -1513,7 +1542,7 @@ const make = Effect.gen(function* () {
               maxChars: Math.max(
                 0,
                 PROVIDER_SEND_TURN_MAX_INPUT_CHARS -
-                  providerInputWithMentionContext.length -
+                  providerInputWithPapero.length -
                   PROVIDER_INPUT_SAFETY_MARGIN_CHARS,
               ),
             }),
@@ -1527,8 +1556,8 @@ const make = Effect.gen(function* () {
           )
         : "";
     const providerInputWithSkills = skillInlineText
-      ? `${providerInputWithMentionContext}\n\n${skillInlineText}`
-      : providerInputWithMentionContext;
+      ? `${providerInputWithPapero}\n\n${skillInlineText}`
+      : providerInputWithPapero;
     const normalizedInput = toNonEmptyProviderInput(
       normalizeSkillMentionTextForProvider({
         provider: selectedProvider as ProviderKind,
@@ -1660,7 +1689,7 @@ const make = Effect.gen(function* () {
       ) =>
         Effect.gen(function* () {
           // Claude cannot continue from a missing native session; clear the
-          // dead cursor and replay once with Synara transcript context.
+          // dead cursor and replay once with Quack transcript context.
           yield* clearStaleProviderResumeState({
             threadId: input.threadId,
             cause,
@@ -2245,6 +2274,10 @@ const make = Effect.gen(function* () {
         ...(message.attachments !== undefined ? { attachments: resolvedAttachments } : {}),
         ...(message.skills !== undefined ? { skills: message.skills } : {}),
         ...(message.mentions !== undefined ? { mentions: message.mentions } : {}),
+        ...(message.paperoId !== undefined ? { paperoId: message.paperoId } : {}),
+        ...(message.paperoInstructions !== undefined
+          ? { paperoInstructions: message.paperoInstructions }
+          : {}),
         ...(event.payload.modelSelection !== undefined
           ? { modelSelection: event.payload.modelSelection }
           : {}),
@@ -3939,7 +3972,7 @@ const make = Effect.gen(function* () {
                 threadId: blocker.threadId,
                 kind: "provider.turn.start.failed",
                 summary: "Previous messages were not sent",
-                detail: `Synara recovered an earlier provider failure, but ${skippedPromptCount} ${noun} skipped while the thread was blocked. Resend ${skippedPromptCount === 1 ? "it" : "them"} to continue.`,
+                detail: `Quack recovered an earlier provider failure, but ${skippedPromptCount} ${noun} skipped while the thread was blocked. Resend ${skippedPromptCount === 1 ? "it" : "them"} to continue.`,
                 turnId: null,
                 createdAt,
               });

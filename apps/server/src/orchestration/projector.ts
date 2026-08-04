@@ -921,6 +921,10 @@ export function projectEvent(
             ...(payload.attachments !== undefined ? { attachments: payload.attachments } : {}),
             ...(payload.skills !== undefined ? { skills: payload.skills } : {}),
             ...(payload.mentions !== undefined ? { mentions: payload.mentions } : {}),
+            ...(payload.paperoId !== undefined ? { paperoId: payload.paperoId } : {}),
+            ...(payload.paperoInstructions !== undefined
+              ? { paperoInstructions: payload.paperoInstructions }
+              : {}),
             turnId: payload.turnId,
             streaming: payload.streaming,
             source: payload.source,
@@ -956,6 +960,10 @@ export function projectEvent(
             ...(message.attachments !== undefined ? { attachments: message.attachments } : {}),
             ...(message.skills !== undefined ? { skills: message.skills } : {}),
             ...(message.mentions !== undefined ? { mentions: message.mentions } : {}),
+            ...(message.paperoId !== undefined ? { paperoId: message.paperoId } : {}),
+            ...(message.paperoInstructions !== undefined
+              ? { paperoInstructions: message.paperoInstructions }
+              : {}),
           };
           cappedMessages = nextMessages;
         } else {

@@ -237,7 +237,7 @@ export const TurnDispatchMode = Schema.Literals(["queue", "steer"]);
 export type TurnDispatchMode = typeof TurnDispatchMode.Type;
 export const DEFAULT_TURN_DISPATCH_MODE: TurnDispatchMode = "queue";
 // Marks who dispatched a user turn: a person typing, an automation run, or
-// another agent through the Synara agent gateway (MCP tools).
+// another agent through the Quack agent gateway (MCP tools).
 // Absent is treated as "user"; only server-dispatched turns carry the flag.
 export const MessageDispatchOrigin = Schema.Literals(["user", "automation", "agent"]);
 export type MessageDispatchOrigin = typeof MessageDispatchOrigin.Type;
@@ -482,6 +482,10 @@ export const OrchestrationMessage = Schema.Struct({
   attachments: Schema.optional(Schema.Array(ChatAttachment)),
   skills: Schema.optional(Schema.Array(ProviderSkillReference)),
   mentions: Schema.optional(Schema.Array(ProviderMentionReference)),
+  /** Active papero identity for this turn (Jack/Milo/…); injected server-side, not in bubble text. */
+  paperoId: Schema.optional(TrimmedNonEmptyString),
+  /** Optional instruction override for the papero; when absent the server uses the builtin block. */
+  paperoInstructions: Schema.optional(Schema.String),
   dispatchMode: Schema.optional(TurnDispatchMode),
   dispatchOrigin: Schema.optional(MessageDispatchOrigin),
   turnId: Schema.NullOr(TurnId),
@@ -1275,6 +1279,8 @@ export const ThreadTurnStartCommand = Schema.Struct({
     attachments: ChatAttachmentList,
     skills: Schema.optional(Schema.Array(ProviderSkillReference)),
     mentions: Schema.optional(Schema.Array(ProviderMentionReference)),
+    paperoId: Schema.optional(TrimmedNonEmptyString),
+    paperoInstructions: Schema.optional(Schema.String),
   }).check(TurnMessageContentCheck),
   modelSelection: Schema.optional(ModelSelection),
   providerOptions: Schema.optional(ProviderStartOptions),
@@ -1305,6 +1311,8 @@ const ClientThreadTurnStartCommand = Schema.Struct({
     attachments: UploadChatAttachmentList,
     skills: Schema.optional(Schema.Array(ProviderSkillReference)),
     mentions: Schema.optional(Schema.Array(ProviderMentionReference)),
+    paperoId: Schema.optional(TrimmedNonEmptyString),
+    paperoInstructions: Schema.optional(Schema.String),
   }).check(TurnMessageContentCheck),
   modelSelection: Schema.optional(ModelSelection),
   providerOptions: Schema.optional(ProviderStartOptions),
@@ -1894,6 +1902,8 @@ export const ThreadMessageSentPayload = Schema.Struct({
   attachments: Schema.optional(Schema.Array(ChatAttachment)),
   skills: Schema.optional(Schema.Array(ProviderSkillReference)),
   mentions: Schema.optional(Schema.Array(ProviderMentionReference)),
+  paperoId: Schema.optional(TrimmedNonEmptyString),
+  paperoInstructions: Schema.optional(Schema.String),
   dispatchMode: Schema.optional(TurnDispatchMode),
   dispatchOrigin: Schema.optional(MessageDispatchOrigin),
   turnId: Schema.NullOr(TurnId),
