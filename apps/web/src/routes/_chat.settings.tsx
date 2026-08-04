@@ -255,6 +255,9 @@ function SettingsRouteView() {
     defaults.enableSystemTaskCompletionNotifications
       ? ["Desktop notifications"]
       : []),
+    ...(settings.enableQuackCompletionSound !== defaults.enableQuackCompletionSound
+      ? ["Quack completion sound"]
+      : []),
     ...(settings.enableAssistantStreaming !== defaults.enableAssistantStreaming
       ? ["Assistant output"]
       : []),
@@ -629,7 +632,7 @@ function SettingsRouteView() {
         <SettingsCard>
           <SettingsRow
             title="Theme"
-            description="Choose how Synara looks across the app."
+            description="Choose how Quack looks across the app."
             resetAction={
               theme !== "system" ? (
                 <SettingResetButton label="theme" onClick={() => setTheme("system")} />

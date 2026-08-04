@@ -11,6 +11,7 @@ import { resolveVisibleToastThreadIds } from "../components/ui/toastRouteVisibil
 import { useAppSettings } from "../appSettings";
 import { isElectron } from "../env";
 import { useDiffRouteSearch } from "../hooks/useDiffRouteSearch";
+import { playQuackSound } from "../lib/quackSound";
 import { selectSplitView, useSplitViewStore } from "../splitViewStore";
 import { useStore } from "../store";
 import { createAllThreadsSelector } from "../storeSelectors";
@@ -89,6 +90,8 @@ async function showSystemThreadNotification(
   copy: ThreadNotificationCopy,
   threadId: Thread["id"],
   navigate: ReturnType<typeof useNavigate>,
+  // Mute the OS chime when the app plays its own cue for this event.
+  silent = false,
 ): Promise<boolean> {
   const { body, title } = copy;
 
@@ -97,7 +100,7 @@ async function showSystemThreadNotification(
     if (!supported) {
       return false;
     }
-    return window.desktopBridge.notifications.show({ title, body, silent: false, threadId });
+    return window.desktopBridge.notifications.show({ title, body, silent, threadId });
   }
 
   if (readBrowserNotificationPermissionState() !== "granted") {
@@ -107,6 +110,8 @@ async function showSystemThreadNotification(
   const notification = new Notification(title, {
     body,
     tag: `thread-notification:${threadId}`,
+    icon: "/synara.png",
+    silent,
   });
   notification.addEventListener("click", () => {
     window.focus();
@@ -235,6 +240,11 @@ export function TaskCompletionNotifications() {
       settings.enableSystemTaskCompletionNotifications &&
       (window.desktopBridge ? true : !isWindowForeground());
 
+    // One quack per batch, not per thread, so a burst of completions stays a single cue.
+    if (settings.enableQuackCompletionSound && completions.length > 0) {
+      playQuackSound();
+    }
+
     for (const completion of completions) {
       const copy = buildTaskCompletionCopy(completion);
       if (
@@ -248,7 +258,12 @@ export function TaskCompletionNotifications() {
       }
 
       if (shouldAttemptSystemNotification) {
-        void showSystemThreadNotification(copy, completion.threadId, navigate);
+        void showSystemThreadNotification(
+          copy,
+          completion.threadId,
+          navigate,
+          settings.enableQuackCompletionSound,
+        );
       }
     }
 
@@ -304,6 +319,7 @@ export function TaskCompletionNotifications() {
     }
   }, [
     navigate,
+    settings.enableQuackCompletionSound,
     settings.enableSystemTaskCompletionNotifications,
     settings.enableTaskCompletionToasts,
     terminalStateByThreadId,

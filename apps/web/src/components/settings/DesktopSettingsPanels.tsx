@@ -16,6 +16,7 @@ import type { AppSettingsBinding } from "~/appSettings";
 import { createLatestAppSnapRequestGuard } from "~/appSnap.logic";
 import { playAppSnapCaptureSound } from "~/lib/appSnapSound";
 import { CentralIcon } from "~/lib/central-icons";
+import { playQuackSound } from "~/lib/quackSound";
 import { cn } from "~/lib/utils";
 import { isElectron } from "~/env";
 import {
@@ -36,7 +37,7 @@ import { SettingResetButton } from "./SettingControls";
 import { SettingsCard, SettingsRow, SettingsSection } from "./SettingsPanelPrimitives";
 
 function appSnapStatusText(state: DesktopAppSnapState | null): string {
-  if (!state) return "Available in the Synara desktop app";
+  if (!state) return "Available in the Quack desktop app";
   if (!state.supported) return state.message ?? "Available on macOS only";
   if (state.status === "ready") {
     const shortcut = state.shortcut;
@@ -210,7 +211,12 @@ export function NotificationsSettingsPanel({
           }
           control={
             <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
-              <Button size="xs" variant="outline" onClick={() => void sendTestNotification()}>
+              <Button
+                size="xs"
+                variant="outline"
+                aria-label="Test desktop notification"
+                onClick={() => void sendTestNotification()}
+              >
                 Test
               </Button>
               <Switch
@@ -219,6 +225,42 @@ export function NotificationsSettingsPanel({
                   void setSystemNotificationsEnabled(Boolean(checked));
                 }}
                 aria-label="Desktop activity notifications"
+              />
+            </div>
+          }
+        />
+
+        <SettingsRow
+          title="Quack sound on task completion"
+          description="Play the quack cue when a chat finishes a turn. The matching OS notification is muted so you don't hear both sounds."
+          resetAction={
+            settings.enableQuackCompletionSound !== defaults.enableQuackCompletionSound ? (
+              <SettingResetButton
+                label="quack completion sound"
+                onClick={() =>
+                  updateSettings({
+                    enableQuackCompletionSound: defaults.enableQuackCompletionSound,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
+              <Button
+                size="xs"
+                variant="outline"
+                aria-label="Test quack sound"
+                onClick={() => playQuackSound()}
+              >
+                Test
+              </Button>
+              <Switch
+                checked={settings.enableQuackCompletionSound}
+                onCheckedChange={(checked) =>
+                  updateSettings({ enableQuackCompletionSound: Boolean(checked) })
+                }
+                aria-label="Quack sound on task completion"
               />
             </div>
           }
@@ -266,7 +308,7 @@ export function AppSnapSettingsPanel({
       toastManager.add({
         type: "warning",
         title: "AppSnap unavailable",
-        description: "AppSnap requires the Synara desktop app on macOS.",
+        description: "AppSnap requires the Quack desktop app on macOS.",
       });
       return;
     }
@@ -336,15 +378,15 @@ export function AppSnapSettingsPanel({
             Take an AppSnap to show your agent another app's window
           </p>
           <p className={SETTINGS_CARD_ROW_DESCRIPTION_CLASS_NAME}>
-            Press your two-key shortcut while any app is frontmost. Synara captures that window as
-            an image, brings itself forward, and attaches the snap to a task composer — the capture
+            Press your two-key shortcut while any app is frontmost. Quack captures that window as an
+            image, brings itself forward, and attaches the snap to a task composer — the capture
             stays on this device until you send the message.
           </p>
           {!supported ? (
             <p className={cn(SETTINGS_CARD_ROW_DESCRIPTION_CLASS_NAME, "pt-0.5")}>
               {appSnapState
                 ? (appSnapState.message ?? "AppSnap is available only in the macOS desktop app.")
-                : "AppSnap requires the Synara desktop app on macOS."}
+                : "AppSnap requires the Quack desktop app on macOS."}
             </p>
           ) : null}
         </div>
@@ -353,7 +395,7 @@ export function AppSnapSettingsPanel({
       <SettingsSection title="Capture">
         <SettingsRow
           title="Enable AppSnap"
-          description="Run the capture listener in the background while Synara is open."
+          description="Run the capture listener in the background while Quack is open."
           status={appSnapStatusText(appSnapState)}
           resetAction={
             settings.enableAppSnap !== defaults.enableAppSnap ? (
@@ -375,7 +417,7 @@ export function AppSnapSettingsPanel({
 
         <SettingsRow
           title="Shortcut"
-          description="Choose exactly two keys: one modifier and one other key. Synara checks its own bindings and asks macOS whether another app already owns the shortcut before saving it."
+          description="Choose exactly two keys: one modifier and one other key. Quack checks its own bindings and asks macOS whether another app already owns the shortcut before saving it."
           control={
             <AppSnapShortcutControl
               key={
@@ -397,7 +439,7 @@ export function AppSnapSettingsPanel({
 
         <SettingsRow
           title="Destination"
-          description="Snaps join the task you interacted with in the last minute, and consecutive snaps stay together. Otherwise Synara opens a fresh task with the capture attached."
+          description="Snaps join the task you interacted with in the last minute, and consecutive snaps stay together. Otherwise Quack opens a fresh task with the capture attached."
           control={<span className="text-xs font-medium text-muted-foreground">Automatic</span>}
         />
 
@@ -433,17 +475,17 @@ export function AppSnapSettingsPanel({
         <SettingsSection title="macOS permissions">
           <SettingsRow
             title="Input Monitoring"
-            description="Lets Synara notice the double-Option chord while another app owns the keyboard. Nothing you type is recorded."
+            description="Lets Quack notice the double-Option chord while another app owns the keyboard. Nothing you type is recorded."
             control={<AppSnapPermissionBadge permission={appSnapState.inputMonitoringPermission} />}
           />
           <SettingsRow
             title="Screen Recording"
-            description="Lets Synara capture an image of the frontmost window. Only the single window you snap is captured, only at the moment you press the chord."
+            description="Lets Quack capture an image of the frontmost window. Only the single window you snap is captured, only at the moment you press the chord."
             control={<AppSnapPermissionBadge permission={appSnapState.screenRecordingPermission} />}
           />
           <SettingsRow
             title="Permission status"
-            description="Grant both permissions to Synara under System Settings → Privacy & Security, then recheck here. macOS may require relaunching the app after a change."
+            description="Grant both permissions to Quack under System Settings → Privacy & Security, then recheck here. macOS may require relaunching the app after a change."
             control={
               <Button
                 type="button"
