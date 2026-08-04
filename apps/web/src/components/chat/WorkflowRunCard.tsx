@@ -38,6 +38,7 @@ import { formatClockDuration } from "../../session-logic";
 import { Button } from "../ui/button";
 import { DisclosureChevron } from "../ui/DisclosureChevron";
 import { DisclosureRegion } from "../ui/DisclosureRegion";
+import { SubagentAvatar } from "./SubagentAvatar";
 import {
   workflowElapsedMs,
   type WorkflowAgentRow,
@@ -229,12 +230,16 @@ function WorkflowAgentRowView({
         aria-expanded={expanded}
         onClick={onToggle}
       >
-        <span
-          className={cn(
-            "size-1.5 shrink-0 rounded-full",
-            subagentStatusDotClassName(agent.statusKind),
-          )}
-        />
+        {/* Avatar carries identity, the dot right next to it carries status. */}
+        <span className="flex shrink-0 items-center gap-1">
+          <SubagentAvatar seed={agent.subagentType ?? agent.description} />
+          <span
+            className={cn(
+              "size-1.5 shrink-0 rounded-full",
+              subagentStatusDotClassName(agent.statusKind),
+            )}
+          />
+        </span>
         <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/85">
           {agent.description}
           {agent.subagentType ? (

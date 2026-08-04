@@ -34,6 +34,7 @@ import {
   ComposerStackedPanelRowMain,
 } from "./ComposerStackedPanelContent";
 import { ComposerStackedPanel } from "./ComposerStackedPanel";
+import { SubagentAvatar } from "./SubagentAvatar";
 import {
   COMPOSER_STACKED_PANEL_BODY_PADDING_CLASS_NAME,
   COMPOSER_STACKED_PANEL_ICON_BUTTON_CLASS_NAME,
@@ -160,12 +161,16 @@ export const ComposerSubagentStrip = function ComposerSubagentStrip({
                   title={item.fullLabel}
                   onClick={() => onOpenThread(item.threadId)}
                 >
-                  <span
-                    className={cn(
-                      "size-1.5 shrink-0 rounded-full",
-                      subagentStatusDotClassName(item.statusKind),
-                    )}
-                  />
+                  {/* Avatar carries identity, the dot right next to it carries status. */}
+                  <span className="flex shrink-0 items-center gap-1">
+                    <SubagentAvatar seed={item.primaryLabel} />
+                    <span
+                      className={cn(
+                        "size-1.5 shrink-0 rounded-full",
+                        subagentStatusDotClassName(item.statusKind),
+                      )}
+                    />
+                  </span>
                   <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/85">
                     <span>{item.primaryLabel}</span>
                     {item.role ? (

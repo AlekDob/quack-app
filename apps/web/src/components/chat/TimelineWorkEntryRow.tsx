@@ -54,6 +54,7 @@ import { DiffStatLabel } from "./DiffStatLabel";
 import { type ExpandedImagePreview } from "./ExpandedImagePreview";
 import { LinkChipIcon } from "../LinkChipIcon";
 import { normalizeCompactToolLabel } from "./MessagesTimeline.logic";
+import { SubagentAvatar } from "./SubagentAvatar";
 import { SynaraLogo } from "../SynaraLogo";
 import { ToolCallDetailsContent } from "./ToolCallDetailsDialog";
 import { DisclosureChevron } from "../ui/DisclosureChevron";
@@ -76,6 +77,7 @@ import {
 } from "../../lib/toolCallLabel";
 import { formatLiveActivityMeta, useLiveActivityNow } from "../../lib/liveActivityPresentation";
 import { openWorkspaceFileReference, useWorkspaceFileOpener } from "../../lib/workspaceFileOpener";
+import { resolveSubagentPresentation } from "../../lib/subagentPresentation";
 
 const TRANSCRIPT_DISCLOSURE_TRANSITION_MS = 220;
 const TRANSCRIPT_DISCLOSURE_CLEANUP_BUFFER_MS = 40;
@@ -277,6 +279,25 @@ export function workEntryLeftIcon(workEntry: TimelineWorkEntry): LucideIcon {
   if (isSynaraToolCall(workEntry)) return SynaraToolIcon;
   if (workEntry.itemType === "mcp_tool_call") return McpIcon;
   return workEntryIcon(workEntry);
+}
+
+// Subagent tool rows swap the generic bot glyph for that subagent's own duck.
+// Seeded with the same identity label the composer strip uses, so one subagent
+// shows one duck across both surfaces. Multi-spawn rows take the first subagent.
+function subagentAvatarSeed(workEntry: TimelineWorkEntry): string | null {
+  if (workEntry.itemType !== "collab_agent_tool_call") {
+    return null;
+  }
+  const subagent = workEntry.subagents?.[0];
+  if (!subagent) {
+    return null;
+  }
+  return resolveSubagentPresentation({
+    nickname: subagent.nickname,
+    role: subagent.role,
+    title: subagent.title,
+    fallbackId: subagent.threadId,
+  }).primaryLabel;
 }
 
 function isGitHubMcpToolCall(workEntry: TimelineWorkEntry): boolean {
@@ -481,6 +502,7 @@ export const TimelineWorkEntryRow = memo(function TimelineWorkEntryRow(props: {
     !isSynaraBrowserToolRow &&
     !isSynaraToolRow;
   const LeftIcon = workEntryLeftIcon(workEntry);
+  const subagentSeed = subagentAvatarSeed(workEntry);
   const leftIconKind = webFetchUrl
     ? "web-fetch"
     : isGitHubToolRow || EntryIcon === GitHubIcon
@@ -666,6 +688,11 @@ export const TimelineWorkEntryRow = memo(function TimelineWorkEntryRow(props: {
                 >
                   {webFetchUrl ? (
                     <LinkChipIcon url={webFetchUrl} className={compact ? "size-3.5" : "size-4"} />
+                  ) : subagentSeed ? (
+                    <SubagentAvatar
+                      seed={subagentSeed}
+                      className={compact ? "size-3.5" : "size-4"}
+                    />
                   ) : (
                     renderWorkEntryIcon(LeftIcon, compact ? "size-3.5" : "size-4")
                   )}
