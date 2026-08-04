@@ -12,7 +12,8 @@ export function shouldUseCompactComposerFooter(
 }
 
 // Progressive degradation for the footer's picker cluster.
-// Degradation order (first thing to go first): context-window meter ->
+// Degradation order (first thing to go first): papero role subtitle +
+// context-window meter ->
 // traits/effort label (gear icon stays) -> model name (provider icon stays) ->
 // relocate the leading controls (extras "+" menu, access-rules indicator) into
 // the row below the input, next to the branch toolbar.
@@ -26,6 +27,8 @@ export function shouldUseCompactComposerFooter(
 // pane promotes back with hysteresis instead of flickering at the boundary.
 export interface ComposerFooterControlsPlan {
   showContextMeter: boolean;
+  /** Papero role subtitle ("· Builder"); avatar + name always stay. */
+  showPaperoRole: boolean;
   showModelLabel: boolean;
   showTraitsLabel: boolean;
   relocateLeadingControls: boolean;
@@ -44,6 +47,7 @@ export function composerFooterPlanForTier(
 ): ComposerFooterControlsPlan {
   return {
     showContextMeter: hasContextMeter && tier < 1,
+    showPaperoRole: tier < 1,
     showTraitsLabel: tier < 2,
     showModelLabel: tier < 3,
     relocateLeadingControls: tier >= 4,

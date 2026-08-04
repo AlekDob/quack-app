@@ -24,6 +24,7 @@ import {
   stageDraftNavigation,
 } from "../lib/stagedDraftNavigation";
 import { newCommandId, newThreadId } from "../lib/utils";
+import { usePaperoStore } from "../paperi";
 import { readNativeApi } from "../nativeApi";
 import { useFocusedChatContext } from "../focusedChatContext";
 import { useStore } from "../store";
@@ -71,6 +72,23 @@ export function useHandleNewThread() {
         provider: options.provider,
         model: defaultModel,
       });
+    };
+    // Fresh chats open on the active papero (Milo by default), so its saved model slot
+    // must win over the last-used sticky model — otherwise the pill says Milo while the
+    // model is whatever the previous thread used.
+    const applyPaperoModelSlot = (threadId: ThreadId) => {
+      const provider =
+        useComposerDraftStore.getState().draftsByThreadId[threadId]?.activeProvider ??
+        options?.provider ??
+        settings.defaultProvider;
+      const paperoStore = usePaperoStore.getState();
+      const slot = paperoStore.resolveModelForCurrentProvider(
+        paperoStore.getActivePaperoId(threadId),
+        provider,
+      );
+      if (slot) {
+        setModelSelection(threadId, slot);
+      }
     };
     const restoreComposerDraft = (
       threadId: ThreadId,
@@ -282,6 +300,7 @@ export function useHandleNewThread() {
           activateThreadEntryPoint(threadId);
           applyStickyState(threadId);
           applyProviderOverride(threadId);
+          applyPaperoModelSlot(threadId);
         },
         // Mark the draft-landing navigation as a transition so the new route
         // subtree renders interruptibly and the browser can paint the chat

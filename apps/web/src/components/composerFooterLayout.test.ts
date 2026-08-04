@@ -39,33 +39,38 @@ describe("shouldUseCompactComposerFooter", () => {
 });
 
 describe("composerFooterPlanForTier", () => {
-  it("maps tiers to the degradation order: meter, traits label, model label, relocation", () => {
+  it("maps tiers to the degradation order: meter + role, traits label, model label, relocation", () => {
     expect(composerFooterPlanForTier(0, true)).toEqual({
       showContextMeter: true,
+      showPaperoRole: true,
       showTraitsLabel: true,
       showModelLabel: true,
       relocateLeadingControls: false,
     });
     expect(composerFooterPlanForTier(1, true)).toEqual({
       showContextMeter: false,
+      showPaperoRole: false,
       showTraitsLabel: true,
       showModelLabel: true,
       relocateLeadingControls: false,
     });
     expect(composerFooterPlanForTier(2, true)).toEqual({
       showContextMeter: false,
+      showPaperoRole: false,
       showTraitsLabel: false,
       showModelLabel: true,
       relocateLeadingControls: false,
     });
     expect(composerFooterPlanForTier(3, true)).toEqual({
       showContextMeter: false,
+      showPaperoRole: false,
       showTraitsLabel: false,
       showModelLabel: false,
       relocateLeadingControls: false,
     });
     expect(composerFooterPlanForTier(COMPOSER_FOOTER_MAX_TIER, true)).toEqual({
       showContextMeter: false,
+      showPaperoRole: false,
       showTraitsLabel: false,
       showModelLabel: false,
       relocateLeadingControls: true,

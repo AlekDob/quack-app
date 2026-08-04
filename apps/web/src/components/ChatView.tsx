@@ -8117,9 +8117,9 @@ export default function ChatView({
               : {}),
             paperoId: paperoIdForSendRef.current,
             ...(() => {
-              const override = usePaperoStore.getState().overridesByPaperoId[
-                paperoIdForSendRef.current
-              ]?.instructions?.trim();
+              const override = usePaperoStore
+                .getState()
+                .overridesByPaperoId[paperoIdForSendRef.current]?.instructions?.trim();
               return override ? { paperoInstructions: override } : {};
             })(),
           },
@@ -9201,6 +9201,10 @@ export default function ChatView({
     composerFooterTraitsSummary.summaryText,
     Boolean(runtimeUsageContextWindow),
     useSplitComposerPickerControls,
+    // Plan-ready / pending-progress swap the footer's action cluster (Plan chips,
+    // wide "Implement" button). Without this the tier demoted for the old cluster
+    // stays stuck at the same pane width and model/effort never come back.
+    composerFooterHasWideActions,
   ].join(":");
   useLayoutEffect(() => {
     composerFooterDemotionWidthsRef.current = [];
@@ -10648,11 +10652,7 @@ export default function ChatView({
         currentProvider={selectedProvider}
         modelSelectionByProvider={activePaperoModelMap}
         compact={isComposerFooterCompact}
-        hideRole={
-          isComposerFooterCompact ||
-          options.iconOnly ||
-          !composerFooterControlsPlan.showModelLabel
-        }
+        hideRole={options.iconOnly || !composerFooterControlsPlan.showPaperoRole}
         disabled={isComposerApprovalState || isConnecting || isSendBusy}
         onSelectPapero={onSelectPapero}
         onSaveCurrentModelSlot={onSavePaperoCurrentModelSlot}
