@@ -454,6 +454,15 @@ export interface DesktopWindowState {
   isFullscreen: boolean;
 }
 
+export type DesktopUsageNotchPresentation = "compact" | "expanded";
+
+export interface DesktopUsageNotchState {
+  readonly supported: boolean;
+  readonly enabled: boolean;
+  readonly presentation: DesktopUsageNotchPresentation;
+  readonly displayId: number | null;
+}
+
 export interface SynaraStorageSnapshot {
   readonly version: 1;
   readonly exportedAt: string;
@@ -520,6 +529,10 @@ export interface DesktopBridge {
     onCaptured: (listener: (capture: DesktopAppSnapCapture) => void) => () => void;
     onError: (listener: (error: DesktopAppSnapErrorEvent) => void) => () => void;
     onState: (listener: (state: DesktopAppSnapState) => void) => () => void;
+  };
+  usageNotch: {
+    getState: () => Promise<DesktopUsageNotchState>;
+    setEnabled: (enabled: boolean) => Promise<DesktopUsageNotchState>;
   };
   storageMigration: {
     readSnapshot: () => SynaraStorageSnapshot | null;

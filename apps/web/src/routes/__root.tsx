@@ -248,6 +248,7 @@ function RootRouteView() {
           <GitProgressToastPreviewDev />
           <EventRouter />
           <ProviderStatusRefreshCoordinator />
+          <UsageNotchCoordinator />
           <GlobalShortcutsDialog />
           <GlobalFeedbackDialog />
           <GlobalWhatsNewSurface />
@@ -267,16 +268,16 @@ function RootRouteView() {
 function TransportCompatibilityView({ issue }: { issue: WsCompatibilityError }) {
   const title =
     issue.action === "update-client"
-      ? "This Synara client needs an update."
+      ? "This Quack client needs an update."
       : issue.action === "update-server"
-        ? "The Synara server needs an update."
-        : "Synara needs to reconnect with a matching build.";
+        ? "The Quack server needs an update."
+        : "Quack needs to reconnect with a matching build.";
   const guidance =
     issue.action === "update-client"
       ? "Update or reload this client, then reconnect."
       : issue.action === "update-server"
         ? "Update or restart the server, then reload this client."
-        : "Reload the app. If this repeats, restart Synara so the client and server use matching builds.";
+        : "Reload the app. If this repeats, restart Quack so the client and server use matching builds.";
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4 py-10 text-foreground sm:px-6">
@@ -328,6 +329,16 @@ function ProviderStatusRefreshCoordinator() {
     intervalMs: PROVIDER_UPDATE_REFRESH_INTERVAL_MS,
   });
 
+  return null;
+}
+
+function UsageNotchCoordinator() {
+  const { settings } = useAppSettings();
+  useEffect(() => {
+    const bridge = window.desktopBridge?.usageNotch;
+    if (!bridge) return;
+    void bridge.setEnabled(settings.enableUsageNotch).catch(() => undefined);
+  }, [settings.enableUsageNotch]);
   return null;
 }
 

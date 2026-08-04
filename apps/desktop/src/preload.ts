@@ -179,6 +179,10 @@ contextBridge.exposeInMainWorld("desktopBridge", {
       return () => ipcRenderer.removeListener(IPC.appSnap.state, wrappedListener);
     },
   },
+  usageNotch: {
+    getState: () => ipcRenderer.invoke(IPC.usageNotch.getState),
+    setEnabled: (enabled) => ipcRenderer.invoke(IPC.usageNotch.setEnabled, enabled),
+  },
   storageMigration: {
     readSnapshot: () => ipcRenderer.sendSync(IPC.storageMigration.read),
     acknowledgeSnapshot: () => ipcRenderer.invoke(IPC.storageMigration.acknowledge),

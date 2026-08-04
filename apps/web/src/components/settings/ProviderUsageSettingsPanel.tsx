@@ -13,11 +13,15 @@ import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useAppSettings } from "~/appSettings";
+import { isElectron } from "~/env";
 import { ProviderIcon } from "~/components/ProviderIcon";
 import { ProviderUsageLimitRows } from "~/components/ProviderUsageLimitRows";
 import { ProviderUsageLineList } from "~/components/ProviderUsageLineList";
 import { SettingsCard, SettingsSectionShell } from "~/components/settings/SettingsPanelPrimitives";
+import { SettingsRow } from "~/components/settings/SettingsPanelPrimitives";
+import { SettingResetButton } from "~/components/settings/SettingControls";
 import { Button } from "~/components/ui/button";
+import { Switch } from "~/components/ui/switch";
 import { useProviderUsageSummary } from "~/hooks/useProviderUsageSummary";
 import { RotateCcwIcon, TriangleAlertIcon } from "~/lib/icons";
 import { deriveProviderUsageDisplayRows } from "~/lib/providerUsageDisplay";
@@ -159,7 +163,7 @@ function mergeProviderUsageRefresh(
 
 export function ProviderUsageSettingsPanel() {
   const queryClient = useQueryClient();
-  const { settings } = useAppSettings();
+  const { settings, defaults, updateSettings } = useAppSettings();
   const codexHomePath = settings.codexHomePath || null;
   const threads = useStore(useMemo(() => createAllThreadsSelector(), []));
   // Account/thread fallback rows are shared by every provider card; derive them once per panel.
@@ -188,6 +192,7 @@ export function ProviderUsageSettingsPanel() {
   const showInitialLoading = usageQuery.isPending && !usageQuery.data;
 
   const isRefreshing = usageQuery.isFetching || refreshMutation.isPending;
+  const isMacDesktop = isElectron && /mac/i.test(globalThis.navigator?.platform ?? "");
 
   return (
     <SettingsSectionShell
@@ -205,6 +210,31 @@ export function ProviderUsageSettingsPanel() {
         </Button>
       }
     >
+      {isMacDesktop ? (
+        <SettingsCard>
+          <SettingsRow
+            title="Usage in notch"
+            description="Keep provider limits one hover away in the MacBook notch or a virtual top-center pill."
+            resetAction={
+              settings.enableUsageNotch !== defaults.enableUsageNotch ? (
+                <SettingResetButton
+                  label="usage in notch"
+                  onClick={() => updateSettings({ enableUsageNotch: defaults.enableUsageNotch })}
+                />
+              ) : null
+            }
+            control={
+              <Switch
+                checked={settings.enableUsageNotch}
+                onCheckedChange={(checked) =>
+                  updateSettings({ enableUsageNotch: Boolean(checked) })
+                }
+                aria-label="Enable usage in notch"
+              />
+            }
+          />
+        </SettingsCard>
+      ) : null}
       {showInitialLoading ? (
         <SettingsCard>
           <div className="px-4 py-3.5 text-xs text-muted-foreground">Loading provider usage…</div>

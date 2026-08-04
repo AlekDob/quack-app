@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { NativeApi, DesktopBridge } from "@synara/contracts";
+import type { NativeApi, DesktopBridge, DesktopUsageNotchState } from "@synara/contracts";
 
 interface ImportMetaEnv {
   readonly APP_VERSION: string;
@@ -15,5 +15,9 @@ declare global {
   interface Window {
     nativeApi?: NativeApi;
     desktopBridge?: DesktopBridge;
+    usageNotchBridge?: {
+      getWsUrl: () => string | null;
+      setPresentation: (presentation: "compact" | "expanded") => Promise<DesktopUsageNotchState>;
+    };
   }
 }

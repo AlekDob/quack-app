@@ -371,6 +371,13 @@ export const SETTINGS_SEARCH_ENTRIES: readonly SettingsSearchEntry[] = [
 
   // ── Usage ─────────────────────────────────────────────────────────────────────
   {
+    id: "usage:notch",
+    section: "usage",
+    title: "Usage in notch",
+    keywords: "macOS MacBook notch virtual pill hover provider limits quota overlay",
+    target: null,
+  },
+  {
     id: "usage:usage",
     section: "usage",
     title: "Usage and billing",

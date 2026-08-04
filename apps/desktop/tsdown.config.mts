@@ -35,6 +35,10 @@ export default defineConfig([
   },
   {
     ...shared,
+    entry: ["src/usageNotchPreload.ts"],
+  },
+  {
+    ...shared,
     entry: ["src/browserAnnotations/guestPreload.ts"],
   },
 ]);

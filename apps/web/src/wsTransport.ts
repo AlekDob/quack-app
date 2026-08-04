@@ -1,5 +1,5 @@
 // FILE: wsTransport.ts
-// Purpose: Browser-side Effect RPC transport over the Synara WebSocket endpoint.
+// Purpose: Browser-side Effect RPC transport over the Quack WebSocket endpoint.
 // Layer: Web transport
 // Exports: WsTransport plus stream-selection helpers used by tests.
 
@@ -170,7 +170,7 @@ function resolveRpcUrl(rawUrl: string, path: string): string {
 
 function rawSocketUrl(explicitUrl: string | null): string {
   if (explicitUrl) return explicitUrl;
-  const bridgeUrl = window.desktopBridge?.getWsUrl();
+  const bridgeUrl = window.desktopBridge?.getWsUrl() ?? window.usageNotchBridge?.getWsUrl();
   const envUrl = import.meta.env.VITE_WS_URL as string | undefined;
   return bridgeUrl && bridgeUrl.length > 0
     ? bridgeUrl

@@ -239,6 +239,8 @@ export const AppSettingsSchema = Schema.Struct({
   // Play the in-app quack cue when a chat turn completes. While enabled the
   // matching OS notification is muted so the two sounds don't overlap.
   enableQuackCompletionSound: Schema.Boolean.pipe(withDefaults(() => true)),
+  // macOS desktop overlay. The main renderer synchronizes this preference to Electron.
+  enableUsageNotch: Schema.Boolean.pipe(withDefaults(() => true)),
   // Local desktop preference. Native capability/permission state remains owned by Electron.
   // AppSnap is opt-in because enabling its Settings toggle requests macOS
   // Input Monitoring and Screen Recording permissions.

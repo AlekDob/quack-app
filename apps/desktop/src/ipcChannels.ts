@@ -44,6 +44,11 @@ export const DESKTOP_IPC_CHANNELS = {
     error: "desktop:appsnap-error",
     state: "desktop:appsnap-state",
   },
+  usageNotch: {
+    getState: "desktop:usage-notch-get-state",
+    setEnabled: "desktop:usage-notch-set-enabled",
+    setPresentation: "desktop:usage-notch-set-presentation",
+  },
   browser: {
     state: "desktop:browser-state",
     open: "desktop:browser-open",
