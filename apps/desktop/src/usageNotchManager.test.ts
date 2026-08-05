@@ -5,6 +5,16 @@ function createHarness(platform: NodeJS.Platform = "darwin") {
   const window = {
     isDestroyed: vi.fn(() => false),
     setBounds: vi.fn(),
+    setIgnoreMouseEvents: vi.fn(),
+    setAlwaysOnTop: vi.fn(),
+    setVisibleOnAllWorkspaces: vi.fn(),
+    showInactive: vi.fn(),
+    destroy: vi.fn(),
+  };
+  const logoWindow = {
+    isDestroyed: vi.fn(() => false),
+    setBounds: vi.fn(),
+    setIgnoreMouseEvents: vi.fn(),
     setAlwaysOnTop: vi.fn(),
     setVisibleOnAllWorkspaces: vi.fn(),
     showInactive: vi.fn(),
@@ -16,9 +26,11 @@ function createHarness(platform: NodeJS.Platform = "darwin") {
     removeListener: vi.fn(),
   };
   const createWindow = vi.fn(() => window);
+  const createLogoWindow = vi.fn(() => logoWindow);
   return {
-    manager: new UsageNotchManager({ platform, screen: screen as never, createWindow }),
+    manager: new UsageNotchManager({ platform, screen: screen as never, createWindow, createLogoWindow }),
     window,
+    logoWindow,
     screen,
     createWindow,
   };
@@ -30,12 +42,13 @@ describe("UsageNotchManager", () => {
     expect(harness.createWindow).not.toHaveBeenCalled();
     expect(harness.manager.setEnabled(true)).toMatchObject({ enabled: true, displayId: 7 });
     expect(harness.createWindow).toHaveBeenCalledOnce();
-    expect(harness.window.setBounds).toHaveBeenLastCalledWith({
-      x: 610,
+    expect(harness.logoWindow.setBounds).toHaveBeenLastCalledWith({
+      x: 700,
       y: 0,
-      width: 220,
-      height: 32,
+      width: 40,
+      height: 40,
     });
+    expect(harness.window.setBounds).toHaveBeenLastCalledWith({ x: 700, y: 0, width: 40, height: 40 });
     harness.manager.setPresentation("expanded");
     expect(harness.window.setBounds).toHaveBeenLastCalledWith({
       x: 340,
@@ -45,6 +58,7 @@ describe("UsageNotchManager", () => {
     });
     harness.manager.setEnabled(false);
     expect(harness.window.destroy).toHaveBeenCalledOnce();
+    expect(harness.logoWindow.destroy).toHaveBeenCalledOnce();
   });
 
   it("does nothing outside macOS", () => {
