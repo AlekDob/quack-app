@@ -64,6 +64,7 @@ function ProviderModelRadioItem(
     <MenuRadioItem
       key={`${provider}:${modelOption.slug}`}
       value={modelOption.slug}
+      title={modelOption.name}
       preserveChildLayout={preserveChildLayout}
       className={costMultiplierLabel ? "grid-cols-[minmax(0,1fr)_auto]" : undefined}
       trailing={

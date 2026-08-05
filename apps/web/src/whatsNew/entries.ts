@@ -73,6 +73,14 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
         details:
           "The sidebar surface picker has calmer styling, thread cards keep their active state while hovered, browser actions use clearer presentation, Search is located by its accessible name, and urgent or completed states stay legible in dense task lists.",
       },
+      {
+        id: "composer-model-name-tooltip",
+        title: "See full model names on hover",
+        description:
+          "Hover a model in the composer picker to read its full name, even when the row is shortened to fit.",
+        details:
+          "Every composer model option now exposes its complete display name through the picker row tooltip. The visible label keeps the existing compact truncation, while the full value remains available on hover and is covered by a browser regression test.",
+      },
     ],
   },
   {

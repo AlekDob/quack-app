@@ -382,6 +382,9 @@ describe("ProviderModelPicker", () => {
       await expect
         .element(page.getByRole("menuitemradio", { name: "GPT Favorite Sort" }))
         .toBeInTheDocument();
+      await expect
+        .element(page.getByRole("menuitemradio", { name: "GPT Favorite Sort" }))
+        .toHaveAttribute("title", "GPT Favorite Sort");
       expect(
         Array.from(document.querySelectorAll('[role="menuitemradio"]')).filter((element) =>
           element.textContent?.includes("GPT Favorite Sort"),
