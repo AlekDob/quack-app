@@ -486,6 +486,8 @@ export const OrchestrationMessage = Schema.Struct({
   paperoId: Schema.optional(TrimmedNonEmptyString),
   /** Optional instruction override for the papero; when absent the server uses the builtin block. */
   paperoInstructions: Schema.optional(Schema.String),
+  /** Model + effort the turn actually ran with; the thread-level selection changes under later turns. */
+  modelSelection: Schema.optional(ModelSelection),
   dispatchMode: Schema.optional(TurnDispatchMode),
   dispatchOrigin: Schema.optional(MessageDispatchOrigin),
   turnId: Schema.NullOr(TurnId),
@@ -1904,6 +1906,7 @@ export const ThreadMessageSentPayload = Schema.Struct({
   mentions: Schema.optional(Schema.Array(ProviderMentionReference)),
   paperoId: Schema.optional(TrimmedNonEmptyString),
   paperoInstructions: Schema.optional(Schema.String),
+  modelSelection: Schema.optional(ModelSelection),
   dispatchMode: Schema.optional(TurnDispatchMode),
   dispatchOrigin: Schema.optional(MessageDispatchOrigin),
   turnId: Schema.NullOr(TurnId),

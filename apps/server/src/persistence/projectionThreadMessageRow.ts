@@ -1,9 +1,11 @@
 import {
   ChatAttachment,
   MessageDispatchOrigin,
+  ModelSelection,
   NonNegativeInt,
   ProviderMentionReference,
   ProviderSkillReference,
+  TrimmedNonEmptyString,
   TurnDispatchMode,
   type OrchestrationMessage,
 } from "@synara/contracts";
@@ -22,6 +24,8 @@ export const ProjectionThreadMessageDbRowSchema = ProjectionThreadMessage.mapFie
     mentions: Schema.NullOr(Schema.fromJsonString(Schema.Array(ProviderMentionReference))),
     dispatchMode: Schema.NullOr(TurnDispatchMode),
     dispatchOrigin: Schema.NullOr(MessageDispatchOrigin),
+    paperoId: Schema.NullOr(TrimmedNonEmptyString),
+    modelSelection: Schema.NullOr(Schema.fromJsonString(ModelSelection)),
     sequence: Schema.NullOr(NonNegativeInt),
   }),
 );
@@ -49,6 +53,8 @@ export function projectionThreadMessageFromRow(
     ...(row.mentions !== null ? { mentions: row.mentions } : {}),
     ...(row.dispatchMode ? { dispatchMode: row.dispatchMode } : {}),
     ...(row.dispatchOrigin ? { dispatchOrigin: row.dispatchOrigin } : {}),
+    ...(row.paperoId ? { paperoId: row.paperoId } : {}),
+    ...(row.modelSelection !== null ? { modelSelection: row.modelSelection } : {}),
   };
 }
 
@@ -64,6 +70,8 @@ export function orchestrationMessageFromProjectionRow(
     ...(row.mentions !== null ? { mentions: row.mentions } : {}),
     ...(row.dispatchMode ? { dispatchMode: row.dispatchMode } : {}),
     ...(row.dispatchOrigin ? { dispatchOrigin: row.dispatchOrigin } : {}),
+    ...(row.paperoId ? { paperoId: row.paperoId } : {}),
+    ...(row.modelSelection !== null ? { modelSelection: row.modelSelection } : {}),
     turnId: row.turnId,
     streaming: row.isStreaming === 1,
     source: row.source,

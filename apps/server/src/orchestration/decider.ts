@@ -1617,6 +1617,10 @@ export const decideOrchestrationCommand = Effect.fn("decideOrchestrationCommand"
           ...(command.message.paperoInstructions !== undefined
             ? { paperoInstructions: command.message.paperoInstructions }
             : {}),
+          // Stamp the turn's effective model + effort on the message: the
+          // thread-level selection is overwritten by every later turn, so it is
+          // the only place history can read what this turn actually ran with.
+          modelSelection: command.modelSelection ?? targetThread.modelSelection,
           dispatchMode,
           // Explicit "user" (not absent): edit-resends replay through a fresh
           // server-side turn.start without an origin, and the projection

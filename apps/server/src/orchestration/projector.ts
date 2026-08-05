@@ -925,6 +925,9 @@ export function projectEvent(
             ...(payload.paperoInstructions !== undefined
               ? { paperoInstructions: payload.paperoInstructions }
               : {}),
+            ...(payload.modelSelection !== undefined
+              ? { modelSelection: payload.modelSelection }
+              : {}),
             turnId: payload.turnId,
             streaming: payload.streaming,
             source: payload.source,
@@ -963,6 +966,9 @@ export function projectEvent(
             ...(message.paperoId !== undefined ? { paperoId: message.paperoId } : {}),
             ...(message.paperoInstructions !== undefined
               ? { paperoInstructions: message.paperoInstructions }
+              : {}),
+            ...(message.modelSelection !== undefined
+              ? { modelSelection: message.modelSelection }
               : {}),
           };
           cappedMessages = nextMessages;

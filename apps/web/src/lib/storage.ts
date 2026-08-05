@@ -73,10 +73,17 @@ export function flushStorageBeforePageHide(
     document: typeof document !== "undefined" ? document : undefined,
   },
 ): void {
-  env.window?.addEventListener("beforeunload", flush);
-  env.window?.addEventListener("pagehide", flush);
+  // Partial DOM stubs (SSR-style component tests) expose a `document` object with
+  // no listener API, so presence alone is not enough to call through.
+  if (typeof env.window?.addEventListener === "function") {
+    env.window.addEventListener("beforeunload", flush);
+    env.window.addEventListener("pagehide", flush);
+  }
   const doc = env.document;
-  doc?.addEventListener("visibilitychange", () => {
+  if (typeof doc?.addEventListener !== "function") {
+    return;
+  }
+  doc.addEventListener("visibilitychange", () => {
     if (doc.visibilityState === "hidden") {
       flush();
     }

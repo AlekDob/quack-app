@@ -492,13 +492,13 @@ import { TranscriptSelectionActionLayer } from "./chat/TranscriptSelectionAction
 import { useChatTerminalController } from "./chat/useChatTerminalController";
 import { useChatAutomationSetup } from "./chat/useChatAutomationSetup";
 import { ComposerActiveTaskListCard } from "./chat/ComposerActiveTaskListCard";
-import { ComposerSubagentStrip } from "./chat/ComposerSubagentStrip";
+import { ComposerActivityStrip } from "./chat/ComposerActivityStrip";
 import {
   collectForegroundRunningSubagentStripItems,
   collectRunningSubagentStripItems,
-  deriveComposerSubagentStripItems,
-  type ComposerSubagentStripItem,
-} from "./chat/ComposerSubagentStrip.logic";
+  deriveComposerActivityStripRows,
+  type ComposerActivityStripSubagentItem,
+} from "./chat/ComposerActivityStrip.logic";
 import { WorkflowRunCard } from "./chat/WorkflowRunCard";
 import {
   buildWorkflowResumePrompt,
@@ -1428,7 +1428,7 @@ export default function ChatView({
     useState<Record<string, number>>({});
   const [planSidebarOpen, setPlanSidebarOpen] = useState(false);
   const [activeTaskListCompact, setActiveTaskListCompact] = useState(false);
-  const [subagentStripCompact, setSubagentStripCompact] = useState(false);
+  const [activityStripCompact, setActivityStripCompact] = useState(false);
   const [workflowRunCardCompact, setWorkflowRunCardCompact] = useState(false);
   const [isComposerFooterCompact, setIsComposerFooterCompact] = useState(false);
   // Width-aware visibility for the footer picker cluster (context meter,
@@ -2778,9 +2778,9 @@ export default function ChatView({
     }
     return toolUseIds;
   }, [stripSourceActivities]);
-  const composerSubagentStripItems = useMemo(
+  const composerActivityStripRows = useMemo(
     () =>
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: stripWorkLogEntries,
         liveTurnId: stripLiveTurnId,
         backgroundedProviderThreadIds: backgroundedSubagentToolUseIds,
@@ -5896,7 +5896,7 @@ export default function ChatView({
   }, [activeThread, workflowRunState]);
 
   const onBackgroundSubagentStripItem = useCallback(
-    async (item: ComposerSubagentStripItem) => {
+    async (item: ComposerActivityStripSubagentItem) => {
       const api = readNativeApi();
       // The Task tool_use lives on the strip source thread (the parent while a
       // subagent thread is open), so route the command there.
@@ -5918,7 +5918,7 @@ export default function ChatView({
   // item.threadId can still be the raw tool_use_id while client-side thread
   // resolution lags, which the server would reject as an unknown thread.
   const onStopSubagentStripItem = useCallback(
-    async (item: ComposerSubagentStripItem) => {
+    async (item: ComposerActivityStripSubagentItem) => {
       const api = readNativeApi();
       if (!api || !stripSourceThreadId) return;
       await api.orchestration.dispatchCommand({
@@ -5933,16 +5933,16 @@ export default function ChatView({
 
   // Stop-all fans out through the same per-row stop so both paths share one seam.
   const onStopAllSubagentStripItems = useCallback(async () => {
-    const running = collectRunningSubagentStripItems(composerSubagentStripItems);
+    const running = collectRunningSubagentStripItems(composerActivityStripRows);
     await Promise.all(running.map((item) => onStopSubagentStripItem(item)));
-  }, [composerSubagentStripItems, onStopSubagentStripItem]);
+  }, [composerActivityStripRows, onStopSubagentStripItem]);
 
   // Ctrl+B parity with the native CLI: send every foreground running subagent to
   // the background at once, fanning through the same per-row background dispatch.
   const onBackgroundAllForegroundSubagentStripItems = useCallback(async () => {
-    const foreground = collectForegroundRunningSubagentStripItems(composerSubagentStripItems);
+    const foreground = collectForegroundRunningSubagentStripItems(composerActivityStripRows);
     await Promise.all(foreground.map((item) => onBackgroundSubagentStripItem(item)));
-  }, [composerSubagentStripItems, onBackgroundSubagentStripItem]);
+  }, [composerActivityStripRows, onBackgroundSubagentStripItem]);
 
   // Pause is the same stop command; the persisted flag makes the settled card
   // read as paused (with a resume affordance) instead of plain stopped, across
@@ -6158,7 +6158,7 @@ export default function ChatView({
         event.key.toLowerCase() === "b" &&
         !isTerminalFocused() &&
         !isEditableEventTarget(event) &&
-        collectForegroundRunningSubagentStripItems(composerSubagentStripItems).length > 0
+        collectForegroundRunningSubagentStripItems(composerActivityStripRows).length > 0
       ) {
         event.preventDefault();
         event.stopPropagation();
@@ -6416,7 +6416,7 @@ export default function ChatView({
     onSplitSurface,
     showGitActions,
     isGitRepo,
-    composerSubagentStripItems,
+    composerActivityStripRows,
     onBackgroundAllForegroundSubagentStripItems,
     isFocusedPane,
     hasLiveTurn,
@@ -7900,6 +7900,9 @@ export default function ChatView({
           ? { mentions: mentionedPluginMentionsForSend }
           : {}),
         paperoId: paperoIdForSendRef.current,
+        // Stamped locally too, so the live Thinking row shows model + effort
+        // before the server message lands.
+        modelSelection: selectedModelSelectionForSend,
         createdAt: messageCreatedAt,
         streaming: false,
         source: "native",
@@ -8629,6 +8632,7 @@ export default function ChatView({
         text: outgoingMessageText,
         dispatchMode,
         paperoId: paperoIdForSendRef.current,
+        modelSelection: queuedTurn?.modelSelection ?? selectedModelSelection,
         createdAt: messageCreatedAt,
         streaming: false,
         source: "native",
@@ -10600,14 +10604,17 @@ export default function ChatView({
     );
   }
 
+  // A subagent thread has no papero: its transcript wears the same duck and label
+  // the parent's composer strip shows for it.
+  const activeSubagentPresentation = activeThread.parentThreadId
+    ? resolveSubagentPresentationForThread({
+        thread: activeThread,
+        threads: threadLineageThreads,
+      })
+    : null;
   const activeThreadDisplayTitle = resolveActiveThreadTitle({
     title: activeThread.title,
-    subagentTitle: activeThread.parentThreadId
-      ? resolveSubagentPresentationForThread({
-          thread: activeThread,
-          threads: threadLineageThreads,
-        }).fullLabel
-      : null,
+    subagentTitle: activeSubagentPresentation?.fullLabel ?? null,
     isHomeChat: isChatProject,
     isEmpty: timelineEntries.length === 0,
   });
@@ -10910,7 +10917,7 @@ export default function ChatView({
   const showComposerLiveChangesHeader = latestTurnLive && activeTurnLiveDiffState.hasChanges;
   const showComposerActiveTaskListCard = Boolean(activeTaskList && !planSidebarOpen);
   const showComposerWorkflowRunCard = workflowRunState !== null;
-  const showComposerSubagentStrip = composerSubagentStripItems.length > 0;
+  const showComposerActivityStrip = composerActivityStripRows.length > 0;
   // The workflow card already lists its run and member agents, so the generic
   // "N background agents" footer only counts tasks outside the workflow.
   const composerBackgroundTaskCount = workflowRunState
@@ -10976,11 +10983,11 @@ export default function ChatView({
                   }
                 />
               ) : null}
-              {showComposerSubagentStrip ? (
-                <ComposerSubagentStrip
-                  items={composerSubagentStripItems}
-                  compact={subagentStripCompact}
-                  onCompactChange={setSubagentStripCompact}
+              {showComposerActivityStrip ? (
+                <ComposerActivityStrip
+                  items={composerActivityStripRows}
+                  compact={activityStripCompact}
+                  onCompactChange={setActivityStripCompact}
                   onOpenThread={onNavigateToThread}
                   onBackgroundItem={onBackgroundSubagentStripItem}
                   onStopItem={onStopSubagentStripItem}
@@ -11002,7 +11009,7 @@ export default function ChatView({
                   showComposerLiveChangesHeader ||
                   showComposerActiveTaskListCard ||
                   showComposerWorkflowRunCard ||
-                  showComposerSubagentStrip
+                  showComposerActivityStrip
                 }
               />
               {/* Pending approvals and AskUserQuestion prompts both render as a detached
@@ -11748,6 +11755,8 @@ export default function ChatView({
                   <ChatTranscriptPane
                     activeThreadId={activeThread.id}
                     activeTurnId={activeTurnIdForTranscript}
+                    subagentStreamAvatarSeed={activeSubagentPresentation?.avatarSeed}
+                    subagentStreamLabel={activeSubagentPresentation?.fullLabel}
                     agentActivityDetail={openAgentActivityDetail}
                     hasMessages={timelineEntries.length > 0}
                     isWorking={hasLiveTurn}

@@ -975,6 +975,11 @@ const makeOrchestrationProjectionPipeline = Effect.gen(function* () {
         ),
         dispatch_mode = COALESCE(${event.payload.dispatchMode ?? null}, dispatch_mode),
         dispatch_origin = COALESCE(${event.payload.dispatchOrigin ?? null}, dispatch_origin),
+        papero_id = COALESCE(${event.payload.paperoId ?? null}, papero_id),
+        model_selection_json = COALESCE(
+          ${event.payload.modelSelection !== undefined ? JSON.stringify(event.payload.modelSelection) : null},
+          model_selection_json
+        ),
         is_streaming = 1,
         source = ${event.payload.source},
         sequence = COALESCE(sequence, ${event.sequence}),
@@ -1034,6 +1039,7 @@ const makeOrchestrationProjectionPipeline = Effect.gen(function* () {
             ...(event.payload.dispatchOrigin !== undefined
               ? { dispatchOrigin: event.payload.dispatchOrigin }
               : {}),
+            ...(event.payload.paperoId !== undefined ? { paperoId: event.payload.paperoId } : {}),
             isStreaming: event.payload.streaming,
             source: event.payload.source,
             sequence: Option.isSome(existingMessage)

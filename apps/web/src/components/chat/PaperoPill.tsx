@@ -23,7 +23,7 @@ import { Textarea } from "../ui/textarea";
 import { ComposerPickerMenuPopup, ComposerPickerMenuSubPopup } from "./ComposerPickerMenuPopup";
 import { PickerTriggerButton } from "./PickerTriggerButton";
 import { COMPOSER_PICKER_TRIGGER_TEXT_CLASS_NAME } from "./composerPickerStyles";
-import { CHAT_STREAM_AVATAR_VISIBLE_CLASS_NAME } from "./chatLeftGutter";
+import { RoundAvatarImage } from "./ChatStreamIdentity";
 
 export function PaperoAvatar({
   definition,
@@ -36,39 +36,11 @@ export function PaperoAvatar({
   readonly enlargeOnHover?: boolean;
 }) {
   return (
-    <img
+    <RoundAvatarImage
       src={definition.avatar}
-      alt=""
-      aria-hidden="true"
-      className={cn(
-        "size-3.5 rounded-full object-cover",
-        enlargeOnHover &&
-          // Keep the peek modest (1.25×) and ease it — a large scale + hard z jump
-          // reads as choppy and gets clipped by the transcript's overflow-x-hidden.
-          "z-10 origin-center transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:z-30 hover:scale-125 motion-reduce:transition-none motion-reduce:hover:scale-100",
-        className,
-      )}
+      className={className}
+      enlargeOnHover={enlargeOnHover}
     />
-  );
-}
-
-/**
- * Fixed left-gutter slot for the papero that owns a transcript turn. Shared by the
- * assistant row and the live Thinking row so both sit in the same column and appear
- * or hide at the same pane width.
- */
-export function PaperoStreamAvatarSlot({ definition }: { readonly definition: PaperoDefinition }) {
-  return (
-    <span
-      className={cn(
-        // Fixed slot so the circle can't be cropped by sibling row paint;
-        // visibility follows the shared left-gutter pane width.
-        "mt-0.5 hidden size-7 shrink-0 overflow-visible",
-        CHAT_STREAM_AVATAR_VISIBLE_CLASS_NAME,
-      )}
-    >
-      <PaperoAvatar definition={definition} enlargeOnHover className="size-7" />
-    </span>
   );
 }
 

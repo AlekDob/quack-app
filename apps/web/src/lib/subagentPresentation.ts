@@ -34,7 +34,14 @@ const GENERIC_SUBAGENT_TITLES = new Set([
   "thread",
 ]);
 
-export type SubagentStatusKind = "running" | "completed" | "failed" | "stopped" | "queued" | "idle";
+export type SubagentStatusKind =
+  | "running"
+  | "attention"
+  | "completed"
+  | "failed"
+  | "stopped"
+  | "queued"
+  | "idle";
 
 export interface SubagentPresentation {
   primaryLabel: string;
@@ -42,6 +49,9 @@ export interface SubagentPresentation {
   role: string | null;
   title: string | null;
   fullLabel: string;
+  /** Single identity seed for the duck avatar and the accent color, so one subagent
+   *  looks the same on every surface (composer strip, timeline row, its own stream). */
+  avatarSeed: string;
   accentColor: string;
 }
 
@@ -241,6 +251,7 @@ export function resolveSubagentPresentation(input: {
   const fallbackLabel = fallbackSubagentLabel(normalizedFallbackId) ?? "Subagent";
   const primaryLabel = nickname ?? resolvedTitle ?? capitalizeRoleLabel(role) ?? fallbackLabel;
   const fullLabel = role && nickname ? `${nickname} [${role}]` : primaryLabel;
+  const avatarSeed = nickname ?? primaryLabel;
 
   return {
     primaryLabel,
@@ -248,7 +259,8 @@ export function resolveSubagentPresentation(input: {
     role,
     title: resolvedTitle,
     fullLabel,
-    accentColor: subagentAccentColor(nickname ?? primaryLabel),
+    avatarSeed,
+    accentColor: subagentAccentColor(avatarSeed),
   };
 }
 
@@ -334,6 +346,10 @@ export function normalizeSubagentStatusKind(
   if (normalized === "idle") {
     return "idle";
   }
+  // Background work that stalled on a human (browser OAuth, download approval).
+  if (normalized === "attention" || normalized === "attention required") {
+    return "attention";
+  }
 
   return null;
 }
@@ -350,6 +366,8 @@ export function humanizeSubagentStatus(
   switch (normalized) {
     case "running":
       return "Running";
+    case "attention":
+      return "Needs you";
     case "completed":
       return "Completed";
     case "failed":
@@ -380,6 +398,8 @@ export function subagentStatusTextToneClassName(
   switch (statusKind) {
     case "running":
       return "text-sky-300/85";
+    case "attention":
+      return "text-amber-300/90";
     case "failed":
       return "text-rose-300/85";
     default:
@@ -393,6 +413,8 @@ export function subagentStatusDotClassName(
   switch (statusKind) {
     case "running":
       return "bg-sky-300/95";
+    case "attention":
+      return "bg-amber-400/95";
     case "completed":
       return "bg-emerald-300/80";
     case "failed":

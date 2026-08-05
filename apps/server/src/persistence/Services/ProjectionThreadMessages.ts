@@ -9,6 +9,7 @@
 import {
   ChatAttachment,
   MessageDispatchOrigin,
+  ModelSelection,
   OrchestrationMessageRole,
   OrchestrationMessageSource,
   TurnDispatchMode,
@@ -19,6 +20,7 @@ import {
   TurnId,
   IsoDateTime,
   NonNegativeInt,
+  TrimmedNonEmptyString,
 } from "@synara/contracts";
 import { Schema, ServiceMap } from "effect";
 import type { Effect, Option } from "effect";
@@ -36,6 +38,10 @@ export const ProjectionThreadMessage = Schema.Struct({
   mentions: Schema.optional(Schema.Array(ProviderMentionReference)),
   dispatchMode: Schema.optional(TurnDispatchMode),
   dispatchOrigin: Schema.optional(MessageDispatchOrigin),
+  /** Papero (agent persona) that opened the turn — drives the transcript avatar. */
+  paperoId: Schema.optional(TrimmedNonEmptyString),
+  /** Model + effort the turn ran with; the thread-level selection is overwritten per turn. */
+  modelSelection: Schema.optional(ModelSelection),
   isStreaming: Schema.Boolean,
   source: OrchestrationMessageSource,
   /** Server-owned orchestration event sequence for causal ordering. */

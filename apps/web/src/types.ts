@@ -113,6 +113,8 @@ export interface ChatMessage {
   dispatchOrigin?: MessageDispatchOrigin;
   /** Papero identity active when this message was sent — fixed at creation, never retargeted. */
   paperoId?: string;
+  /** Model + effort this turn actually ran with; the thread selection changes under later turns. */
+  modelSelection?: ModelSelection;
   turnId?: TurnId | null;
   createdAt: string;
   completedAt?: string | undefined;

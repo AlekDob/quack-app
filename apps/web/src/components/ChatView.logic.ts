@@ -199,6 +199,17 @@ export function modelSelectionsEqual(left: ModelSelection, right: ModelSelection
   );
 }
 
+/** Identity-tolerant compare for optional selections (a fresh decode is a new object). */
+export function optionalModelSelectionsEqual(
+  left: ModelSelection | undefined,
+  right: ModelSelection | undefined,
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  return left !== undefined && right !== undefined && modelSelectionsEqual(left, right);
+}
+
 /**
  * Runtime-mode validation uses the canonical thread model. Persist a changed
  * model first when enabling Auto, but downgrade from Auto first so an
@@ -821,7 +832,7 @@ export function describeVoiceRecordingStartError(error: unknown): string {
   const errorName = typeof error.name === "string" ? error.name : "";
 
   if (errorName === "NotAllowedError" || errorName === "PermissionDeniedError") {
-    return "Microphone access was denied. Enable it in macOS Privacy & Security > Microphone for Synara, then try again.";
+    return "Microphone access was denied. Enable it in macOS Privacy & Security > Microphone for Quack, then try again.";
   }
   if (errorName === "NotFoundError" || errorName === "DevicesNotFoundError") {
     return "No microphone was found. Connect one and try again.";

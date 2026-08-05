@@ -30,6 +30,8 @@ const makeProjectionThreadMessageRepository = Effect.gen(function* () {
         row.attachments !== undefined ? JSON.stringify(row.attachments) : null;
       const nextSkillsJson = row.skills !== undefined ? JSON.stringify(row.skills) : null;
       const nextMentionsJson = row.mentions !== undefined ? JSON.stringify(row.mentions) : null;
+      const nextModelSelectionJson =
+        row.modelSelection !== undefined ? JSON.stringify(row.modelSelection) : null;
       return sql`
         INSERT INTO projection_thread_messages (
           message_id,
@@ -42,6 +44,8 @@ const makeProjectionThreadMessageRepository = Effect.gen(function* () {
           mentions_json,
           dispatch_mode,
           dispatch_origin,
+          papero_id,
+          model_selection_json,
           is_streaming,
           source,
           sequence,
@@ -59,6 +63,8 @@ const makeProjectionThreadMessageRepository = Effect.gen(function* () {
           ${nextMentionsJson},
           ${row.dispatchMode ?? null},
           ${row.dispatchOrigin ?? null},
+          ${row.paperoId ?? null},
+          ${nextModelSelectionJson},
           ${row.isStreaming ? 1 : 0},
           ${row.source},
           ${row.sequence ?? null},
@@ -90,6 +96,14 @@ const makeProjectionThreadMessageRepository = Effect.gen(function* () {
             excluded.dispatch_origin,
             projection_thread_messages.dispatch_origin
           ),
+          papero_id = COALESCE(
+            excluded.papero_id,
+            projection_thread_messages.papero_id
+          ),
+          model_selection_json = COALESCE(
+            excluded.model_selection_json,
+            projection_thread_messages.model_selection_json
+          ),
           is_streaming = excluded.is_streaming,
           source = excluded.source,
           sequence = COALESCE(projection_thread_messages.sequence, excluded.sequence),
@@ -115,6 +129,8 @@ const makeProjectionThreadMessageRepository = Effect.gen(function* () {
           mentions_json AS "mentions",
           dispatch_mode AS "dispatchMode",
           dispatch_origin AS "dispatchOrigin",
+          papero_id AS "paperoId",
+          model_selection_json AS "modelSelection",
           is_streaming AS "isStreaming",
           source,
           sequence,
@@ -165,6 +181,8 @@ const makeProjectionThreadMessageRepository = Effect.gen(function* () {
           mentions_json AS "mentions",
           dispatch_mode AS "dispatchMode",
           dispatch_origin AS "dispatchOrigin",
+          papero_id AS "paperoId",
+          model_selection_json AS "modelSelection",
           is_streaming AS "isStreaming",
           source,
           sequence,

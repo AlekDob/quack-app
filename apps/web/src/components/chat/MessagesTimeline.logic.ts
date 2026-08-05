@@ -3,7 +3,8 @@
 // Layer: Web chat presentation helpers
 // Exports: row derivation, structural sharing, copy/timer helpers
 
-import { type MessageId, type TurnId } from "@synara/contracts";
+import { type MessageId, type ModelSelection, type TurnId } from "@synara/contracts";
+import { optionalModelSelectionsEqual } from "../ChatView.logic";
 import { type TimelineEntry, type WorkLogEntry, formatElapsed } from "../../session-logic";
 import { normalizeCompactToolLabel as normalizeCompactToolLabelValue } from "../../lib/toolCallLabel";
 import {
@@ -245,6 +246,8 @@ export type MessagesTimelineRow =
       // transcript pane is too narrow, same bar as MessageTrail).
       showPaperoAvatar?: boolean | undefined;
       avatarPaperoId?: string | undefined;
+      /** Model + effort the turn ran with, stamped on the user message that opened it. */
+      avatarModelSelection?: ModelSelection | undefined;
     }
   | {
       kind: "proposed-plan";
@@ -260,6 +263,8 @@ export type MessagesTimelineRow =
       // carried the avatar yet, the Thinking shimmer wears it instead.
       showPaperoAvatar?: boolean | undefined;
       avatarPaperoId?: string | undefined;
+      /** Model + effort the turn ran with, stamped on the user message that opened it. */
+      avatarModelSelection?: ModelSelection | undefined;
     }
   | {
       // Live-turn header that mirrors the settled "Worked for Xs" disclosure
@@ -512,6 +517,7 @@ export function deriveMessagesTimelineRows(input: {
   // Tracks which papero opened the current turn and whether its avatar has
   // already been rendered — reset at each user message (a new turn boundary).
   let currentTurnPaperoId: string | undefined;
+  let currentTurnModelSelection: ModelSelection | undefined;
   let paperoAvatarShownForTurn = false;
 
   const groupedEntriesEqual = (
@@ -608,6 +614,7 @@ export function deriveMessagesTimelineRows(input: {
 
     if (message.role === "user") {
       currentTurnPaperoId = message.paperoId;
+      currentTurnModelSelection = message.modelSelection;
       paperoAvatarShownForTurn = false;
     }
     const showPaperoAvatar = message.role === "assistant" && !paperoAvatarShownForTurn;
@@ -641,6 +648,7 @@ export function deriveMessagesTimelineRows(input: {
         message.role === "user" ? input.revertTurnCountByUserMessageId.get(message.id) : undefined,
       showPaperoAvatar,
       avatarPaperoId: message.role === "assistant" ? currentTurnPaperoId : undefined,
+      avatarModelSelection: message.role === "assistant" ? currentTurnModelSelection : undefined,
     });
   }
 
@@ -666,6 +674,7 @@ export function deriveMessagesTimelineRows(input: {
       createdAt: input.activeTurnStartedAt,
       showPaperoAvatar: !paperoAvatarShownForTurn,
       avatarPaperoId: currentTurnPaperoId,
+      avatarModelSelection: currentTurnModelSelection,
     });
   }
 
@@ -830,6 +839,7 @@ function collapseSettledTurns(
         if (folded.showPaperoAvatar) {
           row.showPaperoAvatar = true;
           row.avatarPaperoId = folded.avatarPaperoId;
+          row.avatarModelSelection = folded.avatarModelSelection;
         }
       }
     }
@@ -1101,7 +1111,8 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
       return (
         a.createdAt === bw.createdAt &&
         a.showPaperoAvatar === bw.showPaperoAvatar &&
-        a.avatarPaperoId === bw.avatarPaperoId
+        a.avatarPaperoId === bw.avatarPaperoId &&
+        optionalModelSelectionsEqual(a.avatarModelSelection, bw.avatarModelSelection)
       );
     }
 
@@ -1146,7 +1157,8 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
         a.assistantTurnDiffSummary === bm.assistantTurnDiffSummary &&
         a.revertTurnCount === bm.revertTurnCount &&
         a.showPaperoAvatar === bm.showPaperoAvatar &&
-        a.avatarPaperoId === bm.avatarPaperoId
+        a.avatarPaperoId === bm.avatarPaperoId &&
+        optionalModelSelectionsEqual(a.avatarModelSelection, bm.avatarModelSelection)
       );
     }
   }

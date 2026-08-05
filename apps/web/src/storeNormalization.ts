@@ -17,6 +17,7 @@ import { resolveThreadBranchRegressionGuard } from "@synara/shared/git";
 import { normalizeModelSlug } from "@synara/shared/model";
 import { deriveThreadSummaryMetadata } from "@synara/shared/threadSummary";
 
+import { optionalModelSelectionsEqual } from "./components/ChatView.logic";
 import { isStalePendingRequestFailureDetail } from "./lib/pendingInteraction";
 import { toAttachmentPreviewUrl } from "./lib/wsHttpUrl";
 import { hasLiveTurnTailWork } from "./session-logic";
@@ -490,6 +491,7 @@ export function normalizeChatMessage(
     previous.dispatchMode === incoming.dispatchMode &&
     previous.dispatchOrigin === incoming.dispatchOrigin &&
     previous.paperoId === incoming.paperoId &&
+    optionalModelSelectionsEqual(previous.modelSelection, incoming.modelSelection) &&
     previous.turnId === incoming.turnId &&
     previous.createdAt === incoming.createdAt &&
     previous.streaming === incoming.streaming &&
@@ -509,6 +511,7 @@ export function normalizeChatMessage(
     ...(incoming.dispatchMode ? { dispatchMode: incoming.dispatchMode } : {}),
     ...(incoming.dispatchOrigin ? { dispatchOrigin: incoming.dispatchOrigin } : {}),
     ...(incoming.paperoId ? { paperoId: incoming.paperoId } : {}),
+    ...(incoming.modelSelection ? { modelSelection: incoming.modelSelection } : {}),
     turnId: incoming.turnId,
     createdAt: incoming.createdAt,
     streaming: incoming.streaming,
@@ -571,6 +574,7 @@ function readModelMessageFromChatMessage(
     ...(message.dispatchMode ? { dispatchMode: message.dispatchMode } : {}),
     ...(message.dispatchOrigin ? { dispatchOrigin: message.dispatchOrigin } : {}),
     ...(message.paperoId ? { paperoId: message.paperoId } : {}),
+    ...(message.modelSelection ? { modelSelection: message.modelSelection } : {}),
     turnId: message.turnId ?? null,
     streaming: message.streaming,
     source: message.source ?? "native",

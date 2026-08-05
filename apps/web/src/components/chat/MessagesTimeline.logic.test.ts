@@ -926,6 +926,29 @@ describe("deriveMessagesTimelineRows", () => {
   const collapsedSignature = (row: MessageTimelineRow): string[] =>
     (row.collapsedTurnItems ?? []).map((item) => `${item.kind}:${String(item.id)}`);
 
+  it("carries the papero and the turn's model selection from the user message to the turn's rows", () => {
+    const user = userEntry("u1", "2026-01-01T00:00:00Z");
+    if (user.kind === "message") {
+      user.message = {
+        ...user.message,
+        paperoId: "jack",
+        modelSelection: { provider: "codex", model: "gpt-5.6-sol" },
+      };
+    }
+
+    const rows = deriveMessagesTimelineRows({
+      ...baseInput,
+      isWorking: true,
+      timelineEntries: [user, assistantEntry("a1", "2026-01-01T00:00:01Z", { turnId: "t1" })],
+    });
+
+    const assistant = messageRow(rows, "a1");
+    expect(assistant?.avatarPaperoId).toBe("jack");
+    expect(assistant?.avatarModelSelection).toEqual({ provider: "codex", model: "gpt-5.6-sol" });
+    const working = rows.find((row) => row.kind === "working");
+    expect(working && working.kind === "working" ? working.avatarPaperoId : null).toBe("jack");
+  });
+
   it("folds a settled turn's narration and work into one collapsed group on the terminal message", () => {
     const rows = deriveMessagesTimelineRows({
       ...baseInput,

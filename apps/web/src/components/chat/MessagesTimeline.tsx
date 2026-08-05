@@ -60,10 +60,12 @@ import {
 } from "~/lib/icons";
 import { pinActionLabel } from "~/lib/pin";
 import { DEFAULT_PAPERO_ID, isPaperoId, usePaperoStore } from "~/paperi";
+import type { PaperoDefinition, PaperoId } from "@synara/shared/paperi";
 import { Button } from "../ui/button";
 import { CrossTaskOriginLabel, type CrossTaskOrigin } from "./CrossTaskOriginLabel";
-import { PaperoStreamAvatarSlot } from "./PaperoPill";
 import { CHAT_STREAM_AVATAR_GAP_CLASS_NAME } from "./chatLeftGutter";
+import { ChatStreamAvatarSlot, ChatStreamMetaRow } from "./ChatStreamIdentity";
+import { duckAvatarFor } from "~/lib/duckAvatars";
 import { SynaraThreadCreationCard } from "./SynaraThreadCreationCard";
 import { buildExpandedImagePreview, ExpandedImagePreview } from "./ExpandedImagePreview";
 import { ProposedPlanCard } from "./ProposedPlanCard";
@@ -362,8 +364,38 @@ function WorktreeSetupCard({ steps }: { steps: ReadonlyArray<WorktreeSetupStep> 
   );
 }
 
+/**
+ * Who owns this turn on screen: the subagent itself inside a subagent thread,
+ * otherwise the turn's papero (default papero when the turn carries none).
+ */
+function resolveStreamIdentity(input: {
+  show: boolean | undefined;
+  paperoId: string | undefined;
+  subagentSeed: string | undefined;
+  subagentLabel: string | undefined;
+  resolvePapero: (paperoId: PaperoId) => PaperoDefinition;
+}): { src: string; label: string } | null {
+  if (!input.show) {
+    return null;
+  }
+  if (input.subagentSeed) {
+    return {
+      src: duckAvatarFor(input.subagentSeed),
+      label: input.subagentLabel ?? input.subagentSeed,
+    };
+  }
+  const definition = input.resolvePapero(
+    input.paperoId && isPaperoId(input.paperoId) ? input.paperoId : DEFAULT_PAPERO_ID,
+  );
+  return { src: definition.avatar, label: definition.label };
+}
+
 interface MessagesTimelineProps {
   hasMessages: boolean;
+  /** Set when the thread IS a subagent: its turns wear the subagent's own duck and
+   *  label instead of a papero (a subagent thread has no papero of its own). */
+  subagentStreamAvatarSeed?: string | undefined;
+  subagentStreamLabel?: string | undefined;
   isWorking: boolean;
   activeTurnInProgress: boolean;
   activeTurnStartedAt: string | null;
@@ -492,6 +524,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   workspaceRoot,
   emptyStateContent,
   contentInsetRightPx,
+  subagentStreamAvatarSeed,
+  subagentStreamLabel,
 }: MessagesTimelineProps) {
   // Prop defaults are resolved in the body rather than in the destructuring pattern:
   // an `AssignmentPattern` in the parameter list makes React Compiler bail out on the
@@ -1758,22 +1792,28 @@ export const MessagesTimeline = memo(function MessagesTimeline({
               />
             );
           };
-          const paperoDefinition = row.showPaperoAvatar
-            ? resolveEffectivePaperoDefinition(
-                row.avatarPaperoId && isPaperoId(row.avatarPaperoId)
-                  ? row.avatarPaperoId
-                  : DEFAULT_PAPERO_ID,
-              )
-            : null;
+          const streamIdentity = resolveStreamIdentity({
+            show: row.showPaperoAvatar,
+            paperoId: row.avatarPaperoId,
+            subagentSeed: subagentStreamAvatarSeed,
+            subagentLabel: subagentStreamLabel,
+            resolvePapero: resolveEffectivePaperoDefinition,
+          });
           return (
             <div
               className={cn(
                 "flex items-start overflow-visible",
-                paperoDefinition ? CHAT_STREAM_AVATAR_GAP_CLASS_NAME : null,
+                streamIdentity ? CHAT_STREAM_AVATAR_GAP_CLASS_NAME : null,
               )}
             >
-              {paperoDefinition ? <PaperoStreamAvatarSlot definition={paperoDefinition} /> : null}
+              {streamIdentity ? <ChatStreamAvatarSlot src={streamIdentity.src} /> : null}
               <div className="min-w-0 flex-1 overflow-visible">
+                {streamIdentity ? (
+                  <ChatStreamMetaRow
+                    label={streamIdentity.label}
+                    modelSelection={row.avatarModelSelection}
+                  />
+                ) : null}
                 {settledCollapseTransition && (
                   <div
                     aria-hidden="true"
@@ -2169,28 +2209,39 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         (() => {
           // No assistant row has carried the avatar yet in this turn, so the live
           // Thinking row wears it — the papero shows up the moment the send starts.
-          const workingPaperoDefinition = row.showPaperoAvatar
-            ? resolveEffectivePaperoDefinition(
-                row.avatarPaperoId && isPaperoId(row.avatarPaperoId)
-                  ? row.avatarPaperoId
-                  : DEFAULT_PAPERO_ID,
-              )
-            : null;
+          const workingStreamIdentity = resolveStreamIdentity({
+            show: row.showPaperoAvatar,
+            paperoId: row.avatarPaperoId,
+            subagentSeed: subagentStreamAvatarSeed,
+            subagentLabel: subagentStreamLabel,
+            resolvePapero: resolveEffectivePaperoDefinition,
+          });
           return (
             <div
               className={cn(
                 "flex items-start overflow-visible",
-                workingPaperoDefinition ? CHAT_STREAM_AVATAR_GAP_CLASS_NAME : null,
+                workingStreamIdentity ? CHAT_STREAM_AVATAR_GAP_CLASS_NAME : null,
               )}
             >
-              {workingPaperoDefinition ? (
-                <PaperoStreamAvatarSlot definition={workingPaperoDefinition} />
+              {workingStreamIdentity ? (
+                <ChatStreamAvatarSlot src={workingStreamIdentity.src} />
               ) : null}
-              <div
-                className="shimmer min-w-0 flex-1 pt-0.5 text-muted-foreground/70 font-system-ui"
-                style={{ fontSize: `${appTypographyScale.chatPx}px` }}
-              >
-                Thinking
+              <div className="min-w-0 flex-1">
+                {workingStreamIdentity ? (
+                  <ChatStreamMetaRow
+                    label={workingStreamIdentity.label}
+                    modelSelection={row.avatarModelSelection}
+                  />
+                ) : null}
+                {/* Orb sits next to the label (not inside the shimmer span) so the
+                    canvas keeps its own animation instead of pulsing with the text. */}
+                <div
+                  className="flex items-center gap-1.5 text-muted-foreground/70 font-system-ui"
+                  style={{ fontSize: `${appTypographyScale.chatPx}px` }}
+                >
+                  <ThinkingOrb state="solving" size={20} aria-label="Thinking" />
+                  <span className="shimmer">Thinking</span>
+                </div>
               </div>
             </div>
           );

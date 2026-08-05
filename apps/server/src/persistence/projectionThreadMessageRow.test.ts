@@ -38,6 +38,8 @@ const baseRow = {
   ]),
   dispatchMode: "steer",
   dispatchOrigin: "automation",
+  paperoId: "jack",
+  modelSelection: JSON.stringify({ provider: "codex", model: "gpt-5.6-sol" }),
   isStreaming: 1,
   source: "native",
   sequence: 42,
@@ -61,6 +63,8 @@ describe("projection thread message row codec", () => {
       mentions: [{ name: "github", path: "plugin://github" }],
       dispatchMode: "steer",
       dispatchOrigin: "automation",
+      paperoId: "jack",
+      modelSelection: { provider: "codex", model: "gpt-5.6-sol" },
       isStreaming: true,
       source: "native",
       sequence: 42,
@@ -80,6 +84,8 @@ describe("projection thread message row codec", () => {
       mentions: [{ name: "github" }],
       dispatchMode: "steer",
       dispatchOrigin: "automation",
+      paperoId: "jack",
+      modelSelection: { provider: "codex", model: "gpt-5.6-sol" },
     });
     expect("sequence" in projected).toBe(false);
 
@@ -91,6 +97,8 @@ describe("projection thread message row codec", () => {
       mentions: null,
       dispatchMode: null,
       dispatchOrigin: null,
+      paperoId: null,
+      modelSelection: null,
       isStreaming: 0,
       sequence: null,
     });
@@ -111,6 +119,8 @@ describe("projection thread message row codec", () => {
       "mentions",
       "dispatchMode",
       "dispatchOrigin",
+      "paperoId",
+      "modelSelection",
       "sequence",
     ]) {
       expect(optionalField in repositoryMessage).toBe(false);

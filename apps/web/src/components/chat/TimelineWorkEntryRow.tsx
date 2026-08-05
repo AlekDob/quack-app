@@ -76,7 +76,7 @@ import {
   type SynaraMcpToolStatus,
 } from "../../lib/toolCallLabel";
 import { formatLiveActivityMeta, useLiveActivityNow } from "../../lib/liveActivityPresentation";
-import { thinkingOrbStateForWorkEntry } from "../../lib/thinkingOrbState";
+import { isThinkingOrbActivity, thinkingOrbStateForWorkEntry } from "../../lib/thinkingOrbState";
 import { ThinkingOrb } from "thinking-orbs";
 import { openWorkspaceFileReference, useWorkspaceFileOpener } from "../../lib/workspaceFileOpener";
 import { resolveSubagentPresentation } from "../../lib/subagentPresentation";
@@ -299,7 +299,7 @@ function subagentAvatarSeed(workEntry: TimelineWorkEntry): string | null {
     role: subagent.role,
     title: subagent.title,
     fallbackId: subagent.threadId,
-  }).primaryLabel;
+  }).avatarSeed;
 }
 
 function isGitHubMcpToolCall(workEntry: TimelineWorkEntry): boolean {
@@ -516,7 +516,10 @@ export const TimelineWorkEntryRow = memo(function TimelineWorkEntryRow(props: {
           : isMcpToolRow
             ? "mcp"
             : undefined;
-  const showThinkingOrb = workEntry.tone === "thinking" && leftIconKind === undefined;
+  // Tool lifecycle entries are conventionally tone="tool", including commands
+  // that are still running. Render an orb for that live state too; historical
+  // completed calls retain their familiar command/tool icon.
+  const showThinkingOrb = isThinkingOrbActivity(workEntry) && leftIconKind === undefined;
   const heading = toolWorkEntryHeading(workEntry);
   const rawPreview = workEntryPreview(workEntry);
   const preview =

@@ -29,17 +29,17 @@ const projectionThreadsColumnNames = (sql: SqlClient.SqlClient) =>
 
 layer("reconcileMigrationLineage", (it) => {
   // An imported database whose tracker high-water
-  // mark is at or beyond Synara's latest migration ID. The migrator's max-ID
-  // gate then skips every Synara migration — including the #032 self-heal —
+  // mark is at or beyond Quack's latest migration ID. The migrator's max-ID
+  // gate then skips every Quack migration — including the #032 self-heal —
   // and startup crashes on the missing env_mode column.
-  it.effect("re-runs skipped migrations when an imported tracker outruns Synara's latest ID", () =>
+  it.effect("re-runs skipped migrations when an imported tracker outruns Quack's latest ID", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
 
       // Bring the schema to the last shared migration.
       yield* runMigrations({ toMigrationInclusive: 16 });
 
-      // Record a foreign lineage from 17 through past Synara's latest ID.
+      // Record a foreign lineage from 17 through past Quack's latest ID.
       const latestSynaraId = Math.max(...migrationEntries.map(([id]) => id));
       for (let id = 17; id <= latestSynaraId + 3; id++) {
         yield* sql`
@@ -65,7 +65,7 @@ layer("reconcileMigrationLineage", (it) => {
       assert.include(afterColumns, "env_mode");
       assert.include(afterColumns, "archived_at");
 
-      // The tracker now mirrors the Synara lineage exactly; foreign rows are gone.
+      // The tracker now mirrors the Quack lineage exactly; foreign rows are gone.
       const rows = yield* trackerRows(sql);
       assert.deepStrictEqual(
         rows.map((row) => [row.migration_id, row.name]),
@@ -111,7 +111,7 @@ layer("reconcileMigrationLineage", (it) => {
     }),
   );
 
-  it.effect("refuses writable migration startup for a newer Synara schema", () =>
+  it.effect("refuses writable migration startup for a newer Quack schema", () =>
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;
 
@@ -290,10 +290,12 @@ managedAttachmentsLegacyLayer("managed attachment migration after private migrat
         [86, "NormalizeStudioThreadWorkspaces"],
         [87, "DropUnusedOrchestrationEventIndexes"],
         [88, "ProjectionThreadsSettledAt"],
+        [89, "ProjectionThreadMessagesPaperoId"],
+        [90, "ProjectionThreadMessagesModelSelection"],
       ]);
 
       const tracker = yield* trackerRows(sql);
-      assert.deepStrictEqual(tracker.slice(-35), [
+      assert.deepStrictEqual(tracker.slice(-37), [
         { migration_id: 54, name: "DurableProviderCommandDelivery" },
         { migration_id: 55, name: "ManagedAttachments" },
         { migration_id: 56, name: "CommandReceiptFingerprints" },
@@ -329,6 +331,8 @@ managedAttachmentsLegacyLayer("managed attachment migration after private migrat
         { migration_id: 86, name: "NormalizeStudioThreadWorkspaces" },
         { migration_id: 87, name: "DropUnusedOrchestrationEventIndexes" },
         { migration_id: 88, name: "ProjectionThreadsSettledAt" },
+        { migration_id: 89, name: "ProjectionThreadMessagesPaperoId" },
+        { migration_id: 90, name: "ProjectionThreadMessagesModelSelection" },
       ]);
       const preserved = yield* sql<{ readonly count: number }>`
         SELECT COUNT(*) AS count FROM orchestration_consumer_state
@@ -409,6 +413,8 @@ agentGatewayRetentionLegacyLayer(
           [86, "NormalizeStudioThreadWorkspaces"],
           [87, "DropUnusedOrchestrationEventIndexes"],
           [88, "ProjectionThreadsSettledAt"],
+          [89, "ProjectionThreadMessagesPaperoId"],
+          [90, "ProjectionThreadMessagesModelSelection"],
         ]);
 
         const columns = yield* sql<{ readonly name: string }>`
@@ -492,11 +498,13 @@ spacesMigrationCollisionLayer("Spaces migration after the private migration 70 c
         [86, "NormalizeStudioThreadWorkspaces"],
         [87, "DropUnusedOrchestrationEventIndexes"],
         [88, "ProjectionThreadsSettledAt"],
+        [89, "ProjectionThreadMessagesPaperoId"],
+        [90, "ProjectionThreadMessagesModelSelection"],
       ]);
 
       const tracker = yield* trackerRows(sql);
       assert.deepStrictEqual(
-        tracker.slice(-19).map((row) => [row.migration_id, row.name]),
+        tracker.slice(-21).map((row) => [row.migration_id, row.name]),
         [
           [70, "AgentGatewayOperations"],
           [71, "ProjectionThreadsGatewayProvenance"],
@@ -517,6 +525,8 @@ spacesMigrationCollisionLayer("Spaces migration after the private migration 70 c
           [86, "NormalizeStudioThreadWorkspaces"],
           [87, "DropUnusedOrchestrationEventIndexes"],
           [88, "ProjectionThreadsSettledAt"],
+          [89, "ProjectionThreadMessagesPaperoId"],
+          [90, "ProjectionThreadMessagesModelSelection"],
         ],
       );
 
@@ -595,11 +605,13 @@ spacesMigrationCollisionLayer("Spaces migration after the private migration 70 c
         [86, "NormalizeStudioThreadWorkspaces"],
         [87, "DropUnusedOrchestrationEventIndexes"],
         [88, "ProjectionThreadsSettledAt"],
+        [89, "ProjectionThreadMessagesPaperoId"],
+        [90, "ProjectionThreadMessagesModelSelection"],
       ]);
 
       const tracker = yield* trackerRows(sql);
       assert.deepStrictEqual(
-        tracker.slice(-15).map((row) => [row.migration_id, row.name]),
+        tracker.slice(-17).map((row) => [row.migration_id, row.name]),
         [
           [74, "ExternalMcpIntegrations"],
           [75, "ExternalMcpActiveCapacity"],
@@ -616,6 +628,8 @@ spacesMigrationCollisionLayer("Spaces migration after the private migration 70 c
           [86, "NormalizeStudioThreadWorkspaces"],
           [87, "DropUnusedOrchestrationEventIndexes"],
           [88, "ProjectionThreadsSettledAt"],
+          [89, "ProjectionThreadMessagesPaperoId"],
+          [90, "ProjectionThreadMessagesModelSelection"],
         ],
       );
       const preservedSpaces = yield* sql<{ readonly spaceId: string }>`

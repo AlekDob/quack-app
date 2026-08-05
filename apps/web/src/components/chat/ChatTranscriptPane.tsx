@@ -26,6 +26,7 @@ import { DISCLOSURE_CONTENT_MOTION_CLASS } from "~/lib/disclosureMotion";
 import { type ExpandedImagePreview } from "./ExpandedImagePreview";
 import { ChatEmptyStateHero } from "./ChatEmptyStateHero";
 import { MessagesTimeline, type MessagesTimelineController } from "./MessagesTimeline";
+import { CHAT_PANE_CONTAINER_CLASS_NAME } from "./chatLeftGutter";
 import { MessageTrail } from "./MessageTrail";
 import { createActiveTrailStore, deriveMessageTrailItems } from "./messageTrail.logic";
 import { AgentActivityDetailView } from "./AgentActivityDetailView";
@@ -90,6 +91,8 @@ interface ChatTranscriptPaneProps {
   turnDiffSummaryByAssistantMessageId: Map<MessageId, TurnDiffSummary>;
   workspaceRoot: string | undefined;
   worktreeSetup: WorktreeSetupSnapshot | null;
+  subagentStreamAvatarSeed?: ComponentProps<typeof MessagesTimeline>["subagentStreamAvatarSeed"];
+  subagentStreamLabel?: ComponentProps<typeof MessagesTimeline>["subagentStreamLabel"];
 }
 
 export function ChatTranscriptPane({
@@ -149,6 +152,8 @@ export function ChatTranscriptPane({
   turnDiffSummaryByAssistantMessageId,
   workspaceRoot,
   worktreeSetup,
+  subagentStreamAvatarSeed,
+  subagentStreamLabel,
 }: ChatTranscriptPaneProps) {
   const scrollButtonFrameStyle: CSSProperties | undefined = contentInsetRightPx
     ? { paddingRight: contentInsetRightPx }
@@ -177,7 +182,14 @@ export function ChatTranscriptPane({
         terminalWorkspaceTerminalTabActive ? "pointer-events-none invisible" : "",
       )}
     >
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div
+        className={cn(
+          "relative flex min-h-0 flex-1 flex-col overflow-hidden",
+          // Named container so stream-chat avatars can hide below the same
+          // left-gutter width threshold as MessageTrail (see chatLeftGutter.ts).
+          CHAT_PANE_CONTAINER_CLASS_NAME,
+        )}
+      >
         {agentActivityDetail && onCloseAgentActivityDetail ? (
           <AgentActivityDetailView
             detail={agentActivityDetail}
@@ -193,6 +205,8 @@ export function ChatTranscriptPane({
             key={activeThreadId}
             hasMessages={hasMessages}
             isWorking={isWorking}
+            subagentStreamAvatarSeed={subagentStreamAvatarSeed}
+            subagentStreamLabel={subagentStreamLabel}
             worktreeSetup={worktreeSetup}
             activeTurnId={activeTurnId ?? null}
             activeTurnInProgress={activeTurnInProgress}
