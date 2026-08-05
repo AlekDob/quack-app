@@ -7,10 +7,15 @@
 //      and both thread kinds look identical.
 
 import type { ModelSelection } from "@synara/contracts";
+import { useState } from "react";
 
+import { useContainerSize } from "~/lib/pdf/useContainerSize";
 import { resolveThreadModelSummary } from "~/lib/threadModelSummary";
 import { cn } from "~/lib/utils";
 import { CHAT_STREAM_AVATAR_VISIBLE_CLASS_NAME } from "./chatLeftGutter";
+
+/** Below this turn height the avatar stays put instead of sticking. */
+const STICKY_MIN_TURN_HEIGHT_PX = 240;
 
 export function RoundAvatarImage({
   src,
@@ -45,16 +50,30 @@ export function RoundAvatarImage({
  * or hide at the same pane width.
  */
 export function ChatStreamAvatarSlot({ src }: { readonly src: string }) {
+  const [slot, setSlot] = useState<HTMLSpanElement | null>(null);
+  const size = useContainerSize(slot);
+  // Short turns fit on screen whole: sticking would only slide the avatar a few
+  // pixels away from its name for no gain, so keep it pinned to the turn.
+  const sticky = (size?.height ?? 0) > STICKY_MIN_TURN_HEIGHT_PX;
   return (
     <span
+      ref={setSlot}
       className={cn(
         // Fixed slot so the circle can't be cropped by sibling row paint;
-        // visibility follows the shared left-gutter pane width.
-        "mt-0.5 hidden size-7 shrink-0 overflow-visible",
+        // visibility follows the shared left-gutter pane width. `self-stretch` gives
+        // the sticky child a full-turn track to travel along.
+        // pb-7 keeps the sticky travel from running into the turn footer
+        // (copy/meta row, always present in layout) — the avatar stops with the
+        // last line of the reply instead of drifting into empty space.
+        "hidden w-7 shrink-0 self-stretch overflow-visible pb-7",
         CHAT_STREAM_AVATAR_VISIBLE_CLASS_NAME,
       )}
     >
-      <RoundAvatarImage src={src} enlargeOnHover className="size-7" />
+      {/* Sticks to the top of the transcript viewport while its own turn is on screen,
+          then scrolls away with the turn. `top-3` matches the list's py-3 inset. */}
+      <span className={cn("mt-0.5 block size-7", sticky && "sticky top-3")}>
+        <RoundAvatarImage src={src} enlargeOnHover className="size-7" />
+      </span>
     </span>
   );
 }
