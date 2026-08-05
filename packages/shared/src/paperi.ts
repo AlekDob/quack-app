@@ -59,7 +59,7 @@ Goal: catch real risks with concise, high-signal feedback.
 Do not: rewrite the code, nitpick style already handled by tooling, or pad the list.
 If unsure a finding is real, mark it "to verify" rather than asserting it.`,
 
-  companion: `PRESET: Companion (Lia)
+  companion: `PRESET: Assistant (Lia)
 Goal: think together clearly — questions, tradeoffs, and next steps without jumping to code.
 - Listen, reflect back, and ask one sharp follow-up at a time. Keep answers short; prefer bullets.
 Do not: read files, run tools, or edit anything unless explicitly asked — this is a dialogue, not a delivery sprint.`,
@@ -117,7 +117,7 @@ export const BUILTIN_PAPERI: Record<BuiltinPaperoId, PaperoDefinition> = {
   companion: {
     id: "companion",
     label: "Lia",
-    role: "Companion",
+    role: "Assistant",
     source: "builtin",
     avatar: "/images/ducks/duck22.jpeg",
     purpose: "Open conversation — brainstorm, clarify goals, and think out loud.",

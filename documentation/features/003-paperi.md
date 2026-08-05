@@ -28,7 +28,7 @@ tags: [paperi, composer, agents, jack, milo, instructions, keybindings, avatar, 
 | Util        | `apps/web/src/lib/duckAvatars.ts`                                | Codetta duck avatar URLs                                                                                                                          |
 | Component   | `apps/web/src/components/chat/PaperoPill.tsx`                    | Agent picker + discreet chevron → instructions submenu; exports `PaperoAvatar` (shared img)                                                       |
 | Component   | `apps/web/src/components/ChatView.tsx`                           | Pill wiring, select/save/reset, Tab cycle, send freeze, footer tier reset key                                                                     |
-| Hook        | `apps/web/src/hooks/useHandleNewThread.ts`                       | `applyPaperoModelSlot` — new draft threads pick up the active papero's saved model slot                                                          |
+| Hook        | `apps/web/src/hooks/useHandleNewThread.ts`                       | `applyPaperoModelSlot` — new draft threads pick up the active papero's saved model slot                                                           |
 | Util        | `apps/web/src/components/composerFooterLayout.ts`                | `composerFooterPlanForTier` — measured demotion ladder incl. `showPaperoRole`                                                                     |
 | Component   | `apps/web/src/components/chat/MessagesTimeline.tsx`              | Renders `PaperoAvatar` once at the top of each assistant turn's block                                                                             |
 | Logic       | `apps/web/src/components/chat/MessagesTimeline.logic.ts`         | `deriveMessagesTimelineRows` computes `showPaperoAvatar`/`avatarPaperoId` per row; hoisted through settled-turn folding and row-stability diffing |
@@ -79,7 +79,7 @@ tags: [paperi, composer, agents, jack, milo, instructions, keybindings, avatar, 
 
 ### Behavior
 
-- Builtins only (v1): `jack` · `builder`(Milo) · `debugger`(Nora) · `reviewer`(Vera) · `companion`(Lia)
+- Builtins only (v1): `jack` · `builder`(Milo) · `debugger`(Nora) · `reviewer`(Vera) · `companion`/`assistant`(Lia)
 - Picking an agent never switches provider; missing slot keeps current composer model/effort
 - Model slots saved only via “Save current model for \<provider\>”
 - Instructions: row click selects; small chevron opens right submenu (edit / Reset / Save)
