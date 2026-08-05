@@ -1803,10 +1803,10 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             <div
               className={cn(
                 "flex items-start overflow-visible",
-                streamIdentity ? CHAT_STREAM_AVATAR_GAP_CLASS_NAME : null,
+                CHAT_STREAM_AVATAR_GAP_CLASS_NAME,
               )}
             >
-              {streamIdentity ? <ChatStreamAvatarSlot src={streamIdentity.src} /> : null}
+              <ChatStreamAvatarSlot src={streamIdentity?.src} />
               <div className="min-w-0 flex-1 overflow-visible">
                 {streamIdentity ? (
                   <ChatStreamMetaRow

@@ -13,15 +13,15 @@ const credentials = {
 
 describe("macOS DMG finalization", () => {
   it("requires exactly one DMG artifact", () => {
-    expect(resolveSingleMacDmgFileName(["Synara-0.6.0-arm64.zip", "Synara-0.6.0-arm64.dmg"])).toBe(
-      "Synara-0.6.0-arm64.dmg",
+    expect(resolveSingleMacDmgFileName(["Quack-0.6.0-arm64.zip", "Quack-0.6.0-arm64.dmg"])).toBe(
+      "Quack-0.6.0-arm64.dmg",
     );
     expect(() => resolveSingleMacDmgFileName([])).toThrow("found 0");
     expect(() => resolveSingleMacDmgFileName(["a.dmg", "b.dmg"])).toThrow("found 2");
   });
 
   it("sign-checks, notarizes, staples, and validates the final DMG in order", () => {
-    const dmgPath = "/tmp/Synara-0.6.0-arm64.dmg";
+    const dmgPath = "/tmp/Quack-0.6.0-arm64.dmg";
     const commands = buildMacDmgFinalizationCommands(dmgPath, credentials);
 
     expect(commands.map(({ command, args }) => [command, args[0], args[1]])).toEqual([
