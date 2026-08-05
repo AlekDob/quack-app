@@ -12,7 +12,10 @@ import type {
   SpaceId,
   ThreadId,
 } from "@synara/contracts";
-import { THREAD_NOT_ARCHIVED_INVARIANT_MARKER } from "@synara/shared/errorMessages";
+import {
+  THREAD_ALREADY_ARCHIVED_INVARIANT_MARKER,
+  THREAD_NOT_ARCHIVED_INVARIANT_MARKER,
+} from "@synara/shared/errorMessages";
 import {
   isLegacyHomeChatContainerRow as isSharedLegacyHomeChatContainerRow,
   isOrdinaryProjectRow as isSharedOrdinaryProjectRow,
@@ -422,7 +425,7 @@ export function requireThreadNotArchived(input: {
         : Effect.fail(
             invariantError(
               input.command.type,
-              `Thread '${input.threadId}' is already archived and cannot handle command '${input.command.type}'.`,
+              `Thread '${input.threadId}' ${THREAD_ALREADY_ARCHIVED_INVARIANT_MARKER} and cannot handle command '${input.command.type}'.`,
             ),
           ),
     ),

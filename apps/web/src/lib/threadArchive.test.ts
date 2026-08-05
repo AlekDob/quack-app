@@ -4,11 +4,15 @@
 // Exports: Vitest cases for threadArchive helpers
 
 import { ThreadId } from "@synara/contracts";
-import { THREAD_NOT_ARCHIVED_INVARIANT_MARKER } from "@synara/shared/errorMessages";
+import {
+  THREAD_ALREADY_ARCHIVED_INVARIANT_MARKER,
+  THREAD_NOT_ARCHIVED_INVARIANT_MARKER,
+} from "@synara/shared/errorMessages";
 import { assert, describe, expect, it, vi } from "vitest";
 
 import {
   archiveThreadFromClient,
+  isThreadAlreadyArchivedError,
   isThreadAlreadyUnarchivedError,
   unarchiveThreadFromClient,
 } from "./threadArchive";
@@ -49,11 +53,23 @@ describe("threadArchive client helpers", () => {
     assert.equal(isThreadAlreadyUnarchivedError(error, THREAD_ID), true);
   });
 
-  it("does not treat unrelated invariant errors as already restored", () => {
+  it("recognizes the already-archived invariant returned by the server", () => {
     const error = new Error(
-      "Orchestration command invariant failed (thread.archive): Thread 'thread-archive' is already archived and cannot handle command 'thread.archive'.",
+      `Orchestration command invariant failed (thread.archive): Thread '${THREAD_ID}' ${THREAD_ALREADY_ARCHIVED_INVARIANT_MARKER} and cannot handle command 'thread.archive'.`,
     );
 
-    assert.equal(isThreadAlreadyUnarchivedError(error, THREAD_ID), false);
+    assert.equal(isThreadAlreadyArchivedError(error, THREAD_ID), true);
+  });
+
+  it("does not treat unrelated invariant errors as already archived or restored", () => {
+    const archiveError = new Error(
+      `Orchestration command invariant failed (thread.archive): Thread '${THREAD_ID}' ${THREAD_ALREADY_ARCHIVED_INVARIANT_MARKER} and cannot handle command 'thread.archive'.`,
+    );
+    const unarchiveError = new Error(
+      `Orchestration command invariant failed (thread.unarchive): Thread '${THREAD_ID}' ${THREAD_NOT_ARCHIVED_INVARIANT_MARKER} 'thread.unarchive'.`,
+    );
+
+    assert.equal(isThreadAlreadyUnarchivedError(archiveError, THREAD_ID), false);
+    assert.equal(isThreadAlreadyArchivedError(unarchiveError, THREAD_ID), false);
   });
 });

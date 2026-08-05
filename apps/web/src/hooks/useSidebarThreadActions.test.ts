@@ -84,10 +84,12 @@ const harness = vi.hoisted(() => ({
   confirm: vi.fn(),
   archiveThread: vi.fn(),
   unarchiveThread: vi.fn(),
+  alreadyArchived: false,
   alreadyUnarchived: false,
   activeThreadDelete: vi.fn(),
   navigate: vi.fn(),
   toast: vi.fn(),
+  setState: vi.fn(),
   removeFromSelection: vi.fn(),
   reconcileDeletedThreads: vi.fn(),
   clearDraftThread: vi.fn(),
@@ -160,6 +162,7 @@ vi.mock("../nativeApi", () => ({
 vi.mock("../lib/threadArchive", () => ({
   archiveThreadFromClient: harness.archiveThread,
   unarchiveThreadFromClient: harness.unarchiveThread,
+  isThreadAlreadyArchivedError: () => harness.alreadyArchived,
   isThreadAlreadyUnarchivedError: () => harness.alreadyUnarchived,
 }));
 vi.mock("../lib/activeThreadDelete", () => ({
@@ -169,6 +172,9 @@ vi.mock("../lib/deletedThreadClientReconciliation", () => ({
   reconcileDeletedThreadsFromClient: harness.reconcileDeletedThreads,
 }));
 vi.mock("../components/ui/toast", () => ({ toastManager: { add: harness.toast } }));
+vi.mock("../storeProjection", () => ({
+  applyThreadUpdate: (state: unknown) => state,
+}));
 vi.mock("../store", () => {
   const useStore = (selector: (state: unknown) => unknown) =>
     selector({ shellSnapshotSequence: harness.shellSnapshotSequence });
@@ -176,6 +182,7 @@ vi.mock("../store", () => {
     shellSnapshotSequence: harness.shellSnapshotSequence,
     removeDeletedThreadFromClientState: harness.removeDeletedThreadFromClientState,
   });
+  useStore.setState = harness.setState;
   useStore.subscribe = () => () => {};
   return { useStore };
 });
@@ -260,6 +267,7 @@ beforeEach(() => {
   sidebarThreads = [makeThread(THREAD_ID), makeThread(FALLBACK_ID)];
   harness.pinnedThreadIds = [];
   harness.shellSnapshotSequence = 0;
+  harness.alreadyArchived = false;
   harness.alreadyUnarchived = false;
   harness.splitViewsById = {};
   for (const mock of [
@@ -273,6 +281,7 @@ beforeEach(() => {
     harness.activeThreadDelete,
     harness.navigate,
     harness.toast,
+    harness.setState,
     harness.removeFromSelection,
     harness.reconcileDeletedThreads,
     harness.clearDraftThread,
@@ -408,6 +417,46 @@ describe("useSidebarThreadActions", () => {
     expect(harness.archiveThread).toHaveBeenCalledOnce();
     expect(harness.navigate).toHaveBeenCalledWith(
       expect.objectContaining({ params: { threadId: FALLBACK_ID }, replace: true }),
+    );
+  });
+
+  it("treats an already-archived invariant as successful archive", async () => {
+    harness.alreadyArchived = true;
+    harness.archiveThread.mockRejectedValue(new Error("already archived"));
+    const controller = render({ routeThreadId: THREAD_ID });
+
+    await expect(controller.archiveThreadWithUndo(THREAD_ID)).resolves.toBeUndefined();
+
+    expect(harness.archiveThread).toHaveBeenCalledOnce();
+    expect(harness.setState).toHaveBeenCalledOnce();
+    expect(harness.toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ archiveUndo: expect.any(Object) }),
+      }),
+    );
+    expect(harness.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Could not archive thread" }),
+    );
+    expect(harness.navigate).toHaveBeenCalledWith(
+      expect.objectContaining({ params: { threadId: FALLBACK_ID }, replace: true }),
+    );
+  });
+
+  it("keeps archive success when post-archive navigation fails", async () => {
+    harness.navigate.mockRejectedValue(new Error("navigation failed"));
+    const controller = render({ routeThreadId: THREAD_ID });
+
+    await expect(controller.archiveThreadWithUndo(THREAD_ID)).resolves.toBeUndefined();
+
+    expect(harness.archiveThread).toHaveBeenCalledOnce();
+    expect(harness.setState).toHaveBeenCalledOnce();
+    expect(harness.toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ archiveUndo: expect.any(Object) }),
+      }),
+    );
+    expect(harness.toast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Could not archive thread" }),
     );
   });
 

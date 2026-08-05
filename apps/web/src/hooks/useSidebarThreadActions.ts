@@ -23,6 +23,7 @@ import { reconcileDeletedThreadsFromClient } from "../lib/deletedThreadClientRec
 import { gitRemoveWorktreeMutationOptions } from "../lib/gitReactQuery";
 import {
   archiveThreadFromClient,
+  isThreadAlreadyArchivedError,
   isThreadAlreadyUnarchivedError,
   unarchiveThreadFromClient,
 } from "../lib/threadArchive";
@@ -44,6 +45,7 @@ import {
   useSplitViewStore,
 } from "../splitViewStore";
 import { useStore } from "../store";
+import { applyThreadUpdate } from "../storeProjection";
 import { useTemporaryThreadStore } from "../temporaryThreadStore";
 import { getThreadFromState } from "../threadDerivation";
 import { useThreadSelectionStore } from "../threadSelectionStore";
@@ -57,6 +59,44 @@ const ARCHIVE_UNDO_TOAST_DURATION_MS = 8000;
  * override as soon as the projection agrees.
  */
 const SETTLE_OVERRIDE_MAX_LIFETIME_MS = 15_000;
+
+/**
+ * Hides a thread in local sidebar state after the server has accepted (or already
+ * applied) archive. Needed when the shell push for `thread.archived` is dropped
+ * or arrives after a retry that would otherwise leave the row visible forever.
+ */
+function markThreadArchivedInClientState(threadId: ThreadId): void {
+  const archivedAt = new Date().toISOString();
+  useStore.setState((state) =>
+    applyThreadUpdate(state, threadId, (thread) => {
+      if (thread.archivedAt != null) return thread;
+      return {
+        ...thread,
+        archivedAt,
+        updatedAt: archivedAt,
+      };
+    }),
+  );
+}
+
+/**
+ * Archives a thread, treating "it was already archived" as success.
+ *
+ * A prior archive can commit on the server while the client still shows the row
+ * (dispatch timeout, dropped shell upsert, double click). That race is not an
+ * error worth toasting — hide the thread locally and continue. Kept at module
+ * scope because React Compiler cannot lower a `throw` inside a `try`/`catch`.
+ */
+async function archiveThreadIgnoringAlreadyArchived(threadId: ThreadId): Promise<void> {
+  try {
+    const api = readNativeApi();
+    if (!api) throw new Error("Unable to connect to the app server.");
+    await archiveThreadFromClient(api.orchestration, threadId);
+  } catch (error) {
+    if (!isThreadAlreadyArchivedError(error, threadId)) throw error;
+  }
+  markThreadArchivedInClientState(threadId);
+}
 
 /**
  * Unarchives a thread, treating "it was already unarchived" as success.
@@ -572,22 +612,32 @@ export function useSidebarThreadActions(input: {
 
       pendingThreadIds.add(threadId);
       const runArchive = async (): Promise<boolean> => {
-        await archiveThreadFromClient(api.orchestration, threadId);
+        // Archive acceptance (including already-archived races) is separate from
+        // post-archive navigation: a route change failure must not surface as
+        // "Could not archive thread" after the server has already accepted it.
+        await archiveThreadIgnoringAlreadyArchived(threadId);
         if (routeThreadId === threadId) {
-          const fallbackThreadId = getFallbackThreadIdAfterDelete({
-            threads: sidebarThreads,
-            deletedThreadId: threadId,
-            deletedThreadIds: new Set<ThreadId>(),
-            sortOrder: appSettings.sidebarThreadSortOrder,
-          });
-          if (fallbackThreadId) {
-            await navigate({
-              to: "/$threadId",
-              params: { threadId: fallbackThreadId },
-              replace: true,
+          try {
+            const fallbackThreadId = getFallbackThreadIdAfterDelete({
+              threads: sidebarThreads,
+              deletedThreadId: threadId,
+              deletedThreadIds: new Set<ThreadId>(),
+              sortOrder: appSettings.sidebarThreadSortOrder,
             });
-          } else {
-            await handleNewChat({ fresh: true });
+            if (fallbackThreadId) {
+              await navigate({
+                to: "/$threadId",
+                params: { threadId: fallbackThreadId },
+                replace: true,
+              });
+            } else {
+              await handleNewChat({ fresh: true });
+            }
+          } catch (error) {
+            console.error("Failed to navigate after archiving thread", {
+              threadId,
+              error,
+            });
           }
         }
         return true;

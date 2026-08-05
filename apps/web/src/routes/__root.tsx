@@ -106,6 +106,7 @@ import { useDiffRouteSearch } from "../hooks/useDiffRouteSearch";
 import { useProviderAuthRefreshOnFocus } from "../hooks/useProviderAuthRefreshOnFocus";
 import { useProviderStatusRefresh } from "../hooks/useProviderStatusRefresh";
 import { resolveSplitViewThreadIds, selectSplitView, useSplitViewStore } from "../splitViewStore";
+import { arraysShallowEqual } from "../storeNormalization";
 import { providerModelDiscoveryInvalidationFingerprint } from "../lib/providerDiscoveryInvalidation";
 import { providerDiscoveryQueryKeys } from "../lib/providerDiscoveryReactQuery";
 import { useAppSettings } from "../appSettings";
@@ -982,18 +983,33 @@ function EventRouter() {
   const activeSplitView = useSplitViewStore(
     useMemo(() => selectSplitView(routeSearch.splitViewId ?? null), [routeSearch.splitViewId]),
   );
-  const visibleThreadIds = activeSplitView
-    ? resolveSplitViewThreadIds(activeSplitView)
-    : routeThreadId
-      ? [routeThreadId]
-      : [];
+  const hostThreadIds = useMemo(
+    () =>
+      activeSplitView
+        ? resolveSplitViewThreadIds(activeSplitView)
+        : routeThreadId
+          ? [routeThreadId]
+          : [],
+    [activeSplitView, routeThreadId],
+  );
+  const visibleThreadIds = hostThreadIds;
   const retainedThreadIds = useRetainedThreadDetailIds();
   const serverThreadIds = new Set(serverThreads.map((thread) => thread.id));
-  const subscribedThreadIds = resolveThreadDetailSubscriptionLeaseIds({
+  // Stabilize the lease array by content: `serverThreads` re-emits on every
+  // streaming update, and an identity-changing lease list would enqueue a no-op
+  // subscription reconcile per render onto the serialized subscribe chain.
+  const nextSubscribedThreadIds = resolveThreadDetailSubscriptionLeaseIds({
     visibleThreadIds,
     retainedThreadIds,
     serverThreadIds,
   });
+  const subscribedThreadIdsRef = useRef(nextSubscribedThreadIds);
+  const subscribedThreadIds = arraysShallowEqual(
+    subscribedThreadIdsRef.current,
+    nextSubscribedThreadIds,
+  )
+    ? subscribedThreadIdsRef.current
+    : nextSubscribedThreadIds;
   const pathnameRef = useRef(pathname);
   const handledBootstrapThreadIdRef = useRef<string | null>(null);
   const visibleThreadIdsRef = useRef(subscribedThreadIds);
@@ -1008,6 +1024,7 @@ function EventRouter() {
   useEffect(() => {
     pathnameRef.current = pathname;
     visibleThreadIdsRef.current = subscribedThreadIds;
+    subscribedThreadIdsRef.current = subscribedThreadIds;
     // Retention must know what is on screen: an evicted visible thread keeps its
     // shell row and renders as an empty conversation until a snapshot lands.
     setVisibleThreadDetailIds(visibleThreadIds);

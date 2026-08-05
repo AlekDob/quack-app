@@ -263,6 +263,10 @@
     "./browserAnnotations": {
       "types": "./src/browserAnnotations.ts",
       "import": "./src/browserAnnotations.ts"
+    },
+    "./pendingInteractions": {
+      "types": "./src/pendingInteractions.ts",
+      "import": "./src/pendingInteractions.ts"
     }
   },
   "scripts": {

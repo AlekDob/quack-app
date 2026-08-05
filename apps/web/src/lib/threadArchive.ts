@@ -1,11 +1,13 @@
 // FILE: threadArchive.ts
 // Purpose: Dispatches thread archive/unarchive commands from the client.
 // Layer: Web orchestration helper
-// Exports: archiveThreadFromClient, unarchiveThreadFromClient, isThreadAlreadyUnarchivedError
+// Exports: archiveThreadFromClient, unarchiveThreadFromClient, isThreadAlreadyUnarchivedError,
+//          isThreadAlreadyArchivedError
 
 import type { NativeApi, ThreadId } from "@synara/contracts";
 import {
   collectErrorMessages,
+  THREAD_ALREADY_ARCHIVED_INVARIANT_MARKER,
   THREAD_NOT_ARCHIVED_INVARIANT_MARKER,
 } from "@synara/shared/errorMessages";
 
@@ -24,6 +26,19 @@ export async function archiveThreadFromClient(
     commandId: newCommandId(),
     threadId,
   });
+}
+
+// Detects the server invariant returned when an archive races a prior successful
+// archive that the client never applied (timeout, dropped shell push, double submit).
+// Matches the shared marker so the two sides cannot drift, and scopes it to the
+// archive command and this thread so unrelated invariants never read as success.
+export function isThreadAlreadyArchivedError(error: unknown, threadId: ThreadId): boolean {
+  const errorText = collectErrorMessages(error).join("\n");
+  return (
+    errorText.includes("thread.archive") &&
+    errorText.includes(THREAD_ALREADY_ARCHIVED_INVARIANT_MARKER) &&
+    errorText.includes(String(threadId))
+  );
 }
 
 // Detects the server invariant returned when an Undo races another restore (the
