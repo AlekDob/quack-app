@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { RouteInsetSurface } from "~/components/RouteInsetSurface";
 import { Button } from "~/components/ui/button";
 import {
+  dialogFieldLabelClassName,
   Dialog,
   DialogDescription,
   DialogFooter,
@@ -18,6 +19,8 @@ import {
   DialogPopup,
   DialogTitle,
 } from "~/components/ui/dialog";
+import { DisclosureChevron } from "~/components/ui/DisclosureChevron";
+import { DisclosureRegion } from "~/components/ui/DisclosureRegion";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import {
@@ -308,10 +311,12 @@ function AgentDialog({
   readonly onDelete: (agent: TeamAgent) => void;
 }) {
   const [draft, setDraft] = useState<TeamAgent | null>(null);
+  const [avatarsOpen, setAvatarsOpen] = useState(false);
   const shown = draft && agent && draft.id === agent.id ? draft : agent;
   const update = (patch: Partial<TeamAgent>) => setDraft({ ...(shown ?? blankAgent()), ...patch });
   const close = () => {
     setDraft(null);
+    setAvatarsOpen(false);
     onClose();
   };
   const resetBuiltin = () => {
@@ -334,7 +339,7 @@ function AgentDialog({
         if (!open) close();
       }}
     >
-      <DialogPopup className="max-w-2xl">
+      <DialogPopup className="max-w-xl">
         <DialogHeader>
           <DialogTitle>
             {shown?.source === "builtin" ? `Edit ${shown.name}` : "New agent"}
@@ -342,49 +347,101 @@ function AgentDialog({
           <DialogDescription>Changes apply only to this Team.</DialogDescription>
         </DialogHeader>
         {shown ? (
-          <DialogPanel className="space-y-4">
-            <div className="grid grid-cols-7 gap-2">
-              {avatarOptions().map((avatar) => (
-                <button
-                  key={avatar}
+          <DialogPanel className="space-y-5">
+            <div className="rounded-xl border border-border bg-muted/20 p-3">
+              <div className="flex items-center gap-3">
+                <img
+                  className="size-12 rounded-xl object-cover"
+                  src={shown.avatar}
+                  alt="Selected avatar"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">Avatar</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Choose one duck for this agent.
+                  </p>
+                </div>
+                <Button
                   type="button"
-                  onClick={() => update({ avatar })}
-                  className={shown.avatar === avatar ? "rounded-lg ring-2 ring-ring" : "rounded-lg"}
+                  size="xs"
+                  variant="outline"
+                  aria-expanded={avatarsOpen}
+                  onClick={() => setAvatarsOpen((open) => !open)}
                 >
-                  <img
-                    className="size-9 rounded-lg object-cover"
-                    src={avatar}
-                    alt="Choose avatar"
-                  />
-                </button>
-              ))}
+                  Change
+                  <DisclosureChevron open={avatarsOpen} className="size-3" />
+                </Button>
+              </div>
+              <DisclosureRegion open={avatarsOpen} contentClassName="pt-3">
+                <div className="grid max-h-43 grid-cols-7 gap-1.5 overflow-y-auto rounded-lg border border-border bg-background p-2 sm:grid-cols-8">
+                  {avatarOptions().map((avatar, index) => {
+                    const selected = shown.avatar === avatar;
+                    return (
+                      <button
+                        key={avatar}
+                        type="button"
+                        aria-label={`Choose duck ${index + 1}`}
+                        aria-pressed={selected}
+                        onClick={() => {
+                          update({ avatar });
+                          setAvatarsOpen(false);
+                        }}
+                        className={
+                          selected
+                            ? "rounded-lg ring-2 ring-ring ring-offset-2 ring-offset-background"
+                            : "rounded-lg outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                        }
+                      >
+                        <img className="size-10 rounded-lg object-cover" src={avatar} alt="" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </DisclosureRegion>
             </div>
-            <label className="block text-xs text-muted-foreground">
-              Name
-              <Input
-                className="mt-1"
-                value={shown.name}
-                maxLength={48}
-                onChange={(event) => update({ name: event.target.value })}
-              />
-            </label>
-            <label className="block text-xs text-muted-foreground">
-              Role
-              <Input
-                className="mt-1"
-                value={shown.role}
-                maxLength={120}
-                onChange={(event) => update({ role: event.target.value })}
-              />
-            </label>
-            <label className="block text-xs text-muted-foreground">
-              Instructions
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="grid gap-1.5">
+                <span className={dialogFieldLabelClassName}>Name</span>
+                <Input
+                  value={shown.name}
+                  maxLength={48}
+                  placeholder="e.g. Frontend specialist"
+                  onChange={(event) => update({ name: event.target.value })}
+                />
+              </label>
+              <label className="grid gap-1.5">
+                <span className={dialogFieldLabelClassName}>Role</span>
+                <Input
+                  value={shown.role}
+                  maxLength={120}
+                  placeholder="e.g. Builder"
+                  onChange={(event) => update({ role: event.target.value })}
+                />
+              </label>
+            </div>
+            <label className="grid gap-1.5">
+              <span className={dialogFieldLabelClassName}>Instructions</span>
+              <span
+                id="agent-instructions-help"
+                className="text-xs leading-5 text-muted-foreground"
+              >
+                Explain how this agent should work and write. These instructions are sent with each
+                message.
+              </span>
               <Textarea
-                className="mt-1"
+                className="min-h-52"
                 value={shown.instructions}
                 maxLength={20_000}
+                placeholder="You are a focused frontend engineer. Inspect the existing component, make the smallest correct change, and explain the result briefly."
+                aria-describedby="agent-instructions-help agent-instructions-count"
                 onChange={(event) => update({ instructions: event.target.value })}
               />
+              <span
+                id="agent-instructions-count"
+                className="text-right text-xs tabular-nums text-muted-foreground"
+              >
+                {shown.instructions.length.toLocaleString()} / 20,000
+              </span>
             </label>
             {error ? <p className="text-xs text-destructive">{error}</p> : null}
           </DialogPanel>
