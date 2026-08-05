@@ -235,6 +235,7 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from "./ui/alert";
 import { Button } from "./ui/button";
 import { DisclosureChevron } from "./ui/DisclosureChevron";
 import { Input } from "./ui/input";
+import { Skeleton } from "./ui/skeleton";
 import {
   Dialog,
   DialogDescription,
@@ -297,6 +298,7 @@ import {
   resolveProjectStatusIndicator,
   resolveSettingsBackTarget,
   type SettingsBackTarget,
+  resolvePendingSidebarThreadPlaceholder,
   resolveSidebarNewThreadEnvMode,
   resolveThreadHoverCardMetadata,
   resolveThreadProjectLabel,
@@ -352,6 +354,7 @@ import {
 } from "./chat/ComposerPickerMenuPopup";
 import { selectSplitView, useSplitViewStore } from "../splitViewStore";
 import { THREAD_DRAG_MIME } from "./chat-drop-overlay/ChatPaneDropOverlay";
+import { usePendingSendStore } from "../pendingSendStore";
 import { useTemporaryThreadStore } from "../temporaryThreadStore";
 import { useThreadActivationController } from "../hooks/useThreadActivationController";
 import {
@@ -854,6 +857,23 @@ const SYNARA_DOCS_URL = "https://trysynara.com/docs";
 
 // Footer help menu; swapped out for the desktop-update pill while an update is
 // available (see SidebarFooter).
+function PendingSidebarThreadSkeleton() {
+  return (
+    <SidebarMenuSubItem
+      aria-label="Creating new thread"
+      aria-live="polite"
+      className="pointer-events-none w-full"
+      data-testid="pending-sidebar-thread-skeleton"
+      role="status"
+    >
+      <div className="flex h-7 items-center gap-2 rounded-lg px-2">
+        <Skeleton className="size-4 shrink-0 rounded-md" />
+        <Skeleton className="h-3 w-3/5 max-w-36" />
+      </div>
+    </SidebarMenuSubItem>
+  );
+}
+
 function SidebarHelpMenu({
   onOpenShortcuts,
   onOpenFeedback,
@@ -1189,7 +1209,7 @@ function SidebarActivityBellButton({
 }
 
 const SIDEBAR_SURFACE_PICKER_COPY: Record<SidebarView, { title: string; description: string }> = {
-  threads: { title: "Synara", description: "Build, debug, and ship" },
+  threads: { title: "Projects", description: "Build, debug, and ship" },
   studio: { title: "Studio", description: "Open-ended agent work" },
 };
 
@@ -1226,12 +1246,7 @@ export function SidebarSurfacePicker({
           />
         }
       >
-        <span
-          className={cn(
-            "font-display min-w-0 truncate text-foreground",
-            activeView === "threads" ? "text-[17px]" : "text-[15px]",
-          )}
-        >
+        <span className="font-display min-w-0 truncate text-[17px] text-foreground">
           {activeCopy.title}
         </span>
         <DisclosureChevron open className="text-muted-foreground/70" />
@@ -1311,6 +1326,8 @@ export default function Sidebar() {
   const clearProjectDraftThreads = useComposerDraftStore((store) => store.clearProjectDraftThreads);
   const draftThreadsByThreadId = useComposerDraftStore((store) => store.draftThreadsByThreadId);
   const temporaryThreadIds = useTemporaryThreadStore((store) => store.temporaryThreadIds);
+  // Rows whose send was just submitted show Working before the server answers.
+  const pendingSendThreadIds = usePendingSendStore((store) => store.pendingSendThreadIds);
   const persistedPinnedProjectIds = usePinnedProjectsStore((store) => store.pinnedProjectIds);
   const pinProjectLocally = usePinnedProjectsStore((store) => store.pinProject);
   const unpinProject = usePinnedProjectsStore((store) => store.unpinProject);
@@ -1657,11 +1674,12 @@ export default function Sidebar() {
         thread: {
           ...thread,
           dismissedStatusKey: dismissedThreadStatusKeyByThreadId[thread.id],
+          hasPendingLocalSend: pendingSendThreadIds[thread.id] === true,
         },
         hasPendingApprovals: thread.hasPendingApprovals,
         hasPendingUserInput: thread.hasPendingUserInput,
       }),
-    [dismissedThreadStatusKeyByThreadId],
+    [dismissedThreadStatusKeyByThreadId, pendingSendThreadIds],
   );
 
   useEffect(() => {
@@ -1780,6 +1798,29 @@ export default function Sidebar() {
   const activeRouteProject = activeRouteProjectId
     ? (projectById.get(activeRouteProjectId) ?? null)
     : null;
+  // A fresh chat is first registered as a local composer draft. The server-side
+  // summary used by the sidebar follows only after the provider has created its
+  // durable thread, which is especially noticeable for Codex. Keep that gap
+  // visible rather than making the active conversation appear to vanish.
+  const pendingSidebarDraft = useMemo(
+    () =>
+      resolvePendingSidebarThreadPlaceholder({
+        routeThreadId,
+        draftThread: routeThreadId ? (draftThreadsByThreadId[routeThreadId] ?? null) : null,
+        hasSidebarSummary: routeThreadId ? Boolean(sidebarThreadSummaryById[routeThreadId]) : false,
+        hasPendingSend: routeThreadId ? pendingSendThreadIds[routeThreadId] === true : false,
+      }),
+    [draftThreadsByThreadId, pendingSendThreadIds, routeThreadId, sidebarThreadSummaryById],
+  );
+
+  useEffect(() => {
+    if (!pendingSidebarDraft) {
+      return;
+    }
+    // The placeholder is useful only when it is visible. Opening the destination
+    // project also makes creating a chat from a collapsed folder feel immediate.
+    setProjectExpanded(pendingSidebarDraft.projectId, true);
+  }, [pendingSidebarDraft, setProjectExpanded]);
   // Same predicate the Studio collectors use — trusting `kind` alone here would let a drifted
   // studio-kind row (root outside the configured Studio root) activate the Studio segment while
   // every Studio list excludes it, stranding the active thread in neither segment.
@@ -3520,6 +3561,10 @@ export default function Sidebar() {
       ),
     [chatWorkspaceRoot, homeDir, sortedProjects],
   );
+  const hasPendingChatDraft = Boolean(
+    pendingSidebarDraft &&
+    chatProjects.some((project) => project.id === pendingSidebarDraft.projectId),
+  );
   const studioProjects = useMemo(
     () =>
       sortedProjects.filter((project) =>
@@ -4061,7 +4106,7 @@ export default function Sidebar() {
   }, [activeSidebarThreadId, visibleSidebarThreadIds]);
 
   // Pinned rows share the thread-container label rule (project name, or
-  // "Synara" for project-less chats) with the hover cards and Activity rows.
+  // "Quack" for project-less chats) with the hover cards and Activity rows.
   function resolvePinnedThreadProjectLabel(projectId: ProjectId): string {
     return resolveThreadProjectLabel(projectById.get(projectId));
   }
@@ -4639,8 +4684,8 @@ export default function Sidebar() {
       : sidebarHoverRevealHideClassName("project-header");
     const projectRun = projectRunsByProjectId[project.id] ?? null;
     const projectRunServer = projectRunServerByProjectId.get(project.id) ?? null;
-    // A project reads as "running" when Synara tracks a run for it or when a
-    // local server (possibly started outside Synara) is attributed by cwd.
+    // A project reads as "running" when Quack tracks a run for it or when a
+    // local server (possibly started outside Quack) is attributed by cwd.
     const isProjectRunning = projectRun !== null || projectRunServer !== null;
     const collapsedProjectStatus = project.expanded ? null : projectStatus;
     // The "open dev server" affordance now lives in the project context menu, so
@@ -4651,6 +4696,7 @@ export default function Sidebar() {
     // name container itself is not focusable — the row's button is.
     const projectToolbarReserveClassName =
       "group-hover/project-header:pr-[4.75rem] group-has-[:focus-visible]/project-header:pr-[4.75rem]";
+    const hasPendingDraft = pendingSidebarDraft?.projectId === project.id;
 
     return (
       <div className="group/collapsible">
@@ -4857,6 +4903,7 @@ export default function Sidebar() {
               {visibleEntries.map((entry) =>
                 renderThreadRow(entry.thread, orderedProjectThreadIds, entry.depth),
               )}
+              {hasPendingDraft ? <PendingSidebarThreadSkeleton /> : null}
 
               {(canShowMoreThreads || canShowLessThreads) && (
                 <SidebarMenuSubItem className="w-full">
@@ -5346,8 +5393,8 @@ export default function Sidebar() {
       },
       {
         id: "feedback",
-        label: "Feedback Synara",
-        description: "Send feedback or report an issue to the Synara team.",
+        label: "Feedback Quack",
+        description: "Send feedback or report an issue to the Quack team.",
         keywords: ["feedback", "bug", "issue", "problem", "report", "support", "synara"],
       },
       {
@@ -5435,7 +5482,7 @@ export default function Sidebar() {
             toastManager.add({
               type: "info",
               title: "Preparing update",
-              description: `Synara is preparing version ${nextState.availableVersion ?? "available"} in the background.`,
+              description: `Quack is preparing version ${nextState.availableVersion ?? "available"} in the background.`,
             });
             return;
           }
@@ -5444,7 +5491,7 @@ export default function Sidebar() {
             toastManager.add({
               type: "info",
               title: "Preparing update",
-              description: "Synara is downloading the update in the background.",
+              description: "Quack is downloading the update in the background.",
             });
             return;
           }
@@ -5462,7 +5509,7 @@ export default function Sidebar() {
             toastManager.add({
               type: "info",
               title: "You're up to date",
-              description: `Synara ${nextState.currentVersion} is already the newest version.`,
+              description: `Quack ${nextState.currentVersion} is already the newest version.`,
             });
             return;
           }
@@ -5828,7 +5875,7 @@ export default function Sidebar() {
                 <SidebarGroup className="px-1.5 py-1.5">
                   {renderPinnedThreadsSection()}
                   {renderListSectionHeader(
-                    "Studio",
+                    "Chats",
                     <>
                       <SidebarIconButton
                         icon={NewThreadIcon}
@@ -6075,15 +6122,18 @@ export default function Sidebar() {
                   <SidebarMenu
                     className={cn("gap-1", disclosureContentClassName(chatSectionExpanded))}
                   >
-                    {visibleChatThreadRows.length > 0 ? (
-                      renderedChatEntries.map((entry) =>
-                        renderThreadRow(
-                          entry.row.thread,
-                          visibleChatThreadIds,
-                          entry.row.depth,
-                          true,
-                        ),
-                      )
+                    {visibleChatThreadRows.length > 0 || hasPendingChatDraft ? (
+                      <>
+                        {renderedChatEntries.map((entry) =>
+                          renderThreadRow(
+                            entry.row.thread,
+                            visibleChatThreadIds,
+                            entry.row.depth,
+                            true,
+                          ),
+                        )}
+                        {hasPendingChatDraft ? <PendingSidebarThreadSkeleton /> : null}
+                      </>
                     ) : (
                       <div className="px-2 py-2 text-[length:var(--app-font-size-ui,12px)] text-muted-foreground/48">
                         No chats yet

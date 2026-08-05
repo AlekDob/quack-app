@@ -359,6 +359,7 @@ import {
   useComposerThreadDraft,
   useEffectiveComposerModelState,
 } from "../composerDraftStore";
+import { usePendingSendStore } from "../pendingSendStore";
 import { useTemporaryThreadStore } from "../temporaryThreadStore";
 import { requestComposerFocus, useComposerFocusRequestStore } from "../composerFocusRequestStore";
 import { useWorkflowRunUiStore, useWorkflowRunUiThreadState } from "../workflowRunUiStore";
@@ -1351,6 +1352,11 @@ export default function ChatView({
   );
   const markTemporaryThread = useTemporaryThreadStore((store) => store.markTemporaryThread);
   const clearTemporaryThread = useTemporaryThreadStore((store) => store.clearTemporaryThread);
+  // Immediate send feedback: set before the send preflight, cleared when `onSend`
+  // returns (by then `localDispatch` owns the busy state).
+  const hasPendingSend = usePendingSendStore((store) =>
+    threadId ? store.pendingSendThreadIds[threadId] === true : false,
+  );
   const markWorkflowRunPaused = useWorkflowRunUiStore((store) => store.markPaused);
   const markWorkflowRunDismissed = useWorkflowRunUiStore((store) => store.markDismissed);
   const serverThread = useStore(useMemo(() => createThreadSelector(threadId), [threadId]));
@@ -2867,7 +2873,7 @@ export default function ChatView({
       phase,
     ],
   );
-  const isSendBusy = localDispatch !== null && !serverAcknowledgedLocalDispatch;
+  const isSendBusy = hasPendingSend || (localDispatch !== null && !serverAcknowledgedLocalDispatch);
   const activeWorktreeSetup = localDispatch?.worktreeSetup ?? null;
   const isPreparingWorktree = activeWorktreeSetup !== null;
   const hasLiveTurn = phase === "running";
@@ -7109,7 +7115,7 @@ export default function ChatView({
   // and `onSend` (below) can reach handlers that are only declared further down.
   const lateComposerSendHandlersRef = useRef<LateComposerSendHandlers | null>(null);
 
-  const onSend = async (
+  const runSend = async (
     e?: { preventDefault: () => void },
     requestedDispatchMode?: "queue" | "steer",
     queuedTurn?: QueuedComposerChatTurn,
@@ -7482,6 +7488,10 @@ export default function ChatView({
         setPendingAutomationConversation(null);
       }
     }
+    // From here on the send only bails on errors, so flag it as pending: the
+    // composer and the sidebar row show their loader before the (possibly slow)
+    // provider refresh, worktree creation and thread.create round trips.
+    usePendingSendStore.getState().markPendingSend(activeThread.id);
     sendPreflightInFlightRef.current = true;
     const sendProviderAvailability = await resolveProviderSendAvailabilityWithRefresh({
       provider: selectedModelSelectionForSend.provider,
@@ -8276,6 +8286,19 @@ export default function ChatView({
       }
     }
     return turnStartSucceeded;
+  };
+
+  // Every exit of `runSend` (success, bail-out, throw) releases the pending-send
+  // flag; on success `localDispatch` already keeps the busy state alive.
+  const onSend = async (...args: Parameters<typeof runSend>): ReturnType<typeof runSend> => {
+    const pendingSendThreadId = activeThread?.id ?? null;
+    try {
+      return await runSend(...args);
+    } finally {
+      if (pendingSendThreadId) {
+        usePendingSendStore.getState().clearPendingSend(pendingSendThreadId);
+      }
+    }
   };
 
   const onRespondToApproval = useCallback(

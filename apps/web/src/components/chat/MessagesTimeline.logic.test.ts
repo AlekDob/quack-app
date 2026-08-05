@@ -383,7 +383,7 @@ describe("computeStableMessagesTimelineRows", () => {
             tone: "info",
             automation: {
               id: "automation-7",
-              name: "Watch Synara PR 231",
+              name: "Watch Quack PR 231",
               cadenceLabel: "Every 5m",
             },
           },
@@ -1027,6 +1027,29 @@ describe("deriveMessagesTimelineRows", () => {
     expect(terminal!.collapsedWorkElapsed).toBe("23m");
   });
 
+  it("puts the papero avatar on the Thinking row until an assistant row takes it", () => {
+    const workingRowOf = (entries: readonly TimelineEntry[]) => {
+      const rows = deriveMessagesTimelineRows({
+        ...baseInput,
+        isWorking: true,
+        activeTurnInProgress: true,
+        activeTurnId: TurnId.makeUnsafe("t1"),
+        timelineEntries: entries,
+      });
+      return rows.find((row) => row.kind === "working");
+    };
+
+    expect(workingRowOf([userEntry("u1", "2026-01-01T00:00:00Z")])).toMatchObject({
+      showPaperoAvatar: true,
+    });
+    expect(
+      workingRowOf([
+        userEntry("u1", "2026-01-01T00:00:00Z"),
+        assistantEntry("a1", "2026-01-01T00:00:01Z", { turnId: "t1", text: "on it" }),
+      ]),
+    ).toMatchObject({ showPaperoAvatar: false });
+  });
+
   it("keeps the live turn expanded instead of collapsing while it streams", () => {
     const rows = deriveMessagesTimelineRows({
       ...baseInput,
@@ -1204,11 +1227,11 @@ describe("deriveMessagesTimelineRows", () => {
     expect(collapsedSignature(messageRow(rows, "a2")!)).toEqual(["narration:a1", "work:w1"]);
   });
 
-  it("preserves Synara tool calls when a separate creation recap is present", () => {
+  it("preserves Quack tool calls when a separate creation recap is present", () => {
     const createTool = workEntry(
       "synara-create-tool",
       "2026-01-01T00:00:01Z",
-      "Synara created threads",
+      "Quack created threads",
     );
     const creationRecap: TimelineEntry = {
       id: "entry-synara-create-recap",
@@ -1217,7 +1240,7 @@ describe("deriveMessagesTimelineRows", () => {
       entry: {
         id: "synara-create-recap",
         createdAt: "2026-01-01T00:00:02Z",
-        label: "Created 2 Synara threads",
+        label: "Created 2 Quack threads",
         tone: "info",
         synaraThreadCreation: {
           operationId: "gateway:create:two",

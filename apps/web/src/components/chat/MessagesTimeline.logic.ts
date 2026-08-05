@@ -241,7 +241,8 @@ export type MessagesTimelineRow =
       assistantTurnInProgress?: boolean | undefined;
       revertTurnCount?: number | undefined;
       // True on the first assistant row after a user message — the papero avatar
-      // renders once per turn, at the top of the response block, not per message.
+      // renders once per turn in-flow beside the response (hidden when the
+      // transcript pane is too narrow, same bar as MessageTrail).
       showPaperoAvatar?: boolean | undefined;
       avatarPaperoId?: string | undefined;
     }
@@ -251,7 +252,15 @@ export type MessagesTimelineRow =
       createdAt: string;
       proposedPlan: ProposedPlan;
     }
-  | { kind: "working"; id: string; createdAt: string | null }
+  | {
+      kind: "working";
+      id: string;
+      createdAt: string | null;
+      // The papero owns the turn from the first frame: when no assistant row has
+      // carried the avatar yet, the Thinking shimmer wears it instead.
+      showPaperoAvatar?: boolean | undefined;
+      avatarPaperoId?: string | undefined;
+    }
   | {
       // Live-turn header that mirrors the settled "Worked for Xs" disclosure
       // (label + full-width divider), but is non-collapsible and counts up while
@@ -655,6 +664,8 @@ export function deriveMessagesTimelineRows(input: {
       kind: "working",
       id: "working-indicator-row",
       createdAt: input.activeTurnStartedAt,
+      showPaperoAvatar: !paperoAvatarShownForTurn,
+      avatarPaperoId: currentTurnPaperoId,
     });
   }
 
@@ -1085,8 +1096,14 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
   if (a.kind !== b.kind || a.id !== b.id) return false;
 
   switch (a.kind) {
-    case "working":
-      return a.createdAt === (b as typeof a).createdAt;
+    case "working": {
+      const bw = b as typeof a;
+      return (
+        a.createdAt === bw.createdAt &&
+        a.showPaperoAvatar === bw.showPaperoAvatar &&
+        a.avatarPaperoId === bw.avatarPaperoId
+      );
+    }
 
     case "working-header":
       return a.createdAt === (b as typeof a).createdAt;

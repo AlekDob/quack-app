@@ -149,7 +149,7 @@ export function resolveThreadProjectLabel(
   project: Pick<Project, "kind" | "name" | "folderName"> | null | undefined,
 ): string {
   if (!project || project.kind !== "project") {
-    return "Synara";
+    return "Quack";
   }
   return nonEmptyDisplayValue(project.name) ?? project.folderName;
 }
@@ -323,6 +323,9 @@ type ThreadStatusInput = Pick<
   proposedPlans?: Thread["proposedPlans"] | undefined;
   hasActionableProposedPlan?: boolean | undefined;
   hasLiveTailWork?: boolean | undefined;
+  // Client-only: the user just hit send and the server has not acknowledged the
+  // turn yet, so the row shows Working immediately instead of after the round trip.
+  hasPendingLocalSend?: boolean | undefined;
   dismissedStatusKey?: string | undefined;
 };
 
@@ -509,9 +512,13 @@ export function resolveThreadRowClassName(input: {
 // pill never disagree.
 export function isThreadActivelyWorking(thread: {
   hasLiveTailWork?: boolean | undefined;
+  hasPendingLocalSend?: boolean | undefined;
   session?: Thread["session"] | undefined;
   latestTurn?: Thread["latestTurn"] | undefined;
 }): boolean {
+  if (thread.hasPendingLocalSend === true) {
+    return true;
+  }
   if (thread.hasLiveTailWork === true) {
     return true;
   }
@@ -520,6 +527,31 @@ export function isThreadActivelyWorking(thread: {
     session?.status === "running" &&
     (thread.latestTurn == null || hasLiveLatestTurn(thread.latestTurn, session))
   );
+}
+
+/**
+ * The sidebar placeholder row for a conversation whose durable thread is being
+ * created. It must track a creation that is actually in flight: a draft the user
+ * has not sent yet has nothing pending, and rendering a shimmer for it leaves an
+ * empty row hanging under the project for as long as the draft stays open.
+ */
+export function resolvePendingSidebarThreadPlaceholder(input: {
+  readonly routeThreadId: ThreadId | null | undefined;
+  readonly draftThread: { readonly projectId: ProjectId; readonly promotedTo?: ThreadId } | null;
+  readonly hasSidebarSummary: boolean;
+  /** The send was submitted but `thread.create` has not been dispatched yet. */
+  readonly hasPendingSend: boolean;
+}): { projectId: ProjectId; threadId: ThreadId } | null {
+  const { draftThread, routeThreadId } = input;
+  if (!routeThreadId || !draftThread || input.hasSidebarSummary) {
+    return null;
+  }
+  // `promotedTo` means thread.create already went out and only the server summary
+  // is missing; a pending send covers the window before that dispatch.
+  if (!draftThread.promotedTo && !input.hasPendingSend) {
+    return null;
+  }
+  return { projectId: draftThread.projectId, threadId: routeThreadId };
 }
 
 export function resolveThreadStatusPill(input: {

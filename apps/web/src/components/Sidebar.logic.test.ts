@@ -41,6 +41,7 @@ import {
   resolveSidebarNewThreadEnvMode,
   resolveThreadHoverCardMetadata,
   resolveThreadRowClassName,
+  resolvePendingSidebarThreadPlaceholder,
   resolveThreadStatusPill,
   resolveThreadStatusTrailingIndicator,
   isUrgentThreadStatusPill,
@@ -249,18 +250,18 @@ describe("resolveThreadHoverCardMetadata", () => {
     });
   });
 
-  it("labels project-less chat containers as Synara instead of the slug folder", () => {
+  it("labels project-less chat containers as Quack instead of the slug folder", () => {
     const metadata = resolveThreadHoverCardMetadata({
       thread: makeSidebarThreadSummary({ branch: null }),
       project: {
         kind: "chat",
         name: "open-the-browser-search-house-music",
         folderName: "open-the-browser-search-house-music",
-        cwd: "/Users/me/Documents/Synara/2026-08-01/open-the-browser-search-house-music",
+        cwd: "/Users/me/Documents/Quack/2026-08-01/open-the-browser-search-house-music",
       },
     });
 
-    expect(metadata.projectName).toBe("Synara");
+    expect(metadata.projectName).toBe("Quack");
   });
 });
 
@@ -834,6 +835,47 @@ describe("resolveThreadStatusTrailingIndicator", () => {
   });
 });
 
+describe("resolvePendingSidebarThreadPlaceholder", () => {
+  const routeThreadId = ThreadId.makeUnsafe("thread-1");
+  const projectId = ProjectId.makeUnsafe("project-1");
+  const baseInput = {
+    routeThreadId,
+    draftThread: { projectId } as {
+      projectId: typeof projectId;
+      promotedTo?: typeof routeThreadId;
+    },
+    hasSidebarSummary: false,
+    hasPendingSend: false,
+  };
+
+  it("stays hidden for an open draft nobody has sent yet", () => {
+    expect(resolvePendingSidebarThreadPlaceholder(baseInput)).toBeNull();
+  });
+
+  it("shows while the submitted send is still creating the thread", () => {
+    expect(resolvePendingSidebarThreadPlaceholder({ ...baseInput, hasPendingSend: true })).toEqual({
+      projectId,
+      threadId: routeThreadId,
+    });
+    expect(
+      resolvePendingSidebarThreadPlaceholder({
+        ...baseInput,
+        draftThread: { projectId, promotedTo: routeThreadId },
+      }),
+    ).toEqual({ projectId, threadId: routeThreadId });
+  });
+
+  it("disappears once the sidebar summary exists", () => {
+    expect(
+      resolvePendingSidebarThreadPlaceholder({
+        ...baseInput,
+        draftThread: { projectId, promotedTo: routeThreadId },
+        hasSidebarSummary: true,
+      }),
+    ).toBeNull();
+  });
+});
+
 describe("resolveThreadStatusPill", () => {
   const baseThread = {
     interactionMode: "plan" as const,
@@ -876,6 +918,21 @@ describe("resolveThreadStatusPill", () => {
     expect(
       resolveThreadStatusPill({
         thread: baseThread,
+        hasPendingApprovals: false,
+        hasPendingUserInput: false,
+      }),
+    ).toMatchObject({ label: "Working", pulse: true });
+  });
+
+  it("shows working immediately for a locally pending send on an idle thread", () => {
+    expect(
+      resolveThreadStatusPill({
+        thread: {
+          ...baseThread,
+          hasPendingLocalSend: true,
+          session: null,
+          latestTurn: null,
+        },
         hasPendingApprovals: false,
         hasPendingUserInput: false,
       }),

@@ -62,11 +62,8 @@ import { pinActionLabel } from "~/lib/pin";
 import { DEFAULT_PAPERO_ID, isPaperoId, usePaperoStore } from "~/paperi";
 import { Button } from "../ui/button";
 import { CrossTaskOriginLabel, type CrossTaskOrigin } from "./CrossTaskOriginLabel";
-import { PaperoAvatar } from "./PaperoPill";
-import {
-  CHAT_STREAM_AVATAR_GAP_CLASS_NAME,
-  CHAT_STREAM_AVATAR_VISIBLE_CLASS_NAME,
-} from "./chatLeftGutter";
+import { PaperoStreamAvatarSlot } from "./PaperoPill";
+import { CHAT_STREAM_AVATAR_GAP_CLASS_NAME } from "./chatLeftGutter";
 import { SynaraThreadCreationCard } from "./SynaraThreadCreationCard";
 import { buildExpandedImagePreview, ExpandedImagePreview } from "./ExpandedImagePreview";
 import { ProposedPlanCard } from "./ProposedPlanCard";
@@ -1070,7 +1067,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         row.kind === "message" && row.message.role === "assistant" ? "group/assistant" : null,
         // Stack above the previous LegendList row so subpixel overlap can't cover
         // the papero avatar; paint containment is also relaxed in index.css.
-        row.kind === "message" && row.showPaperoAvatar
+        (row.kind === "message" || row.kind === "working") && row.showPaperoAvatar
           ? "relative z-[1] overflow-visible pt-1"
           : null,
         row.kind === "message" && row.message.id === highlightedMessageId
@@ -1775,18 +1772,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                 paperoDefinition ? CHAT_STREAM_AVATAR_GAP_CLASS_NAME : null,
               )}
             >
-              {paperoDefinition ? (
-                <span
-                  className={cn(
-                    // Fixed slot so the circle can't be cropped by sibling row paint;
-                    // visibility follows the shared left-gutter pane width.
-                    "mt-0.5 hidden size-7 shrink-0 overflow-visible",
-                    CHAT_STREAM_AVATAR_VISIBLE_CLASS_NAME,
-                  )}
-                >
-                  <PaperoAvatar definition={paperoDefinition} enlargeOnHover className="size-7" />
-                </span>
-              ) : null}
+              {paperoDefinition ? <PaperoStreamAvatarSlot definition={paperoDefinition} /> : null}
               <div className="min-w-0 flex-1 overflow-visible">
                 {settledCollapseTransition && (
                   <div
@@ -2179,14 +2165,36 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         </div>
       )}
 
-      {row.kind === "working" && (
-        <div
-          className="shimmer pt-0.5 text-muted-foreground/70 font-system-ui"
-          style={{ fontSize: `${appTypographyScale.chatPx}px` }}
-        >
-          Thinking
-        </div>
-      )}
+      {row.kind === "working" &&
+        (() => {
+          // No assistant row has carried the avatar yet in this turn, so the live
+          // Thinking row wears it — the papero shows up the moment the send starts.
+          const workingPaperoDefinition = row.showPaperoAvatar
+            ? resolveEffectivePaperoDefinition(
+                row.avatarPaperoId && isPaperoId(row.avatarPaperoId)
+                  ? row.avatarPaperoId
+                  : DEFAULT_PAPERO_ID,
+              )
+            : null;
+          return (
+            <div
+              className={cn(
+                "flex items-start overflow-visible",
+                workingPaperoDefinition ? CHAT_STREAM_AVATAR_GAP_CLASS_NAME : null,
+              )}
+            >
+              {workingPaperoDefinition ? (
+                <PaperoStreamAvatarSlot definition={workingPaperoDefinition} />
+              ) : null}
+              <div
+                className="shimmer min-w-0 flex-1 pt-0.5 text-muted-foreground/70 font-system-ui"
+                style={{ fontSize: `${appTypographyScale.chatPx}px` }}
+              >
+                Thinking
+              </div>
+            </div>
+          );
+        })()}
 
       {row.kind === "worktree-setup" && (
         <DisclosureRegion open={row.open}>
