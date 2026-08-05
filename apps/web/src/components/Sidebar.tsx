@@ -446,6 +446,7 @@ const ADD_PROJECT_SNAPSHOT_CATCH_UP_DELAY_MS = 50;
 const SIDEBAR_VIEW_LABELS: Record<SidebarView, string> = {
   threads: "Projects",
   studio: "Studio",
+  team: "Team",
 };
 /** Snap the optimistic segment selection back if the navigation never lands. */
 const EMPTY_PROJECT_SIDEBAR_DATA: ReadonlyMap<ProjectId, SidebarDerivedProjectData> = new Map();
@@ -1222,6 +1223,7 @@ function SidebarActivityBellButton({
 const SIDEBAR_SURFACE_PICKER_COPY: Record<SidebarView, { title: string; description: string }> = {
   threads: { title: "Projects", description: "Build, debug, and ship" },
   studio: { title: "Studio", description: "Open-ended agent work" },
+  team: { title: "Team", description: "Agents, instructions, and presets" },
 };
 
 /**
@@ -1353,6 +1355,7 @@ export default function Sidebar() {
     select: (loc) => loc.pathname === "/settings",
   });
   const isOnStudioRoute = pathname.startsWith("/studio");
+  const isOnTeam = pathname === "/team";
   const isOnKanban = pathname.startsWith("/kanban");
   const isOnAutomations = pathname.startsWith("/automations");
   const isOnPullRequests = pathname.startsWith("/pull-requests");
@@ -2365,8 +2368,10 @@ export default function Sidebar() {
     if (isOnSettings) {
       return;
     }
-    lastActiveSidebarSegmentRef.current = isOnStudio ? "studio" : "threads";
-  }, [isOnSettings, isOnStudio]);
+    if (!isOnTeam) {
+      lastActiveSidebarSegmentRef.current = isOnStudio ? "studio" : "threads";
+    }
+  }, [isOnSettings, isOnStudio, isOnTeam]);
 
   // Shared Studio fallback: reopen/create via handleNewStudioChat and, on failure, land on
   // /studio — its splash already displays the error with a retry. Swallowing the result here
@@ -2404,6 +2409,10 @@ export default function Sidebar() {
 
   const handleSidebarViewChange = useCallback(
     (view: SidebarView) => {
+      if (view === "team") {
+        void navigate({ to: "/team" });
+        return;
+      }
       if (view === "studio") {
         // Remembered route first — it already treats the stored Studio draft as a valid target
         // (resolveBackToStudioTarget includes studioDraftThreadIds), so switching back to Studio
@@ -5150,7 +5159,7 @@ export default function Sidebar() {
         return;
       }
       if (command === "space.previous" || command === "space.next") {
-        if (!isProjectsSidebarSurface({ isOnSettings, isOnStudio })) return;
+        if (!isProjectsSidebarSurface({ isOnSettings, isOnStudio, isOnTeam })) return;
         event.preventDefault();
         event.stopPropagation();
         const orderedSpaceIds: ReadonlyArray<SpaceId | null> = [
@@ -5165,7 +5174,7 @@ export default function Sidebar() {
       }
       const spaceJumpIndex = spaceJumpIndexFromCommand(command ?? "");
       if (spaceJumpIndex !== null) {
-        if (!isProjectsSidebarSurface({ isOnSettings, isOnStudio })) return;
+        if (!isProjectsSidebarSurface({ isOnSettings, isOnStudio, isOnTeam })) return;
         // Index 0 is Void, then spaces in strip order — the chord addresses what you see.
         const orderedSpaceIds: ReadonlyArray<SpaceId | null> = [
           null,
@@ -5253,6 +5262,7 @@ export default function Sidebar() {
     homeDir,
     isOnSettings,
     isOnStudio,
+    isOnTeam,
     navigate,
     searchPaletteMode,
     setActivityViewEnabledSmoothly,
@@ -5840,8 +5850,8 @@ export default function Sidebar() {
           <>
             <div className="flex items-center gap-1 pt-0 pb-1 pr-2.5 pl-1.5">
               <SidebarSurfacePicker
-                views={["threads", ...(studioSectionVisible ? (["studio"] as const) : [])]}
-                activeView={isOnStudio ? "studio" : "threads"}
+                views={["threads", ...(studioSectionVisible ? (["studio"] as const) : []), "team"]}
+                activeView={isOnTeam ? "team" : isOnStudio ? "studio" : "threads"}
                 onSelectView={handleSidebarViewChange}
                 onPrewarmView={prewarmSidebarViewTarget}
               />
@@ -5857,7 +5867,7 @@ export default function Sidebar() {
                     setSearchPaletteOpen(true);
                   }}
                 />
-                {!isOnStudio ? (
+                {!isOnStudio && !isOnTeam ? (
                   <SidebarActivityBellButton
                     active={activityViewEnabled}
                     showUnreadDot={hasUnreadActivity}
@@ -5870,13 +5880,21 @@ export default function Sidebar() {
             {/* The keyed content remounts with a short enter animation while the picker
                 stays mounted so its thumb can glide between Projects and Studio. */}
             <div
-              key={isOnStudio ? "studio" : activityViewEnabled ? "activity" : "threads"}
+              key={
+                isOnTeam
+                  ? "team"
+                  : isOnStudio
+                    ? "studio"
+                    : activityViewEnabled
+                      ? "activity"
+                      : "threads"
+              }
               className="sidebar-surface-enter"
             >
               {/* Primary sidebar actions stay limited to features we currently ship. */}
               <SidebarGroup className="px-1.5 pt-1 pb-1.5">
                 <SidebarMenu className="gap-0.5">
-                  {isOnStudio ? (
+                  {isOnTeam ? null : isOnStudio ? (
                     <>
                       <SidebarPrimaryAction
                         icon={NewThreadIcon}
@@ -5929,7 +5947,7 @@ export default function Sidebar() {
                 </SidebarMenu>
               </SidebarGroup>
 
-              {isOnStudio ? (
+              {isOnTeam ? null : isOnStudio ? (
                 // Studio is "just chats": a labeled Studio block holding a flat list of threads
                 // rooted at the Studio workspace (no project-folder chrome).
                 <SidebarGroup className="px-1.5 py-1.5">
@@ -6122,7 +6140,11 @@ export default function Sidebar() {
             </div>
           </>
         )}
-        {!isOnSettings && !isOnStudio && !activityViewEnabled && chatsSectionVisible ? (
+        {!isOnSettings &&
+        !isOnStudio &&
+        !isOnTeam &&
+        !activityViewEnabled &&
+        chatsSectionVisible ? (
           // sidebar-surface-enter: mounts on the Studio -> Projects switch, so it
           // animates in step with the keyed surface wrapper above.
           <SidebarGroup className="sidebar-surface-enter px-1.5 pt-1 pb-2">
@@ -6653,7 +6675,8 @@ export default function Sidebar() {
         }
         placeholder={renameProjectDialogProject?.folderName}
         provider={
-          renameProjectDialogProject?.defaultModelSelection?.provider ?? initialProjectDefaultProvider
+          renameProjectDialogProject?.defaultModelSelection?.provider ??
+          initialProjectDefaultProvider
         }
         providers={projectDefaultProviders}
         onOpenChange={(nextOpen) => {

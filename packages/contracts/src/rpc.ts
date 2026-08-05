@@ -32,6 +32,7 @@ import {
 } from "./externalMcp";
 import { FilesystemBrowseInput, FilesystemBrowseResult } from "./filesystem";
 import { StudioListThreadOutputsInput, StudioListThreadOutputsResult } from "./studio";
+import { TeamDeleteAgentInput, TeamGetRosterInput, TeamRoster, TeamUpsertAgentInput } from "./team";
 import {
   GitCheckoutInput,
   GitActionProgressEvent,
@@ -916,6 +917,24 @@ export const WsAutomationListRpc = Rpc.make(WS_METHODS.automationList, {
   error: WsRpcError,
 });
 
+export const WsTeamGetRosterRpc = Rpc.make(WS_METHODS.teamGetRoster, {
+  payload: TeamGetRosterInput,
+  success: TeamRoster,
+  error: WsRpcError,
+});
+
+export const WsTeamUpsertAgentRpc = Rpc.make(WS_METHODS.teamUpsertAgent, {
+  payload: TeamUpsertAgentInput,
+  success: TeamRoster,
+  error: WsRpcError,
+});
+
+export const WsTeamDeleteAgentRpc = Rpc.make(WS_METHODS.teamDeleteAgent, {
+  payload: TeamDeleteAgentInput,
+  success: TeamRoster,
+  error: WsRpcError,
+});
+
 export const WsAutomationGetMemoryRpc = Rpc.make(WS_METHODS.automationGetMemory, {
   payload: AutomationGetMemoryInput,
   success: Schema.NullOr(AutomationMemory),
@@ -1084,6 +1103,9 @@ export const WsFeatureRpcGroup = RpcGroup.make(
   WsProviderReadPluginRpc,
   WsProviderListModelsRpc,
   WsProviderListAgentsRpc,
+  WsTeamGetRosterRpc,
+  WsTeamUpsertAgentRpc,
+  WsTeamDeleteAgentRpc,
   WsAutomationListRpc,
   WsAutomationGetMemoryRpc,
   WsAutomationCreateRpc,

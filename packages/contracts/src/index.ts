@@ -13,6 +13,7 @@ export * from "./browserAutomationToolCatalogue";
 export * from "./browserAnnotations";
 export * from "./ipc";
 export * from "./terminal";
+export * from "./team";
 export * from "./provider";
 export * from "./providerDiscovery";
 export * from "./providerRuntime";

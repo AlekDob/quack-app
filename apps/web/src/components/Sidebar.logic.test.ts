@@ -77,9 +77,18 @@ function makeLatestTurn(overrides?: {
 
 describe("isProjectsSidebarSurface", () => {
   it("enables Space shortcuts only where the Space switcher is visible", () => {
-    expect(isProjectsSidebarSurface({ isOnSettings: false, isOnStudio: false })).toBe(true);
-    expect(isProjectsSidebarSurface({ isOnSettings: false, isOnStudio: true })).toBe(false);
-    expect(isProjectsSidebarSurface({ isOnSettings: true, isOnStudio: false })).toBe(false);
+    expect(
+      isProjectsSidebarSurface({ isOnSettings: false, isOnStudio: false, isOnTeam: false }),
+    ).toBe(true);
+    expect(
+      isProjectsSidebarSurface({ isOnSettings: false, isOnStudio: true, isOnTeam: false }),
+    ).toBe(false);
+    expect(
+      isProjectsSidebarSurface({ isOnSettings: true, isOnStudio: false, isOnTeam: false }),
+    ).toBe(false);
+    expect(
+      isProjectsSidebarSurface({ isOnSettings: false, isOnStudio: false, isOnTeam: true }),
+    ).toBe(false);
   });
 });
 

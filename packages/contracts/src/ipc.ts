@@ -40,6 +40,12 @@ import type {
   AutomationUpdateInput,
 } from "./automation";
 import type {
+  TeamDeleteAgentInput,
+  TeamGetRosterInput,
+  TeamRoster,
+  TeamUpsertAgentInput,
+} from "./team";
+import type {
   GitCheckoutInput,
   GitActionProgressEvent,
   GitCreateBranchInput,
@@ -613,6 +619,11 @@ export interface NativeApi {
     listThreadOutputs: (
       input: StudioListThreadOutputsInput,
     ) => Promise<StudioListThreadOutputsResult>;
+  };
+  team: {
+    getRoster: (input: TeamGetRosterInput) => Promise<TeamRoster>;
+    upsertAgent: (input: TeamUpsertAgentInput) => Promise<TeamRoster>;
+    deleteAgent: (input: TeamDeleteAgentInput) => Promise<TeamRoster>;
   };
   shell: {
     openInEditor: (cwd: string, editor: EditorId) => Promise<void>;

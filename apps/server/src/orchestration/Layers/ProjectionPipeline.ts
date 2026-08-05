@@ -18,6 +18,7 @@ import * as SqlClient from "effect/unstable/sql/SqlClient";
 import { toPersistenceSqlError, type ProjectionRepositoryError } from "../../persistence/Errors.ts";
 import { OrchestrationEventStore } from "../../persistence/Services/OrchestrationEventStore.ts";
 import { ManagedAttachmentRepository } from "../../persistence/Services/ManagedAttachments.ts";
+import { TeamRepository } from "../../persistence/Services/TeamRepository.ts";
 import {
   type ProjectionPendingInteractionRepositoryShape,
   ProjectionPendingInteractionRepository,
@@ -55,6 +56,7 @@ import { ProjectionThreadSessionRepositoryLive } from "../../persistence/Layers/
 import { ProjectionTurnRepositoryLive } from "../../persistence/Layers/ProjectionTurns.ts";
 import { ProjectionThreadRepositoryLive } from "../../persistence/Layers/ProjectionThreads.ts";
 import { ManagedAttachmentRepositoryLive } from "../../persistence/Layers/ManagedAttachments.ts";
+import { TeamRepositoryLive } from "../../persistence/Layers/TeamRepository.ts";
 import { ServerConfig } from "../../config.ts";
 import {
   OrchestrationProjectionPipeline,
@@ -459,6 +461,7 @@ const makeOrchestrationProjectionPipeline = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const eventStore = yield* OrchestrationEventStore;
   const managedAttachments = yield* ManagedAttachmentRepository;
+  const teamRepository = yield* TeamRepository;
   const projectionStateRepository = yield* ProjectionStateRepository;
   const projectionProjectRepository = yield* ProjectionProjectRepository;
   const projectionSpaceRepository = yield* ProjectionSpaceRepository;
@@ -2145,6 +2148,11 @@ const makeOrchestrationProjectionPipeline = Effect.gen(function* () {
     event,
   ) =>
     applyShellMetadataProjection(event).pipe(
+      Effect.andThen(() =>
+        event.type === "project.deleted"
+          ? teamRepository.deleteProjectRoster(event.payload.projectId).pipe(Effect.catch(() => Effect.void))
+          : Effect.void,
+      ),
       Effect.flatMap(() =>
         advanceProjectMetadataSnapshotState({
           event,
@@ -2247,4 +2255,5 @@ export const OrchestrationProjectionPipelineLive = Layer.effect(
   Layer.provideMerge(ProjectionPendingInteractionRepositoryLive),
   Layer.provideMerge(ProjectionStateRepositoryLive),
   Layer.provideMerge(ManagedAttachmentRepositoryLive),
+  Layer.provideMerge(TeamRepositoryLive),
 );

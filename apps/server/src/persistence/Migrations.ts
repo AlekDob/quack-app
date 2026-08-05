@@ -106,6 +106,7 @@ import Migration0087 from "./Migrations/087_DropUnusedOrchestrationEventIndexes.
 import Migration0088 from "./Migrations/088_ProjectionThreadsSettledAt.ts";
 import Migration0089 from "./Migrations/089_ProjectionThreadMessagesPaperoId.ts";
 import Migration0090 from "./Migrations/090_ProjectionThreadMessagesModelSelection.ts";
+import Migration0091 from "./Migrations/091_TeamAgents.ts";
 
 /**
  * Migration loader with all migrations defined inline.
@@ -211,6 +212,7 @@ export const migrationEntries = [
   [88, "ProjectionThreadsSettledAt", Migration0088],
   [89, "ProjectionThreadMessagesPaperoId", Migration0089],
   [90, "ProjectionThreadMessagesModelSelection", Migration0090],
+  [91, "TeamAgents", Migration0091],
 ] as const;
 
 export const makeMigrationLoader = (throughId?: number) =>

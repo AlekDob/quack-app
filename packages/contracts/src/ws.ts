@@ -112,6 +112,7 @@ import {
   ProviderSkillsCatalogInput,
 } from "./providerDiscovery";
 import { ProviderCompactThreadInput } from "./provider";
+import { TeamDeleteAgentInput, TeamGetRosterInput, TeamUpsertAgentInput } from "./team";
 import {
   PullRequestActionInput,
   PullRequestCommentInput,
@@ -237,6 +238,11 @@ export const WS_METHODS = {
   providerReadPlugin: "provider.readPlugin",
   providerListModels: "provider.listModels",
   providerListAgents: "provider.listAgents",
+
+  // Team
+  teamGetRoster: "team.getRoster",
+  teamUpsertAgent: "team.upsertAgent",
+  teamDeleteAgent: "team.deleteAgent",
 
   // Automation methods
   automationList: "automation.list",
@@ -403,6 +409,11 @@ const WebSocketRequestBody = Schema.Union([
   tagRequestBody(WS_METHODS.providerReadPlugin, ProviderReadPluginInput),
   tagRequestBody(WS_METHODS.providerListModels, ProviderListModelsInput),
   tagRequestBody(WS_METHODS.providerListAgents, ProviderListAgentsInput),
+
+  // Team
+  tagRequestBody(WS_METHODS.teamGetRoster, TeamGetRosterInput),
+  tagRequestBody(WS_METHODS.teamUpsertAgent, TeamUpsertAgentInput),
+  tagRequestBody(WS_METHODS.teamDeleteAgent, TeamDeleteAgentInput),
 
   // Automation methods
   tagRequestBody(WS_METHODS.automationList, AutomationListInput),

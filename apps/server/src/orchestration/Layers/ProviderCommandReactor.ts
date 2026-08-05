@@ -89,6 +89,7 @@ import { resolveProviderDispatchAttachments } from "../../provider/providerAttac
 import { OrchestrationEventDeliveryRepositoryLive } from "../../persistence/Layers/OrchestrationEventDeliveries.ts";
 import { ProjectionPendingInteractionRepositoryLive } from "../../persistence/Layers/ProjectionPendingInteractions.ts";
 import { QueuedTurnPromotionRepositoryLive } from "../../persistence/Layers/QueuedTurnPromotions.ts";
+import { TeamRepositoryLive } from "../../persistence/Layers/TeamRepository.ts";
 import { ProjectionPendingInteractionRepository } from "../../persistence/Services/ProjectionPendingInteractions.ts";
 import {
   OrchestrationEventDeliveryRepository,
@@ -96,6 +97,7 @@ import {
 } from "../../persistence/Services/OrchestrationEventDeliveries.ts";
 import { QueuedTurnPromotionRepository } from "../../persistence/Services/QueuedTurnPromotions.ts";
 import { ManagedAttachmentRepository } from "../../persistence/Services/ManagedAttachments.ts";
+import { TeamRepository } from "../../persistence/Services/TeamRepository.ts";
 import { ServerConfig } from "../../config.ts";
 import { ServerSettingsService } from "../../serverSettings.ts";
 import { providerStartOptionsFromServerSettings } from "@synara/shared/serverSettings";
@@ -460,6 +462,7 @@ const make = Effect.gen(function* () {
   const textGeneration = yield* TextGeneration;
   const serverSettings = yield* ServerSettingsService;
   const managedAttachments = yield* ManagedAttachmentRepository;
+  const teamRepository = yield* TeamRepository;
   const serverConfig = yield* ServerConfig;
   const handledTurnStartKeys = yield* Cache.make<string, true>({
     capacity: HANDLED_TURN_START_KEY_MAX,
@@ -1293,6 +1296,17 @@ const make = Effect.gen(function* () {
     if (!thread) {
       return;
     }
+    const threadProject = Option.getOrUndefined(
+      yield* projectionSnapshotQuery
+        .getProjectShellById(thread.projectId)
+        .pipe(Effect.catch(() => Effect.succeed(Option.none()))),
+    );
+    const teamAgent = input.paperoId
+      ? yield* teamRepository.resolveAgent(
+          threadProject?.kind === "project" ? thread.projectId : null,
+          input.paperoId,
+        )
+      : undefined;
     const threadMentionProjection = yield* resolveThreadMentionPromptProjection({
       mentions: input.mentions,
       snapshotQuery: projectionSnapshotQuery,
@@ -1322,7 +1336,7 @@ const make = Effect.gen(function* () {
         providerThread.modelSelection.provider) as ProviderKind;
       const steerPaperoInlineText = buildInlinePaperoInstructions({
         paperoId: input.paperoId,
-        paperoInstructions: input.paperoInstructions,
+        ...(teamAgent ? { agent: teamAgent } : {}),
         maxChars: Math.max(
           0,
           PROVIDER_SEND_TURN_MAX_INPUT_CHARS -
@@ -1520,7 +1534,7 @@ const make = Effect.gen(function* () {
     const providerInputWithMentionContext = `${providerInput}${mentionContextSuffix}`;
     const paperoInlineText = buildInlinePaperoInstructions({
       paperoId: input.paperoId,
-      paperoInstructions: input.paperoInstructions,
+      ...(teamAgent ? { agent: teamAgent } : {}),
       maxChars: Math.max(
         0,
         PROVIDER_SEND_TURN_MAX_INPUT_CHARS -
@@ -4082,6 +4096,7 @@ export const makeProviderCommandReactorLive = (options?: ProviderCommandReactorL
     Layer.provideMerge(OrchestrationEventDeliveryRepositoryLive),
     Layer.provideMerge(QueuedTurnPromotionRepositoryLive),
     Layer.provideMerge(ProjectionPendingInteractionRepositoryLive),
+    Layer.provideMerge(TeamRepositoryLive),
   );
 
 export const ProviderCommandReactorLive = makeProviderCommandReactorLive();

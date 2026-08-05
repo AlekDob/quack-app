@@ -129,6 +129,7 @@ import { bufferLiveUiStream, type LiveUiStreamDropReport } from "./wsStreamBackp
 import { makeCursorSafeSnapshotLiveStream } from "./wsSnapshotLiveStream";
 import { PullRequestService } from "./pullRequests/Services/PullRequestService";
 import { resolveGitHubRepository } from "./pullRequests/repositoryResolution";
+import { TeamRepository } from "./persistence/Services/TeamRepository";
 
 export function canManageExternalMcp(role: "owner" | "client"): boolean {
   return role === "owner";
@@ -328,6 +329,7 @@ const makeWsRpcHandlersLayer = () =>
       const serverEnvironment = yield* ServerEnvironment;
       const serverSettings = yield* ServerSettingsService;
       const terminalManager = yield* TerminalManager;
+      const teamRepository = yield* TeamRepository;
       const textGeneration = yield* TextGeneration;
       const workspaceEntries = yield* WorkspaceEntries;
       const workspaceFileSystem = yield* WorkspaceFileSystem;
@@ -743,6 +745,19 @@ const makeWsRpcHandlersLayer = () =>
 
       const rpcEffect = <A, E, R>(effect: Effect.Effect<A, E, R>, fallbackMessage: string) =>
         effect.pipe(Effect.mapError((cause) => toWsRpcError(cause, fallbackMessage)));
+
+      const requireExistingTeamScope = (scope: import("@synara/contracts").TeamScope) =>
+        scope.kind === "global"
+          ? Effect.void
+          : projectionReadModelQuery
+              .getProjectShellById(scope.projectId)
+              .pipe(
+                Effect.flatMap((project) =>
+                  Option.isSome(project)
+                    ? Effect.void
+                    : Effect.fail(new Error("Project not found.")),
+                ),
+              );
 
       const requireOwner = Effect.gen(function* () {
         if (!canManageExternalMcp(yield* CurrentWsSessionRole)) {
@@ -1646,6 +1661,27 @@ const makeWsRpcHandlersLayer = () =>
           rpcEffect(providerDiscoveryService.listModels(input), "Failed to list models"),
         [WS_METHODS.providerListAgents]: (input) =>
           rpcEffect(providerDiscoveryService.listAgents(input), "Failed to list agents"),
+        [WS_METHODS.teamGetRoster]: (input) =>
+          rpcEffect(
+            requireExistingTeamScope(input.scope).pipe(
+              Effect.andThen(() => teamRepository.getRoster(input.scope)),
+            ),
+            "Failed to load Team",
+          ),
+        [WS_METHODS.teamUpsertAgent]: (input) =>
+          rpcEffect(
+            requireExistingTeamScope(input.scope).pipe(
+              Effect.andThen(() => teamRepository.upsertAgent(input.scope, input.agent)),
+            ),
+            "Failed to save Team agent",
+          ),
+        [WS_METHODS.teamDeleteAgent]: (input) =>
+          rpcEffect(
+            requireExistingTeamScope(input.scope).pipe(
+              Effect.andThen(() => teamRepository.deleteAgent(input.scope, input.agentId)),
+            ),
+            "Failed to delete Team agent",
+          ),
         [WS_METHODS.automationList]: (input) =>
           rpcEffect(automationService.list(input), "Failed to list automations"),
         [WS_METHODS.automationGetMemory]: ({ automationId }) =>

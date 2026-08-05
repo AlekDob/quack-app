@@ -42,6 +42,9 @@ import {
   WS_METHODS,
   type WsWelcomePayload,
   type AutomationStreamEvent,
+  type TeamDeleteAgentInput,
+  type TeamGetRosterInput,
+  type TeamUpsertAgentInput,
 } from "@synara/contracts";
 import { VOICE_TRANSCRIPTION_UPLOAD_ROUTE_PATH } from "@synara/shared/binaryTransfer";
 
@@ -490,6 +493,13 @@ export function createWsNativeApi(): NativeApi {
     },
     studio: {
       listThreadOutputs: (input) => transport.request(WS_METHODS.studioListThreadOutputs, input),
+    },
+    team: {
+      getRoster: (input: TeamGetRosterInput) => transport.request(WS_METHODS.teamGetRoster, input),
+      upsertAgent: (input: TeamUpsertAgentInput) =>
+        transport.request(WS_METHODS.teamUpsertAgent, input),
+      deleteAgent: (input: TeamDeleteAgentInput) =>
+        transport.request(WS_METHODS.teamDeleteAgent, input),
     },
     shell: {
       openInEditor: (cwd, editor) =>
