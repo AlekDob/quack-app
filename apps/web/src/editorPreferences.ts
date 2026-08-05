@@ -1,5 +1,5 @@
-import { EDITORS, EditorId, NativeApi } from "@synara/contracts";
-import { getLocalStorageItem, setLocalStorageItem, useLocalStorage } from "./hooks/useLocalStorage";
+import { EditorId, NativeApi } from "@synara/contracts";
+import { getLocalStorageItem, useLocalStorage } from "./hooks/useLocalStorage";
 
 const LAST_EDITOR_KEY = "synara:last-editor";
 
@@ -10,7 +10,9 @@ export function usePreferredEditor(availableEditors: ReadonlyArray<EditorId>) {
   if (lastEditor && availableEditors.includes(lastEditor)) {
     effectiveEditor = lastEditor;
   } else {
-    effectiveEditor = EDITORS.find((editor) => availableEditors.includes(editor.id))?.id ?? null;
+    // Do not infer a preference from installation order. Opening an external
+    // editor is an explicit user action, so the first run must stay unassigned.
+    effectiveEditor = null;
   }
 
   return [effectiveEditor, setLastEditor] as const;
@@ -22,9 +24,7 @@ export function resolveAndPersistPreferredEditor(
   const availableEditorIds = new Set(availableEditors);
   const stored = getLocalStorageItem(LAST_EDITOR_KEY, EditorId);
   if (stored && availableEditorIds.has(stored)) return stored;
-  const editor = EDITORS.find((editor) => availableEditorIds.has(editor.id))?.id ?? null;
-  if (editor) setLocalStorageItem(LAST_EDITOR_KEY, editor, EditorId);
-  return editor ?? null;
+  return null;
 }
 
 export async function openInPreferredEditor(api: NativeApi, targetPath: string): Promise<EditorId> {
