@@ -4,11 +4,12 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { Skeleton } from "~/components/ui/skeleton";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { ArrowDownIcon, ArrowUpIcon, GitCommitIcon } from "~/lib/icons";
 import { gitStatusQueryOptions } from "~/lib/gitReactQuery";
 
 import { buildGitStatusSummary } from "./EnvironmentPanel.logic";
-import { ENVIRONMENT_ROW_ICON_CLASS_NAME, EnvironmentRowBody } from "./EnvironmentRow";
 
 export function EnvironmentGitStatusSummary({
   gitCwd,
@@ -17,9 +18,13 @@ export function EnvironmentGitStatusSummary({
   gitCwd: string | null;
   enabled: boolean;
 }) {
-  const { data: status, isError, isFetching } = useQuery(gitStatusQueryOptions(gitCwd, enabled));
+  const { data: status, isError, isLoading } = useQuery(gitStatusQueryOptions(gitCwd, enabled));
 
-  if (!status || isError || isFetching) {
+  if (isLoading) {
+    return <Skeleton className="ml-8 mt-1 h-4 w-28" aria-label="Loading Git status" />;
+  }
+
+  if (!status || isError) {
     return null;
   }
 
@@ -29,7 +34,7 @@ export function EnvironmentGitStatusSummary({
   }
 
   return (
-    <div className="ml-6 flex flex-col">
+    <div className="-mt-0.5 mb-1 ml-8 flex items-center gap-2 font-system-ui text-[length:var(--app-font-size-ui-sm,11px)] font-normal">
       {items.map((item) => {
         const Icon =
           item.type === "commit"
@@ -37,19 +42,33 @@ export function EnvironmentGitStatusSummary({
             : item.type === "pull"
               ? ArrowDownIcon
               : ArrowUpIcon;
-        const color = item.tone === "success" ? "text-success" : "text-warning";
+        const color =
+          item.type === "commit"
+            ? "text-destructive"
+            : item.type === "pull"
+              ? "text-warning"
+              : "text-success";
+        const count =
+          item.type === "commit"
+            ? status.workingTree.files.length
+            : item.type === "pull"
+              ? status.behindCount
+              : status.aheadCount;
         return (
-          <div
-            key={item.type}
-            className="flex items-center gap-2 px-2 py-1 text-[length:var(--app-font-size-ui,12px)]"
-          >
-            <EnvironmentRowBody
-              icon={
-                <Icon className={`${ENVIRONMENT_ROW_ICON_CLASS_NAME} ${color}`} aria-hidden />
+          <Tooltip key={item.type}>
+            <TooltipTrigger
+              render={
+                <span
+                  aria-label={item.label}
+                  className={`inline-flex items-center gap-1 ${color}`}
+                >
+                  <Icon className={`size-3 ${color}`} aria-hidden />
+                  <span className="tabular-nums">{count}</span>
+                </span>
               }
-              label={<span className={color}>{item.label}</span>}
             />
-          </div>
+            <TooltipPopup side="top">{item.label}</TooltipPopup>
+          </Tooltip>
         );
       })}
     </div>
