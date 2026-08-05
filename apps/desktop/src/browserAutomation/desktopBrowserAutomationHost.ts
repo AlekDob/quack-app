@@ -76,12 +76,6 @@ const IDEMPOTENCY_TTL_MS = 15 * 60_000;
 const MAX_IDEMPOTENCY_TOMBSTONES = 4_096;
 const IDEMPOTENCY_TOMBSTONE_TTL_MS = 24 * 60 * 60_000;
 const MAX_SESSION_SNAPSHOTS = 256;
-const VISIBLE_RUNTIME_POLL_MS = 50;
-// The tool's own 10–30 second deadline remains authoritative. This secondary
-// ceiling only prevents an accidentally unbounded wait if the host is ever
-// called without that outer guard; it must not preempt a healthy slow renderer
-// mount and manufacture BrowserHostUnavailable midway through browser_open.
-const DEFAULT_VISIBLE_RUNTIME_TIMEOUT_MS = 30_000;
 const WINDOW_OPEN_RECONCILIATION_TIMEOUT_MS = 2_000;
 const WINDOW_OPEN_EVENT_LOOP_GRACE_MS = 16;
 
@@ -97,7 +91,9 @@ export interface BrowserAutomationToolRequest {
 }
 
 export interface DesktopBrowserAutomationHostOptions {
+  /** @deprecated Browser automation must not reveal or route the user's UI. */
   readonly requestOpenPanel?: (threadId: ThreadId) => void | Promise<void>;
+  /** @deprecated Kept for callers compiled against the visible-runtime host. */
   readonly visibleRuntimeTimeoutMs?: number;
 }
 
@@ -318,17 +314,10 @@ export class DesktopBrowserAutomationHost {
   private readonly lockTails = new Map<string, Promise<void>>();
   private readonly snapshotBySession = new Map<string, BrowserSnapshotHandle>();
   private readonly diagnostics = new BrowserDiagnosticsStore();
-  private readonly requestOpenPanel: ((threadId: ThreadId) => void | Promise<void>) | undefined;
-  private readonly visibleRuntimeTimeoutMs: number;
-
   constructor(
     private readonly browserManager: DesktopBrowserManager,
-    options: DesktopBrowserAutomationHostOptions = {},
-  ) {
-    this.requestOpenPanel = options.requestOpenPanel;
-    this.visibleRuntimeTimeoutMs =
-      options.visibleRuntimeTimeoutMs ?? DEFAULT_VISIBLE_RUNTIME_TIMEOUT_MS;
-  }
+    _options: DesktopBrowserAutomationHostOptions = {},
+  ) {}
 
   async executeTool(request: BrowserAutomationToolRequest): Promise<unknown> {
     if (!isToolName(request.name)) {
@@ -411,6 +400,14 @@ export class DesktopBrowserAutomationHost {
           });
 
     const run = async (): Promise<unknown> => {
+      const tracksActivity = request.name !== "browser_status" && request.name !== "browser_tabs";
+      if (tracksActivity) {
+        this.browserManager.setAutomationState({
+          threadId: request.threadId,
+          phase: "running",
+          tabId: requestedTabId,
+        });
+      }
       try {
         return await this.withLock(
           `session:${request.sessionId}`,
@@ -428,6 +425,20 @@ export class DesktopBrowserAutomationHost {
           queuedTimeoutError,
         );
       } catch (error) {
+        if (tracksActivity && error instanceof BrowserAutomationHostError) {
+          const reason =
+            error.browserError.code === "BrowserDownloadApprovalRequired"
+              ? "download"
+              : error.browserError.code === "BrowserPopupBlocked"
+                ? "popup"
+                : "error";
+          this.browserManager.setAutomationState({
+            threadId: request.threadId,
+            phase: "attention-required",
+            tabId: requestedTabId,
+            reason,
+          });
+        }
         if (error instanceof BrowserAutomationHostError) throw error;
         throw new BrowserAutomationHostError({
           code: "BrowserMalformedResponse",
@@ -435,6 +446,13 @@ export class DesktopBrowserAutomationHost {
           phase: "runtime",
           effectMayHaveCommitted: !definition.annotations.readOnlyHint,
         });
+      } finally {
+        if (tracksActivity) {
+          const state = this.browserManager.getState({ threadId: request.threadId });
+          if (state.automation?.phase === "running") {
+            this.browserManager.setAutomationState({ threadId: request.threadId, phase: "idle" });
+          }
+        }
       }
     };
     const idempotencyKey = typeof input.idempotencyKey === "string" ? input.idempotencyKey : null;
@@ -776,55 +794,26 @@ export class DesktopBrowserAutomationHost {
     signal: AbortSignal,
     reveal: boolean,
   ): Promise<BrowserAutomationVisibleRuntime> {
+    void reveal;
     throwIfAborted(signal);
-    if (!reveal) {
-      try {
-        const runtime = this.browserManager.getVisibleAutomationRuntime({
-          threadId: affinity.threadId,
-          tabId,
-        });
-        throwIfAborted(signal);
-        await this.diagnostics.observe(runtime, signal);
-        return runtime;
-      } catch {
-        throwIfAborted(signal);
-        browserHostError({
-          code: "BrowserHostUnavailable",
-          retryable: true,
-          phase: "runtime",
-          effectMayHaveCommitted: false,
-          tabId: tabId as BrowserTabId,
-        });
-      }
+    try {
+      const runtime = this.browserManager.getAutomationRuntime({
+        threadId: affinity.threadId,
+        tabId,
+      });
+      throwIfAborted(signal);
+      await this.diagnostics.observe(runtime, signal);
+      return runtime;
+    } catch {
+      throwIfAborted(signal);
+      browserHostError({
+        code: "BrowserHostUnavailable",
+        retryable: true,
+        phase: "runtime",
+        effectMayHaveCommitted: false,
+        tabId: tabId as BrowserTabId,
+      });
     }
-    this.browserManager.selectAutomationTab({ threadId: affinity.threadId, tabId });
-    throwIfAborted(signal);
-    if (this.requestOpenPanel) {
-      await raceWithSignal(Promise.resolve(this.requestOpenPanel(affinity.threadId)), signal);
-    }
-    throwIfAborted(signal);
-    const deadline = performance.now() + this.visibleRuntimeTimeoutMs;
-    do {
-      try {
-        const runtime = this.browserManager.getVisibleAutomationRuntime({
-          threadId: affinity.threadId,
-          tabId,
-        });
-        throwIfAborted(signal);
-        await this.diagnostics.observe(runtime, signal);
-        return runtime;
-      } catch {
-        throwIfAborted(signal);
-        await sleep(VISIBLE_RUNTIME_POLL_MS, signal);
-      }
-    } while (performance.now() <= deadline);
-    browserHostError({
-      code: "BrowserHostUnavailable",
-      retryable: true,
-      phase: "runtime",
-      effectMayHaveCommitted: false,
-      tabId: tabId as BrowserTabId,
-    });
   }
 
   private observeWindowOpen(runtime: BrowserAutomationVisibleRuntime): WindowOpenObservation {
@@ -851,7 +840,7 @@ export class DesktopBrowserAutomationHost {
       reconcile: (timeoutMs, signal) => {
         if (observedEvent) return Promise.resolve(observedEvent);
         // CDP announces link/window activation before Electron reconciles the
-        // denied child into Synara's visible tab model. Only that path waits;
+        // denied child into Quack's visible tab model. Only that path waits;
         // ordinary clicks return immediately with no fixed grace period.
         if (!pageAnnouncedWindowOpen) {
           return waitOneTurnForWindowOpenEvent(eventPromise, signal);
@@ -1224,6 +1213,14 @@ export class DesktopBrowserAutomationHost {
     const result = execution.output;
     if (request.name !== "browser_click" && request.name !== "browser_press") return result;
 
+    if (execution.oauthPopup) {
+      this.browserManager.setAutomationState({
+        threadId: affinity.threadId,
+        phase: "attention-required",
+        tabId: targetTabId,
+        reason: "oauth",
+      });
+    }
     const reconciledResult =
       execution.oauthPopup && result !== null && typeof result === "object"
         ? {
@@ -1256,7 +1253,7 @@ export class DesktopBrowserAutomationHost {
   private status(affinity: SessionAffinity): BrowserStatusOutput {
     return {
       available: true,
-      physicalScope: "visible-shared-electron-webview",
+      physicalScope: "shared-electron-browser-runtime",
       assignedTabId: affinity.tabId as BrowserTabId | null,
       authorization: "not-required",
     };
@@ -1289,33 +1286,24 @@ export class DesktopBrowserAutomationHost {
   ): Promise<BrowserOpenOutput> {
     throwIfAborted(signal);
     const url = input.url === undefined ? undefined : validateWebUrl(input.url);
-    const show = input.show ?? true;
+    // `show` is retained only for wire compatibility. Automation never routes
+    // or focuses the user's browser surface.
+    void input.show;
     const before = this.browserManager.getState({ threadId: affinity.threadId });
-    const hiddenTabId = !show && (input.reuse ?? true) ? before.activeTabId : null;
-    if (!show) {
-      if (!hiddenTabId) {
-        browserHostError({
-          code: "BrowserHostUnavailable",
-          retryable: true,
-          phase: "runtime",
-          effectMayHaveCommitted: false,
-        });
-      }
-    }
     throwIfAborted(signal);
-    // A hidden open may only use the tab proven visible below, under both the
-    // per-tab lock and the human-control guard. Preparing browser state here
-    // would reopen, select, or create a renderer before that proof succeeds.
-    const prepared = show
-      ? await this.withVisibilityLock(affinity.threadId, signal, abortError, async () => {
-          markActionStarted();
-          return this.browserManager.prepareAutomationTab({
-            threadId: affinity.threadId,
-            reuse: input.reuse ?? true,
-          });
-        })
-      : before;
-    const selected = show ? prepared.activeTabId : hiddenTabId;
+    const prepared = await this.withVisibilityLock(
+      affinity.threadId,
+      signal,
+      abortError,
+      async () => {
+        markActionStarted();
+        return this.browserManager.prepareAutomationTab({
+          threadId: affinity.threadId,
+          reuse: input.reuse ?? true,
+        });
+      },
+    );
+    const selected = prepared.activeTabId;
     if (!selected) throw new Error("Browser open did not create a tab.");
     const disposition = before.tabs.some((tab) => tab.id === selected) ? "reused" : "created";
     return this.withLock(
@@ -1329,32 +1317,9 @@ export class DesktopBrowserAutomationHost {
           interruptByHuman,
           async () => {
             throwIfAborted(signal);
-            if (!show) {
-              // Keep the potentially slow diagnostics preflight outside the
-              // visibility lease. The state is revalidated under that lease
-              // immediately before any hidden mutation below.
-              await this.resolveVisibleRuntime(affinity, selected, signal, false);
-            }
             const executeOpen = async (): Promise<BrowserOpenOutput> => {
               markActionStarted();
-              if (!show) {
-                const visibleState = this.browserManager.getState({ threadId: affinity.threadId });
-                if (
-                  visibleState.activeTabId !== selected ||
-                  !visibleState.tabs.some((tab) => tab.id === selected)
-                ) {
-                  browserHostError({
-                    code: "BrowserHostUnavailable",
-                    retryable: true,
-                    phase: "runtime",
-                    effectMayHaveCommitted: false,
-                    tabId: selected as BrowserTabId,
-                  });
-                }
-              } else if (!url) {
-                // prepareAutomationTab runs before the per-tab lease is known.
-                // Reassert its selection now that the thread visibility lease
-                // protects this open from every other provider session.
+              if (!url) {
                 this.browserManager.selectAutomationTab({
                   threadId: affinity.threadId,
                   tabId: selected,
@@ -1362,15 +1327,6 @@ export class DesktopBrowserAutomationHost {
               }
               affinity.tabId = selected;
               if (!url) {
-                if (show) {
-                  if (this.requestOpenPanel) {
-                    await raceWithSignal(
-                      Promise.resolve(this.requestOpenPanel(affinity.threadId)),
-                      signal,
-                    );
-                  }
-                  throwIfAborted(signal);
-                }
                 const tab = prepared.tabs.find((candidate) => candidate.id === selected);
                 return {
                   tabId: selected as BrowserTabId,
@@ -1395,7 +1351,7 @@ export class DesktopBrowserAutomationHost {
                     affinity,
                     selected,
                     signal,
-                    show,
+                    false,
                   );
                   return this.withDialogs(runtime, signal, async () => {
                     const loaded = await this.navigateOrObserve(

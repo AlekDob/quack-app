@@ -17,12 +17,12 @@ export const BROWSER_FIELD_INSTRUCTION_COPY = {
     "Optional scoped tab returned by browser_tabs/open; omit to use provider-session affinity.",
   timeoutMs: "Optional end-to-end action deadline in milliseconds within the published bounds.",
   idempotencyKey:
-    "Optional advanced retry key. Synara derives a stable key from the authenticated tool request when omitted; provide one only to deliberately deduplicate a byte-identical retry.",
+    "Optional advanced retry key. Quack derives a stable key from the authenticated tool request when omitted; provide one only to deliberately deduplicate a byte-identical retry.",
   target:
     "Exactly one target; prefer a current snapshot {ref,snapshotId}, then a literal semantic locator, strict CSS, or an allowed point.",
-  show: "Whether to reveal the shared visible browser surface; defaults true. False only reuses an already attached renderer WebView and otherwise reports unavailable; it never creates a separate/headless browser.",
+  show: "Legacy visibility hint. Browser automation runs in the shared background Electron session by default and never changes the user's active thread or pane. A required human action is surfaced as an in-thread indicator.",
   waitUntil:
-    "Navigation milestone; domcontentloaded is the default, while networkidle uses Synara's bounded tracker.",
+    "Navigation milestone; domcontentloaded is the default, while networkidle uses Quack's bounded tracker.",
   annotationId:
     "Optional opaque annotation id from a browser annotation attachment. Pass exactly one of annotationId or url; annotationId resolves the exact captured live page locally without embedding its private live URL in the prompt.",
   conditions:
@@ -120,7 +120,7 @@ export const BrowserToolOpenInput = closedStruct({
   url: Schema.optional(BrowserUrl),
   show: optionalDefault(
     described(Schema.Boolean, BROWSER_FIELD_INSTRUCTION_COPY.show),
-    defaultTrue,
+    defaultFalse,
   ),
   reuse: optionalDefault(
     described(

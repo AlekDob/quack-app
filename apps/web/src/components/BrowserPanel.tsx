@@ -93,7 +93,7 @@ const BROWSER_BOUNDS_SYNC_BURST_FRAMES = 30;
 const BROWSER_BOUNDS_SYNC_STABLE_FRAME_TARGET = 2;
 const BROWSER_WEBVIEW_PARTITION = "persist:synara-browser";
 const BROWSER_PERF_SAMPLE_INTERVAL_MS = 5_000;
-const SYNARA_BROWSER_LABEL = "Synara browser";
+const SYNARA_BROWSER_LABEL = "Quack browser";
 const browserPanelHideScheduler = createBrowserPanelHideScheduler();
 // The address field and tab pills share one chrome-control surface so the whole row reads
 // as a single cohesive control: matching height, radius, border width, and type scale.
@@ -552,6 +552,9 @@ export function BrowserPanel({
   const api = readNativeApi();
   const isLiveRuntime = runtimeMode === "live";
   const threadBrowserState = useBrowserStateStore(selectThreadBrowserState(threadId));
+  const usesNativeRuntime =
+    threadBrowserState?.runtimeSurface === "background-native" ||
+    threadBrowserState?.runtimeSurface === "visible-native";
   const recentHistory = useBrowserStateStore(selectThreadBrowserHistory(threadId));
   const upsertThreadState = useBrowserStateStore((store) => store.upsertThreadState);
   const addComposerDraftImage = useComposerDraftStore((store) => store.addImage);
@@ -808,6 +811,11 @@ export function BrowserPanel({
       return;
     }
 
+    if (usesNativeRuntime) {
+      detachRendererBrowserWebview();
+      return;
+    }
+
     if (showLocalServersHome) {
       detachRendererBrowserWebview();
       return;
@@ -992,6 +1000,7 @@ export function BrowserPanel({
     showLocalServersHome,
     threadId,
     upsertThreadState,
+    usesNativeRuntime,
     workspaceReady,
   ]);
 
@@ -1060,9 +1069,10 @@ export function BrowserPanel({
               height: rect.height,
             };
           })();
+      const surface = usesNativeRuntime ? "native" : "renderer";
       const nextKey = bounds
-        ? `renderer:${Math.round(bounds.x)}:${Math.round(bounds.y)}:${Math.round(bounds.width)}:${Math.round(bounds.height)}`
-        : "renderer:hidden";
+        ? `${surface}:${Math.round(bounds.x)}:${Math.round(bounds.y)}:${Math.round(bounds.width)}:${Math.round(bounds.height)}`
+        : `${surface}:hidden`;
       lastMeasuredBoundsKeyRef.current = nextKey;
       if (lastSentBoundsRef.current === nextKey) {
         perfCountersRef.current.syncSkips += 1;
@@ -1071,7 +1081,7 @@ export function BrowserPanel({
       lastSentBoundsRef.current = nextKey;
       perfCountersRef.current.syncSends += 1;
       void api.browser
-        .setPanelBounds({ threadId, bounds, surface: "renderer" })
+        .setPanelBounds({ threadId, bounds, surface })
         .catch(ignoreBrowserBoundsSyncError);
     };
 
@@ -1178,7 +1188,7 @@ export function BrowserPanel({
       burstFramesRemainingRef.current = 0;
       burstStableFramesRef.current = 0;
     };
-  }, [api, isLiveRuntime, showLocalServersHome, threadId]);
+  }, [api, isLiveRuntime, showLocalServersHome, threadId, usesNativeRuntime]);
 
   const onSubmitAddress = useCallback(() => {
     if (!ensureLiveRuntime()) {

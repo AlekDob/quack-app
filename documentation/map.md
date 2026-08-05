@@ -2,7 +2,7 @@
 type: map
 project: synara
 created: 2026-08-03
-last_verified: 2026-08-04
+last_verified: 2026-08-05
 tags: [map, navigation]
 ---
 
@@ -22,7 +22,9 @@ tags: [map, navigation]
 | `documentation/features/002-brand-mark.md`             | Quack brand mark / app icons / `SynaraLogo`        |
 | `documentation/features/003-paperi.md`                 | Paperi composer agents / Tab cycling               |
 | `documentation/features/004-quack-completion-sound.md` | Quack completion sound / task notifications        |
-| `documentation/features/006-usage-notch-monitor.md`   | macOS notch provider usage and limits monitor      |
+| `documentation/features/006-usage-notch-monitor.md`    | macOS notch provider usage and limits monitor      |
+| `documentation/features/008-sidebar-thread-creation-skeleton.md` | Sidebar placeholder while a new thread is being created |
+| `documentation/features/009-background-browser-automation.md` | Agent browser runtime without automatic focus or pane switching |
 
 ## Recent recaps
 

@@ -64,7 +64,7 @@ export const BrowserTabSummary = closedStruct({
 
 export const BrowserStatusOutput = closedStruct({
   available: Schema.Boolean,
-  physicalScope: Schema.Literals(["visible-shared-electron-webview"]),
+  physicalScope: Schema.Literals(["shared-electron-browser-runtime"]),
   assignedTabId: Schema.NullOr(BrowserTabId),
   authorization: Schema.Literals(["not-required", "pending", "granted", "denied", "revoked"]),
 });

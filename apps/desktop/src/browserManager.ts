@@ -238,6 +238,8 @@ function defaultThreadBrowserState(threadId: ThreadId): ThreadBrowserState {
     activeTabId: null,
     tabs: [],
     lastError: null,
+    runtimeSurface: "none",
+    automation: { phase: "idle", tabId: null, reason: null },
   };
 }
 
@@ -245,6 +247,7 @@ function cloneThreadState(state: ThreadBrowserState): ThreadBrowserState {
   return {
     ...state,
     tabs: state.tabs.map((tab) => ({ ...tab })),
+    ...(state.automation ? { automation: { ...state.automation } } : {}),
   };
 }
 
@@ -702,6 +705,16 @@ export class DesktopBrowserManager {
             kind: "popup",
             openedTabId: null,
           });
+          const runtime = this.runtimes.get(buildRuntimeKey(threadId, tabId));
+          const isBackgroundAutomation =
+            runtime?.ownsWebContents === true &&
+            (this.activeThreadId !== threadId || this.attachedRuntimeKey !== runtime.key);
+          if (isBackgroundAutomation) {
+            // Do not create or focus an OAuth BrowserWindow behind the user's
+            // back. The host reports humanActionRequired and the sidebar badge
+            // lets the user explicitly promote this browser first.
+            return { action: "deny" };
+          }
         }
         // Allow (don't deny) so Electron creates a real child window that keeps
         // `window.opener`, which the OAuth callback needs to message the page back.
@@ -785,7 +798,7 @@ export class DesktopBrowserManager {
     if (this.disposed) return;
     const key = buildRuntimeKey(input.threadId, input.sourceTabId);
     // One native activation can surface duplicate callbacks in embedded guest
-    // runtimes. Only the first decision may create a canonical Synara tab.
+    // runtimes. Only the first decision may create a canonical Quack tab.
     if (
       this.pendingWindowOpenTasksByRuntimeKey.has(key) ||
       this.pendingAutomationWindowOpenCommitsByRuntimeKey.has(key)
@@ -1176,11 +1189,7 @@ export class DesktopBrowserManager {
     };
   }
 
-  /**
-   * Prepares browser state for the renderer-owned browser surface without ever
-   * creating or waking a native WebContentsView. The renderer observes the
-   * emitted state, mounts its visible <webview>, then calls attachWebview.
-   */
+  /** Prepares a tab for background automation without altering the visible UI. */
   prepareAutomationTab(input: BrowserAutomationPrepareTabInput): ThreadBrowserState {
     const hadExistingTab = (this.states.get(input.threadId)?.tabs.length ?? 0) > 0;
     const state = this.ensureWorkspace(input.threadId, input.url);
@@ -1191,15 +1200,10 @@ export class DesktopBrowserManager {
     }
 
     const key = buildRuntimeKey(input.threadId, tab.id);
+    // Keep a manual panel from constructing a transient native view before an
+    // agent actually asks for the background runtime. getAutomationRuntime()
+    // clears this lease atomically when it creates that runtime.
     this.rendererOnlyRuntimeKeys.add(key);
-    const existing = this.runtimes.get(key);
-    if (existing?.ownsWebContents) {
-      // A native fallback can never be an automation target. Drop it so the
-      // renderer can adopt the canonical visible guest for this tab.
-      this.destroyRuntime(input.threadId, tab.id, {
-        preserveAutomationDownloadTracking: true,
-      });
-    }
 
     if (input.url !== undefined) {
       const nextUrl = normalizeUrlInput(input.url);
@@ -1216,7 +1220,7 @@ export class DesktopBrowserManager {
     return this.snapshotThreadState(input.threadId, state);
   }
 
-  /** Selects a scoped tab for automation without resuming a native fallback. */
+  /** Selects a scoped tab for background automation without changing the visible pane. */
   selectAutomationTab(input: BrowserTabInput): ThreadBrowserState {
     const state = this.states.get(input.threadId);
     const tab = state ? this.getTab(state, input.tabId) : null;
@@ -1226,8 +1230,8 @@ export class DesktopBrowserManager {
 
     const key = buildRuntimeKey(input.threadId, tab.id);
     const runtime = this.runtimes.get(key);
-    this.rendererOnlyRuntimeKeys.add(key);
     let didChange = false;
+    this.rendererOnlyRuntimeKeys.add(key);
     if (runtime?.ownsWebContents) {
       this.destroyRuntime(input.threadId, tab.id, {
         preserveAutomationDownloadTracking: true,
@@ -1246,21 +1250,14 @@ export class DesktopBrowserManager {
     return this.snapshotThreadState(input.threadId, state);
   }
 
-  /** Projects a navigation into renderer state before waiting for its guest. */
+  /** Projects a background automation navigation without requesting a renderer guest. */
   prepareAutomationNavigation(input: BrowserAutomationPrepareNavigationInput): ThreadBrowserState {
     const state = this.states.get(input.threadId);
     const tab = state ? this.getTab(state, input.tabId) : null;
     if (!state?.open || !tab) {
       throw new Error("The requested browser tab is not available in this thread.");
     }
-    const runtime = this.runtimes.get(buildRuntimeKey(input.threadId, tab.id));
     this.rendererOnlyRuntimeKeys.add(buildRuntimeKey(input.threadId, tab.id));
-    if (runtime?.ownsWebContents) {
-      this.destroyRuntime(input.threadId, tab.id, {
-        preserveAutomationDownloadTracking: true,
-      });
-      suspendTabState(tab);
-    }
     const nextUrl = normalizeUrlInput(input.url);
     tab.url = nextUrl;
     tab.title = defaultTitleForUrl(nextUrl);
@@ -1314,6 +1311,84 @@ export class DesktopBrowserManager {
       webContents: runtime.webContents,
       expectAgentInput: (signal) => this.expectAutomationInput(input.threadId, tab.id, signal),
     };
+  }
+
+  /**
+   * Returns the canonical runtime for an agent without requiring that its
+   * thread, dock or browser pane be visible. A hidden renderer guest is
+   * replaced with a native runtime so a stale React tree can never race the
+   * automation host; the persistent browser partition preserves login state.
+   */
+  getAutomationRuntime(input: BrowserTabInput): BrowserAutomationVisibleRuntime {
+    const state = this.states.get(input.threadId);
+    const tab = state ? this.getTab(state, input.tabId) : null;
+    if (!state?.open || !tab) {
+      throw new Error("The requested browser tab is not available in this thread.");
+    }
+    if (state.activeTabId !== tab.id) {
+      state.activeTabId = tab.id;
+      this.markThreadStateChanged(input.threadId);
+    }
+
+    const key = buildRuntimeKey(input.threadId, tab.id);
+    this.rendererOnlyRuntimeKeys.delete(key);
+    let runtime = this.runtimes.get(key);
+    const rendererIsVisible =
+      runtime &&
+      !runtime.ownsWebContents &&
+      this.activeThreadId === input.threadId &&
+      this.attachedRuntimeKey === key &&
+      this.getVisibleBoundsForThread(input.threadId) !== null;
+    if (
+      runtime &&
+      !runtime.webContents.isDestroyed() &&
+      !rendererIsVisible &&
+      !runtime.ownsWebContents
+    ) {
+      this.destroyRuntime(input.threadId, tab.id, {
+        preserveAutomationDownloadTracking: true,
+        preserveRendererDebugger: true,
+        annotationReason: "replaced",
+      });
+      runtime = undefined;
+    }
+    if (!runtime || runtime.webContents.isDestroyed()) {
+      this.rendererOnlyRuntimeKeys.delete(key);
+      runtime = this.ensureLiveRuntime(input.threadId, tab.id);
+      void this.loadTab(input.threadId, tab.id, { runtime });
+    }
+    this.syncRuntimeSurface(input.threadId);
+    return {
+      threadId: input.threadId,
+      tabId: tab.id,
+      webContents: runtime.webContents,
+      expectAgentInput: (signal) => this.expectAutomationInput(input.threadId, tab.id, signal),
+    };
+  }
+
+  setAutomationState(input: {
+    readonly threadId: ThreadId;
+    readonly phase: "idle" | "running" | "attention-required";
+    readonly tabId?: string | null;
+    readonly reason?: "oauth" | "download" | "popup" | "error" | null;
+  }): void {
+    const state = this.getOrCreateState(input.threadId);
+    const next = {
+      phase: input.phase,
+      tabId: input.tabId ?? null,
+      reason: input.reason ?? null,
+    } as const;
+    const current = state.automation;
+    if (
+      current?.phase === next.phase &&
+      current.tabId === next.tabId &&
+      current.reason === next.reason
+    ) {
+      return;
+    }
+    state.automation = next;
+    this.markThreadStateChanged(input.threadId);
+    this.emitState(input.threadId);
   }
 
   /** Closes a tab without selecting or constructing a native fallback. */
@@ -1551,7 +1626,7 @@ export class DesktopBrowserManager {
       (this.window !== null && hostWebContentsId !== this.window.webContents.id) ||
       webContents.session !== electronSession.fromPartition(BROWSER_SESSION_PARTITION)
     ) {
-      throw new Error("The browser webview does not belong to this Synara window and partition.");
+      throw new Error("The browser webview does not belong to this Quack window and partition.");
     }
 
     const key = buildRuntimeKey(input.threadId, tab.id);
@@ -2869,6 +2944,25 @@ export class DesktopBrowserManager {
       snapshot,
     });
     return snapshot;
+  }
+
+  private syncRuntimeSurface(threadId: ThreadId): void {
+    const state = this.states.get(threadId);
+    if (!state) return;
+    const tabId = state.activeTabId;
+    const runtime = tabId ? this.runtimes.get(buildRuntimeKey(threadId, tabId)) : undefined;
+    const next =
+      !runtime || runtime.webContents.isDestroyed()
+        ? "none"
+        : !runtime.ownsWebContents
+          ? "visible-renderer"
+          : this.activeThreadId === threadId && this.attachedRuntimeKey === runtime.key
+            ? "visible-native"
+            : "background-native";
+    if (state.runtimeSurface === next) return;
+    state.runtimeSurface = next;
+    this.markThreadStateChanged(threadId);
+    this.emitState(threadId);
   }
 
   private getTrackedProcessIds(): number[] {

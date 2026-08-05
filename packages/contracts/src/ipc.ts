@@ -277,6 +277,19 @@ export interface BrowserTabState {
   lastError: string | null;
 }
 
+/** Ephemeral desktop-only ownership of the active browser runtime. */
+export type BrowserRuntimeSurface =
+  | "none"
+  | "background-native"
+  | "visible-native"
+  | "visible-renderer";
+
+export interface BrowserAutomationState {
+  phase: "idle" | "running" | "attention-required";
+  tabId: string | null;
+  reason: "oauth" | "download" | "popup" | "error" | null;
+}
+
 export interface ThreadBrowserState {
   threadId: ThreadId;
   version: number;
@@ -284,6 +297,10 @@ export interface ThreadBrowserState {
   activeTabId: string | null;
   tabs: BrowserTabState[];
   lastError: string | null;
+  /** Never persisted: communicates the currently owned Electron surface to the renderer. */
+  runtimeSurface?: BrowserRuntimeSurface;
+  /** Never persisted: compact activity state for background browser automation. */
+  automation?: BrowserAutomationState;
 }
 
 export interface BrowserOpenInput {
