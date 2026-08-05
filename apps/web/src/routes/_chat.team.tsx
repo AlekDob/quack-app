@@ -42,6 +42,10 @@ const LEGACY_STORAGE_KEY = "synara:paperi:v1";
 const teamQueryKey = (scope: TeamScope) =>
   ["team", scope.kind, scope.kind === "project" ? scope.projectId : null] as const;
 
+interface TeamSearch {
+  readonly projectId?: string | undefined;
+}
+
 function avatarOptions(): string[] {
   return [
     JACK_AVATAR_URL,
@@ -128,7 +132,10 @@ function migrateLegacyPaperi(roster: TeamRoster): Promise<void> | null {
 function TeamRouteView() {
   const projects = useStore((state) => state.projects);
   const queryClient = useQueryClient();
-  const [scope, setScope] = useState<TeamScope>({ kind: "global" });
+  const projectId = Route.useSearch({ select: (search) => search.projectId });
+  const scope: TeamScope = projectId
+    ? { kind: "project", projectId: projectId as ProjectId }
+    : { kind: "global" };
   const [editing, setEditing] = useState<TeamAgent | null>(null);
   const [deleting, setDeleting] = useState<TeamAgent | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -178,25 +185,12 @@ function TeamRouteView() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <select
-              aria-label="Team scope"
-              className="h-8 rounded-lg border border-border bg-background px-2 text-xs text-foreground"
-              value={scope.kind === "global" ? "global" : scope.projectId}
-              onChange={(event) => {
-                setScope(
-                  event.target.value === "global"
-                    ? { kind: "global" }
-                    : { kind: "project", projectId: event.target.value as ProjectId },
-                );
-              }}
-            >
-              <option value="global">Global</option>
-              {ordinaryProjects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
+            <span className="hidden text-sm text-muted-foreground sm:inline">
+              {scope.kind === "global"
+                ? "Global Team"
+                : (ordinaryProjects.find((project) => project.id === scope.projectId)?.name ??
+                  "Project Team")}
+            </span>
             <Button
               size="sm"
               onClick={() => {
@@ -482,4 +476,10 @@ function AgentDialog({
   );
 }
 
-export const Route = createFileRoute("/_chat/team")({ component: TeamRouteView });
+export const Route = createFileRoute("/_chat/team")({
+  validateSearch: (raw: Record<string, unknown>): TeamSearch =>
+    typeof raw.projectId === "string" && raw.projectId.length > 0
+      ? { projectId: raw.projectId }
+      : {},
+  component: TeamRouteView,
+});

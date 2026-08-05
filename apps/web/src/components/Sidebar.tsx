@@ -1442,6 +1442,10 @@ export default function Sidebar() {
   });
   const routeSearch = useDiffRouteSearch();
   const settingsSectionSearch = useSearch({ strict: false }) as Record<string, unknown>;
+  const activeTeamProjectId =
+    isOnTeam && typeof settingsSectionSearch.projectId === "string"
+      ? settingsSectionSearch.projectId
+      : null;
   const activeSettingsSection = normalizeSettingsSection(settingsSectionSearch.section);
   const activeSplitView = useSplitViewStore(
     useMemo(() => selectSplitView(routeSearch.splitViewId ?? null), [routeSearch.splitViewId]),
@@ -5891,61 +5895,124 @@ export default function Sidebar() {
               }
               className="sidebar-surface-enter"
             >
-              {/* Primary sidebar actions stay limited to features we currently ship. */}
-              <SidebarGroup className="px-1.5 pt-1 pb-1.5">
-                <SidebarMenu className="gap-0.5">
-                  {isOnTeam ? null : isOnStudio ? (
-                    <>
+              {isOnTeam ? (
+                <SidebarGroup className="px-1.5 py-2">
+                  <p className="px-2 pb-1 text-[length:var(--app-font-size-ui-sm,11px)] font-medium text-muted-foreground">
+                    Team scope
+                  </p>
+                  <SidebarMenu className="gap-1">
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        size="sm"
+                        data-active={activeTeamProjectId === null}
+                        aria-current={activeTeamProjectId === null ? "page" : undefined}
+                        className={cn(
+                          SIDEBAR_HEADER_ROW_CLASS_NAME,
+                          activeTeamProjectId === null
+                            ? SIDEBAR_ROW_ACTIVE_CLASS_NAME
+                            : cn(SIDEBAR_ROW_IDLE_TEXT_CLASS_NAME, SIDEBAR_ROW_HOVER_CLASS_NAME),
+                        )}
+                        onClick={() => void navigate({ to: "/team", search: {} })}
+                      >
+                        <SidebarLeadingIcon size="sm" tone="text-inherit">
+                          <SidebarGlyph icon={ChatBubbleIcon} variant="leading" />
+                        </SidebarLeadingIcon>
+                        <span>Global</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    {ordinarySpaceProjects.length > 0 ? (
+                      <p className="px-2 pt-3 pb-1 text-[length:var(--app-font-size-ui-sm,11px)] font-medium text-muted-foreground">
+                        Projects
+                      </p>
+                    ) : null}
+                    {ordinarySpaceProjects.map((project) => {
+                      const active = activeTeamProjectId === project.id;
+                      return (
+                        <SidebarMenuItem key={project.id}>
+                          <SidebarMenuButton
+                            size="sm"
+                            data-active={active}
+                            aria-current={active ? "page" : undefined}
+                            className={cn(
+                              SIDEBAR_HEADER_ROW_CLASS_NAME,
+                              active
+                                ? SIDEBAR_ROW_ACTIVE_CLASS_NAME
+                                : cn(
+                                    SIDEBAR_ROW_IDLE_TEXT_CLASS_NAME,
+                                    SIDEBAR_ROW_HOVER_CLASS_NAME,
+                                  ),
+                            )}
+                            onClick={() =>
+                              void navigate({
+                                to: "/team",
+                                search: { projectId: project.id },
+                              })
+                            }
+                          >
+                            <SidebarLeadingIcon size="sm" tone="text-inherit">
+                              <SidebarGlyph icon={FolderOpenIcon} variant="leading" />
+                            </SidebarLeadingIcon>
+                            <span className="truncate">{project.name}</span>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })}
+                  </SidebarMenu>
+                </SidebarGroup>
+              ) : (
+                <SidebarGroup className="px-1.5 pt-1 pb-1.5">
+                  <SidebarMenu className="gap-0.5">
+                    {isOnStudio ? (
                       <SidebarPrimaryAction
                         icon={NewThreadIcon}
                         iconClassName="size-3.5"
                         label="New studio chat"
                         onClick={handleCreateStudioChat}
                       />
-                    </>
-                  ) : (
-                    <>
-                      <SidebarPrimaryAction
-                        icon={NewThreadIcon}
-                        iconClassName="size-3.5"
-                        label="New thread"
-                        onClick={handlePrimaryNewThread}
-                        onMouseEnter={prefetchModelsForPrimaryNewThread}
-                        onFocus={prefetchModelsForPrimaryNewThread}
-                      />
-                      <SidebarPrimaryAction
-                        icon={KanbanIcon}
-                        label="Kanban"
-                        active={isOnKanban}
-                        onClick={() => {
-                          void navigate({ to: "/kanban" });
-                        }}
-                      />
-                      <SidebarPrimaryAction
-                        icon={IoIosGitCompare}
-                        label="Pull requests"
-                        active={isOnPullRequests}
-                        badge={pullRequestsReviewBadge}
-                        onClick={() => {
-                          void navigate({
-                            to: "/pull-requests",
-                            search: { involvement: "all", state: "open" },
-                          });
-                        }}
-                      />
-                      <SidebarPrimaryAction
-                        icon={ClockIcon}
-                        label="Automations"
-                        active={isOnAutomations}
-                        badge={automationAttentionBadge}
-                        onClick={() => {
-                          void navigate({ to: "/automations" });
-                        }}
-                      />
-                    </>
-                  )}
-                </SidebarMenu>
-              </SidebarGroup>
+                    ) : (
+                      <>
+                        <SidebarPrimaryAction
+                          icon={NewThreadIcon}
+                          iconClassName="size-3.5"
+                          label="New thread"
+                          onClick={handlePrimaryNewThread}
+                          onMouseEnter={prefetchModelsForPrimaryNewThread}
+                          onFocus={prefetchModelsForPrimaryNewThread}
+                        />
+                        <SidebarPrimaryAction
+                          icon={KanbanIcon}
+                          label="Kanban"
+                          active={isOnKanban}
+                          onClick={() => {
+                            void navigate({ to: "/kanban" });
+                          }}
+                        />
+                        <SidebarPrimaryAction
+                          icon={IoIosGitCompare}
+                          label="Pull requests"
+                          active={isOnPullRequests}
+                          badge={pullRequestsReviewBadge}
+                          onClick={() => {
+                            void navigate({
+                              to: "/pull-requests",
+                              search: { involvement: "all", state: "open" },
+                            });
+                          }}
+                        />
+                        <SidebarPrimaryAction
+                          icon={ClockIcon}
+                          label="Automations"
+                          active={isOnAutomations}
+                          badge={automationAttentionBadge}
+                          onClick={() => {
+                            void navigate({ to: "/automations" });
+                          }}
+                        />
+                      </>
+                    )}
+                  </SidebarMenu>
+                </SidebarGroup>
+              )}
 
               {isOnTeam ? null : isOnStudio ? (
                 // Studio is "just chats": a labeled Studio block holding a flat list of threads
