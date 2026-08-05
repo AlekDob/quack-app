@@ -42,6 +42,7 @@ import { cn } from "~/lib/utils";
 import { readNativeApi } from "~/nativeApi";
 
 import { EnvironmentEditorSection } from "./EnvironmentEditorSection";
+import { EnvironmentGitStatusSummary } from "./EnvironmentGitStatusSummary";
 import {
   EnvironmentAutomationsSection,
   type EnvironmentAutomationPanelItem,
@@ -344,23 +345,26 @@ export function EnvironmentPanel({
       ) : null}
 
       {isGitRepo ? (
-        <EnvironmentRow
-          icon={<ChangesIcon className={ENVIRONMENT_ROW_ICON_CLASS_NAME} aria-hidden />}
-          label="Changes"
-          trailing={
-            hasChanges ? (
-              <>
-                <span className="text-success">+{additions}</span>
-                <span className="text-destructive">-{deletions}</span>
-              </>
-            ) : null
-          }
-          disabled={changesDisabled}
-          onClick={() => {
-            onToggleDiff();
-            onClose();
-          }}
-        />
+        <>
+          <EnvironmentRow
+            icon={<ChangesIcon className={ENVIRONMENT_ROW_ICON_CLASS_NAME} aria-hidden />}
+            label="Changes"
+            trailing={
+              hasChanges ? (
+                <>
+                  <span className="text-success">+{additions}</span>
+                  <span className="text-destructive">-{deletions}</span>
+                </>
+              ) : null
+            }
+            disabled={changesDisabled}
+            onClick={() => {
+              onToggleDiff();
+              onClose();
+            }}
+          />
+          <EnvironmentGitStatusSummary gitCwd={gitCwd} enabled={open} />
+        </>
       ) : null}
 
       {isGitRepo ? <BranchToolbar {...branchToolbar} variant="panel" /> : null}
@@ -381,7 +385,9 @@ export function EnvironmentPanel({
         actually shows, so toggling any section via the header gear menu never leaves a doubled or
         dangling rule. Visibility is gated on the per-section AppSettings flags.
       */}
-      {settings.showEnvironmentUsage ? <EnvironmentUsageSection provider={activeProvider} /> : null}
+      {settings.showEnvironmentUsage ? (
+        <EnvironmentUsageSection provider={activeProvider} enabled={open} />
+      ) : null}
 
       {settings.showEnvironmentRepository && githubRepository && onOpenGithubRepository ? (
         <EnvironmentLabeledSection label="Repository">

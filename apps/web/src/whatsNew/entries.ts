@@ -23,8 +23,16 @@ import type { WhatsNewEntry } from "./logic";
 export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
   {
     version: "2.0.0",
-    date: "Aug 2",
+    date: "Aug 5",
     features: [
+      {
+        id: "environment-git-status-summary",
+        title: "See Git work at a glance",
+        description:
+          "The Environment panel now shows changes to commit, commits to pull, and commits ready to push.",
+        details:
+          "The Git summary sits directly below Changes and reuses the existing repository status cache. Pending local work and pull work use the warning color. Commits ready to publish use the success color. The rows are read-only; the existing Changes and Git action controls keep their current behavior.",
+      },
       {
         id: "composer-effort-shortcuts",
         title: "Change reasoning effort from the keyboard",

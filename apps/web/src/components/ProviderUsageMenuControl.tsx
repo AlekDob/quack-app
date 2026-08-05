@@ -32,7 +32,10 @@ export interface ProviderUsageMenuModel {
   isLoading: boolean;
 }
 
-export function useProviderUsageMenuModel(provider: ProviderKind): ProviderUsageMenuModel | null {
+export function useProviderUsageMenuModel(
+  provider: ProviderKind,
+  options: { fetchProviderData?: boolean } = {},
+): ProviderUsageMenuModel | null {
   const { settings } = useAppSettings();
   const selectAllThreads = createAllThreadsSelector();
   const threads = useStore(selectAllThreads);
@@ -40,7 +43,7 @@ export function useProviderUsageMenuModel(provider: ProviderKind): ProviderUsage
     provider,
     threads,
     codexHomePath: settings.codexHomePath || null,
-    fetchProviderData: false,
+    fetchProviderData: options.fetchProviderData ?? false,
   });
   const usageRows = deriveProviderUsageDisplayRows(usageSummary.rateLimits);
   const primaryRow = selectPrimaryProviderUsageDisplayRow(usageRows);

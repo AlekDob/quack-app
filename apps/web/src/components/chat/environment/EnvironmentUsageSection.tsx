@@ -18,8 +18,14 @@ import {
   EnvironmentRowChevron,
 } from "./EnvironmentRow";
 
-export function EnvironmentUsageSection({ provider }: { provider: ProviderKind }) {
-  const model = useProviderUsageMenuModel(provider);
+export function EnvironmentUsageSection({
+  provider,
+  enabled,
+}: {
+  provider: ProviderKind;
+  enabled: boolean;
+}) {
+  const model = useProviderUsageMenuModel(provider, { fetchProviderData: enabled });
 
   if (!model) {
     return null;

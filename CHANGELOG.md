@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0 - 2026-08-05
+
+### Added
+
+- Added a read-only Git status summary below Changes in the Environment panel. It shows local changes waiting for a commit, commits waiting to be pulled, and local commits ready to be pushed, with warning and success colors for quick scanning.
+
+### Changed
+
+- Kept Git actions and the composer layout unchanged. The new summary reuses the existing Git status query and does not add new RPCs or mutations.
+
 ## 0.6.5 - 2026-08-02
 
 ### Added
