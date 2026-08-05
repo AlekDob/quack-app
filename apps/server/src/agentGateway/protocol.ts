@@ -1,5 +1,5 @@
 /**
- * Minimal MCP (Model Context Protocol) JSON-RPC handling for the Synara agent
+ * Minimal MCP (Model Context Protocol) JSON-RPC handling for the Quack agent
  * gateway.
  *
  * Implements the stateless subset of the MCP streamable-HTTP transport the
@@ -154,7 +154,7 @@ export function buildMcpInitializeResult(input: {
     },
     serverInfo: {
       name: "synara",
-      title: "Synara App Control",
+      title: "Quack App Control",
       version: input.serverVersion,
     },
     instructions: input.instructions,

@@ -131,144 +131,144 @@ const SYNARA_BROWSER_TOOL_PRESENTATIONS = Object.fromEntries(
 
 const SYNARA_MCP_TOOL_PRESENTATIONS = {
   synara_context: {
-    running: "Synara is checking its context",
-    completed: "Synara checked its context",
-    failed: "Synara couldn't check its context",
+    running: "Quack is checking its context",
+    completed: "Quack checked its context",
+    failed: "Quack couldn't check its context",
   },
   synara_capabilities: {
-    running: "Synara is checking available agents",
-    completed: "Synara checked available agents",
-    failed: "Synara couldn't check available agents",
+    running: "Quack is checking available agents",
+    completed: "Quack checked available agents",
+    failed: "Quack couldn't check available agents",
   },
   synara_overview: {
-    running: "Synara is gathering an overview",
-    completed: "Synara gathered an overview",
-    failed: "Synara couldn't gather an overview",
+    running: "Quack is gathering an overview",
+    completed: "Quack gathered an overview",
+    failed: "Quack couldn't gather an overview",
   },
   synara_list_allowed_projects: {
-    running: "Synara is listing allowed projects",
-    completed: "Synara listed allowed projects",
-    failed: "Synara couldn't list allowed projects",
+    running: "Quack is listing allowed projects",
+    completed: "Quack listed allowed projects",
+    failed: "Quack couldn't list allowed projects",
   },
   synara_create_task: {
-    running: "Synara is creating a task",
-    completed: "Synara created a task",
-    failed: "Synara couldn't create a task",
+    running: "Quack is creating a task",
+    completed: "Quack created a task",
+    failed: "Quack couldn't create a task",
   },
   synara_wait_for_task: {
-    running: "Synara is waiting for a task",
-    completed: "Synara finished waiting for a task",
-    failed: "Synara couldn't wait for a task",
+    running: "Quack is waiting for a task",
+    completed: "Quack finished waiting for a task",
+    failed: "Quack couldn't wait for a task",
   },
   synara_read_task: {
-    running: "Synara is reading a task",
-    completed: "Synara read a task",
-    failed: "Synara couldn't read a task",
+    running: "Quack is reading a task",
+    completed: "Quack read a task",
+    failed: "Quack couldn't read a task",
   },
   synara_list_projects: {
-    running: "Synara is listing projects",
-    completed: "Synara listed projects",
-    failed: "Synara couldn't list projects",
+    running: "Quack is listing projects",
+    completed: "Quack listed projects",
+    failed: "Quack couldn't list projects",
   },
   synara_list_threads: {
-    running: "Synara is listing threads",
-    completed: "Synara listed threads",
-    failed: "Synara couldn't list threads",
+    running: "Quack is listing threads",
+    completed: "Quack listed threads",
+    failed: "Quack couldn't list threads",
   },
   synara_read_thread: {
-    running: "Synara is reading a thread",
-    completed: "Synara read a thread",
-    failed: "Synara couldn't read a thread",
+    running: "Quack is reading a thread",
+    completed: "Quack read a thread",
+    failed: "Quack couldn't read a thread",
   },
   synara_read_thread_activity: {
-    running: "Synara is reading thread activity",
-    completed: "Synara read thread activity",
-    failed: "Synara couldn't read thread activity",
+    running: "Quack is reading thread activity",
+    completed: "Quack read thread activity",
+    failed: "Quack couldn't read thread activity",
   },
   synara_read_thread_events: {
-    running: "Synara is reading thread events",
-    completed: "Synara read thread events",
-    failed: "Synara couldn't read thread events",
+    running: "Quack is reading thread events",
+    completed: "Quack read thread events",
+    failed: "Quack couldn't read thread events",
   },
   synara_read_thread_runtime_events: {
-    running: "Synara is reading thread runtime events",
-    completed: "Synara read thread runtime events",
-    failed: "Synara couldn't read thread runtime events",
+    running: "Quack is reading thread runtime events",
+    completed: "Quack read thread runtime events",
+    failed: "Quack couldn't read thread runtime events",
   },
   synara_diagnose_thread: {
-    running: "Synara is diagnosing a thread",
-    completed: "Synara diagnosed a thread",
-    failed: "Synara couldn't diagnose a thread",
+    running: "Quack is diagnosing a thread",
+    completed: "Quack diagnosed a thread",
+    failed: "Quack couldn't diagnose a thread",
   },
   synara_create_thread: {
-    running: "Synara is creating a thread",
-    completed: "Synara created a thread",
-    failed: "Synara couldn't create a thread",
+    running: "Quack is creating a thread",
+    completed: "Quack created a thread",
+    failed: "Quack couldn't create a thread",
   },
   synara_create_threads: {
-    running: "Synara is creating threads",
-    completed: "Synara created threads",
-    failed: "Synara couldn't create threads",
+    running: "Quack is creating threads",
+    completed: "Quack created threads",
+    failed: "Quack couldn't create threads",
   },
   synara_wait_for_threads: {
-    running: "Synara is waiting for threads",
-    completed: "Synara finished waiting for threads",
-    failed: "Synara couldn't wait for threads",
+    running: "Quack is waiting for threads",
+    completed: "Quack finished waiting for threads",
+    failed: "Quack couldn't wait for threads",
   },
   synara_send_message: {
-    running: "Synara is sending a message",
-    completed: "Synara sent a message",
-    failed: "Synara couldn't send a message",
+    running: "Quack is sending a message",
+    completed: "Quack sent a message",
+    failed: "Quack couldn't send a message",
   },
   synara_interrupt_thread: {
-    running: "Synara is interrupting a thread",
-    completed: "Synara interrupted a thread",
-    failed: "Synara couldn't interrupt a thread",
+    running: "Quack is interrupting a thread",
+    completed: "Quack interrupted a thread",
+    failed: "Quack couldn't interrupt a thread",
   },
   synara_set_thread_title: {
-    running: "Synara is renaming a thread",
-    completed: "Synara renamed a thread",
-    failed: "Synara couldn't rename a thread",
+    running: "Quack is renaming a thread",
+    completed: "Quack renamed a thread",
+    failed: "Quack couldn't rename a thread",
   },
   synara_set_thread_archived: {
-    running: "Synara is updating a thread",
-    completed: "Synara updated a thread",
-    failed: "Synara couldn't update a thread",
+    running: "Quack is updating a thread",
+    completed: "Quack updated a thread",
+    failed: "Quack couldn't update a thread",
   },
   synara_create_automation: {
-    running: "Synara is creating an automation",
-    completed: "Synara created an automation",
-    failed: "Synara couldn't create an automation",
+    running: "Quack is creating an automation",
+    completed: "Quack created an automation",
+    failed: "Quack couldn't create an automation",
   },
   synara_list_automations: {
-    running: "Synara is listing automations",
-    completed: "Synara listed automations",
-    failed: "Synara couldn't list automations",
+    running: "Quack is listing automations",
+    completed: "Quack listed automations",
+    failed: "Quack couldn't list automations",
   },
   synara_view_automation: {
-    running: "Synara is viewing an automation",
-    completed: "Synara viewed an automation",
-    failed: "Synara couldn't view an automation",
+    running: "Quack is viewing an automation",
+    completed: "Quack viewed an automation",
+    failed: "Quack couldn't view an automation",
   },
   synara_update_automation: {
-    running: "Synara is updating an automation",
-    completed: "Synara updated an automation",
-    failed: "Synara couldn't update an automation",
+    running: "Quack is updating an automation",
+    completed: "Quack updated an automation",
+    failed: "Quack couldn't update an automation",
   },
   synara_update_automation_memory: {
-    running: "Synara is updating automation memory",
-    completed: "Synara updated automation memory",
-    failed: "Synara couldn't update automation memory",
+    running: "Quack is updating automation memory",
+    completed: "Quack updated automation memory",
+    failed: "Quack couldn't update automation memory",
   },
   synara_report_automation_result: {
-    running: "Synara is reporting an automation result",
-    completed: "Synara reported an automation result",
-    failed: "Synara couldn't report an automation result",
+    running: "Quack is reporting an automation result",
+    completed: "Quack reported an automation result",
+    failed: "Quack couldn't report an automation result",
   },
   synara_cancel_automation: {
-    running: "Synara is stopping an automation",
-    completed: "Synara stopped an automation",
-    failed: "Synara couldn't stop an automation",
+    running: "Quack is stopping an automation",
+    completed: "Quack stopped an automation",
+    failed: "Quack couldn't stop an automation",
   },
   ...SYNARA_BROWSER_TOOL_PRESENTATIONS,
 } as const satisfies Record<string, SynaraMcpToolPresentation>;
@@ -341,9 +341,9 @@ function fallbackSynaraMcpToolPresentation(toolName: string): SynaraMcpToolPrese
       .replace(/_+/g, " ")
       .trim() || "an action";
   return {
-    running: `Synara is handling ${action}`,
-    completed: `Synara handled ${action}`,
-    failed: `Synara couldn't handle ${action}`,
+    running: `Quack is handling ${action}`,
+    completed: `Quack handled ${action}`,
+    failed: `Quack couldn't handle ${action}`,
   };
 }
 
@@ -374,7 +374,7 @@ function resolveSynaraMcpToolPresentation(
       return knownPresentation;
     }
     // Free-text summaries (e.g. reconciler activity lines) can begin with the
-    // word "Synara" and normalize into a fake tool identifier; only
+    // word "Quack" and normalize into a fake tool identifier; only
     // identifier-shaped candidates may take an invented fallback presentation.
     if (/\s/.test(candidate.trim())) {
       continue;
@@ -415,7 +415,7 @@ export function isSynaraBrowserToolCall(input: SynaraMcpToolTitleInput): boolean
   return resolveSynaraBrowserToolName([input.toolName, input.title, input.fallbackLabel]) !== null;
 }
 
-// Every provider exposes Synara's MCP tools differently: MCP, dynamic, and even
+// Every provider exposes Quack's MCP tools differently: MCP, dynamic, and even
 // file-change rows can all represent the same gateway action. Normalize by tool
 // identity instead of provider item type so transport details never reach the UI.
 export function deriveSynaraMcpToolTitle(input: SynaraMcpToolTitleInput): string | null {
@@ -435,8 +435,8 @@ export function deriveSynaraMcpToolTitle(input: SynaraMcpToolTitleInput): string
     case "failed":
       return presentation.failed;
     case "cancelled":
-      return presentation.running.startsWith("Synara is ")
-        ? `Synara stopped ${presentation.running.slice("Synara is ".length)}`
+      return presentation.running.startsWith("Quack is ")
+        ? `Quack stopped ${presentation.running.slice("Quack is ".length)}`
         : `Cancelled ${presentation.running}`;
   }
 }

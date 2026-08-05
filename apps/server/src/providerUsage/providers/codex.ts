@@ -182,7 +182,7 @@ export const codexUsageFetcher: ProviderUsageFetcher = {
         headers: {
           Authorization: `Bearer ${auth.accessToken}`,
           Accept: "application/json",
-          "User-Agent": "Synara",
+          "User-Agent": "Quack",
           ...(auth.accountId ? { "ChatGPT-Account-Id": auth.accountId } : {}),
         },
       });

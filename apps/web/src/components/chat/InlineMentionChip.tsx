@@ -12,7 +12,9 @@
 import { type MouseEvent, type ReactNode } from "react";
 import type { ProviderMentionReference } from "@synara/contracts";
 import { basenameOfPath, pathLooksLikeKnownFile } from "~/file-icons";
+import { showFileReferenceContextMenu } from "~/lib/fileReferenceContextMenu";
 import { openWorkspaceFileReference, useWorkspaceFileOpener } from "~/lib/workspaceFileOpener";
+import { readNativeApi } from "~/nativeApi";
 import {
   COMPOSER_INLINE_MENTION_CHIP_CLASS_NAME,
   COMPOSER_INLINE_MENTION_CHIP_INTERACTIVE_CLASS_NAME,
@@ -35,6 +37,10 @@ interface InlineMentionChipProps {
   onHoverPrefetch?: (() => void) | undefined;
 }
 
+function isFilePathChip(kind: MentionChipKind): boolean {
+  return kind === "path";
+}
+
 export function InlineMentionChip(props: InlineMentionChipProps) {
   const opener = useWorkspaceFileOpener();
   const resolvedKind = resolveMentionChipKind(props.path, {
@@ -43,6 +49,20 @@ export function InlineMentionChip(props: InlineMentionChipProps) {
   });
   const label =
     props.label ?? (resolvedKind === "thread" ? props.path : basenameOfPath(props.path));
+  const showFileContextMenu = isFilePathChip(resolvedKind);
+  const handleFileContextMenu = (event: MouseEvent<HTMLElement>) => {
+    if (!showFileContextMenu || !readNativeApi()) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    void showFileReferenceContextMenu({
+      path: props.path,
+      position: { x: event.clientX, y: event.clientY },
+      workspaceRoot: opener?.workspaceRoot,
+      onReferenceInChat: opener?.onReferenceInChat,
+    });
+  };
   const inner = (
     <InlineChipContent
       icon={
@@ -92,6 +112,7 @@ export function InlineMentionChip(props: InlineMentionChipProps) {
         {...(handleHoverPrefetch
           ? { onPointerEnter: handleHoverPrefetch, onFocus: handleHoverPrefetch }
           : {})}
+        {...(showFileContextMenu ? { onContextMenu: handleFileContextMenu } : {})}
       >
         {inner}
       </a>
@@ -99,7 +120,11 @@ export function InlineMentionChip(props: InlineMentionChipProps) {
   }
 
   return (
-    <span className={COMPOSER_INLINE_MENTION_CHIP_CLASS_NAME} title={props.path}>
+    <span
+      className={COMPOSER_INLINE_MENTION_CHIP_CLASS_NAME}
+      title={props.path}
+      {...(showFileContextMenu ? { onContextMenu: handleFileContextMenu } : {})}
+    >
       {inner}
     </span>
   );

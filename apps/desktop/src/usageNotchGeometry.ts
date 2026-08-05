@@ -12,8 +12,9 @@ export interface UsageNotchDisplayBounds {
 
 export interface UsageNotchBounds extends UsageNotchDisplayBounds {}
 
-export const USAGE_NOTCH_COMPACT_SIZE = { width: 220, height: 32 } as const;
+export const USAGE_NOTCH_COMPACT_SIZE = { width: 40, height: 40 } as const;
 export const USAGE_NOTCH_EXPANDED_SIZE = { width: 760, height: 286 } as const;
+export const USAGE_NOTCH_TOP_OFFSET = 0;
 
 export function resolveUsageNotchBounds(input: {
   display: UsageNotchDisplayBounds;
@@ -25,7 +26,7 @@ export function resolveUsageNotchBounds(input: {
   const height = Math.min(preferred.height, Math.max(32, input.display.height));
   return {
     x: Math.round(input.display.x + (input.display.width - width) / 2),
-    y: input.display.y,
+    y: input.display.y + USAGE_NOTCH_TOP_OFFSET,
     width,
     height,
   };

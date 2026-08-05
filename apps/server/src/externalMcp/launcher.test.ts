@@ -37,14 +37,14 @@ describe("external MCP launcher", () => {
     expect(
       externalMcpShellCommand(
         {
-          command: "C:\\Program Files\\Synara\\Synara.exe",
-          args: ["mcp", "serve", "--home-dir", "C:\\Synara home"],
+          command: "C:\\Program Files\\Quack\\Quack.exe",
+          args: ["mcp", "serve", "--home-dir", "C:\\Quack home"],
           env: { ELECTRON_RUN_AS_NODE: "1" },
         },
         "win32",
       ),
     ).toBe(
-      "$env:ELECTRON_RUN_AS_NODE = '1'; & 'C:\\Program Files\\Synara\\Synara.exe' 'mcp' 'serve' '--home-dir' 'C:\\Synara home'",
+      "$env:ELECTRON_RUN_AS_NODE = '1'; & 'C:\\Program Files\\Quack\\Quack.exe' 'mcp' 'serve' '--home-dir' 'C:\\Quack home'",
     );
   });
 });

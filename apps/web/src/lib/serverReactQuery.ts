@@ -1,4 +1,5 @@
 import type {
+  ProfileTokenStats,
   ProviderKind,
   ServerConfig,
   ServerListProviderUsageInput,
@@ -200,7 +201,7 @@ export function serverLocalServersQueryOptions(
 }
 
 // Sidebar project badges need a snapshot, but idle Home should not keep shelling out
-// through lsof/ps; active Synara-owned runs still poll for responsive status.
+// through lsof/ps; active Quack-owned runs still poll for responsive status.
 export function sidebarLocalServersQueryOptions(input: {
   hasActiveProjectRun: boolean;
   hasProjects: boolean;
@@ -280,8 +281,32 @@ export async function fetchAllProviderUsage(input: ServerListProviderUsageInput 
   return api.server.listProviderUsage(input);
 }
 
+/** Loads the DB-backed local token totals used by Profile and lightweight surfaces. */
+export async function fetchProfileTokenStats(
+  input: {
+    utcOffsetMinutes?: number;
+  } = {},
+): Promise<ProfileTokenStats> {
+  const api = ensureNativeApi();
+  return api.stats.getProfileTokenStats({
+    utcOffsetMinutes: input.utcOffsetMinutes ?? -new Date().getTimezoneOffset(),
+  });
+}
+
+/** Loads the prompt/activity heatmap used when token telemetry is not available yet. */
+export async function fetchProfileStats(
+  input: {
+    utcOffsetMinutes?: number;
+  } = {},
+) {
+  const api = ensureNativeApi();
+  return api.stats.getProfileStats({
+    utcOffsetMinutes: input.utcOffsetMinutes ?? -new Date().getTimezoneOffset(),
+  });
+}
+
 // Local profile + shareable-card core statistics. The client passes its own fixed
-// UTC offset; all metrics are computed from Synara's local DB projections.
+// UTC offset; all metrics are computed from Quack's local DB projections.
 export function serverProfileStatsQueryOptions(input: { enabled?: boolean } = {}) {
   const utcOffsetMinutes = -new Date().getTimezoneOffset();
   return queryOptions({
@@ -290,12 +315,7 @@ export function serverProfileStatsQueryOptions(input: { enabled?: boolean } = {}
     staleTime: 60_000,
     refetchOnWindowFocus: false,
     retry: false,
-    queryFn: async () => {
-      const api = ensureNativeApi();
-      return api.stats.getProfileStats({
-        utcOffsetMinutes,
-      });
-    },
+    queryFn: () => fetchProfileStats({ utcOffsetMinutes }),
   });
 }
 
@@ -309,12 +329,7 @@ export function serverProfileTokenStatsQueryOptions(input: { enabled?: boolean }
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
     retry: false,
-    queryFn: async () => {
-      const api = ensureNativeApi();
-      return api.stats.getProfileTokenStats({
-        utcOffsetMinutes,
-      });
-    },
+    queryFn: () => fetchProfileTokenStats({ utcOffsetMinutes }),
   });
 }
 

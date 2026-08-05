@@ -121,7 +121,7 @@ const KILO_PROVIDER = "kilo" as const;
 const OPENCODE_PROVIDER = "opencode" as const;
 const PI_PROVIDER = "pi" as const;
 type ProviderStatuses = ReadonlyArray<ServerProviderStatus>;
-const DISABLED_PROVIDER_STATUS_MESSAGE = "Provider is disabled in Synara settings.";
+const DISABLED_PROVIDER_STATUS_MESSAGE = "Provider is disabled in Quack settings.";
 const MINIMUM_ANTIGRAVITY_CLI_VERSION = "1.0.12";
 
 const PROVIDERS = [
@@ -798,7 +798,7 @@ function parseCursorAuthStatusFromOutput(result: CommandResult): {
     return {
       status: "warning",
       authStatus: "unknown",
-      message: "Cursor Agent is installed, but Synara could not verify authentication status.",
+      message: "Cursor Agent is installed, but Quack could not verify authentication status.",
     };
   }
 
@@ -1384,7 +1384,7 @@ export const makeCheckDroidProviderStatus = (
         ? { authType: "apiKey", authLabel: "Factory API Key" }
         : {
             message:
-              "Droid CLI is installed. Synara can use the CLI's cached device-pairing login; run `droid` to authenticate locally if needed, or set FACTORY_API_KEY.",
+              "Droid CLI is installed. Quack can use the CLI's cached device-pairing login; run `droid` to authenticate locally if needed, or set FACTORY_API_KEY.",
           }),
     } satisfies ServerProviderStatus;
   });
@@ -1547,7 +1547,7 @@ export const checkPiProviderStatus = (
       DEFAULT_TIMEOUT_MS,
     );
 
-    // Pi itself is SDK-backed in Synara. Keep this CLI probe advisory so health
+    // Pi itself is SDK-backed in Quack. Keep this CLI probe advisory so health
     // refreshes do not import the SDK and initialize its native clipboard module.
     if (versionProbe.outcome === "missing" || versionProbe.outcome === "failure") {
       const error = versionProbe.cause;
@@ -1559,7 +1559,7 @@ export const checkPiProviderStatus = (
         checkedAt,
         message:
           versionProbe.outcome === "missing"
-            ? "Pi SDK is bundled, but the Pi CLI (`pi`) is not on PATH, so Synara could not verify the installed CLI version."
+            ? "Pi SDK is bundled, but the Pi CLI (`pi`) is not on PATH, so Quack could not verify the installed CLI version."
             : `Pi SDK is bundled, but the CLI health check failed: ${error instanceof Error ? error.message : String(error)}.`,
       } satisfies ServerProviderStatus;
     }
@@ -1572,7 +1572,7 @@ export const checkPiProviderStatus = (
         authStatus: "unknown" as const,
         checkedAt,
         message:
-          "Pi SDK is bundled, but the CLI health check timed out before Synara could verify the installed version.",
+          "Pi SDK is bundled, but the CLI health check timed out before Quack could verify the installed version.",
       } satisfies ServerProviderStatus;
     }
 
@@ -1602,7 +1602,7 @@ export const checkPiProviderStatus = (
       version: parsedVersion,
       checkedAt,
       message: configuredAgentDir
-        ? `Pi CLI is installed. Synara will use Pi agent dir ${configuredAgentDir}.`
+        ? `Pi CLI is installed. Quack will use Pi agent dir ${configuredAgentDir}.`
         : "Pi CLI is installed. Configure provider credentials inside Pi as needed.",
     } satisfies ServerProviderStatus;
   });
@@ -1666,7 +1666,7 @@ export const checkAntigravityProviderStatus = (
         authStatus: "unknown",
         version: parsedVersion,
         checkedAt,
-        message: `Antigravity CLI ${parsedVersion} is too old for Synara. Upgrade to ${MINIMUM_ANTIGRAVITY_CLI_VERSION} or newer.`,
+        message: `Antigravity CLI ${parsedVersion} is too old for Quack. Upgrade to ${MINIMUM_ANTIGRAVITY_CLI_VERSION} or newer.`,
       } satisfies ServerProviderStatus;
     }
     const models = yield* runAntigravityCommand(["models"], executable).pipe(
@@ -1696,7 +1696,7 @@ export const checkAntigravityProviderStatus = (
       authStatus: "unknown",
       version: parsedVersion,
       checkedAt,
-      message: "Antigravity CLI is installed, but Synara could not verify login by listing models.",
+      message: "Antigravity CLI is installed, but Quack could not verify login by listing models.",
     } satisfies ServerProviderStatus;
   });
 
@@ -1835,7 +1835,7 @@ export const makeCheckCursorProviderStatus = (
         version: parsedVersion,
         checkedAt,
         message:
-          "Cursor Agent is authenticated, but model discovery timed out before Synara could verify available models.",
+          "Cursor Agent is authenticated, but model discovery timed out before Quack could verify available models.",
       } satisfies ServerProviderStatus;
     }
 
@@ -2585,7 +2585,7 @@ export function makeProviderHealthLive(options?: { readonly providerUpdateTimeou
         if (!isProviderEnabledForSettings(provider, settings)) {
           return yield* new ServerProviderUpdateError({
             provider,
-            reason: "Provider is disabled in Synara settings.",
+            reason: "Provider is disabled in Quack settings.",
           });
         }
         const capabilities = yield* getProviderMaintenanceCapabilities(provider).pipe(
@@ -2671,7 +2671,7 @@ export function makeProviderHealthLive(options?: { readonly providerUpdateTimeou
               startedAt,
               finishedAt,
               message: stillOutdated
-                ? `Update command completed, but Synara still detects an outdated provider version${stillOutdatedVersions}.`
+                ? `Update command completed, but Quack still detects an outdated provider version${stillOutdatedVersions}.`
                 : "Provider updated.",
               output: output ? output.slice(0, UPDATE_OUTPUT_MAX_BYTES) : null,
             }),

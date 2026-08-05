@@ -445,6 +445,8 @@ export function SingleChatSurface(props: {
       return true;
     },
     prefetchFile: prefetchOpenerFile,
+    workspaceRoot,
+    onReferenceInChat: handleReferenceInChat,
   };
   // Editor surface: the center file pane is already the file viewer, so file
   // references select into it instead of opening a dock pane.
@@ -461,6 +463,8 @@ export function SingleChatSurface(props: {
       return true;
     },
     prefetchFile: prefetchOpenerFile,
+    workspaceRoot,
+    onReferenceInChat: handleReferenceInChat,
   };
 
   const handleSplitSurface = () => {

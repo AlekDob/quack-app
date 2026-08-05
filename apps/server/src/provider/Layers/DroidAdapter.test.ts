@@ -15,7 +15,7 @@ import {
   takeDroidSynaraHarnessPolicyTextPart,
 } from "./DroidAdapter.ts";
 
-describe("Droid Synara harness policy", () => {
+describe("Droid Quack harness policy", () => {
   it("delivers private scoped host context once", () => {
     const state: { harnessPolicyDelivered?: boolean } = {};
     expect(takeDroidSynaraHarnessPolicyTextPart(state, true)?.text).toContain(

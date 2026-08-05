@@ -84,6 +84,16 @@ describe("CursorAcpExtension", () => {
     expect(planMarkdown).toBe("# Plan\n\n1. Add schemas\n2. Remove casts");
   });
 
+  it("trims Cursor plan markdown so journal encode accepts it", () => {
+    const planMarkdown = extractPlanMarkdown({
+      toolCallId: "plan-2",
+      plan: "  # Workspace unico\n\n- split + drawer\n\n",
+      todos: [],
+    });
+
+    expect(planMarkdown).toBe("# Workspace unico\n\n- split + drawer");
+  });
+
   it("projects todo updates into a plan shape and drops invalid entries", () => {
     expect(
       extractTodosAsPlan({

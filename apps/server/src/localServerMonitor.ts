@@ -799,7 +799,7 @@ function toServerProcess(
     ports,
     addresses,
     isStoppable,
-    ...(isStoppable ? {} : { stopDisabledReason: "Synara cannot signal this process." }),
+    ...(isStoppable ? {} : { stopDisabledReason: "Quack cannot signal this process." }),
   };
 }
 
@@ -975,7 +975,7 @@ export async function stopLocalServer(
     return {
       pid: input.pid,
       stopped: false,
-      message: target.stopDisabledReason ?? "Synara cannot stop this process.",
+      message: target.stopDisabledReason ?? "Quack cannot stop this process.",
     };
   }
 

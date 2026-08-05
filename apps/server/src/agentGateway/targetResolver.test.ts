@@ -519,7 +519,7 @@ describe("agent gateway target resolver", () => {
     }),
   );
 
-  it.effect("fails closed before discovery when Synara disables a provider", () =>
+  it.effect("fails closed before discovery when Quack disables a provider", () =>
     Effect.gen(function* () {
       let discoveryCalls = 0;
       const trackedDiscovery = {

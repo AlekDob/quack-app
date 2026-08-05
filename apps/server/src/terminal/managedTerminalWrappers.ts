@@ -245,7 +245,7 @@ function writeFileIfChanged(filePath: string, content: string, mode: number): vo
 }
 
 function buildManagedZshRc(quotedZshDir: string): string {
-  return `# Synara zsh rc wrapper
+  return `# Quack zsh rc wrapper
 _synara_home="\${SYNARA_ORIGINAL_ZDOTDIR:-$HOME}"
 export ZDOTDIR="$_synara_home"
 [[ -f "$_synara_home/.zshrc" ]] && source "$_synara_home/.zshrc"
@@ -290,7 +290,7 @@ function ensureManagedZshWrappers(zshDir: string): void {
   const quotedZshDir = shellQuote(zshDir);
   writeFileIfChanged(
     path.join(zshDir, ".zshenv"),
-    `# Synara zsh env wrapper
+    `# Quack zsh env wrapper
 _synara_home="\${SYNARA_ORIGINAL_ZDOTDIR:-$HOME}"
 export ZDOTDIR="$_synara_home"
 [[ -f "$_synara_home/.zshenv" ]] && source "$_synara_home/.zshenv"
@@ -300,7 +300,7 @@ export ZDOTDIR=${quotedZshDir}
   );
   writeFileIfChanged(
     path.join(zshDir, ".zprofile"),
-    `# Synara zsh profile wrapper
+    `# Quack zsh profile wrapper
 _synara_home="\${SYNARA_ORIGINAL_ZDOTDIR:-$HOME}"
 export ZDOTDIR="$_synara_home"
 [[ -f "$_synara_home/.zprofile" ]] && source "$_synara_home/.zprofile"

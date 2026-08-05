@@ -162,7 +162,7 @@ const DROID_DISCOVERY_CACHE_MAX_ENTRIES = 16;
 const DROID_RESOURCE_DISCIPLINE_PROMPT =
   "Keep CPU-intensive validation work serial: never overlap builds, typechecks, linters, tests, package audits, or package-manager commands, including across background agents. Wait for one CPU-intensive command to finish before starting the next. Read-only code inspection may still run in parallel.";
 const DROID_PLAN_MODE_PROMPT_PREFIX = [
-  "Synara Droid plan mode is active.",
+  "Quack Droid plan mode is active.",
   "Do not implement or mutate files in this turn.",
   "Do not ask follow-up questions or wait for confirmation; if scope is ambiguous, choose a reasonable default and state the assumption in the plan.",
   "When ready, create the final implementation plan.",
@@ -215,7 +215,7 @@ interface DroidSessionContext {
   readonly activeAssistantItemsWithContent: Set<string>;
   activeTurnFailedToolDetail: string | undefined;
   activePromptFiber: Fiber.Fiber<void, never> | undefined;
-  /** Turns cancelled by Synara only because their Plan proposal was captured. */
+  /** Turns cancelled by Quack only because their Plan proposal was captured. */
   readonly planCapturedTurnIds: Set<TurnId>;
   // Epoch-ms of the last inbound ACP activity for the active turn; drives the
   // idle-progress watchdog that force-fails a silently hung turn.
@@ -862,7 +862,7 @@ export function makeDroidAdapter(
             cwd,
             ...(resumeSessionId ? { resumeSessionId } : {}),
             clientCapabilities: { elicitation: { form: {} } },
-            clientInfo: { name: "Synara", version: "0.0.0" },
+            clientInfo: { name: "Quack", version: "0.0.0" },
             ...(agentGatewayCredentials
               ? {
                   buildMcpServers: (initializeResult: Acp.InitializeResponse) =>
@@ -1032,7 +1032,7 @@ export function makeDroidAdapter(
               provider: PROVIDER,
               method: "session/resume",
               detail:
-                "Droid could not resume the requested native session. Synara refused the fresh fallback to avoid silently losing conversation context.",
+                "Droid could not resume the requested native session. Quack refused the fresh fallback to avoid silently losing conversation context.",
             });
           }
 
@@ -1951,7 +1951,7 @@ export function makeDroidAdapter(
                 provider: PROVIDER,
                 operation: "forkThread",
                 issue:
-                  "This Droid ACP version does not advertise session/fork; Synara will rebuild the fork from its retained transcript.",
+                  "This Droid ACP version does not advertise session/fork; Quack will rebuild the fork from its retained transcript.",
               });
             }
             return yield* runtime.forkSession({ cwd: targetCwd, mcpServers: [] });
@@ -1987,7 +1987,7 @@ export function makeDroidAdapter(
                 childProcessSpawner,
                 cwd: sourceCwd,
                 resumeSessionId: sourceSessionId,
-                clientInfo: { name: "Synara Fork", version: "0.0.0" },
+                clientInfo: { name: "Quack Fork", version: "0.0.0" },
               });
               yield* runtime.start().pipe(
                 Effect.timeoutOption(DROID_ACP_REQUEST_TIMEOUT_MS),
@@ -2087,7 +2087,7 @@ export function makeDroidAdapter(
           const runtime = yield* makeDroidDiscoveryRuntime({
             ...(input.binaryPath ? { binaryPath: input.binaryPath } : {}),
             cwd,
-            clientName: "Synara Model Discovery",
+            clientName: "Quack Model Discovery",
           });
           yield* runtime.start();
           const result = yield* discoverDroidAcpModels(runtime);
@@ -2208,7 +2208,7 @@ export function makeDroidAdapter(
           const runtime = yield* makeDroidDiscoveryRuntime({
             ...(input.binaryPath ? { binaryPath: input.binaryPath } : {}),
             cwd,
-            clientName: "Synara Command Discovery",
+            clientName: "Quack Command Discovery",
           });
           yield* runtime.start();
           let commands = yield* runtime.getAvailableCommands;

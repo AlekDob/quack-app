@@ -20,9 +20,20 @@ export function PickerTriggerButton(
     // Drop the trailing chevron so the trigger reads as a plain label (e.g. the
     // folder picker) instead of an obvious dropdown.
     hideChevron?: boolean;
+    // Overrides the default size-3.5 icon slot (e.g. a slightly larger agent avatar).
+    iconWrapperClassName?: string;
   } & Omit<ComponentProps<typeof Button>, "children" | "size" | "variant">,
 ) {
-  const { icon, label, compact, hideLabel, hideChevron, className, ...buttonProps } = props;
+  const {
+    icon,
+    label,
+    compact,
+    hideLabel,
+    hideChevron,
+    iconWrapperClassName,
+    className,
+    ...buttonProps
+  } = props;
 
   return (
     <Button
@@ -43,7 +54,14 @@ export function PickerTriggerButton(
           hideLabel ? "gap-1" : compact ? "max-w-44" : undefined,
         )}
       >
-        <span className="inline-flex size-3.5 shrink-0 items-center justify-center">{icon}</span>
+        <span
+          className={cn(
+            "inline-flex size-3.5 shrink-0 items-center justify-center",
+            iconWrapperClassName,
+          )}
+        >
+          {icon}
+        </span>
         {hideLabel ? (
           <span className="sr-only">{label}</span>
         ) : (

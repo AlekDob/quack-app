@@ -49,7 +49,7 @@ export function RoundAvatarImage({
  * assistant row and the live Thinking row so both sit in the same column and appear
  * or hide at the same pane width.
  */
-export function ChatStreamAvatarSlot({ src }: { readonly src: string }) {
+export function ChatStreamAvatarSlot({ src }: { readonly src?: string | undefined }) {
   const [slot, setSlot] = useState<HTMLSpanElement | null>(null);
   const size = useContainerSize(slot);
   // Short turns fit on screen whole: sticking would only slide the avatar a few
@@ -72,7 +72,7 @@ export function ChatStreamAvatarSlot({ src }: { readonly src: string }) {
       {/* Sticks to the top of the transcript viewport while its own turn is on screen,
           then scrolls away with the turn. `top-3` matches the list's py-3 inset. */}
       <span className={cn("mt-0.5 block size-7", sticky && "sticky top-3")}>
-        <RoundAvatarImage src={src} enlargeOnHover className="size-7" />
+        {src ? <RoundAvatarImage src={src} enlargeOnHover className="size-7" /> : null}
       </span>
     </span>
   );

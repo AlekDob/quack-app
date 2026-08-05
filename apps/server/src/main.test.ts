@@ -666,7 +666,7 @@ it.layer(testLayer)("server CLI command", (it) => {
 
       assert.equal(start.mock.calls.length, 0);
       assert.equal(resolvedConfig, null);
-      assert.match(String(error), /Refusing to bind Synara to non-loopback host 0\.0\.0\.0/);
+      assert.match(String(error), /Refusing to bind Quack to non-loopback host 0\.0\.0\.0/);
     }),
   );
 

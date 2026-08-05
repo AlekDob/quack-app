@@ -54,8 +54,8 @@ export function remoteAccessPolicyError(
   if (!isPubliclyExposed) return null;
   if (!config.authToken?.trim()) {
     return config.publicUrl
-      ? "Refusing to publish Synara through SYNARA_PUBLIC_URL/--public-url without SYNARA_AUTH_TOKEN/--auth-token."
-      : `Refusing to bind Synara to non-loopback host ${config.host ?? "<unspecified>"} without SYNARA_AUTH_TOKEN/--auth-token.`;
+      ? "Refusing to publish Quack through SYNARA_PUBLIC_URL/--public-url without SYNARA_AUTH_TOKEN/--auth-token."
+      : `Refusing to bind Quack to non-loopback host ${config.host ?? "<unspecified>"} without SYNARA_AUTH_TOKEN/--auth-token.`;
   }
   if (config.devUrl) {
     return "Remote server binds cannot be combined with VITE_DEV_SERVER_URL/--dev-url yet; use a loopback host for development or run the built web UI for remote access.";

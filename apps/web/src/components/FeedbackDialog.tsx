@@ -1,5 +1,5 @@
 // FILE: FeedbackDialog.tsx
-// Purpose: Collects categorized Synara feedback with privacy-safe diagnostics.
+// Purpose: Collects categorized Quack feedback with privacy-safe diagnostics.
 // Layer: Shared UI component
 // Depends on: Feedback delivery logic and the shared dialog primitives.
 
@@ -35,7 +35,7 @@ export function FeedbackDialog({ open, context, onOpenChange }: FeedbackDialogPr
       toastManager.add({
         type: "success",
         title: "Feedback sent",
-        description: "Thanks for helping make Synara better.",
+        description: "Thanks for helping make Quack better.",
       });
     } catch (error) {
       setIsSending(false);

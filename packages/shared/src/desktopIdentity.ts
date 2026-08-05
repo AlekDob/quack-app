@@ -5,7 +5,11 @@ export const SYNARA_DESKTOP_SCHEME = "synara";
 export const SYNARA_DESKTOP_ORIGIN = `${SYNARA_DESKTOP_SCHEME}://app`;
 export const SYNARA_DESKTOP_ENTRY_URL = `${SYNARA_DESKTOP_ORIGIN}/index.html`;
 export const SYNARA_DESKTOP_UPDATE_CHANNEL = "synara";
-export const SYNARA_PRODUCTION_BUNDLE_ID = "com.emanueledipietro.synara";
+// Quack builds must NOT reuse Synara's bundle id: macOS TCC has that id recorded against
+// Synara's Developer ID signature, so a locally (ad-hoc) signed Quack claiming the same id
+// never matches the stored identity — macOS then re-asks for every file permission on every
+// launch instead of remembering the grant.
+export const SYNARA_PRODUCTION_BUNDLE_ID = "com.alekdob.quack";
 export const SYNARA_DEVELOPMENT_BUNDLE_ID = `${SYNARA_PRODUCTION_BUNDLE_ID}.dev`;
 export const SYNARA_CANARY_BUNDLE_ID = `${SYNARA_PRODUCTION_BUNDLE_ID}.canary`;
 export const SYNARA_CANARY_DESKTOP_SCHEME = "synara-canary";
@@ -40,7 +44,7 @@ export function synaraDesktopIdentity(flavor: SynaraDesktopFlavor): SynaraDeskto
   if (flavor === "canary") {
     return {
       flavor,
-      displayName: "Synara Canary",
+      displayName: "Quack Canary",
       bundleId: SYNARA_CANARY_BUNDLE_ID,
       scheme: SYNARA_CANARY_DESKTOP_SCHEME,
       origin: SYNARA_CANARY_DESKTOP_ORIGIN,
@@ -53,7 +57,7 @@ export function synaraDesktopIdentity(flavor: SynaraDesktopFlavor): SynaraDeskto
   if (flavor === "development") {
     return {
       flavor,
-      displayName: "Synara (Dev)",
+      displayName: "Quack (Dev)",
       bundleId: SYNARA_DEVELOPMENT_BUNDLE_ID,
       scheme: SYNARA_DESKTOP_SCHEME,
       origin: SYNARA_DESKTOP_ORIGIN,
@@ -65,7 +69,7 @@ export function synaraDesktopIdentity(flavor: SynaraDesktopFlavor): SynaraDeskto
   }
   return {
     flavor,
-    displayName: "Synara",
+    displayName: "Quack",
     bundleId: SYNARA_PRODUCTION_BUNDLE_ID,
     scheme: SYNARA_DESKTOP_SCHEME,
     origin: SYNARA_DESKTOP_ORIGIN,

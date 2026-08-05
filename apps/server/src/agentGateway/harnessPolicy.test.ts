@@ -8,11 +8,11 @@ import {
   takeSynaraHarnessPolicyForSession,
 } from "./harnessPolicy.ts";
 
-describe("Synara harness policy", () => {
-  it("identifies Synara and explains exact batch coordination when MCP is available", () => {
+describe("Quack harness policy", () => {
+  it("identifies Quack and explains exact batch coordination when MCP is available", () => {
     const policy = renderSynaraHarnessPolicy({ gatewayControlAvailable: true });
     assert.include(policy, SYNARA_HARNESS_POLICY_MARKER);
-    assert.include(policy, "Synara is the host and harness");
+    assert.include(policy, "Quack is the host and harness");
     assert.include(policy, "one exact synara_create_threads plan");
     assert.include(policy, "before returning an operationId");
     assert.include(policy, "synara_wait_for_threads");
@@ -27,7 +27,7 @@ describe("Synara harness policy", () => {
     assert.include(policy, "BrowserDownloadApprovalRequired");
     assert.include(policy, "OAuth popup requiring human action");
     assert.include(policy, "stop using tools and answer");
-    assert.include(policy, "do not create Synara threads");
+    assert.include(policy, "do not create Quack threads");
     assert.include(policy, "3–8 word outcome-oriented task label");
     assert.include(policy, "no assumed chat context");
     assert.include(policy, "notifying the user versus staying silent");
@@ -37,7 +37,7 @@ describe("Synara harness policy", () => {
 
   it("never advertises gateway mutation to providers without scoped MCP", () => {
     const policy = renderSynaraHarnessPolicy({ gatewayControlAvailable: false });
-    assert.include(policy, "Synara MCP control is unavailable");
+    assert.include(policy, "Quack MCP control is unavailable");
     assert.notInclude(policy, "one exact synara_create_threads plan");
   });
 
@@ -88,7 +88,7 @@ describe("Synara harness policy", () => {
           { provider, scopedGatewayConnectionAvailable: false },
         ) ?? "";
       assert.include(text, SYNARA_HARNESS_POLICY_MARKER, provider);
-      assert.include(text, "Synara MCP control is unavailable", provider);
+      assert.include(text, "Quack MCP control is unavailable", provider);
       assert.notInclude(text, "one exact synara_create_threads plan", provider);
     }
   });

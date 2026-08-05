@@ -53,7 +53,7 @@ export function recoverInterruptedAgentGatewayOperations(input: {
               errorJson: JSON.stringify({
                 code: "server_restarted_before_dispatch",
                 message:
-                  "Synara restarted before dispatch began. No git or orchestration resources were touched.",
+                  "Quack restarted before dispatch began. No git or orchestration resources were touched.",
               }),
               now: gatewayIsoNow(),
             });
@@ -198,7 +198,7 @@ export function recoverInterruptedAgentGatewayOperations(input: {
               errorJson: JSON.stringify({
                 code: "recovery_compensation_failed",
                 message:
-                  "Synara could not fully compensate the interrupted operation during startup recovery. The sanitized operation remains retryable and some resources may require manual cleanup; no replacements will be created.",
+                  "Quack could not fully compensate the interrupted operation during startup recovery. The sanitized operation remains retryable and some resources may require manual cleanup; no replacements will be created.",
                 errors: recoveryErrors,
               }),
               now: gatewayIsoNow(),
@@ -214,7 +214,7 @@ export function recoverInterruptedAgentGatewayOperations(input: {
             errorJson: JSON.stringify({
               code: "server_restarted",
               message:
-                "Synara restarted before the operation completed. Deterministic operation-owned resources were compensated; no replacements were created.",
+                "Quack restarted before the operation completed. Deterministic operation-owned resources were compensated; no replacements were created.",
               compensatedCount: plan.length,
             }),
             now: gatewayIsoNow(),
@@ -229,7 +229,7 @@ export function recoverInterruptedAgentGatewayOperations(input: {
                   errorJson: JSON.stringify({
                     code: "startup_recovery_failed",
                     message:
-                      "Synara could not recover the interrupted operation. The sanitized operation remains retryable and resources may require manual cleanup; no replacements will be created.",
+                      "Quack could not recover the interrupted operation. The sanitized operation remains retryable and resources may require manual cleanup; no replacements will be created.",
                     error: detail,
                   }),
                   now: gatewayIsoNow(),

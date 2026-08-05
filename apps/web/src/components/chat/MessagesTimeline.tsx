@@ -2220,12 +2220,13 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             <div
               className={cn(
                 "flex items-start overflow-visible",
-                workingStreamIdentity ? CHAT_STREAM_AVATAR_GAP_CLASS_NAME : null,
+                // Keep Thinking in the message column after the avatar has already
+                // appeared on this turn. The empty slot only occupies space once
+                // the shared wide-pane gutter is visible.
+                CHAT_STREAM_AVATAR_GAP_CLASS_NAME,
               )}
             >
-              {workingStreamIdentity ? (
-                <ChatStreamAvatarSlot src={workingStreamIdentity.src} />
-              ) : null}
+              <ChatStreamAvatarSlot src={workingStreamIdentity?.src} />
               <div className="min-w-0 flex-1">
                 {workingStreamIdentity ? (
                   <ChatStreamMetaRow

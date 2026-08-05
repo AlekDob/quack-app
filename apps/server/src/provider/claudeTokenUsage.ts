@@ -154,6 +154,36 @@ export function mergeClaudeTokenUsageSnapshot(
   };
 }
 
+/**
+ * Post-compaction context snapshot. Compaction shrinks the live context, but the
+ * usual usage sources only report again on the next assistant call — so a manual
+ * `/compact` would leave the meter pinned at the pre-compact number forever.
+ * `totalProcessedTokens` is cumulative and must survive the reset.
+ */
+export function compactedClaudeTokenUsageSnapshot(
+  postTokens: number,
+  contextWindow: number | undefined,
+  previous: ThreadTokenUsageSnapshot | undefined,
+): ThreadTokenUsageSnapshot {
+  const maxTokens = positiveFiniteNumber(contextWindow);
+  const usedTokens = Math.max(0, Math.round(postTokens));
+  const totalProcessedTokens = Math.max(
+    previous?.totalProcessedTokens ?? previous?.usedTokens ?? 0,
+    usedTokens,
+  );
+  return {
+    usedTokens: maxTokens !== undefined ? Math.min(usedTokens, maxTokens) : usedTokens,
+    lastUsedTokens: usedTokens,
+    ...(maxTokens !== undefined
+      ? { maxTokens, usedPercent: Math.min(100, (usedTokens / maxTokens) * 100) }
+      : {}),
+    ...(totalProcessedTokens > usedTokens ? { totalProcessedTokens } : {}),
+    ...(previous?.compactsAutomatically !== undefined
+      ? { compactsAutomatically: previous.compactsAutomatically }
+      : {}),
+  };
+}
+
 export function resolveClaudeApiModelIdContextWindowMaxTokens(
   apiModelId: string | undefined,
 ): number | undefined {

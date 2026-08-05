@@ -1,7 +1,7 @@
 // FILE: MessageTrail.tsx
 // Purpose: Left-gutter message rail with macOS-Dock-style magnification. The tick
 //   nearest the pointer grows longest (Gaussian falloff on its neighbours) and a
-//   side tooltip shows that one focused message. Built on Synara's existing scroll
+//   side tooltip shows that one focused message. Built on Quack's existing scroll
 //   engine: `activeStore` carries the current + visible viewport highlights and
 //   `onSelect` jumps (shadcn's scrollToMessage). The hot path writes tick width /
 //   opacity straight to the DOM inside one coalesced rAF — no React state per move
@@ -24,6 +24,7 @@ import {
 import { cn } from "~/lib/utils";
 import { DISCLOSURE_CONTENT_MOTION_CLASS } from "~/lib/disclosureMotion";
 import { APP_TOOLTIP_SURFACE_CLASS_NAME } from "./composerPickerStyles";
+import { CHAT_LEFT_GUTTER_MIN_PANE_WIDTH_PX } from "./chatLeftGutter";
 import {
   clampNumber,
   clampTooltipTop,
@@ -48,8 +49,8 @@ interface MessageTrailProps {
 
 // Rail only renders once the centered transcript column (max 46rem) leaves a left
 // gutter wide enough for the rail to sit clear of message text. Measured off the
-// pane so a docked side panel / the sidebar is accounted for.
-const MIN_PANE_WIDTH_PX = 864;
+// pane so a docked side panel / the sidebar is accounted for — see
+// CHAT_LEFT_GUTTER_MIN_PANE_WIDTH_PX in chatLeftGutter.ts (shared with stream avatars).
 // Fixed rail box. Ticks grow rightward inside it (left-aligned, like the Dock).
 const RAIL_WIDTH_PX = 56;
 // Cap the scrollable tick viewport a bit below the full pane height so the rail
@@ -342,7 +343,7 @@ export function MessageTrail({ items, activeStore, onSelect }: MessageTrailProps
     let pendingRaf: number | null = null;
     const measure = () => {
       pendingRaf = null;
-      setHasGutter(pane.clientWidth >= MIN_PANE_WIDTH_PX);
+      setHasGutter(pane.clientWidth >= CHAT_LEFT_GUTTER_MIN_PANE_WIDTH_PX);
     };
     const schedule = () => {
       if (pendingRaf === null) {

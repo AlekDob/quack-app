@@ -160,7 +160,7 @@ function shellQuote(value: string, platform: NodeJS.Platform = process.platform)
 }
 
 /**
- * Hook output when capture is inactive (the session is not Synara-managed).
+ * Hook output when capture is inactive (the session is not Quack-managed).
  * Antigravity requires PreToolUse output to carry a `decision`: an empty
  * object is treated as a denial with an empty reason, which blocks every tool
  * call because the hook is installed globally with `matcher: "*"` (#490).
@@ -330,7 +330,7 @@ export async function ensureCapturePlugin(
       {
         $schema: "https://antigravity.google/schemas/v1/plugin.json",
         name: "synara-capture",
-        description: "Streams Antigravity CLI lifecycle events to Synara when requested.",
+        description: "Streams Antigravity CLI lifecycle events to Quack when requested.",
       },
       null,
       2,
@@ -882,7 +882,7 @@ const makeAntigravityAdapter = (dependencies: AntigravityAdapterDependencies = {
             new ProviderAdapterRequestError({
               provider: PROVIDER,
               method: "plugin/install",
-              detail: messageFromCause(cause, "Failed to install the Synara capture hook."),
+              detail: messageFromCause(cause, "Failed to install the Quack capture hook."),
               cause,
             }),
         });
@@ -1028,7 +1028,7 @@ const makeAntigravityAdapter = (dependencies: AntigravityAdapterDependencies = {
           return yield* new ProviderAdapterRequestError({
             provider: PROVIDER,
             method: "turn/prepare",
-            detail: "The Synara gateway credential is no longer active for this provider turn.",
+            detail: "The Quack gateway credential is no longer active for this provider turn.",
           });
         }
         if (gatewaySessionLease) context.gatewaySessionLease = gatewaySessionLease;

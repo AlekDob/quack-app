@@ -252,7 +252,7 @@ export function loadAgentGatewayProviderCatalog(input: {
   const availability = input.availability ?? { enabled: true };
   const unavailableReason =
     availability.enabled === false
-      ? `Provider "${input.provider}" is disabled in Synara settings.`
+      ? `Provider "${input.provider}" is disabled in Quack settings.`
       : availability.available === false
         ? (availability.message ?? `Provider "${input.provider}" is not available.`)
         : availability.authStatus === "unauthenticated"

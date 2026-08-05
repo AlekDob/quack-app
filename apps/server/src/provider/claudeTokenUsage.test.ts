@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   claudePromptTokensFromRawUsage,
+  compactedClaudeTokenUsageSnapshot,
   decideClaudeContextUsageWarnings,
   maxClaudeContextWindowFromModelUsage,
   mergeClaudeTokenUsageSnapshot,
@@ -135,6 +136,31 @@ describe("Claude token arithmetic", () => {
       lastOutputTokens: 2_000,
       compactsAutomatically: true,
     });
+  });
+});
+
+describe("Claude compaction snapshot", () => {
+  it("drops the used context to the post-compaction size and keeps cumulative totals", () => {
+    const snapshot = compactedClaudeTokenUsageSnapshot(18_000, 200_000, {
+      usedTokens: 91_000,
+      totalProcessedTokens: 2_100_000,
+      compactsAutomatically: true,
+    });
+
+    expect(snapshot.usedTokens).toBe(18_000);
+    expect(snapshot.usedPercent).toBe(9);
+    expect(snapshot.totalProcessedTokens).toBe(2_100_000);
+    expect(snapshot.compactsAutomatically).toBe(true);
+  });
+
+  it("keeps the previous used tokens as the cumulative floor when no total was tracked", () => {
+    const snapshot = compactedClaudeTokenUsageSnapshot(18_000, undefined, {
+      usedTokens: 91_000,
+    });
+
+    expect(snapshot.usedTokens).toBe(18_000);
+    expect(snapshot.maxTokens).toBeUndefined();
+    expect(snapshot.totalProcessedTokens).toBe(91_000);
   });
 });
 

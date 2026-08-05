@@ -6,10 +6,10 @@ describe("usage notch geometry", () => {
 
   it("centers the compact pill on the display top edge", () => {
     expect(resolveUsageNotchBounds({ display, presentation: "compact" })).toEqual({
-      x: 710,
+      x: 800,
       y: 20,
-      width: 220,
-      height: 32,
+      width: 40,
+      height: 40,
     });
   });
 

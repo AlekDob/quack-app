@@ -85,7 +85,7 @@ function commandMenuTitle(
     case "subagents":
       return "Subagents";
     case "feedback":
-      return "Feedback Synara";
+      return "Feedback Quack";
     default:
       return humanizeProviderCommandName(item.command);
   }

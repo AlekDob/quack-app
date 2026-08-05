@@ -27,7 +27,7 @@ const DIAGNOSTICS: FeedbackDiagnostics = {
   ...CONTEXT,
   appVersion: "0.5.1",
   submittedAt: "2026-07-15T18:00:00.000Z",
-  userAgent: "Synara test agent",
+  userAgent: "Quack test agent",
   platform: "MacIntel",
   language: "en-US",
   viewport: "1440x900",
@@ -42,7 +42,7 @@ describe("formatFeedbackSummary", () => {
 
     expect(summary).toBe(
       [
-        "I ran into a bug in Synara 0.5.1, using codex with gpt-5.6-sol.",
+        "I ran into a bug in Quack 0.5.1, using codex with gpt-5.6-sol.",
         "",
         "Report type: Bug",
         "App version: 0.5.1",
@@ -58,7 +58,7 @@ describe("formatFeedbackSummary", () => {
         "At submission: the thread was in an error state, the agent was waiting for input.",
         "Platform: MacIntel, viewport 1440x900",
         "Language: en-US",
-        "User agent: Synara test agent",
+        "User agent: Quack test agent",
         "Submitted at: 2026-07-15T18:00:00.000Z",
       ].join("\n"),
     );
@@ -79,9 +79,7 @@ describe("formatFeedbackSummary", () => {
       },
     });
 
-    expect(summary).toContain(
-      "I have some feedback in Synara 0.5.1, using codex with gpt-5.6-sol.",
-    );
+    expect(summary).toContain("I have some feedback in Quack 0.5.1, using codex with gpt-5.6-sol.");
     expect(summary).toContain("Report type: Unspecified");
     expect(summary).toContain("At submission: nothing pending.");
     expect(summary).not.toContain("Screenshot:");
@@ -94,7 +92,7 @@ describe("formatFeedbackSummary", () => {
     ({ value, label, lead }) => {
       const summary = formatFeedbackSummary({ category: value, diagnostics: DIAGNOSTICS });
 
-      expect(summary.startsWith(`${lead} in Synara 0.5.1`)).toBe(true);
+      expect(summary.startsWith(`${lead} in Quack 0.5.1`)).toBe(true);
       expect(summary).toContain(`Report type: ${label}`);
     },
   );
@@ -115,7 +113,7 @@ describe("formatFeedbackSummary", () => {
       },
     });
 
-    expect(summary).toContain("I have some feedback in Synara 0.5.1 outside an active chat.");
+    expect(summary).toContain("I have some feedback in Quack 0.5.1 outside an active chat.");
     expect(summary).not.toContain("Provider:");
     expect(summary).not.toContain("Model:");
   });
@@ -128,7 +126,7 @@ describe("buildFeedbackSubmission", () => {
       details: "  The composer stopped responding.  ",
       context: CONTEXT,
       now: new Date("2026-07-15T18:00:00.000Z"),
-      userAgent: "Synara test agent",
+      userAgent: "Quack test agent",
       platform: "MacIntel",
       language: "en-US",
       viewport: { width: 1_440, height: 900 },
@@ -141,7 +139,7 @@ describe("buildFeedbackSubmission", () => {
         provider: "codex",
         model: "gpt-5.6-sol",
         submittedAt: "2026-07-15T18:00:00.000Z",
-        userAgent: "Synara test agent",
+        userAgent: "Quack test agent",
         platform: "MacIntel",
         language: "en-US",
         viewport: "1440x900",

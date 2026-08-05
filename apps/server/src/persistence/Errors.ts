@@ -93,7 +93,7 @@ export class MigrationLineageError extends Schema.TaggedErrorClass<MigrationLine
   override get message(): string {
     return (
       `Migration tracker does not match any known lineage: migration ${this.firstDivergedId} ` +
-      `is recorded as "${this.recordedName}" but Synara expects "${this.expectedName}". ` +
+      `is recorded as "${this.recordedName}" but Quack expects "${this.expectedName}". ` +
       `Refusing to run migrations against an unrecognized database.`
     );
   }
@@ -108,9 +108,9 @@ export class MigrationSchemaTooNewError extends Schema.TaggedErrorClass<Migratio
 ) {
   override get message(): string {
     return (
-      `Database schema migration ${this.databaseMigrationId} is newer than this Synara build ` +
+      `Database schema migration ${this.databaseMigrationId} is newer than this Quack build ` +
       `(latest supported migration: ${this.latestSupportedMigrationId}). ` +
-      "Refusing writable startup; upgrade Synara or restore a compatible database backup."
+      "Refusing writable startup; upgrade Quack or restore a compatible database backup."
     );
   }
 }

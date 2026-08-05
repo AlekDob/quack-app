@@ -33,7 +33,7 @@ import {
   takeGrokSynaraHarnessPolicyTextPart,
 } from "./GrokAdapter.ts";
 
-describe("Grok Synara harness policy", () => {
+describe("Grok Quack harness policy", () => {
   it("delivers private scoped host context once", () => {
     const state: { harnessPolicyDelivered?: boolean } = {};
     expect(takeGrokSynaraHarnessPolicyTextPart(state, true)?.text).toContain(
@@ -50,7 +50,7 @@ describe("Grok native plan approval", () => {
         text: "Design the change",
         interactionMode: "plan",
       }),
-    ).toMatch(/^Synara requested Grok's native plan mode\./u);
+    ).toMatch(/^Quack requested Grok's native plan mode\./u);
   });
 
   it("sets Grok's native prompt mode idempotently on every turn", () => {
@@ -129,11 +129,11 @@ describe("Grok native plan approval", () => {
     expect(extractGrokExitPlanMarkdown(request)).toBeUndefined();
   });
 
-  it("keeps native plan mode gated after Synara captures the plan", () => {
+  it("keeps native plan mode gated after Quack captures the plan", () => {
     expect(makeGrokExitPlanModeCapturedResponse()).toEqual({
       outcome: "cancelled",
       feedback:
-        "Synara captured this plan for user review. Do not revise or implement it now. End this turn and wait for the user's next message.",
+        "Quack captured this plan for user review. Do not revise or implement it now. End this turn and wait for the user's next message.",
     });
   });
 
@@ -184,7 +184,7 @@ describe("Grok native user questions", () => {
     ]);
   });
 
-  it("maps Synara answers to Grok's question-text keyed response", () => {
+  it("maps Quack answers to Grok's question-text keyed response", () => {
     expect(extractGrokUserInputQuestions(request)[0]).toMatchObject({
       id: "grok-question-0",
       header: "Verification",

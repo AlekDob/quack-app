@@ -17,11 +17,11 @@ tags: [subscriptions, event-router, thread-detail, shell, streaming]
 
 ### Files
 
-| Type      | Path                                      | Exports/Purpose                                                      |
-| --------- | ----------------------------------------- | -------------------------------------------------------------------- |
-| Route/Page| `apps/web/src/routes/__root.tsx`          | `EventRouter` lease list + identity-stable `subscribedThreadIds`     |
-| Util      | `apps/web/src/storeNormalization.ts`      | `arraysShallowEqual` for lease identity                              |
-| Store     | `apps/web/src/store.ts` / shell selectors | `serverThreads` (re-emits on streaming updates)                      |
+| Type       | Path                                      | Exports/Purpose                                                  |
+| ---------- | ----------------------------------------- | ---------------------------------------------------------------- |
+| Route/Page | `apps/web/src/routes/__root.tsx`          | `EventRouter` lease list + identity-stable `subscribedThreadIds` |
+| Util       | `apps/web/src/storeNormalization.ts`      | `arraysShallowEqual` for lease identity                          |
+| Store      | `apps/web/src/store.ts` / shell selectors | `serverThreads` (re-emits on streaming updates)                  |
 
 ### Data Flow
 

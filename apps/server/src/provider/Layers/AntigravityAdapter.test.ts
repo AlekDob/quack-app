@@ -289,7 +289,7 @@ describe("Antigravity CLI integration helpers", () => {
     }
   });
 
-  it("installs the generated Synara MCP plugin alongside the capture hooks", async () => {
+  it("installs the generated Quack MCP plugin alongside the capture hooks", async () => {
     const homeDir = await fs.mkdtemp(path.join(os.tmpdir(), "synara-antigravity-home-test-"));
     const stdioProxy = {
       command: "/Applications/Synara.app/Contents/MacOS/Synara",
@@ -406,7 +406,7 @@ describe("Antigravity CLI integration helpers", () => {
       hasGatewaySessionLease: false,
     });
     expect(identityOnlyPrompt).not.toContain("browser_*");
-    expect(identityOnlyPrompt).toContain("Synara MCP control is unavailable");
+    expect(identityOnlyPrompt).toContain("Quack MCP control is unavailable");
 
     const envWithoutLease = buildAntigravityTurnProcessEnvironment({
       eventFile: "/tmp/thread-b-hooks.ndjson",
@@ -438,7 +438,7 @@ describe("Antigravity CLI integration helpers", () => {
     });
   });
 
-  it("keeps the globally installed hook neutral outside Synara sessions", () => {
+  it("keeps the globally installed hook neutral outside Quack sessions", () => {
     const command = buildAntigravityCaptureCommand(
       "__synara_gui_must_not_launch__",
       "__capture_script_must_not_run__",
@@ -497,7 +497,7 @@ describe("Antigravity CLI integration helpers", () => {
     }
   });
 
-  it("runs the capture script for Synara-managed sessions", async () => {
+  it("runs the capture script for Quack-managed sessions", async () => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), "synara-antigravity-hook-test-"));
     const scriptPath = path.join(directory, "capture.cjs");
     const eventPath = path.join(directory, "events.ndjson");
@@ -519,7 +519,7 @@ describe("Antigravity CLI integration helpers", () => {
     }
   });
 
-  it("runs packaged Electron as Node only for Synara-managed sessions", () => {
+  it("runs packaged Electron as Node only for Quack-managed sessions", () => {
     expect(
       buildAntigravityCaptureCommand(
         "/Applications/Synara.app/Contents/MacOS/Synara",
@@ -532,13 +532,13 @@ describe("Antigravity CLI integration helpers", () => {
     );
     expect(
       buildAntigravityCaptureCommand(
-        String.raw`C:\Program Files\Synara\Synara.exe`,
+        String.raw`C:\Program Files\Quack\Quack.exe`,
         String.raw`C:\Users\test\.gemini\capture.cjs`,
         "pre-tool",
         "win32",
       ),
     ).toBe(
-      String.raw`if not defined SYNARA_ANTIGRAVITY_EVENTS (more >nul 2>nul & echo {"decision":"ask"}) else (set "ELECTRON_RUN_AS_NODE=1" && "C:\Program Files\Synara\Synara.exe" "C:\Users\test\.gemini\capture.cjs" "pre-tool")`,
+      String.raw`if not defined SYNARA_ANTIGRAVITY_EVENTS (more >nul 2>nul & echo {"decision":"ask"}) else (set "ELECTRON_RUN_AS_NODE=1" && "C:\Program Files\Quack\Quack.exe" "C:\Users\test\.gemini\capture.cjs" "pre-tool")`,
     );
   });
 

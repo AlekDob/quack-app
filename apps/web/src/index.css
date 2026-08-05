@@ -1231,8 +1231,8 @@ label:has(> select#reasoning-effort) select {
     0 1px 4px -2px color-mix(in srgb, var(--color-black, #000) 16%, transparent);
 }
 
-/* Rounded chip holding the Synara mark in the box header, echoing the source
-   file's row gutter badge so the comment reads as "from Synara". */
+/* Rounded chip holding the Quack mark in the box header, echoing the source
+   file's row gutter badge so the comment reads as "from Quack". */
 .editor-file-viewer__comment-badge {
   display: inline-flex;
   align-items: center;
@@ -2397,10 +2397,12 @@ diffs-container {
 }
 
 /* Diffs theme bridge (match diff surfaces to app palette) */
-.diff-panel-viewport {
-  /* Keep raw patch fallback and any unthemed diff chrome on the coding font stack. */
-  font-family: var(--font-chat-code-family);
-  background: color-mix(in srgb, var(--background) 94%, var(--card));
+/* LegendList item shells set `contain: paint layout style` inline. Paint
+   containment clips stream-chat papero avatars (and their hover scale) whenever
+   adjacent absolutely-positioned rows subpixel-overlap at the boundary. Keep
+   layout/style containment; drop paint so avatars render as full circles. */
+[data-chat-scroll-container="true"] .legend-list-content-container > div > div {
+  contain: layout style !important;
 }
 
 .diff-render-file {
@@ -2740,7 +2742,7 @@ diffs-container {
   --picker-option-py: 0.3125rem;
 }
 
-/* Sidebar Synara/Studio surface switcher: tight shell inset, airy option rows.
+/* Sidebar Quack/Studio surface switcher: tight shell inset, airy option rows.
    Composer picker tokens otherwise pin option py to ~1px and win over Tailwind. */
 .sidebar-surface-picker-menu {
   --picker-menu-body-p: 0.25rem;

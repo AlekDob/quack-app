@@ -1,5 +1,5 @@
 /**
- * Public contracts for the Synara agent-control gateway.
+ * Public contracts for the Quack agent-control gateway.
  *
  * New gateway tools decode these schemas before doing any work. Keeping the
  * limits here ensures the MCP surface, server implementation, and tests share
@@ -46,7 +46,7 @@ export type SynaraGatewayErrorResult = typeof SynaraGatewayErrorResult.Type;
 
 export const SynaraContextResult = Schema.Struct({
   harness: Schema.Struct({
-    name: Schema.Literal("Synara"),
+    name: Schema.Literal("Quack"),
     policyVersion: Schema.String,
   }),
   caller: Schema.Struct({

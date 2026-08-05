@@ -293,7 +293,7 @@ export function makeAgentGatewayAutomationTools(
     requiresActiveTurn: true,
     definition: {
       name: "synara_create_automation",
-      description: `Create a heartbeat, standalone, or dedicated Synara automation. ${AUTOMATION_AUTHORING_GUIDANCE} Existing calls remain compatible: omitting mode/schedule creates a heartbeat on your thread using everyMinutes (default 5). Prefer suggested:true unless the user explicitly requested creation.`,
+      description: `Create a heartbeat, standalone, or dedicated Quack automation. ${AUTOMATION_AUTHORING_GUIDANCE} Existing calls remain compatible: omitting mode/schedule creates a heartbeat on your thread using everyMinutes (default 5). Prefer suggested:true unless the user explicitly requested creation.`,
       inputSchema: {
         type: "object",
         properties: {
@@ -351,7 +351,7 @@ export function makeAgentGatewayAutomationTools(
         required: ["name", "prompt"],
         additionalProperties: false,
       },
-      annotations: { title: "Create a Synara automation", ...WRITE_TOOL_ANNOTATIONS },
+      annotations: { title: "Create a Quack automation", ...WRITE_TOOL_ANNOTATIONS },
     },
     handler: (args, context) =>
       Effect.gen(function* () {
@@ -528,7 +528,7 @@ export function makeAgentGatewayAutomationTools(
     definition: {
       name: "synara_list_automations",
       description:
-        "List Synara automations (id, name, mode, schedule, target thread, enabled, next run).",
+        "List Quack automations (id, name, mode, schedule, target thread, enabled, next run).",
       inputSchema: {
         type: "object",
         properties: {
@@ -536,7 +536,7 @@ export function makeAgentGatewayAutomationTools(
         },
         additionalProperties: false,
       },
-      annotations: { title: "List Synara automations", ...READ_ONLY_TOOL_ANNOTATIONS },
+      annotations: { title: "List Quack automations", ...READ_ONLY_TOOL_ANNOTATIONS },
     },
     handler: (args) =>
       Effect.gen(function* () {
@@ -577,7 +577,7 @@ export function makeAgentGatewayAutomationTools(
         required: ["automationId"],
         additionalProperties: false,
       },
-      annotations: { title: "View a Synara automation", ...READ_ONLY_TOOL_ANNOTATIONS },
+      annotations: { title: "View a Quack automation", ...READ_ONLY_TOOL_ANNOTATIONS },
     },
     handler: (args, context) =>
       Effect.gen(function* () {
@@ -649,7 +649,7 @@ export function makeAgentGatewayAutomationTools(
         ],
         additionalProperties: false,
       },
-      annotations: { title: "Replace a Synara automation", ...WRITE_TOOL_ANNOTATIONS },
+      annotations: { title: "Replace a Quack automation", ...WRITE_TOOL_ANNOTATIONS },
     },
     handler: (args, context) =>
       Effect.gen(function* () {
@@ -714,7 +714,7 @@ export function makeAgentGatewayAutomationTools(
     definition: {
       name: "synara_cancel_automation",
       description:
-        'Stop a Synara automation. mode "disable" (default) pauses it and keeps history; "delete" archives it. An automation-dispatched run may always stop its own automation, whatever its mode. Prefer a completionPolicy stop clause for conditions known when the automation is created.',
+        'Stop a Quack automation. mode "disable" (default) pauses it and keeps history; "delete" archives it. An automation-dispatched run may always stop its own automation, whatever its mode. Prefer a completionPolicy stop clause for conditions known when the automation is created.',
       inputSchema: {
         type: "object",
         properties: {
@@ -724,7 +724,7 @@ export function makeAgentGatewayAutomationTools(
         required: ["automationId"],
         additionalProperties: false,
       },
-      annotations: { title: "Stop a Synara automation", ...WRITE_TOOL_ANNOTATIONS },
+      annotations: { title: "Stop a Quack automation", ...WRITE_TOOL_ANNOTATIONS },
     },
     handler: (args, context) =>
       Effect.gen(function* () {

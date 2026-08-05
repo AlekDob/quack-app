@@ -205,7 +205,7 @@ describe("buildOpenCodeServerProcessEnv", () => {
     expect(env.OPENCODE_CONFIG_CONTENT).toBe('{"provider":{"openai":{}}}');
   });
 
-  it("strips inherited Synara authority from managed server processes", () => {
+  it("strips inherited Quack authority from managed server processes", () => {
     const env = buildOpenCodeServerProcessEnv({
       baseEnv: {
         OPENAI_API_KEY: "provider-key",

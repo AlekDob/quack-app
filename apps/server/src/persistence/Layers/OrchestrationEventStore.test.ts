@@ -121,7 +121,7 @@ layer("OrchestrationEventStore", (it) => {
     }),
   );
 
-  it.effect("normalizes imported Synara model-selection shapes during replay", () =>
+  it.effect("normalizes imported Quack model-selection shapes during replay", () =>
     Effect.gen(function* () {
       const eventStore = yield* OrchestrationEventStore;
       const sql = yield* SqlClient.SqlClient;

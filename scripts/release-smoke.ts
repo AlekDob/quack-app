@@ -103,7 +103,7 @@ function verifyCanonicalIdentity(): void {
       "Expected the CLI to expose only the Synara entry point and migration recovery binary.",
     );
   }
-  if (SYNARA_PRODUCTION_BUNDLE_ID !== "com.emanueledipietro.synara") {
+  if (SYNARA_PRODUCTION_BUNDLE_ID !== "com.alekdob.quack") {
     throw new Error(`Unexpected production bundle ID: ${SYNARA_PRODUCTION_BUNDLE_ID}.`);
   }
   if (SYNARA_DESKTOP_UPDATE_CHANNEL !== "synara") {

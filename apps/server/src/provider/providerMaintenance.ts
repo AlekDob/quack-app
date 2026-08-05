@@ -199,7 +199,7 @@ export function normalizeCommandPath(commandPath: string): string {
  * npm resolves its global prefix from the `node` binary that runs it, not from
  * npm's own location, so a bare `npm install -g` can write to a different
  * install tree than the one the detected provider binary lives in (e.g. a
- * Homebrew-prefix install checked by Synara while nvm's node makes npm install
+ * Homebrew-prefix install checked by Quack while nvm's node makes npm install
  * into nvm's prefix). Derive the prefix that owns the detected binary so the
  * update can pin it explicitly.
  */

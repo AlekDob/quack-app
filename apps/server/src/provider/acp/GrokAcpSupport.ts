@@ -90,7 +90,7 @@ export function buildGrokAcpSpawnInput(
   grokSettings: GrokAcpRuntimeSettings | null | undefined,
   cwd: string,
 ): AcpSpawnInput {
-  // Keep the provider itself in request-based permission mode. Synara then
+  // Keep the provider itself in request-based permission mode. Quack then
   // auto-answers per turn, so Full Access cannot leak into a later Plan turn
   // through a sticky Grok config or a process-wide always-approve setting.
   const args = ["--permission-mode", "default", "agent", "--no-leader"];

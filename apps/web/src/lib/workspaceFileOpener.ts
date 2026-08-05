@@ -19,6 +19,7 @@ import { isScratchWorkspacePath } from "@synara/shared/threadWorkspace";
 import type { QueryClient } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
 
+import type { ChatFileReference } from "./chatReferences";
 import { openInPreferredEditor } from "../editorPreferences";
 import { readNativeApi } from "../nativeApi";
 import { projectReadFileQueryOptions } from "./projectReactQuery";
@@ -32,6 +33,10 @@ export interface WorkspaceFileOpener {
   openFile: (path: string) => boolean;
   /** Optional hover warm-up for the file contents + syntax highlighter. */
   prefetchFile?: (path: string) => void;
+  /** Workspace cwd so chat file chips can resolve Reveal in Finder paths. */
+  workspaceRoot?: string | null;
+  /** Insert an `@path` mention into the hosting thread's composer. */
+  onReferenceInChat?: (reference: ChatFileReference) => void;
 }
 
 export const WorkspaceFileOpenerContext = createContext<WorkspaceFileOpener | null>(null);

@@ -56,9 +56,9 @@ describe("external MCP guided setup", () => {
   });
 
   it("builds a project-specific prompt without exposing implementation identifiers", () => {
-    const prompt = buildExternalMcpExamplePrompt("Synara app");
+    const prompt = buildExternalMcpExamplePrompt("Quack app");
 
-    expect(prompt).toContain('project named "Synara app"');
+    expect(prompt).toContain('project named "Quack app"');
     expect(prompt).toContain("managed worktree");
     expect(prompt).toContain("approval-required");
     expect(prompt).not.toContain("projectId");

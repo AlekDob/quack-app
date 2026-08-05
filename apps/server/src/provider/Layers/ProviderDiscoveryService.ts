@@ -75,7 +75,7 @@ const make = Effect.gen(function* () {
       const capabilities = adapter.getComposerCapabilities
         ? yield* adapter.getComposerCapabilities()
         : disabledCapabilitiesForProvider(parsed.provider);
-      // The unified Synara skills catalog backs skill discovery for every
+      // The unified Quack skills catalog backs skill discovery for every
       // provider, including ones without native skill support.
       return {
         ...capabilities,
@@ -98,7 +98,7 @@ const make = Effect.gen(function* () {
             .pipe(
               Effect.catch((error) =>
                 Effect.logWarning(
-                  "provider-native skill discovery failed; serving the Synara skills catalog only",
+                  "provider-native skill discovery failed; serving the Quack skills catalog only",
                   { provider: parsed.provider, error },
                 ).pipe(Effect.as(null)),
               ),

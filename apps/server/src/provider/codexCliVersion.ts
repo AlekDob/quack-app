@@ -142,5 +142,5 @@ export function formatCodexCliUpgradeMessage(
   minimumVersion = MINIMUM_CODEX_CLI_VERSION,
 ): string {
   const versionLabel = version ? `v${version}` : "the installed version";
-  return `Codex CLI ${versionLabel} is too old for Synara. Upgrade to v${minimumVersion} or newer and restart Synara.`;
+  return `Codex CLI ${versionLabel} is too old for Quack. Upgrade to v${minimumVersion} or newer and restart Quack.`;
 }

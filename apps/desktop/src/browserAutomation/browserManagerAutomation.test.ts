@@ -27,7 +27,7 @@ const { browserSession, fromId, webContentsViewConstructor, willDownloadListener
 );
 vi.mock("electron", () => ({
   app: {
-    getName: () => "Synara",
+    getName: () => "Quack",
     getPreferredSystemLanguages: () => ["en-US"],
     userAgentFallback: "Mozilla/5.0 Electron/40.0.0",
   },
@@ -148,7 +148,7 @@ describe("DesktopBrowserManager automation runtime boundary", () => {
     ).toThrow(/has not attached yet/i);
   });
 
-  it("adopts only a webview owned by the exact Synara window and browser partition", () => {
+  it("adopts only a webview owned by the exact Quack window and browser partition", () => {
     const manager = new DesktopBrowserManager();
     const state = manager.prepareAutomationTab({ threadId: THREAD_ID, reuse: true });
     const tabId = state.activeTabId!;

@@ -1848,7 +1848,7 @@ function configureAppIdentity(): void {
     applicationName: APP_DISPLAY_NAME,
     applicationVersion: app.getVersion(),
     version: commitHash ?? "unknown",
-    copyright: `© ${new Date().getFullYear()} Emanuele Di Pietro`,
+    copyright: `© ${new Date().getFullYear()} Alek Dobrohotov · fork of Synara, itself a fork of T3.Chat (t3.gg) by Theo Browne`,
   });
 
   if (process.platform === "win32") {

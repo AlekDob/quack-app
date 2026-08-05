@@ -26,7 +26,7 @@ import {
   toPiProviderModelDescriptor,
 } from "./PiAdapter";
 
-describe("Pi native Synara gateway tools", () => {
+describe("Pi native Quack gateway tools", () => {
   it("uses canonical MCP schemas and keeps same-cwd thread tokens distinct", async () => {
     const requests: Array<{ readonly token: string | null; readonly body: any }> = [];
     const fetch = async (_input: string | URL | Request, init?: RequestInit) => {
@@ -44,7 +44,7 @@ describe("Pi native Synara gateway tools", () => {
                 tools: [
                   {
                     name: "synara_list_threads",
-                    description: "List Synara threads.",
+                    description: "List Quack threads.",
                     inputSchema: {
                       type: "object",
                       properties: { limit: { type: "number" } },
@@ -108,7 +108,7 @@ describe("Pi native Synara gateway tools", () => {
             tools: [
               {
                 name: "synara_create_threads",
-                description: "Create Synara threads.",
+                description: "Create Quack threads.",
                 inputSchema: { type: "object", properties: {} },
               },
             ],

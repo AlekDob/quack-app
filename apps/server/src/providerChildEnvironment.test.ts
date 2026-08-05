@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { buildProviderChildEnvironment } from "./providerChildEnvironment";
 
 describe("buildProviderChildEnvironment", () => {
-  it("strips Synara control-plane and inherited native capabilities", () => {
+  it("strips Quack control-plane and inherited native capabilities", () => {
     const env = buildProviderChildEnvironment({
       provider: "antigravity",
       baseEnv: {

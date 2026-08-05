@@ -1,5 +1,5 @@
 // FILE: importedThreadMessages.test.ts
-// Purpose: Verifies provider transcript snapshots become stable Synara import messages.
+// Purpose: Verifies provider transcript snapshots become stable Quack import messages.
 // Layer: Orchestration mapping tests
 // Depends on: importedThreadMessages.
 

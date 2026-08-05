@@ -162,7 +162,7 @@ export function validateWsFeatureCompatibility(
   if (expectedServerInstanceId !== serverInstanceId) {
     return incompatibility(
       "reload",
-      "The Synara server restarted during WebSocket negotiation. Reload to reconnect to the new server generation.",
+      "The Quack server restarted during WebSocket negotiation. Reload to reconnect to the new server generation.",
       "WS_SERVER_GENERATION_CHANGED",
     );
   }

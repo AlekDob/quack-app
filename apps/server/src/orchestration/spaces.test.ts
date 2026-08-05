@@ -82,7 +82,7 @@ describe("Spaces", () => {
       type: "project.create",
       commandId: CommandId.makeUnsafe("cmd-project-create"),
       projectId,
-      title: "Synara",
+      title: "Quack",
       workspaceRoot: "/tmp/synara",
       createdAt,
     }));
@@ -346,7 +346,7 @@ describe("Spaces", () => {
       type: "project.create",
       commandId: CommandId.makeUnsafe("cmd-create-ordinary"),
       projectId: ordinaryProjectId,
-      title: "Synara",
+      title: "Quack",
       workspaceRoot: "/Users/dev/code/synara",
       createdAt,
     }));
@@ -438,7 +438,7 @@ describe("Spaces", () => {
       type: "project.create",
       commandId: CommandId.makeUnsafe("cmd-create-transition-to-home"),
       projectId,
-      title: "Synara",
+      title: "Quack",
       workspaceRoot: "/tmp/synara",
       createdAt,
     }));

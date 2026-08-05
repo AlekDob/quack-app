@@ -17,11 +17,11 @@ tags: [pending-interactions, approvals, store-projection, reclaim, upstream-port
 
 ### Files
 
-| Type       | Path                                            | Exports/Purpose                                                                 |
-| ---------- | ----------------------------------------------- | ------------------------------------------------------------------------------- |
-| Util       | `packages/shared/src/pendingInteractions.ts`    | `isPendingInteractionResponseClaimable`, reclaim grace cutoff                   |
-| Config     | `packages/shared/package.json`                  | Export `@synara/shared/pendingInteractions`                                     |
-| Store/State| `apps/web/src/storeEventReducer.ts`             | `markInteractionResponding`; `reconcileLatestTurnFromSession` stale guard       |
+| Type        | Path                                         | Exports/Purpose                                                           |
+| ----------- | -------------------------------------------- | ------------------------------------------------------------------------- |
+| Util        | `packages/shared/src/pendingInteractions.ts` | `isPendingInteractionResponseClaimable`, reclaim grace cutoff             |
+| Config      | `packages/shared/package.json`               | Export `@synara/shared/pendingInteractions`                               |
+| Store/State | `apps/web/src/storeEventReducer.ts`          | `markInteractionResponding`; `reconcileLatestTurnFromSession` stale guard |
 
 ### Data Flow
 

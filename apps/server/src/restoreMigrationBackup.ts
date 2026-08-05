@@ -6,7 +6,7 @@ import { restoreMarkedMigrationBackup } from "./persistence/MigrationBackup.ts";
 
 const USAGE = "Usage: synara-restore-migration-backup <absolute-database-path>";
 const STOP_PROCESSES_WARNING =
-  "WARNING: Stop every Synara process before restoring a migration backup.";
+  "WARNING: Stop every Quack process before restoring a migration backup.";
 
 type RestoreMigrationBackupOutput = Pick<Console, "error" | "log" | "warn">;
 

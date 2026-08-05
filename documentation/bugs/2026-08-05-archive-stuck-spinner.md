@@ -17,11 +17,11 @@ tags: [archive, sidebar, toast, race]
 
 ### Root causes
 
-| # | Cause |
-| - | ----- |
-| 1 | Client treated already-archived invariant as hard failure |
-| 2 | No optimistic local `archivedAt` when shell push dropped/late |
-| 3 | Post-archive navigation errors bubbled as archive failure |
+| #   | Cause                                                         |
+| --- | ------------------------------------------------------------- |
+| 1   | Client treated already-archived invariant as hard failure     |
+| 2   | No optimistic local `archivedAt` when shell push dropped/late |
+| 3   | Post-archive navigation errors bubbled as archive failure     |
 
 ### Fix
 

@@ -1,5 +1,5 @@
 // FILE: profileStats.ts
-// Purpose: Compute Profile-page stats from Synara's local projection DB only.
+// Purpose: Compute Profile-page stats from Quack's local projection DB only.
 // The share card never reads provider archives or cloud services for metrics.
 // Stats are lifetime numbers: deleting a thread purges its rows but snapshots
 // the aggregates into profile_stats_deleted_* first (profileStatsArchive.ts),
@@ -243,7 +243,7 @@ function extractTextSkillNames(text: string | null): string[] {
   return names;
 }
 
-// Builds profile skill rows from every stored Synara user message, plus the
+// Builds profile skill rows from every stored Quack user message, plus the
 // pre-aggregated counts snapshotted from purged threads. Structured references
 // stay authoritative, while text tokens backfill older or partial rows.
 export function aggregateProfileSkillUsageRows(
@@ -648,7 +648,7 @@ const makeProfileStatsQuery = Effect.gen(function* () {
   // query below merges live projections with those archived aggregates.
   // ── SQL helpers ──────────────────────────────────────────────────────
 
-  // Activity = days/hours the user actually sent a Synara prompt. One day-hour
+  // Activity = days/hours the user actually sent a Quack prompt. One day-hour
   // grouping gives day totals, hour totals, and lifetime prompt count in TS.
   const queryPromptActivity = (tz: string) =>
     legacyCompatibleQuery(
@@ -678,7 +678,7 @@ const makeProfileStatsQuery = Effect.gen(function* () {
       `,
     );
 
-  // Token usage for EVERY provider, straight from Synara's own DB (no external
+  // Token usage for EVERY provider, straight from Quack's own DB (no external
   // ~/.codex/~/.claude archives, so it is provider-agnostic AND per-instance). Each
   // `context-window.updated` activity carries a running per-thread token counter;
   // the positive delta is the tokens processed in that step, bucketed by the

@@ -742,6 +742,15 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
         url: `http://localhost:${mockUpdateServerPort ?? 3000}`,
       },
     ];
+  } else {
+    // electron-builder only emits latest-mac.yml when a publish provider exists.
+    // Local unsigned builds still need that metadata so zip finalization can run.
+    buildConfig.publish = [
+      {
+        provider: "generic",
+        url: "https://example.invalid/synara-local-desktop-build",
+      },
+    ];
   }
 
   const windowsSigningConfig =
@@ -1012,7 +1021,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   const resolvedBuildConfig = yield* createBuildConfig(
     options.platform,
     options.target,
-    desktopPackageJson.productName ?? "Synara",
+    desktopPackageJson.productName ?? "Quack",
     options.signed,
     options.mockUpdates,
     options.mockUpdateServerPort,
@@ -1027,8 +1036,8 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     synaraSourceTag: options.sourceTag ?? null,
     synaraWindowsPublisherSubject: resolvedBuildConfig.windowsPublisherSubject,
     private: true,
-    description: "Synara desktop build",
-    author: "Emanuele Di Pietro",
+    description: "Synara desktop build, fork of T3.Chat (t3.gg) by Theo Browne",
+    author: "Alek Dobrohotov",
     main: "apps/desktop/dist-electron/main.js",
     build: resolvedBuildConfig.buildConfig,
     dependencies: {
@@ -1067,6 +1076,9 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     delete buildEnv.APPLE_API_KEY;
     delete buildEnv.APPLE_API_KEY_ID;
     delete buildEnv.APPLE_API_ISSUER;
+    delete buildEnv.APPLE_ID;
+    delete buildEnv.APPLE_APP_SPECIFIC_PASSWORD;
+    delete buildEnv.APPLE_TEAM_ID;
   }
 
   if (process.platform === "win32") {
@@ -1107,6 +1119,9 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
           appleApiKey: buildEnv.APPLE_API_KEY,
           appleApiKeyId: buildEnv.APPLE_API_KEY_ID,
           appleApiIssuer: buildEnv.APPLE_API_ISSUER,
+          appleId: buildEnv.APPLE_ID,
+          applePassword: buildEnv.APPLE_APP_SPECIFIC_PASSWORD,
+          appleTeamId: buildEnv.APPLE_TEAM_ID,
           verbose: options.verbose,
         }),
       catch: (cause) =>

@@ -47,11 +47,11 @@ describe("chatWorkspaceFolders", () => {
   it("preserves Windows separators when the server root uses them", () => {
     expect(
       buildChatWorkspaceFolderPath({
-        chatWorkspaceRoot: "C:\\Users\\tester\\Documents\\Synara",
+        chatWorkspaceRoot: "C:\\Users\\tester\\Documents\\Quack",
         createdAt: new Date(2026, 5, 11, 23, 30, 43),
         existingWorkspaceRoots: [],
         titleSeed: "Hello there",
       }),
-    ).toBe("C:\\Users\\tester\\Documents\\Synara\\2026-06-11\\hello-there");
+    ).toBe("C:\\Users\\tester\\Documents\\Quack\\2026-06-11\\hello-there");
   });
 });

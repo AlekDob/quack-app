@@ -18,23 +18,23 @@ tags: [recap, archive, regressions, upstream, thread-visibility]
 
 ## Decisions / patterns
 
-| Pattern | Why |
-| ------- | --- |
-| Shared invariant markers in `@synara/shared/errorMessages` | Server wording and client race detection cannot drift |
-| Treat “already applied” archive/unarchive invariants as success | Retries after timeout/dropped push are common |
-| Lease array shallow-equal before reconcile | Streaming shell must not enqueue no-op subscribe work |
-| Port critical upstream fixes selectively | Full `upstream/main` merge still large (fork ahead/behind) |
+| Pattern                                                         | Why                                                        |
+| --------------------------------------------------------------- | ---------------------------------------------------------- |
+| Shared invariant markers in `@synara/shared/errorMessages`      | Server wording and client race detection cannot drift      |
+| Treat “already applied” archive/unarchive invariants as success | Retries after timeout/dropped push are common              |
+| Lease array shallow-equal before reconcile                      | Streaming shell must not enqueue no-op subscribe work      |
+| Port critical upstream fixes selectively                        | Full `upstream/main` merge still large (fork ahead/behind) |
 
 ## Docs
 
-| Kind | Path |
-| ---- | ---- |
-| Feature | `documentation/features/010-sidebar-thread-archive.md` |
-| Feature | `documentation/features/011-thread-detail-subscriptions.md` |
-| Feature | `documentation/features/012-pending-interaction-claim.md` |
-| Bug | `documentation/bugs/2026-08-05-archive-stuck-spinner.md` |
-| Bug | `documentation/bugs/2026-08-05-thread-visibility-regressions.md` |
-| Diary | `documentation/diary/2026-08-05.md` |
+| Kind    | Path                                                             |
+| ------- | ---------------------------------------------------------------- |
+| Feature | `documentation/features/010-sidebar-thread-archive.md`           |
+| Feature | `documentation/features/011-thread-detail-subscriptions.md`      |
+| Feature | `documentation/features/012-pending-interaction-claim.md`        |
+| Bug     | `documentation/bugs/2026-08-05-archive-stuck-spinner.md`         |
+| Bug     | `documentation/bugs/2026-08-05-thread-visibility-regressions.md` |
+| Diary   | `documentation/diary/2026-08-05.md`                              |
 
 ## Residual risks
 

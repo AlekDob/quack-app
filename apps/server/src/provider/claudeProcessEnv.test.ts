@@ -48,7 +48,7 @@ describe("claudeProcessEnv", () => {
     assert.equal(result.ANTHROPIC_API_KEY, "api-key-auth");
   });
 
-  it("does not grant Synara control-plane authority to Claude", () => {
+  it("does not grant Quack control-plane authority to Claude", () => {
     const result = buildClaudeProcessEnv({
       env: {
         ANTHROPIC_API_KEY: "api-key-auth",

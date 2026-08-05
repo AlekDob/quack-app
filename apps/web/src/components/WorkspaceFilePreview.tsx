@@ -410,6 +410,7 @@ export function WorkspaceFilePreview(props: WorkspaceFilePreviewProps) {
     void showFileReferenceContextMenu({
       path: filePath,
       position: { x: event.clientX, y: event.clientY },
+      workspaceRoot,
       selection,
       onReferenceInChat,
       onAskWhyInChat,

@@ -221,7 +221,7 @@ const ServerConfigLive = (input: CliInput) =>
       yield* Effect.try({
         try: () => preparePrivateServerPaths(derivedPaths),
         catch: (cause) =>
-          new StartupError({ message: "Failed to secure Synara's local state directory", cause }),
+          new StartupError({ message: "Failed to secure Quack's local state directory", cause }),
       });
       const noBrowser = resolveBooleanConfig(input.noBrowser, env.noBrowser, mode === "desktop");
       const authToken = Option.getOrUndefined(input.authToken) ?? env.authToken;
@@ -418,7 +418,7 @@ const makeServerProgram = (input: CliInput) =>
       }),
     );
 
-    yield* Effect.logInfo("Synara running", makeServerStartupLogData(config));
+    yield* Effect.logInfo("Quack running", makeServerStartupLogData(config));
     if (startupPairingUrl) {
       if (config.allowInsecureRemote && !config.publicUrl) {
         yield* Effect.logWarning(
@@ -475,7 +475,7 @@ const hostFlag = Flag.string("host").pipe(
   Flag.optional,
 );
 const synaraHomeFlag = Flag.string("home-dir").pipe(
-  Flag.withDescription("Base directory for all Synara data (equivalent to SYNARA_HOME)."),
+  Flag.withDescription("Base directory for all Quack data (equivalent to SYNARA_HOME)."),
   Flag.optional,
 );
 const devUrlFlag = Flag.string("dev-url").pipe(
@@ -542,7 +542,7 @@ const baseServerCommand = Command.make("synara", {
   autoBootstrapProjectFromCwd: autoBootstrapProjectFromCwdFlag,
   logProviderEvents: logProviderEventsFlag,
   logWebSocketEvents: logWebSocketEventsFlag,
-}).pipe(Command.withDescription("Run the Synara server."));
+}).pipe(Command.withDescription("Run the Quack server."));
 
 const mcpServeCommand = Command.make(
   "serve",
@@ -563,7 +563,7 @@ const mcpServeCommand = Command.make(
     }),
 ).pipe(
   Command.withDescription(
-    "Serve the paired Synara external MCP integration over stdio for Codex, Claude, and other MCP clients.",
+    "Serve the paired Quack external MCP integration over stdio for Codex, Claude, and other MCP clients.",
   ),
 );
 
@@ -571,7 +571,7 @@ const mcpPairCommand = Command.make(
   "pair",
   {
     code: Flag.string("code").pipe(
-      Flag.withDescription("Short-lived pairing code issued by Synara Settings."),
+      Flag.withDescription("Short-lived pairing code issued by Quack Settings."),
     ),
   },
   ({ code }) =>
@@ -587,18 +587,18 @@ const mcpPairCommand = Command.make(
         catch: (cause) => new StartupError({ message: "External MCP pairing failed.", cause }),
       });
       process.stdout.write(
-        `Paired Synara external MCP integration "${paired.paired.name}".\nCredential stored privately at ${paired.storePath}.\nConfigure the MCP client command as: ${externalMcpShellCommand(externalMcpLauncher(["mcp", "serve", "--integration", paired.paired.integrationId, "--home-dir", baseDir]))}\n`,
+        `Paired Quack external MCP integration "${paired.paired.name}".\nCredential stored privately at ${paired.storePath}.\nConfigure the MCP client command as: ${externalMcpShellCommand(externalMcpLauncher(["mcp", "serve", "--integration", paired.paired.integrationId, "--home-dir", baseDir]))}\n`,
       );
       if (process.platform === "win32") {
         process.stdout.write(
-          "Windows note: Synara stores this credential under your user profile, but Windows does not expose POSIX 0600 permission checks. Protect the profile and its Synara data directory.\n",
+          "Windows note: Quack stores this credential under your user profile, but Windows does not expose POSIX 0600 permission checks. Protect the profile and its Quack data directory.\n",
         );
       }
     }),
-).pipe(Command.withDescription("Pair this CLI with a user-approved Synara MCP integration."));
+).pipe(Command.withDescription("Pair this CLI with a user-approved Quack MCP integration."));
 
 const mcpCommand = Command.make("mcp").pipe(
-  Command.withDescription("Manage Synara's loopback external MCP bridge."),
+  Command.withDescription("Manage Quack's loopback external MCP bridge."),
   Command.withSubcommands([mcpServeCommand, mcpPairCommand]),
 );
 

@@ -18,18 +18,18 @@ tags: [regression, upstream, transcript, subscriptions, pending-interactions]
 
 Missing vs `Emanuele-web04/synara` (`upstream/main`):
 
-| Commit | Relevance |
-| ------ | --------- |
+| Commit                                                            | Relevance                                           |
+| ----------------------------------------------------------------- | --------------------------------------------------- |
 | `6c4153c59` Improve session orchestration and transcript handling | claimable interactions + stale session settle guard |
-| `425a2d5cc` Optimize thread detail subscriptions | lease identity stability in `EventRouter` |
+| `425a2d5cc` Optimize thread detail subscriptions                  | lease identity stability in `EventRouter`           |
 
 ### Root causes
 
-| # | Cause | File |
-| - | ----- | ---- |
-| 1 | Response claim only allowed `pending`/`retryable` (not `uncertain` / reclaimable `responding`) | `storeEventReducer.ts` |
-| 2 | Stale session snapshot settled a just-started running turn | `storeEventReducer.ts` |
-| 3 | Streaming `serverThreads` churn rebuilt lease arrays → subscribe reconcile races | `__root.tsx` |
+| #   | Cause                                                                                          | File                   |
+| --- | ---------------------------------------------------------------------------------------------- | ---------------------- |
+| 1   | Response claim only allowed `pending`/`retryable` (not `uncertain` / reclaimable `responding`) | `storeEventReducer.ts` |
+| 2   | Stale session snapshot settled a just-started running turn                                     | `storeEventReducer.ts` |
+| 3   | Streaming `serverThreads` churn rebuilt lease arrays → subscribe reconcile races               | `__root.tsx`           |
 
 ### Fix (ported locally)
 

@@ -43,6 +43,13 @@ Only rows with `tone === "thinking"` and no special left-glyph (e.g. GitHub, MCP
 | `itemType === "collab_agent_tool_call"`            | `connecting` | Talking to a subagent                      |
 | Everything else with `tone === "thinking"`         | `solving`    | Generic reasoning                          |
 
+### Live "Thinking" row
+
+The generic live status row (`row.kind === "working"`) renders a `solving` orb (20 px)
+before the shimmering **Thinking** label. The papero avatar stays in its slot; the orb
+sits inline next to the text, outside the shimmer span so the canvas animation isn't
+overridden by the text pulse.
+
 ### Streaming indicator
 
 When an assistant message is streaming (`row.message.streaming`), a small inline header appears above the markdown:

@@ -432,7 +432,7 @@ export function parseCursorCliModelList(stdout: string): ReadonlyArray<ProviderM
 
 export const CURSOR_LIST_AVAILABLE_MODELS_METHOD = "cursor/list_available_models";
 
-// Cursor exposes "auto" as a `default` model id over ACP; keep Synara's "auto"
+// Cursor exposes "auto" as a `default` model id over ACP; keep Quack's "auto"
 // slug so the picker and DEFAULT_MODEL_BY_PROVIDER stay consistent.
 const CURSOR_ACP_AUTO_MODEL_ID = "default";
 

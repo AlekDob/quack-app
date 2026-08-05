@@ -90,7 +90,7 @@ describe("disableCodexConfigSections", () => {
 });
 
 describe("buildCodexProcessEnv", () => {
-  it("replaces a user-defined Synara MCP table only inside the session overlay", async () => {
+  it("replaces a user-defined Quack MCP table only inside the session overlay", async () => {
     const sourceHome = mkdtempSync(path.join(os.tmpdir(), "synara-codex-source-"));
     const runtimeHome = mkdtempSync(path.join(os.tmpdir(), "synara-codex-runtime-"));
     const sourceConfig = [
@@ -136,7 +136,7 @@ describe("buildCodexProcessEnv", () => {
       });
       const overlayHome = env.CODEX_HOME;
       if (!overlayHome) {
-        throw new Error("Expected a Synara Codex home overlay.");
+        throw new Error("Expected a Quack Codex home overlay.");
       }
       const overlayConfig = readFileSync(path.join(overlayHome, "config.toml"), "utf8");
 

@@ -562,7 +562,7 @@ describe("planProviderRuntimeReconciliation", () => {
           id: "provider-runtime-reconcile:activity",
           tone: "info",
           kind: "provider.runtime.reconciled",
-          summary: "Synara recovered a stale running state",
+          summary: "Quack recovered a stale running state",
           payload: {
             provider: plan.provider,
             action: plan.action,

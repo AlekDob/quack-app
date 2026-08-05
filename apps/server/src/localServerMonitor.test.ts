@@ -94,7 +94,7 @@ describe("localServerMonitor", () => {
     ).toBe(true);
     expect(
       isIgnoredLocalServerProcess({
-        command: "Synara",
+        command: "Quack",
         args: "/Applications/Synara.app/Contents/MacOS/Synara",
         ports: [61449],
       }),

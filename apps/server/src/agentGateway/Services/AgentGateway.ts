@@ -1,8 +1,8 @@
 /**
- * AgentGateway - Synara app-control tool surface for provider agents.
+ * AgentGateway - Quack app-control tool surface for provider agents.
  *
  * Serves the `synara_*` MCP tools that let any provider session (Codex,
- * Claude, Grok, ...) inspect and control Synara itself: list projects and
+ * Claude, Grok, ...) inspect and control Quack itself: list projects and
  * threads, read thread status, spawn child threads, send messages, and manage
  * heartbeat automations. The HTTP route delegates every `POST /mcp` request
  * here; authentication and JSON-RPC handling both live behind this interface.

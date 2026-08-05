@@ -1383,7 +1383,7 @@ describe("resolveAutoFeatureBranchName", () => {
 });
 
 describe("resolveDefaultCreateBranchName", () => {
-  it("uses Synara as the default namespace", () => {
+  it("uses Quack as the default namespace", () => {
     const branch = resolveDefaultCreateBranchName(["main"], "fix toast copy");
     assert.equal(branch, "synara/fix-toast-copy");
   });
@@ -1393,12 +1393,12 @@ describe("resolveDefaultCreateBranchName", () => {
     assert.equal(branch, "synara/refine-toolbar-actions");
   });
 
-  it("preserves nested namespaces under Synara", () => {
+  it("preserves nested namespaces under Quack", () => {
     const branch = resolveDefaultCreateBranchName(["main"], "feature/refine-toolbar-actions");
     assert.equal(branch, "synara/feature/refine-toolbar-actions");
   });
 
-  it("increments suffix when the Synara branch already exists", () => {
+  it("increments suffix when the Quack branch already exists", () => {
     const branch = resolveDefaultCreateBranchName(
       ["main", "synara/fix-toast-copy", "synara/fix-toast-copy-2"],
       "fix toast copy",

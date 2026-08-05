@@ -62,7 +62,7 @@ describe("normalizeCompactToolLabel", () => {
 });
 
 describe("deriveSynaraMcpToolTitle", () => {
-  it("uses stable action-first names for Synara browser tools", () => {
+  it("uses stable action-first names for Quack browser tools", () => {
     for (const status of ["running", "completed", "failed"] as const) {
       expect(
         deriveSynaraMcpToolTitle({
@@ -80,64 +80,60 @@ describe("deriveSynaraMcpToolTitle", () => {
     ).toBe("Snapshot browser page");
   });
 
-  it("has intentional running and completed copy for every Synara gateway action", () => {
+  it("has intentional running and completed copy for every Quack gateway action", () => {
     const cases = [
-      ["synara_context", "Synara is checking its context", "Synara checked its context"],
+      ["synara_context", "Quack is checking its context", "Quack checked its context"],
       [
         "synara_capabilities",
-        "Synara is checking available agents",
-        "Synara checked available agents",
+        "Quack is checking available agents",
+        "Quack checked available agents",
       ],
-      ["synara_list_projects", "Synara is listing projects", "Synara listed projects"],
-      ["synara_list_threads", "Synara is listing threads", "Synara listed threads"],
-      ["synara_read_thread", "Synara is reading a thread", "Synara read a thread"],
+      ["synara_list_projects", "Quack is listing projects", "Quack listed projects"],
+      ["synara_list_threads", "Quack is listing threads", "Quack listed threads"],
+      ["synara_read_thread", "Quack is reading a thread", "Quack read a thread"],
       [
         "synara_read_thread_activity",
-        "Synara is reading thread activity",
-        "Synara read thread activity",
+        "Quack is reading thread activity",
+        "Quack read thread activity",
       ],
-      ["synara_read_thread_events", "Synara is reading thread events", "Synara read thread events"],
+      ["synara_read_thread_events", "Quack is reading thread events", "Quack read thread events"],
       [
         "synara_read_thread_runtime_events",
-        "Synara is reading thread runtime events",
-        "Synara read thread runtime events",
+        "Quack is reading thread runtime events",
+        "Quack read thread runtime events",
       ],
-      ["synara_diagnose_thread", "Synara is diagnosing a thread", "Synara diagnosed a thread"],
-      ["synara_create_thread", "Synara is creating a thread", "Synara created a thread"],
-      ["synara_create_threads", "Synara is creating threads", "Synara created threads"],
+      ["synara_diagnose_thread", "Quack is diagnosing a thread", "Quack diagnosed a thread"],
+      ["synara_create_thread", "Quack is creating a thread", "Quack created a thread"],
+      ["synara_create_threads", "Quack is creating threads", "Quack created threads"],
       [
         "synara_wait_for_threads",
-        "Synara is waiting for threads",
-        "Synara finished waiting for threads",
+        "Quack is waiting for threads",
+        "Quack finished waiting for threads",
       ],
-      ["synara_send_message", "Synara is sending a message", "Synara sent a message"],
-      ["synara_interrupt_thread", "Synara is interrupting a thread", "Synara interrupted a thread"],
-      ["synara_set_thread_title", "Synara is renaming a thread", "Synara renamed a thread"],
-      ["synara_set_thread_archived", "Synara is updating a thread", "Synara updated a thread"],
+      ["synara_send_message", "Quack is sending a message", "Quack sent a message"],
+      ["synara_interrupt_thread", "Quack is interrupting a thread", "Quack interrupted a thread"],
+      ["synara_set_thread_title", "Quack is renaming a thread", "Quack renamed a thread"],
+      ["synara_set_thread_archived", "Quack is updating a thread", "Quack updated a thread"],
       [
         "synara_create_automation",
-        "Synara is creating an automation",
-        "Synara created an automation",
+        "Quack is creating an automation",
+        "Quack created an automation",
       ],
-      ["synara_list_automations", "Synara is listing automations", "Synara listed automations"],
+      ["synara_list_automations", "Quack is listing automations", "Quack listed automations"],
       [
         "synara_cancel_automation",
-        "Synara is stopping an automation",
-        "Synara stopped an automation",
+        "Quack is stopping an automation",
+        "Quack stopped an automation",
       ],
-      ["synara_overview", "Synara is gathering an overview", "Synara gathered an overview"],
+      ["synara_overview", "Quack is gathering an overview", "Quack gathered an overview"],
       [
         "synara_list_allowed_projects",
-        "Synara is listing allowed projects",
-        "Synara listed allowed projects",
+        "Quack is listing allowed projects",
+        "Quack listed allowed projects",
       ],
-      ["synara_create_task", "Synara is creating a task", "Synara created a task"],
-      [
-        "synara_wait_for_task",
-        "Synara is waiting for a task",
-        "Synara finished waiting for a task",
-      ],
-      ["synara_read_task", "Synara is reading a task", "Synara read a task"],
+      ["synara_create_task", "Quack is creating a task", "Quack created a task"],
+      ["synara_wait_for_task", "Quack is waiting for a task", "Quack finished waiting for a task"],
+      ["synara_read_task", "Quack is reading a task", "Quack read a task"],
     ] as const;
 
     for (const [toolName, running, completed] of cases) {
@@ -150,13 +146,13 @@ describe("deriveSynaraMcpToolTitle", () => {
         toolName: "synara_create_threads",
         status: "failed",
       }),
-    ).toBe("Synara couldn't create threads");
+    ).toBe("Quack couldn't create threads");
     expect(
       deriveSynaraMcpToolTitle({
         toolName: "synara_create_thread",
         status: "cancelled",
       }),
-    ).toBe("Synara stopped creating a thread");
+    ).toBe("Quack stopped creating a thread");
   });
 
   it("turns provider-specific create-thread identifiers into activity sentences", () => {
@@ -165,22 +161,22 @@ describe("deriveSynaraMcpToolTitle", () => {
         toolName: "Synara__synara_create_thread",
         status: "running",
       }),
-    ).toBe("Synara is creating a thread");
+    ).toBe("Quack is creating a thread");
     expect(
       deriveSynaraMcpToolTitle({
         toolName: "mcp__synara__synara_create_thread",
         status: "completed",
       }),
-    ).toBe("Synara created a thread");
+    ).toBe("Quack created a thread");
   });
 
-  it("recognizes bare and already-humanized Synara tool names", () => {
+  it("recognizes bare and already-humanized Quack tool names", () => {
     expect(deriveSynaraMcpToolTitle({ toolName: "synara_send_message", status: "running" })).toBe(
-      "Synara is sending a message",
+      "Quack is sending a message",
     );
     expect(
       deriveSynaraMcpToolTitle({ title: "Synara: Synara List Threads", status: "completed" }),
-    ).toBe("Synara listed threads");
+    ).toBe("Quack listed threads");
   });
 
   it("ignores tools from other MCP servers", () => {
@@ -192,75 +188,75 @@ describe("deriveSynaraMcpToolTitle", () => {
     ).toBeNull();
   });
 
-  it("keeps future Synara actions branded without exposing raw identifiers", () => {
+  it("keeps future Quack actions branded without exposing raw identifiers", () => {
     expect(
       deriveSynaraMcpToolTitle({
         toolName: "mcp__synara__synara_delete_project",
         status: "running",
       }),
-    ).toBe("Synara is handling delete project");
+    ).toBe("Quack is handling delete project");
     expect(
       deriveSynaraMcpToolTitle({
         toolName: "Synara__synara_delete_project",
         status: "completed",
       }),
-    ).toBe("Synara handled delete project");
+    ).toBe("Quack handled delete project");
     expect(
       deriveSynaraMcpToolTitle({
         toolName: "synara_is_handling_delete_project",
         status: "completed",
       }),
-    ).toBe("Synara handled delete project");
+    ).toBe("Quack handled delete project");
   });
 
   it("does not reinterpret free text beginning with fallback status copy", () => {
     expect(
       deriveSynaraMcpToolTitle({
-        title: "Synara is handling delete project after recovery",
+        title: "Quack is handling delete project after recovery",
         status: "completed",
       }),
     ).toBeNull();
     expect(
       deriveSynaraMcpToolTitle({
-        title: "Synara handled delete project after recovery",
+        title: "Quack handled delete project after recovery",
         status: "running",
       }),
     ).toBeNull();
     expect(
       deriveSynaraMcpToolTitle({
-        title: "Synara couldn't handle delete project after recovery",
+        title: "Quack couldn't handle delete project after recovery",
         status: "failed",
       }),
     ).toBeNull();
   });
 
-  it("leaves free-text activity summaries starting with Synara untouched", () => {
+  it("leaves free-text activity summaries starting with Quack untouched", () => {
     expect(
       deriveSynaraMcpToolTitle({
-        title: "Synara recovered a stale running state",
+        title: "Quack recovered a stale running state",
         status: "completed",
       }),
     ).toBeNull();
     expect(
       deriveSynaraMcpToolTitle({
-        fallbackLabel: "Synara restarted the provider session",
+        fallbackLabel: "Quack restarted the provider session",
         status: "running",
       }),
     ).toBeNull();
   });
 
-  it("removes transport identifiers without hiding meaningful Synara details", () => {
+  it("removes transport identifiers without hiding meaningful Quack details", () => {
     expect(
       sanitizeSynaraMcpToolPreview({
         preview: "Synara__synara_create_threads",
-        heading: "Synara created threads",
+        heading: "Quack created threads",
         status: "completed",
       }),
     ).toBeNull();
     expect(
       sanitizeSynaraMcpToolPreview({
         preview: 'Unexpected key "reasoningEffort" for Claude Agent',
-        heading: "Synara couldn't create threads",
+        heading: "Quack couldn't create threads",
         status: "failed",
       }),
     ).toBe('Unexpected key "reasoningEffort" for Claude Agent');
@@ -271,7 +267,7 @@ describe("isSynaraBrowserToolCall", () => {
   it("recognizes canonical presentation titles without a tool identifier", () => {
     expect(isSynaraBrowserToolCall({ title: "Open browser tab" })).toBe(true);
     expect(isSynaraBrowserToolCall({ fallbackLabel: "Snapshot browser page" })).toBe(true);
-    expect(isSynaraBrowserToolCall({ title: "Synara listed threads" })).toBe(false);
+    expect(isSynaraBrowserToolCall({ title: "Quack listed threads" })).toBe(false);
   });
 });
 

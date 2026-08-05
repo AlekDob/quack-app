@@ -46,13 +46,36 @@ describe("macOS DMG finalization", () => {
     ]);
   });
 
+  it("notarizes with Apple ID credentials when no API key is provided", () => {
+    const commands = buildMacDmgFinalizationCommands("/tmp/Synara.dmg", {
+      appleId: "dev@example.com",
+      applePassword: "abcd-efgh-ijkl-mnop",
+      appleTeamId: "TEAM12345",
+    });
+
+    expect(commands[1]?.args).toEqual([
+      "notarytool",
+      "submit",
+      "/tmp/Synara.dmg",
+      "--apple-id",
+      "dev@example.com",
+      "--password",
+      "abcd-efgh-ijkl-mnop",
+      "--team-id",
+      "TEAM12345",
+      "--wait",
+    ]);
+  });
+
   it("fails closed when Apple notarization credentials are unavailable", () => {
+    expect(() => buildMacDmgFinalizationCommands("/tmp/Synara.dmg", {})).toThrow(
+      "requires APPLE_API_KEY",
+    );
+  });
+
+  it("fails closed when an auth mode is incomplete", () => {
     expect(() =>
-      buildMacDmgFinalizationCommands("/tmp/Synara.dmg", {
-        appleApiKey: undefined,
-        appleApiKeyId: undefined,
-        appleApiIssuer: undefined,
-      }),
-    ).toThrow("requires APPLE_API_KEY");
+      buildMacDmgFinalizationCommands("/tmp/Synara.dmg", { appleId: "dev@example.com" }),
+    ).toThrow("requires APPLE_APP_SPECIFIC_PASSWORD");
   });
 });

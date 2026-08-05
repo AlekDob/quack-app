@@ -17,14 +17,14 @@ tags: [sidebar, threads, archive, optimistic-ui, invariants]
 
 ### Files
 
-| Type   | Path                                                         | Exports/Purpose                                                                 |
-| ------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------- |
-| Service| `apps/web/src/hooks/useSidebarThreadActions.ts`              | Archive/undo UI; optimistic `archivedAt`; navigation isolated from archive OK |
-| Util   | `apps/web/src/lib/threadArchive.ts`                          | `archiveThreadFromClient`, `isThreadAlreadyArchivedError`                       |
-| Util   | `packages/shared/src/errorMessages.ts`                       | `THREAD_ALREADY_ARCHIVED_INVARIANT_MARKER`                                      |
-| Service| `apps/server/src/orchestration/commandInvariants.ts`         | `requireThreadNotArchived` embeds the shared marker                             |
-| Test   | `apps/web/src/hooks/useSidebarThreadActions.test.ts`         | Already-archived race + nav failure after archive                               |
-| Test   | `apps/web/src/lib/threadArchive.test.ts`                     | Marker-scoped already-archived detection                                        |
+| Type    | Path                                                 | Exports/Purpose                                                               |
+| ------- | ---------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Service | `apps/web/src/hooks/useSidebarThreadActions.ts`      | Archive/undo UI; optimistic `archivedAt`; navigation isolated from archive OK |
+| Util    | `apps/web/src/lib/threadArchive.ts`                  | `archiveThreadFromClient`, `isThreadAlreadyArchivedError`                     |
+| Util    | `packages/shared/src/errorMessages.ts`               | `THREAD_ALREADY_ARCHIVED_INVARIANT_MARKER`                                    |
+| Service | `apps/server/src/orchestration/commandInvariants.ts` | `requireThreadNotArchived` embeds the shared marker                           |
+| Test    | `apps/web/src/hooks/useSidebarThreadActions.test.ts` | Already-archived race + nav failure after archive                             |
+| Test    | `apps/web/src/lib/threadArchive.test.ts`             | Marker-scoped already-archived detection                                      |
 
 ### Data Flow
 

@@ -79,6 +79,16 @@ Any UI element with an open/close toggle (expand/collapse, show/hide, disclosure
 
 Reference usage: opening/closing a project and the sidebar sections in `apps/web/src/components/Sidebar.tsx`. If you find a toggle that animates differently, migrate it to this module rather than duplicating logic.
 
+## React Perf Guardrails (learned from codetta's chat lag)
+
+codetta (sister project) got slow not because of its stack, but from these exact patterns — enforce their opposite here:
+
+- No god components: a component over ~400 lines or handling more than one concern (chat log + input + streaming state, say) must be split. Reference bug: `AIChatPanel.tsx` grew to ~7000 lines with almost no `memo()`.
+- Any list that can grow unbounded (chat messages, logs, session history) must be virtualized (`react-window`/`react-virtual` or equivalent) once it can realistically exceed ~100 rows. Don't `.map()` an unbounded list straight into the DOM.
+- No global store holding unrelated state in one blob. Split by domain and select narrow slices, so a change in one slice doesn't re-render components that only read another.
+- No `setInterval`/`setTimeout` ticking state in a component that re-renders expensive children. Isolate the ticking bit (e.g. a relative-timestamp label) into its own tiny memoized component.
+- Streaming updates (tokens, log lines) must not re-render the whole parent per chunk — batch or scope the re-render to the smallest subtree that displays the stream.
+
 ## Package Roles
 
 - `apps/server`: Node.js WebSocket server. Wraps Codex app-server (JSON-RPC over stdio), serves the React web app, and manages provider sessions.

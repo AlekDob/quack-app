@@ -188,16 +188,21 @@ export async function finalizeMacUpdateZip(
   }
   const sha512 = await computeSha512Base64(zipPath);
 
+  // Local DMG builds often run without a publish provider, so electron-builder
+  // may omit *-mac.yml. Still ship a validated zip; only patch manifests when present.
   const updatedManifestPaths: string[] = [];
-  for (const manifestName of resolveMacUpdateManifestFileNames(distEntries)) {
-    const manifestPath = join(options.stageDistDir, manifestName);
-    const manifest = readFileSync(manifestPath, "utf8");
-    const nextManifest = updateMacUpdateManifestZipEntry(manifest, zipFileName, {
-      sha512,
-      size: zipStat.size,
-    });
-    writeFileSync(manifestPath, nextManifest);
-    updatedManifestPaths.push(manifestPath);
+  const manifestFileNames = distEntries.filter((entry) => entry.endsWith("-mac.yml"));
+  if (manifestFileNames.length > 0) {
+    for (const manifestName of resolveMacUpdateManifestFileNames(distEntries)) {
+      const manifestPath = join(options.stageDistDir, manifestName);
+      const manifest = readFileSync(manifestPath, "utf8");
+      const nextManifest = updateMacUpdateManifestZipEntry(manifest, zipFileName, {
+        sha512,
+        size: zipStat.size,
+      });
+      writeFileSync(manifestPath, nextManifest);
+      updatedManifestPaths.push(manifestPath);
+    }
   }
 
   const staleZipBlockmapPath = `${zipPath}.blockmap`;

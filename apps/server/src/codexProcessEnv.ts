@@ -1,5 +1,5 @@
 // FILE: codexProcessEnv.ts
-// Purpose: Builds the exact environment used when Synara launches Codex subprocesses.
+// Purpose: Builds the exact environment used when Quack launches Codex subprocesses.
 // Layer: Server runtime utility
 // Exports: Codex process env builder and browser-plugin overlay helpers.
 // Depends on: Codex home path helpers, shared Codex config parsing, login-shell env reader.
@@ -561,7 +561,7 @@ function appendManagedCodexConfigSection(config: string, section: string): strin
       continue;
     }
     if (normalizeTomlTableHeaderName(header) === managedMcpTableName) {
-      // The session-scoped gateway entry is authoritative inside Synara's
+      // The session-scoped gateway entry is authoritative inside Quack's
       // overlay. The user's source config remains untouched.
       overlayConfig = removeTomlTableNamespace(overlayConfig, SYNARA_MANAGED_MCP_TABLE_HEADER);
       tables.push(table);

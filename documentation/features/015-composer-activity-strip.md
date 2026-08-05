@@ -17,14 +17,14 @@ tags: [composer, activity-strip, subagents, browser-automation, background-work]
 
 ### Files
 
-| Type      | Path                                                                     | Exports/Purpose                                                                                             |
-| --------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Logic     | `apps/web/src/components/chat/ComposerActivityStrip.logic.ts`           | `deriveComposerActivityStripRows`, `deriveComposerBackgroundActivityRows`, `activityStripHeaderLabel`, row types |
-| Component | `apps/web/src/components/chat/ComposerActivityStrip.tsx`                | Renders the unified strip; `BackgroundActivityRow` for browser/command rows                                  |
-| Util      | `apps/web/src/lib/subagentPresentation.ts`                              | `SubagentStatusKind` (adds `"attention"`), dot/tone/label helpers shared by subagent and background rows      |
-| Store     | `apps/web/src/browserStateStore.ts`                                     | `selectThreadBrowserState` — source for the browser automation row                                            |
-| Consumer  | `apps/web/src/components/ChatView.tsx`                                 | Wires `threadBrowserState`, `onOpenBrowserPanel` into the strip                                                |
-| Test      | `apps/web/src/components/chat/ComposerActivityStrip.logic.test.ts`      | Subagent scoping (pre-existing) + background rows, attention ordering, header label                          |
+| Type      | Path                                                               | Exports/Purpose                                                                                                  |
+| --------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| Logic     | `apps/web/src/components/chat/ComposerActivityStrip.logic.ts`      | `deriveComposerActivityStripRows`, `deriveComposerBackgroundActivityRows`, `activityStripHeaderLabel`, row types |
+| Component | `apps/web/src/components/chat/ComposerActivityStrip.tsx`           | Renders the unified strip; `BackgroundActivityRow` for browser/command rows                                      |
+| Util      | `apps/web/src/lib/subagentPresentation.ts`                         | `SubagentStatusKind` (adds `"attention"`), dot/tone/label helpers shared by subagent and background rows         |
+| Store     | `apps/web/src/browserStateStore.ts`                                | `selectThreadBrowserState` — source for the browser automation row                                               |
+| Consumer  | `apps/web/src/components/ChatView.tsx`                             | Wires `threadBrowserState`, `onOpenBrowserPanel` into the strip                                                  |
+| Test      | `apps/web/src/components/chat/ComposerActivityStrip.logic.test.ts` | Subagent scoping (pre-existing) + background rows, attention ordering, header label                              |
 
 Renamed from `ComposerSubagentStrip.tsx` / `.logic.ts` (git mv, no new files for the subagent path). See [005-subagent-avatars.md](005-subagent-avatars.md) for the duck-avatar half of this component.
 

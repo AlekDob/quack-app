@@ -41,9 +41,9 @@ afterEach(() => {
 });
 
 describe("resolveStaticDir", () => {
-  it("uses the desktop static snapshot exposed through the Synara environment", async () => {
+  it("uses the desktop static snapshot exposed through the Quack environment", async () => {
     const snapshotDir = makeTempDir("synara-static-snapshot-test-");
-    fs.writeFileSync(path.join(snapshotDir, "index.html"), "<main>Synara</main>");
+    fs.writeFileSync(path.join(snapshotDir, "index.html"), "<main>Quack</main>");
     process.env.SYNARA_STATIC_DIR = snapshotDir;
 
     const resolved = await Effect.runPromise(

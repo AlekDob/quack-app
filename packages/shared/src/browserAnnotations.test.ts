@@ -35,7 +35,7 @@ describe("sanitizeBrowserAnnotationPageTitle", () => {
     expect(sanitizeBrowserAnnotationPageTitle(title)).toBe("");
   });
 
-  it.each(["Synara", "React 19 documentation", "API keys – Settings", "Invoice #1234", "Checkout"])(
+  it.each(["Quack", "React 19 documentation", "API keys – Settings", "Invoice #1234", "Checkout"])(
     "preserves an ordinary title: %s",
     (title) => {
       expect(sanitizeBrowserAnnotationPageTitle(title)).toBe(title);

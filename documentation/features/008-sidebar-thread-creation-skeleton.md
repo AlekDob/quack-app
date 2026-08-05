@@ -21,15 +21,15 @@ New conversations are intentionally staged as local composer drafts before the p
 
 ### Files
 
-| Type      | Path                                      | Exports/Purpose                                                       |
-| --------- | ----------------------------------------- | --------------------------------------------------------------------- |
-| Component | `apps/web/src/components/Sidebar.tsx`     | Detects the active unpersisted draft and renders the loading row      |
+| Type      | Path                                       | Exports/Purpose                                                       |
+| --------- | ------------------------------------------ | --------------------------------------------------------------------- |
+| Component | `apps/web/src/components/Sidebar.tsx`      | Detects the active unpersisted draft and renders the loading row      |
 | Logic     | `apps/web/src/components/Sidebar.logic.ts` | `resolvePendingSidebarThreadPlaceholder` — when the row may show      |
-| Store     | `apps/web/src/pendingSendStore.ts`        | Signals that a send was submitted and creation is in flight          |
-| Component | `apps/web/src/components/ui/skeleton.tsx` | Shared shimmer primitive used by the placeholder                      |
-| Store     | `apps/web/src/composerDraftStore.ts`      | Source of `draftThreadsByThreadId` for fresh local conversations      |
-| Store     | `apps/web/src/store.ts`                   | Expands the destination project so the placeholder is visible         |
-| Logic     | `apps/web/src/storeProjection.ts`         | Produces the persisted sidebar summaries that replace the placeholder |
+| Store     | `apps/web/src/pendingSendStore.ts`         | Signals that a send was submitted and creation is in flight           |
+| Component | `apps/web/src/components/ui/skeleton.tsx`  | Shared shimmer primitive used by the placeholder                      |
+| Store     | `apps/web/src/composerDraftStore.ts`       | Source of `draftThreadsByThreadId` for fresh local conversations      |
+| Store     | `apps/web/src/store.ts`                    | Expands the destination project so the placeholder is visible         |
+| Logic     | `apps/web/src/storeProjection.ts`          | Produces the persisted sidebar summaries that replace the placeholder |
 
 ### Data flow
 

@@ -2,12 +2,21 @@
 // Purpose: Locks down server React Query polling profiles and cache options.
 // Layer: Web data-fetching unit tests
 
-import type { ServerConfig, ServerProviderStatus } from "@synara/contracts";
+import type {
+  NativeApi,
+  ProfileTokenStats,
+  ServerConfig,
+  ServerProviderStatus,
+} from "@synara/contracts";
 import { QueryClient } from "@tanstack/react-query";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import * as nativeApi from "~/nativeApi";
 
 import {
   LOCAL_SERVERS_VISIBLE_REFETCH_INTERVAL_MS,
+  fetchProfileTokenStats,
+  fetchProfileStats,
   reconcileServerProviderStatuses,
   refreshServerConfigAfterTransportOpen,
   serverAllProviderUsageQueryOptions,
@@ -29,8 +38,8 @@ function makeServerConfig(providers: readonly ServerProviderStatus[]): ServerCon
   return {
     cwd: "G:\\synara",
     homeDir: "C:\\Users\\tester",
-    chatWorkspaceRoot: "C:\\Users\\tester\\Documents\\Synara",
-    studioWorkspaceRoot: "C:\\Users\\tester\\Documents\\Synara\\Studio",
+    chatWorkspaceRoot: "C:\\Users\\tester\\Documents\\Quack",
+    studioWorkspaceRoot: "C:\\Users\\tester\\Documents\\Quack\\Studio",
     worktreesDir: "C:\\SynaraDev\\worktrees",
     keybindingsConfigPath: "C:\\SynaraDev\\keybindings.json",
     keybindings: [],
@@ -166,7 +175,7 @@ describe("serverLocalServersQueryOptions", () => {
     expect(options.refetchOnWindowFocus).toBe(true);
   });
 
-  it("uses visible polling while a Synara-owned project run is active", () => {
+  it("uses visible polling while a Quack-owned project run is active", () => {
     const options = sidebarLocalServersQueryOptions({
       hasActiveProjectRun: true,
       hasProjects: true,
@@ -211,5 +220,46 @@ describe("serverProviderUsageSnapshotQueryOptions", () => {
     });
 
     expect(options.enabled).toBe(false);
+  });
+});
+
+describe("fetchProfileTokenStats", () => {
+  it("forwards the caller timezone through the shared Native API accessor", async () => {
+    const result = {
+      available: false,
+      lifetimeTotalTokens: null,
+      peakDayTokens: null,
+      peakDay: null,
+      providers: [],
+      unavailableProviders: [],
+      topProvider: null,
+      topProviderPercent: null,
+      models: [],
+      heatmapMetric: "tokens",
+      heatmap: [],
+    } satisfies ProfileTokenStats;
+    const getProfileTokenStats = vi.fn().mockResolvedValue(result);
+    const spy = vi.spyOn(nativeApi, "ensureNativeApi").mockReturnValue({
+      stats: { getProfileTokenStats },
+    } as unknown as NativeApi);
+
+    await expect(fetchProfileTokenStats({ utcOffsetMinutes: 120 })).resolves.toEqual(result);
+    expect(getProfileTokenStats).toHaveBeenCalledWith({ utcOffsetMinutes: 120 });
+
+    spy.mockRestore();
+  });
+});
+
+describe("fetchProfileStats", () => {
+  it("forwards the caller timezone through the shared Native API accessor", async () => {
+    const getProfileStats = vi.fn().mockResolvedValue({ activity: { heatmap: [] } });
+    const spy = vi.spyOn(nativeApi, "ensureNativeApi").mockReturnValue({
+      stats: { getProfileStats },
+    } as unknown as NativeApi);
+
+    await fetchProfileStats({ utcOffsetMinutes: 120 });
+    expect(getProfileStats).toHaveBeenCalledWith({ utcOffsetMinutes: 120 });
+
+    spy.mockRestore();
   });
 });

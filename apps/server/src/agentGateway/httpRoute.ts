@@ -1,5 +1,5 @@
 /**
- * HTTP route for the Synara agent gateway MCP endpoint.
+ * HTTP route for the Quack agent gateway MCP endpoint.
  *
  * Registers `POST /mcp` (streamable-HTTP MCP, stateless JSON responses) plus
  * spec-mandated method handling for GET/DELETE. Authentication is a

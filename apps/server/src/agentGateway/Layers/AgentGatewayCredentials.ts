@@ -2,7 +2,7 @@
  * AgentGatewayCredentialsLive - Live layer for agent gateway credentials.
  *
  * Issues opaque in-memory credentials. Tokens live for the provider session,
- * can be revoked independently, and intentionally do not survive a Synara
+ * can be revoked independently, and intentionally do not survive a Quack
  * restart.
  *
  * @module agentGateway/Layers/AgentGatewayCredentials

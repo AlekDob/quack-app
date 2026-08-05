@@ -77,7 +77,7 @@ describe("agent gateway MCP protocol", () => {
     assert.equal(result.instructions, "use the tools");
     assert.deepEqual(result.serverInfo, {
       name: "synara",
-      title: "Synara App Control",
+      title: "Quack App Control",
       version: "1.2.3",
     });
   });
@@ -85,16 +85,16 @@ describe("agent gateway MCP protocol", () => {
   it("supports MCP tool annotations without changing protocol shaping", () => {
     const tool: McpToolDefinition = {
       name: "synara_context",
-      description: "Inspect the current Synara harness context.",
+      description: "Inspect the current Quack harness context.",
       inputSchema: { type: "object" },
       annotations: {
-        title: "Synara context",
+        title: "Quack context",
         readOnlyHint: true,
         destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
       },
     };
-    assert.equal(tool.annotations?.title, "Synara context");
+    assert.equal(tool.annotations?.title, "Quack context");
   });
 });

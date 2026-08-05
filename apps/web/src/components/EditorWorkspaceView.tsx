@@ -237,6 +237,7 @@ function DiffFilesLoadingRows() {
 function DiffFilesSidebar(props: {
   files: ReadonlyArray<FileDiffMetadata>;
   isLoading: boolean;
+  workspaceRoot: string | null;
   selectedFilePath: string | null;
   optionsControl?: ReactNode;
   onSelectFile: (path: string) => void;
@@ -253,6 +254,7 @@ function DiffFilesSidebar(props: {
     void showFileReferenceContextMenu({
       path: filePath,
       position,
+      workspaceRoot: props.workspaceRoot,
       onReferenceInChat,
       onAskWhyInChat,
     });
@@ -601,6 +603,7 @@ export function EditorWorkspaceView(props: EditorWorkspaceViewProps) {
             <DiffFilesSidebar
               files={props.diffFiles}
               isLoading={props.diffFilesLoading ?? false}
+              workspaceRoot={props.workspaceRoot}
               selectedFilePath={props.selectedDiffFilePath}
               optionsControl={props.diffOptionsControl}
               onSelectFile={props.onSelectDiffFile}

@@ -14,7 +14,7 @@ import {
 describe("managed checkpoint refs", () => {
   const threadId = ThreadId.makeUnsafe("thread-1");
 
-  it("creates canonical Synara refs", () => {
+  it("creates canonical Quack refs", () => {
     expect(checkpointRefForThreadTurn(threadId, 4)).toMatch(/^refs\/synara\/checkpoints\//);
   });
 

@@ -43,3 +43,17 @@ export function thinkingOrbStateForWorkEntry(entry: WorkLogEntry): OrbState {
   // Generic reasoning / thinking fallback.
   return "solving";
 }
+
+/**
+ * Whether an activity is still doing work and should use an orb in place of
+ * the generic work-row glyph. Provider tool lifecycle events deliberately use
+ * the `tool` tone, so relying on the presentational `thinking` tone alone
+ * would leave the normal live command/tool path without an orb.
+ */
+export function isThinkingOrbActivity(entry: Pick<WorkLogEntry, "tone" | "liveActivity">): boolean {
+  return (
+    entry.tone === "thinking" ||
+    entry.liveActivity?.state === "thinking" ||
+    entry.liveActivity?.state === "running_tool"
+  );
+}

@@ -106,6 +106,7 @@ import { loadClaudeAgentSdk } from "../claudeAgentSdk.ts";
 import { buildClaudeProcessEnv } from "../claudeProcessEnv.ts";
 import {
   CLAUDE_CONTEXT_WINDOW_MAX_TOKENS,
+  compactedClaudeTokenUsageSnapshot,
   decideClaudeContextUsageWarnings,
   maxClaudeContextWindowFromModelUsage,
   mergeClaudeTokenUsageSnapshot,
@@ -1030,7 +1031,7 @@ const CLAUDE_CONTEXT_USAGE_TIMEOUT_MS = 1_000;
 const CLAUDE_INTERRUPT_TIMEOUT = Duration.seconds(10);
 export const buildEmbeddedClaudeSystemPromptAppend = (gatewayControlAvailable: boolean) =>
   [
-    "You are running inside Synara, a coding app that embeds the Claude Agent SDK.",
+    "You are running inside Quack, a coding app that embeds the Claude Agent SDK.",
     "Do not present the host app as Claude Code unless the user is explicitly asking about Claude Code.",
     "Treat the current working directory as the active workspace for the task.",
     "When the user asks about the current project, codebase, or repository, proactively inspect files in the current working directory before asking the user where to look.",
@@ -3816,7 +3817,7 @@ function makeClaudeAdapter(options?: ClaudeAdapterLiveOptions) {
               },
             });
             return;
-          case "compact_boundary":
+          case "compact_boundary": {
             yield* offerRuntimeEvent(context, {
               ...base,
               type: "thread.state.changed",
@@ -3825,7 +3826,39 @@ function makeClaudeAdapter(options?: ClaudeAdapterLiveOptions) {
                 detail: message,
               },
             });
+            // Refresh the context meter here: a manual /compact ends the turn with
+            // no further assistant usage, so without this the meter stays stuck on
+            // the pre-compaction number. Prefer the boundary's own post_tokens and
+            // fall back to a live control read when the SDK omits it.
+            const postTokens = positiveFiniteNumber(message.compact_metadata?.post_tokens);
+            const liveUsage =
+              postTokens === undefined ? yield* readClaudeContextUsage(context) : undefined;
+            const compactedUsage =
+              postTokens !== undefined
+                ? compactedClaudeTokenUsageSnapshot(
+                    postTokens,
+                    claudeEffectiveContextBudget(context),
+                    context.lastKnownTokenUsage,
+                  )
+                : liveUsage
+                  ? snapshotFromClaudeContextUsage(
+                      liveUsage,
+                      context.lastKnownTokenUsage?.totalProcessedTokens,
+                    )
+                  : undefined;
+            if (compactedUsage) {
+              context.lastKnownTokenUsage = compactedUsage;
+              const usageStamp = yield* makeEventStamp();
+              yield* offerRuntimeEvent(context, {
+                ...base,
+                eventId: usageStamp.eventId,
+                createdAt: usageStamp.createdAt,
+                type: "thread.token-usage.updated",
+                payload: { usage: compactedUsage },
+              });
+            }
             return;
+          }
           case "hook_started":
             yield* offerRuntimeEvent(context, {
               ...base,
@@ -4280,7 +4313,7 @@ function makeClaudeAdapter(options?: ClaudeAdapterLiveOptions) {
               // native conversation only after the prompt is queued. Drop the
               // dead native ids before completing the turn so ProviderService
               // persists a cursor without `resume`; the next dispatch then
-              // starts a fresh Claude session and bootstraps Synara's retained
+              // starts a fresh Claude session and bootstraps Quack's retained
               // transcript instead of replaying the same broken id forever.
               context.resumeSessionId = undefined;
               context.lastAssistantUuid = undefined;
@@ -4873,7 +4906,7 @@ function makeClaudeAdapter(options?: ClaudeAdapterLiveOptions) {
               (input.runtimeMode === "full-access" ? "bypassPermissions" : undefined));
         const settings = {
           // Native 1M models otherwise compact near their full model limit. Keep
-          // Synara's safer 200k budget explicit unless the thread opts into 1M.
+          // Quack's safer 200k budget explicit unless the thread opts into 1M.
           autoCompactEnabled: true,
           ...(requestedAutoCompactWindowTokens !== undefined
             ? { autoCompactWindow: requestedAutoCompactWindowTokens }

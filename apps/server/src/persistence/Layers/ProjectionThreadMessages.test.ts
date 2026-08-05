@@ -353,6 +353,47 @@ layer("ProjectionThreadMessageRepository", (it) => {
     }),
   );
 
+  // The transcript avatar reads the papero off the turn's user message, so a
+  // later update that omits it must not clear it — otherwise the avatar falls
+  // back to the default papero mid-stream.
+  it.effect("round-trips and preserves the papero that opened the turn", () =>
+    Effect.gen(function* () {
+      const repository = yield* ProjectionThreadMessageRepository;
+      const threadId = ThreadId.makeUnsafe("thread-papero");
+      const messageId = MessageId.makeUnsafe("message-papero");
+      const createdAt = "2026-02-28T19:33:00.000Z";
+
+      yield* repository.upsert({
+        messageId,
+        threadId,
+        turnId: null,
+        role: "user",
+        text: "plan this",
+        paperoId: "jack",
+        isStreaming: false,
+        source: "native",
+        createdAt,
+        updatedAt: "2026-02-28T19:33:01.000Z",
+      });
+
+      yield* repository.upsert({
+        messageId,
+        threadId,
+        turnId: null,
+        role: "user",
+        text: "plan this now",
+        isStreaming: false,
+        source: "native",
+        createdAt,
+        updatedAt: "2026-02-28T19:33:02.000Z",
+      });
+
+      const rows = yield* repository.listByThreadId({ threadId });
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0]?.paperoId, "jack");
+    }),
+  );
+
   it.effect(
     "overwrites a stale automation origin when a resend carries an explicit user origin",
     () =>

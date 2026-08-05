@@ -190,7 +190,7 @@ const XAI_API_BASE_URL = "https://api.x.ai/v1";
 const GROK_DEFAULT_REASONING_EFFORT = "low";
 const GROK_RUNTIME_REASONING_EFFORTS = GROK_REASONING_EFFORT_OPTIONS.map((value) => ({ value }));
 const GROK_PLAN_MODE_PROMPT_PREFIX = [
-  "Synara requested Grok's native plan mode.",
+  "Quack requested Grok's native plan mode.",
   "Do not implement or mutate files in this turn.",
   "Do not ask follow-up questions or wait for confirmation; if scope is ambiguous, choose a reasonable default and state the assumption in the plan.",
   "When ready, create the final implementation plan.",
@@ -252,7 +252,7 @@ export function buildGrokPromptMeta(interactionMode: ProviderInteractionMode): {
 } {
   // Grok ACP reconciles its native Plan tracker from session/prompt `_meta.mode`.
   // Unlike x.ai/toggle_plan_mode this is idempotent, so reconnects cannot invert
-  // the provider state when Synara sends the desired mode again.
+  // the provider state when Quack sends the desired mode again.
   return { mode: interactionMode === "plan" ? "plan" : "agent" };
 }
 
@@ -290,7 +290,7 @@ export function resolveGrokPlanHookResponse(
   }
   return {
     decision: "deny",
-    systemMessage: `Synara Plan mode blocks the mutating or unknown Grok tool "${toolName || "unknown"}".`,
+    systemMessage: `Quack Plan mode blocks the mutating or unknown Grok tool "${toolName || "unknown"}".`,
   };
 }
 
@@ -1098,7 +1098,7 @@ export function makeGrokAdapter(
             childProcessSpawner,
             cwd,
             ...(resumeSessionId ? { resumeSessionId } : {}),
-            clientInfo: { name: "Synara", version: "0.0.0" },
+            clientInfo: { name: "Quack", version: "0.0.0" },
             // Grok registers client hooks from session setup metadata, not
             // initialize.clientCapabilities. Re-send this on load/resume so a
             // reconnected session keeps the Plan-mode write gate.
@@ -1201,7 +1201,7 @@ export function makeGrokAdapter(
                       ctx.lastPlanFingerprint !== planMarkdown
                     ) {
                       ctx.lastPlanFingerprint = planMarkdown;
-                      // The extension response must reach Grok before Synara cancels the
+                      // The extension response must reach Grok before Quack cancels the
                       // prompt fiber. Cancelling inline can tear down Grok's pending reverse
                       // request and recreate its misleading "client disconnected" failure.
                       yield* Effect.gen(function* () {

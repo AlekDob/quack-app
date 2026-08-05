@@ -131,6 +131,24 @@ Notes:
 - `APPLE_API_KEY` is stored as raw key text in secrets.
 - The workflow writes it to a temporary `AuthKey_<id>.p8` file at runtime.
 
+### Local signed build (Apple ID mode)
+
+Notarization also accepts an Apple ID plus app-specific password, which avoids
+needing the App Store Connect API key locally. The API key takes precedence when
+both are present.
+
+```bash
+export SYNARA_DESKTOP_SIGNED=1
+export CSC_NAME="Developer ID Application: Your Name (TEAMID)"   # certificate in the login keychain
+export APPLE_ID="you@example.com"
+export APPLE_APP_SPECIFIC_PASSWORD="xxxx-xxxx-xxxx-xxxx"
+export APPLE_TEAM_ID="TEAMID"
+bun run dist:desktop:dmg:arm64
+```
+
+App-specific password: account.apple.com → Sign-In and Security → App-Specific Passwords.
+Signing identity: `security find-identity -v -p codesigning`.
+
 ## 3) Azure Trusted Signing setup (Windows)
 
 Published Windows installers must be signed with Azure Trusted Signing. The

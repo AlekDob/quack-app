@@ -74,7 +74,10 @@ export function extractAskQuestions(
 }
 
 export function extractPlanMarkdown(params: typeof CursorCreatePlanRequest.Type): string {
-  return params.plan || "# Plan\n\n(Cursor did not supply plan text.)";
+  // Cursor often trails plan bodies with newlines; TrimmedNonEmptyString on
+  // turn.proposed.completed rejects those and quarantines the plan card.
+  const plan = params.plan.trim();
+  return plan.length > 0 ? plan : "# Plan\n\n(Cursor did not supply plan text.)";
 }
 
 export function extractTodosAsPlan(params: typeof CursorUpdateTodosRequest.Type): {

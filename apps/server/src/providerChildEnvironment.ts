@@ -1,5 +1,5 @@
 // FILE: providerChildEnvironment.ts
-// Purpose: Builds provider child environments without Synara control-plane authority.
+// Purpose: Builds provider child environments without Quack control-plane authority.
 // Layer: Server provider process security
 
 export type ProviderChildKind =

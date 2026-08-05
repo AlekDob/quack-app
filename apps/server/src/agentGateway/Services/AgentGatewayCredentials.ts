@@ -1,5 +1,5 @@
 /**
- * AgentGatewayCredentials - Per-session credentials for the Synara agent
+ * AgentGatewayCredentials - Per-session credentials for the Quack agent
  * gateway.
  *
  * Small service split out from the gateway itself so provider adapters can
@@ -35,7 +35,7 @@ export interface AgentGatewayStdioProxySpawn {
 }
 
 export interface AgentGatewayCredentialsShape {
-  /** Streamable-HTTP MCP endpoint served by this Synara instance. */
+  /** Streamable-HTTP MCP endpoint served by this Quack instance. */
   readonly mcpEndpointUrl: string;
   /** Update the endpoint after the HTTP server resolves a dynamic listen port. */
   readonly setListeningPort: (port: number) => void;

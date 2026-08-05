@@ -176,7 +176,7 @@ export function makeAgentGatewayMcpTransport(input: {
             return yield* Effect.fail(
               new GatewayToolError(
                 "caller_turn_inactive",
-                "This Synara write was rejected because this credential had no write authority for the exact active turn when the MCP request arrived.",
+                "This Quack write was rejected because this credential had no write authority for the exact active turn when the MCP request arrived.",
                 {
                   callerThreadId,
                   latestTurnId: callerThread.value.latestTurn?.turnId ?? null,
@@ -188,7 +188,7 @@ export function makeAgentGatewayMcpTransport(input: {
             return yield* Effect.fail(
               new GatewayToolError(
                 "caller_session_inactive",
-                "This Synara write was rejected because its provider-session authority is no longer active.",
+                "This Quack write was rejected because its provider-session authority is no longer active.",
                 { callerThreadId },
               ),
             );
@@ -200,7 +200,7 @@ export function makeAgentGatewayMcpTransport(input: {
                 (error) =>
                   new GatewayToolError(
                     "caller_turn_inactive",
-                    "This Synara write was rejected because the caller thread could no longer be verified.",
+                    "This Quack write was rejected because the caller thread could no longer be verified.",
                     { callerThreadId, error: errorText(error) },
                   ),
               ),
@@ -212,7 +212,7 @@ export function makeAgentGatewayMcpTransport(input: {
             return yield* Effect.fail(
               new GatewayToolError(
                 "caller_turn_inactive",
-                "This Synara write was rejected because the turn that received this MCP request is no longer active. In-flight requests cannot inherit authority from a later turn.",
+                "This Quack write was rejected because the turn that received this MCP request is no longer active. In-flight requests cannot inherit authority from a later turn.",
                 {
                   callerThreadId,
                   authorizedTurnId: callerWriteAuthority.turnId,

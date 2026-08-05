@@ -17,10 +17,10 @@ tags: [macos, dock, activation-policy, usage-notch, electron]
 
 ### Root causes
 
-| #   | Cause                                                                                                                                                                                          |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #   | Cause                                                                                                                                                                                                                                                                                                            |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | `createUsageNotchWindow()` called `setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })`. On macOS that option is process-wide: Electron switches the whole app's activation policy from regular (`Foreground`) to accessory (`UIElement`), and it does not revert when the window is later destroyed. |
-| 2   | The brand mark lived in a second `BrowserWindow` (`createUsageNotchLogoWindow`) stacked above the panel window. Both share one native window level, so every `setBounds()` on the panel re-ordered it above the logo window.                                                                                    |
+| 2   | The brand mark lived in a second `BrowserWindow` (`createUsageNotchLogoWindow`) stacked above the panel window. Both share one native window level, so every `setBounds()` on the panel re-ordered it above the logo window.                                                                                     |
 
 Cause #1 verified with an isolated Electron probe script (`lsappinfo` reported `type="Foreground"` → `type="UIElement"` immediately after the call on an otherwise-idle app; `alwaysOnTop`/`focusable:false` alone had no effect).
 

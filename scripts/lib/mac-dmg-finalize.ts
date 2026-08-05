@@ -7,10 +7,15 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
+// Two notarization auth modes, same as `xcrun notarytool` itself:
+// App Store Connect API key (used by CI) or Apple ID + app-specific password (used locally).
 export interface MacDmgNotaryCredentials {
-  readonly appleApiKey: string | undefined;
-  readonly appleApiKeyId: string | undefined;
-  readonly appleApiIssuer: string | undefined;
+  readonly appleApiKey?: string | undefined;
+  readonly appleApiKeyId?: string | undefined;
+  readonly appleApiIssuer?: string | undefined;
+  readonly appleId?: string | undefined;
+  readonly applePassword?: string | undefined;
+  readonly appleTeamId?: string | undefined;
 }
 
 export interface MacDmgCommand {
@@ -46,13 +51,37 @@ export function resolveSingleMacDmgFileName(entries: ReadonlyArray<string>): str
   return diskImages[0];
 }
 
+function resolveNotaryAuthArgs(credentials: MacDmgNotaryCredentials): ReadonlyArray<string> {
+  if (credentials.appleApiKey?.trim()) {
+    return [
+      "--key",
+      requireCredential(credentials.appleApiKey, "APPLE_API_KEY"),
+      "--key-id",
+      requireCredential(credentials.appleApiKeyId, "APPLE_API_KEY_ID"),
+      "--issuer",
+      requireCredential(credentials.appleApiIssuer, "APPLE_API_ISSUER"),
+    ];
+  }
+  if (credentials.appleId?.trim()) {
+    return [
+      "--apple-id",
+      requireCredential(credentials.appleId, "APPLE_ID"),
+      "--password",
+      requireCredential(credentials.applePassword, "APPLE_APP_SPECIFIC_PASSWORD"),
+      "--team-id",
+      requireCredential(credentials.appleTeamId, "APPLE_TEAM_ID"),
+    ];
+  }
+  throw new Error(
+    "Signed macOS DMG finalization requires APPLE_API_KEY (with APPLE_API_KEY_ID and APPLE_API_ISSUER) or APPLE_ID (with APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID).",
+  );
+}
+
 export function buildMacDmgFinalizationCommands(
   dmgPath: string,
   credentials: MacDmgNotaryCredentials,
 ): ReadonlyArray<MacDmgCommand> {
-  const appleApiKey = requireCredential(credentials.appleApiKey, "APPLE_API_KEY");
-  const appleApiKeyId = requireCredential(credentials.appleApiKeyId, "APPLE_API_KEY_ID");
-  const appleApiIssuer = requireCredential(credentials.appleApiIssuer, "APPLE_API_ISSUER");
+  const authArgs = resolveNotaryAuthArgs(credentials);
 
   return [
     {
@@ -61,18 +90,7 @@ export function buildMacDmgFinalizationCommands(
     },
     {
       command: "xcrun",
-      args: [
-        "notarytool",
-        "submit",
-        dmgPath,
-        "--key",
-        appleApiKey,
-        "--key-id",
-        appleApiKeyId,
-        "--issuer",
-        appleApiIssuer,
-        "--wait",
-      ],
+      args: ["notarytool", "submit", dmgPath, ...authArgs, "--wait"],
     },
     {
       command: "xcrun",

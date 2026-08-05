@@ -95,7 +95,7 @@ describe("buildSynaraBranchName", () => {
 });
 
 describe("resolveUniqueSynaraBranchName", () => {
-  it("increments suffix when the Synara branch already exists", () => {
+  it("increments suffix when the Quack branch already exists", () => {
     expect(
       resolveUniqueSynaraBranchName(
         ["main", "synara/fix-toast-copy", "synara/fix-toast-copy-2"],

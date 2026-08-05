@@ -12,9 +12,11 @@
 - `bun run test` — Runs workspace tests.
 - `bun run dist:desktop:artifact -- --platform <mac|linux|win> --target <target> --arch <arch>` — Builds a desktop artifact for a specific platform/target/arch.
 - `bun run dist:desktop:dmg` — Builds a shareable macOS `.dmg` into `./release`.
+- `bun run dist:desktop:dmg:arm64` — Builds an Apple Silicon macOS `.dmg`.
 - `bun run dist:desktop:dmg:x64` — Builds an Intel macOS `.dmg`.
 - `bun run dist:desktop:linux` — Builds a Linux AppImage into `./release`.
 - `bun run dist:desktop:win` — Builds a Windows NSIS installer into `./release`.
+- `make mac-app` — Convenience target for local Apple Silicon builds: runs `bun install`, then `bun run dist:desktop:dmg:arm64`. Use this when you have Synara installed from a DMG and need a fresh local build that includes repo dependency updates (for example Pi SDK bumps). The installed `/Applications/Synara.app` does not pick up checkout changes until you rebuild and reinstall.
 
 ## Desktop `.dmg` packaging notes
 
@@ -30,6 +32,7 @@
   `AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE_NAME`, and `AZURE_TRUSTED_SIGNING_PUBLISHER_NAME`.
 - Azure authentication env vars are also required (for example service principal with secret):
   `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`.
+- For day-to-day verification without replacing `/Applications/Synara.app`, prefer `bun run electron:dev` from the checkout. Use `make mac-app` when you specifically need an installable local DMG.
 
 ## Running multiple dev instances
 

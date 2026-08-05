@@ -226,7 +226,7 @@ describe("agent gateway MCP injection", () => {
                 tools: [
                   {
                     name: "synara_list_threads",
-                    description: "List Synara threads.",
+                    description: "List Quack threads.",
                     inputSchema: { type: "object", properties: {} },
                   },
                 ],
@@ -238,7 +238,7 @@ describe("agent gateway MCP injection", () => {
     assert.deepEqual(await listAgentGatewayMcpTools({ connection, fetch }), [
       {
         name: "synara_list_threads",
-        description: "List Synara threads.",
+        description: "List Quack threads.",
         inputSchema: { type: "object", properties: {} },
       },
     ]);

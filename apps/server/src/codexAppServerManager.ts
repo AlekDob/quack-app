@@ -419,7 +419,7 @@ const CODEX_BROWSER_TOOL_ROUTING_INSTRUCTIONS = `
 
 ## Browser tool routing
 
-Prefer Synara's built-in visible browser for browser work. In code mode, call its MCP methods directly inside \`functions.exec\` with the exact \`tools.mcp__synara__browser_*\` prefix (for example, \`await tools.mcp__synara__browser_open({ url })\` and \`await tools.mcp__synara__browser_snapshot({})\`). The available suffixes are ${BROWSER_TOOL_NAMES.map((name) => `\`${name.slice("browser_".length)}\``).join(", ")}.
+Prefer Quack's built-in visible browser for browser work. In code mode, call its MCP methods directly inside \`functions.exec\` with the exact \`tools.mcp__synara__browser_*\` prefix (for example, \`await tools.mcp__synara__browser_open({ url })\` and \`await tools.mcp__synara__browser_snapshot({})\`). The available suffixes are ${BROWSER_TOOL_NAMES.map((name) => `\`${name.slice("browser_".length)}\``).join(", ")}.
 
 For element actions, keep the \`snapshotId\` returned by the fresh snapshot and use the exact shapes \`browser_type({ target: { ref, snapshotId }, text })\`, \`browser_click({ target: { ref, snapshotId } })\`, and \`browser_press({ keys: ["Enter"] })\`. Wait for observable changes with \`browser_wait({ conditions: [{ kind: "url", glob: "*expected*" }] })\` or another published condition. Never pass a bare \`ref\` without its \`snapshotId\`.
 
@@ -567,7 +567,7 @@ The \`request_user_input\` tool is unavailable in Default mode. If you call it w
 In Default mode, strongly prefer making reasonable assumptions and executing the user's request rather than stopping to ask questions. If you absolutely must ask a question because the answer cannot be discovered from local context and a reasonable assumption would be risky, ask the user directly with a concise plain-text question. Never write a multiple choice question as a textual assistant message.
 </collaboration_mode>${CODEX_BROWSER_TOOL_ROUTING_INSTRUCTIONS}\n\n${SYNARA_GATEWAY_HARNESS_POLICY}`;
 
-// Maps Synara's simple runtime toggle to Codex thread-level permission overrides.
+// Maps Quack's simple runtime toggle to Codex thread-level permission overrides.
 function mapCodexRuntimeMode(runtimeMode: RuntimeMode): {
   readonly approvalPolicy: CodexApprovalPolicy;
   readonly approvalsReviewer: CodexApprovalsReviewer;
@@ -631,7 +631,7 @@ const CODEX_ALWAYS_ALLOW_SESSION_TURN_OVERRIDES: CodexSessionApprovalOverride = 
   sandboxPolicy: { type: "dangerFullAccess" },
 };
 
-// Synara re-sends turn-level Codex permission overrides, so keep "always allow"
+// Quack re-sends turn-level Codex permission overrides, so keep "always allow"
 // as live session state instead of relying on one native approval reply.
 function resolveCodexTurnOverrides(context: CodexSessionContext): {
   readonly approvalPolicy: CodexApprovalPolicy;
@@ -694,7 +694,7 @@ export function buildCodexInitializeParams() {
   return {
     clientInfo: {
       name: "synara_desktop",
-      title: "Synara Desktop",
+      title: "Quack Desktop",
       version: "0.1.0",
     },
     capabilities: {
@@ -925,7 +925,7 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
     this.taskCompleteFallbackGraceMs = Math.max(0, options?.taskCompleteFallbackGraceMs ?? 750);
   }
 
-  // The Synara MCP server rides on the shared overlay config (no secrets),
+  // The Quack MCP server rides on the shared overlay config (no secrets),
   // while the per-thread bearer token travels through the app-server process
   // env referenced by `bearer_token_env_var`.
   private async buildSessionProcessEnv(
@@ -957,7 +957,7 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
         extraRoots: [this.synaraSkillsDir],
       });
     } catch (error) {
-      // Older codex builds (< extra-roots support) keep working; Synara-only
+      // Older codex builds (< extra-roots support) keep working; Quack-only
       // skills simply stay invisible to codex on those versions.
       log.warn("skills/extraRoots/set unavailable", { error });
     }
@@ -3199,7 +3199,7 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
         return;
       }
 
-      const detail = "Codex asked a question Synara could not render, so it was declined.";
+      const detail = "Codex asked a question Quack could not render, so it was declined.";
       this.emitErrorEvent(context, "item/tool/requestUserInput/unrenderable", detail);
       await this.writeMessage(context, {
         id: request.id,

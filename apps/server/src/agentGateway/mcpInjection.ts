@@ -1,5 +1,5 @@
 /**
- * Provider-facing config builders for the Synara agent gateway.
+ * Provider-facing config builders for the Quack agent gateway.
  *
  * One shared module shapes the same MCP connection (endpoint URL + per-thread
  * bearer token) into every provider's native MCP configuration format so the
@@ -33,7 +33,7 @@ function authorizationHeader(connection: AgentGatewayMcpConnection): string {
 /**
  * Codex reads MCP servers from `config.toml`; the config file is shared by all
  * sessions of one Codex home, so the token is never written into it. Instead
- * the block references an env var that Synara sets per app-server process.
+ * the block references an env var that Quack sets per app-server process.
  *
  * The shell_environment_policy table keeps that env var out of exec tool
  * subprocesses: codex defaults to `ignore_default_excludes = true`, so the
@@ -69,7 +69,7 @@ export interface OpenCodeMcpRemoteServerConfig {
 /**
  * OpenCode's dynamic `mcp.add` endpoint is server/directory scoped rather
  * than session scoped. Callers must install this config through either a
- * provider process dedicated to the owning Synara thread or an exclusive
+ * provider process dedicated to the owning Quack thread or an exclusive
  * external-server/directory lock held for the full agent turn.
  */
 export function buildOpenCodeMcpServer(
@@ -124,18 +124,18 @@ async function postAgentGatewayJsonRpc(input: {
     ...(input.signal === undefined ? {} : { signal: input.signal }),
   });
   if (!response.ok) {
-    throw new Error(`Synara MCP request failed with HTTP ${String(response.status)}.`);
+    throw new Error(`Quack MCP request failed with HTTP ${String(response.status)}.`);
   }
   const payload: unknown = await response.json();
   if (!isRecord(payload) || payload.jsonrpc !== "2.0") {
-    throw new Error("Synara MCP returned an invalid JSON-RPC response.");
+    throw new Error("Quack MCP returned an invalid JSON-RPC response.");
   }
   if ("error" in payload) {
     const failure = isRecord(payload.error) ? payload.error : null;
-    throw new Error(failure?.message ? String(failure.message) : "Synara MCP request failed.");
+    throw new Error(failure?.message ? String(failure.message) : "Quack MCP request failed.");
   }
   if (payload.id !== id || !("result" in payload)) {
-    throw new Error("Synara MCP returned a mismatched JSON-RPC response.");
+    throw new Error("Quack MCP returned a mismatched JSON-RPC response.");
   }
   return payload.result;
 }
@@ -151,7 +151,7 @@ export async function listAgentGatewayMcpTools(input: {
     method: "tools/list",
   });
   if (!isRecord(result) || !Array.isArray(result.tools)) {
-    throw new Error("Synara MCP tools/list returned an invalid tool catalog.");
+    throw new Error("Quack MCP tools/list returned an invalid tool catalog.");
   }
   return result.tools.map((value) => {
     if (
@@ -160,7 +160,7 @@ export async function listAgentGatewayMcpTools(input: {
       typeof value.description !== "string" ||
       !isRecord(value.inputSchema)
     ) {
-      throw new Error("Synara MCP tools/list returned an invalid tool descriptor.");
+      throw new Error("Quack MCP tools/list returned an invalid tool descriptor.");
     }
     return {
       name: value.name,
@@ -215,7 +215,7 @@ export interface AntigravityMcpPluginConfig {
 }
 
 /**
- * Build the secret-free MCP fragment installed with Synara's Antigravity
+ * Build the secret-free MCP fragment installed with Quack's Antigravity
  * plugin. Antigravity expands the endpoint plus a one-shot bootstrap value
  * from each `agy` process. The stdio proxy consumes that value during MCP
  * initialization and keeps the exchanged session bearer in its own memory,

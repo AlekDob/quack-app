@@ -138,8 +138,8 @@ describe("isHomeChatContainerProject", () => {
         {
           cwd: "/Users/tester/Documents/Synara",
           kind: "project",
-          name: "Synara",
-          remoteName: "Synara",
+          name: "Quack",
+          remoteName: "Quack",
         },
         {
           homeDir: "/Users/tester",

@@ -52,7 +52,7 @@ export function fixPath(
     const readLaunchctlFallbackPath = (): string | undefined =>
       platform === "darwin" ? (options.readLaunchctlPath ?? readPathFromLaunchctl)() : undefined;
 
-    // Cached by default: the probe result is persisted under the Synara home and reused
+    // Cached by default: the probe result is persisted under the Quack home and reused
     // until the shell, the user, or any of its startup files changes.
     const readPath = options.readPath ?? createCachedLoginShellPathReader({ env, platform });
 

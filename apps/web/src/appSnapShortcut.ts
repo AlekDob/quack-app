@@ -1,5 +1,5 @@
 // FILE: appSnapShortcut.ts
-// Purpose: Detect AppSnap shortcut overlap with Synara's renderer keybindings.
+// Purpose: Detect AppSnap shortcut overlap with Quack's renderer keybindings.
 
 import type {
   DesktopAppSnapKeyChord,
