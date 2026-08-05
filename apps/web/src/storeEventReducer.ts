@@ -40,6 +40,7 @@ import {
   resolveCreateBranchFlowCompletedMerge,
   withOrchestrationEventSequence,
 } from "./storeNormalization";
+import { optionalModelSelectionsEqual } from "./components/ChatView.logic";
 import {
   applySpaceOrder,
   applyThreadUpdate,
@@ -629,6 +630,8 @@ function mergeStreamingMessage(
       ? incomingMessage.dispatchOrigin
       : existingMessage.dispatchOrigin;
   const nextSource = incomingMessage.source ?? existingMessage.source;
+  const nextPaperoId = incomingMessage.paperoId ?? existingMessage.paperoId;
+  const nextModelSelection = incomingMessage.modelSelection ?? existingMessage.modelSelection;
 
   if (
     existingMessage.text === nextText &&
@@ -640,7 +643,9 @@ function mergeStreamingMessage(
     existingMessage.turnId === nextTurnId &&
     existingMessage.dispatchMode === nextDispatchMode &&
     existingMessage.dispatchOrigin === nextDispatchOrigin &&
-    existingMessage.source === nextSource
+    existingMessage.source === nextSource &&
+    existingMessage.paperoId === nextPaperoId &&
+    optionalModelSelectionsEqual(existingMessage.modelSelection, nextModelSelection)
   ) {
     return null;
   }
@@ -656,6 +661,8 @@ function mergeStreamingMessage(
     ...(nextDispatchMode !== undefined ? { dispatchMode: nextDispatchMode } : {}),
     ...(nextDispatchOrigin !== undefined ? { dispatchOrigin: nextDispatchOrigin } : {}),
     ...(nextSource !== undefined ? { source: nextSource } : {}),
+    ...(nextPaperoId !== undefined ? { paperoId: nextPaperoId } : {}),
+    ...(nextModelSelection !== undefined ? { modelSelection: nextModelSelection } : {}),
     ...(nextCompletedAt !== undefined ? { completedAt: nextCompletedAt } : {}),
   };
 }
@@ -677,6 +684,8 @@ function applyThreadMessageSentEvent(thread: Thread, event: ThreadMessageSentEve
       attachments: payload.attachments ?? [],
       ...(payload.skills !== undefined ? { skills: payload.skills } : {}),
       ...(payload.mentions !== undefined ? { mentions: payload.mentions } : {}),
+      ...(payload.paperoId !== undefined ? { paperoId: payload.paperoId } : {}),
+      ...(payload.modelSelection !== undefined ? { modelSelection: payload.modelSelection } : {}),
       streaming: payload.streaming,
       source: payload.source,
       createdAt: payload.createdAt,

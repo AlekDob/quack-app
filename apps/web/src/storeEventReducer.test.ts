@@ -93,6 +93,76 @@ describe("store event reducer", () => {
     ]);
   });
 
+  it("preserves the turn's papero and modelSelection from thread.message-sent events", () => {
+    const messageId = MessageId.makeUnsafe("message-with-model-selection");
+    const modelSelection = { provider: "codex", model: "gpt-5.6-sol" } as const;
+    const next = applyOrchestrationEvents(makeState(makeThread()), [
+      makeDomainEvent("thread.message-sent", {
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        messageId,
+        role: "user",
+        text: "Hello",
+        attachments: [],
+        paperoId: "vera",
+        modelSelection,
+        turnId: null,
+        streaming: false,
+        source: "native",
+        createdAt: "2026-02-27T00:00:00.000Z",
+        updatedAt: "2026-02-27T00:00:00.000Z",
+      }),
+    ]);
+
+    const message = threadsOf(next)[0]?.messages[0];
+    expect(message?.paperoId).toBe("vera");
+    expect(message?.modelSelection).toEqual(modelSelection);
+  });
+
+  it("keeps papero and effort when a server event merges into an existing message", () => {
+    const messageId = MessageId.makeUnsafe("message-streaming-identity");
+    const modelSelection = {
+      provider: "codex",
+      model: "gpt-5.6-sol",
+      options: { reasoningEffort: "high" },
+    } as const;
+    const initialState = makeState(
+      makeThread({
+        messages: [
+          {
+            id: messageId,
+            role: "user",
+            text: "Hello",
+            turnId: null,
+            createdAt: "2026-02-27T00:00:00.000Z",
+            streaming: false,
+            source: "native",
+          },
+        ],
+      }),
+    );
+    const next = applyOrchestrationEvents(initialState, [
+      makeDomainEvent("thread.message-sent", {
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        messageId,
+        role: "user",
+        text: "Hello",
+        attachments: [],
+        paperoId: "vera",
+        modelSelection,
+        turnId: null,
+        streaming: false,
+        source: "native",
+        createdAt: "2026-02-27T00:00:00.000Z",
+        updatedAt: "2026-02-27T00:00:00.000Z",
+      }),
+    ]);
+
+    const message = threadsOf(next)[0]?.messages[0];
+    expect(message?.paperoId).toBe("vera");
+    expect(message?.modelSelection).toEqual(modelSelection);
+    expect(message?.modelSelection?.options).toEqual({ reasoningEffort: "high" });
+  });
+
   it("updates thread error and marks the running latest turn failed from session-set events", () => {
     const initialState = makeState(
       makeThread({
