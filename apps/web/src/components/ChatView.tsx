@@ -7899,6 +7899,7 @@ export default function ChatView({
         ...(mentionedPluginMentionsForSend.length > 0
           ? { mentions: mentionedPluginMentionsForSend }
           : {}),
+        paperoId: paperoIdForSendRef.current,
         createdAt: messageCreatedAt,
         streaming: false,
         source: "native",
@@ -8627,6 +8628,7 @@ export default function ChatView({
         role: "user",
         text: outgoingMessageText,
         dispatchMode,
+        paperoId: paperoIdForSendRef.current,
         createdAt: messageCreatedAt,
         streaming: false,
         source: "native",
@@ -8675,6 +8677,7 @@ export default function ChatView({
           role: "user",
           text: outgoingMessageText,
           attachments: [],
+          paperoId: paperoIdForSendRef.current,
         },
         modelSelection: modelSelectionForPlanDispatch,
         ...(providerOptionsForPlanDispatch

@@ -21,21 +21,23 @@ tags: [chat, sidebar, loading, papero, composer, send]
 
 ### Files
 
-| Type  | Path                                                        | Exports/Purpose                                                          |
-| ----- | ------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| Store | `apps/web/src/pendingSendStore.ts`                          | `usePendingSendStore` — `pendingSendThreadIds`, `markPendingSend`, `clearPendingSend` |
-| Component | `apps/web/src/components/ChatView.tsx`                  | Sets/clears the pending flag around the send preflight; feeds `isSendBusy` |
-| Component | `apps/web/src/components/Sidebar.tsx`                    | Reads the flag to light up the row before the server acknowledges         |
-| Logic | `apps/web/src/components/Sidebar.logic.ts`                  | `isThreadActivelyWorking` short-circuits on `hasPendingLocalSend`          |
-| Logic | `apps/web/src/components/chat/MessagesTimeline.logic.ts`    | `working` row carries `showPaperoAvatar` / `avatarPaperoId`               |
-| Component | `apps/web/src/components/chat/PaperoPill.tsx`            | `PaperoStreamAvatarSlot` — shared avatar slot (DRY with the message row)   |
-| Component | `apps/web/src/components/chat/MessagesTimeline.tsx`      | Renders the papero on the live "Thinking" row when unclaimed               |
+| Type      | Path                                                     | Exports/Purpose                                                                       |
+| --------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Store     | `apps/web/src/pendingSendStore.ts`                       | `usePendingSendStore` — `pendingSendThreadIds`, `markPendingSend`, `clearPendingSend` |
+| Component | `apps/web/src/components/ChatView.tsx`                   | Sets/clears the pending flag around the send preflight; feeds `isSendBusy`            |
+| Component | `apps/web/src/components/Sidebar.tsx`                    | Reads the flag to light up the row before the server acknowledges                     |
+| Logic     | `apps/web/src/components/Sidebar.logic.ts`               | `isThreadActivelyWorking` short-circuits on `hasPendingLocalSend`                     |
+| Logic     | `apps/web/src/components/chat/MessagesTimeline.logic.ts` | `working` row carries `showPaperoAvatar` / `avatarPaperoId`                           |
+| Component | `apps/web/src/components/chat/PaperoPill.tsx`            | `PaperoStreamAvatarSlot` — shared avatar slot (DRY with the message row)              |
+| Component | `apps/web/src/components/chat/MessagesTimeline.tsx`      | Renders the papero on the live "Thinking" row when unclaimed                          |
 
 ### Data flow
 
 `onSend` → before the preflight, `markPendingSend(threadId)` sets the flag synchronously → composer (`isSendBusy`) and sidebar row (`isThreadActivelyWorking`) read it and show their loader immediately → preflight runs (provider refresh, worktree, `thread.create`) → `localDispatch` takes over as the real busy signal → `onSend` returns and clears the flag in a `finally`, covering every bail-out/throw path, not just the happy one.
 
 In parallel, `deriveMessagesTimelineRows` tracks whether any row in the current turn has already claimed the papero avatar (`paperoAvatarShownForTurn`). The live `working` ("Thinking…") row wears the avatar itself until an assistant row takes over, so the papero shows up on the very first frame instead of waiting for the first work-log entry.
+
+`currentTurnPaperoId` is read from the last **user** message's `paperoId` field. Until the server acknowledges a turn, the transcript shows the local optimistic user message (`setOptimisticUserMessages`), not the server-projected one — so that optimistic message must carry `paperoId` too, or the avatar falls back to the default (Milo) regardless of which papero was actually selected for the send. Fixed by adding `paperoId: paperoIdForSendRef.current` to the optimistic message in the main send path and in `onSubmitPlanFollowUp` (both the optimistic message and its `thread.turn.start` dispatch).
 
 ### Behavior
 
