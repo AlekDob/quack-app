@@ -1497,6 +1497,17 @@ function dispatchComposerPickerShortcut(target: EventTarget, key: "m" | "e"): vo
   );
 }
 
+function dispatchComposerEffortShortcut(target: EventTarget, level: number): KeyboardEvent {
+  const event = new KeyboardEvent("keydown", {
+    key: String(level),
+    ctrlKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  target.dispatchEvent(event);
+  return event;
+}
+
 function dispatchModelCycleShortcut(target: EventTarget, key: "[" | "]"): KeyboardEvent {
   const event = new KeyboardEvent("keydown", {
     key,
@@ -3863,6 +3874,69 @@ describe("ChatView timeline estimator parity (full app)", () => {
       dispatchComposerPickerShortcut(composerEditor, "e");
 
       await waitForComposerPickerSurfaceOpen();
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
+  it("selects the numbered composer effort level", async () => {
+    useComposerDraftStore.getState().setModelSelection(THREAD_ID, {
+      provider: "codex",
+      model: "gpt-5.4",
+      options: { reasoningEffort: "low" },
+    });
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot: createSnapshotForTargetUser({
+        targetMessageId: "msg-user-effort-shortcut" as MessageId,
+        targetText: "effort shortcut",
+      }),
+      configureFixture: (nextFixture) => {
+        nextFixture.serverConfig = {
+          ...nextFixture.serverConfig,
+          keybindings: [
+            {
+              command: "composer.effort.2",
+              shortcut: {
+                key: "2",
+                metaKey: false,
+                ctrlKey: true,
+                shiftKey: false,
+                altKey: false,
+                modKey: false,
+              },
+            },
+            {
+              command: "composer.effort.9",
+              shortcut: {
+                key: "9",
+                metaKey: false,
+                ctrlKey: true,
+                shiftKey: false,
+                altKey: false,
+                modKey: false,
+              },
+            },
+          ],
+        };
+      },
+    });
+
+    try {
+      const composerEditor = await waitForComposerEditor();
+      await waitForServerConfigToApply();
+      composerEditor.focus();
+
+      await vi.waitFor(() => {
+        expect(dispatchComposerEffortShortcut(composerEditor, 2).defaultPrevented).toBe(true);
+      });
+      await vi.waitFor(() => {
+        expect(
+          useComposerDraftStore.getState().draftsByThreadId[THREAD_ID]?.modelSelectionByProvider
+            .codex?.options,
+        ).toMatchObject({ reasoningEffort: "medium" });
+      });
+      expect(dispatchComposerEffortShortcut(composerEditor, 9).defaultPrevented).toBe(false);
     } finally {
       await mounted.cleanup();
     }

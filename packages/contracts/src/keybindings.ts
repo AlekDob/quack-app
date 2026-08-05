@@ -7,6 +7,19 @@ export const MAX_WHEN_EXPRESSION_DEPTH = 64;
 export const MAX_SCRIPT_ID_LENGTH = 24;
 export const MAX_KEYBINDINGS_COUNT = 256;
 
+export const COMPOSER_EFFORT_KEYBINDING_COMMANDS = [
+  "composer.effort.1",
+  "composer.effort.2",
+  "composer.effort.3",
+  "composer.effort.4",
+  "composer.effort.5",
+  "composer.effort.6",
+  "composer.effort.7",
+  "composer.effort.8",
+  "composer.effort.9",
+] as const;
+export type ComposerEffortKeybindingCommand = (typeof COMPOSER_EFFORT_KEYBINDING_COMMANDS)[number];
+
 const STATIC_KEYBINDING_COMMANDS = [
   "sidebar.toggle",
   "sidebar.search",
@@ -44,6 +57,7 @@ const STATIC_KEYBINDING_COMMANDS = [
   "model.previous",
   "papero.next",
   "traitsPicker.toggle",
+  ...COMPOSER_EFFORT_KEYBINDING_COMMANDS,
   "settings.usage",
   "chat.new",
   "chat.newLatestProject",

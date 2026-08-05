@@ -1,6 +1,7 @@
 import { assert, describe, it } from "vitest";
 
 import {
+  COMPOSER_EFFORT_KEYBINDING_COMMANDS,
   type KeybindingCommand,
   type KeybindingShortcut,
   type KeybindingWhenNode,
@@ -199,6 +200,10 @@ const whenCreationAllowed = whenOr(
   whenNot(whenIdentifier("terminalFocus")),
   whenIdentifier("isMac"),
 );
+const whenComposerEffortShortcutAvailable = whenAnd(
+  whenNot(whenIdentifier("terminalFocus")),
+  whenNot(whenIdentifier("terminalWorkspaceOpen")),
+);
 
 interface TestBinding {
   shortcut: KeybindingShortcut;
@@ -303,6 +308,11 @@ const DEFAULT_BINDINGS = compile([
     command: "traitsPicker.toggle",
     whenAst: whenNot(whenIdentifier("terminalFocus")),
   },
+  ...COMPOSER_EFFORT_KEYBINDING_COMMANDS.map((command, index) => ({
+    shortcut: ctrlShortcut(String(index + 1)),
+    command,
+    whenAst: whenComposerEffortShortcutAvailable,
+  })),
   {
     shortcut: modShortcut("l", { metaKey: true, modKey: false }),
     command: "composer.focus.toggle",
@@ -1567,6 +1577,11 @@ describe("resolveShortcutCommand", () => {
         command: "traitsPicker.toggle",
         whenAst: whenNot(whenIdentifier("terminalFocus")),
       },
+      {
+        shortcut: ctrlShortcut("1"),
+        command: "composer.effort.1",
+        whenAst: whenComposerEffortShortcutAvailable,
+      },
     ]);
 
     assert.strictEqual(
@@ -1584,6 +1599,13 @@ describe("resolveShortcutCommand", () => {
       "traitsPicker.toggle",
     );
     assert.strictEqual(
+      resolveShortcutCommand(event({ key: "1", ctrlKey: true }), keybindings, {
+        platform: "MacIntel",
+        context: { terminalFocus: false },
+      }),
+      "composer.effort.1",
+    );
+    assert.strictEqual(
       resolveShortcutCommand(event({ key: "m", metaKey: true, altKey: true }), keybindings, {
         platform: "MacIntel",
         context: { terminalFocus: true },
@@ -1599,7 +1621,10 @@ describe("resolveShortcutCommand", () => {
         binding.command !== "model.next" &&
         binding.command !== "model.previous" &&
         binding.command !== "papero.next" &&
-        binding.command !== "traitsPicker.toggle",
+        binding.command !== "traitsPicker.toggle" &&
+        !COMPOSER_EFFORT_KEYBINDING_COMMANDS.includes(
+          binding.command as (typeof COMPOSER_EFFORT_KEYBINDING_COMMANDS)[number],
+        ),
     );
 
     assert.strictEqual(
@@ -1636,6 +1661,13 @@ describe("resolveShortcutCommand", () => {
         context: { terminalFocus: false },
       }),
       "papero.next",
+    );
+    assert.strictEqual(
+      resolveShortcutCommand(event({ key: "9", ctrlKey: true }), legacyBindings, {
+        platform: "MacIntel",
+        context: { terminalFocus: false },
+      }),
+      "composer.effort.9",
     );
   });
 

@@ -1,4 +1,5 @@
 import {
+  COMPOSER_EFFORT_KEYBINDING_COMMANDS,
   type KeybindingCommand,
   type ResolvedKeybindingRule,
   type KeybindingShortcut,
@@ -179,6 +180,11 @@ export const DEFAULT_SHORTCUT_FALLBACKS: ResolvedKeybindingsConfig = [
     shortcut: commandShortcut("e", { shiftKey: true }),
     whenAst: whenNotTerminalFocus,
   },
+  ...COMPOSER_EFFORT_KEYBINDING_COMMANDS.map((command, index) => ({
+    command,
+    shortcut: commandShortcut(String(index + 1), { ctrlKey: true, modKey: false }),
+    whenAst: whenThreadJumpAvailable,
+  })),
   // Cmd-only instead of mod so Ctrl+L remains available to shells on non-macOS.
   {
     command: "composer.focus.toggle",

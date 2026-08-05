@@ -9,6 +9,7 @@ import {
   type ProviderModelDescriptor,
 } from "@synara/contracts";
 import {
+  applyClaudePromptEffortPrefix,
   getProviderOptionCurrentValue,
   getProviderOptionDescriptors,
   isClaudeUltrathinkPrompt,
@@ -17,6 +18,8 @@ import {
 
 import type { ProviderOptions } from "../../providerModelOptions";
 import { getRuntimeAwareModelCapabilities } from "./runtimeModelCapabilities";
+
+const ULTRATHINK_PROMPT_PREFIX = "Ultrathink:\n";
 
 function getCursorBooleanModelParameter(
   model: string | null | undefined,
@@ -178,6 +181,39 @@ export function getComposerTraitSelection(
     defaultContextWindow,
     ultrathinkPromptControlled,
   };
+}
+
+export function resolveComposerEffortChange(input: {
+  provider: ProviderKind;
+  prompt: string;
+  value: string;
+  selection: Pick<
+    ReturnType<typeof getComposerTraitSelection>,
+    "effortLevels" | "primarySelectDescriptor" | "promptInjectedValues" | "ultrathinkPromptControlled"
+  >;
+}): { kind: "prompt"; prompt: string } | { kind: "options"; patch: Record<string, unknown> } | null {
+  if (input.selection.ultrathinkPromptControlled || !input.value) return null;
+  const nextOption = input.selection.effortLevels.find((option) => option.value === input.value);
+  if (!nextOption) return null;
+  if (input.selection.promptInjectedValues.includes(nextOption.value)) {
+    return {
+      kind: "prompt",
+      prompt:
+        input.prompt.trim().length === 0
+          ? ULTRATHINK_PROMPT_PREFIX
+          : applyClaudePromptEffortPrefix(input.prompt, "ultrathink"),
+    };
+  }
+  const optionId =
+    input.selection.primarySelectDescriptor?.id ??
+    (input.provider === "kilo" || input.provider === "opencode"
+      ? "variant"
+      : input.provider === "pi"
+        ? "thinkingLevel"
+        : input.provider === "claudeAgent"
+          ? "effort"
+          : "reasoningEffort");
+  return { kind: "options", patch: { [optionId]: nextOption.value } };
 }
 
 // Human label for the currently selected reasoning/thinking trait, shared by the

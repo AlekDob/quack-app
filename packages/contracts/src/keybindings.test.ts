@@ -125,6 +125,18 @@ it.effect("parses keybinding rules", () =>
     });
     assert.strictEqual(parsedTraitsPickerToggle.command, "traitsPicker.toggle");
 
+    const parsedLowestEffort = yield* decode(KeybindingRule, {
+      key: "ctrl+1",
+      command: "composer.effort.1",
+    });
+    assert.strictEqual(parsedLowestEffort.command, "composer.effort.1");
+
+    const parsedHighestEffort = yield* decode(KeybindingRule, {
+      key: "ctrl+9",
+      command: "composer.effort.9",
+    });
+    assert.strictEqual(parsedHighestEffort.command, "composer.effort.9");
+
     const parsedComposerFocusToggle = yield* decode(KeybindingRule, {
       key: "cmd+l",
       command: "composer.focus.toggle",

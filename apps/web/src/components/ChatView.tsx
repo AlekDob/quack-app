@@ -2,6 +2,7 @@ import {
   type AutomationDefinition,
   type AutomationSchedule,
   type ApprovalRequestId,
+  COMPOSER_EFFORT_KEYBINDING_COMMANDS,
   DEFAULT_MODEL_BY_PROVIDER,
   EventId,
   MessageId,
@@ -532,7 +533,7 @@ import {
   CHAT_COLUMN_GUTTER_CLASS_NAME,
   ENVIRONMENT_CONTENT_INSET_MOTION_CLASS,
 } from "./chat/composerPickerStyles";
-import { getComposerTraitSelection } from "./chat/composerTraits";
+import { getComposerTraitSelection, resolveComposerEffortChange } from "./chat/composerTraits";
 import { resolveRuntimeModelDescriptor } from "./chat/runtimeModelCapabilities";
 import { ProjectPicker } from "./chat/ProjectPicker";
 import { FolderClosed } from "./FolderClosed";
@@ -4157,6 +4158,64 @@ export default function ChatView({
       focusComposer();
     });
   }, [focusComposer]);
+  const setPromptFromTraits = useCallback(
+    (nextPrompt: string) => {
+      const currentPrompt = promptRef.current;
+      if (nextPrompt === currentPrompt) {
+        scheduleComposerFocus();
+        return;
+      }
+      promptRef.current = nextPrompt;
+      setPrompt(nextPrompt);
+      const nextCursor = collapseExpandedComposerCursor(nextPrompt, nextPrompt.length);
+      setComposerCursor(nextCursor);
+      setComposerTrigger(detectComposerTrigger(nextPrompt, nextPrompt.length));
+      scheduleComposerFocus();
+    },
+    [scheduleComposerFocus, setPrompt],
+  );
+  const selectedProviderModelOptions = composerModelOptions?.[selectedProvider];
+  const composerTraitSelection = getComposerTraitSelection(
+    selectedProvider,
+    selectedModel,
+    prompt,
+    selectedProviderModelOptions,
+    selectedRuntimeModel,
+  );
+  const selectComposerEffort = useCallback(
+    (value: string) => {
+      const change = resolveComposerEffortChange({
+        provider: selectedProvider,
+        prompt,
+        value,
+        selection: composerTraitSelection,
+      });
+      if (!change) return false;
+      if (change.kind === "prompt") {
+        setPromptFromTraits(change.prompt);
+        return true;
+      }
+      setComposerDraftProviderModelOptions(
+        threadId,
+        selectedProvider,
+        buildNextProviderOptions(selectedProvider, selectedProviderModelOptions, change.patch),
+        { model: selectedModel, persistSticky: true },
+      );
+      scheduleComposerFocus();
+      return true;
+    },
+    [
+      composerTraitSelection,
+      prompt,
+      scheduleComposerFocus,
+      selectedModel,
+      selectedProvider,
+      selectedProviderModelOptions,
+      setComposerDraftProviderModelOptions,
+      setPromptFromTraits,
+      threadId,
+    ],
+  );
   // External panels (diff headers, file explorer, preview) bump this nonce after
   // inserting a reference so the composer visibly receives the text.
   const composerFocusRequestNonce = useComposerFocusRequestStore(
@@ -6229,6 +6288,19 @@ export default function ChatView({
         return;
       }
 
+      const effortShortcutIndex = COMPOSER_EFFORT_KEYBINDING_COMMANDS.indexOf(
+        command as (typeof COMPOSER_EFFORT_KEYBINDING_COMMANDS)[number],
+      );
+      if (effortShortcutIndex !== -1) {
+        if (!composerPickerShortcutActive) return;
+        const effort = composerTraitSelection.effortLevels[effortShortcutIndex];
+        if (!effort) return;
+        event.preventDefault();
+        event.stopPropagation();
+        selectComposerEffort(effort.value);
+        return;
+      }
+
       if (command === "papero.next") {
         // Yield to slash/mention/folder menus so Tab still completes items there.
         if (!composerPickerShortcutActive || composerMenuOpenRef.current) return;
@@ -6446,7 +6518,9 @@ export default function ChatView({
     modelOptionsByProvider,
     onProviderModelSelect,
     activePaperoId,
+    composerTraitSelection,
     onSelectPapero,
+    selectComposerEffort,
   ]);
 
   // Preserve the original "single mic button" contract:
@@ -9173,30 +9247,6 @@ export default function ChatView({
     selectedModel,
   ]);
 
-  const setPromptFromTraits = useCallback(
-    (nextPrompt: string) => {
-      const currentPrompt = promptRef.current;
-      if (nextPrompt === currentPrompt) {
-        scheduleComposerFocus();
-        return;
-      }
-      promptRef.current = nextPrompt;
-      setPrompt(nextPrompt);
-      const nextCursor = collapseExpandedComposerCursor(nextPrompt, nextPrompt.length);
-      setComposerCursor(nextCursor);
-      setComposerTrigger(detectComposerTrigger(nextPrompt, nextPrompt.length));
-      scheduleComposerFocus();
-    },
-    [scheduleComposerFocus, setPrompt],
-  );
-  const selectedProviderModelOptions = composerModelOptions?.[selectedProvider];
-  const composerTraitSelection = getComposerTraitSelection(
-    selectedProvider,
-    selectedModel,
-    prompt,
-    selectedProviderModelOptions,
-    selectedRuntimeModel,
-  );
   const runtimeUsageContextWindow = useMemo(
     () =>
       activeContextWindow ??

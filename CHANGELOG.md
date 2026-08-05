@@ -6,6 +6,7 @@
 
 - Added a sidebar Activity view that acts as a compact task inbox for running work, input requests, failures, and recently settled tasks, with project grouping, project-scoped filters, pinned rows, urgency-aware ordering, and a persistent cross-tab view preference.
 - Added focused transcript-scroll cancellation coverage so user input can stop both native smooth scrolling and virtual-list bookkeeping at the currently visible offset.
+- Added configurable `Ctrl+1` through `Ctrl+9` composer shortcuts. Each key selects the matching reasoning-effort position, ordered from the lowest available level to the highest. The shortcuts appear in Settings and are persisted with the existing keybindings configuration. `Ctrl+1` and `Ctrl+2` remain available for terminal-workspace tabs while that workspace is open.
 
 ### Changed
 

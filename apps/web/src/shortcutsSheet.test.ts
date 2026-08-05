@@ -32,6 +32,17 @@ describe("buildShortcutSheetSections", () => {
             altKey: false,
           },
         },
+        {
+          command: "composer.effort.1",
+          shortcut: {
+            key: "1",
+            modKey: false,
+            metaKey: false,
+            ctrlKey: true,
+            shiftKey: false,
+            altKey: false,
+          },
+        },
       ],
       projectScripts: PROJECT_SCRIPTS,
       platform: "MacIntel",
@@ -56,6 +67,14 @@ describe("buildShortcutSheetSections", () => {
     expect(
       sections[0]?.entries.some(
         (entry) => entry.id === "sidebar.activity" && entry.shortcutLabel === "⌥⌘U",
+      ),
+    ).toBe(true);
+    expect(
+      sections[0]?.entries.some(
+        (entry) =>
+          entry.id === "composer.effort.1" &&
+          entry.label === "Select reasoning level 1" &&
+          entry.shortcutLabel === "⌃1",
       ),
     ).toBe(true);
     expect(sections[1]?.title).toBe("In workspace mode");

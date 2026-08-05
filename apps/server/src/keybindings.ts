@@ -7,6 +7,7 @@
  * @module Keybindings
  */
 import {
+  COMPOSER_EFFORT_KEYBINDING_COMMANDS,
   KeybindingRule,
   KeybindingsConfig,
   KeybindingShortcut,
@@ -118,6 +119,11 @@ export const DEFAULT_KEYBINDINGS: ReadonlyArray<KeybindingRule> = [
   // Shift+Tab stays reserved for plan-mode toggle in the composer.
   { key: "tab", command: "papero.next", when: "!terminalFocus" },
   { key: "mod+shift+e", command: "traitsPicker.toggle", when: "!terminalFocus" },
+  ...COMPOSER_EFFORT_KEYBINDING_COMMANDS.map((command, index) => ({
+    key: `ctrl+${index + 1}`,
+    command,
+    when: "!terminalFocus && !terminalWorkspaceOpen",
+  })),
   { key: "mod+shift+u", command: "settings.usage", when: "!terminalFocus" },
   // New thread (chat.new) is the primary create action; it falls back to the most
   // recent project when no project is active.

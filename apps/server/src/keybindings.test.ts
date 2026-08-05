@@ -812,6 +812,31 @@ it.layer(NodeServices.layer)("keybindings", (it) => {
     );
   });
 
+  it.effect("does not overwrite a custom effort shortcut while syncing defaults", () =>
+    Effect.gen(function* () {
+      const { keybindingsConfigPath } = yield* ServerConfig;
+      yield* writeKeybindingsConfig(keybindingsConfigPath, [
+        {
+          key: "ctrl+1",
+          command: "script.custom-action.run",
+          when: "!terminalFocus && !terminalWorkspaceOpen",
+        },
+      ]);
+
+      yield* Effect.gen(function* () {
+        const keybindings = yield* Keybindings;
+        yield* keybindings.syncDefaultKeybindingsOnStartup;
+      });
+
+      const persisted = yield* readKeybindingsConfig(keybindingsConfigPath);
+      assert.isTrue(
+        persisted.some((entry) => entry.command === "script.custom-action.run"),
+      );
+      assert.isFalse(persisted.some((entry) => entry.command === "composer.effort.1"));
+      assert.isTrue(persisted.some((entry) => entry.command === "composer.effort.2"));
+    }).pipe(Effect.provide(makeKeybindingsLayer())),
+  );
+
   it.effect("upserts custom keybindings to configured path", () =>
     Effect.gen(function* () {
       const { keybindingsConfigPath } = yield* ServerConfig;

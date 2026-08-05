@@ -26,6 +26,14 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
     date: "Aug 2",
     features: [
       {
+        id: "composer-effort-shortcuts",
+        title: "Change reasoning effort from the keyboard",
+        description:
+          "Hold Control and press a number in the composer to move from the lowest available effort to the highest.",
+        details:
+          "Ctrl+1 selects the first effort exposed by the active model, Ctrl+2 selects the next one, and so on through Ctrl+9. The commands use the existing keybinding file and appear in Settings → Keyboard shortcuts, so they can be changed without touching the composer. Shortcuts stay scoped to the composer and leave terminal-workspace tab bindings intact.",
+      },
+      {
         id: "sidebar-activity-inbox",
         title: "See what needs attention from one Activity view",
         description:

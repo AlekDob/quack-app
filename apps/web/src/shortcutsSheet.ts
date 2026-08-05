@@ -3,7 +3,11 @@
 // Layer: UI helper
 // Depends on: keybinding label resolution, project script command mapping, and platform helpers.
 
-import type { KeybindingCommand, ResolvedKeybindingsConfig } from "@synara/contracts";
+import {
+  COMPOSER_EFFORT_KEYBINDING_COMMANDS,
+  type KeybindingCommand,
+  type ResolvedKeybindingsConfig,
+} from "@synara/contracts";
 import { isMacPlatform } from "./lib/utils";
 import { shortcutLabelForCommand } from "./keybindings";
 import { commandForProjectScript } from "./projectScripts";
@@ -167,6 +171,14 @@ const AVAILABLE_NOW_DEFINITIONS: readonly ShortcutDefinition[] = [
     label: "Reasoning picker",
     description: "Open the composer reasoning and trait controls.",
   },
+  ...COMPOSER_EFFORT_KEYBINDING_COMMANDS.map((command, index) => ({
+    command,
+    label: `Select reasoning level ${index + 1}`,
+    description:
+      index === 0
+        ? "Choose the lowest available reasoning level for the selected model."
+        : "Choose this reasoning level for the selected model, ordered from lowest to highest.",
+  })),
   {
     command: "composer.focus.toggle",
     label: "Focus composer",

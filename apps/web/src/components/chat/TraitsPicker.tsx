@@ -10,7 +10,6 @@ import {
   type ProviderModelDescriptor,
   type ThreadId,
 } from "@synara/contracts";
-import { applyClaudePromptEffortPrefix } from "@synara/shared/model";
 import { memo, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDownIcon, FastModeIcon, FastModeOutlineIcon, SettingsIcon } from "~/lib/icons";
 import { cn } from "~/lib/utils";
@@ -27,7 +26,6 @@ import {
 import { useComposerDraftStore } from "../../composerDraftStore";
 import {
   buildNextProviderOptions,
-  buildProviderOptionPatch,
   type ProviderOptions,
 } from "../../providerModelOptions";
 import { COMPOSER_PICKER_TRIGGER_TEXT_CLASS_NAME } from "./composerPickerStyles";
@@ -35,14 +33,13 @@ import { ComposerPickerMenuPopup } from "./ComposerPickerMenuPopup";
 import {
   getComposerTraitSelection,
   hasVisibleComposerTraitControls,
+  resolveComposerEffortChange,
   resolveComposerTraitStatusLabel,
   showsComposerFastModeBadge,
   supportsComposerFastModeControl,
 } from "./composerTraits";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { ShortcutKbd } from "../ui/shortcut-kbd";
-
-const ULTRATHINK_PROMPT_PREFIX = "Ultrathink:\n";
 
 function defaultAgentForProvider(provider: ProviderKind): string | null {
   if (provider === "kilo") return "code";
@@ -343,29 +340,24 @@ export const TraitsMenuContent = memo(function TraitsMenuContentImpl({
   // hand-written dependency list can match it and the validator refuses to compile the component at
   // all. Letting the compiler own this memoization is what gets the whole file optimized.
   const handleEffortChange = (value: string) => {
-    if (ultrathinkPromptControlled) return;
-    if (!value) return;
-    const nextOption = effortLevels.find((option) => option.value === value);
-    if (!nextOption) return;
-    if (promptInjectedValues.includes(nextOption.value)) {
-      const nextPrompt =
-        prompt.trim().length === 0
-          ? ULTRATHINK_PROMPT_PREFIX
-          : applyClaudePromptEffortPrefix(prompt, "ultrathink");
-      onPromptChange(nextPrompt);
+    const change = resolveComposerEffortChange({
+      provider,
+      prompt,
+      value,
+      selection: {
+        effortLevels,
+        primarySelectDescriptor,
+        promptInjectedValues,
+        ultrathinkPromptControlled,
+      },
+    });
+    if (!change) return;
+    if (change.kind === "prompt") {
+      onPromptChange(change.prompt);
       onSelectionComplete?.();
       return;
     }
-    const optionId =
-      primarySelectDescriptorId ??
-      (provider === "kilo" || provider === "opencode"
-        ? "variant"
-        : provider === "pi"
-          ? "thinkingLevel"
-          : provider === "claudeAgent"
-            ? "effort"
-            : "reasoningEffort");
-    commitTrait(buildProviderOptionPatch(provider, optionId, nextOption.value));
+    commitTrait(change.patch);
   };
 
   if (!hasVisibleControls && !hasAgentControls) {
