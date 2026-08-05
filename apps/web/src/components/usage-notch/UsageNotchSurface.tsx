@@ -123,6 +123,15 @@ export function UsageNotchSurface() {
           expanded ? "pointer-events-none scale-95 opacity-0" : "scale-100 opacity-100",
         )}
       />
+      {/* The mark lives above both layers so it keeps one fixed screen position
+          while the panel resizes — a second overlay window would be re-ordered
+          behind this one whenever the notch bounds change. */}
+      <img
+        src="/synara.png"
+        alt="Quack"
+        draggable={false}
+        className="pointer-events-none absolute top-2.5 left-1/2 z-10 size-5 -translate-x-1/2 object-contain opacity-95"
+      />
       <div
         className={cn(
           "absolute inset-0 rounded-b-[28px] bg-black shadow-[0_20px_50px_rgba(0,0,0,.42)] transition-[opacity,filter] duration-180 [transition-timing-function:cubic-bezier(.23,1,.32,1)] motion-reduce:transition-none",

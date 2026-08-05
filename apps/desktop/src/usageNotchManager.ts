@@ -22,7 +22,6 @@ export interface UsageNotchManagerOptions {
   readonly platform: NodeJS.Platform;
   readonly screen: Pick<Screen, "getPrimaryDisplay" | "on" | "removeListener">;
   readonly createWindow: () => UsageNotchWindow;
-  readonly createLogoWindow: () => UsageNotchWindow;
 }
 
 export interface UsageNotchState {
@@ -35,7 +34,6 @@ export interface UsageNotchState {
 export class UsageNotchManager {
   readonly #options: UsageNotchManagerOptions;
   #window: UsageNotchWindow | null = null;
-  #logoWindow: UsageNotchWindow | null = null;
   #enabled = false;
   #presentation: UsageNotchPresentation = "compact";
   #disposed = false;
@@ -75,7 +73,6 @@ export class UsageNotchManager {
     this.#ensureWindow();
     this.#applyBounds();
     this.#window?.showInactive();
-    this.#logoWindow?.showInactive();
     return this.getState();
   }
 
@@ -97,34 +94,25 @@ export class UsageNotchManager {
     this.#destroyWindow();
   }
 
+  // The window factory already applies level and workspace behavior; repeating it
+  // here re-ordered the overlay inside its window level for no benefit.
   #ensureWindow(): void {
     if (!this.#window || this.#window.isDestroyed()) {
       this.#window = this.#options.createWindow();
-      this.#window.setAlwaysOnTop(true, "screen-saver");
-      this.#window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    }
-    if (!this.#logoWindow || this.#logoWindow.isDestroyed()) {
-      this.#logoWindow = this.#options.createLogoWindow();
-      this.#logoWindow.setIgnoreMouseEvents(true);
-      this.#logoWindow.setAlwaysOnTop(true, "screen-saver");
-      this.#logoWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     }
   }
 
   #applyBounds(): void {
     if (!this.#enabled || !this.#window || this.#window.isDestroyed()) return;
     const display: Display = this.#options.screen.getPrimaryDisplay();
-    const nextBounds = resolveUsageNotchBounds({ display: display.bounds, presentation: this.#presentation });
+    const nextBounds = resolveUsageNotchBounds({
+      display: display.bounds,
+      presentation: this.#presentation,
+    });
     this.#window.setBounds(nextBounds);
-    this.#logoWindow?.setBounds(
-      resolveUsageNotchBounds({ display: display.bounds, presentation: "compact" }),
-    );
   }
 
   #destroyWindow(): void {
-    const logoWindow = this.#logoWindow;
-    this.#logoWindow = null;
-    if (logoWindow && !logoWindow.isDestroyed()) logoWindow.destroy();
     const window = this.#window;
     this.#window = null;
     if (window && !window.isDestroyed()) window.destroy();

@@ -1718,7 +1718,6 @@ function initializeUsageNotch(): void {
     platform: process.platform,
     screen,
     createWindow: createUsageNotchWindow,
-    createLogoWindow: createUsageNotchLogoWindow,
   });
 }
 
@@ -3842,12 +3841,12 @@ function registerIpcHandlers(): void {
   registerBrowserIpcHandlers(ipcMain, browserManager);
 }
 
-function usageNotchEntryUrl(surface: "usage-notch" | "usage-notch-logo" = "usage-notch"): string {
+function usageNotchEntryUrl(): string {
   const baseUrl = isDevelopment
     ? (process.env.VITE_DEV_SERVER_URL as string)
     : desktopIdentity.entryUrl;
   const url = new URL(baseUrl);
-  url.searchParams.set("surface", surface);
+  url.searchParams.set("surface", "usage-notch");
   return url.toString();
 }
 
@@ -3877,39 +3876,12 @@ function createUsageNotchWindow(): BrowserWindow {
   window.setMenuBarVisibility(false);
   window.setAlwaysOnTop(true, "screen-saver");
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // `visibleOnFullScreen` makes Electron switch the whole app to the accessory
+  // activation policy, which drops Quack from the Dock and the Cmd+Tab switcher.
+  // Re-asserting the dock restores the regular policy; the overlay stays visible.
+  void app.dock?.show();
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   void window.loadURL(usageNotchEntryUrl());
-  return window;
-}
-
-function createUsageNotchLogoWindow(): BrowserWindow {
-  const window = new BrowserWindow({
-    width: 40,
-    height: 40,
-    x: 0,
-    y: 0,
-    show: false,
-    frame: false,
-    transparent: true,
-    resizable: false,
-    movable: false,
-    focusable: false,
-    skipTaskbar: true,
-    hasShadow: false,
-    backgroundColor: "#00000000",
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      backgroundThrottling: true,
-    },
-  });
-  window.setMenuBarVisibility(false);
-  window.setIgnoreMouseEvents(true);
-  window.setAlwaysOnTop(true, "screen-saver");
-  window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-  void window.loadURL(usageNotchEntryUrl("usage-notch-logo"));
   return window;
 }
 

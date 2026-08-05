@@ -10,7 +10,6 @@ import { getRouter } from "./router";
 import { APP_DISPLAY_NAME } from "./branding";
 import { isElectron } from "./env";
 import { UsageNotchSurface } from "./components/usage-notch/UsageNotchSurface";
-import { UsageNotchLogoSurface } from "./components/usage-notch/UsageNotchLogoSurface";
 
 document.title = APP_DISPLAY_NAME;
 
@@ -20,17 +19,10 @@ if (isElectron) {
 
 const surface = new URLSearchParams(window.location.search).get("surface");
 const isUsageNotchSurface = surface === "usage-notch";
-const isUsageNotchLogoSurface = surface === "usage-notch-logo";
-const router = isUsageNotchSurface || isUsageNotchLogoSurface ? null : getRouter(appHistory);
+const router = isUsageNotchSurface ? null : getRouter(appHistory);
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    {isUsageNotchSurface ? (
-      <UsageNotchSurface />
-    ) : isUsageNotchLogoSurface ? (
-      <UsageNotchLogoSurface />
-    ) : (
-      <RouterProvider router={router!} />
-    )}
+    {isUsageNotchSurface ? <UsageNotchSurface /> : <RouterProvider router={router!} />}
   </React.StrictMode>,
 );
