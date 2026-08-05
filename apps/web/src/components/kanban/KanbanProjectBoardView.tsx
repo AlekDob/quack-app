@@ -23,10 +23,13 @@ import {
   resolveAssistantDeliveryMode,
   useAppSettings,
 } from "~/appSettings";
+import type { ModelSelection } from "@synara/contracts";
 import { toastManager } from "~/components/ui/toast";
 import { useProviderStatusesForLocalConfig } from "~/hooks/useProviderStatusesForLocalConfig";
 import { useRefreshProviderStatusesNow } from "~/hooks/useProviderStatusRefresh";
 import { resolveProviderSendAvailabilityWithRefresh } from "~/lib/providerAvailability";
+import { resolveProjectDefaultModelSelection } from "~/lib/projectDefaultProvider";
+import { readNativeApi } from "~/nativeApi";
 import { dispatchKanbanDraftCard } from "../../lib/kanbanDispatch";
 import { KanbanCardView } from "./KanbanCardView";
 import { KanbanColumn, parseKanbanColumnDropId } from "./KanbanColumn";
@@ -37,6 +40,7 @@ import {
   type KanbanProjectBoard,
 } from "./kanban.logic";
 import { useKanbanUiStore } from "../../kanbanUiStore";
+import { useStore } from "../../store";
 
 function resolveDropColumn(board: KanbanProjectBoard, overId: string): KanbanColumnKey | null {
   const columnDrop = parseKanbanColumnDropId(overId);
@@ -73,6 +77,7 @@ export function KanbanProjectBoardView({
   const providerOptionsForDispatch = getProviderStartOptions(settings);
   const providerStatuses = useProviderStatusesForLocalConfig();
   const refreshProviderStatuses = useRefreshProviderStatusesNow();
+  const project = useStore((state) => state.projects.find((candidate) => candidate.id === board.projectId));
   const setDraftOrder = useKanbanUiStore((state) => state.setDraftOrder);
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null);
   // A completed drag still emits a click on the source card; swallow exactly that one
@@ -92,12 +97,51 @@ export function KanbanProjectBoardView({
   };
 
   const handleDispatchDrop = async (card: KanbanCard) => {
-    const targetProvider = card.provider ?? settings.defaultProvider;
-    const sendAvailability = await resolveProviderSendAvailabilityWithRefresh({
+    const projectProvider = project?.defaultModelSelection?.provider ?? settings.defaultProvider;
+    const targetProvider = card.provider ?? projectProvider;
+    let modelSelectionOverride: ModelSelection | undefined;
+    let sendAvailability = await resolveProviderSendAvailabilityWithRefresh({
       provider: targetProvider,
       statuses: providerStatuses,
       refreshStatuses: () => refreshProviderStatuses({ silent: true }),
     });
+    if (
+      !sendAvailability.usable &&
+      targetProvider === projectProvider &&
+      settings.defaultProvider !== targetProvider
+    ) {
+      const globalAvailability = await resolveProviderSendAvailabilityWithRefresh({
+        provider: settings.defaultProvider,
+        statuses: providerStatuses,
+        refreshStatuses: () => refreshProviderStatuses({ silent: true }),
+      });
+      if (globalAvailability.usable && project?.cwd) {
+        try {
+          const api = readNativeApi();
+          if (!api) {
+            throw new Error("App is still connecting. Try again in a moment.");
+          }
+          modelSelectionOverride = await resolveProjectDefaultModelSelection({
+            api,
+            provider: settings.defaultProvider,
+            workspaceRoot: project.cwd,
+          });
+          sendAvailability = globalAvailability;
+          toastManager.add({
+            type: "warning",
+            title: "Project provider unavailable",
+            description: `Using ${settings.defaultProvider} for this Kanban task. The project preference was not changed.`,
+          });
+        } catch (error) {
+          toastManager.add({
+            type: "error",
+            title: "Could not resolve the fallback provider",
+            description: error instanceof Error ? error.message : "Try again later.",
+          });
+          return;
+        }
+      }
+    }
     if (!sendAvailability.usable) {
       toastManager.add({
         type: "error",
@@ -112,6 +156,7 @@ export function KanbanProjectBoardView({
       defaultProvider: settings.defaultProvider,
       assistantDeliveryMode,
       providerOptions: providerOptionsForDispatch,
+      ...(modelSelectionOverride ? { modelSelection: modelSelectionOverride } : {}),
     });
     if (result.kind === "dispatched") {
       toastManager.add({

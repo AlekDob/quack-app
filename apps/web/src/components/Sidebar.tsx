@@ -155,7 +155,12 @@ import { useLatestProjectStore } from "../latestProjectStore";
 import { resolveThreadEnvironmentPresentation } from "../lib/threadEnvironment";
 import { dispatchThreadRename } from "../lib/threadRename";
 import { quotePosixShellArgument } from "../lib/shellQuote";
-import { DEFAULT_THREAD_TERMINAL_ID, type SidebarThreadSummary, type Thread } from "../types";
+import {
+  DEFAULT_THREAD_TERMINAL_ID,
+  type Project,
+  type SidebarThreadSummary,
+  type Thread,
+} from "../types";
 import {
   applyAutomationEvent,
   automationAttentionCount,
@@ -379,8 +384,14 @@ import {
   createOrRecoverProjectFromPath,
   PROJECT_CREATE_EXISTING_SYNC_ERROR,
 } from "../lib/projectCreation";
+import {
+  defaultProjectProvider,
+  resolveProjectDefaultModelSelection,
+  visibleProjectProviders,
+} from "../lib/projectDefaultProvider";
 import { useSpacesUiStore } from "../spacesUiStore";
 import { CreateProjectDialog, type CreateProjectSubmitValue } from "./CreateProjectDialog";
+import { ProjectSettingsDialog } from "./ProjectSettingsDialog";
 import { SpaceEditorDialog } from "./SpaceEditorDialog";
 import { useSpacesController } from "./useSpacesController";
 import { SpaceEmptyState } from "./SpaceEmptyState";
@@ -1393,6 +1404,22 @@ export default function Sidebar() {
     [automationListQuery.data],
   );
   const { settings: appSettings, updateSettings } = useAppSettings();
+  const projectDefaultProviders = useMemo(
+    () =>
+      visibleProjectProviders({
+        providerOrder: appSettings.providerOrder,
+        hiddenProviders: appSettings.hiddenProviders,
+      }),
+    [appSettings.hiddenProviders, appSettings.providerOrder],
+  );
+  const initialProjectDefaultProvider = useMemo(
+    () =>
+      defaultProjectProvider({
+        appDefaultProvider: appSettings.defaultProvider,
+        providers: projectDefaultProviders,
+      }),
+    [appSettings.defaultProvider, projectDefaultProviders],
+  );
   // Projects is always available; Studio and the standalone Chats footer can be hidden
   // independently from Settings.
   const chatsSectionVisible = appSettings.showChatsSection;
@@ -2444,7 +2471,11 @@ export default function Sidebar() {
   const addProjectFromPath = useCallback(
     async (
       rawCwd: string,
-      options: { createIfMissing?: boolean; spaceId?: SpaceId | null } = {},
+      options: {
+        createIfMissing?: boolean;
+        spaceId?: SpaceId | null;
+        defaultProvider?: ProviderKind;
+      } = {},
     ) => {
       const cwd = rawCwd.trim();
       if (!cwd) {
@@ -2494,6 +2525,9 @@ export default function Sidebar() {
             ? {}
             : { createIfMissing: options.createIfMissing }),
           ...(options.spaceId === undefined ? {} : { spaceId: options.spaceId }),
+          ...(options.defaultProvider === undefined
+            ? { defaultProvider: initialProjectDefaultProvider }
+            : { defaultProvider: options.defaultProvider }),
           loadSnapshot: () => api.orchestration.getShellSnapshot().catch(() => null),
           maxAttempts: ADD_PROJECT_SNAPSHOT_CATCH_UP_MAX_ATTEMPTS,
           delayMs: ADD_PROJECT_SNAPSHOT_CATCH_UP_DELAY_MS,
@@ -2549,6 +2583,7 @@ export default function Sidebar() {
     [
       appSettings.defaultThreadEnvMode,
       handleNewThread,
+      initialProjectDefaultProvider,
       isAddingProject,
       projects,
       recoverExistingProjectFromServer,
@@ -3295,6 +3330,7 @@ export default function Sidebar() {
         await addProjectFromPath(value.workspaceRoot, {
           createIfMissing: value.createIfMissing,
           spaceId: value.spaceId,
+          defaultProvider: value.defaultProvider,
         });
       } catch (error) {
         // Project creation is one UI transaction: a failed command must not
@@ -3548,6 +3584,30 @@ export default function Sidebar() {
       renameProjectLocally(projectId, trimmed.length > 0 ? trimmed : null);
     },
     [renameProjectLocally],
+  );
+
+  const handleProjectSettingsSave = useCallback(
+    async (project: Project, value: { name: string; provider: ProviderKind }) => {
+      const currentProvider =
+        project.defaultModelSelection?.provider ?? initialProjectDefaultProvider;
+      if (value.provider !== currentProvider) {
+        const api = readNativeApi();
+        if (!api) throw new Error("The app server is unavailable.");
+        const defaultModelSelection = await resolveProjectDefaultModelSelection({
+          api,
+          provider: value.provider,
+          workspaceRoot: project.cwd,
+        });
+        await api.orchestration.dispatchCommand({
+          type: "project.meta.update",
+          commandId: newCommandId(),
+          projectId: project.id,
+          defaultModelSelection,
+        });
+      }
+      handleRenameProjectSave(project.id, value.name, project.localName);
+    },
+    [handleRenameProjectSave, initialProjectDefaultProvider],
   );
 
   const sortedProjects = useMemo(
@@ -6262,6 +6322,8 @@ export default function Sidebar() {
         open={createProjectDialogOpen}
         spaces={spaces}
         activeSpaceId={activeSpaceId}
+        providers={projectDefaultProviders}
+        defaultProvider={initialProjectDefaultProvider}
         onOpenChange={setCreateProjectDialogOpen}
         onSubmit={handleCreateProjectSubmit}
       />
@@ -6584,25 +6646,22 @@ export default function Sidebar() {
         }}
       />
 
-      <RenameDialog
+      <ProjectSettingsDialog
         open={renameProjectDialogId !== null && renameProjectDialogProject !== null}
-        title="Rename project"
-        description="Keep it short and recognizable."
-        initialValue={
+        initialName={
           renameProjectDialogProject?.localName ?? renameProjectDialogProject?.name ?? ""
         }
-        allowEmpty
         placeholder={renameProjectDialogProject?.folderName}
+        provider={
+          renameProjectDialogProject?.defaultModelSelection?.provider ?? initialProjectDefaultProvider
+        }
+        providers={projectDefaultProviders}
         onOpenChange={(nextOpen) => {
           if (!nextOpen) setRenameProjectDialogId(null);
         }}
-        onSave={(nextName) => {
+        onSave={(value) => {
           if (!renameProjectDialogProject) return;
-          handleRenameProjectSave(
-            renameProjectDialogProject.id,
-            nextName,
-            renameProjectDialogProject.localName,
-          );
+          return handleProjectSettingsSave(renameProjectDialogProject, value);
         }}
       />
 

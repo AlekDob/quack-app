@@ -50,6 +50,9 @@ function makeApi(dispatchCommand: ReturnType<typeof vi.fn>): NativeApi {
     orchestration: {
       dispatchCommand,
     },
+    provider: {
+      listModels: vi.fn(async () => ({ models: [], source: "empty" })),
+    },
   } as unknown as NativeApi;
 }
 
@@ -135,5 +138,62 @@ describe("createOrRecoverProjectFromPath", () => {
         spaceId: activeSpaceId,
       }),
     );
+  });
+
+  it("saves the selected provider's default model", async () => {
+    const dispatchCommand = vi.fn(async () => ({ sequence: 2 }));
+    await createOrRecoverProjectFromPath({
+      api: makeApi(dispatchCommand),
+      workspaceRoot: WORKSPACE_ROOT,
+      defaultProvider: "claudeAgent",
+      loadSnapshot: async () => makeSnapshot([]),
+    });
+
+    expect(dispatchCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultModelSelection: {
+          provider: "claudeAgent",
+          model: "claude-sonnet-5",
+        },
+      }),
+    );
+  });
+
+  it("uses the first discovered Pi model", async () => {
+    const dispatchCommand = vi.fn(async () => ({ sequence: 2 }));
+    const api = makeApi(dispatchCommand);
+    vi.mocked(api.provider.listModels).mockResolvedValue({
+      models: [{ slug: "anthropic/claude-sonnet-5", name: "Claude Sonnet 5" }],
+      source: "pi.sdk",
+    });
+
+    await createOrRecoverProjectFromPath({
+      api,
+      workspaceRoot: WORKSPACE_ROOT,
+      defaultProvider: "pi",
+      loadSnapshot: async () => makeSnapshot([]),
+    });
+
+    expect(dispatchCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        defaultModelSelection: {
+          provider: "pi",
+          model: "anthropic/claude-sonnet-5",
+        },
+      }),
+    );
+  });
+
+  it("does not create a Pi project when no model is available", async () => {
+    const dispatchCommand = vi.fn(async () => ({ sequence: 2 }));
+    await expect(
+      createOrRecoverProjectFromPath({
+        api: makeApi(dispatchCommand),
+        workspaceRoot: WORKSPACE_ROOT,
+        defaultProvider: "pi",
+        loadSnapshot: async () => makeSnapshot([]),
+      }),
+    ).rejects.toThrow("Pi has no available models for this project.");
+    expect(dispatchCommand).not.toHaveBeenCalled();
   });
 });

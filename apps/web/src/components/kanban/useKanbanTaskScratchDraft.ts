@@ -3,8 +3,7 @@
 // Layer: Kanban UI hook
 // Exports: useKanbanTaskScratchDraft
 
-import type { ModelSlug, ProviderKind } from "@synara/contracts";
-import { getDefaultModel } from "@synara/shared/model";
+import type { ModelSelection, ModelSlug, ProviderKind } from "@synara/contracts";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -24,16 +23,20 @@ import {
 import { buildModelSelection } from "../../providerModelOptions";
 import { toastManager } from "../ui/toast";
 
-export function useKanbanTaskScratchDraft(input: { readonly defaultProvider: ProviderKind }) {
+export function useKanbanTaskScratchDraft(input: { readonly defaultModelSelection: ModelSelection }) {
   // Scratch composer draft backing the dialog: model/effort/speed state lives in
   // the composer draft store under this throwaway thread id, exactly like chat.
   const [scratchThreadId] = useState(() => newThreadId());
   useEffect(() => {
-    useComposerDraftStore.getState().applyStickyState(scratchThreadId);
     return () => {
       useComposerDraftStore.getState().clearDraftThread(scratchThreadId);
     };
   }, [scratchThreadId]);
+  useEffect(() => {
+    const store = useComposerDraftStore.getState();
+    store.applyStickyState(scratchThreadId);
+    store.setModelSelection(scratchThreadId, input.defaultModelSelection);
+  }, [input.defaultModelSelection, scratchThreadId]);
 
   const scratchDraft = useComposerThreadDraft(scratchThreadId);
   const prompt = scratchDraft.prompt;
@@ -54,12 +57,15 @@ export function useKanbanTaskScratchDraft(input: { readonly defaultProvider: Pro
     (state) => state.stickyModelSelectionByProvider,
   );
   const selectedProvider: ProviderKind =
-    scratchDraft.activeProvider ?? stickyActiveProvider ?? input.defaultProvider;
+    scratchDraft.activeProvider ?? stickyActiveProvider ?? input.defaultModelSelection.provider;
   const draftModelSelection =
     scratchDraft.modelSelectionByProvider[selectedProvider] ??
     stickyModelSelectionByProvider[selectedProvider];
   const selectedModel: ModelSlug | null =
-    draftModelSelection?.model ?? getDefaultModel(selectedProvider);
+    draftModelSelection?.model ??
+    (selectedProvider === input.defaultModelSelection.provider
+      ? input.defaultModelSelection.model
+      : null);
   const selectedProviderModelOptions = draftModelSelection?.options;
   const selectedModelSupportsAutoMode =
     draftModelSelection?.provider === "claudeAgent"

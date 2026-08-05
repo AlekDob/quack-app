@@ -6,10 +6,10 @@
 import {
   type NativeApi,
   type OrchestrationShellSnapshot,
+  type ProviderKind,
   type ProjectId,
   type SpaceId,
 } from "@synara/contracts";
-import { getDefaultModel } from "@synara/shared/model";
 
 import { readActiveSpaceId } from "../spacesUiStore";
 import {
@@ -19,6 +19,7 @@ import {
   waitForRecoverableProjectInReadModel,
 } from "./projectCreateRecovery";
 import { newCommandId, newProjectId } from "./utils";
+import { resolveProjectDefaultModelSelection } from "./projectDefaultProvider";
 
 const DEFAULT_PROJECT_CREATE_RECOVERY_MAX_ATTEMPTS = 6;
 const DEFAULT_PROJECT_CREATE_RECOVERY_DELAY_MS = 50;
@@ -39,6 +40,7 @@ export async function createOrRecoverProjectFromPath(input: {
   createIfMissing?: boolean;
   /** Overrides the active-space default; `null` files the project in Void. */
   spaceId?: SpaceId | null;
+  defaultProvider?: ProviderKind;
   loadSnapshot: () => Promise<OrchestrationShellSnapshot | null>;
   maxAttempts?: number;
   delayMs?: number;
@@ -58,6 +60,11 @@ export async function createOrRecoverProjectFromPath(input: {
   const projectId = newProjectId();
   const createdAt = new Date().toISOString();
   const title = buildProjectTitleFromWorkspaceRoot(workspaceRoot);
+  const defaultModelSelection = await resolveProjectDefaultModelSelection({
+    api: input.api,
+    provider: input.defaultProvider ?? "codex",
+    workspaceRoot,
+  });
 
   try {
     await input.api.orchestration.dispatchCommand({
@@ -68,10 +75,7 @@ export async function createOrRecoverProjectFromPath(input: {
       title,
       workspaceRoot,
       createWorkspaceRootIfMissing: input.createIfMissing === true,
-      defaultModelSelection: {
-        provider: "codex",
-        model: getDefaultModel("codex"),
-      },
+      defaultModelSelection,
       // A project created while a space is active belongs to that space — filing it
       // afterwards would bounce the sidebar back to Void to follow the new project.
       // Callers with an explicit destination (the Create Project dialog) override it.

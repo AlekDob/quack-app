@@ -591,6 +591,7 @@ import {
   isDuplicateProjectCreateError,
   waitForRecoverableProjectForDuplicateCreate,
 } from "../lib/projectCreateRecovery";
+import { resolveProjectDefaultModelSelection } from "../lib/projectDefaultProvider";
 
 // The terminal drawer drags in xterm plus its addons (~223 KB gzip). Both mount points
 // are conditional, so loading it lazily keeps the terminal stack out of the initial
@@ -7307,11 +7308,11 @@ export default function ChatView({
       queuedChatTurn?.skills ?? selectedComposerSkillsRef.current;
     const selectedComposerMentionsForSend =
       queuedChatTurn?.mentions ?? selectedComposerMentionsRef.current;
-    const selectedProviderForSend = queuedChatTurn?.selectedProvider ?? selectedProvider;
-    const selectedModelForSend = queuedChatTurn?.selectedModel ?? selectedModel;
+    let selectedProviderForSend = queuedChatTurn?.selectedProvider ?? selectedProvider;
+    let selectedModelForSend = queuedChatTurn?.selectedModel ?? selectedModel;
     const selectedPromptEffortForSend =
       queuedChatTurn?.selectedPromptEffort ?? selectedPromptEffort;
-    const selectedModelSelectionForSend = queuedChatTurn?.modelSelection ?? selectedModelSelection;
+    let selectedModelSelectionForSend = queuedChatTurn?.modelSelection ?? selectedModelSelection;
     const providerOptionsForDispatchForSend =
       queuedChatTurn?.providerOptionsForDispatch ?? providerOptionsForDispatch;
     const runtimeModeForSend = queuedChatTurn?.runtimeMode ?? runtimeMode;
@@ -7585,11 +7586,58 @@ export default function ChatView({
       sendPreflightInFlightRef.current = false;
     });
     if (!sendProviderAvailability.usable) {
-      toastManager.add({
-        type: "error",
-        title: sendProviderAvailability.unavailableReason,
-      });
-      return false;
+      const isProjectDefaultFirstSend =
+        queuedChatTurn === null &&
+        activeThread.messages.length === 0 &&
+        activeProject.defaultModelSelection?.provider === selectedModelSelectionForSend.provider &&
+        settings.defaultProvider !== selectedModelSelectionForSend.provider;
+      if (isProjectDefaultFirstSend) {
+        const fallbackAvailability = await resolveProviderSendAvailabilityWithRefresh({
+          provider: settings.defaultProvider,
+          statuses: providerStatuses,
+          refreshStatuses: () => refreshProviderStatuses({ silent: true }),
+        });
+        if (fallbackAvailability.usable) {
+          const fallbackProjectSelection = await resolveProjectDefaultModelSelection({
+            api,
+            provider: settings.defaultProvider,
+            workspaceRoot: activeProject.cwd,
+          }).catch((error: unknown) => {
+            toastManager.add({
+              type: "error",
+              title: "Could not prepare the fallback provider",
+              description: error instanceof Error ? error.message : "Unknown provider error.",
+            });
+            return null;
+          });
+          if (!fallbackProjectSelection) {
+            return false;
+          }
+          const fallbackSelection =
+            resolvePaperoModelForProvider(activePaperoId, settings.defaultProvider) ??
+            fallbackProjectSelection;
+          selectedModelSelectionForSend = fallbackSelection;
+          selectedProviderForSend = fallbackSelection.provider;
+          selectedModelForSend = fallbackSelection.model;
+          setComposerDraftModelSelection(activeThread.id, fallbackSelection);
+          toastManager.add({
+            type: "warning",
+            title: `${sendProviderAvailability.unavailableReason} Using ${PROVIDER_DISPLAY_NAMES[fallbackSelection.provider]} for this chat.`,
+          });
+        } else {
+          toastManager.add({
+            type: "error",
+            title: fallbackAvailability.unavailableReason,
+          });
+          return false;
+        }
+      } else {
+        toastManager.add({
+          type: "error",
+          title: sendProviderAvailability.unavailableReason,
+        });
+        return false;
+      }
     }
 
     const browserPromptAttachment: BrowserPromptAttachmentResolution =

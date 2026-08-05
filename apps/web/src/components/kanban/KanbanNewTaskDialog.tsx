@@ -9,11 +9,13 @@
 // Exports: KanbanNewTaskDialog
 
 import type {
+  ModelSelection,
   ProjectId,
   ProviderInteractionMode,
   ProviderKind,
   RuntimeMode,
 } from "@synara/contracts";
+import { getDefaultModel } from "@synara/shared/model";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -132,6 +134,19 @@ export function KanbanNewTaskDialog({
   const [selectedProjectId, setSelectedProjectId] = useState<ProjectId | null>(
     () => initialProjectId ?? projectOptions[0]?.id ?? null,
   );
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId],
+  );
+  const kanbanDefaultModelSelection = useMemo<ModelSelection>(
+    () =>
+      selectedProject?.defaultModelSelection ??
+      buildModelSelection(
+        settings.defaultProvider === "pi" ? "codex" : settings.defaultProvider,
+        getDefaultModel(settings.defaultProvider === "pi" ? "codex" : settings.defaultProvider),
+      ),
+    [selectedProject?.defaultModelSelection, settings.defaultProvider],
+  );
   const {
     scratchThreadId,
     prompt,
@@ -156,7 +171,7 @@ export function KanbanNewTaskDialog({
     clearComposerAssistantSelections,
     clearComposerFileComments,
     removeComposerTerminalContext,
-  } = useKanbanTaskScratchDraft({ defaultProvider: settings.defaultProvider });
+  } = useKanbanTaskScratchDraft({ defaultModelSelection: kanbanDefaultModelSelection });
   const promptRef = useRef(prompt);
 
   const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>(DEFAULT_RUNTIME_MODE);
@@ -171,10 +186,6 @@ export function KanbanNewTaskDialog({
   const [isTraitsPickerOpen, setIsTraitsPickerOpen] = useState(false);
   const [isDragOverComposer, setIsDragOverComposer] = useState(false);
   const [expandedImage, setExpandedImage] = useState<ExpandedImagePreview | null>(null);
-  const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId) ?? null,
-    [projects, selectedProjectId],
-  );
   const providerModelDiscoveryCwd = resolveProviderDiscoveryCwd({
     activeThreadWorktreePath: null,
     activeProjectCwd: selectedProject?.cwd ?? null,
@@ -272,6 +283,8 @@ export function KanbanNewTaskDialog({
     envMode,
     sendAsDraft,
     defaultProvider: settings.defaultProvider,
+    projectDefaultProvider: kanbanDefaultModelSelection.provider,
+    projectWorkspaceRoot: selectedProject?.cwd ?? null,
     assistantDeliveryMode,
     providerOptionsForDispatch,
     providerStatuses,

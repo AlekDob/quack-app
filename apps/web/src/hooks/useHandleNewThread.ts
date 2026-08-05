@@ -1,4 +1,4 @@
-import { type ProjectId, ThreadId } from "@synara/contracts";
+import { type ModelSelection, type ProjectId, ThreadId } from "@synara/contracts";
 import { getDefaultModel } from "@synara/shared/model";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { startTransition } from "react";
@@ -17,6 +17,7 @@ import {
   resolveThreadBootstrapPlan,
   type NewThreadOptions,
 } from "../lib/threadBootstrap";
+import { makeModelSelection } from "../composerDraftModels";
 import { promoteThreadCreate } from "../lib/threadCreatePromotion";
 import {
   draftNavigationSlotKey,
@@ -60,18 +61,24 @@ export function useHandleNewThread() {
   ): Promise<ThreadId | null> => {
     const entryPoint = options?.entryPoint ?? "chat";
     const wantsTemporaryThread = options?.temporary === true;
-    const applyProviderOverride = (threadId: ThreadId) => {
-      if (!options?.provider) {
-        return;
-      }
-      const defaultModel = getDefaultModel(options.provider);
-      if (!defaultModel) {
-        return;
-      }
-      setModelSelection(threadId, {
-        provider: options.provider,
-        model: defaultModel,
-      });
+    const projectDefaultModelSelection =
+      useStore.getState().projects.find((project) => project.id === projectId)
+        ?.defaultModelSelection ?? null;
+    const explicitProviderModelSelection: ModelSelection | null = options?.provider
+      ? (() => {
+          const model = getDefaultModel(options.provider);
+          return model ? makeModelSelection(options.provider, model) : null;
+        })()
+      : null;
+    const initialModelSelection =
+      explicitProviderModelSelection ??
+      projectDefaultModelSelection ??
+      makeModelSelection(
+        settings.defaultProvider === "pi" ? "codex" : settings.defaultProvider,
+        getDefaultModel(settings.defaultProvider === "pi" ? "codex" : settings.defaultProvider),
+      );
+    const applyInitialProviderSelection = (threadId: ThreadId) => {
+      setModelSelection(threadId, initialModelSelection);
     };
     // Fresh chats open on the active papero (Milo by default), so its saved model slot
     // must win over the last-used sticky model — otherwise the pill says Milo while the
@@ -79,8 +86,7 @@ export function useHandleNewThread() {
     const applyPaperoModelSlot = (threadId: ThreadId) => {
       const provider =
         useComposerDraftStore.getState().draftsByThreadId[threadId]?.activeProvider ??
-        options?.provider ??
-        settings.defaultProvider;
+        initialModelSelection.provider;
       const paperoStore = usePaperoStore.getState();
       const slot = paperoStore.resolveModelForCurrentProvider(
         paperoStore.getActivePaperoId(threadId),
@@ -151,10 +157,6 @@ export function useHandleNewThread() {
       projectId,
       routeThreadId: focusedThreadId,
     });
-    // Read from the store at call time so post-sync sidebar flows can use the latest project defaults.
-    const projectDefaultModelSelection =
-      useStore.getState().projects.find((project) => project.id === projectId)
-        ?.defaultModelSelection ?? null;
     const activeThreadSnapshot = createActiveThreadSnapshot(activeThread, projectId);
     const activeDraftThreadSnapshot = createActiveDraftThreadSnapshot(activeDraftThread, projectId);
     const resolveCreationState = (
@@ -221,7 +223,7 @@ export function useHandleNewThread() {
           setDraftThreadContext(bootstrapPlan.threadId, draftContextPatch);
           resolvedStoredDraftThread = getDraftThread(bootstrapPlan.threadId);
         }
-        applyProviderOverride(bootstrapPlan.threadId);
+        if (options?.provider) applyInitialProviderSelection(bootstrapPlan.threadId);
         setProjectDraftThreadId(projectId, bootstrapPlan.threadId, { entryPoint });
         restoreComposerDraft(bootstrapPlan.threadId, preservedComposerDraft);
         activateThreadEntryPoint(bootstrapPlan.threadId);
@@ -271,7 +273,7 @@ export function useHandleNewThread() {
           setDraftThreadContext(bootstrapPlan.threadId, draftContextPatch);
           resolvedActiveDraftThread = getDraftThread(bootstrapPlan.threadId);
         }
-        applyProviderOverride(bootstrapPlan.threadId);
+        if (options?.provider) applyInitialProviderSelection(bootstrapPlan.threadId);
         setProjectDraftThreadId(projectId, bootstrapPlan.threadId, { entryPoint });
         restoreComposerDraft(bootstrapPlan.threadId, preservedComposerDraft);
         activateThreadEntryPoint(bootstrapPlan.threadId);
@@ -299,7 +301,7 @@ export function useHandleNewThread() {
           registerDraftThread(threadId, { projectId, ...draftSeed });
           activateThreadEntryPoint(threadId);
           applyStickyState(threadId);
-          applyProviderOverride(threadId);
+          applyInitialProviderSelection(threadId);
           applyPaperoModelSlot(threadId);
         },
         // Mark the draft-landing navigation as a transition so the new route

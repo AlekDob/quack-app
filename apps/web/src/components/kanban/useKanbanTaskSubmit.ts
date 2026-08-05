@@ -23,6 +23,8 @@ import { useComposerDraftStore } from "~/composerDraftStore";
 import { useRefreshProviderStatusesNow } from "~/hooks/useProviderStatusRefresh";
 import { createAndSendKanbanTask, createKanbanDraftTask } from "~/lib/kanbanTaskCreate";
 import { resolveProviderSendAvailabilityWithRefresh } from "~/lib/providerAvailability";
+import { resolveProjectDefaultModelSelection } from "~/lib/projectDefaultProvider";
+import { readNativeApi } from "~/nativeApi";
 import { buildModelSelection } from "~/providerModelOptions";
 import { truncateKanbanTaskPreview } from "./KanbanNewTaskDialog.logic";
 
@@ -40,6 +42,8 @@ interface UseKanbanTaskSubmitInput {
   readonly envMode: DraftThreadEnvMode;
   readonly sendAsDraft: boolean;
   readonly defaultProvider: ProviderKind;
+  readonly projectDefaultProvider: ProviderKind;
+  readonly projectWorkspaceRoot: string | null;
   readonly assistantDeliveryMode: AssistantDeliveryMode;
   readonly providerOptionsForDispatch: ProviderStartOptions | undefined;
   readonly providerStatuses: readonly ServerProviderStatus[];
@@ -63,6 +67,8 @@ export function useKanbanTaskSubmit(input: UseKanbanTaskSubmitInput) {
     envMode,
     sendAsDraft,
     defaultProvider,
+    projectDefaultProvider,
+    projectWorkspaceRoot,
     assistantDeliveryMode,
     providerOptionsForDispatch,
     providerStatuses,
@@ -106,7 +112,7 @@ export function useKanbanTaskSubmit(input: UseKanbanTaskSubmitInput) {
       storedModelSelection?.provider === "claudeAgent"
         ? storedModelSelection.supportsAutoMode
         : undefined;
-    const modelSelection = buildModelSelection(
+    let modelSelection = buildModelSelection(
       selectedProvider,
       selectedModel,
       storedModelSelection?.options,
@@ -114,7 +120,7 @@ export function useKanbanTaskSubmit(input: UseKanbanTaskSubmitInput) {
         ? (selectedModelSupportsAutoMode ?? storedModelSupportsAutoMode)
         : undefined,
     );
-    const taskInput = {
+    let taskInput = {
       projectId: selectedProjectId,
       prompt: trimmedPrompt,
       sourceComposerThreadId: scratchThreadId,
@@ -142,12 +148,47 @@ export function useKanbanTaskSubmit(input: UseKanbanTaskSubmitInput) {
       refreshStatuses: () => refreshProviderStatuses({ silent: true }),
     });
     if (!sendAvailability.usable) {
-      toastManager.add({
-        type: "error",
-        title: sendAvailability.unavailableReason,
-      });
-      isCreatingRef.current = false;
-      return;
+      if (modelSelection.provider === projectDefaultProvider && defaultProvider !== projectDefaultProvider) {
+        const fallbackAvailability = await resolveProviderSendAvailabilityWithRefresh({
+          provider: defaultProvider,
+          statuses: providerStatuses,
+          refreshStatuses: () => refreshProviderStatuses({ silent: true }),
+        });
+        const api = readNativeApi();
+        if (fallbackAvailability.usable && api && projectWorkspaceRoot) {
+          const fallbackSelection = await resolveProjectDefaultModelSelection({
+            api,
+            provider: defaultProvider,
+            workspaceRoot: projectWorkspaceRoot,
+          }).catch(() => null);
+          if (fallbackSelection) {
+            modelSelection = fallbackSelection;
+            taskInput = { ...taskInput, modelSelection };
+            toastManager.add({
+              type: "warning",
+              title: `${sendAvailability.unavailableReason} Using ${defaultProvider} for this task.`,
+            });
+          } else {
+            toastManager.add({ type: "error", title: "Could not prepare the fallback provider" });
+            isCreatingRef.current = false;
+            return;
+          }
+        } else {
+          toastManager.add({
+            type: "error",
+            title: fallbackAvailability.unavailableReason,
+          });
+          isCreatingRef.current = false;
+          return;
+        }
+      } else {
+        toastManager.add({
+          type: "error",
+          title: sendAvailability.unavailableReason,
+        });
+        isCreatingRef.current = false;
+        return;
+      }
     }
 
     setIsCreating(true);

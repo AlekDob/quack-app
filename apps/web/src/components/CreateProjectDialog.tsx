@@ -4,7 +4,7 @@
 // Layer: Web UI dialog
 // Exports: CreateProjectDialog, CreateProjectSubmitValue
 
-import { type SpaceId } from "@synara/contracts";
+import { PROVIDER_DISPLAY_NAMES, type ProviderKind, type SpaceId } from "@synara/contracts";
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 
 import { isElectron } from "../env";
@@ -37,6 +37,7 @@ import { ComposerPickerSelectPopup } from "./chat/ComposerPickerMenuPopup";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "./ui/input-group";
 import { Select, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { CentralIcon } from "~/lib/central-icons";
+import { ProviderIcon } from "./ProviderIcon";
 
 // Inputs share one fixed height + radius so every control in the dialog reads
 // as the same size (mirrors EditProfileDialog's field styling).
@@ -64,6 +65,7 @@ function resolveDroppedFolder(dataTransfer: DataTransfer): DroppedFolderResult |
 
 export interface CreateProjectSubmitValue {
   readonly workspaceRoot: string;
+  readonly defaultProvider: ProviderKind;
   /** Destination Space; `null` is Void (unassigned). */
   readonly spaceId: SpaceId | null;
   /** True when the path was typed/edited by hand, so a missing folder may be created. */
@@ -74,6 +76,8 @@ export function CreateProjectDialog(props: {
   open: boolean;
   spaces: ReadonlyArray<Space>;
   activeSpaceId: SpaceId | null;
+  providers: ReadonlyArray<ProviderKind>;
+  defaultProvider: ProviderKind;
   onOpenChange: (open: boolean) => void;
   onSubmit: (value: CreateProjectSubmitValue) => Promise<void>;
 }) {
@@ -85,6 +89,7 @@ export function CreateProjectDialog(props: {
    */
   const [pickedPath, setPickedPath] = useState<string | null>(null);
   const [selectedSpaceKey, setSelectedSpaceKey] = useState<string>(VOID_SPACE_KEY);
+  const [selectedProvider, setSelectedProvider] = useState<ProviderKind>(props.defaultProvider);
   const [spaceEditorOpen, setSpaceEditorOpen] = useState(false);
   /**
    * A space created from this dialog, kept locally until the refreshed shell
@@ -112,6 +117,11 @@ export function CreateProjectDialog(props: {
     setPath("");
     setPickedPath(null);
     setSelectedSpaceKey(spaceKey(props.activeSpaceId));
+    setSelectedProvider(
+      props.providers.includes(props.defaultProvider)
+        ? props.defaultProvider
+        : (props.providers[0] ?? props.defaultProvider),
+    );
     setSpaceEditorOpen(false);
     setCreatedSpace(null);
     setIsPickingFolder(false);
@@ -122,7 +132,7 @@ export function CreateProjectDialog(props: {
     // path field has to happen after that lands or it is immediately undone.
     const frame = requestAnimationFrame(() => document.getElementById(pathInputId)?.focus());
     return () => cancelAnimationFrame(frame);
-  }, [pathInputId, props.activeSpaceId, props.open]);
+  }, [pathInputId, props.activeSpaceId, props.defaultProvider, props.open, props.providers]);
 
   const trimmedPath = path.trim();
   const formErrorMeaning = formError ? describeAddProjectError(formError) : null;
@@ -221,6 +231,7 @@ export function CreateProjectDialog(props: {
     try {
       await props.onSubmit({
         workspaceRoot: trimmedPath,
+        defaultProvider: selectedProvider,
         spaceId: spaces.find((space) => space.id === selectedSpaceKey)?.id ?? null,
         createIfMissing: trimmedPath !== pickedPath,
       });
@@ -334,6 +345,44 @@ export function CreateProjectDialog(props: {
               </button>
             </div>
           ) : null}
+
+          <div className="space-y-2">
+            <span
+              id={`${fieldId}-provider`}
+              className={cn(
+                "block",
+                dialogFieldLabelClassName,
+                "text-[length:var(--app-font-size-ui,12px)] text-foreground",
+              )}
+            >
+              Default provider
+            </span>
+            <Select
+              value={selectedProvider}
+              onValueChange={(next) => {
+                if (typeof next === "string") setSelectedProvider(next as ProviderKind);
+              }}
+            >
+              <SelectTrigger className={fieldControlClassName} aria-label="Default provider">
+                <SelectValue>
+                  <span className="flex items-center gap-2">
+                    <ProviderIcon provider={selectedProvider} className="size-3.5" />
+                    {PROVIDER_DISPLAY_NAMES[selectedProvider]}
+                  </span>
+                </SelectValue>
+              </SelectTrigger>
+              <ComposerPickerSelectPopup align="start">
+                {props.providers.map((provider) => (
+                  <SelectItem key={provider} value={provider}>
+                    <span className="flex items-center gap-2">
+                      <ProviderIcon provider={provider} className="size-3.5" />
+                      {PROVIDER_DISPLAY_NAMES[provider]}
+                    </span>
+                  </SelectItem>
+                ))}
+              </ComposerPickerSelectPopup>
+            </Select>
+          </div>
 
           <div className="space-y-2">
             <span

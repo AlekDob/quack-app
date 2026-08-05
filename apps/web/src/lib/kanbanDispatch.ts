@@ -7,6 +7,7 @@
 import type {
   AssistantDeliveryMode,
   ProjectId,
+  ModelSelection,
   ProviderKind,
   ProviderStartOptions,
   ThreadEnvironmentMode,
@@ -68,6 +69,7 @@ export async function dispatchKanbanDraftCard(input: {
   defaultProvider: ProviderKind;
   assistantDeliveryMode: AssistantDeliveryMode;
   providerOptions?: ProviderStartOptions | undefined;
+  modelSelection?: ModelSelection | undefined;
 }): Promise<KanbanDraftDispatchResult> {
   const { card } = input;
   if (resolveDraftDropAction(card) !== "dispatch") {
@@ -83,6 +85,7 @@ export async function dispatchKanbanDraftCard(input: {
     defaultProvider: input.defaultProvider,
     assistantDeliveryMode: input.assistantDeliveryMode,
     providerOptions: input.providerOptions,
+    modelSelection: input.modelSelection,
   });
 }
 
@@ -94,6 +97,7 @@ interface KanbanDraftDispatchInput {
   defaultProvider: ProviderKind;
   assistantDeliveryMode: AssistantDeliveryMode;
   providerOptions?: ProviderStartOptions | undefined;
+  modelSelection?: ModelSelection | undefined;
 }
 
 // Racing callers (a re-drop before the board re-derives, drag + send-now) must
@@ -145,7 +149,7 @@ async function dispatchKanbanDraftThreadOnce(
   const appState = useStore.getState();
   const project = appState.projects.find((candidate) => candidate.id === projectId) ?? null;
   const existingThread = thread ? getThreadFromState(appState, threadId) : null;
-  const modelSelection = resolvePreferredComposerModelSelection({
+  const modelSelection = input.modelSelection ?? resolvePreferredComposerModelSelection({
     draft: draftComposerState,
     threadModelSelection: thread?.modelSelection ?? null,
     projectModelSelection: project?.defaultModelSelection ?? null,
