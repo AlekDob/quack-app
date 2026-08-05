@@ -116,6 +116,7 @@ import {
   loadConfirmedCustomBinaryPaths,
   saveConfirmedCustomBinaryPaths,
 } from "../confirmedCustomBinaryPathStore";
+import { selectThreadBrowserState, useBrowserStateStore } from "../browserStateStore";
 import { isElectron } from "../env";
 import { isScrollContainerNearBottom } from "../chat-scroll";
 import { stripDiffSearchParams } from "../diffRouteSearch";
@@ -1848,6 +1849,8 @@ export default function ChatView({
   const canCheckoutPullRequestIntoThread = isLocalDraftThread;
   const diffOpen = rawSearch.panel === "diff";
   const browserOpen = rawSearch.panel === "browser";
+  // Feeds the activity strip's browser automation row (same source as BrowserPanel).
+  const threadBrowserState = useBrowserStateStore(selectThreadBrowserState(threadId));
   const resolvedDiffOpen = panelState ? panelState.panel === "diff" : diffOpen;
   const activeThreadId = activeThread?.id ?? null;
   const activeLatestTurn = activeThread?.latestTurn ?? null;
@@ -2788,6 +2791,7 @@ export default function ChatView({
         parentRow: stripParentThread
           ? { threadId: stripParentThread.id, label: stripParentThread.title ?? null }
           : null,
+        browserState: threadBrowserState,
       }),
     [
       activeThread?.id,
@@ -2795,6 +2799,7 @@ export default function ChatView({
       stripLiveTurnId,
       stripParentThread,
       stripWorkLogEntries,
+      threadBrowserState,
     ],
   );
   // Links workflow agent rows to their subagent child threads (and models) when the
@@ -3997,6 +4002,11 @@ export default function ChatView({
       },
     });
   }, [browserOpen, navigate, onToggleBrowserPanel, threadId]);
+  // Activity strip row: reveal the browser, never hide it while automation runs.
+  const onOpenBrowserPanel = useCallback(() => {
+    if (browserOpen) return;
+    onToggleBrowser();
+  }, [browserOpen, onToggleBrowser]);
   const openBrowserUrl = useCallback(
     (url: string) => {
       const api = readNativeApi();
@@ -10992,6 +11002,7 @@ export default function ChatView({
                   onBackgroundItem={onBackgroundSubagentStripItem}
                   onStopItem={onStopSubagentStripItem}
                   onStopAll={onStopAllSubagentStripItems}
+                  onOpenBrowser={onOpenBrowserPanel}
                   attachedToPrevious={
                     showComposerLiveChangesHeader ||
                     showComposerActiveTaskListCard ||

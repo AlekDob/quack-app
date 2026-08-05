@@ -48,14 +48,14 @@ These fields are ephemeral. They are not persisted as thread messages or used to
 
 ### Files
 
-| Area | Files | Responsibility |
-| --- | --- | --- |
-| Shared contract | `packages/contracts/src/ipc.ts` | Runtime surface and automation activity state |
-| Tool contract | `packages/contracts/src/browserAutomationToolInputs.ts`, `packages/contracts/src/browserAutomationToolOutputs.ts` | Background-default `show` semantics and physical scope |
-| Desktop runtime | `apps/desktop/src/browserManager.ts` | Canonical native background runtime, promotion, teardown, OAuth popup deferral |
-| Automation host | `apps/desktop/src/browserAutomation/desktopBrowserAutomationHost.ts` | Direct background runtime resolution and attention state |
-| Browser UI | `apps/web/src/components/BrowserPanel.tsx` | Native surface bounds vs renderer WebView adoption |
-| Provider guidance | `apps/server/src/agentGateway/harnessPolicy.ts`, `packages/shared/src/browserAutomationCatalogue.ts` | Tell agents that browser actions do not reveal the UI |
+| Area              | Files                                                                                                             | Responsibility                                                                 |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Shared contract   | `packages/contracts/src/ipc.ts`                                                                                   | Runtime surface and automation activity state                                  |
+| Tool contract     | `packages/contracts/src/browserAutomationToolInputs.ts`, `packages/contracts/src/browserAutomationToolOutputs.ts` | Background-default `show` semantics and physical scope                         |
+| Desktop runtime   | `apps/desktop/src/browserManager.ts`                                                                              | Canonical native background runtime, promotion, teardown, OAuth popup deferral |
+| Automation host   | `apps/desktop/src/browserAutomation/desktopBrowserAutomationHost.ts`                                              | Direct background runtime resolution and attention state                       |
+| Browser UI        | `apps/web/src/components/BrowserPanel.tsx`                                                                        | Native surface bounds vs renderer WebView adoption                             |
+| Provider guidance | `apps/server/src/agentGateway/harnessPolicy.ts`, `packages/shared/src/browserAutomationCatalogue.ts`              | Tell agents that browser actions do not reveal the UI                          |
 
 ### Regression coverage
 
@@ -65,4 +65,4 @@ These fields are ephemeral. They are not persisted as thread messages or used to
 
 ### Follow-up
 
-The runtime state is available to the web store for a future sidebar attention badge. The current implementation intentionally does not auto-open a panel or popup; any human-required browser step must be surfaced by an explicit UI action before taking control.
+`automation.phase` is now consumed by the composer activity strip (`apps/web/src/components/chat/ComposerActivityStrip.tsx`): a `running` or `attention-required` phase renders a browser row above the composer, with the reason as its status label, and clicking it opens the thread's browser panel. Still open: a cross-thread attention badge in the sidebar/notch. The implementation still never auto-opens a panel or popup; any human-required browser step is taken only through an explicit UI action.

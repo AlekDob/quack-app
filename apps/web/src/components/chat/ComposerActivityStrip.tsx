@@ -1,21 +1,23 @@
-// FILE: ComposerSubagentStrip.tsx
-// Purpose: Compact subagent rows stacked above the composer input (status dot,
-// nickname, role/model, live status); clicking a row switches to that subagent's
-// thread. Wraps the shared stacked-header frame like the active task list.
+// FILE: ComposerActivityStrip.tsx
+// Purpose: One compact "what is running right now" strip stacked above the composer:
+// subagent rows (avatar, nickname, role/model, live status — clicking switches to that
+// thread) and background activity rows (browser automation, running agent commands).
+// Wraps the shared stacked-header frame like the active task list.
 // Layer: Chat composer UI
-// Exports: ComposerSubagentStrip
+// Exports: ComposerActivityStrip
 
 import type { ThreadId } from "@synara/contracts";
-import { pluralize } from "@synara/shared/text";
 
 import {
   BackgroundTrayIcon,
   BackToParentIcon,
   BotIcon,
+  GlobeIcon,
   LoaderIcon,
   PanelCollapseIcon,
   PanelExpandIcon,
   StopIcon,
+  TerminalIcon,
 } from "~/lib/icons";
 import {
   subagentStatusDotClassName,
@@ -24,10 +26,12 @@ import {
 import { cn } from "~/lib/utils";
 import { Button } from "../ui/button";
 import { DisclosureRegion } from "../ui/DisclosureRegion";
-import type {
-  ComposerSubagentStripItem,
-  ComposerSubagentStripRow,
-} from "./ComposerSubagentStrip.logic";
+import {
+  activityStripHeaderLabel,
+  type ComposerActivityStripBackgroundItem,
+  type ComposerActivityStripSubagentItem,
+  type ComposerActivityStripRow,
+} from "./ComposerActivityStrip.logic";
 import {
   ComposerStackedPanelHeaderRow,
   ComposerStackedPanelRowLabel,
@@ -42,18 +46,26 @@ import {
   COMPOSER_STACKED_PANEL_SCROLL_REGION_CLASS_NAME,
 } from "./composerStackedPanelStyles";
 
-interface ComposerSubagentStripProps {
-  items: ReadonlyArray<ComposerSubagentStripRow>;
+// Every row kind shares one shell so the strip reads as a single list.
+const STRIP_ROW_CLASS_NAME =
+  "-mx-1 flex w-[calc(100%+0.5rem)] min-w-0 items-center gap-1 rounded-md px-1 py-1 transition-colors hover:bg-[var(--color-background-button-secondary-hover)]";
+const STRIP_ROW_LABEL_CLASS_NAME =
+  "min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/85";
+
+interface ComposerActivityStripProps {
+  items: ReadonlyArray<ComposerActivityStripRow>;
   compact: boolean;
   onCompactChange: (compact: boolean) => void;
   onOpenThread: (threadId: ThreadId) => void;
-  onBackgroundItem?: (item: ComposerSubagentStripItem) => void;
-  onStopItem?: (item: ComposerSubagentStripItem) => void;
+  onBackgroundItem?: (item: ComposerActivityStripSubagentItem) => void;
+  onStopItem?: (item: ComposerActivityStripSubagentItem) => void;
   onStopAll?: () => void;
+  /** Opens the thread's browser surface from the browser automation row. */
+  onOpenBrowser?: () => void;
   attachedToPrevious?: boolean;
 }
 
-export const ComposerSubagentStrip = function ComposerSubagentStrip({
+export const ComposerActivityStrip = function ComposerActivityStrip({
   items,
   compact,
   onCompactChange,
@@ -61,19 +73,24 @@ export const ComposerSubagentStrip = function ComposerSubagentStrip({
   onBackgroundItem,
   onStopItem,
   onStopAll,
+  onOpenBrowser,
   attachedToPrevious: attachedToPreviousProp,
-}: ComposerSubagentStripProps) {
+}: ComposerActivityStripProps) {
   const attachedToPrevious = attachedToPreviousProp ?? false;
   const subagentItems = items.filter(
-    (item): item is ComposerSubagentStripItem => item.kind === "subagent",
+    (item): item is ComposerActivityStripSubagentItem => item.kind === "subagent",
   );
-  const runningCount = subagentItems.filter((item) => item.isActive).length;
+  // Stop-all only ever targeted subagents; the header spinner covers every kind.
+  const runningSubagentCount = subagentItems.filter((item) => item.isActive).length;
+  const runningCount = items.filter(
+    (item) => (item.kind === "subagent" || item.kind === "activity") && item.isActive,
+  ).length;
 
   return (
     <ComposerStackedPanel
       passthroughSideMargins
       attachedToPrevious={attachedToPrevious}
-      data-testid="composer-subagent-strip"
+      data-testid="composer-activity-strip"
     >
       <ComposerStackedPanelHeaderRow>
         <ComposerStackedPanelRowMain>
@@ -83,12 +100,10 @@ export const ComposerSubagentStrip = function ComposerSubagentStrip({
             <BotIcon className={COMPOSER_STACKED_PANEL_ICON_CLASS_NAME} />
           )}
           <ComposerStackedPanelRowLabel tone="meta">
-            {runningCount > 0
-              ? `${runningCount} of ${subagentItems.length} ${pluralize(subagentItems.length, "subagent")} running`
-              : `${subagentItems.length} ${pluralize(subagentItems.length, "subagent")}`}
+            {activityStripHeaderLabel(items)}
           </ComposerStackedPanelRowLabel>
         </ComposerStackedPanelRowMain>
-        {onStopAll && runningCount > 1 ? (
+        {onStopAll && runningSubagentCount > 1 ? (
           <Button
             type="button"
             variant="ghost"
@@ -107,8 +122,8 @@ export const ComposerSubagentStrip = function ComposerSubagentStrip({
           size="icon-xs"
           className={cn("shrink-0", COMPOSER_STACKED_PANEL_ICON_BUTTON_CLASS_NAME)}
           onClick={() => onCompactChange(!compact)}
-          aria-label={compact ? "Expand subagent strip" : "Collapse subagent strip"}
-          title={compact ? "Expand subagent strip" : "Collapse subagent strip"}
+          aria-label={compact ? "Expand activity strip" : "Collapse activity strip"}
+          title={compact ? "Expand activity strip" : "Collapse activity strip"}
         >
           {compact ? (
             <PanelExpandIcon className="size-3" />
@@ -126,32 +141,45 @@ export const ComposerSubagentStrip = function ComposerSubagentStrip({
             COMPOSER_STACKED_PANEL_SCROLL_REGION_CLASS_NAME,
           )}
         >
-          {items.map((item) =>
-            item.kind === "parent" ? (
-              <div
-                key={item.key}
-                data-testid="composer-subagent-parent-row"
-                className="-mx-1 flex w-[calc(100%+0.5rem)] min-w-0 items-center gap-1 rounded-md px-1 py-1 transition-colors hover:bg-[var(--color-background-button-secondary-hover)]"
-              >
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  title={item.label}
-                  onClick={() => onOpenThread(item.threadId)}
+          {items.map((item) => {
+            if (item.kind === "parent") {
+              return (
+                <div
+                  key={item.key}
+                  data-testid="composer-subagent-parent-row"
+                  className={STRIP_ROW_CLASS_NAME}
                 >
-                  <BackToParentIcon className="size-3 shrink-0 text-muted-foreground/55" />
-                  <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/85">
-                    {item.label}
-                  </span>
-                </button>
-              </div>
-            ) : (
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    title={item.label}
+                    onClick={() => onOpenThread(item.threadId)}
+                  >
+                    <BackToParentIcon className="size-3 shrink-0 text-muted-foreground/55" />
+                    <span className={STRIP_ROW_LABEL_CLASS_NAME}>{item.label}</span>
+                  </button>
+                </div>
+              );
+            }
+            if (item.kind === "activity") {
+              return (
+                <BackgroundActivityRow
+                  key={item.key}
+                  item={item}
+                  {...(item.activityKind === "browser" && onOpenBrowser
+                    ? { onOpen: onOpenBrowser }
+                    : {})}
+                />
+              );
+            }
+            return (
               <div
                 key={item.key}
                 data-testid="composer-subagent-row"
                 data-viewed={item.isViewed || undefined}
                 className={cn(
-                  "group -mx-1 flex w-[calc(100%+0.5rem)] min-w-0 items-center gap-1 rounded-md px-1 py-1 transition-colors hover:bg-[var(--color-background-button-secondary-hover)]",
+                  "group",
+                  STRIP_ROW_CLASS_NAME,
                   item.isViewed && "bg-[var(--color-background-button-secondary)]",
                 )}
               >
@@ -163,7 +191,7 @@ export const ComposerSubagentStrip = function ComposerSubagentStrip({
                 >
                   {/* Avatar carries identity, the dot right next to it carries status. */}
                   <span className="flex shrink-0 items-center gap-1">
-                    <SubagentAvatar seed={item.primaryLabel} />
+                    <SubagentAvatar seed={item.avatarSeed} />
                     <span
                       className={cn(
                         "size-1.5 shrink-0 rounded-full",
@@ -171,7 +199,7 @@ export const ComposerSubagentStrip = function ComposerSubagentStrip({
                       )}
                     />
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/85">
+                  <span className={STRIP_ROW_LABEL_CLASS_NAME}>
                     <span>{item.primaryLabel}</span>
                     {item.role ? (
                       <span className="ml-1 text-[11px] font-normal text-muted-foreground/55">
@@ -233,10 +261,67 @@ export const ComposerSubagentStrip = function ComposerSubagentStrip({
                   </Button>
                 ) : null}
               </div>
-            ),
-          )}
+            );
+          })}
         </div>
       </DisclosureRegion>
     </ComposerStackedPanel>
   );
 };
+
+// Background rows carry no identity (there is only one browser, commands are
+// one-shot), so a kind icon replaces the subagent avatar next to the status dot.
+function BackgroundActivityRow({
+  item,
+  onOpen,
+}: {
+  item: ComposerActivityStripBackgroundItem;
+  onOpen?: () => void;
+}) {
+  const KindIcon = item.activityKind === "browser" ? GlobeIcon : TerminalIcon;
+  const content = (
+    <>
+      <span className="flex shrink-0 items-center gap-1">
+        <KindIcon className="size-3 text-muted-foreground/55" />
+        <span
+          className={cn(
+            "size-1.5 shrink-0 rounded-full",
+            subagentStatusDotClassName(item.statusKind),
+          )}
+        />
+      </span>
+      <span className={STRIP_ROW_LABEL_CLASS_NAME}>
+        <span>{item.label}</span>
+        {item.secondary ? (
+          <span className="ml-1.5 text-[11px] font-normal text-muted-foreground/45">
+            {item.secondary}
+          </span>
+        ) : null}
+      </span>
+      <span
+        className={cn("shrink-0 text-[11px]", subagentStatusTextToneClassName(item.statusKind))}
+      >
+        {item.statusLabel}
+      </span>
+    </>
+  );
+
+  return (
+    <div className={STRIP_ROW_CLASS_NAME} data-testid="composer-activity-row">
+      {onOpen ? (
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          title={item.label}
+          onClick={onOpen}
+        >
+          {content}
+        </button>
+      ) : (
+        <span className="flex min-w-0 flex-1 items-center gap-2" title={item.label}>
+          {content}
+        </span>
+      )}
+    </div>
+  );
+}

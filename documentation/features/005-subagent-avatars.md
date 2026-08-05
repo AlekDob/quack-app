@@ -21,7 +21,7 @@ tags: [subagents, avatars, composer, workflow, transcript, duck]
 | --------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | Util      | `apps/web/src/lib/duckAvatars.ts`                        | `duckAvatarFor(name, explicit?) → string` — hash(name) % 35 → `/images/ducks/duckN.jpeg`                           |
 | Component | `apps/web/src/components/chat/SubagentAvatar.tsx`        | `SubagentAvatar({ seed, className })` — thin `<img>` wrapper around `duckAvatarFor`                                |
-| Component | `apps/web/src/components/chat/ComposerSubagentStrip.tsx` | Renders `SubagentAvatar` next to the status dot on each running-subagent row above the composer                    |
+| Component | `apps/web/src/components/chat/ComposerActivityStrip.tsx` | Renders `SubagentAvatar` next to the status dot on each running-subagent row above the composer (renamed from `ComposerSubagentStrip`, see [015-composer-activity-strip.md](015-composer-activity-strip.md)) |
 | Component | `apps/web/src/components/chat/WorkflowRunCard.tsx`       | `WorkflowAgentRowView` renders `SubagentAvatar` next to the status dot on each dynamic-workflow agent row          |
 | Component | `apps/web/src/components/chat/TimelineWorkEntryRow.tsx`  | `subagentAvatarSeed()` swaps the generic bot icon for `SubagentAvatar` on `collab_agent_tool_call` transcript rows |
 | Util      | `apps/web/src/lib/subagentPresentation.ts`               | `resolveSubagentPresentation()` — supplies `avatarSeed`, the single seed for the duck and the accent color         |

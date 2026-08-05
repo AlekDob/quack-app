@@ -1,10 +1,18 @@
-// FILE: ComposerSubagentStrip.logic.test.ts
-// Purpose: Locks composer subagent strip row derivation to live-turn scoping,
-// snapshot merging, and retire-once-finished behavior.
+// FILE: ComposerActivityStrip.logic.test.ts
+// Purpose: Locks composer activity strip row derivation: subagent live-turn scoping,
+// snapshot merging, retire-once-finished behavior, plus background activity rows
+// (browser automation, running agent commands) and the shared header label.
 // Layer: Web chat composer tests
-// Depends on: deriveComposerSubagentStripItems
+// Depends on: deriveComposerActivityStripRows, activityStripHeaderLabel
 
-import { EventId, ThreadId, TurnId, type OrchestrationThreadActivity } from "@synara/contracts";
+import {
+  EventId,
+  ThreadId,
+  TurnId,
+  type BrowserAutomationState,
+  type OrchestrationThreadActivity,
+  type ThreadBrowserState,
+} from "@synara/contracts";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -17,12 +25,13 @@ import type { Thread } from "../../types";
 import { enrichSubagentWorkEntries } from "../ChatView.logic";
 import { localSubagentThreadId } from "../ChatView.selectors";
 import {
+  activityStripHeaderLabel,
   collectForegroundRunningSubagentStripItems,
   collectRunningSubagentStripItems,
-  deriveComposerSubagentStripItems,
-  type ComposerSubagentStripItem,
-  type ComposerSubagentStripRow,
-} from "./ComposerSubagentStrip.logic";
+  deriveComposerActivityStripRows,
+  type ComposerActivityStripSubagentItem,
+  type ComposerActivityStripRow,
+} from "./ComposerActivityStrip.logic";
 
 function workEntry(
   overrides: Partial<Omit<WorkLogEntry, "turnId">> & { id: string; turnId?: string | null },
@@ -41,14 +50,14 @@ function subagent(overrides: Partial<WorkLogSubagent> & { threadId: string }): W
   return overrides;
 }
 
-function subagentRows(rows: ComposerSubagentStripRow[]): ComposerSubagentStripItem[] {
-  return rows.filter((row): row is ComposerSubagentStripItem => row.kind === "subagent");
+function subagentRows(rows: ComposerActivityStripRow[]): ComposerActivityStripSubagentItem[] {
+  return rows.filter((row): row is ComposerActivityStripSubagentItem => row.kind === "subagent");
 }
 
-describe("deriveComposerSubagentStripItems", () => {
+describe("deriveComposerActivityStripRows", () => {
   it("returns no rows when the work log has no subagents", () => {
     expect(
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: [workEntry({ id: "entry-1", turnId: "turn-1" })],
         liveTurnId: TurnId.makeUnsafe("turn-1"),
       }),
@@ -56,7 +65,7 @@ describe("deriveComposerSubagentStripItems", () => {
   });
 
   it("keeps prior running background rows alongside subagents from the live turn", () => {
-    const items = deriveComposerSubagentStripItems({
+    const items = deriveComposerActivityStripRows({
       workEntries: [
         workEntry({
           id: "entry-1",
@@ -102,7 +111,7 @@ describe("deriveComposerSubagentStripItems", () => {
 
   it("merges snapshots of one subagent, keeping identity while the latest status wins", () => {
     const items = subagentRows(
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: [
           workEntry({
             id: "entry-1",
@@ -161,7 +170,7 @@ describe("deriveComposerSubagentStripItems", () => {
     ];
 
     const stillRunning = subagentRows(
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: entries("running"),
         liveTurnId: null,
       }),
@@ -169,7 +178,7 @@ describe("deriveComposerSubagentStripItems", () => {
     expect(stillRunning.map((item) => item.primaryLabel)).toEqual(["Ada", "Blue"]);
 
     expect(
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: entries("completed"),
         liveTurnId: null,
       }),
@@ -178,7 +187,7 @@ describe("deriveComposerSubagentStripItems", () => {
 
   it("appends the worker-tier effort to the model label", () => {
     const items = subagentRows(
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: [
           workEntry({
             id: "entry-1",
@@ -213,7 +222,7 @@ describe("deriveComposerSubagentStripItems", () => {
 
   it("marks rows background from spawn hints and confirmed backgrounded tool use ids", () => {
     const items = subagentRows(
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: [
           workEntry({
             id: "entry-1",
@@ -258,7 +267,7 @@ describe("deriveComposerSubagentStripItems", () => {
 
   it("matches confirmed backgrounded patches by tool_use_id when it differs from the row key", () => {
     const items = subagentRows(
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: [
           workEntry({
             id: "entry-1",
@@ -284,7 +293,7 @@ describe("deriveComposerSubagentStripItems", () => {
 
   it("falls back to prior subagents when the live turn spawned none", () => {
     const items = subagentRows(
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: [
           workEntry({
             id: "entry-1",
@@ -308,7 +317,7 @@ describe("deriveComposerSubagentStripItems", () => {
 
   it("marks the viewed subagent row and leaves siblings unmarked", () => {
     const items = subagentRows(
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: [
           workEntry({
             id: "entry-1",
@@ -351,7 +360,7 @@ describe("deriveComposerSubagentStripItems", () => {
       }),
     ];
 
-    const fromSubagentView = deriveComposerSubagentStripItems({
+    const fromSubagentView = deriveComposerActivityStripRows({
       workEntries,
       liveTurnId: TurnId.makeUnsafe("turn-1"),
       viewedThreadId: ThreadId.makeUnsafe("sub-1"),
@@ -366,7 +375,7 @@ describe("deriveComposerSubagentStripItems", () => {
     expect(subagentRows(fromSubagentView)).toHaveLength(1);
 
     // Untitled parent threads fall back to a generic label.
-    const untitled = deriveComposerSubagentStripItems({
+    const untitled = deriveComposerActivityStripRows({
       workEntries,
       liveTurnId: TurnId.makeUnsafe("turn-1"),
       parentRow: { threadId: ThreadId.makeUnsafe("thread-main"), label: null },
@@ -374,7 +383,7 @@ describe("deriveComposerSubagentStripItems", () => {
     expect(untitled[0]).toMatchObject({ kind: "parent", label: "Main thread" });
 
     // Main thread view passes no parentRow, so no parent row appears.
-    const fromMainView = deriveComposerSubagentStripItems({
+    const fromMainView = deriveComposerActivityStripRows({
       workEntries,
       liveTurnId: TurnId.makeUnsafe("turn-1"),
     });
@@ -395,7 +404,7 @@ describe("deriveComposerSubagentStripItems", () => {
     const parentRow = { threadId: ThreadId.makeUnsafe("thread-main"), label: "Fix the bug" };
 
     // Parent turn settled but the viewed subagent still works: rows stay visible.
-    const stillRunning = deriveComposerSubagentStripItems({
+    const stillRunning = deriveComposerActivityStripRows({
       workEntries: entries("running"),
       liveTurnId: null,
       viewedThreadId: ThreadId.makeUnsafe("sub-2"),
@@ -406,7 +415,7 @@ describe("deriveComposerSubagentStripItems", () => {
     // Everything finished and the parent turn settled: the strip retires whole,
     // parent row included.
     expect(
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: entries("completed"),
         liveTurnId: null,
         viewedThreadId: ThreadId.makeUnsafe("sub-2"),
@@ -449,14 +458,14 @@ describe("deriveComposerSubagentStripItems", () => {
       };
     }
 
-    function enrichedItems(entry: WorkLogEntry): ComposerSubagentStripItem[] {
+    function enrichedItems(entry: WorkLogEntry): ComposerActivityStripSubagentItem[] {
       const enriched = enrichSubagentWorkEntries(
         [entry],
         [settledSubagentThread("toolu_x")],
         parentThreadId,
       );
       return subagentRows(
-        deriveComposerSubagentStripItems({
+        deriveComposerActivityStripRows({
           workEntries: enriched,
           liveTurnId: TurnId.makeUnsafe("turn-1"),
         }),
@@ -584,7 +593,7 @@ describe("deriveComposerSubagentStripItems", () => {
 
     // Background case: parent turn already settled (liveTurnId null) while the
     // subagent keeps running.
-    const items = deriveComposerSubagentStripItems({
+    const items = deriveComposerActivityStripRows({
       workEntries: enriched,
       liveTurnId: null,
     });
@@ -601,7 +610,7 @@ describe("deriveComposerSubagentStripItems", () => {
 describe("worker-tier role suppression", () => {
   it("hides worker-tier agent types while keeping the effort in the model label", () => {
     const items = subagentRows(
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: [
           workEntry({
             id: "entry-1",
@@ -645,7 +654,7 @@ describe("worker-tier role suppression", () => {
 
   it("strips worker-tier suffixes from title-derived labels", () => {
     const items = subagentRows(
-      deriveComposerSubagentStripItems({
+      deriveComposerActivityStripRows({
         workEntries: [
           workEntry({
             id: "entry-1",
@@ -674,7 +683,7 @@ describe("worker-tier role suppression", () => {
 
 describe("collectRunningSubagentStripItems", () => {
   it("collects only running subagent rows, skipping parent and settled rows", () => {
-    const rows = deriveComposerSubagentStripItems({
+    const rows = deriveComposerActivityStripRows({
       workEntries: [
         workEntry({
           id: "entry-1",
@@ -696,7 +705,7 @@ describe("collectRunningSubagentStripItems", () => {
   });
 
   it("returns no rows when nothing is running", () => {
-    const rows = deriveComposerSubagentStripItems({
+    const rows = deriveComposerActivityStripRows({
       workEntries: [
         workEntry({
           id: "entry-1",
@@ -713,7 +722,7 @@ describe("collectRunningSubagentStripItems", () => {
 
 describe("collectForegroundRunningSubagentStripItems", () => {
   it("keeps only running rows not backgrounded by spawn hint or confirmed patch", () => {
-    const rows = deriveComposerSubagentStripItems({
+    const rows = deriveComposerActivityStripRows({
       workEntries: [
         workEntry({
           id: "entry-1",
@@ -745,5 +754,180 @@ describe("collectForegroundRunningSubagentStripItems", () => {
 
     const foreground = collectForegroundRunningSubagentStripItems(rows);
     expect(foreground.map((item) => item.primaryLabel)).toEqual(["Ada"]);
+  });
+});
+
+function browserState(automation: BrowserAutomationState | undefined): ThreadBrowserState {
+  return {
+    threadId: ThreadId.makeUnsafe("thread-1"),
+    version: 1,
+    open: false,
+    activeTabId: "tab-1",
+    tabs: [
+      {
+        id: "tab-1",
+        url: "https://github.com/openai/codex",
+        title: "codex",
+        status: "live",
+        isLoading: false,
+        canGoBack: false,
+        canGoForward: false,
+        faviconUrl: null,
+        lastCommittedUrl: null,
+        lastError: null,
+      },
+    ],
+    lastError: null,
+    ...(automation ? { automation } : {}),
+  };
+}
+
+function commandEntry(id: string, toolStatus: "running" | "completed", toolCallId: string) {
+  return workEntry({
+    id,
+    turnId: "turn-1",
+    label: "npm run build",
+    itemType: "command_execution",
+    toolStatus,
+    toolCallId,
+    command: "npm run build",
+  });
+}
+
+describe("background activity rows", () => {
+  it("shows no row while browser automation is idle", () => {
+    expect(
+      deriveComposerActivityStripRows({
+        workEntries: [],
+        liveTurnId: null,
+        browserState: browserState({ phase: "idle", tabId: null, reason: null }),
+      }),
+    ).toEqual([]);
+  });
+
+  it("shows a running browser row with the tab host", () => {
+    const rows = deriveComposerActivityStripRows({
+      workEntries: [],
+      liveTurnId: null,
+      browserState: browserState({ phase: "running", tabId: "tab-1", reason: null }),
+    });
+
+    expect(rows).toEqual([
+      {
+        kind: "activity",
+        activityKind: "browser",
+        key: "browser:thread-1",
+        label: "Browser automation",
+        secondary: "github.com",
+        statusKind: "running",
+        statusLabel: "Running",
+        isActive: true,
+      },
+    ]);
+  });
+
+  it("puts an attention-required browser row first, labelled by its reason", () => {
+    const rows = deriveComposerActivityStripRows({
+      workEntries: [
+        workEntry({
+          id: "entry-1",
+          turnId: "turn-1",
+          subagents: [subagent({ threadId: "sub-1", nickname: "Ada", rawStatus: "running" })],
+        }),
+        commandEntry("entry-2", "running", "toolu_cmd"),
+      ],
+      liveTurnId: TurnId.makeUnsafe("turn-1"),
+      browserState: browserState({ phase: "attention-required", tabId: "tab-1", reason: "oauth" }),
+    });
+
+    expect(rows[0]).toMatchObject({
+      activityKind: "browser",
+      statusKind: "attention",
+      statusLabel: "Sign-in needed",
+    });
+    expect(rows.map((row) => row.kind)).toEqual(["activity", "subagent", "activity"]);
+  });
+
+  it("shows a running command row and retires it once the command completes", () => {
+    const running = deriveComposerActivityStripRows({
+      workEntries: [commandEntry("entry-1", "running", "toolu_cmd")],
+      liveTurnId: TurnId.makeUnsafe("turn-1"),
+    });
+    expect(running).toEqual([
+      {
+        kind: "activity",
+        activityKind: "command",
+        key: "command:toolu_cmd",
+        label: "npm run build",
+        secondary: undefined,
+        statusKind: "running",
+        statusLabel: "Running",
+        isActive: true,
+      },
+    ]);
+
+    expect(
+      deriveComposerActivityStripRows({
+        workEntries: [commandEntry("entry-1", "completed", "toolu_cmd")],
+        liveTurnId: TurnId.makeUnsafe("turn-1"),
+      }),
+    ).toEqual([]);
+  });
+
+  it("dedupes command rows by tool call id across snapshots", () => {
+    const rows = deriveComposerActivityStripRows({
+      workEntries: [
+        commandEntry("entry-1", "running", "toolu_cmd"),
+        commandEntry("entry-2", "running", "toolu_cmd"),
+        commandEntry("entry-3", "running", "toolu_other"),
+      ],
+      liveTurnId: TurnId.makeUnsafe("turn-1"),
+    });
+
+    expect(rows.map((row) => row.key)).toEqual(["command:toolu_cmd", "command:toolu_other"]);
+  });
+});
+
+describe("activityStripHeaderLabel", () => {
+  const subagentOnly = () =>
+    deriveComposerActivityStripRows({
+      workEntries: [
+        workEntry({
+          id: "entry-1",
+          turnId: "turn-1",
+          subagents: [subagent({ threadId: "sub-1", nickname: "Ada", rawStatus: "running" })],
+        }),
+      ],
+      liveTurnId: TurnId.makeUnsafe("turn-1"),
+    });
+
+  it("keeps the subagent wording when there is no background work", () => {
+    expect(activityStripHeaderLabel(subagentOnly())).toBe("1 of 1 subagent running");
+  });
+
+  it("names background activities when there are no subagents", () => {
+    const rows = deriveComposerActivityStripRows({
+      workEntries: [commandEntry("entry-1", "running", "toolu_cmd")],
+      liveTurnId: TurnId.makeUnsafe("turn-1"),
+      browserState: browserState({ phase: "running", tabId: "tab-1", reason: null }),
+    });
+
+    expect(activityStripHeaderLabel(rows)).toBe("2 background activities");
+  });
+
+  it("falls back to a neutral count when both kinds are present", () => {
+    const rows = deriveComposerActivityStripRows({
+      workEntries: [
+        workEntry({
+          id: "entry-1",
+          turnId: "turn-1",
+          subagents: [subagent({ threadId: "sub-1", nickname: "Ada", rawStatus: "running" })],
+        }),
+        commandEntry("entry-2", "running", "toolu_cmd"),
+      ],
+      liveTurnId: TurnId.makeUnsafe("turn-1"),
+    });
+
+    expect(activityStripHeaderLabel(rows)).toBe("2 of 2 running");
   });
 });
