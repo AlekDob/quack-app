@@ -43,6 +43,7 @@ import {
 } from "../../types";
 import ChatMarkdown from "../ChatMarkdown";
 import { InlineLinkChip } from "../InlineLinkChip";
+import { ThinkingOrb } from "thinking-orbs";
 import {
   BotIcon,
   ChangesIcon,
@@ -62,6 +63,10 @@ import { DEFAULT_PAPERO_ID, isPaperoId, usePaperoStore } from "~/paperi";
 import { Button } from "../ui/button";
 import { CrossTaskOriginLabel, type CrossTaskOrigin } from "./CrossTaskOriginLabel";
 import { PaperoAvatar } from "./PaperoPill";
+import {
+  CHAT_STREAM_AVATAR_GAP_CLASS_NAME,
+  CHAT_STREAM_AVATAR_VISIBLE_CLASS_NAME,
+} from "./chatLeftGutter";
 import { SynaraThreadCreationCard } from "./SynaraThreadCreationCard";
 import { buildExpandedImagePreview, ExpandedImagePreview } from "./ExpandedImagePreview";
 import { ProposedPlanCard } from "./ProposedPlanCard";
@@ -1063,6 +1068,11 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             ? "pb-2"
             : "pb-4",
         row.kind === "message" && row.message.role === "assistant" ? "group/assistant" : null,
+        // Stack above the previous LegendList row so subpixel overlap can't cover
+        // the papero avatar; paint containment is also relaxed in index.css.
+        row.kind === "message" && row.showPaperoAvatar
+          ? "relative z-[1] overflow-visible pt-1"
+          : null,
         row.kind === "message" && row.message.id === highlightedMessageId
           ? "rounded-xl bg-[var(--color-background-elevated-secondary)]"
           : null,
@@ -1759,347 +1769,382 @@ export const MessagesTimeline = memo(function MessagesTimeline({
               )
             : null;
           return (
-            <>
-              {paperoDefinition && (
-                <PaperoAvatar definition={paperoDefinition} className="mb-1.5 size-5" />
+            <div
+              className={cn(
+                "flex items-start overflow-visible",
+                paperoDefinition ? CHAT_STREAM_AVATAR_GAP_CLASS_NAME : null,
               )}
-              {settledCollapseTransition && (
-                <div
-                  aria-hidden="true"
-                  inert
-                  // The clone is visual-only for the entire close transition; keep it inert
-                  // even while the inner DisclosureRegion starts open for its first frame.
-                  className="pointer-events-none mb-3 select-none"
-                  data-settled-turn-collapse-transition="true"
+            >
+              {paperoDefinition ? (
+                <span
+                  className={cn(
+                    // Fixed slot so the circle can't be cropped by sibling row paint;
+                    // visibility follows the shared left-gutter pane width.
+                    "mt-0.5 hidden size-7 shrink-0 overflow-visible",
+                    CHAT_STREAM_AVATAR_VISIBLE_CLASS_NAME,
+                  )}
                 >
-                  <DisclosureRegion
-                    open={settledCollapseTransition.open}
-                    contentClassName="space-y-1.5 pb-2.5"
-                  >
-                    {chunkCollapsedTurnItems(settledCollapseTransition.items).map((chunk) =>
-                      renderCollapsedTurnChunk(chunk, "settling-turn-close"),
-                    )}
-                  </DisclosureRegion>
-                </div>
-              )}
-              {hasCollapsedWork && (
-                <div className="mb-3">
-                  <Collapsible
-                    className="group/collapsed-work"
-                    open={isCollapsedWorkExpanded}
-                    onOpenChange={(open) => {
-                      setCollapsedWorkExpanded(row.message.id, open);
-                    }}
-                  >
-                    <CollapsibleTrigger
-                      // ChatView's click anchor preserves this trigger's screen position
-                      // while the disclosure height animates, so opening it should not tail-scroll.
-                      // -ml-0.5 optically aligns the leading "W" with the reply
-                      // text below: the box is already flush, but the W glyph
-                      // carries a left side-bearing that reads as an inset.
-                      className="-ml-0.5 inline-flex items-center gap-1 pb-2 text-left text-muted-foreground/70 transition-colors duration-200 hover:text-muted-foreground/90"
-                      style={{ fontSize: chatTypographyStyle.fontSize }}
-                    >
-                      <span>
-                        {row.collapsedWorkElapsed
-                          ? `Worked for ${row.collapsedWorkElapsed}`
-                          : "Details"}
-                      </span>
-                      <DisclosureChevron
-                        open={isCollapsedWorkExpanded}
-                        className="text-muted-foreground/55"
-                      />
-                    </CollapsibleTrigger>
-                    <CollapsiblePanel>
-                      <div
-                        className={disclosureContentClassName(
-                          isCollapsedWorkExpanded,
-                          "mb-2.5 space-y-1.5",
-                        )}
-                      >
-                        {chunkCollapsedTurnItems(collapsedTurnItems!).map((chunk) =>
-                          renderCollapsedTurnChunk(chunk, "collapsed-panel"),
-                        )}
-                      </div>
-                    </CollapsiblePanel>
-                  </Collapsible>
-                  <div className="h-px w-full bg-border" />
-                </div>
-              )}
-              <div className="group min-w-0 py-0.5">
-                {renderWorkDisplay(leadingWorkDisplay, "leading")}
-                {messageText !== null ? (
-                  <div data-assistant-message-id={row.message.id}>
-                    <ChatMarkdown
-                      text={messageText}
-                      cwd={markdownCwd}
-                      isStreaming={Boolean(row.message.streaming)}
-                      style={chatTypographyStyle}
-                      onImageExpand={onImageExpand}
-                      markers={messageMarkers}
-                    />
-                  </div>
-                ) : null}
-                {renderWorkDisplay(inlineWorkDisplay, "inline")}
-                {inlineEditedFilesFromTurnSummary.length > 0 && (
-                  <div className="mt-2 space-y-0.5">
-                    {inlineEditedFilesFromTurnSummary.map((file) => (
-                      <button
-                        key={`inline-summary-edit:${row.message.id}:${file.path}`}
-                        type="button"
-                        className="group/file-row flex w-full max-w-full items-center gap-2 px-0 py-1.5 text-left transition-colors duration-150 focus-visible:outline-none"
-                        title={file.path}
-                        onClick={() => onOpenTurnDiff(turnSummary!.turnId, file.path)}
-                      >
-                        <EditedFileRowContent
-                          filePath={file.path}
-                          additions={file.additions}
-                          deletions={file.deletions}
-                          fontSizePx={normalizedChatFontSizePx}
-                          compact={false}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {(showPinToggle || assistantCopyState.visible || assistantMeta.length > 0) && (
+                  <PaperoAvatar definition={paperoDefinition} enlargeOnHover className="size-7" />
+                </span>
+              ) : null}
+              <div className="min-w-0 flex-1 overflow-visible">
+                {settledCollapseTransition && (
                   <div
-                    className="mt-0.5 flex items-center gap-2 font-system-ui font-normal text-muted-foreground/45"
-                    style={chatMessageFooterStyle}
+                    aria-hidden="true"
+                    inert
+                    // The clone is visual-only for the entire close transition; keep it inert
+                    // even while the inner DisclosureRegion starts open for its first frame.
+                    className="pointer-events-none mb-3 select-none"
+                    data-settled-turn-collapse-transition="true"
                   >
-                    {showPinToggle ? (
-                      // Pin sits at the left edge of the footer, before the copy action. It stays
-                      // visible when pinned so it reads as a persistent "this is pinned" marker; an
-                      // unpinned message only reveals it on hover, like the other footer actions.
-                      // Same Central pin glyph in both states — persistence signals the pinned state.
-                      <MessageActionButton
-                        label={pinActionLabel("message", messagePinned)}
-                        tooltip={messagePinned ? "Unpin from panel" : "Pin to panel"}
-                        aria-pressed={messagePinned}
-                        className={
-                          messagePinned
-                            ? "text-muted-foreground/80"
-                            : MESSAGE_HOVER_REVEAL_CLASS_NAME
-                        }
-                        onClick={() => onTogglePinMessage?.(row.message.id)}
-                      >
-                        <PinIcon className={MESSAGE_ACTION_ICON_CLASS_NAME} />
-                      </MessageActionButton>
-                    ) : null}
-                    {assistantCopyState.visible ? (
-                      <MessageCopyButton
-                        text={assistantCopyState.text ?? ""}
-                        className={MESSAGE_HOVER_REVEAL_CLASS_NAME}
-                      />
-                    ) : null}
-                    {assistantMeta.length > 0 ? (
-                      <p className={cn("tabular-nums", MESSAGE_HOVER_REVEAL_CLASS_NAME)}>
-                        {assistantMeta}
-                      </p>
-                    ) : null}
+                    <DisclosureRegion
+                      open={settledCollapseTransition.open}
+                      contentClassName="space-y-1.5 pb-2.5"
+                    >
+                      {chunkCollapsedTurnItems(settledCollapseTransition.items).map((chunk) =>
+                        renderCollapsedTurnChunk(chunk, "settling-turn-close"),
+                      )}
+                    </DisclosureRegion>
                   </div>
                 )}
-                {!row.assistantTurnInProgress && row.showAssistantCopyButton
-                  ? synaraThreadCreationRecaps.map((creation) => (
-                      <div key={creation.operationId} className="mt-2 mb-4">
-                        <SynaraThreadCreationCard
-                          creation={creation}
-                          {...(onOpenThread
-                            ? {
-                                onOpenThread: (createdThreadId) =>
-                                  onOpenThread(ThreadId.makeUnsafe(createdThreadId)),
-                              }
-                            : {})}
-                        />
-                      </div>
-                    ))
-                  : null}
-                {(() => {
-                  // Hold the end-of-turn changes card (Undo / Review) until the
-                  // turn settles. While the turn is live the composer's own
-                  // live-changes strip owns this surface; showing the card too
-                  // would duplicate it and pre-empt the strip mid-turn.
-                  if (!turnSummary || row.assistantTurnInProgress) return null;
-                  const checkpointFiles = turnSummary.files;
-                  if (checkpointFiles.length === 0) return null;
-                  const fileChangesExpanded =
-                    expandedFileChangesByTurnId[turnSummary.turnId] ?? true;
-                  const fileListExpanded = expandedFileListByTurnId[turnSummary.turnId] ?? false;
-                  const checkpointTurnCount = turnSummary.checkpointTurnCount;
-                  const checkpointTurnCounts =
-                    turnSummary.checkpointTurnCounts ??
-                    (checkpointTurnCount === undefined ? [] : [checkpointTurnCount]);
-                  const canUndo =
-                    turnSummary.status !== "missing" &&
-                    turnSummary.status !== "error" &&
-                    turnSummary.checkpointRef !== undefined &&
-                    !turnSummary.checkpointRef.startsWith("provider-diff:") &&
-                    checkpointTurnCounts.length > 0 &&
-                    onUndoTurnFiles !== undefined;
-                  const totalAdditions = checkpointFiles.reduce(
-                    (sum, file) => sum + (file.additions ?? 0),
-                    0,
-                  );
-                  const totalDeletions = checkpointFiles.reduce(
-                    (sum, file) => sum + (file.deletions ?? 0),
-                    0,
-                  );
-                  const editedFilesLabel = `Edited ${checkpointFiles.length} ${pluralize(
-                    checkpointFiles.length,
-                    "file",
-                  )}`;
-                  const firstCheckpointFiles = checkpointFiles.slice(0, MAX_VISIBLE_CHANGED_FILES);
-                  const overflowCheckpointFiles = checkpointFiles.slice(MAX_VISIBLE_CHANGED_FILES);
-                  const renderCheckpointFileRow = (
-                    file: (typeof checkpointFiles)[number],
-                    withFirstReset: boolean,
-                  ) => {
-                    // Hoisted out of JSX: a `??` inside an `&&` test makes React Compiler
-                    // bail out ("Unexpected terminal kind `logical` for logical test block").
-                    const additions = file.additions ?? 0;
-                    const deletions = file.deletions ?? 0;
-                    const hasDiffStat = additions + deletions > 0;
-                    return (
-                      <button
-                        key={file.path}
-                        type="button"
-                        className={cn(
-                          "group/file-row flex w-full items-center gap-2 border-t border-[color:var(--color-border-light)] bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-background-button-secondary-hover)] dark:bg-transparent dark:hover:bg-transparent",
-                          withFirstReset && "first:border-t-0",
-                        )}
-                        onClick={() => onOpenTurnDiff(turnSummary.turnId, file.path)}
+                {hasCollapsedWork && (
+                  <div className="mb-3">
+                    <Collapsible
+                      className="group/collapsed-work"
+                      open={isCollapsedWorkExpanded}
+                      onOpenChange={(open) => {
+                        setCollapsedWorkExpanded(row.message.id, open);
+                      }}
+                    >
+                      <CollapsibleTrigger
+                        // ChatView's click anchor preserves this trigger's screen position
+                        // while the disclosure height animates, so opening it should not tail-scroll.
+                        // -ml-0.5 optically aligns the leading "W" with the reply
+                        // text below: the box is already flush, but the W glyph
+                        // carries a left side-bearing that reads as an inset.
+                        className="-ml-0.5 inline-flex items-center gap-1 pb-2 text-left text-muted-foreground/70 transition-colors duration-200 hover:text-muted-foreground/90"
+                        style={{ fontSize: chatTypographyStyle.fontSize }}
                       >
-                        <FileEntryIcon
-                          pathValue={file.path}
-                          kind="file"
-                          theme={resolvedTheme}
-                          colorMode="inherit"
-                          className="size-4 shrink-0 text-[var(--color-text-foreground)] opacity-70 dark:opacity-80"
-                        />
-                        <span
-                          className="font-system-ui truncate font-normal text-[var(--color-text-foreground)] underline-offset-2 group-hover/file-row:underline group-focus-visible/file-row:underline"
-                          style={{ fontSize: chatTypographyStyle.fontSize }}
-                        >
-                          {file.path}
+                        <span>
+                          {row.collapsedWorkElapsed
+                            ? `Worked for ${row.collapsedWorkElapsed}`
+                            : "Details"}
                         </span>
-                        {hasDiffStat && (
+                        <DisclosureChevron
+                          open={isCollapsedWorkExpanded}
+                          className="text-muted-foreground/55"
+                        />
+                      </CollapsibleTrigger>
+                      <CollapsiblePanel>
+                        <div
+                          className={disclosureContentClassName(
+                            isCollapsedWorkExpanded,
+                            "mb-2.5 space-y-1.5",
+                          )}
+                        >
+                          {chunkCollapsedTurnItems(collapsedTurnItems!).map((chunk) =>
+                            renderCollapsedTurnChunk(chunk, "collapsed-panel"),
+                          )}
+                        </div>
+                      </CollapsiblePanel>
+                    </Collapsible>
+                    <div className="h-px w-full bg-border" />
+                  </div>
+                )}
+                <div className="group min-w-0 py-0.5">
+                  {renderWorkDisplay(leadingWorkDisplay, "leading")}
+                  {messageText !== null ? (
+                    <div data-assistant-message-id={row.message.id}>
+                      {row.message.streaming ? (
+                        <div className="mb-1.5 flex items-center gap-1.5 text-muted-foreground/60">
+                          <ThinkingOrb
+                            state="composing"
+                            size={20}
+                            aria-label="Composing response"
+                          />
                           <span
-                            className="font-system-ui ml-auto shrink-0 tabular-nums"
+                            className="font-system-ui"
+                            style={{ fontSize: `${appTypographyScale.chatMetaPx}px` }}
+                          >
+                            Composing…
+                          </span>
+                        </div>
+                      ) : null}
+                      <ChatMarkdown
+                        text={messageText}
+                        cwd={markdownCwd}
+                        isStreaming={Boolean(row.message.streaming)}
+                        style={chatTypographyStyle}
+                        onImageExpand={onImageExpand}
+                        markers={messageMarkers}
+                      />
+                    </div>
+                  ) : null}
+                  {renderWorkDisplay(inlineWorkDisplay, "inline")}
+                  {inlineEditedFilesFromTurnSummary.length > 0 && (
+                    <div className="mt-2 space-y-0.5">
+                      {inlineEditedFilesFromTurnSummary.map((file) => (
+                        <button
+                          key={`inline-summary-edit:${row.message.id}:${file.path}`}
+                          type="button"
+                          className="group/file-row flex w-full max-w-full items-center gap-2 px-0 py-1.5 text-left transition-colors duration-150 focus-visible:outline-none"
+                          title={file.path}
+                          onClick={() => onOpenTurnDiff(turnSummary!.turnId, file.path)}
+                        >
+                          <EditedFileRowContent
+                            filePath={file.path}
+                            additions={file.additions}
+                            deletions={file.deletions}
+                            fontSizePx={normalizedChatFontSizePx}
+                            compact={false}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {(showPinToggle || assistantCopyState.visible || assistantMeta.length > 0) && (
+                    <div
+                      className="mt-0.5 flex items-center gap-2 font-system-ui font-normal text-muted-foreground/45"
+                      style={chatMessageFooterStyle}
+                    >
+                      {showPinToggle ? (
+                        // Pin sits at the left edge of the footer, before the copy action. It stays
+                        // visible when pinned so it reads as a persistent "this is pinned" marker; an
+                        // unpinned message only reveals it on hover, like the other footer actions.
+                        // Same Central pin glyph in both states — persistence signals the pinned state.
+                        <MessageActionButton
+                          label={pinActionLabel("message", messagePinned)}
+                          tooltip={messagePinned ? "Unpin from panel" : "Pin to panel"}
+                          aria-pressed={messagePinned}
+                          className={
+                            messagePinned
+                              ? "text-muted-foreground/80"
+                              : MESSAGE_HOVER_REVEAL_CLASS_NAME
+                          }
+                          onClick={() => onTogglePinMessage?.(row.message.id)}
+                        >
+                          <PinIcon className={MESSAGE_ACTION_ICON_CLASS_NAME} />
+                        </MessageActionButton>
+                      ) : null}
+                      {assistantCopyState.visible ? (
+                        <MessageCopyButton
+                          text={assistantCopyState.text ?? ""}
+                          className={MESSAGE_HOVER_REVEAL_CLASS_NAME}
+                        />
+                      ) : null}
+                      {assistantMeta.length > 0 ? (
+                        <p className={cn("tabular-nums", MESSAGE_HOVER_REVEAL_CLASS_NAME)}>
+                          {assistantMeta}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+                  {!row.assistantTurnInProgress && row.showAssistantCopyButton
+                    ? synaraThreadCreationRecaps.map((creation) => (
+                        <div key={creation.operationId} className="mt-2 mb-4">
+                          <SynaraThreadCreationCard
+                            creation={creation}
+                            {...(onOpenThread
+                              ? {
+                                  onOpenThread: (createdThreadId) =>
+                                    onOpenThread(ThreadId.makeUnsafe(createdThreadId)),
+                                }
+                              : {})}
+                          />
+                        </div>
+                      ))
+                    : null}
+                  {(() => {
+                    // Hold the end-of-turn changes card (Undo / Review) until the
+                    // turn settles. While the turn is live the composer's own
+                    // live-changes strip owns this surface; showing the card too
+                    // would duplicate it and pre-empt the strip mid-turn.
+                    if (!turnSummary || row.assistantTurnInProgress) return null;
+                    const checkpointFiles = turnSummary.files;
+                    if (checkpointFiles.length === 0) return null;
+                    const fileChangesExpanded =
+                      expandedFileChangesByTurnId[turnSummary.turnId] ?? true;
+                    const fileListExpanded = expandedFileListByTurnId[turnSummary.turnId] ?? false;
+                    const checkpointTurnCount = turnSummary.checkpointTurnCount;
+                    const checkpointTurnCounts =
+                      turnSummary.checkpointTurnCounts ??
+                      (checkpointTurnCount === undefined ? [] : [checkpointTurnCount]);
+                    const canUndo =
+                      turnSummary.status !== "missing" &&
+                      turnSummary.status !== "error" &&
+                      turnSummary.checkpointRef !== undefined &&
+                      !turnSummary.checkpointRef.startsWith("provider-diff:") &&
+                      checkpointTurnCounts.length > 0 &&
+                      onUndoTurnFiles !== undefined;
+                    const totalAdditions = checkpointFiles.reduce(
+                      (sum, file) => sum + (file.additions ?? 0),
+                      0,
+                    );
+                    const totalDeletions = checkpointFiles.reduce(
+                      (sum, file) => sum + (file.deletions ?? 0),
+                      0,
+                    );
+                    const editedFilesLabel = `Edited ${checkpointFiles.length} ${pluralize(
+                      checkpointFiles.length,
+                      "file",
+                    )}`;
+                    const firstCheckpointFiles = checkpointFiles.slice(
+                      0,
+                      MAX_VISIBLE_CHANGED_FILES,
+                    );
+                    const overflowCheckpointFiles =
+                      checkpointFiles.slice(MAX_VISIBLE_CHANGED_FILES);
+                    const renderCheckpointFileRow = (
+                      file: (typeof checkpointFiles)[number],
+                      withFirstReset: boolean,
+                    ) => {
+                      // Hoisted out of JSX: a `??` inside an `&&` test makes React Compiler
+                      // bail out ("Unexpected terminal kind `logical` for logical test block").
+                      const additions = file.additions ?? 0;
+                      const deletions = file.deletions ?? 0;
+                      const hasDiffStat = additions + deletions > 0;
+                      return (
+                        <button
+                          key={file.path}
+                          type="button"
+                          className={cn(
+                            "group/file-row flex w-full items-center gap-2 border-t border-[color:var(--color-border-light)] bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-[var(--color-background-button-secondary-hover)] dark:bg-transparent dark:hover:bg-transparent",
+                            withFirstReset && "first:border-t-0",
+                          )}
+                          onClick={() => onOpenTurnDiff(turnSummary.turnId, file.path)}
+                        >
+                          <FileEntryIcon
+                            pathValue={file.path}
+                            kind="file"
+                            theme={resolvedTheme}
+                            colorMode="inherit"
+                            className="size-4 shrink-0 text-[var(--color-text-foreground)] opacity-70 dark:opacity-80"
+                          />
+                          <span
+                            className="font-system-ui truncate font-normal text-[var(--color-text-foreground)] underline-offset-2 group-hover/file-row:underline group-focus-visible/file-row:underline"
                             style={{ fontSize: chatTypographyStyle.fontSize }}
                           >
-                            <DiffStatLabel additions={additions} deletions={deletions} />
+                            {file.path}
                           </span>
-                        )}
-                      </button>
-                    );
-                  };
-                  return (
-                    <div className="mt-1 mb-4 overflow-hidden rounded-[0.65rem] border border-[color:var(--color-border-light)] dark:border-[color:color-mix(in_srgb,var(--color-border-light)_55%,transparent)]">
-                      <div
-                        className={cn(
-                          "flex items-center justify-between gap-3 bg-[color:color-mix(in_srgb,var(--app-user-message-background)_40%,transparent)] px-3 py-1.5",
-                          fileChangesExpanded &&
-                            "border-b border-[color:var(--color-border-light)]",
-                        )}
-                      >
-                        <div className="flex min-w-0 items-center gap-2.5">
-                          <ChangesIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
-                          <div className="min-w-0">
-                            <div
-                              className="truncate font-normal text-foreground/92"
+                          {hasDiffStat && (
+                            <span
+                              className="font-system-ui ml-auto shrink-0 tabular-nums"
                               style={{ fontSize: chatTypographyStyle.fontSize }}
                             >
-                              {editedFilesLabel}
-                            </div>
-                            {totalAdditions + totalDeletions > 0 ? (
+                              <DiffStatLabel additions={additions} deletions={deletions} />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    };
+                    return (
+                      <div className="mt-1 mb-4 overflow-hidden rounded-[0.65rem] border border-[color:var(--color-border-light)] dark:border-[color:color-mix(in_srgb,var(--color-border-light)_55%,transparent)]">
+                        <div
+                          className={cn(
+                            "flex items-center justify-between gap-3 bg-[color:color-mix(in_srgb,var(--app-user-message-background)_40%,transparent)] px-3 py-1.5",
+                            fileChangesExpanded &&
+                              "border-b border-[color:var(--color-border-light)]",
+                          )}
+                        >
+                          <div className="flex min-w-0 items-center gap-2.5">
+                            <ChangesIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
+                            <div className="min-w-0">
                               <div
-                                className="font-system-ui tabular-nums"
+                                className="truncate font-normal text-foreground/92"
                                 style={{ fontSize: chatTypographyStyle.fontSize }}
                               >
-                                <DiffStatLabel
-                                  additions={totalAdditions}
-                                  deletions={totalDeletions}
-                                />
+                                {editedFilesLabel}
                               </div>
-                            ) : null}
+                              {totalAdditions + totalDeletions > 0 ? (
+                                <div
+                                  className="font-system-ui tabular-nums"
+                                  style={{ fontSize: chatTypographyStyle.fontSize }}
+                                >
+                                  <DiffStatLabel
+                                    additions={totalAdditions}
+                                    deletions={totalDeletions}
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          {canUndo && (
+                          <div className="flex shrink-0 items-center gap-2">
+                            {canUndo && (
+                              <button
+                                type="button"
+                                className="flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
+                                style={{ fontSize: chatTypographyStyle.fontSize }}
+                                onClick={() => onUndoTurnFiles(checkpointTurnCounts)}
+                              >
+                                Undo
+                                <Undo2Icon className="size-3" />
+                              </button>
+                            )}
+                            <ReviewChangesButton
+                              style={{ fontSize: chatTypographyStyle.fontSize }}
+                              onClick={() => onOpenTurnDiff(turnSummary.turnId)}
+                            />
                             <button
                               type="button"
-                              className="flex items-center gap-1 text-muted-foreground transition-colors hover:text-foreground"
-                              style={{ fontSize: chatTypographyStyle.fontSize }}
-                              onClick={() => onUndoTurnFiles(checkpointTurnCounts)}
-                            >
-                              Undo
-                              <Undo2Icon className="size-3" />
-                            </button>
-                          )}
-                          <ReviewChangesButton
-                            style={{ fontSize: chatTypographyStyle.fontSize }}
-                            onClick={() => onOpenTurnDiff(turnSummary.turnId)}
-                          />
-                          <button
-                            type="button"
-                            className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-[var(--color-background-button-secondary-hover)] hover:text-foreground/80"
-                            aria-expanded={fileChangesExpanded}
-                            aria-label={
-                              fileChangesExpanded
-                                ? "Collapse changed files list"
-                                : "Expand changed files list"
-                            }
-                            onClick={(event) => {
-                              event.preventDefault();
-                              event.stopPropagation();
-                              if (!fileChangesExpanded && isTailContentRow) {
-                                scrollTailExpansionToEnd();
+                              className="inline-flex items-center justify-center rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-[var(--color-background-button-secondary-hover)] hover:text-foreground/80"
+                              aria-expanded={fileChangesExpanded}
+                              aria-label={
+                                fileChangesExpanded
+                                  ? "Collapse changed files list"
+                                  : "Expand changed files list"
                               }
-                              toggleFileChangesExpanded(turnSummary.turnId);
-                            }}
-                            data-scroll-anchor-ignore={isTailContentRow ? true : undefined}
-                          >
-                            <DisclosureChevron
-                              open={fileChangesExpanded}
-                              className="dark:text-muted-foreground/50"
-                            />
-                          </button>
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                if (!fileChangesExpanded && isTailContentRow) {
+                                  scrollTailExpansionToEnd();
+                                }
+                                toggleFileChangesExpanded(turnSummary.turnId);
+                              }}
+                              data-scroll-anchor-ignore={isTailContentRow ? true : undefined}
+                            >
+                              <DisclosureChevron
+                                open={fileChangesExpanded}
+                                className="dark:text-muted-foreground/50"
+                              />
+                            </button>
+                          </div>
                         </div>
+                        <DisclosureRegion open={fileChangesExpanded}>
+                          {firstCheckpointFiles.map((file) => renderCheckpointFileRow(file, true))}
+                          {overflowCheckpointFiles.length > 0 ? (
+                            <DisclosureRegion open={fileListExpanded}>
+                              {overflowCheckpointFiles.map((file) =>
+                                renderCheckpointFileRow(file, false),
+                              )}
+                            </DisclosureRegion>
+                          ) : null}
+                          {overflowCheckpointFiles.length > 0 ? (
+                            <button
+                              type="button"
+                              className="flex w-full items-center justify-start gap-1.5 border-t border-[color:var(--color-border-light)] bg-transparent px-3 py-2 font-system-ui font-normal text-muted-foreground transition-colors hover:bg-[var(--color-background-button-secondary-hover)] hover:text-foreground"
+                              style={{ fontSize: chatTypographyStyle.fontSize }}
+                              aria-expanded={fileListExpanded}
+                              onClick={() => toggleFileListExpanded(turnSummary.turnId)}
+                            >
+                              <DisclosureChevron open={fileListExpanded} />
+                              <span>
+                                {fileListExpanded
+                                  ? "Show less"
+                                  : `Show ${overflowCheckpointFiles.length} more ${pluralize(
+                                      overflowCheckpointFiles.length,
+                                      "file",
+                                    )}`}
+                              </span>
+                            </button>
+                          ) : null}
+                        </DisclosureRegion>
                       </div>
-                      <DisclosureRegion open={fileChangesExpanded}>
-                        {firstCheckpointFiles.map((file) => renderCheckpointFileRow(file, true))}
-                        {overflowCheckpointFiles.length > 0 ? (
-                          <DisclosureRegion open={fileListExpanded}>
-                            {overflowCheckpointFiles.map((file) =>
-                              renderCheckpointFileRow(file, false),
-                            )}
-                          </DisclosureRegion>
-                        ) : null}
-                        {overflowCheckpointFiles.length > 0 ? (
-                          <button
-                            type="button"
-                            className="flex w-full items-center justify-start gap-1.5 border-t border-[color:var(--color-border-light)] bg-transparent px-3 py-2 font-system-ui font-normal text-muted-foreground transition-colors hover:bg-[var(--color-background-button-secondary-hover)] hover:text-foreground"
-                            style={{ fontSize: chatTypographyStyle.fontSize }}
-                            aria-expanded={fileListExpanded}
-                            onClick={() => toggleFileListExpanded(turnSummary.turnId)}
-                          >
-                            <DisclosureChevron open={fileListExpanded} />
-                            <span>
-                              {fileListExpanded
-                                ? "Show less"
-                                : `Show ${overflowCheckpointFiles.length} more ${pluralize(
-                                    overflowCheckpointFiles.length,
-                                    "file",
-                                  )}`}
-                            </span>
-                          </button>
-                        ) : null}
-                      </DisclosureRegion>
-                    </div>
-                  );
-                })()}
+                    );
+                  })()}
+                </div>
               </div>
-            </>
+            </div>
           );
         })()}
 

@@ -76,6 +76,8 @@ import {
   type SynaraMcpToolStatus,
 } from "../../lib/toolCallLabel";
 import { formatLiveActivityMeta, useLiveActivityNow } from "../../lib/liveActivityPresentation";
+import { thinkingOrbStateForWorkEntry } from "../../lib/thinkingOrbState";
+import { ThinkingOrb } from "thinking-orbs";
 import { openWorkspaceFileReference, useWorkspaceFileOpener } from "../../lib/workspaceFileOpener";
 import { resolveSubagentPresentation } from "../../lib/subagentPresentation";
 
@@ -514,6 +516,7 @@ export const TimelineWorkEntryRow = memo(function TimelineWorkEntryRow(props: {
           : isMcpToolRow
             ? "mcp"
             : undefined;
+  const showThinkingOrb = workEntry.tone === "thinking" && leftIconKind === undefined;
   const heading = toolWorkEntryHeading(workEntry);
   const rawPreview = workEntryPreview(workEntry);
   const preview =
@@ -681,7 +684,7 @@ export const TimelineWorkEntryRow = memo(function TimelineWorkEntryRow(props: {
                   className={cn(
                     "flex shrink-0 items-center justify-center",
                     WORK_ROW_MUTED_HOVER_TONE["tool-row"],
-                    compact ? "size-4" : "size-5",
+                    showThinkingOrb ? "size-5" : compact ? "size-4" : "size-5",
                   )}
                   data-tool-icon={leftIconKind}
                   data-work-entry-icon="true"
@@ -692,6 +695,12 @@ export const TimelineWorkEntryRow = memo(function TimelineWorkEntryRow(props: {
                     <SubagentAvatar
                       seed={subagentSeed}
                       className={compact ? "size-3.5" : "size-4"}
+                    />
+                  ) : showThinkingOrb ? (
+                    <ThinkingOrb
+                      state={thinkingOrbStateForWorkEntry(workEntry)}
+                      size={20}
+                      aria-label="Thinking"
                     />
                   ) : (
                     renderWorkEntryIcon(LeftIcon, compact ? "size-3.5" : "size-4")
