@@ -23,10 +23,10 @@ interface BufferedAnalyticsEvent {
 
 const TelemetryEnvConfig = Config.all({
   posthogKey: Config.string("SYNARA_POSTHOG_KEY").pipe(
-    Config.withDefault("phc_XOWci4oZP4VvLiEyrFqkFjP4CZn55mjYYBMREK5Wd6m"),
+    Config.withDefault("phc_XAkRh21xG4XgQXT81heC39RYx5UnPHQHXYyyzIy4eC7"),
   ),
   posthogHost: Config.string("SYNARA_POSTHOG_HOST").pipe(
-    Config.withDefault("https://us.i.posthog.com"),
+    Config.withDefault("https://eu.i.posthog.com"),
   ),
   enabled: Config.boolean("SYNARA_TELEMETRY_ENABLED").pipe(Config.withDefault(true)),
   flushBatchSize: Config.number("SYNARA_TELEMETRY_FLUSH_BATCH_SIZE").pipe(Config.withDefault(20)),
