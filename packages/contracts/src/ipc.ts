@@ -150,6 +150,8 @@ import type {
   ServerUpdateSettingsResult,
   ServerUpsertKeybindingInput,
   ServerUpsertKeybindingResult,
+  ServerVoicePrewarmInput,
+  ServerVoicePrewarmResult,
   ServerVoiceTranscriptionInput,
   ServerVoiceTranscriptionResult,
 } from "./server";
@@ -738,6 +740,7 @@ export interface NativeApi {
     generateAutomationIntent: (
       input: ServerGenerateAutomationIntentInput,
     ) => Promise<ServerGenerateAutomationIntentResult>;
+    prewarmVoice?: (input: ServerVoicePrewarmInput) => Promise<ServerVoicePrewarmResult>;
     transcribeVoice: (
       input: ServerVoiceTranscriptionInput,
     ) => Promise<ServerVoiceTranscriptionResult>;
