@@ -92,6 +92,12 @@ import {
   getThreadDetailResumeCursor,
   setThreadDetailResumeCursor,
 } from "../threadDetailResumeCursors";
+import {
+  type CatchupThreadView,
+  shouldPollThreadDetailCatchupFor,
+  shouldReconcileThreadProjectionFor,
+} from "../threadDetailCatchupPolicy";
+import { hasUnacknowledgedSend } from "../pendingSendStore";
 import { canApplyThreadSnapshot, selectOrphanedThreadDetailIds } from "./-threadDetailOwnership";
 import { getThreadFromState, getThreadsFromState } from "../threadDerivation";
 import { useAppDensity } from "../hooks/useAppDensity";
@@ -914,20 +920,31 @@ function isThreadDetailEventForThread(event: OrchestrationEvent, threadId: Threa
   );
 }
 
-function shouldPollThreadDetailCatchup(threadId: ThreadId): boolean {
+function toCatchupThreadView(threadId: ThreadId): CatchupThreadView | null {
   const thread = getThreadFromState(useStore.getState(), threadId);
-  return (
-    thread?.session?.orchestrationStatus === "running" || thread?.latestTurn?.state === "running"
+  if (!thread) {
+    return null;
+  }
+  return {
+    orchestrationStatus: thread.session?.orchestrationStatus,
+    latestTurnState: thread.latestTurn?.state,
+    hasStreamingAssistantMessage: thread.messages.some(
+      (message) => message.role === "assistant" && message.streaming,
+    ),
+  };
+}
+
+function shouldPollThreadDetailCatchup(threadId: ThreadId): boolean {
+  return shouldPollThreadDetailCatchupFor(
+    toCatchupThreadView(threadId),
+    hasUnacknowledgedSend(threadId),
   );
 }
 
 function shouldReconcileThreadProjection(threadId: ThreadId): boolean {
-  const thread = getThreadFromState(useStore.getState(), threadId);
-  return (
-    thread?.session?.orchestrationStatus === "starting" ||
-    thread?.session?.orchestrationStatus === "running" ||
-    thread?.latestTurn?.state === "running" ||
-    thread?.messages.some((message) => message.role === "assistant" && message.streaming) === true
+  return shouldReconcileThreadProjectionFor(
+    toCatchupThreadView(threadId),
+    hasUnacknowledgedSend(threadId),
   );
 }
 

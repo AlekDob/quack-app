@@ -21,6 +21,27 @@ interface BufferedAnalyticsEvent {
   readonly capturedAt: string;
 }
 
+const FLUSH_INTERVAL_MS = 1_000;
+const MAX_FLUSH_BACKOFF_MS = 300_000;
+/** Log the first failure of a streak, then one in ten. */
+const FLUSH_FAILURE_LOG_EVERY = 10;
+
+/**
+ * Backoff between flush attempts. Without it a dead PostHog endpoint is retried
+ * every second forever, and each failure prints a ~2.5KB stack: the server log
+ * grows ~10MB per hour and buries every real diagnostic under it.
+ */
+export function telemetryFlushDelayMs(consecutiveFailures: number): number {
+  if (consecutiveFailures <= 0) {
+    return FLUSH_INTERVAL_MS;
+  }
+  return Math.min(FLUSH_INTERVAL_MS * 2 ** consecutiveFailures, MAX_FLUSH_BACKOFF_MS);
+}
+
+export function shouldLogTelemetryFlushFailure(consecutiveFailures: number): boolean {
+  return consecutiveFailures === 1 || consecutiveFailures % FLUSH_FAILURE_LOG_EVERY === 0;
+}
+
 const TelemetryEnvConfig = Config.all({
   posthogKey: Config.string("SYNARA_POSTHOG_KEY").pipe(
     Config.withDefault("phc_XAkRh21xG4XgQXT81heC39RYx5UnPHQHXYyyzIy4eC7"),
@@ -99,7 +120,7 @@ const makeAnalyticsService = Effect.gen(function* () {
       );
     });
 
-  const flush: AnalyticsServiceShape["flush"] = Effect.gen(function* () {
+  const flushOnce = Effect.gen(function* () {
     while (true) {
       const batch = yield* Ref.modify(bufferRef, (current) => {
         if (current.length === 0) {
@@ -122,7 +143,11 @@ const makeAnalyticsService = Effect.gen(function* () {
         ),
       );
     }
-  }).pipe(Effect.catch((cause) => Effect.logError("Failed to flush telemetry", { cause })));
+  });
+
+  const flush: AnalyticsServiceShape["flush"] = flushOnce.pipe(
+    Effect.catch((cause) => Effect.logError("Failed to flush telemetry", { cause })),
+  );
 
   const record: AnalyticsServiceShape["record"] = Effect.fnUntraced(function* (event, properties) {
     if (!telemetryConfig.enabled || !identifier) return;
@@ -136,9 +161,33 @@ const makeAnalyticsService = Effect.gen(function* () {
     }
   });
 
-  yield* Effect.forever(Effect.sleep(1000).pipe(Effect.flatMap(() => flush)), {
-    disableYield: true,
-  }).pipe(Effect.forkScoped);
+  const consecutiveFlushFailuresRef = yield* Ref.make(0);
+
+  const recordFlushFailure = (cause: unknown) =>
+    Ref.modify(consecutiveFlushFailuresRef, (current) => {
+      const next = current + 1;
+      return [next, next] as const;
+    }).pipe(
+      Effect.flatMap((failures) =>
+        shouldLogTelemetryFlushFailure(failures)
+          ? Effect.logError("Failed to flush telemetry", {
+              cause,
+              consecutiveFailures: failures,
+            })
+          : Effect.void,
+      ),
+    );
+
+  const flushWithBackoff = Effect.gen(function* () {
+    const failures = yield* Ref.get(consecutiveFlushFailuresRef);
+    yield* Effect.sleep(telemetryFlushDelayMs(failures));
+    yield* flushOnce.pipe(
+      Effect.flatMap(() => Ref.set(consecutiveFlushFailuresRef, 0)),
+      Effect.catch(recordFlushFailure),
+    );
+  });
+
+  yield* Effect.forever(flushWithBackoff, { disableYield: true }).pipe(Effect.forkScoped);
 
   yield* Effect.addFinalizer(() => flush);
 

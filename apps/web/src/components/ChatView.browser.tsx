@@ -4283,6 +4283,51 @@ describe("ChatView timeline estimator parity (full app)", () => {
     }
   });
 
+  it("queues a follow-up while running even when the provider clears activeTurnId", async () => {
+    useComposerDraftStore.getState().setPrompt(THREAD_ID, "queue without active turn id");
+
+    const baseSnapshot = createSnapshotForTargetUser({
+      targetMessageId: "msg-user-running-no-active-turn" as MessageId,
+      targetText: "running no active turn target",
+      sessionStatus: "running",
+    });
+    const threadIndex = baseSnapshot.threads.findIndex((thread) => thread.id === THREAD_ID);
+    const snapshot: OrchestrationReadModel = {
+      ...baseSnapshot,
+      threads: baseSnapshot.threads.map((thread, index) =>
+        index === threadIndex
+          ? {
+              ...thread,
+              session: thread.session
+                ? { ...thread.session, activeTurnId: null, updatedAt: NOW_ISO }
+                : null,
+            }
+          : thread,
+      ),
+    };
+
+    const mounted = await mountChatView({
+      viewport: DEFAULT_VIEWPORT,
+      snapshot,
+    });
+
+    try {
+      const composerForm = await waitForElement(
+        () => document.querySelector<HTMLFormElement>('form[data-chat-composer-form="true"]'),
+        "Unable to find composer form.",
+      );
+      composerForm.requestSubmit();
+
+      const queuedRow = await waitForElement(
+        () => document.querySelector<HTMLElement>('[data-testid="queued-follow-up-row"]'),
+        "Unable to find queued follow-up row when activeTurnId is null.",
+      );
+      expect(queuedRow).not.toBeNull();
+    } finally {
+      await mounted.cleanup();
+    }
+  });
+
   it("steers a running turn when Follow-up behavior is set to Steer", async () => {
     localStorage.setItem("synara:app-settings:v1", JSON.stringify({ followUpBehavior: "steer" }));
     useComposerDraftStore.getState().setPrompt(THREAD_ID, "steer this running turn");

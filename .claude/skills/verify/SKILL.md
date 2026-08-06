@@ -1,3 +1,8 @@
+---
+name: verify
+description: Use when you need to see a Quack UI change actually running, or reproduce a bug at runtime. Launches an isolated Quack instance (server + web) on scratch ports without touching ~/.synara or the default dev ports.
+---
+
 # Verify: run Synara locally for runtime verification
 
 How to launch an isolated Synara instance (server + web) to observe UI changes, without touching `~/.synara` or the default dev ports.

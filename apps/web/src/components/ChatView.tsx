@@ -169,6 +169,7 @@ import { useHandleNewChat } from "../hooks/useHandleNewChat";
 import { splitComposerDropzoneFiles, useComposerDropzone } from "../hooks/useComposerDropzone";
 import { useComposerImageIntake } from "../hooks/useComposerImageIntake";
 import { useDiffRouteSearch } from "../hooks/useDiffRouteSearch";
+import { useSustainedFlag } from "../hooks/useSustainedFlag";
 import {
   buildThreadBreadcrumbs,
   buildTranscriptAutoFollowSignal,
@@ -346,6 +347,16 @@ import {
 } from "@synara/shared/paperi";
 
 const EMPTY_PAPERO_MODEL_MAP: Partial<Record<ProviderKind, ModelSelection>> = Object.freeze({});
+
+/**
+ * Papero selezionato al momento dell'invio: si legge qui, non da un ref
+ * aggiornato in render (che fa bailare il React Compiler su tutto ChatView).
+ * Read at dispatch time, so flipping the pill mid-stream never relabels the
+ * in-flight turn.
+ */
+function readPaperoIdForSend(threadId: ThreadId): PaperoId {
+  return usePaperoStore.getState().activePaperoIdByThreadId[threadId] ?? DEFAULT_PAPERO_ID;
+}
 import {
   getCustomBinaryPathForProvider,
   getProviderStartOptions,
@@ -1017,6 +1028,9 @@ function formatPastedTextTitleSeed(pastedTexts: ReadonlyArray<PastedTextDraft>):
     : `${pastedTexts.length} pasted texts`;
 }
 
+// How long a running session may sit with no active turn before the composer
+// stops queueing follow-ups into a queue that may never drain.
+const RUNNING_WITHOUT_ACTIVE_TURN_QUEUE_GRACE_MS = 10_000;
 const COMPOSER_PATH_QUERY_DEBOUNCE_MS = 120;
 const VOICE_RECORDER_ACTION_ARM_DELAY_MS = 250;
 
@@ -1211,9 +1225,6 @@ export default function ChatView({
   const activePaperoModelMap = usePaperoStore(
     (store) => store.modelSelectionByProviderByPaperoId[activePaperoId] ?? EMPTY_PAPERO_MODEL_MAP,
   );
-  // Freeze papero at send so flipping the pill mid-stream does not relabel the in-flight turn.
-  const paperoIdForSendRef = useRef<PaperoId>(activePaperoId);
-  paperoIdForSendRef.current = activePaperoId;
   const timestampFormat = settings.timestampFormat;
   const navigate = useNavigate();
   const { handleNewThread } = useHandleNewThread();
@@ -1905,13 +1916,15 @@ export default function ChatView({
   const activeProject = useStore(
     useMemo(() => createProjectSelector(activeProjectId), [activeProjectId]),
   );
-  const teamScope = useMemo<TeamScope>(
-    () =>
-      activeProject?.kind === "project"
-        ? { kind: "project", projectId: activeProject.id }
-        : GLOBAL_TEAM_SCOPE,
-    [activeProject?.id, activeProject?.kind],
-  );
+  // No useMemo on purpose: the compiler infers `activeProject` as the dependency
+  // while the hand-written list said [activeProject?.id, activeProject?.kind],
+  // and that mismatch made it bail out of memoizing all of ChatView. The only
+  // consumer is react-query, which hashes the key structurally, so a fresh
+  // object per render costs nothing.
+  const teamScope: TeamScope =
+    activeProject?.kind === "project"
+      ? { kind: "project", projectId: activeProject.id }
+      : GLOBAL_TEAM_SCOPE;
   const teamRosterQuery = useQuery({
     queryKey: teamRosterQueryKey(teamScope),
     queryFn: () => ensureNativeApi().team.getRoster({ scope: teamScope }),
@@ -2900,6 +2913,21 @@ export default function ChatView({
     ],
   );
   const isSendBusy = hasPendingSend || (localDispatch !== null && !serverAcknowledgedLocalDispatch);
+  // Publish the unacknowledged dispatch so the thread-detail catch-up poll can
+  // repair a client whose event stream died mid-send. That poll otherwise only
+  // runs for threads the client already believes are running, so a stale-idle
+  // client never asks for the events it is missing and the spinner stays up.
+  useEffect(() => {
+    if (!threadId) {
+      return;
+    }
+    if (!isSendBusy) {
+      usePendingSendStore.getState().clearUnacknowledgedSend(threadId);
+      return;
+    }
+    usePendingSendStore.getState().markUnacknowledgedSend(threadId);
+    return () => usePendingSendStore.getState().clearUnacknowledgedSend(threadId);
+  }, [isSendBusy, threadId]);
   const activeWorktreeSetup = localDispatch?.worktreeSetup ?? null;
   const isPreparingWorktree = activeWorktreeSetup !== null;
   const hasLiveTurn = phase === "running";
@@ -2926,11 +2954,24 @@ export default function ChatView({
     });
     return editTarget.editable ? (editTarget.messageId as MessageId) : null;
   }, [activeThread, isServerThread]);
-  // Defence in depth against a session stuck at "running" with no turn to
-  // complete: nothing would ever drain the composer queue, so messages routed
-  // into it would be swallowed. Server-side reconciliation settles these
-  // sessions; this keeps the composer usable until it does.
-  const hasQueueableLiveTurn = hasLiveTurn && activeThread?.session?.activeTurnId != null;
+  // A running session should queue follow-ups so they are dispatched once the
+  // current turn finishes. Relying on `activeTurnId` being non-null breaks
+  // providers like Claude that clear it between terminal events: in those gaps
+  // the composer would send normally, the server appends the message but cannot
+  // start a new turn, and the follow-up is effectively lost. Server-side
+  // reconciliation settles genuinely stuck sessions so the queue can drain.
+  //
+  // That reconciliation only runs at server boot, so a session left at
+  // "running" with no turn mid-session would hold the queue shut for hours.
+  // Those gaps last a moment in normal operation: if one outlives the grace
+  // period, stop queueing and let the composer send, so a follow-up is never
+  // swallowed by a queue nothing will drain.
+  const isRunningWithoutActiveTurn = hasLiveTurn && activeThread?.session?.activeTurnId == null;
+  const isStuckRunningWithoutActiveTurn = useSustainedFlag(
+    isRunningWithoutActiveTurn,
+    RUNNING_WITHOUT_ACTIVE_TURN_QUEUE_GRACE_MS,
+  );
+  const hasQueueableLiveTurn = hasLiveTurn && !isStuckRunningWithoutActiveTurn;
   const {
     automationProjects,
     automationThreads,
@@ -6156,7 +6197,6 @@ export default function ChatView({
     (paperoId: PaperoId) => {
       if (!activeThread) return;
       setActivePaperoId(activeThread.id, paperoId);
-      paperoIdForSendRef.current = paperoId;
       const slot = resolvePaperoModelForProvider(paperoId, selectedProvider);
       if (slot) {
         setComposerDraftModelSelectionAndSticky(activeThread.id, slot);
@@ -7791,6 +7831,7 @@ export default function ChatView({
       return true;
     }
     const threadIdForSend = activeThread.id;
+    const paperoIdForSend = readPaperoIdForSend(threadIdForSend);
     const isFirstMessage = !isServerThread || !hasNativeUserMessages;
     const firstSendCreatedAt = new Date();
     let firstComposerImageNameForTitle: string | null = null;
@@ -8085,7 +8126,7 @@ export default function ChatView({
         ...(mentionedPluginMentionsForSend.length > 0
           ? { mentions: mentionedPluginMentionsForSend }
           : {}),
-        paperoId: paperoIdForSendRef.current,
+        paperoId: paperoIdForSend,
         // Stamped locally too, so the live Thinking row shows model + effort
         // before the server message lands.
         modelSelection: selectedModelSelectionForSend,
@@ -8315,11 +8356,11 @@ export default function ChatView({
             ...(mentionedPluginMentionsForSend.length > 0
               ? { mentions: mentionedPluginMentionsForSend }
               : {}),
-            paperoId: paperoIdForSendRef.current,
+            paperoId: paperoIdForSend,
             ...(() => {
               const override = usePaperoStore
                 .getState()
-                .overridesByPaperoId[paperoIdForSendRef.current]?.instructions?.trim();
+                .overridesByPaperoId[paperoIdForSend]?.instructions?.trim();
               return override ? { paperoInstructions: override } : {};
             })(),
           },
@@ -8480,15 +8521,16 @@ export default function ChatView({
 
   // Every exit of `runSend` (success, bail-out, throw) releases the pending-send
   // flag; on success `localDispatch` already keeps the busy state alive.
-  const onSend = async (...args: Parameters<typeof runSend>): ReturnType<typeof runSend> => {
+  // Written as `Promise.finally` rather than try/finally on purpose: the React
+  // Compiler cannot lower a try without a catch, and bailing out here would
+  // strip ChatView's memoization on the chat hot path.
+  const onSend = (...args: Parameters<typeof runSend>): ReturnType<typeof runSend> => {
     const pendingSendThreadId = activeThread?.id ?? null;
-    try {
-      return await runSend(...args);
-    } finally {
+    return runSend(...args).finally(() => {
       if (pendingSendThreadId) {
         usePendingSendStore.getState().clearPendingSend(pendingSendThreadId);
       }
-    }
+    });
   };
 
   const onRespondToApproval = useCallback(
@@ -8798,6 +8840,7 @@ export default function ChatView({
     }
 
     const threadIdForSend = activeThread.id;
+    const paperoIdForSend = readPaperoIdForSend(threadIdForSend);
     const messageIdForSend = newMessageId();
     const messageCreatedAt = new Date().toISOString();
     const outgoingMessageText = formatOutgoingComposerPrompt({
@@ -8817,7 +8860,7 @@ export default function ChatView({
         role: "user",
         text: outgoingMessageText,
         dispatchMode,
-        paperoId: paperoIdForSendRef.current,
+        paperoId: paperoIdForSend,
         modelSelection: queuedTurn?.modelSelection ?? selectedModelSelection,
         createdAt: messageCreatedAt,
         streaming: false,
@@ -8867,7 +8910,7 @@ export default function ChatView({
           role: "user",
           text: outgoingMessageText,
           attachments: [],
-          paperoId: paperoIdForSendRef.current,
+          paperoId: paperoIdForSend,
         },
         modelSelection: modelSelectionForPlanDispatch,
         ...(providerOptionsForPlanDispatch

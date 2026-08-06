@@ -49,6 +49,9 @@ export function renderSynaraHarnessPolicy(capabilities: SynaraHarnessCapabilitie
   return [
     SYNARA_HARNESS_POLICY_MARKER,
     "You are running inside Quack. Quack is the host and harness for this session.",
+    // The MCP server, its tools and the internal packages still carry the legacy `synara`
+    // prefix. Without this line models infer the product is called Synara and say so to users.
+    "The host tools are prefixed `synara_` and the host context envelope is `<synara_host_context>` for legacy reasons only. The product is named Quack: never call it Synara in user-facing text.",
     ...controlPolicy,
   ].join("\n");
 }

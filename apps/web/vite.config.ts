@@ -11,7 +11,10 @@ import tailwindcss from "@tailwindcss/vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import { defineConfig, type Plugin } from "vite";
+// `vitest/config` re-exports Vite's own defineConfig plus the `test` field, so
+// the build config and the test-runner config stay in one file (the three
+// vitest.browser.*.config.ts files mergeConfig() this one and inherit it).
+import { type Plugin, defineConfig } from "vitest/config";
 import pkg from "./package.json" with { type: "json" };
 
 const port = Number(process.env.PORT ?? 5733);
@@ -227,6 +230,17 @@ export default defineConfig({
       protocol: "ws",
       host: "localhost",
     },
+  },
+  test: {
+    // Heap ceiling for test workers (top-level since Vitest 4 removed
+    // `poolOptions`). chatHotPath.compiler.test.ts calls babel.transformSync on
+    // ChatView.tsx (~12k lines) inside the worker, and React Compiler's
+    // per-component dataflow analysis grows super-linearly with file size.
+    // Uncapped, V8 kept growing past 12 GB and took the whole machine down
+    // (macOS watchdog reboot, 2026-08-06) instead of the process. 4 GB is far
+    // above the normal peak, so this only turns a machine-killer into an
+    // ordinary OOM failure.
+    execArgv: ["--max-old-space-size=4096"],
   },
   build: {
     outDir: "dist",
