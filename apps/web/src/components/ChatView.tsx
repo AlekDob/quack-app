@@ -1,43 +1,31 @@
 import {
   type AutomationDefinition,
-  type AutomationSchedule,
   type ApprovalRequestId,
   COMPOSER_EFFORT_KEYBINDING_COMMANDS,
   DEFAULT_MODEL_BY_PROVIDER,
   EventId,
   MessageId,
   type ModelSelection,
-  type NativeApi,
-  type OrchestrationShellSnapshot,
   type ProjectScript,
   type ModelSlug,
   type ProviderKind,
-  type ProjectEntry,
   type ProjectId,
   type TeamScope,
   type ProviderApprovalDecision,
   PROVIDER_DISPLAY_NAMES,
   type ProviderMentionReference,
-  type ProviderNativeCommandDescriptor,
-  type ProviderPluginDescriptor,
   type ProviderRequestKind,
-  type ProviderSkillDescriptor,
   type ProviderSkillReference,
   type ProviderStartOptions,
   type ProviderUserInputAnswers,
-  type PinnedMessage,
   PROVIDER_SEND_TURN_MAX_ATTACHMENTS,
-  type ResolvedKeybindingsConfig,
-  type ServerProviderStatus,
   ThreadId,
   ThreadMarkerId,
   type ThreadMarker,
   type ThreadMarkerColor,
   type ThreadMarkerStyle,
   type TurnId,
-  type EditorId,
   type KeybindingCommand,
-  OrchestrationThreadActivity,
   ProviderInteractionMode,
   RuntimeMode,
 } from "@synara/contracts";
@@ -114,7 +102,6 @@ import { getLocalFolderBrowseRootPath, isLocalFolderMentionQuery } from "~/lib/l
 import {
   findProviderStatus,
   isProviderUsable,
-  normalizeCustomBinaryPath,
   normalizeProviderStatusForLocalConfig,
   resolveProviderSendAvailabilityWithRefresh,
 } from "~/lib/providerAvailability";
@@ -150,7 +137,6 @@ import {
   hydratePendingBlobComposerAttachments,
   readFileAsDataUrl,
 } from "../lib/composerSend";
-import { composerImageBlobKey, persistComposerImageBlob } from "../lib/composerImageBlobStore";
 import { reconcileDeletedThreadFromClient } from "../lib/deletedThreadClientReconciliation";
 import { extractChatAutomationInvocation } from "../lib/automationIntent";
 import {
@@ -199,6 +185,49 @@ import {
   shouldEnableComposerPastedTextCollapse,
   shouldConsumePendingCustomBinaryConfirmation,
   shouldShowComposerModelBootstrapSkeleton,
+} from "./ChatView.logic";
+import {
+  ATTACHMENT_PREVIEW_HANDOFF_TTL_MS,
+  automationScheduleActivityPayload,
+  buildQueuedComposerPreviewText,
+  canHandleComposerPickerShortcut,
+  COMPOSER_PATH_QUERY_DEBOUNCE_MS,
+  composerPromptStillMatchesRestoredQueuedDraft,
+  EMPTY_ACTIVITIES,
+  EMPTY_AVAILABLE_EDITORS,
+  EMPTY_COMPOSER_PLUGIN_SUGGESTIONS,
+  EMPTY_DISMISSED_PROVIDER_HEALTH_BANNERS,
+  EMPTY_KEYBINDINGS,
+  EMPTY_LAST_INVOKED_SCRIPT_BY_PROJECT,
+  EMPTY_MESSAGES,
+  EMPTY_PAPERO_MODEL_MAP,
+  EMPTY_PENDING_USER_INPUT_ANSWERS,
+  EMPTY_PINNED_MESSAGES,
+  EMPTY_PINNED_TEXT,
+  EMPTY_PROJECT_ENTRIES,
+  EMPTY_PROVIDER_NATIVE_COMMANDS,
+  EMPTY_PROVIDER_SKILLS,
+  EMPTY_PROVIDER_STATUSES,
+  EMPTY_TERMINAL_RUNTIME_ENV,
+  EMPTY_THREAD_MARKERS,
+  eventTargetsComposer,
+  formatPastedTextTitleSeed,
+  getConfirmedCustomBinarySessionKey,
+  getProviderHealthBannerDismissalKey,
+  getProviderStartOptionsCustomBinaryPath,
+  getRateLimitBannerDismissalKey,
+  getThreadProviderCustomBinaryPathKey,
+  LOCAL_PROJECT_DRAFT_CONTEXT,
+  makeAutomationSetupBubble,
+  MAX_DISMISSED_PROVIDER_HEALTH_BANNERS,
+  readPaperoIdForSend,
+  revokeBlobPreviewUrlsAfterPaint,
+  RUNNING_WITHOUT_ACTIVE_TURN_QUEUE_GRACE_MS,
+  stagePersistedComposerImageAttachments,
+  VOICE_RECORDER_ACTION_ARM_DELAY_MS,
+  waitForSetupScriptTerminalActivity,
+  waitForShellProjectById,
+  warnVoiceGuard,
 } from "./ChatView.logic";
 import {
   createRelevantWorkLogThreadsSelector,
@@ -346,17 +375,6 @@ import {
   type PaperoId,
 } from "@synara/shared/paperi";
 
-const EMPTY_PAPERO_MODEL_MAP: Partial<Record<ProviderKind, ModelSelection>> = Object.freeze({});
-
-/**
- * Papero selezionato al momento dell'invio: si legge qui, non da un ref
- * aggiornato in render (che fa bailare il React Compiler su tutto ChatView).
- * Read at dispatch time, so flipping the pill mid-stream never relabels the
- * in-flight turn.
- */
-function readPaperoIdForSend(threadId: ThreadId): PaperoId {
-  return usePaperoStore.getState().activePaperoIdByThreadId[threadId] ?? DEFAULT_PAPERO_ID;
-}
 import {
   getCustomBinaryPathForProvider,
   getProviderStartOptions,
@@ -373,7 +391,6 @@ import {
   type ComposerAssistantSelectionAttachment,
   type BrowserAnnotationDraft,
   type DraftThreadEnvMode,
-  type PersistedComposerImageAttachment,
   type QueuedComposerChatTurn,
   type QueuedComposerPlanFollowUp,
   type QueuedComposerTurn,
@@ -403,12 +420,10 @@ import {
 import {
   appendPastedTextsToPrompt,
   createPastedTextDraft,
-  pastedTextTitle,
   type PastedTextDraft,
 } from "../lib/composerPastedText";
 import {
   appendAssistantSelectionsToPrompt,
-  formatAssistantSelectionQueuePreview,
   formatAssistantSelectionTitleSeed,
 } from "../lib/assistantSelections";
 import {
@@ -417,7 +432,6 @@ import {
 } from "../lib/browserAnnotations";
 import {
   appendFileCommentsToPrompt,
-  formatFileCommentLabel,
   formatFileCommentTitleSeed,
   type FileCommentDraft,
 } from "../lib/fileComments";
@@ -433,7 +447,7 @@ import {
   resolveNextComposerFooterTier,
   shouldUseCompactComposerFooter,
 } from "./composerFooterLayout";
-import { selectThreadTerminalState, useTerminalStateStore } from "../terminalStateStore";
+import { useTerminalStateStore } from "../terminalStateStore";
 import {
   resolveSplitViewFocusedThreadId,
   selectSplitView,
@@ -561,11 +575,7 @@ import { ProjectPicker } from "./chat/ProjectPicker";
 import { FolderClosed } from "./FolderClosed";
 import { ProviderHealthBanner } from "./chat/ProviderHealthBanner";
 import { ThreadErrorBanner } from "./chat/ThreadErrorBanner";
-import {
-  RateLimitBanner,
-  deriveLatestRateLimitStatus,
-  type RateLimitStatus,
-} from "./chat/RateLimitBanner";
+import { RateLimitBanner, deriveLatestRateLimitStatus } from "./chat/RateLimitBanner";
 import {
   ACTIVE_TURN_LAYOUT_SETTLE_DELAY_MS,
   appendVoiceTranscriptToPrompt,
@@ -619,431 +629,6 @@ import { resolveProjectDefaultModelSelection } from "../lib/projectDefaultProvid
 // are conditional, so loading it lazily keeps the terminal stack out of the initial
 // chat bundle and defers the cost to the first time a terminal is actually opened.
 const ThreadTerminalDrawer = lazy(() => import("./ThreadTerminalDrawer"));
-
-const ATTACHMENT_PREVIEW_HANDOFF_TTL_MS = 5000;
-const EMPTY_ACTIVITIES: OrchestrationThreadActivity[] = [];
-const EMPTY_MESSAGES: ChatMessage[] = [];
-const EMPTY_PINNED_MESSAGES: readonly PinnedMessage[] = [];
-const EMPTY_THREAD_MARKERS: readonly ThreadMarker[] = [];
-const EMPTY_PINNED_TEXT: ReadonlyMap<MessageId, string> = new Map();
-const EMPTY_KEYBINDINGS: ResolvedKeybindingsConfig = [];
-const EMPTY_PROJECT_ENTRIES: ProjectEntry[] = [];
-const EMPTY_PROVIDER_NATIVE_COMMANDS: ProviderNativeCommandDescriptor[] = [];
-const EMPTY_PROVIDER_SKILLS: ProviderSkillDescriptor[] = [];
-const LOCAL_PROJECT_DRAFT_CONTEXT = {
-  envMode: "local",
-  worktreePath: null,
-  branch: null,
-  lastKnownPr: null,
-} as const;
-const DRAFT_PROJECT_SYNC_MAX_ATTEMPTS = 6;
-const DRAFT_PROJECT_SYNC_DELAY_MS = 50;
-const SETUP_SCRIPT_TERMINAL_ACTIVITY_START_TIMEOUT_MS = 1_000;
-const SETUP_SCRIPT_TERMINAL_MAX_RUNTIME_MS = 10 * 60 * 1000;
-
-function terminalHasRunningSubprocess(threadId: ThreadId, terminalId: string): boolean {
-  const terminalState = selectThreadTerminalState(
-    useTerminalStateStore.getState().terminalStateByThreadId,
-    threadId,
-  );
-  return terminalState.runningTerminalIds.includes(terminalId);
-}
-
-function waitForSetupScriptTerminalActivity(input: {
-  threadId: ThreadId;
-  terminalId: string;
-  observeStartTimeoutMs?: number;
-  maxRuntimeMs?: number;
-}): Promise<void> {
-  if (typeof window === "undefined") {
-    return Promise.resolve();
-  }
-
-  const observeStartTimeoutMs =
-    input.observeStartTimeoutMs ?? SETUP_SCRIPT_TERMINAL_ACTIVITY_START_TIMEOUT_MS;
-  const maxRuntimeMs = input.maxRuntimeMs ?? SETUP_SCRIPT_TERMINAL_MAX_RUNTIME_MS;
-
-  return new Promise((resolve) => {
-    let resolved = false;
-    let observedRunning = terminalHasRunningSubprocess(input.threadId, input.terminalId);
-    let observeStartTimer: number | null = null;
-    let maxRuntimeTimer: number | null = null;
-
-    const unsubscribe = useTerminalStateStore.subscribe(() => {
-      checkRunningState();
-    });
-
-    const clearTimers = () => {
-      if (observeStartTimer !== null) {
-        window.clearTimeout(observeStartTimer);
-        observeStartTimer = null;
-      }
-      if (maxRuntimeTimer !== null) {
-        window.clearTimeout(maxRuntimeTimer);
-        maxRuntimeTimer = null;
-      }
-    };
-
-    const finish = () => {
-      if (resolved) return;
-      resolved = true;
-      clearTimers();
-      unsubscribe();
-      resolve();
-    };
-
-    const ensureMaxRuntimeTimer = () => {
-      if (maxRuntimeTimer !== null) return;
-      maxRuntimeTimer = window.setTimeout(finish, maxRuntimeMs);
-    };
-
-    function checkRunningState() {
-      const running = terminalHasRunningSubprocess(input.threadId, input.terminalId);
-      if (running) {
-        observedRunning = true;
-        if (observeStartTimer !== null) {
-          window.clearTimeout(observeStartTimer);
-          observeStartTimer = null;
-        }
-        ensureMaxRuntimeTimer();
-        return;
-      }
-      if (observedRunning) {
-        finish();
-      }
-    }
-
-    checkRunningState();
-    if (!observedRunning) {
-      observeStartTimer = window.setTimeout(finish, observeStartTimeoutMs);
-    }
-  });
-}
-
-function waitForDraftProjectSyncDelay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    window.setTimeout(resolve, ms);
-  });
-}
-
-// Waits for a project to appear in the shell snapshot before a local draft points at it.
-async function waitForShellProjectById(
-  api: NativeApi,
-  projectId: ProjectId,
-): Promise<{
-  project: OrchestrationShellSnapshot["projects"][number] | null;
-  snapshot: OrchestrationShellSnapshot | null;
-}> {
-  let latestSnapshot: OrchestrationShellSnapshot | null = null;
-  for (let attempt = 1; attempt <= DRAFT_PROJECT_SYNC_MAX_ATTEMPTS; attempt += 1) {
-    const snapshot = await api.orchestration.getShellSnapshot().catch(() => null);
-    if (snapshot) {
-      latestSnapshot = snapshot;
-      const project = snapshot.projects.find((candidate) => candidate.id === projectId) ?? null;
-      if (project) {
-        return { project, snapshot };
-      }
-    }
-    if (attempt < DRAFT_PROJECT_SYNC_MAX_ATTEMPTS) {
-      await waitForDraftProjectSyncDelay(DRAFT_PROJECT_SYNC_DELAY_MS * attempt);
-    }
-  }
-  return { project: null, snapshot: latestSnapshot };
-}
-
-function automationScheduleActivityPayload(schedule: AutomationSchedule) {
-  switch (schedule.type) {
-    case "manual":
-      return { type: "manual" } as const;
-    case "once":
-      return { type: "once", runAt: schedule.runAt } as const;
-    case "interval":
-      return { type: "interval", everySeconds: schedule.everySeconds } as const;
-    case "daily":
-      return schedule.timezone
-        ? { type: "daily", timeOfDay: schedule.timeOfDay, timezone: schedule.timezone }
-        : { type: "daily", timeOfDay: schedule.timeOfDay };
-    case "weekdays":
-      return schedule.timezone
-        ? { type: "weekdays", timeOfDay: schedule.timeOfDay, timezone: schedule.timezone }
-        : { type: "weekdays", timeOfDay: schedule.timeOfDay };
-    case "weekly":
-      return schedule.timezone
-        ? {
-            type: "weekly",
-            dayOfWeek: schedule.dayOfWeek,
-            timeOfDay: schedule.timeOfDay,
-            timezone: schedule.timezone,
-          }
-        : {
-            type: "weekly",
-            dayOfWeek: schedule.dayOfWeek,
-            timeOfDay: schedule.timeOfDay,
-          };
-    case "cron":
-      return {
-        type: "cron",
-        expression: schedule.expression,
-        timezone: schedule.timezone,
-      } as const;
-  }
-}
-
-function revokeBlobPreviewUrlsAfterPaint(previewUrls: readonly string[]): void {
-  if (previewUrls.length === 0 || typeof window === "undefined") {
-    return;
-  }
-  window.requestAnimationFrame(() => {
-    window.setTimeout(() => {
-      for (const previewUrl of previewUrls) {
-        revokeBlobPreviewUrl(previewUrl);
-      }
-    }, 0);
-  });
-}
-
-// Shared by the live-composer and prompt-history attachment sync effects:
-// AppSnap images persist their bytes as IndexedDB blobs (reusing an existing
-// blob key when valid), everything else inlines a data URL. Falls back to the
-// already-persisted attachments for images whose serialization fails.
-async function stagePersistedComposerImageAttachments(input: {
-  threadId: ThreadId;
-  images: ReadonlyArray<ComposerImageAttachment>;
-  getPersistedAttachments: () => PersistedComposerImageAttachment[];
-}): Promise<PersistedComposerImageAttachment[]> {
-  try {
-    const existingPersistedById = new Map(
-      input.getPersistedAttachments().map((attachment) => [attachment.id, attachment]),
-    );
-    const stagedAttachmentById = new Map<string, PersistedComposerImageAttachment>();
-    await Promise.all(
-      input.images.map(async (image) => {
-        try {
-          if (image.source?.kind === "appsnap") {
-            const existingPersisted = existingPersistedById.get(image.id);
-            const expectedBlobKey = composerImageBlobKey(input.threadId, image.id);
-            const blobKey =
-              existingPersisted?.blobKey === expectedBlobKey
-                ? expectedBlobKey
-                : await persistComposerImageBlob({
-                    threadId: input.threadId,
-                    imageId: image.id,
-                    file: image.file,
-                  });
-            stagedAttachmentById.set(image.id, {
-              id: image.id,
-              name: image.name,
-              mimeType: image.mimeType,
-              sizeBytes: image.sizeBytes,
-              blobKey,
-              source: image.source,
-            });
-            return;
-          }
-          const dataUrl = await readFileAsDataUrl(image.file);
-          stagedAttachmentById.set(image.id, {
-            id: image.id,
-            name: image.name,
-            mimeType: image.mimeType,
-            sizeBytes: image.sizeBytes,
-            dataUrl,
-          });
-        } catch {
-          const existingPersisted = existingPersistedById.get(image.id);
-          if (existingPersisted) {
-            stagedAttachmentById.set(image.id, existingPersisted);
-          }
-        }
-      }),
-    );
-    return Array.from(stagedAttachmentById.values());
-  } catch {
-    const currentImageIds = new Set(input.images.map((image) => image.id));
-    return input
-      .getPersistedAttachments()
-      .filter((attachment) => currentImageIds.has(attachment.id));
-  }
-}
-
-function eventTargetsComposer(
-  event: globalThis.KeyboardEvent,
-  composerForm: HTMLFormElement | null,
-): boolean {
-  if (!composerForm) return false;
-  const target = event.target;
-  return target instanceof Node ? composerForm.contains(target) : false;
-}
-
-function canHandleComposerPickerShortcut(
-  event: globalThis.KeyboardEvent,
-  composerForm: HTMLFormElement | null,
-): boolean {
-  if (!composerForm) return false;
-  if (eventTargetsComposer(event, composerForm)) return true;
-  const target = event.target;
-  return (
-    target === document.body ||
-    target === document.documentElement ||
-    document.activeElement === document.body ||
-    document.activeElement === document.documentElement
-  );
-}
-const EMPTY_AVAILABLE_EDITORS: EditorId[] = [];
-const EMPTY_PROVIDER_STATUSES: ServerProviderStatus[] = [];
-const EMPTY_PENDING_USER_INPUT_ANSWERS: Record<string, PendingUserInputDraftAnswer> = {};
-const EMPTY_TERMINAL_RUNTIME_ENV: Record<string, string> = {};
-const MAX_DISMISSED_PROVIDER_HEALTH_BANNERS = 50;
-const EMPTY_LAST_INVOKED_SCRIPT_BY_PROJECT: Record<string, string> = {};
-const EMPTY_DISMISSED_PROVIDER_HEALTH_BANNERS: ReadonlyArray<string> = [];
-
-function getThreadProviderCustomBinaryPathKey(threadId: Thread["id"], provider: ProviderKind) {
-  return `${threadId}:${provider}`;
-}
-
-function getConfirmedCustomBinarySessionKey(
-  thread: Thread | null | undefined,
-  provider: ProviderKind,
-): string | null {
-  const session = thread?.session;
-  if (!thread || session?.provider !== provider) {
-    return null;
-  }
-  if (session.status !== "ready" && session.status !== "running") {
-    return null;
-  }
-  return getThreadProviderCustomBinaryPathKey(thread.id, provider);
-}
-
-function getProviderStartOptionsCustomBinaryPath(
-  providerOptions: ProviderStartOptions | undefined,
-  provider: ProviderKind,
-): string | null {
-  switch (provider) {
-    case "codex":
-      return normalizeCustomBinaryPath(providerOptions?.codex?.binaryPath);
-    case "claudeAgent":
-      return normalizeCustomBinaryPath(providerOptions?.claudeAgent?.binaryPath);
-    case "antigravity":
-      return normalizeCustomBinaryPath(providerOptions?.antigravity?.binaryPath);
-    case "grok":
-      return normalizeCustomBinaryPath(providerOptions?.grok?.binaryPath);
-    case "droid":
-      return normalizeCustomBinaryPath(providerOptions?.droid?.binaryPath);
-    case "kilo":
-      return normalizeCustomBinaryPath(providerOptions?.kilo?.binaryPath);
-    case "opencode":
-      return normalizeCustomBinaryPath(providerOptions?.opencode?.binaryPath);
-    case "cursor":
-      return normalizeCustomBinaryPath(providerOptions?.cursor?.binaryPath);
-    case "pi":
-      return normalizeCustomBinaryPath(providerOptions?.pi?.binaryPath);
-  }
-}
-
-function getProviderHealthBannerDismissalKey(status: ServerProviderStatus | null): string | null {
-  if (!status || status.status === "ready") {
-    return null;
-  }
-  return [
-    status.provider,
-    status.status,
-    status.available ? "available" : "unavailable",
-    status.authStatus,
-    status.message?.trim() ?? "",
-  ].join("\u001f");
-}
-
-function getRateLimitBannerDismissalKey(
-  status: RateLimitStatus | null,
-  threadId: Thread["id"] | null,
-): string | null {
-  if (!status || !threadId) {
-    return null;
-  }
-  return [
-    threadId,
-    status.status,
-    status.resetsAt ?? "",
-    typeof status.utilization === "number" ? String(Math.round(status.utilization * 100)) : "",
-  ].join("\u001f");
-}
-
-type ComposerPluginSuggestion = {
-  plugin: ProviderPluginDescriptor;
-  mention: ProviderMentionReference;
-};
-
-const EMPTY_COMPOSER_PLUGIN_SUGGESTIONS: ComposerPluginSuggestion[] = [];
-
-function buildQueuedComposerPreviewText(input: {
-  trimmedPrompt: string;
-  images: ReadonlyArray<ComposerImageAttachment>;
-  files: ReadonlyArray<ComposerFileAttachment>;
-  assistantSelections: ReadonlyArray<{ id: string }>;
-  browserAnnotations: ReadonlyArray<BrowserAnnotationDraft>;
-  terminalContexts: ReadonlyArray<TerminalContextDraft>;
-  fileComments: ReadonlyArray<FileCommentDraft>;
-  pastedTexts: ReadonlyArray<PastedTextDraft>;
-}): string {
-  if (input.trimmedPrompt.length > 0) {
-    return input.trimmedPrompt;
-  }
-  const firstImage = input.images[0];
-  if (firstImage) {
-    return `Image: ${firstImage.name}`;
-  }
-  const firstFile = input.files[0];
-  if (firstFile) {
-    return `File: ${firstFile.name}`;
-  }
-  if (input.assistantSelections.length > 0) {
-    return formatAssistantSelectionQueuePreview(input.assistantSelections.length);
-  }
-  const firstBrowserAnnotation = input.browserAnnotations[0];
-  if (firstBrowserAnnotation) {
-    return `#${firstBrowserAnnotation.ordinal} ${formatBrowserAnnotationLabel(firstBrowserAnnotation)}`;
-  }
-  const firstTerminalContext = input.terminalContexts[0];
-  if (firstTerminalContext) {
-    return formatTerminalContextLabel(firstTerminalContext);
-  }
-  const firstFileComment = input.fileComments[0];
-  if (firstFileComment) {
-    return formatFileCommentLabel(firstFileComment);
-  }
-  const pastedTitle = formatPastedTextTitleSeed(input.pastedTexts);
-  if (pastedTitle) {
-    return pastedTitle;
-  }
-  return "Queued follow-up";
-}
-
-function formatPastedTextTitleSeed(pastedTexts: ReadonlyArray<PastedTextDraft>): string | null {
-  const firstPastedText = pastedTexts[0];
-  if (!firstPastedText) {
-    return null;
-  }
-  return pastedTexts.length === 1
-    ? pastedTextTitle(firstPastedText.text)
-    : `${pastedTexts.length} pasted texts`;
-}
-
-// How long a running session may sit with no active turn before the composer
-// stops queueing follow-ups into a queue that may never drain.
-const RUNNING_WITHOUT_ACTIVE_TURN_QUEUE_GRACE_MS = 10_000;
-const COMPOSER_PATH_QUERY_DEBOUNCE_MS = 120;
-const VOICE_RECORDER_ACTION_ARM_DELAY_MS = 250;
-
-function warnVoiceGuard(event: string, details?: Record<string, unknown>) {
-  if (!import.meta.env.DEV) {
-    return;
-  }
-  if (details) {
-    console.warn(`[voice] ${event}`, details);
-    return;
-  }
-  console.warn(`[voice] ${event}`);
-}
 
 function ComposerControlSkeleton(props: { widthClassName: string }) {
   return (
@@ -1127,46 +712,6 @@ interface ChatViewProps {
   } | null;
   onChangeThreadInSplitPane?: () => void;
   onCloseThreadPane?: () => void;
-}
-
-function normalizeRestoredQueuedPrompt(value: string): string {
-  return value.trim().replace(/\s+/g, " ");
-}
-
-function composerPromptStillMatchesRestoredQueuedDraft(
-  restoredPrompt: string,
-  nextPrompt: string,
-): boolean {
-  const restored = normalizeRestoredQueuedPrompt(restoredPrompt);
-  const next = normalizeRestoredQueuedPrompt(nextPrompt);
-  if (next.length === 0) {
-    return false;
-  }
-  if (restored.length === 0) {
-    return true;
-  }
-  if (next.includes(restored)) {
-    return true;
-  }
-  if (next.length >= Math.min(16, restored.length) && restored.includes(next)) {
-    return true;
-  }
-  const probe = restored.slice(0, Math.min(48, restored.length));
-  return probe.length >= 16 && next.includes(probe);
-}
-
-// Builds an ephemeral transcript bubble for the conversational automation-setup
-// exchange. These never reach a provider and are not persisted; they render the
-// back-and-forth (user request, Quack's clarifying questions) inline like Codex.
-function makeAutomationSetupBubble(role: "user" | "assistant", text: string): ChatMessage {
-  return {
-    id: newMessageId(),
-    role,
-    text,
-    createdAt: new Date().toISOString(),
-    streaming: false,
-    source: "native",
-  };
 }
 
 export default function ChatView({

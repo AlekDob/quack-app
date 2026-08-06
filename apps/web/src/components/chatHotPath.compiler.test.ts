@@ -73,7 +73,7 @@ interface HotPathModule {
 }
 
 const HOT_PATH_MODULES: readonly HotPathModule[] = [
-  { relativePath: "ChatView.tsx", allowedBailoutReasons: [], maxLines: 12_192 },
+  { relativePath: "ChatView.tsx", allowedBailoutReasons: [], maxLines: 11_737 },
   { relativePath: "Sidebar.tsx", allowedBailoutReasons: [], maxLines: 6_998 },
   {
     relativePath: "chat/MessagesTimeline.tsx",
