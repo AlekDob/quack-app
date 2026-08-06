@@ -125,6 +125,8 @@ function PaperoInstructionsPanel(props: {
 export function PaperoPill(props: {
   readonly activePaperoId: PaperoId;
   readonly activeDefinition: PaperoDefinition;
+  /** Definitions from the effective Global or Project Team roster. */
+  readonly definitions?: readonly PaperoDefinition[];
   readonly currentProvider: ProviderKind;
   readonly modelSelectionByProvider: Partial<Record<ProviderKind, ModelSelection>>;
   readonly compact?: boolean;
@@ -140,7 +142,7 @@ export function PaperoPill(props: {
 }) {
   const [open, setOpen] = useState(false);
   const [slotsOpen, setSlotsOpen] = useState(false);
-  const paperi = listComposerPaperi();
+  const paperi = props.definitions ?? listComposerPaperi();
   const savedProviders = paperoSlotProviders(props.modelSelectionByProvider);
   const hasSlotForCurrent = savedProviders.includes(props.currentProvider);
 

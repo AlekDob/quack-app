@@ -22,6 +22,16 @@ export type TeamAgentSource = typeof TeamAgentSource.Type;
 export const TeamModelSlots = Schema.Record(Schema.String, ModelSelection);
 export type TeamModelSlots = typeof TeamModelSlots.Type;
 
+export const TeamAgentOverrideField = Schema.Literals([
+  "name",
+  "role",
+  "avatar",
+  "purpose",
+  "instructions",
+  "modelSlots",
+]);
+export type TeamAgentOverrideField = typeof TeamAgentOverrideField.Type;
+
 export const TeamAgent = Schema.Struct({
   id: TeamAgentId,
   source: TeamAgentSource,
@@ -34,6 +44,10 @@ export const TeamAgent = Schema.Struct({
   createdAt: Schema.String,
   updatedAt: Schema.String,
   deletedAt: Schema.NullOr(Schema.String),
+  /** Present on project rosters to explain whether this agent inherits Global. */
+  inheritedFromGlobal: Schema.optional(Schema.Boolean),
+  /** The fields this project intentionally differs from Global on. */
+  overriddenFields: Schema.optional(Schema.Array(TeamAgentOverrideField)),
 });
 export type TeamAgent = typeof TeamAgent.Type;
 

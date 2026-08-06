@@ -33,15 +33,13 @@ import {
   AlertDialogTitle,
 } from "~/components/ui/alert-dialog";
 import { DUCK_COUNT, JACK_AVATAR_URL } from "~/lib/duckAvatars";
+import { GLOBAL_TEAM_SCOPE, teamRosterQueryKey } from "~/lib/teamRoster";
 import { ensureNativeApi } from "~/nativeApi";
 import { useStore } from "~/store";
 import { getPaperoDefinition, type PaperoId } from "@synara/shared/paperi";
 
 const LEGACY_MIGRATION_KEY = "synara:team:migrated:v1";
 const LEGACY_STORAGE_KEY = "synara:paperi:v1";
-const teamQueryKey = (scope: TeamScope) =>
-  ["team", scope.kind, scope.kind === "project" ? scope.projectId : null] as const;
-
 interface TeamSearch {
   readonly projectId?: string | undefined;
 }
@@ -144,13 +142,21 @@ function TeamRouteView() {
     [projects],
   );
   const rosterQuery = useQuery({
-    queryKey: teamQueryKey(scope),
+    queryKey: teamRosterQueryKey(scope),
     queryFn: () => ensureNativeApi().team.getRoster({ scope }),
+  });
+  const globalRosterQuery = useQuery({
+    queryKey: teamRosterQueryKey(GLOBAL_TEAM_SCOPE),
+    queryFn: () => ensureNativeApi().team.getRoster({ scope: GLOBAL_TEAM_SCOPE }),
+    enabled: scope.kind === "project",
   });
   const saveAgent = useMutation({
     mutationFn: (agent: TeamAgent) => ensureNativeApi().team.upsertAgent({ scope, agent }),
     onSuccess: (roster) => {
-      queryClient.setQueryData(teamQueryKey(scope), roster);
+      queryClient.setQueryData(teamRosterQueryKey(scope), roster);
+      if (scope.kind === "global") {
+        void queryClient.invalidateQueries({ queryKey: ["team", "project"] });
+      }
       setEditing(null);
     },
     onError: (cause) => setError(cause instanceof Error ? cause.message : "Could not save agent."),
@@ -158,7 +164,10 @@ function TeamRouteView() {
   const deleteAgent = useMutation({
     mutationFn: (agentId: string) => ensureNativeApi().team.deleteAgent({ scope, agentId }),
     onSuccess: (roster) => {
-      queryClient.setQueryData(teamQueryKey(scope), roster);
+      queryClient.setQueryData(teamRosterQueryKey(scope), roster);
+      if (scope.kind === "global") {
+        void queryClient.invalidateQueries({ queryKey: ["team", "project"] });
+      }
       setDeleting(null);
       setEditing(null);
     },
@@ -220,9 +229,29 @@ function TeamRouteView() {
                       <h2 className="truncate font-medium text-foreground">{agent.name}</h2>
                       <p className="truncate text-xs text-muted-foreground">{agent.role}</p>
                     </div>
-                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
-                      {agent.source === "builtin" ? "Built-in" : "Custom"}
-                    </span>
+                    <div className="flex shrink-0 flex-wrap justify-end gap-1">
+                      <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+                        {agent.source === "builtin" ? "Built-in" : "Custom"}
+                      </span>
+                      {scope.kind === "project" ? (
+                        <span
+                          className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground"
+                          title={
+                            agent.inheritedFromGlobal
+                              ? agent.overriddenFields && agent.overriddenFields.length > 0
+                                ? `Overrides Global: ${agent.overriddenFields.join(", ")}`
+                                : "Uses Global settings"
+                              : "Only available in this project"
+                          }
+                        >
+                          {agent.inheritedFromGlobal
+                            ? agent.overriddenFields && agent.overriddenFields.length > 0
+                              ? `Overrides ${agent.overriddenFields.length}`
+                              : "Global"
+                            : "Project only"}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                   <p className="mt-4 line-clamp-4 text-xs leading-5 text-muted-foreground">
                     {agent.instructions}
@@ -254,6 +283,12 @@ function TeamRouteView() {
 
       <AgentDialog
         agent={editing}
+        inheritedAgent={
+          scope.kind === "project" && editing
+            ? (globalRosterQuery.data?.agents.find((agent) => agent.id === editing.id) ?? null)
+            : null
+        }
+        inheritsGlobal={scope.kind === "project"}
         error={error}
         saving={saveAgent.isPending}
         onClose={() => setEditing(null)}
@@ -291,6 +326,8 @@ function TeamRouteView() {
 
 function AgentDialog({
   agent,
+  inheritedAgent,
+  inheritsGlobal,
   error,
   saving,
   onClose,
@@ -298,6 +335,8 @@ function AgentDialog({
   onDelete,
 }: {
   readonly agent: TeamAgent | null;
+  readonly inheritedAgent: TeamAgent | null;
+  readonly inheritsGlobal: boolean;
   readonly error: string | null;
   readonly saving: boolean;
   readonly onClose: () => void;
@@ -314,7 +353,20 @@ function AgentDialog({
     onClose();
   };
   const resetBuiltin = () => {
-    if (!shown || shown.source !== "builtin") return;
+    if (!shown) return;
+    if (inheritsGlobal && inheritedAgent) {
+      setDraft({
+        ...shown,
+        name: inheritedAgent.name,
+        role: inheritedAgent.role,
+        avatar: inheritedAgent.avatar,
+        purpose: inheritedAgent.purpose,
+        instructions: inheritedAgent.instructions,
+        modelSlots: inheritedAgent.modelSlots,
+      });
+      return;
+    }
+    if (shown.source !== "builtin") return;
     const definition = getPaperoDefinition(shown.id as PaperoId);
     setDraft({
       ...shown,
@@ -338,7 +390,11 @@ function AgentDialog({
           <DialogTitle>
             {shown?.source === "builtin" ? `Edit ${shown.name}` : "New agent"}
           </DialogTitle>
-          <DialogDescription>Changes apply only to this Team.</DialogDescription>
+          <DialogDescription>
+            {inheritsGlobal
+              ? "This project inherits Global. Saving keeps only the fields you change."
+              : "Changes apply to every project unless that project overrides them."}
+          </DialogDescription>
         </DialogHeader>
         {shown ? (
           <DialogPanel className="space-y-5">
@@ -446,9 +502,9 @@ function AgentDialog({
               Delete agent
             </Button>
           ) : null}
-          {shown?.source === "builtin" ? (
+          {shown?.source === "builtin" || (inheritsGlobal && inheritedAgent) ? (
             <Button size="sm" variant="outline" onClick={resetBuiltin}>
-              Reset to default
+              {inheritsGlobal ? "Reset to Global" : "Reset to default"}
             </Button>
           ) : null}
           <Button size="sm" variant="outline" onClick={close}>

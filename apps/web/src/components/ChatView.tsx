@@ -14,6 +14,7 @@ import {
   type ProviderKind,
   type ProjectEntry,
   type ProjectId,
+  type TeamScope,
   type ProviderApprovalDecision,
   PROVIDER_DISPLAY_NAMES,
   type ProviderMentionReference,
@@ -329,11 +330,21 @@ import {
 } from "~/projectScripts";
 import { runProjectCommandInTerminal } from "~/projectTerminalRunner";
 import { newCommandId, newMessageId, newProjectId, newThreadId } from "~/lib/utils";
-import { readNativeApi } from "~/nativeApi";
+import { ensureNativeApi, readNativeApi } from "~/nativeApi";
 import { promoteThreadCreate } from "~/lib/threadCreatePromotion";
 import { readFavoriteModelSlugs } from "~/lib/modelFavorites";
+import {
+  composerPaperiFromRoster,
+  GLOBAL_TEAM_SCOPE,
+  teamRosterQueryKey,
+} from "~/lib/teamRoster";
 import { usePaperoStore } from "~/paperi";
-import { DEFAULT_PAPERO_ID, resolveCycledPaperoId, type PaperoId } from "@synara/shared/paperi";
+import {
+  DEFAULT_PAPERO_ID,
+  getPaperoDefinition,
+  resolveCycledPaperoId,
+  type PaperoId,
+} from "@synara/shared/paperi";
 
 const EMPTY_PAPERO_MODEL_MAP: Partial<Record<ProviderKind, ModelSelection>> = Object.freeze({});
 import {
@@ -1191,9 +1202,6 @@ export default function ChatView({
   const resolvePaperoModelForProvider = usePaperoStore(
     (store) => store.resolveModelForCurrentProvider,
   );
-  const resolveEffectivePaperoDefinition = usePaperoStore(
-    (store) => store.resolveEffectiveDefinition,
-  );
   const setPaperoModelSelectionForProvider = usePaperoStore(
     (store) => store.setModelSelectionForProvider,
   );
@@ -1203,13 +1211,6 @@ export default function ChatView({
   const setPaperoInstructions = usePaperoStore((store) => store.setInstructions);
   const activePaperoModelMap = usePaperoStore(
     (store) => store.modelSelectionByProviderByPaperoId[activePaperoId] ?? EMPTY_PAPERO_MODEL_MAP,
-  );
-  const activePaperoOverrides = usePaperoStore(
-    (store) => store.overridesByPaperoId[activePaperoId],
-  );
-  const activePaperoDefinition = useMemo(
-    () => resolveEffectivePaperoDefinition(activePaperoId),
-    [activePaperoId, activePaperoOverrides, resolveEffectivePaperoDefinition],
   );
   // Freeze papero at send so flipping the pill mid-stream does not relabel the in-flight turn.
   const paperoIdForSendRef = useRef<PaperoId>(activePaperoId);
@@ -1905,6 +1906,24 @@ export default function ChatView({
   const activeProject = useStore(
     useMemo(() => createProjectSelector(activeProjectId), [activeProjectId]),
   );
+  const teamScope = useMemo<TeamScope>(
+    () =>
+      activeProject?.kind === "project"
+        ? { kind: "project", projectId: activeProject.id }
+        : GLOBAL_TEAM_SCOPE,
+    [activeProject?.id, activeProject?.kind],
+  );
+  const teamRosterQuery = useQuery({
+    queryKey: teamRosterQueryKey(teamScope),
+    queryFn: () => ensureNativeApi().team.getRoster({ scope: teamScope }),
+  });
+  const composerPaperi = useMemo(
+    () => composerPaperiFromRoster(teamRosterQuery.data),
+    [teamRosterQuery.data],
+  );
+  const activePaperoDefinition =
+    composerPaperi.find((definition) => definition.id === activePaperoId) ??
+    getPaperoDefinition(activePaperoId);
   const deletePlaceholderTerminalThread = useCallback(
     async (terminalThreadId: ThreadId) => {
       const api = readNativeApi();
@@ -6131,7 +6150,9 @@ export default function ChatView({
           });
         }
       }
-      const definition = resolveEffectivePaperoDefinition(paperoId);
+      const definition =
+        composerPaperi.find((candidate) => candidate.id === paperoId) ??
+        getPaperoDefinition(paperoId);
       toastManager.add({
         type: "success",
         title: `${definition.label}`,
@@ -6141,7 +6162,7 @@ export default function ChatView({
     },
     [
       activeThread,
-      resolveEffectivePaperoDefinition,
+      composerPaperi,
       resolvePaperoModelForProvider,
       scheduleComposerFocus,
       selectedProvider,
@@ -6175,14 +6196,16 @@ export default function ChatView({
   const onSavePaperoInstructions = useCallback(
     (paperoId: PaperoId, instructions: string) => {
       setPaperoInstructions(paperoId, instructions);
-      const definition = resolveEffectivePaperoDefinition(paperoId);
+      const definition =
+        composerPaperi.find((candidate) => candidate.id === paperoId) ??
+        getPaperoDefinition(paperoId);
       toastManager.add({
         type: "success",
         title: "Instructions saved",
         description: `${definition.label} will use these from the next message`,
       });
     },
-    [resolveEffectivePaperoDefinition, setPaperoInstructions],
+    [composerPaperi, setPaperoInstructions],
   );
 
   const onResetPaperoInstructions = useCallback(
@@ -10791,6 +10814,7 @@ export default function ChatView({
       <PaperoPill
         activePaperoId={activePaperoId}
         activeDefinition={activePaperoDefinition}
+        definitions={composerPaperi}
         currentProvider={selectedProvider}
         modelSelectionByProvider={activePaperoModelMap}
         compact={isComposerFooterCompact}
