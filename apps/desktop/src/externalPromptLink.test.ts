@@ -8,7 +8,9 @@ import {
 
 describe("externalPromptLink", () => {
   it("accepts a Linear prompt, including Unicode", () => {
-    expect(parseExternalPromptLink("quack://open?source=linear&prompt=Caff%C3%A8%20%F0%9F%A6%86")).toEqual({
+    expect(
+      parseExternalPromptLink("quack://open?source=linear&prompt=Caff%C3%A8%20%F0%9F%A6%86"),
+    ).toEqual({
       source: "linear",
       prompt: "Caffè 🦆",
     });
@@ -33,7 +35,9 @@ describe("externalPromptLink", () => {
   });
 
   it("finds a prompt link in process arguments", () => {
-    expect(findExternalPromptLink(["Quack", "--flag", "quack://open?source=linear&prompt=Fix"])).toEqual({
+    expect(
+      findExternalPromptLink(["Quack", "--flag", "quack://open?source=linear&prompt=Fix"]),
+    ).toEqual({
       source: "linear",
       prompt: "Fix",
     });

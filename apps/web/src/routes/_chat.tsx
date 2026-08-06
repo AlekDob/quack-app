@@ -320,7 +320,9 @@ function ChatRouteGlobalShortcuts() {
           });
           return;
         }
-        useComposerDraftStore.getState().setPrompt(result.threadId, `Source: Linear\n\n${request.prompt}`);
+        useComposerDraftStore
+          .getState()
+          .setPrompt(result.threadId, `Source: Linear\n\n${request.prompt}`);
       });
     });
   }, [handleNewChatForActiveSurface]);
