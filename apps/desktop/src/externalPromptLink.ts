@@ -33,7 +33,7 @@ export function parseExternalPromptLink(rawUrl: string): ExternalPromptRequest |
     return null;
   }
 
-  const prompt = prompts[0];
+  const prompt = prompts[0] ?? "";
   if (!prompt.trim() || Buffer.byteLength(prompt, "utf8") > MAX_EXTERNAL_PROMPT_BYTES) {
     return null;
   }
@@ -41,7 +41,9 @@ export function parseExternalPromptLink(rawUrl: string): ExternalPromptRequest |
   return { source: "linear", prompt };
 }
 
-export function findExternalPromptLink(commandLine: readonly string[]): ExternalPromptRequest | null {
+export function findExternalPromptLink(
+  commandLine: readonly string[],
+): ExternalPromptRequest | null {
   for (const argument of commandLine) {
     const request = parseExternalPromptLink(argument);
     if (request) return request;
