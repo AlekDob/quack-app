@@ -1140,6 +1140,22 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           );
           const isLiveGroup =
             groupId === lastLiveWorkGroupId && (activeTurnInProgress || isWorking);
+          const renderWorkContent = (content: ReactNode) => {
+            if (!isLiveGroup) return content;
+            return (
+              <div
+                className={cn(
+                  "flex items-start overflow-visible",
+                  CHAT_STREAM_AVATAR_GAP_CLASS_NAME,
+                )}
+              >
+                {/* Keep the live tool group on Thinking's text edge. The avatar belongs
+                    to the single live-status row, so this slot is blank. */}
+                <ChatStreamAvatarSlot />
+                <div className="min-w-0 flex-1">{content}</div>
+              </div>
+            );
+          };
           const isExpanded = expandedWorkGroupsState[groupId] ?? false;
           const plannedRenderChunks = planWorkEntryRenderChunks(groupedEntries, {
             tailIsLive: isLiveGroup,
@@ -1152,8 +1168,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           const renderChunks = cappedRenderPlan.chunks;
           const hasCollapsedChunk = renderChunks.some((chunk) => chunk.summary !== null);
           if (hasCollapsedChunk) {
-            return (
-              <div>
+            return renderWorkContent(
+              <>
                 <div className="space-y-0.5">
                   {renderChunks.map((chunk) => {
                     if (!chunk.summary) return chunk.entries.map(renderEntryRow);
@@ -1187,7 +1203,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     </button>
                   </div>
                 )}
-              </div>
+              </>,
             );
           }
           const hasOverflow = groupedEntries.length > MAX_VISIBLE_WORK_LOG_ENTRIES;
@@ -1198,8 +1214,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           const hiddenCount = groupedEntries.length - visibleEntries.length;
           const showOverflowToggle = hasOverflow;
 
-          return (
-            <div>
+          return renderWorkContent(
+            <>
               <div className="space-y-0.5">{visibleEntries.map(renderEntryRow)}</div>
               {showOverflowToggle && (
                 <div className="mt-1.5 flex items-center justify-start gap-2 px-0.5">
@@ -1213,7 +1229,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                   </button>
                 </div>
               )}
-            </div>
+            </>,
           );
         })()}
 

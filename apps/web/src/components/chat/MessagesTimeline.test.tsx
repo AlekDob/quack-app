@@ -1102,6 +1102,7 @@ describe("MessagesTimeline", () => {
 
     expect(markup).toContain("Context compacted manually");
     expect(markup).not.toContain("Work log");
+    expect(markup).not.toContain("@[864px]/chat-pane:gap-3");
   });
 
   it("keeps the generic working copy alongside the active compaction entry", async () => {
@@ -1144,6 +1145,7 @@ describe("MessagesTimeline", () => {
     expect(markup).toContain("Compacting conversation...");
     expect(markup).toContain("Working for");
     expect(markup).not.toContain("h-px flex-1 bg-border");
+    expect(markup.match(/@\[864px\]\/chat-pane:gap-3/g)).toHaveLength(2);
   });
 
   it("does not reserve a timestamp footer between live status updates and Thinking", async () => {

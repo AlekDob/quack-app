@@ -66,6 +66,14 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
           "The transcript cancels both native and virtual-list scroll state at the visible offset, guards late tail-settle work after user takeover or task replacement, and preserves the simpler non-virtualized path for ordinary conversation sizes.",
       },
       {
+        id: "live-tool-row-alignment",
+        title: "Live tool work follows Thinking",
+        description:
+          "The last live tool group now lines up with the Thinking row, while older tool rows keep their existing layout.",
+        details:
+          "Only the standalone work group that belongs to the active turn receives the shared avatar gutter. Tool rows already rendered inside an assistant message are unchanged, and settled or orphaned work rows do not gain extra indentation. Focused transcript tests cover both paths.",
+      },
+      {
         id: "safer-composer-images",
         title: "Image attachments fail more safely",
         description:
