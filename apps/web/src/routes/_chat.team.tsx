@@ -40,7 +40,7 @@ import { getPaperoDefinition, type PaperoId } from "@synara/shared/paperi";
 
 const LEGACY_MIGRATION_KEY = "synara:team:migrated:v1";
 const LEGACY_STORAGE_KEY = "synara:paperi:v1";
-interface TeamSearch {
+export interface TeamSearch {
   readonly projectId?: string | undefined;
 }
 
