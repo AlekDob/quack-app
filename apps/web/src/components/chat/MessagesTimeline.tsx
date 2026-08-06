@@ -1105,7 +1105,8 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         row.kind === "message" && row.message.role === "assistant" ? "group/assistant" : null,
         // Stack above the previous LegendList row so subpixel overlap can't cover
         // the papero avatar; paint containment is also relaxed in index.css.
-        (row.kind === "message" || row.kind === "working") && row.showPaperoAvatar
+        (row.kind === "message" || row.kind === "working" || row.kind === "work") &&
+          row.showPaperoAvatar
           ? "relative z-[1] overflow-visible pt-1"
           : null,
         row.kind === "message" && row.message.id === highlightedMessageId
@@ -1144,8 +1145,17 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           );
           const isLiveGroup =
             groupId === lastLiveWorkGroupId && (activeTurnInProgress || isWorking);
+          // Set only when this group opens the turn (tools ran before any
+          // assistant text): then the identity belongs on top of the tool rows.
+          const workStreamIdentity = resolveStreamIdentity({
+            show: row.showPaperoAvatar,
+            paperoId: row.avatarPaperoId,
+            subagentSeed: subagentStreamAvatarSeed,
+            subagentLabel: subagentStreamLabel,
+            resolvePapero: resolveEffectivePaperoDefinition,
+          });
           const renderWorkContent = (content: ReactNode) => {
-            if (!isLiveGroup) return content;
+            if (!isLiveGroup && !workStreamIdentity) return content;
             return (
               <div
                 className={cn(
@@ -1153,10 +1163,18 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                   CHAT_STREAM_AVATAR_GAP_CLASS_NAME,
                 )}
               >
-                {/* Keep the live tool group on Thinking's text edge. The avatar belongs
-                    to the single live-status row, so this slot is blank. */}
-                <ChatStreamAvatarSlot />
-                <div className="min-w-0 flex-1">{content}</div>
+                {/* Keep the tool group on Thinking's text edge. The slot stays blank
+                    unless this group is the row that owns the turn's avatar. */}
+                <ChatStreamAvatarSlot src={workStreamIdentity?.src} />
+                <div className="min-w-0 flex-1">
+                  {workStreamIdentity ? (
+                    <ChatStreamMetaRow
+                      label={workStreamIdentity.label}
+                      modelSelection={row.avatarModelSelection}
+                    />
+                  ) : null}
+                  {content}
+                </div>
               </div>
             );
           };

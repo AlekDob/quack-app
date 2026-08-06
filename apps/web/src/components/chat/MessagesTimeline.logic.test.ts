@@ -1073,6 +1073,23 @@ describe("deriveMessagesTimelineRows", () => {
     ).toMatchObject({ showPaperoAvatar: false });
   });
 
+  it("gives the avatar to a leading tool group so tool rows never sit above the identity", () => {
+    const rows = deriveMessagesTimelineRows({
+      ...baseInput,
+      isWorking: true,
+      activeTurnInProgress: true,
+      activeTurnId: TurnId.makeUnsafe("t1"),
+      timelineEntries: [
+        userEntry("u1", "2026-01-01T00:00:00Z"),
+        workEntry("w1", "2026-01-01T00:00:01Z", "git status"),
+      ],
+    });
+
+    expect(rows.find((row) => row.kind === "work")).toMatchObject({ showPaperoAvatar: true });
+    // Identity shows once per turn: the Thinking row below must not repeat it.
+    expect(rows.find((row) => row.kind === "working")).toMatchObject({ showPaperoAvatar: false });
+  });
+
   it("keeps the live turn expanded instead of collapsing while it streams", () => {
     const rows = deriveMessagesTimelineRows({
       ...baseInput,

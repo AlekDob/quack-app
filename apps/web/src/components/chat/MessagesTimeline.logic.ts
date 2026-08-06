@@ -220,6 +220,13 @@ export type MessagesTimelineRow =
       id: string;
       createdAt: string;
       groupedEntries: WorkLogEntry[];
+      // A live turn can run tools before any assistant text exists, leaving this
+      // row as the turn's first one. It then wears the avatar so the identity
+      // always opens the turn instead of appearing under the tool rows.
+      showPaperoAvatar?: boolean | undefined;
+      avatarPaperoId?: string | undefined;
+      /** Model + effort the turn ran with, stamped on the user message that opened it. */
+      avatarModelSelection?: ModelSelection | undefined;
     }
   | {
       kind: "message";
@@ -519,6 +526,9 @@ export function deriveMessagesTimelineRows(input: {
   let currentTurnPaperoId: string | undefined;
   let currentTurnModelSelection: ModelSelection | undefined;
   let paperoAvatarShownForTurn = false;
+  // Work can also predate any turn (a standalone "Context compacted" row): only
+  // work that belongs to a real turn may wear that turn's avatar.
+  let currentTurnHasUserMessage = false;
 
   const groupedEntriesEqual = (
     left: ReadonlyArray<WorkLogEntry>,
@@ -558,6 +568,15 @@ export function deriveMessagesTimelineRows(input: {
       !shouldAttachToPreviousAssistant ||
       !appendWorkEntriesToPreviousAssistant(pendingWorkGroup.groupedEntries, pendingWorkGroup.id)
     ) {
+      // Standalone row: nothing has carried the turn's avatar yet, so it opens
+      // the turn and must wear it — otherwise the tool rows render above the
+      // identity line, which lands on the Thinking row further down.
+      if (!paperoAvatarShownForTurn && currentTurnHasUserMessage) {
+        paperoAvatarShownForTurn = true;
+        pendingWorkGroup.showPaperoAvatar = true;
+        pendingWorkGroup.avatarPaperoId = currentTurnPaperoId;
+        pendingWorkGroup.avatarModelSelection = currentTurnModelSelection;
+      }
       nextRows.push(pendingWorkGroup);
     }
     pendingWorkGroup = null;
@@ -616,6 +635,7 @@ export function deriveMessagesTimelineRows(input: {
       currentTurnPaperoId = message.paperoId;
       currentTurnModelSelection = message.modelSelection;
       paperoAvatarShownForTurn = false;
+      currentTurnHasUserMessage = true;
     }
     const showPaperoAvatar = message.role === "assistant" && !paperoAvatarShownForTurn;
     if (showPaperoAvatar) {
@@ -821,6 +841,13 @@ function collapseSettledTurns(
       if (folded.kind === "work") {
         collapsedStart = earliestTimestamp(collapsedStart, folded.createdAt);
         collectWorkItems(folded.groupedEntries, collapsedItems);
+        // Same hoist as for folded narration: a work row that opened the turn
+        // carries the avatar, and folding it away must not lose it.
+        if (folded.showPaperoAvatar) {
+          row.showPaperoAvatar = true;
+          row.avatarPaperoId = folded.avatarPaperoId;
+          row.avatarModelSelection = folded.avatarModelSelection;
+        }
       } else if (folded.kind === "message" && folded.message.role === "assistant") {
         collapsedStart = earliestTimestamp(collapsedStart, folded.durationStart);
         if (folded.assistantTurnDiffSummary) {
@@ -1134,11 +1161,16 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
     case "proposed-plan":
       return a.proposedPlan === (b as typeof a).proposedPlan;
 
-    case "work":
+    case "work": {
+      const bw = b as typeof a;
       return (
-        a.createdAt === (b as typeof a).createdAt &&
-        workLogEntryArraysEqual(a.groupedEntries, (b as typeof a).groupedEntries)
+        a.createdAt === bw.createdAt &&
+        workLogEntryArraysEqual(a.groupedEntries, bw.groupedEntries) &&
+        a.showPaperoAvatar === bw.showPaperoAvatar &&
+        a.avatarPaperoId === bw.avatarPaperoId &&
+        optionalModelSelectionsEqual(a.avatarModelSelection, bw.avatarModelSelection)
       );
+    }
 
     case "message": {
       const bm = b as typeof a;
