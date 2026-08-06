@@ -127,6 +127,10 @@ import {
   ExternalMcpRefreshPairingInput,
   ExternalMcpRevokeIntegrationInput,
 } from "./externalMcp";
+import {
+  GitHubProjectProvisionInput,
+  GitHubProjectProvisionProgressEvent,
+} from "./githubProjectProvisioning";
 
 // ── WebSocket RPC Method Names ───────────────────────────────────────
 
@@ -143,6 +147,7 @@ export const WS_METHODS = {
   projectsStopDevServer: "projects.stopDevServer",
   projectsListDevServers: "projects.listDevServers",
   subscribeProjectDevServerEvents: "projects.subscribeDevServerEvents",
+  projectsProvisionFromGitHub: "projects.provisionFromGitHub",
 
   // Studio methods
   studioListThreadOutputs: "studio.listThreadOutputs",
@@ -265,6 +270,7 @@ export const WS_METHODS = {
 export const WS_CHANNELS = {
   automationEvent: "automation.event",
   gitActionProgress: "git.actionProgress",
+  projectProvisionProgress: "project.provisionProgress",
   terminalEvent: "terminal.event",
   projectDevServerEvent: "project.devServerEvent",
   serverWelcome: "server.welcome",
@@ -323,6 +329,7 @@ const WebSocketRequestBody = Schema.Union([
   tagRequestBody(WS_METHODS.projectsStopDevServer, ProjectStopDevServerInput),
   tagRequestBody(WS_METHODS.projectsListDevServers, Schema.Struct({})),
   tagRequestBody(WS_METHODS.subscribeProjectDevServerEvents, Schema.Struct({})),
+  tagRequestBody(WS_METHODS.projectsProvisionFromGitHub, GitHubProjectProvisionInput),
 
   // Filesystem browse
   // Studio
@@ -471,6 +478,7 @@ export interface WsPushPayloadByChannel {
   readonly [WS_CHANNELS.serverSettingsUpdated]: typeof ServerSettingsUpdatedPayload.Type;
   readonly [WS_CHANNELS.automationEvent]: typeof AutomationStreamEvent.Type;
   readonly [WS_CHANNELS.gitActionProgress]: typeof GitActionProgressEvent.Type;
+  readonly [WS_CHANNELS.projectProvisionProgress]: typeof GitHubProjectProvisionProgressEvent.Type;
   readonly [WS_CHANNELS.terminalEvent]: typeof TerminalEvent.Type;
   readonly [WS_CHANNELS.projectDevServerEvent]: typeof ProjectDevServerEvent.Type;
   readonly [ORCHESTRATION_WS_CHANNELS.domainEvent]: OrchestrationEvent;
@@ -517,6 +525,10 @@ export const WsPushGitActionProgress = makeWsPushSchema(
   WS_CHANNELS.gitActionProgress,
   GitActionProgressEvent,
 );
+export const WsPushProjectProvisionProgress = makeWsPushSchema(
+  WS_CHANNELS.projectProvisionProgress,
+  GitHubProjectProvisionProgressEvent,
+);
 export const WsPushTerminalEvent = makeWsPushSchema(WS_CHANNELS.terminalEvent, TerminalEvent);
 export const WsPushProjectDevServerEvent = makeWsPushSchema(
   WS_CHANNELS.projectDevServerEvent,
@@ -537,6 +549,7 @@ export const WsPushOrchestrationThreadEvent = makeWsPushSchema(
 
 export const WsPushChannelSchema = Schema.Literals([
   WS_CHANNELS.gitActionProgress,
+  WS_CHANNELS.projectProvisionProgress,
   WS_CHANNELS.serverWelcome,
   WS_CHANNELS.serverMaintenanceUpdated,
   WS_CHANNELS.serverConfigUpdated,
@@ -559,6 +572,7 @@ export const WsPush = Schema.Union([
   WsPushServerSettingsUpdated,
   WsPushAutomationEvent,
   WsPushGitActionProgress,
+  WsPushProjectProvisionProgress,
   WsPushTerminalEvent,
   WsPushProjectDevServerEvent,
   WsPushOrchestrationDomainEvent,
