@@ -3,6 +3,7 @@ import type {
   BrowserAnnotationEvent,
   BrowserUseOpenPanelRequest,
   DesktopBridge,
+  ExternalPromptRequest,
 } from "@synara/contracts";
 import { normalizeDesktopWsUrl, resolveDesktopWsUrlFromEnv } from "./desktopWsBridge";
 import { DESKTOP_IPC_CHANNELS } from "./ipcChannels";
@@ -59,6 +60,25 @@ function parseBrowserAnnotationEvent(payload: unknown): BrowserAnnotationEvent |
   return payload as BrowserAnnotationEvent;
 }
 
+function parseExternalPromptRequest(payload: unknown): ExternalPromptRequest | null {
+  if (!payload || typeof payload !== "object") return null;
+  const request = payload as { source?: unknown; prompt?: unknown };
+  if (request.source !== "linear" || typeof request.prompt !== "string") return null;
+  return { source: "linear", prompt: request.prompt };
+}
+
+let externalPromptListener: ((request: ExternalPromptRequest) => void) | null = null;
+const pendingExternalPrompts: ExternalPromptRequest[] = [];
+ipcRenderer.on(IPC.externalPrompt, (_event, payload: unknown) => {
+  const request = parseExternalPromptRequest(payload);
+  if (!request) return;
+  if (externalPromptListener) {
+    externalPromptListener(request);
+  } else {
+    pendingExternalPrompts.push(request);
+  }
+});
+
 contextBridge.exposeInMainWorld("desktopBridge", {
   getWsUrl: getDesktopWsUrl,
   // Absolute path for OS-dropped File objects (folders with spaces/parens, etc.).
@@ -109,6 +129,13 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     ipcRenderer.on(IPC.menuAction, wrappedListener);
     return () => {
       ipcRenderer.removeListener(IPC.menuAction, wrappedListener);
+    };
+  },
+  onExternalPrompt: (listener) => {
+    externalPromptListener = listener;
+    for (const request of pendingExternalPrompts.splice(0)) listener(request);
+    return () => {
+      if (externalPromptListener === listener) externalPromptListener = null;
     };
   },
   getZoomFactor: () => {

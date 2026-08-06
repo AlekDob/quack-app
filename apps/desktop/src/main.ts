@@ -221,6 +221,12 @@ import {
 } from "./appSnapIpc";
 import { UsageNotchManager } from "./usageNotchManager";
 import { registerUsageNotchIpcHandlers } from "./usageNotchIpc";
+import {
+  EXTERNAL_PROMPT_SCHEME,
+  findExternalPromptLink,
+  parseExternalPromptLink,
+} from "./externalPromptLink";
+import type { ExternalPromptRequest } from "@synara/contracts";
 
 // Capture the real archive identity before any explicit app.asar lookup. Static
 // snapshotting and the runtime watcher both use this same generation as their
@@ -307,6 +313,8 @@ const browserPerfLoggingEnabled = process.env.SYNARA_BROWSER_PERF === "1";
 type DesktopUpdateErrorContext = DesktopUpdateState["errorContext"];
 
 let mainWindow: BrowserWindow | null = null;
+const pendingExternalPrompts: ExternalPromptRequest[] = [];
+let externalPromptFlushScheduled = false;
 let backendProcess: ChildProcess.ChildProcess | null = null;
 let backendPort = 0;
 let backendAuthToken = "";
@@ -1330,6 +1338,47 @@ function registerDesktopProtocol(): void {
   });
 
   desktopProtocolRegistered = true;
+}
+
+function registerExternalPromptProtocol(): void {
+  const registered = isDevelopment
+    ? app.setAsDefaultProtocolClient(EXTERNAL_PROMPT_SCHEME, process.execPath, [process.argv[1]!])
+    : app.setAsDefaultProtocolClient(EXTERNAL_PROMPT_SCHEME);
+  if (!registered) {
+    console.warn(`[desktop] Failed to register ${EXTERNAL_PROMPT_SCHEME}:// links.`);
+  }
+}
+
+function flushExternalPrompts(): void {
+  const targetWindow = mainWindow;
+  if (!targetWindow || targetWindow.isDestroyed() || pendingExternalPrompts.length === 0) {
+    return;
+  }
+  if (targetWindow.webContents.isLoadingMainFrame()) {
+    if (!externalPromptFlushScheduled) {
+      externalPromptFlushScheduled = true;
+      targetWindow.webContents.once("did-finish-load", () => {
+        externalPromptFlushScheduled = false;
+        flushExternalPrompts();
+      });
+    }
+    return;
+  }
+
+  const requests = pendingExternalPrompts.splice(0);
+  for (const request of requests) {
+    targetWindow.webContents.send(IPC.externalPrompt, request);
+  }
+}
+
+function openExternalPrompt(request: ExternalPromptRequest): void {
+  pendingExternalPrompts.push(request);
+  if (app.isReady() && (!mainWindow || mainWindow.isDestroyed())) {
+    app.emit("activate");
+    return;
+  }
+  focusMainWindow({ stealAppFocus: true });
+  flushExternalPrompts();
 }
 
 function dispatchMenuAction(action: string): void {
@@ -4041,6 +4090,7 @@ function createWindow(): BrowserWindow {
   window.webContents.on("did-finish-load", () => {
     window.setTitle(APP_DISPLAY_NAME);
     emitUpdateState();
+    flushExternalPrompts();
   });
   window.once("ready-to-show", () => {
     // Preserve the original first-launch behavior, then respect the state saved
@@ -4293,9 +4343,21 @@ configureAppIdentity();
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
-  app.on("second-instance", () => {
+  app.on("open-url", (event, rawUrl) => {
+    event.preventDefault();
+    const request = parseExternalPromptLink(rawUrl);
+    if (request) openExternalPrompt(request);
+  });
+  app.on("second-instance", (_event, commandLine) => {
+    const request = findExternalPromptLink(commandLine);
+    if (request) {
+      openExternalPrompt(request);
+      return;
+    }
     focusMainWindow();
   });
+  const initialRequest = findExternalPromptLink(process.argv);
+  if (initialRequest) openExternalPrompt(initialRequest);
 }
 
 async function bootstrap(): Promise<void> {
@@ -4411,6 +4473,7 @@ if (hasSingleInstanceLock) {
     .then(() => {
       writeDesktopLogHeader("app ready");
       configureAppIdentity();
+      registerExternalPromptProtocol();
       applyLegacyMacDockIcon();
       refreshMacIconCacheOnVersionChange();
       configureMediaPermissions();

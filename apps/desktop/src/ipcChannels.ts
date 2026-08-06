@@ -17,6 +17,7 @@ export const DESKTOP_IPC_CHANNELS = {
   windowGetState: "desktop:window-get-state",
   windowState: "desktop:window-state",
   menuAction: "desktop:menu-action",
+  externalPrompt: "desktop:external-prompt",
   updateState: "desktop:update-state",
   updateGetState: "desktop:update-get-state",
   updateCheck: "desktop:update-check",

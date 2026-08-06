@@ -19,6 +19,7 @@ import { useTemporaryThreadLifecycle } from "../hooks/useTemporaryThreadLifecycl
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useRecentViewSwitcher } from "../hooks/useRecentViewSwitcher";
 import { useLatestProjectStore } from "../latestProjectStore";
+import { useComposerDraftStore } from "../composerDraftStore";
 import {
   resolveCurrentProjectTargetId,
   resolveLatestProjectTargetId,
@@ -302,6 +303,27 @@ function ChatRouteGlobalShortcuts() {
       studioWorkspaceRoot,
     ],
   );
+
+  useEffect(() => {
+    const onExternalPrompt = window.desktopBridge?.onExternalPrompt;
+    if (typeof onExternalPrompt !== "function") {
+      return;
+    }
+
+    return onExternalPrompt((request) => {
+      void handleNewChatForActiveSurface().then((result) => {
+        if (!result.ok || !result.threadId) {
+          toastManager.add({
+            type: "error",
+            title: "Couldn't open the Linear issue",
+            description: result.ok ? "A new chat wasn't created." : result.error,
+          });
+          return;
+        }
+        useComposerDraftStore.getState().setPrompt(result.threadId, `Source: Linear\n\n${request.prompt}`);
+      });
+    });
+  }, [handleNewChatForActiveSurface]);
 
   useEffect(() => {
     if (!currentProjectId) {

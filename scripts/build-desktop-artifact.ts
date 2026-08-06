@@ -727,6 +727,7 @@ const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     appId: SYNARA_PRODUCTION_BUNDLE_ID,
     productName,
     artifactName: "Quack-${version}-${arch}.${ext}",
+    protocols: [{ name: "Quack", schemes: ["quack"] }],
     directories: {
       buildResources: "apps/desktop/resources",
     },

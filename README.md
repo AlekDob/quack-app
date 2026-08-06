@@ -37,6 +37,10 @@ Quack runs as the workspace layer on your machine. There is no Quack cloud holdi
 
 The provider you choose still receives the prompts, file snippets, diffs, terminal output, or tool results needed for a session, but that traffic goes to the provider you picked rather than through a separate Quack-hosted workspace.
 
+## Linear
+
+Open Linear issues as unsent Quack drafts: [setup guide](./docs/linear-coding-tools.md).
+
 ## Some notes
 
 This soft-fork is still early. Expect bugs, rough edges, and fast-moving internals.

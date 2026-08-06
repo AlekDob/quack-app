@@ -477,6 +477,11 @@ export interface DesktopWindowState {
   isFullscreen: boolean;
 }
 
+export interface ExternalPromptRequest {
+  readonly source: "linear";
+  readonly prompt: string;
+}
+
 export type DesktopUsageNotchPresentation = "compact" | "expanded";
 
 export interface DesktopUsageNotchState {
@@ -527,6 +532,7 @@ export interface DesktopBridge {
     onState: (listener: (state: DesktopWindowState) => void) => () => void;
   };
   onMenuAction: (listener: (action: string) => void) => () => void;
+  onExternalPrompt: (listener: (request: ExternalPromptRequest) => void) => () => void;
   /** Current `webContents` page zoom (1 = 100%). Used to keep macOS traffic-light gutter aligned. */
   getZoomFactor: () => number;
   onZoomFactorChange: (listener: (zoomFactor: number) => void) => () => void;

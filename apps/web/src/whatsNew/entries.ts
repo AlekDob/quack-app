@@ -26,6 +26,14 @@ export const WHATS_NEW_ENTRIES: readonly WhatsNewEntry[] = [
     date: "Aug 5",
     features: [
       {
+        id: "linear-quack-drafts",
+        title: "Open Linear issues in Quack",
+        description:
+          "Open an issue from Linear in a new Quack chat with the prompt ready to review and send.",
+        details:
+          "Quack registers the quack://open link on desktop builds, validates Linear prompt payloads, and buffers requests while the app starts. The issue text is inserted into a new draft and is never sent automatically. See docs/linear-coding-tools.md for Custom Link and Custom Script setup.",
+      },
+      {
         id: "environment-git-status-summary",
         title: "See Git work at a glance",
         description:
