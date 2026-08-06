@@ -10,11 +10,14 @@ if (!prompt) {
   url.searchParams.set("source", "linear");
   url.searchParams.set("prompt", prompt);
 
-  const [command, args]: [string, string[]] =
+  const [command, args] =
     process.platform === "darwin"
       ? ["open", [url.toString()]]
       : process.platform === "win32"
-        ? ["powershell.exe", ["-NoProfile", "-Command", "Start-Process -FilePath $args[0]", url.toString()]]
+        ? [
+            "powershell.exe",
+            ["-NoProfile", "-Command", "Start-Process -FilePath $args[0]", url.toString()],
+          ]
         : ["xdg-open", [url.toString()]];
   const child = spawn(command, args, { detached: true, stdio: "ignore" });
   child.unref();
