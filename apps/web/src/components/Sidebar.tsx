@@ -2439,6 +2439,7 @@ export default function Sidebar() {
     },
     [
       handleNewChat,
+      navigate,
       navigateToBackTarget,
       openStudioChatFallback,
       resolveBackToStudioTarget,
