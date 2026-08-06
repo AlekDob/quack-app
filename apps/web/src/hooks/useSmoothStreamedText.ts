@@ -30,15 +30,20 @@ const MAX_FRAME_SECONDS = 0.05;
 /**
  * Smoothly reveal `text` while `isStreaming` is true.
  *
- * - Returns `text` unchanged when not streaming or under prefers-reduced-motion, so
- *   completed messages and reduced-motion users see the exact text with zero animation.
+ * - Returns `text` unchanged when not streaming, when `enabled` is false, or under
+ *   prefers-reduced-motion, so completed messages and reduced-motion users see the exact
+ *   text with zero animation.
  * - Snaps to the full text the instant streaming ends (no trailing typewriter once the
  *   agent is done).
  * - Text already present on mount is shown immediately; only newly-arriving deltas animate.
  */
-export function useSmoothStreamedText(text: string, isStreaming: boolean): string {
+export function useSmoothStreamedText(
+  text: string,
+  isStreaming: boolean,
+  enabled: boolean,
+): string {
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
-  const animate = isStreaming && !reduceMotion;
+  const animate = enabled && isStreaming && !reduceMotion;
 
   const [revealed, setRevealed] = useState(text);
 

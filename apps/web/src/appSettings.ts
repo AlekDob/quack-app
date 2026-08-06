@@ -232,6 +232,9 @@ export const AppSettingsSchema = Schema.Struct({
   showEnvironmentNotepad: Schema.Boolean.pipe(withDefaults(() => false)),
   followUpBehavior: FollowUpBehavior.pipe(withDefaults(() => DEFAULT_FOLLOW_UP_BEHAVIOR)),
   enableAssistantStreaming: Schema.Boolean.pipe(withDefaults(() => true)),
+  // Typewriter reveal for streamed assistant text. Off by default: it drives a setState per
+  // animation frame (~60/s) on the streaming message, which repaints the whole timeline.
+  enableSmoothStreamingText: Schema.Boolean.pipe(withDefaults(() => false)),
   enableProviderUpdateChecks: Schema.Boolean.pipe(withDefaults(() => true)),
   enableNativeFontSmoothing: Schema.Boolean.pipe(withDefaults(getDefaultNativeFontSmoothing)),
   enableTaskCompletionToasts: Schema.Boolean.pipe(withDefaults(() => true)),

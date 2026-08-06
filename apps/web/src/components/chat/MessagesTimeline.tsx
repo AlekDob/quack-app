@@ -462,6 +462,7 @@ interface MessagesTimelineProps {
   markdownCwd: string | undefined;
   resolvedTheme: "light" | "dark";
   chatFontSizePx?: number;
+  smoothStreamingText?: boolean;
   timestampFormat: TimestampFormat;
   workspaceRoot: string | undefined;
   /**
@@ -520,6 +521,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   markdownCwd,
   resolvedTheme,
   chatFontSizePx: chatFontSizePxProp,
+  smoothStreamingText: smoothStreamingTextProp,
   timestampFormat,
   workspaceRoot,
   emptyStateContent,
@@ -545,6 +547,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     setSettledTailAnchorMessageId((current) => (current === messageId ? current : messageId));
   }, []);
   const crossTaskOrigin = crossTaskOriginProp ?? null;
+  const smoothStreamingText = smoothStreamingTextProp ?? false;
   const normalizedChatFontSizePx = normalizeChatFontSizePx(
     chatFontSizePxProp ?? DEFAULT_CHAT_FONT_SIZE_PX,
   );
@@ -1817,10 +1820,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
           });
           return (
             <div
-              className={cn(
-                "flex items-start overflow-visible",
-                CHAT_STREAM_AVATAR_GAP_CLASS_NAME,
-              )}
+              className={cn("flex items-start overflow-visible", CHAT_STREAM_AVATAR_GAP_CLASS_NAME)}
             >
               <ChatStreamAvatarSlot src={streamIdentity?.src} />
               <div className="min-w-0 flex-1 overflow-visible">
@@ -1916,6 +1916,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                         text={messageText}
                         cwd={markdownCwd}
                         isStreaming={Boolean(row.message.streaming)}
+                        smoothStreaming={smoothStreamingText}
                         style={chatTypographyStyle}
                         onImageExpand={onImageExpand}
                         markers={messageMarkers}

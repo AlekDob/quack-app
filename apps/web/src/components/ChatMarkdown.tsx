@@ -98,6 +98,8 @@ interface ChatMarkdownProps {
   text: string;
   cwd: string | undefined;
   isStreaming?: boolean;
+  /** Typewriter reveal while streaming. Off unless the caller opts in (Settings toggle). */
+  smoothStreaming?: boolean;
   className?: string | undefined;
   style?: CSSProperties | undefined;
   onImageExpand?: ((preview: ExpandedImagePreview) => void) | undefined;
@@ -1014,6 +1016,7 @@ function ChatMarkdown({
   text,
   cwd,
   isStreaming: isStreamingProp,
+  smoothStreaming: smoothStreamingProp,
   className: classNameProp,
   style,
   onImageExpand,
@@ -1033,10 +1036,10 @@ function ChatMarkdown({
   const diffThemeName = resolveDiffThemeName(resolvedTheme);
   const isUserVariant = variant === "user";
   // Reveal streamed text at a steady, adaptive cadence so tokens appear fluidly instead of
-  // in the ~100ms network clumps that land in the store. No-ops (returns `text`) when not
-  // streaming or under reduced motion. Governs cadence only; the deferred value below still
-  // bounds the markdown re-parse cost.
-  const smoothedText = useSmoothStreamedText(text, isStreaming);
+  // in the ~100ms network clumps that land in the store. No-ops (returns `text`) when the
+  // caller opts out, when not streaming, or under reduced motion. Governs cadence only; the
+  // deferred value below still bounds the markdown re-parse cost.
+  const smoothedText = useSmoothStreamedText(text, isStreaming, smoothStreamingProp ?? false);
   // The dollar rewrite exists to disambiguate math from currency; the user
   // variant has no math, so its text must stay byte-for-byte what was typed.
   const normalizedText = useMemo(

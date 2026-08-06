@@ -40,6 +40,7 @@ interface ChatTranscriptPaneProps {
   agentActivityDetail?: AgentActivityDetail | null;
   contentInsetRightPx?: ComponentProps<typeof MessagesTimeline>["contentInsetRightPx"];
   chatFontSizePx: number;
+  smoothStreamingText: boolean;
   emptyStateContent?: ReactNode;
   emptyStateProjectName: string | undefined;
   expandedWorkGroups?: Record<string, boolean>;
@@ -103,6 +104,7 @@ export function ChatTranscriptPane({
   agentActivityDetail,
   contentInsetRightPx,
   chatFontSizePx,
+  smoothStreamingText,
   emptyStateContent,
   emptyStateProjectName,
   expandedWorkGroups,
@@ -248,6 +250,7 @@ export function ChatTranscriptPane({
             markdownCwd={markdownCwd}
             resolvedTheme={resolvedTheme}
             chatFontSizePx={chatFontSizePx}
+            smoothStreamingText={smoothStreamingText}
             timestampFormat={timestampFormat}
             workspaceRoot={workspaceRoot}
             contentInsetRightPx={contentInsetRightPx}

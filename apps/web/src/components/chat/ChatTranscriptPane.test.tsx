@@ -15,6 +15,7 @@ function renderTranscriptPaneMarkup(
       activeTurnInProgress={false}
       activeTurnStartedAt={null}
       chatFontSizePx={14}
+      smoothStreamingText={false}
       emptyStateProjectName={undefined}
       hasMessages
       isRevertingCheckpoint={false}

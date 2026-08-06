@@ -333,11 +333,7 @@ import { newCommandId, newMessageId, newProjectId, newThreadId } from "~/lib/uti
 import { ensureNativeApi, readNativeApi } from "~/nativeApi";
 import { promoteThreadCreate } from "~/lib/threadCreatePromotion";
 import { readFavoriteModelSlugs } from "~/lib/modelFavorites";
-import {
-  composerPaperiFromRoster,
-  GLOBAL_TEAM_SCOPE,
-  teamRosterQueryKey,
-} from "~/lib/teamRoster";
+import { composerPaperiFromRoster, GLOBAL_TEAM_SCOPE, teamRosterQueryKey } from "~/lib/teamRoster";
 import { usePaperoStore } from "~/paperi";
 import {
   DEFAULT_PAPERO_ID,
@@ -11927,6 +11923,7 @@ export default function ChatView({
                     markdownCwd={threadWorkspaceCwd ?? undefined}
                     resolvedTheme={resolvedTheme}
                     chatFontSizePx={settings.chatFontSizePx}
+                    smoothStreamingText={settings.enableSmoothStreamingText}
                     timestampFormat={timestampFormat}
                     workspaceRoot={threadArtifactWorkspaceRoot ?? undefined}
                     emptyStateContent={transcriptEmptyStateContent}

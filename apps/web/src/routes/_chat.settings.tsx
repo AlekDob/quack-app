@@ -261,6 +261,9 @@ function SettingsRouteView() {
     ...(settings.enableAssistantStreaming !== defaults.enableAssistantStreaming
       ? ["Assistant output"]
       : []),
+    ...(settings.enableSmoothStreamingText !== defaults.enableSmoothStreamingText
+      ? ["Typewriter reveal"]
+      : []),
     ...(settings.followUpBehavior !== defaults.followUpBehavior ? ["Follow-up behavior"] : []),
     ...(settings.enableAppSnap !== defaults.enableAppSnap ? ["AppSnap"] : []),
     ...(!sameAppSnapShortcut(settings.appSnapShortcut, defaults.appSnapShortcut)
@@ -953,6 +956,15 @@ function SettingsRouteView() {
           description: "Show token-by-token output while a response is in progress.",
           resetLabel: "assistant output",
           ariaLabel: "Stream assistant messages",
+        })}
+
+        {renderBooleanSettingRow({
+          settingKey: "enableSmoothStreamingText",
+          title: "Typewriter reveal",
+          description:
+            "Reveal streamed text character by character instead of in the chunks it arrives in. Costs noticeably more CPU while a response is running.",
+          resetLabel: "typewriter reveal",
+          ariaLabel: "Reveal streamed text with a typewriter animation",
         })}
       </SettingsSection>
 
