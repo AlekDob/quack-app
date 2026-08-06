@@ -77,7 +77,9 @@ export function KanbanProjectBoardView({
   const providerOptionsForDispatch = getProviderStartOptions(settings);
   const providerStatuses = useProviderStatusesForLocalConfig();
   const refreshProviderStatuses = useRefreshProviderStatusesNow();
-  const project = useStore((state) => state.projects.find((candidate) => candidate.id === board.projectId));
+  const project = useStore((state) =>
+    state.projects.find((candidate) => candidate.id === board.projectId),
+  );
   const setDraftOrder = useKanbanUiStore((state) => state.setDraftOrder);
   const [activeCard, setActiveCard] = useState<KanbanCard | null>(null);
   // A completed drag still emits a click on the source card; swallow exactly that one

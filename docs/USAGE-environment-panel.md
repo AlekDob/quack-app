@@ -14,11 +14,11 @@ state and does not start a live fetch.
 
 The panel uses the existing read-only server fetchers:
 
-| Provider | Source |
-| --- | --- |
-| Codex | Codex account usage snapshot |
+| Provider    | Source                         |
+| ----------- | ------------------------------ |
+| Codex       | Codex account usage snapshot   |
 | Claude Code | Anthropic OAuth usage endpoint |
-| Cursor | Cursor DashboardService |
+| Cursor      | Cursor DashboardService        |
 
 Providers without a registered usage fetcher stay hidden. The same applies when the provider has
 no readable limits, is not authenticated, or the usage request fails.

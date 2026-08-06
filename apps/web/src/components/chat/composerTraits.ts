@@ -189,9 +189,15 @@ export function resolveComposerEffortChange(input: {
   value: string;
   selection: Pick<
     ReturnType<typeof getComposerTraitSelection>,
-    "effortLevels" | "primarySelectDescriptor" | "promptInjectedValues" | "ultrathinkPromptControlled"
+    | "effortLevels"
+    | "primarySelectDescriptor"
+    | "promptInjectedValues"
+    | "ultrathinkPromptControlled"
   >;
-}): { kind: "prompt"; prompt: string } | { kind: "options"; patch: Record<string, unknown> } | null {
+}):
+  | { kind: "prompt"; prompt: string }
+  | { kind: "options"; patch: Record<string, unknown> }
+  | null {
   if (input.selection.ultrathinkPromptControlled || !input.value) return null;
   const nextOption = input.selection.effortLevels.find((option) => option.value === input.value);
   if (!nextOption) return null;

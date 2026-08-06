@@ -58,10 +58,7 @@ export function EnvironmentGitStatusSummary({
           <Tooltip key={item.type}>
             <TooltipTrigger
               render={
-                <span
-                  aria-label={item.label}
-                  className={`inline-flex items-center gap-1 ${color}`}
-                >
+                <span aria-label={item.label} className={`inline-flex items-center gap-1 ${color}`}>
                   <Icon className={`size-3 ${color}`} aria-hidden />
                   <span className="tabular-nums">{count}</span>
                 </span>

@@ -46,7 +46,7 @@ export function useProviderUsageMenuModel(
     fetchProviderData: options.fetchProviderData ?? false,
   });
   const usageRows = deriveProviderUsageDisplayRows(usageSummary.rateLimits);
-  const primaryRow = selectPrimaryProviderUsageDisplayRow(usageRows);
+  const primaryRow = selectPrimaryProviderUsageDisplayRow(usageRows, provider === "claudeAgent");
 
   if (!primaryRow) {
     return null;

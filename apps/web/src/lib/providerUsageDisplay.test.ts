@@ -40,6 +40,21 @@ describe("providerUsageDisplay", () => {
     expect(primary?.remainingTone).toBe("warning");
   });
 
+  it("prioritizes Claude's five-hour window for compact usage chips", () => {
+    const rows = deriveProviderUsageDisplayRows([
+      {
+        provider: "claudeAgent",
+        updatedAt: "2099-04-08T18:00:00.000Z",
+        limits: [
+          { window: "5h", usedPercent: 49 },
+          { window: "Weekly", usedPercent: 84 },
+        ],
+      },
+    ]);
+
+    expect(selectPrimaryProviderUsageDisplayRow(rows, true)?.label).toBe("5h");
+  });
+
   it("centralizes reserve and eta details for display rows", () => {
     vi.setSystemTime("2026-06-09T12:00:00.000Z");
 

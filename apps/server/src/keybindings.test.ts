@@ -829,9 +829,7 @@ it.layer(NodeServices.layer)("keybindings", (it) => {
       });
 
       const persisted = yield* readKeybindingsConfig(keybindingsConfigPath);
-      assert.isTrue(
-        persisted.some((entry) => entry.command === "script.custom-action.run"),
-      );
+      assert.isTrue(persisted.some((entry) => entry.command === "script.custom-action.run"));
       assert.isFalse(persisted.some((entry) => entry.command === "composer.effort.1"));
       assert.isTrue(persisted.some((entry) => entry.command === "composer.effort.2"));
     }).pipe(Effect.provide(makeKeybindingsLayer())),

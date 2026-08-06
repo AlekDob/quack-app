@@ -133,13 +133,21 @@ function ProjectSettingsForm(props: {
           </Select>
         </div>
         {error ? (
-          <p role="alert" className="text-[length:var(--app-font-size-ui-xs,10px)] text-destructive">
+          <p
+            role="alert"
+            className="text-[length:var(--app-font-size-ui-xs,10px)] text-destructive"
+          >
             {error}
           </p>
         ) : null}
       </DialogPanel>
       <DialogFooter>
-        <Button variant="outline" size="sm" onClick={() => props.onOpenChange(false)} disabled={isSaving}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => props.onOpenChange(false)}
+          disabled={isSaving}
+        >
           Cancel
         </Button>
         <Button size="sm" onClick={() => void save()} disabled={isSaving}>

@@ -136,7 +136,13 @@ export function deriveProviderUsageDisplayRows(
 
 export function selectPrimaryProviderUsageDisplayRow(
   rows: ReadonlyArray<ProviderUsageDisplayRow>,
+  preferFiveHour = false,
 ): ProviderUsageDisplayRow | null {
+  if (preferFiveHour) {
+    const fiveHourRow = rows.find((row) => row.label === "5h");
+    if (fiveHourRow) return fiveHourRow;
+  }
+
   return rows.reduce<ProviderUsageDisplayRow | null>((selected, row) => {
     if (!selected || row.remainingPercent < selected.remainingPercent) {
       return row;

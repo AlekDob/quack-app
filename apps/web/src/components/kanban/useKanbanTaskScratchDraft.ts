@@ -23,7 +23,9 @@ import {
 import { buildModelSelection } from "../../providerModelOptions";
 import { toastManager } from "../ui/toast";
 
-export function useKanbanTaskScratchDraft(input: { readonly defaultModelSelection: ModelSelection }) {
+export function useKanbanTaskScratchDraft(input: {
+  readonly defaultModelSelection: ModelSelection;
+}) {
   // Scratch composer draft backing the dialog: model/effort/speed state lives in
   // the composer draft store under this throwaway thread id, exactly like chat.
   const [scratchThreadId] = useState(() => newThreadId());

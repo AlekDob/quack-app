@@ -148,7 +148,10 @@ export function useKanbanTaskSubmit(input: UseKanbanTaskSubmitInput) {
       refreshStatuses: () => refreshProviderStatuses({ silent: true }),
     });
     if (!sendAvailability.usable) {
-      if (modelSelection.provider === projectDefaultProvider && defaultProvider !== projectDefaultProvider) {
+      if (
+        modelSelection.provider === projectDefaultProvider &&
+        defaultProvider !== projectDefaultProvider
+      ) {
         const fallbackAvailability = await resolveProviderSendAvailabilityWithRefresh({
           provider: defaultProvider,
           statuses: providerStatuses,

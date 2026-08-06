@@ -24,10 +24,7 @@ import {
   MenuTrigger,
 } from "../ui/menu";
 import { useComposerDraftStore } from "../../composerDraftStore";
-import {
-  buildNextProviderOptions,
-  type ProviderOptions,
-} from "../../providerModelOptions";
+import { buildNextProviderOptions, type ProviderOptions } from "../../providerModelOptions";
 import { COMPOSER_PICKER_TRIGGER_TEXT_CLASS_NAME } from "./composerPickerStyles";
 import { ComposerPickerMenuPopup } from "./ComposerPickerMenuPopup";
 import {
