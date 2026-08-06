@@ -571,7 +571,10 @@ export function CreateProjectDialog(props: {
                 if (typeof next === "string") setSelectedProvider(next as ProviderKind);
               }}
             >
-              <SelectTrigger className={fieldControlClassName} aria-label="Default provider">
+              <SelectTrigger
+                className={PROJECT_DIALOG_FIELD_CONTROL_CLASS_NAME}
+                aria-label="Default provider"
+              >
                 <SelectValue>
                   <span className="flex items-center gap-2">
                     <ProviderIcon provider={selectedProvider} className="size-3.5" />

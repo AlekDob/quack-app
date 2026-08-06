@@ -31,6 +31,8 @@ describe("CreateProjectDialog GitHub source", () => {
         githubProvisioningAvailable={false}
         spaces={[]}
         activeSpaceId={null}
+        providers={["codex"]}
+        defaultProvider="codex"
         defaultCloneParent="/Users/test/Developer"
         onOpenChange={vi.fn()}
         onSubmit={vi.fn()}
@@ -51,6 +53,8 @@ describe("CreateProjectDialog GitHub source", () => {
         githubProvisioningAvailable
         spaces={[]}
         activeSpaceId={null}
+        providers={["codex"]}
+        defaultProvider="codex"
         defaultCloneParent="/Users/test/Developer"
         onOpenChange={onOpenChange}
         onSubmit={onSubmit}
@@ -87,6 +91,8 @@ describe("CreateProjectDialog GitHub source", () => {
         githubProvisioningAvailable
         spaces={[]}
         activeSpaceId={null}
+        providers={["codex"]}
+        defaultProvider="codex"
         defaultCloneParent="/Users/test/Developer"
         onOpenChange={vi.fn()}
         onSubmit={onSubmit}
@@ -122,6 +128,8 @@ describe("CreateProjectDialog GitHub source", () => {
           githubProvisioningAvailable
           spaces={[]}
           activeSpaceId={null}
+          providers={["codex"]}
+          defaultProvider="codex"
           defaultCloneParent="/Users/test"
           onOpenChange={(nextOpen) => {
             onOpenChange(nextOpen);
