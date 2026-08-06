@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   findExternalPromptLink,
+  MAX_EXTERNAL_PROJECT_BYTES,
   MAX_EXTERNAL_PROMPT_BYTES,
   parseExternalPromptLink,
 } from "./externalPromptLink";
@@ -25,8 +26,37 @@ describe("externalPromptLink", () => {
     "quack://open?source=linear&prompt=%ZZ",
     "quack://open?source=linear&source=linear&prompt=Fix",
     "quack://open?source=linear&prompt=Fix&prompt=Again",
+    "quack://open?source=linear&prompt=Fix&project=a&project=b",
   ])("rejects invalid links: %s", (url) => {
     expect(parseExternalPromptLink(url)).toBeNull();
+  });
+
+  it("accepts an optional project hint", () => {
+    expect(parseExternalPromptLink("quack://open?source=linear&prompt=Fix&project=esopo")).toEqual({
+      source: "linear",
+      prompt: "Fix",
+      project: "esopo",
+    });
+  });
+
+  it("omits the project key when it is absent or blank", () => {
+    expect(parseExternalPromptLink("quack://open?source=linear&prompt=Fix")).toEqual({
+      source: "linear",
+      prompt: "Fix",
+    });
+    expect(parseExternalPromptLink("quack://open?source=linear&prompt=Fix&project=%20%20")).toEqual(
+      {
+        source: "linear",
+        prompt: "Fix",
+      },
+    );
+  });
+
+  it("rejects a project hint beyond the byte limit", () => {
+    const project = "a".repeat(MAX_EXTERNAL_PROJECT_BYTES + 1);
+    expect(
+      parseExternalPromptLink(`quack://open?source=linear&prompt=Fix&project=${project}`),
+    ).toBeNull();
   });
 
   it("rejects prompts beyond the byte limit", () => {

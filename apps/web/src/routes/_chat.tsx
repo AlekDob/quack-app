@@ -29,7 +29,11 @@ import {
 import { resolveInheritedThreadContext } from "../lib/threadBootstrap";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { serverConfigQueryOptions } from "../lib/serverReactQuery";
-import { startFreshChatForActiveSurface } from "../lib/startContainerChat";
+import {
+  startFreshChatForActiveSurface,
+  type StartContainerChatResult,
+} from "../lib/startContainerChat";
+import { resolveExternalPromptProjectId } from "../lib/externalPromptProject";
 import { isOrdinarySpaceProject } from "../lib/spaces";
 import { isKeyboardShortcutsHelpShortcut, resolveShortcutCommand } from "../keybindings";
 import { useStore } from "../store";
@@ -311,7 +315,19 @@ function ChatRouteGlobalShortcuts() {
     }
 
     return onExternalPrompt((request) => {
-      void handleNewChatForActiveSurface().then((result) => {
+      const targetProjectId = resolveExternalPromptProjectId(projects, request.project);
+      // handleNewThread rejects on a failed route commit; mirror startContainerChat's
+      // try/catch so a bad project hint surfaces as a toast, not an unhandled rejection.
+      const start = targetProjectId
+        ? handleNewThread(targetProjectId).then(
+            (threadId): StartContainerChatResult => ({ ok: true, threadId }),
+            (error: unknown): StartContainerChatResult => ({
+              ok: false,
+              error: error instanceof Error ? error.message : "A new chat wasn't created.",
+            }),
+          )
+        : handleNewChatForActiveSurface();
+      void start.then((result) => {
         if (!result.ok || !result.threadId) {
           toastManager.add({
             type: "error",
@@ -325,7 +341,7 @@ function ChatRouteGlobalShortcuts() {
           .setPrompt(result.threadId, `Source: Linear\n\n${request.prompt}`);
       });
     });
-  }, [handleNewChatForActiveSurface]);
+  }, [handleNewChatForActiveSurface, handleNewThread, projects]);
 
   useEffect(() => {
     if (!currentProjectId) {

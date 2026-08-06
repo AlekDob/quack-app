@@ -489,6 +489,8 @@ export interface DesktopWindowState {
 export interface ExternalPromptRequest {
   readonly source: "linear";
   readonly prompt: string;
+  /** Optional Quack project hint: project id, name, or absolute workspace path. */
+  readonly project?: string;
 }
 
 export type DesktopUsageNotchPresentation = "compact" | "expanded";

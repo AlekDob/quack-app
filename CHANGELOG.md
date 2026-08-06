@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Added an optional `project` parameter to the `quack://open` Linear link. When it matches a Quack project by id, workspace path, or name, the issue opens as a draft chat inside that project instead of wherever a new chat would land. The Linear helper script maps Linear project and team names to Quack projects through `~/.quack/linear-projects.json`. See `documentation/features/018-linear-project-routing.md`.
+
 ## 2.0.0 - 2026-08-05
 
 ### Added

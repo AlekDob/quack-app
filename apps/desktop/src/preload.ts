@@ -62,9 +62,11 @@ function parseBrowserAnnotationEvent(payload: unknown): BrowserAnnotationEvent |
 
 function parseExternalPromptRequest(payload: unknown): ExternalPromptRequest | null {
   if (!payload || typeof payload !== "object") return null;
-  const request = payload as { source?: unknown; prompt?: unknown };
+  const request = payload as { source?: unknown; prompt?: unknown; project?: unknown };
   if (request.source !== "linear" || typeof request.prompt !== "string") return null;
-  return { source: "linear", prompt: request.prompt };
+  return typeof request.project === "string" && request.project.trim().length > 0
+    ? { source: "linear", prompt: request.prompt, project: request.project }
+    : { source: "linear", prompt: request.prompt };
 }
 
 let externalPromptListener: ((request: ExternalPromptRequest) => void) | null = null;
