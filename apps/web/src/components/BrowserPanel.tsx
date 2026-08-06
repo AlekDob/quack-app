@@ -1701,11 +1701,7 @@ export function BrowserPanel({
           <LinkIcon className="size-3.5" />
           <span className="sr-only">Copy link</span>
         </Button>
-        <Menu
-          modal={false}
-          open={browserActionsMenuOpen}
-          onOpenChange={setBrowserActionsMenuOpen}
-        >
+        <Menu modal={false} open={browserActionsMenuOpen} onOpenChange={setBrowserActionsMenuOpen}>
           <MenuTrigger
             render={
               <Button

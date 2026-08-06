@@ -110,14 +110,20 @@ function toAgent(row: TeamAgentRow): TeamAgent {
 }
 
 function withoutInheritance(agent: TeamAgent): TeamAgent {
-  const { inheritedFromGlobal: _inheritedFromGlobal, overriddenFields: _overriddenFields, ...base } =
-    agent;
+  const {
+    inheritedFromGlobal: _inheritedFromGlobal,
+    overriddenFields: _overriddenFields,
+    ...base
+  } = agent;
   void _inheritedFromGlobal;
   void _overriddenFields;
   return base;
 }
 
-function agentsHaveSameModelSlots(left: TeamAgent["modelSlots"], right: TeamAgent["modelSlots"]): boolean {
+function agentsHaveSameModelSlots(
+  left: TeamAgent["modelSlots"],
+  right: TeamAgent["modelSlots"],
+): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
@@ -195,8 +201,8 @@ const makeTeamRepository = Effect.gen(function* () {
     const overrides = new Map(
       persisted.filter((agent) => agent.source === "builtin").map((agent) => [agent.id, agent]),
     );
-    const builtins = listComposerPaperi().map(
-      (definition) => withoutInheritance(overrides.get(definition.id) ?? baseAgent(definition.id)),
+    const builtins = listComposerPaperi().map((definition) =>
+      withoutInheritance(overrides.get(definition.id) ?? baseAgent(definition.id)),
     );
     const custom = persisted
       .filter((agent) => agent.source === "custom" && agent.deletedAt === null)
@@ -206,9 +212,7 @@ const makeTeamRepository = Effect.gen(function* () {
 
   const getRoster: TeamRepositoryShape["getRoster"] = (scope) =>
     (scope.kind === "global"
-      ? rowsForScope(globalScope).pipe(
-          Effect.map((rows) => globalRosterFromRows(rows)),
-        )
+      ? rowsForScope(globalScope).pipe(Effect.map((rows) => globalRosterFromRows(rows)))
       : Effect.all([rowsForScope(globalScope), rowsForScope(scope)]).pipe(
           Effect.map(([globalRows, projectRows]) => {
             const globalRoster = globalRosterFromRows(globalRows);
@@ -235,7 +239,8 @@ const makeTeamRepository = Effect.gen(function* () {
               }));
             return { scope, agents: [...inherited, ...projectOnly] } satisfies TeamRoster;
           }),
-        )).pipe(Effect.mapError((cause) => new Error(`Could not load Team: ${String(cause)}`)));
+        )
+    ).pipe(Effect.mapError((cause) => new Error(`Could not load Team: ${String(cause)}`)));
 
   const upsertAgent: TeamRepositoryShape["upsertAgent"] = (scope, agent) =>
     Effect.try({
@@ -246,23 +251,28 @@ const makeTeamRepository = Effect.gen(function* () {
         (scope.kind === "global"
           ? Effect.succeed(undefined)
           : rowsForScope(globalScope).pipe(
-              Effect.map((rows) => globalRosterFromRows(rows).agents.find((entry) => entry.id === agent.id)),
-            )).pipe(
+              Effect.map((rows) =>
+                globalRosterFromRows(rows).agents.find((entry) => entry.id === agent.id),
+              ),
+            )
+        ).pipe(
           Effect.mapError((cause) => new Error(`Could not validate Team: ${String(cause)}`)),
           Effect.flatMap((globalAgent) =>
-            rowsForScope(scope).pipe(Effect.flatMap((rows) => {
-            const duplicate = rows.some(
-              (row) =>
-                row.agentId !== agent.id &&
-                row.deletedAt === null &&
-                row.name.localeCompare(agent.name, undefined, { sensitivity: "accent" }) === 0,
-            );
-            if (duplicate) return Effect.fail(new Error("An agent with this name already exists."));
-            const overriddenFields =
-              scope.kind === "project"
-                ? overriddenFieldsForProject(agent, globalAgent)
-                : ([] satisfies TeamAgentOverrideField[]);
-            return sql`
+            rowsForScope(scope).pipe(
+              Effect.flatMap((rows) => {
+                const duplicate = rows.some(
+                  (row) =>
+                    row.agentId !== agent.id &&
+                    row.deletedAt === null &&
+                    row.name.localeCompare(agent.name, undefined, { sensitivity: "accent" }) === 0,
+                );
+                if (duplicate)
+                  return Effect.fail(new Error("An agent with this name already exists."));
+                const overriddenFields =
+                  scope.kind === "project"
+                    ? overriddenFieldsForProject(agent, globalAgent)
+                    : ([] satisfies TeamAgentOverrideField[]);
+                return sql`
               INSERT INTO team_agents (
                 scope_key, project_id, agent_id, source, name, role, avatar, purpose,
                 instructions, model_slots_json, overridden_fields_json, created_at, updated_at, deleted_at
@@ -279,7 +289,8 @@ const makeTeamRepository = Effect.gen(function* () {
                 overridden_fields_json = excluded.overridden_fields_json,
                 updated_at = excluded.updated_at, deleted_at = excluded.deleted_at
             `.pipe(Effect.mapError((cause) => new Error(`Could not save Team: ${String(cause)}`)));
-          })),
+              }),
+            ),
           ),
         ),
       ),
@@ -290,24 +301,25 @@ const makeTeamRepository = Effect.gen(function* () {
     if (BUILTIN_IDS.has(agentId as never))
       return Effect.fail(new Error("Built-in agents cannot be deleted."));
     const now = new Date().toISOString();
-    return (scope.kind === "global"
-      ? sql`
+    return (
+      scope.kind === "global"
+        ? sql`
           UPDATE team_agents
           SET deleted_at = ${now}, updated_at = ${now}
           WHERE scope_key = ${scopeKey(scope)} AND agent_id = ${agentId} AND source = 'custom'
         `
-      : Effect.gen(function* () {
-          const globalAgent = globalRosterFromRows(yield* rowsForScope(globalScope)).agents.find(
-            (agent) => agent.id === agentId,
-          );
-          if (!globalAgent) {
-            return yield* sql`
+        : Effect.gen(function* () {
+            const globalAgent = globalRosterFromRows(yield* rowsForScope(globalScope)).agents.find(
+              (agent) => agent.id === agentId,
+            );
+            if (!globalAgent) {
+              return yield* sql`
               UPDATE team_agents
               SET deleted_at = ${now}, updated_at = ${now}
               WHERE scope_key = ${scopeKey(scope)} AND agent_id = ${agentId} AND source = 'custom'
             `;
-          }
-          return yield* sql`
+            }
+            return yield* sql`
             INSERT INTO team_agents (
               scope_key, project_id, agent_id, source, name, role, avatar, purpose,
               instructions, model_slots_json, overridden_fields_json, created_at, updated_at, deleted_at
@@ -320,7 +332,8 @@ const makeTeamRepository = Effect.gen(function* () {
             ON CONFLICT(scope_key, agent_id) DO UPDATE SET
               deleted_at = excluded.deleted_at, updated_at = excluded.updated_at
           `;
-        })).pipe(
+          })
+    ).pipe(
       Effect.mapError((cause) => new Error(`Could not delete Team agent: ${String(cause)}`)),
       Effect.andThen(() => getRoster(scope)),
     );

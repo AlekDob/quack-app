@@ -2150,7 +2150,9 @@ const makeOrchestrationProjectionPipeline = Effect.gen(function* () {
     applyShellMetadataProjection(event).pipe(
       Effect.andThen(() =>
         event.type === "project.deleted"
-          ? teamRepository.deleteProjectRoster(event.payload.projectId).pipe(Effect.catch(() => Effect.void))
+          ? teamRepository
+              .deleteProjectRoster(event.payload.projectId)
+              .pipe(Effect.catch(() => Effect.void))
           : Effect.void,
       ),
       Effect.flatMap(() =>
