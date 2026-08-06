@@ -498,5 +498,7 @@ describe("canonical browser host RPC", () => {
         expect(socket.destroyed).toBe(false);
       },
     );
-  });
+    // 8 MiB through a real pipe misses the default 5s budget when the whole
+    // monorepo suite runs in parallel.
+  }, 20_000);
 });
