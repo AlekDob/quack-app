@@ -7,7 +7,7 @@ import {
   type ModelSlug,
   type RuntimeMode,
 } from "@synara/contracts";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   appendVoiceTranscriptToPrompt,
@@ -36,6 +36,7 @@ import {
   resolveActiveThreadTitle,
   resolveActiveTurnLiveDiffState,
   resolveCommittedProviderModel,
+  resolveComposerStripWorkLogEntries,
   resolveCycledModelSlug,
   resolveDefaultEnvironmentPanelOpen,
   resolveEnvironmentPanelOpen,
@@ -61,6 +62,29 @@ import {
   shouldRenderTerminalWorkspace,
   worktreeSetupHasError,
 } from "./ChatView.logic";
+
+describe("composer strip work-log derivation", () => {
+  it("reuses the active derivation unless a subagent view needs its parent source", () => {
+    const activeWorkLogEntries = [];
+    const deriveParentWorkLogEntries = vi.fn(() => []);
+
+    expect(
+      resolveComposerStripWorkLogEntries({
+        hasDistinctParentSource: false,
+        activeWorkLogEntries,
+        deriveParentWorkLogEntries,
+      }),
+    ).toBe(activeWorkLogEntries);
+    expect(deriveParentWorkLogEntries).not.toHaveBeenCalled();
+
+    resolveComposerStripWorkLogEntries({
+      hasDistinctParentSource: true,
+      activeWorkLogEntries,
+      deriveParentWorkLogEntries,
+    });
+    expect(deriveParentWorkLogEntries).toHaveBeenCalledOnce();
+  });
+});
 
 describe("thread artifact workspace root", () => {
   it("uses a materialized worktree for file previews", () => {
