@@ -11360,7 +11360,7 @@ export default function ChatView({
                               ) : (
                                 <ComposerSendArrowIcon
                                   aria-hidden="true"
-                                  className="size-5 shrink-0"
+                                  className="size-5 shrink-0 translate-y-px"
                                 />
                               )}
                             </Button>
