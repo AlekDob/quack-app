@@ -84,5 +84,8 @@ export function providerStartOptionsFromServerSettings(
       ...(providers.pi.binaryPath ? { binaryPath: providers.pi.binaryPath } : {}),
       ...(providers.pi.agentDir ? { agentDir: providers.pi.agentDir } : {}),
     },
+    astronaut: {
+      ...(providers.astronaut.serverUrl ? { serverUrl: providers.astronaut.serverUrl } : {}),
+    },
   };
 }

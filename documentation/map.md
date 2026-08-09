@@ -30,6 +30,7 @@ tags: [map, navigation]
 | `documentation/features/011-thread-detail-subscriptions.md`      | EventRouter detail lease identity under streaming                   |
 | `documentation/features/012-pending-interaction-claim.md`        | Shared pending-interaction claim + stale turn settle                |
 | `documentation/features/015-composer-activity-strip.md`          | Unified composer strip: subagents + background browser/command work |
+| `documentation/features/017-astronaut-remote-provider.md`        | Astronaut remoto con sessioni, memoria e import da Tailscale        |
 
 ## Recent bugs
 

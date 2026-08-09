@@ -50,6 +50,8 @@ function providerResumeCursorForImport(provider: ProviderKind, externalId: strin
     case "kilo":
     case "opencode":
       return { openCodeSessionId: externalId };
+    case "astronaut":
+      return { astronautSessionId: externalId };
     default:
       return { threadId: externalId };
   }
@@ -136,7 +138,7 @@ export function makeImportThreadHandler(options: ImportThreadHandlerOptions) {
   });
 
   const resolveImportedProviderThreadContext = Effect.fn(function* (input: {
-    readonly provider: "codex" | "droid" | "kilo" | "opencode";
+    readonly provider: "astronaut" | "codex" | "droid" | "kilo" | "opencode";
     readonly externalId: string;
     readonly projectWorkspaceRoot: string;
     readonly fallbackCwd?: string;
@@ -281,7 +283,7 @@ export function makeImportThreadHandler(options: ImportThreadHandlerOptions) {
 
   const importOpenCodeCompatibleThreadHistory = Effect.fn(function* (input: {
     readonly importedAt: string;
-    readonly provider: "kilo" | "opencode";
+    readonly provider: "astronaut" | "kilo" | "opencode";
     readonly threadId: ThreadId;
   }) {
     const adapter = yield* options.providerAdapterRegistry.getByProvider(input.provider);
@@ -292,18 +294,31 @@ export function makeImportThreadHandler(options: ImportThreadHandlerOptions) {
           importMessagesError(
             cause instanceof Error && cause.message.length > 0
               ? cause.message
-              : `Failed to read ${input.provider === "kilo" ? "Kilo" : "OpenCode"} session history.`,
+              : `Failed to read ${
+                  input.provider === "kilo"
+                    ? "Kilo"
+                    : input.provider === "astronaut"
+                      ? "Astronaut"
+                      : "OpenCode"
+                } session history.`,
           ),
         ),
       );
 
     yield* dispatchImportedMessages({
       threadId: input.threadId,
-      messages: mapOpenCodeSnapshotMessages({
-        threadId: input.threadId,
-        turns: snapshot.turns,
-        importedAt: input.importedAt,
-      }),
+      messages:
+        input.provider === "astronaut"
+          ? mapFactorySnapshotMessages({
+              threadId: input.threadId,
+              turns: snapshot.turns,
+              importedAt: input.importedAt,
+            })
+          : mapOpenCodeSnapshotMessages({
+              threadId: input.threadId,
+              turns: snapshot.turns,
+              importedAt: input.importedAt,
+            }),
       createdAt: input.importedAt,
     });
   });
@@ -374,7 +389,8 @@ export function makeImportThreadHandler(options: ImportThreadHandlerOptions) {
       (thread.modelSelection.provider === "codex" ||
         thread.modelSelection.provider === "droid" ||
         thread.modelSelection.provider === "kilo" ||
-        thread.modelSelection.provider === "opencode") &&
+        thread.modelSelection.provider === "opencode" ||
+        thread.modelSelection.provider === "astronaut") &&
       project
         ? yield* resolveImportedProviderThreadContext({
             provider: thread.modelSelection.provider,
@@ -432,7 +448,8 @@ export function makeImportThreadHandler(options: ImportThreadHandlerOptions) {
         });
       } else if (
         thread.modelSelection.provider === "kilo" ||
-        thread.modelSelection.provider === "opencode"
+        thread.modelSelection.provider === "opencode" ||
+        thread.modelSelection.provider === "astronaut"
       ) {
         yield* importOpenCodeCompatibleThreadHistory({
           provider: thread.modelSelection.provider,

@@ -95,7 +95,7 @@ interface SidebarSearchPaletteProps {
 
 export type ImportProviderKind = Extract<
   ProviderKind,
-  "codex" | "claudeAgent" | "cursor" | "kilo" | "opencode"
+  "astronaut" | "codex" | "claudeAgent" | "cursor" | "kilo" | "opencode"
 >;
 
 function actionHandler(
