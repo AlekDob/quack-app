@@ -17,6 +17,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useContext,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -58,12 +59,13 @@ import {
   WorktreeIcon,
 } from "~/lib/icons";
 import { pinActionLabel } from "~/lib/pin";
-import { DEFAULT_PAPERO_ID, isPaperoId, usePaperoStore } from "~/paperi";
+import { DEFAULT_PAPERO_ID, isPaperoId } from "~/paperi";
 import type { PaperoDefinition, PaperoId } from "@synara/shared/paperi";
 import { Button } from "../ui/button";
 import { CrossTaskOriginLabel, type CrossTaskOrigin } from "./CrossTaskOriginLabel";
 import { CHAT_STREAM_AVATAR_GAP_CLASS_NAME } from "./chatLeftGutter";
 import { ChatStreamAvatarSlot, ChatStreamMetaRow } from "./ChatStreamIdentity";
+import { PaperoIdentityContext } from "./paperoIdentityContext";
 import { duckAvatarFor } from "~/lib/duckAvatars";
 import { SynaraThreadCreationCard } from "./SynaraThreadCreationCard";
 import { buildExpandedImagePreview, ExpandedImagePreview } from "./ExpandedImagePreview";
@@ -667,9 +669,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
     ),
     [],
   );
-  const resolveEffectivePaperoDefinition = usePaperoStore(
-    (store) => store.resolveEffectiveDefinition,
-  );
+  const resolveEffectivePaperoDefinition = useContext(PaperoIdentityContext);
   useTailAnchorScroll({
     listRef: resolvedListRef,
     timelineRootRef,

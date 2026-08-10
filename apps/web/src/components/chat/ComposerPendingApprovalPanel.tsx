@@ -74,6 +74,7 @@ const KIND_PROMPT: Record<PendingApproval["requestKind"], string> = {
   "file-read": "Approve reading this file?",
   "file-change": "Approve this file change?",
   permissions: "Grant these permissions?",
+  "plugin-install": "Install this plugin?",
 };
 
 export const ComposerPendingApprovalPanel = function ComposerPendingApprovalPanel({
@@ -85,7 +86,9 @@ export const ComposerPendingApprovalPanel = function ComposerPendingApprovalPane
   const parsed = parseApprovalDetail(approval.detail);
   const requestId = approval.requestId;
   const actions =
-    approval.sessionApprovalAvailable === false
+    approval.requestKind === "plugin-install"
+      ? APPROVAL_ACTIONS.filter((action) => action.decision !== "acceptForSession")
+      : approval.sessionApprovalAvailable === false
       ? APPROVAL_ACTIONS.filter((action) => action.decision !== "acceptForSession")
       : APPROVAL_ACTIONS;
 

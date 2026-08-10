@@ -15,7 +15,7 @@ import { orderedActivities } from "./workLog";
 export interface PendingApproval {
   requestId: ApprovalRequestId;
   lifecycleGeneration?: string;
-  requestKind: "command" | "file-read" | "file-change" | "permissions";
+  requestKind: "command" | "file-read" | "file-change" | "permissions" | "plugin-install";
   createdAt: string;
   detail?: string;
   permissionProfile?: Record<string, unknown>;
@@ -219,7 +219,8 @@ export function derivePendingApprovals(
         payload?.requestKind === "command" ||
         payload?.requestKind === "file-read" ||
         payload?.requestKind === "file-change" ||
-        payload?.requestKind === "permissions"
+        payload?.requestKind === "permissions" ||
+        payload?.requestKind === "plugin-install"
           ? payload.requestKind
           : approvalRequestKindFromRequestType(payload?.requestType);
       if (!requestKind) {

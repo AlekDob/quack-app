@@ -366,14 +366,15 @@ import { newCommandId, newMessageId, newProjectId, newThreadId } from "~/lib/uti
 import { ensureNativeApi, readNativeApi } from "~/nativeApi";
 import { promoteThreadCreate } from "~/lib/threadCreatePromotion";
 import { readFavoriteModelSlugs } from "~/lib/modelFavorites";
-import { composerPaperiFromRoster, GLOBAL_TEAM_SCOPE, teamRosterQueryKey } from "~/lib/teamRoster";
-import { usePaperoStore } from "~/paperi";
 import {
-  DEFAULT_PAPERO_ID,
-  getPaperoDefinition,
-  resolveCycledPaperoId,
-  type PaperoId,
-} from "@synara/shared/paperi";
+  composerPaperiFromRoster,
+  GLOBAL_TEAM_SCOPE,
+  paperoResolverFromRoster,
+  teamRosterQueryKey,
+  useSaveTeamAgentInstructions,
+} from "~/lib/teamRoster";
+import { usePaperoStore } from "~/paperi";
+import { DEFAULT_PAPERO_ID, resolveCycledPaperoId, type PaperoId } from "@synara/shared/paperi";
 
 import {
   getCustomBinaryPathForProvider,
@@ -457,6 +458,7 @@ import {
 import { ComposerPromptEditor, type ComposerPromptEditorHandle } from "./ComposerPromptEditor";
 import { PullRequestThreadDialog } from "./PullRequestThreadDialog";
 import { ChatHeader } from "./chat/ChatHeader";
+import { PaperoIdentityContext } from "./chat/paperoIdentityContext";
 import { dispatchThreadNotes } from "~/pinnedMessages";
 import {
   mergeProjectInstructionsIntoThreadNotes,
@@ -766,7 +768,6 @@ export default function ChatView({
   const clearPaperoModelSelectionForProvider = usePaperoStore(
     (store) => store.clearModelSelectionForProvider,
   );
-  const setPaperoInstructions = usePaperoStore((store) => store.setInstructions);
   const activePaperoModelMap = usePaperoStore(
     (store) => store.modelSelectionByProviderByPaperoId[activePaperoId] ?? EMPTY_PAPERO_MODEL_MAP,
   );
@@ -1478,9 +1479,12 @@ export default function ChatView({
     () => composerPaperiFromRoster(teamRosterQuery.data),
     [teamRosterQuery.data],
   );
-  const activePaperoDefinition =
-    composerPaperi.find((definition) => definition.id === activePaperoId) ??
-    getPaperoDefinition(activePaperoId);
+  const resolvePaperoFromRoster = useMemo(
+    () => paperoResolverFromRoster(composerPaperi),
+    [composerPaperi],
+  );
+  const activePaperoDefinition = resolvePaperoFromRoster(activePaperoId);
+  const writePaperoInstructions = useSaveTeamAgentInstructions(teamScope, teamRosterQuery.data);
   const deletePlaceholderTerminalThread = useCallback(
     async (terminalThreadId: ThreadId) => {
       const api = readNativeApi();
@@ -5752,9 +5756,7 @@ export default function ChatView({
           });
         }
       }
-      const definition =
-        composerPaperi.find((candidate) => candidate.id === paperoId) ??
-        getPaperoDefinition(paperoId);
+      const definition = resolvePaperoFromRoster(paperoId);
       toastManager.add({
         type: "success",
         title: `${definition.label}`,
@@ -5764,7 +5766,7 @@ export default function ChatView({
     },
     [
       activeThread,
-      composerPaperi,
+      resolvePaperoFromRoster,
       resolvePaperoModelForProvider,
       scheduleComposerFocus,
       selectedProvider,
@@ -5796,25 +5798,34 @@ export default function ChatView({
   );
 
   const onSavePaperoInstructions = useCallback(
-    (paperoId: PaperoId, instructions: string) => {
-      setPaperoInstructions(paperoId, instructions);
-      const definition =
-        composerPaperi.find((candidate) => candidate.id === paperoId) ??
-        getPaperoDefinition(paperoId);
-      toastManager.add({
-        type: "success",
-        title: "Instructions saved",
-        description: `${definition.label} will use these from the next message`,
-      });
+    async (paperoId: PaperoId, instructions: string) => {
+      try {
+        const saved = await writePaperoInstructions(paperoId, instructions);
+        if (!saved) {
+          throw new Error("This agent is no longer present in the active Team roster.");
+        }
+        const definition = resolvePaperoFromRoster(paperoId);
+        toastManager.add({
+          type: "success",
+          title: "Instructions saved",
+          description: `${definition.label} will use these from the next message`,
+        });
+      } catch (error) {
+        toastManager.add({
+          type: "error",
+          title: "Could not save instructions",
+          description: error instanceof Error ? error.message : "Team update failed.",
+        });
+      }
     },
-    [composerPaperi, setPaperoInstructions],
+    [resolvePaperoFromRoster, writePaperoInstructions],
   );
 
   const onResetPaperoInstructions = useCallback(
     (paperoId: PaperoId) => {
-      setPaperoInstructions(paperoId, null);
+      void writePaperoInstructions(paperoId, null);
     },
-    [setPaperoInstructions],
+    [writePaperoInstructions],
   );
 
   useEffect(() => {
@@ -7901,13 +7912,9 @@ export default function ChatView({
             ...(mentionedPluginMentionsForSend.length > 0
               ? { mentions: mentionedPluginMentionsForSend }
               : {}),
+            // No paperoInstructions: the server resolves the Team agent for every turn
+            // and that resolution wins, so anything sent from here is discarded.
             paperoId: paperoIdForSend,
-            ...(() => {
-              const override = usePaperoStore
-                .getState()
-                .overridesByPaperoId[paperoIdForSend]?.instructions?.trim();
-              return override ? { paperoInstructions: override } : {};
-            })(),
           },
           modelSelection: selectedModelSelectionForSend,
           ...(providerOptionsForDispatchForSend
@@ -11498,74 +11505,76 @@ export default function ChatView({
             {shouldRenderChatPaneContent && !isCenteredEmptyLanding ? (
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-                  <ChatTranscriptPane
-                    activeThreadId={activeThread.id}
-                    activeTurnId={activeTurnIdForTranscript}
-                    subagentStreamAvatarSeed={activeSubagentPresentation?.avatarSeed}
-                    subagentStreamLabel={activeSubagentPresentation?.fullLabel}
-                    agentActivityDetail={openAgentActivityDetail}
-                    hasMessages={timelineEntries.length > 0}
-                    isWorking={hasLiveTurn}
-                    worktreeSetup={activeWorktreeSetup}
-                    activeTurnInProgress={activeTurnInProgress}
-                    activeTurnStartedAt={activeWorkStartedAt}
-                    listRef={legendListRef}
-                    timelineControllerRef={timelineControllerRef}
-                    pinnedMessageIds={pinnedMessageIds}
-                    canPinMessage={canPinMessage}
-                    onTogglePinMessage={handleTogglePinMessageGuarded}
-                    threadMarkers={threadMarkers}
-                    enteringUserMessageIds={enteringUserMessageIds}
-                    tailAnchorMessageId={
-                      tailAnchor !== null && tailAnchor.threadId === activeThread.id
-                        ? tailAnchor.messageId
-                        : null
-                    }
-                    tailAnchorScrollInFlightRef={tailAnchorScrollInFlightRef}
-                    crossTaskOrigin={crossTaskOrigin}
-                    timelineEntries={timelineEntries}
-                    turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
-                    onOpenTurnDiff={onOpenTurnDiff}
-                    onOpenThread={onNavigateToThread}
-                    onOpenAutomation={onOpenAutomation}
-                    revertTurnCountByUserMessageId={revertTurnCountByUserMessageId}
-                    onRevertUserMessage={onRevertUserMessage}
-                    onUndoTurnFiles={onUndoTurnFiles}
-                    onEditUserMessage={onEditUserMessage}
-                    editableUserMessageId={editableUserMessageId}
-                    isRevertingCheckpoint={isRevertingCheckpoint}
-                    onExpandTimelineImage={onExpandTimelineImage}
-                    followLiveOutput={hasStreamingAssistantText}
-                    onIsAtEndChange={onIsAtEndChange}
-                    markdownCwd={threadWorkspaceCwd ?? undefined}
-                    resolvedTheme={resolvedTheme}
-                    chatFontSizePx={settings.chatFontSizePx}
-                    smoothStreamingText={settings.enableSmoothStreamingText}
-                    timestampFormat={timestampFormat}
-                    workspaceRoot={threadArtifactWorkspaceRoot ?? undefined}
-                    emptyStateContent={transcriptEmptyStateContent}
-                    emptyStateProjectName={activeProjectDisplayName}
-                    terminalWorkspaceTerminalTabActive={terminalWorkspaceTerminalTabActive}
-                    onMessagesScroll={onMessagesScroll}
-                    onMessagesClickCapture={onMessagesClickCapture}
-                    onMessagesMouseUp={onMessagesMouseUp}
-                    onMessagesWheel={onMessagesWheel}
-                    onMessagesPointerDown={onMessagesPointerDown}
-                    onMessagesPointerUp={onMessagesPointerUp}
-                    onMessagesPointerCancel={onMessagesPointerCancel}
-                    onMessagesTouchStart={onMessagesTouchStart}
-                    onMessagesTouchMove={onMessagesTouchMove}
-                    onMessagesTouchEnd={onMessagesTouchEnd}
-                    onOpenAgentActivity={setOpenAgentActivityId}
-                    onCloseAgentActivityDetail={() => setOpenAgentActivityId(null)}
-                    scrollButtonVisible={showScrollToBottom}
-                    onScrollToBottom={onScrollToBottom}
-                    contentInsetRightPx={
-                      environmentAppliesContentInset
-                        ? ENVIRONMENT_DOCKED_CONTENT_INSET_PX
-                        : undefined
-                    }
-                  />
+                  <PaperoIdentityContext.Provider value={resolvePaperoFromRoster}>
+                    <ChatTranscriptPane
+                      activeThreadId={activeThread.id}
+                      activeTurnId={activeTurnIdForTranscript}
+                      subagentStreamAvatarSeed={activeSubagentPresentation?.avatarSeed}
+                      subagentStreamLabel={activeSubagentPresentation?.fullLabel}
+                      agentActivityDetail={openAgentActivityDetail}
+                      hasMessages={timelineEntries.length > 0}
+                      isWorking={hasLiveTurn}
+                      worktreeSetup={activeWorktreeSetup}
+                      activeTurnInProgress={activeTurnInProgress}
+                      activeTurnStartedAt={activeWorkStartedAt}
+                      listRef={legendListRef}
+                      timelineControllerRef={timelineControllerRef}
+                      pinnedMessageIds={pinnedMessageIds}
+                      canPinMessage={canPinMessage}
+                      onTogglePinMessage={handleTogglePinMessageGuarded}
+                      threadMarkers={threadMarkers}
+                      enteringUserMessageIds={enteringUserMessageIds}
+                      tailAnchorMessageId={
+                        tailAnchor !== null && tailAnchor.threadId === activeThread.id
+                          ? tailAnchor.messageId
+                          : null
+                      }
+                      tailAnchorScrollInFlightRef={tailAnchorScrollInFlightRef}
+                      crossTaskOrigin={crossTaskOrigin}
+                      timelineEntries={timelineEntries}
+                      turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
+                      onOpenTurnDiff={onOpenTurnDiff}
+                      onOpenThread={onNavigateToThread}
+                      onOpenAutomation={onOpenAutomation}
+                      revertTurnCountByUserMessageId={revertTurnCountByUserMessageId}
+                      onRevertUserMessage={onRevertUserMessage}
+                      onUndoTurnFiles={onUndoTurnFiles}
+                      onEditUserMessage={onEditUserMessage}
+                      editableUserMessageId={editableUserMessageId}
+                      isRevertingCheckpoint={isRevertingCheckpoint}
+                      onExpandTimelineImage={onExpandTimelineImage}
+                      followLiveOutput={hasStreamingAssistantText}
+                      onIsAtEndChange={onIsAtEndChange}
+                      markdownCwd={threadWorkspaceCwd ?? undefined}
+                      resolvedTheme={resolvedTheme}
+                      chatFontSizePx={settings.chatFontSizePx}
+                      smoothStreamingText={settings.enableSmoothStreamingText}
+                      timestampFormat={timestampFormat}
+                      workspaceRoot={threadArtifactWorkspaceRoot ?? undefined}
+                      emptyStateContent={transcriptEmptyStateContent}
+                      emptyStateProjectName={activeProjectDisplayName}
+                      terminalWorkspaceTerminalTabActive={terminalWorkspaceTerminalTabActive}
+                      onMessagesScroll={onMessagesScroll}
+                      onMessagesClickCapture={onMessagesClickCapture}
+                      onMessagesMouseUp={onMessagesMouseUp}
+                      onMessagesWheel={onMessagesWheel}
+                      onMessagesPointerDown={onMessagesPointerDown}
+                      onMessagesPointerUp={onMessagesPointerUp}
+                      onMessagesPointerCancel={onMessagesPointerCancel}
+                      onMessagesTouchStart={onMessagesTouchStart}
+                      onMessagesTouchMove={onMessagesTouchMove}
+                      onMessagesTouchEnd={onMessagesTouchEnd}
+                      onOpenAgentActivity={setOpenAgentActivityId}
+                      onCloseAgentActivityDetail={() => setOpenAgentActivityId(null)}
+                      scrollButtonVisible={showScrollToBottom}
+                      onScrollToBottom={onScrollToBottom}
+                      contentInsetRightPx={
+                        environmentAppliesContentInset
+                          ? ENVIRONMENT_DOCKED_CONTENT_INSET_PX
+                          : undefined
+                      }
+                    />
+                  </PaperoIdentityContext.Provider>
                 </div>
 
                 <div

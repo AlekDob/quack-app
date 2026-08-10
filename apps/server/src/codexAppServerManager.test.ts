@@ -2929,6 +2929,55 @@ describe("thread checkpoint control", () => {
 });
 
 describe("respondToRequest", () => {
+  it("keeps a plugin-install elicitation pending and accepts it with the MCP response shape", async () => {
+    const { manager, context, writeMessage, emitEvent } = createPendingApprovalHarness();
+    context.sessionApprovalOverride = fullAccessTurnOverrides;
+
+    await handleServerRequestForTest(manager, context, {
+      id: 77,
+      method: "mcpServer/elicitation/request",
+      params: {
+        threadId: "thread_1",
+        turnId: "turn_1",
+        mode: "form",
+        message: "Install Linear to manage issues.",
+        requestedSchema: { type: "object", properties: {} },
+        _meta: {
+          codex_approval_kind: "tool_suggestion",
+          tool_type: "plugin",
+          suggest_type: "install",
+          tool_name: "Linear",
+        },
+      },
+    });
+
+    const [requestId, pending] = Array.from(context.pendingApprovals.entries()).find(
+      ([, request]) =>
+        (request as { readonly method: string }).method === "mcpServer/elicitation/request",
+    ) ?? [];
+    expect(requestId).toBeDefined();
+    expect(pending).toEqual(
+      expect.objectContaining({
+        method: "mcpServer/elicitation/request",
+        requestKind: "plugin-install",
+      }),
+    );
+    expect(writeMessage).not.toHaveBeenCalled();
+
+    await manager.respondToRequest(asThreadId("thread_1"), requestId!, "accept");
+
+    expect(writeMessage).toHaveBeenLastCalledWith(context, {
+      id: 77,
+      result: { action: "accept", content: {} },
+    });
+    expect(emitEvent).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        method: "item/requestApproval/decision",
+        requestKind: "plugin-install",
+      }),
+    );
+  });
+
   it("keeps acceptForSession active for later Codex turns", async () => {
     const { manager, context, requireSession, writeMessage, emitEvent, sendRequest } =
       createPendingApprovalHarness();

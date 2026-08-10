@@ -1,7 +1,11 @@
 import type { TeamRoster } from "@synara/contracts";
 import { describe, expect, it } from "vitest";
 
-import { composerPaperiFromRoster, teamRosterQueryKey } from "./teamRoster";
+import {
+  composerPaperiFromRoster,
+  paperoResolverFromRoster,
+  teamRosterQueryKey,
+} from "./teamRoster";
 
 const roster: TeamRoster = {
   scope: { kind: "global" },
@@ -36,6 +40,18 @@ describe("composerPaperiFromRoster", () => {
     const nora = composerPaperiFromRoster(roster).find((agent) => agent.id === "debugger");
 
     expect(nora?.avatar).toBe("/images/ducks/duck16.jpeg");
+  });
+});
+
+describe("paperoResolverFromRoster", () => {
+  const resolve = paperoResolverFromRoster(composerPaperiFromRoster(roster));
+
+  it("resolves the Team avatar, so the transcript matches the composer", () => {
+    expect(resolve("builder").avatar).toBe("/images/ducks/duck14.jpeg");
+  });
+
+  it("falls back to the built-in definition for an unedited papero", () => {
+    expect(resolve("debugger").avatar).toBe("/images/ducks/duck16.jpeg");
   });
 });
 

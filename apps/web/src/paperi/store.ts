@@ -114,10 +114,10 @@ type PaperoStoreState = PaperoPersistedState & {
   getModelSelectionMap: (paperoId: PaperoId) => PaperoModelSelectionMap;
   setModelSelectionForProvider: (paperoId: PaperoId, modelSelection: ModelSelection) => void;
   clearModelSelectionForProvider: (paperoId: PaperoId, provider: ProviderKind) => void;
-  getOverrides: (paperoId: PaperoId) => PaperoOverrides | undefined;
-  setOverrides: (paperoId: PaperoId, overrides: PaperoOverrides) => void;
-  /** null clears the instruction override (back to builtin). */
-  setInstructions: (paperoId: PaperoId, instructions: string | null) => void;
+  /**
+   * Read-only: overrides are no longer written here. Agent edits live in the Team
+   * roster on the server; this only still resolves pre-migration localStorage data.
+   */
   resolveEffectiveDefinition: (paperoId: PaperoId) => PaperoDefinition;
   resolveModelForCurrentProvider: (
     paperoId: PaperoId,
@@ -185,56 +185,6 @@ export const usePaperoStore = create<PaperoStoreState>((set, get) => {
           activePaperoIdByThreadId: state.activePaperoIdByThreadId,
         });
         return { modelSelectionByProviderByPaperoId };
-      });
-    },
-    getOverrides: (paperoId) => get().overridesByPaperoId[paperoId],
-    setOverrides: (paperoId, overrides) => {
-      set((state) => {
-        const overridesByPaperoId = {
-          ...state.overridesByPaperoId,
-          [paperoId]: overrides,
-        };
-        persist({
-          version: 1,
-          overridesByPaperoId,
-          modelSelectionByProviderByPaperoId: state.modelSelectionByProviderByPaperoId,
-          activePaperoIdByThreadId: state.activePaperoIdByThreadId,
-        });
-        return { overridesByPaperoId };
-      });
-    },
-    setInstructions: (paperoId, instructions) => {
-      set((state) => {
-        const previous = state.overridesByPaperoId[paperoId] ?? {};
-        const nextOverrides: PaperoOverrides = { ...previous };
-        if (instructions === null || instructions.trim().length === 0) {
-          const { instructions: _removed, ...rest } = nextOverrides;
-          void _removed;
-          const overridesByPaperoId = { ...state.overridesByPaperoId };
-          if (Object.keys(rest).length === 0) {
-            delete overridesByPaperoId[paperoId];
-          } else {
-            overridesByPaperoId[paperoId] = rest;
-          }
-          persist({
-            version: 1,
-            overridesByPaperoId,
-            modelSelectionByProviderByPaperoId: state.modelSelectionByProviderByPaperoId,
-            activePaperoIdByThreadId: state.activePaperoIdByThreadId,
-          });
-          return { overridesByPaperoId };
-        }
-        const overridesByPaperoId = {
-          ...state.overridesByPaperoId,
-          [paperoId]: { ...nextOverrides, instructions: instructions.trim() },
-        };
-        persist({
-          version: 1,
-          overridesByPaperoId,
-          modelSelectionByProviderByPaperoId: state.modelSelectionByProviderByPaperoId,
-          activePaperoIdByThreadId: state.activePaperoIdByThreadId,
-        });
-        return { overridesByPaperoId };
       });
     },
     resolveEffectiveDefinition: (paperoId) => {

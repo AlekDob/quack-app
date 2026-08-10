@@ -102,7 +102,8 @@ interface PendingApprovalRequest {
     | "item/commandExecution/requestApproval"
     | "item/fileChange/requestApproval"
     | "item/fileRead/requestApproval"
-    | "item/permissions/requestApproval";
+    | "item/permissions/requestApproval"
+    | "mcpServer/elicitation/request";
   requestKind: ProviderRequestKind;
   threadId: ThreadId;
   turnId?: TurnId;
@@ -115,6 +116,10 @@ interface PendingApprovalRequest {
 
 function isPermissionApprovalRequest(request: PendingApprovalRequest): boolean {
   return request.method === "item/permissions/requestApproval";
+}
+
+function isSessionApprovalEligible(request: PendingApprovalRequest): boolean {
+  return !isPermissionApprovalRequest(request) && request.method !== "mcpServer/elicitation/request";
 }
 
 interface PendingUserInputRequest {
@@ -1981,7 +1986,11 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
         : {}),
     };
     const result =
-      pendingRequest.method === "item/permissions/requestApproval"
+      pendingRequest.method === "mcpServer/elicitation/request"
+        ? decision === "accept"
+          ? { action: "accept" as const, content: {} }
+          : { action: decision === "cancel" ? ("cancel" as const) : ("decline" as const) }
+        : pendingRequest.method === "item/permissions/requestApproval"
         ? {
             permissions:
               decision === "accept" || decision === "acceptForSession" ? grantedPermissions : {},
@@ -2022,7 +2031,7 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
     context: CodexSessionContext,
   ): Promise<void> {
     const remainingRequests = Array.from(context.pendingApprovals.values()).filter(
-      (request) => !isPermissionApprovalRequest(request),
+      isSessionApprovalEligible,
     );
     for (const pendingRequest of remainingRequests) {
       context.pendingApprovals.delete(pendingRequest.requestId);
@@ -2043,7 +2052,7 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
 
     context.pendingApprovals.delete(requestId);
     const isPermissionRequest = isPermissionApprovalRequest(pendingRequest);
-    if (decision === "acceptForSession" && !isPermissionRequest) {
+    if (decision === "acceptForSession" && isSessionApprovalEligible(pendingRequest)) {
       context.sessionApprovalOverride = CODEX_ALWAYS_ALLOW_SESSION_TURN_OVERRIDES;
     }
     await this.resolveApprovalRequest(context, pendingRequest, decision);
@@ -3250,7 +3259,7 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
         ...(providerParentThreadId ? { providerParentThreadId } : {}),
         ...(requestedPermissions ? { requestedPermissions } : {}),
       };
-      if (context.sessionApprovalOverride && !isPermissionApprovalRequest(pendingRequest)) {
+      if (context.sessionApprovalOverride && isSessionApprovalEligible(pendingRequest)) {
         await this.resolveApprovalRequest(context, pendingRequest, "acceptForSession");
         return;
       }
@@ -3579,6 +3588,10 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
 
     if (method === "item/permissions/requestApproval") {
       return "permissions";
+    }
+
+    if (method === "mcpServer/elicitation/request") {
+      return "plugin-install";
     }
 
     return undefined;
