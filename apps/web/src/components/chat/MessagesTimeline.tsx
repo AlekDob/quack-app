@@ -109,6 +109,7 @@ import {
   resolveAssistantMessageDisplayText,
   type StableMessagesTimelineRowsState,
 } from "./MessagesTimeline.logic";
+import { ClaudeAuthRecoveryCard, type ClaudeAuthRecoveryStatus } from "./ClaudeAuthRecoveryCard";
 import { summarizeToolCallGroup } from "./toolCallGroup.logic";
 import { ToolCallGroupSummaryRow } from "./ToolCallGroupSummaryRow";
 import { useTailAnchorScroll } from "./useTailAnchorScroll";
@@ -480,6 +481,13 @@ interface MessagesTimelineProps {
    * far right; only the content is inset.
    */
   contentInsetRightPx?: number | undefined;
+  claudeAuthRecovery?: {
+    status: ClaudeAuthRecoveryStatus;
+    error: string | null;
+    unavailableReason: string | null;
+  } | null;
+  onOpenClaudeAuthRecovery?: () => void;
+  onDismissClaudeAuthRecovery?: () => void;
 }
 
 export const MessagesTimeline = memo(function MessagesTimeline({
@@ -538,6 +546,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   contentInsetRightPx,
   subagentStreamAvatarSeed,
   subagentStreamLabel,
+  claudeAuthRecovery: claudeAuthRecoveryProp,
+  onOpenClaudeAuthRecovery,
+  onDismissClaudeAuthRecovery,
 }: MessagesTimelineProps) {
   // Prop defaults are resolved in the body rather than in the destructuring pattern:
   // an `AssignmentPattern` in the parameter list makes React Compiler bail out on the
@@ -558,6 +569,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
   }, []);
   const crossTaskOrigin = crossTaskOriginProp ?? null;
   const smoothStreamingText = smoothStreamingTextProp ?? false;
+  const claudeAuthRecovery = claudeAuthRecoveryProp ?? null;
   const normalizedChatFontSizePx = normalizeChatFontSizePx(
     chatFontSizePxProp ?? DEFAULT_CHAT_FONT_SIZE_PX,
   );
@@ -693,6 +705,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         activeTurnStartedAt,
         turnDiffSummaryByAssistantMessageId,
         revertTurnCountByUserMessageId,
+        claudeAuthRecovery,
       }),
     [
       timelineEntries,
@@ -703,6 +716,7 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       activeTurnStartedAt,
       turnDiffSummaryByAssistantMessageId,
       revertTurnCountByUserMessageId,
+      claudeAuthRecovery,
     ],
   );
   const rows = useStableRows(rawRows);
@@ -1254,6 +1268,16 @@ export const MessagesTimeline = memo(function MessagesTimeline({
             </>,
           );
         })()}
+
+      {row.kind === "claude-auth-recovery" ? (
+        <ClaudeAuthRecoveryCard
+          status={row.status}
+          error={row.error}
+          unavailableReason={row.unavailableReason}
+          onOpen={onOpenClaudeAuthRecovery ?? (() => {})}
+          onDismiss={onDismissClaudeAuthRecovery ?? (() => {})}
+        />
+      ) : null}
 
       {row.kind === "message" &&
         row.message.role === "user" &&

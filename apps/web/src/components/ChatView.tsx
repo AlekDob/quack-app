@@ -362,6 +362,11 @@ import {
   type ProjectScriptRunResult,
 } from "~/projectScripts";
 import { runProjectCommandInTerminal } from "~/projectTerminalRunner";
+import {
+  CLAUDE_AUTH_LOGIN_COMMAND,
+  CLAUDE_AUTHENTICATION_FAILED_MESSAGE,
+  isClaudeAuthenticationFailedError,
+} from "~/lib/claudeAuthRecovery";
 import { newCommandId, newMessageId, newProjectId, newThreadId } from "~/lib/utils";
 import { ensureNativeApi, readNativeApi } from "~/nativeApi";
 import { promoteThreadCreate } from "~/lib/threadCreatePromotion";
@@ -1774,6 +1779,10 @@ export default function ChatView({
   ]);
 
   const sessionProvider = activeThread?.session?.provider ?? null;
+  const hasClaudeAuthRecovery = isClaudeAuthenticationFailedError(
+    sessionProvider,
+    activeThread?.error,
+  );
   const selectedProviderByThreadId = composerDraft.activeProvider ?? null;
   const threadProvider =
     activeThread?.modelSelection.provider ?? activeProject?.defaultModelSelection?.provider ?? null;
@@ -2827,6 +2836,17 @@ export default function ChatView({
       ),
     [activeThread?.proposedPlans, agentActivityTimelineState.timelineWorkEntries, timelineMessages],
   );
+  const transcriptTimelineEntries = useMemo(
+    () =>
+      hasClaudeAuthRecovery
+        ? timelineEntries.filter(
+            (entry) =>
+              entry.kind !== "message" ||
+              entry.message.text !== CLAUDE_AUTHENTICATION_FAILED_MESSAGE,
+          )
+        : timelineEntries,
+    [hasClaudeAuthRecovery, timelineEntries],
+  );
   const enteringUserMessageIds = useMemo<ReadonlySet<MessageId>>(
     () => new Set(optimisticUserMessages.map((message) => message.id)),
     [optimisticUserMessages],
@@ -3087,6 +3107,104 @@ export default function ChatView({
         workingDirectory: resolvedThreadWorkingDirectory,
       })
     : null;
+  const claudeAuthRecoveryKey = activeThreadId
+    ? `${activeThreadId}:${activeLatestTurn?.turnId ?? "idle"}`
+    : null;
+  const [claudeAuthRecoveryStates, setClaudeAuthRecoveryStates] = useState<
+    Record<
+      string,
+      {
+        status: "idle" | "opening" | "open" | "failed";
+        terminalId: string | null;
+        error: string | null;
+      }
+    >
+  >({});
+  const activeClaudeAuthRecoveryState =
+    claudeAuthRecoveryKey === null
+      ? { status: "idle" as const, terminalId: null, error: null }
+      : (claudeAuthRecoveryStates[claudeAuthRecoveryKey] ?? {
+          status: "idle" as const,
+          terminalId: null,
+          error: null,
+        });
+  const claudeAuthRecoveryUnavailableReason = threadWorkspaceCwd
+    ? null
+    : "This thread has no working directory, so Quack cannot open a login terminal.";
+  const openClaudeAuthRecovery = useCallback(async () => {
+    if (
+      !activeThreadId ||
+      !activeProject ||
+      !claudeAuthRecoveryKey ||
+      !threadWorkspaceCwd ||
+      !hasClaudeAuthRecovery
+    ) {
+      return;
+    }
+    const current = claudeAuthRecoveryStates[claudeAuthRecoveryKey];
+    if (current?.terminalId && terminalState.terminalIds.includes(current.terminalId)) {
+      setTerminalPresentationMode("drawer");
+      setTerminalOpen(true);
+      storeSetActiveTerminal(activeThreadId, current.terminalId);
+      requestTerminalFocus();
+      return;
+    }
+
+    const api = readNativeApi();
+    if (!api) return;
+    const terminalId = randomTerminalId();
+    setClaudeAuthRecoveryStates((states) => ({
+      ...states,
+      [claudeAuthRecoveryKey]: { status: "opening", terminalId, error: null },
+    }));
+    setTerminalPresentationMode("drawer");
+    setTerminalOpen(true);
+    storeNewTerminal(activeThreadId, terminalId);
+    requestTerminalFocus();
+    try {
+      await runProjectCommandInTerminal({
+        api,
+        threadId: activeThreadId,
+        terminalId,
+        project: { cwd: activeProject.cwd },
+        cwd: threadWorkspaceCwd,
+        command: CLAUDE_AUTH_LOGIN_COMMAND,
+        worktreePath: activeThread?.worktreePath ?? null,
+      });
+      storeSetTerminalMetadata(activeThreadId, terminalId, {
+        cliKind: "claude",
+        label: "Claude Code",
+      });
+      setClaudeAuthRecoveryStates((states) => ({
+        ...states,
+        [claudeAuthRecoveryKey]: { status: "open", terminalId, error: null },
+      }));
+    } catch (error) {
+      setClaudeAuthRecoveryStates((states) => ({
+        ...states,
+        [claudeAuthRecoveryKey]: {
+          status: "failed",
+          terminalId: null,
+          error: error instanceof Error ? error.message : "Could not open the login terminal.",
+        },
+      }));
+    }
+  }, [
+    activeProject,
+    activeThread?.worktreePath,
+    activeThreadId,
+    claudeAuthRecoveryKey,
+    claudeAuthRecoveryStates,
+    hasClaudeAuthRecovery,
+    requestTerminalFocus,
+    setTerminalOpen,
+    setTerminalPresentationMode,
+    storeNewTerminal,
+    storeSetActiveTerminal,
+    storeSetTerminalMetadata,
+    terminalState.terminalIds,
+    threadWorkspaceCwd,
+  ]);
   const threadArtifactWorkspaceRoot = resolveThreadArtifactWorkspaceRoot({
     isStudioContainer,
     projectCwd: activeProject?.cwd ?? null,
@@ -11391,12 +11509,14 @@ export default function ChatView({
         status={shouldShowProviderHealthBanner ? visibleActiveProviderStatus : null}
         onDismiss={dismissActiveProviderHealthBanner}
       />
-      <ThreadErrorBanner
-        error={activeThread.error}
-        onDismiss={dismissActiveThreadError}
-        onUnblock={unblockActiveThread}
-        unblocking={unblockingActiveThread}
-      />
+      {!hasClaudeAuthRecovery ? (
+        <ThreadErrorBanner
+          error={activeThread.error}
+          onDismiss={dismissActiveThreadError}
+          onUnblock={unblockActiveThread}
+          unblocking={unblockingActiveThread}
+        />
+      ) : null}
       <RateLimitBanner
         rateLimitStatus={visibleActiveRateLimitStatus}
         onDismiss={dismissActiveRateLimitBanner}
@@ -11517,6 +11637,17 @@ export default function ChatView({
                       worktreeSetup={activeWorktreeSetup}
                       activeTurnInProgress={activeTurnInProgress}
                       activeTurnStartedAt={activeWorkStartedAt}
+                      claudeAuthRecovery={
+                        hasClaudeAuthRecovery
+                          ? {
+                              status: activeClaudeAuthRecoveryState.status,
+                              error: activeClaudeAuthRecoveryState.error,
+                              unavailableReason: claudeAuthRecoveryUnavailableReason,
+                            }
+                          : null
+                      }
+                      onOpenClaudeAuthRecovery={openClaudeAuthRecovery}
+                      onDismissClaudeAuthRecovery={dismissActiveThreadError}
                       listRef={legendListRef}
                       timelineControllerRef={timelineControllerRef}
                       pinnedMessageIds={pinnedMessageIds}
@@ -11531,7 +11662,7 @@ export default function ChatView({
                       }
                       tailAnchorScrollInFlightRef={tailAnchorScrollInFlightRef}
                       crossTaskOrigin={crossTaskOrigin}
-                      timelineEntries={timelineEntries}
+                      timelineEntries={transcriptTimelineEntries}
                       turnDiffSummaryByAssistantMessageId={turnDiffSummaryByAssistantMessageId}
                       onOpenTurnDiff={onOpenTurnDiff}
                       onOpenThread={onNavigateToThread}
