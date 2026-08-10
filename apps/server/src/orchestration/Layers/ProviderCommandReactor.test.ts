@@ -8058,6 +8058,111 @@ describe("ProviderCommandReactor", () => {
     });
   });
 
+  it("settles a user-input response rejected because the provider runtime died", async () => {
+    // Regression: this rejection used to settle as `retryable`, so the question
+    // panel stayed on screen after an app restart and every click failed the
+    // same way. The runtime that owned the callback is gone — no retry can land.
+    const harness = await createHarness();
+    const now = new Date().toISOString();
+    harness.respondToUserInput.mockImplementation(() =>
+      Effect.fail(
+        new ProviderValidationError({
+          operation: "ProviderService.respondToUserInput",
+          issue:
+            "Cannot respond to request 'user-input-request-dead' because the provider runtime is not active.",
+        }),
+      ),
+    );
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.session.set",
+        commandId: CommandId.makeUnsafe("cmd-session-set-for-dead-runtime"),
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        session: {
+          threadId: ThreadId.makeUnsafe("thread-1"),
+          status: "running",
+          providerName: "claudeAgent",
+          runtimeMode: "approval-required",
+          activeTurnId: null,
+          lastError: null,
+          updatedAt: now,
+        },
+        createdAt: now,
+      }),
+    );
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.activity.append",
+        commandId: CommandId.makeUnsafe("cmd-user-input-requested-dead"),
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        activity: {
+          id: EventId.makeUnsafe("activity-user-input-requested-dead"),
+          tone: "info",
+          kind: "user-input.requested",
+          summary: "User input requested",
+          payload: {
+            requestId: "user-input-request-dead",
+            questions: [
+              {
+                id: "sandbox_mode",
+                header: "Sandbox",
+                question: "Which mode should be used?",
+                options: [{ label: "workspace-write", description: "Allow workspace writes only" }],
+              },
+            ],
+          },
+          turnId: null,
+          createdAt: now,
+        },
+        createdAt: now,
+      }),
+    );
+
+    await Effect.runPromise(
+      harness.engine.dispatch({
+        type: "thread.user-input.respond",
+        commandId: CommandId.makeUnsafe("cmd-user-input-respond-dead"),
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        requestId: asApprovalRequestId("user-input-request-dead"),
+        answers: { sandbox_mode: "workspace-write" },
+        createdAt: now,
+      }),
+    );
+
+    await waitFor(
+      async () =>
+        (await readHarnessThread(harness))?.activities.some(
+          (activity) =>
+            activity.kind === "provider.user-input.respond.failed" &&
+            (activity.payload as Record<string, unknown> | null)?.requestId ===
+              "user-input-request-dead",
+        ) === true,
+    );
+
+    const thread = await readHarnessThread(harness);
+    const failureActivity = thread?.activities.find(
+      (activity) =>
+        activity.kind === "provider.user-input.respond.failed" &&
+        (activity.payload as Record<string, unknown> | null)?.requestId ===
+          "user-input-request-dead",
+    );
+    expect(failureActivity?.payload).toMatchObject({
+      settlementStatus: "uncertain",
+      detail: expect.stringContaining("Stale pending user-input request: user-input-request-dead"),
+    });
+
+    const settledRow = await Effect.runPromise(
+      harness.pendingInteractionRepository.getByIdentity({
+        threadId: ThreadId.makeUnsafe("thread-1"),
+        interactionKind: "userInput",
+        requestId: asApprovalRequestId("user-input-request-dead"),
+      }),
+    );
+    expect(Option.getOrUndefined(settledRow)).toMatchObject({ status: "uncertain" });
+  });
+
   it("surfaces unclaimable user-input responses instead of dropping them silently", async () => {
     const harness = await createHarness();
     const now = new Date().toISOString();

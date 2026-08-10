@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   planRestartTurnReconciliation,
+  selectThreadsNeedingRestartCleanup,
   type ReconcilableThread,
 } from "./startupTurnReconciliation.ts";
 
@@ -460,5 +461,38 @@ describe("planRestartTurnReconciliation", () => {
     const second = planRestartTurnReconciliation({ threads, now: NOW });
     expect(first[0]?.commandId).toBe(second[0]?.commandId);
     expect(first[0]?.commandId).toBe(`restart-reconcile:stuck:${NOW}`);
+  });
+});
+
+describe("selectThreadsNeedingRestartCleanup", () => {
+  it("selects a settled thread that still holds an open question prompt", () => {
+    // The regression: this thread has no in-flight turn, so it used to be
+    // skipped and its dead prompt stayed on screen across every restart.
+    const threads = [
+      makeThread("asked", {
+        session: makeSession("asked", { status: "stopped", activeTurnId: null }),
+        latestTurn: { state: "interrupted" },
+      }),
+      makeThread("clean", {
+        session: makeSession("clean", { status: "ready", activeTurnId: null }),
+        latestTurn: { state: "completed" },
+      }),
+    ];
+
+    const selected = selectThreadsNeedingRestartCleanup({
+      threads,
+      threadIdsWithPendingRequests: new Set([ThreadId.makeUnsafe("asked")]),
+    });
+    expect(selected.map((thread) => thread.id)).toEqual(["asked"]);
+  });
+
+  it("still selects orphaned turns when no request is pending", () => {
+    const threads = [makeThread("stuck", { latestTurn: { state: "running" } })];
+
+    const selected = selectThreadsNeedingRestartCleanup({
+      threads,
+      threadIdsWithPendingRequests: new Set(),
+    });
+    expect(selected.map((thread) => thread.id)).toEqual(["stuck"]);
   });
 });

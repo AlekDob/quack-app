@@ -187,6 +187,25 @@ function buildStalePendingRequestCommand(input: {
 }
 
 /**
+ * Pure candidate selection: which persisted threads the boot sweep must clean.
+ * A thread qualifies on an orphaned turn, an interrupted checkpoint revert, or
+ * an open approval/user-input request. The pending-request ids are passed in
+ * because the only trustworthy source for them is the shell snapshot's
+ * SQL-computed counts, not the thread objects themselves.
+ */
+export function selectThreadsNeedingRestartCleanup<T extends ReconcilableThread>(input: {
+  readonly threads: ReadonlyArray<T>;
+  readonly threadIdsWithPendingRequests: ReadonlySet<ThreadId>;
+}): ReadonlyArray<T> {
+  return input.threads.filter(
+    (thread) =>
+      needsRestartReconciliation(thread) ||
+      threadHasCheckpointRevertInProgress({ activities: thread.activities ?? [] }) ||
+      input.threadIdsWithPendingRequests.has(thread.id),
+  );
+}
+
+/**
  * Pure planner: maps persisted threads to stale-request resolution commands and
  * terminal `thread.session.set` commands. Extracted from the effectful runner so
  * the reliability-critical selection logic is unit-testable without a database,
@@ -279,15 +298,32 @@ export const reconcileRestartStuckTurns: Effect.Effect<
   const snapshotQuery = yield* ProjectionSnapshotQuery;
 
   const readModel = yield* engine.getReadModel();
+  // The command read model materializes threads without their activities, so its
+  // own `hasPendingApprovals` / `hasPendingUserInput` are derived from an empty
+  // list and are structurally always false — filtering on them silently skipped
+  // every thread whose only problem was a dead question prompt. The shell
+  // snapshot carries the SQL-computed counts, which are the real ones.
+  const threadIdsWithPendingRequests = yield* snapshotQuery.getShellSnapshot().pipe(
+    Effect.map(
+      (snapshot) =>
+        new Set(
+          snapshot.threads
+            .filter((thread) => thread.hasPendingApprovals || thread.hasPendingUserInput)
+            .map((thread) => thread.id),
+        ),
+    ),
+    Effect.catchCause((cause) =>
+      Effect.logWarning("restart turn reconciliation continuing without pending-request scan", {
+        cause,
+      }).pipe(Effect.as(new Set<ThreadId>())),
+    ),
+  );
 
   const now = new Date().toISOString();
-  const threadsNeedingRestartCleanup = readModel.threads.filter(
-    (thread) =>
-      needsRestartReconciliation(thread) ||
-      threadHasCheckpointRevertInProgress(thread) ||
-      thread.hasPendingApprovals ||
-      thread.hasPendingUserInput,
-  );
+  const threadsNeedingRestartCleanup = selectThreadsNeedingRestartCleanup({
+    threads: readModel.threads,
+    threadIdsWithPendingRequests,
+  });
   if (threadsNeedingRestartCleanup.length === 0) {
     return;
   }
