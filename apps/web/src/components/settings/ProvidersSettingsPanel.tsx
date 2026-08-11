@@ -383,9 +383,9 @@ const PROVIDER_INSTALL_SETTINGS: readonly ProviderInstallSettings[] = [
       {
         kind: "text",
         settingsKey: "astronautServerUrl",
-        label: "Astronaut server URL",
+        label: "Companion server URL",
         placeholder: "http://imac-di-alek:4567",
-        description: "Your Astronaut companion on Tailscale.",
+        description: "Your Companion on Tailscale.",
       },
     ],
   },

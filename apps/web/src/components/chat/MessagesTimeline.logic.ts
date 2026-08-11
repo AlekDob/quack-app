@@ -524,6 +524,7 @@ export function deriveMessagesTimelineRows(input: {
   revertTurnCountByUserMessageId: ReadonlyMap<MessageId, number>;
   claudeAuthRecovery?: {
     status: ClaudeAuthRecoveryStatus;
+    authenticated?: boolean;
     error: string | null;
     unavailableReason: string | null;
   } | null;

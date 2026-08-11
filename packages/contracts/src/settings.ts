@@ -81,7 +81,7 @@ export type PiServerProviderSettings = typeof PiServerProviderSettings.Type;
 
 export const AstronautServerProviderSettings = Schema.Struct({
   ...ProviderSettingsBase,
-  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(() => false)),
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(() => true)),
   serverUrl: StringSetting.pipe(Schema.withDecodingDefault(() => "http://imac-di-alek:4567")),
 });
 export type AstronautServerProviderSettings = typeof AstronautServerProviderSettings.Type;

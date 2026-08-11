@@ -1804,6 +1804,13 @@ export default function ChatView({
   const featureFlags = useFeatureFlags();
   const showDebugTaskBanner = import.meta.env.DEV && featureFlags["show-debug-task-banner"];
   const serverConfigQuery = useQuery(serverConfigQueryOptions());
+  const isClaudeAuthenticated =
+    serverConfigQuery.data?.providers.some(
+      (status) =>
+        status.provider === "claudeAgent" &&
+        status.available &&
+        status.authStatus === "authenticated",
+    ) ?? false;
   const composerModelHintByProvider = useMemo<Record<ProviderKind, string | null>>(() => {
     const threadModelSelection = activeThread?.modelSelection ?? null;
     const projectModelSelection = activeProject?.defaultModelSelection ?? null;
@@ -3620,6 +3627,25 @@ export default function ChatView({
     [providerStatuses],
   );
   const refreshProviderStatuses = useRefreshProviderStatusesNow();
+  useEffect(() => {
+    if (
+      !hasClaudeAuthRecovery ||
+      activeClaudeAuthRecoveryState.status !== "open" ||
+      isClaudeAuthenticated
+    ) {
+      return;
+    }
+
+    const refresh = () => void refreshProviderStatuses({ silent: true });
+    refresh();
+    const intervalId = window.setInterval(refresh, 3_000);
+    return () => window.clearInterval(intervalId);
+  }, [
+    activeClaudeAuthRecoveryState.status,
+    hasClaudeAuthRecovery,
+    isClaudeAuthenticated,
+    refreshProviderStatuses,
+  ]);
   const activeProjectCwd = activeProject?.cwd ?? null;
   const activeThreadWorktreePath = isStudioContainer ? null : (activeThread?.worktreePath ?? null);
   const hasNativeUserMessages = useMemo(
@@ -11641,6 +11667,7 @@ export default function ChatView({
                         hasClaudeAuthRecovery
                           ? {
                               status: activeClaudeAuthRecoveryState.status,
+                              authenticated: isClaudeAuthenticated,
                               error: activeClaudeAuthRecoveryState.error,
                               unavailableReason: claudeAuthRecoveryUnavailableReason,
                             }

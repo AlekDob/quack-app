@@ -298,7 +298,7 @@ export function makeImportThreadHandler(options: ImportThreadHandlerOptions) {
                   input.provider === "kilo"
                     ? "Kilo"
                     : input.provider === "astronaut"
-                      ? "Astronaut"
+                      ? "Companion"
                       : "OpenCode"
                 } session history.`,
           ),

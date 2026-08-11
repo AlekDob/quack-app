@@ -252,6 +252,17 @@ export const XcodeIcon = adaptSimpleIcon(SiXcode);
 
 export const AntigravityIcon: Icon = (props) => <AntigravityBrandIcon {...props} />;
 
+export const AstronautIcon: Icon = (props) => (
+  <svg {...props} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      fill="currentColor"
+      fillRule="evenodd"
+      d="M12 2a8 8 0 0 0-8 8v5.1L2.4 17a1 1 0 0 0 .2 1.7l2.2 1.1A3.5 3.5 0 0 0 8 22h8a3.5 3.5 0 0 0 3.2-2.2l2.2-1.1a1 1 0 0 0 .2-1.7L20 15.1V10a8 8 0 0 0-8-8Zm-5 8a5 5 0 0 1 10 0v4H7v-4Zm2 2a3 3 0 0 0 6 0V9H9v3Z"
+      clipRule="evenodd"
+    />
+  </svg>
+);
+
 export const GrokIcon: Icon = (props) => (
   <svg {...props} viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path

@@ -1198,5 +1198,5 @@ export const PROVIDER_DISPLAY_NAMES: Record<ProviderKind, string> = {
   kilo: "Kilo",
   opencode: "OpenCode",
   pi: "Pi",
-  astronaut: "Astronaut",
+  astronaut: "Companion",
 };

@@ -483,6 +483,7 @@ interface MessagesTimelineProps {
   contentInsetRightPx?: number | undefined;
   claudeAuthRecovery?: {
     status: ClaudeAuthRecoveryStatus;
+    authenticated?: boolean;
     error: string | null;
     unavailableReason: string | null;
   } | null;

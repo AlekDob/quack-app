@@ -120,6 +120,7 @@ const DROID_PROVIDER = "droid" as const;
 const KILO_PROVIDER = "kilo" as const;
 const OPENCODE_PROVIDER = "opencode" as const;
 const PI_PROVIDER = "pi" as const;
+const ASTRONAUT_PROVIDER = "astronaut" as const;
 type ProviderStatuses = ReadonlyArray<ServerProviderStatus>;
 const DISABLED_PROVIDER_STATUS_MESSAGE = "Provider is disabled in Quack settings.";
 const MINIMUM_ANTIGRAVITY_CLI_VERSION = "1.0.12";
@@ -134,6 +135,7 @@ const PROVIDERS = [
   KILO_PROVIDER,
   OPENCODE_PROVIDER,
   PI_PROVIDER,
+  ASTRONAUT_PROVIDER,
 ] as const satisfies ReadonlyArray<ProviderKind>;
 
 const providerChildKind = (provider: ProviderKind): ProviderChildKind =>
@@ -1039,6 +1041,25 @@ export const makeCheckCodexProviderStatus = (
 };
 
 export const checkCodexProviderStatus = makeCheckCodexProviderStatus();
+
+export const checkAstronautProviderStatus = (serverUrl: string): Effect.Effect<ServerProviderStatus> =>
+  Effect.tryPromise({
+    try: async () => {
+      const url = new URL(serverUrl).toString().replace(/\/$/, "");
+      const response = await fetch(`${url}/status`, { signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    },
+    catch: () => undefined,
+  }).pipe(
+    Effect.map((result) => ({
+      provider: ASTRONAUT_PROVIDER,
+      status: result === undefined ? "error" as const : "ready" as const,
+      available: result !== undefined,
+      authStatus: result === undefined ? "unknown" as const : "authenticated" as const,
+      checkedAt: new Date().toISOString(),
+      ...(result === undefined ? { message: "Companion is not reachable at the configured server URL." } : {}),
+    })),
+  );
 
 // ── Claude Agent health check ───────────────────────────────────────
 
@@ -2183,6 +2204,8 @@ export function makeProviderHealthLive(options?: { readonly providerUpdateTimeou
             return settings.providers.opencode.binaryPath;
           case "pi":
             return settings.providers.pi.binaryPath;
+          case "astronaut":
+            return settings.providers.astronaut.binaryPath;
         }
       };
 
@@ -2395,6 +2418,11 @@ export function makeProviderHealthLive(options?: { readonly providerUpdateTimeou
                     settings.providers.pi.agentDir,
                     settings.providers.pi.binaryPath,
                   ),
+                ),
+                checkProviderWhenEnabled(
+                  settings,
+                  ASTRONAUT_PROVIDER,
+                  checkAstronautProviderStatus(settings.providers.astronaut.serverUrl),
                 ),
               ],
               {
