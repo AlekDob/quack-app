@@ -36,4 +36,5 @@ export * from "./environment";
 export * from "./project";
 export * from "./studio";
 export * from "./filesystem";
+export * from "./device";
 export * from "./rpc";

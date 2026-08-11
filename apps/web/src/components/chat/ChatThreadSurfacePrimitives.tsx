@@ -17,6 +17,7 @@ import { cn } from "~/lib/utils";
 
 const DiffPanel = lazy(() => import("../DiffPanel"));
 export const LazyBrowserPanel = lazy(() => import("../BrowserPanel"));
+export const LazyDevicePanel = lazy(() => import("../DevicePanel"));
 
 export const noopChatSurfaceAction = () => {};
 
@@ -108,6 +109,7 @@ export function DeferredChatView(props: {
   onToggleDiff: () => void;
   onToggleRightDock?: () => void;
   onToggleBrowser: () => void;
+  onToggleDevice?: () => void;
   onOpenBrowserUrl: (url: string) => void;
   onOpenTurnDiff: (turnId: TurnId, filePath?: string) => void;
   onSplitSurface?: () => void;
@@ -168,6 +170,7 @@ export function DeferredChatView(props: {
       onToggleDiffPanel={props.onToggleDiff}
       {...(props.onToggleRightDock ? { onToggleRightDock: props.onToggleRightDock } : {})}
       onToggleBrowserPanel={props.onToggleBrowser}
+      {...(props.onToggleDevice ? { onToggleDevicePanel: props.onToggleDevice } : {})}
       onOpenBrowserUrl={props.onOpenBrowserUrl}
       onOpenTurnDiffPanel={props.onOpenTurnDiff}
       {...(props.onSplitSurface ? { onSplitSurface: props.onSplitSurface } : {})}
