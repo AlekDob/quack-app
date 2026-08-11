@@ -3,7 +3,7 @@ type: feature-doc
 project: synara
 stack: React / Vite / TypeScript / Node / SQLite
 created: 2026-08-09
-last_verified: 2026-08-09
+last_verified: 2026-08-11
 status: active
 tags: [astronaut, remote-provider, tailscale, sessions, memory]
 ---
@@ -12,13 +12,19 @@ tags: [astronaut, remote-provider, tailscale, sessions, memory]
 
 Quack può usare Astronaut come provider remoto. Astronaut resta la fonte di verità per la memoria, gli strumenti e le sessioni di Chris sull'iMac. Quack conserva il transcript locale e il collegamento alla sessione remota.
 
+Nella UI (settings, picker modelli, messaggio di import) il provider `astronaut` è etichettato **"Companion"**, non "Astronaut" — solo la label è cambiata, chiave provider e contratti restano `astronaut`.
+
 ### Configurazione
 
 - Provider: `astronaut`
-- Stato iniziale: disabilitato
+- Stato iniziale: abilitato di default (`AstronautServerProviderSettings.enabled` decodifica a `true`)
 - URL predefinito: `http://imac-di-alek:4567`
 - Agent inviato ad Astronaut: `companion` (mostrato come Chris)
 - Modelli: letti dal vivo da `GET /models`, con modelli custom locali come fallback
+
+### Health check
+
+`checkAstronautProviderStatus(serverUrl)` in `apps/server/src/provider/Layers/ProviderHealth.ts` fa `GET /status` sul server configurato (timeout `DEFAULT_TIMEOUT_MS`) e produce un `ServerProviderStatus` (`ready`/`error`, `authStatus`). È incluso nell'array `PROVIDERS` e nel fan-out di `makeProviderHealthLive`, quindi la UI impostazioni lo mostra con lo stesso meccanismo generico (`providerStatusByProvider`) usato per gli altri provider — nessun contratto o componente dedicato aggiunto.
 
 Quack non salva la memoria di Astronaut, le credenziali OpenAI o altri secret.
 
@@ -60,6 +66,7 @@ La sidebar espone “Import thread from…”. Con provider Astronaut e un sessi
 | Contratti | `packages/contracts/src/model.ts`, `orchestration.ts`, `providerDiscovery.ts`, `settings.ts` |
 | Metadata e settings | `packages/shared/src/providerMetadata.ts`, `serverSettings.ts`, `apps/web/src/appSettings.ts` |
 | Adapter | `apps/server/src/provider/Services/AstronautAdapter.ts`, `Layers/AstronautAdapter.ts` |
+| Health check | `apps/server/src/provider/Layers/ProviderHealth.ts` (`checkAstronautProviderStatus`) |
 | SSE | `apps/server/src/provider/astronautRemote.ts` |
 | Registry e runtime | `apps/server/src/provider/Layers/ProviderAdapterRegistry.ts`, `runtimeLayer.ts` |
 | UI | `apps/web/src/components/settings/ProvidersSettingsPanel.tsx`, `Sidebar.tsx`, `SidebarSearchPalette.tsx` |
@@ -91,4 +98,4 @@ Il controllo manuale completo resta: abilitare Astronaut, inviare un messaggio, 
 
 ### Gap noto
 
-L'endpoint Astronaut `/status` è raggiungibile e usato per la verifica manuale, ma il relativo stato non è ancora mostrato nella UI delle impostazioni. Va aggiunto in un passaggio successivo senza cambiare il contratto del provider.
+Nessuno al momento. Lo stato `/status` è ora integrato nel health check generico e visibile nelle impostazioni (vedi sezione Health check).
