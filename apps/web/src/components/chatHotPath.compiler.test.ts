@@ -74,7 +74,7 @@ interface HotPathModule {
 
 const HOT_PATH_MODULES: readonly HotPathModule[] = [
   { relativePath: "ChatView.tsx", allowedBailoutReasons: [], maxLines: 11_737 },
-  { relativePath: "Sidebar.tsx", allowedBailoutReasons: [], maxLines: 6_947 },
+  { relativePath: "Sidebar.tsx", allowedBailoutReasons: [], maxLines: 6_942 },
   {
     relativePath: "chat/MessagesTimeline.tsx",
     // `useStableRows` deliberately reads and rewrites a previous-state ref inside

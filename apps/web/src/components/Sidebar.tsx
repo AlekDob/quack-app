@@ -5,16 +5,12 @@
 import {
   AddPlusIcon,
   ArchiveIcon,
-  BookIcon,
   ChatBubbleIcon,
-  CircleQuestionIcon,
   ClockIcon,
   CopyIcon,
   ExternalLinkIcon,
   FolderOpenIcon,
-  GiftIcon,
   KanbanIcon,
-  KeyboardIcon,
   BellIcon,
   type LucideIcon,
   NewThreadIcon,
@@ -220,7 +216,6 @@ import { useHandleNewStudioChat } from "../hooks/useHandleNewStudioChat";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { useThreadHandoff } from "../hooks/useThreadHandoff";
 import { useFeedbackDialogStore } from "../feedbackDialogStore";
-import { openExternalLink } from "~/lib/linkChips";
 import { selectThreadTerminalState, useTerminalStateStore } from "../terminalStateStore";
 import { toastManager } from "./ui/toast";
 import {
