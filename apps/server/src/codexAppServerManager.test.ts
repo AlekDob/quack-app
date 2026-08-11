@@ -3031,10 +3031,11 @@ describe("respondToRequest", () => {
       },
     });
 
-    const [requestId, pending] = Array.from(context.pendingApprovals.entries()).find(
-      ([, request]) =>
-        (request as { readonly method: string }).method === "mcpServer/elicitation/request",
-    ) ?? [];
+    const [requestId, pending] =
+      Array.from(context.pendingApprovals.entries()).find(
+        ([, request]) =>
+          (request as { readonly method: string }).method === "mcpServer/elicitation/request",
+      ) ?? [];
     expect(requestId).toBeDefined();
     expect(pending).toEqual(
       expect.objectContaining({

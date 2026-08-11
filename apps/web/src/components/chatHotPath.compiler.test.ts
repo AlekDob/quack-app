@@ -74,7 +74,7 @@ interface HotPathModule {
 
 const HOT_PATH_MODULES: readonly HotPathModule[] = [
   { relativePath: "ChatView.tsx", allowedBailoutReasons: [], maxLines: 11_737 },
-  { relativePath: "Sidebar.tsx", allowedBailoutReasons: [], maxLines: 6_998 },
+  { relativePath: "Sidebar.tsx", allowedBailoutReasons: [], maxLines: 6_947 },
   {
     relativePath: "chat/MessagesTimeline.tsx",
     // `useStableRows` deliberately reads and rewrites a previous-state ref inside
@@ -89,7 +89,7 @@ const HOT_PATH_MODULES: readonly HotPathModule[] = [
   // picker or the slash-command menu is open.
   { relativePath: "chat/ComposerCommandMenu.tsx", allowedBailoutReasons: [], maxLines: 599 },
   { relativePath: "chat/TraitsPicker.tsx", allowedBailoutReasons: [], maxLines: 670 },
-  { relativePath: "chat/ProjectPicker.tsx", allowedBailoutReasons: [], maxLines: 718 },
+  { relativePath: "chat/ProjectPicker.tsx", allowedBailoutReasons: [], maxLines: 668 },
   // Not chat-specific, but rendered inside every message row and sidebar row.
   { relativePath: "ui/button.tsx", allowedBailoutReasons: [], maxLines: 157 },
   // Hooks called from the chat and sidebar render paths. A bailing hook does not

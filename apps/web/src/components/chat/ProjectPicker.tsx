@@ -28,6 +28,14 @@ import { FolderClosed } from "../FolderClosed";
 import { SpaceIcon } from "../SpaceIcon";
 import { PickerTriggerButton } from "./PickerTriggerButton";
 import {
+  type ActiveFolderOption,
+  basenameOfPath,
+  directorySearchHaystack,
+  getNavigatorPlatform,
+  joinDirectoryPath,
+  startActiveFolderSelection,
+} from "./ProjectPicker.logic";
+import {
   Combobox,
   ComboboxEmpty,
   ComboboxGroup,
@@ -67,73 +75,12 @@ interface ProjectPickerProps {
   searchPlaceholder?: string;
 }
 
-interface ActiveFolderOption {
-  projectId: ProjectId | null;
-  spaceId: SpaceId | null;
-  spaceName: string;
-  cwd: string;
-  primaryLabel: string;
-  secondaryLabel: string | null;
-}
-
-/**
- * Existing projects switch the draft into that project; raw paths stay workspace roots.
- *
- * Module scope on purpose: the caller runs this inside a `try`, and React Compiler cannot lower a
- * conditional expression there — inlining it makes the whole picker skip compilation.
- */
 /** Full-width action row in the picker footer (add project, reset to home). */
 const PICKER_FOOTER_ACTION_CLASS_NAME = cn(
   "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm",
   ELEVATED_HOVER_SURFACE_CLASS_NAME,
   "hover:text-[var(--color-text-foreground)]",
 );
-
-function startActiveFolderSelection(
-  folder: ActiveFolderOption,
-  handlers: {
-    isProjectSelectionMode: boolean;
-    onSelectProject?: ((projectId: ProjectId) => void | Promise<void>) | undefined;
-    onSelectWorkspaceRoot?: ((workspaceRoot: string) => void) | undefined;
-  },
-): void | Promise<void> {
-  if (folder.projectId && handlers.onSelectProject) {
-    return handlers.onSelectProject(folder.projectId);
-  }
-  if (handlers.isProjectSelectionMode) {
-    return undefined;
-  }
-  return handlers.onSelectWorkspaceRoot?.(folder.cwd);
-}
-
-function basenameOfPath(value: string | null | undefined): string | null {
-  if (!value) return null;
-  const normalized = value.replace(/[\\/]+$/, "");
-  const separatorIndex = Math.max(normalized.lastIndexOf("/"), normalized.lastIndexOf("\\"));
-  const basename = separatorIndex === -1 ? normalized : normalized.slice(separatorIndex + 1);
-  return basename.length > 0 ? basename : null;
-}
-
-function directorySearchHaystack(entry: ProjectDirectoryEntry): string {
-  return [entry.name, entry.path].join(" ").toLowerCase();
-}
-
-function joinDirectoryPath(rootPath: string, relativePath: string): string {
-  if (!relativePath) return rootPath;
-  const separator = rootPath.includes("\\") ? "\\" : "/";
-  const normalizedRoot = rootPath.endsWith(separator) ? rootPath.slice(0, -1) : rootPath;
-  const normalizedRelative = relativePath.split(/[\\/]+/).join(separator);
-  return `${normalizedRoot}${separator}${normalizedRelative}`;
-}
-
-function getNavigatorPlatform(): string {
-  const navigatorLike = globalThis.navigator as
-    | (Navigator & { userAgentData?: { platform?: string } })
-    | undefined;
-  return [navigatorLike?.platform, navigatorLike?.userAgentData?.platform]
-    .filter(Boolean)
-    .join(" ");
-}
 
 export const ProjectPicker = memo(function ProjectPicker({
   align: alignProp,
@@ -699,9 +646,7 @@ export const ProjectPicker = memo(function ProjectPicker({
             disabled={isPicking}
           >
             <PlusIcon className="size-3.5 shrink-0 text-muted-foreground/70" />
-            <span className="truncate">
-              {isPicking ? loadingAddProjectLabel : addProjectLabel}
-            </span>
+            <span className="truncate">{isPicking ? loadingAddProjectLabel : addProjectLabel}</span>
           </button>
           {shouldShowResetToHome ? (
             <button

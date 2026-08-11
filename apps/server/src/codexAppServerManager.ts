@@ -119,7 +119,9 @@ function isPermissionApprovalRequest(request: PendingApprovalRequest): boolean {
 }
 
 function isSessionApprovalEligible(request: PendingApprovalRequest): boolean {
-  return !isPermissionApprovalRequest(request) && request.method !== "mcpServer/elicitation/request";
+  return (
+    !isPermissionApprovalRequest(request) && request.method !== "mcpServer/elicitation/request"
+  );
 }
 
 interface PendingUserInputRequest {
@@ -2069,12 +2071,12 @@ export class CodexAppServerManager extends EventEmitter<CodexAppServerManagerEve
           ? { action: "accept" as const, content: {} }
           : { action: decision === "cancel" ? ("cancel" as const) : ("decline" as const) }
         : pendingRequest.method === "item/permissions/requestApproval"
-        ? {
-            permissions:
-              decision === "accept" || decision === "acceptForSession" ? grantedPermissions : {},
-            scope: decision === "acceptForSession" ? ("session" as const) : ("turn" as const),
-          }
-        : { decision };
+          ? {
+              permissions:
+                decision === "accept" || decision === "acceptForSession" ? grantedPermissions : {},
+              scope: decision === "acceptForSession" ? ("session" as const) : ("turn" as const),
+            }
+          : { decision };
     await this.writeMessage(context, {
       id: pendingRequest.jsonRpcId,
       result,
