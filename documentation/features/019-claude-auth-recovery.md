@@ -15,13 +15,13 @@ tags: [claude-agent, auth, recovery, terminal, transcript]
 
 ### Files
 
-| Type      | Path                                                            | Exports/Purpose                                                                          |
-| --------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Component | `apps/web/src/components/chat/ClaudeAuthRecoveryCard.tsx`        | `ClaudeAuthRecoveryCard`, `ClaudeAuthRecoveryStatus` type                                  |
-| Consumer  | `apps/web/src/components/ChatView.tsx`                            | Detects the failure, opens the login terminal, polls provider status while card is open  |
-| Logic     | `apps/web/src/components/chat/MessagesTimeline.logic.ts`         | `deriveMessagesTimelineRows` accepts `claudeAuthRecovery` (status/authenticated/error/unavailableReason) |
-| Component | `apps/web/src/components/chat/MessagesTimeline.tsx`               | Renders the card as a timeline row when `claudeAuthRecovery` is set                        |
-| Test      | `apps/web/src/components/chat/ClaudeAuthRecoveryCard.test.tsx`   | Card states: idle/opening/open/failed, authenticated                                       |
+| Type      | Path                                                           | Exports/Purpose                                                                                          |
+| --------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Component | `apps/web/src/components/chat/ClaudeAuthRecoveryCard.tsx`      | `ClaudeAuthRecoveryCard`, `ClaudeAuthRecoveryStatus` type                                                |
+| Consumer  | `apps/web/src/components/ChatView.tsx`                         | Detects the failure, opens the login terminal, polls provider status while card is open                  |
+| Logic     | `apps/web/src/components/chat/MessagesTimeline.logic.ts`       | `deriveMessagesTimelineRows` accepts `claudeAuthRecovery` (status/authenticated/error/unavailableReason) |
+| Component | `apps/web/src/components/chat/MessagesTimeline.tsx`            | Renders the card as a timeline row when `claudeAuthRecovery` is set                                      |
+| Test      | `apps/web/src/components/chat/ClaudeAuthRecoveryCard.test.tsx` | Card states: idle/opening/open/failed, authenticated                                                     |
 
 ### Data Flow
 

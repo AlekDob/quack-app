@@ -41,17 +41,17 @@ La richiesta chat contiene `message`, `agent: "companion"`, il modello seleziona
 
 ### Eventi e richieste remote
 
-| Astronaut | Quack |
-| --- | --- |
-| `session` | aggiorna il binding remoto |
-| `token` | delta di testo assistant |
-| `reasoning` | delta di ragionamento |
-| `tool` | avanzamento e completamento tool |
-| `permission` | richiesta di approvazione |
-| `question` | richiesta di input strutturato |
-| `interaction-resolved` | risolve la richiesta aperta |
-| `done` | completa il turno |
-| `error` | fallisce il turno con l'errore remoto |
+| Astronaut              | Quack                                 |
+| ---------------------- | ------------------------------------- |
+| `session`              | aggiorna il binding remoto            |
+| `token`                | delta di testo assistant              |
+| `reasoning`            | delta di ragionamento                 |
+| `tool`                 | avanzamento e completamento tool      |
+| `permission`           | richiesta di approvazione             |
+| `question`             | richiesta di input strutturato        |
+| `interaction-resolved` | risolve la richiesta aperta           |
+| `done`                 | completa il turno                     |
+| `error`                | fallisce il turno con l'errore remoto |
 
 Le approvazioni usano `/permission/:id/reply`: `once`, `always` o `reject`. Le risposte alle domande usano `/question/:id/reply` oppure `/question/:id/reject`. L'interruzione usa `POST /sessions/:id/abort`.
 
@@ -61,17 +61,17 @@ La sidebar espone “Import thread from…”. Con provider Astronaut e un sessi
 
 ### File principali
 
-| Area | File |
-| --- | --- |
-| Contratti | `packages/contracts/src/model.ts`, `orchestration.ts`, `providerDiscovery.ts`, `settings.ts` |
-| Metadata e settings | `packages/shared/src/providerMetadata.ts`, `serverSettings.ts`, `apps/web/src/appSettings.ts` |
-| Adapter | `apps/server/src/provider/Services/AstronautAdapter.ts`, `Layers/AstronautAdapter.ts` |
-| Health check | `apps/server/src/provider/Layers/ProviderHealth.ts` (`checkAstronautProviderStatus`) |
-| SSE | `apps/server/src/provider/astronautRemote.ts` |
-| Registry e runtime | `apps/server/src/provider/Layers/ProviderAdapterRegistry.ts`, `runtimeLayer.ts` |
-| UI | `apps/web/src/components/settings/ProvidersSettingsPanel.tsx`, `Sidebar.tsx`, `SidebarSearchPalette.tsx` |
-| Modelli | `apps/web/src/hooks/useProviderModelCatalog.ts` |
-| Import | `apps/server/src/orchestration/importThreadRoute.ts` |
+| Area                | File                                                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------- |
+| Contratti           | `packages/contracts/src/model.ts`, `orchestration.ts`, `providerDiscovery.ts`, `settings.ts`             |
+| Metadata e settings | `packages/shared/src/providerMetadata.ts`, `serverSettings.ts`, `apps/web/src/appSettings.ts`            |
+| Adapter             | `apps/server/src/provider/Services/AstronautAdapter.ts`, `Layers/AstronautAdapter.ts`                    |
+| Health check        | `apps/server/src/provider/Layers/ProviderHealth.ts` (`checkAstronautProviderStatus`)                     |
+| SSE                 | `apps/server/src/provider/astronautRemote.ts`                                                            |
+| Registry e runtime  | `apps/server/src/provider/Layers/ProviderAdapterRegistry.ts`, `runtimeLayer.ts`                          |
+| UI                  | `apps/web/src/components/settings/ProvidersSettingsPanel.tsx`, `Sidebar.tsx`, `SidebarSearchPalette.tsx` |
+| Modelli             | `apps/web/src/hooks/useProviderModelCatalog.ts`                                                          |
+| Import              | `apps/server/src/orchestration/importThreadRoute.ts`                                                     |
 
 ### Confini della prima release
 
