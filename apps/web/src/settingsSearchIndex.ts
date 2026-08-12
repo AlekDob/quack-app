@@ -360,6 +360,15 @@ export const SETTINGS_SEARCH_ENTRIES: readonly SettingsSearchEntry[] = [
     keywords: "Review provider versions and update tools. binary overrides path install",
   },
 
+  // ── Companion ─────────────────────────────────────────────────────────────────
+  {
+    id: "companion:server-url",
+    section: "companion",
+    title: "Server URL",
+    keywords:
+      "Where your Companion is reachable, usually a Tailscale host. companion server url astronaut remote test connection",
+  },
+
   // ── Skills ────────────────────────────────────────────────────────────────────
   {
     id: "skills:skills",

@@ -27,6 +27,7 @@ import {
 } from "../appSettings";
 import { APP_VERSION } from "../branding";
 import { AdvancedSettingsPanel } from "~/components/settings/AdvancedSettingsPanel";
+import { CompanionSettingsPanel } from "~/components/settings/CompanionSettingsPanel";
 import {
   ArchivedSettingsPanel,
   WorktreesSettingsPanel,
@@ -1121,6 +1122,12 @@ function SettingsRouteView() {
                   defaults={defaults}
                   updateSettings={updateSettings}
                   resetEpoch={resetEpoch}
+                />
+                <CompanionSettingsPanel
+                  active={activeSection === "companion"}
+                  settings={settings}
+                  defaults={defaults}
+                  updateSettings={updateSettings}
                 />
                 <ExternalMcpSettingsPanel active={activeSection === "integrations"} />
                 <AdvancedSettingsPanel

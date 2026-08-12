@@ -62,7 +62,6 @@ describe("createProviderInstallResetPatch", () => {
     expect(Object.keys(patch).sort()).toEqual(
       [
         "antigravityBinaryPath",
-        "astronautServerUrl",
         "claudeBinaryPath",
         "codexBinaryPath",
         "codexHomePath",

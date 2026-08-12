@@ -3,7 +3,7 @@ type: feature-doc
 project: synara
 stack: React / Vite / TypeScript / Node / SQLite
 created: 2026-08-09
-last_verified: 2026-08-11
+last_verified: 2026-08-12
 status: active
 tags: [astronaut, remote-provider, tailscale, sessions, memory]
 ---
@@ -21,6 +21,19 @@ Nella UI (settings, picker modelli, messaggio di import) il provider `astronaut`
 - URL predefinito: `http://imac-di-alek:4567`
 - Agent inviato ad Astronaut: `companion` (mostrato come Chris)
 - Modelli: letti dal vivo da `GET /models`, con modelli custom locali come fallback
+
+### Sezione impostazioni dedicata (2026-08-12)
+
+Companion non è una CLI, quindi il suo URL non sta più in "Installed CLIs": ha una voce
+propria nelle impostazioni, gruppo Coding, subito dopo "Agent providers".
+
+- Panel: `apps/web/src/components/settings/CompanionSettingsPanel.tsx`
+- Sezione `companion` in `apps/web/src/settingsNavigation.ts` e `settingsSearchIndex.ts`
+- Il pulsante "Test connection" riusa l'RPC esistente `provider.listModels` con
+  `apiEndpoint` = URL digitato: un `GET /models` riuscito prova che il server è su e
+  risponde. Nessun endpoint o contratto nuovo. Mostra "Connected · N models · X ms" o
+  l'errore.
+- La logica testabile è esportata: `runCompanionConnectionTest(url)` e `CompanionTestStatus`.
 
 ### Health check
 

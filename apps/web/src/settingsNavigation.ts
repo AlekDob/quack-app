@@ -15,6 +15,7 @@ export const SETTINGS_SECTION_IDS = [
   "archived",
   "models",
   "providers",
+  "companion",
   "skills",
   "usage",
   "integrations",
@@ -135,6 +136,14 @@ export const SETTINGS_NAV_ITEMS: readonly SettingsNavItem[] = [
     description: "Choose visible coding agents and manage their installed CLI tools.",
     icon: "puzzle",
     eyebrow: "Coding agents",
+  },
+  {
+    id: "companion",
+    group: "coding",
+    label: "Companion",
+    description: "Point Quack at your Companion server and test the connection.",
+    icon: "satellite-1",
+    eyebrow: "Remote companion",
   },
   {
     id: "models",
