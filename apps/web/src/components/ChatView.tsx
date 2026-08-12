@@ -543,9 +543,11 @@ import { useChatTerminalController } from "./chat/useChatTerminalController";
 import { useChatAutomationSetup } from "./chat/useChatAutomationSetup";
 import { ComposerActiveTaskListCard } from "./chat/ComposerActiveTaskListCard";
 import { ComposerActivityStrip } from "./chat/ComposerActivityStrip";
+import { ComposerBrowserActivityPill } from "./chat/ComposerBrowserActivityPill";
 import {
   collectForegroundRunningSubagentStripItems,
   collectRunningSubagentStripItems,
+  deriveComposerBrowserActivityPresentation,
   deriveComposerActivityStripRows,
   type ComposerActivityStripSubagentItem,
 } from "./chat/ComposerActivityStrip.logic";
@@ -1422,7 +1424,7 @@ export default function ChatView({
   const canCheckoutPullRequestIntoThread = isLocalDraftThread;
   const diffOpen = rawSearch.panel === "diff";
   const browserOpen = rawSearch.panel === "browser";
-  // Feeds the activity strip's browser automation row (same source as BrowserPanel).
+  // Feeds the browser activity pill (same source as BrowserPanel).
   const threadBrowserState = useBrowserStateStore(selectThreadBrowserState(threadId));
   const resolvedDiffOpen = panelState ? panelState.panel === "diff" : diffOpen;
   const activeThreadId = activeThread?.id ?? null;
@@ -2408,7 +2410,6 @@ export default function ChatView({
         parentRow: stripParentThread
           ? { threadId: stripParentThread.id, label: stripParentThread.title ?? null }
           : null,
-        browserState: threadBrowserState,
       }),
     [
       activeThread?.id,
@@ -2416,8 +2417,11 @@ export default function ChatView({
       stripLiveTurnId,
       stripParentThread,
       stripWorkLogEntries,
-      threadBrowserState,
     ],
+  );
+  const composerBrowserActivity = useMemo(
+    () => deriveComposerBrowserActivityPresentation(threadBrowserState),
+    [threadBrowserState],
   );
   // Links workflow agent rows to their subagent child threads (and models) when the
   // Task tool_use_id produced one; agents spawned without a tool call stay unlinked.
@@ -10959,6 +10963,12 @@ export default function ChatView({
                   }
                 />
               ) : null}
+              {composerBrowserActivity ? (
+                <ComposerBrowserActivityPill
+                  activity={composerBrowserActivity}
+                  onOpenBrowser={onOpenBrowserPanel}
+                />
+              ) : null}
               {showComposerActivityStrip ? (
                 <ComposerActivityStrip
                   items={composerActivityStripRows}
@@ -10968,7 +10978,6 @@ export default function ChatView({
                   onBackgroundItem={onBackgroundSubagentStripItem}
                   onStopItem={onStopSubagentStripItem}
                   onStopAll={onStopAllSubagentStripItems}
-                  onOpenBrowser={onOpenBrowserPanel}
                   attachedToPrevious={
                     showComposerLiveChangesHeader ||
                     showComposerActiveTaskListCard ||

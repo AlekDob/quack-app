@@ -12,7 +12,6 @@ import {
   BackgroundTrayIcon,
   BackToParentIcon,
   BotIcon,
-  GlobeIcon,
   LoaderIcon,
   PanelCollapseIcon,
   PanelExpandIcon,
@@ -60,8 +59,6 @@ interface ComposerActivityStripProps {
   onBackgroundItem?: (item: ComposerActivityStripSubagentItem) => void;
   onStopItem?: (item: ComposerActivityStripSubagentItem) => void;
   onStopAll?: () => void;
-  /** Opens the thread's browser surface from the browser automation row. */
-  onOpenBrowser?: () => void;
   attachedToPrevious?: boolean;
 }
 
@@ -73,7 +70,6 @@ export const ComposerActivityStrip = function ComposerActivityStrip({
   onBackgroundItem,
   onStopItem,
   onStopAll,
-  onOpenBrowser,
   attachedToPrevious: attachedToPreviousProp,
 }: ComposerActivityStripProps) {
   const attachedToPrevious = attachedToPreviousProp ?? false;
@@ -166,9 +162,6 @@ export const ComposerActivityStrip = function ComposerActivityStrip({
                 <BackgroundActivityRow
                   key={item.key}
                   item={item}
-                  {...(item.activityKind === "browser" && onOpenBrowser
-                    ? { onOpen: onOpenBrowser }
-                    : {})}
                 />
               );
             }
@@ -269,16 +262,14 @@ export const ComposerActivityStrip = function ComposerActivityStrip({
   );
 };
 
-// Background rows carry no identity (there is only one browser, commands are
-// one-shot), so a kind icon replaces the subagent avatar next to the status dot.
+// Background command rows carry no identity, so their kind icon replaces the
+// subagent avatar next to the status dot.
 function BackgroundActivityRow({
   item,
-  onOpen,
 }: {
   item: ComposerActivityStripBackgroundItem;
-  onOpen?: () => void;
 }) {
-  const KindIcon = item.activityKind === "browser" ? GlobeIcon : TerminalIcon;
+  const KindIcon = TerminalIcon;
   const content = (
     <>
       <span className="flex shrink-0 items-center gap-1">
@@ -308,20 +299,9 @@ function BackgroundActivityRow({
 
   return (
     <div className={STRIP_ROW_CLASS_NAME} data-testid="composer-activity-row">
-      {onOpen ? (
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-center gap-2 text-left"
-          title={item.label}
-          onClick={onOpen}
-        >
-          {content}
-        </button>
-      ) : (
-        <span className="flex min-w-0 flex-1 items-center gap-2" title={item.label}>
-          {content}
-        </span>
-      )}
+      <span className="flex min-w-0 flex-1 items-center gap-2" title={item.label}>
+        {content}
+      </span>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 // FILE: ComposerActivityStrip.logic.test.ts
 // Purpose: Locks composer activity strip row derivation: subagent live-turn scoping,
-// snapshot merging, retire-once-finished behavior, plus background activity rows
-// (browser automation, running agent commands) and the shared header label.
+// snapshot merging, retire-once-finished behavior, plus background agent commands
+// and the shared header label.
 // Layer: Web chat composer tests
 // Depends on: deriveComposerActivityStripRows, activityStripHeaderLabel
 
@@ -28,6 +28,7 @@ import {
   activityStripHeaderLabel,
   collectForegroundRunningSubagentStripItems,
   collectRunningSubagentStripItems,
+  deriveComposerBrowserActivityPresentation,
   deriveComposerActivityStripRows,
   type ComposerActivityStripSubagentItem,
   type ComposerActivityStripRow,
@@ -794,60 +795,42 @@ function commandEntry(id: string, toolStatus: "running" | "completed", toolCallI
   });
 }
 
-describe("background activity rows", () => {
-  it("shows no row while browser automation is idle", () => {
+describe("browser activity presentation", () => {
+  it("returns nothing while browser automation is idle", () => {
     expect(
-      deriveComposerActivityStripRows({
-        workEntries: [],
-        liveTurnId: null,
-        browserState: browserState({ phase: "idle", tabId: null, reason: null }),
-      }),
-    ).toEqual([]);
+      deriveComposerBrowserActivityPresentation(
+        browserState({ phase: "idle", tabId: null, reason: null }),
+      ),
+    ).toBeNull();
   });
 
-  it("shows a running browser row with the tab host", () => {
-    const rows = deriveComposerActivityStripRows({
-      workEntries: [],
-      liveTurnId: null,
-      browserState: browserState({ phase: "running", tabId: "tab-1", reason: null }),
+  it("derives a running browser pill with the tab host", () => {
+    expect(
+      deriveComposerBrowserActivityPresentation(
+        browserState({ phase: "running", tabId: "tab-1", reason: null }),
+      ),
+    ).toEqual({
+      label: "Browser in use",
+      hostname: "github.com",
+      statusKind: "running",
     });
-
-    expect(rows).toEqual([
-      {
-        kind: "activity",
-        activityKind: "browser",
-        key: "browser:thread-1",
-        label: "Browser automation",
-        secondary: "github.com",
-        statusKind: "running",
-        statusLabel: "Running",
-        isActive: true,
-      },
-    ]);
   });
 
-  it("puts an attention-required browser row first, labelled by its reason", () => {
-    const rows = deriveComposerActivityStripRows({
-      workEntries: [
-        workEntry({
-          id: "entry-1",
-          turnId: "turn-1",
-          subagents: [subagent({ threadId: "sub-1", nickname: "Ada", rawStatus: "running" })],
-        }),
-        commandEntry("entry-2", "running", "toolu_cmd"),
-      ],
-      liveTurnId: TurnId.makeUnsafe("turn-1"),
-      browserState: browserState({ phase: "attention-required", tabId: "tab-1", reason: "oauth" }),
-    });
-
-    expect(rows[0]).toMatchObject({
-      activityKind: "browser",
-      statusKind: "attention",
-      statusLabel: "Sign-in needed",
-    });
-    expect(rows.map((row) => row.kind)).toEqual(["activity", "subagent", "activity"]);
+  it.each([
+    ["oauth", "Sign-in needed"],
+    ["download", "Approval needed"],
+    ["popup", "Popup blocked"],
+    ["error", "Failed"],
+  ] as const)("derives the %s attention state", (reason, label) => {
+    expect(
+      deriveComposerBrowserActivityPresentation(
+        browserState({ phase: "attention-required", tabId: "tab-1", reason }),
+      ),
+    ).toMatchObject({ label, statusKind: "attention" });
   });
+});
 
+describe("background activity rows", () => {
   it("shows a running command row and retires it once the command completes", () => {
     const running = deriveComposerActivityStripRows({
       workEntries: [commandEntry("entry-1", "running", "toolu_cmd")],
@@ -909,10 +892,9 @@ describe("activityStripHeaderLabel", () => {
     const rows = deriveComposerActivityStripRows({
       workEntries: [commandEntry("entry-1", "running", "toolu_cmd")],
       liveTurnId: TurnId.makeUnsafe("turn-1"),
-      browserState: browserState({ phase: "running", tabId: "tab-1", reason: null }),
     });
 
-    expect(activityStripHeaderLabel(rows)).toBe("2 background activities");
+    expect(activityStripHeaderLabel(rows)).toBe("1 background activity");
   });
 
   it("falls back to a neutral count when both kinds are present", () => {

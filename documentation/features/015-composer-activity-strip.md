@@ -20,7 +20,8 @@ tags: [composer, activity-strip, subagents, browser-automation, background-work]
 | Type      | Path                                                               | Exports/Purpose                                                                                                  |
 | --------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | Logic     | `apps/web/src/components/chat/ComposerActivityStrip.logic.ts`      | `deriveComposerActivityStripRows`, `deriveComposerBackgroundActivityRows`, `activityStripHeaderLabel`, row types |
-| Component | `apps/web/src/components/chat/ComposerActivityStrip.tsx`           | Renders the unified strip; `BackgroundActivityRow` for browser/command rows                                      |
+| Component | `apps/web/src/components/chat/ComposerActivityStrip.tsx`           | Renders the unified strip; `BackgroundActivityRow` for command rows                                             |
+| Component | `apps/web/src/components/chat/ComposerBrowserActivityPill.tsx`     | Dedicated Browser status marker above the composer                                                             |
 | Util      | `apps/web/src/lib/subagentPresentation.ts`                         | `SubagentStatusKind` (adds `"attention"`), dot/tone/label helpers shared by subagent and background rows         |
 | Store     | `apps/web/src/browserStateStore.ts`                                | `selectThreadBrowserState` — source for the browser automation row                                               |
 | Consumer  | `apps/web/src/components/ChatView.tsx`                             | Wires `threadBrowserState`, `onOpenBrowserPanel` into the strip                                                  |
@@ -31,7 +32,7 @@ Renamed from `ComposerSubagentStrip.tsx` / `.logic.ts` (git mv, no new files for
 ### Data Flow
 
 - **Subagents:** unchanged — `WorkLogEntry.subagents` → `collectSubagentRows` → `kind: "subagent"` rows.
-- **Browser automation:** `ThreadBrowserState.automation` (from `useBrowserStateStore(selectThreadBrowserState(threadId))`, delivered over Electron IPC `desktop:browser-state`) → `browserAutomationRow()` → one `kind: "activity"` row while `automation.phase !== "idle"`.
+- **Browser automation:** `ThreadBrowserState.automation` (from `useBrowserStateStore(selectThreadBrowserState(threadId))`, delivered over Electron IPC `desktop:browser-state`) → `deriveComposerBrowserActivityPresentation()` → a dedicated Browser pill while `automation.phase !== "idle"`. The pill opens the existing right dock and is separate from the collapsible activity strip.
 - **Agent commands:** `WorkLogEntry` with `itemType === "command_execution"` and `toolStatus === "running"` → `runningCommandRows()`, deduped by `` `command:${toolCallId ?? id}` `` → one `kind: "activity"` row per running command; retires itself once `toolStatus` moves to `completed`/`failed`/`cancelled`.
 - Both row kinds merge in `deriveComposerActivityStripRows`, attention rows first, then subagents, then the rest of the background rows.
 - On a top-level thread, `stripRawWorkLogEntries` reuses the already-derived `rawWorkLogEntries` (`ChatView.logic.resolveComposerStripWorkLogEntries`) instead of re-deriving from `stripSourceActivities` on every live activity tick — the re-derive path only runs for subagent threads, which have a distinct parent source.
@@ -39,7 +40,7 @@ Renamed from `ComposerSubagentStrip.tsx` / `.logic.ts` (git mv, no new files for
 ### Key Functions
 
 - `deriveComposerActivityStripRows(input) → ComposerActivityStripRow[]` — single entry point ChatView calls; returns `[]` when there is nothing to show.
-- `deriveComposerBackgroundActivityRows({ workEntries, browserState }) → ComposerActivityStripBackgroundItem[]` — the non-subagent half, also unit-tested standalone.
+- `deriveComposerBackgroundActivityRows({ workEntries }) → ComposerActivityStripBackgroundItem[]` — the command-only non-subagent half, also unit-tested standalone.
 - `resolveComposerStripWorkLogEntries({ hasDistinctParentSource, activeWorkLogEntries, deriveParentWorkLogEntries }) → WorkLogEntry[]` — picks the cheap path (reuse) vs. the parent-derive path; avoids scanning and normalizing the full activity history twice per live update on long threads.
 - `activityStripHeaderLabel(rows) → string` — one header string for all three cases: subagents-only ("N of M subagents running"), background-only ("N background activities"), mixed ("N of M running").
 

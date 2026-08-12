@@ -2,7 +2,7 @@
 // Purpose: Derives every "what is running right now" row of the composer strip:
 // subagents (from enriched work log entries, mirroring the active-task-list scoping
 // where the live turn wins and a prior set stays visible while someone still works)
-// plus background activity (browser automation, running agent commands).
+// plus background agent commands.
 // Layer: Chat composer logic
 // Exports: deriveComposerActivityStripRows, activityStripHeaderLabel and the row types
 
@@ -48,10 +48,10 @@ export interface ComposerActivityStripParentItem {
   label: string;
 }
 
-/** Background work that is not a subagent: browser automation and agent commands. */
+/** Background agent command work that is not a subagent. */
 export interface ComposerActivityStripBackgroundItem {
   kind: "activity";
-  activityKind: "browser" | "command";
+  activityKind: "command";
   key: string;
   label: string;
   /** Secondary hint next to the label (tab host, command detail). */
@@ -267,25 +267,26 @@ function tabHost(browserState: ThreadBrowserState, tabId: string | null): string
   }
 }
 
-function browserAutomationRow(
+export interface ComposerBrowserActivityPresentation {
+  label: string;
+  hostname: string | undefined;
+  statusKind: "running" | "attention";
+}
+
+export function deriveComposerBrowserActivityPresentation(
   browserState: ThreadBrowserState | undefined,
-): ComposerActivityStripBackgroundItem | null {
+): ComposerBrowserActivityPresentation | null {
   const automation = browserState?.automation;
   if (!browserState || !automation || automation.phase === "idle") {
     return null;
   }
   const needsAttention = automation.phase === "attention-required";
   return {
-    kind: "activity",
-    activityKind: "browser",
-    key: `browser:${browserState.threadId}`,
-    label: "Browser automation",
-    secondary: tabHost(browserState, automation.tabId),
-    statusKind: needsAttention ? "attention" : "running",
-    statusLabel: needsAttention
+    label: needsAttention
       ? (BROWSER_ATTENTION_LABELS[automation.reason ?? "error"] ?? "Needs you")
-      : "Running",
-    isActive: true,
+      : "Browser in use",
+    hostname: tabHost(browserState, automation.tabId),
+    statusKind: needsAttention ? "attention" : "running",
   };
 }
 
@@ -316,10 +317,8 @@ function runningCommandRows(
 
 export function deriveComposerBackgroundActivityRows(input: {
   workEntries: ReadonlyArray<WorkLogEntry>;
-  browserState?: ThreadBrowserState | undefined;
 }): ComposerActivityStripBackgroundItem[] {
-  const browserRow = browserAutomationRow(input.browserState);
-  return [...(browserRow ? [browserRow] : []), ...runningCommandRows(input.workEntries)];
+  return runningCommandRows(input.workEntries);
 }
 
 export function deriveComposerActivityStripRows(input: {
@@ -331,8 +330,6 @@ export function deriveComposerActivityStripRows(input: {
   viewedThreadId?: ThreadId | null;
   // Present while a subagent thread is open: prepends a row back to the parent.
   parentRow?: { threadId: ThreadId; label: string | null } | null;
-  // Desktop browser runtime state for this thread (background automation rows).
-  browserState?: ThreadBrowserState | undefined;
 }): ComposerActivityStripRow[] {
   const subagentRows = collectSubagentRows(input);
   const backgroundRows = deriveComposerBackgroundActivityRows(input);
