@@ -237,10 +237,12 @@ export default defineConfig({
     // ChatView.tsx (~12k lines) inside the worker, and React Compiler's
     // per-component dataflow analysis grows super-linearly with file size.
     // Uncapped, V8 kept growing past 12 GB and took the whole machine down
-    // (macOS watchdog reboot, 2026-08-06) instead of the process. 4 GB is far
-    // above the normal peak, so this only turns a machine-killer into an
-    // ordinary OOM failure.
-    execArgv: ["--max-old-space-size=4096"],
+    // (macOS watchdog reboot, 2026-08-06) instead of the process. The cap only
+    // turns a machine-killer into an ordinary OOM failure.
+    // 8 GB, not 4: once ChatView stopped bailing out the compiler actually walks
+    // the whole file, and a single transformSync now peaks at 4.24 GB RSS
+    // (measured 2026-08-12; it was 0.32 GB while the bailouts were still there).
+    execArgv: ["--max-old-space-size=8192"],
   },
   build: {
     outDir: "dist",

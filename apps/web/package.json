@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "NODE_OPTIONS=--max-old-space-size=8192 vite build",
     "prepare": "effect-language-service patch",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
