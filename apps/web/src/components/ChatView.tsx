@@ -10514,6 +10514,13 @@ export default function ChatView({
     if (!activeThread) return;
     setThreadError(activeThread.id, null);
   }, [activeThread, setThreadError]);
+  // The auth error stays on the thread after a successful login, which kept the
+  // sign-in card (and its terminal poll) on screen forever. Clearing the error is
+  // the single exit: the card is derived from it, so it unmounts with it.
+  useEffect(() => {
+    if (!hasClaudeAuthRecovery || !isClaudeAuthenticated) return;
+    dismissActiveThreadError();
+  }, [dismissActiveThreadError, hasClaudeAuthRecovery, isClaudeAuthenticated]);
   const clearThreadErrorAfterUnblock = useCallback(
     (unblockedThreadId: ThreadId) => {
       setThreadError(unblockedThreadId, null);
@@ -11750,7 +11757,6 @@ export default function ChatView({
                         hasClaudeAuthRecovery
                           ? {
                               status: activeClaudeAuthRecoveryState.status,
-                              authenticated: isClaudeAuthenticated,
                               error: activeClaudeAuthRecoveryState.error,
                               unavailableReason: claudeAuthRecoveryUnavailableReason,
                             }

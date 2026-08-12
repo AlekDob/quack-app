@@ -483,7 +483,6 @@ interface MessagesTimelineProps {
   contentInsetRightPx?: number | undefined;
   claudeAuthRecovery?: {
     status: ClaudeAuthRecoveryStatus;
-    authenticated?: boolean;
     error: string | null;
     unavailableReason: string | null;
   } | null;
@@ -1271,13 +1270,20 @@ export const MessagesTimeline = memo(function MessagesTimeline({
         })()}
 
       {row.kind === "claude-auth-recovery" ? (
-        <ClaudeAuthRecoveryCard
-          status={row.status}
-          error={row.error}
-          unavailableReason={row.unavailableReason}
-          onOpen={onOpenClaudeAuthRecovery ?? (() => {})}
-          onDismiss={onDismissClaudeAuthRecovery ?? (() => {})}
-        />
+        // Blank avatar slot + shared gap so the card starts on the same text edge
+        // as assistant replies and tool groups instead of hugging the pane border.
+        <div className={cn("flex items-start overflow-visible", CHAT_STREAM_AVATAR_GAP_CLASS_NAME)}>
+          <ChatStreamAvatarSlot />
+          <div className="min-w-0 flex-1">
+            <ClaudeAuthRecoveryCard
+              status={row.status}
+              error={row.error}
+              unavailableReason={row.unavailableReason}
+              onOpen={onOpenClaudeAuthRecovery ?? (() => {})}
+              onDismiss={onDismissClaudeAuthRecovery ?? (() => {})}
+            />
+          </div>
+        </div>
       ) : null}
 
       {row.kind === "message" &&
