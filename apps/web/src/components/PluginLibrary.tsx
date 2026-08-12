@@ -433,6 +433,8 @@ export function PluginLibrary() {
       plugins: supportsPluginDiscovery(piCapabilitiesQuery.data),
       skills: supportsSkillDiscovery(piCapabilitiesQuery.data),
     },
+    // Companion proxies a remote machine: no local plugin or skill discovery.
+    astronaut: { plugins: false, skills: false },
   };
 
   // Auto-fallback: when the current tab/provider combo is unsupported, render

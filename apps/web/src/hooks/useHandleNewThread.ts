@@ -1,5 +1,5 @@
 import { type ModelSelection, type ProjectId, ThreadId } from "@synara/contracts";
-import { getDefaultModel } from "@synara/shared/model";
+import { getDefaultModel, providerWithDefaultModel } from "@synara/shared/model";
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { startTransition } from "react";
 import { useAppSettings } from "../appSettings";
@@ -73,10 +73,10 @@ export function useHandleNewThread() {
     const initialModelSelection =
       explicitProviderModelSelection ??
       projectDefaultModelSelection ??
-      makeModelSelection(
-        settings.defaultProvider === "pi" ? "codex" : settings.defaultProvider,
-        getDefaultModel(settings.defaultProvider === "pi" ? "codex" : settings.defaultProvider),
-      );
+      (() => {
+        const provider = providerWithDefaultModel(settings.defaultProvider);
+        return makeModelSelection(provider, getDefaultModel(provider));
+      })();
     const applyInitialProviderSelection = (threadId: ThreadId) => {
       setModelSelection(threadId, initialModelSelection);
     };

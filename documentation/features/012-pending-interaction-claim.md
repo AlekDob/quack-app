@@ -7,7 +7,16 @@ startDate: 2026-08-05
 endDate:
 last_verified: 2026-08-09
 status: active
-tags: [pending-interactions, approvals, store-projection, reclaim, upstream-port, startup-reconciliation, dead-runtime]
+tags:
+  [
+    pending-interactions,
+    approvals,
+    store-projection,
+    reclaim,
+    upstream-port,
+    startup-reconciliation,
+    dead-runtime,
+  ]
 ---
 
 ## Pending interaction response claim
@@ -17,13 +26,13 @@ tags: [pending-interactions, approvals, store-projection, reclaim, upstream-port
 
 ### Files
 
-| Type        | Path                                         | Exports/Purpose                                                           |
-| ----------- | -------------------------------------------- | ------------------------------------------------------------------------- |
-| Util        | `packages/shared/src/pendingInteractions.ts` | `isPendingInteractionResponseClaimable`, reclaim grace cutoff             |
-| Config      | `packages/shared/package.json`               | Export `@synara/shared/pendingInteractions`                               |
-| Store/State | `apps/web/src/storeEventReducer.ts`          | `markInteractionResponding`; `reconcileLatestTurnFromSession` stale guard |
+| Type        | Path                                                             | Exports/Purpose                                                                                                                                       |
+| ----------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Util        | `packages/shared/src/pendingInteractions.ts`                     | `isPendingInteractionResponseClaimable`, reclaim grace cutoff                                                                                         |
+| Config      | `packages/shared/package.json`                                   | Export `@synara/shared/pendingInteractions`                                                                                                           |
+| Store/State | `apps/web/src/storeEventReducer.ts`                              | `markInteractionResponding`; `reconcileLatestTurnFromSession` stale guard                                                                             |
 | Reactor     | `apps/server/src/orchestration/Layers/ProviderCommandReactor.ts` | `isUnanswerableApprovalRequestError` / `isUnanswerableUserInputRequestError` — treat "provider runtime is not active" as terminal, settle `uncertain` |
-| Startup     | `apps/server/src/orchestration/startupTurnReconciliation.ts` | `selectThreadsNeedingRestartCleanup` — boot sweep candidates from the shell snapshot's SQL-computed pending counts, not the command read model |
+| Startup     | `apps/server/src/orchestration/startupTurnReconciliation.ts`     | `selectThreadsNeedingRestartCleanup` — boot sweep candidates from the shell snapshot's SQL-computed pending counts, not the command read model        |
 
 ### Data Flow
 

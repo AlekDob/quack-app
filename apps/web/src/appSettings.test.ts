@@ -277,6 +277,7 @@ describe("resolveAppModelSelection", () => {
           kilo: [],
           opencode: [],
           pi: [],
+          astronaut: [],
         },
         "galapagos-alpha",
       ),
@@ -297,6 +298,7 @@ describe("resolveAppModelSelection", () => {
           kilo: [],
           opencode: [],
           pi: [],
+          astronaut: [],
         },
         "",
       ),
@@ -317,6 +319,7 @@ describe("resolveAppModelSelection", () => {
           kilo: [],
           opencode: [],
           pi: [],
+          astronaut: [],
         },
         "GPT-5.3 Codex",
       ),
@@ -337,6 +340,7 @@ describe("resolveAppModelSelection", () => {
           kilo: [],
           opencode: [],
           pi: [],
+          astronaut: [],
         },
         "sonnet",
       ),
@@ -357,6 +361,7 @@ describe("resolveAppModelSelection", () => {
           kilo: [],
           opencode: [],
           pi: [],
+          astronaut: [],
         },
         "custom/selected-model",
       ),
@@ -519,6 +524,7 @@ describe("getProviderStartOptions", () => {
         openCodeServerUrl: "",
         piAgentDir: "",
         piBinaryPath: "",
+        astronautServerUrl: "",
       }),
     ).toEqual({
       claudeAgent: {
@@ -558,6 +564,7 @@ describe("getProviderStartOptions", () => {
         openCodeServerUrl: "",
         piAgentDir: "",
         piBinaryPath: "",
+        astronautServerUrl: "",
       }),
     ).toBeUndefined();
   });
@@ -580,6 +587,7 @@ describe("getProviderStartOptions", () => {
         openCodeServerUrl: "",
         piAgentDir: "",
         piBinaryPath: "pi",
+        astronautServerUrl: "",
       }),
     ).toBeUndefined();
   });
@@ -596,6 +604,7 @@ describe("provider-indexed custom model settings", () => {
     customKiloModels: ["kilo/kilo-auto/free"],
     customOpenCodeModels: ["openrouter/gpt-oss-120b"],
     customPiModels: ["anthropic/custom-pi"],
+    customAstronautModels: ["remote/custom-companion"],
   } as const;
 
   it("exports one provider config per provider", () => {
@@ -609,6 +618,7 @@ describe("provider-indexed custom model settings", () => {
       "kilo",
       "opencode",
       "pi",
+      "astronaut",
     ]);
   });
 
@@ -640,6 +650,7 @@ describe("provider-indexed custom model settings", () => {
       customKiloModels: ["kilo/default-auto"],
       customOpenCodeModels: ["openai/gpt-5"],
       customPiModels: ["anthropic/default-pi"],
+      customAstronautModels: ["remote/default-companion"],
     } as const;
 
     expect(getDefaultCustomModelsForProvider(defaults, "codex")).toEqual(["default/codex-model"]);
@@ -722,6 +733,7 @@ describe("provider-indexed custom model settings", () => {
       kilo: ["kilo/kilo-auto/free"],
       opencode: ["openrouter/gpt-oss-120b"],
       pi: ["anthropic/custom-pi"],
+      astronaut: ["remote/custom-companion"],
     });
   });
 
@@ -779,6 +791,7 @@ describe("provider-indexed custom model settings", () => {
         "anthropic/custom-pi",
         "anthropic/custom-pi",
       ],
+      customAstronautModels: [],
     });
 
     expect(

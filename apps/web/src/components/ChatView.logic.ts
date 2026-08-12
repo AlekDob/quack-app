@@ -1939,6 +1939,9 @@ export function getProviderStartOptionsCustomBinaryPath(
       return normalizeCustomBinaryPath(providerOptions?.cursor?.binaryPath);
     case "pi":
       return normalizeCustomBinaryPath(providerOptions?.pi?.binaryPath);
+    // Companion runs on the paired machine: no local binary path.
+    case "astronaut":
+      return null;
   }
 }
 
@@ -2089,4 +2092,23 @@ export function makeAutomationSetupBubble(role: "user" | "assistant", text: stri
     streaming: false,
     source: "native",
   };
+}
+
+// Saves an agent's instructions and reports the failure message, or null on success.
+// Lives here, outside the component, because React Compiler bails out of the whole
+// module on a `throw` inside a `try` — see chatHotPath.compiler.test.ts.
+export async function savePaperoInstructionsFailure(
+  write: (paperoId: PaperoId, instructions: string | null) => Promise<boolean>,
+  paperoId: PaperoId,
+  instructions: string,
+): Promise<string | null> {
+  try {
+    const saved = await write(paperoId, instructions);
+    if (!saved) {
+      return "This agent is no longer present in the active Team roster.";
+    }
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : "Team update failed.";
+  }
 }

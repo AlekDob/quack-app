@@ -49,3 +49,16 @@ tags: [claude-agent, auth, recovery, terminal, transcript]
 
 - Auto-closing the card after authentication — the user still dismisses it manually.
 - Recovery for other providers' auth failures (Codex, Grok, etc.) — this card is Claude-Agent-specific.
+
+### Vincoli React Compiler (2026-08-12)
+
+`ChatView.tsx` è coperto da `chatHotPath.compiler.test.ts`: un bailout fa perdere
+l'auto-memoizzazione all'intero componente. Il flusso di recovery ne ha attivati due,
+entrambi risolti sollevando il valore fuori dalla closure:
+
+- il messaggio d'errore nel `catch` di `openClaudeAuthRecovery` va calcolato in un
+  `const` prima di entrare nell'updater di `setState` (un value block letto dentro una
+  closure dichiarata in `catch` viola un invariante del compiler);
+- la dependency list manuale non può nominare `activeThread?.worktreePath`: il compiler
+  inferisce `activeThread`. Serve un `const claudeAuthRecoveryWorktreePath` prima della
+  `useCallback`, usato sia nel corpo sia nelle dipendenze.

@@ -10,6 +10,8 @@ describe("providerStartOptionsFromServerSettings", () => {
     const settings = {
       ...DEFAULT_SERVER_SETTINGS,
       providers: {
+        // Spread first so providers without blank-launch settings (astronaut) stay covered.
+        ...DEFAULT_SERVER_SETTINGS.providers,
         codex: {
           ...DEFAULT_SERVER_SETTINGS.providers.codex,
           binaryPath: "",

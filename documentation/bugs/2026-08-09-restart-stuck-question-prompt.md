@@ -29,8 +29,8 @@ Two independent defects, both required to produce the wedge.
 The prompt is answered through a callback held in memory by the provider runtime
 (`ClaudeAdapter`'s `pendingUserInputs` map). That runtime dies with the process, so after a restart
 no response can ever land. `ProviderService.respondToInteraction` rejects with a
-`ProviderValidationError`: *"Cannot respond to request '…' because the provider runtime is not
-active."*
+`ProviderValidationError`: _"Cannot respond to request '…' because the provider runtime is not
+active."_
 
 `ProviderCommandReactor.interactionFailureSettlementStatus` only treated adapter-level errors as
 terminal, so this rejection settled as `retryable`. Both the durable row and the client's derivation
@@ -41,7 +41,7 @@ every click failed the same way and the panel never cleared.
 
 `startupTurnReconciliation` exists exactly for this and already emits stale-request failures at
 startup. Its candidate filter read `thread.hasPendingApprovals` / `thread.hasPendingUserInput` off
-the *command* read model. But `ProjectionSnapshotQuery.getCommandReadModel` builds each thread with
+the _command_ read model. But `ProjectionSnapshotQuery.getCommandReadModel` builds each thread with
 `activities: <checkpoint-revert rows only>` and `pendingInteractions: []`, and `toProjectedThread`
 derives those flags from that activity list. With no `user-input.requested` activity in it, both
 flags are structurally **always false**. The sweep therefore only ever cleaned threads with an

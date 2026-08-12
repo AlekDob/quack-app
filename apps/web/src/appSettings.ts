@@ -906,12 +906,14 @@ export function getAppModelOptions(
   customModels: readonly string[],
   selectedModel?: string | null,
 ): AppModelOption[] {
-  const options: AppModelOption[] = (provider === "astronaut" ? [] : getModelOptions(provider)).map(({ slug, name }) => ({
-    provider,
-    slug,
-    name,
-    isCustom: false,
-  }));
+  const options: AppModelOption[] = (provider === "astronaut" ? [] : getModelOptions(provider)).map(
+    ({ slug, name }) => ({
+      provider,
+      slug,
+      name,
+      isCustom: false,
+    }),
+  );
   const seen = new Set(options.map((option) => option.slug));
   const trimmedSelectedModel = selectedModel?.trim().toLowerCase();
 
@@ -1232,6 +1234,9 @@ export function getCustomBinaryPathForProvider(
       return normalizeProviderBinaryPathOverride(provider, settings.openCodeBinaryPath);
     case "pi":
       return normalizeProviderBinaryPathOverride(provider, settings.piBinaryPath);
+    // Companion runs on the paired machine: no local binary to override.
+    case "astronaut":
+      return "";
   }
 }
 

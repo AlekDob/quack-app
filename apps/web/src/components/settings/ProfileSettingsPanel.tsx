@@ -7,7 +7,12 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { type ProfileStats, type ProfileTokenStats, type ProviderKind } from "@synara/contracts";
+import {
+  PROVIDER_DISPLAY_NAMES,
+  type ProfileStats,
+  type ProfileTokenStats,
+  type ProviderKind,
+} from "@synara/contracts";
 import {
   serverProfileStatsQueryOptions,
   serverProfileTokenStatsQueryOptions,
@@ -328,26 +333,7 @@ function formatMostWorkedProjectLabel(project: ProfileStats["mostWorkedProject"]
 }
 
 function formatProviderLabel(provider: ProviderKind): string {
-  switch (provider) {
-    case "codex":
-      return "Codex";
-    case "claudeAgent":
-      return "Claude";
-    case "cursor":
-      return "Cursor";
-    case "antigravity":
-      return "Antigravity";
-    case "grok":
-      return "Grok";
-    case "droid":
-      return "Droid";
-    case "kilo":
-      return "Kilo";
-    case "opencode":
-      return "OpenCode";
-    case "pi":
-      return "Pi";
-  }
+  return PROVIDER_DISPLAY_NAMES[provider];
 }
 
 function ModelUsageRow({

@@ -99,3 +99,20 @@ Il controllo manuale completo resta: abilitare Astronaut, inviare un messaggio, 
 ### Gap noto
 
 Nessuno al momento. Lo stato `/status` è ora integrato nel health check generico e visibile nelle impostazioni (vedi sezione Health check).
+
+### Integrazione con i tipi per-provider (2026-08-12)
+
+Aggiungere un valore a `ProviderKind` non basta: il tipo è usato in modo esaustivo in
+decine di punti. Un nuovo provider va aggiunto anche a:
+
+- ogni `Record<ProviderKind, …>` in `packages/contracts` (opzioni modello, capabilities,
+  display name), in web (registry del composer, picker, plugin library) e in server
+  (`providerChildEnvironment`, `providerStatusCache`, `skillsCatalog`, `targetResolver`);
+- ogni `switch` esaustivo su `provider`;
+- il membro corrispondente di `ModelSelection`, che deve avere il campo `options` come
+  tutti gli altri — senza, `modelSelection?.options` smette di compilare ovunque.
+
+Companion e Pi non hanno un modello di default hardcoded: scoprono il catalogo a runtime.
+Il predicato unico è `hasDefaultModel(provider)` in `packages/shared/src/model.ts`, con
+`providerWithDefaultModel(provider)` per i punti che richiedono comunque uno slug
+concreto (ricade su Codex). Non replicare controlli `provider === "pi"` nei call site.

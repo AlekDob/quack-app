@@ -9,7 +9,17 @@ describe("project default providers", () => {
         providerOrder: ["claudeAgent", "codex"],
         hiddenProviders: ["codex"],
       }),
-    ).toEqual(["claudeAgent", "cursor", "antigravity", "grok", "droid", "kilo", "opencode", "pi"]);
+    ).toEqual([
+      "claudeAgent",
+      "cursor",
+      "antigravity",
+      "grok",
+      "droid",
+      "kilo",
+      "opencode",
+      "pi",
+      "astronaut",
+    ]);
   });
 
   it("falls back to the first visible provider", () => {

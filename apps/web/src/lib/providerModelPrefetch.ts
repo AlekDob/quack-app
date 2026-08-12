@@ -117,6 +117,9 @@ export function providerModelsPrefetchQueryOptions(input: {
         agentDir: settings.piAgentDir || null,
         cwd,
       });
+    // Companion has no local binary: the paired machine serves its catalogue.
+    case "astronaut":
+      return providerModelsQueryOptions({ provider: "astronaut", cwd });
   }
 }
 

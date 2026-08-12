@@ -555,7 +555,7 @@ export function projectProviderRuntimeActivities(
                       ? "Permission approval requested"
                       : requestKind === "plugin-install"
                         ? "Plugin installation requested"
-                      : "Approval requested",
+                        : "Approval requested",
           payload: toActivityPayload({
             // Omitted, never `undefined`: `Schema.Json` rejects a member that is
             // explicitly present and undefined.

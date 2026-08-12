@@ -154,9 +154,9 @@ const allProvidersDisabledSettings = {
     grok: { enabled: false },
     droid: { enabled: false },
     kilo: { enabled: false },
-  opencode: { enabled: false },
-  pi: { enabled: false },
-  astronaut: { enabled: false },
+    opencode: { enabled: false },
+    pi: { enabled: false },
+    astronaut: { enabled: false },
   },
 } as const;
 

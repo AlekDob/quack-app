@@ -198,10 +198,12 @@ export const ServerSettingsPatch = Schema.Struct({
           agentDir: Schema.optionalKey(StringSetting),
         }),
       ),
-      astronaut: Schema.optionalKey(Schema.Struct({
-        ...ProviderSettingsBasePatch,
-        serverUrl: Schema.optionalKey(StringSetting),
-      })),
+      astronaut: Schema.optionalKey(
+        Schema.Struct({
+          ...ProviderSettingsBasePatch,
+          serverUrl: Schema.optionalKey(StringSetting),
+        }),
+      ),
     }),
   ),
   skills: Schema.optionalKey(

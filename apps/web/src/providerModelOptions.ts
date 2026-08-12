@@ -443,5 +443,8 @@ export function buildModelSelection(
             options: options as PiModelOptions,
           }
         : { provider, model };
+    // Companion has no local options: the paired machine owns them.
+    case "astronaut":
+      return { provider, model };
   }
 }

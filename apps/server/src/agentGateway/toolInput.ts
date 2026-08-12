@@ -5,6 +5,7 @@ import {
   type ModelSelection,
   type ProviderKind,
 } from "@synara/contracts";
+import { hasDefaultModel } from "@synara/shared/model";
 import { Schema } from "effect";
 
 import { AGENT_GATEWAY_TARGET_OPTIONS_DESCRIPTION } from "./targetResolver.ts";
@@ -132,10 +133,7 @@ export function buildModelSelection(
   model: string | undefined,
 ): ModelSelection {
   const effectiveModel =
-    model ??
-    (provider === "pi"
-      ? undefined
-      : DEFAULT_MODEL_BY_PROVIDER[provider as Exclude<ProviderKind, "pi">]);
+    model ?? (hasDefaultModel(provider) ? DEFAULT_MODEL_BY_PROVIDER[provider] : undefined);
   if (!effectiveModel) {
     throw new ToolInputError(
       `Provider "${provider}" has no default model; pass an explicit "model" argument.`,

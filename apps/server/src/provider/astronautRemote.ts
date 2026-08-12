@@ -15,7 +15,11 @@ export function createAstronautSseParser(emit: (event: AstronautEvent) => void) 
     if (data.length === 0) return;
     const raw = data.join("\n");
     let parsed: unknown = raw;
-    try { parsed = JSON.parse(raw); } catch { /* Astronaut normally sends JSON; preserve text. */ }
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      /* Astronaut normally sends JSON; preserve text. */
+    }
     emit({ type: eventName, data: parsed });
     eventName = "message";
     data = [];
@@ -38,24 +42,48 @@ export function createAstronautSseParser(emit: (event: AstronautEvent) => void) 
       boundary = buffer.indexOf("\n\n");
     }
   };
-  const end = () => { if (buffer.trim()) push("\n\n"); };
+  const end = () => {
+    if (buffer.trim()) push("\n\n");
+  };
   return { push, end };
 }
 
-export function astronautChatRequest(url: string, input: { message: string; sessionId?: string; model?: string }) {
+export function astronautChatRequest(
+  url: string,
+  input: { message: string; sessionId?: string; model?: string },
+) {
   return {
     url: `${url.replace(/\/$/, "")}/chat`,
-    init: { method: "POST", headers: { "content-type": "application/json", accept: "text/event-stream" },
-      body: JSON.stringify({ ...input, agent: "companion" }) },
+    init: {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "text/event-stream" },
+      body: JSON.stringify({ ...input, agent: "companion" }),
+    },
   } as const;
 }
 
-export function astronautApprovalReply(url: string, requestId: string, reply: "once" | "always" | "reject") {
-  return { url: `${url.replace(/\/$/, "")}/permission/${encodeURIComponent(requestId)}/reply`,
-    init: { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reply }) } } as const;
+export function astronautApprovalReply(
+  url: string,
+  requestId: string,
+  reply: "once" | "always" | "reject",
+) {
+  return {
+    url: `${url.replace(/\/$/, "")}/permission/${encodeURIComponent(requestId)}/reply`,
+    init: {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ reply }),
+    },
+  } as const;
 }
 
 export function astronautQuestionReply(url: string, requestId: string, answers: string[][]) {
-  return { url: `${url.replace(/\/$/, "")}/question/${encodeURIComponent(requestId)}/reply`,
-    init: { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ answers }) } } as const;
+  return {
+    url: `${url.replace(/\/$/, "")}/question/${encodeURIComponent(requestId)}/reply`,
+    init: {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ answers }),
+    },
+  } as const;
 }

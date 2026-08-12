@@ -1042,23 +1042,38 @@ export const makeCheckCodexProviderStatus = (
 
 export const checkCodexProviderStatus = makeCheckCodexProviderStatus();
 
-export const checkAstronautProviderStatus = (serverUrl: string): Effect.Effect<ServerProviderStatus> =>
+export const checkAstronautProviderStatus = (
+  serverUrl: string,
+): Effect.Effect<ServerProviderStatus> =>
   Effect.tryPromise({
     try: async () => {
       const url = new URL(serverUrl).toString().replace(/\/$/, "");
-      const response = await fetch(`${url}/status`, { signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS) });
+      const response = await fetch(`${url}/status`, {
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
     },
     catch: () => undefined,
   }).pipe(
-    Effect.map((result) => ({
-      provider: ASTRONAUT_PROVIDER,
-      status: result === undefined ? "error" as const : "ready" as const,
-      available: result !== undefined,
-      authStatus: result === undefined ? "unknown" as const : "authenticated" as const,
-      checkedAt: new Date().toISOString(),
-      ...(result === undefined ? { message: "Companion is not reachable at the configured server URL." } : {}),
-    })),
+    // Match on the channel, not on the success value: the probe resolves to void,
+    // so a `result === undefined` test would report "error" even when /status is up.
+    Effect.match({
+      onSuccess: (): ServerProviderStatus => ({
+        provider: ASTRONAUT_PROVIDER,
+        status: "ready",
+        available: true,
+        authStatus: "authenticated",
+        checkedAt: new Date().toISOString(),
+      }),
+      onFailure: (): ServerProviderStatus => ({
+        provider: ASTRONAUT_PROVIDER,
+        status: "error",
+        available: false,
+        authStatus: "unknown",
+        checkedAt: new Date().toISOString(),
+        message: "Companion is not reachable at the configured server URL.",
+      }),
+    }),
   );
 
 // ── Claude Agent health check ───────────────────────────────────────

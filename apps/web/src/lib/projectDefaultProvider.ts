@@ -1,5 +1,6 @@
 import type { ModelSelection, NativeApi, ProviderKind } from "@synara/contracts";
-import { getDefaultModel } from "@synara/shared/model";
+import { PROVIDER_DISPLAY_NAMES } from "@synara/contracts";
+import { getDefaultModel, hasDefaultModel } from "@synara/shared/model";
 
 import { normalizeHiddenProviders, normalizeProviderOrder } from "../providerOrdering";
 
@@ -25,20 +26,23 @@ export async function resolveProjectDefaultModelSelection(input: {
   provider: ProviderKind;
   workspaceRoot: string;
 }): Promise<ModelSelection> {
-  if (input.provider !== "pi") {
+  if (hasDefaultModel(input.provider)) {
     return {
       provider: input.provider,
       model: getDefaultModel(input.provider),
     };
   }
 
+  // Pi and Companion have no hardcoded default: ask the runtime for its catalogue.
   const result = await input.api.provider.listModels({
-    provider: "pi",
+    provider: input.provider,
     cwd: input.workspaceRoot,
   });
   const model = result.models[0]?.slug;
   if (!model) {
-    throw new Error("Pi has no available models for this project.");
+    throw new Error(
+      `${PROVIDER_DISPLAY_NAMES[input.provider]} has no available models for this project.`,
+    );
   }
-  return { provider: "pi", model };
+  return { provider: input.provider, model } as ModelSelection;
 }

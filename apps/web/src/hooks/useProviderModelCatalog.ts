@@ -401,8 +401,8 @@ export function useProviderModelCatalog(input: {
       pi: piDynamicModelsQuery.data?.models ?? [],
     }),
     [
-    antigravityModelsQuery.data?.models,
-    astronautDynamicModelsQuery.data?.models,
+      antigravityModelsQuery.data?.models,
+      astronautDynamicModelsQuery.data?.models,
       claudeDynamicModelsQuery.data?.models,
       codexDynamicModelsQuery.data?.models,
       cursorRuntimeModels,

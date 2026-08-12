@@ -29,12 +29,7 @@ describe("ClaudeAuthRecoveryCard", () => {
 
   it("confirms the login only after Claude reports an authenticated session", () => {
     const complete = renderToStaticMarkup(
-      <ClaudeAuthRecoveryCard
-        status="open"
-        authenticated
-        onOpen={() => {}}
-        onDismiss={() => {}}
-      />,
+      <ClaudeAuthRecoveryCard status="open" authenticated onOpen={() => {}} onDismiss={() => {}} />,
     );
 
     expect(complete).toContain("Login effettuato");

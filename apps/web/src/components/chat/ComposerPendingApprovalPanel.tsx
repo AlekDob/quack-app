@@ -89,8 +89,8 @@ export const ComposerPendingApprovalPanel = function ComposerPendingApprovalPane
     approval.requestKind === "plugin-install"
       ? APPROVAL_ACTIONS.filter((action) => action.decision !== "acceptForSession")
       : approval.sessionApprovalAvailable === false
-      ? APPROVAL_ACTIONS.filter((action) => action.decision !== "acceptForSession")
-      : APPROVAL_ACTIONS;
+        ? APPROVAL_ACTIONS.filter((action) => action.decision !== "acceptForSession")
+        : APPROVAL_ACTIONS;
 
   // Digit shortcuts bubble from focused controls inside this card only; a bare
   // number key elsewhere in the app must never approve a tool request.

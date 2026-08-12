@@ -723,9 +723,10 @@ export function WorkspaceFilePreview(props: WorkspaceFilePreviewProps) {
           cwd: workspaceRoot,
           relativePath: writeRelativePath,
           contents: nextContents,
-          expectedVersion: taskFileDiskVersionRef.current.get(fileKey) ?? current.version,
-          encoding: current.encoding,
-          lineEnding: current.lineEnding,
+          expectedVersion:
+            taskFileDiskVersionRef.current.get(fileKey) ?? current.version ?? undefined,
+          ...(current.encoding ? { encoding: current.encoding } : {}),
+          ...(current.lineEnding ? { lineEnding: current.lineEnding } : {}),
         });
         taskFileDiskVersionRef.current.set(fileKey, result.version);
         queryClient.setQueryData<ProjectReadFileResult>(options.queryKey, (cached) =>

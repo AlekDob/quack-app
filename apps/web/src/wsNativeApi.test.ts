@@ -326,6 +326,12 @@ describe("wsNativeApi", () => {
             customModels: [],
           },
           pi: { enabled: true, binaryPath: "pi", agentDir: "", customModels: [] },
+          astronaut: {
+            enabled: true,
+            binaryPath: "",
+            serverUrl: "http://companion.local:4567",
+            customModels: [],
+          },
         },
         skills: { disabled: [] },
       },

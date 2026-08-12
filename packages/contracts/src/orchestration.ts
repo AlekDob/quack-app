@@ -7,6 +7,7 @@ import {
   DroidModelOptions,
   GrokModelOptions,
   OpenCodeModelOptions,
+  AstronautModelOptions,
   PiModelOptions,
 } from "./model";
 import { ProviderMentionReference, ProviderSkillReference } from "./providerDiscovery";
@@ -148,6 +149,7 @@ export type PiModelSelection = typeof PiModelSelection.Type;
 export const AstronautModelSelection = Schema.Struct({
   provider: Schema.Literal("astronaut"),
   model: TrimmedNonEmptyString,
+  options: Schema.optional(AstronautModelOptions),
 });
 export type AstronautModelSelection = typeof AstronautModelSelection.Type;
 

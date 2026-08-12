@@ -62,10 +62,11 @@ import {
   shouldRenderTerminalWorkspace,
   worktreeSetupHasError,
 } from "./ChatView.logic";
+import type { WorkLogEntry } from "../session-logic";
 
 describe("composer strip work-log derivation", () => {
   it("reuses the active derivation unless a subagent view needs its parent source", () => {
-    const activeWorkLogEntries = [];
+    const activeWorkLogEntries: WorkLogEntry[] = [];
     const deriveParentWorkLogEntries = vi.fn(() => []);
 
     expect(

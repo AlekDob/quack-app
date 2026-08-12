@@ -15,21 +15,21 @@ tags: [device, ios, simulator, dock-pane, agent-gateway, webcodecs]
 
 ### Files
 
-| Type      | Path                                             | Exports/Purpose                                                    |
-| --------- | ------------------------------------------------ | ------------------------------------------------------------------ |
-| Contracts | `packages/contracts/src/device.ts`               | Device schemas, `ThreadDeviceState`, frame envelope                |
-| Contracts | `packages/contracts/src/rpc.ts`, `ws.ts`         | The 17 device RPC methods and WS channels                          |
+| Type      | Path                                             | Exports/Purpose                                                     |
+| --------- | ------------------------------------------------ | ------------------------------------------------------------------- |
+| Contracts | `packages/contracts/src/device.ts`               | Device schemas, `ThreadDeviceState`, frame envelope                 |
+| Contracts | `packages/contracts/src/rpc.ts`, `ws.ts`         | The 17 device RPC methods and WS channels                           |
 | Server    | `apps/server/src/device/DeviceManager.ts`        | Thread-scoped attachment, versioned state, boot cap, shutdown rules |
-| Server    | `apps/server/src/device/IosSimulatorBackend.ts`  | Drives simulators through `simctl` + the native helper             |
-| Server    | `apps/server/src/device/FakeDeviceBackend.ts`    | Deterministic backend for tests                                    |
-| Server    | `apps/server/src/device/helperClient.ts`         | JSON-RPC over stdio + frame socket to the helper                   |
-| Server    | `apps/server/src/device/deviceFrameTransport.ts` | Fans encoded frames to WS clients, bounded queues                  |
-| Server    | `apps/server/src/agentGateway/deviceTools.ts`    | The 11 `device_*` MCP tools                                        |
-| Native    | `apps/server/native/device-helper/`              | Swift/ObjC helper; built on the user's Xcode via `build.sh`        |
-| Web       | `apps/web/src/components/DevicePanel.tsx`        | The pane                                                           |
-| Web       | `apps/web/src/components/DevicePanel.logic.ts`   | Frame gate, canvas→device mapping, gesture classification          |
-| Web       | `apps/web/src/components/device/DeviceFrame.tsx` | WebCodecs decoder + canvas                                         |
-| Web       | `apps/web/src/deviceStateStore.ts`               | Version-gated per-thread device state                              |
+| Server    | `apps/server/src/device/IosSimulatorBackend.ts`  | Drives simulators through `simctl` + the native helper              |
+| Server    | `apps/server/src/device/FakeDeviceBackend.ts`    | Deterministic backend for tests                                     |
+| Server    | `apps/server/src/device/helperClient.ts`         | JSON-RPC over stdio + frame socket to the helper                    |
+| Server    | `apps/server/src/device/deviceFrameTransport.ts` | Fans encoded frames to WS clients, bounded queues                   |
+| Server    | `apps/server/src/agentGateway/deviceTools.ts`    | The 11 `device_*` MCP tools                                         |
+| Native    | `apps/server/native/device-helper/`              | Swift/ObjC helper; built on the user's Xcode via `build.sh`         |
+| Web       | `apps/web/src/components/DevicePanel.tsx`        | The pane                                                            |
+| Web       | `apps/web/src/components/DevicePanel.logic.ts`   | Frame gate, canvas→device mapping, gesture classification           |
+| Web       | `apps/web/src/components/device/DeviceFrame.tsx` | WebCodecs decoder + canvas                                          |
+| Web       | `apps/web/src/deviceStateStore.ts`               | Version-gated per-thread device state                               |
 
 ### Data Flow
 
@@ -46,7 +46,7 @@ tags: [device, ios, simulator, dock-pane, agent-gateway, webcodecs]
 
 ### Platform gate
 
-macOS only, and specifically a macOS *server* — the pane works fine in a plain browser tab as long as there's a Mac on the other end. The add-menu entry and the `device.toggle` shortcut only light up when the server reports `darwin`.
+macOS only, and specifically a macOS _server_ — the pane works fine in a plain browser tab as long as there's a Mac on the other end. The add-menu entry and the `device.toggle` shortcut only light up when the server reports `darwin`.
 
 The helper is not shipped as a binary. Source lives in-repo and compiles with the user's own Xcode, because the private API surface moves with the toolchain. The build is cached under `~/Library/Caches/synara/device-helper/<xcode-build>/`.
 

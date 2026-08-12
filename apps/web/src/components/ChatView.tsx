@@ -615,6 +615,7 @@ import {
   shouldRenderProviderHealthBanner,
   resolveRuntimeModeAfterApprovalDecision,
   revokeBlobPreviewUrl,
+  savePaperoInstructionsFailure,
   revokeUserMessagePreviewUrls,
 } from "./ChatView.logic";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
@@ -1838,6 +1839,7 @@ export default function ChatView({
       kilo: resolveHint("kilo"),
       opencode: resolveHint("opencode"),
       pi: resolveHint("pi"),
+      astronaut: resolveHint("astronaut"),
     };
   }, [
     activeProject?.defaultModelSelection,
@@ -3154,6 +3156,9 @@ export default function ChatView({
   const claudeAuthRecoveryUnavailableReason = threadWorkspaceCwd
     ? null
     : "This thread has no working directory, so Quack cannot open a login terminal.";
+  // Read off the thread before the callback: React Compiler infers `activeThread` as
+  // the dependency and refuses to preserve a manual list naming the narrower property.
+  const claudeAuthRecoveryWorktreePath = activeThread?.worktreePath ?? null;
   const openClaudeAuthRecovery = useCallback(async () => {
     if (
       !activeThreadId ||
@@ -3192,7 +3197,7 @@ export default function ChatView({
         project: { cwd: activeProject.cwd },
         cwd: threadWorkspaceCwd,
         command: CLAUDE_AUTH_LOGIN_COMMAND,
-        worktreePath: activeThread?.worktreePath ?? null,
+        worktreePath: claudeAuthRecoveryWorktreePath,
       });
       storeSetTerminalMetadata(activeThreadId, terminalId, {
         cliKind: "claude",
@@ -3203,20 +3208,19 @@ export default function ChatView({
         [claudeAuthRecoveryKey]: { status: "open", terminalId, error: null },
       }));
     } catch (error) {
+      // Hoisted out of the updater: a value block read inside a closure declared in
+      // `catch` trips a React Compiler invariant — see chatHotPath.compiler.test.ts.
+      const message = error instanceof Error ? error.message : "Could not open the login terminal.";
       setClaudeAuthRecoveryStates((states) => ({
         ...states,
-        [claudeAuthRecoveryKey]: {
-          status: "failed",
-          terminalId: null,
-          error: error instanceof Error ? error.message : "Could not open the login terminal.",
-        },
+        [claudeAuthRecoveryKey]: { status: "failed", terminalId: null, error: message },
       }));
     }
   }, [
     activeProject,
-    activeThread?.worktreePath,
     activeThreadId,
     claudeAuthRecoveryKey,
+    claudeAuthRecoveryWorktreePath,
     claudeAuthRecoveryStates,
     hasClaudeAuthRecovery,
     requestTerminalFocus,
@@ -5959,24 +5963,25 @@ export default function ChatView({
 
   const onSavePaperoInstructions = useCallback(
     async (paperoId: PaperoId, instructions: string) => {
-      try {
-        const saved = await writePaperoInstructions(paperoId, instructions);
-        if (!saved) {
-          throw new Error("This agent is no longer present in the active Team roster.");
-        }
-        const definition = resolvePaperoFromRoster(paperoId);
-        toastManager.add({
-          type: "success",
-          title: "Instructions saved",
-          description: `${definition.label} will use these from the next message`,
-        });
-      } catch (error) {
+      const failure = await savePaperoInstructionsFailure(
+        writePaperoInstructions,
+        paperoId,
+        instructions,
+      );
+      if (failure) {
         toastManager.add({
           type: "error",
           title: "Could not save instructions",
-          description: error instanceof Error ? error.message : "Team update failed.",
+          description: failure,
         });
+        return;
       }
+      const definition = resolvePaperoFromRoster(paperoId);
+      toastManager.add({
+        type: "success",
+        title: "Instructions saved",
+        description: `${definition.label} will use these from the next message`,
+      });
     },
     [resolvePaperoFromRoster, writePaperoInstructions],
   );
