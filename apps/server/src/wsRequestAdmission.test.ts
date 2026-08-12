@@ -2,7 +2,11 @@ import { ORCHESTRATION_WS_METHODS, WS_METHODS } from "@synara/contracts";
 import { Deferred, Effect, Fiber } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { classifyWsRequest, makeWsRequestAdmission } from "./wsRequestAdmission";
+import {
+  classifyWsRequest,
+  makeWsRequestAdmission,
+  WS_REQUEST_CLASS_LIMITS,
+} from "./wsRequestAdmission";
 
 describe("WsRequestAdmission", () => {
   it("keeps lightweight shell reads out of the expensive lane", () => {
@@ -20,8 +24,17 @@ describe("WsRequestAdmission", () => {
     await Effect.runPromise(
       Effect.gen(function* () {
         const admission = yield* makeWsRequestAdmission;
-        const first = yield* admission.acquire(1, ORCHESTRATION_WS_METHODS.getSnapshot);
-        const second = yield* admission.acquire(1, WS_METHODS.statsGetProfileStats);
+        expect(WS_REQUEST_CLASS_LIMITS["expensive-read"]).toBe(10);
+        const leases = yield* Effect.all(
+          Array.from({ length: WS_REQUEST_CLASS_LIMITS["expensive-read"] }, (_, index) =>
+            admission.acquire(
+              1,
+              index % 2 === 0
+                ? ORCHESTRATION_WS_METHODS.getSnapshot
+                : WS_METHODS.statsGetProfileStats,
+            ),
+          ),
+        );
         const rejected = yield* admission
           .acquire(1, WS_METHODS.gitReadWorkingTreeDiff)
           .pipe(Effect.exit);
@@ -33,14 +46,12 @@ describe("WsRequestAdmission", () => {
 
         const control = yield* admission.acquire(1, WS_METHODS.terminalAckOutput);
         expect(control.requestClass).toBe("control");
-        yield* admission.release(first);
-        yield* admission.release(first);
-        yield* admission.release(second);
+        yield* Effect.forEach(leases, admission.release);
         yield* admission.release(control);
         expect(yield* admission.snapshot).toMatchObject({
           active: 0,
-          admittedTotal: 3,
-          releasedTotal: 3,
+          admittedTotal: WS_REQUEST_CLASS_LIMITS["expensive-read"] + 1,
+          releasedTotal: WS_REQUEST_CLASS_LIMITS["expensive-read"] + 1,
           rejectedTotal: 1,
         });
       }),

@@ -8,7 +8,9 @@ export type WsRequestClass = "control" | "standard" | "expensive-read";
 export const WS_REQUEST_CLASS_LIMITS: Readonly<Record<WsRequestClass, number>> = {
   control: 16,
   standard: 12,
-  "expensive-read": 2,
+  // File previews and provider discovery run alongside background prefetches.
+  // Two slots makes a normal user action fail whenever those overlap.
+  "expensive-read": 10,
 };
 
 const CONTROL_METHODS = new Set<string>([
